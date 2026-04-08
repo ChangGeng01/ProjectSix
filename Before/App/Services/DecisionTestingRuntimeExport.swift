@@ -128,6 +128,10 @@ struct DecisionTestingRuntimeExport {
             lowPressureModelCallRateByKind: intelligenceTelemetry.lowPressureModelCallRateByKind,
             avoidableModelCallRate: intelligenceTelemetry.avoidableModelCallRate,
             avoidableModelCallRateByKind: intelligenceTelemetry.avoidableModelCallRateByKind,
+            reminderRequestCount: intelligenceTelemetry.requestCountByKind[.reminder] ?? 0,
+            reminderKnowledgeNeedRate: intelligenceTelemetry.reminderKnowledgeNeedRate,
+            reminderControlOnlyRate: intelligenceTelemetry.reminderControlOnlyRate,
+            reminderRetrievalBypassRate: intelligenceTelemetry.reminderRetrievalBypassRate,
             deterministicFallbackRate: intelligenceTelemetry.deterministicFallbackRate,
             averageRequestDurationMs: intelligenceTelemetry.averageRequestDurationMs,
             averageRequestDurationMsByKind: intelligenceTelemetry.averageRequestDurationMsByKind,
@@ -379,6 +383,10 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let lowPressureModelCallRateByKind: [DecisionIntelligenceTraceKind: Double]
     let avoidableModelCallRate: Double
     let avoidableModelCallRateByKind: [DecisionIntelligenceTraceKind: Double]
+    let reminderRequestCount: Int
+    let reminderKnowledgeNeedRate: Double
+    let reminderControlOnlyRate: Double
+    let reminderRetrievalBypassRate: Double
     let deterministicFallbackRate: Double
     let averageRequestDurationMs: Double
     let averageRequestDurationMsByKind: [DecisionIntelligenceTraceKind: Double]

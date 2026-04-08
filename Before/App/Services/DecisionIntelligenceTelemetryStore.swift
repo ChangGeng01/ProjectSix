@@ -22,6 +22,8 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
     let gemmaBackendDurationTotalMs: [InferenceBackendKind: Double]
     let admissionSkipCountByReason: [DecisionIntelligenceAdmissionSkipReason: Int]
     let admissionSkipCountByReasonAndKind: [DecisionIntelligenceAdmissionSkipReason: [DecisionIntelligenceTraceKind: Int]]
+    let reminderSelectionNeedCount: [ReminderSelectionNeed: Int]
+    let reminderSelectionNeedCountByKind: [ReminderSelectionNeed: [DecisionIntelligenceTraceKind: Int]]
     let promptPressureCount: [DecisionIntelligencePromptPressure: Int]
     let promptCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int]
     let prefixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int]
@@ -220,6 +222,32 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
         )
     }
 
+    var reminderKnowledgeNeedRate: Double {
+        rate(
+            numerator: reminderSelectionNeedCount[.knowledge] ?? 0,
+            denominator: requestCountByKind[.reminder] ?? 0
+        )
+    }
+
+    var reminderControlOnlyRate: Double {
+        rate(
+            numerator: reminderSelectionNeedCount[.control] ?? 0,
+            denominator: requestCountByKind[.reminder] ?? 0
+        )
+    }
+
+    var reminderRetrievalBypassRate: Double {
+        rate(
+            numerator: reminderRetrievalBypassCount,
+            denominator: requestCountByKind[.reminder] ?? 0
+        )
+    }
+
+    var reminderRetrievalBypassCount: Int {
+        (admissionSkipCountByReason[.insufficientReminderChoice] ?? 0)
+            + (admissionSkipCountByReason[.retrievalNotNeeded] ?? 0)
+    }
+
     var slowRequestRate: Double {
         rate(
             numerator: slowRequestCountByKind.values.reduce(0, +),
@@ -279,6 +307,8 @@ actor DecisionIntelligenceTelemetryStore {
     private var gemmaBackendDurationTotalMs: [InferenceBackendKind: Double] = [:]
     private var admissionSkipCountByReason: [DecisionIntelligenceAdmissionSkipReason: Int] = [:]
     private var admissionSkipCountByReasonAndKind: [DecisionIntelligenceAdmissionSkipReason: [DecisionIntelligenceTraceKind: Int]] = [:]
+    private var reminderSelectionNeedCount: [ReminderSelectionNeed: Int] = [:]
+    private var reminderSelectionNeedCountByKind: [ReminderSelectionNeed: [DecisionIntelligenceTraceKind: Int]] = [:]
     private var promptPressureCount: [DecisionIntelligencePromptPressure: Int] = [:]
     private var promptCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int] = [:]
     private var prefixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int] = [:]
@@ -351,6 +381,12 @@ actor DecisionIntelligenceTelemetryStore {
             if outcome == .providerSuccess, admissionDecision.pressure == .low {
                 lowPressureModelCallCountByKind[kind, default: 0] += 1
             }
+            if let reminderSelectionNeed = admissionDecision.reminderSelectionNeed {
+                reminderSelectionNeedCount[reminderSelectionNeed, default: 0] += 1
+                var countsForNeed = reminderSelectionNeedCountByKind[reminderSelectionNeed, default: [:]]
+                countsForNeed[kind, default: 0] += 1
+                reminderSelectionNeedCountByKind[reminderSelectionNeed] = countsForNeed
+            }
             if let skipReason = admissionDecision.skipReason {
                 admissionSkipCountByReason[skipReason, default: 0] += 1
                 var countsForReason = admissionSkipCountByReasonAndKind[skipReason, default: [:]]
@@ -380,6 +416,8 @@ actor DecisionIntelligenceTelemetryStore {
             gemmaBackendDurationTotalMs: gemmaBackendDurationTotalMs,
             admissionSkipCountByReason: admissionSkipCountByReason,
             admissionSkipCountByReasonAndKind: admissionSkipCountByReasonAndKind,
+            reminderSelectionNeedCount: reminderSelectionNeedCount,
+            reminderSelectionNeedCountByKind: reminderSelectionNeedCountByKind,
             promptPressureCount: promptPressureCount,
             promptCharactersTotalByKind: promptCharactersTotalByKind,
             prefixCharactersTotalByKind: prefixCharactersTotalByKind,
@@ -404,6 +442,8 @@ actor DecisionIntelligenceTelemetryStore {
         gemmaBackendDurationTotalMs.removeAll()
         admissionSkipCountByReason.removeAll()
         admissionSkipCountByReasonAndKind.removeAll()
+        reminderSelectionNeedCount.removeAll()
+        reminderSelectionNeedCountByKind.removeAll()
         promptPressureCount.removeAll()
         promptCharactersTotalByKind.removeAll()
         prefixCharactersTotalByKind.removeAll()

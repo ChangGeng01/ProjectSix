@@ -158,7 +158,15 @@ enum DecisionIntelligenceCoordinator {
         }
 
         let ranked = ReminderSelectionPolicy.ranked(reminders: reminders.filter { $0.scenario == scenario })
-        let candidates = ranked.map { ReminderSelectionCandidate(id: $0.id, content: $0.content) }
+        let candidates = ranked.enumerated().map { index, reminder in
+            ReminderSelectionCandidate(
+                id: reminder.id,
+                content: reminder.content,
+                rank: index,
+                source: reminder.source,
+                useCount: reminder.useCount
+            )
+        }
 
         guard let selected = await DecisionIntelligenceProviderPipeline.pickReminder(
             from: candidates,

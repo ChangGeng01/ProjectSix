@@ -95,4 +95,47 @@ final class DecisionIntelligenceTelemetryStoreTests: XCTestCase {
         XCTAssertEqual(snapshot.avoidableModelCallRateByKind[.balance] ?? 0, 0, accuracy: 0.0001)
         XCTAssertEqual(snapshot.admissionSkipCountByReasonAndKind[.templateAlreadySufficient]?[.quick], 1)
     }
+
+    func testSnapshotTracksReminderKnowledgeAndControlNeed() async {
+        let store = DecisionIntelligenceTelemetryStore()
+
+        await store.record(
+            kind: .reminder,
+            outcome: .admissionSkipped,
+            activeProvider: nil,
+            attemptedProviders: [],
+            usedFallback: false,
+            durationMs: 18,
+            admissionDecision: DecisionIntelligenceAdmissionDecision(
+                isAllowed: false,
+                pressure: .low,
+                reason: "Deterministic leader is already clear.",
+                skipReason: .retrievalNotNeeded,
+                reminderSelectionNeed: .control
+            )
+        )
+        await store.record(
+            kind: .reminder,
+            outcome: .providerSuccess,
+            activeProvider: .gemmaE4B,
+            attemptedProviders: [.gemmaE4B],
+            usedFallback: false,
+            durationMs: 130,
+            admissionDecision: DecisionIntelligenceAdmissionDecision(
+                isAllowed: true,
+                pressure: .elevated,
+                reason: "Prompt creates real candidate conflict.",
+                skipReason: nil,
+                reminderSelectionNeed: .knowledge
+            )
+        )
+
+        let snapshot = await store.snapshot()
+
+        XCTAssertEqual(snapshot.reminderSelectionNeedCount[.control], 1)
+        XCTAssertEqual(snapshot.reminderSelectionNeedCount[.knowledge], 1)
+        XCTAssertEqual(snapshot.reminderKnowledgeNeedRate, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.reminderControlOnlyRate, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.reminderRetrievalBypassRate, 0.5, accuracy: 0.0001)
+    }
 }

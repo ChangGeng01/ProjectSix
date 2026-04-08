@@ -497,6 +497,38 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
     }
 
     @MainActor
+    func testReminderAdmissionSkipsWhenDeterministicLeaderIsAlreadyClear() async {
+        let selected = await DecisionIntelligenceProviderPipeline.pickReminder(
+            from: [
+                ReminderSelectionCandidate(id: UUID(), content: "This is stress shopping again."),
+                ReminderSelectionCandidate(id: UUID(), content: "You already knew this was a real replacement.", rank: 1)
+            ],
+            scenario: .buy,
+            prompt: "This is stress shopping again tonight.",
+            mode: .quick,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertNil(selected)
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertEqual(snapshot.outcomeCount[.admissionSkipped], 1)
+        XCTAssertEqual(snapshot.admissionSkipCountByReason[.retrievalNotNeeded], 1)
+        XCTAssertEqual(snapshot.reminderControlOnlyRate, 1, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.reminderRetrievalBypassRate, 1, accuracy: 0.0001)
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected an admission-skip trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .reminder)
+        XCTAssertEqual(latestTrace.admissionDecision?.skipReason, .retrievalNotNeeded)
+        XCTAssertEqual(latestTrace.admissionDecision?.reminderSelectionNeed, .control)
+    }
+
+    @MainActor
     func testTestingStubBypassesAdmissionSkipForBalanceRefinement() async {
         let base = BalanceBoardResult(
             headline: "Base headline",

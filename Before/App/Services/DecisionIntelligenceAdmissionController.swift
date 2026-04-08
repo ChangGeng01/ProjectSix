@@ -11,6 +11,7 @@ enum DecisionIntelligenceAdmissionSkipReason: String, CaseIterable, Sendable {
     case budgetExceeded
     case prefillPressureTooHigh
     case insufficientReminderChoice
+    case retrievalNotNeeded
     case templateAlreadySufficient
     case insufficientSourceMaterial
 }
@@ -20,6 +21,21 @@ struct DecisionIntelligenceAdmissionDecision: Equatable, Sendable {
     let pressure: DecisionIntelligencePromptPressure
     let reason: String
     let skipReason: DecisionIntelligenceAdmissionSkipReason?
+    let reminderSelectionNeed: ReminderSelectionNeed?
+
+    init(
+        isAllowed: Bool,
+        pressure: DecisionIntelligencePromptPressure,
+        reason: String,
+        skipReason: DecisionIntelligenceAdmissionSkipReason?,
+        reminderSelectionNeed: ReminderSelectionNeed? = nil
+    ) {
+        self.isAllowed = isAllowed
+        self.pressure = pressure
+        self.reason = reason
+        self.skipReason = skipReason
+        self.reminderSelectionNeed = reminderSelectionNeed
+    }
 }
 
 enum DecisionIntelligenceAdmissionController {
@@ -36,7 +52,8 @@ enum DecisionIntelligenceAdmissionController {
 
     static func decide(
         for envelope: DecisionIntelligencePromptContract.PromptEnvelope,
-        reminderCandidateCount: Int? = nil
+        reminderCandidateCount: Int? = nil,
+        reminderSelectionAssessment: ReminderSelectionAssessment? = nil
     ) -> DecisionIntelligenceAdmissionDecision {
         let pressure = promptPressure(for: envelope.budget)
 
@@ -44,8 +61,9 @@ enum DecisionIntelligenceAdmissionController {
             return DecisionIntelligenceAdmissionDecision(
                 isAllowed: false,
                 pressure: pressure,
-                reason: "Reminder selection stayed deterministic because there was not enough choice spread to justify a model pass.",
-                skipReason: .insufficientReminderChoice
+                reason: reminderSelectionAssessment?.reason ?? "Reminder selection stayed deterministic because there was not enough choice spread to justify a model pass.",
+                skipReason: .insufficientReminderChoice,
+                reminderSelectionNeed: reminderSelectionAssessment?.need ?? .control
             )
         }
 
@@ -71,12 +89,23 @@ enum DecisionIntelligenceAdmissionController {
                 )
             }
         case .reminder:
-            if pressure == .high || pressure == .severe {
+            if let reminderSelectionAssessment, reminderSelectionAssessment.need == .control {
                 return DecisionIntelligenceAdmissionDecision(
                     isAllowed: false,
                     pressure: pressure,
-                    reason: "Reminder selection stayed deterministic because the prefill pressure is already high and the ranked list is the safer low-cost path.",
-                    skipReason: .prefillPressureTooHigh
+                    reason: reminderSelectionAssessment.reason,
+                    skipReason: .retrievalNotNeeded,
+                    reminderSelectionNeed: reminderSelectionAssessment.need
+                )
+            }
+
+            if pressure == .severe {
+                return DecisionIntelligenceAdmissionDecision(
+                    isAllowed: false,
+                    pressure: pressure,
+                    reason: "Reminder selection stayed deterministic because the prompt crossed the safe prefill ceiling for an on-device reminder pass.",
+                    skipReason: .prefillPressureTooHigh,
+                    reminderSelectionNeed: reminderSelectionAssessment?.need
                 )
             }
         case .balance, .mirror:
@@ -104,7 +133,8 @@ enum DecisionIntelligenceAdmissionController {
             isAllowed: true,
             pressure: pressure,
             reason: "Admission controller allowed the model pass because the structured prompt stayed inside the current prefill budget.",
-            skipReason: nil
+            skipReason: nil,
+            reminderSelectionNeed: reminderSelectionAssessment?.need
         )
     }
 

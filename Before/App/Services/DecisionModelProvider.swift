@@ -33,4 +33,21 @@ struct DecisionModelRuntimeStatus: Equatable, Sendable {
 struct ReminderSelectionCandidate: Equatable, Identifiable, Sendable {
     let id: UUID
     let content: String
+    let rank: Int
+    let source: ReminderSourceType
+    let useCount: Int
+
+    init(
+        id: UUID,
+        content: String,
+        rank: Int = 0,
+        source: ReminderSourceType = .template,
+        useCount: Int = 0
+    ) {
+        self.id = id
+        self.content = content
+        self.rank = rank
+        self.source = source
+        self.useCount = useCount
+    }
 }

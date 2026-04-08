@@ -839,6 +839,12 @@ enum DecisionIntelligenceProviderPipeline {
         let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: selection.prompt)
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: selection.prompt)
         let clippedCandidates = selection.candidates
+        let reminderSelectionAssessment = ReminderSelectionPolicy.assessSelectionNeed(
+            candidates: clippedCandidates,
+            scenario: scenario,
+            prompt: prompt,
+            mode: mode
+        )
         guard !clippedCandidates.isEmpty else { return nil }
         guard preference != .template else {
             await recordTelemetry(
@@ -856,7 +862,8 @@ enum DecisionIntelligenceProviderPipeline {
             _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: selection.prompt)
         } ?? DecisionIntelligenceAdmissionController.decide(
             for: selection.prompt,
-            reminderCandidateCount: clippedCandidates.count
+            reminderCandidateCount: clippedCandidates.count,
+            reminderSelectionAssessment: reminderSelectionAssessment
         )
         guard admissionDecision.isAllowed else {
             await recordTelemetry(

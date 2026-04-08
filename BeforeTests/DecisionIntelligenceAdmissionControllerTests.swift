@@ -105,6 +105,64 @@ final class DecisionIntelligenceAdmissionControllerTests: XCTestCase {
         XCTAssertEqual(decision.skipReason, .insufficientReminderChoice)
     }
 
+    func testReminderAdmissionSkipsWhenTheRankedLeaderIsAlreadyClearEnough() {
+        let candidates = [
+            ReminderSelectionCandidate(id: UUID(), content: "This is stress shopping again."),
+            ReminderSelectionCandidate(id: UUID(), content: "You already knew this was a real replacement.", rank: 1)
+        ]
+        let selection = DecisionIntelligencePromptContract.reminderSelectionEnvelope(
+            candidates: candidates,
+            scenario: .buy,
+            prompt: "This is stress shopping again tonight.",
+            mode: .quick
+        )
+        let assessment = ReminderSelectionPolicy.assessSelectionNeed(
+            candidates: selection.candidates,
+            scenario: .buy,
+            prompt: "This is stress shopping again tonight.",
+            mode: .quick
+        )
+
+        let decision = DecisionIntelligenceAdmissionController.decide(
+            for: selection.prompt,
+            reminderCandidateCount: selection.candidates.count,
+            reminderSelectionAssessment: assessment
+        )
+
+        XCTAssertFalse(decision.isAllowed)
+        XCTAssertEqual(decision.skipReason, .retrievalNotNeeded)
+        XCTAssertEqual(decision.reminderSelectionNeed, .control)
+    }
+
+    func testReminderAdmissionAllowsWhenKnowledgeNeedIsReal() {
+        let candidates = [
+            ReminderSelectionCandidate(id: UUID(), content: "Stress shopping."),
+            ReminderSelectionCandidate(id: UUID(), content: "Real replacement.", rank: 1)
+        ]
+        let selection = DecisionIntelligencePromptContract.reminderSelectionEnvelope(
+            candidates: candidates,
+            scenario: .buy,
+            prompt: "Stress shopping or real replacement?",
+            mode: .quick
+        )
+        let assessment = ReminderSelectionPolicy.assessSelectionNeed(
+            candidates: selection.candidates,
+            scenario: .buy,
+            prompt: "Stress shopping or real replacement?",
+            mode: .quick
+        )
+
+        let decision = DecisionIntelligenceAdmissionController.decide(
+            for: selection.prompt,
+            reminderCandidateCount: selection.candidates.count,
+            reminderSelectionAssessment: assessment
+        )
+
+        XCTAssertTrue(decision.isAllowed)
+        XCTAssertNil(decision.skipReason)
+        XCTAssertEqual(decision.reminderSelectionNeed, .knowledge)
+    }
+
     func testBalanceAdmissionSkipsWhenThereIsNotEnoughOpenTextMaterial() {
         let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(
             base: BalanceBoardResult(
