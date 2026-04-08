@@ -73,9 +73,15 @@ struct QuickCheckView: View {
                         }
 
                         BeforeActionButton("Show me the call", isEnabled: session.canEvaluate) {
-                            session.evaluate()
+                            Task {
+                                await session.evaluateWithIntelligence(preferences: appModel.preferences)
+                            }
                         }
                         .disabled(!session.canEvaluate)
+
+                        if session.isRefiningWithModel {
+                            refiningHint
+                        }
                     }
                     .padding(20)
                 }
@@ -107,6 +113,17 @@ struct QuickCheckView: View {
                 }
             }
         }
+    }
+
+    private var refiningHint: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .tint(BeforeTheme.ember)
+            Text("Refining the language locally…")
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 4)
     }
 }
 

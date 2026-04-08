@@ -7,6 +7,10 @@ struct ResultView: View {
     let result: QuickCheckResult
     @State private var reminderText: String?
 
+    private var displayedResult: QuickCheckResult {
+        session.result ?? result
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -15,10 +19,20 @@ struct ResultView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         SectionHeader(
-                            eyebrow: result.verdict.title,
-                            title: result.verdict.summary,
+                            eyebrow: displayedResult.verdict.title,
+                            title: displayedResult.verdict.summary,
                             subtitle: "One honest view of now. One honest view of after."
                         )
+
+                        if session.isRefiningWithModel {
+                            HStack(spacing: 10) {
+                                ProgressView()
+                                    .tint(BeforeTheme.ember)
+                                Text("Tightening the language on-device…")
+                                    .font(.footnote.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
 
                         if let reminderText {
                             PanelCard {
@@ -36,7 +50,7 @@ struct ResultView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 Label("Current perspective", systemImage: "bolt.horizontal.fill")
                                     .font(.headline)
-                                Text(result.currentPerspective)
+                                Text(displayedResult.currentPerspective)
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -45,29 +59,29 @@ struct ResultView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 Label("After perspective", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
                                     .font(.headline)
-                                Text(result.afterPerspective)
+                                Text(displayedResult.afterPerspective)
                                     .foregroundStyle(.secondary)
                             }
                         }
 
                         VStack(spacing: 12) {
-                            BeforeActionButton(result.primaryAction.title(using: appModel.preferences.quickBufferDuration)) {
-                                Task { await handleAction(result.primaryAction) }
+                            BeforeActionButton(displayedResult.primaryAction.title(using: appModel.preferences.quickBufferDuration)) {
+                                Task { await handleAction(displayedResult.primaryAction) }
                             }
 
-                            ForEach(result.secondaryActions) { action in
+                            ForEach(displayedResult.secondaryActions) { action in
                                 BeforeActionButton(action.title(using: appModel.preferences.quickBufferDuration), style: .secondary) {
                                     Task { await handleAction(action) }
                                 }
                             }
 
                             BeforeActionButton("Ask for support", style: .tertiary) {
-                                appModel.sendQuickSessionToSupport(session, result: result)
+                                appModel.sendQuickSessionToSupport(session, result: displayedResult)
                                 dismiss()
                             }
 
                             BeforeActionButton("Move this to Shared Life", style: .tertiary) {
-                                appModel.sendQuickSessionToSharedLife(session, result: result)
+                                appModel.sendQuickSessionToSharedLife(session, result: displayedResult)
                                 dismiss()
                             }
                         }

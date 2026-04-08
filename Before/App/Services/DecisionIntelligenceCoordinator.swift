@@ -61,4 +61,31 @@ enum DecisionIntelligenceCoordinator {
 
         return ranked.first(where: { $0.content == selected }) ?? ranked.first
     }
+
+    static func refineQuickResult(
+        base: QuickCheckResult,
+        input: QuickCheckInput,
+        preferences: BeforePreferences = BeforePreferencesStore.load()
+    ) async -> QuickCheckResult? {
+        guard preferences.onDeviceIntelligenceMode.isEnabled else { return nil }
+        return await FoundationModelsIntelligenceService.refineQuickResult(base: base, input: input)
+    }
+
+    static func refineBalanceResult(
+        base: BalanceBoardResult,
+        input: BalanceBoardInput,
+        preferences: BeforePreferences = BeforePreferencesStore.load()
+    ) async -> BalanceBoardResult? {
+        guard preferences.onDeviceIntelligenceMode.isEnabled else { return nil }
+        return await FoundationModelsIntelligenceService.refineBalanceResult(base: base, input: input)
+    }
+
+    static func refineMirrorResult(
+        base: MirrorResult,
+        input: MirrorInput,
+        preferences: BeforePreferences = BeforePreferencesStore.load()
+    ) async -> MirrorResult? {
+        guard preferences.onDeviceIntelligenceMode.isEnabled else { return nil }
+        return await FoundationModelsIntelligenceService.refineMirrorResult(base: base, input: input)
+    }
 }

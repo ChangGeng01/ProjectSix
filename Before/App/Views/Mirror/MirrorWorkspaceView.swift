@@ -39,11 +39,23 @@ struct MirrorWorkspaceView: View {
                         revisitCueCard
 
                         BeforeActionButton(session.result == nil ? "Reflect it back" : "Reflect it back again", isEnabled: session.canEvaluate) {
-                            session.evaluate()
+                            Task {
+                                await session.evaluateWithIntelligence(preferences: appModel.preferences)
+                            }
                         }
                         .disabled(!session.canEvaluate)
 
                         if let result = session.result {
+                            if session.isRefiningWithModel {
+                                HStack(spacing: 10) {
+                                    ProgressView()
+                                        .tint(BeforeTheme.ember)
+                                    Text("Clarifying the mirror on-device…")
+                                        .font(.footnote.weight(.medium))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
                             resultCard(result)
                             actionCard()
                         }

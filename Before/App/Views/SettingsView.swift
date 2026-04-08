@@ -73,6 +73,12 @@ struct SettingsView: View {
                     Text(appModel.preferences.onDeviceIntelligenceMode.subtitle)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+
+                    LabeledContent("Foundation Model", value: appModel.onDeviceModelStatus.title)
+
+                    Text(appModel.onDeviceModelStatus.detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("System surfaces") {

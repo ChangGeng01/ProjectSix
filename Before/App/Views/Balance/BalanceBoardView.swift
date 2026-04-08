@@ -69,11 +69,23 @@ struct BalanceBoardView: View {
                         )
 
                         BeforeActionButton("Show the board", isEnabled: session.canEvaluate) {
-                            session.evaluate()
+                            Task {
+                                await session.evaluateWithIntelligence(preferences: appModel.preferences)
+                            }
                         }
                         .disabled(!session.canEvaluate)
 
                         if let result = session.result {
+                            if session.isRefiningWithModel {
+                                HStack(spacing: 10) {
+                                    ProgressView()
+                                        .tint(BeforeTheme.ember)
+                                    Text("Refining the board on-device…")
+                                        .font(.footnote.weight(.medium))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
                             PanelCard {
                                 VStack(alignment: .leading, spacing: 10) {
                                     Text(result.headline)

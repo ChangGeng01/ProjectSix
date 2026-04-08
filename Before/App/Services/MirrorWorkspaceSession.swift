@@ -12,6 +12,7 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
     @Published var longTerm: String = ""
     @Published var selfLens: String = ""
     @Published var result: MirrorResult?
+    @Published var isRefiningWithModel = false
 
     init(entrySource: EntrySource, prompt: String = "") {
         self.entrySource = entrySource
@@ -34,6 +35,34 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
                 selfLens: trimmed(selfLens)
             )
         )
+    }
+
+    func evaluateWithIntelligence(preferences: BeforePreferences = BeforePreferencesStore.load()) async {
+        guard canEvaluate else { return }
+
+        let input = MirrorInput(
+            prompt: trimmed(prompt),
+            emotion: trimmed(emotion),
+            relationship: trimmed(relationship),
+            reality: trimmed(reality),
+            longTerm: trimmed(longTerm),
+            selfLens: trimmed(selfLens)
+        )
+
+        let base = DecisionIntelligenceCoordinator.mirrorResult(for: input, preferences: preferences)
+        result = base
+        guard preferences.onDeviceIntelligenceMode.isEnabled else { return }
+
+        isRefiningWithModel = true
+        defer { isRefiningWithModel = false }
+
+        if let refined = await DecisionIntelligenceCoordinator.refineMirrorResult(
+            base: base,
+            input: input,
+            preferences: preferences
+        ) {
+            result = refined
+        }
     }
 
     var filledLensCount: Int {

@@ -11,6 +11,7 @@ final class BalanceBoardSession: ObservableObject, Identifiable {
     @Published var constraint: String = ""
     @Published var longTerm: String = ""
     @Published var result: BalanceBoardResult?
+    @Published var isRefiningWithModel = false
 
     init(entrySource: EntrySource, prompt: String = "") {
         self.entrySource = entrySource
@@ -32,6 +33,33 @@ final class BalanceBoardSession: ObservableObject, Identifiable {
                 longTerm: trimmed(longTerm)
             )
         )
+    }
+
+    func evaluateWithIntelligence(preferences: BeforePreferences = BeforePreferencesStore.load()) async {
+        guard canEvaluate else { return }
+
+        let input = BalanceBoardInput(
+            prompt: trimmed(prompt),
+            desire: trimmed(desire),
+            concern: trimmed(concern),
+            constraint: trimmed(constraint),
+            longTerm: trimmed(longTerm)
+        )
+
+        let base = DecisionIntelligenceCoordinator.balanceResult(for: input, preferences: preferences)
+        result = base
+        guard preferences.onDeviceIntelligenceMode.isEnabled else { return }
+
+        isRefiningWithModel = true
+        defer { isRefiningWithModel = false }
+
+        if let refined = await DecisionIntelligenceCoordinator.refineBalanceResult(
+            base: base,
+            input: input,
+            preferences: preferences
+        ) {
+            result = refined
+        }
     }
 
     private var populatedFieldCount: Int {

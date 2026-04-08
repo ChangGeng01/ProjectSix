@@ -11,6 +11,7 @@ final class QuickCheckSession: ObservableObject, Identifiable {
     @Published var result: QuickCheckResult?
     @Published var selectedAction: CheckAction?
     @Published var isShowingWaitSheet = false
+    @Published var isRefiningWithModel = false
 
     let entrySource: EntrySource
 
@@ -33,5 +34,32 @@ final class QuickCheckSession: ObservableObject, Identifiable {
             note: note.trimmingCharacters(in: .whitespacesAndNewlines)
         )
         result = DecisionIntelligenceCoordinator.quickResult(for: input)
+    }
+
+    func evaluateWithIntelligence(preferences: BeforePreferences = BeforePreferencesStore.load()) async {
+        guard let motivation, let expectedOutcome, let controlLevel else { return }
+
+        let input = QuickCheckInput(
+            scenario: scenario,
+            motivation: motivation,
+            expectedOutcome: expectedOutcome,
+            controlLevel: controlLevel,
+            note: note.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+
+        let base = DecisionIntelligenceCoordinator.quickResult(for: input, preferences: preferences)
+        result = base
+        guard preferences.onDeviceIntelligenceMode.isEnabled else { return }
+
+        isRefiningWithModel = true
+        defer { isRefiningWithModel = false }
+
+        if let refined = await DecisionIntelligenceCoordinator.refineQuickResult(
+            base: base,
+            input: input,
+            preferences: preferences
+        ) {
+            result = refined
+        }
     }
 }

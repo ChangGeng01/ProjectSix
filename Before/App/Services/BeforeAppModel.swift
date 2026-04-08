@@ -36,6 +36,10 @@ final class BeforeAppModel: ObservableObject {
         restorePendingReflectionState()
     }
 
+    var onDeviceModelStatus: OnDeviceModelStatus {
+        FoundationModelsIntelligenceService.availabilityStatus
+    }
+
     func handleInitialAppearance() {
         presentPendingReflectionIfNeeded()
         consumePendingLaunchRequestIfNeeded()
