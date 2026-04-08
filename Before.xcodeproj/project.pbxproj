@@ -146,6 +146,7 @@
 		AAF18BC521ADB96092407FF5 /* SharedLifeItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 762115548A918265DAC1DFF1 /* SharedLifeItemDetailView.swift */; };
 		AB3F4D0488D9E91CC8AF7E64 /* BeforeActionButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A7B6A83F0C81717A9A5D601 /* BeforeActionButton.swift */; };
 		AD18C6CEDD62926AF684ABB1 /* WaitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DFE4FB1A6B9A76AD2AD80E3 /* WaitView.swift */; };
+		AF866F34C8C9CE112C41C176 /* DecisionPromptEvidenceGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 274CBE36C805B3D2578B1AC1 /* DecisionPromptEvidenceGuard.swift */; };
 		B3A95EBD594597E4716A51D3 /* DecisionIntelligenceTelemetryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69781CDF0B11766FBB071AAF /* DecisionIntelligenceTelemetryStoreTests.swift */; };
 		B6401C0BE7236DB94F7E0FD4 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12B18D0B36378C98DA6A44EA /* NotificationServiceTests.swift */; };
 		B6AAF5251B4B0DA6FA01D697 /* DecisionIntelligenceResponseCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1198836DDA48CF625D5BB0E7 /* DecisionIntelligenceResponseCacheTests.swift */; };
@@ -181,6 +182,7 @@
 		D946B10D8FB631D6C5C61A4B /* DecisionTestingRuntimeExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8116ADEB650BEA3CC214DAC2 /* DecisionTestingRuntimeExport.swift */; };
 		D95E6740672BA7080A66DF1D /* DecisionModeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25779E30F91D917702DC456 /* DecisionModeCard.swift */; };
 		D99FF9332959DCD349DD6FF6 /* DecisionRecordRestorationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438899EA716D6093E4500048 /* DecisionRecordRestorationTests.swift */; };
+		DB738178BDECDEB3F0FC5336 /* DecisionPromptEvidenceGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 274CBE36C805B3D2578B1AC1 /* DecisionPromptEvidenceGuard.swift */; };
 		DC772636D1CBA8BC844DAF50 /* CheckRuleEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F454C1445FA6FD73087FAC8 /* CheckRuleEngine.swift */; };
 		DE34F729495D2206CCFAD372 /* InferenceBackendPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B45BDE0A0AC8F56688BBF51 /* InferenceBackendPolicy.swift */; };
 		E0EBF7F86996CD952329873D /* DecisionContextLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD7AE8679F2717EDE797F325 /* DecisionContextLifecycle.swift */; };
@@ -289,6 +291,7 @@
 		23F476A392EB99124E0CBDBF /* LocalModelAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModelAdapter.swift; sourceTree = "<group>"; };
 		24184A62A2B7E01F7BEA869A /* SupportInboxStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportInboxStoreTests.swift; sourceTree = "<group>"; };
 		2674B942E6DC6FD9A34FD9C8 /* BeforeTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BeforeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		274CBE36C805B3D2578B1AC1 /* DecisionPromptEvidenceGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionPromptEvidenceGuard.swift; sourceTree = "<group>"; };
 		28559294F554136C5D9334B2 /* QuickBufferDuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickBufferDuration.swift; sourceTree = "<group>"; };
 		2869C61692150B11BE791AD8 /* DecisionIntelligencePromptContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligencePromptContract.swift; sourceTree = "<group>"; };
 		2A7B6A83F0C81717A9A5D601 /* BeforeActionButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeActionButton.swift; sourceTree = "<group>"; };
@@ -566,6 +569,7 @@
 				66E54FE3709A309C60A79794 /* DecisionFieldSuggestionLibrary.swift */,
 				44CADF38945C264E4DE6F821 /* DecisionModeRouter.swift */,
 				07A2BDA791F079B89E195EE2 /* DecisionNeuralEngine.swift */,
+				274CBE36C805B3D2578B1AC1 /* DecisionPromptEvidenceGuard.swift */,
 				CC3ED6E2F02764281FE79FDD /* LaunchRequestResolver.swift */,
 				7AE75E02F04EBA937CA1B8A3 /* LetGoMotionDetector.swift */,
 				A05E06826B9C52DE8D6875DC /* MirrorEngine.swift */,
@@ -1009,6 +1013,7 @@
 				167EC3CF0549AAFEED0A0940 /* DecisionModeRouter.swift in Sources */,
 				FFEFBAAC6A158CEB42BF96E8 /* DecisionModelProvider.swift in Sources */,
 				12EE76EC3F105489A3C9F87F /* DecisionNeuralEngine.swift in Sources */,
+				DB738178BDECDEB3F0FC5336 /* DecisionPromptEvidenceGuard.swift in Sources */,
 				40CDCC53B762BF3B98144AF4 /* DecisionRecordRestoration.swift in Sources */,
 				A67CDCCE9D03D5DBB3D500FB /* DecisionReviewEngine.swift in Sources */,
 				67EE16CD290619AAB8F5A647 /* DecisionRoutePreviewCard.swift in Sources */,
@@ -1116,6 +1121,7 @@
 				EAFB12A3676EAF72B6BC9989 /* DecisionMode.swift in Sources */,
 				CCB15F44F3F2C2C27384875B /* DecisionModeRouter.swift in Sources */,
 				1E49AC6B426FD2DD6556ED0A /* DecisionNeuralEngine.swift in Sources */,
+				AF866F34C8C9CE112C41C176 /* DecisionPromptEvidenceGuard.swift in Sources */,
 				66D7DD242C25DB82A472CFAE /* EntrySource.swift in Sources */,
 				DE34F729495D2206CCFAD372 /* InferenceBackendPolicy.swift in Sources */,
 				97229440C03B71286BB0544A /* LaunchRequestResolver.swift in Sources */,

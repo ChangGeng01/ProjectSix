@@ -27,6 +27,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
     let attemptedProviders: [DecisionModelProviderKind]
     let allowFallbacks: Bool
     let usedFallback: Bool
+    let frontstageState: DecisionFrontstageState?
     let contextState: DecisionContextPreparedState?
     let neuralState: DecisionNeuralState?
     let promptBudget: DecisionIntelligencePromptContract.ContextBudget?
@@ -46,6 +47,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
         attemptedProviders: [DecisionModelProviderKind],
         allowFallbacks: Bool,
         usedFallback: Bool,
+        frontstageState: DecisionFrontstageState? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         promptBudget: DecisionIntelligencePromptContract.ContextBudget? = nil,
@@ -64,6 +66,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
         self.attemptedProviders = attemptedProviders
         self.allowFallbacks = allowFallbacks
         self.usedFallback = usedFallback
+        self.frontstageState = frontstageState
         self.contextState = contextState
         self.neuralState = neuralState
         self.promptBudget = promptBudget

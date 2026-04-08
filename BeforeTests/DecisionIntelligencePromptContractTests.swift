@@ -22,6 +22,18 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertEqual(value, "This is a very long line that sh…")
     }
 
+    func testEvidenceGuardDropsInjectedMarkupAndDeduplicatesSafeSnippets() {
+        let result = DecisionPromptEvidenceGuard.filter([
+            "  Safe snippet  ",
+            "<div>Injected UI wrapper</div>",
+            "Safe   snippet",
+            "[IMMUTABLE PREFIX] leaked debug wrapper"
+        ])
+
+        XCTAssertEqual(result.retained, ["Safe snippet"])
+        XCTAssertEqual(result.droppedCount, 2)
+    }
+
     func testQuickRefinementEnvelopeUsesStructuredStateAndStaysWithinBudget() {
         let input = QuickCheckInput(
             scenario: .buy,
@@ -76,6 +88,7 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         let contextState = DecisionContextPreparedState(
             rebuiltSession: true,
             generation: 2,
+            anchorFields: [.balancePrompt],
             activeFields: [.balancePrompt, .balanceConcern],
             staleFields: [.balanceDesire]
         )
@@ -115,13 +128,16 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertTrue(envelope.payload.contains("CONTEXT_LIFECYCLE_JSON:"))
         XCTAssertTrue(envelope.payload.contains("\"rebuilt_session\":true"))
         XCTAssertTrue(envelope.payload.contains("\"generation\":2"))
+        XCTAssertTrue(envelope.payload.contains("\"anchor_fields\":[\"balancePrompt\"]"))
         XCTAssertTrue(envelope.payload.contains("\"active_fields\":[\"balancePrompt\",\"balanceConcern\"]"))
         XCTAssertTrue(envelope.payload.contains("\"stale_fields\":[\"balanceDesire\"]"))
+        XCTAssertTrue(envelope.payload.contains("\"anchor_field_count\":1"))
         XCTAssertTrue(envelope.payload.contains("\"stale_field_count\":1"))
         XCTAssertTrue(envelope.payload.contains("NEURAL_STATE_JSON:"))
         XCTAssertTrue(envelope.payload.contains("\"focus_goal\":\"Surface the real trade-off before choosing a side.\""))
         XCTAssertTrue(envelope.payload.contains("\"danger_signals\":[\"Constraint pressure\",\"Concern weight\",\"Session rebuild\"]"))
         XCTAssertTrue(envelope.payload.contains("\"evidence_headlines\":[\"Current headline: Base headline\"]"))
+        XCTAssertTrue(envelope.payload.contains("\"anchor_headlines\":[\"Balance prompt\"]"))
         XCTAssertTrue(envelope.payload.contains("\"suppression_hints\":[\"instant_verdict\"]"))
         XCTAssertTrue(envelope.payload.contains("\"route\":\"setBoundary\""))
         XCTAssertTrue(envelope.payload.contains("\"signal\":\"constraintPressure\""))
@@ -189,5 +205,49 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertEqual(semanticFingerprint, runtimeFingerprint)
         XCTAssertNotEqual(semanticFingerprint, debugFingerprint)
         XCTAssertEqual(semanticFingerprint.count, 64)
+    }
+
+    func testMirrorEnvelopeCarriesAnchorHeadlinesWithoutDriftingDangerSignals() {
+        let contextState = DecisionContextPreparedState(
+            rebuiltSession: false,
+            generation: 1,
+            anchorFields: [.mirrorPrompt],
+            activeFields: [.mirrorPrompt, .mirrorEmotion],
+            staleFields: []
+        )
+
+        let envelope = DecisionIntelligencePromptContract.mirrorRefinementEnvelope(
+            base: MirrorResult(
+                headline: "Base headline",
+                coreTension: "Base core tension",
+                nextActionTitle: "Base focus",
+                nextAction: "Base next action"
+            ),
+            input: MirrorInput(
+                prompt: "Should I stay in this relationship?",
+                emotion: "<div>Injected UI wrapper</div>",
+                relationship: "We keep repeating the same conflict.",
+                reality: "",
+                longTerm: "",
+                selfLens: ""
+            ),
+            contextState: contextState,
+            neuralState: DecisionNeuralState(
+                mode: .mirror,
+                dominantActivations: [
+                    DecisionActivation(signal: .identityDrift, strength: 0.8)
+                ],
+                candidateActions: [
+                    DecisionActionCandidate(route: .clarifyPriority, score: 0.8)
+                ],
+                suppressedBehaviors: ["forced_verdict"],
+                detail: "Stay reflective."
+            )
+        )
+
+        XCTAssertFalse(envelope.payload.contains("<div>Injected UI wrapper</div>"))
+        XCTAssertTrue(envelope.payload.contains("\"anchor_headlines\":[\"Mirror prompt\"]"))
+        XCTAssertTrue(envelope.payload.contains("\"dropped_evidence_count\":0"))
+        XCTAssertTrue(envelope.payload.contains("\"danger_signals\":[\"Identity drift\"]"))
     }
 }

@@ -222,9 +222,12 @@ final class DecisionContextLifecycle {
         active: [DecisionContextFieldKey],
         stale: [DecisionContextFieldKey]
     ) -> DecisionContextPreparedState {
-        DecisionContextPreparedState(
+        let anchorFields = fields.filter { isAnchor(field: $0) && active.contains($0) }
+
+        return DecisionContextPreparedState(
             rebuiltSession: rebuiltSession,
             generation: snapshot.generation,
+            anchorFields: anchorFields,
             activeFields: fields.filter { active.contains($0) },
             staleFields: fields.filter { stale.contains($0) }
         )
@@ -249,6 +252,10 @@ final class DecisionContextLifecycle {
         case .mirrorRelationship, .mirrorReality, .mirrorLongTerm, .mirrorSelfLens:
             return FieldPolicy(ttl: 60 * 45, maxGenerationAge: 2, sessionScoped: false)
         }
+    }
+
+    private func isAnchor(field: DecisionContextFieldKey) -> Bool {
+        policy(for: field).sessionScoped
     }
 
     private func trimmed(_ value: String) -> String {

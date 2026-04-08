@@ -26,12 +26,25 @@ struct DecisionTestingRuntimeExport {
             }
         }
 
+        let droppedEvidenceCountByKind = Dictionary(
+            grouping: recentTraces.filter { ($0.frontstageState?.droppedEvidenceCount ?? 0) > 0 },
+            by: \.kind
+        )
+        .mapValues { traces in
+            traces.reduce(0) { partialResult, trace in
+                partialResult + (trace.frontstageState?.droppedEvidenceCount ?? 0)
+            }
+        }
+
         return DecisionTestingLifecycleSummary(
             contextAwareTraceCount: contextAwareTraces.count,
             rebuildCount: contextAwareTraces.filter(\.rebuiltSession).count,
             rebuildCountByKind: rebuildCountByKind,
             staleFieldDropCount: contextAwareTraces.reduce(0) { $0 + $1.staleFieldCount },
             staleFieldDropCountByKind: staleFieldCountByKind,
+            droppedEvidenceCount: recentTraces.reduce(0) { $0 + ($1.frontstageState?.droppedEvidenceCount ?? 0) },
+            droppedEvidenceCountByKind: droppedEvidenceCountByKind,
+            averageAnchorFieldCountByKind: averageAnchorFieldCountByKind,
             latestGenerationByKind: latestGenerationByKind
         )
     }
@@ -96,6 +109,7 @@ struct DecisionTestingRuntimeExport {
             contextAwareTraceCount: lifecycleSummary.contextAwareTraceCount,
             lifecycleRebuildCount: lifecycleSummary.rebuildCount,
             staleFieldDropCount: lifecycleSummary.staleFieldDropCount,
+            droppedEvidenceCount: lifecycleSummary.droppedEvidenceCount,
             neuralTraceCount: neuralSummary.neuralTraceCount,
             suppressedBehaviorCount: neuralSummary.suppressedBehaviorCount,
             traceCount: recentTraces.count,
@@ -116,6 +130,17 @@ struct DecisionTestingRuntimeExport {
             guard let generation = trace.contextState?.generation else { return }
             partialResult[trace.kind] = max(partialResult[trace.kind] ?? generation, generation)
         }
+    }
+
+    private var averageAnchorFieldCountByKind: [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(grouping: recentTraces.filter { $0.contextState != nil }, by: \.kind)
+            .compactMapValues { traces in
+                guard !traces.isEmpty else { return nil }
+                let total = traces.reduce(0) { partialResult, trace in
+                    partialResult + (trace.contextState?.anchorFieldCount ?? 0)
+                }
+                return Double(total) / Double(traces.count)
+            }
     }
 
     private var semanticPromptVariantCountByKind: [DecisionIntelligenceTraceKind: Int] {
@@ -144,6 +169,9 @@ struct DecisionTestingLifecycleSummary: Equatable, Sendable {
     let rebuildCountByKind: [DecisionIntelligenceTraceKind: Int]
     let staleFieldDropCount: Int
     let staleFieldDropCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let droppedEvidenceCount: Int
+    let droppedEvidenceCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let averageAnchorFieldCountByKind: [DecisionIntelligenceTraceKind: Double]
     let latestGenerationByKind: [DecisionIntelligenceTraceKind: Int]
 }
 
@@ -186,6 +214,7 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let contextAwareTraceCount: Int
     let lifecycleRebuildCount: Int
     let staleFieldDropCount: Int
+    let droppedEvidenceCount: Int
     let neuralTraceCount: Int
     let suppressedBehaviorCount: Int
     let traceCount: Int

@@ -426,9 +426,18 @@ enum DecisionIntelligencePromptContract {
         let instructions = [immutablePrefix, adaptivePrefix]
             .filter { !$0.isEmpty }
             .joined(separator: "\n\n")
+        let evidenceFilter = DecisionPromptEvidenceGuard.filter(evidence)
+        var guardedOutput = outputGuard
+        if evidenceFilter.droppedCount > 0 {
+            guardedOutput.insert(
+                "Some evidence snippets were removed because they looked like markup, tool output, or injected text. Do not infer from the missing content.",
+                at: 0
+            )
+        }
         let preparedFrontstageState = frontstageState(
             kind: kind,
-            evidence: evidence,
+            evidence: evidenceFilter.retained,
+            droppedEvidenceCount: evidenceFilter.droppedCount,
             contextState: contextState,
             neuralState: neuralState
         )
@@ -455,9 +464,9 @@ enum DecisionIntelligencePromptContract {
 
         sections += [
             "EVIDENCE_SNIPPETS:",
-            evidenceBlock(evidence),
+            evidenceBlock(evidenceFilter.retained),
             "OUTPUT_GUARD:",
-            bulletList(outputGuard)
+            bulletList(guardedOutput)
         ]
 
         let payload = sections.joined(separator: "\n")
@@ -520,8 +529,10 @@ enum DecisionIntelligencePromptContract {
         let payload: [String: Any] = [
             "rebuilt_session": contextState.rebuiltSession,
             "generation": contextState.generation,
+            "anchor_fields": contextState.anchorFields.map(\.rawValue),
             "active_fields": contextState.activeFields.map(\.rawValue),
             "stale_fields": contextState.staleFields.map(\.rawValue),
+            "anchor_field_count": contextState.anchorFieldCount,
             "active_field_count": contextState.activeFieldCount,
             "stale_field_count": contextState.staleFieldCount
         ]
@@ -566,6 +577,7 @@ enum DecisionIntelligencePromptContract {
     private static func frontstageState(
         kind: TaskKind,
         evidence: [String],
+        droppedEvidenceCount: Int,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?
     ) -> DecisionFrontstageState {
@@ -597,6 +609,9 @@ enum DecisionIntelligencePromptContract {
         if let staleFieldCount = contextState?.staleFieldCount, staleFieldCount > 0 {
             dangerSignals.append("Stale fields dropped")
         }
+        if droppedEvidenceCount > 0 {
+            dangerSignals.append("Evidence filtered")
+        }
         dangerSignals = Array(dangerSignals.prefix(Limit.frontstageSignalCount))
 
         let evidenceHeadlines = evidence
@@ -609,6 +624,13 @@ enum DecisionIntelligencePromptContract {
                 )
             }
 
+        let anchorHeadlines = Array(
+            (contextState?.anchorFields ?? [])
+                .map(\.title)
+                .map { sanitized($0, fallback: $0, limit: Limit.frontstageEvidence) }
+                .prefix(Limit.frontstageSignalCount)
+        )
+
         let suppressionHints = Array(
             (neuralState?.suppressedBehaviors ?? [])
                 .map { sanitized($0, fallback: $0, limit: Limit.frontstageSignal) }
@@ -619,6 +641,8 @@ enum DecisionIntelligencePromptContract {
             focusGoal: focusGoal,
             dangerSignals: dangerSignals,
             evidenceHeadlines: evidenceHeadlines,
+            anchorHeadlines: anchorHeadlines,
+            droppedEvidenceCount: droppedEvidenceCount,
             suppressionHints: suppressionHints
         )
     }
@@ -628,6 +652,8 @@ enum DecisionIntelligencePromptContract {
             "focus_goal": frontstageState.focusGoal,
             "danger_signals": frontstageState.dangerSignals,
             "evidence_headlines": frontstageState.evidenceHeadlines,
+            "anchor_headlines": frontstageState.anchorHeadlines,
+            "dropped_evidence_count": frontstageState.droppedEvidenceCount,
             "suppression_hints": frontstageState.suppressionHints
         ]
 

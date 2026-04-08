@@ -314,9 +314,18 @@ struct DecisionTestingInterfaceTests {
             attemptedProviders: [.gemmaE4B],
             allowFallbacks: true,
             usedFallback: false,
+            frontstageState: DecisionFrontstageState(
+                focusGoal: "Interrupt the automatic reaction before it locks in.",
+                dangerSignals: ["Urgency", "Evidence filtered"],
+                evidenceHeadlines: ["Current perspective: Quick relief."],
+                anchorHeadlines: ["Quick note"],
+                droppedEvidenceCount: 1,
+                suppressionHints: ["long_explanation"]
+            ),
             contextState: DecisionContextPreparedState(
                 rebuiltSession: true,
                 generation: 4,
+                anchorFields: [.quickNote],
                 activeFields: [.quickNote],
                 staleFields: []
             ),
@@ -433,10 +442,14 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.slowRequestRateByKind[.quick] == 0)
         #expect(export.lifecycleSummary.contextAwareTraceCount == 1)
         #expect(export.lifecycleSummary.rebuildCount == 1)
+        #expect(export.lifecycleSummary.droppedEvidenceCount == 1)
+        #expect(export.lifecycleSummary.droppedEvidenceCountByKind[.quick] == 1)
+        #expect(export.lifecycleSummary.averageAnchorFieldCountByKind[.quick] == 1)
         #expect(export.lifecycleSummary.latestGenerationByKind[.quick] == 4)
         #expect(export.summary.contextAwareTraceCount == 1)
         #expect(export.summary.lifecycleRebuildCount == 1)
         #expect(export.summary.staleFieldDropCount == 0)
+        #expect(export.summary.droppedEvidenceCount == 1)
         #expect(export.neuralSummary.neuralTraceCount == 1)
         #expect(export.neuralSummary.suppressedBehaviorCount == 1)
         #expect(export.neuralSummary.dominantActionByKind[.quick] == .waitBuffer)

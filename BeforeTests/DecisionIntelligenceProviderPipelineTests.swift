@@ -205,6 +205,7 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         let contextState = DecisionContextPreparedState(
             rebuiltSession: true,
             generation: 3,
+            anchorFields: [.balancePrompt],
             activeFields: [.balancePrompt, .balanceConcern],
             staleFields: [.balanceDesire]
         )
@@ -235,6 +236,7 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         }
 
         XCTAssertEqual(latestTrace.kind, .balance)
+        XCTAssertEqual(latestTrace.frontstageState?.anchorHeadlines, ["Balance prompt"])
         XCTAssertEqual(latestTrace.contextState, contextState)
         XCTAssertEqual(latestTrace.neuralState, neuralState)
         XCTAssertTrue(latestTrace.prompt.contains("CONTEXT_LIFECYCLE_JSON:"))
@@ -437,6 +439,7 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         let contextState = DecisionContextPreparedState(
             rebuiltSession: false,
             generation: 1,
+            anchorFields: [.balancePrompt],
             activeFields: [.balancePrompt, .balanceDesire, .balanceConcern, .balanceConstraint, .balanceLongTerm],
             staleFields: []
         )
