@@ -84,7 +84,7 @@ struct WaitView: View {
             if secondsRemaining == 0 {
                 secondsRemaining = appModel.preferences.quickBufferDuration.seconds
             }
-            reminderText = appModel.bestReminder(
+            reminderText = await appModel.bestReminder(
                 for: session.scenario,
                 prompt: session.note,
                 mode: .quick

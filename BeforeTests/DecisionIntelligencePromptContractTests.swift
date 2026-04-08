@@ -49,4 +49,21 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertTrue(prompt.contains("Current perspective: \(base.currentPerspective)"))
         XCTAssertTrue(prompt.contains("After perspective: \(base.afterPerspective)"))
     }
+
+    func testReminderSelectionPromptIncludesIndexedCandidates() {
+        let prompt = DecisionIntelligencePromptContract.reminderSelectionPrompt(
+            candidates: [
+                ReminderSelectionCandidate(id: UUID(), content: "This is stress shopping again."),
+                ReminderSelectionCandidate(id: UUID(), content: "You already knew this was a real replacement.")
+            ],
+            scenario: .buy,
+            prompt: "Today was rough and I want these shoes.",
+            mode: .quick
+        )
+
+        XCTAssertTrue(prompt.contains("Scenario: Buy"))
+        XCTAssertTrue(prompt.contains("Mode: Quick"))
+        XCTAssertTrue(prompt.contains("0: This is stress shopping again."))
+        XCTAssertTrue(prompt.contains("1: You already knew this was a real replacement."))
+    }
 }

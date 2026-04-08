@@ -24,6 +24,13 @@ protocol GemmaLocalRuntimeBridging: Sendable {
         base: MirrorResult,
         input: MirrorInput
     ) async -> MirrorResult?
+
+    func pickReminder(
+        from candidates: [ReminderSelectionCandidate],
+        scenario: ScenarioType,
+        prompt: String,
+        mode: DecisionMode?
+    ) async -> ReminderSelectionCandidate?
 }
 
 enum GemmaLocalRuntimeBridge {
@@ -238,6 +245,48 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
         )
     }
 
+    func pickReminder(
+        from candidates: [ReminderSelectionCandidate],
+        scenario: ScenarioType,
+        prompt: String,
+        mode: DecisionMode?
+    ) async -> ReminderSelectionCandidate? {
+        guard case let .ready(_, generator) = cachedLoadState,
+              let modelPath = modelPathProvider() else { return nil }
+
+        let clippedCandidates = Array(candidates.prefix(DecisionIntelligencePromptContract.Limit.reminderCandidates))
+        guard clippedCandidates.count > 1 else { return clippedCandidates.first }
+
+        let prompt = """
+        Choose the best reminder candidate for the user's current state.
+        Return exactly one line.
+        INDEX: <zero-based integer>
+
+        \(DecisionIntelligencePromptContract.reminderSelectionPrompt(
+            candidates: clippedCandidates,
+            scenario: scenario,
+            prompt: prompt,
+            mode: mode
+        ))
+        """
+
+        guard let text = await generateText(
+            prompt: prompt,
+            modelPath: modelPath,
+            maxOutputTokens: 24,
+            generator: generator
+        ) else {
+            return nil
+        }
+
+        let fields = parseFields(from: text, expectedKeys: ["INDEX"])
+        guard let rawIndex = fields["INDEX"],
+              let index = parseIndex(rawIndex),
+              clippedCandidates.indices.contains(index) else { return nil }
+
+        return clippedCandidates[index]
+    }
+
     private func generateText(
         prompt: String,
         modelPath: String,
@@ -271,6 +320,15 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
             guard !value.isEmpty else { return }
             partialResult[key] = value
         }
+    }
+
+    private func parseIndex(_ raw: String) -> Int? {
+        let token = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(whereSeparator: { $0.isWhitespace || $0 == "," || $0 == "." || $0 == ":" })
+            .first
+        guard let token else { return nil }
+        return Int(token)
     }
 }
 

@@ -76,6 +76,46 @@ enum DecisionIntelligenceCoordinator {
         return ranked.first(where: { $0.content == selected }) ?? ranked.first
     }
 
+    @MainActor
+    static func bestReminderWithIntelligence(
+        from reminders: [SelfReminder],
+        scenario: ScenarioType,
+        prompt: String = "",
+        mode: DecisionMode? = nil,
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
+    ) async -> SelfReminder? {
+        let deterministic = bestReminder(
+            from: reminders,
+            scenario: scenario,
+            prompt: prompt,
+            mode: mode,
+            preferences: preferences
+        )
+
+        let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard preferences.onDeviceIntelligenceMode.isEnabled,
+              preferences.preferredIntelligenceProvider != .template,
+              !trimmedPrompt.isEmpty else {
+            return deterministic
+        }
+
+        let ranked = ReminderSelectionPolicy.ranked(reminders: reminders.filter { $0.scenario == scenario })
+        let candidates = ranked.map { ReminderSelectionCandidate(id: $0.id, content: $0.content) }
+
+        guard let selected = await DecisionIntelligenceProviderPipeline.pickReminder(
+            from: candidates,
+            scenario: scenario,
+            prompt: trimmedPrompt,
+            mode: mode,
+            preference: preferences.preferredIntelligenceProvider,
+            allowFallbacks: preferences.allowModelFallbacks
+        ) else {
+            return deterministic
+        }
+
+        return ranked.first(where: { $0.id == selected.id }) ?? deterministic
+    }
+
     static func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,

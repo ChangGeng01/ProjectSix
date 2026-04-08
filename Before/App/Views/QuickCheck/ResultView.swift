@@ -96,7 +96,7 @@ struct ResultView: View {
                 }
             }
             .task {
-                reminderText = appModel.bestReminder(
+                reminderText = await appModel.bestReminder(
                     for: session.scenario,
                     prompt: session.note,
                     mode: .quick

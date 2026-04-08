@@ -196,6 +196,48 @@ enum FoundationModelsIntelligenceService {
 #endif
     }
 
+    static func pickReminder(
+        from candidates: [ReminderSelectionCandidate],
+        scenario: ScenarioType,
+        prompt: String,
+        mode: DecisionMode?
+    ) async -> ReminderSelectionCandidate? {
+#if canImport(FoundationModels)
+        guard #available(iOS 26.0, *), availabilityStatus.isAvailable else { return nil }
+        let clippedCandidates = Array(candidates.prefix(DecisionIntelligencePromptContract.Limit.reminderCandidates))
+        guard clippedCandidates.count > 1 else { return clippedCandidates.first }
+
+        do {
+            let session = LanguageModelSession(
+                model: .default,
+                instructions: """
+                You pick the single best self-reminder for a local decision app.
+                Choose only from the provided candidates.
+                Do not rewrite or invent text.
+                Prefer the reminder that most directly matches the user's current state.
+                """
+            )
+
+            let response = try await session.respond(
+                to: DecisionIntelligencePromptContract.reminderSelectionPrompt(
+                    candidates: clippedCandidates,
+                    scenario: scenario,
+                    prompt: prompt,
+                    mode: mode
+                ),
+                generating: ReminderSelectionRefinement.self
+            )
+
+            guard clippedCandidates.indices.contains(response.content.selectedIndex) else { return nil }
+            return clippedCandidates[response.content.selectedIndex]
+        } catch {
+            return nil
+        }
+#else
+        return nil
+#endif
+    }
+
 #if canImport(FoundationModels)
     @available(iOS 26.0, *)
     private static func detail(for reason: SystemLanguageModel.Availability.UnavailableReason) -> String {
@@ -236,5 +278,11 @@ private struct MirrorRefinement {
     let headline: String
     let coreTension: String
     let nextAction: String
+}
+
+@available(iOS 26.0, *)
+@Generable(description: "Select the zero-based index of the best reminder candidate.")
+private struct ReminderSelectionRefinement {
+    let selectedIndex: Int
 }
 #endif

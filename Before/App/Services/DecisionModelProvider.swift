@@ -27,3 +27,8 @@ struct DecisionModelRuntimeStatus: Equatable, Sendable {
     let fallback: DecisionModelProviderKind?
     let detail: String
 }
+
+struct ReminderSelectionCandidate: Equatable, Identifiable, Sendable {
+    let id: UUID
+    let content: String
+}

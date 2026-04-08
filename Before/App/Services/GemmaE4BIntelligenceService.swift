@@ -105,4 +105,20 @@ enum GemmaE4BIntelligenceService {
         guard bundleStatus().isReady else { return nil }
         return await runtime.refineMirrorResult(base: base, input: input)
     }
+
+    static func pickReminder(
+        from candidates: [ReminderSelectionCandidate],
+        scenario: ScenarioType,
+        prompt: String,
+        mode: DecisionMode?,
+        runtime: any GemmaLocalRuntimeBridging = GemmaLocalRuntimeBridge.shared
+    ) async -> ReminderSelectionCandidate? {
+        guard bundleStatus().isReady else { return nil }
+        return await runtime.pickReminder(
+            from: candidates,
+            scenario: scenario,
+            prompt: prompt,
+            mode: mode
+        )
+    }
 }

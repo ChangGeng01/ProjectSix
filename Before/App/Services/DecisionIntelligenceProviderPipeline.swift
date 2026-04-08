@@ -18,6 +18,13 @@ protocol DecisionIntelligenceProviding: Sendable {
         base: MirrorResult,
         input: MirrorInput
     ) async -> MirrorResult?
+
+    func pickReminder(
+        from candidates: [ReminderSelectionCandidate],
+        scenario: ScenarioType,
+        prompt: String,
+        mode: DecisionMode?
+    ) async -> ReminderSelectionCandidate?
 }
 
 struct GemmaDecisionIntelligenceProvider: DecisionIntelligenceProviding {
@@ -44,6 +51,20 @@ struct GemmaDecisionIntelligenceProvider: DecisionIntelligenceProviding {
     ) async -> MirrorResult? {
         await GemmaE4BIntelligenceService.refineMirrorResult(base: base, input: input)
     }
+
+    func pickReminder(
+        from candidates: [ReminderSelectionCandidate],
+        scenario: ScenarioType,
+        prompt: String,
+        mode: DecisionMode?
+    ) async -> ReminderSelectionCandidate? {
+        await GemmaE4BIntelligenceService.pickReminder(
+            from: candidates,
+            scenario: scenario,
+            prompt: prompt,
+            mode: mode
+        )
+    }
 }
 
 struct FoundationDecisionIntelligenceProvider: DecisionIntelligenceProviding {
@@ -69,6 +90,20 @@ struct FoundationDecisionIntelligenceProvider: DecisionIntelligenceProviding {
         input: MirrorInput
     ) async -> MirrorResult? {
         await FoundationModelsIntelligenceService.refineMirrorResult(base: base, input: input)
+    }
+
+    func pickReminder(
+        from candidates: [ReminderSelectionCandidate],
+        scenario: ScenarioType,
+        prompt: String,
+        mode: DecisionMode?
+    ) async -> ReminderSelectionCandidate? {
+        await FoundationModelsIntelligenceService.pickReminder(
+            from: candidates,
+            scenario: scenario,
+            prompt: prompt,
+            mode: mode
+        )
     }
 }
 
@@ -337,6 +372,64 @@ enum DecisionIntelligenceProviderPipeline {
         return nil
     }
 
+    static func pickReminder(
+        from candidates: [ReminderSelectionCandidate],
+        scenario: ScenarioType,
+        prompt: String,
+        mode: DecisionMode?,
+        preference: DecisionModelProviderPreference,
+        allowFallbacks: Bool
+    ) async -> ReminderSelectionCandidate? {
+        let clippedCandidates = Array(candidates.prefix(DecisionIntelligencePromptContract.Limit.reminderCandidates))
+        guard !clippedCandidates.isEmpty, preference != .template else { return nil }
+
+        let contractPrompt = DecisionIntelligencePromptContract.reminderSelectionPrompt(
+            candidates: clippedCandidates,
+            scenario: scenario,
+            prompt: prompt,
+            mode: mode
+        )
+        let providers = orderedProviders(for: preference, allowFallbacks: allowFallbacks)
+        let attemptedKinds = providers.map(\.kind)
+
+        for provider in providers {
+            if let selected = await provider.pickReminder(
+                from: clippedCandidates,
+                scenario: scenario,
+                prompt: prompt,
+                mode: mode
+            ) {
+                recordTrace(
+                    kind: .reminder,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: attemptedKinds,
+                    allowFallbacks: allowFallbacks,
+                    prompt: contractPrompt,
+                    outputPreview: reminderPreview(from: selected),
+                    detail: detail(
+                        preferred: preference.kind,
+                        active: provider.kind,
+                        allowFallbacks: allowFallbacks
+                    )
+                )
+                return selected
+            }
+        }
+
+        recordTrace(
+            kind: .reminder,
+            preferredProvider: preference.kind,
+            activeProvider: nil,
+            attemptedProviders: attemptedKinds,
+            allowFallbacks: allowFallbacks,
+            prompt: contractPrompt,
+            outputPreview: "No reminder selected",
+            detail: "No provider returned a reminder selection, so Before kept the deterministic reminder ordering."
+        )
+        return nil
+    }
+
     static func defaultStatusesByKind() -> [DecisionModelProviderKind: DecisionModelProviderStatus] {
         providersByKind.reduce(into: [:]) { partialResult, entry in
             partialResult[entry.key] = entry.value.availabilityStatus
@@ -401,5 +494,9 @@ enum DecisionIntelligenceProviderPipeline {
 
     private static func mirrorPreview(from result: MirrorResult) -> String {
         "Headline: \(result.headline)\nTension: \(result.coreTension)\nNext: \(result.nextAction)"
+    }
+
+    private static func reminderPreview(from candidate: ReminderSelectionCandidate) -> String {
+        candidate.content
     }
 }

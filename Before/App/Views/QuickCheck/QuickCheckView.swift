@@ -95,7 +95,7 @@ struct QuickCheckView: View {
                 }
             }
             .task(id: session.scenario) {
-                displayedReminder = appModel.bestReminder(
+                displayedReminder = await appModel.bestReminder(
                     for: session.scenario,
                     prompt: session.note,
                     mode: .quick

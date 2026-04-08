@@ -4,6 +4,7 @@ enum DecisionIntelligenceTraceKind: String, Identifiable, Sendable {
     case quick
     case balance
     case mirror
+    case reminder
 
     var id: String { rawValue }
 
@@ -12,6 +13,7 @@ enum DecisionIntelligenceTraceKind: String, Identifiable, Sendable {
         case .quick: "Quick refinement"
         case .balance: "Balance refinement"
         case .mirror: "Mirror refinement"
+        case .reminder: "Reminder selection"
         }
     }
 }

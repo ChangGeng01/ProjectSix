@@ -85,4 +85,13 @@ private struct MockGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging {
     ) async -> MirrorResult? {
         nil
     }
+
+    func pickReminder(
+        from candidates: [ReminderSelectionCandidate],
+        scenario: ScenarioType,
+        prompt: String,
+        mode: DecisionMode?
+    ) async -> ReminderSelectionCandidate? {
+        nil
+    }
 }

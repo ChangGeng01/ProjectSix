@@ -478,15 +478,15 @@ final class BeforeAppModel: ObservableObject {
         return ReminderSelectionPolicy.ranked(reminders: fetched.filter { $0.scenario == scenario })
     }
 
-    func bestReminder(for scenario: ScenarioType) -> String? {
-        bestReminder(for: scenario, prompt: "", mode: nil)
+    func bestReminder(for scenario: ScenarioType) async -> String? {
+        await bestReminder(for: scenario, prompt: "", mode: nil)
     }
 
-    func bestReminder(for scenario: ScenarioType, prompt: String, mode: DecisionMode?) -> String? {
+    func bestReminder(for scenario: ScenarioType, prompt: String, mode: DecisionMode?) async -> String? {
         let context = modelContainer.mainContext
         let descriptor = FetchDescriptor<SelfReminder>()
         let reminders = (try? context.fetch(descriptor)) ?? []
-        return DecisionIntelligenceCoordinator.bestReminder(
+        return await DecisionIntelligenceCoordinator.bestReminderWithIntelligence(
             from: reminders,
             scenario: scenario,
             prompt: prompt,

@@ -11,6 +11,8 @@ enum DecisionIntelligencePromptContract {
         static let mirrorHeadline = 120
         static let mirrorCoreTension = 220
         static let mirrorNextAction = 180
+        static let reminderCandidates = 6
+        static let reminderCandidateLength = 140
     }
 
     static func sanitized(_ value: String, fallback: String, limit: Int) -> String {
@@ -73,6 +75,37 @@ enum DecisionIntelligencePromptContract {
             bullet("Next action", base.nextAction),
             "Clarify the mirror without becoming dramatic or giving a yes-no answer."
         ]
+        .joined(separator: "\n")
+    }
+
+    static func reminderSelectionPrompt(
+        candidates: [ReminderSelectionCandidate],
+        scenario: ScenarioType,
+        prompt: String,
+        mode: DecisionMode?
+    ) -> String {
+        let clippedCandidates = Array(candidates.prefix(Limit.reminderCandidates))
+        let modeLine = mode.map { "Mode: \($0.shortTitle)" } ?? "Mode: Not specified"
+        let currentPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidateLines = clippedCandidates.enumerated().map { index, candidate in
+            let safeContent = sanitized(
+                candidate.content,
+                fallback: candidate.content,
+                limit: Limit.reminderCandidateLength
+            )
+            return "\(index): \(safeContent)"
+        }
+
+        return (
+            [
+                "Scenario: \(scenario.title)",
+                modeLine,
+                bullet("Current prompt", currentPrompt),
+                "Choose the one reminder that best matches the user's current state.",
+                "Return only the zero-based index of the best candidate."
+            ]
+            + candidateLines
+        )
         .joined(separator: "\n")
     }
 

@@ -68,6 +68,36 @@ final class DecisionIntelligenceCoordinatorTests: XCTestCase {
         XCTAssertEqual(selected?.content, "This is just stress shopping again.")
     }
 
+    @MainActor
+    func testAsyncReminderSelectionFallsBackToDeterministicChoiceWhenProvidersCannotHelp() async {
+        let reminders = [
+            SelfReminder(
+                content: "This is just stress shopping again.",
+                scenario: .buy,
+                source: .userWritten,
+                createdAt: .now.addingTimeInterval(-20),
+                lastUsedAt: .now.addingTimeInterval(-20)
+            ),
+            SelfReminder(
+                content: "You actually needed the charger.",
+                scenario: .buy,
+                source: .userWritten,
+                createdAt: .now.addingTimeInterval(-10),
+                lastUsedAt: .now.addingTimeInterval(-10)
+            )
+        ]
+
+        let selected = await DecisionIntelligenceCoordinator.bestReminderWithIntelligence(
+            from: reminders,
+            scenario: .buy,
+            prompt: "I want to buy these shoes because today was rough",
+            mode: .quick,
+            preferences: assistivePreferences
+        )
+
+        XCTAssertEqual(selected?.content, "This is just stress shopping again.")
+    }
+
     private var assistivePreferences: BeforePreferences {
         BeforePreferences(
             homePromptAction: .autoRoute,
