@@ -137,11 +137,11 @@ struct LetGoView: View {
     private var settledCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
-                Label("Out of the foreground", systemImage: "tray.and.arrow.down.fill")
+                Label(context.settledTitle, systemImage: "tray.and.arrow.down.fill")
                     .font(.headline)
                     .foregroundStyle(BeforeTheme.moss)
 
-                Text("You can leave this in Tomorrow Box and come back when timing is cleaner.")
+                Text(context.settledDetail)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

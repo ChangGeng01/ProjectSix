@@ -12,6 +12,8 @@ struct LetGoContext: Identifiable, Equatable, Sendable {
     let instructionDetail: String
     let completionTitle: String
     let completionSubtitle: String
+    let settledTitle: String
+    let settledDetail: String
     let primaryActionTitle: String
     let primaryTarget: AppTab
     let secondaryActionTitle: String?
@@ -29,6 +31,8 @@ struct LetGoContext: Identifiable, Equatable, Sendable {
         instructionDetail: String,
         completionTitle: String,
         completionSubtitle: String,
+        settledTitle: String,
+        settledDetail: String,
         primaryActionTitle: String,
         primaryTarget: AppTab,
         secondaryActionTitle: String? = nil,
@@ -45,6 +49,8 @@ struct LetGoContext: Identifiable, Equatable, Sendable {
         self.instructionDetail = instructionDetail
         self.completionTitle = completionTitle
         self.completionSubtitle = completionSubtitle
+        self.settledTitle = settledTitle
+        self.settledDetail = settledDetail
         self.primaryActionTitle = primaryActionTitle
         self.primaryTarget = primaryTarget
         self.secondaryActionTitle = secondaryActionTitle

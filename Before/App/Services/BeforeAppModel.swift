@@ -258,6 +258,7 @@ final class BeforeAppModel: ObservableObject {
         context.insert(record)
         try? context.save()
         activeBalanceSession = nil
+        presentLetGo( LetGoCopyLibrary.savedBalanceContext(for: record) )
         persistActiveWorkspaceState()
     }
 
@@ -292,6 +293,7 @@ final class BeforeAppModel: ObservableObject {
         context.insert(record)
         try? context.save()
         activeMirrorSession = nil
+        presentLetGo( LetGoCopyLibrary.savedMirrorContext(for: record) )
         persistActiveWorkspaceState()
     }
 
@@ -728,6 +730,11 @@ final class BeforeAppModel: ObservableObject {
     private func presentLetGo(for item: TomorrowBoxItem) {
         selectedTab = .home
         letGoContext = LetGoCopyLibrary.tomorrowBoxContext(for: item)
+    }
+
+    private func presentLetGo(_ context: LetGoContext) {
+        selectedTab = .home
+        letGoContext = context
     }
 
     private func trimReminders(in context: ModelContext) {

@@ -37,4 +37,47 @@ final class LetGoCopyLibraryTests: XCTestCase {
         XCTAssertTrue(context.title.contains("enough"))
         XCTAssertTrue(context.completionSubtitle.contains("evening"))
     }
+
+    func testSavedBalanceContextPointsToHistoryAsSecondarySurface() {
+        let record = BalanceDecisionRecord(
+            prompt: "Should I take the easier option?",
+            desire: "Convenience",
+            concern: "Drift",
+            constraint: "Time",
+            longTerm: "Regret",
+            focusTitle: "Reality first",
+            focusSummary: "The schedule pressure matters more than the fantasy version of the plan.",
+            nextAction: "Choose the version you can actually sustain tonight.",
+            entrySource: .app
+        )
+
+        let context = LetGoCopyLibrary.savedBalanceContext(for: record)
+
+        XCTAssertEqual(context.mode, .balance)
+        XCTAssertEqual(context.primaryTarget, .home)
+        XCTAssertEqual(context.secondaryTarget, .history)
+        XCTAssertTrue(context.settledDetail.contains("History"))
+    }
+
+    func testSavedMirrorContextUsesMirrorSpecificEndingLanguage() {
+        let record = MirrorDecisionRecord(
+            prompt: "Should I keep doing this?",
+            emotion: "Tired",
+            relationship: "Misaligned",
+            reality: "Shared commitments",
+            longTerm: "More erosion",
+            selfLens: "I feel smaller here",
+            coreTension: "I keep confusing care with endurance.",
+            nextActionTitle: "Separate the fear from the fit",
+            nextAction: "Write what would need to change for staying to feel honest.",
+            entrySource: .app
+        )
+
+        let context = LetGoCopyLibrary.savedMirrorContext(for: record)
+
+        XCTAssertEqual(context.mode, .mirror)
+        XCTAssertTrue(context.title.contains("enough"))
+        XCTAssertTrue(context.completionSubtitle.contains("night"))
+        XCTAssertEqual(context.secondaryTarget, .history)
+    }
 }
