@@ -28,6 +28,17 @@ struct TomorrowBoxDraft: Codable, Equatable, Sendable {
         )
     }
 
+    static func quick(from event: CheckEvent) -> TomorrowBoxDraft {
+        TomorrowBoxDraft(
+            prompt: trimmed(event.note),
+            scenarioRaw: event.scenario.rawValue,
+            motivationRaw: event.motivation.rawValue,
+            expectedOutcomeRaw: event.expectedOutcome.rawValue,
+            controlLevelRaw: event.controlLevel.rawValue,
+            note: trimmed(event.note)
+        )
+    }
+
     @MainActor
     static func balance(from session: BalanceBoardSession) -> TomorrowBoxDraft {
         TomorrowBoxDraft(
@@ -36,6 +47,16 @@ struct TomorrowBoxDraft: Codable, Equatable, Sendable {
             concern: trimmed(session.concern),
             constraint: trimmed(session.constraint),
             longTerm: trimmed(session.longTerm)
+        )
+    }
+
+    static func balance(from record: BalanceDecisionRecord) -> TomorrowBoxDraft {
+        TomorrowBoxDraft(
+            prompt: trimmed(record.prompt),
+            desire: trimmed(record.desire),
+            concern: trimmed(record.concern),
+            constraint: trimmed(record.constraint),
+            longTerm: trimmed(record.longTerm)
         )
     }
 
@@ -48,6 +69,17 @@ struct TomorrowBoxDraft: Codable, Equatable, Sendable {
             relationship: trimmed(session.relationship),
             reality: trimmed(session.reality),
             selfLens: trimmed(session.selfLens)
+        )
+    }
+
+    static func mirror(from record: MirrorDecisionRecord) -> TomorrowBoxDraft {
+        TomorrowBoxDraft(
+            prompt: trimmed(record.prompt),
+            longTerm: trimmed(record.longTerm),
+            emotion: trimmed(record.emotion),
+            relationship: trimmed(record.relationship),
+            reality: trimmed(record.reality),
+            selfLens: trimmed(record.selfLens)
         )
     }
 

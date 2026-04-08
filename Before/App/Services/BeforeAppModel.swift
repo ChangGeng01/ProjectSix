@@ -304,6 +304,48 @@ final class BeforeAppModel: ObservableObject {
         persistActiveWorkspaceState()
     }
 
+    func reopenCheckEvent(_ event: CheckEvent) {
+        clearActiveDecisionFlows()
+        activeQuickSession = event.restoredSession()
+        selectedTab = 0
+        persistActiveWorkspaceState()
+    }
+
+    func reopenBalanceRecord(_ record: BalanceDecisionRecord) {
+        clearActiveDecisionFlows()
+        activeBalanceSession = record.restoredSession()
+        selectedTab = 0
+        persistActiveWorkspaceState()
+    }
+
+    func reopenMirrorRecord(_ record: MirrorDecisionRecord) {
+        clearActiveDecisionFlows()
+        activeMirrorSession = record.restoredSession()
+        selectedTab = 0
+        persistActiveWorkspaceState()
+    }
+
+    func moveCheckEventToTomorrow(_ event: CheckEvent) {
+        let context = modelContainer.mainContext
+        context.insert(event.makeTomorrowBoxItem())
+        try? context.save()
+        selectedTab = 1
+    }
+
+    func moveBalanceRecordToTomorrow(_ record: BalanceDecisionRecord) {
+        let context = modelContainer.mainContext
+        context.insert(record.makeTomorrowBoxItem())
+        try? context.save()
+        selectedTab = 1
+    }
+
+    func moveMirrorRecordToTomorrow(_ record: MirrorDecisionRecord) {
+        let context = modelContainer.mainContext
+        context.insert(record.makeTomorrowBoxItem())
+        try? context.save()
+        selectedTab = 1
+    }
+
     func removeTomorrowBoxItem(_ item: TomorrowBoxItem) {
         if let eventID = item.linkedCheckEventID {
             NotificationService.shared.cancelTomorrowNotification(eventID: eventID)

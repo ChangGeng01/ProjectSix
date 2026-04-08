@@ -8,6 +8,7 @@ struct HistoryView: View {
     @Query(sort: \MirrorDecisionRecord.updatedAt, order: .reverse) private var mirrorRecords: [MirrorDecisionRecord]
     @Query(sort: \TomorrowBoxItem.createdAt, order: .reverse) private var tomorrowItems: [TomorrowBoxItem]
     @State private var selectedFilter: HistoryFilter = .all
+    @State private var selectedDetail: HistoryDetailSelection?
 
     var body: some View {
         NavigationStack {
@@ -74,6 +75,10 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("History")
+            .sheet(item: $selectedDetail) { selection in
+                HistoryDetailView(selection: selection)
+                    .environmentObject(appModel)
+            }
         }
     }
 
@@ -109,100 +114,115 @@ struct HistoryView: View {
     private func historyCard(for item: HistoryTimelineItem) -> some View {
         switch item.content {
         case .quick(let event):
-            PanelCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Label(event.scenario.title, systemImage: event.scenario.symbolName)
-                        Spacer()
-                        Text(event.verdict.title)
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(
-                                Capsule()
-                                    .fill(BeforeTheme.ember.opacity(0.18))
-                            )
-                    }
+            Button {
+                selectedDetail = .quick(event)
+            } label: {
+                PanelCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Label(event.scenario.title, systemImage: event.scenario.symbolName)
+                            Spacer()
+                            Text(event.verdict.title)
+                                .font(.caption.weight(.semibold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(BeforeTheme.ember.opacity(0.18))
+                                )
+                        }
 
-                    Text(event.currentPerspective)
-                        .font(.headline)
-                        .foregroundStyle(BeforeTheme.ink)
+                        Text(event.currentPerspective)
+                            .font(.headline)
+                            .foregroundStyle(BeforeTheme.ink)
 
-                    Text(event.afterPerspective)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    HStack {
-                        Text(event.createdAt, style: .relative)
-                            .font(.caption)
+                        Text(event.afterPerspective)
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
-                        Spacer()
-                        if let reflection = event.reflectionOutcome {
-                            Text(reflection.title)
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(BeforeTheme.moss)
+
+                        HStack {
+                            Text(event.createdAt, style: .relative)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            if let reflection = event.reflectionOutcome {
+                                Text(reflection.title)
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(BeforeTheme.moss)
+                            }
                         }
                     }
                 }
             }
+            .buttonStyle(.plain)
 
         case .balance(let board):
-            PanelCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Label("Balance board", systemImage: DecisionMode.balance.symbolName)
-                        Spacer()
-                        Text(board.focusTitle)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(BeforeTheme.moss)
+            Button {
+                selectedDetail = .balance(board)
+            } label: {
+                PanelCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Label("Balance board", systemImage: DecisionMode.balance.symbolName)
+                            Spacer()
+                            Text(board.focusTitle)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(BeforeTheme.moss)
+                        }
+
+                        Text(board.prompt)
+                            .font(.headline)
+                            .foregroundStyle(BeforeTheme.ink)
+
+                        Text(board.focusSummary)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        Text(board.nextAction)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(BeforeTheme.ember)
+
+                        Text(board.updatedAt, style: .relative)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-
-                    Text(board.prompt)
-                        .font(.headline)
-                        .foregroundStyle(BeforeTheme.ink)
-
-                    Text(board.focusSummary)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    Text(board.nextAction)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(BeforeTheme.ember)
-
-                    Text(board.updatedAt, style: .relative)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
             }
+            .buttonStyle(.plain)
 
         case .mirror(let record):
-            PanelCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Label("Mirror", systemImage: DecisionMode.mirror.symbolName)
-                        Spacer()
-                        Text(record.nextActionTitle)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(BeforeTheme.moss)
+            Button {
+                selectedDetail = .mirror(record)
+            } label: {
+                PanelCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Label("Mirror", systemImage: DecisionMode.mirror.symbolName)
+                            Spacer()
+                            Text(record.nextActionTitle)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(BeforeTheme.moss)
+                        }
+
+                        Text(record.prompt)
+                            .font(.headline)
+                            .foregroundStyle(BeforeTheme.ink)
+
+                        Text(record.coreTension)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        Text(record.nextAction)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(BeforeTheme.ember)
+
+                        Text(record.updatedAt, style: .relative)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-
-                    Text(record.prompt)
-                        .font(.headline)
-                        .foregroundStyle(BeforeTheme.ink)
-
-                    Text(record.coreTension)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    Text(record.nextAction)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(BeforeTheme.ember)
-
-                    Text(record.updatedAt, style: .relative)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
             }
+            .buttonStyle(.plain)
         }
     }
 
