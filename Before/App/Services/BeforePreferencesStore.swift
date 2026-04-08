@@ -1,5 +1,32 @@
 import Foundation
 
+enum OnDeviceIntelligenceMode: String, CaseIterable, Codable, Identifiable, Sendable {
+    case off
+    case assistive
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .off: "Off"
+        case .assistive: "Assistive"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .off:
+            "Use the deterministic decision system only."
+        case .assistive:
+            "Let local intelligence tighten routing, summaries, and reminder recall without owning verdicts."
+        }
+    }
+
+    var isEnabled: Bool {
+        self == .assistive
+    }
+}
+
 enum HomePromptAction: String, CaseIterable, Codable, Identifiable, Sendable {
     case autoRoute
     case quick
@@ -41,13 +68,46 @@ struct BeforePreferences: Codable, Equatable, Sendable {
     var quickBufferDuration: QuickBufferDuration
     var restoreInProgressWorkspaces: Bool
     var showReviewInsights: Bool
+    var onDeviceIntelligenceMode: OnDeviceIntelligenceMode
 
     static let `default` = BeforePreferences(
         homePromptAction: .autoRoute,
         quickBufferDuration: BeforePolicy.QuickCheck.defaultBufferDuration,
         restoreInProgressWorkspaces: true,
-        showReviewInsights: true
+        showReviewInsights: true,
+        onDeviceIntelligenceMode: .assistive
     )
+
+    private enum CodingKeys: String, CodingKey {
+        case homePromptAction
+        case quickBufferDuration
+        case restoreInProgressWorkspaces
+        case showReviewInsights
+        case onDeviceIntelligenceMode
+    }
+
+    init(
+        homePromptAction: HomePromptAction,
+        quickBufferDuration: QuickBufferDuration,
+        restoreInProgressWorkspaces: Bool,
+        showReviewInsights: Bool,
+        onDeviceIntelligenceMode: OnDeviceIntelligenceMode
+    ) {
+        self.homePromptAction = homePromptAction
+        self.quickBufferDuration = quickBufferDuration
+        self.restoreInProgressWorkspaces = restoreInProgressWorkspaces
+        self.showReviewInsights = showReviewInsights
+        self.onDeviceIntelligenceMode = onDeviceIntelligenceMode
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.homePromptAction = try container.decodeIfPresent(HomePromptAction.self, forKey: .homePromptAction) ?? BeforePreferences.default.homePromptAction
+        self.quickBufferDuration = try container.decodeIfPresent(QuickBufferDuration.self, forKey: .quickBufferDuration) ?? BeforePreferences.default.quickBufferDuration
+        self.restoreInProgressWorkspaces = try container.decodeIfPresent(Bool.self, forKey: .restoreInProgressWorkspaces) ?? BeforePreferences.default.restoreInProgressWorkspaces
+        self.showReviewInsights = try container.decodeIfPresent(Bool.self, forKey: .showReviewInsights) ?? BeforePreferences.default.showReviewInsights
+        self.onDeviceIntelligenceMode = try container.decodeIfPresent(OnDeviceIntelligenceMode.self, forKey: .onDeviceIntelligenceMode) ?? BeforePreferences.default.onDeviceIntelligenceMode
+    }
 }
 
 enum BeforePreferencesStore {

@@ -23,11 +23,33 @@ final class BeforePreferencesStoreTests: XCTestCase {
             homePromptAction: .balance,
             quickBufferDuration: .tenMinutes,
             restoreInProgressWorkspaces: false,
-            showReviewInsights: false
+            showReviewInsights: false,
+            onDeviceIntelligenceMode: .off
         )
 
         BeforePreferencesStore.save(preferences)
 
         XCTAssertEqual(BeforePreferencesStore.load(), preferences)
+    }
+
+    func testLoadMigratesMissingIntelligenceModeToDefault() throws {
+        let legacyData = """
+        {
+          "homePromptAction": "quick",
+          "quickBufferDuration": "fiveMinutes",
+          "restoreInProgressWorkspaces": false,
+          "showReviewInsights": true
+        }
+        """.data(using: .utf8)!
+
+        UserDefaults.standard.set(legacyData, forKey: key)
+
+        let loaded = BeforePreferencesStore.load()
+
+        XCTAssertEqual(loaded.homePromptAction, .quick)
+        XCTAssertEqual(loaded.quickBufferDuration, .fiveMinutes)
+        XCTAssertEqual(loaded.restoreInProgressWorkspaces, false)
+        XCTAssertEqual(loaded.showReviewInsights, true)
+        XCTAssertEqual(loaded.onDeviceIntelligenceMode, .assistive)
     }
 }

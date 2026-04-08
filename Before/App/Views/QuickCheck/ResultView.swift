@@ -82,7 +82,11 @@ struct ResultView: View {
                 }
             }
             .task {
-                reminderText = appModel.bestReminder(for: session.scenario)
+                reminderText = appModel.bestReminder(
+                    for: session.scenario,
+                    prompt: session.note,
+                    mode: .quick
+                )
             }
         }
     }

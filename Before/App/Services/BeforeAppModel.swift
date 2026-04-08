@@ -63,7 +63,7 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func routeDecision(prompt: String, entrySource: EntrySource) -> RoutedDecision {
-        let route = DecisionModeRouter.route(prompt: prompt)
+        let route = DecisionIntelligenceCoordinator.route(prompt: prompt, preferences: preferences)
         startDecisionMode(route.mode, entrySource: entrySource, prompt: prompt)
         return route
     }
@@ -436,10 +436,20 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func bestReminder(for scenario: ScenarioType) -> String? {
+        bestReminder(for: scenario, prompt: "", mode: nil)
+    }
+
+    func bestReminder(for scenario: ScenarioType, prompt: String, mode: DecisionMode?) -> String? {
         let context = modelContainer.mainContext
         let descriptor = FetchDescriptor<SelfReminder>()
         let reminders = (try? context.fetch(descriptor)) ?? []
-        return ReminderSelectionPolicy.bestReminder(in: reminders, for: scenario)?.content
+        return DecisionIntelligenceCoordinator.bestReminder(
+            from: reminders,
+            scenario: scenario,
+            prompt: prompt,
+            mode: mode,
+            preferences: preferences
+        )?.content
     }
 
     func latestEvents(limit: Int = BeforePolicy.QuickCheck.recentHistoryLimit) -> [CheckEvent] {

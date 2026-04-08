@@ -84,7 +84,11 @@ struct WaitView: View {
             if secondsRemaining == 0 {
                 secondsRemaining = appModel.preferences.quickBufferDuration.seconds
             }
-            reminderText = appModel.bestReminder(for: session.scenario)
+            reminderText = appModel.bestReminder(
+                for: session.scenario,
+                prompt: session.note,
+                mode: .quick
+            )
             await NotificationService.shared.scheduleWaitFinishedNotification(
                 sessionID: session.id,
                 duration: appModel.preferences.quickBufferDuration

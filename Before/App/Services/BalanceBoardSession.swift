@@ -23,8 +23,8 @@ final class BalanceBoardSession: ObservableObject, Identifiable {
 
     func evaluate() {
         guard canEvaluate else { return }
-        result = BalanceBoardEngine.evaluate(
-            BalanceBoardInput(
+        result = DecisionIntelligenceCoordinator.balanceResult(
+            for: BalanceBoardInput(
                 prompt: trimmed(prompt),
                 desire: trimmed(desire),
                 concern: trimmed(concern),

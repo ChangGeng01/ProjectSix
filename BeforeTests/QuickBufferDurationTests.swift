@@ -12,7 +12,8 @@ final class QuickBufferDurationTests: XCTestCase {
             homePromptAction: .autoRoute,
             quickBufferDuration: .fiveMinutes,
             restoreInProgressWorkspaces: true,
-            showReviewInsights: true
+            showReviewInsights: true,
+            onDeviceIntelligenceMode: .assistive
         )
 
         XCTAssertEqual(CheckAction.wait90s.title(using: preferences.quickBufferDuration), "Wait 5 minutes")

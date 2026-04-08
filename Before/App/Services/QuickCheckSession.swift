@@ -32,6 +32,6 @@ final class QuickCheckSession: ObservableObject, Identifiable {
             controlLevel: controlLevel,
             note: note.trimmingCharacters(in: .whitespacesAndNewlines)
         )
-        result = CheckRuleEngine.evaluate(input)
+        result = DecisionIntelligenceCoordinator.quickResult(for: input)
     }
 }

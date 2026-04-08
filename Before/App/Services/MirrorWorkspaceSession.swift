@@ -24,8 +24,8 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
 
     func evaluate() {
         guard canEvaluate else { return }
-        result = MirrorEngine.evaluate(
-            MirrorInput(
+        result = DecisionIntelligenceCoordinator.mirrorResult(
+            for: MirrorInput(
                 prompt: trimmed(prompt),
                 emotion: trimmed(emotion),
                 relationship: trimmed(relationship),

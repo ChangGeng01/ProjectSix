@@ -63,6 +63,18 @@ struct SettingsView: View {
                     Toggle("Show review insights", isOn: reviewInsightsBinding)
                 }
 
+                Section("On-device intelligence") {
+                    Picker("Assistive intelligence", selection: intelligenceModeBinding) {
+                        ForEach(OnDeviceIntelligenceMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+
+                    Text(appModel.preferences.onDeviceIntelligenceMode.subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
                 Section("System surfaces") {
                     Label("Widget-first entry", systemImage: "square.grid.2x2")
                     Label("Siri connected but not primary", systemImage: "waveform")
@@ -183,6 +195,15 @@ struct SettingsView: View {
             get: { appModel.preferences.showReviewInsights },
             set: { newValue in
                 appModel.updatePreferences { $0.showReviewInsights = newValue }
+            }
+        )
+    }
+
+    private var intelligenceModeBinding: Binding<OnDeviceIntelligenceMode> {
+        Binding(
+            get: { appModel.preferences.onDeviceIntelligenceMode },
+            set: { newValue in
+                appModel.updatePreferences { $0.onDeviceIntelligenceMode = newValue }
             }
         )
     }

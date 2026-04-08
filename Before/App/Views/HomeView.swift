@@ -204,7 +204,10 @@ struct HomeView: View {
             )
         }
 
-        let routed = DecisionModeRouter.route(prompt: trimmedPrompt)
+        let routed = DecisionIntelligenceCoordinator.route(
+            prompt: trimmedPrompt,
+            preferences: appModel.preferences
+        )
         return HomePromptPreview(
             mode: routed.mode,
             title: "This looks like a \(routed.mode.title.lowercased()) question.",

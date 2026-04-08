@@ -89,7 +89,11 @@ struct QuickCheckView: View {
                 }
             }
             .task(id: session.scenario) {
-                displayedReminder = appModel.bestReminder(for: session.scenario)
+                displayedReminder = appModel.bestReminder(
+                    for: session.scenario,
+                    prompt: session.note,
+                    mode: .quick
+                )
             }
             .sheet(
                 isPresented: Binding(
