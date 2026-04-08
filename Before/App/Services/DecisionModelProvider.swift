@@ -3,12 +3,14 @@ import Foundation
 enum DecisionModelProviderKind: String, Sendable {
     case gemmaE4B
     case foundationModels
+    case testingStub
     case template
 
     var title: String {
         switch self {
         case .gemmaE4B: "Gemma 4 E4B"
         case .foundationModels: "Apple Foundation Model"
+        case .testingStub: "Testing stub"
         case .template: "Deterministic fallback"
         }
     }

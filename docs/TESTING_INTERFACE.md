@@ -21,6 +21,9 @@ The app reads these values at launch and folds them into the stored preferences 
 - `BEFORE_TEST_ALLOW_FALLBACKS`
   - accepted truthy values: `1`, `true`, `yes`, `on`
   - accepted falsy values: `0`, `false`, `no`, `off`
+- `BEFORE_TEST_MODEL_STUB_PROFILE`
+  - accepted values: `smoke`
+  - when present, Before bypasses live model providers and uses a deterministic testing stub for refinement and reminder selection
 
 ## XCTest / UI Test Usage
 
@@ -30,7 +33,8 @@ You can build a consistent launch environment from code:
 let environment = DecisionTestingInterface.launchEnvironment(
     intelligenceMode: .assistive,
     preferredProvider: .gemmaE4B,
-    allowFallbacks: false
+    allowFallbacks: false,
+    stubProfile: .smoke
 )
 ```
 
@@ -53,6 +57,7 @@ let snapshot = DecisionTestingInterface.runtimeSnapshot()
 This snapshot includes:
 
 - effective preferences
+- active testing stub profile, if one was injected
 - active runtime status
 - Apple Foundation Models availability
 - Gemma provider availability
@@ -74,4 +79,5 @@ Trace and replay access is `@MainActor`, matching the debug store’s threading 
 - Keep the user-facing app free of developer-only controls.
 - Prefer launch-environment overrides for tests over hidden debug toggles.
 - Treat model provider switching as a testing and automation concern, not a normal settings concern.
+- Prefer the testing stub when UI tests or smoke tests need stable model output without depending on Gemma or Apple runtime availability.
 - Keep quick verdict ownership in the deterministic rules layer, even when assistive model refinement is enabled.

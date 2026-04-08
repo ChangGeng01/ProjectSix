@@ -5,6 +5,7 @@ enum DecisionIntelligenceCoordinator {
 
     static func runtimeStatus(
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences(),
+        testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile,
         gemmaStatus: DecisionModelProviderStatus = GemmaE4BIntelligenceService.availabilityStatus,
         foundationStatus: DecisionModelProviderStatus = FoundationModelsIntelligenceService.availabilityStatus
     ) -> DecisionModelRuntimeStatus {
@@ -13,7 +14,8 @@ enum DecisionIntelligenceCoordinator {
             statusesByKind: [
                 .gemmaE4B: gemmaStatus,
                 .foundationModels: foundationStatus
-            ]
+            ],
+            testingStubProfile: testingStubProfile
         )
     }
 

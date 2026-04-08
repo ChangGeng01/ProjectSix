@@ -43,10 +43,17 @@ struct DecisionTestingInterfaceTests {
             allowModelFallbacks: true
         )
 
-        let snapshot = DecisionTestingInterface.runtimeSnapshot(preferences: preferences)
+        let snapshot = DecisionTestingInterface.runtimeSnapshot(
+            preferences: preferences,
+            environment: [:]
+        )
 
         #expect(snapshot.preferences == preferences)
-        #expect(snapshot.runtimeStatus == DecisionIntelligenceCoordinator.runtimeStatus(preferences: preferences))
+        #expect(snapshot.testingStubProfile == nil)
+        #expect(snapshot.runtimeStatus == DecisionIntelligenceCoordinator.runtimeStatus(
+            preferences: preferences,
+            testingStubProfile: nil
+        ))
         #expect(snapshot.runtimeStatus.active == .template)
     }
 
@@ -55,12 +62,14 @@ struct DecisionTestingInterfaceTests {
         let environment = DecisionTestingInterface.launchEnvironment(
             intelligenceMode: .assistive,
             preferredProvider: .gemmaE4B,
-            allowFallbacks: false
+            allowFallbacks: false,
+            stubProfile: .smoke
         )
 
         #expect(environment[DecisionTestingInterface.EnvironmentKey.intelligenceMode] == "assistive")
         #expect(environment[DecisionTestingInterface.EnvironmentKey.preferredProvider] == "gemmaE4B")
         #expect(environment[DecisionTestingInterface.EnvironmentKey.allowFallbacks] == "0")
+        #expect(environment[DecisionTestingInterface.EnvironmentKey.stubProfile] == "smoke")
     }
 
     @Test
@@ -92,6 +101,20 @@ struct DecisionTestingInterfaceTests {
         #expect(effective.onDeviceIntelligenceMode == .assistive)
         #expect(effective.preferredIntelligenceProvider == .foundationModels)
         #expect(effective.allowModelFallbacks == true)
+    }
+
+    @Test
+    func environmentOverrideParsesTestingStubProfile() {
+        let environment = DecisionTestingInterface.launchEnvironment(
+            intelligenceMode: .assistive,
+            preferredProvider: .gemmaE4B,
+            allowFallbacks: true,
+            stubProfile: .smoke
+        )
+
+        let override = DecisionTestingInterface.environmentOverride(environment: environment)
+
+        #expect(override?.stubProfile == .smoke)
     }
 
     @Test

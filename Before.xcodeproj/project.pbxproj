@@ -24,6 +24,7 @@
 		11F77E80EE0F2B45F51AE79E /* DecisionReviewEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE5ECF006D7648F3C667BF84 /* DecisionReviewEngineTests.swift */; };
 		13AD02906D9AF2ECABC655C2 /* LetGoMotionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AE75E02F04EBA937CA1B8A3 /* LetGoMotionDetector.swift */; };
 		167EC3CF0549AAFEED0A0940 /* DecisionModeRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44CADF38945C264E4DE6F821 /* DecisionModeRouter.swift */; };
+		18C8A6D0E76968EB5CB7A174 /* DecisionTestingStubProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0902DDCE1D710D597D2B43DF /* DecisionTestingStubProfile.swift */; };
 		1912360C43CECEE3A107BBE2 /* MirrorWorkspaceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70A414A2528AF11F510CD25 /* MirrorWorkspaceSession.swift */; };
 		19263068F7BD5DEF2A611842 /* TomorrowBoxDelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B506CA81E60C2268F94BB49 /* TomorrowBoxDelay.swift */; };
 		1B16408FE6065B5938D2C51C /* DecisionStarterLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D900CAAC9F53880921790B3 /* DecisionStarterLibrary.swift */; };
@@ -101,6 +102,7 @@
 		873075573792938B474AE0C9 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 546368DC120CDB70926CB195 /* HistoryView.swift */; };
 		8778D84FF644B965A734E2AE /* SupportMetricBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 370CE5AB9760497CFEBE0361 /* SupportMetricBlock.swift */; };
 		8955A79E10D850EECA0739CC /* DecisionIntelligencePromptContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F56AFCB0B70F9BE7E014100 /* DecisionIntelligencePromptContractTests.swift */; };
+		8A3AC99CE30C1E3AFD39311E /* TestingDecisionIntelligenceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47EBB9A1A6B11F195895C43F /* TestingDecisionIntelligenceProvider.swift */; };
 		8B2CA2CE45540D3CDE6F2B9B /* PersistenceBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922541BCCDEEF8FA8FE5E169 /* PersistenceBootstrap.swift */; };
 		8D6E53B8156501A71CF98272 /* CheckVerdict.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58C429E74F83380B3EB5DD21 /* CheckVerdict.swift */; };
 		8FAC775FD6270B1BF688FA4A /* ScenarioType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79FE2701FB38D185371AA573 /* ScenarioType.swift */; };
@@ -229,6 +231,7 @@
 		078D41DF98B71E11CD93C772 /* SharedLifeItemFactoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLifeItemFactoryTests.swift; sourceTree = "<group>"; };
 		0878363BE996C18206470FE0 /* GuidedInputCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedInputCard.swift; sourceTree = "<group>"; };
 		089FFE692CB2D08A060A21AC /* TomorrowBoxDelayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxDelayTests.swift; sourceTree = "<group>"; };
+		0902DDCE1D710D597D2B43DF /* DecisionTestingStubProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionTestingStubProfile.swift; sourceTree = "<group>"; };
 		0D0F4B964794D48979212BA9 /* GemmaModelAssetCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GemmaModelAssetCatalog.swift; sourceTree = "<group>"; };
 		0DAB364E56E5EA8CCC7204F3 /* BeforePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforePolicy.swift; sourceTree = "<group>"; };
 		0E0334A8565803EF7707BB38 /* PendingLaunchRequestStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingLaunchRequestStore.swift; sourceTree = "<group>"; };
@@ -270,6 +273,7 @@
 		3FBEC07A4802202A55F07273 /* BeforeTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeTheme.swift; sourceTree = "<group>"; };
 		438899EA716D6093E4500048 /* DecisionRecordRestorationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionRecordRestorationTests.swift; sourceTree = "<group>"; };
 		44CADF38945C264E4DE6F821 /* DecisionModeRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionModeRouter.swift; sourceTree = "<group>"; };
+		47EBB9A1A6B11F195895C43F /* TestingDecisionIntelligenceProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestingDecisionIntelligenceProvider.swift; sourceTree = "<group>"; };
 		4C1CF4BDBA8776C1E59C9B45 /* CheckAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckAction.swift; sourceTree = "<group>"; };
 		4C202B77A6D3DD97C78CDC6F /* GemmaLocalRuntimeBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GemmaLocalRuntimeBridge.swift; sourceTree = "<group>"; };
 		4DDB21D625F2F95F5D016974 /* TomorrowBoxDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxDraft.swift; sourceTree = "<group>"; };
@@ -457,6 +461,7 @@
 				7B2D947D30BE6BCB8C3A28A6 /* DecisionReviewEngine.swift */,
 				1D900CAAC9F53880921790B3 /* DecisionStarterLibrary.swift */,
 				3418C7D3898FC17BBD65C3DB /* DecisionTestingInterface.swift */,
+				0902DDCE1D710D597D2B43DF /* DecisionTestingStubProfile.swift */,
 				375B68124108DDEB478DD2EE /* DeveloperDecisionReplayBuilder.swift */,
 				E9236FC498B39FD0A29ED234 /* FoundationModelsIntelligenceService.swift */,
 				89976181A6C6D07117C3220F /* GemmaE4BIntelligenceService.swift */,
@@ -477,6 +482,7 @@
 				90848CE193E40A87CF870DFA /* SupportInboxStore.swift */,
 				F3163BA3375D030F9A4BECEA /* SupportRequestFactory.swift */,
 				D9188451B9E1E6CC57E271BF /* TemplateLocalModelAdapter.swift */,
+				47EBB9A1A6B11F195895C43F /* TestingDecisionIntelligenceProvider.swift */,
 				D62498CF59BEC1AC487951E9 /* TomorrowBoxItemFactory.swift */,
 			);
 			path = Services;
@@ -897,6 +903,7 @@
 				67EE16CD290619AAB8F5A647 /* DecisionRoutePreviewCard.swift in Sources */,
 				1B16408FE6065B5938D2C51C /* DecisionStarterLibrary.swift in Sources */,
 				73D203E36532ADCAC6538D01 /* DecisionTestingInterface.swift in Sources */,
+				18C8A6D0E76968EB5CB7A174 /* DecisionTestingStubProfile.swift in Sources */,
 				64B17580818F6EB045D8C841 /* DecisionTraceDetailView.swift in Sources */,
 				EFC2A7E17CE71EF3FAB55874 /* DeveloperDecisionReplayBuilder.swift in Sources */,
 				BA99C96ABD658EADEE79DE5B /* EntrySource.swift in Sources */,
@@ -964,6 +971,7 @@
 				9EC97EE9323F24A7BC5F5FD0 /* SupportSurfaceTarget.swift in Sources */,
 				EB8585D15C914F624AEC8386 /* SupportView.swift in Sources */,
 				10D2FDC1606BE7EB44BBC1EA /* TemplateLocalModelAdapter.swift in Sources */,
+				8A3AC99CE30C1E3AFD39311E /* TestingDecisionIntelligenceProvider.swift in Sources */,
 				BEF9FB6AD6634CB9001B3E8A /* TomorrowBoxDelay.swift in Sources */,
 				514E8C0F9F44F8BAE2173DDB /* TomorrowBoxDraft.swift in Sources */,
 				91FCA41E7AC8B16CB8884144 /* TomorrowBoxItem.swift in Sources */,

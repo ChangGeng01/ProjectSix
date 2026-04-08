@@ -2,6 +2,7 @@ import Foundation
 
 struct DecisionTestingRuntimeSnapshot: Equatable, Sendable {
     let preferences: BeforePreferences
+    let testingStubProfile: DecisionTestingStubProfile?
     let runtimeStatus: DecisionModelRuntimeStatus
     let foundationStatus: DecisionModelProviderStatus
     let gemmaProviderStatus: DecisionModelProviderStatus
@@ -13,9 +14,10 @@ struct DecisionTestingEnvironmentOverride: Equatable, Sendable {
     var intelligenceMode: OnDeviceIntelligenceMode?
     var preferredProvider: DecisionModelProviderPreference?
     var allowFallbacks: Bool?
+    var stubProfile: DecisionTestingStubProfile?
 
     var isEmpty: Bool {
-        intelligenceMode == nil && preferredProvider == nil && allowFallbacks == nil
+        intelligenceMode == nil && preferredProvider == nil && allowFallbacks == nil && stubProfile == nil
     }
 }
 
@@ -24,6 +26,7 @@ enum DecisionTestingInterface {
         static let intelligenceMode = "BEFORE_TEST_INTELLIGENCE_MODE"
         static let preferredProvider = "BEFORE_TEST_MODEL_PROVIDER"
         static let allowFallbacks = "BEFORE_TEST_ALLOW_FALLBACKS"
+        static let stubProfile = "BEFORE_TEST_MODEL_STUB_PROFILE"
     }
 
     static func configuredPreferences(
@@ -48,7 +51,8 @@ enum DecisionTestingInterface {
     static func launchEnvironment(
         intelligenceMode: OnDeviceIntelligenceMode? = nil,
         preferredProvider: DecisionModelProviderPreference? = nil,
-        allowFallbacks: Bool? = nil
+        allowFallbacks: Bool? = nil,
+        stubProfile: DecisionTestingStubProfile? = nil
     ) -> [String: String] {
         var environment: [String: String] = [:]
         if let intelligenceMode {
@@ -59,6 +63,9 @@ enum DecisionTestingInterface {
         }
         if let allowFallbacks {
             environment[EnvironmentKey.allowFallbacks] = allowFallbacks ? "1" : "0"
+        }
+        if let stubProfile {
+            environment[EnvironmentKey.stubProfile] = stubProfile.rawValue
         }
         return environment
     }
@@ -72,7 +79,9 @@ enum DecisionTestingInterface {
             preferredProvider: environment[EnvironmentKey.preferredProvider]
                 .flatMap(DecisionModelProviderPreference.init(rawValue:)),
             allowFallbacks: environment[EnvironmentKey.allowFallbacks]
-                .flatMap(parseBoolOverride(_:))
+                .flatMap(parseBoolOverride(_:)),
+            stubProfile: environment[EnvironmentKey.stubProfile]
+                .flatMap(DecisionTestingStubProfile.init(rawValue:))
         )
 
         return override.isEmpty ? nil : override
@@ -99,11 +108,17 @@ enum DecisionTestingInterface {
     }
 
     static func runtimeSnapshot(
-        preferences: BeforePreferences = effectivePreferences()
+        preferences: BeforePreferences = effectivePreferences(),
+        environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> DecisionTestingRuntimeSnapshot {
-        DecisionTestingRuntimeSnapshot(
+        let stubProfile = environmentOverride(environment: environment)?.stubProfile
+        return DecisionTestingRuntimeSnapshot(
             preferences: preferences,
-            runtimeStatus: DecisionIntelligenceCoordinator.runtimeStatus(preferences: preferences),
+            testingStubProfile: stubProfile,
+            runtimeStatus: DecisionIntelligenceCoordinator.runtimeStatus(
+                preferences: preferences,
+                testingStubProfile: stubProfile
+            ),
             foundationStatus: FoundationModelsIntelligenceService.availabilityStatus,
             gemmaProviderStatus: GemmaE4BIntelligenceService.availabilityStatus,
             gemmaBundleStatus: GemmaE4BIntelligenceService.modelBundleStatus,

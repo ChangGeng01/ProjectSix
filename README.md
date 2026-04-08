@@ -63,5 +63,6 @@ xcodebuild -project Before.xcodeproj -scheme Before -destination 'platform=iOS S
 - Apple Foundation Models can refine local copy on supported devices.
 - Gemma 4 E4B is prepared as a bundled `.litertlm` asset under `Before/Resources/Models`, with runtime fallback to Apple or deterministic copy when unavailable.
 - Model switching for tests is driven through `DecisionTestingInterface` and launch environment overrides instead of in-app developer UI.
+- Tests can pin a deterministic `smoke` stub provider through launch environment when refinement paths need stable output without a live model runtime.
 - See `/Users/changgeng/Project/Project06/Project06/docs/TESTING_INTERFACE.md` for launch keys and examples.
-- The project currently includes `115` XCTest cases and `7` Swift Testing cases covering routing, restoration, storage, reminders, review insights, typed preferences, testing overrides, and model-provider fallback behavior.
+- The project currently includes `121` XCTest cases and `8` Swift Testing cases covering routing, restoration, storage, reminders, review insights, typed preferences, testing overrides, stub-model injection, and model-provider fallback behavior.

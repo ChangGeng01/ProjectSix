@@ -133,7 +133,8 @@ enum DecisionIntelligenceProviderPipeline {
 
     static func runtimeStatus(
         preferences: BeforePreferences,
-        statusesByKind: [DecisionModelProviderKind: DecisionModelProviderStatus] = defaultStatusesByKind()
+        statusesByKind: [DecisionModelProviderKind: DecisionModelProviderStatus] = defaultStatusesByKind(),
+        testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) -> DecisionModelRuntimeStatus {
         let preferred = preferences.preferredIntelligenceProvider.kind
 
@@ -143,6 +144,15 @@ enum DecisionIntelligenceProviderPipeline {
                 active: .template,
                 fallback: nil,
                 detail: "On-device intelligence is off, so Before is using the deterministic decision system only."
+            )
+        }
+
+        if let testingStubProfile, preferred != .template {
+            return DecisionModelRuntimeStatus(
+                preferred: preferred,
+                active: .testingStub,
+                fallback: .testingStub,
+                detail: "Testing stub profile '\(testingStubProfile.title)' is overriding live providers so the AI path can be verified without a model runtime."
             )
         }
 
@@ -205,7 +215,8 @@ enum DecisionIntelligenceProviderPipeline {
         base: QuickCheckResult,
         input: QuickCheckInput,
         preference: DecisionModelProviderPreference,
-        allowFallbacks: Bool
+        allowFallbacks: Bool,
+        testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> QuickCheckResult? {
         let prompt = DecisionIntelligencePromptContract.quickRefinementPrompt(base: base, input: input)
         guard preference != .template else {
@@ -222,7 +233,11 @@ enum DecisionIntelligenceProviderPipeline {
             return nil
         }
 
-        let providers = orderedProviders(for: preference, allowFallbacks: allowFallbacks)
+        let providers = orderedProviders(
+            for: preference,
+            allowFallbacks: allowFallbacks,
+            testingStubProfile: testingStubProfile
+        )
         let attemptedKinds = providers.map(\.kind)
 
         for provider in providers {
@@ -262,7 +277,8 @@ enum DecisionIntelligenceProviderPipeline {
         base: BalanceBoardResult,
         input: BalanceBoardInput,
         preference: DecisionModelProviderPreference,
-        allowFallbacks: Bool
+        allowFallbacks: Bool,
+        testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> BalanceBoardResult? {
         let prompt = DecisionIntelligencePromptContract.balanceRefinementPrompt(base: base, input: input)
         guard preference != .template else {
@@ -279,7 +295,11 @@ enum DecisionIntelligenceProviderPipeline {
             return nil
         }
 
-        let providers = orderedProviders(for: preference, allowFallbacks: allowFallbacks)
+        let providers = orderedProviders(
+            for: preference,
+            allowFallbacks: allowFallbacks,
+            testingStubProfile: testingStubProfile
+        )
         let attemptedKinds = providers.map(\.kind)
 
         for provider in providers {
@@ -319,7 +339,8 @@ enum DecisionIntelligenceProviderPipeline {
         base: MirrorResult,
         input: MirrorInput,
         preference: DecisionModelProviderPreference,
-        allowFallbacks: Bool
+        allowFallbacks: Bool,
+        testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> MirrorResult? {
         let prompt = DecisionIntelligencePromptContract.mirrorRefinementPrompt(base: base, input: input)
         guard preference != .template else {
@@ -336,7 +357,11 @@ enum DecisionIntelligenceProviderPipeline {
             return nil
         }
 
-        let providers = orderedProviders(for: preference, allowFallbacks: allowFallbacks)
+        let providers = orderedProviders(
+            for: preference,
+            allowFallbacks: allowFallbacks,
+            testingStubProfile: testingStubProfile
+        )
         let attemptedKinds = providers.map(\.kind)
 
         for provider in providers {
@@ -378,7 +403,8 @@ enum DecisionIntelligenceProviderPipeline {
         prompt: String,
         mode: DecisionMode?,
         preference: DecisionModelProviderPreference,
-        allowFallbacks: Bool
+        allowFallbacks: Bool,
+        testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> ReminderSelectionCandidate? {
         let clippedCandidates = Array(candidates.prefix(DecisionIntelligencePromptContract.Limit.reminderCandidates))
         guard !clippedCandidates.isEmpty, preference != .template else { return nil }
@@ -389,7 +415,11 @@ enum DecisionIntelligenceProviderPipeline {
             prompt: prompt,
             mode: mode
         )
-        let providers = orderedProviders(for: preference, allowFallbacks: allowFallbacks)
+        let providers = orderedProviders(
+            for: preference,
+            allowFallbacks: allowFallbacks,
+            testingStubProfile: testingStubProfile
+        )
         let attemptedKinds = providers.map(\.kind)
 
         for provider in providers {
@@ -438,9 +468,13 @@ enum DecisionIntelligenceProviderPipeline {
 
     private static func orderedProviders(
         for preference: DecisionModelProviderPreference,
-        allowFallbacks: Bool
+        allowFallbacks: Bool,
+        testingStubProfile: DecisionTestingStubProfile?
     ) -> [any DecisionIntelligenceProviding] {
-        orderedKinds(for: preference, allowFallbacks: allowFallbacks).compactMap { providersByKind[$0] }
+        if let testingStubProfile, preference != .template {
+            return [TestingDecisionIntelligenceProvider(profile: testingStubProfile)]
+        }
+        return orderedKinds(for: preference, allowFallbacks: allowFallbacks).compactMap { providersByKind[$0] }
     }
 
     private static func recordTrace(

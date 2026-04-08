@@ -165,4 +165,26 @@ final class DecisionIntelligenceCoordinatorTests: XCTestCase {
         XCTAssertEqual(status.active, .template)
         XCTAssertEqual(status.fallback, .template)
     }
+
+    func testRuntimeStatusCanBeForcedIntoTestingStub() {
+        let status = DecisionIntelligenceCoordinator.runtimeStatus(
+            preferences: assistivePreferences,
+            testingStubProfile: .smoke,
+            gemmaStatus: DecisionModelProviderStatus(
+                kind: .gemmaE4B,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Gemma is missing."
+            ),
+            foundationStatus: DecisionModelProviderStatus(
+                kind: .foundationModels,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Apple is off."
+            )
+        )
+
+        XCTAssertEqual(status.active, .testingStub)
+        XCTAssertEqual(status.fallback, .testingStub)
+    }
 }
