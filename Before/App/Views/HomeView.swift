@@ -151,6 +151,21 @@ struct HomeView: View {
                                 }
                             }
                         }
+
+                        PanelCard {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Need another perspective?")
+                                    .font(.headline)
+                                Text("Buddy keeps it personal. Shared Life keeps recurring household decisions from resetting every time.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+
+                                BeforeActionButton("Open Support Space", style: .secondary) {
+                                    appModel.supportSurface = .buddy
+                                    appModel.selectedTab = .support
+                                }
+                            }
+                        }
                     }
                     .padding(20)
                 }

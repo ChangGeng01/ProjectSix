@@ -17,11 +17,13 @@ final class BeforeAppModel: ObservableObject {
     @Published var activeMirrorSession: MirrorWorkspaceSession?
     @Published var reflectionContext: ReflectionContext?
     @Published var startupNotice: String?
+    @Published var supportSurface: SupportSurfaceTarget = .buddy
     @Published private(set) var preferences: BeforePreferences
     @AppStorage("before.hasSeenOnboarding") var hasSeenOnboarding = false
 
     let modelContainer: ModelContainer
     let supportInbox: SupportInboxStore
+    let sharedLifeStore: SharedLifeStore
     private var shouldPromptReflectionAfterBackground = false
     private var pendingReflectionContext: ReflectionContext?
 
@@ -30,6 +32,7 @@ final class BeforeAppModel: ObservableObject {
         self.startupNotice = startupNotice
         self.preferences = BeforePreferencesStore.load()
         self.supportInbox = SupportInboxStore()
+        self.sharedLifeStore = SharedLifeStore()
         restorePendingReflectionState()
     }
 
@@ -534,6 +537,7 @@ final class BeforeAppModel: ObservableObject {
         deleteAll(SelfReminder.self, in: context)
         clearTomorrowBox()
         supportInbox.clearAll()
+        sharedLifeStore.clearAll()
 
         PendingLaunchRequestStore.clear()
         WidgetSnapshotStore.clear()
@@ -564,6 +568,7 @@ final class BeforeAppModel: ObservableObject {
         let request = SupportRequestFactory.makeQuickRequest(from: session, result: result)
         supportInbox.insert(request)
         activeQuickSession = nil
+        supportSurface = .buddy
         selectedTab = .support
         ActiveDecisionWorkspaceStore.clear()
     }
@@ -573,6 +578,7 @@ final class BeforeAppModel: ObservableObject {
         let request = SupportRequestFactory.makeBalanceRequest(from: session)
         supportInbox.insert(request)
         activeBalanceSession = nil
+        supportSurface = .buddy
         selectedTab = .support
         ActiveDecisionWorkspaceStore.clear()
     }
@@ -582,6 +588,7 @@ final class BeforeAppModel: ObservableObject {
         let request = SupportRequestFactory.makeMirrorRequest(from: session)
         supportInbox.insert(request)
         activeMirrorSession = nil
+        supportSurface = .buddy
         selectedTab = .support
         ActiveDecisionWorkspaceStore.clear()
     }
@@ -610,6 +617,60 @@ final class BeforeAppModel: ObservableObject {
         context.insert(item)
         try? context.save()
         supportInbox.markHeard(request.id)
+        selectedTab = .box
+    }
+
+    @MainActor
+    func sendQuickSessionToSharedLife(_ session: QuickCheckSession, result: QuickCheckResult? = nil) {
+        sharedLifeStore.insert(SharedLifeItemFactory.makeQuickItem(from: session, result: result))
+        activeQuickSession = nil
+        supportSurface = .sharedLife
+        selectedTab = .support
+        ActiveDecisionWorkspaceStore.clear()
+    }
+
+    @MainActor
+    func sendBalanceSessionToSharedLife(_ session: BalanceBoardSession) {
+        sharedLifeStore.insert(SharedLifeItemFactory.makeBalanceItem(from: session))
+        activeBalanceSession = nil
+        supportSurface = .sharedLife
+        selectedTab = .support
+        ActiveDecisionWorkspaceStore.clear()
+    }
+
+    @MainActor
+    func sendMirrorSessionToSharedLife(_ session: MirrorWorkspaceSession) {
+        sharedLifeStore.insert(SharedLifeItemFactory.makeMirrorItem(from: session))
+        activeMirrorSession = nil
+        supportSurface = .sharedLife
+        selectedTab = .support
+        ActiveDecisionWorkspaceStore.clear()
+    }
+
+    func reopenSharedLifeItem(_ item: SharedLifeBoxItem) {
+        guard let mode = item.mode, let draft = item.draft else { return }
+
+        clearActiveDecisionFlows()
+        switch mode {
+        case .quick:
+            activeQuickSession = draft.restoreQuickSession(entrySource: .app)
+        case .balance:
+            activeBalanceSession = draft.restoreBalanceSession(entrySource: .app)
+        case .mirror:
+            activeMirrorSession = draft.restoreMirrorSession(entrySource: .app)
+        }
+
+        sharedLifeStore.markReviewing(item.id)
+        selectedTab = .home
+        persistActiveWorkspaceState()
+    }
+
+    func moveSharedLifeItemToTomorrow(_ item: SharedLifeBoxItem) {
+        guard let tomorrowItem = TomorrowBoxItemFactory.makeSharedLifeItem(from: item) else { return }
+        let context = modelContainer.mainContext
+        context.insert(tomorrowItem)
+        try? context.save()
+        sharedLifeStore.deferItem(item.id)
         selectedTab = .box
     }
 

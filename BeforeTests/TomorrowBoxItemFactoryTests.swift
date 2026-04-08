@@ -104,6 +104,32 @@ final class TomorrowBoxItemFactoryTests: XCTestCase {
         XCTAssertEqual(item.draft?.concern, "The hours look rough.")
     }
 
+    func testSharedLifeFactoryPreservesModeAndDraft() throws {
+        let item = SharedLifeBoxItem(
+            title: "Should we revisit the apartment plan?",
+            detail: "This is bigger than tonight's mood.",
+            status: .reviewing,
+            mode: .mirror,
+            prompt: "Should we move?",
+            draft: TomorrowBoxDraft(
+                prompt: "Should we move?",
+                longTerm: "Staying keeps shrinking our week.",
+                emotion: "Unsettled",
+                relationship: "We keep dodging the same tension.",
+                reality: "The commute is draining both of us.",
+                selfLens: "I do not feel spacious here."
+            )
+        )
+
+        let tomorrowItem = try XCTUnwrap(TomorrowBoxItemFactory.makeSharedLifeItem(from: item))
+
+        XCTAssertEqual(tomorrowItem.mode, DecisionMode.mirror)
+        XCTAssertEqual(tomorrowItem.title, "Should we revisit the apartment plan?")
+        XCTAssertEqual(tomorrowItem.prompt, "Should we move?")
+        XCTAssertEqual(tomorrowItem.detail, "This is bigger than tonight's mood.")
+        XCTAssertEqual(tomorrowItem.draft?.selfLens, "I do not feel spacious here.")
+    }
+
     private func fixedCalendar() -> Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!

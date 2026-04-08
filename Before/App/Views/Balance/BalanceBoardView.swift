@@ -108,6 +108,11 @@ struct BalanceBoardView: View {
                                     dismiss()
                                 }
 
+                                BeforeActionButton("Move this to Shared Life", style: .secondary) {
+                                    appModel.sendBalanceSessionToSharedLife(session)
+                                    dismiss()
+                                }
+
                                 BeforeActionButton("Move this to tomorrow", style: .secondary) {
                                     appModel.moveBalanceBoardToTomorrow(session)
                                     dismiss()

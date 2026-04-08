@@ -19,6 +19,7 @@ struct RootTabView: View {
 
             SupportView()
                 .environmentObject(appModel.supportInbox)
+                .environmentObject(appModel.sharedLifeStore)
                 .tabItem {
                     Label("Support", systemImage: "person.2")
                 }

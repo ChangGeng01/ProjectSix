@@ -65,6 +65,11 @@ struct ResultView: View {
                                 appModel.sendQuickSessionToSupport(session, result: result)
                                 dismiss()
                             }
+
+                            BeforeActionButton("Move this to Shared Life", style: .tertiary) {
+                                appModel.sendQuickSessionToSharedLife(session, result: result)
+                                dismiss()
+                            }
                         }
                     }
                     .padding(20)

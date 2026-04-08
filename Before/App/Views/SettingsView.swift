@@ -83,6 +83,9 @@ struct SettingsView: View {
                     LabeledContent("Saved mirrors", value: "\(mirrorRecords.count)")
                     LabeledContent("Saved reminders", value: "\(reminders.count)")
                     LabeledContent("Tomorrow Box items", value: "\(tomorrowItems.count)")
+                    LabeledContent("Buddy requests", value: "\(appModel.supportInbox.requests.count)")
+                    LabeledContent("Shared rules", value: "\(appModel.sharedLifeStore.rules.count)")
+                    LabeledContent("Shared box items", value: "\(appModel.sharedLifeStore.boxItems.count)")
                     Button("Show onboarding again") {
                         appModel.hasSeenOnboarding = false
                     }
@@ -90,7 +93,7 @@ struct SettingsView: View {
 
                 Section("Privacy & safety") {
                     Label("Widgets only show generic safe text", systemImage: "lock.shield")
-                    Text("Your own reminder lines stay inside the app and never appear on the Home or Lock Screen. Heavier decisions also stay local to this device unless you explicitly share them later.")
+                    Text("Your own reminder lines stay inside the app and never appear on the Home or Lock Screen. Buddy and Shared Life are still local-first in this version, so nothing leaves this device unless you add a real sync layer later.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

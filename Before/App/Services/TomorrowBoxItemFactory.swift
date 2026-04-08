@@ -140,6 +140,25 @@ enum TomorrowBoxItemFactory {
         )
     }
 
+    static func makeSharedLifeItem(
+        from item: SharedLifeBoxItem,
+        entrySource: EntrySource = .app,
+        referenceDate: Date = .now,
+        calendar: Calendar = .autoupdatingCurrent
+    ) -> TomorrowBoxItem? {
+        guard let mode = item.mode, let draft = item.draft else { return nil }
+
+        return TomorrowBoxItem(
+            dueAt: dueDate(after: referenceDate, calendar: calendar),
+            mode: mode,
+            title: trimmed(item.title),
+            detail: trimmed(item.detail),
+            prompt: trimmed(item.prompt),
+            entrySource: entrySource,
+            draft: draft
+        )
+    }
+
     private static func dueDate(
         after referenceDate: Date,
         calendar: Calendar

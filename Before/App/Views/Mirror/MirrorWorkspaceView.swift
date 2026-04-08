@@ -220,6 +220,11 @@ struct MirrorWorkspaceView: View {
                         dismiss()
                     }
 
+                    BeforeActionButton("Move this to Shared Life", style: .secondary) {
+                        appModel.sendMirrorSessionToSharedLife(session)
+                        dismiss()
+                    }
+
                     BeforeActionButton("Move this to Tomorrow Box", style: .secondary) {
                         appModel.moveMirrorWorkspaceToTomorrow(session)
                         dismiss()
