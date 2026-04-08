@@ -103,6 +103,11 @@ struct BalanceBoardView: View {
                                     dismiss()
                                 }
 
+                                BeforeActionButton("Ask for a second read", style: .secondary) {
+                                    appModel.sendBalanceSessionToSupport(session)
+                                    dismiss()
+                                }
+
                                 BeforeActionButton("Move this to tomorrow", style: .secondary) {
                                     appModel.moveBalanceBoardToTomorrow(session)
                                     dismiss()

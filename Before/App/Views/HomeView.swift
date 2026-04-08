@@ -147,7 +147,7 @@ struct HomeView: View {
                                     .foregroundStyle(.secondary)
 
                                 BeforeActionButton("Open Tomorrow Box", style: .secondary) {
-                                    appModel.selectedTab = 1
+                                    appModel.selectedTab = .box
                                 }
                             }
                         }

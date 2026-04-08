@@ -130,15 +130,18 @@ struct ReviewProfileView: View {
                 }
                 .buttonStyle(.plain)
 
-                HStack(spacing: 10) {
-                    BeforeActionButton("Reopen", style: .secondary) {
+                DecisionContinuationActions(
+                    reopenTitle: "Reopen",
+                    reopenStyle: .secondary,
+                    postponeTitle: "Tomorrow Box",
+                    postponeStyle: .secondary,
+                    reopenAction: {
                         reopen(entry)
-                    }
-
-                    BeforeActionButton("Tomorrow Box", style: .secondary) {
+                    },
+                    postponeAction: {
                         moveToTomorrow(entry)
                     }
-                }
+                )
             }
         }
     }

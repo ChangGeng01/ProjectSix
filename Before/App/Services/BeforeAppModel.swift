@@ -11,7 +11,7 @@ struct DecisionSignal {
 
 @MainActor
 final class BeforeAppModel: ObservableObject {
-    @Published var selectedTab = 0
+    @Published var selectedTab: AppTab = .home
     @Published var activeQuickSession: QuickCheckSession?
     @Published var activeBalanceSession: BalanceBoardSession?
     @Published var activeMirrorSession: MirrorWorkspaceSession?
@@ -21,6 +21,7 @@ final class BeforeAppModel: ObservableObject {
     @AppStorage("before.hasSeenOnboarding") var hasSeenOnboarding = false
 
     let modelContainer: ModelContainer
+    let supportInbox: SupportInboxStore
     private var shouldPromptReflectionAfterBackground = false
     private var pendingReflectionContext: ReflectionContext?
 
@@ -28,6 +29,7 @@ final class BeforeAppModel: ObservableObject {
         self.modelContainer = modelContainer
         self.startupNotice = startupNotice
         self.preferences = BeforePreferencesStore.load()
+        self.supportInbox = SupportInboxStore()
         restorePendingReflectionState()
     }
 
@@ -104,21 +106,21 @@ final class BeforeAppModel: ObservableObject {
             session.scenario = scenario
         }
         activeQuickSession = session
-        selectedTab = 0
+        selectedTab = .home
         persistActiveWorkspaceState()
     }
 
     func startBalanceBoard(entrySource: EntrySource, prompt: String = "") {
         clearActiveDecisionFlows()
         activeBalanceSession = BalanceBoardSession(entrySource: entrySource, prompt: prompt)
-        selectedTab = 0
+        selectedTab = .home
         persistActiveWorkspaceState()
     }
 
     func startMirrorWorkspace(entrySource: EntrySource, prompt: String = "") {
         clearActiveDecisionFlows()
         activeMirrorSession = MirrorWorkspaceSession(entrySource: entrySource, prompt: prompt)
-        selectedTab = 0
+        selectedTab = .home
         persistActiveWorkspaceState()
     }
 
@@ -191,7 +193,7 @@ final class BeforeAppModel: ObservableObject {
                 eventID: event.id,
                 from: event.createdAt
             )
-            selectedTab = 1
+            selectedTab = .box
         default:
             break
         }
@@ -238,7 +240,7 @@ final class BeforeAppModel: ObservableObject {
         context.insert(TomorrowBoxItemFactory.makeBalanceItem(from: session, result: result))
         try? context.save()
         activeBalanceSession = nil
-        selectedTab = 1
+        selectedTab = .box
         persistActiveWorkspaceState()
     }
 
@@ -271,7 +273,7 @@ final class BeforeAppModel: ObservableObject {
         context.insert(TomorrowBoxItemFactory.makeMirrorItem(from: session, result: result))
         try? context.save()
         activeMirrorSession = nil
-        selectedTab = 1
+        selectedTab = .box
         persistActiveWorkspaceState()
     }
 
@@ -300,28 +302,28 @@ final class BeforeAppModel: ObservableObject {
         }
 
         removeTomorrowBoxItem(item)
-        selectedTab = 0
+        selectedTab = .home
         persistActiveWorkspaceState()
     }
 
     func reopenCheckEvent(_ event: CheckEvent) {
         clearActiveDecisionFlows()
         activeQuickSession = event.restoredSession()
-        selectedTab = 0
+        selectedTab = .home
         persistActiveWorkspaceState()
     }
 
     func reopenBalanceRecord(_ record: BalanceDecisionRecord) {
         clearActiveDecisionFlows()
         activeBalanceSession = record.restoredSession()
-        selectedTab = 0
+        selectedTab = .home
         persistActiveWorkspaceState()
     }
 
     func reopenMirrorRecord(_ record: MirrorDecisionRecord) {
         clearActiveDecisionFlows()
         activeMirrorSession = record.restoredSession()
-        selectedTab = 0
+        selectedTab = .home
         persistActiveWorkspaceState()
     }
 
@@ -329,21 +331,21 @@ final class BeforeAppModel: ObservableObject {
         let context = modelContainer.mainContext
         context.insert(event.makeTomorrowBoxItem())
         try? context.save()
-        selectedTab = 1
+        selectedTab = .box
     }
 
     func moveBalanceRecordToTomorrow(_ record: BalanceDecisionRecord) {
         let context = modelContainer.mainContext
         context.insert(record.makeTomorrowBoxItem())
         try? context.save()
-        selectedTab = 1
+        selectedTab = .box
     }
 
     func moveMirrorRecordToTomorrow(_ record: MirrorDecisionRecord) {
         let context = modelContainer.mainContext
         context.insert(record.makeTomorrowBoxItem())
         try? context.save()
-        selectedTab = 1
+        selectedTab = .box
     }
 
     func removeTomorrowBoxItem(_ item: TomorrowBoxItem) {
@@ -531,6 +533,7 @@ final class BeforeAppModel: ObservableObject {
         deleteAll(MirrorDecisionRecord.self, in: context)
         deleteAll(SelfReminder.self, in: context)
         clearTomorrowBox()
+        supportInbox.clearAll()
 
         PendingLaunchRequestStore.clear()
         WidgetSnapshotStore.clear()
@@ -554,6 +557,60 @@ final class BeforeAppModel: ObservableObject {
 
     func syncWorkspacePersistence() {
         persistActiveWorkspaceState()
+    }
+
+    @MainActor
+    func sendQuickSessionToSupport(_ session: QuickCheckSession, result: QuickCheckResult? = nil) {
+        let request = SupportRequestFactory.makeQuickRequest(from: session, result: result)
+        supportInbox.insert(request)
+        activeQuickSession = nil
+        selectedTab = .support
+        ActiveDecisionWorkspaceStore.clear()
+    }
+
+    @MainActor
+    func sendBalanceSessionToSupport(_ session: BalanceBoardSession) {
+        let request = SupportRequestFactory.makeBalanceRequest(from: session)
+        supportInbox.insert(request)
+        activeBalanceSession = nil
+        selectedTab = .support
+        ActiveDecisionWorkspaceStore.clear()
+    }
+
+    @MainActor
+    func sendMirrorSessionToSupport(_ session: MirrorWorkspaceSession) {
+        let request = SupportRequestFactory.makeMirrorRequest(from: session)
+        supportInbox.insert(request)
+        activeMirrorSession = nil
+        selectedTab = .support
+        ActiveDecisionWorkspaceStore.clear()
+    }
+
+    func reopenSupportRequest(_ request: SupportRequest) {
+        guard let mode = request.mode, let draft = request.draft else { return }
+
+        clearActiveDecisionFlows()
+        switch mode {
+        case .quick:
+            activeQuickSession = draft.restoreQuickSession(entrySource: .app)
+        case .balance:
+            activeBalanceSession = draft.restoreBalanceSession(entrySource: .app)
+        case .mirror:
+            activeMirrorSession = draft.restoreMirrorSession(entrySource: .app)
+        }
+
+        supportInbox.markHeard(request.id)
+        selectedTab = .home
+        persistActiveWorkspaceState()
+    }
+
+    func moveSupportRequestToTomorrow(_ request: SupportRequest) {
+        guard let item = TomorrowBoxItemFactory.makeSupportItem(from: request) else { return }
+        let context = modelContainer.mainContext
+        context.insert(item)
+        try? context.save()
+        supportInbox.markHeard(request.id)
+        selectedTab = .box
     }
 
     private func clearActiveDecisionFlows() {
@@ -637,7 +694,7 @@ final class BeforeAppModel: ObservableObject {
             activeMirrorSession = state.restoreMirrorSession()
         }
 
-        selectedTab = 0
+        selectedTab = .home
     }
 
     private func persistActiveWorkspaceState() {

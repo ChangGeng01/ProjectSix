@@ -26,6 +26,8 @@ struct SupportRequest: Identifiable, Codable, Equatable, Sendable {
     var message: String
     var reply: String?
     var status: SupportRequestStatus
+    var modeRaw: String?
+    var draftPayload: Data?
     var isSeeded: Bool
 
     init(
@@ -36,6 +38,8 @@ struct SupportRequest: Identifiable, Codable, Equatable, Sendable {
         message: String,
         reply: String? = nil,
         status: SupportRequestStatus = .pending,
+        mode: DecisionMode? = nil,
+        draft: TomorrowBoxDraft? = nil,
         isSeeded: Bool = false
     ) {
         let normalizedMessage = Self.trimmed(message)
@@ -48,11 +52,26 @@ struct SupportRequest: Identifiable, Codable, Equatable, Sendable {
         self.message = normalizedMessage.isEmpty ? kind.defaultMessage : normalizedMessage
         self.reply = normalizedReply
         self.status = status
+        self.modeRaw = mode?.rawValue
+        self.draftPayload = draft.flatMap { try? JSONEncoder().encode($0) }
         self.isSeeded = isSeeded
     }
 
     var summary: String {
         reply ?? kind.defaultMessage
+    }
+
+    var mode: DecisionMode? {
+        modeRaw.flatMap(DecisionMode.init(rawValue:))
+    }
+
+    var draft: TomorrowBoxDraft? {
+        guard let draftPayload else { return nil }
+        return try? JSONDecoder().decode(TomorrowBoxDraft.self, from: draftPayload)
+    }
+
+    var canContinueDecision: Bool {
+        mode != nil && draft != nil
     }
 
     var timestampLabel: String {

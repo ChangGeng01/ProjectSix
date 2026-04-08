@@ -117,6 +117,29 @@ enum TomorrowBoxItemFactory {
         )
     }
 
+    static func makeSupportItem(
+        from request: SupportRequest,
+        entrySource: EntrySource = .app,
+        referenceDate: Date = .now,
+        calendar: Calendar = .autoupdatingCurrent
+    ) -> TomorrowBoxItem? {
+        guard let mode = request.mode, let draft = request.draft else { return nil }
+
+        let prompt = trimmed(draft.prompt)
+        let title = trimmed(request.message).isEmpty ? request.kind.title : trimmed(request.message)
+        let detail = trimmed(request.reply ?? request.summary)
+
+        return TomorrowBoxItem(
+            dueAt: dueDate(after: referenceDate, calendar: calendar),
+            mode: mode,
+            title: title,
+            detail: detail,
+            prompt: prompt,
+            entrySource: entrySource,
+            draft: draft
+        )
+    }
+
     private static func dueDate(
         after referenceDate: Date,
         calendar: Calendar

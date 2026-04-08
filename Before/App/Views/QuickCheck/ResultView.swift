@@ -60,6 +60,11 @@ struct ResultView: View {
                                     Task { await handleAction(action) }
                                 }
                             }
+
+                            BeforeActionButton("Ask for support", style: .tertiary) {
+                                appModel.sendQuickSessionToSupport(session, result: result)
+                                dismiss()
+                            }
                         }
                     }
                     .padding(20)

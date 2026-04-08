@@ -77,13 +77,13 @@ struct HistoryDetailView: View {
             }
         }
 
-        actionStack(
+        DecisionContinuationActions(
             reopenTitle: "Reopen this check",
             reopenAction: {
                 appModel.reopenCheckEvent(event)
                 dismiss()
             },
-            tomorrowAction: {
+            postponeAction: {
                 appModel.moveCheckEventToTomorrow(event)
                 dismiss()
             }
@@ -109,13 +109,13 @@ struct HistoryDetailView: View {
             }
         }
 
-        actionStack(
+        DecisionContinuationActions(
             reopenTitle: "Reopen this board",
             reopenAction: {
                 appModel.reopenBalanceRecord(record)
                 dismiss()
             },
-            tomorrowAction: {
+            postponeAction: {
                 appModel.moveBalanceRecordToTomorrow(record)
                 dismiss()
             }
@@ -142,34 +142,17 @@ struct HistoryDetailView: View {
             }
         }
 
-        actionStack(
+        DecisionContinuationActions(
             reopenTitle: "Reopen this mirror",
             reopenAction: {
                 appModel.reopenMirrorRecord(record)
                 dismiss()
             },
-            tomorrowAction: {
+            postponeAction: {
                 appModel.moveMirrorRecordToTomorrow(record)
                 dismiss()
             }
         )
-    }
-
-    @ViewBuilder
-    private func actionStack(
-        reopenTitle: String,
-        reopenAction: @escaping () -> Void,
-        tomorrowAction: @escaping () -> Void
-    ) -> some View {
-        VStack(spacing: 12) {
-            BeforeActionButton(reopenTitle) {
-                reopenAction()
-            }
-
-            BeforeActionButton("Move this to Tomorrow Box", style: .secondary) {
-                tomorrowAction()
-            }
-        }
     }
 
     @ViewBuilder

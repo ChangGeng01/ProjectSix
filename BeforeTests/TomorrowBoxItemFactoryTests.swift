@@ -84,6 +84,26 @@ final class TomorrowBoxItemFactoryTests: XCTestCase {
         XCTAssertEqual(item.draft?.selfLens, "I do not feel like myself.")
     }
 
+    func testSupportFactoryCarriesDraftAndModeIntoTomorrowBox() throws {
+        let request = SupportRequest(
+            kind: .helpMeJudgeThis,
+            message: "Help me sort this out.",
+            mode: .balance,
+            draft: TomorrowBoxDraft(
+                prompt: "Should I take the offer?",
+                concern: "The hours look rough.",
+                constraint: "The salary is better."
+            )
+        )
+
+        let item = try XCTUnwrap(TomorrowBoxItemFactory.makeSupportItem(from: request))
+
+        XCTAssertEqual(item.mode, .balance)
+        XCTAssertEqual(item.title, "Help me sort this out.")
+        XCTAssertEqual(item.prompt, "Should I take the offer?")
+        XCTAssertEqual(item.draft?.concern, "The hours look rough.")
+    }
+
     private func fixedCalendar() -> Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!

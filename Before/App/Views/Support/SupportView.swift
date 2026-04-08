@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct SupportView: View {
-    @StateObject private var inbox = SupportInboxStore()
+    @EnvironmentObject private var appModel: BeforeAppModel
+    @EnvironmentObject private var inbox: SupportInboxStore
     @State private var draftMessage = ""
 
     var body: some View {
@@ -140,6 +141,19 @@ struct SupportView: View {
                     }
                 }
 
+                if request.canContinueDecision {
+                    DecisionContinuationActions(
+                        reopenTitle: "Continue this decision",
+                        postponeTitle: "Move to Tomorrow Box",
+                        reopenAction: {
+                            appModel.reopenSupportRequest(request)
+                        },
+                        postponeAction: {
+                            appModel.moveSupportRequestToTomorrow(request)
+                        }
+                    )
+                }
+
                 Menu {
                     ForEach(request.kind.quickReplies, id: \.self) { reply in
                         Button(reply) {
@@ -173,6 +187,11 @@ struct SupportView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
+                    if request.canContinueDecision {
+                        Text("Linked")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(BeforeTheme.ember)
+                    }
                     if request.isSeeded {
                         Text("Seeded")
                             .font(.caption.weight(.semibold))

@@ -8,6 +8,26 @@ final class WidgetSafeCopyTests: XCTestCase {
         XCTAssertEqual(message, .generic)
     }
 
+    func testKnownWidgetSafeMessagesStayShortAndContextFree() {
+        let cases: [(ScenarioType?, CheckVerdict?)] = [
+            (.buy, .pause),
+            (.buy, .notRecommended),
+            (.eat, .pause),
+            (.scroll, .notRecommended),
+            (.other, .goAhead),
+            (nil, nil)
+        ]
+
+        for input in cases {
+            let message = WidgetSafeCopy.message(for: input.0, verdict: input.1)
+
+            XCTAssertFalse(message.body.isEmpty)
+            XCTAssertLessThanOrEqual(message.body.count, 80)
+            XCTAssertFalse(message.body.lowercased().contains("reminder"))
+            XCTAssertFalse(message.body.lowercased().contains("upset"))
+        }
+    }
+
     func testLegacyWidgetSnapshotStillDecodesAndFallsBackToSafeCopy() throws {
         let legacyData = """
         {
@@ -22,5 +42,24 @@ final class WidgetSafeCopyTests: XCTestCase {
 
         XCTAssertNil(snapshot.safeMessage)
         XCTAssertEqual(snapshot.messageBody, WidgetSafeMessage.generic.body)
+    }
+
+    func testLegacyReminderPayloadDoesNotOverrideSafeWidgetCopy() throws {
+        let legacyData = """
+        {
+          "safeMessage": {
+            "body": "A safe widget line."
+          },
+          "latestReminder": "My private reminder should never appear here.",
+          "latestVerdict": "pause",
+          "latestScenario": "buy",
+          "updatedAt": 0
+        }
+        """.data(using: .utf8)!
+
+        let snapshot = try JSONDecoder().decode(WidgetSnapshot.self, from: legacyData)
+
+        XCTAssertEqual(snapshot.messageBody, "A safe widget line.")
+        XCTAssertFalse(snapshot.messageBody.contains("private reminder"))
     }
 }

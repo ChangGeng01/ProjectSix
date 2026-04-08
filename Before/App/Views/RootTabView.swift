@@ -9,25 +9,32 @@ struct RootTabView: View {
                 .tabItem {
                     Label("Home", systemImage: "house")
                 }
-                .tag(0)
+                .tag(AppTab.home)
 
             TomorrowBoxView()
                 .tabItem {
                     Label("Box", systemImage: "tray")
                 }
-                .tag(1)
+                .tag(AppTab.box)
+
+            SupportView()
+                .environmentObject(appModel.supportInbox)
+                .tabItem {
+                    Label("Support", systemImage: "person.2")
+                }
+                .tag(AppTab.support)
 
             HistoryView()
                 .tabItem {
                     Label("History", systemImage: "clock")
                 }
-                .tag(2)
+                .tag(AppTab.history)
 
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "slider.horizontal.3")
                 }
-                .tag(3)
+                .tag(AppTab.settings)
         }
         .sheet(item: $appModel.activeQuickSession) { session in
             QuickCheckView(session: session)

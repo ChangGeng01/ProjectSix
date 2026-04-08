@@ -3,9 +3,19 @@ import Foundation
 @MainActor
 final class SupportInboxStore: ObservableObject {
     @Published private(set) var requests: [SupportRequest]
+    private let defaults: UserDefaults
+    private let key: String
+    private let seed: Bool
 
-    init(seed: Bool = true) {
-        requests = seed ? Self.seededRequests : []
+    init(
+        defaults: UserDefaults = .standard,
+        key: String = "before.support.inbox",
+        seed: Bool = true
+    ) {
+        self.defaults = defaults
+        self.key = key
+        self.seed = seed
+        self.requests = Self.load(defaults: defaults, key: key) ?? (seed ? Self.seededRequests : [])
     }
 
     var activeRequests: [SupportRequest] {
@@ -27,23 +37,56 @@ final class SupportInboxStore: ObservableObject {
     }
 
     func create(kind: SupportRequestKind, message: String = "") {
-        let request = SupportRequest(kind: kind, message: message)
+        insert(SupportRequest(kind: kind, message: message))
+    }
+
+    func insert(_ request: SupportRequest) {
+        requests.removeAll { $0.id == request.id }
         requests.insert(request, at: 0)
+        persist()
     }
 
     func reply(to requestID: UUID, with message: String) {
         guard let index = requests.firstIndex(where: { $0.id == requestID }) else { return }
         requests[index].addReply(message)
+        persist()
     }
 
     func markHeard(_ requestID: UUID) {
         guard let index = requests.firstIndex(where: { $0.id == requestID }) else { return }
         requests[index].markHeard()
+        persist()
     }
 
     func archive(_ requestID: UUID) {
         guard let index = requests.firstIndex(where: { $0.id == requestID }) else { return }
         requests[index].archive()
+        persist()
+    }
+
+    func clearAll() {
+        requests = seed ? Self.seededRequests : []
+        persist()
+    }
+
+    private func persist() {
+        Self.save(requests, defaults: defaults, key: key)
+    }
+
+    private static func load(defaults: UserDefaults, key: String) -> [SupportRequest]? {
+        guard
+            let data = defaults.data(forKey: key),
+            let requests = try? JSONDecoder().decode([SupportRequest].self, from: data)
+        else {
+            return nil
+        }
+
+        return requests
+    }
+
+    private static func save(_ requests: [SupportRequest], defaults: UserDefaults, key: String) {
+        guard let data = try? JSONEncoder().encode(requests) else { return }
+        defaults.set(data, forKey: key)
     }
 
     private static let seededRequests: [SupportRequest] = [
