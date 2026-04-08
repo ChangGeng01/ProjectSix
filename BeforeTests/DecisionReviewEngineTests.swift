@@ -215,4 +215,95 @@ final class DecisionReviewEngineTests: XCTestCase {
             ["Emotions", "Relationship patterns", "Reality", "Long-term", "Self lens", "Mirror actions"]
         )
     }
+
+    func testRecentEntriesForQuickStaySortedNewestFirst() {
+        let older = CheckEvent(
+            createdAt: Date(timeIntervalSince1970: 100),
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .yes,
+            note: "",
+            currentPerspective: "Older",
+            afterPerspective: "Older detail",
+            verdict: .goAhead,
+            finalAction: .goAheadAnyway,
+            entrySource: .app
+        )
+        let newer = CheckEvent(
+            createdAt: Date(timeIntervalSince1970: 200),
+            scenario: .scroll,
+            motivation: .stressed,
+            expectedOutcome: .regret,
+            controlLevel: .maybe,
+            note: "",
+            currentPerspective: "Newer",
+            afterPerspective: "Newer detail",
+            verdict: .pause,
+            finalAction: .wait90s,
+            entrySource: .app
+        )
+
+        let entries = DecisionReviewEngine.recentEntries(
+            for: .quick,
+            quick: [older, newer],
+            balance: [],
+            mirror: []
+        )
+
+        XCTAssertEqual(entries.count, 2)
+        XCTAssertEqual(entries.first?.title, "Newer")
+        XCTAssertEqual(entries.first?.detail, "Newer detail")
+    }
+
+    func testRecentEntriesForMirrorOnlyIncludeMirrorRecords() {
+        let mirror = MirrorDecisionRecord(
+            prompt: "Should I leave?",
+            emotion: "Numb",
+            relationship: "The same pattern keeps coming back",
+            reality: "We still share a home",
+            longTerm: "I keep disappearing inside this",
+            selfLens: "I do not feel like myself",
+            coreTension: "This is asking what staying keeps costing you.",
+            nextActionTitle: "Write the boundary",
+            nextAction: "Name what you cannot keep negotiating away.",
+            entrySource: .app
+        )
+
+        let entries = DecisionReviewEngine.recentEntries(
+            for: .mirror,
+            quick: [
+                CheckEvent(
+                    scenario: .buy,
+                    motivation: .reward,
+                    expectedOutcome: .regret,
+                    controlLevel: .maybe,
+                    note: "",
+                    currentPerspective: "Quick entry",
+                    afterPerspective: "Quick detail",
+                    verdict: .pause,
+                    finalAction: .wait90s,
+                    entrySource: .app
+                )
+            ],
+            balance: [
+                BalanceDecisionRecord(
+                    prompt: "Should I take this job?",
+                    desire: "Growth",
+                    concern: "Capacity",
+                    constraint: "Time",
+                    longTerm: "I do not want to burn out",
+                    focusTitle: "Capacity pressure",
+                    focusSummary: "The real question is whether you still have room.",
+                    nextAction: "Cut one commitment first.",
+                    entrySource: .app
+                )
+            ],
+            mirror: [mirror]
+        )
+
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertEqual(entries.first?.title, "Should I leave?")
+        XCTAssertEqual(entries.first?.actionTitle, "Write the boundary")
+    }
 }

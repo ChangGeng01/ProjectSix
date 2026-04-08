@@ -82,7 +82,11 @@ struct HistoryView: View {
             }
             .sheet(item: $selectedProfile) { selection in
                 if let profile = profile(for: selection) {
-                    ReviewProfileView(profile: profile)
+                    ReviewProfileView(
+                        profile: profile,
+                        recentEntries: recentEntries(for: selection)
+                    )
+                    .environmentObject(appModel)
                 }
             }
         }
@@ -298,6 +302,17 @@ struct HistoryView: View {
             DecisionReviewEngine.profile(for: .balance, quick: events, balance: balanceBoards, mirror: mirrorRecords)
         case .mirror:
             DecisionReviewEngine.profile(for: .mirror, quick: events, balance: balanceBoards, mirror: mirrorRecords)
+        }
+    }
+
+    private func recentEntries(for selection: ReviewProfileSelection) -> [ReviewProfileEntry] {
+        switch selection {
+        case .quick:
+            DecisionReviewEngine.recentEntries(for: .quick, quick: events, balance: balanceBoards, mirror: mirrorRecords)
+        case .balance:
+            DecisionReviewEngine.recentEntries(for: .balance, quick: events, balance: balanceBoards, mirror: mirrorRecords)
+        case .mirror:
+            DecisionReviewEngine.recentEntries(for: .mirror, quick: events, balance: balanceBoards, mirror: mirrorRecords)
         }
     }
 }

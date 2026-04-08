@@ -40,6 +40,67 @@ struct ReviewProfile: Equatable {
     let sections: [ReviewProfileSection]
 }
 
+enum ReviewProfileEntry: Identifiable {
+    case quick(CheckEvent)
+    case balance(BalanceDecisionRecord)
+    case mirror(MirrorDecisionRecord)
+
+    var id: String {
+        switch self {
+        case .quick(let event):
+            "quick-\(event.id.uuidString)"
+        case .balance(let record):
+            "balance-\(record.id.uuidString)"
+        case .mirror(let record):
+            "mirror-\(record.id.uuidString)"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .quick(let event):
+            event.currentPerspective
+        case .balance(let record):
+            record.prompt
+        case .mirror(let record):
+            record.prompt
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .quick(let event):
+            event.afterPerspective
+        case .balance(let record):
+            record.focusSummary
+        case .mirror(let record):
+            record.coreTension
+        }
+    }
+
+    var actionTitle: String {
+        switch self {
+        case .quick(let event):
+            event.verdict.title
+        case .balance(let record):
+            record.focusTitle
+        case .mirror(let record):
+            record.nextActionTitle
+        }
+    }
+
+    var timestamp: Date {
+        switch self {
+        case .quick(let event):
+            event.createdAt
+        case .balance(let record):
+            record.updatedAt
+        case .mirror(let record):
+            record.updatedAt
+        }
+    }
+}
+
 enum DecisionReviewEngine {
     static func summaries(
         quick: [CheckEvent],
@@ -247,6 +308,32 @@ enum DecisionReviewEngine {
                 ]
                 .filter { !$0.rows.isEmpty }
             )
+        }
+    }
+
+    static func recentEntries(
+        for mode: DecisionMode,
+        quick: [CheckEvent],
+        balance: [BalanceDecisionRecord],
+        mirror: [MirrorDecisionRecord],
+        limit: Int = 3
+    ) -> [ReviewProfileEntry] {
+        switch mode {
+        case .quick:
+            quick
+                .sorted(by: { $0.createdAt > $1.createdAt })
+                .prefix(limit)
+                .map(ReviewProfileEntry.quick)
+        case .balance:
+            balance
+                .sorted(by: { $0.updatedAt > $1.updatedAt })
+                .prefix(limit)
+                .map(ReviewProfileEntry.balance)
+        case .mirror:
+            mirror
+                .sorted(by: { $0.updatedAt > $1.updatedAt })
+                .prefix(limit)
+                .map(ReviewProfileEntry.mirror)
         }
     }
 
