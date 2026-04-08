@@ -69,12 +69,23 @@ struct LetGoView: View {
                 Text(context.itemDetail)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+
+                Divider()
+
+                Label("Flick or press and hold", systemImage: "hand.tap")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(BeforeTheme.ember)
             }
         }
         .offset(x: cardOffset)
         .rotationEffect(.degrees(cardRotation))
         .opacity(cardOpacity)
         .scaleEffect(cardScale)
+        .contentShape(.rect)
+        .onLongPressGesture(minimumDuration: BeforePolicy.LetGo.longPressDuration) {
+            triggerRelease(using: .press)
+        }
+        .accessibilityHint("Flick the phone gently or press and hold this card to put the decision down.")
     }
 
     private var instructionCard: some View {
@@ -86,8 +97,8 @@ struct LetGoView: View {
 
                 Text(
                     motionMonitor.isAvailable
-                    ? context.instructionDetail
-                    : "Motion is not available here, so you can finish the handoff with the button below instead."
+                    ? "\(context.instructionDetail) You can also press and hold the card."
+                    : "Motion is not available here, so you can press and hold the card or use the button below instead."
                 )
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -98,7 +109,7 @@ struct LetGoView: View {
     private var actionButtons: some View {
         VStack(spacing: 12) {
             BeforeActionButton("Put it down without motion", style: .secondary) {
-                finishWithoutMotion()
+                triggerRelease(using: .press)
             }
 
             BeforeActionButton("Skip for now", style: .tertiary) {
@@ -137,38 +148,31 @@ struct LetGoView: View {
     }
 
     private func triggerRelease(direction: LetGoFlickDirection) {
+        triggerRelease(using: .flick(direction))
+    }
+
+    private func triggerRelease(using trigger: ReleaseTrigger) {
         guard phase == .ready else { return }
 
         phase = .releasing
-        let sign: CGFloat = direction == .right ? 1 : -1
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
         withAnimation(.easeInOut(duration: BeforePolicy.LetGo.releaseAnimationDuration)) {
-            cardOffset = sign * BeforePolicy.LetGo.releaseTravelDistance
-            cardRotation = sign * BeforePolicy.LetGo.releaseRotationDegrees
+            switch trigger {
+            case .flick(let direction):
+                let sign: CGFloat = direction == .right ? 1 : -1
+                cardOffset = sign * BeforePolicy.LetGo.releaseTravelDistance
+                cardRotation = sign * BeforePolicy.LetGo.releaseRotationDegrees
+            case .press:
+                cardOffset = 0
+                cardRotation = 0
+            }
             cardOpacity = 0
             cardScale = 0.92
         }
 
         Task {
             try? await Task.sleep(nanoseconds: UInt64(BeforePolicy.LetGo.releaseAnimationDuration * 1_000_000_000))
-            await MainActor.run {
-                phase = .settled
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-            }
-        }
-    }
-
-    private func finishWithoutMotion() {
-        guard phase == .ready else { return }
-
-        withAnimation(.easeInOut(duration: BeforePolicy.LetGo.completionTransitionDuration)) {
-            cardOpacity = 0
-            cardScale = 0.96
-        }
-
-        Task {
-            try? await Task.sleep(nanoseconds: UInt64(BeforePolicy.LetGo.completionTransitionDuration * 1_000_000_000))
             await MainActor.run {
                 phase = .settled
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -182,5 +186,10 @@ private extension LetGoView {
         case ready
         case releasing
         case settled
+    }
+
+    enum ReleaseTrigger {
+        case flick(LetGoFlickDirection)
+        case press
     }
 }
