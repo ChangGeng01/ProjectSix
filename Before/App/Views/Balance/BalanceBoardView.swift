@@ -25,6 +25,17 @@ struct BalanceBoardView: View {
                             text: $session.prompt
                         )
 
+                        if session.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            PanelCard {
+                                StarterPromptRow(
+                                    title: "Try a balance starter",
+                                    suggestions: DecisionStarterLibrary.suggestions(for: .balance)
+                                ) { suggestion in
+                                    session.prompt = suggestion.prompt
+                                }
+                            }
+                        }
+
                         GuidedInputCard(
                             title: "What do you want?",
                             subtitle: "Your subjective pull, without apologizing for it.",

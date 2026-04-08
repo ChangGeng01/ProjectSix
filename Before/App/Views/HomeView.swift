@@ -46,6 +46,15 @@ struct HomeView: View {
                             text: $decisionPrompt
                         )
 
+                        PanelCard {
+                            StarterPromptRow(
+                                title: "Need a cleaner starting point?",
+                                suggestions: DecisionStarterLibrary.homeFeatured
+                            ) { suggestion in
+                                appModel.startDecisionMode(suggestion.mode, entrySource: .app, prompt: suggestion.prompt)
+                            }
+                        }
+
                         BeforeActionButton(appModel.preferences.homePromptAction.buttonTitle, isEnabled: !trimmedPrompt.isEmpty) {
                             _ = appModel.submitHomePrompt(trimmedPrompt, entrySource: .app)
                             decisionPrompt = ""

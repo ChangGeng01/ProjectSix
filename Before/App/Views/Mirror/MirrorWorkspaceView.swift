@@ -25,6 +25,17 @@ struct MirrorWorkspaceView: View {
                             text: $session.prompt
                         )
 
+                        if session.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            PanelCard {
+                                StarterPromptRow(
+                                    title: "Try a mirror starter",
+                                    suggestions: DecisionStarterLibrary.suggestions(for: .mirror)
+                                ) { suggestion in
+                                    session.prompt = suggestion.prompt
+                                }
+                            }
+                        }
+
                         GuidedInputCard(
                             title: "Emotion",
                             subtitle: "What is strongest right now: hurt, anger, fear, loneliness, grief, relief?",
