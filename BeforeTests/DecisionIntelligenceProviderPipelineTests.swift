@@ -38,6 +38,17 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         )
     }
 
+    func testOrderedKindsExcludeProvidersUnderRuntimeCooldown() {
+        XCTAssertEqual(
+            DecisionIntelligenceProviderPipeline.orderedKinds(
+                for: .gemmaE4B,
+                allowFallbacks: true,
+                excluding: [.gemmaE4B]
+            ),
+            [.foundationModels]
+        )
+    }
+
     func testRuntimeStatusFallsBackToGemmaWhenFoundationPreferenceIsUnavailable() {
         let preferences = BeforePreferences(
             homePromptAction: .autoRoute,

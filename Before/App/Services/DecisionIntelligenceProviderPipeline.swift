@@ -129,20 +129,27 @@ enum DecisionIntelligenceProviderPipeline {
 
     static func orderedKinds(
         for preference: DecisionModelProviderPreference,
-        allowFallbacks: Bool = true
+        allowFallbacks: Bool = true,
+        excluding suspendedKinds: Set<DecisionModelProviderKind> = []
     ) -> [DecisionModelProviderKind] {
-        if !allowFallbacks {
-            return [preference.kind]
+        if preference != .template, suspendedKinds.contains(preference.kind), !allowFallbacks {
+            return []
         }
 
-        switch preference {
-        case .gemmaE4B:
-            return [.gemmaE4B, .foundationModels]
-        case .foundationModels:
-            return [.foundationModels, .gemmaE4B]
-        case .template:
-            return [.template]
+        if !allowFallbacks {
+            return suspendedKinds.contains(preference.kind) ? [] : [preference.kind]
         }
+
+        let ordered: [DecisionModelProviderKind] = switch preference {
+        case .gemmaE4B:
+            [.gemmaE4B, .foundationModels]
+        case .foundationModels:
+            [.foundationModels, .gemmaE4B]
+        case .template:
+            [.template]
+        }
+
+        return ordered.filter { !suspendedKinds.contains($0) }
     }
 
     static func runtimeStatus(
@@ -307,11 +314,12 @@ enum DecisionIntelligenceProviderPipeline {
             return nil
         }
 
-        let providers = orderedProviders(
+        let providers = await orderedProviders(
             for: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
         )
+        let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
         let attemptedKinds = providers.map(\.kind)
         var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
@@ -322,6 +330,10 @@ enum DecisionIntelligenceProviderPipeline {
                 envelope: envelope
             )
             if let cached = await responseCache.quickResult(for: cacheKey) {
+                await DecisionIntelligenceCircuitBreaker.shared.record(
+                    provider: provider.kind,
+                    event: .cacheHit
+                )
                 await recordTelemetry(
                     kind: .quick,
                     outcome: .cacheHit,
@@ -358,6 +370,13 @@ enum DecisionIntelligenceProviderPipeline {
 
             if let refined = await provider.refineQuickResult(base: base, input: input) {
                 await responseCache.storeQuickResult(refined, for: cacheKey)
+                await DecisionIntelligenceCircuitBreaker.shared.record(
+                    provider: provider.kind,
+                    event: .providerSuccess(
+                        kind: .quick,
+                        durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                    )
+                )
                 await recordTelemetry(
                     kind: .quick,
                     outcome: .providerSuccess,
@@ -391,6 +410,11 @@ enum DecisionIntelligenceProviderPipeline {
                 )
                 return refined
             }
+
+            await DecisionIntelligenceCircuitBreaker.shared.record(
+                provider: provider.kind,
+                event: .providerFailure
+            )
         }
 
         await recordTelemetry(
@@ -418,7 +442,10 @@ enum DecisionIntelligenceProviderPipeline {
             stablePrefixFingerprint: stablePrefixFingerprint,
             prompt: envelope.debugPrompt,
             outputPreview: quickPreview(from: base),
-            detail: "No provider returned a refined quick result, so Before kept the deterministic copy."
+            detail: deterministicFallbackDetail(
+                base: "No provider returned a refined quick result, so Before kept the deterministic copy.",
+                suspendedKinds: suspendedKinds
+            )
         )
         return nil
     }
@@ -505,11 +532,12 @@ enum DecisionIntelligenceProviderPipeline {
             return nil
         }
 
-        let providers = orderedProviders(
+        let providers = await orderedProviders(
             for: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
         )
+        let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
         let attemptedKinds = providers.map(\.kind)
         var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
@@ -520,6 +548,10 @@ enum DecisionIntelligenceProviderPipeline {
                 envelope: envelope
             )
             if let cached = await responseCache.balanceResult(for: cacheKey) {
+                await DecisionIntelligenceCircuitBreaker.shared.record(
+                    provider: provider.kind,
+                    event: .cacheHit
+                )
                 await recordTelemetry(
                     kind: .balance,
                     outcome: .cacheHit,
@@ -556,6 +588,13 @@ enum DecisionIntelligenceProviderPipeline {
 
             if let refined = await provider.refineBalanceResult(base: base, input: input) {
                 await responseCache.storeBalanceResult(refined, for: cacheKey)
+                await DecisionIntelligenceCircuitBreaker.shared.record(
+                    provider: provider.kind,
+                    event: .providerSuccess(
+                        kind: .balance,
+                        durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                    )
+                )
                 await recordTelemetry(
                     kind: .balance,
                     outcome: .providerSuccess,
@@ -589,6 +628,11 @@ enum DecisionIntelligenceProviderPipeline {
                 )
                 return refined
             }
+
+            await DecisionIntelligenceCircuitBreaker.shared.record(
+                provider: provider.kind,
+                event: .providerFailure
+            )
         }
 
         await recordTelemetry(
@@ -616,7 +660,10 @@ enum DecisionIntelligenceProviderPipeline {
             stablePrefixFingerprint: stablePrefixFingerprint,
             prompt: envelope.debugPrompt,
             outputPreview: balancePreview(from: base),
-            detail: "No provider returned a refined balance board, so Before kept the deterministic copy."
+            detail: deterministicFallbackDetail(
+                base: "No provider returned a refined balance board, so Before kept the deterministic copy.",
+                suspendedKinds: suspendedKinds
+            )
         )
         return nil
     }
@@ -703,11 +750,12 @@ enum DecisionIntelligenceProviderPipeline {
             return nil
         }
 
-        let providers = orderedProviders(
+        let providers = await orderedProviders(
             for: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
         )
+        let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
         let attemptedKinds = providers.map(\.kind)
         var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
@@ -718,6 +766,10 @@ enum DecisionIntelligenceProviderPipeline {
                 envelope: envelope
             )
             if let cached = await responseCache.mirrorResult(for: cacheKey) {
+                await DecisionIntelligenceCircuitBreaker.shared.record(
+                    provider: provider.kind,
+                    event: .cacheHit
+                )
                 await recordTelemetry(
                     kind: .mirror,
                     outcome: .cacheHit,
@@ -754,6 +806,13 @@ enum DecisionIntelligenceProviderPipeline {
 
             if let refined = await provider.refineMirrorResult(base: base, input: input) {
                 await responseCache.storeMirrorResult(refined, for: cacheKey)
+                await DecisionIntelligenceCircuitBreaker.shared.record(
+                    provider: provider.kind,
+                    event: .providerSuccess(
+                        kind: .mirror,
+                        durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                    )
+                )
                 await recordTelemetry(
                     kind: .mirror,
                     outcome: .providerSuccess,
@@ -787,6 +846,11 @@ enum DecisionIntelligenceProviderPipeline {
                 )
                 return refined
             }
+
+            await DecisionIntelligenceCircuitBreaker.shared.record(
+                provider: provider.kind,
+                event: .providerFailure
+            )
         }
 
         await recordTelemetry(
@@ -814,7 +878,10 @@ enum DecisionIntelligenceProviderPipeline {
             stablePrefixFingerprint: stablePrefixFingerprint,
             prompt: envelope.debugPrompt,
             outputPreview: mirrorPreview(from: base),
-            detail: "No provider returned a refined mirror, so Before kept the deterministic copy."
+            detail: deterministicFallbackDetail(
+                base: "No provider returned a refined mirror, so Before kept the deterministic copy.",
+                suspendedKinds: suspendedKinds
+            )
         )
         return nil
     }
@@ -893,11 +960,12 @@ enum DecisionIntelligenceProviderPipeline {
             )
             return nil
         }
-        let providers = orderedProviders(
+        let providers = await orderedProviders(
             for: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
         )
+        let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
         let attemptedKinds = providers.map(\.kind)
         var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
@@ -909,6 +977,10 @@ enum DecisionIntelligenceProviderPipeline {
             )
             if let cached = await responseCache.reminder(for: cacheKey),
                clippedCandidates.contains(where: { $0.id == cached.id }) {
+                await DecisionIntelligenceCircuitBreaker.shared.record(
+                    provider: provider.kind,
+                    event: .cacheHit
+                )
                 await recordTelemetry(
                     kind: .reminder,
                     outcome: .cacheHit,
@@ -947,6 +1019,13 @@ enum DecisionIntelligenceProviderPipeline {
                 prompt: prompt,
                 mode: mode
             ) {
+                await DecisionIntelligenceCircuitBreaker.shared.record(
+                    provider: provider.kind,
+                    event: .providerSuccess(
+                        kind: .reminder,
+                        durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                    )
+                )
                 await responseCache.storeReminder(selected, for: cacheKey)
                 await recordTelemetry(
                     kind: .reminder,
@@ -979,6 +1058,11 @@ enum DecisionIntelligenceProviderPipeline {
                 )
                 return selected
             }
+
+            await DecisionIntelligenceCircuitBreaker.shared.record(
+                provider: provider.kind,
+                event: .providerFailure
+            )
         }
 
         await recordTelemetry(
@@ -1004,7 +1088,10 @@ enum DecisionIntelligenceProviderPipeline {
             stablePrefixFingerprint: stablePrefixFingerprint,
             prompt: selection.prompt.debugPrompt,
             outputPreview: "No reminder selected",
-            detail: "No provider returned a reminder selection, so Before kept the deterministic reminder ordering."
+            detail: deterministicFallbackDetail(
+                base: "No provider returned a reminder selection, so Before kept the deterministic reminder ordering.",
+                suspendedKinds: suspendedKinds
+            )
         )
         return nil
     }
@@ -1019,11 +1106,25 @@ enum DecisionIntelligenceProviderPipeline {
         for preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile?
-    ) -> [any DecisionIntelligenceProviding] {
+    ) async -> [any DecisionIntelligenceProviding] {
         if let testingStubProfile, preference != .template {
             return [TestingDecisionIntelligenceProvider(profile: testingStubProfile)]
         }
-        return orderedKinds(for: preference, allowFallbacks: allowFallbacks).compactMap { providersByKind[$0] }
+        let suspendedKinds = Set(await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders)
+        return orderedKinds(
+            for: preference,
+            allowFallbacks: allowFallbacks,
+            excluding: suspendedKinds
+        ).compactMap { providersByKind[$0] }
+    }
+
+    private static func deterministicFallbackDetail(
+        base: String,
+        suspendedKinds: [DecisionModelProviderKind]
+    ) -> String {
+        guard !suspendedKinds.isEmpty else { return base }
+        let titles = suspendedKinds.map(\.title).joined(separator: ", ")
+        return "\(base) Active runtime cooldown: \(titles)."
     }
 
     private static func recordTrace(

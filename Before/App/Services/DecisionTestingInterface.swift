@@ -234,6 +234,12 @@ enum DecisionTestingInterface {
         await cache.telemetrySnapshot()
     }
 
+    static func circuitBreakerSnapshot(
+        breaker: DecisionIntelligenceCircuitBreaker = .shared
+    ) async -> DecisionIntelligenceCircuitBreakerSnapshot {
+        await breaker.snapshot()
+    }
+
     @MainActor
     static func runtimeExport(
         quick: [CheckEvent],
@@ -245,7 +251,8 @@ enum DecisionTestingInterface {
         replayLimit: Int = BeforePolicy.Settings.developerReplayLimit,
         debugStore: DecisionIntelligenceDebugStore = .shared,
         telemetryStore: DecisionIntelligenceTelemetryStore = .shared,
-        cache: DecisionIntelligenceResponseCache = .shared
+        cache: DecisionIntelligenceResponseCache = .shared,
+        circuitBreaker: DecisionIntelligenceCircuitBreaker = .shared
     ) async -> DecisionTestingRuntimeExport {
         let snapshot = runtimeSnapshot(
             preferences: preferences,
@@ -265,6 +272,7 @@ enum DecisionTestingInterface {
             runtimeSnapshot: snapshot,
             intelligenceTelemetry: await telemetryStore.snapshot(),
             cacheTelemetry: await cache.telemetrySnapshot(),
+            circuitBreakerSnapshot: await circuitBreaker.snapshot(),
             recentTraces: traces,
             recentReplay: replay
         )
@@ -273,11 +281,13 @@ enum DecisionTestingInterface {
     @MainActor
     static func resetTransientIntelligenceState(
         store: DecisionIntelligenceDebugStore = .shared,
-        telemetryStore: DecisionIntelligenceTelemetryStore = .shared
+        telemetryStore: DecisionIntelligenceTelemetryStore = .shared,
+        circuitBreaker: DecisionIntelligenceCircuitBreaker = .shared
     ) async {
         clearTraces(store: store)
         await telemetryStore.clear()
         await clearResponseCache()
+        await circuitBreaker.clear()
     }
 
     @MainActor

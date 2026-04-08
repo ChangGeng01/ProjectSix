@@ -5,6 +5,7 @@ struct DecisionTestingRuntimeExport {
     let runtimeSnapshot: DecisionTestingRuntimeSnapshot
     let intelligenceTelemetry: DecisionIntelligenceTelemetrySnapshot
     let cacheTelemetry: DecisionIntelligenceCacheTelemetrySnapshot
+    let circuitBreakerSnapshot: DecisionIntelligenceCircuitBreakerSnapshot
     let recentTraces: [DecisionIntelligenceTrace]
     let recentReplay: [DeveloperDecisionReplayEntry]
 
@@ -173,7 +174,12 @@ struct DecisionTestingRuntimeExport {
             traceCount: recentTraces.count,
             replayCount: recentReplay.count,
             totalCacheEntries: cacheTelemetry.entryCountByKind.values.reduce(0, +),
-            dominantGemmaBackend: dominantGemmaBackend
+            dominantGemmaBackend: dominantGemmaBackend,
+            circuitOpenProviderCount: circuitBreakerSnapshot.activeProviders.count,
+            activeCircuitProviders: circuitBreakerSnapshot.activeProviders,
+            circuitTripCount: circuitBreakerSnapshot.totalTripCount,
+            circuitTripCountByProvider: circuitBreakerSnapshot.totalTripCountByProvider,
+            circuitTripCountByReason: circuitBreakerSnapshot.totalTripCountByReason
         )
     }
 
@@ -429,4 +435,9 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let replayCount: Int
     let totalCacheEntries: Int
     let dominantGemmaBackend: InferenceBackendKind?
+    let circuitOpenProviderCount: Int
+    let activeCircuitProviders: [DecisionModelProviderKind]
+    let circuitTripCount: Int
+    let circuitTripCountByProvider: [DecisionModelProviderKind: Int]
+    let circuitTripCountByReason: [DecisionIntelligenceCircuitTripReason: Int]
 }

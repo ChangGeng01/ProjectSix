@@ -202,6 +202,7 @@ struct DecisionTestingInterfaceTests {
     func resetTransientIntelligenceStateClearsTraceAndResponseCache() async {
         let store = DecisionIntelligenceDebugStore()
         let telemetryStore = DecisionIntelligenceTelemetryStore()
+        let breaker = DecisionIntelligenceCircuitBreaker()
         store.record(
             DecisionIntelligenceTrace(
                 kind: .quick,
@@ -228,14 +229,19 @@ struct DecisionTestingInterfaceTests {
             usedFallback: false,
             durationMs: 90
         )
+        await breaker.record(provider: .foundationModels, event: .providerFailure)
+        await breaker.record(provider: .foundationModels, event: .providerFailure)
+        await breaker.record(provider: .foundationModels, event: .providerFailure)
 
         await DecisionTestingInterface.resetTransientIntelligenceState(
             store: store,
-            telemetryStore: telemetryStore
+            telemetryStore: telemetryStore,
+            circuitBreaker: breaker
         )
 
         #expect(store.traces.isEmpty)
         #expect(await telemetryStore.snapshot().totalRequests == 0)
+        #expect(await breaker.snapshot().totalTripCount == 0)
         let cached = await DecisionIntelligenceResponseCache.shared.reminder(for: "cache-key")
         #expect(cached == nil)
     }
@@ -309,6 +315,7 @@ struct DecisionTestingInterfaceTests {
         let debugStore = DecisionIntelligenceDebugStore()
         let telemetryStore = DecisionIntelligenceTelemetryStore()
         let cache = DecisionIntelligenceResponseCache(limit: 2)
+        let breaker = DecisionIntelligenceCircuitBreaker()
 
         let quickTrace = DecisionIntelligenceTrace(
             kind: .quick,
@@ -394,6 +401,9 @@ struct DecisionTestingInterfaceTests {
             ),
             for: "quick"
         )
+        await breaker.record(provider: .gemmaE4B, event: .providerFailure)
+        await breaker.record(provider: .gemmaE4B, event: .providerFailure)
+        await breaker.record(provider: .gemmaE4B, event: .providerFailure)
 
         let event = CheckEvent(
             createdAt: .now,
@@ -422,7 +432,8 @@ struct DecisionTestingInterfaceTests {
             replayLimit: 4,
             debugStore: debugStore,
             telemetryStore: telemetryStore,
-            cache: cache
+            cache: cache,
+            circuitBreaker: breaker
         )
 
         #expect(export.runtimeSnapshot.runtimeStatus.preferred == .gemmaE4B)
@@ -434,6 +445,12 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.totalRequests == 1)
         #expect(export.summary.totalCacheEntries == 1)
         #expect(export.summary.dominantGemmaBackend == .cpu)
+        #expect(export.circuitBreakerSnapshot.activeProviders == [.gemmaE4B])
+        #expect(export.summary.circuitOpenProviderCount == 1)
+        #expect(export.summary.activeCircuitProviders == [.gemmaE4B])
+        #expect(export.summary.circuitTripCount == 1)
+        #expect(export.summary.circuitTripCountByProvider[.gemmaE4B] == 1)
+        #expect(export.summary.circuitTripCountByReason[.repeatedProviderFailure] == 1)
         #expect(export.summary.admissionSkipRate == 0)
         #expect(export.summary.providerBypassRate == 0)
         #expect(abs((export.summary.providerBypassRateByKind[.quick] ?? 0) - 0) < 0.0001)
