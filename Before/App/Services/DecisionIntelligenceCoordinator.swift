@@ -4,7 +4,7 @@ enum DecisionIntelligenceCoordinator {
     private static let adapter: any LocalModelAdapting = TemplateLocalModelAdapter()
 
     static func runtimeStatus(
-        preferences: BeforePreferences = BeforePreferencesStore.load(),
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences(),
         gemmaStatus: DecisionModelProviderStatus = GemmaE4BIntelligenceService.availabilityStatus,
         foundationStatus: DecisionModelProviderStatus = FoundationModelsIntelligenceService.availabilityStatus
     ) -> DecisionModelRuntimeStatus {
@@ -20,7 +20,7 @@ enum DecisionIntelligenceCoordinator {
     static func route(
         prompt: String,
         scenario: ScenarioType? = nil,
-        preferences: BeforePreferences = BeforePreferencesStore.load()
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) -> RoutedDecision {
         let fallback = DecisionModeRouter.route(prompt: prompt, scenario: scenario)
         guard preferences.onDeviceIntelligenceMode.isEnabled else { return fallback }
@@ -29,7 +29,7 @@ enum DecisionIntelligenceCoordinator {
 
     static func quickResult(
         for input: QuickCheckInput,
-        preferences: BeforePreferences = BeforePreferencesStore.load()
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) -> QuickCheckResult {
         let fallback = CheckRuleEngine.evaluate(input)
         guard preferences.onDeviceIntelligenceMode.isEnabled else { return fallback }
@@ -38,7 +38,7 @@ enum DecisionIntelligenceCoordinator {
 
     static func balanceResult(
         for input: BalanceBoardInput,
-        preferences: BeforePreferences = BeforePreferencesStore.load()
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) -> BalanceBoardResult {
         let fallback = BalanceBoardEngine.evaluate(input)
         guard preferences.onDeviceIntelligenceMode.isEnabled else { return fallback }
@@ -47,7 +47,7 @@ enum DecisionIntelligenceCoordinator {
 
     static func mirrorResult(
         for input: MirrorInput,
-        preferences: BeforePreferences = BeforePreferencesStore.load()
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) -> MirrorResult {
         let fallback = MirrorEngine.evaluate(input)
         guard preferences.onDeviceIntelligenceMode.isEnabled else { return fallback }
@@ -59,7 +59,7 @@ enum DecisionIntelligenceCoordinator {
         scenario: ScenarioType,
         prompt: String = "",
         mode: DecisionMode? = nil,
-        preferences: BeforePreferences = BeforePreferencesStore.load()
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) -> SelfReminder? {
         let ranked = ReminderSelectionPolicy.ranked(reminders: reminders.filter { $0.scenario == scenario })
         guard preferences.onDeviceIntelligenceMode.isEnabled else { return ranked.first }
@@ -79,7 +79,7 @@ enum DecisionIntelligenceCoordinator {
     static func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
-        preferences: BeforePreferences = BeforePreferencesStore.load()
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> QuickCheckResult? {
         guard preferences.onDeviceIntelligenceMode.isEnabled else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineQuickResult(
@@ -93,7 +93,7 @@ enum DecisionIntelligenceCoordinator {
     static func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
-        preferences: BeforePreferences = BeforePreferencesStore.load()
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> BalanceBoardResult? {
         guard preferences.onDeviceIntelligenceMode.isEnabled else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineBalanceResult(
@@ -107,7 +107,7 @@ enum DecisionIntelligenceCoordinator {
     static func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
-        preferences: BeforePreferences = BeforePreferencesStore.load()
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> MirrorResult? {
         guard preferences.onDeviceIntelligenceMode.isEnabled else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineMirrorResult(

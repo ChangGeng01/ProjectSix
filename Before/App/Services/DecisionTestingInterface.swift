@@ -9,8 +9,23 @@ struct DecisionTestingRuntimeSnapshot: Equatable, Sendable {
     let gemmaRuntimeStatus: GemmaLocalRuntimeStatus
 }
 
-@MainActor
+struct DecisionTestingEnvironmentOverride: Equatable, Sendable {
+    var intelligenceMode: OnDeviceIntelligenceMode?
+    var preferredProvider: DecisionModelProviderPreference?
+    var allowFallbacks: Bool?
+
+    var isEmpty: Bool {
+        intelligenceMode == nil && preferredProvider == nil && allowFallbacks == nil
+    }
+}
+
 enum DecisionTestingInterface {
+    enum EnvironmentKey {
+        static let intelligenceMode = "BEFORE_TEST_INTELLIGENCE_MODE"
+        static let preferredProvider = "BEFORE_TEST_MODEL_PROVIDER"
+        static let allowFallbacks = "BEFORE_TEST_ALLOW_FALLBACKS"
+    }
+
     static func configuredPreferences(
         from base: BeforePreferences = .default,
         intelligenceMode: OnDeviceIntelligenceMode? = nil,
@@ -30,12 +45,61 @@ enum DecisionTestingInterface {
         return updated
     }
 
+    static func launchEnvironment(
+        intelligenceMode: OnDeviceIntelligenceMode? = nil,
+        preferredProvider: DecisionModelProviderPreference? = nil,
+        allowFallbacks: Bool? = nil
+    ) -> [String: String] {
+        var environment: [String: String] = [:]
+        if let intelligenceMode {
+            environment[EnvironmentKey.intelligenceMode] = intelligenceMode.rawValue
+        }
+        if let preferredProvider {
+            environment[EnvironmentKey.preferredProvider] = preferredProvider.rawValue
+        }
+        if let allowFallbacks {
+            environment[EnvironmentKey.allowFallbacks] = allowFallbacks ? "1" : "0"
+        }
+        return environment
+    }
+
+    static func environmentOverride(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> DecisionTestingEnvironmentOverride? {
+        let override = DecisionTestingEnvironmentOverride(
+            intelligenceMode: environment[EnvironmentKey.intelligenceMode]
+                .flatMap(OnDeviceIntelligenceMode.init(rawValue:)),
+            preferredProvider: environment[EnvironmentKey.preferredProvider]
+                .flatMap(DecisionModelProviderPreference.init(rawValue:)),
+            allowFallbacks: environment[EnvironmentKey.allowFallbacks]
+                .flatMap(parseBoolOverride(_:))
+        )
+
+        return override.isEmpty ? nil : override
+    }
+
+    static func effectivePreferences(
+        stored: BeforePreferences = BeforePreferencesStore.load(),
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> BeforePreferences {
+        guard let override = environmentOverride(environment: environment) else {
+            return stored
+        }
+
+        return configuredPreferences(
+            from: stored,
+            intelligenceMode: override.intelligenceMode,
+            preferredProvider: override.preferredProvider,
+            allowFallbacks: override.allowFallbacks
+        )
+    }
+
     static func persistPreferences(_ preferences: BeforePreferences) {
         BeforePreferencesStore.save(preferences)
     }
 
     static func runtimeSnapshot(
-        preferences: BeforePreferences = BeforePreferencesStore.load()
+        preferences: BeforePreferences = effectivePreferences()
     ) -> DecisionTestingRuntimeSnapshot {
         DecisionTestingRuntimeSnapshot(
             preferences: preferences,
@@ -47,17 +111,32 @@ enum DecisionTestingInterface {
         )
     }
 
+    @MainActor
+    static func recentTraces(
+        limit: Int = BeforePolicy.Settings.developerTraceLimit
+    ) -> [DecisionIntelligenceTrace] {
+        recentTraces(limit: limit, store: DecisionIntelligenceDebugStore.shared)
+    }
+
+    @MainActor
     static func recentTraces(
         limit: Int = BeforePolicy.Settings.developerTraceLimit,
-        store: DecisionIntelligenceDebugStore = .shared
+        store: DecisionIntelligenceDebugStore
     ) -> [DecisionIntelligenceTrace] {
         Array(store.traces.prefix(limit))
     }
 
-    static func clearTraces(store: DecisionIntelligenceDebugStore = .shared) {
+    @MainActor
+    static func clearTraces() {
+        clearTraces(store: DecisionIntelligenceDebugStore.shared)
+    }
+
+    @MainActor
+    static func clearTraces(store: DecisionIntelligenceDebugStore) {
         store.clear()
     }
 
+    @MainActor
     static func recentReplay(
         quick: [CheckEvent],
         balance: [BalanceDecisionRecord],
@@ -65,12 +144,24 @@ enum DecisionTestingInterface {
         traces: [DecisionIntelligenceTrace]? = nil,
         limit: Int = BeforePolicy.Settings.developerReplayLimit
     ) -> [DeveloperDecisionReplayEntry] {
-        DeveloperDecisionReplayBuilder.build(
+        let resolvedTraces = traces ?? DecisionIntelligenceDebugStore.shared.traces
+        return DeveloperDecisionReplayBuilder.build(
             quick: quick,
             balance: balance,
             mirror: mirror,
-            traces: traces ?? DecisionIntelligenceDebugStore.shared.traces,
+            traces: resolvedTraces,
             limit: limit
         )
+    }
+
+    private static func parseBoolOverride(_ value: String) -> Bool? {
+        switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "1", "true", "yes", "on":
+            true
+        case "0", "false", "no", "off":
+            false
+        default:
+            nil
+        }
     }
 }

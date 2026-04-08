@@ -51,6 +51,50 @@ struct DecisionTestingInterfaceTests {
     }
 
     @Test
+    func launchEnvironmentUsesStableTestingKeys() {
+        let environment = DecisionTestingInterface.launchEnvironment(
+            intelligenceMode: .assistive,
+            preferredProvider: .gemmaE4B,
+            allowFallbacks: false
+        )
+
+        #expect(environment[DecisionTestingInterface.EnvironmentKey.intelligenceMode] == "assistive")
+        #expect(environment[DecisionTestingInterface.EnvironmentKey.preferredProvider] == "gemmaE4B")
+        #expect(environment[DecisionTestingInterface.EnvironmentKey.allowFallbacks] == "0")
+    }
+
+    @Test
+    func effectivePreferencesAppliesEnvironmentOverrideWithoutChangingOtherFields() {
+        let stored = BeforePreferences(
+            homePromptAction: .mirror,
+            quickBufferDuration: .fiveMinutes,
+            restoreInProgressWorkspaces: false,
+            showReviewInsights: false,
+            onDeviceIntelligenceMode: .off,
+            preferredIntelligenceProvider: .template,
+            allowModelFallbacks: false
+        )
+        let environment = DecisionTestingInterface.launchEnvironment(
+            intelligenceMode: .assistive,
+            preferredProvider: .foundationModels,
+            allowFallbacks: true
+        )
+
+        let effective = DecisionTestingInterface.effectivePreferences(
+            stored: stored,
+            environment: environment
+        )
+
+        #expect(effective.homePromptAction == .mirror)
+        #expect(effective.quickBufferDuration == .fiveMinutes)
+        #expect(effective.restoreInProgressWorkspaces == false)
+        #expect(effective.showReviewInsights == false)
+        #expect(effective.onDeviceIntelligenceMode == .assistive)
+        #expect(effective.preferredIntelligenceProvider == .foundationModels)
+        #expect(effective.allowModelFallbacks == true)
+    }
+
+    @Test
     func recentTracesAndClearWorkWithInjectedStore() {
         let store = DecisionIntelligenceDebugStore()
         store.record(

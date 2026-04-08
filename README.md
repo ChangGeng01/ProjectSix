@@ -32,6 +32,7 @@ It is not a streak app, not a blocker, and not a shame machine. The current buil
 - `Before/`: main iOS app
 - `BeforeWidgetExtension/`: widget target
 - `BeforeTests/`: unit tests for the rules and reminder templates
+- `docs/`: model packaging and testing-interface notes
 
 ## Generate The Project
 
@@ -61,4 +62,6 @@ xcodebuild -project Before.xcodeproj -scheme Before -destination 'platform=iOS S
 - The quick verdict engine remains rule-based and intentionally lightweight.
 - Apple Foundation Models can refine local copy on supported devices.
 - Gemma 4 E4B is prepared as a bundled `.litertlm` asset under `Before/Resources/Models`, with runtime fallback to Apple or deterministic copy when unavailable.
-- The project currently includes 84 passing unit tests covering routing, restoration, storage, reminders, review insights, typed preferences, and model-provider fallback behavior.
+- Model switching for tests is driven through `DecisionTestingInterface` and launch environment overrides instead of in-app developer UI.
+- See `/Users/changgeng/Project/Project06/Project06/docs/TESTING_INTERFACE.md` for launch keys and examples.
+- The project currently includes `115` XCTest cases and `7` Swift Testing cases covering routing, restoration, storage, reminders, review insights, typed preferences, testing overrides, and model-provider fallback behavior.

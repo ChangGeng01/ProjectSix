@@ -31,7 +31,7 @@ final class BeforeAppModel: ObservableObject {
     init(modelContainer: ModelContainer, startupNotice: String? = nil) {
         self.modelContainer = modelContainer
         self.startupNotice = startupNotice
-        self.preferences = BeforePreferencesStore.load()
+        self.preferences = DecisionTestingInterface.effectivePreferences()
         self.supportInbox = SupportInboxStore()
         self.sharedLifeStore = SharedLifeStore()
         restorePendingReflectionState()
@@ -112,14 +112,18 @@ final class BeforeAppModel: ObservableObject {
     func updatePreferences(_ transform: (inout BeforePreferences) -> Void) {
         var updated = preferences
         transform(&updated)
-        preferences = updated
         BeforePreferencesStore.save(updated)
+        preferences = DecisionTestingInterface.effectivePreferences(stored: updated)
 
         if updated.restoreInProgressWorkspaces {
             persistActiveWorkspaceState()
         } else {
             ActiveDecisionWorkspaceStore.clear()
         }
+    }
+
+    func refreshPreferencesFromTestingInterface() {
+        preferences = DecisionTestingInterface.effectivePreferences()
     }
 
     func startQuickCheck(
