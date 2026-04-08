@@ -32,6 +32,7 @@ enum BeforePolicy {
 
     enum Settings {
         static let developerCenterUnlockTapCount = 7
+        static let developerTraceLimit = 12
     }
 
     enum Notifications {

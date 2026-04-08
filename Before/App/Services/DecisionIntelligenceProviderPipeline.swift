@@ -172,14 +172,54 @@ enum DecisionIntelligenceProviderPipeline {
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool
     ) async -> QuickCheckResult? {
-        guard preference != .template else { return nil }
+        let prompt = DecisionIntelligencePromptContract.quickRefinementPrompt(base: base, input: input)
+        guard preference != .template else {
+            recordTrace(
+                kind: .quick,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [.template],
+                allowFallbacks: allowFallbacks,
+                prompt: prompt,
+                outputPreview: quickPreview(from: base),
+                detail: "Template mode is pinned, so no model provider was used for quick refinement."
+            )
+            return nil
+        }
 
-        for provider in orderedProviders(for: preference, allowFallbacks: allowFallbacks) {
+        let providers = orderedProviders(for: preference, allowFallbacks: allowFallbacks)
+        let attemptedKinds = providers.map(\.kind)
+
+        for provider in providers {
             if let refined = await provider.refineQuickResult(base: base, input: input) {
+                recordTrace(
+                    kind: .quick,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: attemptedKinds,
+                    allowFallbacks: allowFallbacks,
+                    prompt: prompt,
+                    outputPreview: quickPreview(from: refined),
+                    detail: detail(
+                        preferred: preference.kind,
+                        active: provider.kind,
+                        allowFallbacks: allowFallbacks
+                    )
+                )
                 return refined
             }
         }
 
+        recordTrace(
+            kind: .quick,
+            preferredProvider: preference.kind,
+            activeProvider: nil,
+            attemptedProviders: attemptedKinds,
+            allowFallbacks: allowFallbacks,
+            prompt: prompt,
+            outputPreview: quickPreview(from: base),
+            detail: "No provider returned a refined quick result, so Before kept the deterministic copy."
+        )
         return nil
     }
 
@@ -189,14 +229,54 @@ enum DecisionIntelligenceProviderPipeline {
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool
     ) async -> BalanceBoardResult? {
-        guard preference != .template else { return nil }
+        let prompt = DecisionIntelligencePromptContract.balanceRefinementPrompt(base: base, input: input)
+        guard preference != .template else {
+            recordTrace(
+                kind: .balance,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [.template],
+                allowFallbacks: allowFallbacks,
+                prompt: prompt,
+                outputPreview: balancePreview(from: base),
+                detail: "Template mode is pinned, so no model provider was used for balance refinement."
+            )
+            return nil
+        }
 
-        for provider in orderedProviders(for: preference, allowFallbacks: allowFallbacks) {
+        let providers = orderedProviders(for: preference, allowFallbacks: allowFallbacks)
+        let attemptedKinds = providers.map(\.kind)
+
+        for provider in providers {
             if let refined = await provider.refineBalanceResult(base: base, input: input) {
+                recordTrace(
+                    kind: .balance,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: attemptedKinds,
+                    allowFallbacks: allowFallbacks,
+                    prompt: prompt,
+                    outputPreview: balancePreview(from: refined),
+                    detail: detail(
+                        preferred: preference.kind,
+                        active: provider.kind,
+                        allowFallbacks: allowFallbacks
+                    )
+                )
                 return refined
             }
         }
 
+        recordTrace(
+            kind: .balance,
+            preferredProvider: preference.kind,
+            activeProvider: nil,
+            attemptedProviders: attemptedKinds,
+            allowFallbacks: allowFallbacks,
+            prompt: prompt,
+            outputPreview: balancePreview(from: base),
+            detail: "No provider returned a refined balance board, so Before kept the deterministic copy."
+        )
         return nil
     }
 
@@ -206,14 +286,54 @@ enum DecisionIntelligenceProviderPipeline {
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool
     ) async -> MirrorResult? {
-        guard preference != .template else { return nil }
+        let prompt = DecisionIntelligencePromptContract.mirrorRefinementPrompt(base: base, input: input)
+        guard preference != .template else {
+            recordTrace(
+                kind: .mirror,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [.template],
+                allowFallbacks: allowFallbacks,
+                prompt: prompt,
+                outputPreview: mirrorPreview(from: base),
+                detail: "Template mode is pinned, so no model provider was used for mirror refinement."
+            )
+            return nil
+        }
 
-        for provider in orderedProviders(for: preference, allowFallbacks: allowFallbacks) {
+        let providers = orderedProviders(for: preference, allowFallbacks: allowFallbacks)
+        let attemptedKinds = providers.map(\.kind)
+
+        for provider in providers {
             if let refined = await provider.refineMirrorResult(base: base, input: input) {
+                recordTrace(
+                    kind: .mirror,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: attemptedKinds,
+                    allowFallbacks: allowFallbacks,
+                    prompt: prompt,
+                    outputPreview: mirrorPreview(from: refined),
+                    detail: detail(
+                        preferred: preference.kind,
+                        active: provider.kind,
+                        allowFallbacks: allowFallbacks
+                    )
+                )
                 return refined
             }
         }
 
+        recordTrace(
+            kind: .mirror,
+            preferredProvider: preference.kind,
+            activeProvider: nil,
+            attemptedProviders: attemptedKinds,
+            allowFallbacks: allowFallbacks,
+            prompt: prompt,
+            outputPreview: mirrorPreview(from: base),
+            detail: "No provider returned a refined mirror, so Before kept the deterministic copy."
+        )
         return nil
     }
 
@@ -228,5 +348,58 @@ enum DecisionIntelligenceProviderPipeline {
         allowFallbacks: Bool
     ) -> [any DecisionIntelligenceProviding] {
         orderedKinds(for: preference, allowFallbacks: allowFallbacks).compactMap { providersByKind[$0] }
+    }
+
+    private static func recordTrace(
+        kind: DecisionIntelligenceTraceKind,
+        preferredProvider: DecisionModelProviderKind,
+        activeProvider: DecisionModelProviderKind?,
+        attemptedProviders: [DecisionModelProviderKind],
+        allowFallbacks: Bool,
+        prompt: String,
+        outputPreview: String,
+        detail: String
+    ) {
+        let trace = DecisionIntelligenceTrace(
+            kind: kind,
+            preferredProvider: preferredProvider,
+            activeProvider: activeProvider,
+            attemptedProviders: attemptedProviders,
+            allowFallbacks: allowFallbacks,
+            usedFallback: activeProvider != nil && activeProvider != preferredProvider,
+            prompt: prompt,
+            outputPreview: outputPreview,
+            detail: detail
+        )
+
+        Task { @MainActor in
+            DecisionIntelligenceDebugStore.shared.record(trace)
+        }
+    }
+
+    private static func detail(
+        preferred: DecisionModelProviderKind,
+        active: DecisionModelProviderKind,
+        allowFallbacks: Bool
+    ) -> String {
+        if active == preferred {
+            return allowFallbacks
+                ? "Before used the preferred provider without needing a fallback."
+                : "Before used the pinned provider with fallback disabled."
+        }
+
+        return "Before switched away from \(preferred.title) and used \(active.title) for this refinement."
+    }
+
+    private static func quickPreview(from result: QuickCheckResult) -> String {
+        "Current: \(result.currentPerspective)\nAfter: \(result.afterPerspective)"
+    }
+
+    private static func balancePreview(from result: BalanceBoardResult) -> String {
+        "Headline: \(result.headline)\nFocus: \(result.focusDescription)\nNext: \(result.nextAction)"
+    }
+
+    private static func mirrorPreview(from result: MirrorResult) -> String {
+        "Headline: \(result.headline)\nTension: \(result.coreTension)\nNext: \(result.nextAction)"
     }
 }

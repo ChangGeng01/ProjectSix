@@ -3,6 +3,7 @@ import SwiftUI
 struct DeveloperCenterView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var debugStore = DecisionIntelligenceDebugStore.shared
 
     var body: some View {
         NavigationStack {
@@ -70,6 +71,46 @@ struct DeveloperCenterView: View {
                 Section("Developer actions") {
                     Button("Preview Let Go finish-state") {
                         appModel.presentDeveloperLetGoPreview()
+                    }
+                }
+
+                Section("Prompt Inspector") {
+                    if debugStore.traces.isEmpty {
+                        Text("No model refinement traces yet. Run a quick, balance, or mirror flow to inspect the latest prompt and provider path.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(debugStore.traces) { trace in
+                            NavigationLink {
+                                DecisionTraceDetailView(trace: trace)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack {
+                                        Text(trace.kind.title)
+                                            .font(.subheadline.weight(.semibold))
+                                        Spacer()
+                                        Text(trace.activeProvider?.title ?? "Deterministic")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Text(trace.detail)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+
+                                    Text(trace.outputPreview)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+
+                        Button("Clear traces", role: .destructive) {
+                            debugStore.clear()
+                        }
                     }
                 }
 

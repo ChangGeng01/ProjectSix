@@ -25,6 +25,7 @@ final class BeforeAppModel: ObservableObject {
     let modelContainer: ModelContainer
     let supportInbox: SupportInboxStore
     let sharedLifeStore: SharedLifeStore
+    let developerDebugStore: DecisionIntelligenceDebugStore
     private var shouldPromptReflectionAfterBackground = false
     private var pendingReflectionContext: ReflectionContext?
 
@@ -34,6 +35,7 @@ final class BeforeAppModel: ObservableObject {
         self.preferences = BeforePreferencesStore.load()
         self.supportInbox = SupportInboxStore()
         self.sharedLifeStore = SharedLifeStore()
+        self.developerDebugStore = .shared
         restorePendingReflectionState()
     }
 
