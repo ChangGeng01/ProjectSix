@@ -22,7 +22,7 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertEqual(value, "This is a very long line that sh…")
     }
 
-    func testQuickRefinementPromptIncludesStructuredFields() {
+    func testQuickRefinementEnvelopeUsesStructuredStateAndStaysWithinBudget() {
         let input = QuickCheckInput(
             scenario: .buy,
             motivation: .reward,
@@ -39,31 +39,41 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
             secondaryActions: [.decideTomorrow]
         )
 
-        let prompt = DecisionIntelligencePromptContract.quickRefinementPrompt(base: base, input: input)
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(base: base, input: input)
 
-        XCTAssertTrue(prompt.contains("Scenario: \(input.scenario.title)"))
-        XCTAssertTrue(prompt.contains("Motivation: \(input.motivation.title)"))
-        XCTAssertTrue(prompt.contains("Expected outcome: \(input.expectedOutcome.title)"))
-        XCTAssertTrue(prompt.contains("Control level: \(input.controlLevel.title)"))
-        XCTAssertTrue(prompt.contains("Optional note: Not provided."))
-        XCTAssertTrue(prompt.contains("Current perspective: \(base.currentPerspective)"))
-        XCTAssertTrue(prompt.contains("After perspective: \(base.afterPerspective)"))
+        XCTAssertTrue(envelope.instructions.contains("language rendering layer"))
+        XCTAssertTrue(envelope.payload.contains("TASK_STATE_JSON:"))
+        XCTAssertTrue(envelope.payload.contains("\"mode\":\"Quick\""))
+        XCTAssertTrue(envelope.payload.contains("\"scenario\":\"\(input.scenario.title)\""))
+        XCTAssertTrue(envelope.payload.contains("\"motivation\":\"\(input.motivation.title)\""))
+        XCTAssertTrue(envelope.payload.contains("\"note\":\"Not provided.\""))
+        XCTAssertTrue(envelope.payload.contains("Current perspective: \(base.currentPerspective)"))
+        XCTAssertTrue(envelope.payload.contains("After perspective: \(base.afterPerspective)"))
+        XCTAssertTrue(envelope.payload.contains("OUTPUT_GUARD:"))
+        XCTAssertTrue(envelope.budget.isWithinTarget)
     }
 
-    func testReminderSelectionPromptIncludesIndexedCandidates() {
-        let prompt = DecisionIntelligencePromptContract.reminderSelectionPrompt(
+    func testReminderSelectionEnvelopeClipsCandidatesAndUsesStructuredState() {
+        let envelope = DecisionIntelligencePromptContract.reminderSelectionEnvelope(
             candidates: [
                 ReminderSelectionCandidate(id: UUID(), content: "This is stress shopping again."),
-                ReminderSelectionCandidate(id: UUID(), content: "You already knew this was a real replacement.")
+                ReminderSelectionCandidate(id: UUID(), content: "You already knew this was a real replacement."),
+                ReminderSelectionCandidate(id: UUID(), content: "This is discomfort, not a need."),
+                ReminderSelectionCandidate(id: UUID(), content: "This fourth option should be clipped away.")
             ],
             scenario: .buy,
             prompt: "Today was rough and I want these shoes.",
             mode: .quick
         )
 
-        XCTAssertTrue(prompt.contains("Scenario: Buy"))
-        XCTAssertTrue(prompt.contains("Mode: Quick"))
-        XCTAssertTrue(prompt.contains("0: This is stress shopping again."))
-        XCTAssertTrue(prompt.contains("1: You already knew this was a real replacement."))
+        XCTAssertEqual(envelope.candidates.count, 3)
+        XCTAssertTrue(envelope.prompt.payload.contains("\"scenario\":\"Buy\""))
+        XCTAssertTrue(envelope.prompt.payload.contains("\"mode\":\"Quick\""))
+        XCTAssertTrue(envelope.prompt.payload.contains("\"candidate_count\":3"))
+        XCTAssertTrue(envelope.prompt.payload.contains("0: This is stress shopping again."))
+        XCTAssertTrue(envelope.prompt.payload.contains("1: You already knew this was a real replacement."))
+        XCTAssertTrue(envelope.prompt.payload.contains("2: This is discomfort, not a need."))
+        XCTAssertFalse(envelope.prompt.payload.contains("This fourth option should be clipped away."))
+        XCTAssertTrue(envelope.prompt.budget.isWithinTarget)
     }
 }

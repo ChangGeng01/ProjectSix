@@ -218,7 +218,7 @@ enum DecisionIntelligenceProviderPipeline {
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> QuickCheckResult? {
-        let prompt = DecisionIntelligencePromptContract.quickRefinementPrompt(base: base, input: input)
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(base: base, input: input)
         guard preference != .template else {
             recordTrace(
                 kind: .quick,
@@ -226,7 +226,7 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [.template],
                 allowFallbacks: allowFallbacks,
-                prompt: prompt,
+                prompt: envelope.debugPrompt,
                 outputPreview: quickPreview(from: base),
                 detail: "Template mode is pinned, so no model provider was used for quick refinement."
             )
@@ -248,7 +248,7 @@ enum DecisionIntelligenceProviderPipeline {
                     activeProvider: provider.kind,
                     attemptedProviders: attemptedKinds,
                     allowFallbacks: allowFallbacks,
-                    prompt: prompt,
+                    prompt: envelope.debugPrompt,
                     outputPreview: quickPreview(from: refined),
                     detail: detail(
                         preferred: preference.kind,
@@ -266,7 +266,7 @@ enum DecisionIntelligenceProviderPipeline {
             activeProvider: nil,
             attemptedProviders: attemptedKinds,
             allowFallbacks: allowFallbacks,
-            prompt: prompt,
+            prompt: envelope.debugPrompt,
             outputPreview: quickPreview(from: base),
             detail: "No provider returned a refined quick result, so Before kept the deterministic copy."
         )
@@ -280,7 +280,7 @@ enum DecisionIntelligenceProviderPipeline {
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> BalanceBoardResult? {
-        let prompt = DecisionIntelligencePromptContract.balanceRefinementPrompt(base: base, input: input)
+        let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(base: base, input: input)
         guard preference != .template else {
             recordTrace(
                 kind: .balance,
@@ -288,7 +288,7 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [.template],
                 allowFallbacks: allowFallbacks,
-                prompt: prompt,
+                prompt: envelope.debugPrompt,
                 outputPreview: balancePreview(from: base),
                 detail: "Template mode is pinned, so no model provider was used for balance refinement."
             )
@@ -310,7 +310,7 @@ enum DecisionIntelligenceProviderPipeline {
                     activeProvider: provider.kind,
                     attemptedProviders: attemptedKinds,
                     allowFallbacks: allowFallbacks,
-                    prompt: prompt,
+                    prompt: envelope.debugPrompt,
                     outputPreview: balancePreview(from: refined),
                     detail: detail(
                         preferred: preference.kind,
@@ -328,7 +328,7 @@ enum DecisionIntelligenceProviderPipeline {
             activeProvider: nil,
             attemptedProviders: attemptedKinds,
             allowFallbacks: allowFallbacks,
-            prompt: prompt,
+            prompt: envelope.debugPrompt,
             outputPreview: balancePreview(from: base),
             detail: "No provider returned a refined balance board, so Before kept the deterministic copy."
         )
@@ -342,7 +342,7 @@ enum DecisionIntelligenceProviderPipeline {
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> MirrorResult? {
-        let prompt = DecisionIntelligencePromptContract.mirrorRefinementPrompt(base: base, input: input)
+        let envelope = DecisionIntelligencePromptContract.mirrorRefinementEnvelope(base: base, input: input)
         guard preference != .template else {
             recordTrace(
                 kind: .mirror,
@@ -350,7 +350,7 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [.template],
                 allowFallbacks: allowFallbacks,
-                prompt: prompt,
+                prompt: envelope.debugPrompt,
                 outputPreview: mirrorPreview(from: base),
                 detail: "Template mode is pinned, so no model provider was used for mirror refinement."
             )
@@ -372,7 +372,7 @@ enum DecisionIntelligenceProviderPipeline {
                     activeProvider: provider.kind,
                     attemptedProviders: attemptedKinds,
                     allowFallbacks: allowFallbacks,
-                    prompt: prompt,
+                    prompt: envelope.debugPrompt,
                     outputPreview: mirrorPreview(from: refined),
                     detail: detail(
                         preferred: preference.kind,
@@ -390,7 +390,7 @@ enum DecisionIntelligenceProviderPipeline {
             activeProvider: nil,
             attemptedProviders: attemptedKinds,
             allowFallbacks: allowFallbacks,
-            prompt: prompt,
+            prompt: envelope.debugPrompt,
             outputPreview: mirrorPreview(from: base),
             detail: "No provider returned a refined mirror, so Before kept the deterministic copy."
         )
@@ -406,15 +406,14 @@ enum DecisionIntelligenceProviderPipeline {
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> ReminderSelectionCandidate? {
-        let clippedCandidates = Array(candidates.prefix(DecisionIntelligencePromptContract.Limit.reminderCandidates))
-        guard !clippedCandidates.isEmpty, preference != .template else { return nil }
-
-        let contractPrompt = DecisionIntelligencePromptContract.reminderSelectionPrompt(
-            candidates: clippedCandidates,
+        let selection = DecisionIntelligencePromptContract.reminderSelectionEnvelope(
+            candidates: candidates,
             scenario: scenario,
             prompt: prompt,
             mode: mode
         )
+        let clippedCandidates = selection.candidates
+        guard !clippedCandidates.isEmpty, preference != .template else { return nil }
         let providers = orderedProviders(
             for: preference,
             allowFallbacks: allowFallbacks,
@@ -435,7 +434,7 @@ enum DecisionIntelligenceProviderPipeline {
                     activeProvider: provider.kind,
                     attemptedProviders: attemptedKinds,
                     allowFallbacks: allowFallbacks,
-                    prompt: contractPrompt,
+                    prompt: selection.prompt.debugPrompt,
                     outputPreview: reminderPreview(from: selected),
                     detail: detail(
                         preferred: preference.kind,
@@ -453,7 +452,7 @@ enum DecisionIntelligenceProviderPipeline {
             activeProvider: nil,
             attemptedProviders: attemptedKinds,
             allowFallbacks: allowFallbacks,
-            prompt: contractPrompt,
+            prompt: selection.prompt.debugPrompt,
             outputPreview: "No reminder selected",
             detail: "No provider returned a reminder selection, so Before kept the deterministic reminder ordering."
         )

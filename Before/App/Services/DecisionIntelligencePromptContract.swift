@@ -11,8 +11,102 @@ enum DecisionIntelligencePromptContract {
         static let mirrorHeadline = 120
         static let mirrorCoreTension = 220
         static let mirrorNextAction = 180
-        static let reminderCandidates = 6
+        static let reminderCandidates = 3
         static let reminderCandidateLength = 140
+        static let stateField = 140
+        static let statePrompt = 170
+        static let evidenceSnippet = 180
+    }
+
+    enum TaskKind: Equatable, Sendable {
+        case quick
+        case balance
+        case mirror
+        case reminder
+
+        var targetCharacters: Int {
+            switch self {
+            case .quick: 1_350
+            case .balance: 1_550
+            case .mirror: 1_700
+            case .reminder: 1_100
+            }
+        }
+    }
+
+    struct ContextBudget: Equatable, Sendable {
+        let targetCharacters: Int
+        let prefixCharacters: Int
+        let suffixCharacters: Int
+
+        var totalCharacters: Int {
+            prefixCharacters + suffixCharacters
+        }
+
+        var isWithinTarget: Bool {
+            totalCharacters <= targetCharacters
+        }
+    }
+
+    struct PromptEnvelope: Equatable, Sendable {
+        let kind: TaskKind
+        let instructions: String
+        let payload: String
+        let debugPrompt: String
+        let budget: ContextBudget
+
+        var runtimePrompt: String {
+            instructions + "\n\n" + payload
+        }
+    }
+
+    struct ReminderSelectionEnvelope: Equatable, Sendable {
+        let prompt: PromptEnvelope
+        let candidates: [ReminderSelectionCandidate]
+    }
+
+    enum PrefixCache {
+        static let sharedPrelude = """
+        You are the language rendering layer for a local decision app.
+        The app owns state, routing, safety, verdicts, and actions.
+        You only tighten wording or select from provided options.
+        Keep the tone calm, short, and non-shaming.
+        """
+
+        static let quick = """
+        Rewrite only the two perspective lines.
+        Keep the same meaning and do not change verdicts or actions.
+        """
+
+        static let balance = """
+        Tighten the board without inventing new facts or turning it into a verdict.
+        Preserve the same focus and next-step intent.
+        """
+
+        static let mirror = """
+        Clarify the mirror without becoming dramatic, therapeutic, or yes-no.
+        Preserve the same tension and reflective next move.
+        """
+
+        static let reminder = """
+        Pick one existing reminder that best matches the current state.
+        Do not rewrite or invent reminder text.
+        """
+
+        static func instructions(for kind: TaskKind) -> String {
+            let modeInstructions: String = switch kind {
+            case .quick:
+                quick
+            case .balance:
+                balance
+            case .mirror:
+                mirror
+            case .reminder:
+                reminder
+            }
+
+            return sharedPrelude + "\n" + modeInstructions
+        }
     }
 
     static func sanitized(_ value: String, fallback: String, limit: Int) -> String {
@@ -30,52 +124,129 @@ enum DecisionIntelligencePromptContract {
         return String(collapsed.prefix(limit)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
     }
 
+    static func quickRefinementEnvelope(base: QuickCheckResult, input: QuickCheckInput) -> PromptEnvelope {
+        makeEnvelope(
+            kind: .quick,
+            state: [
+                "mode": DecisionMode.quick.shortTitle,
+                "scenario": input.scenario.title,
+                "motivation": input.motivation.title,
+                "expected_outcome": input.expectedOutcome.title,
+                "control_level": input.controlLevel.title,
+                "note": stateValue(input.note, fallback: "Not provided.", limit: Limit.stateField)
+            ],
+            evidence: [
+                "Current perspective: \(evidenceValue(base.currentPerspective, limit: Limit.evidenceSnippet))",
+                "After perspective: \(evidenceValue(base.afterPerspective, limit: Limit.evidenceSnippet))",
+                "Verdict: \(base.verdict.title)",
+                "Primary action: \(base.primaryAction.title)",
+                secondaryActionEvidence(base.secondaryActions)
+            ],
+            outputGuard: [
+                "Rewrite only the current and after perspective lines.",
+                "Keep the same meaning and emotional direction.",
+                "Do not change the verdict, actions, or scenario."
+            ]
+        )
+    }
+
     static func quickRefinementPrompt(base: QuickCheckResult, input: QuickCheckInput) -> String {
-        [
-            "Scenario: \(input.scenario.title)",
-            "Motivation: \(input.motivation.title)",
-            "Expected outcome: \(input.expectedOutcome.title)",
-            "Control level: \(input.controlLevel.title)",
-            bullet("Optional note", input.note),
-            bullet("Current perspective", base.currentPerspective),
-            bullet("After perspective", base.afterPerspective),
-            "Rewrite those two lines so they feel more precise and human, but keep the same meaning."
-        ]
-        .joined(separator: "\n")
+        quickRefinementEnvelope(base: base, input: input).debugPrompt
+    }
+
+    static func balanceRefinementEnvelope(base: BalanceBoardResult, input: BalanceBoardInput) -> PromptEnvelope {
+        makeEnvelope(
+            kind: .balance,
+            state: [
+                "mode": DecisionMode.balance.shortTitle,
+                "prompt": stateValue(input.prompt, fallback: "Not provided.", limit: Limit.statePrompt),
+                "want": stateValue(input.desire, fallback: "Not provided.", limit: Limit.stateField),
+                "concern": stateValue(input.concern, fallback: "Not provided.", limit: Limit.stateField),
+                "reality": stateValue(input.constraint, fallback: "Not provided.", limit: Limit.stateField),
+                "long_term": stateValue(input.longTerm, fallback: "Not provided.", limit: Limit.stateField)
+            ],
+            evidence: [
+                "Current headline: \(evidenceValue(base.headline, limit: Limit.evidenceSnippet))",
+                "Current summary: \(evidenceValue(base.summary, limit: Limit.evidenceSnippet))",
+                "Focus title: \(evidenceValue(base.focusTitle, limit: Limit.evidenceSnippet))",
+                "Focus description: \(evidenceValue(base.focusDescription, limit: Limit.evidenceSnippet))",
+                "Next action: \(evidenceValue(base.nextAction, limit: Limit.evidenceSnippet))"
+            ],
+            outputGuard: [
+                "Keep the same focus and next-step intent.",
+                "Do not invent facts or turn the board into a verdict.",
+                "Return tighter language only."
+            ]
+        )
     }
 
     static func balanceRefinementPrompt(base: BalanceBoardResult, input: BalanceBoardInput) -> String {
-        [
-            bullet("Prompt", input.prompt),
-            bullet("Want", input.desire),
-            bullet("Concern", input.concern),
-            bullet("Reality", input.constraint),
-            bullet("Long-term", input.longTerm),
-            bullet("Current headline", base.headline),
-            bullet("Current summary", base.summary),
-            bullet("Focus title", base.focusTitle),
-            bullet("Focus description", base.focusDescription),
-            bullet("Next action", base.nextAction),
-            "Tighten the wording without changing the underlying focus."
-        ]
-        .joined(separator: "\n")
+        balanceRefinementEnvelope(base: base, input: input).debugPrompt
+    }
+
+    static func mirrorRefinementEnvelope(base: MirrorResult, input: MirrorInput) -> PromptEnvelope {
+        makeEnvelope(
+            kind: .mirror,
+            state: [
+                "mode": DecisionMode.mirror.shortTitle,
+                "prompt": stateValue(input.prompt, fallback: "Not provided.", limit: Limit.statePrompt),
+                "emotion": stateValue(input.emotion, fallback: "Not provided.", limit: Limit.stateField),
+                "relationship": stateValue(input.relationship, fallback: "Not provided.", limit: Limit.stateField),
+                "reality": stateValue(input.reality, fallback: "Not provided.", limit: Limit.stateField),
+                "long_term": stateValue(input.longTerm, fallback: "Not provided.", limit: Limit.stateField),
+                "self_lens": stateValue(input.selfLens, fallback: "Not provided.", limit: Limit.stateField)
+            ],
+            evidence: [
+                "Current headline: \(evidenceValue(base.headline, limit: Limit.evidenceSnippet))",
+                "Core tension: \(evidenceValue(base.coreTension, limit: Limit.evidenceSnippet))",
+                "Next action title: \(evidenceValue(base.nextActionTitle, limit: Limit.evidenceSnippet))",
+                "Next action: \(evidenceValue(base.nextAction, limit: Limit.evidenceSnippet))"
+            ],
+            outputGuard: [
+                "Clarify the mirror without giving a yes-no answer.",
+                "Keep the tone restrained, reflective, and non-therapeutic.",
+                "Preserve the same core tension and next reflective move."
+            ]
+        )
     }
 
     static func mirrorRefinementPrompt(base: MirrorResult, input: MirrorInput) -> String {
-        [
-            bullet("Prompt", input.prompt),
-            bullet("Emotion", input.emotion),
-            bullet("Relationship", input.relationship),
-            bullet("Reality", input.reality),
-            bullet("Long-term", input.longTerm),
-            bullet("Self lens", input.selfLens),
-            bullet("Current headline", base.headline),
-            bullet("Core tension", base.coreTension),
-            bullet("Next action title", base.nextActionTitle),
-            bullet("Next action", base.nextAction),
-            "Clarify the mirror without becoming dramatic or giving a yes-no answer."
-        ]
-        .joined(separator: "\n")
+        mirrorRefinementEnvelope(base: base, input: input).debugPrompt
+    }
+
+    static func reminderSelectionEnvelope(
+        candidates: [ReminderSelectionCandidate],
+        scenario: ScenarioType,
+        prompt: String,
+        mode: DecisionMode?
+    ) -> ReminderSelectionEnvelope {
+        let clippedCandidates = Array(candidates.prefix(Limit.reminderCandidates))
+        let modeTitle = mode?.shortTitle ?? "Not specified"
+
+        let envelope = makeEnvelope(
+            kind: .reminder,
+            state: [
+                "mode": modeTitle,
+                "scenario": scenario.title,
+                "current_prompt": stateValue(prompt, fallback: "Not provided.", limit: Limit.statePrompt),
+                "candidate_count": clippedCandidates.count
+            ],
+            evidence: clippedCandidates.enumerated().map { index, candidate in
+                let safeContent = sanitized(
+                    candidate.content,
+                    fallback: candidate.content,
+                    limit: Limit.reminderCandidateLength
+                )
+                return "\(index): \(safeContent)"
+            },
+            outputGuard: [
+                "Choose exactly one candidate index from the provided evidence.",
+                "Do not rewrite, combine, or invent reminder text.",
+                "Prefer the reminder that most directly matches the current state."
+            ]
+        )
+
+        return ReminderSelectionEnvelope(prompt: envelope, candidates: clippedCandidates)
     }
 
     static func reminderSelectionPrompt(
@@ -84,33 +255,94 @@ enum DecisionIntelligencePromptContract {
         prompt: String,
         mode: DecisionMode?
     ) -> String {
-        let clippedCandidates = Array(candidates.prefix(Limit.reminderCandidates))
-        let modeLine = mode.map { "Mode: \($0.shortTitle)" } ?? "Mode: Not specified"
-        let currentPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        let candidateLines = clippedCandidates.enumerated().map { index, candidate in
-            let safeContent = sanitized(
-                candidate.content,
-                fallback: candidate.content,
-                limit: Limit.reminderCandidateLength
-            )
-            return "\(index): \(safeContent)"
-        }
-
-        return (
-            [
-                "Scenario: \(scenario.title)",
-                modeLine,
-                bullet("Current prompt", currentPrompt),
-                "Choose the one reminder that best matches the user's current state.",
-                "Return only the zero-based index of the best candidate."
-            ]
-            + candidateLines
+        reminderSelectionEnvelope(
+            candidates: candidates,
+            scenario: scenario,
+            prompt: prompt,
+            mode: mode
         )
-        .joined(separator: "\n")
+        .prompt
+        .debugPrompt
     }
 
-    private static func bullet(_ label: String, _ value: String) -> String {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return "\(label): \(trimmed.isEmpty ? "Not provided." : trimmed)"
+    private static func makeEnvelope(
+        kind: TaskKind,
+        state: [String: Any?],
+        evidence: [String],
+        outputGuard: [String]
+    ) -> PromptEnvelope {
+        let instructions = PrefixCache.instructions(for: kind)
+        let payload = [
+            "TASK_STATE_JSON:",
+            stateJSONString(state),
+            "EVIDENCE_SNIPPETS:",
+            evidenceBlock(evidence),
+            "OUTPUT_GUARD:",
+            bulletList(outputGuard)
+        ]
+        .joined(separator: "\n")
+
+        let debugPrompt = [
+            "[PREFIX CACHE]",
+            instructions,
+            "",
+            "[SUFFIX CONTEXT]",
+            payload
+        ]
+        .joined(separator: "\n")
+
+        return PromptEnvelope(
+            kind: kind,
+            instructions: instructions,
+            payload: payload,
+            debugPrompt: debugPrompt,
+            budget: ContextBudget(
+                targetCharacters: kind.targetCharacters,
+                prefixCharacters: instructions.count,
+                suffixCharacters: payload.count
+            )
+        )
+    }
+
+    private static func stateJSONString(_ state: [String: Any?]) -> String {
+        let compactState = state.reduce(into: [String: Any]()) { result, pair in
+            guard let value = pair.value else { return }
+            result[pair.key] = value
+        }
+
+        guard JSONSerialization.isValidJSONObject(compactState),
+              let data = try? JSONSerialization.data(withJSONObject: compactState, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+
+        return json
+    }
+
+    private static func evidenceBlock(_ evidence: [String]) -> String {
+        let compactEvidence = evidence
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard !compactEvidence.isEmpty else { return "- None." }
+        return bulletList(compactEvidence)
+    }
+
+    private static func bulletList(_ lines: [String]) -> String {
+        lines.map { "- \($0)" }.joined(separator: "\n")
+    }
+
+    private static func stateValue(_ value: String, fallback: String, limit: Int) -> String {
+        sanitized(value, fallback: fallback, limit: limit)
+    }
+
+    private static func evidenceValue(_ value: String, limit: Int) -> String {
+        sanitized(value, fallback: "Not provided.", limit: limit)
+    }
+
+    private static func secondaryActionEvidence(_ actions: [CheckAction]) -> String {
+        guard !actions.isEmpty else { return "Secondary actions: None." }
+        let titles = actions.map(\.title).joined(separator: ", ")
+        return "Secondary actions: \(titles)"
     }
 }

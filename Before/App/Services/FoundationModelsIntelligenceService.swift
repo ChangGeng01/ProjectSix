@@ -51,21 +51,16 @@ enum FoundationModelsIntelligenceService {
     ) async -> QuickCheckResult? {
 #if canImport(FoundationModels)
         guard #available(iOS 26.0, *), availabilityStatus.isAvailable else { return nil }
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(base: base, input: input)
 
         do {
             let session = LanguageModelSession(
                 model: .default,
-                instructions: """
-                You refine copy for a local decision app.
-                Rewrite only the two perspective lines.
-                Keep them short, calm, and non-shaming.
-                Do not change the verdict, actions, or overall direction.
-                Never mention AI, therapy, or morality.
-                """
+                instructions: envelope.instructions
             )
 
             let response = try await session.respond(
-                to: DecisionIntelligencePromptContract.quickRefinementPrompt(base: base, input: input),
+                to: envelope.payload,
                 generating: QuickPerspectiveRefinement.self
             )
 
@@ -98,21 +93,16 @@ enum FoundationModelsIntelligenceService {
     ) async -> BalanceBoardResult? {
 #if canImport(FoundationModels)
         guard #available(iOS 26.0, *), availabilityStatus.isAvailable else { return nil }
+        let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(base: base, input: input)
 
         do {
             let session = LanguageModelSession(
                 model: .default,
-                instructions: """
-                You refine copy for a balance-board style decision tool.
-                Keep the board concise and useful.
-                Do not invent new facts.
-                Do not turn the result into a verdict.
-                Preserve the same focus and next-step intent.
-                """
+                instructions: envelope.instructions
             )
 
             let response = try await session.respond(
-                to: DecisionIntelligencePromptContract.balanceRefinementPrompt(base: base, input: input),
+                to: envelope.payload,
                 generating: BalanceRefinement.self
             )
 
@@ -153,20 +143,16 @@ enum FoundationModelsIntelligenceService {
     ) async -> MirrorResult? {
 #if canImport(FoundationModels)
         guard #available(iOS 26.0, *), availabilityStatus.isAvailable else { return nil }
+        let envelope = DecisionIntelligencePromptContract.mirrorRefinementEnvelope(base: base, input: input)
 
         do {
             let session = LanguageModelSession(
                 model: .default,
-                instructions: """
-                You refine copy for a structured mirror inside a local decision app.
-                Keep the tone honest, restrained, and non-therapeutic.
-                Do not hand out life verdicts.
-                Clarify the tension and the next reflective move only.
-                """
+                instructions: envelope.instructions
             )
 
             let response = try await session.respond(
-                to: DecisionIntelligencePromptContract.mirrorRefinementPrompt(base: base, input: input),
+                to: envelope.payload,
                 generating: MirrorRefinement.self
             )
 
@@ -204,27 +190,23 @@ enum FoundationModelsIntelligenceService {
     ) async -> ReminderSelectionCandidate? {
 #if canImport(FoundationModels)
         guard #available(iOS 26.0, *), availabilityStatus.isAvailable else { return nil }
-        let clippedCandidates = Array(candidates.prefix(DecisionIntelligencePromptContract.Limit.reminderCandidates))
+        let selection = DecisionIntelligencePromptContract.reminderSelectionEnvelope(
+            candidates: candidates,
+            scenario: scenario,
+            prompt: prompt,
+            mode: mode
+        )
+        let clippedCandidates = selection.candidates
         guard clippedCandidates.count > 1 else { return clippedCandidates.first }
 
         do {
             let session = LanguageModelSession(
                 model: .default,
-                instructions: """
-                You pick the single best self-reminder for a local decision app.
-                Choose only from the provided candidates.
-                Do not rewrite or invent text.
-                Prefer the reminder that most directly matches the user's current state.
-                """
+                instructions: selection.prompt.instructions
             )
 
             let response = try await session.respond(
-                to: DecisionIntelligencePromptContract.reminderSelectionPrompt(
-                    candidates: clippedCandidates,
-                    scenario: scenario,
-                    prompt: prompt,
-                    mode: mode
-                ),
+                to: selection.prompt.payload,
                 generating: ReminderSelectionRefinement.self
             )
 

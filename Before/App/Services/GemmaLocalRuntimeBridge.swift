@@ -88,15 +88,15 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
     ) async -> QuickCheckResult? {
         guard case let .ready(_, generator) = cachedLoadState,
               let modelPath = modelPathProvider() else { return nil }
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(base: base, input: input)
 
         let prompt = """
-        You refine copy for a local decision app.
-        Return exactly two lines.
+        \(envelope.runtimePrompt)
+
+        RESPONSE_FORMAT:
         CURRENT: <rewrite of the current perspective>
         AFTER: <rewrite of the after perspective>
-        Keep the same meaning, stay calm, and do not mention AI or morality.
-
-        \(DecisionIntelligencePromptContract.quickRefinementPrompt(base: base, input: input))
+        Return exactly two lines.
         """
 
         guard let text = await generateText(
@@ -134,17 +134,17 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
     ) async -> BalanceBoardResult? {
         guard case let .ready(_, generator) = cachedLoadState,
               let modelPath = modelPathProvider() else { return nil }
+        let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(base: base, input: input)
 
         let prompt = """
-        You refine copy for a local balance-board decision tool.
-        Return exactly four lines.
+        \(envelope.runtimePrompt)
+
+        RESPONSE_FORMAT:
         HEADLINE: <headline>
         SUMMARY: <summary>
         FOCUS_DESCRIPTION: <focus description>
         NEXT_ACTION: <next action>
-        Keep the same focus. Do not turn it into a yes-or-no verdict.
-
-        \(DecisionIntelligencePromptContract.balanceRefinementPrompt(base: base, input: input))
+        Return exactly four lines.
         """
 
         guard let text = await generateText(
@@ -196,16 +196,16 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
     ) async -> MirrorResult? {
         guard case let .ready(_, generator) = cachedLoadState,
               let modelPath = modelPathProvider() else { return nil }
+        let envelope = DecisionIntelligencePromptContract.mirrorRefinementEnvelope(base: base, input: input)
 
         let prompt = """
-        You refine copy for a structured mirror inside a local decision app.
-        Return exactly three lines.
+        \(envelope.runtimePrompt)
+
+        RESPONSE_FORMAT:
         HEADLINE: <headline>
         CORE_TENSION: <core tension>
         NEXT_ACTION: <next action>
-        Stay restrained, reflective, and non-therapeutic.
-
-        \(DecisionIntelligencePromptContract.mirrorRefinementPrompt(base: base, input: input))
+        Return exactly three lines.
         """
 
         guard let text = await generateText(
@@ -253,21 +253,21 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
     ) async -> ReminderSelectionCandidate? {
         guard case let .ready(_, generator) = cachedLoadState,
               let modelPath = modelPathProvider() else { return nil }
-
-        let clippedCandidates = Array(candidates.prefix(DecisionIntelligencePromptContract.Limit.reminderCandidates))
-        guard clippedCandidates.count > 1 else { return clippedCandidates.first }
-
-        let prompt = """
-        Choose the best reminder candidate for the user's current state.
-        Return exactly one line.
-        INDEX: <zero-based integer>
-
-        \(DecisionIntelligencePromptContract.reminderSelectionPrompt(
-            candidates: clippedCandidates,
+        let selection = DecisionIntelligencePromptContract.reminderSelectionEnvelope(
+            candidates: candidates,
             scenario: scenario,
             prompt: prompt,
             mode: mode
-        ))
+        )
+        let clippedCandidates = selection.candidates
+        guard clippedCandidates.count > 1 else { return clippedCandidates.first }
+
+        let prompt = """
+        \(selection.prompt.runtimePrompt)
+
+        RESPONSE_FORMAT:
+        INDEX: <zero-based integer>
+        Return exactly one line.
         """
 
         guard let text = await generateText(
