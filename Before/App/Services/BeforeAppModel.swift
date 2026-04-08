@@ -16,6 +16,7 @@ final class BeforeAppModel: ObservableObject {
     @Published var activeBalanceSession: BalanceBoardSession?
     @Published var activeMirrorSession: MirrorWorkspaceSession?
     @Published var reflectionContext: ReflectionContext?
+    @Published var letGoContext: LetGoContext?
     @Published var startupNotice: String?
     @Published var supportSurface: SupportSurfaceTarget = .buddy
     @Published private(set) var preferences: BeforePreferences
@@ -220,7 +221,7 @@ final class BeforeAppModel: ObservableObject {
                 eventID: event.id,
                 from: event.createdAt
             )
-            selectedTab = .box
+            presentLetGo(for: tomorrowItem)
         default:
             break
         }
@@ -264,10 +265,11 @@ final class BeforeAppModel: ObservableObject {
         guard let result = session.result else { return }
 
         let context = modelContainer.mainContext
-        context.insert(TomorrowBoxItemFactory.makeBalanceItem(from: session, result: result))
+        let tomorrowItem = TomorrowBoxItemFactory.makeBalanceItem(from: session, result: result)
+        context.insert(tomorrowItem)
         try? context.save()
         activeBalanceSession = nil
-        selectedTab = .box
+        presentLetGo(for: tomorrowItem)
         persistActiveWorkspaceState()
     }
 
@@ -297,10 +299,11 @@ final class BeforeAppModel: ObservableObject {
         guard let result = session.result else { return }
 
         let context = modelContainer.mainContext
-        context.insert(TomorrowBoxItemFactory.makeMirrorItem(from: session, result: result))
+        let tomorrowItem = TomorrowBoxItemFactory.makeMirrorItem(from: session, result: result)
+        context.insert(tomorrowItem)
         try? context.save()
         activeMirrorSession = nil
-        selectedTab = .box
+        presentLetGo(for: tomorrowItem)
         persistActiveWorkspaceState()
     }
 
@@ -356,23 +359,26 @@ final class BeforeAppModel: ObservableObject {
 
     func moveCheckEventToTomorrow(_ event: CheckEvent) {
         let context = modelContainer.mainContext
-        context.insert(event.makeTomorrowBoxItem())
+        let tomorrowItem = event.makeTomorrowBoxItem()
+        context.insert(tomorrowItem)
         try? context.save()
-        selectedTab = .box
+        presentLetGo(for: tomorrowItem)
     }
 
     func moveBalanceRecordToTomorrow(_ record: BalanceDecisionRecord) {
         let context = modelContainer.mainContext
-        context.insert(record.makeTomorrowBoxItem())
+        let tomorrowItem = record.makeTomorrowBoxItem()
+        context.insert(tomorrowItem)
         try? context.save()
-        selectedTab = .box
+        presentLetGo(for: tomorrowItem)
     }
 
     func moveMirrorRecordToTomorrow(_ record: MirrorDecisionRecord) {
         let context = modelContainer.mainContext
-        context.insert(record.makeTomorrowBoxItem())
+        let tomorrowItem = record.makeTomorrowBoxItem()
+        context.insert(tomorrowItem)
         try? context.save()
-        selectedTab = .box
+        presentLetGo(for: tomorrowItem)
     }
 
     func removeTomorrowBoxItem(_ item: TomorrowBoxItem) {
@@ -708,10 +714,20 @@ final class BeforeAppModel: ObservableObject {
         selectedTab = .box
     }
 
+    func dismissLetGo(to target: AppTab) {
+        selectedTab = target
+        letGoContext = nil
+    }
+
     private func clearActiveDecisionFlows() {
         activeQuickSession = nil
         activeBalanceSession = nil
         activeMirrorSession = nil
+    }
+
+    private func presentLetGo(for item: TomorrowBoxItem) {
+        selectedTab = .home
+        letGoContext = LetGoCopyLibrary.tomorrowBoxContext(for: item)
     }
 
     private func trimReminders(in context: ModelContext) {
@@ -734,6 +750,7 @@ final class BeforeAppModel: ObservableObject {
     private func resetTransientState() {
         clearActiveDecisionFlows()
         reflectionContext = nil
+        letGoContext = nil
         pendingReflectionContext = nil
         shouldPromptReflectionAfterBackground = false
         persistPendingReflectionState()

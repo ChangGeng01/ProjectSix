@@ -75,6 +75,10 @@ struct RootTabView: View {
             ReflectionPromptView(context: context)
                 .environmentObject(appModel)
         }
+        .fullScreenCover(item: $appModel.letGoContext) { context in
+            LetGoView(context: context)
+                .environmentObject(appModel)
+        }
         .fullScreenCover(isPresented: Binding(
             get: { !appModel.hasSeenOnboarding },
             set: { appModel.hasSeenOnboarding = !$0 }

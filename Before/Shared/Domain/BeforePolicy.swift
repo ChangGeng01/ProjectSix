@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 enum BeforePolicy {
     enum QuickCheck {
@@ -8,6 +9,17 @@ enum BeforePolicy {
 
     enum Widget {
         static let timelineRefreshInterval: TimeInterval = 60 * 30
+    }
+
+    enum LetGo {
+        static let motionUpdateInterval = 1.0 / 60.0
+        static let horizontalAccelerationThreshold = 1.08
+        static let directionalDominanceRatio = 1.15
+        static let triggerCooldownInterval: TimeInterval = 0.9
+        static let releaseAnimationDuration = 0.24
+        static let completionTransitionDuration = 0.18
+        static let releaseTravelDistance: CGFloat = 520
+        static let releaseRotationDegrees = 8.0
     }
 
     enum Reflection {
