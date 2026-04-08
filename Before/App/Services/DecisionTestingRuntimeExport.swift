@@ -36,6 +36,33 @@ struct DecisionTestingRuntimeExport {
         )
     }
 
+    var neuralSummary: DecisionTestingNeuralSummary {
+        let neuralTraces = recentTraces.compactMap { trace in
+            trace.neuralState.map { (trace.kind, $0) }
+        }
+
+        let dominantActionByKind = Dictionary(grouping: neuralTraces, by: \.0)
+            .compactMapValues { grouped in
+                grouped
+                    .compactMap(\.1.dominantAction)
+                    .first
+            }
+
+        let strongestSignalByKind = Dictionary(grouping: neuralTraces, by: \.0)
+            .compactMapValues { grouped in
+                grouped
+                    .compactMap { $0.1.dominantActivations.first?.signal }
+                    .first
+            }
+
+        return DecisionTestingNeuralSummary(
+            neuralTraceCount: neuralTraces.count,
+            suppressedBehaviorCount: neuralTraces.reduce(0) { $0 + $1.1.suppressedBehaviors.count },
+            dominantActionByKind: dominantActionByKind,
+            strongestSignalByKind: strongestSignalByKind
+        )
+    }
+
     var summary: DecisionTestingRuntimeSummary {
         DecisionTestingRuntimeSummary(
             activeProvider: runtimeSnapshot.runtimeStatus.active,
@@ -54,6 +81,8 @@ struct DecisionTestingRuntimeExport {
             contextAwareTraceCount: lifecycleSummary.contextAwareTraceCount,
             lifecycleRebuildCount: lifecycleSummary.rebuildCount,
             staleFieldDropCount: lifecycleSummary.staleFieldDropCount,
+            neuralTraceCount: neuralSummary.neuralTraceCount,
+            suppressedBehaviorCount: neuralSummary.suppressedBehaviorCount,
             traceCount: recentTraces.count,
             replayCount: recentReplay.count,
             totalCacheEntries: cacheTelemetry.entryCountByKind.values.reduce(0, +),
@@ -84,6 +113,13 @@ struct DecisionTestingLifecycleSummary: Equatable, Sendable {
     let latestGenerationByKind: [DecisionIntelligenceTraceKind: Int]
 }
 
+struct DecisionTestingNeuralSummary: Equatable, Sendable {
+    let neuralTraceCount: Int
+    let suppressedBehaviorCount: Int
+    let dominantActionByKind: [DecisionIntelligenceTraceKind: DecisionActionRoute]
+    let strongestSignalByKind: [DecisionIntelligenceTraceKind: DecisionNeuralSignal]
+}
+
 struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let activeProvider: DecisionModelProviderKind
     let fallbackProvider: DecisionModelProviderKind?
@@ -101,6 +137,8 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let contextAwareTraceCount: Int
     let lifecycleRebuildCount: Int
     let staleFieldDropCount: Int
+    let neuralTraceCount: Int
+    let suppressedBehaviorCount: Int
     let traceCount: Int
     let replayCount: Int
     let totalCacheEntries: Int

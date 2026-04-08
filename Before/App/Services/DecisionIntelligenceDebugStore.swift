@@ -28,6 +28,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
     let allowFallbacks: Bool
     let usedFallback: Bool
     let contextState: DecisionContextPreparedState?
+    let neuralState: DecisionNeuralState?
     let prompt: String
     let outputPreview: String
     let detail: String
@@ -42,6 +43,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
         allowFallbacks: Bool,
         usedFallback: Bool,
         contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
         prompt: String,
         outputPreview: String,
         detail: String
@@ -55,6 +57,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
         self.allowFallbacks = allowFallbacks
         self.usedFallback = usedFallback
         self.contextState = contextState
+        self.neuralState = neuralState
         self.prompt = prompt
         self.outputPreview = outputPreview
         self.detail = detail

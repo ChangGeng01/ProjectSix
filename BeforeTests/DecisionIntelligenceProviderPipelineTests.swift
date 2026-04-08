@@ -208,11 +208,23 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
             activeFields: [.balancePrompt, .balanceConcern],
             staleFields: [.balanceDesire]
         )
+        let neuralState = DecisionNeuralState(
+            mode: .balance,
+            dominantActivations: [
+                DecisionActivation(signal: .constraintPressure, strength: 0.82)
+            ],
+            candidateActions: [
+                DecisionActionCandidate(route: .setBoundary, score: 0.82)
+            ],
+            suppressedBehaviors: ["instant_verdict"],
+            detail: "Structured routing is active."
+        )
 
         _ = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
             base: base,
             input: input,
             contextState: contextState,
+            neuralState: neuralState,
             preference: .gemmaE4B,
             allowFallbacks: true,
             testingStubProfile: .smoke
@@ -224,7 +236,9 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
 
         XCTAssertEqual(latestTrace.kind, .balance)
         XCTAssertEqual(latestTrace.contextState, contextState)
+        XCTAssertEqual(latestTrace.neuralState, neuralState)
         XCTAssertTrue(latestTrace.prompt.contains("CONTEXT_LIFECYCLE_JSON:"))
+        XCTAssertTrue(latestTrace.prompt.contains("NEURAL_STATE_JSON:"))
     }
 
     @MainActor

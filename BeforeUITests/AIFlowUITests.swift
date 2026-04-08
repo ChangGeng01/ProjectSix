@@ -10,6 +10,7 @@ final class AIFlowUITests: XCTestCase {
 
     func testQuickFlowShowsStubRefinement() throws {
         let app = launchApp()
+        defer { app.terminate() }
 
         XCTAssertTrue(app.buttons["home.mode.quick"].waitForExistence(timeout: timeout))
         app.buttons["home.mode.quick"].tap()
@@ -30,6 +31,7 @@ final class AIFlowUITests: XCTestCase {
 
     func testBalanceFlowShowsStubBoard() throws {
         let app = launchApp()
+        defer { app.terminate() }
 
         XCTAssertTrue(app.buttons["home.mode.balance"].waitForExistence(timeout: timeout))
         app.buttons["home.mode.balance"].tap()
@@ -50,6 +52,7 @@ final class AIFlowUITests: XCTestCase {
 
     func testMirrorFlowShowsStubMirror() throws {
         let app = launchApp()
+        defer { app.terminate() }
 
         XCTAssertTrue(app.buttons["home.mode.mirror"].waitForExistence(timeout: timeout))
         app.buttons["home.mode.mirror"].tap()

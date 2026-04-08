@@ -62,10 +62,15 @@ final class QuickCheckSession: ObservableObject, Identifiable {
         defer { isRefiningWithModel = false }
 
         let prepared = intelligenceLifecycle.prepareQuickInput(input)
+        let neuralState = DecisionNeuralEngine.quickState(
+            input: prepared.input,
+            contextState: prepared.state
+        )
         if let refined = await DecisionIntelligenceCoordinator.refineQuickResult(
             base: base,
             input: prepared.input,
             contextState: prepared.state,
+            neuralState: neuralState,
             preferences: preferences
         ) {
             result = refined

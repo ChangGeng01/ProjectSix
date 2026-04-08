@@ -229,6 +229,7 @@ enum DecisionIntelligenceProviderPipeline {
         base: QuickCheckResult,
         input: QuickCheckInput,
         contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
@@ -238,7 +239,8 @@ enum DecisionIntelligenceProviderPipeline {
         let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
             base: base,
             input: input,
-            contextState: contextState
+            contextState: contextState,
+            neuralState: neuralState
         )
         guard preference != .template else {
             await recordTelemetry(
@@ -256,6 +258,7 @@ enum DecisionIntelligenceProviderPipeline {
                 attemptedProviders: [.template],
                 allowFallbacks: allowFallbacks,
                 contextState: contextState,
+                neuralState: neuralState,
                 prompt: envelope.debugPrompt,
                 outputPreview: quickPreview(from: base),
                 detail: "Template mode is pinned, so no model provider was used for quick refinement."
@@ -290,6 +293,7 @@ enum DecisionIntelligenceProviderPipeline {
                     attemptedProviders: attemptedKinds,
                     allowFallbacks: allowFallbacks,
                     contextState: contextState,
+                    neuralState: neuralState,
                     prompt: envelope.debugPrompt,
                     outputPreview: quickPreview(from: cached),
                     detail: cachedDetail(
@@ -318,6 +322,7 @@ enum DecisionIntelligenceProviderPipeline {
                     attemptedProviders: attemptedKinds,
                     allowFallbacks: allowFallbacks,
                     contextState: contextState,
+                    neuralState: neuralState,
                     prompt: envelope.debugPrompt,
                     outputPreview: quickPreview(from: refined),
                     detail: detail(
@@ -345,6 +350,7 @@ enum DecisionIntelligenceProviderPipeline {
             attemptedProviders: attemptedKinds,
             allowFallbacks: allowFallbacks,
             contextState: contextState,
+            neuralState: neuralState,
             prompt: envelope.debugPrompt,
             outputPreview: quickPreview(from: base),
             detail: "No provider returned a refined quick result, so Before kept the deterministic copy."
@@ -356,6 +362,7 @@ enum DecisionIntelligenceProviderPipeline {
         base: BalanceBoardResult,
         input: BalanceBoardInput,
         contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
@@ -365,7 +372,8 @@ enum DecisionIntelligenceProviderPipeline {
         let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(
             base: base,
             input: input,
-            contextState: contextState
+            contextState: contextState,
+            neuralState: neuralState
         )
         guard preference != .template else {
             await recordTelemetry(
@@ -383,6 +391,7 @@ enum DecisionIntelligenceProviderPipeline {
                 attemptedProviders: [.template],
                 allowFallbacks: allowFallbacks,
                 contextState: contextState,
+                neuralState: neuralState,
                 prompt: envelope.debugPrompt,
                 outputPreview: balancePreview(from: base),
                 detail: "Template mode is pinned, so no model provider was used for balance refinement."
@@ -417,6 +426,7 @@ enum DecisionIntelligenceProviderPipeline {
                     attemptedProviders: attemptedKinds,
                     allowFallbacks: allowFallbacks,
                     contextState: contextState,
+                    neuralState: neuralState,
                     prompt: envelope.debugPrompt,
                     outputPreview: balancePreview(from: cached),
                     detail: cachedDetail(
@@ -445,6 +455,7 @@ enum DecisionIntelligenceProviderPipeline {
                     attemptedProviders: attemptedKinds,
                     allowFallbacks: allowFallbacks,
                     contextState: contextState,
+                    neuralState: neuralState,
                     prompt: envelope.debugPrompt,
                     outputPreview: balancePreview(from: refined),
                     detail: detail(
@@ -472,6 +483,7 @@ enum DecisionIntelligenceProviderPipeline {
             attemptedProviders: attemptedKinds,
             allowFallbacks: allowFallbacks,
             contextState: contextState,
+            neuralState: neuralState,
             prompt: envelope.debugPrompt,
             outputPreview: balancePreview(from: base),
             detail: "No provider returned a refined balance board, so Before kept the deterministic copy."
@@ -483,6 +495,7 @@ enum DecisionIntelligenceProviderPipeline {
         base: MirrorResult,
         input: MirrorInput,
         contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
@@ -492,7 +505,8 @@ enum DecisionIntelligenceProviderPipeline {
         let envelope = DecisionIntelligencePromptContract.mirrorRefinementEnvelope(
             base: base,
             input: input,
-            contextState: contextState
+            contextState: contextState,
+            neuralState: neuralState
         )
         guard preference != .template else {
             await recordTelemetry(
@@ -510,6 +524,7 @@ enum DecisionIntelligenceProviderPipeline {
                 attemptedProviders: [.template],
                 allowFallbacks: allowFallbacks,
                 contextState: contextState,
+                neuralState: neuralState,
                 prompt: envelope.debugPrompt,
                 outputPreview: mirrorPreview(from: base),
                 detail: "Template mode is pinned, so no model provider was used for mirror refinement."
@@ -544,6 +559,7 @@ enum DecisionIntelligenceProviderPipeline {
                     attemptedProviders: attemptedKinds,
                     allowFallbacks: allowFallbacks,
                     contextState: contextState,
+                    neuralState: neuralState,
                     prompt: envelope.debugPrompt,
                     outputPreview: mirrorPreview(from: cached),
                     detail: cachedDetail(
@@ -572,6 +588,7 @@ enum DecisionIntelligenceProviderPipeline {
                     attemptedProviders: attemptedKinds,
                     allowFallbacks: allowFallbacks,
                     contextState: contextState,
+                    neuralState: neuralState,
                     prompt: envelope.debugPrompt,
                     outputPreview: mirrorPreview(from: refined),
                     detail: detail(
@@ -599,6 +616,7 @@ enum DecisionIntelligenceProviderPipeline {
             attemptedProviders: attemptedKinds,
             allowFallbacks: allowFallbacks,
             contextState: contextState,
+            neuralState: neuralState,
             prompt: envelope.debugPrompt,
             outputPreview: mirrorPreview(from: base),
             detail: "No provider returned a refined mirror, so Before kept the deterministic copy."
@@ -752,6 +770,7 @@ enum DecisionIntelligenceProviderPipeline {
         attemptedProviders: [DecisionModelProviderKind],
         allowFallbacks: Bool,
         contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
         prompt: String,
         outputPreview: String,
         detail: String
@@ -764,6 +783,7 @@ enum DecisionIntelligenceProviderPipeline {
             allowFallbacks: allowFallbacks,
             usedFallback: activeProvider != nil && activeProvider != preferredProvider,
             contextState: contextState,
+            neuralState: neuralState,
             prompt: prompt,
             outputPreview: outputPreview,
             detail: detail

@@ -1,20 +1,5 @@
 import Foundation
 
-enum DecisionContextFieldKey: String, Codable, CaseIterable, Sendable {
-    case quickNote
-    case balancePrompt
-    case balanceDesire
-    case balanceConcern
-    case balanceConstraint
-    case balanceLongTerm
-    case mirrorPrompt
-    case mirrorEmotion
-    case mirrorRelationship
-    case mirrorReality
-    case mirrorLongTerm
-    case mirrorSelfLens
-}
-
 struct DecisionContextFieldRecord: Codable, Equatable, Sendable {
     var lastUpdatedAt: Date
     var generation: Int
@@ -25,21 +10,6 @@ struct DecisionContextLifecycleSnapshot: Codable, Equatable, Sendable {
     var generation: Int = 0
     var refinementCountInGeneration: Int = 0
     var fieldRecords: [String: DecisionContextFieldRecord] = [:]
-}
-
-struct DecisionContextPreparedState: Equatable, Sendable {
-    var rebuiltSession: Bool
-    var generation: Int
-    var activeFields: [DecisionContextFieldKey]
-    var staleFields: [DecisionContextFieldKey]
-
-    var activeFieldCount: Int {
-        activeFields.count
-    }
-
-    var staleFieldCount: Int {
-        staleFields.count
-    }
 }
 
 @MainActor

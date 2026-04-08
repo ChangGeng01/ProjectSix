@@ -178,6 +178,7 @@ enum DecisionIntelligenceCoordinator {
         base: QuickCheckResult,
         input: QuickCheckInput,
         contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> QuickCheckResult? {
         let profile = executionProfile(preferences: preferences)
@@ -187,6 +188,7 @@ enum DecisionIntelligenceCoordinator {
             base: base,
             input: input,
             contextState: contextState,
+            neuralState: neuralState,
             preference: profile.effectiveProviderPreference,
             allowFallbacks: profile.allowFallbacks
         )
@@ -196,6 +198,7 @@ enum DecisionIntelligenceCoordinator {
         base: BalanceBoardResult,
         input: BalanceBoardInput,
         contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> BalanceBoardResult? {
         let profile = executionProfile(preferences: preferences)
@@ -205,6 +208,7 @@ enum DecisionIntelligenceCoordinator {
             base: base,
             input: input,
             contextState: contextState,
+            neuralState: neuralState,
             preference: profile.effectiveProviderPreference,
             allowFallbacks: profile.allowFallbacks
         )
@@ -214,6 +218,7 @@ enum DecisionIntelligenceCoordinator {
         base: MirrorResult,
         input: MirrorInput,
         contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> MirrorResult? {
         let profile = executionProfile(preferences: preferences)
@@ -223,6 +228,7 @@ enum DecisionIntelligenceCoordinator {
             base: base,
             input: input,
             contextState: contextState,
+            neuralState: neuralState,
             preference: profile.effectiveProviderPreference,
             allowFallbacks: profile.allowFallbacks
         )

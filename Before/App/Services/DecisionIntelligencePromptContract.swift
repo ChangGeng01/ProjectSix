@@ -127,7 +127,8 @@ enum DecisionIntelligencePromptContract {
     static func quickRefinementEnvelope(
         base: QuickCheckResult,
         input: QuickCheckInput,
-        contextState: DecisionContextPreparedState? = nil
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil
     ) -> PromptEnvelope {
         makeEnvelope(
             kind: .quick,
@@ -151,22 +152,30 @@ enum DecisionIntelligencePromptContract {
                 "Keep the same meaning and emotional direction.",
                 "Do not change the verdict, actions, or scenario."
             ],
-            contextState: contextState
+            contextState: contextState,
+            neuralState: neuralState
         )
     }
 
     static func quickRefinementPrompt(
         base: QuickCheckResult,
         input: QuickCheckInput,
-        contextState: DecisionContextPreparedState? = nil
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil
     ) -> String {
-        quickRefinementEnvelope(base: base, input: input, contextState: contextState).debugPrompt
+        quickRefinementEnvelope(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState
+        ).debugPrompt
     }
 
     static func balanceRefinementEnvelope(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
-        contextState: DecisionContextPreparedState? = nil
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil
     ) -> PromptEnvelope {
         makeEnvelope(
             kind: .balance,
@@ -190,22 +199,30 @@ enum DecisionIntelligencePromptContract {
                 "Do not invent facts or turn the board into a verdict.",
                 "Return tighter language only."
             ],
-            contextState: contextState
+            contextState: contextState,
+            neuralState: neuralState
         )
     }
 
     static func balanceRefinementPrompt(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
-        contextState: DecisionContextPreparedState? = nil
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil
     ) -> String {
-        balanceRefinementEnvelope(base: base, input: input, contextState: contextState).debugPrompt
+        balanceRefinementEnvelope(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState
+        ).debugPrompt
     }
 
     static func mirrorRefinementEnvelope(
         base: MirrorResult,
         input: MirrorInput,
-        contextState: DecisionContextPreparedState? = nil
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil
     ) -> PromptEnvelope {
         makeEnvelope(
             kind: .mirror,
@@ -229,16 +246,23 @@ enum DecisionIntelligencePromptContract {
                 "Keep the tone restrained, reflective, and non-therapeutic.",
                 "Preserve the same core tension and next reflective move."
             ],
-            contextState: contextState
+            contextState: contextState,
+            neuralState: neuralState
         )
     }
 
     static func mirrorRefinementPrompt(
         base: MirrorResult,
         input: MirrorInput,
-        contextState: DecisionContextPreparedState? = nil
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil
     ) -> String {
-        mirrorRefinementEnvelope(base: base, input: input, contextState: contextState).debugPrompt
+        mirrorRefinementEnvelope(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState
+        ).debugPrompt
     }
 
     static func reminderSelectionEnvelope(
@@ -297,7 +321,8 @@ enum DecisionIntelligencePromptContract {
         state: [String: Any?],
         evidence: [String],
         outputGuard: [String],
-        contextState: DecisionContextPreparedState? = nil
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil
     ) -> PromptEnvelope {
         let instructions = PrefixCache.instructions(for: kind)
         var sections = [
@@ -309,6 +334,13 @@ enum DecisionIntelligencePromptContract {
             sections += [
                 "CONTEXT_LIFECYCLE_JSON:",
                 contextStateJSONString(contextState)
+            ]
+        }
+
+        if let neuralState {
+            sections += [
+                "NEURAL_STATE_JSON:",
+                neuralStateJSONString(neuralState)
             ]
         }
 
@@ -366,6 +398,34 @@ enum DecisionIntelligencePromptContract {
             "stale_fields": contextState.staleFields.map(\.rawValue),
             "active_field_count": contextState.activeFieldCount,
             "stale_field_count": contextState.staleFieldCount
+        ]
+
+        guard JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+
+        return json
+    }
+
+    private static func neuralStateJSONString(_ neuralState: DecisionNeuralState) -> String {
+        let payload: [String: Any] = [
+            "mode": neuralState.mode.rawValue,
+            "dominant_signals": neuralState.dominantActivations.map { activation in
+                [
+                    "signal": activation.signal.rawValue,
+                    "strength": activation.strength
+                ]
+            },
+            "candidate_actions": neuralState.candidateActions.map { candidate in
+                [
+                    "route": candidate.route.rawValue,
+                    "score": candidate.score
+                ]
+            },
+            "suppressed_behaviors": neuralState.suppressedBehaviors,
+            "detail": neuralState.detail
         ]
 
         guard JSONSerialization.isValidJSONObject(payload),

@@ -60,6 +60,19 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
             activeFields: [.balancePrompt, .balanceConcern],
             staleFields: [.balanceDesire]
         )
+        let neuralState = DecisionNeuralState(
+            mode: .balance,
+            dominantActivations: [
+                DecisionActivation(signal: .constraintPressure, strength: 0.82),
+                DecisionActivation(signal: .concernWeight, strength: 0.74)
+            ],
+            candidateActions: [
+                DecisionActionCandidate(route: .setBoundary, score: 0.82),
+                DecisionActionCandidate(route: .clarifyPriority, score: 0.68)
+            ],
+            suppressedBehaviors: ["instant_verdict"],
+            detail: "Use structured trade-off routing."
+        )
 
         let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(
             base: BalanceBoardResult(
@@ -76,7 +89,8 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
                 constraint: "",
                 longTerm: ""
             ),
-            contextState: contextState
+            contextState: contextState,
+            neuralState: neuralState
         )
 
         XCTAssertTrue(envelope.payload.contains("CONTEXT_LIFECYCLE_JSON:"))
@@ -85,6 +99,10 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertTrue(envelope.payload.contains("\"active_fields\":[\"balancePrompt\",\"balanceConcern\"]"))
         XCTAssertTrue(envelope.payload.contains("\"stale_fields\":[\"balanceDesire\"]"))
         XCTAssertTrue(envelope.payload.contains("\"stale_field_count\":1"))
+        XCTAssertTrue(envelope.payload.contains("NEURAL_STATE_JSON:"))
+        XCTAssertTrue(envelope.payload.contains("\"route\":\"setBoundary\""))
+        XCTAssertTrue(envelope.payload.contains("\"signal\":\"constraintPressure\""))
+        XCTAssertTrue(envelope.payload.contains("\"suppressed_behaviors\":[\"instant_verdict\"]"))
         XCTAssertTrue(envelope.budget.isWithinTarget)
     }
 

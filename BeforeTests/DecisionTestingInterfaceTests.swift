@@ -300,6 +300,17 @@ struct DecisionTestingInterfaceTests {
                 activeFields: [.quickNote],
                 staleFields: []
             ),
+            neuralState: DecisionNeuralState(
+                mode: .quick,
+                dominantActivations: [
+                    DecisionActivation(signal: .urgency, strength: 0.88)
+                ],
+                candidateActions: [
+                    DecisionActionCandidate(route: .waitBuffer, score: 0.88)
+                ],
+                suppressedBehaviors: ["long_explanation"],
+                detail: "Quick neural routing is active."
+            ),
             prompt: "Quick prompt",
             outputPreview: "Quick output",
             detail: "Quick detail"
@@ -383,5 +394,11 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.contextAwareTraceCount == 1)
         #expect(export.summary.lifecycleRebuildCount == 1)
         #expect(export.summary.staleFieldDropCount == 0)
+        #expect(export.neuralSummary.neuralTraceCount == 1)
+        #expect(export.neuralSummary.suppressedBehaviorCount == 1)
+        #expect(export.neuralSummary.dominantActionByKind[.quick] == .waitBuffer)
+        #expect(export.neuralSummary.strongestSignalByKind[.quick] == .urgency)
+        #expect(export.summary.neuralTraceCount == 1)
+        #expect(export.summary.suppressedBehaviorCount == 1)
     }
 }
