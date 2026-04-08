@@ -1,0 +1,157 @@
+import SwiftUI
+
+struct QuickCheckView: View {
+    @EnvironmentObject private var appModel: BeforeAppModel
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var session: QuickCheckSession
+    @State private var displayedReminder: String?
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                BeforeBackground()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        SectionHeader(
+                            eyebrow: session.entrySource.label,
+                            title: "Take five clean seconds.",
+                            subtitle: "Choose the shape of the urge before you obey it."
+                        )
+
+                        if let displayedReminder {
+                            PanelCard {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("From a previous moment")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(BeforeTheme.ember)
+                                    Text("“\(displayedReminder)”")
+                                        .font(.headline)
+                                }
+                            }
+                        }
+
+                        PanelCard {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Scenario")
+                                    .font(.headline)
+                                Picker("Scenario", selection: $session.scenario) {
+                                    ForEach(ScenarioType.allCases) { scenario in
+                                        Text(scenario.title).tag(scenario)
+                                    }
+                                }
+                                .pickerStyle(.segmented)
+                            }
+                        }
+
+                        QuestionCard(
+                            title: "Why now?",
+                            selection: $session.motivation,
+                            values: MotivationChoice.allCases
+                        ) { $0.title }
+
+                        QuestionCard(
+                            title: "What usually happens after?",
+                            selection: $session.expectedOutcome,
+                            values: OutcomeChoice.allCases
+                        ) { $0.title }
+
+                        QuestionCard(
+                            title: "Can you still pull back?",
+                            selection: $session.controlLevel,
+                            values: ControlChoice.allCases
+                        ) { $0.title }
+
+                        PanelCard {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Optional note")
+                                    .font(.headline)
+                                TextField("What feels true right now?", text: $session.note, axis: .vertical)
+                                    .textFieldStyle(.roundedBorder)
+                                    .lineLimit(2...4)
+                            }
+                        }
+
+                        Button {
+                            session.evaluate()
+                        } label: {
+                            Text("Show me the call")
+                                .font(.headline)
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 18)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                        .fill(session.canEvaluate ? BeforeTheme.ink : Color.gray)
+                                )
+                        }
+                        .disabled(!session.canEvaluate)
+                        .buttonStyle(.plain)
+                    }
+                    .padding(20)
+                }
+            }
+            .navigationTitle("Quick Check")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
+            .task(id: session.scenario) {
+                displayedReminder = appModel.bestReminder(for: session.scenario)
+            }
+            .sheet(
+                isPresented: Binding(
+                    get: { session.result != nil },
+                    set: { if !$0 { session.result = nil } }
+                )
+            ) {
+                if let result = session.result {
+                    ResultView(session: session, result: result)
+                        .environmentObject(appModel)
+                }
+            }
+        }
+    }
+}
+
+private struct QuestionCard<Value: Identifiable & Hashable>: View {
+    let title: String
+    @Binding var selection: Value?
+    let values: [Value]
+    let label: (Value) -> String
+
+    var body: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(title)
+                    .font(.headline)
+
+                VStack(spacing: 10) {
+                    ForEach(values) { value in
+                        Button {
+                            selection = value
+                        } label: {
+                            HStack(alignment: .center, spacing: 12) {
+                                Image(systemName: selection == value ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(selection == value ? BeforeTheme.ember : .secondary)
+                                Text(label(value))
+                                    .multilineTextAlignment(.leading)
+                                    .foregroundStyle(BeforeTheme.ink)
+                                Spacer()
+                            }
+                            .padding(14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .fill(selection == value ? BeforeTheme.ember.opacity(0.12) : Color.white.opacity(0.65))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+}
