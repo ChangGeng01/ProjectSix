@@ -65,20 +65,20 @@ enum FoundationModelsIntelligenceService {
             )
 
             let response = try await session.respond(
-                to: quickPrompt(base: base, input: input),
+                to: DecisionIntelligencePromptContract.quickRefinementPrompt(base: base, input: input),
                 generating: QuickPerspectiveRefinement.self
             )
 
             return QuickCheckResult(
-                currentPerspective: sanitized(
+                currentPerspective: DecisionIntelligencePromptContract.sanitized(
                     response.content.currentPerspective,
                     fallback: base.currentPerspective,
-                    limit: 140
+                    limit: DecisionIntelligencePromptContract.Limit.quickCurrentPerspective
                 ),
-                afterPerspective: sanitized(
+                afterPerspective: DecisionIntelligencePromptContract.sanitized(
                     response.content.afterPerspective,
                     fallback: base.afterPerspective,
-                    limit: 160
+                    limit: DecisionIntelligencePromptContract.Limit.quickAfterPerspective
                 ),
                 verdict: base.verdict,
                 primaryAction: base.primaryAction,
@@ -112,23 +112,31 @@ enum FoundationModelsIntelligenceService {
             )
 
             let response = try await session.respond(
-                to: balancePrompt(base: base, input: input),
+                to: DecisionIntelligencePromptContract.balanceRefinementPrompt(base: base, input: input),
                 generating: BalanceRefinement.self
             )
 
             return BalanceBoardResult(
-                headline: sanitized(response.content.headline, fallback: base.headline, limit: 110),
-                summary: sanitized(response.content.summary, fallback: base.summary, limit: 180),
+                headline: DecisionIntelligencePromptContract.sanitized(
+                    response.content.headline,
+                    fallback: base.headline,
+                    limit: DecisionIntelligencePromptContract.Limit.balanceHeadline
+                ),
+                summary: DecisionIntelligencePromptContract.sanitized(
+                    response.content.summary,
+                    fallback: base.summary,
+                    limit: DecisionIntelligencePromptContract.Limit.balanceSummary
+                ),
                 focusTitle: base.focusTitle,
-                focusDescription: sanitized(
+                focusDescription: DecisionIntelligencePromptContract.sanitized(
                     response.content.focusDescription,
                     fallback: base.focusDescription,
-                    limit: 170
+                    limit: DecisionIntelligencePromptContract.Limit.balanceFocusDescription
                 ),
-                nextAction: sanitized(
+                nextAction: DecisionIntelligencePromptContract.sanitized(
                     response.content.nextAction,
                     fallback: base.nextAction,
-                    limit: 170
+                    limit: DecisionIntelligencePromptContract.Limit.balanceNextAction
                 )
             )
         } catch {
@@ -158,22 +166,26 @@ enum FoundationModelsIntelligenceService {
             )
 
             let response = try await session.respond(
-                to: mirrorPrompt(base: base, input: input),
+                to: DecisionIntelligencePromptContract.mirrorRefinementPrompt(base: base, input: input),
                 generating: MirrorRefinement.self
             )
 
             return MirrorResult(
-                headline: sanitized(response.content.headline, fallback: base.headline, limit: 120),
-                coreTension: sanitized(
+                headline: DecisionIntelligencePromptContract.sanitized(
+                    response.content.headline,
+                    fallback: base.headline,
+                    limit: DecisionIntelligencePromptContract.Limit.mirrorHeadline
+                ),
+                coreTension: DecisionIntelligencePromptContract.sanitized(
                     response.content.coreTension,
                     fallback: base.coreTension,
-                    limit: 220
+                    limit: DecisionIntelligencePromptContract.Limit.mirrorCoreTension
                 ),
                 nextActionTitle: base.nextActionTitle,
-                nextAction: sanitized(
+                nextAction: DecisionIntelligencePromptContract.sanitized(
                     response.content.nextAction,
                     fallback: base.nextAction,
-                    limit: 180
+                    limit: DecisionIntelligencePromptContract.Limit.mirrorNextAction
                 )
             )
         } catch {
@@ -182,74 +194,6 @@ enum FoundationModelsIntelligenceService {
 #else
         return nil
 #endif
-    }
-
-    private static func sanitized(_ value: String, fallback: String, limit: Int) -> String {
-        let trimmed = value
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "\n", with: " ")
-
-        guard !trimmed.isEmpty else { return fallback }
-        let collapsed = trimmed.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        guard !collapsed.isEmpty else { return fallback }
-        if collapsed.count <= limit {
-            return collapsed
-        }
-
-        return String(collapsed.prefix(limit)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
-    }
-
-    private static func bullet(_ label: String, _ value: String) -> String {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return "\(label): \(trimmed.isEmpty ? "Not provided." : trimmed)"
-    }
-
-    private static func quickPrompt(base: QuickCheckResult, input: QuickCheckInput) -> String {
-        [
-            "Scenario: \(input.scenario.title)",
-            "Motivation: \(input.motivation.title)",
-            "Expected outcome: \(input.expectedOutcome.title)",
-            "Control level: \(input.controlLevel.title)",
-            bullet("Optional note", input.note),
-            bullet("Current perspective", base.currentPerspective),
-            bullet("After perspective", base.afterPerspective),
-            "Rewrite those two lines so they feel more precise and human, but keep the same meaning."
-        ]
-        .joined(separator: "\n")
-    }
-
-    private static func balancePrompt(base: BalanceBoardResult, input: BalanceBoardInput) -> String {
-        [
-            bullet("Prompt", input.prompt),
-            bullet("Want", input.desire),
-            bullet("Concern", input.concern),
-            bullet("Reality", input.constraint),
-            bullet("Long-term", input.longTerm),
-            bullet("Current headline", base.headline),
-            bullet("Current summary", base.summary),
-            bullet("Focus title", base.focusTitle),
-            bullet("Focus description", base.focusDescription),
-            bullet("Next action", base.nextAction),
-            "Tighten the wording without changing the underlying focus."
-        ]
-        .joined(separator: "\n")
-    }
-
-    private static func mirrorPrompt(base: MirrorResult, input: MirrorInput) -> String {
-        [
-            bullet("Prompt", input.prompt),
-            bullet("Emotion", input.emotion),
-            bullet("Relationship", input.relationship),
-            bullet("Reality", input.reality),
-            bullet("Long-term", input.longTerm),
-            bullet("Self lens", input.selfLens),
-            bullet("Current headline", base.headline),
-            bullet("Core tension", base.coreTension),
-            bullet("Next action title", base.nextActionTitle),
-            bullet("Next action", base.nextAction),
-            "Clarify the mirror without becoming dramatic or giving a yes-no answer."
-        ]
-        .joined(separator: "\n")
     }
 
 #if canImport(FoundationModels)
