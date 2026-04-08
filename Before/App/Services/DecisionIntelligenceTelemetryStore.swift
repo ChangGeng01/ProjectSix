@@ -14,6 +14,9 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
     let attemptedProviderCount: [DecisionModelProviderKind: Int]
     let fallbackActivations: Int
     let gemmaBackendCount: [InferenceBackendKind: Int]
+    let requestDurationTotalMsByKind: [DecisionIntelligenceTraceKind: Double]
+    let activeProviderDurationTotalMs: [DecisionModelProviderKind: Double]
+    let gemmaBackendDurationTotalMs: [InferenceBackendKind: Double]
 
     var totalRequests: Int {
         requestCountByKind.values.reduce(0, +)
@@ -37,9 +40,45 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
         )
     }
 
+    var averageRequestDurationMs: Double {
+        average(
+            totals: requestDurationTotalMsByKind.values.reduce(0, +),
+            count: totalRequests
+        )
+    }
+
+    var averageRequestDurationMsByKind: [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: requestDurationTotalMsByKind.map { kind, total in
+                (kind, average(totals: total, count: requestCountByKind[kind] ?? 0))
+            }
+        )
+    }
+
+    var averageRequestDurationMsByActiveProvider: [DecisionModelProviderKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: activeProviderDurationTotalMs.map { provider, total in
+                (provider, average(totals: total, count: activeProviderCount[provider] ?? 0))
+            }
+        )
+    }
+
+    var averageRequestDurationMsByGemmaBackend: [InferenceBackendKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: gemmaBackendDurationTotalMs.map { backend, total in
+                (backend, average(totals: total, count: gemmaBackendCount[backend] ?? 0))
+            }
+        )
+    }
+
     private func rate(numerator: Int, denominator: Int) -> Double {
         guard denominator > 0 else { return 0 }
         return Double(numerator) / Double(denominator)
+    }
+
+    private func average(totals: Double, count: Int) -> Double {
+        guard count > 0 else { return 0 }
+        return totals / Double(count)
     }
 }
 
@@ -52,6 +91,9 @@ actor DecisionIntelligenceTelemetryStore {
     private var attemptedProviderCount: [DecisionModelProviderKind: Int] = [:]
     private var fallbackActivations = 0
     private var gemmaBackendCount: [InferenceBackendKind: Int] = [:]
+    private var requestDurationTotalMsByKind: [DecisionIntelligenceTraceKind: Double] = [:]
+    private var activeProviderDurationTotalMs: [DecisionModelProviderKind: Double] = [:]
+    private var gemmaBackendDurationTotalMs: [InferenceBackendKind: Double] = [:]
 
     func record(
         kind: DecisionIntelligenceTraceKind,
@@ -59,10 +101,12 @@ actor DecisionIntelligenceTelemetryStore {
         activeProvider: DecisionModelProviderKind?,
         attemptedProviders: [DecisionModelProviderKind],
         usedFallback: Bool,
+        durationMs: Double,
         gemmaBackendResolution: InferenceBackendResolution? = nil
     ) {
         requestCountByKind[kind, default: 0] += 1
         outcomeCount[outcome, default: 0] += 1
+        requestDurationTotalMsByKind[kind, default: 0] += durationMs
 
         for provider in attemptedProviders {
             attemptedProviderCount[provider, default: 0] += 1
@@ -70,6 +114,7 @@ actor DecisionIntelligenceTelemetryStore {
 
         if let activeProvider {
             activeProviderCount[activeProvider, default: 0] += 1
+            activeProviderDurationTotalMs[activeProvider, default: 0] += durationMs
         }
 
         if usedFallback {
@@ -78,6 +123,7 @@ actor DecisionIntelligenceTelemetryStore {
 
         if let gemmaBackendResolution {
             gemmaBackendCount[gemmaBackendResolution.effectiveBackend, default: 0] += 1
+            gemmaBackendDurationTotalMs[gemmaBackendResolution.effectiveBackend, default: 0] += durationMs
         }
     }
 
@@ -88,7 +134,10 @@ actor DecisionIntelligenceTelemetryStore {
             activeProviderCount: activeProviderCount,
             attemptedProviderCount: attemptedProviderCount,
             fallbackActivations: fallbackActivations,
-            gemmaBackendCount: gemmaBackendCount
+            gemmaBackendCount: gemmaBackendCount,
+            requestDurationTotalMsByKind: requestDurationTotalMsByKind,
+            activeProviderDurationTotalMs: activeProviderDurationTotalMs,
+            gemmaBackendDurationTotalMs: gemmaBackendDurationTotalMs
         )
     }
 
@@ -99,5 +148,8 @@ actor DecisionIntelligenceTelemetryStore {
         attemptedProviderCount.removeAll()
         fallbackActivations = 0
         gemmaBackendCount.removeAll()
+        requestDurationTotalMsByKind.removeAll()
+        activeProviderDurationTotalMs.removeAll()
+        gemmaBackendDurationTotalMs.removeAll()
     }
 }

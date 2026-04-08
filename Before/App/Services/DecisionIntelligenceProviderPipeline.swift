@@ -232,6 +232,8 @@ enum DecisionIntelligenceProviderPipeline {
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> QuickCheckResult? {
+        let clock = ContinuousClock()
+        let requestStart = clock.now
         let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(base: base, input: input)
         guard preference != .template else {
             await recordTelemetry(
@@ -239,7 +241,8 @@ enum DecisionIntelligenceProviderPipeline {
                 outcome: .templatePinned,
                 preferredProvider: preference.kind,
                 activeProvider: nil,
-                attemptedProviders: []
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
             )
             recordTrace(
                 kind: .quick,
@@ -271,7 +274,8 @@ enum DecisionIntelligenceProviderPipeline {
                     outcome: .cacheHit,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: actualAttemptedKinds
+                    attemptedProviders: actualAttemptedKinds,
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
                 )
                 recordTrace(
                     kind: .quick,
@@ -297,7 +301,8 @@ enum DecisionIntelligenceProviderPipeline {
                     outcome: .providerSuccess,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: actualAttemptedKinds
+                    attemptedProviders: actualAttemptedKinds,
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
                 )
                 recordTrace(
                     kind: .quick,
@@ -322,7 +327,8 @@ enum DecisionIntelligenceProviderPipeline {
             outcome: .deterministicFallback,
             preferredProvider: preference.kind,
             activeProvider: nil,
-            attemptedProviders: actualAttemptedKinds
+            attemptedProviders: actualAttemptedKinds,
+            durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
         )
         recordTrace(
             kind: .quick,
@@ -344,6 +350,8 @@ enum DecisionIntelligenceProviderPipeline {
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> BalanceBoardResult? {
+        let clock = ContinuousClock()
+        let requestStart = clock.now
         let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(base: base, input: input)
         guard preference != .template else {
             await recordTelemetry(
@@ -351,7 +359,8 @@ enum DecisionIntelligenceProviderPipeline {
                 outcome: .templatePinned,
                 preferredProvider: preference.kind,
                 activeProvider: nil,
-                attemptedProviders: []
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
             )
             recordTrace(
                 kind: .balance,
@@ -383,7 +392,8 @@ enum DecisionIntelligenceProviderPipeline {
                     outcome: .cacheHit,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: actualAttemptedKinds
+                    attemptedProviders: actualAttemptedKinds,
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
                 )
                 recordTrace(
                     kind: .balance,
@@ -409,7 +419,8 @@ enum DecisionIntelligenceProviderPipeline {
                     outcome: .providerSuccess,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: actualAttemptedKinds
+                    attemptedProviders: actualAttemptedKinds,
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
                 )
                 recordTrace(
                     kind: .balance,
@@ -434,7 +445,8 @@ enum DecisionIntelligenceProviderPipeline {
             outcome: .deterministicFallback,
             preferredProvider: preference.kind,
             activeProvider: nil,
-            attemptedProviders: actualAttemptedKinds
+            attemptedProviders: actualAttemptedKinds,
+            durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
         )
         recordTrace(
             kind: .balance,
@@ -456,6 +468,8 @@ enum DecisionIntelligenceProviderPipeline {
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> MirrorResult? {
+        let clock = ContinuousClock()
+        let requestStart = clock.now
         let envelope = DecisionIntelligencePromptContract.mirrorRefinementEnvelope(base: base, input: input)
         guard preference != .template else {
             await recordTelemetry(
@@ -463,7 +477,8 @@ enum DecisionIntelligenceProviderPipeline {
                 outcome: .templatePinned,
                 preferredProvider: preference.kind,
                 activeProvider: nil,
-                attemptedProviders: []
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
             )
             recordTrace(
                 kind: .mirror,
@@ -495,7 +510,8 @@ enum DecisionIntelligenceProviderPipeline {
                     outcome: .cacheHit,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: actualAttemptedKinds
+                    attemptedProviders: actualAttemptedKinds,
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
                 )
                 recordTrace(
                     kind: .mirror,
@@ -521,7 +537,8 @@ enum DecisionIntelligenceProviderPipeline {
                     outcome: .providerSuccess,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: actualAttemptedKinds
+                    attemptedProviders: actualAttemptedKinds,
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
                 )
                 recordTrace(
                     kind: .mirror,
@@ -546,7 +563,8 @@ enum DecisionIntelligenceProviderPipeline {
             outcome: .deterministicFallback,
             preferredProvider: preference.kind,
             activeProvider: nil,
-            attemptedProviders: actualAttemptedKinds
+            attemptedProviders: actualAttemptedKinds,
+            durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
         )
         recordTrace(
             kind: .mirror,
@@ -570,6 +588,8 @@ enum DecisionIntelligenceProviderPipeline {
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> ReminderSelectionCandidate? {
+        let clock = ContinuousClock()
+        let requestStart = clock.now
         let selection = DecisionIntelligencePromptContract.reminderSelectionEnvelope(
             candidates: candidates,
             scenario: scenario,
@@ -584,7 +604,8 @@ enum DecisionIntelligenceProviderPipeline {
                 outcome: .templatePinned,
                 preferredProvider: preference.kind,
                 activeProvider: nil,
-                attemptedProviders: []
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
             )
             return nil
         }
@@ -606,7 +627,8 @@ enum DecisionIntelligenceProviderPipeline {
                     outcome: .cacheHit,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: actualAttemptedKinds
+                    attemptedProviders: actualAttemptedKinds,
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
                 )
                 recordTrace(
                     kind: .reminder,
@@ -637,7 +659,8 @@ enum DecisionIntelligenceProviderPipeline {
                     outcome: .providerSuccess,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: actualAttemptedKinds
+                    attemptedProviders: actualAttemptedKinds,
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
                 )
                 recordTrace(
                     kind: .reminder,
@@ -662,7 +685,8 @@ enum DecisionIntelligenceProviderPipeline {
             outcome: .deterministicFallback,
             preferredProvider: preference.kind,
             activeProvider: nil,
-            attemptedProviders: actualAttemptedKinds
+            attemptedProviders: actualAttemptedKinds,
+            durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
         )
         recordTrace(
             kind: .reminder,
@@ -777,7 +801,8 @@ enum DecisionIntelligenceProviderPipeline {
         outcome: DecisionIntelligenceRequestOutcome,
         preferredProvider: DecisionModelProviderKind,
         activeProvider: DecisionModelProviderKind?,
-        attemptedProviders: [DecisionModelProviderKind]
+        attemptedProviders: [DecisionModelProviderKind],
+        durationMs: Double
     ) async {
         await DecisionIntelligenceTelemetryStore.shared.record(
             kind: kind,
@@ -785,11 +810,23 @@ enum DecisionIntelligenceProviderPipeline {
             activeProvider: activeProvider,
             attemptedProviders: attemptedProviders,
             usedFallback: activeProvider != nil && activeProvider != preferredProvider,
+            durationMs: durationMs,
             gemmaBackendResolution: activeProvider == .gemmaE4B
                 ? GemmaE4BIntelligenceService.backendResolution(
                     policy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
                 )
                 : nil
         )
+    }
+
+    private static func elapsedMilliseconds(
+        since start: ContinuousClock.Instant,
+        clock: ContinuousClock
+    ) -> Double {
+        let duration = start.duration(to: clock.now)
+        let components = duration.components
+        let seconds = Double(components.seconds)
+        let attoseconds = Double(components.attoseconds) / 1_000_000_000_000_000_000
+        return (seconds + attoseconds) * 1_000
     }
 }

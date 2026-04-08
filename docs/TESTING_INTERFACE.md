@@ -80,10 +80,37 @@ This snapshot includes:
 - Gemma bundle status
 - Gemma local runtime status
 
+For a full diagnostics package that also includes telemetry, recent traces, and replay:
+
+```swift
+let export = await DecisionTestingInterface.runtimeExport(
+    quick: quickEvents,
+    balance: balanceRecords,
+    mirror: mirrorRecords
+)
+```
+
+This export bundles:
+
+- runtime snapshot
+- provider/fallback/backend telemetry
+- cache telemetry
+- recent traces
+- recent replay entries
+- a compact summary with cache hit rate, fallback rate, average request latency, and dominant Gemma backend
+
+The summary now also exposes:
+
+- average request duration across all intelligence work
+- average request duration grouped by decision kind
+- average request duration grouped by active provider
+- average request duration grouped by resolved Gemma backend
+
 ## Trace And Replay Helpers
 
 These helpers stay available for tests and tooling, but are not surfaced in the app UI:
 
+- `DecisionTestingInterface.runtimeExport(...)`
 - `DecisionTestingInterface.intelligenceTelemetrySnapshot(...)`
 - `DecisionTestingInterface.cacheTelemetrySnapshot(...)`
 - `DecisionTestingInterface.recentTraces(...)`

@@ -227,6 +227,42 @@ enum DecisionTestingInterface {
     }
 
     @MainActor
+    static func runtimeExport(
+        quick: [CheckEvent],
+        balance: [BalanceDecisionRecord],
+        mirror: [MirrorDecisionRecord],
+        preferences: BeforePreferences = effectivePreferences(),
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        traceLimit: Int = BeforePolicy.Settings.developerTraceLimit,
+        replayLimit: Int = BeforePolicy.Settings.developerReplayLimit,
+        debugStore: DecisionIntelligenceDebugStore = .shared,
+        telemetryStore: DecisionIntelligenceTelemetryStore = .shared,
+        cache: DecisionIntelligenceResponseCache = .shared
+    ) async -> DecisionTestingRuntimeExport {
+        let snapshot = runtimeSnapshot(
+            preferences: preferences,
+            environment: environment
+        )
+        let traces = recentTraces(limit: traceLimit, store: debugStore)
+        let replay = recentReplay(
+            quick: quick,
+            balance: balance,
+            mirror: mirror,
+            traces: traces,
+            limit: replayLimit
+        )
+
+        return DecisionTestingRuntimeExport(
+            generatedAt: .now,
+            runtimeSnapshot: snapshot,
+            intelligenceTelemetry: await telemetryStore.snapshot(),
+            cacheTelemetry: await cache.telemetrySnapshot(),
+            recentTraces: traces,
+            recentReplay: replay
+        )
+    }
+
+    @MainActor
     static func resetTransientIntelligenceState(
         store: DecisionIntelligenceDebugStore = .shared,
         telemetryStore: DecisionIntelligenceTelemetryStore = .shared

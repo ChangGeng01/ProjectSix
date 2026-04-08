@@ -223,7 +223,8 @@ struct DecisionTestingInterfaceTests {
             outcome: .providerSuccess,
             activeProvider: .foundationModels,
             attemptedProviders: [.foundationModels],
-            usedFallback: false
+            usedFallback: false,
+            durationMs: 90
         )
 
         await DecisionTestingInterface.resetTransientIntelligenceState(
@@ -246,6 +247,7 @@ struct DecisionTestingInterfaceTests {
             activeProvider: .gemmaE4B,
             attemptedProviders: [.gemmaE4B],
             usedFallback: false,
+            durationMs: 180,
             gemmaBackendResolution: InferenceBackendResolver.resolve(
                 policy: .cpuOnly,
                 device: DeviceCapabilitySnapshot(
@@ -271,7 +273,98 @@ struct DecisionTestingInterfaceTests {
         #expect(telemetrySnapshot.totalRequests == 1)
         #expect(telemetrySnapshot.activeProviderCount[.gemmaE4B] == 1)
         #expect(telemetrySnapshot.gemmaBackendCount[.cpu] == 1)
+        #expect(telemetrySnapshot.averageRequestDurationMs == 180)
         #expect(cacheSnapshot.hitCountByKind[.reminder] == 1)
         #expect(cacheSnapshot.storeCountByKind[.reminder] == 1)
+    }
+
+    @Test
+    func runtimeExportBundlesSnapshotTelemetryTracesAndReplay() async {
+        let debugStore = DecisionIntelligenceDebugStore()
+        let telemetryStore = DecisionIntelligenceTelemetryStore()
+        let cache = DecisionIntelligenceResponseCache(limit: 2)
+
+        let quickTrace = DecisionIntelligenceTrace(
+            kind: .quick,
+            preferredProvider: .gemmaE4B,
+            activeProvider: .gemmaE4B,
+            attemptedProviders: [.gemmaE4B],
+            allowFallbacks: true,
+            usedFallback: false,
+            prompt: "Quick prompt",
+            outputPreview: "Quick output",
+            detail: "Quick detail"
+        )
+        debugStore.record(quickTrace)
+
+        await telemetryStore.record(
+            kind: .quick,
+            outcome: .providerSuccess,
+            activeProvider: .gemmaE4B,
+            attemptedProviders: [.gemmaE4B],
+            usedFallback: false,
+            durationMs: 220,
+            gemmaBackendResolution: InferenceBackendResolver.resolve(
+                policy: .cpuOnly,
+                device: DeviceCapabilitySnapshot(
+                    isSimulator: true,
+                    supportsMetal: true,
+                    supportsCoreMLAcceleration: false
+                )
+            )
+        )
+        await cache.storeQuickResult(
+            QuickCheckResult(
+                currentPerspective: "Current",
+                afterPerspective: "After",
+                verdict: .pause,
+                primaryAction: .wait90s,
+                secondaryActions: []
+            ),
+            for: "quick"
+        )
+
+        let event = CheckEvent(
+            createdAt: .now,
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "note",
+            currentPerspective: "Current",
+            afterPerspective: "After",
+            verdict: .pause,
+            finalAction: .wait90s,
+            entrySource: .app
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [event],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            environment: DecisionTestingInterface.launchEnvironment(
+                preferredProvider: .gemmaE4B,
+                inferenceBackendPolicy: .cpuOnly
+            ),
+            traceLimit: 4,
+            replayLimit: 4,
+            debugStore: debugStore,
+            telemetryStore: telemetryStore,
+            cache: cache
+        )
+
+        #expect(export.runtimeSnapshot.runtimeStatus.preferred == .gemmaE4B)
+        #expect(export.intelligenceTelemetry.totalRequests == 1)
+        #expect(export.cacheTelemetry.storeCountByKind[.quick] == 1)
+        #expect(export.recentTraces.count == 1)
+        #expect(export.recentReplay.count == 1)
+        #expect(export.summary.activeProvider == export.runtimeSnapshot.runtimeStatus.active)
+        #expect(export.summary.totalRequests == 1)
+        #expect(export.summary.totalCacheEntries == 1)
+        #expect(export.summary.dominantGemmaBackend == .cpu)
+        #expect(export.summary.averageRequestDurationMs == 220)
+        #expect(export.summary.averageRequestDurationMsByKind[.quick] == 220)
+        #expect(export.summary.averageRequestDurationMsByGemmaBackend[.cpu] == 220)
     }
 }
