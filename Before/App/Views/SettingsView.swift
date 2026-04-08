@@ -10,12 +10,7 @@ struct SettingsView: View {
     @Query private var mirrorRecords: [MirrorDecisionRecord]
     @Query private var reminders: [SelfReminder]
     @Query private var tomorrowItems: [TomorrowBoxItem]
-    @AppStorage("before.developerCenterUnlocked") private var developerCenterUnlocked = false
     @State private var destructiveAction: DestructiveAction?
-    @State private var developerCenterTapCount = 0
-    @State private var isDeveloperCenterPresented = false
-
-    private let developerCenterAccessGate = DeveloperCenterAccessGate()
 
     private enum DestructiveAction: Identifiable {
         case history
@@ -91,16 +86,7 @@ struct SettingsView: View {
                 }
 
                 Section("About") {
-                    Button(action: handleDeveloperCenterAccessTap) {
-                        LabeledContent("Version", value: appVersionLabel)
-                    }
-                    .buttonStyle(.plain)
-
-                    if developerCenterUnlocked {
-                        Button("Open Developer Center") {
-                            isDeveloperCenterPresented = true
-                        }
-                    }
+                    LabeledContent("Version", value: appVersionLabel)
                 }
 
                 Section("Notifications") {
@@ -150,10 +136,6 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .background(BeforeBackground())
             .navigationTitle("Settings")
-            .sheet(isPresented: $isDeveloperCenterPresented) {
-                DeveloperCenterView()
-                    .environmentObject(appModel)
-            }
             .confirmationDialog(
                 destructiveAction?.title ?? "",
                 isPresented: Binding(
@@ -263,21 +245,5 @@ struct SettingsView: View {
         let version = bundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build = bundle.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(version) (\(build))"
-    }
-
-    private func handleDeveloperCenterAccessTap() {
-        switch developerCenterAccessGate.handleTap(
-            currentCount: developerCenterTapCount,
-            unlocked: developerCenterUnlocked
-        ) {
-        case .openExisting:
-            isDeveloperCenterPresented = true
-        case .unlocked:
-            developerCenterUnlocked = true
-            developerCenterTapCount = 0
-            isDeveloperCenterPresented = true
-        case .progress:
-            developerCenterTapCount += 1
-        }
     }
 }

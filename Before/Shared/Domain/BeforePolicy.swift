@@ -31,7 +31,6 @@ enum BeforePolicy {
     }
 
     enum Settings {
-        static let developerCenterUnlockTapCount = 7
         static let developerTraceLimit = 12
         static let developerReplayLimit = 8
         static let developerReplayTraceLookbackInterval: TimeInterval = 60 * 30
