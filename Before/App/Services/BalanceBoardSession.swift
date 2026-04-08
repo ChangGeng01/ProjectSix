@@ -5,17 +5,40 @@ final class BalanceBoardSession: ObservableObject, Identifiable {
     let id = UUID()
     let entrySource: EntrySource
 
-    @Published var prompt: String
-    @Published var desire: String = ""
-    @Published var concern: String = ""
-    @Published var constraint: String = ""
-    @Published var longTerm: String = ""
+    @Published var prompt: String {
+        didSet {
+            intelligenceLifecycle.touch(field: .balancePrompt, value: prompt)
+        }
+    }
+    @Published var desire: String = "" {
+        didSet {
+            intelligenceLifecycle.touch(field: .balanceDesire, value: desire)
+        }
+    }
+    @Published var concern: String = "" {
+        didSet {
+            intelligenceLifecycle.touch(field: .balanceConcern, value: concern)
+        }
+    }
+    @Published var constraint: String = "" {
+        didSet {
+            intelligenceLifecycle.touch(field: .balanceConstraint, value: constraint)
+        }
+    }
+    @Published var longTerm: String = "" {
+        didSet {
+            intelligenceLifecycle.touch(field: .balanceLongTerm, value: longTerm)
+        }
+    }
     @Published var result: BalanceBoardResult?
     @Published var isRefiningWithModel = false
+    private let intelligenceLifecycle: DecisionContextLifecycle
 
     init(entrySource: EntrySource, prompt: String = "") {
         self.entrySource = entrySource
+        self.intelligenceLifecycle = DecisionContextLifecycle()
         self.prompt = prompt
+        intelligenceLifecycle.touch(field: .balancePrompt, value: prompt)
     }
 
     var canEvaluate: Bool {
@@ -53,13 +76,22 @@ final class BalanceBoardSession: ObservableObject, Identifiable {
         isRefiningWithModel = true
         defer { isRefiningWithModel = false }
 
+        let prepared = intelligenceLifecycle.prepareBalanceInput(input)
         if let refined = await DecisionIntelligenceCoordinator.refineBalanceResult(
             base: base,
-            input: input,
+            input: prepared.input,
             preferences: preferences
         ) {
             result = refined
         }
+    }
+
+    var intelligenceLifecycleSnapshot: DecisionContextLifecycleSnapshot {
+        intelligenceLifecycle.snapshot
+    }
+
+    func restoreIntelligenceLifecycle(_ snapshot: DecisionContextLifecycleSnapshot) {
+        intelligenceLifecycle.restore(snapshot)
     }
 
     private var populatedFieldCount: Int {

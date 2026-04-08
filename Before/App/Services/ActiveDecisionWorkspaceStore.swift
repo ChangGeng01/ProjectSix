@@ -5,6 +5,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
     var modeRaw: String
     var entrySourceRaw: String
     var draft: TomorrowBoxDraft
+    var intelligenceLifecycle: DecisionContextLifecycleSnapshot?
     var wasEvaluated: Bool
     var selectedActionRaw: String?
     var isShowingWaitSheet: Bool
@@ -14,6 +15,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         mode: DecisionMode,
         entrySource: EntrySource,
         draft: TomorrowBoxDraft,
+        intelligenceLifecycle: DecisionContextLifecycleSnapshot? = nil,
         wasEvaluated: Bool = false,
         selectedAction: CheckAction? = nil,
         isShowingWaitSheet: Bool = false
@@ -22,6 +24,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         self.modeRaw = mode.rawValue
         self.entrySourceRaw = entrySource.rawValue
         self.draft = draft
+        self.intelligenceLifecycle = intelligenceLifecycle
         self.wasEvaluated = wasEvaluated
         self.selectedActionRaw = selectedAction?.rawValue
         self.isShowingWaitSheet = isShowingWaitSheet
@@ -48,6 +51,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
             mode: .quick,
             entrySource: session.entrySource,
             draft: draft,
+            intelligenceLifecycle: session.intelligenceLifecycleSnapshot,
             wasEvaluated: session.result != nil,
             selectedAction: session.selectedAction,
             isShowingWaitSheet: session.isShowingWaitSheet
@@ -63,6 +67,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
             mode: .balance,
             entrySource: session.entrySource,
             draft: draft,
+            intelligenceLifecycle: session.intelligenceLifecycleSnapshot,
             wasEvaluated: session.result != nil
         )
     }
@@ -76,6 +81,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
             mode: .mirror,
             entrySource: session.entrySource,
             draft: draft,
+            intelligenceLifecycle: session.intelligenceLifecycleSnapshot,
             wasEvaluated: session.result != nil
         )
     }
@@ -83,6 +89,9 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
     @MainActor
     func restoreQuickSession() -> QuickCheckSession {
         let session = draft.restoreQuickSession(entrySource: entrySource)
+        if let intelligenceLifecycle {
+            session.restoreIntelligenceLifecycle(intelligenceLifecycle)
+        }
         session.selectedAction = selectedAction
         session.isShowingWaitSheet = isShowingWaitSheet
 
@@ -96,6 +105,9 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
     @MainActor
     func restoreBalanceSession() -> BalanceBoardSession {
         let session = draft.restoreBalanceSession(entrySource: entrySource)
+        if let intelligenceLifecycle {
+            session.restoreIntelligenceLifecycle(intelligenceLifecycle)
+        }
 
         if wasEvaluated, session.canEvaluate {
             session.evaluate()
@@ -107,6 +119,9 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
     @MainActor
     func restoreMirrorSession() -> MirrorWorkspaceSession {
         let session = draft.restoreMirrorSession(entrySource: entrySource)
+        if let intelligenceLifecycle {
+            session.restoreIntelligenceLifecycle(intelligenceLifecycle)
+        }
 
         if wasEvaluated, session.canEvaluate {
             session.evaluate()

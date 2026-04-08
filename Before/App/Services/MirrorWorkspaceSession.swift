@@ -5,18 +5,45 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
     let id = UUID()
     let entrySource: EntrySource
 
-    @Published var prompt: String
-    @Published var emotion: String = ""
-    @Published var relationship: String = ""
-    @Published var reality: String = ""
-    @Published var longTerm: String = ""
-    @Published var selfLens: String = ""
+    @Published var prompt: String {
+        didSet {
+            intelligenceLifecycle.touch(field: .mirrorPrompt, value: prompt)
+        }
+    }
+    @Published var emotion: String = "" {
+        didSet {
+            intelligenceLifecycle.touch(field: .mirrorEmotion, value: emotion)
+        }
+    }
+    @Published var relationship: String = "" {
+        didSet {
+            intelligenceLifecycle.touch(field: .mirrorRelationship, value: relationship)
+        }
+    }
+    @Published var reality: String = "" {
+        didSet {
+            intelligenceLifecycle.touch(field: .mirrorReality, value: reality)
+        }
+    }
+    @Published var longTerm: String = "" {
+        didSet {
+            intelligenceLifecycle.touch(field: .mirrorLongTerm, value: longTerm)
+        }
+    }
+    @Published var selfLens: String = "" {
+        didSet {
+            intelligenceLifecycle.touch(field: .mirrorSelfLens, value: selfLens)
+        }
+    }
     @Published var result: MirrorResult?
     @Published var isRefiningWithModel = false
+    private let intelligenceLifecycle: DecisionContextLifecycle
 
     init(entrySource: EntrySource, prompt: String = "") {
         self.entrySource = entrySource
+        self.intelligenceLifecycle = DecisionContextLifecycle()
         self.prompt = prompt
+        intelligenceLifecycle.touch(field: .mirrorPrompt, value: prompt)
     }
 
     var canEvaluate: Bool {
@@ -56,13 +83,22 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
         isRefiningWithModel = true
         defer { isRefiningWithModel = false }
 
+        let prepared = intelligenceLifecycle.prepareMirrorInput(input)
         if let refined = await DecisionIntelligenceCoordinator.refineMirrorResult(
             base: base,
-            input: input,
+            input: prepared.input,
             preferences: preferences
         ) {
             result = refined
         }
+    }
+
+    var intelligenceLifecycleSnapshot: DecisionContextLifecycleSnapshot {
+        intelligenceLifecycle.snapshot
+    }
+
+    func restoreIntelligenceLifecycle(_ snapshot: DecisionContextLifecycleSnapshot) {
+        intelligenceLifecycle.restore(snapshot)
     }
 
     var filledLensCount: Int {

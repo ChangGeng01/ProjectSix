@@ -7,17 +7,24 @@ final class QuickCheckSession: ObservableObject, Identifiable {
     @Published var motivation: MotivationChoice?
     @Published var expectedOutcome: OutcomeChoice?
     @Published var controlLevel: ControlChoice?
-    @Published var note: String = ""
+    @Published var note: String = "" {
+        didSet {
+            intelligenceLifecycle.touch(field: .quickNote, value: note)
+        }
+    }
     @Published var result: QuickCheckResult?
     @Published var selectedAction: CheckAction?
     @Published var isShowingWaitSheet = false
     @Published var isRefiningWithModel = false
 
     let entrySource: EntrySource
+    private let intelligenceLifecycle: DecisionContextLifecycle
 
     init(entrySource: EntrySource, initialNote: String = "") {
         self.entrySource = entrySource
+        self.intelligenceLifecycle = DecisionContextLifecycle()
         self.note = initialNote
+        intelligenceLifecycle.touch(field: .quickNote, value: initialNote)
     }
 
     var canEvaluate: Bool {
@@ -54,12 +61,21 @@ final class QuickCheckSession: ObservableObject, Identifiable {
         isRefiningWithModel = true
         defer { isRefiningWithModel = false }
 
+        let prepared = intelligenceLifecycle.prepareQuickInput(input)
         if let refined = await DecisionIntelligenceCoordinator.refineQuickResult(
             base: base,
-            input: input,
+            input: prepared.input,
             preferences: preferences
         ) {
             result = refined
         }
+    }
+
+    var intelligenceLifecycleSnapshot: DecisionContextLifecycleSnapshot {
+        intelligenceLifecycle.snapshot
+    }
+
+    func restoreIntelligenceLifecycle(_ snapshot: DecisionContextLifecycleSnapshot) {
+        intelligenceLifecycle.restore(snapshot)
     }
 }

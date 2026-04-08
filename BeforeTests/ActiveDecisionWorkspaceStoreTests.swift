@@ -66,5 +66,7 @@ final class ActiveDecisionWorkspaceStoreTests: XCTestCase {
         XCTAssertEqual(restored?.prompt, "Should I leave?")
         XCTAssertEqual(restored?.selfLens, "I trust myself less")
         XCTAssertEqual(restored?.result?.nextActionTitle, "Write the boundary")
+        XCTAssertNotNil(loaded?.intelligenceLifecycle?.fieldRecords[DecisionContextFieldKey.mirrorEmotion.rawValue])
+        XCTAssertNotNil(restored?.intelligenceLifecycleSnapshot.fieldRecords[DecisionContextFieldKey.mirrorEmotion.rawValue])
     }
 }
