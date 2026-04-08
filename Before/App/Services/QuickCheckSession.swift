@@ -65,6 +65,7 @@ final class QuickCheckSession: ObservableObject, Identifiable {
         if let refined = await DecisionIntelligenceCoordinator.refineQuickResult(
             base: base,
             input: prepared.input,
+            contextState: prepared.state,
             preferences: preferences
         ) {
             result = refined

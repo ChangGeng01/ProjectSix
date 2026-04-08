@@ -187,6 +187,47 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
     }
 
     @MainActor
+    func testRefinementTraceCarriesContextLifecycleState() async {
+        let base = BalanceBoardResult(
+            headline: "Base headline",
+            summary: "Base summary",
+            focusTitle: "Base focus",
+            focusDescription: "Base description",
+            nextAction: "Base next action"
+        )
+        let input = BalanceBoardInput(
+            prompt: "Should I take this side project?",
+            desire: "Momentum",
+            concern: "Burn out",
+            constraint: "",
+            longTerm: ""
+        )
+        let contextState = DecisionContextPreparedState(
+            rebuiltSession: true,
+            generation: 3,
+            activeFields: [.balancePrompt, .balanceConcern],
+            staleFields: [.balanceDesire]
+        )
+
+        _ = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
+            base: base,
+            input: input,
+            contextState: contextState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected a recorded balance trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .balance)
+        XCTAssertEqual(latestTrace.contextState, contextState)
+        XCTAssertTrue(latestTrace.prompt.contains("CONTEXT_LIFECYCLE_JSON:"))
+    }
+
+    @MainActor
     func testTestingStubCanSelectReminderWithoutLiveProvider() async {
         let selected = await DecisionIntelligenceProviderPipeline.pickReminder(
             from: [

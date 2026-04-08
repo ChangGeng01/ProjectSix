@@ -42,13 +42,35 @@ struct DeviceCapabilitySnapshot: Equatable, Sendable {
     let isSimulator: Bool
     let supportsMetal: Bool
     let supportsCoreMLAcceleration: Bool
+    let physicalMemoryBytes: UInt64
+    let isLowPowerModeEnabled: Bool
+
+    init(
+        isSimulator: Bool,
+        supportsMetal: Bool,
+        supportsCoreMLAcceleration: Bool,
+        physicalMemoryBytes: UInt64 = ProcessInfo.processInfo.physicalMemory,
+        isLowPowerModeEnabled: Bool = ProcessInfo.processInfo.isLowPowerModeEnabled
+    ) {
+        self.isSimulator = isSimulator
+        self.supportsMetal = supportsMetal
+        self.supportsCoreMLAcceleration = supportsCoreMLAcceleration
+        self.physicalMemoryBytes = physicalMemoryBytes
+        self.isLowPowerModeEnabled = isLowPowerModeEnabled
+    }
 
     static var current: DeviceCapabilitySnapshot {
         DeviceCapabilitySnapshot(
             isSimulator: isRunningOnSimulator,
             supportsMetal: metalDeviceAvailable,
-            supportsCoreMLAcceleration: !isRunningOnSimulator
+            supportsCoreMLAcceleration: !isRunningOnSimulator,
+            physicalMemoryBytes: ProcessInfo.processInfo.physicalMemory,
+            isLowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled
         )
+    }
+
+    var physicalMemoryGB: Int {
+        max(1, Int(physicalMemoryBytes / 1_073_741_824))
     }
 
     private static var isRunningOnSimulator: Bool {

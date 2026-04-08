@@ -32,6 +32,14 @@ struct DecisionContextPreparedState: Equatable, Sendable {
     var generation: Int
     var activeFields: [DecisionContextFieldKey]
     var staleFields: [DecisionContextFieldKey]
+
+    var activeFieldCount: Int {
+        activeFields.count
+    }
+
+    var staleFieldCount: Int {
+        staleFields.count
+    }
 }
 
 @MainActor

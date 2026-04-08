@@ -51,11 +51,13 @@ struct DecisionTestingInterfaceTests {
 
         #expect(snapshot.preferences == preferences)
         #expect(snapshot.testingStubProfile == nil)
+        #expect(snapshot.executionProfile.effectiveProviderPreference == .template)
         #expect(snapshot.inferenceBackendPolicy == .auto)
         #expect(snapshot.gemmaBackendResolution.policy == .auto)
         #expect(snapshot.runtimeStatus == DecisionIntelligenceCoordinator.runtimeStatus(
             preferences: preferences,
-            testingStubProfile: nil
+            testingStubProfile: nil,
+            device: snapshot.deviceCapabilities
         ))
         #expect(snapshot.runtimeStatus.active == .template)
     }
@@ -292,6 +294,12 @@ struct DecisionTestingInterfaceTests {
             attemptedProviders: [.gemmaE4B],
             allowFallbacks: true,
             usedFallback: false,
+            contextState: DecisionContextPreparedState(
+                rebuiltSession: true,
+                generation: 4,
+                activeFields: [.quickNote],
+                staleFields: []
+            ),
             prompt: "Quick prompt",
             outputPreview: "Quick output",
             detail: "Quick detail"
@@ -369,5 +377,11 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.averageRequestDurationMsByGemmaBackend[.cpu] == 220)
         #expect(export.summary.slowRequestRate == 0)
         #expect(export.summary.slowRequestRateByKind[.quick] == 0)
+        #expect(export.lifecycleSummary.contextAwareTraceCount == 1)
+        #expect(export.lifecycleSummary.rebuildCount == 1)
+        #expect(export.lifecycleSummary.latestGenerationByKind[.quick] == 4)
+        #expect(export.summary.contextAwareTraceCount == 1)
+        #expect(export.summary.lifecycleRebuildCount == 1)
+        #expect(export.summary.staleFieldDropCount == 0)
     }
 }

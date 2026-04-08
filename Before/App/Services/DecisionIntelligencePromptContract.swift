@@ -124,7 +124,11 @@ enum DecisionIntelligencePromptContract {
         return String(collapsed.prefix(limit)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
     }
 
-    static func quickRefinementEnvelope(base: QuickCheckResult, input: QuickCheckInput) -> PromptEnvelope {
+    static func quickRefinementEnvelope(
+        base: QuickCheckResult,
+        input: QuickCheckInput,
+        contextState: DecisionContextPreparedState? = nil
+    ) -> PromptEnvelope {
         makeEnvelope(
             kind: .quick,
             state: [
@@ -146,15 +150,24 @@ enum DecisionIntelligencePromptContract {
                 "Rewrite only the current and after perspective lines.",
                 "Keep the same meaning and emotional direction.",
                 "Do not change the verdict, actions, or scenario."
-            ]
+            ],
+            contextState: contextState
         )
     }
 
-    static func quickRefinementPrompt(base: QuickCheckResult, input: QuickCheckInput) -> String {
-        quickRefinementEnvelope(base: base, input: input).debugPrompt
+    static func quickRefinementPrompt(
+        base: QuickCheckResult,
+        input: QuickCheckInput,
+        contextState: DecisionContextPreparedState? = nil
+    ) -> String {
+        quickRefinementEnvelope(base: base, input: input, contextState: contextState).debugPrompt
     }
 
-    static func balanceRefinementEnvelope(base: BalanceBoardResult, input: BalanceBoardInput) -> PromptEnvelope {
+    static func balanceRefinementEnvelope(
+        base: BalanceBoardResult,
+        input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState? = nil
+    ) -> PromptEnvelope {
         makeEnvelope(
             kind: .balance,
             state: [
@@ -176,15 +189,24 @@ enum DecisionIntelligencePromptContract {
                 "Keep the same focus and next-step intent.",
                 "Do not invent facts or turn the board into a verdict.",
                 "Return tighter language only."
-            ]
+            ],
+            contextState: contextState
         )
     }
 
-    static func balanceRefinementPrompt(base: BalanceBoardResult, input: BalanceBoardInput) -> String {
-        balanceRefinementEnvelope(base: base, input: input).debugPrompt
+    static func balanceRefinementPrompt(
+        base: BalanceBoardResult,
+        input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState? = nil
+    ) -> String {
+        balanceRefinementEnvelope(base: base, input: input, contextState: contextState).debugPrompt
     }
 
-    static func mirrorRefinementEnvelope(base: MirrorResult, input: MirrorInput) -> PromptEnvelope {
+    static func mirrorRefinementEnvelope(
+        base: MirrorResult,
+        input: MirrorInput,
+        contextState: DecisionContextPreparedState? = nil
+    ) -> PromptEnvelope {
         makeEnvelope(
             kind: .mirror,
             state: [
@@ -206,12 +228,17 @@ enum DecisionIntelligencePromptContract {
                 "Clarify the mirror without giving a yes-no answer.",
                 "Keep the tone restrained, reflective, and non-therapeutic.",
                 "Preserve the same core tension and next reflective move."
-            ]
+            ],
+            contextState: contextState
         )
     }
 
-    static func mirrorRefinementPrompt(base: MirrorResult, input: MirrorInput) -> String {
-        mirrorRefinementEnvelope(base: base, input: input).debugPrompt
+    static func mirrorRefinementPrompt(
+        base: MirrorResult,
+        input: MirrorInput,
+        contextState: DecisionContextPreparedState? = nil
+    ) -> String {
+        mirrorRefinementEnvelope(base: base, input: input, contextState: contextState).debugPrompt
     }
 
     static func reminderSelectionEnvelope(
@@ -269,18 +296,30 @@ enum DecisionIntelligencePromptContract {
         kind: TaskKind,
         state: [String: Any?],
         evidence: [String],
-        outputGuard: [String]
+        outputGuard: [String],
+        contextState: DecisionContextPreparedState? = nil
     ) -> PromptEnvelope {
         let instructions = PrefixCache.instructions(for: kind)
-        let payload = [
+        var sections = [
             "TASK_STATE_JSON:",
             stateJSONString(state),
+        ]
+
+        if let contextState {
+            sections += [
+                "CONTEXT_LIFECYCLE_JSON:",
+                contextStateJSONString(contextState)
+            ]
+        }
+
+        sections += [
             "EVIDENCE_SNIPPETS:",
             evidenceBlock(evidence),
             "OUTPUT_GUARD:",
             bulletList(outputGuard)
         ]
-        .joined(separator: "\n")
+
+        let payload = sections.joined(separator: "\n")
 
         let debugPrompt = [
             "[PREFIX CACHE]",
@@ -312,6 +351,25 @@ enum DecisionIntelligencePromptContract {
 
         guard JSONSerialization.isValidJSONObject(compactState),
               let data = try? JSONSerialization.data(withJSONObject: compactState, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+
+        return json
+    }
+
+    private static func contextStateJSONString(_ contextState: DecisionContextPreparedState) -> String {
+        let payload: [String: Any] = [
+            "rebuilt_session": contextState.rebuiltSession,
+            "generation": contextState.generation,
+            "active_fields": contextState.activeFields.map(\.rawValue),
+            "stale_fields": contextState.staleFields.map(\.rawValue),
+            "active_field_count": contextState.activeFieldCount,
+            "stale_field_count": contextState.staleFieldCount
+        ]
+
+        guard JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
               let json = String(data: data, encoding: .utf8) else {
             return "{}"
         }

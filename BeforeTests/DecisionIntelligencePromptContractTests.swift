@@ -53,6 +53,41 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertTrue(envelope.budget.isWithinTarget)
     }
 
+    func testBalanceRefinementEnvelopeIncludesContextLifecycleWhenProvided() {
+        let contextState = DecisionContextPreparedState(
+            rebuiltSession: true,
+            generation: 2,
+            activeFields: [.balancePrompt, .balanceConcern],
+            staleFields: [.balanceDesire]
+        )
+
+        let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(
+            base: BalanceBoardResult(
+                headline: "Base headline",
+                summary: "Base summary",
+                focusTitle: "Base focus",
+                focusDescription: "Base focus description",
+                nextAction: "Base next action"
+            ),
+            input: BalanceBoardInput(
+                prompt: "Should I take this side project?",
+                desire: "Extra momentum",
+                concern: "Burn out",
+                constraint: "",
+                longTerm: ""
+            ),
+            contextState: contextState
+        )
+
+        XCTAssertTrue(envelope.payload.contains("CONTEXT_LIFECYCLE_JSON:"))
+        XCTAssertTrue(envelope.payload.contains("\"rebuilt_session\":true"))
+        XCTAssertTrue(envelope.payload.contains("\"generation\":2"))
+        XCTAssertTrue(envelope.payload.contains("\"active_fields\":[\"balancePrompt\",\"balanceConcern\"]"))
+        XCTAssertTrue(envelope.payload.contains("\"stale_fields\":[\"balanceDesire\"]"))
+        XCTAssertTrue(envelope.payload.contains("\"stale_field_count\":1"))
+        XCTAssertTrue(envelope.budget.isWithinTarget)
+    }
+
     func testReminderSelectionEnvelopeClipsCandidatesAndUsesStructuredState() {
         let envelope = DecisionIntelligencePromptContract.reminderSelectionEnvelope(
             candidates: [

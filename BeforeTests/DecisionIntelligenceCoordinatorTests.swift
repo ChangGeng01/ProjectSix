@@ -125,6 +125,14 @@ final class DecisionIntelligenceCoordinatorTests: XCTestCase {
     func testRuntimeStatusFallsBackToFoundationWhenGemmaIsUnavailable() {
         let status = DecisionIntelligenceCoordinator.runtimeStatus(
             preferences: assistivePreferences,
+            testingStubProfile: nil,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true,
+                physicalMemoryBytes: 8 * 1_073_741_824,
+                isLowPowerModeEnabled: false
+            ),
             gemmaStatus: DecisionModelProviderStatus(
                 kind: .gemmaE4B,
                 isAvailable: false,
@@ -147,6 +155,14 @@ final class DecisionIntelligenceCoordinatorTests: XCTestCase {
     func testRuntimeStatusFallsBackToTemplateWhenNoAssistiveProviderIsAvailable() {
         let status = DecisionIntelligenceCoordinator.runtimeStatus(
             preferences: assistivePreferences,
+            testingStubProfile: nil,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true,
+                physicalMemoryBytes: 8 * 1_073_741_824,
+                isLowPowerModeEnabled: false
+            ),
             gemmaStatus: DecisionModelProviderStatus(
                 kind: .gemmaE4B,
                 isAvailable: false,
@@ -186,5 +202,36 @@ final class DecisionIntelligenceCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(status.active, .testingStub)
         XCTAssertEqual(status.fallback, .testingStub)
+    }
+
+    func testRuntimeStatusUsesConservativeTemplateOnSixGigDevice() {
+        let status = DecisionIntelligenceCoordinator.runtimeStatus(
+            preferences: assistivePreferences,
+            testingStubProfile: nil,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true,
+                physicalMemoryBytes: 6 * 1_073_741_824,
+                isLowPowerModeEnabled: false
+            ),
+            gemmaStatus: DecisionModelProviderStatus(
+                kind: .gemmaE4B,
+                isAvailable: true,
+                title: "Ready",
+                detail: "Gemma is ready."
+            ),
+            foundationStatus: DecisionModelProviderStatus(
+                kind: .foundationModels,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Apple is off."
+            )
+        )
+
+        XCTAssertEqual(status.preferred, .gemmaE4B)
+        XCTAssertEqual(status.active, .template)
+        XCTAssertEqual(status.fallback, .template)
+        XCTAssertTrue(status.detail.contains("iPhone 14"))
     }
 }

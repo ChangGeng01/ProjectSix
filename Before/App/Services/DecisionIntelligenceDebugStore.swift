@@ -27,6 +27,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
     let attemptedProviders: [DecisionModelProviderKind]
     let allowFallbacks: Bool
     let usedFallback: Bool
+    let contextState: DecisionContextPreparedState?
     let prompt: String
     let outputPreview: String
     let detail: String
@@ -40,6 +41,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
         attemptedProviders: [DecisionModelProviderKind],
         allowFallbacks: Bool,
         usedFallback: Bool,
+        contextState: DecisionContextPreparedState? = nil,
         prompt: String,
         outputPreview: String,
         detail: String
@@ -52,6 +54,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
         self.attemptedProviders = attemptedProviders
         self.allowFallbacks = allowFallbacks
         self.usedFallback = usedFallback
+        self.contextState = contextState
         self.prompt = prompt
         self.outputPreview = outputPreview
         self.detail = detail

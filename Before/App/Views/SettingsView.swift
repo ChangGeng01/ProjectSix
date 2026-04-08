@@ -234,7 +234,7 @@ struct SettingsView: View {
         }
 
         if appModel.intelligenceRuntimeStatus.active == .template {
-            return "Local intelligence is unavailable right now, so Before is using deterministic local copy instead."
+            return appModel.intelligenceRuntimeStatus.detail
         }
 
         return "Before is refining routes, summaries, and reminder recall locally on this device while keeping verdicts deterministic."

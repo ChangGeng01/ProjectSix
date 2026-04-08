@@ -3,6 +3,7 @@ import Foundation
 struct DecisionTestingRuntimeSnapshot: Equatable, Sendable {
     let preferences: BeforePreferences
     let testingStubProfile: DecisionTestingStubProfile?
+    let executionProfile: DecisionIntelligenceExecutionProfile
     let inferenceBackendPolicy: InferenceBackendPolicy
     let deviceCapabilities: DeviceCapabilitySnapshot
     let gemmaBackendResolution: InferenceBackendResolution
@@ -164,6 +165,11 @@ enum DecisionTestingInterface {
         let stubProfile = override?.stubProfile
         let backendPolicy = override?.inferenceBackendPolicy ?? .auto
         let deviceCapabilities = DeviceCapabilitySnapshot.current
+        let executionProfile = DecisionIntelligenceCoordinator.executionProfile(
+            preferences: preferences,
+            testingStubProfile: stubProfile,
+            device: deviceCapabilities
+        )
         let gemmaBackendResolution = GemmaE4BIntelligenceService.backendResolution(
             policy: backendPolicy,
             device: deviceCapabilities
@@ -171,12 +177,14 @@ enum DecisionTestingInterface {
         return DecisionTestingRuntimeSnapshot(
             preferences: preferences,
             testingStubProfile: stubProfile,
+            executionProfile: executionProfile,
             inferenceBackendPolicy: backendPolicy,
             deviceCapabilities: deviceCapabilities,
             gemmaBackendResolution: gemmaBackendResolution,
             runtimeStatus: DecisionIntelligenceCoordinator.runtimeStatus(
                 preferences: preferences,
-                testingStubProfile: stubProfile
+                testingStubProfile: stubProfile,
+                device: deviceCapabilities
             ),
             foundationStatus: FoundationModelsIntelligenceService.availabilityStatus,
             gemmaProviderStatus: GemmaE4BIntelligenceService.availabilityStatus,

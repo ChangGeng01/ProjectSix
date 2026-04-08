@@ -3,20 +3,74 @@ import Foundation
 enum DecisionIntelligenceCoordinator {
     private static let adapter: any LocalModelAdapting = TemplateLocalModelAdapter()
 
+    static func executionProfile(
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences(),
+        testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile,
+        device: DeviceCapabilitySnapshot = .current,
+        gemmaStatus: DecisionModelProviderStatus = GemmaE4BIntelligenceService.availabilityStatus,
+        foundationStatus: DecisionModelProviderStatus = FoundationModelsIntelligenceService.availabilityStatus
+    ) -> DecisionIntelligenceExecutionProfile {
+        DecisionIntelligenceExecutionProfileResolver.resolve(
+            preferences: preferences,
+            device: device,
+            foundationStatus: foundationStatus,
+            gemmaStatus: gemmaStatus,
+            testingStubProfile: testingStubProfile
+        )
+    }
+
     static func runtimeStatus(
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences(),
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile,
+        device: DeviceCapabilitySnapshot = .current,
         gemmaStatus: DecisionModelProviderStatus = GemmaE4BIntelligenceService.availabilityStatus,
         foundationStatus: DecisionModelProviderStatus = FoundationModelsIntelligenceService.availabilityStatus
     ) -> DecisionModelRuntimeStatus {
-        DecisionIntelligenceProviderPipeline.runtimeStatus(
+        let profile = executionProfile(
             preferences: preferences,
+            testingStubProfile: testingStubProfile,
+            device: device,
+            gemmaStatus: gemmaStatus,
+            foundationStatus: foundationStatus
+        )
+        let runtimePreferences = BeforePreferences(
+            homePromptAction: preferences.homePromptAction,
+            quickBufferDuration: preferences.quickBufferDuration,
+            restoreInProgressWorkspaces: preferences.restoreInProgressWorkspaces,
+            showReviewInsights: preferences.showReviewInsights,
+            onDeviceIntelligenceMode: preferences.onDeviceIntelligenceMode,
+            preferredIntelligenceProvider: profile.effectiveProviderPreference,
+            allowModelFallbacks: profile.allowFallbacks
+        )
+
+        var status = DecisionIntelligenceProviderPipeline.runtimeStatus(
+            preferences: runtimePreferences,
             statusesByKind: [
                 .gemmaE4B: gemmaStatus,
                 .foundationModels: foundationStatus
             ],
             testingStubProfile: testingStubProfile
         )
+
+        if status.active == .template || profile.effectiveProviderPreference != preferences.preferredIntelligenceProvider {
+            let fallback: DecisionModelProviderKind?
+            if status.active == .template && preferences.preferredIntelligenceProvider != .template {
+                fallback = .template
+            } else if status.active != preferences.preferredIntelligenceProvider.kind {
+                fallback = status.active
+            } else {
+                fallback = status.fallback
+            }
+
+            status = DecisionModelRuntimeStatus(
+                preferred: preferences.preferredIntelligenceProvider.kind,
+                active: status.active,
+                fallback: fallback,
+                detail: profile.detail
+            )
+        }
+
+        return status
     }
 
     static func route(
@@ -95,8 +149,10 @@ enum DecisionIntelligenceCoordinator {
         )
 
         let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let profile = executionProfile(preferences: preferences)
         guard preferences.onDeviceIntelligenceMode.isEnabled,
-              preferences.preferredIntelligenceProvider != .template,
+              profile.allowsReminderSelection,
+              profile.effectiveProviderPreference != .template,
               !trimmedPrompt.isEmpty else {
             return deterministic
         }
@@ -109,8 +165,8 @@ enum DecisionIntelligenceCoordinator {
             scenario: scenario,
             prompt: trimmedPrompt,
             mode: mode,
-            preference: preferences.preferredIntelligenceProvider,
-            allowFallbacks: preferences.allowModelFallbacks
+            preference: profile.effectiveProviderPreference,
+            allowFallbacks: profile.allowFallbacks
         ) else {
             return deterministic
         }
@@ -121,42 +177,54 @@ enum DecisionIntelligenceCoordinator {
     static func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        contextState: DecisionContextPreparedState? = nil,
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> QuickCheckResult? {
-        guard preferences.onDeviceIntelligenceMode.isEnabled else { return nil }
+        let profile = executionProfile(preferences: preferences)
+        guard preferences.onDeviceIntelligenceMode.isEnabled,
+              profile.allowsQuickRefinement else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineQuickResult(
             base: base,
             input: input,
-            preference: preferences.preferredIntelligenceProvider,
-            allowFallbacks: preferences.allowModelFallbacks
+            contextState: contextState,
+            preference: profile.effectiveProviderPreference,
+            allowFallbacks: profile.allowFallbacks
         )
     }
 
     static func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState? = nil,
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> BalanceBoardResult? {
-        guard preferences.onDeviceIntelligenceMode.isEnabled else { return nil }
+        let profile = executionProfile(preferences: preferences)
+        guard preferences.onDeviceIntelligenceMode.isEnabled,
+              profile.allowsBalanceRefinement else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineBalanceResult(
             base: base,
             input: input,
-            preference: preferences.preferredIntelligenceProvider,
-            allowFallbacks: preferences.allowModelFallbacks
+            contextState: contextState,
+            preference: profile.effectiveProviderPreference,
+            allowFallbacks: profile.allowFallbacks
         )
     }
 
     static func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        contextState: DecisionContextPreparedState? = nil,
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> MirrorResult? {
-        guard preferences.onDeviceIntelligenceMode.isEnabled else { return nil }
+        let profile = executionProfile(preferences: preferences)
+        guard preferences.onDeviceIntelligenceMode.isEnabled,
+              profile.allowsMirrorRefinement else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineMirrorResult(
             base: base,
             input: input,
-            preference: preferences.preferredIntelligenceProvider,
-            allowFallbacks: preferences.allowModelFallbacks
+            contextState: contextState,
+            preference: profile.effectiveProviderPreference,
+            allowFallbacks: profile.allowFallbacks
         )
     }
 }
