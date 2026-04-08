@@ -36,14 +36,52 @@ struct DecisionTestingRuntimeExport {
             }
         }
 
+        let droppedInjectedEvidenceCountByKind = Dictionary(
+            grouping: recentTraces.filter { ($0.frontstageState?.droppedInjectedEvidenceCount ?? 0) > 0 },
+            by: \.kind
+        )
+        .mapValues { traces in
+            traces.reduce(0) { partialResult, trace in
+                partialResult + (trace.frontstageState?.droppedInjectedEvidenceCount ?? 0)
+            }
+        }
+
+        let droppedDuplicateEvidenceCountByKind = Dictionary(
+            grouping: recentTraces.filter { ($0.frontstageState?.droppedDuplicateEvidenceCount ?? 0) > 0 },
+            by: \.kind
+        )
+        .mapValues { traces in
+            traces.reduce(0) { partialResult, trace in
+                partialResult + (trace.frontstageState?.droppedDuplicateEvidenceCount ?? 0)
+            }
+        }
+
+        let droppedBudgetEvidenceCountByKind = Dictionary(
+            grouping: recentTraces.filter { ($0.frontstageState?.droppedBudgetEvidenceCount ?? 0) > 0 },
+            by: \.kind
+        )
+        .mapValues { traces in
+            traces.reduce(0) { partialResult, trace in
+                partialResult + (trace.frontstageState?.droppedBudgetEvidenceCount ?? 0)
+            }
+        }
+
         return DecisionTestingLifecycleSummary(
             contextAwareTraceCount: contextAwareTraces.count,
             rebuildCount: contextAwareTraces.filter(\.rebuiltSession).count,
             rebuildCountByKind: rebuildCountByKind,
             staleFieldDropCount: contextAwareTraces.reduce(0) { $0 + $1.staleFieldCount },
             staleFieldDropCountByKind: staleFieldCountByKind,
+            retainedEvidenceCount: recentTraces.reduce(0) { $0 + ($1.frontstageState?.retainedEvidenceCount ?? 0) },
             droppedEvidenceCount: recentTraces.reduce(0) { $0 + ($1.frontstageState?.droppedEvidenceCount ?? 0) },
             droppedEvidenceCountByKind: droppedEvidenceCountByKind,
+            droppedInjectedEvidenceCount: recentTraces.reduce(0) { $0 + ($1.frontstageState?.droppedInjectedEvidenceCount ?? 0) },
+            droppedInjectedEvidenceCountByKind: droppedInjectedEvidenceCountByKind,
+            droppedDuplicateEvidenceCount: recentTraces.reduce(0) { $0 + ($1.frontstageState?.droppedDuplicateEvidenceCount ?? 0) },
+            droppedDuplicateEvidenceCountByKind: droppedDuplicateEvidenceCountByKind,
+            droppedBudgetEvidenceCount: recentTraces.reduce(0) { $0 + ($1.frontstageState?.droppedBudgetEvidenceCount ?? 0) },
+            droppedBudgetEvidenceCountByKind: droppedBudgetEvidenceCountByKind,
+            averageRetainedEvidenceCountByKind: averageRetainedEvidenceCountByKind,
             averageAnchorFieldCountByKind: averageAnchorFieldCountByKind,
             latestGenerationByKind: latestGenerationByKind
         )
@@ -109,7 +147,12 @@ struct DecisionTestingRuntimeExport {
             contextAwareTraceCount: lifecycleSummary.contextAwareTraceCount,
             lifecycleRebuildCount: lifecycleSummary.rebuildCount,
             staleFieldDropCount: lifecycleSummary.staleFieldDropCount,
+            retainedEvidenceCount: lifecycleSummary.retainedEvidenceCount,
+            evidenceRetentionRatio: evidenceRetentionRatio,
             droppedEvidenceCount: lifecycleSummary.droppedEvidenceCount,
+            droppedInjectedEvidenceCount: lifecycleSummary.droppedInjectedEvidenceCount,
+            droppedDuplicateEvidenceCount: lifecycleSummary.droppedDuplicateEvidenceCount,
+            droppedBudgetEvidenceCount: lifecycleSummary.droppedBudgetEvidenceCount,
             neuralTraceCount: neuralSummary.neuralTraceCount,
             suppressedBehaviorCount: neuralSummary.suppressedBehaviorCount,
             traceCount: recentTraces.count,
@@ -143,6 +186,24 @@ struct DecisionTestingRuntimeExport {
             }
     }
 
+    private var averageRetainedEvidenceCountByKind: [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(grouping: recentTraces.filter { $0.frontstageState != nil }, by: \.kind)
+            .compactMapValues { traces in
+                guard !traces.isEmpty else { return nil }
+                let total = traces.reduce(0) { partialResult, trace in
+                    partialResult + (trace.frontstageState?.retainedEvidenceCount ?? 0)
+                }
+                return Double(total) / Double(traces.count)
+            }
+    }
+
+    private var evidenceRetentionRatio: Double {
+        let retained = lifecycleSummary.retainedEvidenceCount
+        let total = retained + lifecycleSummary.droppedEvidenceCount
+        guard total > 0 else { return 0 }
+        return Double(retained) / Double(total)
+    }
+
     private var semanticPromptVariantCountByKind: [DecisionIntelligenceTraceKind: Int] {
         variantCountByKind(for: \.semanticPromptFingerprint)
     }
@@ -169,8 +230,16 @@ struct DecisionTestingLifecycleSummary: Equatable, Sendable {
     let rebuildCountByKind: [DecisionIntelligenceTraceKind: Int]
     let staleFieldDropCount: Int
     let staleFieldDropCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let retainedEvidenceCount: Int
     let droppedEvidenceCount: Int
     let droppedEvidenceCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let droppedInjectedEvidenceCount: Int
+    let droppedInjectedEvidenceCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let droppedDuplicateEvidenceCount: Int
+    let droppedDuplicateEvidenceCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let droppedBudgetEvidenceCount: Int
+    let droppedBudgetEvidenceCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let averageRetainedEvidenceCountByKind: [DecisionIntelligenceTraceKind: Double]
     let averageAnchorFieldCountByKind: [DecisionIntelligenceTraceKind: Double]
     let latestGenerationByKind: [DecisionIntelligenceTraceKind: Int]
 }
@@ -214,7 +283,12 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let contextAwareTraceCount: Int
     let lifecycleRebuildCount: Int
     let staleFieldDropCount: Int
+    let retainedEvidenceCount: Int
+    let evidenceRetentionRatio: Double
     let droppedEvidenceCount: Int
+    let droppedInjectedEvidenceCount: Int
+    let droppedDuplicateEvidenceCount: Int
+    let droppedBudgetEvidenceCount: Int
     let neuralTraceCount: Int
     let suppressedBehaviorCount: Int
     let traceCount: Int

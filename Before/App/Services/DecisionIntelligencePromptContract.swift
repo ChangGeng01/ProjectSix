@@ -30,10 +30,10 @@ enum DecisionIntelligencePromptContract {
 
         var targetCharacters: Int {
             switch self {
-            case .quick: 1_350
-            case .balance: 1_900
+            case .quick: 1_500
+            case .balance: 2_050
             case .mirror: 1_700
-            case .reminder: 1_100
+            case .reminder: 1_250
             }
         }
     }
@@ -426,18 +426,26 @@ enum DecisionIntelligencePromptContract {
         let instructions = [immutablePrefix, adaptivePrefix]
             .filter { !$0.isEmpty }
             .joined(separator: "\n\n")
-        let evidenceFilter = DecisionPromptEvidenceGuard.filter(evidence)
+        let evidenceFilter = DecisionPromptEvidenceGuard.filter(
+            evidence,
+            maxRetained: evidenceRetentionBudget(for: kind)
+        )
         var guardedOutput = outputGuard
-        if evidenceFilter.droppedCount > 0 {
+        if evidenceFilter.droppedInjectedCount > 0 {
             guardedOutput.insert(
-                "Some evidence snippets were removed because they looked like markup, tool output, or injected text. Do not infer from the missing content.",
+                "Filtered markup or tool text was removed. Ignore the missing content.",
                 at: 0
+            )
+        }
+        if evidenceFilter.droppedBudgetCount > 0 {
+            guardedOutput.insert(
+                "Lower-value evidence was trimmed. Work only from the retained evidence.",
+                at: guardedOutput.isEmpty ? 0 : min(guardedOutput.count, 1)
             )
         }
         let preparedFrontstageState = frontstageState(
             kind: kind,
-            evidence: evidenceFilter.retained,
-            droppedEvidenceCount: evidenceFilter.droppedCount,
+            evidenceFilter: evidenceFilter,
             contextState: contextState,
             neuralState: neuralState
         )
@@ -576,8 +584,7 @@ enum DecisionIntelligencePromptContract {
 
     private static func frontstageState(
         kind: TaskKind,
-        evidence: [String],
-        droppedEvidenceCount: Int,
+        evidenceFilter: DecisionPromptEvidenceFilterResult,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?
     ) -> DecisionFrontstageState {
@@ -609,12 +616,15 @@ enum DecisionIntelligencePromptContract {
         if let staleFieldCount = contextState?.staleFieldCount, staleFieldCount > 0 {
             dangerSignals.append("Stale fields dropped")
         }
-        if droppedEvidenceCount > 0 {
+        if evidenceFilter.droppedInjectedCount > 0 {
             dangerSignals.append("Evidence filtered")
+        }
+        if evidenceFilter.droppedBudgetCount > 0 {
+            dangerSignals.append("Frontstage trimmed")
         }
         dangerSignals = Array(dangerSignals.prefix(Limit.frontstageSignalCount))
 
-        let evidenceHeadlines = evidence
+        let evidenceHeadlines = evidenceFilter.retained
             .prefix(frontstageEvidenceCount(for: kind))
             .map { snippet in
                 sanitized(
@@ -642,7 +652,11 @@ enum DecisionIntelligencePromptContract {
             dangerSignals: dangerSignals,
             evidenceHeadlines: evidenceHeadlines,
             anchorHeadlines: anchorHeadlines,
-            droppedEvidenceCount: droppedEvidenceCount,
+            retainedEvidenceCount: evidenceFilter.retainedCount,
+            droppedEvidenceCount: evidenceFilter.droppedCount,
+            droppedInjectedEvidenceCount: evidenceFilter.droppedInjectedCount,
+            droppedDuplicateEvidenceCount: evidenceFilter.droppedDuplicateCount,
+            droppedBudgetEvidenceCount: evidenceFilter.droppedBudgetCount,
             suppressionHints: suppressionHints
         )
     }
@@ -653,7 +667,11 @@ enum DecisionIntelligencePromptContract {
             "danger_signals": frontstageState.dangerSignals,
             "evidence_headlines": frontstageState.evidenceHeadlines,
             "anchor_headlines": frontstageState.anchorHeadlines,
+            "retained_evidence_count": frontstageState.retainedEvidenceCount,
             "dropped_evidence_count": frontstageState.droppedEvidenceCount,
+            "dropped_injected_evidence_count": frontstageState.droppedInjectedEvidenceCount,
+            "dropped_duplicate_evidence_count": frontstageState.droppedDuplicateEvidenceCount,
+            "dropped_budget_evidence_count": frontstageState.droppedBudgetEvidenceCount,
             "suppression_hints": frontstageState.suppressionHints
         ]
 
@@ -674,6 +692,19 @@ enum DecisionIntelligencePromptContract {
             1
         case .reminder:
             0
+        }
+    }
+
+    private static func evidenceRetentionBudget(for kind: TaskKind) -> Int {
+        switch kind {
+        case .quick:
+            5
+        case .balance:
+            4
+        case .mirror:
+            4
+        case .reminder:
+            3
         }
     }
 

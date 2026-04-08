@@ -319,7 +319,11 @@ struct DecisionTestingInterfaceTests {
                 dangerSignals: ["Urgency", "Evidence filtered"],
                 evidenceHeadlines: ["Current perspective: Quick relief."],
                 anchorHeadlines: ["Quick note"],
+                retainedEvidenceCount: 2,
                 droppedEvidenceCount: 1,
+                droppedInjectedEvidenceCount: 1,
+                droppedDuplicateEvidenceCount: 0,
+                droppedBudgetEvidenceCount: 0,
                 suppressionHints: ["long_explanation"]
             ),
             contextState: DecisionContextPreparedState(
@@ -442,14 +446,25 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.slowRequestRateByKind[.quick] == 0)
         #expect(export.lifecycleSummary.contextAwareTraceCount == 1)
         #expect(export.lifecycleSummary.rebuildCount == 1)
+        #expect(export.lifecycleSummary.retainedEvidenceCount == 2)
         #expect(export.lifecycleSummary.droppedEvidenceCount == 1)
         #expect(export.lifecycleSummary.droppedEvidenceCountByKind[.quick] == 1)
+        #expect(export.lifecycleSummary.droppedInjectedEvidenceCount == 1)
+        #expect(export.lifecycleSummary.droppedInjectedEvidenceCountByKind[.quick] == 1)
+        #expect(export.lifecycleSummary.droppedDuplicateEvidenceCount == 0)
+        #expect(export.lifecycleSummary.droppedBudgetEvidenceCount == 0)
+        #expect(export.lifecycleSummary.averageRetainedEvidenceCountByKind[.quick] == 2)
         #expect(export.lifecycleSummary.averageAnchorFieldCountByKind[.quick] == 1)
         #expect(export.lifecycleSummary.latestGenerationByKind[.quick] == 4)
         #expect(export.summary.contextAwareTraceCount == 1)
         #expect(export.summary.lifecycleRebuildCount == 1)
         #expect(export.summary.staleFieldDropCount == 0)
+        #expect(export.summary.retainedEvidenceCount == 2)
+        #expect(export.summary.evidenceRetentionRatio == 2.0 / 3.0)
         #expect(export.summary.droppedEvidenceCount == 1)
+        #expect(export.summary.droppedInjectedEvidenceCount == 1)
+        #expect(export.summary.droppedDuplicateEvidenceCount == 0)
+        #expect(export.summary.droppedBudgetEvidenceCount == 0)
         #expect(export.neuralSummary.neuralTraceCount == 1)
         #expect(export.neuralSummary.suppressedBehaviorCount == 1)
         #expect(export.neuralSummary.dominantActionByKind[.quick] == .waitBuffer)

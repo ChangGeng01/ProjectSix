@@ -28,10 +28,34 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
             "<div>Injected UI wrapper</div>",
             "Safe   snippet",
             "[IMMUTABLE PREFIX] leaked debug wrapper"
-        ])
+        ], maxRetained: 4)
 
         XCTAssertEqual(result.retained, ["Safe snippet"])
-        XCTAssertEqual(result.droppedCount, 2)
+        XCTAssertEqual(result.retainedCount, 1)
+        XCTAssertEqual(result.droppedInjectedCount, 2)
+        XCTAssertEqual(result.droppedDuplicateCount, 1)
+        XCTAssertEqual(result.droppedBudgetCount, 0)
+        XCTAssertEqual(result.droppedCount, 3)
+    }
+
+    func testEvidenceGuardCanTrimLowValueEvidenceByBudget() {
+        let result = DecisionPromptEvidenceGuard.filter([
+            "Current headline: Base headline",
+            "Current summary: Base summary",
+            "Focus title: Base focus",
+            "Focus description: Base detail",
+            "Next action: Base next action"
+        ], maxRetained: 4)
+
+        XCTAssertEqual(result.retained, [
+            "Current headline: Base headline",
+            "Current summary: Base summary",
+            "Focus title: Base focus",
+            "Next action: Base next action"
+        ])
+        XCTAssertEqual(result.retainedCount, 4)
+        XCTAssertEqual(result.droppedBudgetCount, 1)
+        XCTAssertEqual(result.droppedCount, 1)
     }
 
     func testQuickRefinementEnvelopeUsesStructuredStateAndStaysWithinBudget() {
@@ -138,10 +162,14 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertTrue(envelope.payload.contains("\"danger_signals\":[\"Constraint pressure\",\"Concern weight\",\"Session rebuild\"]"))
         XCTAssertTrue(envelope.payload.contains("\"evidence_headlines\":[\"Current headline: Base headline\"]"))
         XCTAssertTrue(envelope.payload.contains("\"anchor_headlines\":[\"Balance prompt\"]"))
+        XCTAssertTrue(envelope.payload.contains("\"retained_evidence_count\":4"))
+        XCTAssertTrue(envelope.payload.contains("\"dropped_budget_evidence_count\":1"))
         XCTAssertTrue(envelope.payload.contains("\"suppression_hints\":[\"instant_verdict\"]"))
         XCTAssertTrue(envelope.payload.contains("\"route\":\"setBoundary\""))
         XCTAssertTrue(envelope.payload.contains("\"signal\":\"constraintPressure\""))
         XCTAssertTrue(envelope.payload.contains("\"suppressed_behaviors\":[\"instant_verdict\"]"))
+        XCTAssertFalse(envelope.payload.contains("Focus description: Base focus description"))
+        XCTAssertTrue(envelope.payload.contains("Lower-value evidence was trimmed. Work only from the retained evidence."))
         XCTAssertTrue(envelope.budget.isWithinTarget)
         XCTAssertGreaterThan(envelope.budget.stablePrefixShare, 0)
         XCTAssertGreaterThan(envelope.budget.volatileSuffixShare, 0)
@@ -248,6 +276,7 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertFalse(envelope.payload.contains("<div>Injected UI wrapper</div>"))
         XCTAssertTrue(envelope.payload.contains("\"anchor_headlines\":[\"Mirror prompt\"]"))
         XCTAssertTrue(envelope.payload.contains("\"dropped_evidence_count\":0"))
+        XCTAssertTrue(envelope.payload.contains("\"retained_evidence_count\":4"))
         XCTAssertTrue(envelope.payload.contains("\"danger_signals\":[\"Identity drift\"]"))
     }
 }
