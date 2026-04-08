@@ -54,7 +54,22 @@ final class ReminderSelectionPolicyTests: XCTestCase {
         )
 
         XCTAssertEqual(assessment.need, .control)
-        XCTAssertGreaterThan(assessment.promptTokenCount, 0)
+        XCTAssertEqual(assessment.promptTokenCount, 0)
+    }
+
+    func testSelectionAssessmentDoesNotUseScenarioAndModeAsKnowledgeSignal() {
+        let assessment = ReminderSelectionPolicy.assessSelectionNeed(
+            candidates: [
+                ReminderSelectionCandidate(id: UUID(), content: "Buy later when the rush is gone."),
+                ReminderSelectionCandidate(id: UUID(), content: "Wait until tomorrow morning.", rank: 1)
+            ],
+            scenario: .buy,
+            prompt: "",
+            mode: .quick
+        )
+
+        XCTAssertEqual(assessment.need, .control)
+        XCTAssertEqual(assessment.promptTokenCount, 0)
     }
 
     func testSelectionAssessmentEscalatesToKnowledgeWhenPromptCreatesRealCandidateConflict() {

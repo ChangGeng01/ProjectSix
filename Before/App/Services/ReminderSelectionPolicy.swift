@@ -44,13 +44,14 @@ enum ReminderSelectionPolicy {
             )
         }
 
-        let selectionPrompt = [prompt, scenario.title, mode?.shortTitle]
+        let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let selectionPrompt = [trimmedPrompt, scenario.title, mode?.shortTitle]
             .compactMap { value in
                 let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 return trimmed.isEmpty ? nil : trimmed
             }
             .joined(separator: " ")
-        let promptTokenCount = DecisionIntelligencePromptLibrary.tokenSet(for: selectionPrompt).count
+        let promptTokenCount = DecisionIntelligencePromptLibrary.tokenSet(for: trimmedPrompt).count
         let distinctCandidateCount = Set(candidates.map { DecisionIntelligencePromptLibrary.normalized($0.content) }).count
 
         guard distinctCandidateCount > 1 else {
