@@ -32,6 +32,7 @@ final class BeforeAppModel: ObservableObject {
     func handleInitialAppearance() {
         presentPendingReflectionIfNeeded()
         consumePendingLaunchRequestIfNeeded()
+        restoreActiveWorkspaceIfNeeded()
         syncWidgetSnapshot()
     }
 
@@ -72,16 +73,22 @@ final class BeforeAppModel: ObservableObject {
             session.scenario = scenario
         }
         activeQuickSession = session
+        selectedTab = 0
+        persistActiveWorkspaceState()
     }
 
     func startBalanceBoard(entrySource: EntrySource, prompt: String = "") {
         clearActiveDecisionFlows()
         activeBalanceSession = BalanceBoardSession(entrySource: entrySource, prompt: prompt)
+        selectedTab = 0
+        persistActiveWorkspaceState()
     }
 
     func startMirrorWorkspace(entrySource: EntrySource, prompt: String = "") {
         clearActiveDecisionFlows()
         activeMirrorSession = MirrorWorkspaceSession(entrySource: entrySource, prompt: prompt)
+        selectedTab = 0
+        persistActiveWorkspaceState()
     }
 
     func consumePendingLaunchRequestIfNeeded() {
@@ -105,11 +112,15 @@ final class BeforeAppModel: ObservableObject {
         case .active:
             presentPendingReflectionIfNeeded()
             consumePendingLaunchRequestIfNeeded()
+            restoreActiveWorkspaceIfNeeded()
         case .background:
             if pendingReflectionContext != nil {
                 shouldPromptReflectionAfterBackground = true
                 persistPendingReflectionState()
             }
+            persistActiveWorkspaceState()
+        case .inactive:
+            persistActiveWorkspaceState()
         default:
             break
         }
@@ -165,6 +176,7 @@ final class BeforeAppModel: ObservableObject {
         persistPendingReflectionState()
         reflectionContext = nil
         activeQuickSession = nil
+        persistActiveWorkspaceState()
     }
 
     func saveBalanceBoard(_ session: BalanceBoardSession) {
@@ -185,6 +197,7 @@ final class BeforeAppModel: ObservableObject {
         context.insert(record)
         try? context.save()
         activeBalanceSession = nil
+        persistActiveWorkspaceState()
     }
 
     func moveBalanceBoardToTomorrow(_ session: BalanceBoardSession) {
@@ -195,6 +208,7 @@ final class BeforeAppModel: ObservableObject {
         try? context.save()
         activeBalanceSession = nil
         selectedTab = 1
+        persistActiveWorkspaceState()
     }
 
     func saveMirrorWorkspace(_ session: MirrorWorkspaceSession) {
@@ -216,6 +230,7 @@ final class BeforeAppModel: ObservableObject {
         context.insert(record)
         try? context.save()
         activeMirrorSession = nil
+        persistActiveWorkspaceState()
     }
 
     func moveMirrorWorkspaceToTomorrow(_ session: MirrorWorkspaceSession) {
@@ -226,6 +241,7 @@ final class BeforeAppModel: ObservableObject {
         try? context.save()
         activeMirrorSession = nil
         selectedTab = 1
+        persistActiveWorkspaceState()
     }
 
     func reopenTomorrowBoxItem(_ item: TomorrowBoxItem) {
@@ -254,6 +270,7 @@ final class BeforeAppModel: ObservableObject {
 
         removeTomorrowBoxItem(item)
         selectedTab = 0
+        persistActiveWorkspaceState()
     }
 
     func removeTomorrowBoxItem(_ item: TomorrowBoxItem) {
@@ -448,6 +465,10 @@ final class BeforeAppModel: ObservableObject {
         WidgetSnapshotStore.save(snapshot)
     }
 
+    func syncWorkspacePersistence() {
+        persistActiveWorkspaceState()
+    }
+
     private func clearActiveDecisionFlows() {
         activeQuickSession = nil
         activeBalanceSession = nil
@@ -526,6 +547,7 @@ final class BeforeAppModel: ObservableObject {
         pendingReflectionContext = nil
         shouldPromptReflectionAfterBackground = false
         persistPendingReflectionState()
+        ActiveDecisionWorkspaceStore.clear()
     }
 
     private func restorePendingReflectionState() {
@@ -553,6 +575,50 @@ final class BeforeAppModel: ObservableObject {
                 shouldPromptOnNextActive: shouldPromptReflectionAfterBackground
             )
         )
+    }
+
+    private func restoreActiveWorkspaceIfNeeded() {
+        guard
+            activeQuickSession == nil,
+            activeBalanceSession == nil,
+            activeMirrorSession == nil,
+            reflectionContext == nil,
+            let state = ActiveDecisionWorkspaceStore.load(),
+            let mode = state.mode
+        else {
+            return
+        }
+
+        switch mode {
+        case .quick:
+            activeQuickSession = state.restoreQuickSession()
+        case .balance:
+            activeBalanceSession = state.restoreBalanceSession()
+        case .mirror:
+            activeMirrorSession = state.restoreMirrorSession()
+        }
+
+        selectedTab = 0
+    }
+
+    private func persistActiveWorkspaceState() {
+        let state: ActiveDecisionWorkspaceState?
+
+        if let session = activeQuickSession {
+            state = ActiveDecisionWorkspaceState.capture(from: session)
+        } else if let session = activeBalanceSession {
+            state = ActiveDecisionWorkspaceState.capture(from: session)
+        } else if let session = activeMirrorSession {
+            state = ActiveDecisionWorkspaceState.capture(from: session)
+        } else {
+            state = nil
+        }
+
+        if let state {
+            ActiveDecisionWorkspaceStore.save(state)
+        } else {
+            ActiveDecisionWorkspaceStore.clear()
+        }
     }
 
     private func trimmed(_ value: String) -> String {

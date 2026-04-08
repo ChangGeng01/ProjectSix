@@ -42,13 +42,22 @@ struct RootTabView: View {
                         .environmentObject(appModel)
                 }
         }
+        .onChange(of: appModel.activeQuickSession?.id) { _, _ in
+            appModel.syncWorkspacePersistence()
+        }
         .sheet(item: $appModel.activeBalanceSession) { session in
             BalanceBoardView(session: session)
                 .environmentObject(appModel)
         }
+        .onChange(of: appModel.activeBalanceSession?.id) { _, _ in
+            appModel.syncWorkspacePersistence()
+        }
         .sheet(item: $appModel.activeMirrorSession) { session in
             MirrorWorkspaceView(session: session)
                 .environmentObject(appModel)
+        }
+        .onChange(of: appModel.activeMirrorSession?.id) { _, _ in
+            appModel.syncWorkspacePersistence()
         }
         .sheet(item: $appModel.reflectionContext) { context in
             ReflectionPromptView(context: context)

@@ -82,6 +82,40 @@ struct TomorrowBoxDraft: Codable, Equatable, Sendable {
         return session
     }
 
+    func hasMeaningfulContent(for mode: DecisionMode) -> Bool {
+        switch mode {
+        case .quick:
+            let hasNonDefaultScenario = scenarioRaw != nil && scenarioRaw != ScenarioType.buy.rawValue
+            return hasNonDefaultScenario
+                || motivationRaw != nil
+                || expectedOutcomeRaw != nil
+                || controlLevelRaw != nil
+                || !Self.trimmed(prompt).isEmpty
+                || !Self.trimmed(note ?? "").isEmpty
+        case .balance:
+            return [
+                prompt,
+                desire ?? "",
+                concern ?? "",
+                constraint ?? "",
+                longTerm ?? ""
+            ]
+            .map(Self.trimmed)
+            .contains { !$0.isEmpty }
+        case .mirror:
+            return [
+                prompt,
+                emotion ?? "",
+                relationship ?? "",
+                reality ?? "",
+                longTerm ?? "",
+                selfLens ?? ""
+            ]
+            .map(Self.trimmed)
+            .contains { !$0.isEmpty }
+        }
+    }
+
     private static func trimmed(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
