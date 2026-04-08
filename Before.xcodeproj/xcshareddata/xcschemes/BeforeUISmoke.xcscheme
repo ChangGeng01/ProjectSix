@@ -29,9 +29,9 @@
             buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "2CE655EF0522BDA24E1B5AE4"
-               BuildableName = "BeforeTests.xctest"
-               BlueprintName = "BeforeTests"
+               BlueprintIdentifier = "7AC0D588057D461E1ECAB994"
+               BuildableName = "BeforeUITests.xctest"
+               BlueprintName = "BeforeUITests"
                ReferencedContainer = "container:Before.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -72,9 +72,20 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "2CE655EF0522BDA24E1B5AE4"
-               BuildableName = "BeforeTests.xctest"
-               BlueprintName = "BeforeTests"
+               BlueprintIdentifier = "7AC0D588057D461E1ECAB994"
+               BuildableName = "BeforeUITests.xctest"
+               BlueprintName = "BeforeUITests"
+               ReferencedContainer = "container:Before.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "7AC0D588057D461E1ECAB994"
+               BuildableName = "BeforeUITests.xctest"
+               BlueprintName = "BeforeUITests"
                ReferencedContainer = "container:Before.xcodeproj">
             </BuildableReference>
          </TestableReference>

@@ -73,6 +73,8 @@ struct DecisionTestingRuntimeExport {
             admissionSkipRate: intelligenceTelemetry.admissionSkipRate,
             providerBypassRate: intelligenceTelemetry.providerBypassRate,
             providerBypassRateByKind: intelligenceTelemetry.providerBypassRateByKind,
+            lowPressureModelCallRate: intelligenceTelemetry.lowPressureModelCallRate,
+            lowPressureModelCallRateByKind: intelligenceTelemetry.lowPressureModelCallRateByKind,
             deterministicFallbackRate: intelligenceTelemetry.deterministicFallbackRate,
             averageRequestDurationMs: intelligenceTelemetry.averageRequestDurationMs,
             averageRequestDurationMsByKind: intelligenceTelemetry.averageRequestDurationMsByKind,
@@ -140,6 +142,8 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let admissionSkipRate: Double
     let providerBypassRate: Double
     let providerBypassRateByKind: [DecisionIntelligenceTraceKind: Double]
+    let lowPressureModelCallRate: Double
+    let lowPressureModelCallRateByKind: [DecisionIntelligenceTraceKind: Double]
     let deterministicFallbackRate: Double
     let averageRequestDurationMs: Double
     let averageRequestDurationMsByKind: [DecisionIntelligenceTraceKind: Double]

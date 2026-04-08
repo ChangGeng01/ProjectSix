@@ -28,6 +28,7 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
     let adaptivePrefixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int]
     let suffixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int]
     let overTargetBudgetCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let lowPressureModelCallCountByKind: [DecisionIntelligenceTraceKind: Int]
 
     var totalRequests: Int {
         requestCountByKind.values.reduce(0, +)
@@ -136,6 +137,22 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
         )
     }
 
+    var lowPressureModelCallRate: Double {
+        rate(
+            numerator: lowPressureModelCallCountByKind.values.reduce(0, +),
+            denominator: totalRequests
+        )
+    }
+
+    var lowPressureModelCallRateByKind: [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: requestCountByKind.map { kind, count in
+                let lowPressureCalls = lowPressureModelCallCountByKind[kind] ?? 0
+                return (kind, rate(numerator: lowPressureCalls, denominator: count))
+            }
+        )
+    }
+
     var providerBypassCount: Int {
         providerBypassCountByKind.values.reduce(0, +)
     }
@@ -231,6 +248,7 @@ actor DecisionIntelligenceTelemetryStore {
     private var adaptivePrefixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int] = [:]
     private var suffixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int] = [:]
     private var overTargetBudgetCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
+    private var lowPressureModelCallCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
 
     private static func slowRequestThresholdMs(
         for kind: DecisionIntelligenceTraceKind
@@ -292,6 +310,9 @@ actor DecisionIntelligenceTelemetryStore {
 
         if let admissionDecision {
             promptPressureCount[admissionDecision.pressure, default: 0] += 1
+            if outcome == .providerSuccess, admissionDecision.pressure == .low {
+                lowPressureModelCallCountByKind[kind, default: 0] += 1
+            }
             if let skipReason = admissionDecision.skipReason {
                 admissionSkipCountByReason[skipReason, default: 0] += 1
             }
@@ -323,7 +344,8 @@ actor DecisionIntelligenceTelemetryStore {
             immutablePrefixCharactersTotalByKind: immutablePrefixCharactersTotalByKind,
             adaptivePrefixCharactersTotalByKind: adaptivePrefixCharactersTotalByKind,
             suffixCharactersTotalByKind: suffixCharactersTotalByKind,
-            overTargetBudgetCountByKind: overTargetBudgetCountByKind
+            overTargetBudgetCountByKind: overTargetBudgetCountByKind,
+            lowPressureModelCallCountByKind: lowPressureModelCallCountByKind
         )
     }
 
@@ -346,6 +368,7 @@ actor DecisionIntelligenceTelemetryStore {
         adaptivePrefixCharactersTotalByKind.removeAll()
         suffixCharactersTotalByKind.removeAll()
         overTargetBudgetCountByKind.removeAll()
+        lowPressureModelCallCountByKind.removeAll()
         outcomeCountByKind.removeAll()
     }
 }

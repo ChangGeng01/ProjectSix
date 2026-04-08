@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0435BCEFA8A07CE59796719A /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EDEFDEA19B8C992836638F9 /* AppTab.swift */; };
 		046F56A2947A1E8287D8392E /* DecisionContextPreparedState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F94CB71B4918233F505006 /* DecisionContextPreparedState.swift */; };
+		05DE60BF21270D62ED8AEA08 /* DecisionFrontstageState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1EF1DBB04E66319BF5C80E /* DecisionFrontstageState.swift */; };
 		063B95CB0003BED2CEFA42C0 /* SupportRequestKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E920EDE589F5E07C3D3C2C1F /* SupportRequestKindTests.swift */; };
 		08E0CF120EEAFE9A355FA71F /* CheckEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB33E572D887CB4574F01A2 /* CheckEvent.swift */; };
 		09C7278F68876D47C852BB34 /* BeforeBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 788D0A8A1D8137BDA6A5EDE0 /* BeforeBackground.swift */; };
@@ -152,6 +153,7 @@
 		B85E951908A4087DEFAF730F /* DecisionIntelligenceAdmissionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13CA4CCE8E080D56C166ED5A /* DecisionIntelligenceAdmissionControllerTests.swift */; };
 		B93169E7C80A5958DC963E22 /* SupportRequestKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EC6D618BA06FEEFADA2ED4B /* SupportRequestKind.swift */; };
 		BA99C96ABD658EADEE79DE5B /* EntrySource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5263B35DEB9254806060CCA3 /* EntrySource.swift */; };
+		BB20F5F880F9E66C3754665A /* DecisionFrontstageState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1EF1DBB04E66319BF5C80E /* DecisionFrontstageState.swift */; };
 		BB67511098C3741B7E832995 /* SharedContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E63D346FC718230713E7B30B /* SharedContainer.swift */; };
 		BB74CD533C51228C40787E52 /* DecisionFieldSuggestionLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9ED7A91142A6380075D141 /* DecisionFieldSuggestionLibraryTests.swift */; };
 		BBC8A21467AE24FDE91F1294 /* ReminderSelectionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC7AFD8BAE5FD8656546EA60 /* ReminderSelectionPolicy.swift */; };
@@ -386,6 +388,7 @@
 		A61DB79FB9E3DC311CE85256 /* SectionHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionHeader.swift; sourceTree = "<group>"; };
 		A9E33F27723396B6B342EB59 /* CheckRuleEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckRuleEngineTests.swift; sourceTree = "<group>"; };
 		AA6E1FD7F02BE18A0F653DE4 /* ResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultView.swift; sourceTree = "<group>"; };
+		AB1EF1DBB04E66319BF5C80E /* DecisionFrontstageState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionFrontstageState.swift; sourceTree = "<group>"; };
 		AB8A05C41C31FF92FED7AB83 /* QuickCheckAnswers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCheckAnswers.swift; sourceTree = "<group>"; };
 		AD17481B92151CE94BC45836 /* SupportRequestFactoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportRequestFactoryTests.swift; sourceTree = "<group>"; };
 		AEF88B8304CF7F148F06C204 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -480,6 +483,7 @@
 				58C429E74F83380B3EB5DD21 /* CheckVerdict.swift */,
 				15786A7BDA5F624F94D347DA /* DecisionContextFieldKey.swift */,
 				C5F94CB71B4918233F505006 /* DecisionContextPreparedState.swift */,
+				AB1EF1DBB04E66319BF5C80E /* DecisionFrontstageState.swift */,
 				8803C58B37023CB5C616CD7C /* DecisionMode.swift */,
 				5263B35DEB9254806060CCA3 /* EntrySource.swift */,
 				8B45BDE0A0AC8F56688BBF51 /* InferenceBackendPolicy.swift */,
@@ -990,6 +994,7 @@
 				046F56A2947A1E8287D8392E /* DecisionContextPreparedState.swift in Sources */,
 				CC5EF4FD96DC5D33D7F92A37 /* DecisionContinuationActions.swift in Sources */,
 				86C0AF0FFC0C65E491F002E2 /* DecisionFieldSuggestionLibrary.swift in Sources */,
+				05DE60BF21270D62ED8AEA08 /* DecisionFrontstageState.swift in Sources */,
 				62B2D14B7432B2D253940BA0 /* DecisionIntelligenceAdmissionController.swift in Sources */,
 				7D6E2C32F1B7CF33CD9B7910 /* DecisionIntelligenceCoordinator.swift in Sources */,
 				9B391CD6FD31BB6092442103 /* DecisionIntelligenceDebugStore.swift in Sources */,
@@ -1107,6 +1112,7 @@
 				FFE9B155120181A57899A64D /* DecisionContextFieldKey.swift in Sources */,
 				108A911D2F173D9E68E54B6C /* DecisionContextPreparedState.swift in Sources */,
 				90F60CB4116980D6BFEA9523 /* DecisionFieldSuggestionLibrary.swift in Sources */,
+				BB20F5F880F9E66C3754665A /* DecisionFrontstageState.swift in Sources */,
 				EAFB12A3676EAF72B6BC9989 /* DecisionMode.swift in Sources */,
 				CCB15F44F3F2C2C27384875B /* DecisionModeRouter.swift in Sources */,
 				1E49AC6B426FD2DD6556ED0A /* DecisionNeuralEngine.swift in Sources */,

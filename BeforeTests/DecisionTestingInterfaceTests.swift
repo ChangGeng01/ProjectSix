@@ -296,6 +296,7 @@ struct DecisionTestingInterfaceTests {
         #expect(abs((telemetrySnapshot.averageStablePrefixShareByKind[.balance] ?? 0) - (200.0 / 520.0)) < 0.0001)
         #expect(telemetrySnapshot.admissionSkipRate == 0)
         #expect(telemetrySnapshot.providerBypassRate == 0)
+        #expect(telemetrySnapshot.lowPressureModelCallRate == 0)
         #expect(cacheSnapshot.hitCountByKind[.reminder] == 1)
         #expect(cacheSnapshot.storeCountByKind[.reminder] == 1)
     }
@@ -416,6 +417,8 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.admissionSkipRate == 0)
         #expect(export.summary.providerBypassRate == 0)
         #expect(abs((export.summary.providerBypassRateByKind[.quick] ?? 0) - 0) < 0.0001)
+        #expect(export.summary.lowPressureModelCallRate == 1)
+        #expect(export.summary.lowPressureModelCallRateByKind[.quick] == 1)
         #expect(export.summary.averageRequestDurationMs == 220)
         #expect(export.summary.averageRequestDurationMsByKind[.quick] == 220)
         #expect(export.summary.averageRequestDurationMsByGemmaBackend[.cpu] == 220)

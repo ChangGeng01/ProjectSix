@@ -16,6 +16,9 @@ enum DecisionIntelligencePromptContract {
         static let stateField = 140
         static let statePrompt = 170
         static let evidenceSnippet = 180
+        static let frontstageSignal = 48
+        static let frontstageEvidence = 96
+        static let frontstageSignalCount = 3
     }
 
     enum TaskKind: Equatable, Sendable {
@@ -27,7 +30,7 @@ enum DecisionIntelligencePromptContract {
         var targetCharacters: Int {
             switch self {
             case .quick: 1_350
-            case .balance: 1_550
+            case .balance: 1_900
             case .mirror: 1_700
             case .reminder: 1_100
             }
@@ -107,6 +110,7 @@ enum DecisionIntelligencePromptContract {
         let debugPrompt: String
         let budget: ContextBudget
         let layers: PromptLayers
+        let frontstageState: DecisionFrontstageState
 
         var runtimePrompt: String {
             layers.runtimePrompt
@@ -399,7 +403,15 @@ enum DecisionIntelligencePromptContract {
         let instructions = [immutablePrefix, adaptivePrefix]
             .filter { !$0.isEmpty }
             .joined(separator: "\n\n")
+        let preparedFrontstageState = frontstageState(
+            kind: kind,
+            evidence: evidence,
+            contextState: contextState,
+            neuralState: neuralState
+        )
         var sections = [
+            "FRONTSTAGE_STATE_JSON:",
+            frontstageStateJSONString(preparedFrontstageState),
             "TASK_STATE_JSON:",
             stateJSONString(state),
         ]
@@ -456,7 +468,8 @@ enum DecisionIntelligencePromptContract {
                 immutablePrefixCharacters: immutablePrefix.count,
                 adaptivePrefixCharacters: adaptivePrefix.count
             ),
-            layers: layers
+            layers: layers,
+            frontstageState: preparedFrontstageState
         )
     }
 
@@ -520,6 +533,94 @@ enum DecisionIntelligencePromptContract {
         }
 
         return json
+    }
+
+    private static func frontstageState(
+        kind: TaskKind,
+        evidence: [String],
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?
+    ) -> DecisionFrontstageState {
+        let focusGoal: String = switch kind {
+        case .quick:
+            "Interrupt the automatic reaction before it locks in."
+        case .balance:
+            "Surface the real trade-off before choosing a side."
+        case .mirror:
+            "Name the core tension without forcing a yes-no answer."
+        case .reminder:
+            "Pick the one reminder that best fits the current state."
+        }
+
+        var dangerSignals = neuralState?
+            .dominantActivations
+            .prefix(Limit.frontstageSignalCount)
+            .map { activation in
+                sanitized(
+                    activation.signal.title,
+                    fallback: activation.signal.title,
+                    limit: Limit.frontstageSignal
+                )
+            } ?? []
+
+        if contextState?.rebuiltSession == true {
+            dangerSignals.append("Session rebuild")
+        }
+        if let staleFieldCount = contextState?.staleFieldCount, staleFieldCount > 0 {
+            dangerSignals.append("Stale fields dropped")
+        }
+        dangerSignals = Array(dangerSignals.prefix(Limit.frontstageSignalCount))
+
+        let evidenceHeadlines = evidence
+            .prefix(frontstageEvidenceCount(for: kind))
+            .map { snippet in
+                sanitized(
+                    snippet,
+                    fallback: snippet,
+                    limit: Limit.frontstageEvidence
+                )
+            }
+
+        let suppressionHints = Array(
+            (neuralState?.suppressedBehaviors ?? [])
+                .map { sanitized($0, fallback: $0, limit: Limit.frontstageSignal) }
+                .prefix(Limit.frontstageSignalCount)
+        )
+
+        return DecisionFrontstageState(
+            focusGoal: focusGoal,
+            dangerSignals: dangerSignals,
+            evidenceHeadlines: evidenceHeadlines,
+            suppressionHints: suppressionHints
+        )
+    }
+
+    private static func frontstageStateJSONString(_ frontstageState: DecisionFrontstageState) -> String {
+        let payload: [String: Any] = [
+            "focus_goal": frontstageState.focusGoal,
+            "danger_signals": frontstageState.dangerSignals,
+            "evidence_headlines": frontstageState.evidenceHeadlines,
+            "suppression_hints": frontstageState.suppressionHints
+        ]
+
+        guard JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+
+        return json
+    }
+
+    private static func frontstageEvidenceCount(for kind: TaskKind) -> Int {
+        switch kind {
+        case .quick:
+            2
+        case .balance, .mirror:
+            1
+        case .reminder:
+            0
+        }
     }
 
     private static func evidenceBlock(_ evidence: [String]) -> String {

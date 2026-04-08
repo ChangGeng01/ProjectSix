@@ -12,6 +12,12 @@ final class DecisionIntelligenceTelemetryStoreTests: XCTestCase {
             attemptedProviders: [.gemmaE4B],
             usedFallback: false,
             durationMs: 120,
+            admissionDecision: DecisionIntelligenceAdmissionDecision(
+                isAllowed: true,
+                pressure: .low,
+                reason: "Allowed for testing.",
+                skipReason: nil
+            ),
             gemmaBackendResolution: InferenceBackendResolver.resolve(
                 policy: .coreMLPreferred,
                 device: DeviceCapabilitySnapshot(
@@ -40,6 +46,8 @@ final class DecisionIntelligenceTelemetryStoreTests: XCTestCase {
         XCTAssertEqual(snapshot.gemmaBackendCount[.coreML], 1)
         XCTAssertEqual(snapshot.deterministicFallbackRate, 0.5, accuracy: 0.0001)
         XCTAssertEqual(snapshot.providerBypassRate, 0, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.lowPressureModelCallRate, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.lowPressureModelCallRateByKind[.quick] ?? 0, 1, accuracy: 0.0001)
         XCTAssertEqual(snapshot.averageRequestDurationMs, 1_260, accuracy: 0.0001)
         XCTAssertEqual(snapshot.averageRequestDurationMsByKind[.quick] ?? 0, 120, accuracy: 0.0001)
         XCTAssertEqual(snapshot.averageRequestDurationMsByGemmaBackend[.coreML] ?? 0, 120, accuracy: 0.0001)

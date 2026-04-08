@@ -102,8 +102,16 @@ schemes:
         Before: all
         BeforeWidgetExtension: all
         BeforeTests: [test]
-        BeforeUITests: [test]
     test:
       targets:
         - name: BeforeTests
+  BeforeUISmoke:
+    build:
+      targets:
+        Before: all
+        BeforeWidgetExtension: all
+        BeforeUITests: [test]
+    test:
+      targets:
+        - name: BeforeUITests
         - name: BeforeUITests
