@@ -179,6 +179,16 @@ enum DecisionTestingInterface {
         store.clear()
     }
 
+    static func clearResponseCache() async {
+        await DecisionIntelligenceResponseCache.shared.clear()
+    }
+
+    @MainActor
+    static func resetTransientIntelligenceState(store: DecisionIntelligenceDebugStore = .shared) async {
+        clearTraces(store: store)
+        await clearResponseCache()
+    }
+
     @MainActor
     static func recentReplay(
         quick: [CheckEvent],

@@ -35,6 +35,7 @@ enum BeforePolicy {
         static let developerReplayLimit = 8
         static let developerReplayTraceLookbackInterval: TimeInterval = 60 * 30
         static let developerReplayFutureTraceGraceInterval: TimeInterval = 10
+        static let intelligenceResponseCacheLimit = 24
     }
 
     enum Notifications {

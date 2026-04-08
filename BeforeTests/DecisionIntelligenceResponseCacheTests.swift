@@ -1,0 +1,63 @@
+import XCTest
+@testable import Before
+
+final class DecisionIntelligenceResponseCacheTests: XCTestCase {
+    func testQuickCacheKeepsMostRecentEntriesWithinLimit() async {
+        let cache = DecisionIntelligenceResponseCache(limit: 2)
+
+        await cache.storeQuickResult(
+            QuickCheckResult(
+                currentPerspective: "One",
+                afterPerspective: "After one",
+                verdict: .pause,
+                primaryAction: .wait90s,
+                secondaryActions: []
+            ),
+            for: "one"
+        )
+
+        await cache.storeQuickResult(
+            QuickCheckResult(
+                currentPerspective: "Two",
+                afterPerspective: "After two",
+                verdict: .pause,
+                primaryAction: .wait90s,
+                secondaryActions: []
+            ),
+            for: "two"
+        )
+
+        await cache.storeQuickResult(
+            QuickCheckResult(
+                currentPerspective: "Three",
+                afterPerspective: "After three",
+                verdict: .pause,
+                primaryAction: .wait90s,
+                secondaryActions: []
+            ),
+            for: "three"
+        )
+
+        let first = await cache.quickResult(for: "one")
+        let second = await cache.quickResult(for: "two")
+        let third = await cache.quickResult(for: "three")
+
+        XCTAssertNil(first)
+        XCTAssertEqual(second?.currentPerspective, "Two")
+        XCTAssertEqual(third?.currentPerspective, "Three")
+    }
+
+    func testClearRemovesStoredReminderSelection() async {
+        let cache = DecisionIntelligenceResponseCache(limit: 2)
+        let candidate = ReminderSelectionCandidate(id: UUID(), content: "Keep going.")
+
+        await cache.storeReminder(candidate, for: "reminder")
+        let stored = await cache.reminder(for: "reminder")
+        XCTAssertEqual(stored?.id, candidate.id)
+
+        await cache.clear()
+
+        let cleared = await cache.reminder(for: "reminder")
+        XCTAssertNil(cleared)
+    }
+}

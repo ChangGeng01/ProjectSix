@@ -865,6 +865,9 @@ final class BeforeAppModel: ObservableObject {
             PendingReflectionStore.clear()
             ActiveDecisionWorkspaceStore.clear()
             WidgetSnapshotStore.clear()
+            Task {
+                await DecisionTestingInterface.resetTransientIntelligenceState()
+            }
 
             let context = modelContainer.mainContext
             deleteAll(CheckEvent.self, in: context)

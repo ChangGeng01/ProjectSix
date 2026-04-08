@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Before
 
@@ -171,5 +172,34 @@ struct DecisionTestingInterfaceTests {
 
         DecisionTestingInterface.clearTraces(store: store)
         #expect(store.traces.isEmpty)
+    }
+
+    @Test
+    func resetTransientIntelligenceStateClearsTraceAndResponseCache() async {
+        let store = DecisionIntelligenceDebugStore()
+        store.record(
+            DecisionIntelligenceTrace(
+                kind: .quick,
+                preferredProvider: .gemmaE4B,
+                activeProvider: .gemmaE4B,
+                attemptedProviders: [.gemmaE4B],
+                allowFallbacks: true,
+                usedFallback: false,
+                prompt: "Prompt",
+                outputPreview: "Output",
+                detail: "Detail"
+            )
+        )
+
+        await DecisionIntelligenceResponseCache.shared.storeReminder(
+            ReminderSelectionCandidate(id: UUID(), content: "Reminder"),
+            for: "cache-key"
+        )
+
+        await DecisionTestingInterface.resetTransientIntelligenceState(store: store)
+
+        #expect(store.traces.isEmpty)
+        let cached = await DecisionIntelligenceResponseCache.shared.reminder(for: "cache-key")
+        #expect(cached == nil)
     }
 }

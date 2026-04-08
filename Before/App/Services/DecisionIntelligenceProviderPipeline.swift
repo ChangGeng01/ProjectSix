@@ -112,6 +112,7 @@ enum DecisionIntelligenceProviderPipeline {
         .gemmaE4B: GemmaDecisionIntelligenceProvider(),
         .foundationModels: FoundationDecisionIntelligenceProvider()
     ]
+    private static let responseCache = DecisionIntelligenceResponseCache.shared
 
     static func orderedKinds(
         for preference: DecisionModelProviderPreference,
@@ -241,7 +242,27 @@ enum DecisionIntelligenceProviderPipeline {
         let attemptedKinds = providers.map(\.kind)
 
         for provider in providers {
+            let cacheKey = cacheKey(provider: provider.kind, prompt: envelope.debugPrompt)
+            if let cached = await responseCache.quickResult(for: cacheKey) {
+                recordTrace(
+                    kind: .quick,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: attemptedKinds,
+                    allowFallbacks: allowFallbacks,
+                    prompt: envelope.debugPrompt,
+                    outputPreview: quickPreview(from: cached),
+                    detail: cachedDetail(
+                        preferred: preference.kind,
+                        active: provider.kind,
+                        allowFallbacks: allowFallbacks
+                    )
+                )
+                return cached
+            }
+
             if let refined = await provider.refineQuickResult(base: base, input: input) {
+                await responseCache.storeQuickResult(refined, for: cacheKey)
                 recordTrace(
                     kind: .quick,
                     preferredProvider: preference.kind,
@@ -303,7 +324,27 @@ enum DecisionIntelligenceProviderPipeline {
         let attemptedKinds = providers.map(\.kind)
 
         for provider in providers {
+            let cacheKey = cacheKey(provider: provider.kind, prompt: envelope.debugPrompt)
+            if let cached = await responseCache.balanceResult(for: cacheKey) {
+                recordTrace(
+                    kind: .balance,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: attemptedKinds,
+                    allowFallbacks: allowFallbacks,
+                    prompt: envelope.debugPrompt,
+                    outputPreview: balancePreview(from: cached),
+                    detail: cachedDetail(
+                        preferred: preference.kind,
+                        active: provider.kind,
+                        allowFallbacks: allowFallbacks
+                    )
+                )
+                return cached
+            }
+
             if let refined = await provider.refineBalanceResult(base: base, input: input) {
+                await responseCache.storeBalanceResult(refined, for: cacheKey)
                 recordTrace(
                     kind: .balance,
                     preferredProvider: preference.kind,
@@ -365,7 +406,27 @@ enum DecisionIntelligenceProviderPipeline {
         let attemptedKinds = providers.map(\.kind)
 
         for provider in providers {
+            let cacheKey = cacheKey(provider: provider.kind, prompt: envelope.debugPrompt)
+            if let cached = await responseCache.mirrorResult(for: cacheKey) {
+                recordTrace(
+                    kind: .mirror,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: attemptedKinds,
+                    allowFallbacks: allowFallbacks,
+                    prompt: envelope.debugPrompt,
+                    outputPreview: mirrorPreview(from: cached),
+                    detail: cachedDetail(
+                        preferred: preference.kind,
+                        active: provider.kind,
+                        allowFallbacks: allowFallbacks
+                    )
+                )
+                return cached
+            }
+
             if let refined = await provider.refineMirrorResult(base: base, input: input) {
+                await responseCache.storeMirrorResult(refined, for: cacheKey)
                 recordTrace(
                     kind: .mirror,
                     preferredProvider: preference.kind,
@@ -422,12 +483,33 @@ enum DecisionIntelligenceProviderPipeline {
         let attemptedKinds = providers.map(\.kind)
 
         for provider in providers {
+            let cacheKey = cacheKey(provider: provider.kind, prompt: selection.prompt.debugPrompt)
+            if let cached = await responseCache.reminder(for: cacheKey),
+               clippedCandidates.contains(where: { $0.id == cached.id }) {
+                recordTrace(
+                    kind: .reminder,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: attemptedKinds,
+                    allowFallbacks: allowFallbacks,
+                    prompt: selection.prompt.debugPrompt,
+                    outputPreview: reminderPreview(from: cached),
+                    detail: cachedDetail(
+                        preferred: preference.kind,
+                        active: provider.kind,
+                        allowFallbacks: allowFallbacks
+                    )
+                )
+                return cached
+            }
+
             if let selected = await provider.pickReminder(
                 from: clippedCandidates,
                 scenario: scenario,
                 prompt: prompt,
                 mode: mode
             ) {
+                await responseCache.storeReminder(selected, for: cacheKey)
                 recordTrace(
                     kind: .reminder,
                     preferredProvider: preference.kind,
@@ -515,6 +597,19 @@ enum DecisionIntelligenceProviderPipeline {
         }
 
         return "Before switched away from \(preferred.title) and used \(active.title) for this refinement."
+    }
+
+    private static func cachedDetail(
+        preferred: DecisionModelProviderKind,
+        active: DecisionModelProviderKind,
+        allowFallbacks: Bool
+    ) -> String {
+        detail(preferred: preferred, active: active, allowFallbacks: allowFallbacks)
+            + " Before served the response from the structured prompt cache instead of recomputing it."
+    }
+
+    private static func cacheKey(provider: DecisionModelProviderKind, prompt: String) -> String {
+        "\(provider.rawValue)\n\(prompt)"
     }
 
     private static func quickPreview(from result: QuickCheckResult) -> String {

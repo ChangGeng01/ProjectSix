@@ -2,6 +2,13 @@ import XCTest
 @testable import Before
 
 final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
+    @MainActor
+    override func setUp() async throws {
+        try await super.setUp()
+        await DecisionIntelligenceResponseCache.shared.clear()
+        DecisionIntelligenceDebugStore.shared.clear()
+    }
+
     func testOrderedKindsPreferGemmaFirst() {
         XCTAssertEqual(
             DecisionIntelligenceProviderPipeline.orderedKinds(for: .gemmaE4B),
@@ -194,5 +201,46 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         )
 
         XCTAssertEqual(selected?.content, "Last")
+    }
+
+    @MainActor
+    func testSecondQuickRefinementCanBeServedFromResponseCache() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+
+        _ = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        _ = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected a recorded trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .quick)
+        XCTAssertTrue(latestTrace.detail.contains("structured prompt cache"))
     }
 }
