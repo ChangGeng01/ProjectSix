@@ -1,36 +1,94 @@
 import Foundation
 import SwiftData
 
+struct DecisionMemoryDraft: Sendable {
+    let id: String
+    let type: DecisionMemoryType
+    let topic: String
+    let headline: String
+    let value: String
+    let confidence: Double
+    let priority: Double
+    let source: DecisionMemorySource
+    let lastConfirmedAt: Date
+    let decayPolicy: DecisionMemoryDecayPolicy
+    let retrievalTags: [String]
+    let evidenceCount: Int
+    let provenanceSummary: String
+    let promotionPolicy: PromotionPolicy
+
+    var fingerprint: String {
+        [
+            id,
+            type.rawValue,
+            topic,
+            headline,
+            value,
+            String(format: "%.3f", confidence),
+            String(format: "%.3f", priority),
+            source.rawValue,
+            lastConfirmedAt.ISO8601Format(),
+            decayPolicy.rawValue,
+            retrievalTags.sorted().joined(separator: "|"),
+            String(evidenceCount)
+        ]
+        .joined(separator: "::")
+    }
+
+    func makeRecord(observationCount: Int) -> DecisionMemoryRecord {
+        DecisionMemoryRecord(
+            id: id,
+            type: type,
+            topic: topic,
+            headline: headline,
+            value: value,
+            confidence: confidence,
+            priority: priority,
+            source: source,
+            lastConfirmedAt: lastConfirmedAt,
+            decayPolicy: decayPolicy,
+            retrievalTags: retrievalTags,
+            evidenceCount: evidenceCount,
+            observationCount: observationCount,
+            provenanceSummary: provenanceSummary
+        )
+    }
+}
+
 enum DecisionMemorySystem {
-    private struct MemoryDraft {
+    private struct BrainMemoryItem {
         let id: String
         let type: DecisionMemoryType
-        let topic: String
         let headline: String
-        let value: String
-        let confidence: Double
         let priority: Double
-        let source: DecisionMemorySource
+        let confidence: Double
+        let retrievalTags: [String]
         let lastConfirmedAt: Date
         let decayPolicy: DecisionMemoryDecayPolicy
-        let retrievalTags: [String]
-        let evidenceCount: Int
+        let isPending: Bool
 
-        func makeRecord() -> DecisionMemoryRecord {
-            DecisionMemoryRecord(
-                id: id,
-                type: type,
-                topic: topic,
-                headline: headline,
-                value: value,
-                confidence: confidence,
-                priority: priority,
-                source: source,
-                lastConfirmedAt: lastConfirmedAt,
-                decayPolicy: decayPolicy,
-                retrievalTags: retrievalTags,
-                evidenceCount: evidenceCount
-            )
+        init(record: DecisionMemoryRecord) {
+            id = record.id
+            type = record.type
+            headline = record.headline
+            priority = record.priority
+            confidence = record.confidence
+            retrievalTags = record.retrievalTags
+            lastConfirmedAt = record.lastConfirmedAt
+            decayPolicy = record.decayPolicy
+            isPending = false
+        }
+
+        init(candidate: DecisionMemoryCandidateRecord) {
+            id = candidate.id
+            type = candidate.type
+            headline = candidate.headline
+            priority = candidate.priority
+            confidence = candidate.confidence
+            retrievalTags = candidate.retrievalTags
+            lastConfirmedAt = candidate.lastObservedAt
+            decayPolicy = candidate.decayPolicy
+            isPending = candidate.status == .pending
         }
     }
 
@@ -46,17 +104,10 @@ enum DecisionMemorySystem {
                 return lhs.priority > rhs.priority
             }
 
-        let existing = (try? context.fetch(FetchDescriptor<DecisionMemoryRecord>())) ?? []
-        existing.forEach { context.delete($0) }
-
-        let records = drafts.map { draft in
-            let record = draft.makeRecord()
-            context.insert(record)
-            return record
-        }
-
-        try? context.save()
-        return records
+        return DecisionMemoryGovernor.reconcile(
+            drafts: drafts,
+            in: context
+        )
     }
 
     static func loadBrainState(
@@ -65,11 +116,25 @@ enum DecisionMemorySystem {
         context: ModelContext,
         now: Date = .now
     ) -> DecisionBrainState {
-        let records = fetchMemoryRecords(in: context).isEmpty
-            ? refreshStoredMemories(in: context, now: now)
-            : fetchMemoryRecords(in: context)
+        let records = fetchMemoryRecords(in: context)
+        let candidates = fetchCandidateRecords(in: context)
 
-        guard !records.isEmpty else {
+        let resolvedRecords: [DecisionMemoryRecord]
+        let resolvedCandidates: [DecisionMemoryCandidateRecord]
+        if records.isEmpty && candidates.isEmpty {
+            resolvedRecords = refreshStoredMemories(in: context, now: now)
+            resolvedCandidates = fetchCandidateRecords(in: context)
+        } else {
+            resolvedRecords = records
+            resolvedCandidates = candidates
+        }
+
+        let brainItems = buildBrainItems(
+            records: resolvedRecords,
+            candidates: resolvedCandidates
+        )
+
+        guard !brainItems.isEmpty else {
             return DecisionBrainState(
                 profileCore: [],
                 activeGoals: [],
@@ -81,28 +146,36 @@ enum DecisionMemorySystem {
         }
 
         let queryTags = queryTags(for: mode, prompt: prompt)
-        let profileCore = records
-            .filter { $0.type == .identity || $0.type == .preference }
-            .sorted(by: memorySort)
-            .prefix(2)
-            .map(\.headline)
+        let orderedItems = brainItems.sorted {
+            score($0, mode: mode, queryTags: queryTags, now: now) >
+                score($1, mode: mode, queryTags: queryTags, now: now)
+        }
 
-        let activeGoals = records
-            .filter { $0.type == .goal }
-            .sorted(by: memorySort)
-            .prefix(2)
-            .map(\.headline)
+        let profileCore = orderedUnique(
+            orderedItems
+                .filter { $0.type == .identity || $0.type == .preference }
+                .prefix(2)
+                .map(\.headline)
+        )
 
-        let relevantMemories = records
-            .sorted { score($0, mode: mode, queryTags: queryTags, now: now) > score($1, mode: mode, queryTags: queryTags, now: now) }
-            .filter { !profileCore.contains($0.headline) && !activeGoals.contains($0.headline) }
-            .prefix(3)
-            .map(\.headline)
+        let activeGoals = orderedUnique(
+            orderedItems
+                .filter { $0.type == .goal }
+                .prefix(2)
+                .map(\.headline)
+        )
+
+        let relevantMemories = orderedUnique(
+            orderedItems
+                .filter { !profileCore.contains($0.headline) && !activeGoals.contains($0.headline) }
+                .prefix(3)
+                .map(\.headline)
+        )
 
         let sessionBiases = buildSessionBiases(
             mode: mode,
             queryTags: queryTags,
-            records: records,
+            records: resolvedRecords,
             profileCore: profileCore,
             relevantMemories: relevantMemories,
             now: now
@@ -118,14 +191,37 @@ enum DecisionMemorySystem {
         )
     }
 
-    private static func fetchMemoryRecords(in context: ModelContext) -> [DecisionMemoryRecord] {
+    static func fetchMemoryRecords(in context: ModelContext) -> [DecisionMemoryRecord] {
         (try? context.fetch(FetchDescriptor<DecisionMemoryRecord>())) ?? []
+    }
+
+    static func fetchCandidateRecords(in context: ModelContext) -> [DecisionMemoryCandidateRecord] {
+        (try? context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())) ?? []
+    }
+
+    private static func buildBrainItems(
+        records: [DecisionMemoryRecord],
+        candidates: [DecisionMemoryCandidateRecord]
+    ) -> [BrainMemoryItem] {
+        let pendingCandidates = candidates
+            .filter { $0.status == .pending }
+            .map(BrainMemoryItem.init(candidate:))
+        let activeRecords = records.map(BrainMemoryItem.init(record:))
+
+        var byID: [String: BrainMemoryItem] = [:]
+        for item in activeRecords + pendingCandidates {
+            if let existing = byID[item.id], memorySort(existing, item) {
+                continue
+            }
+            byID[item.id] = item
+        }
+        return Array(byID.values)
     }
 
     private static func deriveMemoryDrafts(
         in context: ModelContext,
         now: Date
-    ) -> [MemoryDraft] {
+    ) -> [DecisionMemoryDraft] {
         let checkEvents = (try? context.fetch(
             FetchDescriptor<CheckEvent>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
         )) ?? []
@@ -139,14 +235,14 @@ enum DecisionMemorySystem {
             FetchDescriptor<SelfReminder>(sortBy: [SortDescriptor(\.lastUsedAt, order: .reverse)])
         )) ?? []
 
-        var drafts: [MemoryDraft] = []
+        var drafts: [DecisionMemoryDraft] = []
         drafts += preferenceDrafts(reminders: reminders, checkEvents: checkEvents, now: now)
         drafts += goalDrafts(balanceRecords: balanceRecords, mirrorRecords: mirrorRecords)
         drafts += situationalDrafts(checkEvents: checkEvents, balanceRecords: balanceRecords, mirrorRecords: mirrorRecords)
         drafts += semanticDrafts(checkEvents: checkEvents, now: now)
         drafts += supportDrafts(checkEvents: checkEvents)
 
-        var unique: [String: MemoryDraft] = [:]
+        var unique: [String: DecisionMemoryDraft] = [:]
         for draft in drafts {
             if let existing = unique[draft.id], memorySort(existing, draft) {
                 continue
@@ -161,8 +257,8 @@ enum DecisionMemorySystem {
         reminders: [SelfReminder],
         checkEvents: [CheckEvent],
         now: Date
-    ) -> [MemoryDraft] {
-        var drafts: [MemoryDraft] = []
+    ) -> [DecisionMemoryDraft] {
+        var drafts: [DecisionMemoryDraft] = []
         let reminderLengths = reminders.map { $0.content.count }
         let noteLengths = checkEvents
             .map(\.note)
@@ -175,7 +271,7 @@ enum DecisionMemorySystem {
             let averageLength = Double(allLengths.reduce(0, +)) / Double(allLengths.count)
             if averageLength <= 96 {
                 drafts.append(
-                    MemoryDraft(
+                    DecisionMemoryDraft(
                         id: "preference.communication.concise",
                         type: .preference,
                         topic: "communication_style",
@@ -190,7 +286,9 @@ enum DecisionMemorySystem {
                         ),
                         decayPolicy: .slow,
                         retrievalTags: ["style", "communication", "concise", "direct"],
-                        evidenceCount: allLengths.count
+                        evidenceCount: allLengths.count,
+                        provenanceSummary: "Derived from repeated short reminders and recent quick-check note length.",
+                        promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
                     )
                 )
             }
@@ -202,7 +300,7 @@ enum DecisionMemorySystem {
     private static func goalDrafts(
         balanceRecords: [BalanceDecisionRecord],
         mirrorRecords: [MirrorDecisionRecord]
-    ) -> [MemoryDraft] {
+    ) -> [DecisionMemoryDraft] {
         let balanceGoals = balanceRecords.compactMap { record -> (String, Date)? in
             let value = normalized(record.longTerm)
             return value.isEmpty ? nil : (value, record.updatedAt)
@@ -227,7 +325,7 @@ enum DecisionMemorySystem {
                 let lastConfirmedAt = items.map(\.1).max() ?? .now
                 let headline = clipped(goal, limit: 120)
 
-                return MemoryDraft(
+                return DecisionMemoryDraft(
                     id: "goal.\(slug(goal))",
                     type: .goal,
                     topic: "active_goal_\(index + 1)",
@@ -239,7 +337,9 @@ enum DecisionMemorySystem {
                     lastConfirmedAt: lastConfirmedAt,
                     decayPolicy: .medium,
                     retrievalTags: tags(from: goal) + ["goal", "long_term"],
-                    evidenceCount: items.count
+                    evidenceCount: items.count,
+                    provenanceSummary: "Promoted from repeated long-term fields in balance and mirror workspaces.",
+                    promotionPolicy: .immediate
                 )
             }
     }
@@ -248,8 +348,8 @@ enum DecisionMemorySystem {
         checkEvents: [CheckEvent],
         balanceRecords: [BalanceDecisionRecord],
         mirrorRecords: [MirrorDecisionRecord]
-    ) -> [MemoryDraft] {
-        var drafts: [MemoryDraft] = []
+    ) -> [DecisionMemoryDraft] {
+        var drafts: [DecisionMemoryDraft] = []
 
         if let event = checkEvents.first {
             let note = normalized(event.note)
@@ -258,7 +358,7 @@ enum DecisionMemorySystem {
                 : "Recently carrying: \(clipped(note, limit: 96))"
 
             drafts.append(
-                MemoryDraft(
+                DecisionMemoryDraft(
                     id: "situational.quick.latest",
                     type: .situational,
                     topic: "recent_quick_loop",
@@ -270,7 +370,9 @@ enum DecisionMemorySystem {
                     lastConfirmedAt: event.createdAt,
                     decayPolicy: .fast,
                     retrievalTags: [event.scenario.rawValue, "quick", "recent"] + tags(from: note),
-                    evidenceCount: 1
+                    evidenceCount: 1,
+                    provenanceSummary: "Candidate memory staged from the latest quick-check loop.",
+                    promotionPolicy: .candidateOnly
                 )
             )
         }
@@ -279,7 +381,7 @@ enum DecisionMemorySystem {
             let prompt = normalized(record.prompt)
             if !prompt.isEmpty {
                 drafts.append(
-                    MemoryDraft(
+                    DecisionMemoryDraft(
                         id: "situational.balance.latest",
                         type: .situational,
                         topic: "recent_balance_board",
@@ -291,7 +393,9 @@ enum DecisionMemorySystem {
                         lastConfirmedAt: record.updatedAt,
                         decayPolicy: .fast,
                         retrievalTags: ["balance", "recent"] + tags(from: prompt),
-                        evidenceCount: 1
+                        evidenceCount: 1,
+                        provenanceSummary: "Candidate memory staged from the latest balance board.",
+                        promotionPolicy: .candidateOnly
                     )
                 )
             }
@@ -301,7 +405,7 @@ enum DecisionMemorySystem {
             let prompt = normalized(record.prompt)
             if !prompt.isEmpty {
                 drafts.append(
-                    MemoryDraft(
+                    DecisionMemoryDraft(
                         id: "situational.mirror.latest",
                         type: .situational,
                         topic: "recent_mirror_question",
@@ -313,7 +417,9 @@ enum DecisionMemorySystem {
                         lastConfirmedAt: record.updatedAt,
                         decayPolicy: .fast,
                         retrievalTags: ["mirror", "recent"] + tags(from: prompt),
-                        evidenceCount: 1
+                        evidenceCount: 1,
+                        provenanceSummary: "Candidate memory staged from the latest mirror workspace.",
+                        promotionPolicy: .candidateOnly
                     )
                 )
             }
@@ -325,14 +431,14 @@ enum DecisionMemorySystem {
     private static func semanticDrafts(
         checkEvents: [CheckEvent],
         now: Date
-    ) -> [MemoryDraft] {
-        var drafts: [MemoryDraft] = []
+    ) -> [DecisionMemoryDraft] {
+        var drafts: [DecisionMemoryDraft] = []
         let scenarioGroups = Dictionary(grouping: checkEvents, by: \.scenario)
         if let dominantScenario = scenarioGroups
             .filter({ $0.value.count >= 2 })
             .max(by: { $0.value.count < $1.value.count }) {
             drafts.append(
-                MemoryDraft(
+                DecisionMemoryDraft(
                     id: "semantic.scenario.\(dominantScenario.key.rawValue)",
                     type: .semantic,
                     topic: "repeat_scenario",
@@ -344,7 +450,9 @@ enum DecisionMemorySystem {
                     lastConfirmedAt: dominantScenario.value.map(\.createdAt).max() ?? now,
                     decayPolicy: .slow,
                     retrievalTags: [dominantScenario.key.rawValue, "pattern", "repeat"],
-                    evidenceCount: dominantScenario.value.count
+                    evidenceCount: dominantScenario.value.count,
+                    provenanceSummary: "Derived from repeated quick-check events in the same scenario.",
+                    promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 2)
                 )
             )
         }
@@ -355,7 +463,7 @@ enum DecisionMemorySystem {
         }
         if lateNightEvents.count >= 3, lateNightEvents.count * 2 >= checkEvents.count {
             drafts.append(
-                MemoryDraft(
+                DecisionMemoryDraft(
                     id: "semantic.pattern.late_night",
                     type: .semantic,
                     topic: "late_night_regulation",
@@ -367,7 +475,9 @@ enum DecisionMemorySystem {
                     lastConfirmedAt: lateNightEvents.map(\.createdAt).max() ?? now,
                     decayPolicy: .slow,
                     retrievalTags: ["night", "late", "fatigue", "support"],
-                    evidenceCount: lateNightEvents.count
+                    evidenceCount: lateNightEvents.count,
+                    provenanceSummary: "Derived from repeated late-night quick-check history.",
+                    promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
                 )
             )
         }
@@ -375,7 +485,7 @@ enum DecisionMemorySystem {
         return drafts
     }
 
-    private static func supportDrafts(checkEvents: [CheckEvent]) -> [MemoryDraft] {
+    private static func supportDrafts(checkEvents: [CheckEvent]) -> [DecisionMemoryDraft] {
         let actionGroups = Dictionary(grouping: checkEvents, by: \.finalAction)
 
         return actionGroups
@@ -406,7 +516,7 @@ enum DecisionMemorySystem {
                     )
                 }
 
-                return MemoryDraft(
+                return DecisionMemoryDraft(
                     id: "support.action.\(action.rawValue)",
                     type: .support,
                     topic: "action_support",
@@ -418,7 +528,9 @@ enum DecisionMemorySystem {
                     lastConfirmedAt: events.map(\.createdAt).max() ?? .now,
                     decayPolicy: .medium,
                     retrievalTags: tags + ["quick", action.rawValue],
-                    evidenceCount: events.count
+                    evidenceCount: events.count,
+                    provenanceSummary: "Derived from repeated successful quick-check final actions.",
+                    promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 2)
                 )
             }
     }
@@ -489,7 +601,7 @@ enum DecisionMemorySystem {
     }
 
     private static func score(
-        _ memory: DecisionMemoryRecord,
+        _ memory: BrainMemoryItem,
         mode: DecisionMode,
         queryTags: Set<String>,
         now: Date
@@ -524,18 +636,24 @@ enum DecisionMemorySystem {
             max(0.45, 1.0 - (ageInDays / 45))
         }
 
-        return ((memory.priority * 5) + (memory.confidence * 3) + overlap + typeBoost) * decayMultiplier
+        let pendingPenalty = memory.isPending ? 0.88 : 1.0
+        return ((memory.priority * 5) + (memory.confidence * 3) + overlap + typeBoost) *
+            decayMultiplier *
+            pendingPenalty
     }
 
-    private static func memorySort(_ lhs: DecisionMemoryRecord, _ rhs: DecisionMemoryRecord) -> Bool {
+    private static func memorySort(_ lhs: DecisionMemoryDraft, _ rhs: DecisionMemoryDraft) -> Bool {
         if lhs.priority == rhs.priority {
             return lhs.lastConfirmedAt > rhs.lastConfirmedAt
         }
         return lhs.priority > rhs.priority
     }
 
-    private static func memorySort(_ lhs: MemoryDraft, _ rhs: MemoryDraft) -> Bool {
+    private static func memorySort(_ lhs: BrainMemoryItem, _ rhs: BrainMemoryItem) -> Bool {
         if lhs.priority == rhs.priority {
+            if lhs.isPending != rhs.isPending {
+                return !lhs.isPending
+            }
             return lhs.lastConfirmedAt > rhs.lastConfirmedAt
         }
         return lhs.priority > rhs.priority

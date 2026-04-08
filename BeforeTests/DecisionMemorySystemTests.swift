@@ -19,6 +19,47 @@ final class DecisionMemorySystemTests: XCTestCase {
     }
 
     @MainActor
+    func testRefreshStoredMemoriesStagesSituationalCandidatesWithoutPromotingThem() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        seedHistory(into: context)
+
+        _ = DecisionMemorySystem.refreshStoredMemories(in: context)
+        let candidates = try context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())
+
+        let quickCandidate = try XCTUnwrap(candidates.first(where: { $0.id == "situational.quick.latest" }))
+        XCTAssertEqual(quickCandidate.status, .pending)
+        XCTAssertEqual(quickCandidate.lastWriteOperation, .noop)
+        XCTAssertFalse(
+            DecisionMemorySystem.fetchMemoryRecords(in: context)
+                .contains(where: { $0.id == "situational.quick.latest" })
+        )
+    }
+
+    @MainActor
+    func testRefreshStoredMemoriesUsesExplicitMemoryWriteOperations() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        seedHistory(into: context)
+
+        _ = DecisionMemorySystem.refreshStoredMemories(in: context)
+        var candidates = try context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())
+
+        let supportCandidate = try XCTUnwrap(candidates.first(where: { $0.id == "support.action.decideTomorrow" }))
+        XCTAssertEqual(supportCandidate.status, .promoted)
+        XCTAssertEqual(supportCandidate.lastWriteOperation, .add)
+
+        _ = DecisionMemorySystem.refreshStoredMemories(in: context)
+        candidates = try context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())
+
+        let unchangedSupportCandidate = try XCTUnwrap(candidates.first(where: { $0.id == "support.action.decideTomorrow" }))
+        XCTAssertEqual(unchangedSupportCandidate.lastWriteOperation, .noop)
+        XCTAssertEqual(unchangedSupportCandidate.confirmationCount, 1)
+    }
+
+    @MainActor
     func testLoadBrainStateReconstructsProfileGoalsAndRelevantMemories() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -54,6 +95,7 @@ final class DecisionMemorySystemTests: XCTestCase {
             BalanceDecisionRecord.self,
             MirrorDecisionRecord.self,
             DecisionMemoryRecord.self,
+            DecisionMemoryCandidateRecord.self,
             configurations: configuration
         )
     }

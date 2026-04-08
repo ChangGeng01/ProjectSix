@@ -593,6 +593,7 @@ final class BeforeAppModel: ObservableObject {
         deleteAll(BalanceDecisionRecord.self, in: context)
         deleteAll(MirrorDecisionRecord.self, in: context)
         deleteAll(DecisionMemoryRecord.self, in: context)
+        deleteAll(DecisionMemoryCandidateRecord.self, in: context)
 
         resetTransientState()
         refreshWidgetSurfaces()
@@ -623,6 +624,7 @@ final class BeforeAppModel: ObservableObject {
         deleteAll(MirrorDecisionRecord.self, in: context)
         deleteAll(SelfReminder.self, in: context)
         deleteAll(DecisionMemoryRecord.self, in: context)
+        deleteAll(DecisionMemoryCandidateRecord.self, in: context)
         clearTomorrowBox()
         supportInbox.clearAll()
         sharedLifeStore.clearAll()
@@ -935,6 +937,7 @@ final class BeforeAppModel: ObservableObject {
             deleteAll(MirrorDecisionRecord.self, in: context)
             deleteAll(SelfReminder.self, in: context)
             deleteAll(DecisionMemoryRecord.self, in: context)
+            deleteAll(DecisionMemoryCandidateRecord.self, in: context)
             deleteAll(TomorrowBoxItem.self, in: context)
 
             supportInbox.clearAll()

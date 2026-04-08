@@ -13,6 +13,7 @@ struct PersistenceBootstrap {
                 BalanceDecisionRecord.self,
                 MirrorDecisionRecord.self,
                 DecisionMemoryRecord.self,
+                DecisionMemoryCandidateRecord.self,
                 TomorrowBoxItem.self
             )
             return PersistenceBootstrap(container: container, recoveryMessage: nil)
@@ -25,6 +26,7 @@ struct PersistenceBootstrap {
                 BalanceDecisionRecord.self,
                 MirrorDecisionRecord.self,
                 DecisionMemoryRecord.self,
+                DecisionMemoryCandidateRecord.self,
                 TomorrowBoxItem.self,
                 configurations: fallbackConfiguration
             ) else {
