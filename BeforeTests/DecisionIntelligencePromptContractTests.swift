@@ -155,4 +155,39 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertFalse(envelope.prompt.payload.contains("This fourth option should be clipped away."))
         XCTAssertTrue(envelope.prompt.budget.isWithinTarget)
     }
+
+    func testCacheFingerprintUsesRuntimePromptInsteadOfDebugPrompt() {
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let base = QuickCheckResult(
+            currentPerspective: "You want a quick release.",
+            afterPerspective: "It may feel noisier tomorrow.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(base: base, input: input)
+        let semanticFingerprint = DecisionIntelligencePromptContract.cacheFingerprint(
+            provider: .gemmaE4B,
+            envelope: envelope
+        )
+        let runtimeFingerprint = DecisionIntelligencePromptContract.cacheFingerprint(
+            provider: .gemmaE4B,
+            semanticPrompt: envelope.runtimePrompt
+        )
+        let debugFingerprint = DecisionIntelligencePromptContract.cacheFingerprint(
+            provider: .gemmaE4B,
+            semanticPrompt: envelope.debugPrompt
+        )
+
+        XCTAssertEqual(semanticFingerprint, runtimeFingerprint)
+        XCTAssertNotEqual(semanticFingerprint, debugFingerprint)
+        XCTAssertEqual(semanticFingerprint.count, 64)
+    }
 }

@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 enum DecisionIntelligencePromptContract {
@@ -388,6 +389,22 @@ enum DecisionIntelligencePromptContract {
         )
         .prompt
         .debugPrompt
+    }
+
+    static func cacheFingerprint(
+        provider: DecisionModelProviderKind,
+        envelope: PromptEnvelope
+    ) -> String {
+        cacheFingerprint(provider: provider, semanticPrompt: envelope.runtimePrompt)
+    }
+
+    static func cacheFingerprint(
+        provider: DecisionModelProviderKind,
+        semanticPrompt: String
+    ) -> String {
+        let seed = "\(provider.rawValue)\n\(semanticPrompt)"
+        let digest = SHA256.hash(data: Data(seed.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     private static func makeEnvelope(

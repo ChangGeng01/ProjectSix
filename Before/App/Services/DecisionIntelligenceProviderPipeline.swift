@@ -309,7 +309,10 @@ enum DecisionIntelligenceProviderPipeline {
 
         for provider in providers {
             actualAttemptedKinds.append(provider.kind)
-            let cacheKey = cacheKey(provider: provider.kind, prompt: envelope.debugPrompt)
+            let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+                provider: provider.kind,
+                envelope: envelope
+            )
             if let cached = await responseCache.quickResult(for: cacheKey) {
                 await recordTelemetry(
                     kind: .quick,
@@ -487,7 +490,10 @@ enum DecisionIntelligenceProviderPipeline {
 
         for provider in providers {
             actualAttemptedKinds.append(provider.kind)
-            let cacheKey = cacheKey(provider: provider.kind, prompt: envelope.debugPrompt)
+            let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+                provider: provider.kind,
+                envelope: envelope
+            )
             if let cached = await responseCache.balanceResult(for: cacheKey) {
                 await recordTelemetry(
                     kind: .balance,
@@ -665,7 +671,10 @@ enum DecisionIntelligenceProviderPipeline {
 
         for provider in providers {
             actualAttemptedKinds.append(provider.kind)
-            let cacheKey = cacheKey(provider: provider.kind, prompt: envelope.debugPrompt)
+            let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+                provider: provider.kind,
+                envelope: envelope
+            )
             if let cached = await responseCache.mirrorResult(for: cacheKey) {
                 await recordTelemetry(
                     kind: .mirror,
@@ -831,7 +840,10 @@ enum DecisionIntelligenceProviderPipeline {
 
         for provider in providers {
             actualAttemptedKinds.append(provider.kind)
-            let cacheKey = cacheKey(provider: provider.kind, prompt: selection.prompt.debugPrompt)
+            let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+                provider: provider.kind,
+                envelope: selection.prompt
+            )
             if let cached = await responseCache.reminder(for: cacheKey),
                clippedCandidates.contains(where: { $0.id == cached.id }) {
                 await recordTelemetry(
@@ -1006,10 +1018,6 @@ enum DecisionIntelligenceProviderPipeline {
     ) -> String {
         detail(preferred: preferred, active: active, allowFallbacks: allowFallbacks)
             + " Before served the response from the structured prompt cache instead of recomputing it."
-    }
-
-    private static func cacheKey(provider: DecisionModelProviderKind, prompt: String) -> String {
-        "\(provider.rawValue)\n\(prompt)"
     }
 
     private static func quickPreview(from result: QuickCheckResult) -> String {
