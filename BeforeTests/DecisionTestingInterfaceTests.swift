@@ -199,6 +199,7 @@ struct DecisionTestingInterfaceTests {
     @Test
     func resetTransientIntelligenceStateClearsTraceAndResponseCache() async {
         let store = DecisionIntelligenceDebugStore()
+        let telemetryStore = DecisionIntelligenceTelemetryStore()
         store.record(
             DecisionIntelligenceTrace(
                 kind: .quick,
@@ -217,11 +218,60 @@ struct DecisionTestingInterfaceTests {
             ReminderSelectionCandidate(id: UUID(), content: "Reminder"),
             for: "cache-key"
         )
+        await telemetryStore.record(
+            kind: .quick,
+            outcome: .providerSuccess,
+            activeProvider: .foundationModels,
+            attemptedProviders: [.foundationModels],
+            usedFallback: false
+        )
 
-        await DecisionTestingInterface.resetTransientIntelligenceState(store: store)
+        await DecisionTestingInterface.resetTransientIntelligenceState(
+            store: store,
+            telemetryStore: telemetryStore
+        )
 
         #expect(store.traces.isEmpty)
+        #expect(await telemetryStore.snapshot().totalRequests == 0)
         let cached = await DecisionIntelligenceResponseCache.shared.reminder(for: "cache-key")
         #expect(cached == nil)
+    }
+
+    @Test
+    func telemetrySnapshotsExposePipelineAndCacheState() async {
+        let telemetryStore = DecisionIntelligenceTelemetryStore()
+        await telemetryStore.record(
+            kind: .balance,
+            outcome: .providerSuccess,
+            activeProvider: .gemmaE4B,
+            attemptedProviders: [.gemmaE4B],
+            usedFallback: false,
+            gemmaBackendResolution: InferenceBackendResolver.resolve(
+                policy: .cpuOnly,
+                device: DeviceCapabilitySnapshot(
+                    isSimulator: true,
+                    supportsMetal: true,
+                    supportsCoreMLAcceleration: false
+                )
+            )
+        )
+
+        let cache = DecisionIntelligenceResponseCache(limit: 2)
+        await cache.storeReminder(
+            ReminderSelectionCandidate(id: UUID(), content: "Reminder"),
+            for: "cache-key"
+        )
+        _ = await cache.reminder(for: "cache-key")
+
+        let telemetrySnapshot = await DecisionTestingInterface.intelligenceTelemetrySnapshot(
+            store: telemetryStore
+        )
+        let cacheSnapshot = await DecisionTestingInterface.cacheTelemetrySnapshot(cache: cache)
+
+        #expect(telemetrySnapshot.totalRequests == 1)
+        #expect(telemetrySnapshot.activeProviderCount[.gemmaE4B] == 1)
+        #expect(telemetrySnapshot.gemmaBackendCount[.cpu] == 1)
+        #expect(cacheSnapshot.hitCountByKind[.reminder] == 1)
+        #expect(cacheSnapshot.storeCountByKind[.reminder] == 1)
     }
 }

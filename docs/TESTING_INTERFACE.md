@@ -7,6 +7,7 @@ Use `DecisionTestingInterface` when tests, automation, or developer tooling need
 - switch the active model provider
 - pin deterministic behavior
 - disable provider fallbacks
+- inspect runtime telemetry for provider usage, fallbacks, and cache behavior
 - inspect recent model traces
 - build replay data from recent saved decisions
 
@@ -83,11 +84,14 @@ This snapshot includes:
 
 These helpers stay available for tests and tooling, but are not surfaced in the app UI:
 
+- `DecisionTestingInterface.intelligenceTelemetrySnapshot(...)`
+- `DecisionTestingInterface.cacheTelemetrySnapshot(...)`
 - `DecisionTestingInterface.recentTraces(...)`
 - `DecisionTestingInterface.clearTraces(...)`
 - `DecisionTestingInterface.recentReplay(...)`
+- `DecisionTestingInterface.resetTransientIntelligenceState(...)`
 
-Trace and replay access is `@MainActor`, matching the debug store’s threading model.
+Trace and replay access is `@MainActor`, matching the debug store’s threading model. Telemetry and cache snapshots are async because they read actor-backed stores.
 
 ## Design Rules
 

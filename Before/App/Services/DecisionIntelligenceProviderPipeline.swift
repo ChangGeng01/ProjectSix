@@ -234,6 +234,13 @@ enum DecisionIntelligenceProviderPipeline {
     ) async -> QuickCheckResult? {
         let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(base: base, input: input)
         guard preference != .template else {
+            await recordTelemetry(
+                kind: .quick,
+                outcome: .templatePinned,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: []
+            )
             recordTrace(
                 kind: .quick,
                 preferredProvider: preference.kind,
@@ -253,10 +260,19 @@ enum DecisionIntelligenceProviderPipeline {
             testingStubProfile: testingStubProfile
         )
         let attemptedKinds = providers.map(\.kind)
+        var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
         for provider in providers {
+            actualAttemptedKinds.append(provider.kind)
             let cacheKey = cacheKey(provider: provider.kind, prompt: envelope.debugPrompt)
             if let cached = await responseCache.quickResult(for: cacheKey) {
+                await recordTelemetry(
+                    kind: .quick,
+                    outcome: .cacheHit,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: actualAttemptedKinds
+                )
                 recordTrace(
                     kind: .quick,
                     preferredProvider: preference.kind,
@@ -276,6 +292,13 @@ enum DecisionIntelligenceProviderPipeline {
 
             if let refined = await provider.refineQuickResult(base: base, input: input) {
                 await responseCache.storeQuickResult(refined, for: cacheKey)
+                await recordTelemetry(
+                    kind: .quick,
+                    outcome: .providerSuccess,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: actualAttemptedKinds
+                )
                 recordTrace(
                     kind: .quick,
                     preferredProvider: preference.kind,
@@ -294,6 +317,13 @@ enum DecisionIntelligenceProviderPipeline {
             }
         }
 
+        await recordTelemetry(
+            kind: .quick,
+            outcome: .deterministicFallback,
+            preferredProvider: preference.kind,
+            activeProvider: nil,
+            attemptedProviders: actualAttemptedKinds
+        )
         recordTrace(
             kind: .quick,
             preferredProvider: preference.kind,
@@ -316,6 +346,13 @@ enum DecisionIntelligenceProviderPipeline {
     ) async -> BalanceBoardResult? {
         let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(base: base, input: input)
         guard preference != .template else {
+            await recordTelemetry(
+                kind: .balance,
+                outcome: .templatePinned,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: []
+            )
             recordTrace(
                 kind: .balance,
                 preferredProvider: preference.kind,
@@ -335,10 +372,19 @@ enum DecisionIntelligenceProviderPipeline {
             testingStubProfile: testingStubProfile
         )
         let attemptedKinds = providers.map(\.kind)
+        var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
         for provider in providers {
+            actualAttemptedKinds.append(provider.kind)
             let cacheKey = cacheKey(provider: provider.kind, prompt: envelope.debugPrompt)
             if let cached = await responseCache.balanceResult(for: cacheKey) {
+                await recordTelemetry(
+                    kind: .balance,
+                    outcome: .cacheHit,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: actualAttemptedKinds
+                )
                 recordTrace(
                     kind: .balance,
                     preferredProvider: preference.kind,
@@ -358,6 +404,13 @@ enum DecisionIntelligenceProviderPipeline {
 
             if let refined = await provider.refineBalanceResult(base: base, input: input) {
                 await responseCache.storeBalanceResult(refined, for: cacheKey)
+                await recordTelemetry(
+                    kind: .balance,
+                    outcome: .providerSuccess,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: actualAttemptedKinds
+                )
                 recordTrace(
                     kind: .balance,
                     preferredProvider: preference.kind,
@@ -376,6 +429,13 @@ enum DecisionIntelligenceProviderPipeline {
             }
         }
 
+        await recordTelemetry(
+            kind: .balance,
+            outcome: .deterministicFallback,
+            preferredProvider: preference.kind,
+            activeProvider: nil,
+            attemptedProviders: actualAttemptedKinds
+        )
         recordTrace(
             kind: .balance,
             preferredProvider: preference.kind,
@@ -398,6 +458,13 @@ enum DecisionIntelligenceProviderPipeline {
     ) async -> MirrorResult? {
         let envelope = DecisionIntelligencePromptContract.mirrorRefinementEnvelope(base: base, input: input)
         guard preference != .template else {
+            await recordTelemetry(
+                kind: .mirror,
+                outcome: .templatePinned,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: []
+            )
             recordTrace(
                 kind: .mirror,
                 preferredProvider: preference.kind,
@@ -417,10 +484,19 @@ enum DecisionIntelligenceProviderPipeline {
             testingStubProfile: testingStubProfile
         )
         let attemptedKinds = providers.map(\.kind)
+        var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
         for provider in providers {
+            actualAttemptedKinds.append(provider.kind)
             let cacheKey = cacheKey(provider: provider.kind, prompt: envelope.debugPrompt)
             if let cached = await responseCache.mirrorResult(for: cacheKey) {
+                await recordTelemetry(
+                    kind: .mirror,
+                    outcome: .cacheHit,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: actualAttemptedKinds
+                )
                 recordTrace(
                     kind: .mirror,
                     preferredProvider: preference.kind,
@@ -440,6 +516,13 @@ enum DecisionIntelligenceProviderPipeline {
 
             if let refined = await provider.refineMirrorResult(base: base, input: input) {
                 await responseCache.storeMirrorResult(refined, for: cacheKey)
+                await recordTelemetry(
+                    kind: .mirror,
+                    outcome: .providerSuccess,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: actualAttemptedKinds
+                )
                 recordTrace(
                     kind: .mirror,
                     preferredProvider: preference.kind,
@@ -458,6 +541,13 @@ enum DecisionIntelligenceProviderPipeline {
             }
         }
 
+        await recordTelemetry(
+            kind: .mirror,
+            outcome: .deterministicFallback,
+            preferredProvider: preference.kind,
+            activeProvider: nil,
+            attemptedProviders: actualAttemptedKinds
+        )
         recordTrace(
             kind: .mirror,
             preferredProvider: preference.kind,
@@ -487,18 +577,37 @@ enum DecisionIntelligenceProviderPipeline {
             mode: mode
         )
         let clippedCandidates = selection.candidates
-        guard !clippedCandidates.isEmpty, preference != .template else { return nil }
+        guard !clippedCandidates.isEmpty else { return nil }
+        guard preference != .template else {
+            await recordTelemetry(
+                kind: .reminder,
+                outcome: .templatePinned,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: []
+            )
+            return nil
+        }
         let providers = orderedProviders(
             for: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
         )
         let attemptedKinds = providers.map(\.kind)
+        var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
         for provider in providers {
+            actualAttemptedKinds.append(provider.kind)
             let cacheKey = cacheKey(provider: provider.kind, prompt: selection.prompt.debugPrompt)
             if let cached = await responseCache.reminder(for: cacheKey),
                clippedCandidates.contains(where: { $0.id == cached.id }) {
+                await recordTelemetry(
+                    kind: .reminder,
+                    outcome: .cacheHit,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: actualAttemptedKinds
+                )
                 recordTrace(
                     kind: .reminder,
                     preferredProvider: preference.kind,
@@ -523,6 +632,13 @@ enum DecisionIntelligenceProviderPipeline {
                 mode: mode
             ) {
                 await responseCache.storeReminder(selected, for: cacheKey)
+                await recordTelemetry(
+                    kind: .reminder,
+                    outcome: .providerSuccess,
+                    preferredProvider: preference.kind,
+                    activeProvider: provider.kind,
+                    attemptedProviders: actualAttemptedKinds
+                )
                 recordTrace(
                     kind: .reminder,
                     preferredProvider: preference.kind,
@@ -541,6 +657,13 @@ enum DecisionIntelligenceProviderPipeline {
             }
         }
 
+        await recordTelemetry(
+            kind: .reminder,
+            outcome: .deterministicFallback,
+            preferredProvider: preference.kind,
+            activeProvider: nil,
+            attemptedProviders: actualAttemptedKinds
+        )
         recordTrace(
             kind: .reminder,
             preferredProvider: preference.kind,
@@ -647,5 +770,26 @@ enum DecisionIntelligenceProviderPipeline {
 
     private static func reminderPreview(from candidate: ReminderSelectionCandidate) -> String {
         candidate.content
+    }
+
+    private static func recordTelemetry(
+        kind: DecisionIntelligenceTraceKind,
+        outcome: DecisionIntelligenceRequestOutcome,
+        preferredProvider: DecisionModelProviderKind,
+        activeProvider: DecisionModelProviderKind?,
+        attemptedProviders: [DecisionModelProviderKind]
+    ) async {
+        await DecisionIntelligenceTelemetryStore.shared.record(
+            kind: kind,
+            outcome: outcome,
+            activeProvider: activeProvider,
+            attemptedProviders: attemptedProviders,
+            usedFallback: activeProvider != nil && activeProvider != preferredProvider,
+            gemmaBackendResolution: activeProvider == .gemmaE4B
+                ? GemmaE4BIntelligenceService.backendResolution(
+                    policy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
+                )
+                : nil
+        )
     }
 }

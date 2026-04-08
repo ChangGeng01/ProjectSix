@@ -60,4 +60,30 @@ final class DecisionIntelligenceResponseCacheTests: XCTestCase {
         let cleared = await cache.reminder(for: "reminder")
         XCTAssertNil(cleared)
     }
+
+    func testTelemetrySnapshotTracksHitsMissesAndStores() async {
+        let cache = DecisionIntelligenceResponseCache(limit: 2)
+
+        await cache.storeQuickResult(
+            QuickCheckResult(
+                currentPerspective: "One",
+                afterPerspective: "After one",
+                verdict: .pause,
+                primaryAction: .wait90s,
+                secondaryActions: []
+            ),
+            for: "one"
+        )
+
+        _ = await cache.quickResult(for: "one")
+        _ = await cache.quickResult(for: "missing")
+
+        let snapshot = await cache.telemetrySnapshot()
+
+        XCTAssertEqual(snapshot.entryCountByKind[.quick], 1)
+        XCTAssertEqual(snapshot.storeCountByKind[.quick], 1)
+        XCTAssertEqual(snapshot.hitCountByKind[.quick], 1)
+        XCTAssertEqual(snapshot.missCountByKind[.quick], 1)
+        XCTAssertEqual(snapshot.totalEvictions, 0)
+    }
 }

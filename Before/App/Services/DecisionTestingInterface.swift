@@ -214,9 +214,25 @@ enum DecisionTestingInterface {
         await DecisionIntelligenceResponseCache.shared.clear()
     }
 
+    static func intelligenceTelemetrySnapshot(
+        store: DecisionIntelligenceTelemetryStore = .shared
+    ) async -> DecisionIntelligenceTelemetrySnapshot {
+        await store.snapshot()
+    }
+
+    static func cacheTelemetrySnapshot(
+        cache: DecisionIntelligenceResponseCache = .shared
+    ) async -> DecisionIntelligenceCacheTelemetrySnapshot {
+        await cache.telemetrySnapshot()
+    }
+
     @MainActor
-    static func resetTransientIntelligenceState(store: DecisionIntelligenceDebugStore = .shared) async {
+    static func resetTransientIntelligenceState(
+        store: DecisionIntelligenceDebugStore = .shared,
+        telemetryStore: DecisionIntelligenceTelemetryStore = .shared
+    ) async {
         clearTraces(store: store)
+        await telemetryStore.clear()
         await clearResponseCache()
     }
 

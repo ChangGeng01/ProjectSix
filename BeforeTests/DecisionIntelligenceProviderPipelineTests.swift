@@ -6,6 +6,7 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         await DecisionIntelligenceResponseCache.shared.clear()
+        await DecisionIntelligenceTelemetryStore.shared.clear()
         DecisionIntelligenceDebugStore.shared.clear()
     }
 
@@ -242,5 +243,47 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
 
         XCTAssertEqual(latestTrace.kind, .quick)
         XCTAssertTrue(latestTrace.detail.contains("structured prompt cache"))
+    }
+
+    @MainActor
+    func testTelemetryCapturesProviderSuccessThenCacheHit() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+
+        _ = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+        _ = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+
+        XCTAssertEqual(snapshot.requestCountByKind[.quick], 2)
+        XCTAssertEqual(snapshot.outcomeCount[.providerSuccess], 1)
+        XCTAssertEqual(snapshot.outcomeCount[.cacheHit], 1)
+        XCTAssertEqual(snapshot.activeProviderCount[.testingStub], 2)
+        XCTAssertEqual(snapshot.attemptedProviderCount[.testingStub], 2)
+        XCTAssertEqual(snapshot.fallbackActivations, 2)
     }
 }
