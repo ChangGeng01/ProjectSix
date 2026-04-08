@@ -1,3 +1,4 @@
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -49,13 +50,12 @@ struct BeforeWidgetView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.7))
             Spacer()
-            Button(intent: OpenQuickCheckIntent(entrySource: .homeWidgetSmall)) {
-                Text("Worth it?")
-                    .font(.headline.weight(.bold))
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.white)
+            widgetIntentButton(
+                title: "Worth it?",
+                systemImage: "bolt.circle",
+                prominent: true,
+                intent: OpenDecisionModeIntent(mode: .quick, entrySource: .homeWidgetSmall)
+            )
         }
         .padding()
         .containerBackground(for: .widget) {
@@ -68,25 +68,40 @@ struct BeforeWidgetView: View {
     }
 
     private var medium: some View {
-        HStack(alignment: .top, spacing: 14) {
+        VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Before")
                     .font(.headline)
                     .foregroundStyle(.white)
+                if let verdict = entry.snapshot.latestVerdict {
+                    Text(verdict.title.uppercased())
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.0)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
                 Text(entry.snapshot.messageBody)
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.82))
-                    .lineLimit(4)
-                Spacer()
+                    .lineLimit(3)
             }
 
-            Button(intent: OpenQuickCheckIntent(entrySource: .homeWidgetMedium)) {
-                Text("Open")
-                    .font(.headline)
-                    .frame(maxHeight: .infinity)
+            HStack(spacing: 8) {
+                widgetIntentButton(
+                    title: "Quick",
+                    systemImage: DecisionMode.quick.symbolName,
+                    intent: OpenDecisionModeIntent(mode: .quick, entrySource: .homeWidgetMedium)
+                )
+                widgetIntentButton(
+                    title: "Balance",
+                    systemImage: DecisionMode.balance.symbolName,
+                    intent: OpenDecisionModeIntent(mode: .balance, entrySource: .homeWidgetMedium)
+                )
+                widgetIntentButton(
+                    title: "Mirror",
+                    systemImage: DecisionMode.mirror.symbolName,
+                    intent: OpenDecisionModeIntent(mode: .mirror, entrySource: .homeWidgetMedium)
+                )
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.white)
         }
         .padding()
         .containerBackground(for: .widget) {
@@ -99,7 +114,7 @@ struct BeforeWidgetView: View {
     }
 
     private var lockScreen: some View {
-        Button(intent: OpenQuickCheckIntent(entrySource: .lockScreenWidget)) {
+        Button(intent: OpenDecisionModeIntent(mode: .quick, entrySource: .lockScreenWidget)) {
             HStack {
                 Image(systemName: "pause.circle.fill")
                 Text("Open Before")
@@ -109,10 +124,32 @@ struct BeforeWidgetView: View {
     }
 
     private var circular: some View {
-        Button(intent: OpenQuickCheckIntent(entrySource: .lockScreenWidget)) {
+        Button(intent: OpenDecisionModeIntent(mode: .quick, entrySource: .lockScreenWidget)) {
             Image(systemName: "pause.circle.fill")
                 .font(.title3)
         }
+    }
+
+    private func widgetIntentButton<IntentType: AppIntent>(
+        title: String,
+        systemImage: String,
+        prominent: Bool = false,
+        intent: IntentType
+    ) -> some View {
+        Button(intent: intent) {
+            Label(title, systemImage: systemImage)
+                .font(prominent ? .headline.weight(.bold) : .caption.weight(.semibold))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, prominent ? 10 : 8)
+                .padding(.horizontal, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: prominent ? 16 : 14, style: .continuous)
+                        .fill(prominent ? .white : .white.opacity(0.18))
+                )
+                .foregroundStyle(prominent ? BeforeTheme.ink : .white)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -124,7 +161,7 @@ struct BeforeWidget: Widget {
             BeforeWidgetView(entry: entry)
         }
         .configurationDisplayName("Before")
-        .description("A one-tap buffer before acting on impulse.")
+        .description("Quick, balance, or mirror entry points for seeing a decision more clearly.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryCircular])
     }
 }
