@@ -202,6 +202,7 @@ enum DecisionIntelligenceCoordinator {
         input: QuickCheckInput,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil,
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> QuickCheckResult? {
         let profile = executionProfile(preferences: preferences)
@@ -212,6 +213,7 @@ enum DecisionIntelligenceCoordinator {
             input: input,
             contextState: contextState,
             neuralState: neuralState,
+            brainState: brainState,
             preference: profile.effectiveProviderPreference,
             allowFallbacks: profile.allowFallbacks
         )
@@ -222,6 +224,7 @@ enum DecisionIntelligenceCoordinator {
         input: BalanceBoardInput,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil,
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> BalanceBoardResult? {
         let profile = executionProfile(preferences: preferences)
@@ -232,6 +235,7 @@ enum DecisionIntelligenceCoordinator {
             input: input,
             contextState: contextState,
             neuralState: neuralState,
+            brainState: brainState,
             preference: profile.effectiveProviderPreference,
             allowFallbacks: profile.allowFallbacks
         )
@@ -242,6 +246,7 @@ enum DecisionIntelligenceCoordinator {
         input: MirrorInput,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil,
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> MirrorResult? {
         let profile = executionProfile(preferences: preferences)
@@ -252,6 +257,7 @@ enum DecisionIntelligenceCoordinator {
             input: input,
             contextState: contextState,
             neuralState: neuralState,
+            brainState: brainState,
             preference: profile.effectiveProviderPreference,
             allowFallbacks: profile.allowFallbacks
         )

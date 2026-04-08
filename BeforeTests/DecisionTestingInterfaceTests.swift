@@ -331,12 +331,14 @@ struct DecisionTestingInterfaceTests {
                 dangerSignals: ["Urgency", "Evidence filtered"],
                 evidenceHeadlines: ["Current perspective: Quick relief."],
                 anchorHeadlines: ["Quick note"],
+                memoryHeadlines: ["Short, direct language lands better."],
                 retainedEvidenceCount: 2,
                 droppedEvidenceCount: 1,
                 droppedInjectedEvidenceCount: 1,
                 droppedDuplicateEvidenceCount: 0,
                 droppedBudgetEvidenceCount: 0,
-                suppressionHints: ["long_explanation"]
+                suppressionHints: ["long_explanation"],
+                sessionBiases: ["Keep the language short and concrete."]
             ),
             contextState: DecisionContextPreparedState(
                 rebuiltSession: true,

@@ -47,11 +47,20 @@ enum FoundationModelsIntelligenceService {
 
     static func refineQuickResult(
         base: QuickCheckResult,
-        input: QuickCheckInput
+        input: QuickCheckInput,
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil
     ) async -> QuickCheckResult? {
 #if canImport(FoundationModels)
         guard #available(iOS 26.0, *), availabilityStatus.isAvailable else { return nil }
-        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(base: base, input: input)
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
 
         do {
             let session = LanguageModelSession(
@@ -89,11 +98,20 @@ enum FoundationModelsIntelligenceService {
 
     static func refineBalanceResult(
         base: BalanceBoardResult,
-        input: BalanceBoardInput
+        input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil
     ) async -> BalanceBoardResult? {
 #if canImport(FoundationModels)
         guard #available(iOS 26.0, *), availabilityStatus.isAvailable else { return nil }
-        let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(base: base, input: input)
+        let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
 
         do {
             let session = LanguageModelSession(
@@ -139,11 +157,20 @@ enum FoundationModelsIntelligenceService {
 
     static func refineMirrorResult(
         base: MirrorResult,
-        input: MirrorInput
+        input: MirrorInput,
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil
     ) async -> MirrorResult? {
 #if canImport(FoundationModels)
         guard #available(iOS 26.0, *), availabilityStatus.isAvailable else { return nil }
-        let envelope = DecisionIntelligencePromptContract.mirrorRefinementEnvelope(base: base, input: input)
+        let envelope = DecisionIntelligencePromptContract.mirrorRefinementEnvelope(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
 
         do {
             let session = LanguageModelSession(

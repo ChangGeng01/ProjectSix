@@ -89,34 +89,61 @@ enum GemmaE4BIntelligenceService {
     static func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil,
         backendPolicy: InferenceBackendPolicy = DecisionTestingInterface.effectiveInferenceBackendPolicy(),
         runtime: any GemmaLocalRuntimeBridging = GemmaLocalRuntimeBridge.shared
     ) async -> QuickCheckResult? {
         guard bundleStatus().isReady else { return nil }
         _ = backendResolution(policy: backendPolicy)
-        return await runtime.refineQuickResult(base: base, input: input)
+        return await runtime.refineQuickResult(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
     }
 
     static func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil,
         backendPolicy: InferenceBackendPolicy = DecisionTestingInterface.effectiveInferenceBackendPolicy(),
         runtime: any GemmaLocalRuntimeBridging = GemmaLocalRuntimeBridge.shared
     ) async -> BalanceBoardResult? {
         guard bundleStatus().isReady else { return nil }
         _ = backendResolution(policy: backendPolicy)
-        return await runtime.refineBalanceResult(base: base, input: input)
+        return await runtime.refineBalanceResult(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
     }
 
     static func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil,
         backendPolicy: InferenceBackendPolicy = DecisionTestingInterface.effectiveInferenceBackendPolicy(),
         runtime: any GemmaLocalRuntimeBridging = GemmaLocalRuntimeBridge.shared
     ) async -> MirrorResult? {
         guard bundleStatus().isReady else { return nil }
         _ = backendResolution(policy: backendPolicy)
-        return await runtime.refineMirrorResult(base: base, input: input)
+        return await runtime.refineMirrorResult(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
     }
 
     static func pickReminder(

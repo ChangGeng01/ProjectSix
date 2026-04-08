@@ -1,0 +1,595 @@
+import Foundation
+import SwiftData
+
+enum DecisionMemorySystem {
+    private struct MemoryDraft {
+        let id: String
+        let type: DecisionMemoryType
+        let topic: String
+        let headline: String
+        let value: String
+        let confidence: Double
+        let priority: Double
+        let source: DecisionMemorySource
+        let lastConfirmedAt: Date
+        let decayPolicy: DecisionMemoryDecayPolicy
+        let retrievalTags: [String]
+        let evidenceCount: Int
+
+        func makeRecord() -> DecisionMemoryRecord {
+            DecisionMemoryRecord(
+                id: id,
+                type: type,
+                topic: topic,
+                headline: headline,
+                value: value,
+                confidence: confidence,
+                priority: priority,
+                source: source,
+                lastConfirmedAt: lastConfirmedAt,
+                decayPolicy: decayPolicy,
+                retrievalTags: retrievalTags,
+                evidenceCount: evidenceCount
+            )
+        }
+    }
+
+    static func refreshStoredMemories(
+        in context: ModelContext,
+        now: Date = .now
+    ) -> [DecisionMemoryRecord] {
+        let drafts = deriveMemoryDrafts(in: context, now: now)
+            .sorted { lhs, rhs in
+                if lhs.priority == rhs.priority {
+                    return lhs.lastConfirmedAt > rhs.lastConfirmedAt
+                }
+                return lhs.priority > rhs.priority
+            }
+
+        let existing = (try? context.fetch(FetchDescriptor<DecisionMemoryRecord>())) ?? []
+        existing.forEach { context.delete($0) }
+
+        let records = drafts.map { draft in
+            let record = draft.makeRecord()
+            context.insert(record)
+            return record
+        }
+
+        try? context.save()
+        return records
+    }
+
+    static func loadBrainState(
+        mode: DecisionMode,
+        prompt: String,
+        context: ModelContext,
+        now: Date = .now
+    ) -> DecisionBrainState {
+        let records = fetchMemoryRecords(in: context).isEmpty
+            ? refreshStoredMemories(in: context, now: now)
+            : fetchMemoryRecords(in: context)
+
+        guard !records.isEmpty else {
+            return DecisionBrainState(
+                profileCore: [],
+                activeGoals: [],
+                relevantMemories: [],
+                sessionBiases: defaultSessionBiases(for: mode),
+                retrievalTags: Array(queryTags(for: mode, prompt: prompt)).sorted(),
+                loadedAt: now
+            )
+        }
+
+        let queryTags = queryTags(for: mode, prompt: prompt)
+        let profileCore = records
+            .filter { $0.type == .identity || $0.type == .preference }
+            .sorted(by: memorySort)
+            .prefix(2)
+            .map(\.headline)
+
+        let activeGoals = records
+            .filter { $0.type == .goal }
+            .sorted(by: memorySort)
+            .prefix(2)
+            .map(\.headline)
+
+        let relevantMemories = records
+            .sorted { score($0, mode: mode, queryTags: queryTags, now: now) > score($1, mode: mode, queryTags: queryTags, now: now) }
+            .filter { !profileCore.contains($0.headline) && !activeGoals.contains($0.headline) }
+            .prefix(3)
+            .map(\.headline)
+
+        let sessionBiases = buildSessionBiases(
+            mode: mode,
+            queryTags: queryTags,
+            records: records,
+            profileCore: profileCore,
+            relevantMemories: relevantMemories,
+            now: now
+        )
+
+        return DecisionBrainState(
+            profileCore: profileCore,
+            activeGoals: activeGoals,
+            relevantMemories: relevantMemories,
+            sessionBiases: sessionBiases,
+            retrievalTags: Array(queryTags).sorted(),
+            loadedAt: now
+        )
+    }
+
+    private static func fetchMemoryRecords(in context: ModelContext) -> [DecisionMemoryRecord] {
+        (try? context.fetch(FetchDescriptor<DecisionMemoryRecord>())) ?? []
+    }
+
+    private static func deriveMemoryDrafts(
+        in context: ModelContext,
+        now: Date
+    ) -> [MemoryDraft] {
+        let checkEvents = (try? context.fetch(
+            FetchDescriptor<CheckEvent>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
+        )) ?? []
+        let balanceRecords = (try? context.fetch(
+            FetchDescriptor<BalanceDecisionRecord>(sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
+        )) ?? []
+        let mirrorRecords = (try? context.fetch(
+            FetchDescriptor<MirrorDecisionRecord>(sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
+        )) ?? []
+        let reminders = (try? context.fetch(
+            FetchDescriptor<SelfReminder>(sortBy: [SortDescriptor(\.lastUsedAt, order: .reverse)])
+        )) ?? []
+
+        var drafts: [MemoryDraft] = []
+        drafts += preferenceDrafts(reminders: reminders, checkEvents: checkEvents, now: now)
+        drafts += goalDrafts(balanceRecords: balanceRecords, mirrorRecords: mirrorRecords)
+        drafts += situationalDrafts(checkEvents: checkEvents, balanceRecords: balanceRecords, mirrorRecords: mirrorRecords)
+        drafts += semanticDrafts(checkEvents: checkEvents, now: now)
+        drafts += supportDrafts(checkEvents: checkEvents)
+
+        var unique: [String: MemoryDraft] = [:]
+        for draft in drafts {
+            if let existing = unique[draft.id], memorySort(existing, draft) {
+                continue
+            }
+            unique[draft.id] = draft
+        }
+
+        return Array(unique.values)
+    }
+
+    private static func preferenceDrafts(
+        reminders: [SelfReminder],
+        checkEvents: [CheckEvent],
+        now: Date
+    ) -> [MemoryDraft] {
+        var drafts: [MemoryDraft] = []
+        let reminderLengths = reminders.map { $0.content.count }
+        let noteLengths = checkEvents
+            .map(\.note)
+            .map { normalized($0) }
+            .filter { !$0.isEmpty }
+            .map(\.count)
+        let allLengths = reminderLengths + noteLengths
+
+        if allLengths.count >= 3 {
+            let averageLength = Double(allLengths.reduce(0, +)) / Double(allLengths.count)
+            if averageLength <= 96 {
+                drafts.append(
+                    MemoryDraft(
+                        id: "preference.communication.concise",
+                        type: .preference,
+                        topic: "communication_style",
+                        headline: "Short, direct language lands better.",
+                        value: "Prefer brief, concrete phrasing over long explanations.",
+                        confidence: 0.78,
+                        priority: 0.92,
+                        source: .pattern,
+                        lastConfirmedAt: maxDate(
+                            reminders.map(\.lastUsedAt) + checkEvents.map(\.createdAt),
+                            fallback: now
+                        ),
+                        decayPolicy: .slow,
+                        retrievalTags: ["style", "communication", "concise", "direct"],
+                        evidenceCount: allLengths.count
+                    )
+                )
+            }
+        }
+
+        return drafts
+    }
+
+    private static func goalDrafts(
+        balanceRecords: [BalanceDecisionRecord],
+        mirrorRecords: [MirrorDecisionRecord]
+    ) -> [MemoryDraft] {
+        let balanceGoals = balanceRecords.compactMap { record -> (String, Date)? in
+            let value = normalized(record.longTerm)
+            return value.isEmpty ? nil : (value, record.updatedAt)
+        }
+        let mirrorGoals = mirrorRecords.compactMap { record -> (String, Date)? in
+            let value = normalized(record.longTerm)
+            return value.isEmpty ? nil : (value, record.updatedAt)
+        }
+
+        let grouped = Dictionary(grouping: balanceGoals + mirrorGoals, by: \.0)
+        return grouped
+            .sorted { lhs, rhs in
+                let lhsDate = lhs.value.map(\.1).max() ?? .distantPast
+                let rhsDate = rhs.value.map(\.1).max() ?? .distantPast
+                return lhsDate > rhsDate
+            }
+            .prefix(3)
+            .enumerated()
+            .map { index, pair in
+                let goal = pair.key
+                let items = pair.value
+                let lastConfirmedAt = items.map(\.1).max() ?? .now
+                let headline = clipped(goal, limit: 120)
+
+                return MemoryDraft(
+                    id: "goal.\(slug(goal))",
+                    type: .goal,
+                    topic: "active_goal_\(index + 1)",
+                    headline: headline,
+                    value: goal,
+                    confidence: 0.82,
+                    priority: max(0.65, 0.95 - (Double(index) * 0.08)),
+                    source: .history,
+                    lastConfirmedAt: lastConfirmedAt,
+                    decayPolicy: .medium,
+                    retrievalTags: tags(from: goal) + ["goal", "long_term"],
+                    evidenceCount: items.count
+                )
+            }
+    }
+
+    private static func situationalDrafts(
+        checkEvents: [CheckEvent],
+        balanceRecords: [BalanceDecisionRecord],
+        mirrorRecords: [MirrorDecisionRecord]
+    ) -> [MemoryDraft] {
+        var drafts: [MemoryDraft] = []
+
+        if let event = checkEvents.first {
+            let note = normalized(event.note)
+            let headline = note.isEmpty
+                ? "Recently revisiting \(event.scenario.title.lowercased()) pressure."
+                : "Recently carrying: \(clipped(note, limit: 96))"
+
+            drafts.append(
+                MemoryDraft(
+                    id: "situational.quick.latest",
+                    type: .situational,
+                    topic: "recent_quick_loop",
+                    headline: headline,
+                    value: note.isEmpty ? event.scenario.title : note,
+                    confidence: 0.7,
+                    priority: 0.72,
+                    source: .history,
+                    lastConfirmedAt: event.createdAt,
+                    decayPolicy: .fast,
+                    retrievalTags: [event.scenario.rawValue, "quick", "recent"] + tags(from: note),
+                    evidenceCount: 1
+                )
+            )
+        }
+
+        if let record = balanceRecords.first {
+            let prompt = normalized(record.prompt)
+            if !prompt.isEmpty {
+                drafts.append(
+                    MemoryDraft(
+                        id: "situational.balance.latest",
+                        type: .situational,
+                        topic: "recent_balance_board",
+                        headline: "Recently weighing: \(clipped(prompt, limit: 96))",
+                        value: prompt,
+                        confidence: 0.74,
+                        priority: 0.76,
+                        source: .history,
+                        lastConfirmedAt: record.updatedAt,
+                        decayPolicy: .fast,
+                        retrievalTags: ["balance", "recent"] + tags(from: prompt),
+                        evidenceCount: 1
+                    )
+                )
+            }
+        }
+
+        if let record = mirrorRecords.first {
+            let prompt = normalized(record.prompt)
+            if !prompt.isEmpty {
+                drafts.append(
+                    MemoryDraft(
+                        id: "situational.mirror.latest",
+                        type: .situational,
+                        topic: "recent_mirror_question",
+                        headline: "Recently reflecting on: \(clipped(prompt, limit: 96))",
+                        value: prompt,
+                        confidence: 0.78,
+                        priority: 0.82,
+                        source: .history,
+                        lastConfirmedAt: record.updatedAt,
+                        decayPolicy: .fast,
+                        retrievalTags: ["mirror", "recent"] + tags(from: prompt),
+                        evidenceCount: 1
+                    )
+                )
+            }
+        }
+
+        return drafts
+    }
+
+    private static func semanticDrafts(
+        checkEvents: [CheckEvent],
+        now: Date
+    ) -> [MemoryDraft] {
+        var drafts: [MemoryDraft] = []
+        let scenarioGroups = Dictionary(grouping: checkEvents, by: \.scenario)
+        if let dominantScenario = scenarioGroups
+            .filter({ $0.value.count >= 2 })
+            .max(by: { $0.value.count < $1.value.count }) {
+            drafts.append(
+                MemoryDraft(
+                    id: "semantic.scenario.\(dominantScenario.key.rawValue)",
+                    type: .semantic,
+                    topic: "repeat_scenario",
+                    headline: "\(dominantScenario.key.title) pressure keeps recurring.",
+                    value: dominantScenario.key.title,
+                    confidence: 0.75,
+                    priority: 0.8,
+                    source: .pattern,
+                    lastConfirmedAt: dominantScenario.value.map(\.createdAt).max() ?? now,
+                    decayPolicy: .slow,
+                    retrievalTags: [dominantScenario.key.rawValue, "pattern", "repeat"],
+                    evidenceCount: dominantScenario.value.count
+                )
+            )
+        }
+
+        let lateNightEvents = checkEvents.filter { event in
+            let hour = Calendar.current.component(.hour, from: event.createdAt)
+            return hour >= 21 || hour < 6
+        }
+        if lateNightEvents.count >= 3, lateNightEvents.count * 2 >= checkEvents.count {
+            drafts.append(
+                MemoryDraft(
+                    id: "semantic.pattern.late_night",
+                    type: .semantic,
+                    topic: "late_night_regulation",
+                    headline: "Late sessions need lighter, shorter guidance.",
+                    value: "late_night_support",
+                    confidence: 0.73,
+                    priority: 0.77,
+                    source: .pattern,
+                    lastConfirmedAt: lateNightEvents.map(\.createdAt).max() ?? now,
+                    decayPolicy: .slow,
+                    retrievalTags: ["night", "late", "fatigue", "support"],
+                    evidenceCount: lateNightEvents.count
+                )
+            )
+        }
+
+        return drafts
+    }
+
+    private static func supportDrafts(checkEvents: [CheckEvent]) -> [MemoryDraft] {
+        let actionGroups = Dictionary(grouping: checkEvents, by: \.finalAction)
+
+        return actionGroups
+            .filter { $0.value.count >= 2 }
+            .sorted { $0.value.count > $1.value.count }
+            .prefix(2)
+            .compactMap { action, events in
+                let (headline, tags): (String, [String]) = switch action {
+                case .decideTomorrow:
+                    (
+                        "Putting it into Tomorrow Box often breaks the loop.",
+                        ["support", "tomorrow", "delay", "loop_break"]
+                    )
+                case .leaveStimulus:
+                    (
+                        "Stepping away from the trigger usually helps faster.",
+                        ["support", "stimulus", "step_away", "interrupt"]
+                    )
+                case .wait90s:
+                    (
+                        "A short pause usually creates enough space to reset.",
+                        ["support", "pause", "wait", "interrupt"]
+                    )
+                case .goAheadAnyway, .continueMindfully:
+                    (
+                        "When it is genuinely aligned, acting cleanly beats over-processing.",
+                        ["support", "aligned", "action", "clarity"]
+                    )
+                }
+
+                return MemoryDraft(
+                    id: "support.action.\(action.rawValue)",
+                    type: .support,
+                    topic: "action_support",
+                    headline: headline,
+                    value: action.title,
+                    confidence: 0.72,
+                    priority: 0.79,
+                    source: .history,
+                    lastConfirmedAt: events.map(\.createdAt).max() ?? .now,
+                    decayPolicy: .medium,
+                    retrievalTags: tags + ["quick", action.rawValue],
+                    evidenceCount: events.count
+                )
+            }
+    }
+
+    private static func buildSessionBiases(
+        mode: DecisionMode,
+        queryTags: Set<String>,
+        records: [DecisionMemoryRecord],
+        profileCore: [String],
+        relevantMemories: [String],
+        now: Date
+    ) -> [String] {
+        var biases = defaultSessionBiases(for: mode)
+
+        if profileCore.contains(where: { $0.localizedCaseInsensitiveContains("short") || $0.localizedCaseInsensitiveContains("direct") }) {
+            biases.append("Keep the language short and concrete.")
+        }
+
+        if queryTags.contains("night") || queryTags.contains("late") {
+            biases.append("Avoid heavy, high-friction guidance late at night.")
+        }
+
+        if (queryTags.contains("night") || queryTags.contains("late")),
+           records.contains(where: { $0.topic == "late_night_regulation" }) {
+            biases.append("Keep the cognitive load light right now.")
+        }
+
+        if mode == .quick,
+           relevantMemories.contains(where: {
+               $0.localizedCaseInsensitiveContains("Tomorrow Box") ||
+               $0.localizedCaseInsensitiveContains("pause") ||
+               $0.localizedCaseInsensitiveContains("trigger")
+           }) {
+            biases.append("Favor interruptive next steps over extra analysis.")
+        }
+
+        let hour = Calendar.current.component(.hour, from: now)
+        if hour >= 22 || hour < 6 {
+            biases.append("Avoid heavy, high-friction guidance late at night.")
+        }
+
+        return orderedUnique(biases)
+    }
+
+    private static func defaultSessionBiases(for mode: DecisionMode) -> [String] {
+        switch mode {
+        case .quick:
+            ["Interrupt the loop before explaining too much."]
+        case .balance:
+            ["Keep the trade-off explicit and bounded."]
+        case .mirror:
+            ["Name the tension before suggesting anything."]
+        }
+    }
+
+    private static func queryTags(for mode: DecisionMode, prompt: String) -> Set<String> {
+        var tagsSet = Set(tags(from: prompt))
+        tagsSet.insert(mode.rawValue)
+        switch mode {
+        case .quick:
+            tagsSet.insert("quick")
+        case .balance:
+            tagsSet.insert("balance")
+        case .mirror:
+            tagsSet.insert("mirror")
+        }
+        return tagsSet
+    }
+
+    private static func score(
+        _ memory: DecisionMemoryRecord,
+        mode: DecisionMode,
+        queryTags: Set<String>,
+        now: Date
+    ) -> Double {
+        let overlap = Double(Set(memory.retrievalTags).intersection(queryTags).count)
+        let typeBoost: Double = switch (mode, memory.type) {
+        case (.quick, .support):
+            3.4
+        case (.quick, .semantic):
+            2.8
+        case (.quick, .situational):
+            2.4
+        case (.balance, .goal), (.balance, .semantic):
+            3.0
+        case (.mirror, .situational), (.mirror, .semantic), (.mirror, .goal):
+            3.4
+        case (_, .preference), (_, .identity):
+            1.8
+        default:
+            1.0
+        }
+
+        let ageInDays = max(0, now.timeIntervalSince(memory.lastConfirmedAt) / 86_400)
+        let decayMultiplier: Double = switch memory.decayPolicy {
+        case .stable:
+            1.0
+        case .slow:
+            max(0.82, 1.0 - (ageInDays / 240))
+        case .medium:
+            max(0.65, 1.0 - (ageInDays / 120))
+        case .fast:
+            max(0.45, 1.0 - (ageInDays / 45))
+        }
+
+        return ((memory.priority * 5) + (memory.confidence * 3) + overlap + typeBoost) * decayMultiplier
+    }
+
+    private static func memorySort(_ lhs: DecisionMemoryRecord, _ rhs: DecisionMemoryRecord) -> Bool {
+        if lhs.priority == rhs.priority {
+            return lhs.lastConfirmedAt > rhs.lastConfirmedAt
+        }
+        return lhs.priority > rhs.priority
+    }
+
+    private static func memorySort(_ lhs: MemoryDraft, _ rhs: MemoryDraft) -> Bool {
+        if lhs.priority == rhs.priority {
+            return lhs.lastConfirmedAt > rhs.lastConfirmedAt
+        }
+        return lhs.priority > rhs.priority
+    }
+
+    private static func normalized(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\n", with: " ")
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+    }
+
+    private static func clipped(_ value: String, limit: Int) -> String {
+        let normalizedValue = normalized(value)
+        guard normalizedValue.count > limit else { return normalizedValue }
+        return String(normalizedValue.prefix(limit)).trimmingCharacters(in: .whitespacesAndNewlines) + "..."
+    }
+
+    private static func slug(_ value: String) -> String {
+        let allowed = CharacterSet.alphanumerics
+        let lowered = normalized(value).lowercased()
+        let scalarView = lowered.unicodeScalars.map { allowed.contains($0) ? Character($0) : "-" }
+        let slug = String(scalarView)
+            .split(separator: "-")
+            .prefix(8)
+            .joined(separator: "-")
+        return slug.isEmpty ? "memory" : slug
+    }
+
+    private static func tags(from text: String) -> [String] {
+        let stopwords: Set<String> = [
+            "the", "and", "for", "that", "with", "this", "from", "into",
+            "have", "just", "been", "than", "then", "they", "them",
+            "want", "need", "feel", "will", "your", "about", "after",
+            "before", "would", "should", "could", "again", "really",
+            "maybe", "because", "when", "what", "where", "while", "into"
+        ]
+
+        let tokens = normalized(text)
+            .lowercased()
+            .split { !$0.isLetter && !$0.isNumber }
+            .map(String.init)
+            .filter { $0.count > 2 && !stopwords.contains($0) }
+
+        return orderedUnique(Array(tokens.prefix(8)))
+    }
+
+    private static func maxDate(_ values: [Date], fallback: Date) -> Date {
+        values.max() ?? fallback
+    }
+
+    private static func orderedUnique(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.filter { seen.insert($0).inserted }
+    }
+}

@@ -116,6 +116,7 @@ enum DecisionIntelligenceProviderPipeline {
         input: QuickCheckInput,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
@@ -126,7 +127,8 @@ enum DecisionIntelligenceProviderPipeline {
             base: base,
             input: input,
             contextState: contextState,
-            neuralState: neuralState
+            neuralState: neuralState,
+            brainState: brainState
         )
         let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: envelope)
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: envelope)
@@ -248,7 +250,13 @@ enum DecisionIntelligenceProviderPipeline {
                 return cached
             }
 
-            if let refined = await provider.refineQuickResult(base: base, input: input) {
+            if let refined = await provider.refineQuickResult(
+                base: base,
+                input: input,
+                contextState: contextState,
+                neuralState: neuralState,
+                brainState: brainState
+            ) {
                 await responseCache.storeQuickResult(refined, for: cacheKey)
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
@@ -335,6 +343,7 @@ enum DecisionIntelligenceProviderPipeline {
         input: BalanceBoardInput,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
@@ -345,7 +354,8 @@ enum DecisionIntelligenceProviderPipeline {
             base: base,
             input: input,
             contextState: contextState,
-            neuralState: neuralState
+            neuralState: neuralState,
+            brainState: brainState
         )
         let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: envelope)
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: envelope)
@@ -467,7 +477,13 @@ enum DecisionIntelligenceProviderPipeline {
                 return cached
             }
 
-            if let refined = await provider.refineBalanceResult(base: base, input: input) {
+            if let refined = await provider.refineBalanceResult(
+                base: base,
+                input: input,
+                contextState: contextState,
+                neuralState: neuralState,
+                brainState: brainState
+            ) {
                 await responseCache.storeBalanceResult(refined, for: cacheKey)
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
@@ -554,6 +570,7 @@ enum DecisionIntelligenceProviderPipeline {
         input: MirrorInput,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
@@ -564,7 +581,8 @@ enum DecisionIntelligenceProviderPipeline {
             base: base,
             input: input,
             contextState: contextState,
-            neuralState: neuralState
+            neuralState: neuralState,
+            brainState: brainState
         )
         let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: envelope)
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: envelope)
@@ -686,7 +704,13 @@ enum DecisionIntelligenceProviderPipeline {
                 return cached
             }
 
-            if let refined = await provider.refineMirrorResult(base: base, input: input) {
+            if let refined = await provider.refineMirrorResult(
+                base: base,
+                input: input,
+                contextState: contextState,
+                neuralState: neuralState,
+                brainState: brainState
+            ) {
                 await responseCache.storeMirrorResult(refined, for: cacheKey)
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,

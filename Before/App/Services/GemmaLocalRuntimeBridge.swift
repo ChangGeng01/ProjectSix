@@ -12,17 +12,26 @@ protocol GemmaLocalRuntimeBridging: Sendable {
 
     func refineQuickResult(
         base: QuickCheckResult,
-        input: QuickCheckInput
+        input: QuickCheckInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> QuickCheckResult?
 
     func refineBalanceResult(
         base: BalanceBoardResult,
-        input: BalanceBoardInput
+        input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> BalanceBoardResult?
 
     func refineMirrorResult(
         base: MirrorResult,
-        input: MirrorInput
+        input: MirrorInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> MirrorResult?
 
     func pickReminder(
@@ -84,11 +93,20 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
 
     func refineQuickResult(
         base: QuickCheckResult,
-        input: QuickCheckInput
+        input: QuickCheckInput,
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil
     ) async -> QuickCheckResult? {
         guard case let .ready(_, generator) = cachedLoadState,
               let modelPath = modelPathProvider() else { return nil }
-        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(base: base, input: input)
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
 
         let prompt = """
         \(envelope.runtimePrompt)
@@ -130,11 +148,20 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
 
     func refineBalanceResult(
         base: BalanceBoardResult,
-        input: BalanceBoardInput
+        input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil
     ) async -> BalanceBoardResult? {
         guard case let .ready(_, generator) = cachedLoadState,
               let modelPath = modelPathProvider() else { return nil }
-        let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(base: base, input: input)
+        let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
 
         let prompt = """
         \(envelope.runtimePrompt)
@@ -192,11 +219,20 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
 
     func refineMirrorResult(
         base: MirrorResult,
-        input: MirrorInput
+        input: MirrorInput,
+        contextState: DecisionContextPreparedState? = nil,
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil
     ) async -> MirrorResult? {
         guard case let .ready(_, generator) = cachedLoadState,
               let modelPath = modelPathProvider() else { return nil }
-        let envelope = DecisionIntelligencePromptContract.mirrorRefinementEnvelope(base: base, input: input)
+        let envelope = DecisionIntelligencePromptContract.mirrorRefinementEnvelope(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
 
         let prompt = """
         \(envelope.runtimePrompt)

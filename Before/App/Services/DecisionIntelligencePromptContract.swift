@@ -20,6 +20,8 @@ enum DecisionIntelligencePromptContract {
         static let frontstageSignal = 48
         static let frontstageEvidence = 96
         static let frontstageSignalCount = 3
+        static let brainHeadline = 110
+        static let sessionBias = 72
     }
 
     enum TaskKind: Equatable, Sendable {
@@ -204,7 +206,8 @@ enum DecisionIntelligencePromptContract {
         base: QuickCheckResult,
         input: QuickCheckInput,
         contextState: DecisionContextPreparedState? = nil,
-        neuralState: DecisionNeuralState? = nil
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil
     ) -> PromptEnvelope {
         makeEnvelope(
             kind: .quick,
@@ -230,7 +233,8 @@ enum DecisionIntelligencePromptContract {
             ],
             openTextSignalCount: nonEmptySignalCount([input.note]),
             contextState: contextState,
-            neuralState: neuralState
+            neuralState: neuralState,
+            brainState: brainState
         )
     }
 
@@ -238,13 +242,15 @@ enum DecisionIntelligencePromptContract {
         base: QuickCheckResult,
         input: QuickCheckInput,
         contextState: DecisionContextPreparedState? = nil,
-        neuralState: DecisionNeuralState? = nil
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil
     ) -> String {
         quickRefinementEnvelope(
             base: base,
             input: input,
             contextState: contextState,
-            neuralState: neuralState
+            neuralState: neuralState,
+            brainState: brainState
         ).debugPrompt
     }
 
@@ -252,7 +258,8 @@ enum DecisionIntelligencePromptContract {
         base: BalanceBoardResult,
         input: BalanceBoardInput,
         contextState: DecisionContextPreparedState? = nil,
-        neuralState: DecisionNeuralState? = nil
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil
     ) -> PromptEnvelope {
         makeEnvelope(
             kind: .balance,
@@ -284,7 +291,8 @@ enum DecisionIntelligencePromptContract {
                 input.longTerm
             ]),
             contextState: contextState,
-            neuralState: neuralState
+            neuralState: neuralState,
+            brainState: brainState
         )
     }
 
@@ -292,13 +300,15 @@ enum DecisionIntelligencePromptContract {
         base: BalanceBoardResult,
         input: BalanceBoardInput,
         contextState: DecisionContextPreparedState? = nil,
-        neuralState: DecisionNeuralState? = nil
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil
     ) -> String {
         balanceRefinementEnvelope(
             base: base,
             input: input,
             contextState: contextState,
-            neuralState: neuralState
+            neuralState: neuralState,
+            brainState: brainState
         ).debugPrompt
     }
 
@@ -306,7 +316,8 @@ enum DecisionIntelligencePromptContract {
         base: MirrorResult,
         input: MirrorInput,
         contextState: DecisionContextPreparedState? = nil,
-        neuralState: DecisionNeuralState? = nil
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil
     ) -> PromptEnvelope {
         makeEnvelope(
             kind: .mirror,
@@ -339,7 +350,8 @@ enum DecisionIntelligencePromptContract {
                 input.selfLens
             ]),
             contextState: contextState,
-            neuralState: neuralState
+            neuralState: neuralState,
+            brainState: brainState
         )
     }
 
@@ -347,13 +359,15 @@ enum DecisionIntelligencePromptContract {
         base: MirrorResult,
         input: MirrorInput,
         contextState: DecisionContextPreparedState? = nil,
-        neuralState: DecisionNeuralState? = nil
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil
     ) -> String {
         mirrorRefinementEnvelope(
             base: base,
             input: input,
             contextState: contextState,
-            neuralState: neuralState
+            neuralState: neuralState,
+            brainState: brainState
         ).debugPrompt
     }
 
@@ -438,7 +452,8 @@ enum DecisionIntelligencePromptContract {
         outputGuard: [String],
         openTextSignalCount: Int = 0,
         contextState: DecisionContextPreparedState? = nil,
-        neuralState: DecisionNeuralState? = nil
+        neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil
     ) -> PromptEnvelope {
         let immutablePrefix = PrefixCache.immutablePrefix(for: kind)
         let adaptivePrefix = PrefixCache.adaptivePrefix(for: kind)
@@ -468,7 +483,8 @@ enum DecisionIntelligencePromptContract {
             openTextSignalCount: openTextSignalCount,
             evidenceFilter: evidenceFilter,
             contextState: contextState,
-            neuralState: neuralState
+            neuralState: neuralState,
+            brainState: brainState
         )
         var sections = [
             "FRONTSTAGE_STATE_JSON:",
@@ -488,6 +504,13 @@ enum DecisionIntelligencePromptContract {
             sections += [
                 "NEURAL_STATE_JSON:",
                 neuralStateJSONString(neuralState)
+            ]
+        }
+
+        if let brainState, !brainState.isEmpty {
+            sections += [
+                "BRAIN_STATE_JSON:",
+                brainStateJSONString(brainState)
             ]
         }
 
@@ -561,10 +584,7 @@ enum DecisionIntelligencePromptContract {
             "generation": contextState.generation,
             "anchor_fields": contextState.anchorFields.map(\.rawValue),
             "active_fields": contextState.activeFields.map(\.rawValue),
-            "stale_fields": contextState.staleFields.map(\.rawValue),
-            "anchor_field_count": contextState.anchorFieldCount,
-            "active_field_count": contextState.activeFieldCount,
-            "stale_field_count": contextState.staleFieldCount
+            "stale_fields": contextState.staleFields.map(\.rawValue)
         ]
 
         guard JSONSerialization.isValidJSONObject(payload),
@@ -578,21 +598,17 @@ enum DecisionIntelligencePromptContract {
 
     private static func neuralStateJSONString(_ neuralState: DecisionNeuralState) -> String {
         let payload: [String: Any] = [
-            "mode": neuralState.mode.rawValue,
             "dominant_signals": neuralState.dominantActivations.map { activation in
                 [
-                    "signal": activation.signal.rawValue,
-                    "strength": activation.strength
+                    "signal": activation.signal.rawValue
                 ]
             },
             "candidate_actions": neuralState.candidateActions.map { candidate in
                 [
-                    "route": candidate.route.rawValue,
-                    "score": candidate.score
+                    "route": candidate.route.rawValue
                 ]
             },
-            "suppressed_behaviors": neuralState.suppressedBehaviors,
-            "detail": neuralState.detail
+            "suppressed_behaviors": neuralState.suppressedBehaviors
         ]
 
         guard JSONSerialization.isValidJSONObject(payload),
@@ -610,7 +626,8 @@ enum DecisionIntelligencePromptContract {
         openTextSignalCount: Int,
         evidenceFilter: DecisionPromptEvidenceFilterResult,
         contextState: DecisionContextPreparedState?,
-        neuralState: DecisionNeuralState?
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) -> DecisionFrontstageState {
         let focusGoal: String = switch kind {
         case .quick:
@@ -665,9 +682,21 @@ enum DecisionIntelligencePromptContract {
                 .prefix(Limit.frontstageSignalCount)
         )
 
+        let memoryHeadlines = Array(
+            (brainState?.relevantMemories ?? [])
+                .map { sanitized($0, fallback: $0, limit: Limit.brainHeadline) }
+                .prefix(Limit.frontstageSignalCount)
+        )
+
         let suppressionHints = Array(
             (neuralState?.suppressedBehaviors ?? [])
                 .map { sanitized($0, fallback: $0, limit: Limit.frontstageSignal) }
+                .prefix(Limit.frontstageSignalCount)
+        )
+
+        let sessionBiases = Array(
+            (brainState?.sessionBiases ?? [])
+                .map { sanitized($0, fallback: $0, limit: Limit.sessionBias) }
                 .prefix(Limit.frontstageSignalCount)
         )
 
@@ -678,12 +707,14 @@ enum DecisionIntelligencePromptContract {
             dangerSignals: dangerSignals,
             evidenceHeadlines: evidenceHeadlines,
             anchorHeadlines: anchorHeadlines,
+            memoryHeadlines: memoryHeadlines,
             retainedEvidenceCount: evidenceFilter.retainedCount,
             droppedEvidenceCount: evidenceFilter.droppedCount,
             droppedInjectedEvidenceCount: evidenceFilter.droppedInjectedCount,
             droppedDuplicateEvidenceCount: evidenceFilter.droppedDuplicateCount,
             droppedBudgetEvidenceCount: evidenceFilter.droppedBudgetCount,
-            suppressionHints: suppressionHints
+            suppressionHints: suppressionHints,
+            sessionBiases: sessionBiases
         )
     }
 
@@ -693,12 +724,25 @@ enum DecisionIntelligencePromptContract {
             "danger_signals": frontstageState.dangerSignals,
             "evidence_headlines": frontstageState.evidenceHeadlines,
             "anchor_headlines": frontstageState.anchorHeadlines,
-            "retained_evidence_count": frontstageState.retainedEvidenceCount,
-            "dropped_evidence_count": frontstageState.droppedEvidenceCount,
-            "dropped_injected_evidence_count": frontstageState.droppedInjectedEvidenceCount,
-            "dropped_duplicate_evidence_count": frontstageState.droppedDuplicateEvidenceCount,
             "dropped_budget_evidence_count": frontstageState.droppedBudgetEvidenceCount,
             "suppression_hints": frontstageState.suppressionHints
+        ]
+
+        guard JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+
+        return json
+    }
+
+    private static func brainStateJSONString(_ brainState: DecisionBrainState) -> String {
+        let payload: [String: Any] = [
+            "profile_core": brainState.profileCore,
+            "active_goals": brainState.activeGoals,
+            "relevant_memories": brainState.relevantMemories,
+            "session_biases": brainState.sessionBiases
         ]
 
         guard JSONSerialization.isValidJSONObject(payload),

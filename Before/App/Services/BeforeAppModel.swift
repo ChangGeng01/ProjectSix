@@ -64,6 +64,7 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func handleInitialAppearance() {
+        refreshDecisionMemoryStore()
         presentPendingReflectionIfNeeded()
         consumePendingLaunchRequestIfNeeded()
         restoreActiveWorkspaceIfNeeded()
@@ -139,6 +140,8 @@ final class BeforeAppModel: ObservableObject {
         if let scenario {
             session.scenario = scenario
         }
+        refreshDecisionMemoryStore()
+        primeQuickSession(session)
         activeQuickSession = session
         selectedTab = .home
         persistActiveWorkspaceState()
@@ -146,14 +149,20 @@ final class BeforeAppModel: ObservableObject {
 
     func startBalanceBoard(entrySource: EntrySource, prompt: String = "") {
         clearActiveDecisionFlows()
-        activeBalanceSession = BalanceBoardSession(entrySource: entrySource, prompt: prompt)
+        let session = BalanceBoardSession(entrySource: entrySource, prompt: prompt)
+        refreshDecisionMemoryStore()
+        primeBalanceSession(session)
+        activeBalanceSession = session
         selectedTab = .home
         persistActiveWorkspaceState()
     }
 
     func startMirrorWorkspace(entrySource: EntrySource, prompt: String = "") {
         clearActiveDecisionFlows()
-        activeMirrorSession = MirrorWorkspaceSession(entrySource: entrySource, prompt: prompt)
+        let session = MirrorWorkspaceSession(entrySource: entrySource, prompt: prompt)
+        refreshDecisionMemoryStore()
+        primeMirrorSession(session)
+        activeMirrorSession = session
         selectedTab = .home
         persistActiveWorkspaceState()
     }
@@ -214,6 +223,7 @@ final class BeforeAppModel: ObservableObject {
         )
         context.insert(event)
         try? context.save()
+        refreshDecisionMemoryStore()
 
         switch action {
         case .decideTomorrow:
@@ -270,6 +280,7 @@ final class BeforeAppModel: ObservableObject {
         )
         context.insert(record)
         try? context.save()
+        refreshDecisionMemoryStore()
         activeBalanceSession = nil
         presentLetGo( LetGoCopyLibrary.savedBalanceContext(for: record) )
         persistActiveWorkspaceState()
@@ -282,6 +293,7 @@ final class BeforeAppModel: ObservableObject {
         let tomorrowItem = TomorrowBoxItemFactory.makeBalanceItem(from: session, result: result)
         context.insert(tomorrowItem)
         try? context.save()
+        refreshDecisionMemoryStore()
         activeBalanceSession = nil
         presentLetGo(for: tomorrowItem)
         persistActiveWorkspaceState()
@@ -305,6 +317,7 @@ final class BeforeAppModel: ObservableObject {
         )
         context.insert(record)
         try? context.save()
+        refreshDecisionMemoryStore()
         activeMirrorSession = nil
         presentLetGo( LetGoCopyLibrary.savedMirrorContext(for: record) )
         persistActiveWorkspaceState()
@@ -317,6 +330,7 @@ final class BeforeAppModel: ObservableObject {
         let tomorrowItem = TomorrowBoxItemFactory.makeMirrorItem(from: session, result: result)
         context.insert(tomorrowItem)
         try? context.save()
+        refreshDecisionMemoryStore()
         activeMirrorSession = nil
         presentLetGo(for: tomorrowItem)
         persistActiveWorkspaceState()
@@ -328,19 +342,25 @@ final class BeforeAppModel: ObservableObject {
         switch item.mode {
         case .quick:
             if let draft = item.draft {
-                activeQuickSession = draft.restoreQuickSession(entrySource: .app)
+                let session = draft.restoreQuickSession(entrySource: .app)
+                primeQuickSession(session)
+                activeQuickSession = session
             } else {
                 startQuickCheck(entrySource: .app, prompt: item.prompt)
             }
         case .balance:
             if let draft = item.draft {
-                activeBalanceSession = draft.restoreBalanceSession(entrySource: .app)
+                let session = draft.restoreBalanceSession(entrySource: .app)
+                primeBalanceSession(session)
+                activeBalanceSession = session
             } else {
                 startBalanceBoard(entrySource: .app, prompt: item.prompt)
             }
         case .mirror:
             if let draft = item.draft {
-                activeMirrorSession = draft.restoreMirrorSession(entrySource: .app)
+                let session = draft.restoreMirrorSession(entrySource: .app)
+                primeMirrorSession(session)
+                activeMirrorSession = session
             } else {
                 startMirrorWorkspace(entrySource: .app, prompt: item.prompt)
             }
@@ -353,21 +373,30 @@ final class BeforeAppModel: ObservableObject {
 
     func reopenCheckEvent(_ event: CheckEvent) {
         clearActiveDecisionFlows()
-        activeQuickSession = event.restoredSession()
+        let session = event.restoredSession()
+        refreshDecisionMemoryStore()
+        primeQuickSession(session)
+        activeQuickSession = session
         selectedTab = .home
         persistActiveWorkspaceState()
     }
 
     func reopenBalanceRecord(_ record: BalanceDecisionRecord) {
         clearActiveDecisionFlows()
-        activeBalanceSession = record.restoredSession()
+        let session = record.restoredSession()
+        refreshDecisionMemoryStore()
+        primeBalanceSession(session)
+        activeBalanceSession = session
         selectedTab = .home
         persistActiveWorkspaceState()
     }
 
     func reopenMirrorRecord(_ record: MirrorDecisionRecord) {
         clearActiveDecisionFlows()
-        activeMirrorSession = record.restoredSession()
+        let session = record.restoredSession()
+        refreshDecisionMemoryStore()
+        primeMirrorSession(session)
+        activeMirrorSession = session
         selectedTab = .home
         persistActiveWorkspaceState()
     }
@@ -459,6 +488,7 @@ final class BeforeAppModel: ObservableObject {
         }
 
         try? context.save()
+        refreshDecisionMemoryStore()
         refreshWidgetSurfaces()
         pendingReflectionContext = nil
         shouldPromptReflectionAfterBackground = false
@@ -562,6 +592,7 @@ final class BeforeAppModel: ObservableObject {
         deleteAll(CheckEvent.self, in: context)
         deleteAll(BalanceDecisionRecord.self, in: context)
         deleteAll(MirrorDecisionRecord.self, in: context)
+        deleteAll(DecisionMemoryRecord.self, in: context)
 
         resetTransientState()
         refreshWidgetSurfaces()
@@ -570,6 +601,7 @@ final class BeforeAppModel: ObservableObject {
     func clearReminders() {
         let context = modelContainer.mainContext
         deleteAll(SelfReminder.self, in: context)
+        refreshDecisionMemoryStore()
         refreshWidgetSurfaces()
     }
 
@@ -590,6 +622,7 @@ final class BeforeAppModel: ObservableObject {
         deleteAll(BalanceDecisionRecord.self, in: context)
         deleteAll(MirrorDecisionRecord.self, in: context)
         deleteAll(SelfReminder.self, in: context)
+        deleteAll(DecisionMemoryRecord.self, in: context)
         clearTomorrowBox()
         supportInbox.clearAll()
         sharedLifeStore.clearAll()
@@ -654,11 +687,20 @@ final class BeforeAppModel: ObservableObject {
         clearActiveDecisionFlows()
         switch mode {
         case .quick:
-            activeQuickSession = draft.restoreQuickSession(entrySource: .app)
+            let session = draft.restoreQuickSession(entrySource: .app)
+            refreshDecisionMemoryStore()
+            primeQuickSession(session)
+            activeQuickSession = session
         case .balance:
-            activeBalanceSession = draft.restoreBalanceSession(entrySource: .app)
+            let session = draft.restoreBalanceSession(entrySource: .app)
+            refreshDecisionMemoryStore()
+            primeBalanceSession(session)
+            activeBalanceSession = session
         case .mirror:
-            activeMirrorSession = draft.restoreMirrorSession(entrySource: .app)
+            let session = draft.restoreMirrorSession(entrySource: .app)
+            refreshDecisionMemoryStore()
+            primeMirrorSession(session)
+            activeMirrorSession = session
         }
 
         supportInbox.markHeard(request.id)
@@ -708,11 +750,20 @@ final class BeforeAppModel: ObservableObject {
         clearActiveDecisionFlows()
         switch mode {
         case .quick:
-            activeQuickSession = draft.restoreQuickSession(entrySource: .app)
+            let session = draft.restoreQuickSession(entrySource: .app)
+            refreshDecisionMemoryStore()
+            primeQuickSession(session)
+            activeQuickSession = session
         case .balance:
-            activeBalanceSession = draft.restoreBalanceSession(entrySource: .app)
+            let session = draft.restoreBalanceSession(entrySource: .app)
+            refreshDecisionMemoryStore()
+            primeBalanceSession(session)
+            activeBalanceSession = session
         case .mirror:
-            activeMirrorSession = draft.restoreMirrorSession(entrySource: .app)
+            let session = draft.restoreMirrorSession(entrySource: .app)
+            refreshDecisionMemoryStore()
+            primeMirrorSession(session)
+            activeMirrorSession = session
         }
 
         sharedLifeStore.markReviewing(item.id)
@@ -823,11 +874,20 @@ final class BeforeAppModel: ObservableObject {
 
         switch mode {
         case .quick:
-            activeQuickSession = state.restoreQuickSession()
+            let session = state.restoreQuickSession()
+            refreshDecisionMemoryStore()
+            primeQuickSession(session)
+            activeQuickSession = session
         case .balance:
-            activeBalanceSession = state.restoreBalanceSession()
+            let session = state.restoreBalanceSession()
+            refreshDecisionMemoryStore()
+            primeBalanceSession(session)
+            activeBalanceSession = session
         case .mirror:
-            activeMirrorSession = state.restoreMirrorSession()
+            let session = state.restoreMirrorSession()
+            refreshDecisionMemoryStore()
+            primeMirrorSession(session)
+            activeMirrorSession = session
         }
 
         selectedTab = .home
@@ -874,6 +934,7 @@ final class BeforeAppModel: ObservableObject {
             deleteAll(BalanceDecisionRecord.self, in: context)
             deleteAll(MirrorDecisionRecord.self, in: context)
             deleteAll(SelfReminder.self, in: context)
+            deleteAll(DecisionMemoryRecord.self, in: context)
             deleteAll(TomorrowBoxItem.self, in: context)
 
             supportInbox.clearAll()
@@ -887,5 +948,79 @@ final class BeforeAppModel: ObservableObject {
         if options.skipOnboarding {
             hasSeenOnboarding = true
         }
+    }
+
+    private func refreshDecisionMemoryStore() {
+        _ = DecisionMemorySystem.refreshStoredMemories(in: modelContainer.mainContext)
+    }
+
+    private func primeQuickSession(_ session: QuickCheckSession) {
+        session.loadBrainState(
+            DecisionMemorySystem.loadBrainState(
+                mode: .quick,
+                prompt: quickPromptSeed(for: session),
+                context: modelContainer.mainContext
+            )
+        )
+    }
+
+    private func primeBalanceSession(_ session: BalanceBoardSession) {
+        session.loadBrainState(
+            DecisionMemorySystem.loadBrainState(
+                mode: .balance,
+                prompt: balancePromptSeed(for: session),
+                context: modelContainer.mainContext
+            )
+        )
+    }
+
+    private func primeMirrorSession(_ session: MirrorWorkspaceSession) {
+        session.loadBrainState(
+            DecisionMemorySystem.loadBrainState(
+                mode: .mirror,
+                prompt: mirrorPromptSeed(for: session),
+                context: modelContainer.mainContext
+            )
+        )
+    }
+
+    private func quickPromptSeed(for session: QuickCheckSession) -> String {
+        [
+            session.scenario.title,
+            session.note,
+            session.motivation?.title ?? "",
+            session.expectedOutcome?.title ?? "",
+            session.controlLevel?.title ?? ""
+        ]
+        .map(trimmed)
+        .filter { !$0.isEmpty }
+        .joined(separator: " ")
+    }
+
+    private func balancePromptSeed(for session: BalanceBoardSession) -> String {
+        [
+            session.prompt,
+            session.desire,
+            session.concern,
+            session.constraint,
+            session.longTerm
+        ]
+        .map(trimmed)
+        .filter { !$0.isEmpty }
+        .joined(separator: " ")
+    }
+
+    private func mirrorPromptSeed(for session: MirrorWorkspaceSession) -> String {
+        [
+            session.prompt,
+            session.emotion,
+            session.relationship,
+            session.reality,
+            session.longTerm,
+            session.selfLens
+        ]
+        .map(trimmed)
+        .filter { !$0.isEmpty }
+        .joined(separator: " ")
     }
 }

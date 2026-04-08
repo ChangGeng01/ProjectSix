@@ -37,6 +37,7 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
     }
     @Published var result: MirrorResult?
     @Published var isRefiningWithModel = false
+    @Published private(set) var brainState: DecisionBrainState?
     private let intelligenceLifecycle: DecisionContextLifecycle
 
     init(entrySource: EntrySource, prompt: String = "") {
@@ -93,6 +94,7 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
             input: prepared.input,
             contextState: prepared.state,
             neuralState: neuralState,
+            brainState: brainState,
             preferences: preferences
         ) {
             result = refined
@@ -105,6 +107,10 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
 
     func restoreIntelligenceLifecycle(_ snapshot: DecisionContextLifecycleSnapshot) {
         intelligenceLifecycle.restore(snapshot)
+    }
+
+    func loadBrainState(_ brainState: DecisionBrainState?) {
+        self.brainState = brainState
     }
 
     var filledLensCount: Int {

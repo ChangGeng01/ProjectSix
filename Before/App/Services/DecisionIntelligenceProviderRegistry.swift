@@ -6,17 +6,26 @@ protocol DecisionIntelligenceProviding: Sendable {
 
     func refineQuickResult(
         base: QuickCheckResult,
-        input: QuickCheckInput
+        input: QuickCheckInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> QuickCheckResult?
 
     func refineBalanceResult(
         base: BalanceBoardResult,
-        input: BalanceBoardInput
+        input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> BalanceBoardResult?
 
     func refineMirrorResult(
         base: MirrorResult,
-        input: MirrorInput
+        input: MirrorInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> MirrorResult?
 
     func pickReminder(
@@ -33,17 +42,26 @@ protocol DecisionOpenModelAdapting: Sendable {
 
     func refineQuickResult(
         base: QuickCheckResult,
-        input: QuickCheckInput
+        input: QuickCheckInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> QuickCheckResult?
 
     func refineBalanceResult(
         base: BalanceBoardResult,
-        input: BalanceBoardInput
+        input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> BalanceBoardResult?
 
     func refineMirrorResult(
         base: MirrorResult,
-        input: MirrorInput
+        input: MirrorInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> MirrorResult?
 
     func pickReminder(
@@ -93,23 +111,50 @@ struct OpenModelDecisionIntelligenceProvider: DecisionIntelligenceProviding {
 
     func refineQuickResult(
         base: QuickCheckResult,
-        input: QuickCheckInput
+        input: QuickCheckInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> QuickCheckResult? {
-        await adapter.refineQuickResult(base: base, input: input)
+        await adapter.refineQuickResult(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
     }
 
     func refineBalanceResult(
         base: BalanceBoardResult,
-        input: BalanceBoardInput
+        input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> BalanceBoardResult? {
-        await adapter.refineBalanceResult(base: base, input: input)
+        await adapter.refineBalanceResult(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
     }
 
     func refineMirrorResult(
         base: MirrorResult,
-        input: MirrorInput
+        input: MirrorInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> MirrorResult? {
-        await adapter.refineMirrorResult(base: base, input: input)
+        await adapter.refineMirrorResult(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
     }
 
     func pickReminder(
@@ -148,33 +193,51 @@ struct GemmaOpenModelAdapter: DecisionOpenModelAdapting {
 
     func refineQuickResult(
         base: QuickCheckResult,
-        input: QuickCheckInput
+        input: QuickCheckInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> QuickCheckResult? {
         await GemmaE4BIntelligenceService.refineQuickResult(
             base: base,
             input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState,
             backendPolicy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
         )
     }
 
     func refineBalanceResult(
         base: BalanceBoardResult,
-        input: BalanceBoardInput
+        input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> BalanceBoardResult? {
         await GemmaE4BIntelligenceService.refineBalanceResult(
             base: base,
             input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState,
             backendPolicy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
         )
     }
 
     func refineMirrorResult(
         base: MirrorResult,
-        input: MirrorInput
+        input: MirrorInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> MirrorResult? {
         await GemmaE4BIntelligenceService.refineMirrorResult(
             base: base,
             input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState,
             backendPolicy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
         )
     }
@@ -221,21 +284,30 @@ struct ReservedOpenModelAdapter: DecisionOpenModelAdapting {
 
     func refineQuickResult(
         base: QuickCheckResult,
-        input: QuickCheckInput
+        input: QuickCheckInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> QuickCheckResult? {
         nil
     }
 
     func refineBalanceResult(
         base: BalanceBoardResult,
-        input: BalanceBoardInput
+        input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> BalanceBoardResult? {
         nil
     }
 
     func refineMirrorResult(
         base: MirrorResult,
-        input: MirrorInput
+        input: MirrorInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> MirrorResult? {
         nil
     }
@@ -256,23 +328,50 @@ struct FoundationDecisionIntelligenceProvider: DecisionIntelligenceProviding {
 
     func refineQuickResult(
         base: QuickCheckResult,
-        input: QuickCheckInput
+        input: QuickCheckInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> QuickCheckResult? {
-        await FoundationModelsIntelligenceService.refineQuickResult(base: base, input: input)
+        await FoundationModelsIntelligenceService.refineQuickResult(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
     }
 
     func refineBalanceResult(
         base: BalanceBoardResult,
-        input: BalanceBoardInput
+        input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> BalanceBoardResult? {
-        await FoundationModelsIntelligenceService.refineBalanceResult(base: base, input: input)
+        await FoundationModelsIntelligenceService.refineBalanceResult(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
     }
 
     func refineMirrorResult(
         base: MirrorResult,
-        input: MirrorInput
+        input: MirrorInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> MirrorResult? {
-        await FoundationModelsIntelligenceService.refineMirrorResult(base: base, input: input)
+        await FoundationModelsIntelligenceService.refineMirrorResult(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
     }
 
     func pickReminder(

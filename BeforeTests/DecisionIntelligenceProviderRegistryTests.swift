@@ -105,21 +105,30 @@ private struct FakeOpenModelAdapter: DecisionOpenModelAdapting {
 
     func refineQuickResult(
         base: QuickCheckResult,
-        input: QuickCheckInput
+        input: QuickCheckInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> QuickCheckResult? {
         base
     }
 
     func refineBalanceResult(
         base: BalanceBoardResult,
-        input: BalanceBoardInput
+        input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> BalanceBoardResult? {
         base
     }
 
     func refineMirrorResult(
         base: MirrorResult,
-        input: MirrorInput
+        input: MirrorInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> MirrorResult? {
         base
     }

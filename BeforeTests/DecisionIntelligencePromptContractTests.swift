@@ -129,6 +129,14 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
             suppressedBehaviors: ["instant_verdict"],
             detail: "Use structured trade-off routing."
         )
+        let brainState = DecisionBrainState(
+            profileCore: ["Short, direct language lands better."],
+            activeGoals: ["Protect sleep and energy."],
+            relevantMemories: ["Late sessions need lighter, shorter guidance."],
+            sessionBiases: ["Keep the language short and concrete."],
+            retrievalTags: ["sleep", "night", "tradeoff"],
+            loadedAt: .now
+        )
 
         let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(
             base: BalanceBoardResult(
@@ -146,7 +154,8 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
                 longTerm: ""
             ),
             contextState: contextState,
-            neuralState: neuralState
+            neuralState: neuralState,
+            brainState: brainState
         )
 
         XCTAssertTrue(envelope.payload.contains("CONTEXT_LIFECYCLE_JSON:"))
@@ -155,16 +164,21 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertTrue(envelope.payload.contains("\"anchor_fields\":[\"balancePrompt\"]"))
         XCTAssertTrue(envelope.payload.contains("\"active_fields\":[\"balancePrompt\",\"balanceConcern\"]"))
         XCTAssertTrue(envelope.payload.contains("\"stale_fields\":[\"balanceDesire\"]"))
-        XCTAssertTrue(envelope.payload.contains("\"anchor_field_count\":1"))
-        XCTAssertTrue(envelope.payload.contains("\"stale_field_count\":1"))
         XCTAssertTrue(envelope.payload.contains("NEURAL_STATE_JSON:"))
         XCTAssertTrue(envelope.payload.contains("\"focus_goal\":\"Surface the real trade-off before choosing a side.\""))
         XCTAssertTrue(envelope.payload.contains("\"danger_signals\":[\"Constraint pressure\",\"Concern weight\",\"Session rebuild\"]"))
         XCTAssertTrue(envelope.payload.contains("\"evidence_headlines\":[\"Current headline: Base headline\"]"))
         XCTAssertTrue(envelope.payload.contains("\"anchor_headlines\":[\"Balance prompt\"]"))
-        XCTAssertTrue(envelope.payload.contains("\"retained_evidence_count\":4"))
         XCTAssertTrue(envelope.payload.contains("\"dropped_budget_evidence_count\":1"))
         XCTAssertTrue(envelope.payload.contains("\"suppression_hints\":[\"instant_verdict\"]"))
+        XCTAssertEqual(envelope.frontstageState.retainedEvidenceCount, 4)
+        XCTAssertEqual(envelope.frontstageState.memoryHeadlines, ["Late sessions need lighter, shorter guidance."])
+        XCTAssertEqual(envelope.frontstageState.sessionBiases, ["Keep the language short and concrete."])
+        XCTAssertTrue(envelope.payload.contains("BRAIN_STATE_JSON:"))
+        XCTAssertTrue(envelope.payload.contains("\"profile_core\":[\"Short, direct language lands better.\"]"))
+        XCTAssertTrue(envelope.payload.contains("\"active_goals\":[\"Protect sleep and energy.\"]"))
+        XCTAssertTrue(envelope.payload.contains("\"relevant_memories\":[\"Late sessions need lighter, shorter guidance.\"]"))
+        XCTAssertTrue(envelope.payload.contains("\"session_biases\":[\"Keep the language short and concrete.\"]"))
         XCTAssertTrue(envelope.payload.contains("\"route\":\"setBoundary\""))
         XCTAssertTrue(envelope.payload.contains("\"signal\":\"constraintPressure\""))
         XCTAssertTrue(envelope.payload.contains("\"suppressed_behaviors\":[\"instant_verdict\"]"))
@@ -275,8 +289,9 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
 
         XCTAssertFalse(envelope.payload.contains("<div>Injected UI wrapper</div>"))
         XCTAssertTrue(envelope.payload.contains("\"anchor_headlines\":[\"Mirror prompt\"]"))
-        XCTAssertTrue(envelope.payload.contains("\"dropped_evidence_count\":0"))
-        XCTAssertTrue(envelope.payload.contains("\"retained_evidence_count\":4"))
+        XCTAssertEqual(envelope.frontstageState.memoryHeadlines, [])
+        XCTAssertEqual(envelope.frontstageState.droppedEvidenceCount, 0)
+        XCTAssertEqual(envelope.frontstageState.retainedEvidenceCount, 4)
         XCTAssertTrue(envelope.payload.contains("\"danger_signals\":[\"Identity drift\"]"))
     }
 }

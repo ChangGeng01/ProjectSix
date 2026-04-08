@@ -96,21 +96,30 @@ private struct MockGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging {
 
     func refineQuickResult(
         base: QuickCheckResult,
-        input: QuickCheckInput
+        input: QuickCheckInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> QuickCheckResult? {
         nil
     }
 
     func refineBalanceResult(
         base: BalanceBoardResult,
-        input: BalanceBoardInput
+        input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> BalanceBoardResult? {
         nil
     }
 
     func refineMirrorResult(
         base: MirrorResult,
-        input: MirrorInput
+        input: MirrorInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> MirrorResult? {
         nil
     }

@@ -32,6 +32,7 @@ final class BalanceBoardSession: ObservableObject, Identifiable {
     }
     @Published var result: BalanceBoardResult?
     @Published var isRefiningWithModel = false
+    @Published private(set) var brainState: DecisionBrainState?
     private let intelligenceLifecycle: DecisionContextLifecycle
 
     init(entrySource: EntrySource, prompt: String = "") {
@@ -86,6 +87,7 @@ final class BalanceBoardSession: ObservableObject, Identifiable {
             input: prepared.input,
             contextState: prepared.state,
             neuralState: neuralState,
+            brainState: brainState,
             preferences: preferences
         ) {
             result = refined
@@ -98,6 +100,10 @@ final class BalanceBoardSession: ObservableObject, Identifiable {
 
     func restoreIntelligenceLifecycle(_ snapshot: DecisionContextLifecycleSnapshot) {
         intelligenceLifecycle.restore(snapshot)
+    }
+
+    func loadBrainState(_ brainState: DecisionBrainState?) {
+        self.brainState = brainState
     }
 
     private var populatedFieldCount: Int {

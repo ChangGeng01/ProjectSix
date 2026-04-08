@@ -16,6 +16,7 @@ final class QuickCheckSession: ObservableObject, Identifiable {
     @Published var selectedAction: CheckAction?
     @Published var isShowingWaitSheet = false
     @Published var isRefiningWithModel = false
+    @Published private(set) var brainState: DecisionBrainState?
 
     let entrySource: EntrySource
     private let intelligenceLifecycle: DecisionContextLifecycle
@@ -71,6 +72,7 @@ final class QuickCheckSession: ObservableObject, Identifiable {
             input: prepared.input,
             contextState: prepared.state,
             neuralState: neuralState,
+            brainState: brainState,
             preferences: preferences
         ) {
             result = refined
@@ -83,5 +85,9 @@ final class QuickCheckSession: ObservableObject, Identifiable {
 
     func restoreIntelligenceLifecycle(_ snapshot: DecisionContextLifecycleSnapshot) {
         intelligenceLifecycle.restore(snapshot)
+    }
+
+    func loadBrainState(_ brainState: DecisionBrainState?) {
+        self.brainState = brainState
     }
 }

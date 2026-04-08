@@ -15,7 +15,10 @@ struct TestingDecisionIntelligenceProvider: DecisionIntelligenceProviding {
 
     func refineQuickResult(
         base: QuickCheckResult,
-        input: QuickCheckInput
+        input: QuickCheckInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> QuickCheckResult? {
         switch profile {
         case .smoke:
@@ -40,7 +43,10 @@ struct TestingDecisionIntelligenceProvider: DecisionIntelligenceProviding {
 
     func refineBalanceResult(
         base: BalanceBoardResult,
-        input: BalanceBoardInput
+        input: BalanceBoardInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> BalanceBoardResult? {
         switch profile {
         case .smoke:
@@ -80,7 +86,10 @@ struct TestingDecisionIntelligenceProvider: DecisionIntelligenceProviding {
 
     func refineMirrorResult(
         base: MirrorResult,
-        input: MirrorInput
+        input: MirrorInput,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
     ) async -> MirrorResult? {
         switch profile {
         case .smoke:
