@@ -4,19 +4,14 @@ import Foundation
 import FoundationModels
 #endif
 
-struct OnDeviceModelStatus: Equatable, Sendable {
-    let isAvailable: Bool
-    let title: String
-    let detail: String
-}
-
 enum FoundationModelsIntelligenceService {
-    static var availabilityStatus: OnDeviceModelStatus {
+    static var availabilityStatus: DecisionModelProviderStatus {
 #if canImport(FoundationModels)
         if #available(iOS 26.0, *) {
             let model = SystemLanguageModel.default
             if !model.supportsLocale(Locale.current) {
-                return OnDeviceModelStatus(
+                return DecisionModelProviderStatus(
+                    kind: .foundationModels,
                     isAvailable: false,
                     title: "Unavailable",
                     detail: "The current locale is not supported by the system language model."
@@ -25,13 +20,15 @@ enum FoundationModelsIntelligenceService {
 
             switch model.availability {
             case .available:
-                return OnDeviceModelStatus(
+                return DecisionModelProviderStatus(
+                    kind: .foundationModels,
                     isAvailable: true,
                     title: "Available",
                     detail: "Apple on-device generation is ready. Before can refine language locally without sending your decisions away."
                 )
             case .unavailable(let reason):
-                return OnDeviceModelStatus(
+                return DecisionModelProviderStatus(
+                    kind: .foundationModels,
                     isAvailable: false,
                     title: "Unavailable",
                     detail: detail(for: reason)
@@ -40,7 +37,8 @@ enum FoundationModelsIntelligenceService {
         }
 #endif
 
-        return OnDeviceModelStatus(
+        return DecisionModelProviderStatus(
+            kind: .foundationModels,
             isAvailable: false,
             title: "Unavailable",
             detail: "Requires iOS 26 or newer with Apple Intelligence support."

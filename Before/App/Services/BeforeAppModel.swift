@@ -36,8 +36,20 @@ final class BeforeAppModel: ObservableObject {
         restorePendingReflectionState()
     }
 
-    var onDeviceModelStatus: OnDeviceModelStatus {
+    var intelligenceRuntimeStatus: DecisionModelRuntimeStatus {
+        DecisionIntelligenceCoordinator.runtimeStatus(preferences: preferences)
+    }
+
+    var foundationModelStatus: DecisionModelProviderStatus {
         FoundationModelsIntelligenceService.availabilityStatus
+    }
+
+    var gemmaModelStatus: DecisionModelProviderStatus {
+        GemmaE4BIntelligenceService.availabilityStatus
+    }
+
+    var gemmaBundledAsset: GemmaModelAsset? {
+        GemmaE4BIntelligenceService.bundledModel
     }
 
     func handleInitialAppearance() {

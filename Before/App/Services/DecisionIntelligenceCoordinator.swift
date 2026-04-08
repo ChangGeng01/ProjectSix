@@ -3,6 +3,56 @@ import Foundation
 enum DecisionIntelligenceCoordinator {
     private static let adapter: any LocalModelAdapting = TemplateLocalModelAdapter()
 
+    static func runtimeStatus(
+        preferences: BeforePreferences = BeforePreferencesStore.load(),
+        gemmaStatus: DecisionModelProviderStatus = GemmaE4BIntelligenceService.availabilityStatus,
+        foundationStatus: DecisionModelProviderStatus = FoundationModelsIntelligenceService.availabilityStatus
+    ) -> DecisionModelRuntimeStatus {
+        guard preferences.onDeviceIntelligenceMode.isEnabled else {
+            return DecisionModelRuntimeStatus(
+                preferred: preferredKind(for: preferences.preferredIntelligenceProvider),
+                active: .template,
+                fallback: nil,
+                detail: "On-device intelligence is off, so Before is using the deterministic decision system only."
+            )
+        }
+
+        let preferred = preferredKind(for: preferences.preferredIntelligenceProvider)
+        let orderedStatuses = orderedStatuses(
+            for: preferences.preferredIntelligenceProvider,
+            gemmaStatus: gemmaStatus,
+            foundationStatus: foundationStatus
+        )
+
+        if let active = orderedStatuses.first(where: \.isAvailable) {
+            let fallback = active.kind == preferred ? nil : active.kind
+            let detail: String
+            if active.kind == preferred {
+                detail = "\(active.title). \(active.detail)"
+            } else {
+                detail = "\(providerTitle(for: preferred)) is not available. Before is using \(active.title.lowercased()) instead."
+            }
+
+            return DecisionModelRuntimeStatus(
+                preferred: preferred,
+                active: active.kind,
+                fallback: fallback,
+                detail: detail
+            )
+        }
+
+        let fallbackSource = orderedStatuses.first(where: { !$0.isAvailable && $0.kind == preferred }) ?? orderedStatuses.first
+        let detail = fallbackSource.map { "\(providerTitle(for: preferred)) is not available. \($0.detail) Before is falling back to deterministic local copy." }
+            ?? "No assistive provider is available. Before is falling back to deterministic local copy."
+
+        return DecisionModelRuntimeStatus(
+            preferred: preferred,
+            active: .template,
+            fallback: .template,
+            detail: detail
+        )
+    }
+
     static func route(
         prompt: String,
         scenario: ScenarioType? = nil,
@@ -68,7 +118,16 @@ enum DecisionIntelligenceCoordinator {
         preferences: BeforePreferences = BeforePreferencesStore.load()
     ) async -> QuickCheckResult? {
         guard preferences.onDeviceIntelligenceMode.isEnabled else { return nil }
-        return await FoundationModelsIntelligenceService.refineQuickResult(base: base, input: input)
+        return await refineUsingPreferredProvider(preference: preferences.preferredIntelligenceProvider) { provider in
+            switch provider {
+            case .gemmaE4B:
+                await GemmaE4BIntelligenceService.refineQuickResult(base: base, input: input)
+            case .foundationModels:
+                await FoundationModelsIntelligenceService.refineQuickResult(base: base, input: input)
+            case .template:
+                nil
+            }
+        }
     }
 
     static func refineBalanceResult(
@@ -77,7 +136,16 @@ enum DecisionIntelligenceCoordinator {
         preferences: BeforePreferences = BeforePreferencesStore.load()
     ) async -> BalanceBoardResult? {
         guard preferences.onDeviceIntelligenceMode.isEnabled else { return nil }
-        return await FoundationModelsIntelligenceService.refineBalanceResult(base: base, input: input)
+        return await refineUsingPreferredProvider(preference: preferences.preferredIntelligenceProvider) { provider in
+            switch provider {
+            case .gemmaE4B:
+                await GemmaE4BIntelligenceService.refineBalanceResult(base: base, input: input)
+            case .foundationModels:
+                await FoundationModelsIntelligenceService.refineBalanceResult(base: base, input: input)
+            case .template:
+                nil
+            }
+        }
     }
 
     static func refineMirrorResult(
@@ -86,6 +154,65 @@ enum DecisionIntelligenceCoordinator {
         preferences: BeforePreferences = BeforePreferencesStore.load()
     ) async -> MirrorResult? {
         guard preferences.onDeviceIntelligenceMode.isEnabled else { return nil }
-        return await FoundationModelsIntelligenceService.refineMirrorResult(base: base, input: input)
+        return await refineUsingPreferredProvider(preference: preferences.preferredIntelligenceProvider) { provider in
+            switch provider {
+            case .gemmaE4B:
+                await GemmaE4BIntelligenceService.refineMirrorResult(base: base, input: input)
+            case .foundationModels:
+                await FoundationModelsIntelligenceService.refineMirrorResult(base: base, input: input)
+            case .template:
+                nil
+            }
+        }
+    }
+
+    private static func preferredKind(for preference: DecisionModelProviderPreference) -> DecisionModelProviderKind {
+        switch preference {
+        case .gemmaE4B:
+            .gemmaE4B
+        case .foundationModels:
+            .foundationModels
+        }
+    }
+
+    private static func providerTitle(for kind: DecisionModelProviderKind) -> String {
+        kind.title
+    }
+
+    private static func orderedStatuses(
+        for preference: DecisionModelProviderPreference,
+        gemmaStatus: DecisionModelProviderStatus,
+        foundationStatus: DecisionModelProviderStatus
+    ) -> [DecisionModelProviderStatus] {
+        switch preference {
+        case .gemmaE4B:
+            [gemmaStatus, foundationStatus]
+        case .foundationModels:
+            [foundationStatus, gemmaStatus]
+        }
+    }
+
+    private static func orderedProviders(
+        for preference: DecisionModelProviderPreference
+    ) -> [DecisionModelProviderKind] {
+        switch preference {
+        case .gemmaE4B:
+            [.gemmaE4B, .foundationModels]
+        case .foundationModels:
+            [.foundationModels, .gemmaE4B]
+        }
+    }
+
+    private static func refineUsingPreferredProvider<T>(
+        preference: DecisionModelProviderPreference,
+        attempt: @escaping (DecisionModelProviderKind) async -> T?
+    ) async -> T? {
+        for provider in orderedProviders(for: preference) {
+            if let refined = await attempt(provider) {
+                return refined
+            }
+        }
+
+        return nil
     }
 }

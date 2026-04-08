@@ -27,6 +27,29 @@ enum OnDeviceIntelligenceMode: String, CaseIterable, Codable, Identifiable, Send
     }
 }
 
+enum DecisionModelProviderPreference: String, CaseIterable, Codable, Identifiable, Sendable {
+    case gemmaE4B
+    case foundationModels
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .gemmaE4B: "Gemma 4 E4B"
+        case .foundationModels: "Apple Foundation Model"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .gemmaE4B:
+            "Prefer the bundled Gemma model first, then fall back to Apple or deterministic local copy if it is unavailable."
+        case .foundationModels:
+            "Prefer Apple Intelligence first, then fall back to Gemma or deterministic local copy."
+        }
+    }
+}
+
 enum HomePromptAction: String, CaseIterable, Codable, Identifiable, Sendable {
     case autoRoute
     case quick
@@ -69,13 +92,15 @@ struct BeforePreferences: Codable, Equatable, Sendable {
     var restoreInProgressWorkspaces: Bool
     var showReviewInsights: Bool
     var onDeviceIntelligenceMode: OnDeviceIntelligenceMode
+    var preferredIntelligenceProvider: DecisionModelProviderPreference
 
     static let `default` = BeforePreferences(
         homePromptAction: .autoRoute,
         quickBufferDuration: BeforePolicy.QuickCheck.defaultBufferDuration,
         restoreInProgressWorkspaces: true,
         showReviewInsights: true,
-        onDeviceIntelligenceMode: .assistive
+        onDeviceIntelligenceMode: .assistive,
+        preferredIntelligenceProvider: .gemmaE4B
     )
 
     private enum CodingKeys: String, CodingKey {
@@ -84,6 +109,7 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         case restoreInProgressWorkspaces
         case showReviewInsights
         case onDeviceIntelligenceMode
+        case preferredIntelligenceProvider
     }
 
     init(
@@ -91,13 +117,15 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         quickBufferDuration: QuickBufferDuration,
         restoreInProgressWorkspaces: Bool,
         showReviewInsights: Bool,
-        onDeviceIntelligenceMode: OnDeviceIntelligenceMode
+        onDeviceIntelligenceMode: OnDeviceIntelligenceMode,
+        preferredIntelligenceProvider: DecisionModelProviderPreference
     ) {
         self.homePromptAction = homePromptAction
         self.quickBufferDuration = quickBufferDuration
         self.restoreInProgressWorkspaces = restoreInProgressWorkspaces
         self.showReviewInsights = showReviewInsights
         self.onDeviceIntelligenceMode = onDeviceIntelligenceMode
+        self.preferredIntelligenceProvider = preferredIntelligenceProvider
     }
 
     init(from decoder: any Decoder) throws {
@@ -107,6 +135,7 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         self.restoreInProgressWorkspaces = try container.decodeIfPresent(Bool.self, forKey: .restoreInProgressWorkspaces) ?? BeforePreferences.default.restoreInProgressWorkspaces
         self.showReviewInsights = try container.decodeIfPresent(Bool.self, forKey: .showReviewInsights) ?? BeforePreferences.default.showReviewInsights
         self.onDeviceIntelligenceMode = try container.decodeIfPresent(OnDeviceIntelligenceMode.self, forKey: .onDeviceIntelligenceMode) ?? BeforePreferences.default.onDeviceIntelligenceMode
+        self.preferredIntelligenceProvider = try container.decodeIfPresent(DecisionModelProviderPreference.self, forKey: .preferredIntelligenceProvider) ?? BeforePreferences.default.preferredIntelligenceProvider
     }
 }
 

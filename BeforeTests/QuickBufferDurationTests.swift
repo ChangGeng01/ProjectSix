@@ -13,7 +13,8 @@ final class QuickBufferDurationTests: XCTestCase {
             quickBufferDuration: .fiveMinutes,
             restoreInProgressWorkspaces: true,
             showReviewInsights: true,
-            onDeviceIntelligenceMode: .assistive
+            onDeviceIntelligenceMode: .assistive,
+            preferredIntelligenceProvider: .gemmaE4B
         )
 
         XCTAssertEqual(CheckAction.wait90s.title(using: preferences.quickBufferDuration), "Wait 5 minutes")

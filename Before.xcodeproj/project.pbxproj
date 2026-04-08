@@ -26,6 +26,7 @@
 		1B16408FE6065B5938D2C51C /* DecisionStarterLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D900CAAC9F53880921790B3 /* DecisionStarterLibrary.swift */; };
 		1C369C889014AD149DC50FD4 /* BeforePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DAB364E56E5EA8CCC7204F3 /* BeforePolicy.swift */; };
 		1C817A6C32A9FDB942853C9E /* ResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6E1FD7F02BE18A0F653DE4 /* ResultView.swift */; };
+		21E57F47E1E3F755A2D0382F /* GemmaModelAssetCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0F4B964794D48979212BA9 /* GemmaModelAssetCatalog.swift */; };
 		2243D36D33F343B82F81029E /* MirrorEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A05E06826B9C52DE8D6875DC /* MirrorEngine.swift */; };
 		22ECFF18FE978AC0BAD75802 /* BeforePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DAB364E56E5EA8CCC7204F3 /* BeforePolicy.swift */; };
 		25229166B79487699A5BE43C /* TomorrowBoxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9981DC0C62B0CC0F075EDC39 /* TomorrowBoxView.swift */; };
@@ -36,6 +37,7 @@
 		2FB60FD583DFA2A03C103177 /* SharedLifeItemFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38B6040A74F189418060A171 /* SharedLifeItemFactory.swift */; };
 		2FBA7E9C24DACAA361AE1A87 /* QuickCheckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 808EB61307CDE69C81AE5BBE /* QuickCheckView.swift */; };
 		30B7C7F83352774B5CB49CB7 /* PendingReflectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CEADE1FA1884D9F8FEB7950 /* PendingReflectionStore.swift */; };
+		323DB6BB7275505F3E7A7617 /* GemmaModelAssetCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BE1F483720C3F9E3812F4C4 /* GemmaModelAssetCatalogTests.swift */; };
 		3671D50FE2556C6C7D0E7FA4 /* PendingLaunchRequestStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E0334A8565803EF7707BB38 /* PendingLaunchRequestStore.swift */; };
 		3E057C871B016661F9EBC629 /* ReminderTemplateLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 572E58A5A6D0778DCAD31234 /* ReminderTemplateLibraryTests.swift */; };
 		3E42715FBE871E2C86C124F4 /* BeforeTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FBEC07A4802202A55F07273 /* BeforeTheme.swift */; };
@@ -54,6 +56,7 @@
 		52C12D06470D02C5A92EE481 /* DecisionStarterLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5EC40417B021F9CAFFD08C /* DecisionStarterLibraryTests.swift */; };
 		542CC720483001216062BDAF /* SharedContainerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14BBBFC879A75D527348A3A /* SharedContainerTests.swift */; };
 		5888AC82F3C7C85C034AB622 /* WidgetSafeCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E7431FC89A250D4D0C9BB0B /* WidgetSafeCopyTests.swift */; };
+		6155DA5D7A284986C8864148 /* GemmaE4BIntelligenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89976181A6C6D07117C3220F /* GemmaE4BIntelligenceService.swift */; };
 		61ABFAE2B9337149D8BF6BAB /* LaunchRequestResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC3ED6E2F02764281FE79FDD /* LaunchRequestResolver.swift */; };
 		62BC59F28EFB73407F848C35 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2FC0E53534B32B214E62F4E5 /* Assets.xcassets */; };
 		6461C907703FF797BE2E2203 /* PendingLaunchRequestStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E0334A8565803EF7707BB38 /* PendingLaunchRequestStore.swift */; };
@@ -159,6 +162,7 @@
 		F9E1151C7529383382623872 /* TomorrowBoxDelayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089FFE692CB2D08A060A21AC /* TomorrowBoxDelayTests.swift */; };
 		FC0E461363A93C5121E51141 /* SupportInboxStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24184A62A2B7E01F7BEA869A /* SupportInboxStoreTests.swift */; };
 		FF8818ABD3CE2840697F5DB9 /* QuickBufferDuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28559294F554136C5D9334B2 /* QuickBufferDuration.swift */; };
+		FFEFBAAC6A158CEB42BF96E8 /* DecisionModelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EF86CEA609BCC614EAAB7D0 /* DecisionModelProvider.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -198,6 +202,7 @@
 		078D41DF98B71E11CD93C772 /* SharedLifeItemFactoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLifeItemFactoryTests.swift; sourceTree = "<group>"; };
 		0878363BE996C18206470FE0 /* GuidedInputCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedInputCard.swift; sourceTree = "<group>"; };
 		089FFE692CB2D08A060A21AC /* TomorrowBoxDelayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxDelayTests.swift; sourceTree = "<group>"; };
+		0D0F4B964794D48979212BA9 /* GemmaModelAssetCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GemmaModelAssetCatalog.swift; sourceTree = "<group>"; };
 		0DAB364E56E5EA8CCC7204F3 /* BeforePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforePolicy.swift; sourceTree = "<group>"; };
 		0E0334A8565803EF7707BB38 /* PendingLaunchRequestStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingLaunchRequestStore.swift; sourceTree = "<group>"; };
 		0EC6D618BA06FEEFADA2ED4B /* SupportRequestKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportRequestKind.swift; sourceTree = "<group>"; };
@@ -234,6 +239,7 @@
 		4C1CF4BDBA8776C1E59C9B45 /* CheckAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckAction.swift; sourceTree = "<group>"; };
 		4DDB21D625F2F95F5D016974 /* TomorrowBoxDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxDraft.swift; sourceTree = "<group>"; };
 		4DFE4FB1A6B9A76AD2AD80E3 /* WaitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitView.swift; sourceTree = "<group>"; };
+		4EF86CEA609BCC614EAAB7D0 /* DecisionModelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionModelProvider.swift; sourceTree = "<group>"; };
 		4F454C1445FA6FD73087FAC8 /* CheckRuleEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckRuleEngine.swift; sourceTree = "<group>"; };
 		4FC15551C8847566B4860806 /* BeforePreferencesStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforePreferencesStoreTests.swift; sourceTree = "<group>"; };
 		5263B35DEB9254806060CCA3 /* EntrySource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntrySource.swift; sourceTree = "<group>"; };
@@ -265,9 +271,11 @@
 		7ACE14AA595C9EA5B7FEB035 /* ActiveDecisionWorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveDecisionWorkspaceStore.swift; sourceTree = "<group>"; };
 		7B2D947D30BE6BCB8C3A28A6 /* DecisionReviewEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionReviewEngine.swift; sourceTree = "<group>"; };
 		7BAE04A71B8826BDE45EAF6E /* QuickCheckSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCheckSession.swift; sourceTree = "<group>"; };
+		7BE1F483720C3F9E3812F4C4 /* GemmaModelAssetCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GemmaModelAssetCatalogTests.swift; sourceTree = "<group>"; };
 		808EB61307CDE69C81AE5BBE /* QuickCheckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCheckView.swift; sourceTree = "<group>"; };
 		832388234BBD87089EB64DD9 /* SharedLifeRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLifeRule.swift; sourceTree = "<group>"; };
 		8803C58B37023CB5C616CD7C /* DecisionMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionMode.swift; sourceTree = "<group>"; };
+		89976181A6C6D07117C3220F /* GemmaE4BIntelligenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GemmaE4BIntelligenceService.swift; sourceTree = "<group>"; };
 		8C770A8A464D7D5BFFD53D19 /* BeforeWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeforeWidgetExtension.entitlements; sourceTree = "<group>"; };
 		8FDBF1730457BB2E21337458 /* DecisionRecordRestoration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionRecordRestoration.swift; sourceTree = "<group>"; };
 		90848CE193E40A87CF870DFA /* SupportInboxStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportInboxStore.swift; sourceTree = "<group>"; };
@@ -388,10 +396,13 @@
 				A2710C9DCEDCB00295552131 /* BeforePreferencesStore.swift */,
 				2F047738D148D3433E732FA5 /* DecisionIntelligenceCoordinator.swift */,
 				645A67931102F242BF694CBB /* DecisionIntelligencePromptLibrary.swift */,
+				4EF86CEA609BCC614EAAB7D0 /* DecisionModelProvider.swift */,
 				8FDBF1730457BB2E21337458 /* DecisionRecordRestoration.swift */,
 				7B2D947D30BE6BCB8C3A28A6 /* DecisionReviewEngine.swift */,
 				1D900CAAC9F53880921790B3 /* DecisionStarterLibrary.swift */,
 				E9236FC498B39FD0A29ED234 /* FoundationModelsIntelligenceService.swift */,
+				89976181A6C6D07117C3220F /* GemmaE4BIntelligenceService.swift */,
+				0D0F4B964794D48979212BA9 /* GemmaModelAssetCatalog.swift */,
 				23F476A392EB99124E0CBDBF /* LocalModelAdapter.swift */,
 				E70A414A2528AF11F510CD25 /* MirrorWorkspaceSession.swift */,
 				DFDA8C2C4F4EB349F7763323 /* NotificationService.swift */,
@@ -445,6 +456,7 @@
 				438899EA716D6093E4500048 /* DecisionRecordRestorationTests.swift */,
 				EE5ECF006D7648F3C667BF84 /* DecisionReviewEngineTests.swift */,
 				9A5EC40417B021F9CAFFD08C /* DecisionStarterLibraryTests.swift */,
+				7BE1F483720C3F9E3812F4C4 /* GemmaModelAssetCatalogTests.swift */,
 				63658AD94D911459300CDB15 /* HomePromptActionTests.swift */,
 				5DF9D3F05358E50DCC11E2AF /* LaunchRequestResolverTests.swift */,
 				734F52EF13FFB8B1DA81BC96 /* MirrorEngineTests.swift */,
@@ -782,12 +794,15 @@
 				0E3E39505C17952EE5C84880 /* DecisionMode.swift in Sources */,
 				D95E6740672BA7080A66DF1D /* DecisionModeCard.swift in Sources */,
 				167EC3CF0549AAFEED0A0940 /* DecisionModeRouter.swift in Sources */,
+				FFEFBAAC6A158CEB42BF96E8 /* DecisionModelProvider.swift in Sources */,
 				40CDCC53B762BF3B98144AF4 /* DecisionRecordRestoration.swift in Sources */,
 				A67CDCCE9D03D5DBB3D500FB /* DecisionReviewEngine.swift in Sources */,
 				67EE16CD290619AAB8F5A647 /* DecisionRoutePreviewCard.swift in Sources */,
 				1B16408FE6065B5938D2C51C /* DecisionStarterLibrary.swift in Sources */,
 				BA99C96ABD658EADEE79DE5B /* EntrySource.swift in Sources */,
 				41AD1DA946062CDD67101DBF /* FoundationModelsIntelligenceService.swift in Sources */,
+				6155DA5D7A284986C8864148 /* GemmaE4BIntelligenceService.swift in Sources */,
+				21E57F47E1E3F755A2D0382F /* GemmaModelAssetCatalog.swift in Sources */,
 				BC119E173C9725E0DD522AD7 /* GuidedInputCard.swift in Sources */,
 				6B27C4A3750F2A7978B425D3 /* HistoryDetailView.swift in Sources */,
 				873075573792938B474AE0C9 /* HistoryView.swift in Sources */,
@@ -901,6 +916,7 @@
 				D99FF9332959DCD349DD6FF6 /* DecisionRecordRestorationTests.swift in Sources */,
 				11F77E80EE0F2B45F51AE79E /* DecisionReviewEngineTests.swift in Sources */,
 				52C12D06470D02C5A92EE481 /* DecisionStarterLibraryTests.swift in Sources */,
+				323DB6BB7275505F3E7A7617 /* GemmaModelAssetCatalogTests.swift in Sources */,
 				F8234276CF94ACFD29BA7372 /* HomePromptActionTests.swift in Sources */,
 				A4C6F0721574B7ADAF7D388A /* LaunchRequestResolverTests.swift in Sources */,
 				3FA6A6CEB2949EBCAEC944FF /* MirrorEngineTests.swift in Sources */,

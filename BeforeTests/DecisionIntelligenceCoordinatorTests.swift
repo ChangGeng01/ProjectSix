@@ -74,7 +74,8 @@ final class DecisionIntelligenceCoordinatorTests: XCTestCase {
             quickBufferDuration: .ninetySeconds,
             restoreInProgressWorkspaces: true,
             showReviewInsights: true,
-            onDeviceIntelligenceMode: .assistive
+            onDeviceIntelligenceMode: .assistive,
+            preferredIntelligenceProvider: .gemmaE4B
         )
     }
 
@@ -84,7 +85,52 @@ final class DecisionIntelligenceCoordinatorTests: XCTestCase {
             quickBufferDuration: .ninetySeconds,
             restoreInProgressWorkspaces: true,
             showReviewInsights: true,
-            onDeviceIntelligenceMode: .off
+            onDeviceIntelligenceMode: .off,
+            preferredIntelligenceProvider: .gemmaE4B
         )
+    }
+
+    func testRuntimeStatusFallsBackToFoundationWhenGemmaIsUnavailable() {
+        let status = DecisionIntelligenceCoordinator.runtimeStatus(
+            preferences: assistivePreferences,
+            gemmaStatus: DecisionModelProviderStatus(
+                kind: .gemmaE4B,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Gemma is missing."
+            ),
+            foundationStatus: DecisionModelProviderStatus(
+                kind: .foundationModels,
+                isAvailable: true,
+                title: "Available",
+                detail: "Apple is ready."
+            )
+        )
+
+        XCTAssertEqual(status.preferred, .gemmaE4B)
+        XCTAssertEqual(status.active, .foundationModels)
+        XCTAssertEqual(status.fallback, .foundationModels)
+    }
+
+    func testRuntimeStatusFallsBackToTemplateWhenNoAssistiveProviderIsAvailable() {
+        let status = DecisionIntelligenceCoordinator.runtimeStatus(
+            preferences: assistivePreferences,
+            gemmaStatus: DecisionModelProviderStatus(
+                kind: .gemmaE4B,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Gemma is missing."
+            ),
+            foundationStatus: DecisionModelProviderStatus(
+                kind: .foundationModels,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Apple is off."
+            )
+        )
+
+        XCTAssertEqual(status.preferred, .gemmaE4B)
+        XCTAssertEqual(status.active, .template)
+        XCTAssertEqual(status.fallback, .template)
     }
 }

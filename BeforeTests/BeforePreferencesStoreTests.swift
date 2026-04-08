@@ -24,7 +24,8 @@ final class BeforePreferencesStoreTests: XCTestCase {
             quickBufferDuration: .tenMinutes,
             restoreInProgressWorkspaces: false,
             showReviewInsights: false,
-            onDeviceIntelligenceMode: .off
+            onDeviceIntelligenceMode: .off,
+            preferredIntelligenceProvider: .foundationModels
         )
 
         BeforePreferencesStore.save(preferences)
@@ -51,5 +52,6 @@ final class BeforePreferencesStoreTests: XCTestCase {
         XCTAssertEqual(loaded.restoreInProgressWorkspaces, false)
         XCTAssertEqual(loaded.showReviewInsights, true)
         XCTAssertEqual(loaded.onDeviceIntelligenceMode, .assistive)
+        XCTAssertEqual(loaded.preferredIntelligenceProvider, .gemmaE4B)
     }
 }

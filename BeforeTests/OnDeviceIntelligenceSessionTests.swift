@@ -82,7 +82,8 @@ final class OnDeviceIntelligenceSessionTests: XCTestCase {
             quickBufferDuration: .ninetySeconds,
             restoreInProgressWorkspaces: true,
             showReviewInsights: true,
-            onDeviceIntelligenceMode: .off
+            onDeviceIntelligenceMode: .off,
+            preferredIntelligenceProvider: .gemmaE4B
         )
     }
 }

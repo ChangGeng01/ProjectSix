@@ -15,6 +15,7 @@ It is not a streak app, not a blocker, and not a shame machine. The current buil
 - Home / History / Settings tabs
 - Home Screen + Lock Screen widgets
 - App Intents / Shortcuts / Siri entry groundwork
+- assistive intelligence with provider routing and deterministic fallbacks
 
 ## Stack
 
@@ -58,4 +59,6 @@ xcodebuild -project Before.xcodeproj -scheme Before -destination 'platform=iOS S
 - Widget surfaces only use safe generic copy and never show raw user-written reminders.
 - Personal data stays local in this build.
 - The quick verdict engine remains rule-based and intentionally lightweight.
-- The project currently includes 47 passing unit tests covering routing, restoration, storage, reminders, review insights, and typed preferences.
+- Apple Foundation Models can refine local copy on supported devices.
+- Gemma 4 E4B is prepared as a bundled `.litertlm` asset under `Before/Resources/Models`, with runtime fallback to Apple or deterministic copy when unavailable.
+- The project currently includes 84 passing unit tests covering routing, restoration, storage, reminders, review insights, typed preferences, and model-provider fallback behavior.

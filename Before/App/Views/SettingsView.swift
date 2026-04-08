@@ -74,9 +74,40 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
-                    LabeledContent("Foundation Model", value: appModel.onDeviceModelStatus.title)
+                    Picker("Preferred model", selection: preferredProviderBinding) {
+                        ForEach(DecisionModelProviderPreference.allCases) { provider in
+                            Text(provider.title).tag(provider)
+                        }
+                    }
 
-                    Text(appModel.onDeviceModelStatus.detail)
+                    Text(appModel.preferences.preferredIntelligenceProvider.subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    LabeledContent("Active provider", value: appModel.intelligenceRuntimeStatus.active.title)
+
+                    Text(appModel.intelligenceRuntimeStatus.detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    LabeledContent("Gemma bundle", value: appModel.gemmaModelStatus.title)
+
+                    Text(appModel.gemmaModelStatus.detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    if let gemmaAsset = appModel.gemmaBundledAsset {
+                        LabeledContent("Bundled asset", value: gemmaAsset.fileName)
+                        LabeledContent("Bundled size", value: gemmaAsset.displaySize)
+                    } else {
+                        Text("Expected bundle folder: Before/Resources/Models")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    LabeledContent("Apple model", value: appModel.foundationModelStatus.title)
+
+                    Text(appModel.foundationModelStatus.detail)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -210,6 +241,15 @@ struct SettingsView: View {
             get: { appModel.preferences.onDeviceIntelligenceMode },
             set: { newValue in
                 appModel.updatePreferences { $0.onDeviceIntelligenceMode = newValue }
+            }
+        )
+    }
+
+    private var preferredProviderBinding: Binding<DecisionModelProviderPreference> {
+        Binding(
+            get: { appModel.preferences.preferredIntelligenceProvider },
+            set: { newValue in
+                appModel.updatePreferences { $0.preferredIntelligenceProvider = newValue }
             }
         )
     }
