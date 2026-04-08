@@ -7,12 +7,19 @@ enum DecisionIntelligenceCoordinator {
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences(),
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile,
         device: DeviceCapabilitySnapshot = .current,
+        openModelStatus: DecisionModelProviderStatus = DecisionIntelligenceProviderRegistry.shared.statusesByKind()[.openModel] ?? DecisionModelProviderStatus(
+            kind: .openModel,
+            isAvailable: false,
+            title: "Reserved",
+            detail: "No open-model runtime is registered."
+        ),
         gemmaStatus: DecisionModelProviderStatus = GemmaE4BIntelligenceService.availabilityStatus,
         foundationStatus: DecisionModelProviderStatus = FoundationModelsIntelligenceService.availabilityStatus
     ) -> DecisionIntelligenceExecutionProfile {
         DecisionIntelligenceExecutionProfileResolver.resolve(
             preferences: preferences,
             device: device,
+            openModelStatus: openModelStatus,
             foundationStatus: foundationStatus,
             gemmaStatus: gemmaStatus,
             testingStubProfile: testingStubProfile
@@ -23,6 +30,12 @@ enum DecisionIntelligenceCoordinator {
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences(),
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile,
         device: DeviceCapabilitySnapshot = .current,
+        openModelStatus: DecisionModelProviderStatus = DecisionIntelligenceProviderRegistry.shared.statusesByKind()[.openModel] ?? DecisionModelProviderStatus(
+            kind: .openModel,
+            isAvailable: false,
+            title: "Reserved",
+            detail: "No open-model runtime is registered."
+        ),
         gemmaStatus: DecisionModelProviderStatus = GemmaE4BIntelligenceService.availabilityStatus,
         foundationStatus: DecisionModelProviderStatus = FoundationModelsIntelligenceService.availabilityStatus
     ) -> DecisionModelRuntimeStatus {
@@ -30,6 +43,7 @@ enum DecisionIntelligenceCoordinator {
             preferences: preferences,
             testingStubProfile: testingStubProfile,
             device: device,
+            openModelStatus: openModelStatus,
             gemmaStatus: gemmaStatus,
             foundationStatus: foundationStatus
         )
@@ -46,6 +60,7 @@ enum DecisionIntelligenceCoordinator {
         var status = DecisionIntelligenceProviderPipeline.runtimeStatus(
             preferences: runtimePreferences,
             statusesByKind: [
+                .openModel: openModelStatus,
                 .gemmaE4B: gemmaStatus,
                 .foundationModels: foundationStatus
             ],

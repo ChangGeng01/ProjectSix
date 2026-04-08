@@ -24,6 +24,13 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         )
     }
 
+    func testOrderedKindsPreferOpenModelSlotFirst() {
+        XCTAssertEqual(
+            DecisionIntelligenceProviderPipeline.orderedKinds(for: .openModel),
+            [.openModel, .gemmaE4B, .foundationModels]
+        )
+    }
+
     func testOrderedKindsCanPinTemplateOnly() {
         XCTAssertEqual(
             DecisionIntelligenceProviderPipeline.orderedKinds(for: .template),

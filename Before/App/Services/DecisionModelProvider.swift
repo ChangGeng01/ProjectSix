@@ -2,6 +2,7 @@ import Foundation
 
 enum DecisionModelProviderKind: String, Sendable {
     case gemmaE4B
+    case openModel
     case foundationModels
     case testingStub
     case template
@@ -9,6 +10,7 @@ enum DecisionModelProviderKind: String, Sendable {
     var title: String {
         switch self {
         case .gemmaE4B: "Gemma 4 E4B"
+        case .openModel: "Open model runtime"
         case .foundationModels: "Apple Foundation Model"
         case .testingStub: "Testing stub"
         case .template: "Deterministic fallback"

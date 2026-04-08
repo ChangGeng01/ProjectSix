@@ -3,6 +3,7 @@ import Foundation
 struct DecisionTestingRuntimeExport {
     let generatedAt: Date
     let runtimeSnapshot: DecisionTestingRuntimeSnapshot
+    let registeredProviders: [DecisionModelProviderDescriptor]
     let intelligenceTelemetry: DecisionIntelligenceTelemetrySnapshot
     let cacheTelemetry: DecisionIntelligenceCacheTelemetrySnapshot
     let circuitBreakerSnapshot: DecisionIntelligenceCircuitBreakerSnapshot
@@ -175,6 +176,8 @@ struct DecisionTestingRuntimeExport {
             replayCount: recentReplay.count,
             totalCacheEntries: cacheTelemetry.entryCountByKind.values.reduce(0, +),
             dominantGemmaBackend: dominantGemmaBackend,
+            registeredProviderCount: registeredProviders.count,
+            registeredOpenModelProviderCount: registeredProviders.filter { $0.track == .builtInOpenModel }.count,
             circuitOpenProviderCount: circuitBreakerSnapshot.activeProviders.count,
             activeCircuitProviders: circuitBreakerSnapshot.activeProviders,
             circuitTripCount: circuitBreakerSnapshot.totalTripCount,
@@ -435,6 +438,8 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let replayCount: Int
     let totalCacheEntries: Int
     let dominantGemmaBackend: InferenceBackendKind?
+    let registeredProviderCount: Int
+    let registeredOpenModelProviderCount: Int
     let circuitOpenProviderCount: Int
     let activeCircuitProviders: [DecisionModelProviderKind]
     let circuitTripCount: Int

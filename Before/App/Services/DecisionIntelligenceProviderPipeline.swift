@@ -1,130 +1,7 @@
 import Foundation
 
-protocol DecisionIntelligenceProviding: Sendable {
-    var kind: DecisionModelProviderKind { get }
-    var availabilityStatus: DecisionModelProviderStatus { get }
-
-    func refineQuickResult(
-        base: QuickCheckResult,
-        input: QuickCheckInput
-    ) async -> QuickCheckResult?
-
-    func refineBalanceResult(
-        base: BalanceBoardResult,
-        input: BalanceBoardInput
-    ) async -> BalanceBoardResult?
-
-    func refineMirrorResult(
-        base: MirrorResult,
-        input: MirrorInput
-    ) async -> MirrorResult?
-
-    func pickReminder(
-        from candidates: [ReminderSelectionCandidate],
-        scenario: ScenarioType,
-        prompt: String,
-        mode: DecisionMode?
-    ) async -> ReminderSelectionCandidate?
-}
-
-struct GemmaDecisionIntelligenceProvider: DecisionIntelligenceProviding {
-    var kind: DecisionModelProviderKind { .gemmaE4B }
-    var availabilityStatus: DecisionModelProviderStatus { GemmaE4BIntelligenceService.availabilityStatus }
-
-    func refineQuickResult(
-        base: QuickCheckResult,
-        input: QuickCheckInput
-    ) async -> QuickCheckResult? {
-        await GemmaE4BIntelligenceService.refineQuickResult(
-            base: base,
-            input: input,
-            backendPolicy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
-        )
-    }
-
-    func refineBalanceResult(
-        base: BalanceBoardResult,
-        input: BalanceBoardInput
-    ) async -> BalanceBoardResult? {
-        await GemmaE4BIntelligenceService.refineBalanceResult(
-            base: base,
-            input: input,
-            backendPolicy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
-        )
-    }
-
-    func refineMirrorResult(
-        base: MirrorResult,
-        input: MirrorInput
-    ) async -> MirrorResult? {
-        await GemmaE4BIntelligenceService.refineMirrorResult(
-            base: base,
-            input: input,
-            backendPolicy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
-        )
-    }
-
-    func pickReminder(
-        from candidates: [ReminderSelectionCandidate],
-        scenario: ScenarioType,
-        prompt: String,
-        mode: DecisionMode?
-    ) async -> ReminderSelectionCandidate? {
-        await GemmaE4BIntelligenceService.pickReminder(
-            from: candidates,
-            scenario: scenario,
-            prompt: prompt,
-            mode: mode,
-            backendPolicy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
-        )
-    }
-}
-
-struct FoundationDecisionIntelligenceProvider: DecisionIntelligenceProviding {
-    var kind: DecisionModelProviderKind { .foundationModels }
-    var availabilityStatus: DecisionModelProviderStatus { FoundationModelsIntelligenceService.availabilityStatus }
-
-    func refineQuickResult(
-        base: QuickCheckResult,
-        input: QuickCheckInput
-    ) async -> QuickCheckResult? {
-        await FoundationModelsIntelligenceService.refineQuickResult(base: base, input: input)
-    }
-
-    func refineBalanceResult(
-        base: BalanceBoardResult,
-        input: BalanceBoardInput
-    ) async -> BalanceBoardResult? {
-        await FoundationModelsIntelligenceService.refineBalanceResult(base: base, input: input)
-    }
-
-    func refineMirrorResult(
-        base: MirrorResult,
-        input: MirrorInput
-    ) async -> MirrorResult? {
-        await FoundationModelsIntelligenceService.refineMirrorResult(base: base, input: input)
-    }
-
-    func pickReminder(
-        from candidates: [ReminderSelectionCandidate],
-        scenario: ScenarioType,
-        prompt: String,
-        mode: DecisionMode?
-    ) async -> ReminderSelectionCandidate? {
-        await FoundationModelsIntelligenceService.pickReminder(
-            from: candidates,
-            scenario: scenario,
-            prompt: prompt,
-            mode: mode
-        )
-    }
-}
-
 enum DecisionIntelligenceProviderPipeline {
-    private static let providersByKind: [DecisionModelProviderKind: any DecisionIntelligenceProviding] = [
-        .gemmaE4B: GemmaDecisionIntelligenceProvider(),
-        .foundationModels: FoundationDecisionIntelligenceProvider()
-    ]
+    private static let registry = DecisionIntelligenceProviderRegistry.shared
     private static let responseCache = DecisionIntelligenceResponseCache.shared
 
     static func orderedKinds(
@@ -143,6 +20,8 @@ enum DecisionIntelligenceProviderPipeline {
         let ordered: [DecisionModelProviderKind] = switch preference {
         case .gemmaE4B:
             [.gemmaE4B, .foundationModels]
+        case .openModel:
+            [.openModel, .gemmaE4B, .foundationModels]
         case .foundationModels:
             [.foundationModels, .gemmaE4B]
         case .template:
@@ -1097,9 +976,7 @@ enum DecisionIntelligenceProviderPipeline {
     }
 
     static func defaultStatusesByKind() -> [DecisionModelProviderKind: DecisionModelProviderStatus] {
-        providersByKind.reduce(into: [:]) { partialResult, entry in
-            partialResult[entry.key] = entry.value.availabilityStatus
-        }
+        registry.statusesByKind()
     }
 
     private static func orderedProviders(
@@ -1115,7 +992,7 @@ enum DecisionIntelligenceProviderPipeline {
             for: preference,
             allowFallbacks: allowFallbacks,
             excluding: suspendedKinds
-        ).compactMap { providersByKind[$0] }
+        ).compactMap { registry.provider(for: $0) }
     }
 
     private static func deterministicFallbackDetail(

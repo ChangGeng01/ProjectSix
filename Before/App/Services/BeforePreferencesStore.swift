@@ -29,6 +29,7 @@ enum OnDeviceIntelligenceMode: String, CaseIterable, Codable, Identifiable, Send
 
 enum DecisionModelProviderPreference: String, CaseIterable, Codable, Identifiable, Sendable {
     case gemmaE4B
+    case openModel
     case foundationModels
     case template
 
@@ -37,6 +38,7 @@ enum DecisionModelProviderPreference: String, CaseIterable, Codable, Identifiabl
     var title: String {
         switch self {
         case .gemmaE4B: "Gemma 4 E4B"
+        case .openModel: "Open model runtime"
         case .foundationModels: "Apple Foundation Model"
         case .template: "Deterministic local copy"
         }
@@ -46,6 +48,8 @@ enum DecisionModelProviderPreference: String, CaseIterable, Codable, Identifiabl
         switch self {
         case .gemmaE4B:
             "Use the bundled Gemma model as the primary local intelligence provider."
+        case .openModel:
+            "Use the currently registered open-model runtime slot as the primary local intelligence provider."
         case .foundationModels:
             "Use Apple Intelligence as the primary on-device language model when it is available."
         case .template:
@@ -56,6 +60,7 @@ enum DecisionModelProviderPreference: String, CaseIterable, Codable, Identifiabl
     var kind: DecisionModelProviderKind {
         switch self {
         case .gemmaE4B: .gemmaE4B
+        case .openModel: .openModel
         case .foundationModels: .foundationModels
         case .template: .template
         }

@@ -240,6 +240,12 @@ enum DecisionTestingInterface {
         await breaker.snapshot()
     }
 
+    static func registeredProviderDescriptors(
+        registry: DecisionIntelligenceProviderRegistry = .shared
+    ) -> [DecisionModelProviderDescriptor] {
+        registry.descriptors()
+    }
+
     @MainActor
     static func runtimeExport(
         quick: [CheckEvent],
@@ -252,7 +258,8 @@ enum DecisionTestingInterface {
         debugStore: DecisionIntelligenceDebugStore = .shared,
         telemetryStore: DecisionIntelligenceTelemetryStore = .shared,
         cache: DecisionIntelligenceResponseCache = .shared,
-        circuitBreaker: DecisionIntelligenceCircuitBreaker = .shared
+        circuitBreaker: DecisionIntelligenceCircuitBreaker = .shared,
+        registry: DecisionIntelligenceProviderRegistry = .shared
     ) async -> DecisionTestingRuntimeExport {
         let snapshot = runtimeSnapshot(
             preferences: preferences,
@@ -270,6 +277,7 @@ enum DecisionTestingInterface {
         return DecisionTestingRuntimeExport(
             generatedAt: .now,
             runtimeSnapshot: snapshot,
+            registeredProviders: registry.descriptors(),
             intelligenceTelemetry: await telemetryStore.snapshot(),
             cacheTelemetry: await cache.telemetrySnapshot(),
             circuitBreakerSnapshot: await circuitBreaker.snapshot(),

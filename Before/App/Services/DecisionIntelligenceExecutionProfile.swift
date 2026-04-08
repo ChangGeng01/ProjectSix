@@ -29,6 +29,12 @@ enum DecisionIntelligenceExecutionProfileResolver {
     static func resolve(
         preferences: BeforePreferences,
         device: DeviceCapabilitySnapshot = .current,
+        openModelStatus: DecisionModelProviderStatus = DecisionIntelligenceProviderRegistry.shared.statusesByKind()[.openModel] ?? DecisionModelProviderStatus(
+            kind: .openModel,
+            isAvailable: false,
+            title: "Reserved",
+            detail: "No open-model runtime is registered."
+        ),
         foundationStatus: DecisionModelProviderStatus = FoundationModelsIntelligenceService.availabilityStatus,
         gemmaStatus: DecisionModelProviderStatus = GemmaE4BIntelligenceService.availabilityStatus,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile,
@@ -86,6 +92,13 @@ enum DecisionIntelligenceExecutionProfileResolver {
                         detail: "Testing is pinning Apple's system-managed model, so Before is keeping the full assistive path open for that provider."
                     )
                 }
+            case .openModel:
+                return openModelProfile(
+                    preferences: preferences,
+                    device: device,
+                    status: openModelStatus,
+                    detailPrefix: "Testing is pinning the registered open-model runtime."
+                )
             case .gemmaE4B:
                 if gemmaStatus.isAvailable {
                     return DecisionIntelligenceExecutionProfile(
@@ -112,6 +125,15 @@ enum DecisionIntelligenceExecutionProfileResolver {
                 allowsMirrorRefinement: false,
                 allowsReminderSelection: false,
                 detail: "Deterministic local copy is pinned, so Before is not using a model provider for assistive refinement."
+            )
+        }
+
+        if preferences.preferredIntelligenceProvider == .openModel {
+            return openModelProfile(
+                preferences: preferences,
+                device: device,
+                status: openModelStatus,
+                detailPrefix: "The open-model runtime slot is preferred."
             )
         }
 
@@ -202,6 +224,64 @@ enum DecisionIntelligenceExecutionProfileResolver {
             allowsMirrorRefinement: true,
             allowsReminderSelection: true,
             detail: "This device has enough headroom for the full Gemma-assisted path, while Before still keeps verdicts deterministic."
+        )
+    }
+
+    private static func openModelProfile(
+        preferences: BeforePreferences,
+        device: DeviceCapabilitySnapshot,
+        status: DecisionModelProviderStatus,
+        detailPrefix: String
+    ) -> DecisionIntelligenceExecutionProfile {
+        if device.isSimulator {
+            return DecisionIntelligenceExecutionProfile(
+                tier: .simulator,
+                effectiveProviderPreference: .template,
+                allowFallbacks: false,
+                allowsQuickRefinement: false,
+                allowsBalanceRefinement: false,
+                allowsMirrorRefinement: false,
+                allowsReminderSelection: false,
+                detail: "On Simulator, Before keeps the reserved open-model slot off the critical path and stays deterministic."
+            )
+        }
+
+        if device.isLowPowerModeEnabled {
+            return DecisionIntelligenceExecutionProfile(
+                tier: .conservativeDeterministic,
+                effectiveProviderPreference: .template,
+                allowFallbacks: false,
+                allowsQuickRefinement: false,
+                allowsBalanceRefinement: false,
+                allowsMirrorRefinement: false,
+                allowsReminderSelection: false,
+                detail: "Low Power Mode is on, so Before keeps the open-model runtime off the critical path to protect battery life."
+            )
+        }
+
+        if device.physicalMemoryGB < 7 {
+            return DecisionIntelligenceExecutionProfile(
+                tier: .conservativeDeterministic,
+                effectiveProviderPreference: .template,
+                allowFallbacks: false,
+                allowsQuickRefinement: false,
+                allowsBalanceRefinement: false,
+                allowsMirrorRefinement: false,
+                allowsReminderSelection: false,
+                detail: "This device is on a conservative intelligence profile, so Before keeps the reserved open-model lane deterministic on 6 GB-class phones."
+            )
+        }
+
+        let detail = "\(detailPrefix) \(status.detail)"
+        return DecisionIntelligenceExecutionProfile(
+            tier: device.physicalMemoryGB < 8 ? .balancedGemma : .fullGemma,
+            effectiveProviderPreference: .openModel,
+            allowFallbacks: preferences.allowModelFallbacks,
+            allowsQuickRefinement: device.physicalMemoryGB >= 8,
+            allowsBalanceRefinement: true,
+            allowsMirrorRefinement: true,
+            allowsReminderSelection: true,
+            detail: detail
         )
     }
 }
