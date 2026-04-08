@@ -105,6 +105,8 @@ The summary now also exposes:
 - average request duration grouped by decision kind
 - average request duration grouped by active provider
 - average request duration grouped by resolved Gemma backend
+- slow-request rate across the whole run
+- slow-request rate grouped by decision kind, using internal latency budgets per mode
 
 ## Trace And Replay Helpers
 

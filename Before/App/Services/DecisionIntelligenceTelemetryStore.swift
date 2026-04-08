@@ -14,6 +14,7 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
     let attemptedProviderCount: [DecisionModelProviderKind: Int]
     let fallbackActivations: Int
     let gemmaBackendCount: [InferenceBackendKind: Int]
+    let slowRequestCountByKind: [DecisionIntelligenceTraceKind: Int]
     let requestDurationTotalMsByKind: [DecisionIntelligenceTraceKind: Double]
     let activeProviderDurationTotalMs: [DecisionModelProviderKind: Double]
     let gemmaBackendDurationTotalMs: [InferenceBackendKind: Double]
@@ -71,6 +72,21 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
         )
     }
 
+    var slowRequestRate: Double {
+        rate(
+            numerator: slowRequestCountByKind.values.reduce(0, +),
+            denominator: totalRequests
+        )
+    }
+
+    var slowRequestRateByKind: [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: requestCountByKind.map { kind, count in
+                (kind, rate(numerator: slowRequestCountByKind[kind] ?? 0, denominator: count))
+            }
+        )
+    }
+
     private func rate(numerator: Int, denominator: Int) -> Double {
         guard denominator > 0 else { return 0 }
         return Double(numerator) / Double(denominator)
@@ -91,9 +107,23 @@ actor DecisionIntelligenceTelemetryStore {
     private var attemptedProviderCount: [DecisionModelProviderKind: Int] = [:]
     private var fallbackActivations = 0
     private var gemmaBackendCount: [InferenceBackendKind: Int] = [:]
+    private var slowRequestCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
     private var requestDurationTotalMsByKind: [DecisionIntelligenceTraceKind: Double] = [:]
     private var activeProviderDurationTotalMs: [DecisionModelProviderKind: Double] = [:]
     private var gemmaBackendDurationTotalMs: [InferenceBackendKind: Double] = [:]
+
+    private static func slowRequestThresholdMs(
+        for kind: DecisionIntelligenceTraceKind
+    ) -> Double {
+        switch kind {
+        case .quick:
+            return 800
+        case .balance, .mirror:
+            return 1_500
+        case .reminder:
+            return 450
+        }
+    }
 
     func record(
         kind: DecisionIntelligenceTraceKind,
@@ -107,6 +137,9 @@ actor DecisionIntelligenceTelemetryStore {
         requestCountByKind[kind, default: 0] += 1
         outcomeCount[outcome, default: 0] += 1
         requestDurationTotalMsByKind[kind, default: 0] += durationMs
+        if durationMs >= Self.slowRequestThresholdMs(for: kind) {
+            slowRequestCountByKind[kind, default: 0] += 1
+        }
 
         for provider in attemptedProviders {
             attemptedProviderCount[provider, default: 0] += 1
@@ -135,6 +168,7 @@ actor DecisionIntelligenceTelemetryStore {
             attemptedProviderCount: attemptedProviderCount,
             fallbackActivations: fallbackActivations,
             gemmaBackendCount: gemmaBackendCount,
+            slowRequestCountByKind: slowRequestCountByKind,
             requestDurationTotalMsByKind: requestDurationTotalMsByKind,
             activeProviderDurationTotalMs: activeProviderDurationTotalMs,
             gemmaBackendDurationTotalMs: gemmaBackendDurationTotalMs
@@ -148,6 +182,7 @@ actor DecisionIntelligenceTelemetryStore {
         attemptedProviderCount.removeAll()
         fallbackActivations = 0
         gemmaBackendCount.removeAll()
+        slowRequestCountByKind.removeAll()
         requestDurationTotalMsByKind.removeAll()
         activeProviderDurationTotalMs.removeAll()
         gemmaBackendDurationTotalMs.removeAll()

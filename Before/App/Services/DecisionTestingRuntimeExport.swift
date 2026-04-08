@@ -20,6 +20,8 @@ struct DecisionTestingRuntimeExport {
             averageRequestDurationMsByKind: intelligenceTelemetry.averageRequestDurationMsByKind,
             averageRequestDurationMsByProvider: intelligenceTelemetry.averageRequestDurationMsByActiveProvider,
             averageRequestDurationMsByGemmaBackend: intelligenceTelemetry.averageRequestDurationMsByGemmaBackend,
+            slowRequestRate: intelligenceTelemetry.slowRequestRate,
+            slowRequestRateByKind: intelligenceTelemetry.slowRequestRateByKind,
             fallbackActivations: intelligenceTelemetry.fallbackActivations,
             traceCount: recentTraces.count,
             replayCount: recentReplay.count,
@@ -46,6 +48,8 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let averageRequestDurationMsByKind: [DecisionIntelligenceTraceKind: Double]
     let averageRequestDurationMsByProvider: [DecisionModelProviderKind: Double]
     let averageRequestDurationMsByGemmaBackend: [InferenceBackendKind: Double]
+    let slowRequestRate: Double
+    let slowRequestRateByKind: [DecisionIntelligenceTraceKind: Double]
     let fallbackActivations: Int
     let traceCount: Int
     let replayCount: Int

@@ -274,6 +274,7 @@ struct DecisionTestingInterfaceTests {
         #expect(telemetrySnapshot.activeProviderCount[.gemmaE4B] == 1)
         #expect(telemetrySnapshot.gemmaBackendCount[.cpu] == 1)
         #expect(telemetrySnapshot.averageRequestDurationMs == 180)
+        #expect(telemetrySnapshot.slowRequestRate == 0)
         #expect(cacheSnapshot.hitCountByKind[.reminder] == 1)
         #expect(cacheSnapshot.storeCountByKind[.reminder] == 1)
     }
@@ -366,5 +367,7 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.averageRequestDurationMs == 220)
         #expect(export.summary.averageRequestDurationMsByKind[.quick] == 220)
         #expect(export.summary.averageRequestDurationMsByGemmaBackend[.cpu] == 220)
+        #expect(export.summary.slowRequestRate == 0)
+        #expect(export.summary.slowRequestRateByKind[.quick] == 0)
     }
 }
