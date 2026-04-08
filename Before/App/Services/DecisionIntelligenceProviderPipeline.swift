@@ -242,6 +242,8 @@ enum DecisionIntelligenceProviderPipeline {
             contextState: contextState,
             neuralState: neuralState
         )
+        let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: envelope)
+        let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: envelope)
         guard preference != .template else {
             await recordTelemetry(
                 kind: .quick,
@@ -261,6 +263,8 @@ enum DecisionIntelligenceProviderPipeline {
                 contextState: contextState,
                 neuralState: neuralState,
                 promptBudget: envelope.budget,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
                 prompt: envelope.debugPrompt,
                 outputPreview: quickPreview(from: base),
                 detail: "Template mode is pinned, so no model provider was used for quick refinement."
@@ -292,6 +296,8 @@ enum DecisionIntelligenceProviderPipeline {
                 neuralState: neuralState,
                 promptBudget: envelope.budget,
                 admissionDecision: admissionDecision,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
                 prompt: envelope.debugPrompt,
                 outputPreview: quickPreview(from: base),
                 detail: "Admission controller skipped quick refinement. \(admissionDecision.reason)"
@@ -334,6 +340,8 @@ enum DecisionIntelligenceProviderPipeline {
                     neuralState: neuralState,
                     promptBudget: envelope.budget,
                     admissionDecision: admissionDecision,
+                    semanticPromptFingerprint: semanticPromptFingerprint,
+                    stablePrefixFingerprint: stablePrefixFingerprint,
                     prompt: envelope.debugPrompt,
                     outputPreview: quickPreview(from: cached),
                     detail: cachedDetail(
@@ -367,6 +375,8 @@ enum DecisionIntelligenceProviderPipeline {
                     neuralState: neuralState,
                     promptBudget: envelope.budget,
                     admissionDecision: admissionDecision,
+                    semanticPromptFingerprint: semanticPromptFingerprint,
+                    stablePrefixFingerprint: stablePrefixFingerprint,
                     prompt: envelope.debugPrompt,
                     outputPreview: quickPreview(from: refined),
                     detail: detail(
@@ -399,6 +409,8 @@ enum DecisionIntelligenceProviderPipeline {
             neuralState: neuralState,
             promptBudget: envelope.budget,
             admissionDecision: admissionDecision,
+            semanticPromptFingerprint: semanticPromptFingerprint,
+            stablePrefixFingerprint: stablePrefixFingerprint,
             prompt: envelope.debugPrompt,
             outputPreview: quickPreview(from: base),
             detail: "No provider returned a refined quick result, so Before kept the deterministic copy."
@@ -423,6 +435,8 @@ enum DecisionIntelligenceProviderPipeline {
             contextState: contextState,
             neuralState: neuralState
         )
+        let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: envelope)
+        let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: envelope)
         guard preference != .template else {
             await recordTelemetry(
                 kind: .balance,
@@ -442,6 +456,8 @@ enum DecisionIntelligenceProviderPipeline {
                 contextState: contextState,
                 neuralState: neuralState,
                 promptBudget: envelope.budget,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
                 prompt: envelope.debugPrompt,
                 outputPreview: balancePreview(from: base),
                 detail: "Template mode is pinned, so no model provider was used for balance refinement."
@@ -473,6 +489,8 @@ enum DecisionIntelligenceProviderPipeline {
                 neuralState: neuralState,
                 promptBudget: envelope.budget,
                 admissionDecision: admissionDecision,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
                 prompt: envelope.debugPrompt,
                 outputPreview: balancePreview(from: base),
                 detail: "Admission controller skipped balance refinement. \(admissionDecision.reason)"
@@ -515,6 +533,8 @@ enum DecisionIntelligenceProviderPipeline {
                     neuralState: neuralState,
                     promptBudget: envelope.budget,
                     admissionDecision: admissionDecision,
+                    semanticPromptFingerprint: semanticPromptFingerprint,
+                    stablePrefixFingerprint: stablePrefixFingerprint,
                     prompt: envelope.debugPrompt,
                     outputPreview: balancePreview(from: cached),
                     detail: cachedDetail(
@@ -548,6 +568,8 @@ enum DecisionIntelligenceProviderPipeline {
                     neuralState: neuralState,
                     promptBudget: envelope.budget,
                     admissionDecision: admissionDecision,
+                    semanticPromptFingerprint: semanticPromptFingerprint,
+                    stablePrefixFingerprint: stablePrefixFingerprint,
                     prompt: envelope.debugPrompt,
                     outputPreview: balancePreview(from: refined),
                     detail: detail(
@@ -580,6 +602,8 @@ enum DecisionIntelligenceProviderPipeline {
             neuralState: neuralState,
             promptBudget: envelope.budget,
             admissionDecision: admissionDecision,
+            semanticPromptFingerprint: semanticPromptFingerprint,
+            stablePrefixFingerprint: stablePrefixFingerprint,
             prompt: envelope.debugPrompt,
             outputPreview: balancePreview(from: base),
             detail: "No provider returned a refined balance board, so Before kept the deterministic copy."
@@ -604,6 +628,8 @@ enum DecisionIntelligenceProviderPipeline {
             contextState: contextState,
             neuralState: neuralState
         )
+        let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: envelope)
+        let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: envelope)
         guard preference != .template else {
             await recordTelemetry(
                 kind: .mirror,
@@ -623,6 +649,8 @@ enum DecisionIntelligenceProviderPipeline {
                 contextState: contextState,
                 neuralState: neuralState,
                 promptBudget: envelope.budget,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
                 prompt: envelope.debugPrompt,
                 outputPreview: mirrorPreview(from: base),
                 detail: "Template mode is pinned, so no model provider was used for mirror refinement."
@@ -654,6 +682,8 @@ enum DecisionIntelligenceProviderPipeline {
                 neuralState: neuralState,
                 promptBudget: envelope.budget,
                 admissionDecision: admissionDecision,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
                 prompt: envelope.debugPrompt,
                 outputPreview: mirrorPreview(from: base),
                 detail: "Admission controller skipped mirror refinement. \(admissionDecision.reason)"
@@ -696,6 +726,8 @@ enum DecisionIntelligenceProviderPipeline {
                     neuralState: neuralState,
                     promptBudget: envelope.budget,
                     admissionDecision: admissionDecision,
+                    semanticPromptFingerprint: semanticPromptFingerprint,
+                    stablePrefixFingerprint: stablePrefixFingerprint,
                     prompt: envelope.debugPrompt,
                     outputPreview: mirrorPreview(from: cached),
                     detail: cachedDetail(
@@ -729,6 +761,8 @@ enum DecisionIntelligenceProviderPipeline {
                     neuralState: neuralState,
                     promptBudget: envelope.budget,
                     admissionDecision: admissionDecision,
+                    semanticPromptFingerprint: semanticPromptFingerprint,
+                    stablePrefixFingerprint: stablePrefixFingerprint,
                     prompt: envelope.debugPrompt,
                     outputPreview: mirrorPreview(from: refined),
                     detail: detail(
@@ -761,6 +795,8 @@ enum DecisionIntelligenceProviderPipeline {
             neuralState: neuralState,
             promptBudget: envelope.budget,
             admissionDecision: admissionDecision,
+            semanticPromptFingerprint: semanticPromptFingerprint,
+            stablePrefixFingerprint: stablePrefixFingerprint,
             prompt: envelope.debugPrompt,
             outputPreview: mirrorPreview(from: base),
             detail: "No provider returned a refined mirror, so Before kept the deterministic copy."
@@ -785,6 +821,8 @@ enum DecisionIntelligenceProviderPipeline {
             prompt: prompt,
             mode: mode
         )
+        let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: selection.prompt)
+        let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: selection.prompt)
         let clippedCandidates = selection.candidates
         guard !clippedCandidates.isEmpty else { return nil }
         guard preference != .template else {
@@ -824,6 +862,8 @@ enum DecisionIntelligenceProviderPipeline {
                 allowFallbacks: allowFallbacks,
                 promptBudget: selection.prompt.budget,
                 admissionDecision: admissionDecision,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
                 prompt: selection.prompt.debugPrompt,
                 outputPreview: "Deterministic reminder ordering kept",
                 detail: "Admission controller skipped reminder selection. \(admissionDecision.reason)"
@@ -864,6 +904,8 @@ enum DecisionIntelligenceProviderPipeline {
                     allowFallbacks: allowFallbacks,
                     promptBudget: selection.prompt.budget,
                     admissionDecision: admissionDecision,
+                    semanticPromptFingerprint: semanticPromptFingerprint,
+                    stablePrefixFingerprint: stablePrefixFingerprint,
                     prompt: selection.prompt.debugPrompt,
                     outputPreview: reminderPreview(from: cached),
                     detail: cachedDetail(
@@ -900,6 +942,8 @@ enum DecisionIntelligenceProviderPipeline {
                     allowFallbacks: allowFallbacks,
                     promptBudget: selection.prompt.budget,
                     admissionDecision: admissionDecision,
+                    semanticPromptFingerprint: semanticPromptFingerprint,
+                    stablePrefixFingerprint: stablePrefixFingerprint,
                     prompt: selection.prompt.debugPrompt,
                     outputPreview: reminderPreview(from: selected),
                     detail: detail(
@@ -930,6 +974,8 @@ enum DecisionIntelligenceProviderPipeline {
             allowFallbacks: allowFallbacks,
             promptBudget: selection.prompt.budget,
             admissionDecision: admissionDecision,
+            semanticPromptFingerprint: semanticPromptFingerprint,
+            stablePrefixFingerprint: stablePrefixFingerprint,
             prompt: selection.prompt.debugPrompt,
             outputPreview: "No reminder selected",
             detail: "No provider returned a reminder selection, so Before kept the deterministic reminder ordering."
@@ -964,6 +1010,8 @@ enum DecisionIntelligenceProviderPipeline {
         neuralState: DecisionNeuralState? = nil,
         promptBudget: DecisionIntelligencePromptContract.ContextBudget? = nil,
         admissionDecision: DecisionIntelligenceAdmissionDecision? = nil,
+        semanticPromptFingerprint: String? = nil,
+        stablePrefixFingerprint: String? = nil,
         prompt: String,
         outputPreview: String,
         detail: String
@@ -979,6 +1027,8 @@ enum DecisionIntelligenceProviderPipeline {
             neuralState: neuralState,
             promptBudget: promptBudget,
             admissionDecision: admissionDecision,
+            semanticPromptFingerprint: semanticPromptFingerprint,
+            stablePrefixFingerprint: stablePrefixFingerprint,
             prompt: prompt,
             outputPreview: outputPreview,
             detail: detail

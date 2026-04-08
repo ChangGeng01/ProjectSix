@@ -86,6 +86,8 @@ struct DecisionTestingRuntimeExport {
             averageAdaptivePrefixCharactersByKind: intelligenceTelemetry.averageAdaptivePrefixCharactersByKind,
             averageSuffixCharactersByKind: intelligenceTelemetry.averageSuffixCharactersByKind,
             averageStablePrefixShareByKind: intelligenceTelemetry.averageStablePrefixShareByKind,
+            semanticPromptVariantCountByKind: semanticPromptVariantCountByKind,
+            stablePrefixVariantCountByKind: stablePrefixVariantCountByKind,
             slowRequestRate: intelligenceTelemetry.slowRequestRate,
             slowRequestRateByKind: intelligenceTelemetry.slowRequestRateByKind,
             overTargetBudgetRate: intelligenceTelemetry.overTargetBudgetRate,
@@ -114,6 +116,25 @@ struct DecisionTestingRuntimeExport {
             guard let generation = trace.contextState?.generation else { return }
             partialResult[trace.kind] = max(partialResult[trace.kind] ?? generation, generation)
         }
+    }
+
+    private var semanticPromptVariantCountByKind: [DecisionIntelligenceTraceKind: Int] {
+        variantCountByKind(for: \.semanticPromptFingerprint)
+    }
+
+    private var stablePrefixVariantCountByKind: [DecisionIntelligenceTraceKind: Int] {
+        variantCountByKind(for: \.stablePrefixFingerprint)
+    }
+
+    private func variantCountByKind(
+        for keyPath: KeyPath<DecisionIntelligenceTrace, String?>
+    ) -> [DecisionIntelligenceTraceKind: Int] {
+        Dictionary(grouping: recentTraces, by: \.kind)
+            .compactMapValues { traces in
+                let variants = Set(traces.compactMap { $0[keyPath: keyPath] })
+                guard !variants.isEmpty else { return nil }
+                return variants.count
+            }
     }
 }
 
@@ -155,6 +176,8 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let averageAdaptivePrefixCharactersByKind: [DecisionIntelligenceTraceKind: Double]
     let averageSuffixCharactersByKind: [DecisionIntelligenceTraceKind: Double]
     let averageStablePrefixShareByKind: [DecisionIntelligenceTraceKind: Double]
+    let semanticPromptVariantCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let stablePrefixVariantCountByKind: [DecisionIntelligenceTraceKind: Int]
     let slowRequestRate: Double
     let slowRequestRateByKind: [DecisionIntelligenceTraceKind: Double]
     let overTargetBudgetRate: Double

@@ -402,9 +402,15 @@ enum DecisionIntelligencePromptContract {
         provider: DecisionModelProviderKind,
         semanticPrompt: String
     ) -> String {
-        let seed = "\(provider.rawValue)\n\(semanticPrompt)"
-        let digest = SHA256.hash(data: Data(seed.utf8))
-        return digest.map { String(format: "%02x", $0) }.joined()
+        sha256Hex("\(provider.rawValue)\n\(semanticPrompt)")
+    }
+
+    static func semanticFingerprint(for envelope: PromptEnvelope) -> String {
+        sha256Hex(envelope.runtimePrompt)
+    }
+
+    static func stablePrefixFingerprint(for envelope: PromptEnvelope) -> String {
+        sha256Hex(envelope.layers.stablePrefix)
     }
 
     private static func makeEnvelope(
@@ -488,6 +494,11 @@ enum DecisionIntelligencePromptContract {
             layers: layers,
             frontstageState: preparedFrontstageState
         )
+    }
+
+    private static func sha256Hex(_ value: String) -> String {
+        let digest = SHA256.hash(data: Data(value.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     private static func stateJSONString(_ state: [String: Any?]) -> String {

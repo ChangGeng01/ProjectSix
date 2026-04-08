@@ -331,6 +331,8 @@ struct DecisionTestingInterfaceTests {
                 suppressedBehaviors: ["long_explanation"],
                 detail: "Quick neural routing is active."
             ),
+            semanticPromptFingerprint: "semantic-quick-1",
+            stablePrefixFingerprint: "prefix-quick-1",
             prompt: "Quick prompt",
             outputPreview: "Quick output",
             detail: "Quick detail"
@@ -425,6 +427,8 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.averagePromptCharactersByKind[.quick] == 480)
         #expect(export.summary.averageImmutablePrefixCharactersByKind[.quick] == 180)
         #expect(export.summary.averageAdaptivePrefixCharactersByKind[.quick] == 0)
+        #expect(export.summary.semanticPromptVariantCountByKind[.quick] == 1)
+        #expect(export.summary.stablePrefixVariantCountByKind[.quick] == 1)
         #expect(export.summary.slowRequestRate == 0)
         #expect(export.summary.slowRequestRateByKind[.quick] == 0)
         #expect(export.lifecycleSummary.contextAwareTraceCount == 1)
