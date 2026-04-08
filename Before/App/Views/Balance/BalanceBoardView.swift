@@ -40,6 +40,7 @@ struct BalanceBoardView: View {
                             title: "What do you want?",
                             subtitle: "Your subjective pull, without apologizing for it.",
                             placeholder: "Convenience, relief, fun, closeness, momentum...",
+                            suggestions: DecisionFieldSuggestionLibrary.suggestions(for: .desire),
                             text: $session.desire
                         )
 
@@ -47,6 +48,7 @@ struct BalanceBoardView: View {
                             title: "What are you protecting?",
                             subtitle: "What feels risky, costly, or easy to lose here?",
                             placeholder: "Time, money, energy, respect, clarity...",
+                            suggestions: DecisionFieldSuggestionLibrary.suggestions(for: .concern),
                             text: $session.concern
                         )
 
@@ -54,6 +56,7 @@ struct BalanceBoardView: View {
                             title: "What does reality allow?",
                             subtitle: "The concrete constraints, not the story around them.",
                             placeholder: "Budget, schedule, distance, work, family...",
+                            suggestions: DecisionFieldSuggestionLibrary.suggestions(for: .constraint),
                             text: $session.constraint
                         )
 
@@ -61,6 +64,7 @@ struct BalanceBoardView: View {
                             title: "What matters longer-term?",
                             subtitle: "What will future-you have to live with after the moment passes?",
                             placeholder: "Regret, drift, debt, resentment, lost momentum...",
+                            suggestions: DecisionFieldSuggestionLibrary.suggestions(for: BalanceField.longTerm),
                             text: $session.longTerm
                         )
 

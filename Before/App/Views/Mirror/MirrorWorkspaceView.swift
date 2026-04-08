@@ -40,6 +40,7 @@ struct MirrorWorkspaceView: View {
                             title: "Emotion",
                             subtitle: "What is strongest right now: hurt, anger, fear, loneliness, grief, relief?",
                             placeholder: "Name the feeling without defending it.",
+                            suggestions: DecisionFieldSuggestionLibrary.suggestions(for: .emotion),
                             text: $session.emotion
                         )
 
@@ -47,6 +48,7 @@ struct MirrorWorkspaceView: View {
                             title: "Relationship or structure",
                             subtitle: "What keeps going wrong underneath the latest moment?",
                             placeholder: "Boundary, trust, respect, communication, pattern...",
+                            suggestions: DecisionFieldSuggestionLibrary.suggestions(for: .relationship),
                             text: $session.relationship
                         )
 
@@ -54,6 +56,7 @@ struct MirrorWorkspaceView: View {
                             title: "Reality",
                             subtitle: "What concrete constraints are in the room?",
                             placeholder: "Work, money, family, distance, home, timing...",
+                            suggestions: DecisionFieldSuggestionLibrary.suggestions(for: .reality),
                             text: $session.reality
                         )
 
@@ -61,6 +64,7 @@ struct MirrorWorkspaceView: View {
                             title: "Long-term",
                             subtitle: "If this keeps going the same way, what shape does life start taking?",
                             placeholder: "Drift, regret, shrinking, repair, rebuilding...",
+                            suggestions: DecisionFieldSuggestionLibrary.suggestions(for: MirrorField.longTerm),
                             text: $session.longTerm
                         )
 
@@ -68,6 +72,7 @@ struct MirrorWorkspaceView: View {
                             title: "Self",
                             subtitle: "What happens to your sense of self if this continues?",
                             placeholder: "I feel smaller, more split, calmer, freer...",
+                            suggestions: DecisionFieldSuggestionLibrary.suggestions(for: .selfLens),
                             text: $session.selfLens
                         )
 

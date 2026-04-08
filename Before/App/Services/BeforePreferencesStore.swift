@@ -25,6 +25,15 @@ enum HomePromptAction: String, CaseIterable, Codable, Identifiable, Sendable {
         case .mirror: "Open mirror"
         }
     }
+
+    var preferredMode: DecisionMode? {
+        switch self {
+        case .autoRoute: nil
+        case .quick: .quick
+        case .balance: .balance
+        case .mirror: .mirror
+        }
+    }
 }
 
 struct BeforePreferences: Codable, Equatable, Sendable {

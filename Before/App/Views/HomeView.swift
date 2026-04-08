@@ -46,6 +46,15 @@ struct HomeView: View {
                             text: $decisionPrompt
                         )
 
+                        if let preview = homePromptPreview {
+                            DecisionRoutePreviewCard(
+                                mode: preview.mode,
+                                title: preview.title,
+                                detail: preview.detail,
+                                isPinned: preview.isPinned
+                            )
+                        }
+
                         PanelCard {
                             StarterPromptRow(
                                 title: "Need a cleaner starting point?",
@@ -153,4 +162,32 @@ struct HomeView: View {
     private var trimmedPrompt: String {
         decisionPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    private var homePromptPreview: HomePromptPreview? {
+        guard !trimmedPrompt.isEmpty else { return nil }
+
+        if let preferredMode = appModel.preferences.homePromptAction.preferredMode {
+            return HomePromptPreview(
+                mode: preferredMode,
+                title: "This prompt will open in \(preferredMode.title).",
+                detail: "Your home prompt preference is pinned to \(preferredMode.title.lowercased()). You can still open a different mode below when you want to.",
+                isPinned: true
+            )
+        }
+
+        let routed = DecisionModeRouter.route(prompt: trimmedPrompt)
+        return HomePromptPreview(
+            mode: routed.mode,
+            title: "This looks like a \(routed.mode.title.lowercased()) question.",
+            detail: routed.reason,
+            isPinned: false
+        )
+    }
+}
+
+private struct HomePromptPreview {
+    let mode: DecisionMode
+    let title: String
+    let detail: String
+    let isPinned: Bool
 }
