@@ -6,10 +6,14 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
         let descriptors = DecisionIntelligenceProviderRegistry.shared.descriptors()
 
         let openModelDescriptor = descriptors.first { $0.kind == .openModel }
+        let gemmaDescriptor = descriptors.first { $0.kind == .gemmaE4B }
+        let foundationDescriptor = descriptors.first { $0.kind == .foundationModels }
 
         XCTAssertNotNil(openModelDescriptor)
         XCTAssertEqual(openModelDescriptor?.track, .builtInOpenModel)
         XCTAssertEqual(openModelDescriptor?.openModel?.stableID, "before/open-model-slot")
+        XCTAssertEqual(gemmaDescriptor?.affinity(for: .mirror), 100)
+        XCTAssertEqual(foundationDescriptor?.affinity(for: .quick), 100)
     }
 
     func testRegistryCanSwapOpenModelAdapterWithoutChangingPipelineKinds() {
@@ -21,7 +25,13 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
                     title: "Open model runtime",
                     detail: "Reserved slot.",
                     track: .builtInOpenModel,
-                    openModel: ReservedOpenModelAdapter().descriptor
+                    openModel: ReservedOpenModelAdapter().descriptor,
+                    taskAffinities: [
+                        .quick: 88,
+                        .balance: 90,
+                        .mirror: 92,
+                        .reminder: 86
+                    ]
                 )
             ]
         )
@@ -35,6 +45,37 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
         XCTAssertEqual(status?.isAvailable, true)
         XCTAssertEqual(descriptor?.openModel?.stableID, "lab/future-open-model")
         XCTAssertEqual(descriptor?.title, "Future open model")
+        XCTAssertEqual(descriptor?.affinity(for: .mirror), 92)
+    }
+
+    func testTaskRouterPrefersFoundationForQuickLatency() {
+        let ordered = DecisionIntelligenceTaskRouter.orderedKinds(
+            for: .quick,
+            preference: .gemmaE4B,
+            allowFallbacks: true
+        )
+
+        XCTAssertEqual(ordered.first, .foundationModels)
+    }
+
+    func testTaskRouterPrefersGemmaForMirrorDepth() {
+        let ordered = DecisionIntelligenceTaskRouter.orderedKinds(
+            for: .mirror,
+            preference: .foundationModels,
+            allowFallbacks: true
+        )
+
+        XCTAssertEqual(ordered.first, .gemmaE4B)
+    }
+
+    func testTaskRouterKeepsPinnedProviderWhenFallbacksAreOff() {
+        let ordered = DecisionIntelligenceTaskRouter.orderedKinds(
+            for: .mirror,
+            preference: .foundationModels,
+            allowFallbacks: false
+        )
+
+        XCTAssertEqual(ordered, [.foundationModels])
     }
 }
 
@@ -44,7 +85,13 @@ private struct FakeOpenModelAdapter: DecisionOpenModelAdapting {
         family: "Future family",
         version: "vNext",
         title: "Future open model",
-        detail: "A fake adapter used to verify that the registry can swap open-model runtimes."
+        detail: "A fake adapter used to verify that the registry can swap open-model runtimes.",
+        taskAffinities: [
+            .quick: 82,
+            .balance: 87,
+            .mirror: 92,
+            .reminder: 80
+        ]
     )
 
     var availabilityStatus: DecisionModelProviderStatus {

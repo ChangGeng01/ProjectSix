@@ -60,6 +60,7 @@ struct DecisionOpenModelDescriptor: Equatable, Sendable {
     let version: String
     let title: String
     let detail: String
+    let taskAffinities: [DecisionIntelligenceTraceKind: Int]
 }
 
 enum DecisionModelProviderTrack: String, Equatable, Sendable {
@@ -75,6 +76,11 @@ struct DecisionModelProviderDescriptor: Equatable, Sendable {
     let detail: String
     let track: DecisionModelProviderTrack
     let openModel: DecisionOpenModelDescriptor?
+    let taskAffinities: [DecisionIntelligenceTraceKind: Int]
+
+    func affinity(for task: DecisionIntelligenceTraceKind) -> Int {
+        taskAffinities[task] ?? 0
+    }
 }
 
 struct OpenModelDecisionIntelligenceProvider: DecisionIntelligenceProviding {
@@ -127,7 +133,13 @@ struct GemmaOpenModelAdapter: DecisionOpenModelAdapting {
         family: "Gemma 4",
         version: "E4B",
         title: "Gemma 4 E4B",
-        detail: "Built-in open-model adapter. Future bundled open-source runtimes can plug into the same provider contract without changing the intelligence pipeline."
+        detail: "Built-in open-model adapter. Future bundled open-source runtimes can plug into the same provider contract without changing the intelligence pipeline.",
+        taskAffinities: [
+            .quick: 70,
+            .balance: 94,
+            .mirror: 100,
+            .reminder: 84
+        ]
     )
 
     var availabilityStatus: DecisionModelProviderStatus {
@@ -189,7 +201,13 @@ struct ReservedOpenModelAdapter: DecisionOpenModelAdapting {
         family: "Open model runtime",
         version: "reserved",
         title: "Open model runtime",
-        detail: "Reserved integration slot for future bundled or open-source local models. Replace this adapter to add a new model without rewriting the intelligence pipeline."
+        detail: "Reserved integration slot for future bundled or open-source local models. Replace this adapter to add a new model without rewriting the intelligence pipeline.",
+        taskAffinities: [
+            .quick: 88,
+            .balance: 90,
+            .mirror: 92,
+            .reminder: 86
+        ]
     )
 
     var availabilityStatus: DecisionModelProviderStatus {
@@ -342,7 +360,8 @@ final class DecisionIntelligenceProviderRegistry: @unchecked Sendable {
                 title: adapter.descriptor.title,
                 detail: adapter.descriptor.detail,
                 track: .builtInOpenModel,
-                openModel: adapter.descriptor
+                openModel: adapter.descriptor,
+                taskAffinities: adapter.descriptor.taskAffinities
             )
         )
     }
@@ -365,22 +384,128 @@ final class DecisionIntelligenceProviderRegistry: @unchecked Sendable {
                 title: gemmaDescriptor.title,
                 detail: gemmaDescriptor.detail,
                 track: .builtInOpenModel,
-                openModel: gemmaDescriptor
+                openModel: gemmaDescriptor,
+                taskAffinities: gemmaDescriptor.taskAffinities
             ),
             .foundationModels: DecisionModelProviderDescriptor(
                 kind: .foundationModels,
                 title: "Apple Foundation Model",
                 detail: "Built-in system-managed language provider.",
                 track: .builtInSystem,
-                openModel: nil
+                openModel: nil,
+                taskAffinities: defaultTaskAffinities(for: .foundationModels)
             ),
             .openModel: DecisionModelProviderDescriptor(
                 kind: .openModel,
                 title: reservedOpenModelDescriptor.title,
                 detail: reservedOpenModelDescriptor.detail,
                 track: .builtInOpenModel,
-                openModel: reservedOpenModelDescriptor
+                openModel: reservedOpenModelDescriptor,
+                taskAffinities: reservedOpenModelDescriptor.taskAffinities
             )
         ]
+    }
+
+    private static func defaultTaskAffinities(
+        for kind: DecisionModelProviderKind
+    ) -> [DecisionIntelligenceTraceKind: Int] {
+        switch kind {
+        case .gemmaE4B:
+            [
+                .quick: 70,
+                .balance: 94,
+                .mirror: 100,
+                .reminder: 84
+            ]
+        case .openModel:
+            [
+                .quick: 88,
+                .balance: 90,
+                .mirror: 92,
+                .reminder: 86
+            ]
+        case .foundationModels:
+            [
+                .quick: 100,
+                .balance: 78,
+                .mirror: 72,
+                .reminder: 92
+            ]
+        case .testingStub:
+            [
+                .quick: 100,
+                .balance: 100,
+                .mirror: 100,
+                .reminder: 100
+            ]
+        case .template:
+            [
+                .quick: 0,
+                .balance: 0,
+                .mirror: 0,
+                .reminder: 0
+            ]
+        }
+    }
+}
+
+enum DecisionIntelligenceTaskRouter {
+    static func orderedKinds(
+        for task: DecisionIntelligenceTraceKind,
+        preference: DecisionModelProviderPreference,
+        allowFallbacks: Bool,
+        excluding suspendedKinds: Set<DecisionModelProviderKind> = [],
+        registry: DecisionIntelligenceProviderRegistry = .shared
+    ) -> [DecisionModelProviderKind] {
+        let baseKinds = DecisionIntelligenceProviderPipeline.orderedKinds(
+            for: preference,
+            allowFallbacks: allowFallbacks,
+            excluding: suspendedKinds
+        )
+
+        guard allowFallbacks, baseKinds.count > 1 else { return baseKinds }
+
+        let descriptorByKind = Dictionary(
+            uniqueKeysWithValues: registry.descriptors().map { ($0.kind, $0) }
+        )
+        let baseIndexByKind = Dictionary(
+            uniqueKeysWithValues: baseKinds.enumerated().map { ($0.element, $0.offset) }
+        )
+
+        return baseKinds.sorted { lhs, rhs in
+            let lhsScore = routingScore(
+                kind: lhs,
+                task: task,
+                preferredKind: preference.kind,
+                descriptor: descriptorByKind[lhs],
+                baseIndex: baseIndexByKind[lhs] ?? 0
+            )
+            let rhsScore = routingScore(
+                kind: rhs,
+                task: task,
+                preferredKind: preference.kind,
+                descriptor: descriptorByKind[rhs],
+                baseIndex: baseIndexByKind[rhs] ?? 0
+            )
+
+            if lhsScore == rhsScore {
+                return (baseIndexByKind[lhs] ?? 0) < (baseIndexByKind[rhs] ?? 0)
+            }
+
+            return lhsScore > rhsScore
+        }
+    }
+
+    private static func routingScore(
+        kind: DecisionModelProviderKind,
+        task: DecisionIntelligenceTraceKind,
+        preferredKind: DecisionModelProviderKind,
+        descriptor: DecisionModelProviderDescriptor?,
+        baseIndex: Int
+    ) -> Int {
+        let affinity = descriptor?.affinity(for: task) ?? 0
+        let preferredBias = kind == preferredKind ? 8 : 0
+        let baseBias = max(0, 24 - (baseIndex * 12))
+        return (affinity * 10) + preferredBias + baseBias
     }
 }

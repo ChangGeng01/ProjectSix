@@ -194,6 +194,7 @@ enum DecisionIntelligenceProviderPipeline {
         }
 
         let providers = await orderedProviders(
+            task: .quick,
             for: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
@@ -412,6 +413,7 @@ enum DecisionIntelligenceProviderPipeline {
         }
 
         let providers = await orderedProviders(
+            task: .balance,
             for: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
@@ -630,6 +632,7 @@ enum DecisionIntelligenceProviderPipeline {
         }
 
         let providers = await orderedProviders(
+            task: .mirror,
             for: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
@@ -840,6 +843,7 @@ enum DecisionIntelligenceProviderPipeline {
             return nil
         }
         let providers = await orderedProviders(
+            task: .reminder,
             for: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
@@ -980,6 +984,7 @@ enum DecisionIntelligenceProviderPipeline {
     }
 
     private static func orderedProviders(
+        task: DecisionIntelligenceTraceKind,
         for preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile?
@@ -988,11 +993,15 @@ enum DecisionIntelligenceProviderPipeline {
             return [TestingDecisionIntelligenceProvider(profile: testingStubProfile)]
         }
         let suspendedKinds = Set(await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders)
-        return orderedKinds(
-            for: preference,
+        return DecisionIntelligenceTaskRouter.orderedKinds(
+            for: task,
+            preference: preference,
             allowFallbacks: allowFallbacks,
-            excluding: suspendedKinds
-        ).compactMap { registry.provider(for: $0) }
+            excluding: suspendedKinds,
+            registry: registry
+        )
+        .compactMap { registry.provider(for: $0) }
+        .filter { $0.availabilityStatus.isAvailable }
     }
 
     private static func deterministicFallbackDetail(
