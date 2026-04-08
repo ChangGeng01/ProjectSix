@@ -80,4 +80,25 @@ final class LetGoCopyLibraryTests: XCTestCase {
         XCTAssertTrue(context.completionSubtitle.contains("night"))
         XCTAssertEqual(context.secondaryTarget, .history)
     }
+
+    @MainActor
+    func testQuickStepAwayContextUsesHistoryAsSecondarySurface() {
+        let session = QuickCheckSession(entrySource: .app, initialNote: "Should I keep scrolling?")
+        session.scenario = .scroll
+
+        let result = QuickCheckResult(
+            currentPerspective: "You want relief more than content.",
+            afterPerspective: "Staying here will probably keep your head louder, not calmer.",
+            verdict: .notRecommended,
+            primaryAction: .leaveStimulus,
+            secondaryActions: [.wait90s]
+        )
+
+        let context = LetGoCopyLibrary.quickStepAwayContext(for: session, result: result)
+
+        XCTAssertEqual(context.mode, .quick)
+        XCTAssertEqual(context.primaryTarget, .home)
+        XCTAssertEqual(context.secondaryTarget, .history)
+        XCTAssertTrue(context.title.contains("trigger"))
+    }
 }

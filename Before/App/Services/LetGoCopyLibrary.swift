@@ -1,6 +1,35 @@
 import Foundation
 
 enum LetGoCopyLibrary {
+    @MainActor
+    static func quickStepAwayContext(
+        for session: QuickCheckSession,
+        result: QuickCheckResult,
+        primaryTarget: AppTab = .home,
+        secondaryTarget: AppTab = .history
+    ) -> LetGoContext {
+        LetGoContext(
+            mode: .quick,
+            eyebrow: "Step away first",
+            title: "Leave the trigger before you decide anything else.",
+            subtitle: "You already chose not to stay inside the same blur. Give yourself a cleaner break from it too.",
+            itemTitle: session.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? session.scenario.title
+                : session.note.trimmingCharacters(in: .whitespacesAndNewlines),
+            itemDetail: result.afterPerspective,
+            instructionTitle: "Flick the phone gently",
+            instructionDetail: "A short wrist flick is enough. This is just the moment you stop negotiating with it from the same place.",
+            completionTitle: "Okay. Step out first.",
+            completionSubtitle: "You do not need to keep this in front of you while your state is still hot.",
+            settledTitle: "Out of the trigger lane",
+            settledDetail: "Take a step away, then come back only if the choice still feels clean.",
+            primaryActionTitle: "Back home",
+            primaryTarget: primaryTarget,
+            secondaryActionTitle: "Open History",
+            secondaryTarget: secondaryTarget
+        )
+    }
+
     static func tomorrowBoxContext(
         for item: TomorrowBoxItem,
         primaryTarget: AppTab = .home,

@@ -222,6 +222,13 @@ final class BeforeAppModel: ObservableObject {
                 from: event.createdAt
             )
             presentLetGo(for: tomorrowItem)
+        case .leaveStimulus:
+            presentLetGo(
+                LetGoCopyLibrary.quickStepAwayContext(
+                    for: session,
+                    result: result
+                )
+            )
         default:
             break
         }

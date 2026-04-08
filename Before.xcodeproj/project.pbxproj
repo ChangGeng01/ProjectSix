@@ -84,6 +84,7 @@
 		7394A450478981915DEC7373 /* ReviewProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8E5572ABD426B283792639F /* ReviewProfileView.swift */; };
 		7434A9168F97379B3085C717 /* ReflectionContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1548E93121C0DEC8D3A983A /* ReflectionContext.swift */; };
 		766027F5F2D5A2B69C5E84B4 /* LetGoContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B72D5126B9C441ACCC72B5 /* LetGoContext.swift */; };
+		7875D22095FB3EE7EC48DA38 /* FinishStateScaffold.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2208969F9B4D024D571795D8 /* FinishStateScaffold.swift */; };
 		79EF067AA3100DD4F6B27CDC /* QuickCheckInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F68FB2BE9FA50C05DD3BB89 /* QuickCheckInput.swift */; };
 		7D04494DF147348DDB230C23 /* DecisionIntelligencePromptLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 645A67931102F242BF694CBB /* DecisionIntelligencePromptLibrary.swift */; };
 		7D6E2C32F1B7CF33CD9B7910 /* DecisionIntelligenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F047738D148D3433E732FA5 /* DecisionIntelligenceCoordinator.swift */; };
@@ -236,6 +237,7 @@
 		1D900CAAC9F53880921790B3 /* DecisionStarterLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionStarterLibrary.swift; sourceTree = "<group>"; };
 		1D9B5A5DF817EBD959F0B018 /* TomorrowBoxDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxDraftTests.swift; sourceTree = "<group>"; };
 		1F68FB2BE9FA50C05DD3BB89 /* QuickCheckInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCheckInput.swift; sourceTree = "<group>"; };
+		2208969F9B4D024D571795D8 /* FinishStateScaffold.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishStateScaffold.swift; sourceTree = "<group>"; };
 		23EA6415495E3D7A3BFF6785 /* SharedLifeBoxItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLifeBoxItem.swift; sourceTree = "<group>"; };
 		23F476A392EB99124E0CBDBF /* LocalModelAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModelAdapter.swift; sourceTree = "<group>"; };
 		24184A62A2B7E01F7BEA869A /* SupportInboxStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportInboxStoreTests.swift; sourceTree = "<group>"; };
@@ -659,6 +661,7 @@
 				5658063272F3B6A6B04B0EFE /* DecisionContinuationActions.swift */,
 				A25779E30F91D917702DC456 /* DecisionModeCard.swift */,
 				C5ACF20A0EA2C52984402595 /* DecisionRoutePreviewCard.swift */,
+				2208969F9B4D024D571795D8 /* FinishStateScaffold.swift */,
 				0878363BE996C18206470FE0 /* GuidedInputCard.swift */,
 				32B421144DE1D5D71F3CFC70 /* PanelCard.swift */,
 				A61DB79FB9E3DC311CE85256 /* SectionHeader.swift */,
@@ -872,6 +875,7 @@
 				67EE16CD290619AAB8F5A647 /* DecisionRoutePreviewCard.swift in Sources */,
 				1B16408FE6065B5938D2C51C /* DecisionStarterLibrary.swift in Sources */,
 				BA99C96ABD658EADEE79DE5B /* EntrySource.swift in Sources */,
+				7875D22095FB3EE7EC48DA38 /* FinishStateScaffold.swift in Sources */,
 				41AD1DA946062CDD67101DBF /* FoundationModelsIntelligenceService.swift in Sources */,
 				6155DA5D7A284986C8864148 /* GemmaE4BIntelligenceService.swift in Sources */,
 				E66DABC430EF98A944153C58 /* GemmaLocalRuntimeBridge.swift in Sources */,

@@ -8,7 +8,7 @@ struct LetGoView: View {
 
     let context: LetGoContext
 
-    @State private var phase: Phase = .ready
+    @State private var phase: FinishStatePhase = .ready
     @State private var cardOffset: CGFloat = 0
     @State private var cardRotation: Double = 0
     @State private var cardOpacity = 1.0
@@ -16,31 +16,21 @@ struct LetGoView: View {
     @State private var isPressingCard = false
 
     var body: some View {
-        ZStack {
-            BeforeBackground()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    SectionHeader(
-                        eyebrow: context.eyebrow,
-                        title: phase == .settled ? context.completionTitle : context.title,
-                        subtitle: phase == .settled ? context.completionSubtitle : context.subtitle
-                    )
-
-                    if phase == .ready {
-                        releaseCard
-                        instructionCard
-                        actionButtons
-                    } else {
-                        settledCard
-                        settledActions
-                    }
-                }
-                .padding(20)
-            }
+        FinishStateScaffold(
+            phase: phase,
+            eyebrow: context.eyebrow,
+            readyTitle: context.title,
+            readySubtitle: context.subtitle,
+            settledTitle: context.completionTitle,
+            settledSubtitle: context.completionSubtitle
+        ) {
+            releaseCard
+            instructionCard
+            actionButtons
+        } settledContent: {
+            settledCard
+            settledActions
         }
-        .presentationDragIndicator(.hidden)
-        .interactiveDismissDisabled(phase == .ready)
         .onAppear {
             motionMonitor.start { direction in
                 triggerRelease(direction: direction)
@@ -204,12 +194,6 @@ struct LetGoView: View {
 }
 
 private extension LetGoView {
-    enum Phase {
-        case ready
-        case releasing
-        case settled
-    }
-
     enum ReleaseTrigger {
         case flick(LetGoFlickDirection)
         case press
