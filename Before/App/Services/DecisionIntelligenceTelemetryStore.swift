@@ -4,6 +4,7 @@ enum DecisionIntelligenceRequestOutcome: String, CaseIterable, Sendable {
     case templatePinned
     case cacheHit
     case providerSuccess
+    case admissionSkipped
     case deterministicFallback
 }
 
@@ -18,6 +19,12 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
     let requestDurationTotalMsByKind: [DecisionIntelligenceTraceKind: Double]
     let activeProviderDurationTotalMs: [DecisionModelProviderKind: Double]
     let gemmaBackendDurationTotalMs: [InferenceBackendKind: Double]
+    let admissionSkipCountByReason: [DecisionIntelligenceAdmissionSkipReason: Int]
+    let promptPressureCount: [DecisionIntelligencePromptPressure: Int]
+    let promptCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int]
+    let prefixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int]
+    let suffixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int]
+    let overTargetBudgetCountByKind: [DecisionIntelligenceTraceKind: Int]
 
     var totalRequests: Int {
         requestCountByKind.values.reduce(0, +)
@@ -30,6 +37,13 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
     var cacheHitRate: Double {
         rate(
             numerator: outcomeCount[.cacheHit] ?? 0,
+            denominator: totalRequests
+        )
+    }
+
+    var admissionSkipRate: Double {
+        rate(
+            numerator: outcomeCount[.admissionSkipped] ?? 0,
             denominator: totalRequests
         )
     }
@@ -72,6 +86,33 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
         )
     }
 
+    var averagePromptCharactersByKind: [DecisionIntelligenceTraceKind: Double] {
+        averageCharactersByKind(from: promptCharactersTotalByKind)
+    }
+
+    var averagePrefixCharactersByKind: [DecisionIntelligenceTraceKind: Double] {
+        averageCharactersByKind(from: prefixCharactersTotalByKind)
+    }
+
+    var averageSuffixCharactersByKind: [DecisionIntelligenceTraceKind: Double] {
+        averageCharactersByKind(from: suffixCharactersTotalByKind)
+    }
+
+    var overTargetBudgetRate: Double {
+        rate(
+            numerator: overTargetBudgetCountByKind.values.reduce(0, +),
+            denominator: totalRequests
+        )
+    }
+
+    var overTargetBudgetRateByKind: [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: requestCountByKind.map { kind, count in
+                (kind, rate(numerator: overTargetBudgetCountByKind[kind] ?? 0, denominator: count))
+            }
+        )
+    }
+
     var slowRequestRate: Double {
         rate(
             numerator: slowRequestCountByKind.values.reduce(0, +),
@@ -83,6 +124,16 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
         Dictionary(
             uniqueKeysWithValues: requestCountByKind.map { kind, count in
                 (kind, rate(numerator: slowRequestCountByKind[kind] ?? 0, denominator: count))
+            }
+        )
+    }
+
+    private func averageCharactersByKind(
+        from totalsByKind: [DecisionIntelligenceTraceKind: Int]
+    ) -> [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: totalsByKind.map { kind, total in
+                (kind, average(totals: Double(total), count: requestCountByKind[kind] ?? 0))
             }
         )
     }
@@ -111,6 +162,12 @@ actor DecisionIntelligenceTelemetryStore {
     private var requestDurationTotalMsByKind: [DecisionIntelligenceTraceKind: Double] = [:]
     private var activeProviderDurationTotalMs: [DecisionModelProviderKind: Double] = [:]
     private var gemmaBackendDurationTotalMs: [InferenceBackendKind: Double] = [:]
+    private var admissionSkipCountByReason: [DecisionIntelligenceAdmissionSkipReason: Int] = [:]
+    private var promptPressureCount: [DecisionIntelligencePromptPressure: Int] = [:]
+    private var promptCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int] = [:]
+    private var prefixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int] = [:]
+    private var suffixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int] = [:]
+    private var overTargetBudgetCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
 
     private static func slowRequestThresholdMs(
         for kind: DecisionIntelligenceTraceKind
@@ -132,6 +189,8 @@ actor DecisionIntelligenceTelemetryStore {
         attemptedProviders: [DecisionModelProviderKind],
         usedFallback: Bool,
         durationMs: Double,
+        promptBudget: DecisionIntelligencePromptContract.ContextBudget? = nil,
+        admissionDecision: DecisionIntelligenceAdmissionDecision? = nil,
         gemmaBackendResolution: InferenceBackendResolution? = nil
     ) {
         requestCountByKind[kind, default: 0] += 1
@@ -154,6 +213,22 @@ actor DecisionIntelligenceTelemetryStore {
             fallbackActivations += 1
         }
 
+        if let promptBudget {
+            promptCharactersTotalByKind[kind, default: 0] += promptBudget.totalCharacters
+            prefixCharactersTotalByKind[kind, default: 0] += promptBudget.prefixCharacters
+            suffixCharactersTotalByKind[kind, default: 0] += promptBudget.suffixCharacters
+            if !promptBudget.isWithinTarget {
+                overTargetBudgetCountByKind[kind, default: 0] += 1
+            }
+        }
+
+        if let admissionDecision {
+            promptPressureCount[admissionDecision.pressure, default: 0] += 1
+            if let skipReason = admissionDecision.skipReason {
+                admissionSkipCountByReason[skipReason, default: 0] += 1
+            }
+        }
+
         if let gemmaBackendResolution {
             gemmaBackendCount[gemmaBackendResolution.effectiveBackend, default: 0] += 1
             gemmaBackendDurationTotalMs[gemmaBackendResolution.effectiveBackend, default: 0] += durationMs
@@ -171,7 +246,13 @@ actor DecisionIntelligenceTelemetryStore {
             slowRequestCountByKind: slowRequestCountByKind,
             requestDurationTotalMsByKind: requestDurationTotalMsByKind,
             activeProviderDurationTotalMs: activeProviderDurationTotalMs,
-            gemmaBackendDurationTotalMs: gemmaBackendDurationTotalMs
+            gemmaBackendDurationTotalMs: gemmaBackendDurationTotalMs,
+            admissionSkipCountByReason: admissionSkipCountByReason,
+            promptPressureCount: promptPressureCount,
+            promptCharactersTotalByKind: promptCharactersTotalByKind,
+            prefixCharactersTotalByKind: prefixCharactersTotalByKind,
+            suffixCharactersTotalByKind: suffixCharactersTotalByKind,
+            overTargetBudgetCountByKind: overTargetBudgetCountByKind
         )
     }
 
@@ -186,5 +267,11 @@ actor DecisionIntelligenceTelemetryStore {
         requestDurationTotalMsByKind.removeAll()
         activeProviderDurationTotalMs.removeAll()
         gemmaBackendDurationTotalMs.removeAll()
+        admissionSkipCountByReason.removeAll()
+        promptPressureCount.removeAll()
+        promptCharactersTotalByKind.removeAll()
+        prefixCharactersTotalByKind.removeAll()
+        suffixCharactersTotalByKind.removeAll()
+        overTargetBudgetCountByKind.removeAll()
     }
 }

@@ -70,14 +70,20 @@ struct DecisionTestingRuntimeExport {
             totalRequests: intelligenceTelemetry.totalRequests,
             totalProviderAttempts: intelligenceTelemetry.totalProviderAttempts,
             cacheHitRate: intelligenceTelemetry.cacheHitRate,
+            admissionSkipRate: intelligenceTelemetry.admissionSkipRate,
             deterministicFallbackRate: intelligenceTelemetry.deterministicFallbackRate,
             averageRequestDurationMs: intelligenceTelemetry.averageRequestDurationMs,
             averageRequestDurationMsByKind: intelligenceTelemetry.averageRequestDurationMsByKind,
             averageRequestDurationMsByProvider: intelligenceTelemetry.averageRequestDurationMsByActiveProvider,
             averageRequestDurationMsByGemmaBackend: intelligenceTelemetry.averageRequestDurationMsByGemmaBackend,
+            averagePromptCharactersByKind: intelligenceTelemetry.averagePromptCharactersByKind,
+            averagePrefixCharactersByKind: intelligenceTelemetry.averagePrefixCharactersByKind,
+            averageSuffixCharactersByKind: intelligenceTelemetry.averageSuffixCharactersByKind,
             slowRequestRate: intelligenceTelemetry.slowRequestRate,
             slowRequestRateByKind: intelligenceTelemetry.slowRequestRateByKind,
+            overTargetBudgetRate: intelligenceTelemetry.overTargetBudgetRate,
             fallbackActivations: intelligenceTelemetry.fallbackActivations,
+            admissionSkipCount: intelligenceTelemetry.outcomeCount[.admissionSkipped] ?? 0,
             contextAwareTraceCount: lifecycleSummary.contextAwareTraceCount,
             lifecycleRebuildCount: lifecycleSummary.rebuildCount,
             staleFieldDropCount: lifecycleSummary.staleFieldDropCount,
@@ -126,14 +132,20 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let totalRequests: Int
     let totalProviderAttempts: Int
     let cacheHitRate: Double
+    let admissionSkipRate: Double
     let deterministicFallbackRate: Double
     let averageRequestDurationMs: Double
     let averageRequestDurationMsByKind: [DecisionIntelligenceTraceKind: Double]
     let averageRequestDurationMsByProvider: [DecisionModelProviderKind: Double]
     let averageRequestDurationMsByGemmaBackend: [InferenceBackendKind: Double]
+    let averagePromptCharactersByKind: [DecisionIntelligenceTraceKind: Double]
+    let averagePrefixCharactersByKind: [DecisionIntelligenceTraceKind: Double]
+    let averageSuffixCharactersByKind: [DecisionIntelligenceTraceKind: Double]
     let slowRequestRate: Double
     let slowRequestRateByKind: [DecisionIntelligenceTraceKind: Double]
+    let overTargetBudgetRate: Double
     let fallbackActivations: Int
+    let admissionSkipCount: Int
     let contextAwareTraceCount: Int
     let lifecycleRebuildCount: Int
     let staleFieldDropCount: Int

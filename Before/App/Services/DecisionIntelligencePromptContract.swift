@@ -46,6 +46,11 @@ enum DecisionIntelligencePromptContract {
         var isWithinTarget: Bool {
             totalCharacters <= targetCharacters
         }
+
+        var utilizationRatio: Double {
+            guard targetCharacters > 0 else { return 0 }
+            return Double(totalCharacters) / Double(targetCharacters)
+        }
     }
 
     struct PromptEnvelope: Equatable, Sendable {

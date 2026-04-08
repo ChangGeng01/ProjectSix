@@ -341,4 +341,139 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         XCTAssertEqual(snapshot.attemptedProviderCount[.testingStub], 2)
         XCTAssertEqual(snapshot.fallbackActivations, 2)
     }
+
+    @MainActor
+    func testQuickAdmissionCanSkipModelInvocationWhenPromptBecomesTooLarge() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let neuralState = DecisionNeuralState(
+            mode: .quick,
+            dominantActivations: [
+                DecisionActivation(signal: .urgency, strength: 0.96)
+            ],
+            candidateActions: [
+                DecisionActionCandidate(route: .waitBuffer, score: 0.96)
+            ],
+            suppressedBehaviors: Array(repeating: "long_explanation", count: 120),
+            detail: String(repeating: "pressure-", count: 220)
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            neuralState: neuralState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertNil(refined)
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertEqual(snapshot.outcomeCount[.admissionSkipped], 1)
+        XCTAssertEqual(snapshot.admissionSkipCountByReason[.budgetExceeded], 1)
+        XCTAssertEqual(snapshot.requestCountByKind[.quick], 1)
+        XCTAssertNil(snapshot.activeProviderCount[.testingStub])
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected an admission-skip trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .quick)
+        XCTAssertEqual(latestTrace.admissionDecision?.skipReason, .budgetExceeded)
+        XCTAssertEqual(latestTrace.promptBudget?.isWithinTarget, false)
+        XCTAssertTrue(latestTrace.detail.contains("Admission controller skipped quick refinement"))
+    }
+
+    @MainActor
+    func testReminderAdmissionSkipsWhenOnlyOneCandidateExists() async {
+        let selected = await DecisionIntelligenceProviderPipeline.pickReminder(
+            from: [
+                ReminderSelectionCandidate(id: UUID(), content: "Only candidate")
+            ],
+            scenario: .buy,
+            prompt: "I still want it.",
+            mode: .quick,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertNil(selected)
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertEqual(snapshot.outcomeCount[.admissionSkipped], 1)
+        XCTAssertEqual(snapshot.admissionSkipCountByReason[.insufficientReminderChoice], 1)
+    }
+
+    @MainActor
+    func testTestingStubBypassesAdmissionSkipForBalanceRefinement() async {
+        let base = BalanceBoardResult(
+            headline: "Base headline",
+            summary: "Base summary",
+            focusTitle: "Base focus",
+            focusDescription: "Base description",
+            nextAction: "Base next action"
+        )
+        let input = BalanceBoardInput(
+            prompt: "Should I take this side project?",
+            desire: "Momentum",
+            concern: "Burnout",
+            constraint: String(repeating: "constraint-", count: 80),
+            longTerm: String(repeating: "future-", count: 80)
+        )
+        let contextState = DecisionContextPreparedState(
+            rebuiltSession: false,
+            generation: 1,
+            activeFields: [.balancePrompt, .balanceDesire, .balanceConcern, .balanceConstraint, .balanceLongTerm],
+            staleFields: []
+        )
+        let neuralState = DecisionNeuralState(
+            mode: .balance,
+            dominantActivations: [
+                DecisionActivation(signal: .constraintPressure, strength: 0.95)
+            ],
+            candidateActions: [
+                DecisionActionCandidate(route: .setBoundary, score: 0.95)
+            ],
+            suppressedBehaviors: Array(repeating: "long_explanation", count: 80),
+            detail: String(repeating: "pressure-", count: 120)
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
+            base: base,
+            input: input,
+            contextState: contextState,
+            neuralState: neuralState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertEqual(refined?.headline, "Stub balance board")
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertEqual(snapshot.outcomeCount[.providerSuccess], 1)
+        XCTAssertNil(snapshot.outcomeCount[.admissionSkipped])
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected a balance trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .balance)
+        XCTAssertEqual(latestTrace.activeProvider, .testingStub)
+        XCTAssertTrue(latestTrace.admissionDecision?.isAllowed == true)
+    }
 }

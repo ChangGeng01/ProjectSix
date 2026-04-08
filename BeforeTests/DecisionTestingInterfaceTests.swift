@@ -250,6 +250,17 @@ struct DecisionTestingInterfaceTests {
             attemptedProviders: [.gemmaE4B],
             usedFallback: false,
             durationMs: 180,
+            promptBudget: DecisionIntelligencePromptContract.ContextBudget(
+                targetCharacters: 1_000,
+                prefixCharacters: 200,
+                suffixCharacters: 320
+            ),
+            admissionDecision: DecisionIntelligenceAdmissionDecision(
+                isAllowed: true,
+                pressure: .elevated,
+                reason: "Allowed for testing.",
+                skipReason: nil
+            ),
             gemmaBackendResolution: InferenceBackendResolver.resolve(
                 policy: .cpuOnly,
                 device: DeviceCapabilitySnapshot(
@@ -277,6 +288,10 @@ struct DecisionTestingInterfaceTests {
         #expect(telemetrySnapshot.gemmaBackendCount[.cpu] == 1)
         #expect(telemetrySnapshot.averageRequestDurationMs == 180)
         #expect(telemetrySnapshot.slowRequestRate == 0)
+        #expect(telemetrySnapshot.averagePromptCharactersByKind[.balance] == 520)
+        #expect(telemetrySnapshot.averagePrefixCharactersByKind[.balance] == 200)
+        #expect(telemetrySnapshot.averageSuffixCharactersByKind[.balance] == 320)
+        #expect(telemetrySnapshot.admissionSkipRate == 0)
         #expect(cacheSnapshot.hitCountByKind[.reminder] == 1)
         #expect(cacheSnapshot.storeCountByKind[.reminder] == 1)
     }
@@ -324,6 +339,17 @@ struct DecisionTestingInterfaceTests {
             attemptedProviders: [.gemmaE4B],
             usedFallback: false,
             durationMs: 220,
+            promptBudget: DecisionIntelligencePromptContract.ContextBudget(
+                targetCharacters: 1_200,
+                prefixCharacters: 180,
+                suffixCharacters: 300
+            ),
+            admissionDecision: DecisionIntelligenceAdmissionDecision(
+                isAllowed: true,
+                pressure: .low,
+                reason: "Allowed for testing.",
+                skipReason: nil
+            ),
             gemmaBackendResolution: InferenceBackendResolver.resolve(
                 policy: .cpuOnly,
                 device: DeviceCapabilitySnapshot(
@@ -383,9 +409,11 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.totalRequests == 1)
         #expect(export.summary.totalCacheEntries == 1)
         #expect(export.summary.dominantGemmaBackend == .cpu)
+        #expect(export.summary.admissionSkipRate == 0)
         #expect(export.summary.averageRequestDurationMs == 220)
         #expect(export.summary.averageRequestDurationMsByKind[.quick] == 220)
         #expect(export.summary.averageRequestDurationMsByGemmaBackend[.cpu] == 220)
+        #expect(export.summary.averagePromptCharactersByKind[.quick] == 480)
         #expect(export.summary.slowRequestRate == 0)
         #expect(export.summary.slowRequestRateByKind[.quick] == 0)
         #expect(export.lifecycleSummary.contextAwareTraceCount == 1)

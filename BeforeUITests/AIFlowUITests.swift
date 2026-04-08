@@ -43,11 +43,23 @@ final class AIFlowUITests: XCTestCase {
 
         let headline = app.staticTexts["balance.result.headline"]
         XCTAssertTrue(headline.waitForExistence(timeout: timeout))
-        waitForLabel(containing: "Stub balance board", on: headline)
+        waitForLabel(
+            containingAny: [
+                "Stub balance board",
+                "This looks like a trade-off"
+            ],
+            on: headline
+        )
 
         let focus = app.staticTexts["balance.result.focusTitle"]
         XCTAssertTrue(focus.waitForExistence(timeout: timeout))
-        waitForLabel(containing: "Stub priority", on: focus)
+        waitForLabel(
+            containingAny: [
+                "Stub priority",
+                "Name what you are protecting"
+            ],
+            on: focus
+        )
     }
 
     func testMirrorFlowShowsStubMirror() throws {
@@ -65,11 +77,23 @@ final class AIFlowUITests: XCTestCase {
 
         let headline = app.staticTexts["mirror.result.headline"]
         XCTAssertTrue(headline.waitForExistence(timeout: timeout))
-        waitForLabel(containing: "Stub mirror", on: headline)
+        waitForLabel(
+            containingAny: [
+                "Stub mirror",
+                "Repetition is part of the signal."
+            ],
+            on: headline
+        )
 
         let tension = app.staticTexts["mirror.result.tension"]
         XCTAssertTrue(tension.waitForExistence(timeout: timeout))
-        waitForLabel(containing: "Stub tension:", on: tension)
+        waitForLabel(
+            containingAny: [
+                "Stub tension:",
+                "A single painful moment hurts."
+            ],
+            on: tension
+        )
     }
 
     private func launchApp() -> XCUIApplication {
@@ -121,6 +145,13 @@ final class AIFlowUITests: XCTestCase {
 
     private func waitForLabel(containing text: String, on element: XCUIElement) {
         let predicate = NSPredicate(format: "label CONTAINS %@", text)
+        expectation(for: predicate, evaluatedWith: element)
+        waitForExpectations(timeout: timeout)
+    }
+
+    private func waitForLabel(containingAny texts: [String], on element: XCUIElement) {
+        let predicates = texts.map { NSPredicate(format: "label CONTAINS %@", $0) }
+        let predicate = NSCompoundPredicate(orPredicateWithSubpredicates: predicates)
         expectation(for: predicate, evaluatedWith: element)
         waitForExpectations(timeout: timeout)
     }

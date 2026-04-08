@@ -249,7 +249,8 @@ enum DecisionIntelligenceProviderPipeline {
                 preferredProvider: preference.kind,
                 activeProvider: nil,
                 attemptedProviders: [],
-                durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                promptBudget: envelope.budget
             )
             recordTrace(
                 kind: .quick,
@@ -259,9 +260,41 @@ enum DecisionIntelligenceProviderPipeline {
                 allowFallbacks: allowFallbacks,
                 contextState: contextState,
                 neuralState: neuralState,
+                promptBudget: envelope.budget,
                 prompt: envelope.debugPrompt,
                 outputPreview: quickPreview(from: base),
                 detail: "Template mode is pinned, so no model provider was used for quick refinement."
+            )
+            return nil
+        }
+
+        let admissionDecision = testingStubProfile.map {
+            _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: envelope)
+        } ?? DecisionIntelligenceAdmissionController.decide(for: envelope)
+        guard admissionDecision.isAllowed else {
+            await recordTelemetry(
+                kind: .quick,
+                outcome: .admissionSkipped,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                promptBudget: envelope.budget,
+                admissionDecision: admissionDecision
+            )
+            recordTrace(
+                kind: .quick,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                allowFallbacks: allowFallbacks,
+                contextState: contextState,
+                neuralState: neuralState,
+                promptBudget: envelope.budget,
+                admissionDecision: admissionDecision,
+                prompt: envelope.debugPrompt,
+                outputPreview: quickPreview(from: base),
+                detail: "Admission controller skipped quick refinement. \(admissionDecision.reason)"
             )
             return nil
         }
@@ -284,7 +317,9 @@ enum DecisionIntelligenceProviderPipeline {
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
-                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    promptBudget: envelope.budget,
+                    admissionDecision: admissionDecision
                 )
                 recordTrace(
                     kind: .quick,
@@ -294,6 +329,8 @@ enum DecisionIntelligenceProviderPipeline {
                     allowFallbacks: allowFallbacks,
                     contextState: contextState,
                     neuralState: neuralState,
+                    promptBudget: envelope.budget,
+                    admissionDecision: admissionDecision,
                     prompt: envelope.debugPrompt,
                     outputPreview: quickPreview(from: cached),
                     detail: cachedDetail(
@@ -313,7 +350,9 @@ enum DecisionIntelligenceProviderPipeline {
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
-                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    promptBudget: envelope.budget,
+                    admissionDecision: admissionDecision
                 )
                 recordTrace(
                     kind: .quick,
@@ -323,6 +362,8 @@ enum DecisionIntelligenceProviderPipeline {
                     allowFallbacks: allowFallbacks,
                     contextState: contextState,
                     neuralState: neuralState,
+                    promptBudget: envelope.budget,
+                    admissionDecision: admissionDecision,
                     prompt: envelope.debugPrompt,
                     outputPreview: quickPreview(from: refined),
                     detail: detail(
@@ -341,7 +382,9 @@ enum DecisionIntelligenceProviderPipeline {
             preferredProvider: preference.kind,
             activeProvider: nil,
             attemptedProviders: actualAttemptedKinds,
-            durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+            durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+            promptBudget: envelope.budget,
+            admissionDecision: admissionDecision
         )
         recordTrace(
             kind: .quick,
@@ -351,6 +394,8 @@ enum DecisionIntelligenceProviderPipeline {
             allowFallbacks: allowFallbacks,
             contextState: contextState,
             neuralState: neuralState,
+            promptBudget: envelope.budget,
+            admissionDecision: admissionDecision,
             prompt: envelope.debugPrompt,
             outputPreview: quickPreview(from: base),
             detail: "No provider returned a refined quick result, so Before kept the deterministic copy."
@@ -382,7 +427,8 @@ enum DecisionIntelligenceProviderPipeline {
                 preferredProvider: preference.kind,
                 activeProvider: nil,
                 attemptedProviders: [],
-                durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                promptBudget: envelope.budget
             )
             recordTrace(
                 kind: .balance,
@@ -392,9 +438,41 @@ enum DecisionIntelligenceProviderPipeline {
                 allowFallbacks: allowFallbacks,
                 contextState: contextState,
                 neuralState: neuralState,
+                promptBudget: envelope.budget,
                 prompt: envelope.debugPrompt,
                 outputPreview: balancePreview(from: base),
                 detail: "Template mode is pinned, so no model provider was used for balance refinement."
+            )
+            return nil
+        }
+
+        let admissionDecision = testingStubProfile.map {
+            _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: envelope)
+        } ?? DecisionIntelligenceAdmissionController.decide(for: envelope)
+        guard admissionDecision.isAllowed else {
+            await recordTelemetry(
+                kind: .balance,
+                outcome: .admissionSkipped,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                promptBudget: envelope.budget,
+                admissionDecision: admissionDecision
+            )
+            recordTrace(
+                kind: .balance,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                allowFallbacks: allowFallbacks,
+                contextState: contextState,
+                neuralState: neuralState,
+                promptBudget: envelope.budget,
+                admissionDecision: admissionDecision,
+                prompt: envelope.debugPrompt,
+                outputPreview: balancePreview(from: base),
+                detail: "Admission controller skipped balance refinement. \(admissionDecision.reason)"
             )
             return nil
         }
@@ -417,7 +495,9 @@ enum DecisionIntelligenceProviderPipeline {
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
-                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    promptBudget: envelope.budget,
+                    admissionDecision: admissionDecision
                 )
                 recordTrace(
                     kind: .balance,
@@ -427,6 +507,8 @@ enum DecisionIntelligenceProviderPipeline {
                     allowFallbacks: allowFallbacks,
                     contextState: contextState,
                     neuralState: neuralState,
+                    promptBudget: envelope.budget,
+                    admissionDecision: admissionDecision,
                     prompt: envelope.debugPrompt,
                     outputPreview: balancePreview(from: cached),
                     detail: cachedDetail(
@@ -446,7 +528,9 @@ enum DecisionIntelligenceProviderPipeline {
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
-                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    promptBudget: envelope.budget,
+                    admissionDecision: admissionDecision
                 )
                 recordTrace(
                     kind: .balance,
@@ -456,6 +540,8 @@ enum DecisionIntelligenceProviderPipeline {
                     allowFallbacks: allowFallbacks,
                     contextState: contextState,
                     neuralState: neuralState,
+                    promptBudget: envelope.budget,
+                    admissionDecision: admissionDecision,
                     prompt: envelope.debugPrompt,
                     outputPreview: balancePreview(from: refined),
                     detail: detail(
@@ -474,7 +560,9 @@ enum DecisionIntelligenceProviderPipeline {
             preferredProvider: preference.kind,
             activeProvider: nil,
             attemptedProviders: actualAttemptedKinds,
-            durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+            durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+            promptBudget: envelope.budget,
+            admissionDecision: admissionDecision
         )
         recordTrace(
             kind: .balance,
@@ -484,6 +572,8 @@ enum DecisionIntelligenceProviderPipeline {
             allowFallbacks: allowFallbacks,
             contextState: contextState,
             neuralState: neuralState,
+            promptBudget: envelope.budget,
+            admissionDecision: admissionDecision,
             prompt: envelope.debugPrompt,
             outputPreview: balancePreview(from: base),
             detail: "No provider returned a refined balance board, so Before kept the deterministic copy."
@@ -515,7 +605,8 @@ enum DecisionIntelligenceProviderPipeline {
                 preferredProvider: preference.kind,
                 activeProvider: nil,
                 attemptedProviders: [],
-                durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                promptBudget: envelope.budget
             )
             recordTrace(
                 kind: .mirror,
@@ -525,9 +616,41 @@ enum DecisionIntelligenceProviderPipeline {
                 allowFallbacks: allowFallbacks,
                 contextState: contextState,
                 neuralState: neuralState,
+                promptBudget: envelope.budget,
                 prompt: envelope.debugPrompt,
                 outputPreview: mirrorPreview(from: base),
                 detail: "Template mode is pinned, so no model provider was used for mirror refinement."
+            )
+            return nil
+        }
+
+        let admissionDecision = testingStubProfile.map {
+            _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: envelope)
+        } ?? DecisionIntelligenceAdmissionController.decide(for: envelope)
+        guard admissionDecision.isAllowed else {
+            await recordTelemetry(
+                kind: .mirror,
+                outcome: .admissionSkipped,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                promptBudget: envelope.budget,
+                admissionDecision: admissionDecision
+            )
+            recordTrace(
+                kind: .mirror,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                allowFallbacks: allowFallbacks,
+                contextState: contextState,
+                neuralState: neuralState,
+                promptBudget: envelope.budget,
+                admissionDecision: admissionDecision,
+                prompt: envelope.debugPrompt,
+                outputPreview: mirrorPreview(from: base),
+                detail: "Admission controller skipped mirror refinement. \(admissionDecision.reason)"
             )
             return nil
         }
@@ -550,7 +673,9 @@ enum DecisionIntelligenceProviderPipeline {
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
-                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    promptBudget: envelope.budget,
+                    admissionDecision: admissionDecision
                 )
                 recordTrace(
                     kind: .mirror,
@@ -560,6 +685,8 @@ enum DecisionIntelligenceProviderPipeline {
                     allowFallbacks: allowFallbacks,
                     contextState: contextState,
                     neuralState: neuralState,
+                    promptBudget: envelope.budget,
+                    admissionDecision: admissionDecision,
                     prompt: envelope.debugPrompt,
                     outputPreview: mirrorPreview(from: cached),
                     detail: cachedDetail(
@@ -579,7 +706,9 @@ enum DecisionIntelligenceProviderPipeline {
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
-                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    promptBudget: envelope.budget,
+                    admissionDecision: admissionDecision
                 )
                 recordTrace(
                     kind: .mirror,
@@ -589,6 +718,8 @@ enum DecisionIntelligenceProviderPipeline {
                     allowFallbacks: allowFallbacks,
                     contextState: contextState,
                     neuralState: neuralState,
+                    promptBudget: envelope.budget,
+                    admissionDecision: admissionDecision,
                     prompt: envelope.debugPrompt,
                     outputPreview: mirrorPreview(from: refined),
                     detail: detail(
@@ -607,7 +738,9 @@ enum DecisionIntelligenceProviderPipeline {
             preferredProvider: preference.kind,
             activeProvider: nil,
             attemptedProviders: actualAttemptedKinds,
-            durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+            durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+            promptBudget: envelope.budget,
+            admissionDecision: admissionDecision
         )
         recordTrace(
             kind: .mirror,
@@ -617,6 +750,8 @@ enum DecisionIntelligenceProviderPipeline {
             allowFallbacks: allowFallbacks,
             contextState: contextState,
             neuralState: neuralState,
+            promptBudget: envelope.budget,
+            admissionDecision: admissionDecision,
             prompt: envelope.debugPrompt,
             outputPreview: mirrorPreview(from: base),
             detail: "No provider returned a refined mirror, so Before kept the deterministic copy."
@@ -650,7 +785,39 @@ enum DecisionIntelligenceProviderPipeline {
                 preferredProvider: preference.kind,
                 activeProvider: nil,
                 attemptedProviders: [],
-                durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                promptBudget: selection.prompt.budget
+            )
+            return nil
+        }
+        let admissionDecision = testingStubProfile.map {
+            _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: selection.prompt)
+        } ?? DecisionIntelligenceAdmissionController.decide(
+            for: selection.prompt,
+            reminderCandidateCount: clippedCandidates.count
+        )
+        guard admissionDecision.isAllowed else {
+            await recordTelemetry(
+                kind: .reminder,
+                outcome: .admissionSkipped,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                promptBudget: selection.prompt.budget,
+                admissionDecision: admissionDecision
+            )
+            recordTrace(
+                kind: .reminder,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                allowFallbacks: allowFallbacks,
+                promptBudget: selection.prompt.budget,
+                admissionDecision: admissionDecision,
+                prompt: selection.prompt.debugPrompt,
+                outputPreview: "Deterministic reminder ordering kept",
+                detail: "Admission controller skipped reminder selection. \(admissionDecision.reason)"
             )
             return nil
         }
@@ -673,7 +840,9 @@ enum DecisionIntelligenceProviderPipeline {
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
-                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    promptBudget: selection.prompt.budget,
+                    admissionDecision: admissionDecision
                 )
                 recordTrace(
                     kind: .reminder,
@@ -681,6 +850,8 @@ enum DecisionIntelligenceProviderPipeline {
                     activeProvider: provider.kind,
                     attemptedProviders: attemptedKinds,
                     allowFallbacks: allowFallbacks,
+                    promptBudget: selection.prompt.budget,
+                    admissionDecision: admissionDecision,
                     prompt: selection.prompt.debugPrompt,
                     outputPreview: reminderPreview(from: cached),
                     detail: cachedDetail(
@@ -705,7 +876,9 @@ enum DecisionIntelligenceProviderPipeline {
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
-                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    promptBudget: selection.prompt.budget,
+                    admissionDecision: admissionDecision
                 )
                 recordTrace(
                     kind: .reminder,
@@ -713,6 +886,8 @@ enum DecisionIntelligenceProviderPipeline {
                     activeProvider: provider.kind,
                     attemptedProviders: attemptedKinds,
                     allowFallbacks: allowFallbacks,
+                    promptBudget: selection.prompt.budget,
+                    admissionDecision: admissionDecision,
                     prompt: selection.prompt.debugPrompt,
                     outputPreview: reminderPreview(from: selected),
                     detail: detail(
@@ -731,7 +906,9 @@ enum DecisionIntelligenceProviderPipeline {
             preferredProvider: preference.kind,
             activeProvider: nil,
             attemptedProviders: actualAttemptedKinds,
-            durationMs: elapsedMilliseconds(since: requestStart, clock: clock)
+            durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+            promptBudget: selection.prompt.budget,
+            admissionDecision: admissionDecision
         )
         recordTrace(
             kind: .reminder,
@@ -739,6 +916,8 @@ enum DecisionIntelligenceProviderPipeline {
             activeProvider: nil,
             attemptedProviders: attemptedKinds,
             allowFallbacks: allowFallbacks,
+            promptBudget: selection.prompt.budget,
+            admissionDecision: admissionDecision,
             prompt: selection.prompt.debugPrompt,
             outputPreview: "No reminder selected",
             detail: "No provider returned a reminder selection, so Before kept the deterministic reminder ordering."
@@ -771,6 +950,8 @@ enum DecisionIntelligenceProviderPipeline {
         allowFallbacks: Bool,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
+        promptBudget: DecisionIntelligencePromptContract.ContextBudget? = nil,
+        admissionDecision: DecisionIntelligenceAdmissionDecision? = nil,
         prompt: String,
         outputPreview: String,
         detail: String
@@ -784,6 +965,8 @@ enum DecisionIntelligenceProviderPipeline {
             usedFallback: activeProvider != nil && activeProvider != preferredProvider,
             contextState: contextState,
             neuralState: neuralState,
+            promptBudget: promptBudget,
+            admissionDecision: admissionDecision,
             prompt: prompt,
             outputPreview: outputPreview,
             detail: detail
@@ -851,7 +1034,9 @@ enum DecisionIntelligenceProviderPipeline {
         preferredProvider: DecisionModelProviderKind,
         activeProvider: DecisionModelProviderKind?,
         attemptedProviders: [DecisionModelProviderKind],
-        durationMs: Double
+        durationMs: Double,
+        promptBudget: DecisionIntelligencePromptContract.ContextBudget? = nil,
+        admissionDecision: DecisionIntelligenceAdmissionDecision? = nil
     ) async {
         await DecisionIntelligenceTelemetryStore.shared.record(
             kind: kind,
@@ -860,6 +1045,8 @@ enum DecisionIntelligenceProviderPipeline {
             attemptedProviders: attemptedProviders,
             usedFallback: activeProvider != nil && activeProvider != preferredProvider,
             durationMs: durationMs,
+            promptBudget: promptBudget,
+            admissionDecision: admissionDecision,
             gemmaBackendResolution: activeProvider == .gemmaE4B
                 ? GemmaE4BIntelligenceService.backendResolution(
                     policy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
