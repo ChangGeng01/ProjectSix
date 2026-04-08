@@ -181,7 +181,7 @@ final class BeforeAppModel: ObservableObject {
 
         switch action {
         case .decideTomorrow:
-            let tomorrowItem = makeTomorrowBoxItem(
+            let tomorrowItem = TomorrowBoxItemFactory.makeQuickItem(
                 from: session,
                 result: result,
                 eventID: event.id
@@ -235,7 +235,7 @@ final class BeforeAppModel: ObservableObject {
         guard let result = session.result else { return }
 
         let context = modelContainer.mainContext
-        context.insert(makeTomorrowBoxItem(from: session, result: result))
+        context.insert(TomorrowBoxItemFactory.makeBalanceItem(from: session, result: result))
         try? context.save()
         activeBalanceSession = nil
         selectedTab = 1
@@ -268,7 +268,7 @@ final class BeforeAppModel: ObservableObject {
         guard let result = session.result else { return }
 
         let context = modelContainer.mainContext
-        context.insert(makeTomorrowBoxItem(from: session, result: result))
+        context.insert(TomorrowBoxItemFactory.makeMirrorItem(from: session, result: result))
         try? context.save()
         activeMirrorSession = nil
         selectedTab = 1
@@ -577,55 +577,6 @@ final class BeforeAppModel: ObservableObject {
     private func refreshWidgetSurfaces() {
         syncWidgetSnapshot()
         WidgetCenter.shared.reloadAllTimelines()
-    }
-
-    private func makeTomorrowBoxItem(
-        from session: QuickCheckSession,
-        result: QuickCheckResult,
-        eventID: UUID? = nil
-    ) -> TomorrowBoxItem {
-        let prompt = trimmed(session.note)
-        let title = prompt.isEmpty ? "\(session.scenario.title) later" : prompt
-        return TomorrowBoxItem(
-            dueAt: NotificationService.nextTomorrowReminderDate(after: .now),
-            mode: .quick,
-            title: title,
-            detail: result.afterPerspective,
-            prompt: prompt,
-            entrySource: session.entrySource,
-            linkedCheckEventID: eventID,
-            draft: .quick(from: session)
-        )
-    }
-
-    private func makeTomorrowBoxItem(
-        from session: BalanceBoardSession,
-        result: BalanceBoardResult
-    ) -> TomorrowBoxItem {
-        TomorrowBoxItem(
-            dueAt: NotificationService.nextTomorrowReminderDate(after: .now),
-            mode: .balance,
-            title: trimmed(session.prompt),
-            detail: result.summary,
-            prompt: trimmed(session.prompt),
-            entrySource: session.entrySource,
-            draft: .balance(from: session)
-        )
-    }
-
-    private func makeTomorrowBoxItem(
-        from session: MirrorWorkspaceSession,
-        result: MirrorResult
-    ) -> TomorrowBoxItem {
-        TomorrowBoxItem(
-            dueAt: NotificationService.nextTomorrowReminderDate(after: .now),
-            mode: .mirror,
-            title: trimmed(session.prompt),
-            detail: result.coreTension,
-            prompt: trimmed(session.prompt),
-            entrySource: session.entrySource,
-            draft: .mirror(from: session)
-        )
     }
 
     private func resetTransientState() {

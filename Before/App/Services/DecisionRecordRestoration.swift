@@ -14,18 +14,7 @@ extension CheckEvent {
     }
 
     func makeTomorrowBoxItem(entrySource: EntrySource = .app) -> TomorrowBoxItem {
-        let prompt = trimmed(note)
-        let title = prompt.isEmpty ? "\(scenario.title) later" : prompt
-        return TomorrowBoxItem(
-            dueAt: NotificationService.nextTomorrowReminderDate(after: .now),
-            mode: .quick,
-            title: title,
-            detail: afterPerspective,
-            prompt: prompt,
-            entrySource: entrySource,
-            linkedCheckEventID: id,
-            draft: .quick(from: self)
-        )
+        TomorrowBoxItemFactory.makeQuickItem(from: self, entrySource: entrySource)
     }
 }
 
@@ -42,15 +31,7 @@ extension BalanceDecisionRecord {
     }
 
     func makeTomorrowBoxItem(entrySource: EntrySource = .app) -> TomorrowBoxItem {
-        TomorrowBoxItem(
-            dueAt: NotificationService.nextTomorrowReminderDate(after: .now),
-            mode: .balance,
-            title: trimmed(prompt),
-            detail: focusSummary,
-            prompt: trimmed(prompt),
-            entrySource: entrySource,
-            draft: .balance(from: self)
-        )
+        TomorrowBoxItemFactory.makeBalanceItem(from: self, entrySource: entrySource)
     }
 }
 
@@ -68,18 +49,6 @@ extension MirrorDecisionRecord {
     }
 
     func makeTomorrowBoxItem(entrySource: EntrySource = .app) -> TomorrowBoxItem {
-        TomorrowBoxItem(
-            dueAt: NotificationService.nextTomorrowReminderDate(after: .now),
-            mode: .mirror,
-            title: trimmed(prompt),
-            detail: coreTension,
-            prompt: trimmed(prompt),
-            entrySource: entrySource,
-            draft: .mirror(from: self)
-        )
+        TomorrowBoxItemFactory.makeMirrorItem(from: self, entrySource: entrySource)
     }
-}
-
-private func trimmed(_ value: String) -> String {
-    value.trimmingCharacters(in: .whitespacesAndNewlines)
 }
