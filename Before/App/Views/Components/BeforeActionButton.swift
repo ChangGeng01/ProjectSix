@@ -10,17 +10,20 @@ struct BeforeActionButton: View {
     let title: String
     let style: Style
     let isEnabled: Bool
+    let accessibilityIdentifier: String?
     let action: () -> Void
 
     init(
         _ title: String,
         style: Style = .primary,
         isEnabled: Bool = true,
+        accessibilityIdentifier: String? = nil,
         action: @escaping () -> Void
     ) {
         self.title = title
         self.style = style
         self.isEnabled = isEnabled
+        self.accessibilityIdentifier = accessibilityIdentifier
         self.action = action
     }
 
@@ -36,6 +39,7 @@ struct BeforeActionButton: View {
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.58)
         .buttonStyle(.plain)
+        .beforeAccessibilityIdentifier(accessibilityIdentifier)
     }
 
     private var foregroundStyle: Color {

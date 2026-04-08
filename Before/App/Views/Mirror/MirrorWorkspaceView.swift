@@ -38,7 +38,11 @@ struct MirrorWorkspaceView: View {
 
                         revisitCueCard
 
-                        BeforeActionButton(session.result == nil ? "Reflect it back" : "Reflect it back again", isEnabled: session.canEvaluate) {
+                        BeforeActionButton(
+                            session.result == nil ? "Reflect it back" : "Reflect it back again",
+                            isEnabled: session.canEvaluate,
+                            accessibilityIdentifier: "mirror.evaluate"
+                        ) {
                             Task {
                                 await session.evaluateWithIntelligence(preferences: appModel.preferences)
                             }
@@ -116,6 +120,7 @@ struct MirrorWorkspaceView: View {
                 title: "What are you facing?",
                 subtitle: "Write the actual question before you try to solve it.",
                 placeholder: "Should I stay? Should I leave? Do I still fit here?",
+                accessibilityIdentifier: "mirror.prompt.input",
                 text: $session.prompt
             )
 
@@ -156,6 +161,7 @@ struct MirrorWorkspaceView: View {
             subtitle: lens.subtitle,
             placeholder: lens.placeholder,
             suggestions: DecisionFieldSuggestionLibrary.suggestions(for: mirrorField(for: lens)),
+            accessibilityIdentifier: "mirror.\(mirrorField(for: lens).rawValue).input",
             text: binding(for: lens)
         )
     }
@@ -194,8 +200,10 @@ struct MirrorWorkspaceView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(result.headline)
                         .font(.title3.bold())
+                        .accessibilityIdentifier("mirror.result.headline")
                     Text(result.coreTension)
                         .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("mirror.result.tension")
                 }
             }
 
@@ -203,8 +211,10 @@ struct MirrorWorkspaceView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(result.nextActionTitle)
                         .font(.headline)
+                        .accessibilityIdentifier("mirror.result.nextActionTitle")
                     Text(result.nextAction)
                         .foregroundStyle(BeforeTheme.moss)
+                        .accessibilityIdentifier("mirror.result.nextAction")
                 }
             }
         }

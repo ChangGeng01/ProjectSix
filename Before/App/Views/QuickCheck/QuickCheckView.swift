@@ -46,18 +46,21 @@ struct QuickCheckView: View {
 
                         QuestionCard(
                             title: "Why now?",
+                            accessibilityIdentifierPrefix: "quick.motivation",
                             selection: $session.motivation,
                             values: MotivationChoice.allCases
                         ) { $0.title }
 
                         QuestionCard(
                             title: "What usually happens after?",
+                            accessibilityIdentifierPrefix: "quick.outcome",
                             selection: $session.expectedOutcome,
                             values: OutcomeChoice.allCases
                         ) { $0.title }
 
                         QuestionCard(
                             title: "Can you still pull back?",
+                            accessibilityIdentifierPrefix: "quick.control",
                             selection: $session.controlLevel,
                             values: ControlChoice.allCases
                         ) { $0.title }
@@ -69,10 +72,11 @@ struct QuickCheckView: View {
                                 TextField("What feels true right now?", text: $session.note, axis: .vertical)
                                     .textFieldStyle(.roundedBorder)
                                     .lineLimit(2...4)
+                                    .accessibilityIdentifier("quick.note.input")
                             }
                         }
 
-                        BeforeActionButton("Show me the call", isEnabled: session.canEvaluate) {
+                        BeforeActionButton("Show me the call", isEnabled: session.canEvaluate, accessibilityIdentifier: "quick.evaluate") {
                             Task {
                                 await session.evaluateWithIntelligence(preferences: appModel.preferences)
                             }
@@ -129,6 +133,7 @@ struct QuickCheckView: View {
 
 private struct QuestionCard<Value: Identifiable & Hashable>: View {
     let title: String
+    let accessibilityIdentifierPrefix: String?
     @Binding var selection: Value?
     let values: [Value]
     let label: (Value) -> String
@@ -159,9 +164,15 @@ private struct QuestionCard<Value: Identifiable & Hashable>: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .beforeAccessibilityIdentifier(optionIdentifier(for: value))
                     }
                 }
             }
         }
+    }
+
+    private func optionIdentifier(for value: Value) -> String? {
+        guard let accessibilityIdentifierPrefix else { return nil }
+        return "\(accessibilityIdentifierPrefix).\(String(describing: value.id))"
     }
 }

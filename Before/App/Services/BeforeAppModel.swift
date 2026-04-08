@@ -29,11 +29,13 @@ final class BeforeAppModel: ObservableObject {
     private var pendingReflectionContext: ReflectionContext?
 
     init(modelContainer: ModelContainer, startupNotice: String? = nil) {
+        let testingLaunchOptions = DecisionTestingInterface.launchOptions()
         self.modelContainer = modelContainer
-        self.startupNotice = startupNotice
+        self.startupNotice = testingLaunchOptions.cleanLaunch ? nil : startupNotice
         self.preferences = DecisionTestingInterface.effectivePreferences()
         self.supportInbox = SupportInboxStore()
         self.sharedLifeStore = SharedLifeStore()
+        applyTestingLaunchOptions(testingLaunchOptions)
         restorePendingReflectionState()
     }
 
@@ -853,5 +855,34 @@ final class BeforeAppModel: ObservableObject {
 
     private func trimmed(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func applyTestingLaunchOptions(_ options: DecisionTestingLaunchOptions) {
+        guard !options.isEmpty else { return }
+
+        if options.cleanLaunch {
+            PendingLaunchRequestStore.clear()
+            PendingReflectionStore.clear()
+            ActiveDecisionWorkspaceStore.clear()
+            WidgetSnapshotStore.clear()
+
+            let context = modelContainer.mainContext
+            deleteAll(CheckEvent.self, in: context)
+            deleteAll(BalanceDecisionRecord.self, in: context)
+            deleteAll(MirrorDecisionRecord.self, in: context)
+            deleteAll(SelfReminder.self, in: context)
+            deleteAll(TomorrowBoxItem.self, in: context)
+
+            supportInbox.clearAll()
+            sharedLifeStore.clearAll()
+            reflectionContext = nil
+            letGoContext = nil
+            pendingReflectionContext = nil
+            shouldPromptReflectionAfterBackground = false
+        }
+
+        if options.skipOnboarding {
+            hasSeenOnboarding = true
+        }
     }
 }

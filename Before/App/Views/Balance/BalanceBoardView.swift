@@ -22,6 +22,7 @@ struct BalanceBoardView: View {
                             title: "What are you deciding?",
                             subtitle: "Name the real question in one clean line.",
                             placeholder: "Should I go? Which option fits? Is this spend worth it?",
+                            accessibilityIdentifier: "balance.prompt.input",
                             text: $session.prompt
                         )
 
@@ -41,6 +42,7 @@ struct BalanceBoardView: View {
                             subtitle: "Your subjective pull, without apologizing for it.",
                             placeholder: "Convenience, relief, fun, closeness, momentum...",
                             suggestions: DecisionFieldSuggestionLibrary.suggestions(for: .desire),
+                            accessibilityIdentifier: "balance.desire.input",
                             text: $session.desire
                         )
 
@@ -49,6 +51,7 @@ struct BalanceBoardView: View {
                             subtitle: "What feels risky, costly, or easy to lose here?",
                             placeholder: "Time, money, energy, respect, clarity...",
                             suggestions: DecisionFieldSuggestionLibrary.suggestions(for: .concern),
+                            accessibilityIdentifier: "balance.concern.input",
                             text: $session.concern
                         )
 
@@ -57,6 +60,7 @@ struct BalanceBoardView: View {
                             subtitle: "The concrete constraints, not the story around them.",
                             placeholder: "Budget, schedule, distance, work, family...",
                             suggestions: DecisionFieldSuggestionLibrary.suggestions(for: .constraint),
+                            accessibilityIdentifier: "balance.constraint.input",
                             text: $session.constraint
                         )
 
@@ -65,10 +69,11 @@ struct BalanceBoardView: View {
                             subtitle: "What will future-you have to live with after the moment passes?",
                             placeholder: "Regret, drift, debt, resentment, lost momentum...",
                             suggestions: DecisionFieldSuggestionLibrary.suggestions(for: BalanceField.longTerm),
+                            accessibilityIdentifier: "balance.longTerm.input",
                             text: $session.longTerm
                         )
 
-                        BeforeActionButton("Show the board", isEnabled: session.canEvaluate) {
+                        BeforeActionButton("Show the board", isEnabled: session.canEvaluate, accessibilityIdentifier: "balance.evaluate") {
                             Task {
                                 await session.evaluateWithIntelligence(preferences: appModel.preferences)
                             }
@@ -90,8 +95,10 @@ struct BalanceBoardView: View {
                                 VStack(alignment: .leading, spacing: 10) {
                                     Text(result.headline)
                                         .font(.title3.bold())
+                                        .accessibilityIdentifier("balance.result.headline")
                                     Text(result.summary)
                                         .foregroundStyle(.secondary)
+                                        .accessibilityIdentifier("balance.result.summary")
                                 }
                             }
 
@@ -100,12 +107,15 @@ struct BalanceBoardView: View {
                                     Text(result.focusTitle)
                                         .font(.headline)
                                         .foregroundStyle(BeforeTheme.ink)
+                                        .accessibilityIdentifier("balance.result.focusTitle")
                                     Text(result.focusDescription)
                                         .foregroundStyle(.secondary)
+                                        .accessibilityIdentifier("balance.result.focusDescription")
                                     Divider()
                                     Text(result.nextAction)
                                         .font(.subheadline.weight(.medium))
                                         .foregroundStyle(BeforeTheme.moss)
+                                        .accessibilityIdentifier("balance.result.nextAction")
                                 }
                             }
 

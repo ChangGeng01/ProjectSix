@@ -10,6 +10,15 @@ struct DecisionTestingRuntimeSnapshot: Equatable, Sendable {
     let gemmaRuntimeStatus: GemmaLocalRuntimeStatus
 }
 
+struct DecisionTestingLaunchOptions: Equatable, Sendable {
+    var skipOnboarding = false
+    var cleanLaunch = false
+
+    var isEmpty: Bool {
+        !skipOnboarding && !cleanLaunch
+    }
+}
+
 struct DecisionTestingEnvironmentOverride: Equatable, Sendable {
     var intelligenceMode: OnDeviceIntelligenceMode?
     var preferredProvider: DecisionModelProviderPreference?
@@ -27,6 +36,8 @@ enum DecisionTestingInterface {
         static let preferredProvider = "BEFORE_TEST_MODEL_PROVIDER"
         static let allowFallbacks = "BEFORE_TEST_ALLOW_FALLBACKS"
         static let stubProfile = "BEFORE_TEST_MODEL_STUB_PROFILE"
+        static let skipOnboarding = "BEFORE_TEST_SKIP_ONBOARDING"
+        static let cleanLaunch = "BEFORE_TEST_CLEAN_LAUNCH"
     }
 
     static func configuredPreferences(
@@ -52,7 +63,9 @@ enum DecisionTestingInterface {
         intelligenceMode: OnDeviceIntelligenceMode? = nil,
         preferredProvider: DecisionModelProviderPreference? = nil,
         allowFallbacks: Bool? = nil,
-        stubProfile: DecisionTestingStubProfile? = nil
+        stubProfile: DecisionTestingStubProfile? = nil,
+        skipOnboarding: Bool = false,
+        cleanLaunch: Bool = false
     ) -> [String: String] {
         var environment: [String: String] = [:]
         if let intelligenceMode {
@@ -67,7 +80,22 @@ enum DecisionTestingInterface {
         if let stubProfile {
             environment[EnvironmentKey.stubProfile] = stubProfile.rawValue
         }
+        if skipOnboarding {
+            environment[EnvironmentKey.skipOnboarding] = "1"
+        }
+        if cleanLaunch {
+            environment[EnvironmentKey.cleanLaunch] = "1"
+        }
         return environment
+    }
+
+    static func launchOptions(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> DecisionTestingLaunchOptions {
+        DecisionTestingLaunchOptions(
+            skipOnboarding: environment[EnvironmentKey.skipOnboarding].flatMap(parseBoolOverride(_:)) ?? false,
+            cleanLaunch: environment[EnvironmentKey.cleanLaunch].flatMap(parseBoolOverride(_:)) ?? false
+        )
     }
 
     static func environmentOverride(

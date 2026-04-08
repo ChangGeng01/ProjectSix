@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DecisionModeCard: View {
     let mode: DecisionMode
+    let accessibilityIdentifier: String?
     let action: () -> Void
 
     var body: some View {
@@ -31,5 +32,6 @@ struct DecisionModeCard: View {
             )
         }
         .buttonStyle(.plain)
+        .beforeAccessibilityIdentifier(accessibilityIdentifier)
     }
 }

@@ -5,6 +5,7 @@ struct GuidedInputCard: View {
     let subtitle: String?
     let placeholder: String
     let suggestions: [String]
+    let accessibilityIdentifier: String?
     @Binding var text: String
 
     init(
@@ -12,12 +13,14 @@ struct GuidedInputCard: View {
         subtitle: String? = nil,
         placeholder: String,
         suggestions: [String] = [],
+        accessibilityIdentifier: String? = nil,
         text: Binding<String>
     ) {
         self.title = title
         self.subtitle = subtitle
         self.placeholder = placeholder
         self.suggestions = suggestions
+        self.accessibilityIdentifier = accessibilityIdentifier
         _text = text
     }
 
@@ -36,6 +39,7 @@ struct GuidedInputCard: View {
                 TextField(placeholder, text: $text, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
                     .lineLimit(2...5)
+                    .beforeAccessibilityIdentifier(accessibilityIdentifier)
 
                 if trimmedText.isEmpty, !suggestions.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {

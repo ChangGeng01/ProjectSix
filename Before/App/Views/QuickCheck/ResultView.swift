@@ -52,6 +52,7 @@ struct ResultView: View {
                                     .font(.headline)
                                 Text(displayedResult.currentPerspective)
                                     .foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("quick.result.current")
                             }
                         }
 
@@ -61,6 +62,7 @@ struct ResultView: View {
                                     .font(.headline)
                                 Text(displayedResult.afterPerspective)
                                     .foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("quick.result.after")
                             }
                         }
 

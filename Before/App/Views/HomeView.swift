@@ -45,6 +45,7 @@ struct HomeView: View {
                             title: "What are you deciding?",
                             subtitle: "Write it once. Before will start at the right depth.",
                             placeholder: "Buy this? Go there? Reply now? Stay or leave?",
+                            accessibilityIdentifier: "home.prompt.input",
                             text: $decisionPrompt
                         )
 
@@ -66,7 +67,11 @@ struct HomeView: View {
                             }
                         }
 
-                        BeforeActionButton(appModel.preferences.homePromptAction.buttonTitle, isEnabled: !trimmedPrompt.isEmpty) {
+                        BeforeActionButton(
+                            appModel.preferences.homePromptAction.buttonTitle,
+                            isEnabled: !trimmedPrompt.isEmpty,
+                            accessibilityIdentifier: "home.prompt.submit"
+                        ) {
                             _ = appModel.submitHomePrompt(trimmedPrompt, entrySource: .app)
                             decisionPrompt = ""
                         }
@@ -74,7 +79,10 @@ struct HomeView: View {
 
                         VStack(spacing: 14) {
                             ForEach(DecisionMode.allCases) { mode in
-                                DecisionModeCard(mode: mode) {
+                                DecisionModeCard(
+                                    mode: mode,
+                                    accessibilityIdentifier: "home.mode.\(mode.rawValue)"
+                                ) {
                                     appModel.startDecisionMode(mode, entrySource: .app, prompt: trimmedPrompt)
                                     decisionPrompt = ""
                                 }

@@ -63,13 +63,17 @@ struct DecisionTestingInterfaceTests {
             intelligenceMode: .assistive,
             preferredProvider: .gemmaE4B,
             allowFallbacks: false,
-            stubProfile: .smoke
+            stubProfile: .smoke,
+            skipOnboarding: true,
+            cleanLaunch: true
         )
 
         #expect(environment[DecisionTestingInterface.EnvironmentKey.intelligenceMode] == "assistive")
         #expect(environment[DecisionTestingInterface.EnvironmentKey.preferredProvider] == "gemmaE4B")
         #expect(environment[DecisionTestingInterface.EnvironmentKey.allowFallbacks] == "0")
         #expect(environment[DecisionTestingInterface.EnvironmentKey.stubProfile] == "smoke")
+        #expect(environment[DecisionTestingInterface.EnvironmentKey.skipOnboarding] == "1")
+        #expect(environment[DecisionTestingInterface.EnvironmentKey.cleanLaunch] == "1")
     }
 
     @Test
@@ -115,6 +119,20 @@ struct DecisionTestingInterfaceTests {
         let override = DecisionTestingInterface.environmentOverride(environment: environment)
 
         #expect(override?.stubProfile == .smoke)
+    }
+
+    @Test
+    func launchOptionsParseStableTestingFlags() {
+        let environment = DecisionTestingInterface.launchEnvironment(
+            stubProfile: .smoke,
+            skipOnboarding: true,
+            cleanLaunch: true
+        )
+
+        let options = DecisionTestingInterface.launchOptions(environment: environment)
+
+        #expect(options.skipOnboarding == true)
+        #expect(options.cleanLaunch == true)
     }
 
     @Test

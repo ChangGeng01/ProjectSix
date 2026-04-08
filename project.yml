@@ -81,6 +81,20 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Before.app/Before"
         BUNDLE_LOADER: "$(TEST_HOST)"
+
+  BeforeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: BeforeUITests
+    dependencies:
+      - target: Before
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.changgeng.before.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Before
 schemes:
   Before:
     build:
@@ -88,6 +102,8 @@ schemes:
         Before: all
         BeforeWidgetExtension: all
         BeforeTests: [test]
+        BeforeUITests: [test]
     test:
       targets:
         - name: BeforeTests
+        - name: BeforeUITests

@@ -24,6 +24,12 @@ The app reads these values at launch and folds them into the stored preferences 
 - `BEFORE_TEST_MODEL_STUB_PROFILE`
   - accepted values: `smoke`
   - when present, Before bypasses live model providers and uses a deterministic testing stub for refinement and reminder selection
+- `BEFORE_TEST_SKIP_ONBOARDING`
+  - accepted truthy values: `1`, `true`, `yes`, `on`
+  - when present, Before skips the onboarding gate for that launch only
+- `BEFORE_TEST_CLEAN_LAUNCH`
+  - accepted truthy values: `1`, `true`, `yes`, `on`
+  - when present, Before clears persisted workspace state and local decision data before the app becomes interactive
 
 ## XCTest / UI Test Usage
 
@@ -34,7 +40,9 @@ let environment = DecisionTestingInterface.launchEnvironment(
     intelligenceMode: .assistive,
     preferredProvider: .gemmaE4B,
     allowFallbacks: false,
-    stubProfile: .smoke
+    stubProfile: .smoke,
+    skipOnboarding: true,
+    cleanLaunch: true
 )
 ```
 
