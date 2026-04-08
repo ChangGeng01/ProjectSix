@@ -86,24 +86,18 @@ final class BeforeAppModel: ObservableObject {
 
     func consumePendingLaunchRequestIfNeeded() {
         guard let request = PendingLaunchRequestStore.consume() else { return }
-
-        if let scenario = request.scenario {
-            startQuickCheck(entrySource: request.entrySource, scenario: scenario, prompt: request.prompt ?? "")
-            return
-        }
-
-        if let preferredMode = request.preferredMode {
-            startDecisionMode(preferredMode, entrySource: request.entrySource, prompt: request.prompt ?? "")
-            return
-        }
-
-        let prompt = request.prompt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !prompt.isEmpty {
+        switch LaunchRequestResolver.resolve(request) {
+        case let .quick(scenario, prompt):
+            startQuickCheck(
+                entrySource: request.entrySource,
+                scenario: scenario,
+                prompt: prompt
+            )
+        case let .mode(mode, prompt):
+            startDecisionMode(mode, entrySource: request.entrySource, prompt: prompt)
+        case let .routedPrompt(prompt):
             _ = routeDecision(prompt: prompt, entrySource: request.entrySource)
-            return
         }
-
-        startQuickCheck(entrySource: request.entrySource)
     }
 
     func handleScenePhase(_ phase: ScenePhase) {
