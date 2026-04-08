@@ -126,6 +126,8 @@ struct DecisionTestingRuntimeExport {
             providerBypassRateByKind: intelligenceTelemetry.providerBypassRateByKind,
             lowPressureModelCallRate: intelligenceTelemetry.lowPressureModelCallRate,
             lowPressureModelCallRateByKind: intelligenceTelemetry.lowPressureModelCallRateByKind,
+            avoidableModelCallRate: intelligenceTelemetry.avoidableModelCallRate,
+            avoidableModelCallRateByKind: intelligenceTelemetry.avoidableModelCallRateByKind,
             deterministicFallbackRate: intelligenceTelemetry.deterministicFallbackRate,
             averageRequestDurationMs: intelligenceTelemetry.averageRequestDurationMs,
             averageRequestDurationMsByKind: intelligenceTelemetry.averageRequestDurationMsByKind,
@@ -138,7 +140,10 @@ struct DecisionTestingRuntimeExport {
             averageSuffixCharactersByKind: intelligenceTelemetry.averageSuffixCharactersByKind,
             averageStablePrefixShareByKind: intelligenceTelemetry.averageStablePrefixShareByKind,
             semanticPromptVariantCountByKind: semanticPromptVariantCountByKind,
+            semanticPromptReuseRateByKind: semanticPromptReuseRateByKind,
             stablePrefixVariantCountByKind: stablePrefixVariantCountByKind,
+            stablePrefixReuseRateByKind: stablePrefixReuseRateByKind,
+            stablePrefixPollutionRateByKind: stablePrefixPollutionRateByKind,
             slowRequestRate: intelligenceTelemetry.slowRequestRate,
             slowRequestRateByKind: intelligenceTelemetry.slowRequestRateByKind,
             overTargetBudgetRate: intelligenceTelemetry.overTargetBudgetRate,
@@ -153,6 +158,12 @@ struct DecisionTestingRuntimeExport {
             droppedInjectedEvidenceCount: lifecycleSummary.droppedInjectedEvidenceCount,
             droppedDuplicateEvidenceCount: lifecycleSummary.droppedDuplicateEvidenceCount,
             droppedBudgetEvidenceCount: lifecycleSummary.droppedBudgetEvidenceCount,
+            evidencePollutionRate: evidencePollutionRate,
+            evidencePollutionRateByKind: evidencePollutionRateByKind,
+            duplicateEvidenceDropRate: duplicateEvidenceDropRate,
+            duplicateEvidenceDropRateByKind: duplicateEvidenceDropRateByKind,
+            budgetTrimRate: budgetTrimRate,
+            budgetTrimRateByKind: budgetTrimRateByKind,
             neuralTraceCount: neuralSummary.neuralTraceCount,
             suppressedBehaviorCount: neuralSummary.suppressedBehaviorCount,
             traceCount: recentTraces.count,
@@ -208,8 +219,26 @@ struct DecisionTestingRuntimeExport {
         variantCountByKind(for: \.semanticPromptFingerprint)
     }
 
+    private var semanticPromptReuseRateByKind: [DecisionIntelligenceTraceKind: Double] {
+        reuseRateByKind(from: semanticPromptVariantCountByKind)
+    }
+
     private var stablePrefixVariantCountByKind: [DecisionIntelligenceTraceKind: Int] {
         variantCountByKind(for: \.stablePrefixFingerprint)
+    }
+
+    private var stablePrefixReuseRateByKind: [DecisionIntelligenceTraceKind: Double] {
+        reuseRateByKind(from: stablePrefixVariantCountByKind)
+    }
+
+    private var stablePrefixPollutionRateByKind: [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: intelligenceTelemetry.requestCountByKind.map { kind, requestCount in
+                let variants = stablePrefixVariantCountByKind[kind] ?? 0
+                let pollutionEvents = max(0, variants - 1)
+                return (kind, rate(numerator: pollutionEvents, denominator: requestCount))
+            }
+        )
     }
 
     private func variantCountByKind(
@@ -221,6 +250,92 @@ struct DecisionTestingRuntimeExport {
                 guard !variants.isEmpty else { return nil }
                 return variants.count
             }
+    }
+
+    private func reuseRateByKind(
+        from variantCountByKind: [DecisionIntelligenceTraceKind: Int]
+    ) -> [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: intelligenceTelemetry.requestCountByKind.map { kind, requestCount in
+                let variants = min(variantCountByKind[kind] ?? requestCount, requestCount)
+                let reused = max(0, requestCount - variants)
+                return (kind, rate(numerator: reused, denominator: requestCount))
+            }
+        )
+    }
+
+    private var evidencePollutionRate: Double {
+        rate(
+            numerator: lifecycleSummary.droppedInjectedEvidenceCount,
+            denominator: lifecycleSummary.retainedEvidenceCount + lifecycleSummary.droppedEvidenceCount
+        )
+    }
+
+    private var evidencePollutionRateByKind: [DecisionIntelligenceTraceKind: Double] {
+        evidenceRateByKind(
+            numeratorByKind: lifecycleSummary.droppedInjectedEvidenceCountByKind
+        )
+    }
+
+    private var duplicateEvidenceDropRate: Double {
+        rate(
+            numerator: lifecycleSummary.droppedDuplicateEvidenceCount,
+            denominator: lifecycleSummary.retainedEvidenceCount + lifecycleSummary.droppedEvidenceCount
+        )
+    }
+
+    private var duplicateEvidenceDropRateByKind: [DecisionIntelligenceTraceKind: Double] {
+        evidenceRateByKind(
+            numeratorByKind: lifecycleSummary.droppedDuplicateEvidenceCountByKind
+        )
+    }
+
+    private var budgetTrimRate: Double {
+        rate(
+            numerator: lifecycleSummary.droppedBudgetEvidenceCount,
+            denominator: lifecycleSummary.retainedEvidenceCount + lifecycleSummary.droppedEvidenceCount
+        )
+    }
+
+    private var budgetTrimRateByKind: [DecisionIntelligenceTraceKind: Double] {
+        evidenceRateByKind(
+            numeratorByKind: lifecycleSummary.droppedBudgetEvidenceCountByKind
+        )
+    }
+
+    private func evidenceRateByKind(
+        numeratorByKind: [DecisionIntelligenceTraceKind: Int]
+    ) -> [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: intelligenceTelemetry.requestCountByKind.keys.map { kind in
+                let retained = retainedEvidenceCountByKind[kind] ?? 0
+                let dropped = lifecycleSummary.droppedEvidenceCountByKind[kind] ?? 0
+                return (
+                    kind,
+                    rate(
+                        numerator: numeratorByKind[kind] ?? 0,
+                        denominator: retained + dropped
+                    )
+                )
+            }
+        )
+    }
+
+    private var retainedEvidenceCountByKind: [DecisionIntelligenceTraceKind: Int] {
+        Dictionary(
+            grouping: recentTraces.filter { $0.frontstageState != nil },
+            by: \.kind
+        )
+        .mapValues { traces in
+            traces.reduce(0) { partialResult, trace in
+                partialResult + (trace.frontstageState?.retainedEvidenceCount ?? 0)
+            }
+        }
+    }
+
+    private func rate(numerator: Int, denominator: Int) -> Double {
+        guard denominator > 0 else { return 0 }
+        return Double(numerator) / Double(denominator)
     }
 }
 
@@ -262,6 +377,8 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let providerBypassRateByKind: [DecisionIntelligenceTraceKind: Double]
     let lowPressureModelCallRate: Double
     let lowPressureModelCallRateByKind: [DecisionIntelligenceTraceKind: Double]
+    let avoidableModelCallRate: Double
+    let avoidableModelCallRateByKind: [DecisionIntelligenceTraceKind: Double]
     let deterministicFallbackRate: Double
     let averageRequestDurationMs: Double
     let averageRequestDurationMsByKind: [DecisionIntelligenceTraceKind: Double]
@@ -274,7 +391,10 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let averageSuffixCharactersByKind: [DecisionIntelligenceTraceKind: Double]
     let averageStablePrefixShareByKind: [DecisionIntelligenceTraceKind: Double]
     let semanticPromptVariantCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let semanticPromptReuseRateByKind: [DecisionIntelligenceTraceKind: Double]
     let stablePrefixVariantCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let stablePrefixReuseRateByKind: [DecisionIntelligenceTraceKind: Double]
+    let stablePrefixPollutionRateByKind: [DecisionIntelligenceTraceKind: Double]
     let slowRequestRate: Double
     let slowRequestRateByKind: [DecisionIntelligenceTraceKind: Double]
     let overTargetBudgetRate: Double
@@ -289,6 +409,12 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let droppedInjectedEvidenceCount: Int
     let droppedDuplicateEvidenceCount: Int
     let droppedBudgetEvidenceCount: Int
+    let evidencePollutionRate: Double
+    let evidencePollutionRateByKind: [DecisionIntelligenceTraceKind: Double]
+    let duplicateEvidenceDropRate: Double
+    let duplicateEvidenceDropRateByKind: [DecisionIntelligenceTraceKind: Double]
+    let budgetTrimRate: Double
+    let budgetTrimRateByKind: [DecisionIntelligenceTraceKind: Double]
     let neuralTraceCount: Int
     let suppressedBehaviorCount: Int
     let traceCount: Int

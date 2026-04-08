@@ -112,6 +112,7 @@ enum DecisionIntelligencePromptContract {
         let budget: ContextBudget
         let layers: PromptLayers
         let frontstageState: DecisionFrontstageState
+        let openTextSignalCount: Int
 
         var runtimePrompt: String {
             layers.runtimePrompt
@@ -227,6 +228,7 @@ enum DecisionIntelligencePromptContract {
                 "Keep the same meaning and emotional direction.",
                 "Do not change the verdict, actions, or scenario."
             ],
+            openTextSignalCount: nonEmptySignalCount([input.note]),
             contextState: contextState,
             neuralState: neuralState
         )
@@ -274,6 +276,13 @@ enum DecisionIntelligencePromptContract {
                 "Do not invent facts or turn the board into a verdict.",
                 "Return tighter language only."
             ],
+            openTextSignalCount: nonEmptySignalCount([
+                input.prompt,
+                input.desire,
+                input.concern,
+                input.constraint,
+                input.longTerm
+            ]),
             contextState: contextState,
             neuralState: neuralState
         )
@@ -321,6 +330,14 @@ enum DecisionIntelligencePromptContract {
                 "Keep the tone restrained, reflective, and non-therapeutic.",
                 "Preserve the same core tension and next reflective move."
             ],
+            openTextSignalCount: nonEmptySignalCount([
+                input.prompt,
+                input.emotion,
+                input.relationship,
+                input.reality,
+                input.longTerm,
+                input.selfLens
+            ]),
             contextState: contextState,
             neuralState: neuralState
         )
@@ -369,7 +386,8 @@ enum DecisionIntelligencePromptContract {
                 "Choose exactly one candidate index from the provided evidence.",
                 "Do not rewrite, combine, or invent reminder text.",
                 "Prefer the reminder that most directly matches the current state."
-            ]
+            ],
+            openTextSignalCount: nonEmptySignalCount([prompt])
         )
 
         return ReminderSelectionEnvelope(prompt: envelope, candidates: clippedCandidates)
@@ -418,6 +436,7 @@ enum DecisionIntelligencePromptContract {
         state: [String: Any?],
         evidence: [String],
         outputGuard: [String],
+        openTextSignalCount: Int = 0,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil
     ) -> PromptEnvelope {
@@ -445,6 +464,8 @@ enum DecisionIntelligencePromptContract {
         }
         let preparedFrontstageState = frontstageState(
             kind: kind,
+            activeStateSignalCount: activeStateSignalCount(in: state),
+            openTextSignalCount: openTextSignalCount,
             evidenceFilter: evidenceFilter,
             contextState: contextState,
             neuralState: neuralState
@@ -509,7 +530,8 @@ enum DecisionIntelligencePromptContract {
                 adaptivePrefixCharacters: adaptivePrefix.count
             ),
             layers: layers,
-            frontstageState: preparedFrontstageState
+            frontstageState: preparedFrontstageState,
+            openTextSignalCount: openTextSignalCount
         )
     }
 
@@ -584,6 +606,8 @@ enum DecisionIntelligencePromptContract {
 
     private static func frontstageState(
         kind: TaskKind,
+        activeStateSignalCount: Int,
+        openTextSignalCount: Int,
         evidenceFilter: DecisionPromptEvidenceFilterResult,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?
@@ -649,6 +673,8 @@ enum DecisionIntelligencePromptContract {
 
         return DecisionFrontstageState(
             focusGoal: focusGoal,
+            activeStateSignalCount: activeStateSignalCount,
+            openTextSignalCount: openTextSignalCount,
             dangerSignals: dangerSignals,
             evidenceHeadlines: evidenceHeadlines,
             anchorHeadlines: anchorHeadlines,
@@ -723,6 +749,33 @@ enum DecisionIntelligencePromptContract {
 
     private static func stateValue(_ value: String, fallback: String, limit: Int) -> String {
         sanitized(value, fallback: fallback, limit: limit)
+    }
+
+    private static func nonEmptySignalCount(_ values: [String]) -> Int {
+        values.reduce(0) { partialResult, value in
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? partialResult : partialResult + 1
+        }
+    }
+
+    private static func activeStateSignalCount(in state: [String: Any?]) -> Int {
+        state.reduce(0) { partialResult, pair in
+            guard let value = pair.value else { return partialResult }
+
+            if let string = value as? String {
+                let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty || trimmed == "Not provided." || trimmed == "Not specified" {
+                    return partialResult
+                }
+                return partialResult + 1
+            }
+
+            if let number = value as? Int {
+                return number > 0 ? partialResult + 1 : partialResult
+            }
+
+            return partialResult + 1
+        }
     }
 
     private static func evidenceValue(_ value: String, limit: Int) -> String {

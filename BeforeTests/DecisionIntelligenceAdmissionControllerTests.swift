@@ -26,6 +26,30 @@ final class DecisionIntelligenceAdmissionControllerTests: XCTestCase {
         XCTAssertNil(decision.skipReason)
     }
 
+    func testQuickAdmissionSkipsWhenTemplateAlreadyCoversTheTurn() {
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
+            base: QuickCheckResult(
+                currentPerspective: "You want relief.",
+                afterPerspective: "It may pass quickly.",
+                verdict: .pause,
+                primaryAction: .wait90s,
+                secondaryActions: []
+            ),
+            input: QuickCheckInput(
+                scenario: .buy,
+                motivation: .reward,
+                expectedOutcome: .temporaryRelief,
+                controlLevel: .maybe,
+                note: ""
+            )
+        )
+
+        let decision = DecisionIntelligenceAdmissionController.decide(for: envelope)
+
+        XCTAssertFalse(decision.isAllowed)
+        XCTAssertEqual(decision.skipReason, .templateAlreadySufficient)
+    }
+
     func testQuickAdmissionSkipsWhenPromptBudgetIsExceeded() {
         let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
             base: QuickCheckResult(
@@ -79,6 +103,30 @@ final class DecisionIntelligenceAdmissionControllerTests: XCTestCase {
 
         XCTAssertFalse(decision.isAllowed)
         XCTAssertEqual(decision.skipReason, .insufficientReminderChoice)
+    }
+
+    func testBalanceAdmissionSkipsWhenThereIsNotEnoughOpenTextMaterial() {
+        let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(
+            base: BalanceBoardResult(
+                headline: "Base headline",
+                summary: "Base summary",
+                focusTitle: "Base focus",
+                focusDescription: "Base description",
+                nextAction: "Base next action"
+            ),
+            input: BalanceBoardInput(
+                prompt: "Should I do it?",
+                desire: "",
+                concern: "",
+                constraint: "Time is tight.",
+                longTerm: ""
+            )
+        )
+
+        let decision = DecisionIntelligenceAdmissionController.decide(for: envelope)
+
+        XCTAssertFalse(decision.isAllowed)
+        XCTAssertEqual(decision.skipReason, .insufficientSourceMaterial)
     }
 
     func testTestingStubAdmissionAlwaysAllowsPrompt() {

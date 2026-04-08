@@ -11,6 +11,8 @@ enum DecisionIntelligenceAdmissionSkipReason: String, CaseIterable, Sendable {
     case budgetExceeded
     case prefillPressureTooHigh
     case insufficientReminderChoice
+    case templateAlreadySufficient
+    case insufficientSourceMaterial
 }
 
 struct DecisionIntelligenceAdmissionDecision: Equatable, Sendable {
@@ -49,6 +51,17 @@ enum DecisionIntelligenceAdmissionController {
 
         switch envelope.kind {
         case .quick:
+            if envelope.frontstageState.openTextSignalCount == 0,
+               envelope.frontstageState.anchorHeadlines.isEmpty,
+               envelope.frontstageState.suppressionHints.isEmpty,
+               envelope.frontstageState.evidenceHeadlines.count <= 2 {
+                return DecisionIntelligenceAdmissionDecision(
+                    isAllowed: false,
+                    pressure: pressure,
+                    reason: "Quick refinement stayed deterministic because this turn is already fully covered by the structured quick-check template and there is no extra user signal to justify a model pass.",
+                    skipReason: .templateAlreadySufficient
+                )
+            }
             guard envelope.budget.isWithinTarget else {
                 return DecisionIntelligenceAdmissionDecision(
                     isAllowed: false,
@@ -67,6 +80,16 @@ enum DecisionIntelligenceAdmissionController {
                 )
             }
         case .balance, .mirror:
+            if envelope.frontstageState.openTextSignalCount < 3,
+               envelope.frontstageState.anchorHeadlines.isEmpty,
+               envelope.frontstageState.suppressionHints.isEmpty {
+                return DecisionIntelligenceAdmissionDecision(
+                    isAllowed: false,
+                    pressure: pressure,
+                    reason: "This refinement stayed deterministic because there is not enough open-text material to justify a model pass. The structured template already covers the current state.",
+                    skipReason: .insufficientSourceMaterial
+                )
+            }
             if pressure == .severe {
                 return DecisionIntelligenceAdmissionDecision(
                     isAllowed: false,

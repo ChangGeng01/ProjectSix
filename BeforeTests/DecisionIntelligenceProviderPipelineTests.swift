@@ -345,6 +345,48 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
     }
 
     @MainActor
+    func testQuickAdmissionSkipsWhenStructuredTemplateAlreadyCoversTheTurn() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: []
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: ""
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertNil(refined)
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertEqual(snapshot.outcomeCount[.admissionSkipped], 1)
+        XCTAssertEqual(snapshot.admissionSkipCountByReason[.templateAlreadySufficient], 1)
+        XCTAssertEqual(snapshot.avoidableModelCallRate, 1, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.avoidableModelCallRateByKind[.quick] ?? 0, 1, accuracy: 0.0001)
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected an admission-skip trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .quick)
+        XCTAssertEqual(latestTrace.admissionDecision?.skipReason, .templateAlreadySufficient)
+        XCTAssertTrue(latestTrace.detail.contains("Admission controller skipped quick refinement"))
+    }
+
+    @MainActor
     func testQuickAdmissionCanSkipModelInvocationWhenPromptBecomesTooLarge() async {
         let base = QuickCheckResult(
             currentPerspective: "Base current.",
@@ -397,6 +439,40 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         XCTAssertEqual(latestTrace.admissionDecision?.skipReason, .budgetExceeded)
         XCTAssertEqual(latestTrace.promptBudget?.isWithinTarget, false)
         XCTAssertTrue(latestTrace.detail.contains("Admission controller skipped quick refinement"))
+    }
+
+    @MainActor
+    func testBalanceAdmissionSkipsWhenThereIsNotEnoughOpenTextSignal() async {
+        let base = BalanceBoardResult(
+            headline: "Base headline",
+            summary: "Base summary",
+            focusTitle: "Base focus",
+            focusDescription: "Base description",
+            nextAction: "Base next action"
+        )
+        let input = BalanceBoardInput(
+            prompt: "Should I take the side project?",
+            desire: "",
+            concern: "",
+            constraint: "My week is already full.",
+            longTerm: ""
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
+            base: base,
+            input: input,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertNil(refined)
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertEqual(snapshot.outcomeCount[.admissionSkipped], 1)
+        XCTAssertEqual(snapshot.admissionSkipCountByReason[.insufficientSourceMaterial], 1)
+        XCTAssertEqual(snapshot.avoidableModelCallRate, 1, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.avoidableModelCallRateByKind[.balance] ?? 0, 1, accuracy: 0.0001)
     }
 
     @MainActor

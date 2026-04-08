@@ -2,6 +2,8 @@ import Foundation
 
 struct DecisionFrontstageState: Codable, Equatable, Sendable {
     let focusGoal: String
+    let activeStateSignalCount: Int
+    let openTextSignalCount: Int
     let dangerSignals: [String]
     let evidenceHeadlines: [String]
     let anchorHeadlines: [String]

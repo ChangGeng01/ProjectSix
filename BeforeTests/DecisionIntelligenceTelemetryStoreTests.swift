@@ -53,5 +53,46 @@ final class DecisionIntelligenceTelemetryStoreTests: XCTestCase {
         XCTAssertEqual(snapshot.averageRequestDurationMsByGemmaBackend[.coreML] ?? 0, 120, accuracy: 0.0001)
         XCTAssertEqual(snapshot.slowRequestRate, 0.5, accuracy: 0.0001)
         XCTAssertEqual(snapshot.slowRequestRateByKind[.mirror] ?? 0, 1, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.avoidableModelCallRate, 0, accuracy: 0.0001)
+    }
+
+    func testSnapshotTracksAvoidableModelCallSkips() async {
+        let store = DecisionIntelligenceTelemetryStore()
+
+        await store.record(
+            kind: .quick,
+            outcome: .admissionSkipped,
+            activeProvider: nil,
+            attemptedProviders: [],
+            usedFallback: false,
+            durationMs: 12,
+            admissionDecision: DecisionIntelligenceAdmissionDecision(
+                isAllowed: false,
+                pressure: .low,
+                reason: "Template already covers this turn.",
+                skipReason: .templateAlreadySufficient
+            )
+        )
+        await store.record(
+            kind: .balance,
+            outcome: .providerSuccess,
+            activeProvider: .gemmaE4B,
+            attemptedProviders: [.gemmaE4B],
+            usedFallback: false,
+            durationMs: 220,
+            admissionDecision: DecisionIntelligenceAdmissionDecision(
+                isAllowed: true,
+                pressure: .elevated,
+                reason: "Allowed for testing.",
+                skipReason: nil
+            )
+        )
+
+        let snapshot = await store.snapshot()
+
+        XCTAssertEqual(snapshot.avoidableModelCallRate, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.avoidableModelCallRateByKind[.quick] ?? 0, 1, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.avoidableModelCallRateByKind[.balance] ?? 0, 0, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.admissionSkipCountByReasonAndKind[.templateAlreadySufficient]?[.quick], 1)
     }
 }

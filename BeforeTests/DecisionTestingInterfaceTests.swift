@@ -316,6 +316,8 @@ struct DecisionTestingInterfaceTests {
             usedFallback: false,
             frontstageState: DecisionFrontstageState(
                 focusGoal: "Interrupt the automatic reaction before it locks in.",
+                activeStateSignalCount: 2,
+                openTextSignalCount: 1,
                 dangerSignals: ["Urgency", "Evidence filtered"],
                 evidenceHeadlines: ["Current perspective: Quick relief."],
                 anchorHeadlines: ["Quick note"],
@@ -434,6 +436,8 @@ struct DecisionTestingInterfaceTests {
         #expect(abs((export.summary.providerBypassRateByKind[.quick] ?? 0) - 0) < 0.0001)
         #expect(export.summary.lowPressureModelCallRate == 1)
         #expect(export.summary.lowPressureModelCallRateByKind[.quick] == 1)
+        #expect(export.summary.avoidableModelCallRate == 0)
+        #expect(export.summary.avoidableModelCallRateByKind[.quick] == 0)
         #expect(export.summary.averageRequestDurationMs == 220)
         #expect(export.summary.averageRequestDurationMsByKind[.quick] == 220)
         #expect(export.summary.averageRequestDurationMsByGemmaBackend[.cpu] == 220)
@@ -441,7 +445,10 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.averageImmutablePrefixCharactersByKind[.quick] == 180)
         #expect(export.summary.averageAdaptivePrefixCharactersByKind[.quick] == 0)
         #expect(export.summary.semanticPromptVariantCountByKind[.quick] == 1)
+        #expect(export.summary.semanticPromptReuseRateByKind[.quick] == 0)
         #expect(export.summary.stablePrefixVariantCountByKind[.quick] == 1)
+        #expect(export.summary.stablePrefixReuseRateByKind[.quick] == 0)
+        #expect(export.summary.stablePrefixPollutionRateByKind[.quick] == 0)
         #expect(export.summary.slowRequestRate == 0)
         #expect(export.summary.slowRequestRateByKind[.quick] == 0)
         #expect(export.lifecycleSummary.contextAwareTraceCount == 1)
@@ -465,6 +472,12 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.droppedInjectedEvidenceCount == 1)
         #expect(export.summary.droppedDuplicateEvidenceCount == 0)
         #expect(export.summary.droppedBudgetEvidenceCount == 0)
+        #expect(abs(export.summary.evidencePollutionRate - (1.0 / 3.0)) < 0.0001)
+        #expect(abs((export.summary.evidencePollutionRateByKind[.quick] ?? 0) - (1.0 / 3.0)) < 0.0001)
+        #expect(export.summary.duplicateEvidenceDropRate == 0)
+        #expect(export.summary.duplicateEvidenceDropRateByKind[.quick] == 0)
+        #expect(export.summary.budgetTrimRate == 0)
+        #expect(export.summary.budgetTrimRateByKind[.quick] == 0)
         #expect(export.neuralSummary.neuralTraceCount == 1)
         #expect(export.neuralSummary.suppressedBehaviorCount == 1)
         #expect(export.neuralSummary.dominantActionByKind[.quick] == .waitBuffer)
