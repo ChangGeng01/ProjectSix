@@ -3,6 +3,9 @@ import Foundation
 struct PendingLaunchRequest: Codable, Sendable, Equatable {
     var id: UUID
     var entrySource: EntrySource
+    var preferredModeRaw: String?
+    var scenarioRaw: String?
+    var prompt: String?
     var requestedAt: Date
     var expiresAt: Date
     var schemaVersion: Int
@@ -10,12 +13,18 @@ struct PendingLaunchRequest: Codable, Sendable, Equatable {
     init(
         id: UUID = UUID(),
         entrySource: EntrySource,
+        preferredMode: DecisionMode? = nil,
+        scenario: ScenarioType? = nil,
+        prompt: String? = nil,
         requestedAt: Date,
         expiresAt: Date? = nil,
         schemaVersion: Int = BeforePolicy.LaunchRequests.schemaVersion
     ) {
         self.id = id
         self.entrySource = entrySource
+        self.preferredModeRaw = preferredMode?.rawValue
+        self.scenarioRaw = scenario?.rawValue
+        self.prompt = prompt
         self.requestedAt = requestedAt
         self.expiresAt = expiresAt ?? requestedAt.addingTimeInterval(BeforePolicy.LaunchRequests.expirationInterval)
         self.schemaVersion = schemaVersion
@@ -23,6 +32,14 @@ struct PendingLaunchRequest: Codable, Sendable, Equatable {
 
     var isExpired: Bool {
         expiresAt <= .now
+    }
+
+    var preferredMode: DecisionMode? {
+        preferredModeRaw.flatMap(DecisionMode.init(rawValue:))
+    }
+
+    var scenario: ScenarioType? {
+        scenarioRaw.flatMap(ScenarioType.init(rawValue:))
     }
 }
 

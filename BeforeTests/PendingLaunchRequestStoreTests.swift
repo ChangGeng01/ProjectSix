@@ -34,4 +34,20 @@ final class PendingLaunchRequestStoreTests: XCTestCase {
         XCTAssertEqual(queue.count, 1)
         XCTAssertEqual(queue.first?.entrySource, .shortcut)
     }
+
+    func testPendingLaunchRequestPreservesModeAndPrompt() throws {
+        let now = Date(timeIntervalSince1970: 500)
+        let request = PendingLaunchRequest(
+            entrySource: .shortcut,
+            preferredMode: .mirror,
+            prompt: "Should I leave this relationship?",
+            requestedAt: now
+        )
+
+        let data = try JSONEncoder().encode([request])
+        let queue = PendingLaunchRequestStore.normalizedQueue(from: data, now: now)
+
+        XCTAssertEqual(queue.first?.preferredMode, .mirror)
+        XCTAssertEqual(queue.first?.prompt, "Should I leave this relationship?")
+    }
 }

@@ -1,3 +1,4 @@
+import AppIntents
 import Foundation
 
 enum DecisionMode: String, CaseIterable, Codable, Identifiable, Sendable {
@@ -46,4 +47,14 @@ enum DecisionMode: String, CaseIterable, Codable, Identifiable, Sendable {
         case .mirror: "Open mirror"
         }
     }
+}
+
+extension DecisionMode: AppEnum {
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Decision Mode"
+
+    static let caseDisplayRepresentations: [DecisionMode: DisplayRepresentation] = [
+        .quick: "Quick Judgment",
+        .balance: "Balance Board",
+        .mirror: "Mirror"
+    ]
 }
