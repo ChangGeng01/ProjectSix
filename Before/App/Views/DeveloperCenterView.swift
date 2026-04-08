@@ -1,9 +1,13 @@
+import SwiftData
 import SwiftUI
 
 struct DeveloperCenterView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var debugStore = DecisionIntelligenceDebugStore.shared
+    @Query(sort: \CheckEvent.createdAt, order: .reverse) private var events: [CheckEvent]
+    @Query(sort: \BalanceDecisionRecord.updatedAt, order: .reverse) private var balanceBoards: [BalanceDecisionRecord]
+    @Query(sort: \MirrorDecisionRecord.updatedAt, order: .reverse) private var mirrorRecords: [MirrorDecisionRecord]
 
     var body: some View {
         NavigationStack {
@@ -71,6 +75,52 @@ struct DeveloperCenterView: View {
                 Section("Developer actions") {
                     Button("Preview Let Go finish-state") {
                         appModel.presentDeveloperLetGoPreview()
+                    }
+                }
+
+                Section("Decision Replay") {
+                    if replayEntries.isEmpty {
+                        Text("No saved decisions yet. Once you complete a quick, balance, or mirror flow, the latest entries will show up here with any linked model trace.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(replayEntries) { entry in
+                            NavigationLink {
+                                DeveloperDecisionReplayDetailView(entry: entry)
+                                    .environmentObject(appModel)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack {
+                                        Label(entry.mode.shortTitle, systemImage: entry.mode.symbolName)
+                                            .font(.subheadline.weight(.semibold))
+                                        Spacer()
+                                        Text(entry.timestamp, style: .relative)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Text(entry.title)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(BeforeTheme.ink)
+                                        .lineLimit(2)
+
+                                    Text(entry.subtitle)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+
+                                    HStack(spacing: 10) {
+                                        Text(entry.statusTitle)
+                                            .font(.caption.weight(.medium))
+                                            .foregroundStyle(BeforeTheme.ember)
+                                        Text(entry.trace?.activeProvider?.title ?? "No linked model trace")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
                     }
                 }
 
@@ -148,6 +198,15 @@ struct DeveloperCenterView: View {
             set: { newValue in
                 appModel.updatePreferences { $0.allowModelFallbacks = newValue }
             }
+        )
+    }
+
+    private var replayEntries: [DeveloperDecisionReplayEntry] {
+        DeveloperDecisionReplayBuilder.build(
+            quick: events,
+            balance: balanceBoards,
+            mirror: mirrorRecords,
+            traces: debugStore.traces
         )
     }
 }
