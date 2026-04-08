@@ -21,6 +21,7 @@ final class BeforePreferencesStoreTests: XCTestCase {
     func testSaveAndLoadRoundTrip() {
         let preferences = BeforePreferences(
             homePromptAction: .balance,
+            quickBufferDuration: .tenMinutes,
             restoreInProgressWorkspaces: false,
             showReviewInsights: false
         )

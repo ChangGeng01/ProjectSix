@@ -55,6 +55,7 @@
 		7070B692F04D90FC904D5BD9 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA7D45B4CAAA3B24DDA4B1F /* RootTabView.swift */; };
 		71293BD1BD9D0F5447F6F982 /* OpenQuickCheckIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEDCB8C02350F6CC22C4DAAC /* OpenQuickCheckIntent.swift */; };
 		71D13CEFCF19E703C90BEDE1 /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BF5DACA08082B764C73C19F /* WidgetSnapshot.swift */; };
+		7394A450478981915DEC7373 /* ReviewProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8E5572ABD426B283792639F /* ReviewProfileView.swift */; };
 		7434A9168F97379B3085C717 /* ReflectionContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1548E93121C0DEC8D3A983A /* ReflectionContext.swift */; };
 		79EF067AA3100DD4F6B27CDC /* QuickCheckInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F68FB2BE9FA50C05DD3BB89 /* QuickCheckInput.swift */; };
 		7E702A3E19D063CE60540333 /* ReminderSourceType.swift in Sources */ = {isa = PBXBuildFile; fileRef = C94A031C4F195FB7A25E444F /* ReminderSourceType.swift */; };
@@ -78,6 +79,7 @@
 		A0DC2D7A24785D3A66F7BA8A /* DecisionModeRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9C0EC9BCB2856CEA2CDB928 /* DecisionModeRouterTests.swift */; };
 		A1F587F508885CC983D3AE50 /* BeforeAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF0AE4C04AAF5821C532270 /* BeforeAppModel.swift */; };
 		A1F804F13673E29E07AFAE94 /* WidgetSafeCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDB7F1306151CE6EAB2CA002 /* WidgetSafeCopy.swift */; };
+		A4B068D6281F83631F485E33 /* QuickBufferDurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DC1B3E111B5D1197CEB7CDA /* QuickBufferDurationTests.swift */; };
 		A4C6F0721574B7ADAF7D388A /* LaunchRequestResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DF9D3F05358E50DCC11E2AF /* LaunchRequestResolverTests.swift */; };
 		A67CDCCE9D03D5DBB3D500FB /* DecisionReviewEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B2D947D30BE6BCB8C3A28A6 /* DecisionReviewEngine.swift */; };
 		A6F69284943D1182E1B51CAF /* StarterPromptRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05412B6E47A277E56EC0236E /* StarterPromptRow.swift */; };
@@ -106,6 +108,7 @@
 		D95E6740672BA7080A66DF1D /* DecisionModeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25779E30F91D917702DC456 /* DecisionModeCard.swift */; };
 		D99FF9332959DCD349DD6FF6 /* DecisionRecordRestorationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438899EA716D6093E4500048 /* DecisionRecordRestorationTests.swift */; };
 		DC772636D1CBA8BC844DAF50 /* CheckRuleEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F454C1445FA6FD73087FAC8 /* CheckRuleEngine.swift */; };
+		E2D1DA742604121A137BEADE /* QuickBufferDuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28559294F554136C5D9334B2 /* QuickBufferDuration.swift */; };
 		E4E307C29DC37CDB3C88DB3F /* BalanceBoardSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6A240A4A08405C8D91821CD /* BalanceBoardSession.swift */; };
 		E86301EA0C43918C3B37E1C6 /* ReminderSelectionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7152E91B0D3E0D96AA280B51 /* ReminderSelectionPolicyTests.swift */; };
 		E884F883F82E83FF0E329D1E /* MirrorDecisionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D6E8FDD046A39543E12464 /* MirrorDecisionRecord.swift */; };
@@ -117,6 +120,7 @@
 		F374442A214A8ADA30095D13 /* ActiveDecisionWorkspaceStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91300F510722B505F828AB0B /* ActiveDecisionWorkspaceStoreTests.swift */; };
 		F6130B346740F14D025CE845 /* PanelCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B421144DE1D5D71F3CFC70 /* PanelCard.swift */; };
 		F8234276CF94ACFD29BA7372 /* HomePromptActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63658AD94D911459300CDB15 /* HomePromptActionTests.swift */; };
+		FF8818ABD3CE2840697F5DB9 /* QuickBufferDuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28559294F554136C5D9334B2 /* QuickBufferDuration.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -165,6 +169,7 @@
 		1D9B5A5DF817EBD959F0B018 /* TomorrowBoxDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxDraftTests.swift; sourceTree = "<group>"; };
 		1F68FB2BE9FA50C05DD3BB89 /* QuickCheckInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCheckInput.swift; sourceTree = "<group>"; };
 		2674B942E6DC6FD9A34FD9C8 /* BeforeTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BeforeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		28559294F554136C5D9334B2 /* QuickBufferDuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickBufferDuration.swift; sourceTree = "<group>"; };
 		2A7B6A83F0C81717A9A5D601 /* BeforeActionButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeActionButton.swift; sourceTree = "<group>"; };
 		2AF30BA404040B6ECD5A2652 /* PendingLaunchRequestStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingLaunchRequestStoreTests.swift; sourceTree = "<group>"; };
 		2BF5DACA08082B764C73C19F /* WidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshot.swift; sourceTree = "<group>"; };
@@ -193,6 +198,7 @@
 		5F7A4B71C9286A522BBDC902 /* BeforeWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeWidget.swift; sourceTree = "<group>"; };
 		63658AD94D911459300CDB15 /* HomePromptActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomePromptActionTests.swift; sourceTree = "<group>"; };
 		66E54FE3709A309C60A79794 /* DecisionFieldSuggestionLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionFieldSuggestionLibrary.swift; sourceTree = "<group>"; };
+		6DC1B3E111B5D1197CEB7CDA /* QuickBufferDurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickBufferDurationTests.swift; sourceTree = "<group>"; };
 		7084BBE94DCFAE7AF1AF2241 /* ReflectionPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReflectionPromptView.swift; sourceTree = "<group>"; };
 		7152E91B0D3E0D96AA280B51 /* ReminderSelectionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderSelectionPolicyTests.swift; sourceTree = "<group>"; };
 		734F52EF13FFB8B1DA81BC96 /* MirrorEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MirrorEngineTests.swift; sourceTree = "<group>"; };
@@ -232,6 +238,7 @@
 		D14BBBFC879A75D527348A3A /* SharedContainerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedContainerTests.swift; sourceTree = "<group>"; };
 		D5476CF22FF1B67A4F1E4502 /* BalanceBoardEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceBoardEngineTests.swift; sourceTree = "<group>"; };
 		D7CF7713B70A7CA75686CF11 /* BalanceBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceBoardView.swift; sourceTree = "<group>"; };
+		D8E5572ABD426B283792639F /* ReviewProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewProfileView.swift; sourceTree = "<group>"; };
 		DDB7F1306151CE6EAB2CA002 /* WidgetSafeCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSafeCopy.swift; sourceTree = "<group>"; };
 		DFDA8C2C4F4EB349F7763323 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		E63D346FC718230713E7B30B /* SharedContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedContainer.swift; sourceTree = "<group>"; };
@@ -273,6 +280,7 @@
 			isa = PBXGroup;
 			children = (
 				E840ED006682BD4A660B8F99 /* HistoryDetailView.swift */,
+				D8E5572ABD426B283792639F /* ReviewProfileView.swift */,
 			);
 			path = History;
 			sourceTree = "<group>";
@@ -285,6 +293,7 @@
 				58C429E74F83380B3EB5DD21 /* CheckVerdict.swift */,
 				8803C58B37023CB5C616CD7C /* DecisionMode.swift */,
 				5263B35DEB9254806060CCA3 /* EntrySource.swift */,
+				28559294F554136C5D9334B2 /* QuickBufferDuration.swift */,
 				AB8A05C41C31FF92FED7AB83 /* QuickCheckAnswers.swift */,
 				1F68FB2BE9FA50C05DD3BB89 /* QuickCheckInput.swift */,
 				F1548E93121C0DEC8D3A983A /* ReflectionContext.swift */,
@@ -354,6 +363,7 @@
 				734F52EF13FFB8B1DA81BC96 /* MirrorEngineTests.swift */,
 				12B18D0B36378C98DA6A44EA /* NotificationServiceTests.swift */,
 				2AF30BA404040B6ECD5A2652 /* PendingLaunchRequestStoreTests.swift */,
+				6DC1B3E111B5D1197CEB7CDA /* QuickBufferDurationTests.swift */,
 				7152E91B0D3E0D96AA280B51 /* ReminderSelectionPolicyTests.swift */,
 				572E58A5A6D0778DCAD31234 /* ReminderTemplateLibraryTests.swift */,
 				D14BBBFC879A75D527348A3A /* SharedContainerTests.swift */,
@@ -672,6 +682,7 @@
 				6461C907703FF797BE2E2203 /* PendingLaunchRequestStore.swift in Sources */,
 				30B7C7F83352774B5CB49CB7 /* PendingReflectionStore.swift in Sources */,
 				8B2CA2CE45540D3CDE6F2B9B /* PersistenceBootstrap.swift in Sources */,
+				FF8818ABD3CE2840697F5DB9 /* QuickBufferDuration.swift in Sources */,
 				99EB5E6E65F34A2038B1A57F /* QuickCheckAnswers.swift in Sources */,
 				79EF067AA3100DD4F6B27CDC /* QuickCheckInput.swift in Sources */,
 				D8C10F91552AED40EC948DFC /* QuickCheckSession.swift in Sources */,
@@ -682,6 +693,7 @@
 				7E702A3E19D063CE60540333 /* ReminderSourceType.swift in Sources */,
 				0EC6DD9A7FE63C6850AC8D9B /* ReminderTemplateLibrary.swift in Sources */,
 				1C817A6C32A9FDB942853C9E /* ResultView.swift in Sources */,
+				7394A450478981915DEC7373 /* ReviewProfileView.swift in Sources */,
 				7070B692F04D90FC904D5BD9 /* RootTabView.swift in Sources */,
 				8FAC775FD6270B1BF688FA4A /* ScenarioType.swift in Sources */,
 				CCAD0045602DBB2FD0D006B4 /* SectionHeader.swift in Sources */,
@@ -717,6 +729,7 @@
 				EBDFA747E00D674AE132B4C8 /* MirrorEngine.swift in Sources */,
 				71293BD1BD9D0F5447F6F982 /* OpenQuickCheckIntent.swift in Sources */,
 				3671D50FE2556C6C7D0E7FA4 /* PendingLaunchRequestStore.swift in Sources */,
+				E2D1DA742604121A137BEADE /* QuickBufferDuration.swift in Sources */,
 				486753A8A1E653585E9C636F /* QuickCheckAnswers.swift in Sources */,
 				BDE7FDE600641BE0BC49A9A2 /* QuickCheckInput.swift in Sources */,
 				7434A9168F97379B3085C717 /* ReflectionContext.swift in Sources */,
@@ -747,6 +760,7 @@
 				3FA6A6CEB2949EBCAEC944FF /* MirrorEngineTests.swift in Sources */,
 				B6401C0BE7236DB94F7E0FD4 /* NotificationServiceTests.swift in Sources */,
 				402984E1B9C592B27915A179 /* PendingLaunchRequestStoreTests.swift in Sources */,
+				A4B068D6281F83631F485E33 /* QuickBufferDurationTests.swift in Sources */,
 				E86301EA0C43918C3B37E1C6 /* ReminderSelectionPolicyTests.swift in Sources */,
 				3E057C871B016661F9EBC629 /* ReminderTemplateLibraryTests.swift in Sources */,
 				542CC720483001216062BDAF /* SharedContainerTests.swift in Sources */,

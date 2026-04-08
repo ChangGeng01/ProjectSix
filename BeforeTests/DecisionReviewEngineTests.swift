@@ -122,4 +122,97 @@ final class DecisionReviewEngineTests: XCTestCase {
         XCTAssertEqual(summary?.mode, .mirror)
         XCTAssertEqual(summary?.detail, "Name the boundary keeps surfacing when the question gets heavier.")
     }
+
+    func testQuickProfileIncludesScenarioAndVerdictSections() {
+        let eventOne = CheckEvent(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .regret,
+            controlLevel: .maybe,
+            note: "",
+            currentPerspective: "Reward pull",
+            afterPerspective: "Likely regret",
+            verdict: .pause,
+            finalAction: .wait90s,
+            reflectionOutcome: .regrettedIt,
+            entrySource: .app
+        )
+        let eventTwo = CheckEvent(
+            scenario: .buy,
+            motivation: .stressed,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .yes,
+            note: "",
+            currentPerspective: "Fast relief",
+            afterPerspective: "Only brief relief",
+            verdict: .pause,
+            finalAction: .decideTomorrow,
+            reflectionOutcome: .okay,
+            entrySource: .app
+        )
+
+        let profile = DecisionReviewEngine.profile(
+            for: .quick,
+            quick: [eventOne, eventTwo],
+            balance: [],
+            mirror: []
+        )
+
+        XCTAssertEqual(profile?.sections.map(\.title), ["Scenarios", "Verdicts", "Reflections"])
+        XCTAssertEqual(profile?.sections.first?.rows.first?.title, "Buy")
+        XCTAssertEqual(profile?.sections.first?.rows.first?.count, 2)
+    }
+
+    func testBalanceProfileIncludesCoreTradeoffSections() {
+        let record = BalanceDecisionRecord(
+            prompt: "Should I take the contract?",
+            desire: "Momentum",
+            concern: "Capacity",
+            constraint: "Time",
+            longTerm: "I do not want to burn out",
+            focusTitle: "Capacity pressure",
+            focusSummary: "The real question is whether you still have room.",
+            nextAction: "Cut one commitment before adding another.",
+            entrySource: .app
+        )
+
+        let profile = DecisionReviewEngine.profile(
+            for: .balance,
+            quick: [],
+            balance: [record],
+            mirror: []
+        )
+
+        XCTAssertEqual(
+            profile?.sections.map(\.title),
+            ["Wants", "Concerns", "Constraints", "Long-term", "Focus titles"]
+        )
+    }
+
+    func testMirrorProfileIncludesEmotionAndSelfSections() {
+        let record = MirrorDecisionRecord(
+            prompt: "Should I stay?",
+            emotion: "Grief",
+            relationship: "The same boundary keeps slipping",
+            reality: "We still live together",
+            longTerm: "I keep shrinking",
+            selfLens: "I do not trust my no",
+            coreTension: "This is about what staying keeps teaching you to normalize.",
+            nextActionTitle: "Name the boundary",
+            nextAction: "Write the one limit you cannot keep negotiating away.",
+            entrySource: .app
+        )
+
+        let profile = DecisionReviewEngine.profile(
+            for: .mirror,
+            quick: [],
+            balance: [],
+            mirror: [record]
+        )
+
+        XCTAssertEqual(
+            profile?.sections.map(\.title),
+            ["Emotions", "Relationship patterns", "Reality", "Long-term", "Self lens", "Mirror actions"]
+        )
+    }
 }

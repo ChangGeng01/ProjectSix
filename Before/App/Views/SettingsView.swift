@@ -53,6 +53,12 @@ struct SettingsView: View {
                         }
                     }
 
+                    Picker("Quick buffer", selection: quickBufferBinding) {
+                        ForEach(QuickBufferDuration.allCases) { duration in
+                            Text(duration.title).tag(duration)
+                        }
+                    }
+
                     Toggle("Restore in-progress workspaces", isOn: restoreWorkspacesBinding)
                     Toggle("Show review insights", isOn: reviewInsightsBinding)
                 }
@@ -156,6 +162,15 @@ struct SettingsView: View {
             get: { appModel.preferences.restoreInProgressWorkspaces },
             set: { newValue in
                 appModel.updatePreferences { $0.restoreInProgressWorkspaces = newValue }
+            }
+        )
+    }
+
+    private var quickBufferBinding: Binding<QuickBufferDuration> {
+        Binding(
+            get: { appModel.preferences.quickBufferDuration },
+            set: { newValue in
+                appModel.updatePreferences { $0.quickBufferDuration = newValue }
             }
         )
     }

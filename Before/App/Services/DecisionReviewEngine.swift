@@ -18,6 +18,28 @@ struct ReviewInsight: Identifiable, Equatable {
     var id: String { "\(eyebrow)-\(title)" }
 }
 
+struct ReviewProfileRow: Identifiable, Equatable {
+    let title: String
+    let detail: String?
+    let count: Int
+
+    var id: String { "\(title)-\(count)" }
+}
+
+struct ReviewProfileSection: Identifiable, Equatable {
+    let title: String
+    let rows: [ReviewProfileRow]
+
+    var id: String { title }
+}
+
+struct ReviewProfile: Equatable {
+    let mode: DecisionMode
+    let title: String
+    let subtitle: String
+    let sections: [ReviewProfileSection]
+}
+
 enum DecisionReviewEngine {
     static func summaries(
         quick: [CheckEvent],
@@ -90,6 +112,144 @@ enum DecisionReviewEngine {
         return results
     }
 
+    static func profile(
+        for mode: DecisionMode,
+        quick: [CheckEvent],
+        balance: [BalanceDecisionRecord],
+        mirror: [MirrorDecisionRecord]
+    ) -> ReviewProfile? {
+        switch mode {
+        case .quick:
+            guard !quick.isEmpty else { return nil }
+            return ReviewProfile(
+                mode: .quick,
+                title: "See what your fast calls keep becoming.",
+                subtitle: "Quick checks matter when they expose repeat patterns, not just isolated urges.",
+                sections: [
+                    ReviewProfileSection(
+                        title: "Scenarios",
+                        rows: rankedRows(
+                            quick.map(\.scenario.title),
+                            detail: { _ in "Where fast blur tends to start." }
+                        )
+                    ),
+                    ReviewProfileSection(
+                        title: "Verdicts",
+                        rows: rankedRows(
+                            quick.map(\.verdict.title),
+                            detail: { _ in "How the stoplight most often lands." }
+                        )
+                    ),
+                    ReviewProfileSection(
+                        title: "Reflections",
+                        rows: rankedRows(
+                            quick.compactMap(\.reflectionOutcome?.title),
+                            detail: { _ in "How it actually felt afterward." }
+                        )
+                    )
+                ]
+                .filter { !$0.rows.isEmpty }
+            )
+        case .balance:
+            guard !balance.isEmpty else { return nil }
+            return ReviewProfile(
+                mode: .balance,
+                title: "See which trade-off dimension keeps leading.",
+                subtitle: "Balance boards help when they reveal what keeps taking priority before the final choice is even made.",
+                sections: [
+                    ReviewProfileSection(
+                        title: "Wants",
+                        rows: rankedRows(
+                            balance.map(\.desire),
+                            detail: { _ in "What you keep wanting first." }
+                        )
+                    ),
+                    ReviewProfileSection(
+                        title: "Concerns",
+                        rows: rankedRows(
+                            balance.map(\.concern),
+                            detail: { _ in "What you keep trying to protect." }
+                        )
+                    ),
+                    ReviewProfileSection(
+                        title: "Constraints",
+                        rows: rankedRows(
+                            balance.map(\.constraint),
+                            detail: { _ in "The hard edge reality keeps bringing back." }
+                        )
+                    ),
+                    ReviewProfileSection(
+                        title: "Long-term",
+                        rows: rankedRows(
+                            balance.map(\.longTerm),
+                            detail: { _ in "What future-you seems to care about most." }
+                        )
+                    ),
+                    ReviewProfileSection(
+                        title: "Focus titles",
+                        rows: rankedRows(
+                            balance.map(\.focusTitle),
+                            detail: { _ in "The trade-off frame you return to most." }
+                        )
+                    )
+                ]
+                .filter { !$0.rows.isEmpty }
+            )
+        case .mirror:
+            guard !mirror.isEmpty else { return nil }
+            return ReviewProfile(
+                mode: .mirror,
+                title: "See what the heavier questions keep asking of you.",
+                subtitle: "Mirror sessions become useful when you can see which tensions and next moves keep surfacing.",
+                sections: [
+                    ReviewProfileSection(
+                        title: "Emotions",
+                        rows: rankedRows(
+                            mirror.map(\.emotion),
+                            detail: { _ in "What you keep feeling before the heavier question sharpens." }
+                        )
+                    ),
+                    ReviewProfileSection(
+                        title: "Relationship patterns",
+                        rows: rankedRows(
+                            mirror.map(\.relationship),
+                            detail: { _ in "What structure or pattern keeps returning under the latest moment." }
+                        )
+                    ),
+                    ReviewProfileSection(
+                        title: "Reality",
+                        rows: rankedRows(
+                            mirror.map(\.reality),
+                            detail: { _ in "The constraint that keeps staying in the room." }
+                        )
+                    ),
+                    ReviewProfileSection(
+                        title: "Long-term",
+                        rows: rankedRows(
+                            mirror.map(\.longTerm),
+                            detail: { _ in "The future cost you keep circling." }
+                        )
+                    ),
+                    ReviewProfileSection(
+                        title: "Self lens",
+                        rows: rankedRows(
+                            mirror.map(\.selfLens),
+                            detail: { _ in "What the heavier question keeps doing to your sense of self." }
+                        )
+                    ),
+                    ReviewProfileSection(
+                        title: "Mirror actions",
+                        rows: rankedRows(
+                            mirror.map(\.nextActionTitle),
+                            detail: { _ in "The kind of honesty the mirror keeps pulling toward." }
+                        )
+                    )
+                ]
+                .filter { !$0.rows.isEmpty }
+            )
+        }
+    }
+
     private static func quickSummary(from events: [CheckEvent]) -> ReviewModeSummary? {
         guard !events.isEmpty else { return nil }
 
@@ -140,5 +300,26 @@ enum DecisionReviewEngine {
                 return lhs.value < rhs.value
             }?
             .key
+    }
+
+    private static func rankedRows(
+        _ values: [String],
+        detail: (String) -> String?
+    ) -> [ReviewProfileRow] {
+        values
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .reduce(into: [String: Int]()) { counts, value in
+                counts[value, default: 0] += 1
+            }
+            .sorted { lhs, rhs in
+                if lhs.value == rhs.value {
+                    return lhs.key < rhs.key
+                }
+                return lhs.value > rhs.value
+            }
+            .map { key, count in
+                ReviewProfileRow(title: key, detail: detail(key), count: count)
+            }
     }
 }

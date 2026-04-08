@@ -2,7 +2,7 @@ import Foundation
 
 enum BeforePolicy {
     enum QuickCheck {
-        static let waitDurationSeconds = 90
+        static let defaultBufferDuration: QuickBufferDuration = .ninetySeconds
         static let recentHistoryLimit = 30
     }
 

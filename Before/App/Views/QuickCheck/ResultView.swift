@@ -51,12 +51,12 @@ struct ResultView: View {
                         }
 
                         VStack(spacing: 12) {
-                            BeforeActionButton(result.primaryAction.title) {
+                            BeforeActionButton(result.primaryAction.title(using: appModel.preferences.quickBufferDuration)) {
                                 Task { await handleAction(result.primaryAction) }
                             }
 
                             ForEach(result.secondaryActions) { action in
-                                BeforeActionButton(action.title, style: .secondary) {
+                                BeforeActionButton(action.title(using: appModel.preferences.quickBufferDuration), style: .secondary) {
                                     Task { await handleAction(action) }
                                 }
                             }

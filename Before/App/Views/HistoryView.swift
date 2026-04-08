@@ -9,6 +9,7 @@ struct HistoryView: View {
     @Query(sort: \TomorrowBoxItem.createdAt, order: .reverse) private var tomorrowItems: [TomorrowBoxItem]
     @State private var selectedFilter: HistoryFilter = .all
     @State private var selectedDetail: HistoryDetailSelection?
+    @State private var selectedProfile: ReviewProfileSelection?
 
     var body: some View {
         NavigationStack {
@@ -78,6 +79,11 @@ struct HistoryView: View {
             .sheet(item: $selectedDetail) { selection in
                 HistoryDetailView(selection: selection)
                     .environmentObject(appModel)
+            }
+            .sheet(item: $selectedProfile) { selection in
+                if let profile = profile(for: selection) {
+                    ReviewProfileView(profile: profile)
+                }
             }
         }
     }
@@ -227,24 +233,29 @@ struct HistoryView: View {
     }
 
     private func summaryCard(for summary: ReviewModeSummary) -> some View {
-        PanelCard {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Label(summary.title, systemImage: summary.mode.symbolName)
-                        .font(.headline)
-                    Spacer()
-                    Text("\(summary.count)")
-                        .font(.title3.bold())
-                        .foregroundStyle(BeforeTheme.ember)
-                }
+        Button {
+            selectedProfile = profileSelection(for: summary.mode)
+        } label: {
+            PanelCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Label(summary.title, systemImage: summary.mode.symbolName)
+                            .font(.headline)
+                        Spacer()
+                        Text("\(summary.count)")
+                            .font(.title3.bold())
+                            .foregroundStyle(BeforeTheme.ember)
+                    }
 
-                Text(summary.detail)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 220, alignment: .leading)
+                    Text(summary.detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 220, alignment: .leading)
+                }
             }
+            .frame(width: 270)
         }
-        .frame(width: 270)
+        .buttonStyle(.plain)
     }
 
     private func insightCard(for insight: ReviewInsight) -> some View {
@@ -268,6 +279,25 @@ struct HistoryView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+        }
+    }
+
+    private func profileSelection(for mode: DecisionMode) -> ReviewProfileSelection {
+        switch mode {
+        case .quick: .quick
+        case .balance: .balance
+        case .mirror: .mirror
+        }
+    }
+
+    private func profile(for selection: ReviewProfileSelection) -> ReviewProfile? {
+        switch selection {
+        case .quick:
+            DecisionReviewEngine.profile(for: .quick, quick: events, balance: balanceBoards, mirror: mirrorRecords)
+        case .balance:
+            DecisionReviewEngine.profile(for: .balance, quick: events, balance: balanceBoards, mirror: mirrorRecords)
+        case .mirror:
+            DecisionReviewEngine.profile(for: .mirror, quick: events, balance: balanceBoards, mirror: mirrorRecords)
         }
     }
 }

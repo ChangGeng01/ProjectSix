@@ -10,8 +10,12 @@ enum CheckAction: String, CaseIterable, Codable, Identifiable, Sendable {
     var id: String { rawValue }
 
     var title: String {
+        title(using: BeforePolicy.QuickCheck.defaultBufferDuration)
+    }
+
+    func title(using bufferDuration: QuickBufferDuration) -> String {
         switch self {
-        case .wait90s: "Wait 90 seconds"
+        case .wait90s: bufferDuration.actionTitle
         case .leaveStimulus: "Step away first"
         case .decideTomorrow: "Move it to tomorrow"
         case .goAheadAnyway: "I still want to do it"

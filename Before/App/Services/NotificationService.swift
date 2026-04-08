@@ -23,11 +23,14 @@ final class NotificationService {
         _ = try? await center.requestAuthorization(options: [.alert, .badge, .sound])
     }
 
-    func scheduleWaitFinishedNotification(sessionID: UUID) async {
+    func scheduleWaitFinishedNotification(
+        sessionID: UUID,
+        duration: QuickBufferDuration = BeforePolicy.QuickCheck.defaultBufferDuration
+    ) async {
         await requestAuthorizationIfNeeded()
 
         let content = UNMutableNotificationContent()
-        content.title = "90 seconds are up"
+        content.title = duration.notificationTitle
         content.body = "You have a little more space now. Decide from there."
         content.sound = .default
 
@@ -35,7 +38,7 @@ final class NotificationService {
         center.removePendingNotificationRequests(withIdentifiers: [identifier])
 
         let trigger = UNTimeIntervalNotificationTrigger(
-            timeInterval: TimeInterval(BeforePolicy.QuickCheck.waitDurationSeconds),
+            timeInterval: TimeInterval(duration.seconds),
             repeats: false
         )
         let request = UNNotificationRequest(

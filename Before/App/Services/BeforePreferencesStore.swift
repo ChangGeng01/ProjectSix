@@ -38,11 +38,13 @@ enum HomePromptAction: String, CaseIterable, Codable, Identifiable, Sendable {
 
 struct BeforePreferences: Codable, Equatable, Sendable {
     var homePromptAction: HomePromptAction
+    var quickBufferDuration: QuickBufferDuration
     var restoreInProgressWorkspaces: Bool
     var showReviewInsights: Bool
 
     static let `default` = BeforePreferences(
         homePromptAction: .autoRoute,
+        quickBufferDuration: BeforePolicy.QuickCheck.defaultBufferDuration,
         restoreInProgressWorkspaces: true,
         showReviewInsights: true
     )

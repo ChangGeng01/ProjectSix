@@ -1,15 +1,17 @@
 # Before
 
-Before is an iPhone-first impulse calibrator.
+Before is a local-first decision OS for iPhone.
 
-It is not a streak app, not a blocker, and not a shame machine. The Phase 1 build focuses on a fast single-player flow:
+It is not a streak app, not a blocker, and not a shame machine. The current build supports three decision depths inside one shared system:
 
-- 4 scenarios: `Buy`, `Eat`, `Scroll`, `Other`
-- 3-question quick check
-- 2 perspectives + 1 verdict
-- 90-second soft buffer
-- post-check reflection
-- light history
+- `Quick`: 3-question stoplight flow for fast, regret-prone decisions
+- `Balance`: 4-panel trade-off board for everyday choices
+- `Mirror`: 5-panel workspace for heavier personal questions
+- route preview and starter prompts from the home screen
+- configurable quick buffer duration
+- post-decision reflection and reminder capture
+- Tomorrow Box for delayed reconsideration
+- history details, reopen flow, and review profiles
 - Home / History / Settings tabs
 - Home Screen + Lock Screen widgets
 - App Intents / Shortcuts / Siri entry groundwork
@@ -53,5 +55,7 @@ xcodebuild -project Before.xcodeproj -scheme Before -destination 'platform=iOS S
 ## Notes
 
 - The widget extension uses an app group placeholder: `group.com.changgeng.before`.
-- Personal data stays local in this Phase 1 build.
-- The current implementation keeps the verdict engine rule-based and intentionally lightweight.
+- Widget surfaces only use safe generic copy and never show raw user-written reminders.
+- Personal data stays local in this build.
+- The quick verdict engine remains rule-based and intentionally lightweight.
+- The project currently includes 47 passing unit tests covering routing, restoration, storage, reminders, review insights, and typed preferences.

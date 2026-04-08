@@ -4,7 +4,7 @@ struct WaitView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var session: QuickCheckSession
-    @State private var secondsRemaining = BeforePolicy.QuickCheck.waitDurationSeconds
+    @State private var secondsRemaining = 0
     @State private var timerActive = true
     @State private var reminderText: String?
 
@@ -23,7 +23,7 @@ struct WaitView: View {
 
                 PanelCard {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("\(secondsRemaining)s")
+                        Text(countdownText)
                             .font(.system(size: 56, weight: .black, design: .rounded))
                             .foregroundStyle(BeforeTheme.ink)
 
@@ -63,11 +63,14 @@ struct WaitView: View {
                     }
 
                     if !timerActive {
-                        BeforeActionButton("Reset the 90-second buffer", style: .tertiary) {
-                            secondsRemaining = BeforePolicy.QuickCheck.waitDurationSeconds
+                        BeforeActionButton(appModel.preferences.quickBufferDuration.resetTitle, style: .tertiary) {
+                            secondsRemaining = appModel.preferences.quickBufferDuration.seconds
                             timerActive = true
                             Task {
-                                await NotificationService.shared.scheduleWaitFinishedNotification(sessionID: session.id)
+                                await NotificationService.shared.scheduleWaitFinishedNotification(
+                                    sessionID: session.id,
+                                    duration: appModel.preferences.quickBufferDuration
+                                )
                             }
                         }
                     }
@@ -78,8 +81,14 @@ struct WaitView: View {
             .padding(24)
         }
         .task {
+            if secondsRemaining == 0 {
+                secondsRemaining = appModel.preferences.quickBufferDuration.seconds
+            }
             reminderText = appModel.bestReminder(for: session.scenario)
-            await NotificationService.shared.scheduleWaitFinishedNotification(sessionID: session.id)
+            await NotificationService.shared.scheduleWaitFinishedNotification(
+                sessionID: session.id,
+                duration: appModel.preferences.quickBufferDuration
+            )
         }
         .task(id: secondsRemaining) {
             guard timerActive, secondsRemaining > 0 else { return }
@@ -93,5 +102,11 @@ struct WaitView: View {
             NotificationService.shared.cancelWaitFinishedNotification(sessionID: session.id)
             session.isShowingWaitSheet = false
         }
+    }
+
+    private var countdownText: String {
+        let minutes = secondsRemaining / 60
+        let seconds = secondsRemaining % 60
+        return "\(minutes):" + String(format: "%02d", seconds)
     }
 }
