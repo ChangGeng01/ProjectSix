@@ -72,21 +72,10 @@ struct QuickCheckView: View {
                             }
                         }
 
-                        Button {
+                        BeforeActionButton("Show me the call", isEnabled: session.canEvaluate) {
                             session.evaluate()
-                        } label: {
-                            Text("Show me the call")
-                                .font(.headline)
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 18)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                                        .fill(session.canEvaluate ? BeforeTheme.ink : Color.gray)
-                                )
                         }
                         .disabled(!session.canEvaluate)
-                        .buttonStyle(.plain)
                     }
                     .padding(20)
                 }

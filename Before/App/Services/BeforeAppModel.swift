@@ -3,10 +3,18 @@ import SwiftData
 import SwiftUI
 import WidgetKit
 
+struct DecisionSignal {
+    let eyebrow: String
+    let title: String
+    let detail: String
+}
+
 @MainActor
 final class BeforeAppModel: ObservableObject {
     @Published var selectedTab = 0
-    @Published var activeSession: QuickCheckSession?
+    @Published var activeQuickSession: QuickCheckSession?
+    @Published var activeBalanceSession: BalanceBoardSession?
+    @Published var activeMirrorSession: MirrorWorkspaceSession?
     @Published var reflectionContext: ReflectionContext?
     @Published var startupNotice: String?
     @AppStorage("before.hasSeenOnboarding") var hasSeenOnboarding = false
@@ -31,14 +39,49 @@ final class BeforeAppModel: ObservableObject {
         startupNotice = nil
     }
 
-    func startQuickCheck(entrySource: EntrySource) {
-        activeSession = QuickCheckSession(entrySource: entrySource)
+    func startDecisionMode(
+        _ mode: DecisionMode,
+        entrySource: EntrySource,
+        prompt: String = ""
+    ) {
+        switch mode {
+        case .quick:
+            startQuickCheck(entrySource: entrySource, prompt: prompt)
+        case .balance:
+            startBalanceBoard(entrySource: entrySource, prompt: prompt)
+        case .mirror:
+            startMirrorWorkspace(entrySource: entrySource, prompt: prompt)
+        }
     }
 
-    func startQuickCheck(entrySource: EntrySource, scenario: ScenarioType) {
-        let session = QuickCheckSession(entrySource: entrySource)
-        session.scenario = scenario
-        activeSession = session
+    func routeDecision(prompt: String, entrySource: EntrySource) -> RoutedDecision {
+        let route = DecisionModeRouter.route(prompt: prompt)
+        startDecisionMode(route.mode, entrySource: entrySource, prompt: prompt)
+        return route
+    }
+
+    func startQuickCheck(
+        entrySource: EntrySource,
+        scenario: ScenarioType? = nil,
+        prompt: String = ""
+    ) {
+        clearActiveDecisionFlows()
+
+        let session = QuickCheckSession(entrySource: entrySource, initialNote: prompt)
+        if let scenario {
+            session.scenario = scenario
+        }
+        activeQuickSession = session
+    }
+
+    func startBalanceBoard(entrySource: EntrySource, prompt: String = "") {
+        clearActiveDecisionFlows()
+        activeBalanceSession = BalanceBoardSession(entrySource: entrySource, prompt: prompt)
+    }
+
+    func startMirrorWorkspace(entrySource: EntrySource, prompt: String = "") {
+        clearActiveDecisionFlows()
+        activeMirrorSession = MirrorWorkspaceSession(entrySource: entrySource, prompt: prompt)
     }
 
     func consumePendingLaunchRequestIfNeeded() {
@@ -103,7 +146,48 @@ final class BeforeAppModel: ObservableObject {
         )
         persistPendingReflectionState()
         reflectionContext = nil
-        activeSession = nil
+        activeQuickSession = nil
+    }
+
+    func saveBalanceBoard(_ session: BalanceBoardSession) {
+        guard let result = session.result else { return }
+
+        let context = modelContainer.mainContext
+        let record = BalanceDecisionRecord(
+            prompt: trimmed(session.prompt),
+            desire: trimmed(session.desire),
+            concern: trimmed(session.concern),
+            constraint: trimmed(session.constraint),
+            longTerm: trimmed(session.longTerm),
+            focusTitle: result.focusTitle,
+            focusSummary: result.summary,
+            nextAction: result.nextAction,
+            entrySource: session.entrySource
+        )
+        context.insert(record)
+        try? context.save()
+        activeBalanceSession = nil
+    }
+
+    func saveMirrorWorkspace(_ session: MirrorWorkspaceSession) {
+        guard let result = session.result else { return }
+
+        let context = modelContainer.mainContext
+        let record = MirrorDecisionRecord(
+            prompt: trimmed(session.prompt),
+            emotion: trimmed(session.emotion),
+            relationship: trimmed(session.relationship),
+            reality: trimmed(session.reality),
+            longTerm: trimmed(session.longTerm),
+            selfLens: trimmed(session.selfLens),
+            coreTension: result.coreTension,
+            nextActionTitle: result.nextActionTitle,
+            nextAction: result.nextAction,
+            entrySource: session.entrySource
+        )
+        context.insert(record)
+        try? context.save()
+        activeMirrorSession = nil
     }
 
     func submitReflection(
@@ -162,7 +246,6 @@ final class BeforeAppModel: ObservableObject {
     func reminders(for scenario: ScenarioType) -> [SelfReminder] {
         let context = modelContainer.mainContext
         let descriptor = FetchDescriptor<SelfReminder>()
-
         let fetched = (try? context.fetch(descriptor)) ?? []
         return ReminderSelectionPolicy.ranked(reminders: fetched.filter { $0.scenario == scenario })
     }
@@ -182,9 +265,63 @@ final class BeforeAppModel: ObservableObject {
         return Array(events.prefix(limit))
     }
 
+    func latestSignal() -> DecisionSignal? {
+        let context = modelContainer.mainContext
+
+        let latestQuick = try? context.fetch(
+            FetchDescriptor<CheckEvent>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
+        ).first
+
+        let latestBalance = try? context.fetch(
+            FetchDescriptor<BalanceDecisionRecord>(sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
+        ).first
+
+        let latestMirror = try? context.fetch(
+            FetchDescriptor<MirrorDecisionRecord>(sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
+        ).first
+
+        let candidates: [(Date, DecisionSignal)] = [
+            latestQuick.map {
+                (
+                    $0.createdAt,
+                    DecisionSignal(
+                        eyebrow: $0.verdict.title,
+                        title: $0.currentPerspective,
+                        detail: $0.afterPerspective
+                    )
+                )
+            },
+            latestBalance.map {
+                (
+                    $0.updatedAt,
+                    DecisionSignal(
+                        eyebrow: "Balance board",
+                        title: $0.focusTitle,
+                        detail: $0.focusSummary
+                    )
+                )
+            },
+            latestMirror.map {
+                (
+                    $0.updatedAt,
+                    DecisionSignal(
+                        eyebrow: "Mirror",
+                        title: $0.nextActionTitle,
+                        detail: $0.coreTension
+                    )
+                )
+            }
+        ]
+        .compactMap { $0 }
+
+        return candidates.max(by: { $0.0 < $1.0 })?.1
+    }
+
     func clearHistory() {
         let context = modelContainer.mainContext
         deleteAll(CheckEvent.self, in: context)
+        deleteAll(BalanceDecisionRecord.self, in: context)
+        deleteAll(MirrorDecisionRecord.self, in: context)
 
         resetTransientState()
         refreshWidgetSurfaces()
@@ -193,13 +330,14 @@ final class BeforeAppModel: ObservableObject {
     func clearReminders() {
         let context = modelContainer.mainContext
         deleteAll(SelfReminder.self, in: context)
-
         refreshWidgetSurfaces()
     }
 
     func resetLocalData() {
         let context = modelContainer.mainContext
         deleteAll(CheckEvent.self, in: context)
+        deleteAll(BalanceDecisionRecord.self, in: context)
+        deleteAll(MirrorDecisionRecord.self, in: context)
         deleteAll(SelfReminder.self, in: context)
 
         PendingLaunchRequestStore.clear()
@@ -209,8 +347,7 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func syncWidgetSnapshot() {
-        let events = latestEvents(limit: 1)
-        let latest = events.first
+        let latest = latestEvents(limit: 1).first
         let snapshot = WidgetSnapshot(
             safeMessage: WidgetSafeCopy.message(
                 for: latest?.scenario,
@@ -221,6 +358,12 @@ final class BeforeAppModel: ObservableObject {
             updatedAt: .now
         )
         WidgetSnapshotStore.save(snapshot)
+    }
+
+    private func clearActiveDecisionFlows() {
+        activeQuickSession = nil
+        activeBalanceSession = nil
+        activeMirrorSession = nil
     }
 
     private func trimReminders(in context: ModelContext) {
@@ -241,7 +384,7 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func resetTransientState() {
-        activeSession = nil
+        clearActiveDecisionFlows()
         reflectionContext = nil
         pendingReflectionContext = nil
         shouldPromptReflectionAfterBackground = false
@@ -273,5 +416,9 @@ final class BeforeAppModel: ObservableObject {
                 shouldPromptOnNextActive: shouldPromptReflectionAfterBackground
             )
         )
+    }
+
+    private func trimmed(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

@@ -14,8 +14,9 @@ final class QuickCheckSession: ObservableObject, Identifiable {
 
     let entrySource: EntrySource
 
-    init(entrySource: EntrySource) {
+    init(entrySource: EntrySource, initialNote: String = "") {
         self.entrySource = entrySource
+        self.note = initialNote
     }
 
     var canEvaluate: Bool {

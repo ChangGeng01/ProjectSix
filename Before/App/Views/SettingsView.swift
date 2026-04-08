@@ -6,6 +6,8 @@ struct SettingsView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @Environment(\.openURL) private var openURL
     @Query private var events: [CheckEvent]
+    @Query private var balanceBoards: [BalanceDecisionRecord]
+    @Query private var mirrorRecords: [MirrorDecisionRecord]
     @Query private var reminders: [SelfReminder]
     @State private var destructiveAction: DestructiveAction?
 
@@ -37,7 +39,7 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section("Positioning") {
-                    Text("Before is not here to shame or block you. It is here to slow down blurry decisions.")
+                    Text("Before is a local decision system: quick calls get a stoplight, trade-offs get a balance board, heavier questions get a mirror.")
                 }
 
                 Section("System surfaces") {
@@ -55,7 +57,9 @@ struct SettingsView: View {
                 }
 
                 Section("Memory") {
-                    LabeledContent("Saved checks", value: "\(events.count)")
+                    LabeledContent("Saved quick checks", value: "\(events.count)")
+                    LabeledContent("Saved balance boards", value: "\(balanceBoards.count)")
+                    LabeledContent("Saved mirrors", value: "\(mirrorRecords.count)")
                     LabeledContent("Saved reminders", value: "\(reminders.count)")
                     Button("Show onboarding again") {
                         appModel.hasSeenOnboarding = false
@@ -64,7 +68,7 @@ struct SettingsView: View {
 
                 Section("Privacy & safety") {
                     Label("Widgets only show generic safe text", systemImage: "lock.shield")
-                    Text("Your own reminder lines stay inside the app and never appear on the Home or Lock Screen.")
+                    Text("Your own reminder lines stay inside the app and never appear on the Home or Lock Screen. Heavier decisions also stay local to this device unless you explicitly share them later.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

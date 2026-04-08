@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
+    @State private var decisionPrompt = ""
 
     private let columns = [
         GridItem(.flexible(), spacing: 14),
@@ -33,40 +34,38 @@ struct HomeView: View {
                         }
 
                         SectionHeader(
-                            eyebrow: "Quick buffer",
-                            title: "Help me judge this before I act.",
-                            subtitle: "Two perspectives, one verdict, one next move."
+                            eyebrow: "Decision OS",
+                            title: "Help me see this clearly.",
+                            subtitle: "Quick calls, trade-offs, and heavier questions can all start from one clean entry."
                         )
 
-                        Button {
-                            appModel.startQuickCheck(entrySource: .app)
-                        } label: {
-                            HStack(spacing: 14) {
-                                Image(systemName: "pause.circle.fill")
-                                    .font(.system(size: 28))
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Open quick check")
-                                        .font(.headline)
-                                    Text("Fastest route when you already feel the pull.")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.white.opacity(0.74))
-                                }
-                                Spacer()
-                            }
-                            .foregroundStyle(.white)
-                            .padding(20)
-                            .background(
-                                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [BeforeTheme.ink, BeforeTheme.ember.opacity(0.88)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                            )
+                        GuidedInputCard(
+                            title: "What are you deciding?",
+                            subtitle: "Write it once. Before will start at the right depth.",
+                            placeholder: "Buy this? Go there? Reply now? Stay or leave?",
+                            text: $decisionPrompt
+                        )
+
+                        BeforeActionButton("Route this for me", isEnabled: !trimmedPrompt.isEmpty) {
+                            appModel.routeDecision(prompt: trimmedPrompt, entrySource: .app)
+                            decisionPrompt = ""
                         }
-                        .buttonStyle(.plain)
+                        .disabled(trimmedPrompt.isEmpty)
+
+                        VStack(spacing: 14) {
+                            ForEach(DecisionMode.allCases) { mode in
+                                DecisionModeCard(mode: mode) {
+                                    appModel.startDecisionMode(mode, entrySource: .app, prompt: trimmedPrompt)
+                                    decisionPrompt = ""
+                                }
+                            }
+                        }
+
+                        SectionHeader(
+                            eyebrow: "Quick surfaces",
+                            title: "Named impulses still stay one tap away.",
+                            subtitle: "When the shape is obvious, open the fast mode directly."
+                        )
 
                         LazyVGrid(columns: columns, spacing: 14) {
                             ForEach(ScenarioType.allCases) { scenario in
@@ -100,16 +99,21 @@ struct HomeView: View {
                             VStack(alignment: .leading, spacing: 14) {
                                 Text("Recent signal")
                                     .font(.headline)
-                                if let event = appModel.latestEvents(limit: 1).first {
-                                    Text(event.verdict.title)
+
+                                if let signal = appModel.latestSignal() {
+                                    Text(signal.eyebrow.uppercased())
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(BeforeTheme.ember)
+                                    Text(signal.title)
                                         .font(.title3.bold())
                                         .foregroundStyle(BeforeTheme.ink)
-                                    Text(event.afterPerspective)
+                                        .lineLimit(3)
+                                    Text(signal.detail)
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
-                                        .lineLimit(3)
+                                        .lineLimit(4)
                                 } else {
-                                    Text("Your first check will start building a clearer picture here.")
+                                    Text("Your first judgment, balance board, or mirror will start building signal here.")
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
                                 }
@@ -121,5 +125,9 @@ struct HomeView: View {
             }
             .navigationTitle("Before")
         }
+    }
+
+    private var trimmedPrompt: String {
+        decisionPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

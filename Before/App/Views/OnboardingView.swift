@@ -15,9 +15,9 @@ struct OnboardingView: View {
                     .foregroundStyle(BeforeTheme.ink)
 
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Not here to stop you.")
+                    Text("Not here to run your life.")
                         .font(.system(.title2, design: .rounded, weight: .bold))
-                    Text("Before helps you see the now-perspective, the after-perspective, and one clean next move before you act.")
+                    Text("Quick calls get a stoplight. Trade-offs get a balance board. Heavier questions get a mirror.")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                 }
@@ -25,24 +25,15 @@ struct OnboardingView: View {
                 PanelCard {
                     VStack(alignment: .leading, spacing: 12) {
                         Label("No shame.", systemImage: "face.smiling")
-                        Label("No streaks.", systemImage: "line.3.horizontal.decrease.circle")
+                        Label("No forced verdicts on heavy questions.", systemImage: "square.split.2x1")
                         Label("No lecture.", systemImage: "quote.bubble")
                     }
                     .font(.headline)
                 }
 
-                Button(action: dismiss) {
-                    Text("Start using Before")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 18)
-                        .background(
-                            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                                .fill(BeforeTheme.ink)
-                        )
+                BeforeActionButton("Start using Before") {
+                    dismiss()
                 }
-                .buttonStyle(.plain)
 
                 Spacer()
             }

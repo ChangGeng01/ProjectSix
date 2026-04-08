@@ -9,16 +9,24 @@
 /* Begin PBXBuildFile section */
 		08E0CF120EEAFE9A355FA71F /* CheckEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB33E572D887CB4574F01A2 /* CheckEvent.swift */; };
 		09C7278F68876D47C852BB34 /* BeforeBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 788D0A8A1D8137BDA6A5EDE0 /* BeforeBackground.swift */; };
+		0B3DB7350AD390CF01A8FB61 /* BalanceBoardEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB16610FFDAC0B269A585C1 /* BalanceBoardEngine.swift */; };
 		0CE526D8FB890D53DAA2B4D7 /* CheckRuleEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F454C1445FA6FD73087FAC8 /* CheckRuleEngine.swift */; };
+		0D0C1EC99FE870F6BE703F32 /* MirrorWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BED0BAF2ABAEA84E963BDD1 /* MirrorWorkspaceView.swift */; };
+		0E3E39505C17952EE5C84880 /* DecisionMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8803C58B37023CB5C616CD7C /* DecisionMode.swift */; };
 		0EC6DD9A7FE63C6850AC8D9B /* ReminderTemplateLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18D1942BFFCAF7130FAF127F /* ReminderTemplateLibrary.swift */; };
+		0FD53A0F07BBFAB768372B95 /* BalanceBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7CF7713B70A7CA75686CF11 /* BalanceBoardView.swift */; };
+		167EC3CF0549AAFEED0A0940 /* DecisionModeRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44CADF38945C264E4DE6F821 /* DecisionModeRouter.swift */; };
+		1912360C43CECEE3A107BBE2 /* MirrorWorkspaceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70A414A2528AF11F510CD25 /* MirrorWorkspaceSession.swift */; };
 		1C369C889014AD149DC50FD4 /* BeforePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DAB364E56E5EA8CCC7204F3 /* BeforePolicy.swift */; };
 		1C817A6C32A9FDB942853C9E /* ResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6E1FD7F02BE18A0F653DE4 /* ResultView.swift */; };
+		2243D36D33F343B82F81029E /* MirrorEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A05E06826B9C52DE8D6875DC /* MirrorEngine.swift */; };
 		22ECFF18FE978AC0BAD75802 /* BeforePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DAB364E56E5EA8CCC7204F3 /* BeforePolicy.swift */; };
 		2FBA7E9C24DACAA361AE1A87 /* QuickCheckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 808EB61307CDE69C81AE5BBE /* QuickCheckView.swift */; };
 		30B7C7F83352774B5CB49CB7 /* PendingReflectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CEADE1FA1884D9F8FEB7950 /* PendingReflectionStore.swift */; };
 		3671D50FE2556C6C7D0E7FA4 /* PendingLaunchRequestStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E0334A8565803EF7707BB38 /* PendingLaunchRequestStore.swift */; };
 		3E057C871B016661F9EBC629 /* ReminderTemplateLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 572E58A5A6D0778DCAD31234 /* ReminderTemplateLibraryTests.swift */; };
 		3E42715FBE871E2C86C124F4 /* BeforeTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FBEC07A4802202A55F07273 /* BeforeTheme.swift */; };
+		3FA6A6CEB2949EBCAEC944FF /* MirrorEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 734F52EF13FFB8B1DA81BC96 /* MirrorEngineTests.swift */; };
 		402984E1B9C592B27915A179 /* PendingLaunchRequestStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AF30BA404040B6ECD5A2652 /* PendingLaunchRequestStoreTests.swift */; };
 		4748856CD39AAB0011CC84A1 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93C10CF269564FEA13A19731 /* HomeView.swift */; };
 		486753A8A1E653585E9C636F /* QuickCheckAnswers.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8A05C41C31FF92FED7AB83 /* QuickCheckAnswers.swift */; };
@@ -30,6 +38,7 @@
 		6461C907703FF797BE2E2203 /* PendingLaunchRequestStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E0334A8565803EF7707BB38 /* PendingLaunchRequestStore.swift */; };
 		6667D470E86E61D402FB4170 /* SelfReminder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B469617D4620292515EC675 /* SelfReminder.swift */; };
 		66D7DD242C25DB82A472CFAE /* EntrySource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5263B35DEB9254806060CCA3 /* EntrySource.swift */; };
+		69B6E60E25E2CA40F4B4C372 /* BalanceDecisionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B01437D8F3CD6BB36D3BCD38 /* BalanceDecisionRecord.swift */; };
 		6A13D7FF4E56A1E22992DC2B /* BeforeWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 01576E7A17B752C41D1A782C /* BeforeWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		6E573D5E99FFD7D4ED011B62 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9E202C386FB4EE9167AE769C /* Assets.xcassets */; };
 		7070B692F04D90FC904D5BD9 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA7D45B4CAAA3B24DDA4B1F /* RootTabView.swift */; };
@@ -49,6 +58,7 @@
 		99EB5E6E65F34A2038B1A57F /* QuickCheckAnswers.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8A05C41C31FF92FED7AB83 /* QuickCheckAnswers.swift */; };
 		9E036C4D8BB751D3930E0657 /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BF5DACA08082B764C73C19F /* WidgetSnapshot.swift */; };
 		A03889B80C579D9036380803 /* ReminderSourceType.swift in Sources */ = {isa = PBXBuildFile; fileRef = C94A031C4F195FB7A25E444F /* ReminderSourceType.swift */; };
+		A0DC2D7A24785D3A66F7BA8A /* DecisionModeRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9C0EC9BCB2856CEA2CDB928 /* DecisionModeRouterTests.swift */; };
 		A1F587F508885CC983D3AE50 /* BeforeAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF0AE4C04AAF5821C532270 /* BeforeAppModel.swift */; };
 		A1F804F13673E29E07AFAE94 /* WidgetSafeCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDB7F1306151CE6EAB2CA002 /* WidgetSafeCopy.swift */; };
 		AA8B9D1227CD427C509C62B4 /* ScenarioType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79FE2701FB38D185371AA573 /* ScenarioType.swift */; };
@@ -58,20 +68,29 @@
 		BA99C96ABD658EADEE79DE5B /* EntrySource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5263B35DEB9254806060CCA3 /* EntrySource.swift */; };
 		BB67511098C3741B7E832995 /* SharedContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E63D346FC718230713E7B30B /* SharedContainer.swift */; };
 		BBC8A21467AE24FDE91F1294 /* ReminderSelectionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC7AFD8BAE5FD8656546EA60 /* ReminderSelectionPolicy.swift */; };
+		BC119E173C9725E0DD522AD7 /* GuidedInputCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0878363BE996C18206470FE0 /* GuidedInputCard.swift */; };
 		BD34C65E13DED107DB483BB7 /* BeforeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A6F46446EAB4BE1B81889BC /* BeforeApp.swift */; };
 		BDE7FDE600641BE0BC49A9A2 /* QuickCheckInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F68FB2BE9FA50C05DD3BB89 /* QuickCheckInput.swift */; };
 		BF8749721BE6FDA0E6D26222 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF88B8304CF7F148F06C204 /* SettingsView.swift */; };
 		C46A50ABD5DCD6B7FC47FFE3 /* BeforeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7A4B71C9286A522BBDC902 /* BeforeWidget.swift */; };
 		C68A6B36A45AE8D6D6249813 /* CheckAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1CF4BDBA8776C1E59C9B45 /* CheckAction.swift */; };
+		CC15D4EE356A7EB095BD13DE /* BalanceBoardEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5476CF22FF1B67A4F1E4502 /* BalanceBoardEngineTests.swift */; };
 		CCAD0045602DBB2FD0D006B4 /* SectionHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61DB79FB9E3DC311CE85256 /* SectionHeader.swift */; };
+		CCB15F44F3F2C2C27384875B /* DecisionModeRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44CADF38945C264E4DE6F821 /* DecisionModeRouter.swift */; };
+		CE80525173BB79B9E09164E9 /* BalanceBoardEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB16610FFDAC0B269A585C1 /* BalanceBoardEngine.swift */; };
 		CF27D67C84FD09BF673A2FDB /* SharedContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E63D346FC718230713E7B30B /* SharedContainer.swift */; };
 		D2A5EF3042DD67410183A43E /* ReflectionContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1548E93121C0DEC8D3A983A /* ReflectionContext.swift */; };
 		D508BAC239303E3FE5A18318 /* ReminderTemplateLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18D1942BFFCAF7130FAF127F /* ReminderTemplateLibrary.swift */; };
 		D8C10F91552AED40EC948DFC /* QuickCheckSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BAE04A71B8826BDE45EAF6E /* QuickCheckSession.swift */; };
+		D95E6740672BA7080A66DF1D /* DecisionModeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25779E30F91D917702DC456 /* DecisionModeCard.swift */; };
 		DC772636D1CBA8BC844DAF50 /* CheckRuleEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F454C1445FA6FD73087FAC8 /* CheckRuleEngine.swift */; };
+		E4E307C29DC37CDB3C88DB3F /* BalanceBoardSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6A240A4A08405C8D91821CD /* BalanceBoardSession.swift */; };
 		E86301EA0C43918C3B37E1C6 /* ReminderSelectionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7152E91B0D3E0D96AA280B51 /* ReminderSelectionPolicyTests.swift */; };
+		E884F883F82E83FF0E329D1E /* MirrorDecisionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D6E8FDD046A39543E12464 /* MirrorDecisionRecord.swift */; };
 		EAD6DE99C58C6F34D6D34AED /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFDA8C2C4F4EB349F7763323 /* NotificationService.swift */; };
 		EAE10804F80292499C127ABB /* CheckVerdict.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58C429E74F83380B3EB5DD21 /* CheckVerdict.swift */; };
+		EAFB12A3676EAF72B6BC9989 /* DecisionMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8803C58B37023CB5C616CD7C /* DecisionMode.swift */; };
+		EBDFA747E00D674AE132B4C8 /* MirrorEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A05E06826B9C52DE8D6875DC /* MirrorEngine.swift */; };
 		EC4B3A79C4659AFCAD798083 /* CheckRuleEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E33F27723396B6B342EB59 /* CheckRuleEngineTests.swift */; };
 		F6130B346740F14D025CE845 /* PanelCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B421144DE1D5D71F3CFC70 /* PanelCard.swift */; };
 /* End PBXBuildFile section */
@@ -109,11 +128,14 @@
 
 /* Begin PBXFileReference section */
 		01576E7A17B752C41D1A782C /* BeforeWidgetExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = BeforeWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		0878363BE996C18206470FE0 /* GuidedInputCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedInputCard.swift; sourceTree = "<group>"; };
 		0DAB364E56E5EA8CCC7204F3 /* BeforePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforePolicy.swift; sourceTree = "<group>"; };
 		0E0334A8565803EF7707BB38 /* PendingLaunchRequestStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingLaunchRequestStore.swift; sourceTree = "<group>"; };
 		12B18D0B36378C98DA6A44EA /* NotificationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationServiceTests.swift; sourceTree = "<group>"; };
 		18D1942BFFCAF7130FAF127F /* ReminderTemplateLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderTemplateLibrary.swift; sourceTree = "<group>"; };
 		1A4C5AF61DAB5CE975809C4D /* Before.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Before.entitlements; sourceTree = "<group>"; };
+		1BED0BAF2ABAEA84E963BDD1 /* MirrorWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MirrorWorkspaceView.swift; sourceTree = "<group>"; };
+		1CB16610FFDAC0B269A585C1 /* BalanceBoardEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceBoardEngine.swift; sourceTree = "<group>"; };
 		1F68FB2BE9FA50C05DD3BB89 /* QuickCheckInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCheckInput.swift; sourceTree = "<group>"; };
 		2674B942E6DC6FD9A34FD9C8 /* BeforeTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BeforeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2A7B6A83F0C81717A9A5D601 /* BeforeActionButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeActionButton.swift; sourceTree = "<group>"; };
@@ -125,6 +147,7 @@
 		32B421144DE1D5D71F3CFC70 /* PanelCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelCard.swift; sourceTree = "<group>"; };
 		3B469617D4620292515EC675 /* SelfReminder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfReminder.swift; sourceTree = "<group>"; };
 		3FBEC07A4802202A55F07273 /* BeforeTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeTheme.swift; sourceTree = "<group>"; };
+		44CADF38945C264E4DE6F821 /* DecisionModeRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionModeRouter.swift; sourceTree = "<group>"; };
 		4C1CF4BDBA8776C1E59C9B45 /* CheckAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckAction.swift; sourceTree = "<group>"; };
 		4DFE4FB1A6B9A76AD2AD80E3 /* WaitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitView.swift; sourceTree = "<group>"; };
 		4F454C1445FA6FD73087FAC8 /* CheckRuleEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckRuleEngine.swift; sourceTree = "<group>"; };
@@ -139,30 +162,41 @@
 		5F7A4B71C9286A522BBDC902 /* BeforeWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeWidget.swift; sourceTree = "<group>"; };
 		7084BBE94DCFAE7AF1AF2241 /* ReflectionPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReflectionPromptView.swift; sourceTree = "<group>"; };
 		7152E91B0D3E0D96AA280B51 /* ReminderSelectionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderSelectionPolicyTests.swift; sourceTree = "<group>"; };
+		734F52EF13FFB8B1DA81BC96 /* MirrorEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MirrorEngineTests.swift; sourceTree = "<group>"; };
 		788D0A8A1D8137BDA6A5EDE0 /* BeforeBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeBackground.swift; sourceTree = "<group>"; };
 		79FE2701FB38D185371AA573 /* ScenarioType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioType.swift; sourceTree = "<group>"; };
 		7BAE04A71B8826BDE45EAF6E /* QuickCheckSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCheckSession.swift; sourceTree = "<group>"; };
 		808EB61307CDE69C81AE5BBE /* QuickCheckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCheckView.swift; sourceTree = "<group>"; };
+		8803C58B37023CB5C616CD7C /* DecisionMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionMode.swift; sourceTree = "<group>"; };
 		8C770A8A464D7D5BFFD53D19 /* BeforeWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeforeWidgetExtension.entitlements; sourceTree = "<group>"; };
 		922541BCCDEEF8FA8FE5E169 /* PersistenceBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceBootstrap.swift; sourceTree = "<group>"; };
 		93C10CF269564FEA13A19731 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		9A6F46446EAB4BE1B81889BC /* BeforeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeApp.swift; sourceTree = "<group>"; };
 		9E202C386FB4EE9167AE769C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A05E06826B9C52DE8D6875DC /* MirrorEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MirrorEngine.swift; sourceTree = "<group>"; };
+		A25779E30F91D917702DC456 /* DecisionModeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionModeCard.swift; sourceTree = "<group>"; };
 		A61DB79FB9E3DC311CE85256 /* SectionHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionHeader.swift; sourceTree = "<group>"; };
 		A9E33F27723396B6B342EB59 /* CheckRuleEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckRuleEngineTests.swift; sourceTree = "<group>"; };
 		AA6E1FD7F02BE18A0F653DE4 /* ResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultView.swift; sourceTree = "<group>"; };
 		AB8A05C41C31FF92FED7AB83 /* QuickCheckAnswers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCheckAnswers.swift; sourceTree = "<group>"; };
 		AEF88B8304CF7F148F06C204 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		B01437D8F3CD6BB36D3BCD38 /* BalanceDecisionRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceDecisionRecord.swift; sourceTree = "<group>"; };
+		B6A240A4A08405C8D91821CD /* BalanceBoardSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceBoardSession.swift; sourceTree = "<group>"; };
 		BEDCB8C02350F6CC22C4DAAC /* OpenQuickCheckIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenQuickCheckIntent.swift; sourceTree = "<group>"; };
 		C7258A3716547911357AAAC2 /* Before.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Before.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C94A031C4F195FB7A25E444F /* ReminderSourceType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderSourceType.swift; sourceTree = "<group>"; };
 		CC7AFD8BAE5FD8656546EA60 /* ReminderSelectionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderSelectionPolicy.swift; sourceTree = "<group>"; };
 		D14BBBFC879A75D527348A3A /* SharedContainerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedContainerTests.swift; sourceTree = "<group>"; };
+		D5476CF22FF1B67A4F1E4502 /* BalanceBoardEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceBoardEngineTests.swift; sourceTree = "<group>"; };
+		D7CF7713B70A7CA75686CF11 /* BalanceBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceBoardView.swift; sourceTree = "<group>"; };
 		DDB7F1306151CE6EAB2CA002 /* WidgetSafeCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSafeCopy.swift; sourceTree = "<group>"; };
 		DFDA8C2C4F4EB349F7763323 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		E63D346FC718230713E7B30B /* SharedContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedContainer.swift; sourceTree = "<group>"; };
+		E70A414A2528AF11F510CD25 /* MirrorWorkspaceSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MirrorWorkspaceSession.swift; sourceTree = "<group>"; };
 		EAFAB4D7AB512041EFC3A51F /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		F1548E93121C0DEC8D3A983A /* ReflectionContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReflectionContext.swift; sourceTree = "<group>"; };
+		F5D6E8FDD046A39543E12464 /* MirrorDecisionRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MirrorDecisionRecord.swift; sourceTree = "<group>"; };
+		F9C0EC9BCB2856CEA2CDB928 /* DecisionModeRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionModeRouterTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -195,6 +229,7 @@
 				0DAB364E56E5EA8CCC7204F3 /* BeforePolicy.swift */,
 				4C1CF4BDBA8776C1E59C9B45 /* CheckAction.swift */,
 				58C429E74F83380B3EB5DD21 /* CheckVerdict.swift */,
+				8803C58B37023CB5C616CD7C /* DecisionMode.swift */,
 				5263B35DEB9254806060CCA3 /* EntrySource.swift */,
 				AB8A05C41C31FF92FED7AB83 /* QuickCheckAnswers.swift */,
 				1F68FB2BE9FA50C05DD3BB89 /* QuickCheckInput.swift */,
@@ -208,7 +243,9 @@
 		6A5B51D56823337DA63A0C87 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				B6A240A4A08405C8D91821CD /* BalanceBoardSession.swift */,
 				2FF0AE4C04AAF5821C532270 /* BeforeAppModel.swift */,
+				E70A414A2528AF11F510CD25 /* MirrorWorkspaceSession.swift */,
 				DFDA8C2C4F4EB349F7763323 /* NotificationService.swift */,
 				2CEADE1FA1884D9F8FEB7950 /* PendingReflectionStore.swift */,
 				922541BCCDEEF8FA8FE5E169 /* PersistenceBootstrap.swift */,
@@ -221,7 +258,10 @@
 		78ADB228AB5075F251F83673 /* Engine */ = {
 			isa = PBXGroup;
 			children = (
+				1CB16610FFDAC0B269A585C1 /* BalanceBoardEngine.swift */,
 				4F454C1445FA6FD73087FAC8 /* CheckRuleEngine.swift */,
+				44CADF38945C264E4DE6F821 /* DecisionModeRouter.swift */,
+				A05E06826B9C52DE8D6875DC /* MirrorEngine.swift */,
 				18D1942BFFCAF7130FAF127F /* ReminderTemplateLibrary.swift */,
 				DDB7F1306151CE6EAB2CA002 /* WidgetSafeCopy.swift */,
 			);
@@ -239,7 +279,10 @@
 		8124C954763CC543DDBCC140 /* BeforeTests */ = {
 			isa = PBXGroup;
 			children = (
+				D5476CF22FF1B67A4F1E4502 /* BalanceBoardEngineTests.swift */,
 				A9E33F27723396B6B342EB59 /* CheckRuleEngineTests.swift */,
+				F9C0EC9BCB2856CEA2CDB928 /* DecisionModeRouterTests.swift */,
+				734F52EF13FFB8B1DA81BC96 /* MirrorEngineTests.swift */,
 				12B18D0B36378C98DA6A44EA /* NotificationServiceTests.swift */,
 				2AF30BA404040B6ECD5A2652 /* PendingLaunchRequestStoreTests.swift */,
 				7152E91B0D3E0D96AA280B51 /* ReminderSelectionPolicyTests.swift */,
@@ -259,7 +302,9 @@
 				7084BBE94DCFAE7AF1AF2241 /* ReflectionPromptView.swift */,
 				5DA7D45B4CAAA3B24DDA4B1F /* RootTabView.swift */,
 				AEF88B8304CF7F148F06C204 /* SettingsView.swift */,
+				E46CE63B809FBD736753B6CF /* Balance */,
 				D5D425E8A672E6C29C1D4857 /* Components */,
+				D908300F57FF619FD2400FFC /* Mirror */,
 				9D5D3A045DC1E3AFE287689B /* QuickCheck */,
 			);
 			path = Views;
@@ -338,10 +383,28 @@
 			children = (
 				2A7B6A83F0C81717A9A5D601 /* BeforeActionButton.swift */,
 				788D0A8A1D8137BDA6A5EDE0 /* BeforeBackground.swift */,
+				A25779E30F91D917702DC456 /* DecisionModeCard.swift */,
+				0878363BE996C18206470FE0 /* GuidedInputCard.swift */,
 				32B421144DE1D5D71F3CFC70 /* PanelCard.swift */,
 				A61DB79FB9E3DC311CE85256 /* SectionHeader.swift */,
 			);
 			path = Components;
+			sourceTree = "<group>";
+		};
+		D908300F57FF619FD2400FFC /* Mirror */ = {
+			isa = PBXGroup;
+			children = (
+				1BED0BAF2ABAEA84E963BDD1 /* MirrorWorkspaceView.swift */,
+			);
+			path = Mirror;
+			sourceTree = "<group>";
+		};
+		E46CE63B809FBD736753B6CF /* Balance */ = {
+			isa = PBXGroup;
+			children = (
+				D7CF7713B70A7CA75686CF11 /* BalanceBoardView.swift */,
+			);
+			path = Balance;
 			sourceTree = "<group>";
 		};
 		ECEF44F1B998D1555E43DBA8 /* App */ = {
@@ -360,7 +423,9 @@
 		FA95944434B8EB5E1CBAD327 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				B01437D8F3CD6BB36D3BCD38 /* BalanceDecisionRecord.swift */,
 				5CB33E572D887CB4574F01A2 /* CheckEvent.swift */,
+				F5D6E8FDD046A39543E12464 /* MirrorDecisionRecord.swift */,
 				3B469617D4620292515EC675 /* SelfReminder.swift */,
 			);
 			path = Models;
@@ -490,6 +555,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CE80525173BB79B9E09164E9 /* BalanceBoardEngine.swift in Sources */,
+				E4E307C29DC37CDB3C88DB3F /* BalanceBoardSession.swift in Sources */,
+				0FD53A0F07BBFAB768372B95 /* BalanceBoardView.swift in Sources */,
+				69B6E60E25E2CA40F4B4C372 /* BalanceDecisionRecord.swift in Sources */,
 				AB3F4D0488D9E91CC8AF7E64 /* BeforeActionButton.swift in Sources */,
 				BD34C65E13DED107DB483BB7 /* BeforeApp.swift in Sources */,
 				A1F587F508885CC983D3AE50 /* BeforeAppModel.swift in Sources */,
@@ -500,9 +569,17 @@
 				08E0CF120EEAFE9A355FA71F /* CheckEvent.swift in Sources */,
 				0CE526D8FB890D53DAA2B4D7 /* CheckRuleEngine.swift in Sources */,
 				8D6E53B8156501A71CF98272 /* CheckVerdict.swift in Sources */,
+				0E3E39505C17952EE5C84880 /* DecisionMode.swift in Sources */,
+				D95E6740672BA7080A66DF1D /* DecisionModeCard.swift in Sources */,
+				167EC3CF0549AAFEED0A0940 /* DecisionModeRouter.swift in Sources */,
 				BA99C96ABD658EADEE79DE5B /* EntrySource.swift in Sources */,
+				BC119E173C9725E0DD522AD7 /* GuidedInputCard.swift in Sources */,
 				873075573792938B474AE0C9 /* HistoryView.swift in Sources */,
 				4748856CD39AAB0011CC84A1 /* HomeView.swift in Sources */,
+				E884F883F82E83FF0E329D1E /* MirrorDecisionRecord.swift in Sources */,
+				2243D36D33F343B82F81029E /* MirrorEngine.swift in Sources */,
+				1912360C43CECEE3A107BBE2 /* MirrorWorkspaceSession.swift in Sources */,
+				0D0C1EC99FE870F6BE703F32 /* MirrorWorkspaceView.swift in Sources */,
 				EAD6DE99C58C6F34D6D34AED /* NotificationService.swift in Sources */,
 				803A163B61B327AD0E611DEE /* OnboardingView.swift in Sources */,
 				5163F8D746F1CF079AB765D5 /* OpenQuickCheckIntent.swift in Sources */,
@@ -536,13 +613,17 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0B3DB7350AD390CF01A8FB61 /* BalanceBoardEngine.swift in Sources */,
 				1C369C889014AD149DC50FD4 /* BeforePolicy.swift in Sources */,
 				52737B94451BEBEE58D6A018 /* BeforeTheme.swift in Sources */,
 				C46A50ABD5DCD6B7FC47FFE3 /* BeforeWidget.swift in Sources */,
 				C68A6B36A45AE8D6D6249813 /* CheckAction.swift in Sources */,
 				DC772636D1CBA8BC844DAF50 /* CheckRuleEngine.swift in Sources */,
 				EAE10804F80292499C127ABB /* CheckVerdict.swift in Sources */,
+				EAFB12A3676EAF72B6BC9989 /* DecisionMode.swift in Sources */,
+				CCB15F44F3F2C2C27384875B /* DecisionModeRouter.swift in Sources */,
 				66D7DD242C25DB82A472CFAE /* EntrySource.swift in Sources */,
+				EBDFA747E00D674AE132B4C8 /* MirrorEngine.swift in Sources */,
 				71293BD1BD9D0F5447F6F982 /* OpenQuickCheckIntent.swift in Sources */,
 				3671D50FE2556C6C7D0E7FA4 /* PendingLaunchRequestStore.swift in Sources */,
 				486753A8A1E653585E9C636F /* QuickCheckAnswers.swift in Sources */,
@@ -561,7 +642,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CC15D4EE356A7EB095BD13DE /* BalanceBoardEngineTests.swift in Sources */,
 				EC4B3A79C4659AFCAD798083 /* CheckRuleEngineTests.swift in Sources */,
+				A0DC2D7A24785D3A66F7BA8A /* DecisionModeRouterTests.swift in Sources */,
+				3FA6A6CEB2949EBCAEC944FF /* MirrorEngineTests.swift in Sources */,
 				B6401C0BE7236DB94F7E0FD4 /* NotificationServiceTests.swift in Sources */,
 				402984E1B9C592B27915A179 /* PendingLaunchRequestStoreTests.swift in Sources */,
 				E86301EA0C43918C3B37E1C6 /* ReminderSelectionPolicyTests.swift in Sources */,

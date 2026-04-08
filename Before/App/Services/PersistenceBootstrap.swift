@@ -7,7 +7,12 @@ struct PersistenceBootstrap {
 
     static func loadAppContainer() -> PersistenceBootstrap {
         do {
-            let container = try ModelContainer(for: CheckEvent.self, SelfReminder.self)
+            let container = try ModelContainer(
+                for: CheckEvent.self,
+                SelfReminder.self,
+                BalanceDecisionRecord.self,
+                MirrorDecisionRecord.self
+            )
             return PersistenceBootstrap(container: container, recoveryMessage: nil)
         } catch {
             let fallbackConfiguration = ModelConfiguration(isStoredInMemoryOnly: true)
@@ -15,6 +20,8 @@ struct PersistenceBootstrap {
             guard let fallbackContainer = try? ModelContainer(
                 for: CheckEvent.self,
                 SelfReminder.self,
+                BalanceDecisionRecord.self,
+                MirrorDecisionRecord.self,
                 configurations: fallbackConfiguration
             ) else {
                 fatalError("Unable to create a fallback SwiftData container: \(error.localizedDescription)")

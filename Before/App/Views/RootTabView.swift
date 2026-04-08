@@ -23,7 +23,7 @@ struct RootTabView: View {
                 }
                 .tag(2)
         }
-        .sheet(item: $appModel.activeSession) { session in
+        .sheet(item: $appModel.activeQuickSession) { session in
             QuickCheckView(session: session)
                 .environmentObject(appModel)
                 .sheet(
@@ -35,6 +35,14 @@ struct RootTabView: View {
                     WaitView(session: session)
                         .environmentObject(appModel)
                 }
+        }
+        .sheet(item: $appModel.activeBalanceSession) { session in
+            BalanceBoardView(session: session)
+                .environmentObject(appModel)
+        }
+        .sheet(item: $appModel.activeMirrorSession) { session in
+            MirrorWorkspaceView(session: session)
+                .environmentObject(appModel)
         }
         .sheet(item: $appModel.reflectionContext) { context in
             ReflectionPromptView(context: context)

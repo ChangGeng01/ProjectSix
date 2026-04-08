@@ -9,15 +9,18 @@ struct BeforeActionButton: View {
 
     let title: String
     let style: Style
+    let isEnabled: Bool
     let action: () -> Void
 
     init(
         _ title: String,
         style: Style = .primary,
+        isEnabled: Bool = true,
         action: @escaping () -> Void
     ) {
         self.title = title
         self.style = style
+        self.isEnabled = isEnabled
         self.action = action
     }
 
@@ -30,6 +33,8 @@ struct BeforeActionButton: View {
                 .padding(.vertical, verticalPadding)
                 .background(backgroundView)
         }
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.58)
         .buttonStyle(.plain)
     }
 
@@ -47,10 +52,10 @@ struct BeforeActionButton: View {
         switch style {
         case .primary:
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(BeforeTheme.ink)
+                .fill(isEnabled ? BeforeTheme.ink : Color.gray)
         case .secondary:
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(.white.opacity(0.74))
+                .fill(.white.opacity(isEnabled ? 0.74 : 0.5))
         case .tertiary:
             Color.clear
         }
