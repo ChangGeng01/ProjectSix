@@ -9,11 +9,13 @@ struct SettingsView: View {
     @Query private var balanceBoards: [BalanceDecisionRecord]
     @Query private var mirrorRecords: [MirrorDecisionRecord]
     @Query private var reminders: [SelfReminder]
+    @Query private var tomorrowItems: [TomorrowBoxItem]
     @State private var destructiveAction: DestructiveAction?
 
     private enum DestructiveAction: Identifiable {
         case history
         case reminders
+        case tomorrowBox
         case all
 
         var id: Self { self }
@@ -22,6 +24,7 @@ struct SettingsView: View {
             switch self {
             case .history: "Clear history?"
             case .reminders: "Clear reminders?"
+            case .tomorrowBox: "Clear Tomorrow Box?"
             case .all: "Reset all local data?"
             }
         }
@@ -30,7 +33,8 @@ struct SettingsView: View {
             switch self {
             case .history: "This removes saved checks and their reflections from this device."
             case .reminders: "This removes every reminder you wrote to your future self on this device."
-            case .all: "This clears checks, reminders, pending reflections, and local widget state from this device."
+            case .tomorrowBox: "This removes every pending item from Tomorrow Box on this device."
+            case .all: "This clears checks, reminders, Tomorrow Box items, pending reflections, and local widget state from this device."
             }
         }
     }
@@ -61,6 +65,7 @@ struct SettingsView: View {
                     LabeledContent("Saved balance boards", value: "\(balanceBoards.count)")
                     LabeledContent("Saved mirrors", value: "\(mirrorRecords.count)")
                     LabeledContent("Saved reminders", value: "\(reminders.count)")
+                    LabeledContent("Tomorrow Box items", value: "\(tomorrowItems.count)")
                     Button("Show onboarding again") {
                         appModel.hasSeenOnboarding = false
                     }
@@ -79,6 +84,9 @@ struct SettingsView: View {
                     }
                     Button("Clear reminders", role: .destructive) {
                         destructiveAction = .reminders
+                    }
+                    Button("Clear Tomorrow Box", role: .destructive) {
+                        destructiveAction = .tomorrowBox
                     }
                     Button("Reset all local data", role: .destructive) {
                         destructiveAction = .all
@@ -103,6 +111,8 @@ struct SettingsView: View {
                             appModel.clearHistory()
                         case .reminders:
                             appModel.clearReminders()
+                        case .tomorrowBox:
+                            appModel.clearTomorrowBox()
                         case .all:
                             appModel.resetLocalData()
                         }

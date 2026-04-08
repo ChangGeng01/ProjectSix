@@ -47,7 +47,7 @@ struct HomeView: View {
                         )
 
                         BeforeActionButton("Route this for me", isEnabled: !trimmedPrompt.isEmpty) {
-                            appModel.routeDecision(prompt: trimmedPrompt, entrySource: .app)
+                            _ = appModel.routeDecision(prompt: trimmedPrompt, entrySource: .app)
                             decisionPrompt = ""
                         }
                         .disabled(trimmedPrompt.isEmpty)
@@ -116,6 +116,20 @@ struct HomeView: View {
                                     Text("Your first judgment, balance board, or mirror will start building signal here.")
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+
+                        PanelCard {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Need distance, not denial?")
+                                    .font(.headline)
+                                Text("Move it into Tomorrow Box when the call matters, but not from peak blur.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+
+                                BeforeActionButton("Open Tomorrow Box", style: .secondary) {
+                                    appModel.selectedTab = 1
                                 }
                             }
                         }

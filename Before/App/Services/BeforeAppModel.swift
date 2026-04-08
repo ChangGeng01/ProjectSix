@@ -139,10 +139,17 @@ final class BeforeAppModel: ObservableObject {
 
         switch action {
         case .decideTomorrow:
+            let tomorrowItem = makeTomorrowBoxItem(
+                from: session,
+                result: result,
+                eventID: event.id
+            )
+            context.insert(tomorrowItem)
             await NotificationService.shared.scheduleTomorrowNotification(
                 eventID: event.id,
                 from: event.createdAt
             )
+            selectedTab = 1
         default:
             break
         }
@@ -180,6 +187,16 @@ final class BeforeAppModel: ObservableObject {
         activeBalanceSession = nil
     }
 
+    func moveBalanceBoardToTomorrow(_ session: BalanceBoardSession) {
+        guard let result = session.result else { return }
+
+        let context = modelContainer.mainContext
+        context.insert(makeTomorrowBoxItem(from: session, result: result))
+        try? context.save()
+        activeBalanceSession = nil
+        selectedTab = 1
+    }
+
     func saveMirrorWorkspace(_ session: MirrorWorkspaceSession) {
         guard let result = session.result else { return }
 
@@ -199,6 +216,54 @@ final class BeforeAppModel: ObservableObject {
         context.insert(record)
         try? context.save()
         activeMirrorSession = nil
+    }
+
+    func moveMirrorWorkspaceToTomorrow(_ session: MirrorWorkspaceSession) {
+        guard let result = session.result else { return }
+
+        let context = modelContainer.mainContext
+        context.insert(makeTomorrowBoxItem(from: session, result: result))
+        try? context.save()
+        activeMirrorSession = nil
+        selectedTab = 1
+    }
+
+    func reopenTomorrowBoxItem(_ item: TomorrowBoxItem) {
+        clearActiveDecisionFlows()
+
+        switch item.mode {
+        case .quick:
+            if let draft = item.draft {
+                activeQuickSession = draft.restoreQuickSession(entrySource: .app)
+            } else {
+                startQuickCheck(entrySource: .app, prompt: item.prompt)
+            }
+        case .balance:
+            if let draft = item.draft {
+                activeBalanceSession = draft.restoreBalanceSession(entrySource: .app)
+            } else {
+                startBalanceBoard(entrySource: .app, prompt: item.prompt)
+            }
+        case .mirror:
+            if let draft = item.draft {
+                activeMirrorSession = draft.restoreMirrorSession(entrySource: .app)
+            } else {
+                startMirrorWorkspace(entrySource: .app, prompt: item.prompt)
+            }
+        }
+
+        removeTomorrowBoxItem(item)
+        selectedTab = 0
+    }
+
+    func removeTomorrowBoxItem(_ item: TomorrowBoxItem) {
+        if let eventID = item.linkedCheckEventID {
+            NotificationService.shared.cancelTomorrowNotification(eventID: eventID)
+        }
+
+        let context = modelContainer.mainContext
+        context.delete(item)
+        try? context.save()
     }
 
     func submitReflection(
@@ -344,12 +409,24 @@ final class BeforeAppModel: ObservableObject {
         refreshWidgetSurfaces()
     }
 
+    func clearTomorrowBox() {
+        let context = modelContainer.mainContext
+        let descriptor = FetchDescriptor<TomorrowBoxItem>()
+        let items = (try? context.fetch(descriptor)) ?? []
+        items.compactMap(\.linkedCheckEventID).forEach {
+            NotificationService.shared.cancelTomorrowNotification(eventID: $0)
+        }
+        items.forEach { context.delete($0) }
+        try? context.save()
+    }
+
     func resetLocalData() {
         let context = modelContainer.mainContext
         deleteAll(CheckEvent.self, in: context)
         deleteAll(BalanceDecisionRecord.self, in: context)
         deleteAll(MirrorDecisionRecord.self, in: context)
         deleteAll(SelfReminder.self, in: context)
+        clearTomorrowBox()
 
         PendingLaunchRequestStore.clear()
         WidgetSnapshotStore.clear()
@@ -392,6 +469,55 @@ final class BeforeAppModel: ObservableObject {
     private func refreshWidgetSurfaces() {
         syncWidgetSnapshot()
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    private func makeTomorrowBoxItem(
+        from session: QuickCheckSession,
+        result: QuickCheckResult,
+        eventID: UUID? = nil
+    ) -> TomorrowBoxItem {
+        let prompt = trimmed(session.note)
+        let title = prompt.isEmpty ? "\(session.scenario.title) later" : prompt
+        return TomorrowBoxItem(
+            dueAt: NotificationService.nextTomorrowReminderDate(after: .now),
+            mode: .quick,
+            title: title,
+            detail: result.afterPerspective,
+            prompt: prompt,
+            entrySource: session.entrySource,
+            linkedCheckEventID: eventID,
+            draft: .quick(from: session)
+        )
+    }
+
+    private func makeTomorrowBoxItem(
+        from session: BalanceBoardSession,
+        result: BalanceBoardResult
+    ) -> TomorrowBoxItem {
+        TomorrowBoxItem(
+            dueAt: NotificationService.nextTomorrowReminderDate(after: .now),
+            mode: .balance,
+            title: trimmed(session.prompt),
+            detail: result.summary,
+            prompt: trimmed(session.prompt),
+            entrySource: session.entrySource,
+            draft: .balance(from: session)
+        )
+    }
+
+    private func makeTomorrowBoxItem(
+        from session: MirrorWorkspaceSession,
+        result: MirrorResult
+    ) -> TomorrowBoxItem {
+        TomorrowBoxItem(
+            dueAt: NotificationService.nextTomorrowReminderDate(after: .now),
+            mode: .mirror,
+            title: trimmed(session.prompt),
+            detail: result.coreTension,
+            prompt: trimmed(session.prompt),
+            entrySource: session.entrySource,
+            draft: .mirror(from: session)
+        )
     }
 
     private func resetTransientState() {

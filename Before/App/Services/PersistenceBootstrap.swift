@@ -11,7 +11,8 @@ struct PersistenceBootstrap {
                 for: CheckEvent.self,
                 SelfReminder.self,
                 BalanceDecisionRecord.self,
-                MirrorDecisionRecord.self
+                MirrorDecisionRecord.self,
+                TomorrowBoxItem.self
             )
             return PersistenceBootstrap(container: container, recoveryMessage: nil)
         } catch {
@@ -22,6 +23,7 @@ struct PersistenceBootstrap {
                 SelfReminder.self,
                 BalanceDecisionRecord.self,
                 MirrorDecisionRecord.self,
+                TomorrowBoxItem.self,
                 configurations: fallbackConfiguration
             ) else {
                 fatalError("Unable to create a fallback SwiftData container: \(error.localizedDescription)")

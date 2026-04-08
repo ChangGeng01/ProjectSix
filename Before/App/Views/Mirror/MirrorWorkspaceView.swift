@@ -90,7 +90,12 @@ struct MirrorWorkspaceView: View {
                                     dismiss()
                                 }
 
-                                BeforeActionButton("Keep editing", style: .secondary) {
+                                BeforeActionButton("Move this to tomorrow", style: .secondary) {
+                                    appModel.moveMirrorWorkspaceToTomorrow(session)
+                                    dismiss()
+                                }
+
+                                BeforeActionButton("Keep editing", style: .tertiary) {
                                     session.result = nil
                                 }
                             }

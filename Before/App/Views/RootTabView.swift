@@ -11,17 +11,23 @@ struct RootTabView: View {
                 }
                 .tag(0)
 
+            TomorrowBoxView()
+                .tabItem {
+                    Label("Box", systemImage: "tray")
+                }
+                .tag(1)
+
             HistoryView()
                 .tabItem {
                     Label("History", systemImage: "clock")
                 }
-                .tag(1)
+                .tag(2)
 
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "slider.horizontal.3")
                 }
-                .tag(2)
+                .tag(3)
         }
         .sheet(item: $appModel.activeQuickSession) { session in
             QuickCheckView(session: session)
