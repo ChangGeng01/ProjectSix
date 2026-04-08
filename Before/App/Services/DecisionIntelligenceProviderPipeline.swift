@@ -35,21 +35,33 @@ struct GemmaDecisionIntelligenceProvider: DecisionIntelligenceProviding {
         base: QuickCheckResult,
         input: QuickCheckInput
     ) async -> QuickCheckResult? {
-        await GemmaE4BIntelligenceService.refineQuickResult(base: base, input: input)
+        await GemmaE4BIntelligenceService.refineQuickResult(
+            base: base,
+            input: input,
+            backendPolicy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
+        )
     }
 
     func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput
     ) async -> BalanceBoardResult? {
-        await GemmaE4BIntelligenceService.refineBalanceResult(base: base, input: input)
+        await GemmaE4BIntelligenceService.refineBalanceResult(
+            base: base,
+            input: input,
+            backendPolicy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
+        )
     }
 
     func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput
     ) async -> MirrorResult? {
-        await GemmaE4BIntelligenceService.refineMirrorResult(base: base, input: input)
+        await GemmaE4BIntelligenceService.refineMirrorResult(
+            base: base,
+            input: input,
+            backendPolicy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
+        )
     }
 
     func pickReminder(
@@ -62,7 +74,8 @@ struct GemmaDecisionIntelligenceProvider: DecisionIntelligenceProviding {
             from: candidates,
             scenario: scenario,
             prompt: prompt,
-            mode: mode
+            mode: mode,
+            backendPolicy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
         )
     }
 }
@@ -590,13 +603,21 @@ enum DecisionIntelligenceProviderPipeline {
         active: DecisionModelProviderKind,
         allowFallbacks: Bool
     ) -> String {
+        let base: String
         if active == preferred {
-            return allowFallbacks
+            base = allowFallbacks
                 ? "Before used the preferred provider without needing a fallback."
                 : "Before used the pinned provider with fallback disabled."
+        } else {
+            base = "Before switched away from \(preferred.title) and used \(active.title) for this refinement."
         }
 
-        return "Before switched away from \(preferred.title) and used \(active.title) for this refinement."
+        guard active == .gemmaE4B else { return base }
+
+        let resolution = GemmaE4BIntelligenceService.backendResolution(
+            policy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
+        )
+        return "\(base) \(resolution.title): \(resolution.detail)"
     }
 
     private static func cachedDetail(

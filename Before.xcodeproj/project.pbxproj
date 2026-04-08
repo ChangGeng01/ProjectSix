@@ -156,6 +156,7 @@
 		C68A6B36A45AE8D6D6249813 /* CheckAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1CF4BDBA8776C1E59C9B45 /* CheckAction.swift */; };
 		CC15D4EE356A7EB095BD13DE /* BalanceBoardEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5476CF22FF1B67A4F1E4502 /* BalanceBoardEngineTests.swift */; };
 		CC5EF4FD96DC5D33D7F92A37 /* DecisionContinuationActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5658063272F3B6A6B04B0EFE /* DecisionContinuationActions.swift */; };
+		CC949CE298B88BBEB98D6583 /* InferenceBackendPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B45BDE0A0AC8F56688BBF51 /* InferenceBackendPolicy.swift */; };
 		CCAD0045602DBB2FD0D006B4 /* SectionHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61DB79FB9E3DC311CE85256 /* SectionHeader.swift */; };
 		CCB15F44F3F2C2C27384875B /* DecisionModeRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44CADF38945C264E4DE6F821 /* DecisionModeRouter.swift */; };
 		CE80525173BB79B9E09164E9 /* BalanceBoardEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB16610FFDAC0B269A585C1 /* BalanceBoardEngine.swift */; };
@@ -167,6 +168,7 @@
 		D95E6740672BA7080A66DF1D /* DecisionModeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25779E30F91D917702DC456 /* DecisionModeCard.swift */; };
 		D99FF9332959DCD349DD6FF6 /* DecisionRecordRestorationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438899EA716D6093E4500048 /* DecisionRecordRestorationTests.swift */; };
 		DC772636D1CBA8BC844DAF50 /* CheckRuleEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F454C1445FA6FD73087FAC8 /* CheckRuleEngine.swift */; };
+		DE34F729495D2206CCFAD372 /* InferenceBackendPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B45BDE0A0AC8F56688BBF51 /* InferenceBackendPolicy.swift */; };
 		E1BF6E00B7DCD9D76165024D /* SharedLifeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4E4A461F591B98157441D75 /* SharedLifeStore.swift */; };
 		E2D1DA742604121A137BEADE /* QuickBufferDuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28559294F554136C5D9334B2 /* QuickBufferDuration.swift */; };
 		E4D47F1ED5DEE11B4418D0B6 /* GemmaRuntimeLibraryCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B79BE5A0F0200FEEF6D90001 /* GemmaRuntimeLibraryCatalogTests.swift */; };
@@ -336,6 +338,7 @@
 		87503431F48B21095076A259 /* View+BeforeAccessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+BeforeAccessibility.swift"; sourceTree = "<group>"; };
 		8803C58B37023CB5C616CD7C /* DecisionMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionMode.swift; sourceTree = "<group>"; };
 		89976181A6C6D07117C3220F /* GemmaE4BIntelligenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GemmaE4BIntelligenceService.swift; sourceTree = "<group>"; };
+		8B45BDE0A0AC8F56688BBF51 /* InferenceBackendPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceBackendPolicy.swift; sourceTree = "<group>"; };
 		8B51E3D57D268624717EAA40 /* gemma-4-E4B-it.litertlm */ = {isa = PBXFileReference; path = "gemma-4-E4B-it.litertlm"; sourceTree = "<group>"; };
 		8C770A8A464D7D5BFFD53D19 /* BeforeWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeforeWidgetExtension.entitlements; sourceTree = "<group>"; };
 		8E450413459695751644CD73 /* DecisionIntelligenceResponseCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligenceResponseCache.swift; sourceTree = "<group>"; };
@@ -448,6 +451,7 @@
 				58C429E74F83380B3EB5DD21 /* CheckVerdict.swift */,
 				8803C58B37023CB5C616CD7C /* DecisionMode.swift */,
 				5263B35DEB9254806060CCA3 /* EntrySource.swift */,
+				8B45BDE0A0AC8F56688BBF51 /* InferenceBackendPolicy.swift */,
 				75B72D5126B9C441ACCC72B5 /* LetGoContext.swift */,
 				28559294F554136C5D9334B2 /* QuickBufferDuration.swift */,
 				AB8A05C41C31FF92FED7AB83 /* QuickCheckAnswers.swift */,
@@ -970,6 +974,7 @@
 				6B27C4A3750F2A7978B425D3 /* HistoryDetailView.swift in Sources */,
 				873075573792938B474AE0C9 /* HistoryView.swift in Sources */,
 				4748856CD39AAB0011CC84A1 /* HomeView.swift in Sources */,
+				CC949CE298B88BBEB98D6583 /* InferenceBackendPolicy.swift in Sources */,
 				61ABFAE2B9337149D8BF6BAB /* LaunchRequestResolver.swift in Sources */,
 				766027F5F2D5A2B69C5E84B4 /* LetGoContext.swift in Sources */,
 				4969D37725010235EDB286FC /* LetGoCopyLibrary.swift in Sources */,
@@ -1053,6 +1058,7 @@
 				EAFB12A3676EAF72B6BC9989 /* DecisionMode.swift in Sources */,
 				CCB15F44F3F2C2C27384875B /* DecisionModeRouter.swift in Sources */,
 				66D7DD242C25DB82A472CFAE /* EntrySource.swift in Sources */,
+				DE34F729495D2206CCFAD372 /* InferenceBackendPolicy.swift in Sources */,
 				97229440C03B71286BB0544A /* LaunchRequestResolver.swift in Sources */,
 				E79C33979E66AE0AAB611471 /* LetGoContext.swift in Sources */,
 				13AD02906D9AF2ECABC655C2 /* LetGoMotionDetector.swift in Sources */,

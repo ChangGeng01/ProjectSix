@@ -3,6 +3,9 @@ import Foundation
 struct DecisionTestingRuntimeSnapshot: Equatable, Sendable {
     let preferences: BeforePreferences
     let testingStubProfile: DecisionTestingStubProfile?
+    let inferenceBackendPolicy: InferenceBackendPolicy
+    let deviceCapabilities: DeviceCapabilitySnapshot
+    let gemmaBackendResolution: InferenceBackendResolution
     let runtimeStatus: DecisionModelRuntimeStatus
     let foundationStatus: DecisionModelProviderStatus
     let gemmaProviderStatus: DecisionModelProviderStatus
@@ -24,9 +27,14 @@ struct DecisionTestingEnvironmentOverride: Equatable, Sendable {
     var preferredProvider: DecisionModelProviderPreference?
     var allowFallbacks: Bool?
     var stubProfile: DecisionTestingStubProfile?
+    var inferenceBackendPolicy: InferenceBackendPolicy?
 
     var isEmpty: Bool {
-        intelligenceMode == nil && preferredProvider == nil && allowFallbacks == nil && stubProfile == nil
+        intelligenceMode == nil &&
+            preferredProvider == nil &&
+            allowFallbacks == nil &&
+            stubProfile == nil &&
+            inferenceBackendPolicy == nil
     }
 }
 
@@ -36,6 +44,7 @@ enum DecisionTestingInterface {
         static let preferredProvider = "BEFORE_TEST_MODEL_PROVIDER"
         static let allowFallbacks = "BEFORE_TEST_ALLOW_FALLBACKS"
         static let stubProfile = "BEFORE_TEST_MODEL_STUB_PROFILE"
+        static let inferenceBackend = "BEFORE_TEST_INFERENCE_BACKEND"
         static let skipOnboarding = "BEFORE_TEST_SKIP_ONBOARDING"
         static let cleanLaunch = "BEFORE_TEST_CLEAN_LAUNCH"
     }
@@ -64,6 +73,7 @@ enum DecisionTestingInterface {
         preferredProvider: DecisionModelProviderPreference? = nil,
         allowFallbacks: Bool? = nil,
         stubProfile: DecisionTestingStubProfile? = nil,
+        inferenceBackendPolicy: InferenceBackendPolicy? = nil,
         skipOnboarding: Bool = false,
         cleanLaunch: Bool = false
     ) -> [String: String] {
@@ -79,6 +89,9 @@ enum DecisionTestingInterface {
         }
         if let stubProfile {
             environment[EnvironmentKey.stubProfile] = stubProfile.rawValue
+        }
+        if let inferenceBackendPolicy {
+            environment[EnvironmentKey.inferenceBackend] = inferenceBackendPolicy.rawValue
         }
         if skipOnboarding {
             environment[EnvironmentKey.skipOnboarding] = "1"
@@ -109,10 +122,18 @@ enum DecisionTestingInterface {
             allowFallbacks: environment[EnvironmentKey.allowFallbacks]
                 .flatMap(parseBoolOverride(_:)),
             stubProfile: environment[EnvironmentKey.stubProfile]
-                .flatMap(DecisionTestingStubProfile.init(rawValue:))
+                .flatMap(DecisionTestingStubProfile.init(rawValue:)),
+            inferenceBackendPolicy: environment[EnvironmentKey.inferenceBackend]
+                .flatMap(InferenceBackendPolicy.init(rawValue:))
         )
 
         return override.isEmpty ? nil : override
+    }
+
+    static func effectiveInferenceBackendPolicy(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> InferenceBackendPolicy {
+        environmentOverride(environment: environment)?.inferenceBackendPolicy ?? .auto
     }
 
     static func effectivePreferences(
@@ -139,10 +160,20 @@ enum DecisionTestingInterface {
         preferences: BeforePreferences = effectivePreferences(),
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> DecisionTestingRuntimeSnapshot {
-        let stubProfile = environmentOverride(environment: environment)?.stubProfile
+        let override = environmentOverride(environment: environment)
+        let stubProfile = override?.stubProfile
+        let backendPolicy = override?.inferenceBackendPolicy ?? .auto
+        let deviceCapabilities = DeviceCapabilitySnapshot.current
+        let gemmaBackendResolution = GemmaE4BIntelligenceService.backendResolution(
+            policy: backendPolicy,
+            device: deviceCapabilities
+        )
         return DecisionTestingRuntimeSnapshot(
             preferences: preferences,
             testingStubProfile: stubProfile,
+            inferenceBackendPolicy: backendPolicy,
+            deviceCapabilities: deviceCapabilities,
+            gemmaBackendResolution: gemmaBackendResolution,
             runtimeStatus: DecisionIntelligenceCoordinator.runtimeStatus(
                 preferences: preferences,
                 testingStubProfile: stubProfile

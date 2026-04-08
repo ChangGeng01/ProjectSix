@@ -51,6 +51,8 @@ struct DecisionTestingInterfaceTests {
 
         #expect(snapshot.preferences == preferences)
         #expect(snapshot.testingStubProfile == nil)
+        #expect(snapshot.inferenceBackendPolicy == .auto)
+        #expect(snapshot.gemmaBackendResolution.policy == .auto)
         #expect(snapshot.runtimeStatus == DecisionIntelligenceCoordinator.runtimeStatus(
             preferences: preferences,
             testingStubProfile: nil
@@ -65,6 +67,7 @@ struct DecisionTestingInterfaceTests {
             preferredProvider: .gemmaE4B,
             allowFallbacks: false,
             stubProfile: .smoke,
+            inferenceBackendPolicy: .cpuOnly,
             skipOnboarding: true,
             cleanLaunch: true
         )
@@ -73,6 +76,7 @@ struct DecisionTestingInterfaceTests {
         #expect(environment[DecisionTestingInterface.EnvironmentKey.preferredProvider] == "gemmaE4B")
         #expect(environment[DecisionTestingInterface.EnvironmentKey.allowFallbacks] == "0")
         #expect(environment[DecisionTestingInterface.EnvironmentKey.stubProfile] == "smoke")
+        #expect(environment[DecisionTestingInterface.EnvironmentKey.inferenceBackend] == "cpuOnly")
         #expect(environment[DecisionTestingInterface.EnvironmentKey.skipOnboarding] == "1")
         #expect(environment[DecisionTestingInterface.EnvironmentKey.cleanLaunch] == "1")
     }
@@ -114,12 +118,30 @@ struct DecisionTestingInterfaceTests {
             intelligenceMode: .assistive,
             preferredProvider: .gemmaE4B,
             allowFallbacks: true,
-            stubProfile: .smoke
+            stubProfile: .smoke,
+            inferenceBackendPolicy: .metalPreferred
         )
 
         let override = DecisionTestingInterface.environmentOverride(environment: environment)
 
         #expect(override?.stubProfile == .smoke)
+        #expect(override?.inferenceBackendPolicy == .metalPreferred)
+    }
+
+    @Test
+    func effectiveInferenceBackendPolicyDefaultsToAuto() {
+        #expect(DecisionTestingInterface.effectiveInferenceBackendPolicy(environment: [:]) == .auto)
+    }
+
+    @Test
+    func effectiveInferenceBackendPolicyUsesEnvironmentOverride() {
+        let environment = DecisionTestingInterface.launchEnvironment(
+            inferenceBackendPolicy: .coreMLPreferred
+        )
+
+        #expect(
+            DecisionTestingInterface.effectiveInferenceBackendPolicy(environment: environment) == .coreMLPreferred
+        )
     }
 
     @Test

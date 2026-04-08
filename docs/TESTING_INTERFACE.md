@@ -24,6 +24,9 @@ The app reads these values at launch and folds them into the stored preferences 
 - `BEFORE_TEST_MODEL_STUB_PROFILE`
   - accepted values: `smoke`
   - when present, Before bypasses live model providers and uses a deterministic testing stub for refinement and reminder selection
+- `BEFORE_TEST_INFERENCE_BACKEND`
+  - accepted values: `auto`, `systemManaged`, `coreMLPreferred`, `metalPreferred`, `cpuOnly`
+  - when present, Before keeps the choice internal and test-only, but resolves Gemma runtime policy against the current device capabilities
 - `BEFORE_TEST_SKIP_ONBOARDING`
   - accepted truthy values: `1`, `true`, `yes`, `on`
   - when present, Before skips the onboarding gate for that launch only
@@ -41,6 +44,7 @@ let environment = DecisionTestingInterface.launchEnvironment(
     preferredProvider: .gemmaE4B,
     allowFallbacks: false,
     stubProfile: .smoke,
+    inferenceBackendPolicy: .cpuOnly,
     skipOnboarding: true,
     cleanLaunch: true
 )
@@ -66,6 +70,9 @@ This snapshot includes:
 
 - effective preferences
 - active testing stub profile, if one was injected
+- effective inference backend policy
+- current device capability snapshot
+- resolved Gemma backend path for the current environment
 - active runtime status
 - Apple Foundation Models availability
 - Gemma provider availability
@@ -89,3 +96,4 @@ Trace and replay access is `@MainActor`, matching the debug store’s threading 
 - Treat model provider switching as a testing and automation concern, not a normal settings concern.
 - Prefer the testing stub when UI tests or smoke tests need stable model output without depending on Gemma or Apple runtime availability.
 - Keep quick verdict ownership in the deterministic rules layer, even when assistive model refinement is enabled.
+- Treat CPU / Core ML / Metal choice as an internal runtime policy, not as a user-facing setting.

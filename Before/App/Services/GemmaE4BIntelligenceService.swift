@@ -23,6 +23,13 @@ enum GemmaE4BIntelligenceService {
         GemmaModelAssetCatalog.preferredAsset()
     }
 
+    static func backendResolution(
+        policy: InferenceBackendPolicy = DecisionTestingInterface.effectiveInferenceBackendPolicy(),
+        device: DeviceCapabilitySnapshot = .current
+    ) -> InferenceBackendResolution {
+        InferenceBackendResolver.resolve(policy: policy, device: device)
+    }
+
     static func bundleStatus(asset: GemmaModelAsset? = bundledModel) -> GemmaModelBundleStatus {
         guard let asset else {
             return GemmaModelBundleStatus(
@@ -82,27 +89,33 @@ enum GemmaE4BIntelligenceService {
     static func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        backendPolicy: InferenceBackendPolicy = DecisionTestingInterface.effectiveInferenceBackendPolicy(),
         runtime: any GemmaLocalRuntimeBridging = GemmaLocalRuntimeBridge.shared
     ) async -> QuickCheckResult? {
         guard bundleStatus().isReady else { return nil }
+        _ = backendResolution(policy: backendPolicy)
         return await runtime.refineQuickResult(base: base, input: input)
     }
 
     static func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        backendPolicy: InferenceBackendPolicy = DecisionTestingInterface.effectiveInferenceBackendPolicy(),
         runtime: any GemmaLocalRuntimeBridging = GemmaLocalRuntimeBridge.shared
     ) async -> BalanceBoardResult? {
         guard bundleStatus().isReady else { return nil }
+        _ = backendResolution(policy: backendPolicy)
         return await runtime.refineBalanceResult(base: base, input: input)
     }
 
     static func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        backendPolicy: InferenceBackendPolicy = DecisionTestingInterface.effectiveInferenceBackendPolicy(),
         runtime: any GemmaLocalRuntimeBridging = GemmaLocalRuntimeBridge.shared
     ) async -> MirrorResult? {
         guard bundleStatus().isReady else { return nil }
+        _ = backendResolution(policy: backendPolicy)
         return await runtime.refineMirrorResult(base: base, input: input)
     }
 
@@ -111,9 +124,11 @@ enum GemmaE4BIntelligenceService {
         scenario: ScenarioType,
         prompt: String,
         mode: DecisionMode?,
+        backendPolicy: InferenceBackendPolicy = DecisionTestingInterface.effectiveInferenceBackendPolicy(),
         runtime: any GemmaLocalRuntimeBridging = GemmaLocalRuntimeBridge.shared
     ) async -> ReminderSelectionCandidate? {
         guard bundleStatus().isReady else { return nil }
+        _ = backendResolution(policy: backendPolicy)
         return await runtime.pickReminder(
             from: candidates,
             scenario: scenario,

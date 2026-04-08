@@ -2,6 +2,35 @@ import XCTest
 @testable import Before
 
 final class GemmaE4BIntelligenceServiceTests: XCTestCase {
+    func testBackendResolutionDefaultsToCpuOnSimulatorLikeSnapshot() {
+        let resolution = GemmaE4BIntelligenceService.backendResolution(
+            policy: .auto,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: true,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: false
+            )
+        )
+
+        XCTAssertEqual(resolution.policy, .auto)
+        XCTAssertEqual(resolution.effectiveBackend, .cpu)
+        XCTAssertFalse(resolution.isHardwareAccelerated)
+    }
+
+    func testBackendResolutionPrefersCoreMLOnPhysicalDeviceSnapshot() {
+        let resolution = GemmaE4BIntelligenceService.backendResolution(
+            policy: .auto,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true
+            )
+        )
+
+        XCTAssertEqual(resolution.effectiveBackend, .coreML)
+        XCTAssertTrue(resolution.isHardwareAccelerated)
+    }
+
     func testProviderStatusTracksMissingBundleBeforeRuntime() {
         let status = GemmaE4BIntelligenceService.providerStatus(
             asset: nil,
