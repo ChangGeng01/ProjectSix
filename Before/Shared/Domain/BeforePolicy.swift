@@ -30,6 +30,10 @@ enum BeforePolicy {
         static let maxStoredReminders = 10
     }
 
+    enum Settings {
+        static let developerCenterUnlockTapCount = 7
+    }
+
     enum Notifications {
         static let tomorrowReminderHour = 9
         static let tomorrowReminderMinute = 0

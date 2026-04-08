@@ -10,7 +10,12 @@ struct SettingsView: View {
     @Query private var mirrorRecords: [MirrorDecisionRecord]
     @Query private var reminders: [SelfReminder]
     @Query private var tomorrowItems: [TomorrowBoxItem]
+    @AppStorage("before.developerCenterUnlocked") private var developerCenterUnlocked = false
     @State private var destructiveAction: DestructiveAction?
+    @State private var developerCenterTapCount = 0
+    @State private var isDeveloperCenterPresented = false
+
+    private let developerCenterAccessGate = DeveloperCenterAccessGate()
 
     private enum DestructiveAction: Identifiable {
         case history
@@ -73,63 +78,8 @@ struct SettingsView: View {
                     Text(appModel.preferences.onDeviceIntelligenceMode.subtitle)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-
-                    Picker("Preferred model", selection: preferredProviderBinding) {
-                        ForEach(DecisionModelProviderPreference.allCases) { provider in
-                            Text(provider.title).tag(provider)
-                        }
-                    }
-
-                    Text(appModel.preferences.preferredIntelligenceProvider.subtitle)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    Toggle("Allow automatic fallback", isOn: modelFallbackBinding)
-
-                    Text(
-                        appModel.preferences.allowModelFallbacks
-                        ? "If the selected model is unavailable, Before can fall back to another local provider before dropping to deterministic copy."
-                        : "If the selected model is unavailable, Before will skip other model providers and go straight to deterministic local copy."
-                    )
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                    LabeledContent("Active provider", value: appModel.intelligenceRuntimeStatus.active.title)
-
-                    Text(appModel.intelligenceRuntimeStatus.detail)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    LabeledContent("Gemma provider", value: appModel.gemmaModelStatus.title)
-
-                    Text(appModel.gemmaModelStatus.detail)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    LabeledContent("Gemma bundle", value: appModel.gemmaBundleStatus.title)
-
-                    Text(appModel.gemmaBundleStatus.detail)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    LabeledContent("Gemma runtime", value: appModel.gemmaRuntimeStatus.title)
-
-                    Text(appModel.gemmaRuntimeStatus.detail)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    if let gemmaAsset = appModel.gemmaBundledAsset {
-                        LabeledContent("Bundled asset", value: gemmaAsset.fileName)
-                        LabeledContent("Bundled size", value: gemmaAsset.displaySize)
-                    } else {
-                        Text("Expected bundle folder: Before/Resources/Models")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    LabeledContent("Apple model", value: appModel.foundationModelStatus.title)
-
-                    Text(appModel.foundationModelStatus.detail)
+                    LabeledContent("Current behavior", value: userFacingIntelligenceTitle)
+                    Text(userFacingIntelligenceDetail)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -140,15 +90,16 @@ struct SettingsView: View {
                     Label("App Intents ready for Shortcuts and Spotlight", systemImage: "bolt.horizontal.circle")
                 }
 
-                Section("Developer Center") {
-                    LabeledContent("Preferred provider", value: appModel.intelligenceRuntimeStatus.preferred.title)
-                    LabeledContent("Active provider", value: appModel.intelligenceRuntimeStatus.active.title)
-                    if let fallback = appModel.intelligenceRuntimeStatus.fallback {
-                        LabeledContent("Fallback provider", value: fallback.title)
+                Section("About") {
+                    Button(action: handleDeveloperCenterAccessTap) {
+                        LabeledContent("Version", value: appVersionLabel)
                     }
+                    .buttonStyle(.plain)
 
-                    Button("Preview Let Go finish-state") {
-                        appModel.presentDeveloperLetGoPreview()
+                    if developerCenterUnlocked {
+                        Button("Open Developer Center") {
+                            isDeveloperCenterPresented = true
+                        }
                     }
                 }
 
@@ -199,6 +150,10 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .background(BeforeBackground())
             .navigationTitle("Settings")
+            .sheet(isPresented: $isDeveloperCenterPresented) {
+                DeveloperCenterView()
+                    .environmentObject(appModel)
+            }
             .confirmationDialog(
                 destructiveAction?.title ?? "",
                 isPresented: Binding(
@@ -279,21 +234,50 @@ struct SettingsView: View {
         )
     }
 
-    private var preferredProviderBinding: Binding<DecisionModelProviderPreference> {
-        Binding(
-            get: { appModel.preferences.preferredIntelligenceProvider },
-            set: { newValue in
-                appModel.updatePreferences { $0.preferredIntelligenceProvider = newValue }
-            }
-        )
+    private var userFacingIntelligenceTitle: String {
+        if !appModel.preferences.onDeviceIntelligenceMode.isEnabled {
+            return "Deterministic local copy"
+        }
+
+        if appModel.intelligenceRuntimeStatus.active == .template {
+            return "Deterministic fallback"
+        }
+
+        return "Local assistive intelligence"
     }
 
-    private var modelFallbackBinding: Binding<Bool> {
-        Binding(
-            get: { appModel.preferences.allowModelFallbacks },
-            set: { newValue in
-                appModel.updatePreferences { $0.allowModelFallbacks = newValue }
-            }
-        )
+    private var userFacingIntelligenceDetail: String {
+        if !appModel.preferences.onDeviceIntelligenceMode.isEnabled {
+            return "Before is using the deterministic decision system only."
+        }
+
+        if appModel.intelligenceRuntimeStatus.active == .template {
+            return "Local intelligence is unavailable right now, so Before is using deterministic local copy instead."
+        }
+
+        return "Before is refining routes, summaries, and reminder recall locally on this device while keeping verdicts deterministic."
+    }
+
+    private var appVersionLabel: String {
+        let bundle = Bundle.main
+        let version = bundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = bundle.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "\(version) (\(build))"
+    }
+
+    private func handleDeveloperCenterAccessTap() {
+        switch developerCenterAccessGate.handleTap(
+            currentCount: developerCenterTapCount,
+            unlocked: developerCenterUnlocked
+        ) {
+        case .openExisting:
+            isDeveloperCenterPresented = true
+        case .unlocked:
+            developerCenterUnlocked = true
+            developerCenterTapCount = 0
+            isDeveloperCenterPresented = true
+        case .progress:
+            developerCenterTapCount += 1
+        }
     }
 }
