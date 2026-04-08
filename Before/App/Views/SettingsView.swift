@@ -90,9 +90,21 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
-                    LabeledContent("Gemma bundle", value: appModel.gemmaModelStatus.title)
+                    LabeledContent("Gemma provider", value: appModel.gemmaModelStatus.title)
 
                     Text(appModel.gemmaModelStatus.detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    LabeledContent("Gemma bundle", value: appModel.gemmaBundleStatus.title)
+
+                    Text(appModel.gemmaBundleStatus.detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    LabeledContent("Gemma runtime", value: appModel.gemmaRuntimeStatus.title)
+
+                    Text(appModel.gemmaRuntimeStatus.detail)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 

@@ -48,6 +48,14 @@ final class BeforeAppModel: ObservableObject {
         GemmaE4BIntelligenceService.availabilityStatus
     }
 
+    var gemmaBundleStatus: GemmaModelBundleStatus {
+        GemmaE4BIntelligenceService.modelBundleStatus
+    }
+
+    var gemmaRuntimeStatus: GemmaLocalRuntimeStatus {
+        GemmaE4BIntelligenceService.localRuntimeStatus
+    }
+
     var gemmaBundledAsset: GemmaModelAsset? {
         GemmaE4BIntelligenceService.bundledModel
     }
