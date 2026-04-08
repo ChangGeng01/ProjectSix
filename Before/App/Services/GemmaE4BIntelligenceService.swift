@@ -3,6 +3,17 @@ import Foundation
 enum GemmaE4BIntelligenceService {
     static var availabilityStatus: DecisionModelProviderStatus {
         if let asset = bundledModel {
+            if !asset.isComplete {
+                let expected = asset.expectedDisplaySize.map { " of \($0)" } ?? ""
+                let progress = asset.progressDescription.map { " (\($0))" } ?? ""
+                return DecisionModelProviderStatus(
+                    kind: .gemmaE4B,
+                    isAvailable: false,
+                    title: "Bundle incomplete",
+                    detail: "Found \(asset.fileName) at \(asset.displaySize)\(expected)\(progress), but the model asset is still downloading or incomplete."
+                )
+            }
+
             return DecisionModelProviderStatus(
                 kind: .gemmaE4B,
                 isAvailable: false,

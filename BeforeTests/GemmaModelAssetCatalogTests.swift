@@ -16,6 +16,20 @@ final class GemmaModelAssetCatalogTests: XCTestCase {
             ["gemma-4-E2B-it-int4.litertlm", "gemma-4-E4B-it-int4.litertlm"]
         )
         XCTAssertFalse(assets[0].displaySize.isEmpty)
+        XCTAssertTrue(assets.allSatisfy(\.isComplete))
+    }
+
+    func testKnownGemmaAssetReportsIncompleteWhileDownloading() {
+        let directory = temporaryDirectoryURL()
+        let urls = [
+            temporaryFileURL(in: directory, name: "gemma-4-E4B-it.litertlm", size: 500_000_000)
+        ]
+
+        let asset = try! XCTUnwrap(GemmaModelAssetCatalog.assets(from: urls).first)
+
+        XCTAssertFalse(asset.isComplete)
+        XCTAssertEqual(asset.expectedSizeBytes, 3_654_467_584)
+        XCTAssertEqual(asset.progressDescription, "13%")
     }
 
     private func temporaryDirectoryURL() -> URL {
