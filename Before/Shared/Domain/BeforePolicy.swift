@@ -18,6 +18,17 @@ enum BeforePolicy {
     enum Notifications {
         static let tomorrowReminderHour = 9
         static let tomorrowReminderMinute = 0
+
+        static func normalizedReminderDate(
+            after baseDate: Date,
+            calendar: Calendar = .autoupdatingCurrent
+        ) -> Date {
+            let tomorrow = calendar.date(byAdding: .day, value: 1, to: baseDate) ?? baseDate
+            var components = calendar.dateComponents([.year, .month, .day], from: tomorrow)
+            components.hour = tomorrowReminderHour
+            components.minute = tomorrowReminderMinute
+            return calendar.date(from: components) ?? tomorrow
+        }
     }
 
     enum LaunchRequests {

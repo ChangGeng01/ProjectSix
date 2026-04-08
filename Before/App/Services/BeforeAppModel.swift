@@ -356,6 +356,20 @@ final class BeforeAppModel: ObservableObject {
         try? context.save()
     }
 
+    func delayTomorrowBoxItem(_ item: TomorrowBoxItem, by delay: TomorrowBoxDelay) {
+        item.dueAt = delay.reschedule(from: item.dueAt > .now ? item.dueAt : .now)
+        try? modelContainer.mainContext.save()
+
+        if let eventID = item.linkedCheckEventID {
+            Task {
+                await NotificationService.shared.scheduleTomorrowNotification(
+                    eventID: eventID,
+                    at: item.dueAt
+                )
+            }
+        }
+    }
+
     func submitReflection(
         outcome: ReflectionOutcome,
         note: String,

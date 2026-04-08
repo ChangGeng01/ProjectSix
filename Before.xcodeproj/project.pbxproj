@@ -18,6 +18,7 @@
 		11F77E80EE0F2B45F51AE79E /* DecisionReviewEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE5ECF006D7648F3C667BF84 /* DecisionReviewEngineTests.swift */; };
 		167EC3CF0549AAFEED0A0940 /* DecisionModeRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44CADF38945C264E4DE6F821 /* DecisionModeRouter.swift */; };
 		1912360C43CECEE3A107BBE2 /* MirrorWorkspaceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70A414A2528AF11F510CD25 /* MirrorWorkspaceSession.swift */; };
+		19263068F7BD5DEF2A611842 /* TomorrowBoxDelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B506CA81E60C2268F94BB49 /* TomorrowBoxDelay.swift */; };
 		1B16408FE6065B5938D2C51C /* DecisionStarterLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D900CAAC9F53880921790B3 /* DecisionStarterLibrary.swift */; };
 		1C369C889014AD149DC50FD4 /* BeforePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DAB364E56E5EA8CCC7204F3 /* BeforePolicy.swift */; };
 		1C817A6C32A9FDB942853C9E /* ResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6E1FD7F02BE18A0F653DE4 /* ResultView.swift */; };
@@ -94,6 +95,7 @@
 		BC119E173C9725E0DD522AD7 /* GuidedInputCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0878363BE996C18206470FE0 /* GuidedInputCard.swift */; };
 		BD34C65E13DED107DB483BB7 /* BeforeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A6F46446EAB4BE1B81889BC /* BeforeApp.swift */; };
 		BDE7FDE600641BE0BC49A9A2 /* QuickCheckInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F68FB2BE9FA50C05DD3BB89 /* QuickCheckInput.swift */; };
+		BEF9FB6AD6634CB9001B3E8A /* TomorrowBoxDelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B506CA81E60C2268F94BB49 /* TomorrowBoxDelay.swift */; };
 		BF8749721BE6FDA0E6D26222 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF88B8304CF7F148F06C204 /* SettingsView.swift */; };
 		C46A50ABD5DCD6B7FC47FFE3 /* BeforeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7A4B71C9286A522BBDC902 /* BeforeWidget.swift */; };
 		C68A6B36A45AE8D6D6249813 /* CheckAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1CF4BDBA8776C1E59C9B45 /* CheckAction.swift */; };
@@ -120,6 +122,7 @@
 		F374442A214A8ADA30095D13 /* ActiveDecisionWorkspaceStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91300F510722B505F828AB0B /* ActiveDecisionWorkspaceStoreTests.swift */; };
 		F6130B346740F14D025CE845 /* PanelCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B421144DE1D5D71F3CFC70 /* PanelCard.swift */; };
 		F8234276CF94ACFD29BA7372 /* HomePromptActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63658AD94D911459300CDB15 /* HomePromptActionTests.swift */; };
+		F9E1151C7529383382623872 /* TomorrowBoxDelayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089FFE692CB2D08A060A21AC /* TomorrowBoxDelayTests.swift */; };
 		FF8818ABD3CE2840697F5DB9 /* QuickBufferDuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28559294F554136C5D9334B2 /* QuickBufferDuration.swift */; };
 /* End PBXBuildFile section */
 
@@ -158,6 +161,7 @@
 		01576E7A17B752C41D1A782C /* BeforeWidgetExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = BeforeWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		05412B6E47A277E56EC0236E /* StarterPromptRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarterPromptRow.swift; sourceTree = "<group>"; };
 		0878363BE996C18206470FE0 /* GuidedInputCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedInputCard.swift; sourceTree = "<group>"; };
+		089FFE692CB2D08A060A21AC /* TomorrowBoxDelayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxDelayTests.swift; sourceTree = "<group>"; };
 		0DAB364E56E5EA8CCC7204F3 /* BeforePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforePolicy.swift; sourceTree = "<group>"; };
 		0E0334A8565803EF7707BB38 /* PendingLaunchRequestStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingLaunchRequestStore.swift; sourceTree = "<group>"; };
 		12B18D0B36378C98DA6A44EA /* NotificationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationServiceTests.swift; sourceTree = "<group>"; };
@@ -191,6 +195,7 @@
 		572E58A5A6D0778DCAD31234 /* ReminderTemplateLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderTemplateLibraryTests.swift; sourceTree = "<group>"; };
 		58B8955E44D8F1A24CF2D10D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		58C429E74F83380B3EB5DD21 /* CheckVerdict.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckVerdict.swift; sourceTree = "<group>"; };
+		5B506CA81E60C2268F94BB49 /* TomorrowBoxDelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxDelay.swift; sourceTree = "<group>"; };
 		5CB33E572D887CB4574F01A2 /* CheckEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckEvent.swift; sourceTree = "<group>"; };
 		5DA7D45B4CAAA3B24DDA4B1F /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
 		5DF9D3F05358E50DCC11E2AF /* LaunchRequestResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchRequestResolverTests.swift; sourceTree = "<group>"; };
@@ -299,6 +304,7 @@
 				F1548E93121C0DEC8D3A983A /* ReflectionContext.swift */,
 				C94A031C4F195FB7A25E444F /* ReminderSourceType.swift */,
 				79FE2701FB38D185371AA573 /* ScenarioType.swift */,
+				5B506CA81E60C2268F94BB49 /* TomorrowBoxDelay.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -367,6 +373,7 @@
 				7152E91B0D3E0D96AA280B51 /* ReminderSelectionPolicyTests.swift */,
 				572E58A5A6D0778DCAD31234 /* ReminderTemplateLibraryTests.swift */,
 				D14BBBFC879A75D527348A3A /* SharedContainerTests.swift */,
+				089FFE692CB2D08A060A21AC /* TomorrowBoxDelayTests.swift */,
 				1D9B5A5DF817EBD959F0B018 /* TomorrowBoxDraftTests.swift */,
 				5E7431FC89A250D4D0C9BB0B /* WidgetSafeCopyTests.swift */,
 			);
@@ -701,6 +708,7 @@
 				BF8749721BE6FDA0E6D26222 /* SettingsView.swift in Sources */,
 				BB67511098C3741B7E832995 /* SharedContainer.swift in Sources */,
 				A6F69284943D1182E1B51CAF /* StarterPromptRow.swift in Sources */,
+				BEF9FB6AD6634CB9001B3E8A /* TomorrowBoxDelay.swift in Sources */,
 				514E8C0F9F44F8BAE2173DDB /* TomorrowBoxDraft.swift in Sources */,
 				91FCA41E7AC8B16CB8884144 /* TomorrowBoxItem.swift in Sources */,
 				25229166B79487699A5BE43C /* TomorrowBoxView.swift in Sources */,
@@ -737,6 +745,7 @@
 				D508BAC239303E3FE5A18318 /* ReminderTemplateLibrary.swift in Sources */,
 				AA8B9D1227CD427C509C62B4 /* ScenarioType.swift in Sources */,
 				CF27D67C84FD09BF673A2FDB /* SharedContainer.swift in Sources */,
+				19263068F7BD5DEF2A611842 /* TomorrowBoxDelay.swift in Sources */,
 				A1F804F13673E29E07AFAE94 /* WidgetSafeCopy.swift in Sources */,
 				9E036C4D8BB751D3930E0657 /* WidgetSnapshot.swift in Sources */,
 			);
@@ -764,6 +773,7 @@
 				E86301EA0C43918C3B37E1C6 /* ReminderSelectionPolicyTests.swift in Sources */,
 				3E057C871B016661F9EBC629 /* ReminderTemplateLibraryTests.swift in Sources */,
 				542CC720483001216062BDAF /* SharedContainerTests.swift in Sources */,
+				F9E1151C7529383382623872 /* TomorrowBoxDelayTests.swift in Sources */,
 				97C51D0659C57FEAD7D96D35 /* TomorrowBoxDraftTests.swift in Sources */,
 				5888AC82F3C7C85C034AB622 /* WidgetSafeCopyTests.swift in Sources */,
 			);
