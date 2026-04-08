@@ -1,7 +1,9 @@
+import SwiftData
 import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
+    @Query(sort: \TomorrowBoxItem.createdAt, order: .reverse) private var tomorrowItems: [TomorrowBoxItem]
     @State private var decisionPrompt = ""
 
     private let columns = [
@@ -146,6 +148,12 @@ struct HomeView: View {
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
 
+                                if tomorrowBoxCount > 0 {
+                                    Text("\(tomorrowBoxCount) \(tomorrowBoxCount == 1 ? "item is" : "items are") waiting for a clearer read.")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(BeforeTheme.ember)
+                                }
+
                                 BeforeActionButton("Open Tomorrow Box", style: .secondary) {
                                     appModel.selectedTab = .box
                                 }
@@ -159,6 +167,12 @@ struct HomeView: View {
                                 Text("Buddy keeps it personal. Shared Life keeps recurring household decisions from resetting every time.")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
+
+                                if supportPendingCount > 0 || sharedLifePendingCount > 0 {
+                                    Text("\(supportPendingCount) buddy \(supportPendingCount == 1 ? "thread" : "threads"), \(sharedLifePendingCount) shared \(sharedLifePendingCount == 1 ? "item" : "items") still active.")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(BeforeTheme.ember)
+                                }
 
                                 BeforeActionButton("Open Support Space", style: .secondary) {
                                     appModel.supportSurface = .buddy
@@ -197,6 +211,18 @@ struct HomeView: View {
             detail: routed.reason,
             isPinned: false
         )
+    }
+
+    private var tomorrowBoxCount: Int {
+        tomorrowItems.count
+    }
+
+    private var supportPendingCount: Int {
+        appModel.supportInbox.activeRequests.count
+    }
+
+    private var sharedLifePendingCount: Int {
+        appModel.sharedLifeStore.pendingItems.count
     }
 }
 

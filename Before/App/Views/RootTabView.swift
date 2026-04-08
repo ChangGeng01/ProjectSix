@@ -1,7 +1,9 @@
+import SwiftData
 import SwiftUI
 
 struct RootTabView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
+    @Query(sort: \TomorrowBoxItem.createdAt, order: .reverse) private var tomorrowItems: [TomorrowBoxItem]
 
     var body: some View {
         TabView(selection: $appModel.selectedTab) {
@@ -16,6 +18,7 @@ struct RootTabView: View {
                     Label("Box", systemImage: "tray")
                 }
                 .tag(AppTab.box)
+                .badge(tomorrowBoxBadge)
 
             SupportView()
                 .environmentObject(appModel.supportInbox)
@@ -24,6 +27,7 @@ struct RootTabView: View {
                     Label("Support", systemImage: "person.2")
                 }
                 .tag(AppTab.support)
+                .badge(supportBadge)
 
             HistoryView()
                 .tabItem {
@@ -79,5 +83,13 @@ struct RootTabView: View {
                 appModel.hasSeenOnboarding = true
             }
         }
+    }
+
+    private var tomorrowBoxBadge: Int {
+        tomorrowItems.count
+    }
+
+    private var supportBadge: Int {
+        appModel.supportInbox.activeRequests.count + appModel.sharedLifeStore.pendingItems.count
     }
 }
