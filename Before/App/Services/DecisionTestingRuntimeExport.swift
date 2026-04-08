@@ -71,6 +71,8 @@ struct DecisionTestingRuntimeExport {
             totalProviderAttempts: intelligenceTelemetry.totalProviderAttempts,
             cacheHitRate: intelligenceTelemetry.cacheHitRate,
             admissionSkipRate: intelligenceTelemetry.admissionSkipRate,
+            providerBypassRate: intelligenceTelemetry.providerBypassRate,
+            providerBypassRateByKind: intelligenceTelemetry.providerBypassRateByKind,
             deterministicFallbackRate: intelligenceTelemetry.deterministicFallbackRate,
             averageRequestDurationMs: intelligenceTelemetry.averageRequestDurationMs,
             averageRequestDurationMsByKind: intelligenceTelemetry.averageRequestDurationMsByKind,
@@ -78,7 +80,10 @@ struct DecisionTestingRuntimeExport {
             averageRequestDurationMsByGemmaBackend: intelligenceTelemetry.averageRequestDurationMsByGemmaBackend,
             averagePromptCharactersByKind: intelligenceTelemetry.averagePromptCharactersByKind,
             averagePrefixCharactersByKind: intelligenceTelemetry.averagePrefixCharactersByKind,
+            averageImmutablePrefixCharactersByKind: intelligenceTelemetry.averageImmutablePrefixCharactersByKind,
+            averageAdaptivePrefixCharactersByKind: intelligenceTelemetry.averageAdaptivePrefixCharactersByKind,
             averageSuffixCharactersByKind: intelligenceTelemetry.averageSuffixCharactersByKind,
+            averageStablePrefixShareByKind: intelligenceTelemetry.averageStablePrefixShareByKind,
             slowRequestRate: intelligenceTelemetry.slowRequestRate,
             slowRequestRateByKind: intelligenceTelemetry.slowRequestRateByKind,
             overTargetBudgetRate: intelligenceTelemetry.overTargetBudgetRate,
@@ -133,6 +138,8 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let totalProviderAttempts: Int
     let cacheHitRate: Double
     let admissionSkipRate: Double
+    let providerBypassRate: Double
+    let providerBypassRateByKind: [DecisionIntelligenceTraceKind: Double]
     let deterministicFallbackRate: Double
     let averageRequestDurationMs: Double
     let averageRequestDurationMsByKind: [DecisionIntelligenceTraceKind: Double]
@@ -140,7 +147,10 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let averageRequestDurationMsByGemmaBackend: [InferenceBackendKind: Double]
     let averagePromptCharactersByKind: [DecisionIntelligenceTraceKind: Double]
     let averagePrefixCharactersByKind: [DecisionIntelligenceTraceKind: Double]
+    let averageImmutablePrefixCharactersByKind: [DecisionIntelligenceTraceKind: Double]
+    let averageAdaptivePrefixCharactersByKind: [DecisionIntelligenceTraceKind: Double]
     let averageSuffixCharactersByKind: [DecisionIntelligenceTraceKind: Double]
+    let averageStablePrefixShareByKind: [DecisionIntelligenceTraceKind: Double]
     let slowRequestRate: Double
     let slowRequestRateByKind: [DecisionIntelligenceTraceKind: Double]
     let overTargetBudgetRate: Double

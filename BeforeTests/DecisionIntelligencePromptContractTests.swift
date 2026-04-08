@@ -42,6 +42,9 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(base: base, input: input)
 
         XCTAssertTrue(envelope.instructions.contains("language rendering layer"))
+        XCTAssertTrue(envelope.debugPrompt.contains("[IMMUTABLE PREFIX]"))
+        XCTAssertTrue(envelope.debugPrompt.contains("[ADAPTIVE PREFIX]"))
+        XCTAssertTrue(envelope.debugPrompt.contains("[VOLATILE SUFFIX]"))
         XCTAssertTrue(envelope.payload.contains("TASK_STATE_JSON:"))
         XCTAssertTrue(envelope.payload.contains("\"mode\":\"Quick\""))
         XCTAssertTrue(envelope.payload.contains("\"scenario\":\"\(input.scenario.title)\""))
@@ -51,6 +54,18 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertTrue(envelope.payload.contains("After perspective: \(base.afterPerspective)"))
         XCTAssertTrue(envelope.payload.contains("OUTPUT_GUARD:"))
         XCTAssertTrue(envelope.budget.isWithinTarget)
+        XCTAssertGreaterThan(envelope.budget.immutablePrefixCharacters, 0)
+        XCTAssertGreaterThan(envelope.budget.adaptivePrefixCharacters, 0)
+        XCTAssertEqual(
+            envelope.budget.prefixCharacters,
+            envelope.layers.stablePrefix.count
+        )
+        XCTAssertLessThanOrEqual(
+            envelope.budget.prefixCharacters - (
+                envelope.budget.immutablePrefixCharacters + envelope.budget.adaptivePrefixCharacters
+            ),
+            2
+        )
     }
 
     func testBalanceRefinementEnvelopeIncludesContextLifecycleWhenProvided() {
@@ -104,6 +119,8 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertTrue(envelope.payload.contains("\"signal\":\"constraintPressure\""))
         XCTAssertTrue(envelope.payload.contains("\"suppressed_behaviors\":[\"instant_verdict\"]"))
         XCTAssertTrue(envelope.budget.isWithinTarget)
+        XCTAssertGreaterThan(envelope.budget.stablePrefixShare, 0)
+        XCTAssertGreaterThan(envelope.budget.volatileSuffixShare, 0)
     }
 
     func testReminderSelectionEnvelopeClipsCandidatesAndUsesStructuredState() {

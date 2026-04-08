@@ -11,6 +11,7 @@ enum DecisionIntelligenceRequestOutcome: String, CaseIterable, Sendable {
 struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
     let requestCountByKind: [DecisionIntelligenceTraceKind: Int]
     let outcomeCount: [DecisionIntelligenceRequestOutcome: Int]
+    let outcomeCountByKind: [DecisionIntelligenceRequestOutcome: [DecisionIntelligenceTraceKind: Int]]
     let activeProviderCount: [DecisionModelProviderKind: Int]
     let attemptedProviderCount: [DecisionModelProviderKind: Int]
     let fallbackActivations: Int
@@ -23,6 +24,8 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
     let promptPressureCount: [DecisionIntelligencePromptPressure: Int]
     let promptCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int]
     let prefixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int]
+    let immutablePrefixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int]
+    let adaptivePrefixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int]
     let suffixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int]
     let overTargetBudgetCountByKind: [DecisionIntelligenceTraceKind: Int]
 
@@ -44,6 +47,13 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
     var admissionSkipRate: Double {
         rate(
             numerator: outcomeCount[.admissionSkipped] ?? 0,
+            denominator: totalRequests
+        )
+    }
+
+    var providerBypassRate: Double {
+        rate(
+            numerator: providerBypassCount,
             denominator: totalRequests
         )
     }
@@ -94,8 +104,51 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
         averageCharactersByKind(from: prefixCharactersTotalByKind)
     }
 
+    var averageImmutablePrefixCharactersByKind: [DecisionIntelligenceTraceKind: Double] {
+        averageCharactersByKind(from: immutablePrefixCharactersTotalByKind)
+    }
+
+    var averageAdaptivePrefixCharactersByKind: [DecisionIntelligenceTraceKind: Double] {
+        averageCharactersByKind(from: adaptivePrefixCharactersTotalByKind)
+    }
+
     var averageSuffixCharactersByKind: [DecisionIntelligenceTraceKind: Double] {
         averageCharactersByKind(from: suffixCharactersTotalByKind)
+    }
+
+    var averageStablePrefixShareByKind: [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: requestCountByKind.map { kind, count in
+                let totalPrompt = promptCharactersTotalByKind[kind] ?? 0
+                let totalPrefix = prefixCharactersTotalByKind[kind] ?? 0
+                let ratio = totalPrompt > 0 ? Double(totalPrefix) / Double(totalPrompt) : 0
+                return (kind, count > 0 ? ratio : 0)
+            }
+        )
+    }
+
+    var providerBypassRateByKind: [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: requestCountByKind.map { kind, count in
+                let bypass = providerBypassCountByKind[kind] ?? 0
+                return (kind, rate(numerator: bypass, denominator: count))
+            }
+        )
+    }
+
+    var providerBypassCount: Int {
+        providerBypassCountByKind.values.reduce(0, +)
+    }
+
+    private var providerBypassCountByKind: [DecisionIntelligenceTraceKind: Int] {
+        Dictionary(
+            uniqueKeysWithValues: requestCountByKind.keys.map { kind in
+                let templatePinned = outcomeCountForKind(.templatePinned, kind: kind)
+                let admissionSkipped = outcomeCountForKind(.admissionSkipped, kind: kind)
+                let cacheHit = outcomeCountForKind(.cacheHit, kind: kind)
+                return (kind, templatePinned + admissionSkipped + cacheHit)
+            }
+        )
     }
 
     var overTargetBudgetRate: Double {
@@ -147,6 +200,13 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
         guard count > 0 else { return 0 }
         return totals / Double(count)
     }
+
+    private func outcomeCountForKind(
+        _ outcome: DecisionIntelligenceRequestOutcome,
+        kind: DecisionIntelligenceTraceKind
+    ) -> Int {
+        outcomeCountByKind[outcome]?[kind] ?? 0
+    }
 }
 
 actor DecisionIntelligenceTelemetryStore {
@@ -154,6 +214,7 @@ actor DecisionIntelligenceTelemetryStore {
 
     private var requestCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
     private var outcomeCount: [DecisionIntelligenceRequestOutcome: Int] = [:]
+    private var outcomeCountByKind: [DecisionIntelligenceRequestOutcome: [DecisionIntelligenceTraceKind: Int]] = [:]
     private var activeProviderCount: [DecisionModelProviderKind: Int] = [:]
     private var attemptedProviderCount: [DecisionModelProviderKind: Int] = [:]
     private var fallbackActivations = 0
@@ -166,6 +227,8 @@ actor DecisionIntelligenceTelemetryStore {
     private var promptPressureCount: [DecisionIntelligencePromptPressure: Int] = [:]
     private var promptCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int] = [:]
     private var prefixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int] = [:]
+    private var immutablePrefixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int] = [:]
+    private var adaptivePrefixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int] = [:]
     private var suffixCharactersTotalByKind: [DecisionIntelligenceTraceKind: Int] = [:]
     private var overTargetBudgetCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
 
@@ -195,6 +258,9 @@ actor DecisionIntelligenceTelemetryStore {
     ) {
         requestCountByKind[kind, default: 0] += 1
         outcomeCount[outcome, default: 0] += 1
+        var countsForOutcome = outcomeCountByKind[outcome, default: [:]]
+        countsForOutcome[kind, default: 0] += 1
+        outcomeCountByKind[outcome] = countsForOutcome
         requestDurationTotalMsByKind[kind, default: 0] += durationMs
         if durationMs >= Self.slowRequestThresholdMs(for: kind) {
             slowRequestCountByKind[kind, default: 0] += 1
@@ -216,6 +282,8 @@ actor DecisionIntelligenceTelemetryStore {
         if let promptBudget {
             promptCharactersTotalByKind[kind, default: 0] += promptBudget.totalCharacters
             prefixCharactersTotalByKind[kind, default: 0] += promptBudget.prefixCharacters
+            immutablePrefixCharactersTotalByKind[kind, default: 0] += promptBudget.immutablePrefixCharacters
+            adaptivePrefixCharactersTotalByKind[kind, default: 0] += promptBudget.adaptivePrefixCharacters
             suffixCharactersTotalByKind[kind, default: 0] += promptBudget.suffixCharacters
             if !promptBudget.isWithinTarget {
                 overTargetBudgetCountByKind[kind, default: 0] += 1
@@ -239,6 +307,7 @@ actor DecisionIntelligenceTelemetryStore {
         DecisionIntelligenceTelemetrySnapshot(
             requestCountByKind: requestCountByKind,
             outcomeCount: outcomeCount,
+            outcomeCountByKind: outcomeCountByKind,
             activeProviderCount: activeProviderCount,
             attemptedProviderCount: attemptedProviderCount,
             fallbackActivations: fallbackActivations,
@@ -251,6 +320,8 @@ actor DecisionIntelligenceTelemetryStore {
             promptPressureCount: promptPressureCount,
             promptCharactersTotalByKind: promptCharactersTotalByKind,
             prefixCharactersTotalByKind: prefixCharactersTotalByKind,
+            immutablePrefixCharactersTotalByKind: immutablePrefixCharactersTotalByKind,
+            adaptivePrefixCharactersTotalByKind: adaptivePrefixCharactersTotalByKind,
             suffixCharactersTotalByKind: suffixCharactersTotalByKind,
             overTargetBudgetCountByKind: overTargetBudgetCountByKind
         )
@@ -271,7 +342,10 @@ actor DecisionIntelligenceTelemetryStore {
         promptPressureCount.removeAll()
         promptCharactersTotalByKind.removeAll()
         prefixCharactersTotalByKind.removeAll()
+        immutablePrefixCharactersTotalByKind.removeAll()
+        adaptivePrefixCharactersTotalByKind.removeAll()
         suffixCharactersTotalByKind.removeAll()
         overTargetBudgetCountByKind.removeAll()
+        outcomeCountByKind.removeAll()
     }
 }

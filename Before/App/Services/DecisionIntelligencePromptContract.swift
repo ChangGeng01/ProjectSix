@@ -38,6 +38,8 @@ enum DecisionIntelligencePromptContract {
         let targetCharacters: Int
         let prefixCharacters: Int
         let suffixCharacters: Int
+        let immutablePrefixCharacters: Int
+        let adaptivePrefixCharacters: Int
 
         var totalCharacters: Int {
             prefixCharacters + suffixCharacters
@@ -51,6 +53,51 @@ enum DecisionIntelligencePromptContract {
             guard targetCharacters > 0 else { return 0 }
             return Double(totalCharacters) / Double(targetCharacters)
         }
+
+        var stablePrefixShare: Double {
+            guard totalCharacters > 0 else { return 0 }
+            return Double(prefixCharacters) / Double(totalCharacters)
+        }
+
+        var volatileSuffixShare: Double {
+            guard totalCharacters > 0 else { return 0 }
+            return Double(suffixCharacters) / Double(totalCharacters)
+        }
+
+        init(
+            targetCharacters: Int,
+            prefixCharacters: Int,
+            suffixCharacters: Int,
+            immutablePrefixCharacters: Int? = nil,
+            adaptivePrefixCharacters: Int? = nil
+        ) {
+            self.targetCharacters = targetCharacters
+            self.prefixCharacters = prefixCharacters
+            self.suffixCharacters = suffixCharacters
+
+            let resolvedImmutable = immutablePrefixCharacters ?? prefixCharacters
+            let resolvedAdaptive = adaptivePrefixCharacters ?? max(0, prefixCharacters - resolvedImmutable)
+            self.immutablePrefixCharacters = resolvedImmutable
+            self.adaptivePrefixCharacters = resolvedAdaptive
+        }
+    }
+
+    struct PromptLayers: Equatable, Sendable {
+        let immutablePrefix: String
+        let adaptivePrefix: String
+        let volatileSuffix: String
+
+        var stablePrefix: String {
+            [immutablePrefix, adaptivePrefix]
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n\n")
+        }
+
+        var runtimePrompt: String {
+            [stablePrefix, volatileSuffix]
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n\n")
+        }
     }
 
     struct PromptEnvelope: Equatable, Sendable {
@@ -59,9 +106,10 @@ enum DecisionIntelligencePromptContract {
         let payload: String
         let debugPrompt: String
         let budget: ContextBudget
+        let layers: PromptLayers
 
         var runtimePrompt: String {
-            instructions + "\n\n" + payload
+            layers.runtimePrompt
         }
     }
 
@@ -111,6 +159,23 @@ enum DecisionIntelligencePromptContract {
             }
 
             return sharedPrelude + "\n" + modeInstructions
+        }
+
+        static func immutablePrefix(for kind: TaskKind) -> String {
+            sharedPrelude
+        }
+
+        static func adaptivePrefix(for kind: TaskKind) -> String {
+            switch kind {
+            case .quick:
+                quick
+            case .balance:
+                balance
+            case .mirror:
+                mirror
+            case .reminder:
+                reminder
+            }
         }
     }
 
@@ -329,7 +394,11 @@ enum DecisionIntelligencePromptContract {
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil
     ) -> PromptEnvelope {
-        let instructions = PrefixCache.instructions(for: kind)
+        let immutablePrefix = PrefixCache.immutablePrefix(for: kind)
+        let adaptivePrefix = PrefixCache.adaptivePrefix(for: kind)
+        let instructions = [immutablePrefix, adaptivePrefix]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
         var sections = [
             "TASK_STATE_JSON:",
             stateJSONString(state),
@@ -357,12 +426,20 @@ enum DecisionIntelligencePromptContract {
         ]
 
         let payload = sections.joined(separator: "\n")
+        let layers = PromptLayers(
+            immutablePrefix: immutablePrefix,
+            adaptivePrefix: adaptivePrefix,
+            volatileSuffix: payload
+        )
 
         let debugPrompt = [
-            "[PREFIX CACHE]",
-            instructions,
+            "[IMMUTABLE PREFIX]",
+            immutablePrefix,
             "",
-            "[SUFFIX CONTEXT]",
+            "[ADAPTIVE PREFIX]",
+            adaptivePrefix,
+            "",
+            "[VOLATILE SUFFIX]",
             payload
         ]
         .joined(separator: "\n")
@@ -375,8 +452,11 @@ enum DecisionIntelligencePromptContract {
             budget: ContextBudget(
                 targetCharacters: kind.targetCharacters,
                 prefixCharacters: instructions.count,
-                suffixCharacters: payload.count
-            )
+                suffixCharacters: payload.count,
+                immutablePrefixCharacters: immutablePrefix.count,
+                adaptivePrefixCharacters: adaptivePrefix.count
+            ),
+            layers: layers
         )
     }
 
