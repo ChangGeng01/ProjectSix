@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct HistoryView: View {
+    @EnvironmentObject private var appModel: BeforeAppModel
     @Query(sort: \CheckEvent.createdAt, order: .reverse) private var events: [CheckEvent]
     @Query(sort: \BalanceDecisionRecord.updatedAt, order: .reverse) private var balanceBoards: [BalanceDecisionRecord]
     @Query(sort: \MirrorDecisionRecord.updatedAt, order: .reverse) private var mirrorRecords: [MirrorDecisionRecord]
@@ -28,7 +29,7 @@ struct HistoryView: View {
                                 subtitle: "The useful part is not every entry. It is what keeps repeating."
                             )
 
-                            if !summaryCards.isEmpty {
+                            if appModel.preferences.showReviewInsights && !summaryCards.isEmpty {
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 14) {
                                         ForEach(summaryCards) { summary in
@@ -39,7 +40,7 @@ struct HistoryView: View {
                                 }
                             }
 
-                            if !insights.isEmpty {
+                            if appModel.preferences.showReviewInsights && !insights.isEmpty {
                                 VStack(spacing: 12) {
                                     ForEach(insights) { insight in
                                         insightCard(for: insight)

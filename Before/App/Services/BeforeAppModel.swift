@@ -17,6 +17,7 @@ final class BeforeAppModel: ObservableObject {
     @Published var activeMirrorSession: MirrorWorkspaceSession?
     @Published var reflectionContext: ReflectionContext?
     @Published var startupNotice: String?
+    @Published private(set) var preferences: BeforePreferences
     @AppStorage("before.hasSeenOnboarding") var hasSeenOnboarding = false
 
     let modelContainer: ModelContainer
@@ -26,6 +27,7 @@ final class BeforeAppModel: ObservableObject {
     init(modelContainer: ModelContainer, startupNotice: String? = nil) {
         self.modelContainer = modelContainer
         self.startupNotice = startupNotice
+        self.preferences = BeforePreferencesStore.load()
         restorePendingReflectionState()
     }
 
@@ -59,6 +61,35 @@ final class BeforeAppModel: ObservableObject {
         let route = DecisionModeRouter.route(prompt: prompt)
         startDecisionMode(route.mode, entrySource: entrySource, prompt: prompt)
         return route
+    }
+
+    func submitHomePrompt(_ prompt: String, entrySource: EntrySource) -> RoutedDecision {
+        switch preferences.homePromptAction {
+        case .autoRoute:
+            return routeDecision(prompt: prompt, entrySource: entrySource)
+        case .quick:
+            startQuickCheck(entrySource: entrySource, prompt: prompt)
+            return RoutedDecision(mode: .quick, reason: "Preferred quick judgment")
+        case .balance:
+            startBalanceBoard(entrySource: entrySource, prompt: prompt)
+            return RoutedDecision(mode: .balance, reason: "Preferred balance board")
+        case .mirror:
+            startMirrorWorkspace(entrySource: entrySource, prompt: prompt)
+            return RoutedDecision(mode: .mirror, reason: "Preferred mirror")
+        }
+    }
+
+    func updatePreferences(_ transform: (inout BeforePreferences) -> Void) {
+        var updated = preferences
+        transform(&updated)
+        preferences = updated
+        BeforePreferencesStore.save(updated)
+
+        if updated.restoreInProgressWorkspaces {
+            persistActiveWorkspaceState()
+        } else {
+            ActiveDecisionWorkspaceStore.clear()
+        }
     }
 
     func startQuickCheck(
@@ -579,6 +610,7 @@ final class BeforeAppModel: ObservableObject {
 
     private func restoreActiveWorkspaceIfNeeded() {
         guard
+            preferences.restoreInProgressWorkspaces,
             activeQuickSession == nil,
             activeBalanceSession == nil,
             activeMirrorSession == nil,

@@ -46,6 +46,17 @@ struct SettingsView: View {
                     Text("Before is a local decision system: quick calls get a stoplight, trade-offs get a balance board, heavier questions get a mirror.")
                 }
 
+                Section("Decision behavior") {
+                    Picker("Prompt action", selection: promptActionBinding) {
+                        ForEach(HomePromptAction.allCases) { action in
+                            Text(action.title).tag(action)
+                        }
+                    }
+
+                    Toggle("Restore in-progress workspaces", isOn: restoreWorkspacesBinding)
+                    Toggle("Show review insights", isOn: reviewInsightsBinding)
+                }
+
                 Section("System surfaces") {
                     Label("Widget-first entry", systemImage: "square.grid.2x2")
                     Label("Siri connected but not primary", systemImage: "waveform")
@@ -129,5 +140,32 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private var promptActionBinding: Binding<HomePromptAction> {
+        Binding(
+            get: { appModel.preferences.homePromptAction },
+            set: { newValue in
+                appModel.updatePreferences { $0.homePromptAction = newValue }
+            }
+        )
+    }
+
+    private var restoreWorkspacesBinding: Binding<Bool> {
+        Binding(
+            get: { appModel.preferences.restoreInProgressWorkspaces },
+            set: { newValue in
+                appModel.updatePreferences { $0.restoreInProgressWorkspaces = newValue }
+            }
+        )
+    }
+
+    private var reviewInsightsBinding: Binding<Bool> {
+        Binding(
+            get: { appModel.preferences.showReviewInsights },
+            set: { newValue in
+                appModel.updatePreferences { $0.showReviewInsights = newValue }
+            }
+        )
     }
 }

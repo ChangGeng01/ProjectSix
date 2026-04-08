@@ -46,8 +46,8 @@ struct HomeView: View {
                             text: $decisionPrompt
                         )
 
-                        BeforeActionButton("Route this for me", isEnabled: !trimmedPrompt.isEmpty) {
-                            _ = appModel.routeDecision(prompt: trimmedPrompt, entrySource: .app)
+                        BeforeActionButton(appModel.preferences.homePromptAction.buttonTitle, isEnabled: !trimmedPrompt.isEmpty) {
+                            _ = appModel.submitHomePrompt(trimmedPrompt, entrySource: .app)
                             decisionPrompt = ""
                         }
                         .disabled(trimmedPrompt.isEmpty)
