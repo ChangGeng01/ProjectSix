@@ -728,6 +728,10 @@ final class BeforeAppModel: ObservableObject {
         letGoContext = nil
     }
 
+    func presentDeveloperLetGoPreview() {
+        presentLetGo(LetGoCopyLibrary.developerPreviewContext())
+    }
+
     private func clearActiveDecisionFlows() {
         activeQuickSession = nil
         activeBalanceSession = nil

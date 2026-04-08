@@ -75,7 +75,8 @@ final class DecisionIntelligenceCoordinatorTests: XCTestCase {
             restoreInProgressWorkspaces: true,
             showReviewInsights: true,
             onDeviceIntelligenceMode: .assistive,
-            preferredIntelligenceProvider: .gemmaE4B
+            preferredIntelligenceProvider: .gemmaE4B,
+            allowModelFallbacks: true
         )
     }
 
@@ -86,7 +87,8 @@ final class DecisionIntelligenceCoordinatorTests: XCTestCase {
             restoreInProgressWorkspaces: true,
             showReviewInsights: true,
             onDeviceIntelligenceMode: .off,
-            preferredIntelligenceProvider: .gemmaE4B
+            preferredIntelligenceProvider: .gemmaE4B,
+            allowModelFallbacks: true
         )
     }
 

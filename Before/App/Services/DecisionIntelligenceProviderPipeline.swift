@@ -79,13 +79,20 @@ enum DecisionIntelligenceProviderPipeline {
     ]
 
     static func orderedKinds(
-        for preference: DecisionModelProviderPreference
+        for preference: DecisionModelProviderPreference,
+        allowFallbacks: Bool = true
     ) -> [DecisionModelProviderKind] {
+        if !allowFallbacks {
+            return [preference.kind]
+        }
+
         switch preference {
         case .gemmaE4B:
-            [.gemmaE4B, .foundationModels]
+            return [.gemmaE4B, .foundationModels]
         case .foundationModels:
-            [.foundationModels, .gemmaE4B]
+            return [.foundationModels, .gemmaE4B]
+        case .template:
+            return [.template]
         }
     }
 
@@ -93,7 +100,7 @@ enum DecisionIntelligenceProviderPipeline {
         preferences: BeforePreferences,
         statusesByKind: [DecisionModelProviderKind: DecisionModelProviderStatus] = defaultStatusesByKind()
     ) -> DecisionModelRuntimeStatus {
-        let preferred = preferredKind(for: preferences.preferredIntelligenceProvider)
+        let preferred = preferences.preferredIntelligenceProvider.kind
 
         guard preferences.onDeviceIntelligenceMode.isEnabled else {
             return DecisionModelRuntimeStatus(
@@ -104,7 +111,19 @@ enum DecisionIntelligenceProviderPipeline {
             )
         }
 
-        let orderedStatuses = orderedKinds(for: preferences.preferredIntelligenceProvider)
+        if preferred == .template {
+            return DecisionModelRuntimeStatus(
+                preferred: .template,
+                active: .template,
+                fallback: nil,
+                detail: "Deterministic local copy is pinned, so Before is not using a model provider for assistive refinement."
+            )
+        }
+
+        let orderedStatuses = orderedKinds(
+            for: preferences.preferredIntelligenceProvider,
+            allowFallbacks: preferences.allowModelFallbacks
+        )
             .compactMap { statusesByKind[$0] }
 
         if let active = orderedStatuses.first(where: \.isAvailable) {
@@ -124,6 +143,17 @@ enum DecisionIntelligenceProviderPipeline {
             )
         }
 
+        if !preferences.allowModelFallbacks {
+            let detail = "\(preferred.title) is not available. Automatic model fallback is off, so Before is using deterministic local copy instead."
+
+            return DecisionModelRuntimeStatus(
+                preferred: preferred,
+                active: .template,
+                fallback: .template,
+                detail: detail
+            )
+        }
+
         let fallbackSource = orderedStatuses.first(where: { !$0.isAvailable && $0.kind == preferred }) ?? orderedStatuses.first
         let detail = fallbackSource.map { "\(preferred.title) is not available. \($0.detail) Before is falling back to deterministic local copy." }
             ?? "No assistive provider is available. Before is falling back to deterministic local copy."
@@ -139,9 +169,12 @@ enum DecisionIntelligenceProviderPipeline {
     static func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
-        preference: DecisionModelProviderPreference
+        preference: DecisionModelProviderPreference,
+        allowFallbacks: Bool
     ) async -> QuickCheckResult? {
-        for provider in orderedProviders(for: preference) {
+        guard preference != .template else { return nil }
+
+        for provider in orderedProviders(for: preference, allowFallbacks: allowFallbacks) {
             if let refined = await provider.refineQuickResult(base: base, input: input) {
                 return refined
             }
@@ -153,9 +186,12 @@ enum DecisionIntelligenceProviderPipeline {
     static func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
-        preference: DecisionModelProviderPreference
+        preference: DecisionModelProviderPreference,
+        allowFallbacks: Bool
     ) async -> BalanceBoardResult? {
-        for provider in orderedProviders(for: preference) {
+        guard preference != .template else { return nil }
+
+        for provider in orderedProviders(for: preference, allowFallbacks: allowFallbacks) {
             if let refined = await provider.refineBalanceResult(base: base, input: input) {
                 return refined
             }
@@ -167,9 +203,12 @@ enum DecisionIntelligenceProviderPipeline {
     static func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
-        preference: DecisionModelProviderPreference
+        preference: DecisionModelProviderPreference,
+        allowFallbacks: Bool
     ) async -> MirrorResult? {
-        for provider in orderedProviders(for: preference) {
+        guard preference != .template else { return nil }
+
+        for provider in orderedProviders(for: preference, allowFallbacks: allowFallbacks) {
             if let refined = await provider.refineMirrorResult(base: base, input: input) {
                 return refined
             }
@@ -184,18 +223,10 @@ enum DecisionIntelligenceProviderPipeline {
         }
     }
 
-    private static func preferredKind(for preference: DecisionModelProviderPreference) -> DecisionModelProviderKind {
-        switch preference {
-        case .gemmaE4B:
-            .gemmaE4B
-        case .foundationModels:
-            .foundationModels
-        }
-    }
-
     private static func orderedProviders(
-        for preference: DecisionModelProviderPreference
+        for preference: DecisionModelProviderPreference,
+        allowFallbacks: Bool
     ) -> [any DecisionIntelligenceProviding] {
-        orderedKinds(for: preference).compactMap { providersByKind[$0] }
+        orderedKinds(for: preference, allowFallbacks: allowFallbacks).compactMap { providersByKind[$0] }
     }
 }

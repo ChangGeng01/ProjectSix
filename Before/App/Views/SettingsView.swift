@@ -84,6 +84,16 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
+                    Toggle("Allow automatic fallback", isOn: modelFallbackBinding)
+
+                    Text(
+                        appModel.preferences.allowModelFallbacks
+                        ? "If the selected model is unavailable, Before can fall back to another local provider before dropping to deterministic copy."
+                        : "If the selected model is unavailable, Before will skip other model providers and go straight to deterministic local copy."
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
                     LabeledContent("Active provider", value: appModel.intelligenceRuntimeStatus.active.title)
 
                     Text(appModel.intelligenceRuntimeStatus.detail)
@@ -128,6 +138,18 @@ struct SettingsView: View {
                     Label("Widget-first entry", systemImage: "square.grid.2x2")
                     Label("Siri connected but not primary", systemImage: "waveform")
                     Label("App Intents ready for Shortcuts and Spotlight", systemImage: "bolt.horizontal.circle")
+                }
+
+                Section("Developer Center") {
+                    LabeledContent("Preferred provider", value: appModel.intelligenceRuntimeStatus.preferred.title)
+                    LabeledContent("Active provider", value: appModel.intelligenceRuntimeStatus.active.title)
+                    if let fallback = appModel.intelligenceRuntimeStatus.fallback {
+                        LabeledContent("Fallback provider", value: fallback.title)
+                    }
+
+                    Button("Preview Let Go finish-state") {
+                        appModel.presentDeveloperLetGoPreview()
+                    }
                 }
 
                 Section("Notifications") {
@@ -262,6 +284,15 @@ struct SettingsView: View {
             get: { appModel.preferences.preferredIntelligenceProvider },
             set: { newValue in
                 appModel.updatePreferences { $0.preferredIntelligenceProvider = newValue }
+            }
+        )
+    }
+
+    private var modelFallbackBinding: Binding<Bool> {
+        Binding(
+            get: { appModel.preferences.allowModelFallbacks },
+            set: { newValue in
+                appModel.updatePreferences { $0.allowModelFallbacks = newValue }
             }
         )
     }

@@ -25,7 +25,8 @@ final class BeforePreferencesStoreTests: XCTestCase {
             restoreInProgressWorkspaces: false,
             showReviewInsights: false,
             onDeviceIntelligenceMode: .off,
-            preferredIntelligenceProvider: .foundationModels
+            preferredIntelligenceProvider: .foundationModels,
+            allowModelFallbacks: false
         )
 
         BeforePreferencesStore.save(preferences)
@@ -53,5 +54,6 @@ final class BeforePreferencesStoreTests: XCTestCase {
         XCTAssertEqual(loaded.showReviewInsights, true)
         XCTAssertEqual(loaded.onDeviceIntelligenceMode, .assistive)
         XCTAssertEqual(loaded.preferredIntelligenceProvider, .gemmaE4B)
+        XCTAssertEqual(loaded.allowModelFallbacks, true)
     }
 }

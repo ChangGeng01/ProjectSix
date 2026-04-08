@@ -85,7 +85,8 @@ enum DecisionIntelligenceCoordinator {
         return await DecisionIntelligenceProviderPipeline.refineQuickResult(
             base: base,
             input: input,
-            preference: preferences.preferredIntelligenceProvider
+            preference: preferences.preferredIntelligenceProvider,
+            allowFallbacks: preferences.allowModelFallbacks
         )
     }
 
@@ -98,7 +99,8 @@ enum DecisionIntelligenceCoordinator {
         return await DecisionIntelligenceProviderPipeline.refineBalanceResult(
             base: base,
             input: input,
-            preference: preferences.preferredIntelligenceProvider
+            preference: preferences.preferredIntelligenceProvider,
+            allowFallbacks: preferences.allowModelFallbacks
         )
     }
 
@@ -111,7 +113,8 @@ enum DecisionIntelligenceCoordinator {
         return await DecisionIntelligenceProviderPipeline.refineMirrorResult(
             base: base,
             input: input,
-            preference: preferences.preferredIntelligenceProvider
+            preference: preferences.preferredIntelligenceProvider,
+            allowFallbacks: preferences.allowModelFallbacks
         )
     }
 }

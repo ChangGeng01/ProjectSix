@@ -1,6 +1,27 @@
 import Foundation
 
 enum LetGoCopyLibrary {
+    static func developerPreviewContext(
+        primaryTarget: AppTab = .settings
+    ) -> LetGoContext {
+        LetGoContext(
+            mode: .quick,
+            eyebrow: "Developer preview",
+            title: "This is a Let Go preview.",
+            subtitle: "Use it to verify flick, long-press, reduce-motion, and finish-state behavior without changing real decision data.",
+            itemTitle: "Preview finish-state",
+            itemDetail: "No user data changes. No box move. No shared side effects.",
+            instructionTitle: "Flick or press and hold",
+            instructionDetail: "A short wrist flick or long press will run the same finish-state path.",
+            completionTitle: "Preview complete.",
+            completionSubtitle: "The finish-state flow behaved the same way a live decision handoff would.",
+            settledTitle: "Finish-state simulated",
+            settledDetail: "This was only a developer preview, so nothing changed in user memory.",
+            primaryActionTitle: "Back to settings",
+            primaryTarget: primaryTarget
+        )
+    }
+
     @MainActor
     static func quickStepAwayContext(
         for session: QuickCheckSession,

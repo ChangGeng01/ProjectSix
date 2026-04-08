@@ -30,6 +30,7 @@ enum OnDeviceIntelligenceMode: String, CaseIterable, Codable, Identifiable, Send
 enum DecisionModelProviderPreference: String, CaseIterable, Codable, Identifiable, Sendable {
     case gemmaE4B
     case foundationModels
+    case template
 
     var id: String { rawValue }
 
@@ -37,15 +38,26 @@ enum DecisionModelProviderPreference: String, CaseIterable, Codable, Identifiabl
         switch self {
         case .gemmaE4B: "Gemma 4 E4B"
         case .foundationModels: "Apple Foundation Model"
+        case .template: "Deterministic local copy"
         }
     }
 
     var subtitle: String {
         switch self {
         case .gemmaE4B:
-            "Prefer the bundled Gemma model first, then fall back to Apple or deterministic local copy if it is unavailable."
+            "Use the bundled Gemma model as the primary local intelligence provider."
         case .foundationModels:
-            "Prefer Apple Intelligence first, then fall back to Gemma or deterministic local copy."
+            "Use Apple Intelligence as the primary on-device language model when it is available."
+        case .template:
+            "Use the rule-based deterministic layer only, without any model refinement."
+        }
+    }
+
+    var kind: DecisionModelProviderKind {
+        switch self {
+        case .gemmaE4B: .gemmaE4B
+        case .foundationModels: .foundationModels
+        case .template: .template
         }
     }
 }
@@ -93,6 +105,7 @@ struct BeforePreferences: Codable, Equatable, Sendable {
     var showReviewInsights: Bool
     var onDeviceIntelligenceMode: OnDeviceIntelligenceMode
     var preferredIntelligenceProvider: DecisionModelProviderPreference
+    var allowModelFallbacks: Bool
 
     static let `default` = BeforePreferences(
         homePromptAction: .autoRoute,
@@ -100,7 +113,8 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         restoreInProgressWorkspaces: true,
         showReviewInsights: true,
         onDeviceIntelligenceMode: .assistive,
-        preferredIntelligenceProvider: .gemmaE4B
+        preferredIntelligenceProvider: .gemmaE4B,
+        allowModelFallbacks: true
     )
 
     private enum CodingKeys: String, CodingKey {
@@ -110,6 +124,7 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         case showReviewInsights
         case onDeviceIntelligenceMode
         case preferredIntelligenceProvider
+        case allowModelFallbacks
     }
 
     init(
@@ -118,7 +133,8 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         restoreInProgressWorkspaces: Bool,
         showReviewInsights: Bool,
         onDeviceIntelligenceMode: OnDeviceIntelligenceMode,
-        preferredIntelligenceProvider: DecisionModelProviderPreference
+        preferredIntelligenceProvider: DecisionModelProviderPreference,
+        allowModelFallbacks: Bool = true
     ) {
         self.homePromptAction = homePromptAction
         self.quickBufferDuration = quickBufferDuration
@@ -126,6 +142,7 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         self.showReviewInsights = showReviewInsights
         self.onDeviceIntelligenceMode = onDeviceIntelligenceMode
         self.preferredIntelligenceProvider = preferredIntelligenceProvider
+        self.allowModelFallbacks = allowModelFallbacks
     }
 
     init(from decoder: any Decoder) throws {
@@ -136,6 +153,7 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         self.showReviewInsights = try container.decodeIfPresent(Bool.self, forKey: .showReviewInsights) ?? BeforePreferences.default.showReviewInsights
         self.onDeviceIntelligenceMode = try container.decodeIfPresent(OnDeviceIntelligenceMode.self, forKey: .onDeviceIntelligenceMode) ?? BeforePreferences.default.onDeviceIntelligenceMode
         self.preferredIntelligenceProvider = try container.decodeIfPresent(DecisionModelProviderPreference.self, forKey: .preferredIntelligenceProvider) ?? BeforePreferences.default.preferredIntelligenceProvider
+        self.allowModelFallbacks = try container.decodeIfPresent(Bool.self, forKey: .allowModelFallbacks) ?? BeforePreferences.default.allowModelFallbacks
     }
 }
 
