@@ -17,6 +17,8 @@ enum BeforePolicy {
         static let directionalDominanceRatio = 1.15
         static let triggerCooldownInterval: TimeInterval = 0.9
         static let longPressDuration: TimeInterval = 0.55
+        static let pressFeedbackScale: CGFloat = 0.985
+        static let pressFeedbackAnimationDuration: TimeInterval = 0.12
         static let releaseAnimationDuration = 0.24
         static let completionTransitionDuration = 0.18
         static let releaseTravelDistance: CGFloat = 520

@@ -3,6 +3,7 @@ import UIKit
 
 struct LetGoView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var motionMonitor = LetGoMotionMonitor()
 
     let context: LetGoContext
@@ -12,6 +13,7 @@ struct LetGoView: View {
     @State private var cardRotation: Double = 0
     @State private var cardOpacity = 1.0
     @State private var cardScale: CGFloat = 1
+    @State private var isPressingCard = false
 
     var body: some View {
         ZStack {
@@ -80,9 +82,23 @@ struct LetGoView: View {
         .offset(x: cardOffset)
         .rotationEffect(.degrees(cardRotation))
         .opacity(cardOpacity)
-        .scaleEffect(cardScale)
+        .scaleEffect(cardScale * (isPressingCard && phase == .ready ? BeforePolicy.LetGo.pressFeedbackScale : 1))
         .contentShape(.rect)
-        .onLongPressGesture(minimumDuration: BeforePolicy.LetGo.longPressDuration) {
+        .onLongPressGesture(
+            minimumDuration: BeforePolicy.LetGo.longPressDuration,
+            maximumDistance: 24,
+            perform: {
+                triggerRelease(using: .press)
+            },
+            onPressingChanged: { pressing in
+                guard phase == .ready else { return }
+                withAnimation(.easeInOut(duration: BeforePolicy.LetGo.pressFeedbackAnimationDuration)) {
+                    isPressingCard = pressing
+                }
+            }
+        )
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: Text("Put it down")) {
             triggerRelease(using: .press)
         }
         .accessibilityHint("Flick the phone gently or press and hold this card to put the decision down.")
@@ -155,14 +171,20 @@ struct LetGoView: View {
         guard phase == .ready else { return }
 
         phase = .releasing
+        isPressingCard = false
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
         withAnimation(.easeInOut(duration: BeforePolicy.LetGo.releaseAnimationDuration)) {
             switch trigger {
             case .flick(let direction):
-                let sign: CGFloat = direction == .right ? 1 : -1
-                cardOffset = sign * BeforePolicy.LetGo.releaseTravelDistance
-                cardRotation = sign * BeforePolicy.LetGo.releaseRotationDegrees
+                if reduceMotion {
+                    cardOffset = 0
+                    cardRotation = 0
+                } else {
+                    let sign: CGFloat = direction == .right ? 1 : -1
+                    cardOffset = sign * BeforePolicy.LetGo.releaseTravelDistance
+                    cardRotation = sign * BeforePolicy.LetGo.releaseRotationDegrees
+                }
             case .press:
                 cardOffset = 0
                 cardRotation = 0
