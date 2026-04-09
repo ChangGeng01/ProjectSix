@@ -130,10 +130,7 @@ run_step "Launch, notification, reminder, and action tests" \
     -only-testing:BeforeTests/NotificationServiceTests \
     -only-testing:BeforeTests/ReminderSelectionPolicyTests \
     -only-testing:BeforeTests/ReminderTemplateLibraryTests \
-    -only-testing:BeforeTests/DecisionModeRouterTests
-
-run_step "Tomorrow box and support request domain tests" \
-  run_before_tests \
+    -only-testing:BeforeTests/DecisionModeRouterTests \
     -only-testing:BeforeTests/TomorrowBoxItemFactoryTests \
     -only-testing:BeforeTests/TomorrowBoxDelayTests \
     -only-testing:BeforeTests/SupportRequestFactoryTests \
