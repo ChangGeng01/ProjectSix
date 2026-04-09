@@ -280,6 +280,7 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         let strategy = DecisionAdaptiveTaskStrategy(
             kind: .quick,
             entropy: .low,
+            runtimeGear: .low,
             preferredProvider: .gemmaE4B,
             contextBudget: 220,
             retrievalMode: .off,
@@ -307,6 +308,7 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         XCTAssertEqual(latestTrace.kind, .quick)
         XCTAssertEqual(latestTrace.runtimeStrategy, strategy)
         XCTAssertEqual(latestTrace.promptBudget?.targetCharacters, 220)
+        XCTAssertTrue(latestTrace.prompt.contains("\"runtime_gear\":\"low\""))
         XCTAssertTrue(latestTrace.prompt.contains("\"response_language\":\"english\""))
     }
 

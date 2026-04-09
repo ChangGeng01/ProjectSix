@@ -310,6 +310,7 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         let strategy = DecisionAdaptiveTaskStrategy(
             kind: .quick,
             entropy: .low,
+            runtimeGear: .low,
             preferredProvider: .gemmaE4B,
             contextBudget: 220,
             retrievalMode: .off,
@@ -340,10 +341,12 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
 
         XCTAssertTrue(envelope.payload.contains("RUNTIME_STRATEGY_JSON:"))
         XCTAssertTrue(envelope.payload.contains("\"provider\":\"gemmaE4B\""))
+        XCTAssertTrue(envelope.payload.contains("\"runtime_gear\":\"low\""))
         XCTAssertTrue(envelope.payload.contains("\"output_mode\":\"guidedShort\""))
         XCTAssertTrue(envelope.payload.contains("\"tone\":\"briefWarm\""))
         XCTAssertTrue(envelope.payload.contains("\"response_language\":\"english\""))
         XCTAssertTrue(envelope.payload.contains("\"allows_model_invocation\":true"))
+        XCTAssertTrue(envelope.payload.contains("Stay in the low-gear lane: fast, brief, and low-cost."))
         XCTAssertTrue(envelope.payload.contains("Keep the rewrite short and guided, not expansive."))
         XCTAssertTrue(envelope.payload.contains("Keep the tone brief, calm, and warm."))
         XCTAssertTrue(envelope.payload.contains("Keep the user-facing output in English unless the structured format says otherwise."))

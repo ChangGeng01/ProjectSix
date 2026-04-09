@@ -61,6 +61,7 @@ final class GemmaLocalRuntimeBridgeTests: XCTestCase {
         let strategy = DecisionAdaptiveTaskStrategy(
             kind: .quick,
             entropy: .low,
+            runtimeGear: .low,
             preferredProvider: .gemmaE4B,
             contextBudget: 220,
             retrievalMode: .off,

@@ -396,6 +396,7 @@ struct DecisionTestingInterfaceTests {
             runtimeStrategy: DecisionAdaptiveTaskStrategy(
                 kind: .quick,
                 entropy: .low,
+                runtimeGear: .low,
                 preferredProvider: .gemmaE4B,
                 contextBudget: 220,
                 retrievalMode: .off,
@@ -495,6 +496,7 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.runtimeGear == export.runtimeSnapshot.executionProfile.adaptationMatrix.runtimeGear)
         #expect(export.summary.environmentClass == export.runtimeSnapshot.executionProfile.adaptationMatrix.environmentClass)
         #expect(export.summary.deviceClass == export.runtimeSnapshot.executionProfile.adaptationMatrix.deviceClass)
+        #expect(export.summary.runtimeGearByKind[.quick] == export.runtimeSnapshot.executionProfile.strategy(for: .quick).runtimeGear)
         #expect(export.summary.contextBudgetByKind[.quick] == export.runtimeSnapshot.executionProfile.strategy(for: .quick).contextBudget)
         #expect(export.summary.taskEntropyByKind[.mirror] == .high)
         #expect(export.summary.retrievalModeByKind[.mirror] == export.runtimeSnapshot.executionProfile.strategy(for: .mirror).retrievalMode)
@@ -503,6 +505,7 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.actionSpaceByKind[.quick] == export.runtimeSnapshot.executionProfile.strategy(for: .quick).actionSpace)
         #expect(export.summary.responseLanguageByKind[.quick] == export.runtimeSnapshot.executionProfile.strategy(for: .quick).responseLanguage)
         #expect(export.summary.effectivePreferredProviderByKind[.quick] == .gemmaE4B)
+        #expect(export.summary.effectiveRuntimeGearByKind[.quick] == .low)
         #expect(export.summary.effectiveContextBudgetByKind[.quick] == 220)
         #expect(export.summary.effectiveRetrievalModeByKind[.quick] == .off)
         #expect(export.summary.effectiveThinkingModeByKind[.quick] == .off)

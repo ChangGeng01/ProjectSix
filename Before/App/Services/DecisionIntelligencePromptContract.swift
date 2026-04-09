@@ -768,6 +768,7 @@ enum DecisionIntelligencePromptContract {
         let payload: [String: Any] = [
             "kind": strategy.kind.rawValue,
             "entropy": strategy.entropy.rawValue,
+            "runtime_gear": strategy.runtimeGear.rawValue,
             "provider": strategy.preferredProvider.rawValue,
             "context_budget": strategy.contextBudget,
             "retrieval_mode": strategy.retrievalMode.rawValue,
@@ -881,6 +882,15 @@ enum DecisionIntelligencePromptContract {
 
     private static func runtimeOutputGuard(for strategy: DecisionAdaptiveTaskStrategy) -> [String] {
         var lines: [String] = []
+
+        switch strategy.runtimeGear {
+        case .low:
+            lines.append("Stay in the low-gear lane: fast, brief, and low-cost.")
+        case .balanced:
+            lines.append("Stay in the balanced lane: concise, but allow enough depth to ground the answer.")
+        case .high:
+            lines.append("Use the high-gear lane only where deeper reflection materially improves clarity.")
+        }
 
         switch strategy.outputMode {
         case .deterministicTemplate:

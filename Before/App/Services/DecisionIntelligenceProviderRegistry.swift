@@ -865,10 +865,49 @@ enum DecisionIntelligenceTaskRouter {
             }
         }
 
+        switch strategy.runtimeGear {
+        case .low:
+            switch profile.latencyClass {
+            case .low: score += 24
+            case .medium: score += 8
+            case .high: score -= 36
+            }
+            switch profile.memoryClass {
+            case .low: score += 18
+            case .medium: score += 4
+            case .high: score -= 34
+            }
+            score += profile.supports(.lowLatency) ? 14 : -6
+            score += profile.supports(.lowMemory) ? 14 : -6
+        case .balanced:
+            switch profile.latencyClass {
+            case .low: score += 6
+            case .medium: score += 8
+            case .high: break
+            }
+            switch profile.memoryClass {
+            case .low: score += 4
+            case .medium: score += 6
+            case .high: break
+            }
+        case .high:
+            switch profile.latencyClass {
+            case .low: score += 2
+            case .medium: score += 6
+            case .high: score += 8
+            }
+            switch profile.memoryClass {
+            case .low: score -= 2
+            case .medium: score += 4
+            case .high: score += 8
+            }
+            score += profile.supports(.deepReflection) ? 12 : -6
+        }
+
         if profile.supports(responseLanguage: strategy.responseLanguage) {
             score += 12
         } else {
-            score -= 160
+            score -= 260
         }
 
         if strategy.actionSpace.contains("stay_brief") {

@@ -26,6 +26,8 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
         XCTAssertEqual(profile.adaptationMatrix.runtimeGear, .low)
         XCTAssertEqual(profile.adaptationMatrix.deviceClass, .memoryConstrainedPhone)
         XCTAssertEqual(profile.adaptationMatrix.languageMode, .english)
+        XCTAssertEqual(profile.strategy(for: .quick).runtimeGear, .low)
+        XCTAssertEqual(profile.strategy(for: .mirror).runtimeGear, .low)
         XCTAssertEqual(profile.strategy(for: .quick).preferredProvider, .template)
         XCTAssertEqual(profile.strategy(for: .mirror).outputMode, .deterministicTemplate)
         XCTAssertEqual(profile.strategy(for: .mirror).responseLanguage, .english)
@@ -55,6 +57,9 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
         XCTAssertTrue(profile.allowsReminderSelection)
         XCTAssertEqual(profile.adaptationMatrix.runtimeGear, .balanced)
         XCTAssertEqual(profile.adaptationMatrix.languageMode, .mixed)
+        XCTAssertEqual(profile.strategy(for: .quick).runtimeGear, .low)
+        XCTAssertEqual(profile.strategy(for: .balance).runtimeGear, .balanced)
+        XCTAssertEqual(profile.strategy(for: .mirror).runtimeGear, .balanced)
         XCTAssertEqual(profile.strategy(for: .quick).preferredProvider, .template)
         XCTAssertEqual(profile.strategy(for: .balance).preferredProvider, .gemmaE4B)
         XCTAssertEqual(profile.strategy(for: .mirror).retrievalMode, .filtered)
@@ -90,6 +95,8 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
         XCTAssertTrue(profile.allowsReminderSelection)
         XCTAssertEqual(profile.adaptationMatrix.runtimeGear, .balanced)
         XCTAssertEqual(profile.adaptationMatrix.languageMode, .chinese)
+        XCTAssertEqual(profile.strategy(for: .quick).runtimeGear, .low)
+        XCTAssertEqual(profile.strategy(for: .balance).runtimeGear, .balanced)
         XCTAssertEqual(profile.strategy(for: .quick).preferredProvider, .foundationModels)
         XCTAssertEqual(profile.strategy(for: .reminder).outputMode, .jsonShort)
         XCTAssertEqual(profile.strategy(for: .balance).thinkingMode, .off)
@@ -144,9 +151,62 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
         )
 
         XCTAssertLessThan(adapted.contextBudget, baseStrategy.contextBudget)
+        XCTAssertEqual(adapted.runtimeGear, .low)
         XCTAssertEqual(adapted.tone, .briefWarm)
         XCTAssertEqual(adapted.thinkingMode, .off)
         XCTAssertTrue(adapted.actionSpace.contains("stay_brief"))
+    }
+
+    func testAdaptiveStrategyCanUpshiftMirrorWorkWhenBoundarySignalIsStrong() {
+        let profile = DecisionIntelligenceExecutionProfileResolver.resolve(
+            preferences: assistivePreferences,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true,
+                physicalMemoryBytes: 8 * 1_073_741_824,
+                isLowPowerModeEnabled: false
+            ),
+            foundationStatus: unavailableFoundation,
+            gemmaStatus: availableGemma,
+            preferredLanguages: ["en-AU"]
+        )
+
+        let baseStrategy = profile.strategy(for: .mirror)
+        XCTAssertEqual(baseStrategy.runtimeGear, .high)
+
+        let adapted = baseStrategy.adapting(
+            neuralState: DecisionNeuralState(
+                mode: .mirror,
+                dominantActivations: [
+                    DecisionActivation(signal: .boundaryRisk, strength: 0.91)
+                ],
+                candidateActions: [],
+                suppressedBehaviors: [],
+                detail: "Strong boundary signal."
+            ),
+            brainState: DecisionBrainState(
+                profileCore: [],
+                activeGoals: ["Name the boundary clearly."],
+                relevantMemories: [],
+                sessionBiases: [],
+                retrievalTags: [],
+                reactionWeights: DecisionReactionWeights(
+                    briefLanguage: 0.3,
+                    warmDirectTone: 0.76,
+                    lowCognitiveLoad: 0.34,
+                    interruptiveActionBias: 0.2,
+                    boundaryNamingBias: 0.92,
+                    tradeoffClarityBias: 0.42
+                ),
+                loadedAt: .now
+            )
+        )
+
+        XCTAssertEqual(adapted.runtimeGear, .high)
+        XCTAssertEqual(adapted.thinkingMode, .gated)
+        XCTAssertTrue(adapted.actionSpace.contains("name_boundary"))
+        XCTAssertGreaterThanOrEqual(adapted.contextBudget, baseStrategy.contextBudget)
     }
 
     func testAdaptiveStrategyGuardsRetrievalWhenLifecycleIsStale() {

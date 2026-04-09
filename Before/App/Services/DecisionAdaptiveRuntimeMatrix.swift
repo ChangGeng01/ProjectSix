@@ -146,6 +146,7 @@ enum DecisionToneProfile: String, Equatable, Sendable {
 struct DecisionAdaptiveTaskStrategy: Equatable, Sendable {
     let kind: DecisionIntelligenceTraceKind
     let entropy: DecisionTaskEntropyClass
+    let runtimeGear: DecisionRuntimeGear
     let preferredProvider: DecisionModelProviderPreference
     let contextBudget: Int
     let retrievalMode: DecisionRetrievalMode
@@ -159,6 +160,7 @@ struct DecisionAdaptiveTaskStrategy: Equatable, Sendable {
     init(
         kind: DecisionIntelligenceTraceKind,
         entropy: DecisionTaskEntropyClass,
+        runtimeGear: DecisionRuntimeGear = .balanced,
         preferredProvider: DecisionModelProviderPreference,
         contextBudget: Int,
         retrievalMode: DecisionRetrievalMode,
@@ -171,6 +173,7 @@ struct DecisionAdaptiveTaskStrategy: Equatable, Sendable {
     ) {
         self.kind = kind
         self.entropy = entropy
+        self.runtimeGear = runtimeGear
         self.preferredProvider = preferredProvider
         self.contextBudget = contextBudget
         self.retrievalMode = retrievalMode
@@ -189,6 +192,7 @@ extension DecisionAdaptiveTaskStrategy {
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
     ) -> DecisionAdaptiveTaskStrategy {
+        var runtimeGear = runtimeGear
         var contextBudget = contextBudget
         var retrievalMode = retrievalMode
         var thinkingMode = thinkingMode
@@ -224,6 +228,7 @@ extension DecisionAdaptiveTaskStrategy {
         }) == true
 
         if briefBias >= 0.78 || fatigueSignal >= 0.68 || hasBriefSessionBias {
+            runtimeGear = .low
             let reduction: Int = switch kind {
             case .quick:
                 40
@@ -248,6 +253,7 @@ extension DecisionAdaptiveTaskStrategy {
             neuralState?.strength(for: .fatigue) ?? 0
         )
         if kind == .quick, interruptiveBias >= 0.82 {
+            runtimeGear = .low
             contextBudget = max(minimumBudget, contextBudget - 20)
             thinkingMode = .off
             tone = .briefWarm
@@ -263,10 +269,32 @@ extension DecisionAdaptiveTaskStrategy {
         if kind == .mirror, boundaryBias >= 0.78, !actionSpace.contains("name_boundary") {
             actionSpace.append("name_boundary")
         }
+        if kind == .mirror,
+           runtimeGear != .low,
+           boundaryBias >= 0.88,
+           fatigueSignal < 0.55,
+           briefBias < 0.72 {
+            runtimeGear = .high
+            contextBudget += 40
+            if thinkingMode == .off {
+                thinkingMode = .gated
+            }
+        }
 
         let tradeoffBias = brainState?.reactionWeights.tradeoffClarityBias ?? 0
         if kind == .balance, tradeoffBias >= 0.78, !actionSpace.contains("surface_priority") {
             actionSpace.append("surface_priority")
+        }
+        if kind == .balance,
+           runtimeGear == .balanced,
+           tradeoffBias >= 0.86,
+           fatigueSignal < 0.55,
+           briefBias < 0.72 {
+            runtimeGear = .high
+            contextBudget += 30
+            if thinkingMode == .off {
+                thinkingMode = .gated
+            }
         }
 
         let shouldGuardRetrieval =
@@ -295,6 +323,7 @@ extension DecisionAdaptiveTaskStrategy {
         return DecisionAdaptiveTaskStrategy(
             kind: kind,
             entropy: entropy,
+            runtimeGear: runtimeGear,
             preferredProvider: preferredProvider,
             contextBudget: contextBudget,
             retrievalMode: retrievalMode,
@@ -341,6 +370,7 @@ struct DecisionAdaptiveRuntimeMatrix: Equatable, Sendable {
         strategiesByKind[kind] ?? DecisionAdaptiveTaskStrategy(
             kind: kind,
             entropy: .medium,
+            runtimeGear: .low,
             preferredProvider: .template,
             contextBudget: 0,
             retrievalMode: .off,
@@ -447,14 +477,22 @@ enum DecisionAdaptiveRuntimeMatrixResolver {
             preference: preference
         )
         let allowsModelInvocation = preferredProvider != .template
+        let taskGear = taskGear(
+            for: kind,
+            runtimeGear: runtimeGear,
+            allowsModelInvocation: allowsModelInvocation,
+            environmentClass: environmentClass,
+            deviceClass: deviceClass
+        )
 
         return DecisionAdaptiveTaskStrategy(
             kind: kind,
             entropy: entropy(for: kind),
+            runtimeGear: taskGear,
             preferredProvider: preferredProvider,
             contextBudget: contextBudget(
                 for: kind,
-                gear: runtimeGear,
+                gear: taskGear,
                 allowsModelInvocation: allowsModelInvocation,
                 environmentClass: environmentClass,
                 deviceClass: deviceClass,
@@ -462,7 +500,7 @@ enum DecisionAdaptiveRuntimeMatrixResolver {
             ),
             retrievalMode: retrievalMode(
                 for: kind,
-                gear: runtimeGear,
+                gear: taskGear,
                 allowsModelInvocation: allowsModelInvocation,
                 environmentClass: environmentClass,
                 deviceClass: deviceClass,
@@ -470,7 +508,7 @@ enum DecisionAdaptiveRuntimeMatrixResolver {
             ),
             thinkingMode: thinkingMode(
                 for: kind,
-                gear: runtimeGear,
+                gear: taskGear,
                 allowsModelInvocation: allowsModelInvocation,
                 environmentClass: environmentClass,
                 deviceClass: deviceClass,
@@ -495,6 +533,46 @@ enum DecisionAdaptiveRuntimeMatrixResolver {
             responseLanguage: responseLanguage(for: languageMode),
             allowsModelInvocation: allowsModelInvocation
         )
+    }
+
+    private static func taskGear(
+        for kind: DecisionIntelligenceTraceKind,
+        runtimeGear: DecisionRuntimeGear,
+        allowsModelInvocation: Bool,
+        environmentClass: DecisionEnvironmentClass,
+        deviceClass: DecisionDevicePerformanceClass
+    ) -> DecisionRuntimeGear {
+        guard allowsModelInvocation else { return .low }
+
+        let baseGear: DecisionRuntimeGear = switch kind {
+        case .quick, .reminder:
+            .low
+        case .balance:
+            runtimeGear == .low ? .low : .balanced
+        case .mirror:
+            switch runtimeGear {
+            case .low:
+                .low
+            case .balanced:
+                .balanced
+            case .high:
+                .high
+            }
+        }
+
+        if environmentClass == .simulator || environmentClass == .lowPower {
+            return .low
+        }
+
+        if deviceClass == .memoryConstrainedPhone {
+            return baseGear == .high ? .balanced : baseGear
+        }
+
+        if deviceClass == .balancedPhone && baseGear == .high {
+            return .balanced
+        }
+
+        return baseGear
     }
 
     private static func providerPreference(

@@ -173,6 +173,7 @@ struct DecisionTestingRuntimeExport {
             deviceClass: adaptationMatrix.deviceClass,
             languageMode: adaptationMatrix.languageMode,
             taskEntropyByKind: strategyMap(\.entropy),
+            runtimeGearByKind: strategyMap(\.runtimeGear),
             preferredProviderByKind: strategyMap(\.preferredProvider),
             allowsModelInvocationByKind: strategyMap(\.allowsModelInvocation),
             contextBudgetByKind: strategyMap(\.contextBudget),
@@ -182,6 +183,7 @@ struct DecisionTestingRuntimeExport {
             toneByKind: strategyMap(\.tone),
             actionSpaceByKind: strategyMap(\.actionSpace),
             responseLanguageByKind: strategyMap(\.responseLanguage),
+            effectiveRuntimeGearByKind: effectiveStrategyMap(\.runtimeGear),
             effectivePreferredProviderByKind: effectiveStrategyMap(\.preferredProvider),
             effectiveContextBudgetByKind: effectiveStrategyMap(\.contextBudget),
             effectiveRetrievalModeByKind: effectiveStrategyMap(\.retrievalMode),
@@ -565,6 +567,7 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let deviceClass: DecisionDevicePerformanceClass
     let languageMode: DecisionLanguageMode
     let taskEntropyByKind: [DecisionIntelligenceTraceKind: DecisionTaskEntropyClass]
+    let runtimeGearByKind: [DecisionIntelligenceTraceKind: DecisionRuntimeGear]
     let preferredProviderByKind: [DecisionIntelligenceTraceKind: DecisionModelProviderPreference]
     let allowsModelInvocationByKind: [DecisionIntelligenceTraceKind: Bool]
     let contextBudgetByKind: [DecisionIntelligenceTraceKind: Int]
@@ -574,6 +577,7 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let toneByKind: [DecisionIntelligenceTraceKind: DecisionToneProfile]
     let actionSpaceByKind: [DecisionIntelligenceTraceKind: [String]]
     let responseLanguageByKind: [DecisionIntelligenceTraceKind: DecisionAdaptiveResponseLanguage]
+    let effectiveRuntimeGearByKind: [DecisionIntelligenceTraceKind: DecisionRuntimeGear]
     let effectivePreferredProviderByKind: [DecisionIntelligenceTraceKind: DecisionModelProviderPreference]
     let effectiveContextBudgetByKind: [DecisionIntelligenceTraceKind: Int]
     let effectiveRetrievalModeByKind: [DecisionIntelligenceTraceKind: DecisionRetrievalMode]

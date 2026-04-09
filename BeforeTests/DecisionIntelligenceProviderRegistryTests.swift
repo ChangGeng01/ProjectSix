@@ -152,6 +152,7 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
         let strategy = DecisionAdaptiveTaskStrategy(
             kind: .quick,
             entropy: .low,
+            runtimeGear: .low,
             preferredProvider: .openModel,
             contextBudget: 220,
             retrievalMode: .off,
@@ -228,6 +229,7 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
         let strategy = DecisionAdaptiveTaskStrategy(
             kind: .mirror,
             entropy: .high,
+            runtimeGear: .high,
             preferredProvider: .foundationModels,
             contextBudget: 540,
             retrievalMode: .adaptive,
@@ -248,6 +250,83 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
         )
 
         XCTAssertEqual(ordered.first, .gemmaE4B)
+    }
+
+    func testTaskRouterCanUseLowGearStrategyToPromoteLowLatencyProviderForBalance() {
+        let registry = DecisionIntelligenceProviderRegistry(
+            providersByKind: [:],
+            descriptorsByKind: [
+                .foundationModels: DecisionModelProviderDescriptor(
+                    kind: .foundationModels,
+                    title: "Foundation",
+                    detail: "Fast runtime.",
+                    track: .builtInSystem,
+                    openModel: nil,
+                    taskAffinities: [
+                        .balance: 84
+                    ],
+                    capabilityProfile: DecisionModelCapabilityProfile(
+                        modelID: "apple/foundation",
+                        strengths: [.shortDialogue, .structuredOutput, .lowLatency, .lowMemory],
+                        weaknesses: [.deepReflection],
+                        latencyClass: .low,
+                        memoryClass: .low,
+                        supportedResponseLanguages: [.english, .mixed],
+                        supportsThinking: false,
+                        supportsStructuredOutput: true,
+                        supportsToolUse: true,
+                        bestFor: [.quick, .balance]
+                    )
+                ),
+                .gemmaE4B: DecisionModelProviderDescriptor(
+                    kind: .gemmaE4B,
+                    title: "Gemma",
+                    detail: "Reflective runtime.",
+                    track: .builtInOpenModel,
+                    openModel: nil,
+                    taskAffinities: [
+                        .balance: 96
+                    ],
+                    capabilityProfile: DecisionModelCapabilityProfile(
+                        modelID: "google/gemma",
+                        strengths: [.structuredOutput, .deepReflection, .retrievalGrounding],
+                        weaknesses: [],
+                        latencyClass: .high,
+                        memoryClass: .high,
+                        supportedResponseLanguages: [.english, .mixed],
+                        supportsThinking: true,
+                        supportsStructuredOutput: true,
+                        supportsToolUse: true,
+                        bestFor: [.balance, .mirror]
+                    )
+                )
+            ]
+        )
+
+        let strategy = DecisionAdaptiveTaskStrategy(
+            kind: .balance,
+            entropy: .medium,
+            runtimeGear: .low,
+            preferredProvider: .gemmaE4B,
+            contextBudget: 260,
+            retrievalMode: .filtered,
+            thinkingMode: .off,
+            outputMode: .structuredBoard,
+            tone: .briefWarm,
+            actionSpace: ["surface_priority", "save_state"],
+            responseLanguage: .english,
+            allowsModelInvocation: true
+        )
+
+        let ordered = DecisionIntelligenceTaskRouter.orderedKinds(
+            for: .balance,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            registry: registry,
+            strategy: strategy
+        )
+
+        XCTAssertEqual(ordered.first, .foundationModels)
     }
 
     func testCapabilityProfileTreatsBilingualSupportAsMixedLanguageReady() {
