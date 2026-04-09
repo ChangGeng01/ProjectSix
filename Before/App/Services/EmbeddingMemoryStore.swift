@@ -119,7 +119,12 @@ enum EmbeddingMemoryStore {
                     tier: $0.tier
                 )
             }
-            .sorted { $0.score > $1.score }
+            .sorted {
+                if $0.score == $1.score {
+                    return $0.id < $1.id
+                }
+                return $0.score > $1.score
+            }
             .prefix(limit)
             .map { $0 }
     }

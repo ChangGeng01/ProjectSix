@@ -20,10 +20,11 @@ The full `200`-standard apex library lives at:
 
 - [QUALITY_GATE_200.md](/Users/changgeng/Project/Project06/Project06/docs/QUALITY_GATE_200.md)
 - [QUALITY_GATE_DOUBLE.md](/Users/changgeng/Project/Project06/Project06/docs/QUALITY_GATE_DOUBLE.md)
+- [QUALITY_GATE_EXTREME.md](/Users/changgeng/Project/Project06/Project06/docs/QUALITY_GATE_EXTREME.md)
 
 That document defines the long-range operating-system-grade standard. The runnable gate should evolve by sampling more of that library over time, not by inventing a fresh bar on each iteration.
 
-The `double-difficulty` runnable companion lives in `QUALITY_GATE_DOUBLE.md` and is meant to pressure the same system twice instead of trusting one green run.
+The `double-difficulty` runnable companion lives in `QUALITY_GATE_DOUBLE.md` and is meant to pressure the same system twice instead of trusting one green run. The `extreme` gate then adds a third-pass soak plus repeated high-risk subsets for determinism and fatigue resistance.
 
 ## 20-Point Standard
 

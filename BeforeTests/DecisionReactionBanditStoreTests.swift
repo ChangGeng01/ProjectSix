@@ -164,6 +164,77 @@ final class DecisionReactionBanditStoreTests: XCTestCase {
         XCTAssertEqual(first.first, "brief_warm_nudge")
     }
 
+    func testBanditBucketsStayIsolatedAcrossLanguageBuckets() {
+        let now = localDate(year: 2026, month: 4, day: 10, hour: 20, minute: 0)
+
+        for _ in 0..<3 {
+            DecisionReactionBanditStore.update(
+                mode: .mirror,
+                riskLevel: .medium,
+                languageMode: .english,
+                chosenArmID: "reflective_question",
+                reward: true,
+                now: now
+            )
+            DecisionReactionBanditStore.update(
+                mode: .mirror,
+                riskLevel: .medium,
+                languageMode: .chinese,
+                chosenArmID: "slow_delay_guard",
+                reward: true,
+                now: now
+            )
+        }
+
+        let english = DecisionReactionBanditStore.recommendedArmIDs(
+            mode: .mirror,
+            riskLevel: .medium,
+            languageMode: .english,
+            now: now
+        )
+        let chinese = DecisionReactionBanditStore.recommendedArmIDs(
+            mode: .mirror,
+            riskLevel: .medium,
+            languageMode: .chinese,
+            now: now
+        )
+
+        XCTAssertEqual(english.first, "reflective_question")
+        XCTAssertEqual(chinese.first, "slow_delay_guard")
+    }
+
+    func testBanditTieScoresSortLexicographicallyAfterPersistence() {
+        let now = localDate(year: 2026, month: 4, day: 10, hour: 16, minute: 30)
+
+        for _ in 0..<2 {
+            DecisionReactionBanditStore.update(
+                mode: .balance,
+                riskLevel: .medium,
+                languageMode: .english,
+                chosenArmID: "brief_warm_nudge",
+                reward: true,
+                now: now
+            )
+            DecisionReactionBanditStore.update(
+                mode: .balance,
+                riskLevel: .medium,
+                languageMode: .english,
+                chosenArmID: "reflective_question",
+                reward: true,
+                now: now
+            )
+        }
+
+        let ranked = DecisionReactionBanditStore.recommendedArmIDs(
+            mode: .balance,
+            riskLevel: .medium,
+            languageMode: .english,
+            now: now
+        )
+
+        XCTAssertEqual(Array(ranked.prefix(2)), ["brief_warm_nudge", "reflective_question"])
+    }
+
     private func localDate(year: Int, month: Int, day: Int, hour: Int, minute: Int) -> Date {
         var components = DateComponents()
         components.calendar = Calendar.autoupdatingCurrent

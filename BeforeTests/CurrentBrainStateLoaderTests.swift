@@ -154,6 +154,43 @@ final class CurrentBrainStateLoaderTests: XCTestCase {
     }
 
     @MainActor
+    func testRepeatedBootstrapsDoNotDuplicateTemplatesFailurePatternsOrOverflowUpdateCap() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        seedQuickHistory(into: context)
+        seedNightFailure(into: context, at: localDate(year: 2026, month: 4, day: 9, hour: 22, minute: 10))
+        seedNightFailure(into: context, at: localDate(year: 2026, month: 4, day: 9, hour: 23, minute: 20))
+        try context.save()
+
+        let baseDate = localDate(year: 2026, month: 4, day: 10, hour: 23, minute: 0)
+
+        for offset in 0..<85 {
+            let now = baseDate.addingTimeInterval(Double(offset) * 60)
+            let projection = DecisionMemorySystem.refreshProjection(in: context, now: now)
+            _ = CurrentBrainStateLoader.bootstrapCurrentBrainState(
+                mode: .quick,
+                prompt: "Should I send this tonight?",
+                source: .sessionPrime,
+                taskGraph: nil,
+                context: context,
+                projection: projection,
+                retrievalMode: .filtered,
+                now: now
+            )
+        }
+
+        let templates = try context.fetch(FetchDescriptor<InterventionTemplateRecord>())
+        let failurePatterns = try context.fetch(FetchDescriptor<FailurePatternRecord>())
+        let updates = try context.fetch(FetchDescriptor<BrainStateUpdate>())
+
+        XCTAssertEqual(Set(templates.map(\.id)).count, templates.count)
+        XCTAssertEqual(Set(failurePatterns.map(\.id)).count, failurePatterns.count)
+        XCTAssertEqual(templates.count, 4)
+        XCTAssertLessThanOrEqual(updates.count, 60)
+        XCTAssertTrue(failurePatterns.contains(where: { $0.id == "night_fast_path_failure" }))
+    }
+
+    @MainActor
     private func makeContainer() throws -> ModelContainer {
         try ModelContainer(
             for: CheckEvent.self,

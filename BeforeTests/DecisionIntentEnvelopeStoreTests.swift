@@ -138,6 +138,76 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
         XCTAssertNil(SharedProtectedStateStore.loadData(key: key))
     }
 
+    func testRepeatedOverflowAcrossMultipleBatchesKeepsOnlyNewestFreshEnvelopes() {
+        let now = Date()
+
+        for offset in 0..<5 {
+            DecisionIntentEnvelopeStore.enqueue(
+                makeEnvelope(
+                    id: UUID(uuidString: String(format: "10000000-0000-0000-0000-%012d", offset + 1))!,
+                    promptSeed: "batch-a-\(offset)",
+                    requestedAt: now.addingTimeInterval(Double(offset)),
+                    expiresAt: now.addingTimeInterval(3_600 + Double(offset))
+                )
+            )
+        }
+        for offset in 0..<5 {
+            DecisionIntentEnvelopeStore.enqueue(
+                makeEnvelope(
+                    id: UUID(uuidString: String(format: "20000000-0000-0000-0000-%012d", offset + 1))!,
+                    promptSeed: "batch-b-\(offset)",
+                    requestedAt: now.addingTimeInterval(100 + Double(offset)),
+                    expiresAt: now.addingTimeInterval(7_200 + Double(offset))
+                )
+            )
+        }
+
+        let queue = DecisionIntentEnvelopeStore.loadQueue(now: now)
+
+        XCTAssertEqual(queue.count, BeforePolicy.LaunchRequests.maxQueuedRequests)
+        XCTAssertEqual(queue.map(\.promptSeed), [
+            "batch-b-0",
+            "batch-b-1",
+            "batch-b-2",
+            "batch-b-3",
+            "batch-b-4"
+        ])
+    }
+
+    func testRepeatedLoadAndConsumeNeverResurrectsExpiredOrConsumedEnvelopes() {
+        let now = Date(timeIntervalSince1970: 30_000)
+        let expired = makeEnvelope(
+            promptSeed: "expired",
+            requestedAt: now.addingTimeInterval(-500),
+            expiresAt: now.addingTimeInterval(-5)
+        )
+        let fresh = (0..<3).map { offset in
+            makeEnvelope(
+                id: UUID(uuidString: String(format: "30000000-0000-0000-0000-%012d", offset + 1))!,
+                promptSeed: "fresh-\(offset)",
+                requestedAt: now.addingTimeInterval(Double(offset)),
+                expiresAt: now.addingTimeInterval(600 + Double(offset))
+            )
+        }
+
+        XCTAssertTrue(
+            SharedProtectedStateStore.saveData(try! JSONEncoder().encode([expired] + fresh), key: key)
+        )
+
+        var consumed: [UUID] = []
+        for _ in 0..<5 {
+            _ = DecisionIntentEnvelopeStore.loadQueue(now: now)
+            if let next = DecisionIntentEnvelopeStore.consume(now: now) {
+                consumed.append(next.id)
+            }
+        }
+
+        XCTAssertEqual(consumed, fresh.map(\.id))
+        XCTAssertEqual(Set(consumed).count, fresh.count)
+        XCTAssertNil(DecisionIntentEnvelopeStore.consume(now: now))
+        XCTAssertNil(SharedProtectedStateStore.loadData(key: key))
+    }
+
     private func makeEnvelope(
         id: UUID = UUID(),
         promptSeed: String,

@@ -136,4 +136,51 @@ final class EmbeddingMemoryStoreTests: XCTestCase {
         XCTAssertEqual(first, second)
         XCTAssertEqual(first.first?.id, "warm-record")
     }
+
+    func testQueryOrderStaysStableForEqualScoresAcrossInputOrderChanges() {
+        let now = Date(timeIntervalSince1970: 50_000)
+        let alpha = DecisionMemoryRecord(
+            id: "alpha",
+            type: .goal,
+            topic: "sleep",
+            headline: "Same score",
+            value: "same score payload",
+            confidence: 0.8,
+            priority: 0.8,
+            source: .pattern,
+            lastConfirmedAt: now,
+            decayPolicy: .medium,
+            retrievalTags: ["sleep", "night"],
+            evidenceCount: 2,
+            observationCount: 2,
+            provenanceSummary: "alpha",
+            tier: .warm
+        )
+        let beta = DecisionMemoryRecord(
+            id: "beta",
+            type: .goal,
+            topic: "sleep",
+            headline: "Same score",
+            value: "same score payload",
+            confidence: 0.8,
+            priority: 0.8,
+            source: .pattern,
+            lastConfirmedAt: now,
+            decayPolicy: .medium,
+            retrievalTags: ["sleep", "night"],
+            evidenceCount: 2,
+            observationCount: 2,
+            provenanceSummary: "beta",
+            tier: .warm
+        )
+
+        EmbeddingMemoryStore.rebuildIndex(records: [alpha, beta], candidates: [], checkEvents: [])
+        let first = EmbeddingMemoryStore.query("sleep night", allowedTiers: [.warm], limit: 5)
+
+        EmbeddingMemoryStore.rebuildIndex(records: [beta, alpha], candidates: [], checkEvents: [])
+        let second = EmbeddingMemoryStore.query("sleep night", allowedTiers: [.warm], limit: 5)
+
+        XCTAssertEqual(first.map(\.id), ["alpha", "beta"])
+        XCTAssertEqual(second.map(\.id), ["alpha", "beta"])
+    }
 }
