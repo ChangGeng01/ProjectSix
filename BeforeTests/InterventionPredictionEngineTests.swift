@@ -41,6 +41,7 @@ final class InterventionPredictionEngineTests: XCTestCase {
         XCTAssertEqual(candidate?.riskLevel, .high)
         XCTAssertEqual(candidate?.suggestedMode, .mirror)
         XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("regret") == true)
+        XCTAssertEqual(candidate?.evidenceSignalCount, 2)
     }
 
     @MainActor
@@ -78,6 +79,7 @@ final class InterventionPredictionEngineTests: XCTestCase {
 
         XCTAssertNotNil(candidate)
         XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("suppressing night fast paths") == true)
+        XCTAssertEqual(candidate?.evidenceSignalCount, 1)
     }
 
     @MainActor
@@ -118,6 +120,7 @@ final class InterventionPredictionEngineTests: XCTestCase {
         XCTAssertEqual(candidate?.riskLevel, .low)
         XCTAssertEqual(candidate?.suggestedMode, .quick)
         XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("low-friction pause") == true)
+        XCTAssertEqual(candidate?.evidenceSignalCount, 0)
     }
 
     @MainActor

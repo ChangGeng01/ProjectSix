@@ -47,7 +47,7 @@ enum InterventionPredictionEngine {
             suggestedMode = .mirror
         }
 
-        let reason = buildReason(
+        let reasons = buildReasons(
             isNight: isNight,
             negativeRecentCount: negativeRecentCount,
             currentBrainState: currentBrainState
@@ -57,17 +57,20 @@ enum InterventionPredictionEngine {
             riskLevel: riskLevel,
             title: title,
             detail: detail,
+            evidenceSignalCount: reasons.count,
             suggestedMode: suggestedMode,
-            reason: reason,
+            reason: reasons.isEmpty
+                ? "A low-friction pause is still the cleanest move."
+                : reasons.joined(separator: " "),
             expiresAt: now.addingTimeInterval(60 * 30)
         )
     }
 
-    private static func buildReason(
+    private static func buildReasons(
         isNight: Bool,
         negativeRecentCount: Int,
         currentBrainState: CurrentBrainState?
-    ) -> String {
+    ) -> [String] {
         var reasons: [String] = []
         if isNight {
             reasons.append("It is late enough that fast decisions are less trustworthy.")
@@ -78,6 +81,6 @@ enum InterventionPredictionEngine {
         if let currentBrainState, currentBrainState.failureGuardIDs.contains("night_fast_path_failure") {
             reasons.append("Your current brain state is already suppressing night fast paths.")
         }
-        return reasons.isEmpty ? "A low-friction pause is still the cleanest move." : reasons.joined(separator: " ")
+        return reasons
     }
 }

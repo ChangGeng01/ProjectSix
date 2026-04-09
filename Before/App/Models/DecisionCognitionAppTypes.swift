@@ -77,6 +77,7 @@ struct InterventionPredictionCandidate: Identifiable, Codable, Equatable, Sendab
     let riskLevel: InterventionRiskLevel
     let title: String
     let detail: String
+    let evidenceSignalCount: Int
     let suggestedModeRaw: String?
     let reason: String
     let createdAt: Date
@@ -87,6 +88,7 @@ struct InterventionPredictionCandidate: Identifiable, Codable, Equatable, Sendab
         riskLevel: InterventionRiskLevel,
         title: String,
         detail: String,
+        evidenceSignalCount: Int = 1,
         suggestedMode: DecisionMode? = nil,
         reason: String,
         createdAt: Date = .now,
@@ -96,6 +98,7 @@ struct InterventionPredictionCandidate: Identifiable, Codable, Equatable, Sendab
         self.riskLevel = riskLevel
         self.title = title
         self.detail = detail
+        self.evidenceSignalCount = max(0, evidenceSignalCount)
         self.suggestedModeRaw = suggestedMode?.rawValue
         self.reason = reason
         self.createdAt = createdAt

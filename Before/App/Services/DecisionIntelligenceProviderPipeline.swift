@@ -134,6 +134,7 @@ enum DecisionIntelligenceProviderPipeline {
         )
         let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: envelope)
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: envelope)
+        let promptPreparedMs = elapsedMilliseconds(since: requestStart, clock: clock)
         guard preference != .template else {
             await recordTelemetry(
                 kind: .quick,
@@ -142,6 +143,11 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs
+                ),
                 promptBudget: envelope.budget,
                 runtimeStrategy: strategy
             )
@@ -169,6 +175,7 @@ enum DecisionIntelligenceProviderPipeline {
         let admissionDecision = testingStubProfile.map {
             _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: envelope)
         } ?? DecisionIntelligenceAdmissionController.decide(for: envelope)
+        let admissionEvaluatedMs = elapsedMilliseconds(since: requestStart, clock: clock)
         guard admissionDecision.isAllowed else {
             await recordTelemetry(
                 kind: .quick,
@@ -177,6 +184,12 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs,
+                    admissionEvaluatedMs: admissionEvaluatedMs
+                ),
                 promptBudget: envelope.budget,
                 runtimeStrategy: strategy,
                 admissionDecision: admissionDecision
@@ -210,6 +223,7 @@ enum DecisionIntelligenceProviderPipeline {
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
         )
+        let providerSelectionMs = elapsedMilliseconds(since: requestStart, clock: clock)
         let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
         var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
@@ -231,6 +245,13 @@ enum DecisionIntelligenceProviderPipeline {
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    lifecycleMetrics: lifecycleMetrics(
+                        requestStart: requestStart,
+                        clock: clock,
+                        promptPreparedMs: promptPreparedMs,
+                        admissionEvaluatedMs: admissionEvaluatedMs,
+                        providerSelectionMs: providerSelectionMs
+                    ),
                     promptBudget: envelope.budget,
                     runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
@@ -284,6 +305,13 @@ enum DecisionIntelligenceProviderPipeline {
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    lifecycleMetrics: lifecycleMetrics(
+                        requestStart: requestStart,
+                        clock: clock,
+                        promptPreparedMs: promptPreparedMs,
+                        admissionEvaluatedMs: admissionEvaluatedMs,
+                        providerSelectionMs: providerSelectionMs
+                    ),
                     promptBudget: envelope.budget,
                     runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
@@ -327,6 +355,13 @@ enum DecisionIntelligenceProviderPipeline {
             activeProvider: nil,
             attemptedProviders: actualAttemptedKinds,
             durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+            lifecycleMetrics: lifecycleMetrics(
+                requestStart: requestStart,
+                clock: clock,
+                promptPreparedMs: promptPreparedMs,
+                admissionEvaluatedMs: admissionEvaluatedMs,
+                providerSelectionMs: providerSelectionMs
+            ),
             promptBudget: envelope.budget,
             runtimeStrategy: strategy,
             admissionDecision: admissionDecision
@@ -379,6 +414,7 @@ enum DecisionIntelligenceProviderPipeline {
         )
         let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: envelope)
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: envelope)
+        let promptPreparedMs = elapsedMilliseconds(since: requestStart, clock: clock)
         guard preference != .template else {
             await recordTelemetry(
                 kind: .balance,
@@ -387,6 +423,11 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs
+                ),
                 promptBudget: envelope.budget,
                 runtimeStrategy: strategy
             )
@@ -414,6 +455,7 @@ enum DecisionIntelligenceProviderPipeline {
         let admissionDecision = testingStubProfile.map {
             _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: envelope)
         } ?? DecisionIntelligenceAdmissionController.decide(for: envelope)
+        let admissionEvaluatedMs = elapsedMilliseconds(since: requestStart, clock: clock)
         guard admissionDecision.isAllowed else {
             await recordTelemetry(
                 kind: .balance,
@@ -422,6 +464,12 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs,
+                    admissionEvaluatedMs: admissionEvaluatedMs
+                ),
                 promptBudget: envelope.budget,
                 runtimeStrategy: strategy,
                 admissionDecision: admissionDecision
@@ -455,6 +503,7 @@ enum DecisionIntelligenceProviderPipeline {
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
         )
+        let providerSelectionMs = elapsedMilliseconds(since: requestStart, clock: clock)
         let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
         var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
@@ -476,6 +525,13 @@ enum DecisionIntelligenceProviderPipeline {
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    lifecycleMetrics: lifecycleMetrics(
+                        requestStart: requestStart,
+                        clock: clock,
+                        promptPreparedMs: promptPreparedMs,
+                        admissionEvaluatedMs: admissionEvaluatedMs,
+                        providerSelectionMs: providerSelectionMs
+                    ),
                     promptBudget: envelope.budget,
                     runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
@@ -529,6 +585,13 @@ enum DecisionIntelligenceProviderPipeline {
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    lifecycleMetrics: lifecycleMetrics(
+                        requestStart: requestStart,
+                        clock: clock,
+                        promptPreparedMs: promptPreparedMs,
+                        admissionEvaluatedMs: admissionEvaluatedMs,
+                        providerSelectionMs: providerSelectionMs
+                    ),
                     promptBudget: envelope.budget,
                     runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
@@ -572,6 +635,13 @@ enum DecisionIntelligenceProviderPipeline {
             activeProvider: nil,
             attemptedProviders: actualAttemptedKinds,
             durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+            lifecycleMetrics: lifecycleMetrics(
+                requestStart: requestStart,
+                clock: clock,
+                promptPreparedMs: promptPreparedMs,
+                admissionEvaluatedMs: admissionEvaluatedMs,
+                providerSelectionMs: providerSelectionMs
+            ),
             promptBudget: envelope.budget,
             runtimeStrategy: strategy,
             admissionDecision: admissionDecision
@@ -624,6 +694,7 @@ enum DecisionIntelligenceProviderPipeline {
         )
         let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: envelope)
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: envelope)
+        let promptPreparedMs = elapsedMilliseconds(since: requestStart, clock: clock)
         guard preference != .template else {
             await recordTelemetry(
                 kind: .mirror,
@@ -632,6 +703,11 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs
+                ),
                 promptBudget: envelope.budget,
                 runtimeStrategy: strategy
             )
@@ -659,6 +735,7 @@ enum DecisionIntelligenceProviderPipeline {
         let admissionDecision = testingStubProfile.map {
             _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: envelope)
         } ?? DecisionIntelligenceAdmissionController.decide(for: envelope)
+        let admissionEvaluatedMs = elapsedMilliseconds(since: requestStart, clock: clock)
         guard admissionDecision.isAllowed else {
             await recordTelemetry(
                 kind: .mirror,
@@ -667,6 +744,12 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs,
+                    admissionEvaluatedMs: admissionEvaluatedMs
+                ),
                 promptBudget: envelope.budget,
                 runtimeStrategy: strategy,
                 admissionDecision: admissionDecision
@@ -700,6 +783,7 @@ enum DecisionIntelligenceProviderPipeline {
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
         )
+        let providerSelectionMs = elapsedMilliseconds(since: requestStart, clock: clock)
         let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
         var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
@@ -721,6 +805,13 @@ enum DecisionIntelligenceProviderPipeline {
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    lifecycleMetrics: lifecycleMetrics(
+                        requestStart: requestStart,
+                        clock: clock,
+                        promptPreparedMs: promptPreparedMs,
+                        admissionEvaluatedMs: admissionEvaluatedMs,
+                        providerSelectionMs: providerSelectionMs
+                    ),
                     promptBudget: envelope.budget,
                     runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
@@ -774,6 +865,13 @@ enum DecisionIntelligenceProviderPipeline {
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    lifecycleMetrics: lifecycleMetrics(
+                        requestStart: requestStart,
+                        clock: clock,
+                        promptPreparedMs: promptPreparedMs,
+                        admissionEvaluatedMs: admissionEvaluatedMs,
+                        providerSelectionMs: providerSelectionMs
+                    ),
                     promptBudget: envelope.budget,
                     runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
@@ -817,6 +915,13 @@ enum DecisionIntelligenceProviderPipeline {
             activeProvider: nil,
             attemptedProviders: actualAttemptedKinds,
             durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+            lifecycleMetrics: lifecycleMetrics(
+                requestStart: requestStart,
+                clock: clock,
+                promptPreparedMs: promptPreparedMs,
+                admissionEvaluatedMs: admissionEvaluatedMs,
+                providerSelectionMs: providerSelectionMs
+            ),
             promptBudget: envelope.budget,
             runtimeStrategy: strategy,
             admissionDecision: admissionDecision
@@ -867,6 +972,7 @@ enum DecisionIntelligenceProviderPipeline {
         )
         let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: selection.prompt)
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: selection.prompt)
+        let promptPreparedMs = elapsedMilliseconds(since: requestStart, clock: clock)
         let clippedCandidates = selection.candidates
         let reminderSelectionAssessment = ReminderSelectionPolicy.assessSelectionNeed(
             candidates: clippedCandidates,
@@ -883,6 +989,11 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs
+                ),
                 promptBudget: selection.prompt.budget,
                 runtimeStrategy: strategy
             )
@@ -895,6 +1006,7 @@ enum DecisionIntelligenceProviderPipeline {
             reminderCandidateCount: clippedCandidates.count,
             reminderSelectionAssessment: reminderSelectionAssessment
         )
+        let admissionEvaluatedMs = elapsedMilliseconds(since: requestStart, clock: clock)
         guard admissionDecision.isAllowed else {
             await recordTelemetry(
                 kind: .reminder,
@@ -903,6 +1015,12 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs,
+                    admissionEvaluatedMs: admissionEvaluatedMs
+                ),
                 promptBudget: selection.prompt.budget,
                 runtimeStrategy: strategy,
                 admissionDecision: admissionDecision
@@ -932,6 +1050,7 @@ enum DecisionIntelligenceProviderPipeline {
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
         )
+        let providerSelectionMs = elapsedMilliseconds(since: requestStart, clock: clock)
         let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
         var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
@@ -954,6 +1073,13 @@ enum DecisionIntelligenceProviderPipeline {
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    lifecycleMetrics: lifecycleMetrics(
+                        requestStart: requestStart,
+                        clock: clock,
+                        promptPreparedMs: promptPreparedMs,
+                        admissionEvaluatedMs: admissionEvaluatedMs,
+                        providerSelectionMs: providerSelectionMs
+                    ),
                     promptBudget: selection.prompt.budget,
                     runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
@@ -1003,6 +1129,13 @@ enum DecisionIntelligenceProviderPipeline {
                     activeProvider: provider.kind,
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                    lifecycleMetrics: lifecycleMetrics(
+                        requestStart: requestStart,
+                        clock: clock,
+                        promptPreparedMs: promptPreparedMs,
+                        admissionEvaluatedMs: admissionEvaluatedMs,
+                        providerSelectionMs: providerSelectionMs
+                    ),
                     promptBudget: selection.prompt.budget,
                     runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
@@ -1043,6 +1176,13 @@ enum DecisionIntelligenceProviderPipeline {
             activeProvider: nil,
             attemptedProviders: actualAttemptedKinds,
             durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+            lifecycleMetrics: lifecycleMetrics(
+                requestStart: requestStart,
+                clock: clock,
+                promptPreparedMs: promptPreparedMs,
+                admissionEvaluatedMs: admissionEvaluatedMs,
+                providerSelectionMs: providerSelectionMs
+            ),
             promptBudget: selection.prompt.budget,
             runtimeStrategy: strategy,
             admissionDecision: admissionDecision
@@ -1217,6 +1357,7 @@ enum DecisionIntelligenceProviderPipeline {
         activeProvider: DecisionModelProviderKind?,
         attemptedProviders: [DecisionModelProviderKind],
         durationMs: Double,
+        lifecycleMetrics: DecisionRequestLifecycleMetrics? = nil,
         promptBudget: DecisionIntelligencePromptContract.ContextBudget? = nil,
         runtimeStrategy: DecisionAdaptiveTaskStrategy? = nil,
         admissionDecision: DecisionIntelligenceAdmissionDecision? = nil
@@ -1228,6 +1369,7 @@ enum DecisionIntelligenceProviderPipeline {
             attemptedProviders: attemptedProviders,
             usedFallback: activeProvider != nil && activeProvider != preferredProvider,
             durationMs: durationMs,
+            lifecycleMetrics: lifecycleMetrics,
             promptBudget: promptBudget,
             runtimeStrategy: runtimeStrategy,
             admissionDecision: admissionDecision,
@@ -1248,5 +1390,30 @@ enum DecisionIntelligenceProviderPipeline {
         let seconds = Double(components.seconds)
         let attoseconds = Double(components.attoseconds) / 1_000_000_000_000_000_000
         return (seconds + attoseconds) * 1_000
+    }
+
+    private static func lifecycleMetrics(
+        requestStart: ContinuousClock.Instant,
+        clock: ContinuousClock,
+        promptPreparedMs: Double,
+        admissionEvaluatedMs: Double? = nil,
+        providerSelectionMs: Double? = nil
+    ) -> DecisionRequestLifecycleMetrics {
+        let firstPresentableMs = elapsedMilliseconds(since: requestStart, clock: clock)
+        let admissionStageMs = max(0, (admissionEvaluatedMs ?? promptPreparedMs) - promptPreparedMs)
+        let providerStageMs = max(
+            0,
+            (providerSelectionMs ?? (admissionEvaluatedMs ?? promptPreparedMs)) -
+                (admissionEvaluatedMs ?? promptPreparedMs)
+        )
+        let executionMs = max(0, firstPresentableMs - (providerSelectionMs ?? firstPresentableMs))
+
+        return DecisionRequestLifecycleMetrics(
+            promptAssemblyMs: max(0, promptPreparedMs),
+            admissionEvaluationMs: admissionStageMs,
+            providerSelectionMs: providerStageMs,
+            firstPresentableMs: max(0, firstPresentableMs),
+            executionMs: executionMs
+        )
     }
 }

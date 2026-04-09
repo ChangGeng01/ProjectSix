@@ -239,6 +239,13 @@ struct DecisionTestingRuntimeExport {
             deterministicFallbackRate: intelligenceTelemetry.deterministicFallbackRate,
             averageRequestDurationMs: intelligenceTelemetry.averageRequestDurationMs,
             averageRequestDurationMsByKind: intelligenceTelemetry.averageRequestDurationMsByKind,
+            averageFirstPresentableMs: intelligenceTelemetry.averageFirstPresentableMs,
+            averageFirstPresentableMsByKind: intelligenceTelemetry.averageFirstPresentableMsByKind,
+            averagePromptAssemblyMsByKind: intelligenceTelemetry.averagePromptAssemblyMsByKind,
+            averageAdmissionEvaluationMsByKind: intelligenceTelemetry.averageAdmissionEvaluationMsByKind,
+            averageProviderSelectionMsByKind: intelligenceTelemetry.averageProviderSelectionMsByKind,
+            averageExecutionMsByKind: intelligenceTelemetry.averageExecutionMsByKind,
+            averagePrefillEquivalentShareByKind: intelligenceTelemetry.averagePrefillEquivalentShareByKind,
             averageRequestDurationMsByProvider: intelligenceTelemetry.averageRequestDurationMsByActiveProvider,
             averageRequestDurationMsByGemmaBackend: intelligenceTelemetry.averageRequestDurationMsByGemmaBackend,
             averagePromptCharactersByKind: intelligenceTelemetry.averagePromptCharactersByKind,
@@ -692,6 +699,13 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let deterministicFallbackRate: Double
     let averageRequestDurationMs: Double
     let averageRequestDurationMsByKind: [DecisionIntelligenceTraceKind: Double]
+    let averageFirstPresentableMs: Double
+    let averageFirstPresentableMsByKind: [DecisionIntelligenceTraceKind: Double]
+    let averagePromptAssemblyMsByKind: [DecisionIntelligenceTraceKind: Double]
+    let averageAdmissionEvaluationMsByKind: [DecisionIntelligenceTraceKind: Double]
+    let averageProviderSelectionMsByKind: [DecisionIntelligenceTraceKind: Double]
+    let averageExecutionMsByKind: [DecisionIntelligenceTraceKind: Double]
+    let averagePrefillEquivalentShareByKind: [DecisionIntelligenceTraceKind: Double]
     let averageRequestDurationMsByProvider: [DecisionModelProviderKind: Double]
     let averageRequestDurationMsByGemmaBackend: [InferenceBackendKind: Double]
     let averagePromptCharactersByKind: [DecisionIntelligenceTraceKind: Double]

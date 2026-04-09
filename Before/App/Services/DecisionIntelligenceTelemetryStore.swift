@@ -8,6 +8,23 @@ enum DecisionIntelligenceRequestOutcome: String, CaseIterable, Sendable {
     case deterministicFallback
 }
 
+struct DecisionRequestLifecycleMetrics: Equatable, Sendable {
+    let promptAssemblyMs: Double
+    let admissionEvaluationMs: Double
+    let providerSelectionMs: Double
+    let firstPresentableMs: Double
+    let executionMs: Double
+
+    var prefillEquivalentMs: Double {
+        promptAssemblyMs + admissionEvaluationMs + providerSelectionMs
+    }
+
+    var prefillEquivalentShare: Double {
+        guard firstPresentableMs > 0 else { return 0 }
+        return prefillEquivalentMs / firstPresentableMs
+    }
+}
+
 struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
     let requestCountByKind: [DecisionIntelligenceTraceKind: Int]
     let outcomeCount: [DecisionIntelligenceRequestOutcome: Int]
@@ -19,6 +36,11 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
     let slowRequestCountByKind: [DecisionIntelligenceTraceKind: Int]
     let overTimeBudgetCountByKind: [DecisionIntelligenceTraceKind: Int]
     let requestDurationTotalMsByKind: [DecisionIntelligenceTraceKind: Double]
+    let firstPresentableTotalMsByKind: [DecisionIntelligenceTraceKind: Double]
+    let promptAssemblyTotalMsByKind: [DecisionIntelligenceTraceKind: Double]
+    let admissionEvaluationTotalMsByKind: [DecisionIntelligenceTraceKind: Double]
+    let providerSelectionTotalMsByKind: [DecisionIntelligenceTraceKind: Double]
+    let executionTotalMsByKind: [DecisionIntelligenceTraceKind: Double]
     let activeProviderDurationTotalMs: [DecisionModelProviderKind: Double]
     let gemmaBackendDurationTotalMs: [InferenceBackendKind: Double]
     let admissionSkipCountByReason: [DecisionIntelligenceAdmissionSkipReason: Int]
@@ -81,6 +103,47 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
         Dictionary(
             uniqueKeysWithValues: requestDurationTotalMsByKind.map { kind, total in
                 (kind, average(totals: total, count: requestCountByKind[kind] ?? 0))
+            }
+        )
+    }
+
+    var averageFirstPresentableMs: Double {
+        average(
+            totals: firstPresentableTotalMsByKind.values.reduce(0, +),
+            count: totalRequests
+        )
+    }
+
+    var averageFirstPresentableMsByKind: [DecisionIntelligenceTraceKind: Double] {
+        averageStageByKind(from: firstPresentableTotalMsByKind)
+    }
+
+    var averagePromptAssemblyMsByKind: [DecisionIntelligenceTraceKind: Double] {
+        averageStageByKind(from: promptAssemblyTotalMsByKind)
+    }
+
+    var averageAdmissionEvaluationMsByKind: [DecisionIntelligenceTraceKind: Double] {
+        averageStageByKind(from: admissionEvaluationTotalMsByKind)
+    }
+
+    var averageProviderSelectionMsByKind: [DecisionIntelligenceTraceKind: Double] {
+        averageStageByKind(from: providerSelectionTotalMsByKind)
+    }
+
+    var averageExecutionMsByKind: [DecisionIntelligenceTraceKind: Double] {
+        averageStageByKind(from: executionTotalMsByKind)
+    }
+
+    var averagePrefillEquivalentShareByKind: [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: requestCountByKind.map { kind, count in
+                let firstPresentable = firstPresentableTotalMsByKind[kind] ?? 0
+                let prefillEquivalent =
+                    (promptAssemblyTotalMsByKind[kind] ?? 0) +
+                    (admissionEvaluationTotalMsByKind[kind] ?? 0) +
+                    (providerSelectionTotalMsByKind[kind] ?? 0)
+                let ratio = firstPresentable > 0 ? prefillEquivalent / firstPresentable : 0
+                return (kind, count > 0 ? ratio : 0)
             }
         )
     }
@@ -289,6 +352,16 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
         )
     }
 
+    private func averageStageByKind(
+        from totalsByKind: [DecisionIntelligenceTraceKind: Double]
+    ) -> [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: requestCountByKind.map { kind, count in
+                (kind, average(totals: totalsByKind[kind] ?? 0, count: count))
+            }
+        )
+    }
+
     private func rate(numerator: Int, denominator: Int) -> Double {
         guard denominator > 0 else { return 0 }
         return Double(numerator) / Double(denominator)
@@ -320,6 +393,11 @@ actor DecisionIntelligenceTelemetryStore {
     private var slowRequestCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
     private var overTimeBudgetCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
     private var requestDurationTotalMsByKind: [DecisionIntelligenceTraceKind: Double] = [:]
+    private var firstPresentableTotalMsByKind: [DecisionIntelligenceTraceKind: Double] = [:]
+    private var promptAssemblyTotalMsByKind: [DecisionIntelligenceTraceKind: Double] = [:]
+    private var admissionEvaluationTotalMsByKind: [DecisionIntelligenceTraceKind: Double] = [:]
+    private var providerSelectionTotalMsByKind: [DecisionIntelligenceTraceKind: Double] = [:]
+    private var executionTotalMsByKind: [DecisionIntelligenceTraceKind: Double] = [:]
     private var activeProviderDurationTotalMs: [DecisionModelProviderKind: Double] = [:]
     private var gemmaBackendDurationTotalMs: [InferenceBackendKind: Double] = [:]
     private var admissionSkipCountByReason: [DecisionIntelligenceAdmissionSkipReason: Int] = [:]
@@ -355,6 +433,7 @@ actor DecisionIntelligenceTelemetryStore {
         attemptedProviders: [DecisionModelProviderKind],
         usedFallback: Bool,
         durationMs: Double,
+        lifecycleMetrics: DecisionRequestLifecycleMetrics? = nil,
         promptBudget: DecisionIntelligencePromptContract.ContextBudget? = nil,
         runtimeStrategy: DecisionAdaptiveTaskStrategy? = nil,
         admissionDecision: DecisionIntelligenceAdmissionDecision? = nil,
@@ -366,6 +445,13 @@ actor DecisionIntelligenceTelemetryStore {
         countsForOutcome[kind, default: 0] += 1
         outcomeCountByKind[outcome] = countsForOutcome
         requestDurationTotalMsByKind[kind, default: 0] += durationMs
+        if let lifecycleMetrics {
+            firstPresentableTotalMsByKind[kind, default: 0] += lifecycleMetrics.firstPresentableMs
+            promptAssemblyTotalMsByKind[kind, default: 0] += lifecycleMetrics.promptAssemblyMs
+            admissionEvaluationTotalMsByKind[kind, default: 0] += lifecycleMetrics.admissionEvaluationMs
+            providerSelectionTotalMsByKind[kind, default: 0] += lifecycleMetrics.providerSelectionMs
+            executionTotalMsByKind[kind, default: 0] += lifecycleMetrics.executionMs
+        }
         if durationMs >= Self.slowRequestThresholdMs(for: kind) {
             slowRequestCountByKind[kind, default: 0] += 1
         }
@@ -434,6 +520,11 @@ actor DecisionIntelligenceTelemetryStore {
             slowRequestCountByKind: slowRequestCountByKind,
             overTimeBudgetCountByKind: overTimeBudgetCountByKind,
             requestDurationTotalMsByKind: requestDurationTotalMsByKind,
+            firstPresentableTotalMsByKind: firstPresentableTotalMsByKind,
+            promptAssemblyTotalMsByKind: promptAssemblyTotalMsByKind,
+            admissionEvaluationTotalMsByKind: admissionEvaluationTotalMsByKind,
+            providerSelectionTotalMsByKind: providerSelectionTotalMsByKind,
+            executionTotalMsByKind: executionTotalMsByKind,
             activeProviderDurationTotalMs: activeProviderDurationTotalMs,
             gemmaBackendDurationTotalMs: gemmaBackendDurationTotalMs,
             admissionSkipCountByReason: admissionSkipCountByReason,
@@ -461,6 +552,11 @@ actor DecisionIntelligenceTelemetryStore {
         slowRequestCountByKind.removeAll()
         overTimeBudgetCountByKind.removeAll()
         requestDurationTotalMsByKind.removeAll()
+        firstPresentableTotalMsByKind.removeAll()
+        promptAssemblyTotalMsByKind.removeAll()
+        admissionEvaluationTotalMsByKind.removeAll()
+        providerSelectionTotalMsByKind.removeAll()
+        executionTotalMsByKind.removeAll()
         activeProviderDurationTotalMs.removeAll()
         gemmaBackendDurationTotalMs.removeAll()
         admissionSkipCountByReason.removeAll()

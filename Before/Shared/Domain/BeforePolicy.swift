@@ -44,6 +44,11 @@ enum BeforePolicy {
     enum Notifications {
         static let tomorrowReminderHour = 9
         static let tomorrowReminderMinute = 0
+        static let predictiveQuietHoursStartHour = 22
+        static let predictiveQuietHoursEndHour = 8
+        static let predictiveInterventionCooldownInterval: TimeInterval = 60 * 60 * 2
+        static let predictiveInterventionDismissalSuppressionInterval: TimeInterval = 60 * 60 * 12
+        static let predictiveInterventionDailyCap = 2
 
         static func normalizedReminderDate(
             after baseDate: Date,

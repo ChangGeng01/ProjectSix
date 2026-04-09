@@ -142,6 +142,23 @@ enum DecisionSystemFlightDeckBuilder {
             blockers.append("Slow-request rate is elevated.")
         }
 
+        let kindsOverFirstPresentableBudget = summary.averageFirstPresentableMsByKind.map { kind, averageMs in
+            averageMs > Double(summary.timeBudgetMsByKind[kind] ?? Int.max) ? kind.title : nil
+        }
+        .compactMap { $0 }
+        if !kindsOverFirstPresentableBudget.isEmpty {
+            score -= 15
+            blockers.append(
+                "First-presentable latency is outrunning budget for \(kindsOverFirstPresentableBudget.joined(separator: ", "))."
+            )
+        }
+
+        let averagePrefillShare = average(summary.averagePrefillEquivalentShareByKind.values)
+        if averagePrefillShare > 0.7 {
+            score -= 10
+            blockers.append("Front-loaded prompt and routing work is consuming too much of the first-presentable path.")
+        }
+
         if !snapshot.gemmaBackendResolution.isHardwareAccelerated &&
             !snapshot.deviceCapabilities.isSimulator {
             score -= 10
@@ -152,6 +169,8 @@ enum DecisionSystemFlightDeckBuilder {
             "Provider: \(summary.activeProvider.title)",
             "Gear: \(summary.runtimeGear.rawValue)",
             "Avg request: \(Int(summary.averageRequestDurationMs.rounded())) ms",
+            "Avg first presentable: \(Int(summary.averageFirstPresentableMs.rounded())) ms",
+            "Front-load share: \(percent(averagePrefillShare))",
             "Backend: \(snapshot.gemmaBackendResolution.effectiveBackend.title)"
         ]
 
@@ -377,11 +396,17 @@ enum DecisionSystemFlightDeckBuilder {
             blockers.append("Prompt-shape metrics are missing.")
         }
 
+        if summary.totalRequests > 0 && summary.averageFirstPresentableMs == 0 {
+            score -= 10
+            blockers.append("First-presentable latency is not being tracked.")
+        }
+
         let signals = [
             "Requests: \(summary.totalRequests)",
             "Traces: \(summary.traceCount)",
             "Replay: \(summary.replayCount)",
-            "Cache entries: \(summary.totalCacheEntries)"
+            "Cache entries: \(summary.totalCacheEntries)",
+            "Avg first presentable: \(Int(summary.averageFirstPresentableMs.rounded())) ms"
         ]
 
         return DecisionSystemLayerReport(

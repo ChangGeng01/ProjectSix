@@ -388,6 +388,7 @@ final class BeforeAppModel: ObservableObject {
                 riskLevel: riskLevel,
                 title: item.reopenHint ?? item.title,
                 detail: item.interventionHistorySummary ?? item.detail,
+                evidenceSignalCount: item.interventionHistorySummary == nil ? 1 : 2,
                 suggestedMode: item.mode,
                 reason: item.templateHint ?? "A previous hold suggests reopening this with more structure.",
                 expiresAt: .now.addingTimeInterval(60 * 30)
@@ -735,6 +736,7 @@ final class BeforeAppModel: ObservableObject {
     func dismissInterventionCandidate() {
         if let interventionCandidate {
             NotificationService.shared.cancelPredictiveInterventionNotification(candidateID: interventionCandidate.id)
+            markInterventionTriggerDismissed(candidateID: interventionCandidate.id)
         }
         interventionCandidate = nil
     }
@@ -1387,6 +1389,7 @@ final class BeforeAppModel: ObservableObject {
                 riskLevel: envelope.riskLevel ?? .medium,
                 title: envelope.promptSeed ?? "Pause before you decide.",
                 detail: "A predicted pattern says a slower move is safer here.",
+                evidenceSignalCount: envelope.triggerReason == nil ? 1 : 2,
                 suggestedMode: envelope.preferredMode,
                 reason: envelope.triggerReason ?? "A recent pattern suggests more friction before acting.",
                 expiresAt: envelope.expiresAt
@@ -1408,6 +1411,7 @@ final class BeforeAppModel: ObservableObject {
            existing.riskLevel == next.riskLevel,
            existing.title == next.title,
            existing.detail == next.detail,
+           existing.evidenceSignalCount == next.evidenceSignalCount,
            existing.reason == next.reason,
            existing.suggestedMode == next.suggestedMode {
             interventionCandidate = existing
@@ -1424,17 +1428,20 @@ final class BeforeAppModel: ObservableObject {
         }
 
         let context = modelContainer.mainContext
-        context.insert(
-            InterventionTrigger(
-                riskLevel: interventionCandidate.riskLevel,
-                title: interventionCandidate.title,
-                detail: interventionCandidate.detail,
-                reason: interventionCandidate.reason,
-                suggestedMode: interventionCandidate.suggestedMode,
-                wasDelivered: true
-            )
+        let policyDecision = InterventionNotificationPolicyEngine.decide(
+            candidate: interventionCandidate,
+            preferences: preferences,
+            context: context
         )
-        persistContext(context, operation: "recording predictive intervention trigger")
+        upsertInterventionTrigger(
+            interventionCandidate,
+            wasDelivered: policyDecision.isAllowed
+        )
+
+        guard policyDecision.isAllowed else {
+            NotificationService.shared.cancelPredictiveInterventionNotification(candidateID: interventionCandidate.id)
+            return
+        }
 
         Task {
             await NotificationService.shared.schedulePredictiveInterventionNotification(interventionCandidate)
@@ -1535,5 +1542,52 @@ final class BeforeAppModel: ObservableObject {
             return
         }
         startupNotice = notice
+    }
+
+    private func upsertInterventionTrigger(
+        _ candidate: InterventionPredictionCandidate,
+        wasDelivered: Bool
+    ) {
+        let context = modelContainer.mainContext
+        let descriptor = FetchDescriptor<InterventionTrigger>(
+            predicate: #Predicate<InterventionTrigger> { trigger in
+                trigger.id == candidate.id
+            }
+        )
+        if let existing = (try? context.fetch(descriptor))?.first {
+            existing.createdAt = candidate.createdAt
+            existing.riskLevelRaw = candidate.riskLevel.rawValue
+            existing.title = candidate.title
+            existing.detail = candidate.detail
+            existing.reason = candidate.reason
+            existing.suggestedModeRaw = candidate.suggestedMode?.rawValue
+            existing.wasDelivered = wasDelivered
+        } else {
+            context.insert(
+                InterventionTrigger(
+                    id: candidate.id,
+                    createdAt: candidate.createdAt,
+                    riskLevel: candidate.riskLevel,
+                    title: candidate.title,
+                    detail: candidate.detail,
+                    reason: candidate.reason,
+                    suggestedMode: candidate.suggestedMode,
+                    wasDelivered: wasDelivered
+                )
+            )
+        }
+        persistContext(context, operation: "recording predictive intervention trigger")
+    }
+
+    private func markInterventionTriggerDismissed(candidateID: UUID) {
+        let context = modelContainer.mainContext
+        let descriptor = FetchDescriptor<InterventionTrigger>(
+            predicate: #Predicate<InterventionTrigger> { trigger in
+                trigger.id == candidateID
+            }
+        )
+        guard let trigger = (try? context.fetch(descriptor))?.first else { return }
+        trigger.wasDismissed = true
+        persistContext(context, operation: "recording predictive intervention dismissal")
     }
 }

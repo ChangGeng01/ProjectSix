@@ -170,4 +170,49 @@ final class DecisionIntelligenceTelemetryStoreTests: XCTestCase {
         XCTAssertEqual(snapshot.reminderControlOnlyRate, 0.5, accuracy: 0.0001)
         XCTAssertEqual(snapshot.reminderRetrievalBypassRate, 0.5, accuracy: 0.0001)
     }
+
+    func testSnapshotTracksLifecycleStageMetrics() async {
+        let store = DecisionIntelligenceTelemetryStore()
+
+        await store.record(
+            kind: .quick,
+            outcome: .providerSuccess,
+            activeProvider: .gemmaE4B,
+            attemptedProviders: [.gemmaE4B],
+            usedFallback: false,
+            durationMs: 420,
+            lifecycleMetrics: DecisionRequestLifecycleMetrics(
+                promptAssemblyMs: 40,
+                admissionEvaluationMs: 20,
+                providerSelectionMs: 10,
+                firstPresentableMs: 180,
+                executionMs: 110
+            )
+        )
+        await store.record(
+            kind: .quick,
+            outcome: .cacheHit,
+            activeProvider: .gemmaE4B,
+            attemptedProviders: [.gemmaE4B],
+            usedFallback: false,
+            durationMs: 90,
+            lifecycleMetrics: DecisionRequestLifecycleMetrics(
+                promptAssemblyMs: 18,
+                admissionEvaluationMs: 6,
+                providerSelectionMs: 4,
+                firstPresentableMs: 36,
+                executionMs: 8
+            )
+        )
+
+        let snapshot = await store.snapshot()
+
+        XCTAssertEqual(snapshot.averageFirstPresentableMs, 108, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.averageFirstPresentableMsByKind[.quick] ?? 0, 108, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.averagePromptAssemblyMsByKind[.quick] ?? 0, 29, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.averageAdmissionEvaluationMsByKind[.quick] ?? 0, 13, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.averageProviderSelectionMsByKind[.quick] ?? 0, 7, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.averageExecutionMsByKind[.quick] ?? 0, 59, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.averagePrefillEquivalentShareByKind[.quick] ?? 0, 98.0 / 216.0, accuracy: 0.0001)
+    }
 }
