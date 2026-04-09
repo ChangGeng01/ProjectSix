@@ -829,14 +829,16 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func systemFlightDeck() async -> DecisionSystemFlightDeck {
-        let context = modelContainer.mainContext
-        let export = await DecisionTestingInterface.runtimeExport(
-            quick: DecisionMemorySystem.fetchCheckEvents(in: context),
-            balance: DecisionMemorySystem.fetchBalanceRecords(in: context),
-            mirror: DecisionMemorySystem.fetchMirrorRecords(in: context),
-            preferences: preferences
-        )
+        let export = await decisionRuntimeExport()
         return export.flightDeck
+    }
+
+    func substrateConsoleSnapshot() async -> BehavioralAISubstrateBridge.ConsoleSnapshot {
+        let export = await decisionRuntimeExport()
+        return BehavioralAISubstrateBridge.consoleSnapshot(
+            from: export,
+            currentBrainState: currentBrainState
+        )
     }
 
     func deleteBrainPortraitMemory(id: String) {
@@ -1223,6 +1225,16 @@ final class BeforeAppModel: ObservableObject {
         if let notice = PersistenceIssueRecorder.latestNotice() ?? StateStorageIssueRecorder.latestNotice() {
             publishStartupNotice(notice)
         }
+    }
+
+    private func decisionRuntimeExport() async -> DecisionTestingRuntimeExport {
+        let context = modelContainer.mainContext
+        return await DecisionTestingInterface.runtimeExport(
+            quick: DecisionMemorySystem.fetchCheckEvents(in: context),
+            balance: DecisionMemorySystem.fetchBalanceRecords(in: context),
+            mirror: DecisionMemorySystem.fetchMirrorRecords(in: context),
+            preferences: preferences
+        )
     }
 
     private func primeQuickSession(_ session: QuickCheckSession) {
