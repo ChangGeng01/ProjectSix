@@ -58,6 +58,38 @@ struct HomeView: View {
                             )
                         }
 
+                        if let candidate = appModel.interventionCandidate {
+                            PanelCard {
+                                VStack(alignment: .leading, spacing: 14) {
+                                    Label("Predictive pause", systemImage: "waveform.path.ecg")
+                                        .font(.headline)
+                                        .foregroundStyle(BeforeTheme.ember)
+
+                                    Text(candidate.title)
+                                        .font(.title3.bold())
+                                        .foregroundStyle(BeforeTheme.ink)
+
+                                    Text(candidate.detail)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+
+                                    Text(candidate.reason)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+
+                                    HStack(spacing: 10) {
+                                        BeforeActionButton("Use this pause") {
+                                            appModel.applyInterventionCandidate(candidate)
+                                        }
+
+                                        BeforeActionButton("Not now", style: .secondary) {
+                                            appModel.dismissInterventionCandidate()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         PanelCard {
                             StarterPromptRow(
                                 title: "Need a cleaner starting point?",

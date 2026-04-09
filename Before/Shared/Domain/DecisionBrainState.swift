@@ -185,6 +185,8 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
     var sessionBiases: [String]
     var retrievalTags: [String]
     var reactionWeights: DecisionReactionWeights
+    var activeInterventionTemplateIDs: [String]
+    var failureGuardIDs: [String]
     var memoryGovernance: DecisionMemoryGovernanceState = .empty
     var loadedAt: Date
 
@@ -193,6 +195,8 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
         sessionBiases: [String],
         retrievalTags: [String],
         reactionWeights: DecisionReactionWeights,
+        activeInterventionTemplateIDs: [String] = [],
+        failureGuardIDs: [String] = [],
         memoryGovernance: DecisionMemoryGovernanceState = .empty,
         loadedAt: Date
     ) {
@@ -200,6 +204,8 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
         self.sessionBiases = sessionBiases
         self.retrievalTags = retrievalTags
         self.reactionWeights = reactionWeights
+        self.activeInterventionTemplateIDs = activeInterventionTemplateIDs
+        self.failureGuardIDs = failureGuardIDs
         self.memoryGovernance = memoryGovernance
         self.loadedAt = loadedAt
     }
@@ -211,6 +217,8 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
         sessionBiases: [String],
         retrievalTags: [String],
         reactionWeights: DecisionReactionWeights,
+        activeInterventionTemplateIDs: [String] = [],
+        failureGuardIDs: [String] = [],
         memoryGovernance: DecisionMemoryGovernanceState = .empty,
         loadedAt: Date = .now
     ) {
@@ -223,6 +231,8 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
             sessionBiases: sessionBiases,
             retrievalTags: retrievalTags,
             reactionWeights: reactionWeights,
+            activeInterventionTemplateIDs: activeInterventionTemplateIDs,
+            failureGuardIDs: failureGuardIDs,
             memoryGovernance: memoryGovernance,
             loadedAt: loadedAt
         )
@@ -255,7 +265,9 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
     var isEmpty: Bool {
         memorySlices.isEmpty &&
             sessionBiases.isEmpty &&
-            retrievalTags.isEmpty
+            retrievalTags.isEmpty &&
+            activeInterventionTemplateIDs.isEmpty &&
+            failureGuardIDs.isEmpty
     }
 
     var verificationSnapshot: DecisionBrainStateSnapshot {

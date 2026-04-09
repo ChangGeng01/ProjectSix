@@ -9,6 +9,10 @@ enum BeforeNotificationIdentifier {
     static func tomorrowCheckin(for eventID: UUID) -> String {
         "before.tomorrow.checkin.\(eventID.uuidString.lowercased())"
     }
+
+    static func predictiveIntervention(for candidateID: UUID) -> String {
+        "before.predictive.intervention.\(candidateID.uuidString.lowercased())"
+    }
 }
 
 @MainActor
@@ -87,6 +91,37 @@ final class NotificationService {
     func cancelTomorrowNotification(eventID: UUID) {
         center.removePendingNotificationRequests(
             withIdentifiers: [BeforeNotificationIdentifier.tomorrowCheckin(for: eventID)]
+        )
+    }
+
+    func schedulePredictiveInterventionNotification(_ candidate: InterventionPredictionCandidate) async {
+        await requestAuthorizationIfNeeded()
+
+        let content = UNMutableNotificationContent()
+        content.title = candidate.riskLevel == .high
+            ? "Slow this one down"
+            : "Pause before you decide"
+        content.body = candidate.riskLevel == .high
+            ? "Your recent pattern suggests a slower reopen is safer right now."
+            : "A small pause may help this land cleaner."
+        content.sound = .default
+
+        let identifier = BeforeNotificationIdentifier.predictiveIntervention(for: candidate.id)
+        center.removePendingNotificationRequests(withIdentifiers: [identifier])
+
+        let interval: TimeInterval = max(60, candidate.expiresAt.timeIntervalSinceNow > 0 ? 90 : 60)
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: identifier,
+            content: content,
+            trigger: trigger
+        )
+        try? await center.add(request)
+    }
+
+    func cancelPredictiveInterventionNotification(candidateID: UUID) {
+        center.removePendingNotificationRequests(
+            withIdentifiers: [BeforeNotificationIdentifier.predictiveIntervention(for: candidateID)]
         )
     }
 

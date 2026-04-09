@@ -19,7 +19,13 @@ enum TomorrowBoxItemFactory {
             prompt: prompt,
             entrySource: session.entrySource,
             linkedCheckEventID: eventID,
-            draft: .quick(from: session)
+            draft: .quick(from: session),
+            riskLevel: quickRiskLevel(for: result),
+            brainSnapshot: session.brainState?.verificationSnapshot,
+            taskGraphSummary: "Quick check with \(session.scenario.title.lowercased()) still active.",
+            reopenHint: result.primaryAction.title(using: BeforePolicy.QuickCheck.defaultBufferDuration),
+            templateHint: session.brainState?.activeInterventionTemplateIDs.first,
+            interventionHistorySummary: session.brainState?.sessionBiases.first
         )
     }
 
@@ -39,7 +45,11 @@ enum TomorrowBoxItemFactory {
             prompt: prompt,
             entrySource: entrySource,
             linkedCheckEventID: event.id,
-            draft: .quick(from: event)
+            draft: .quick(from: event),
+            riskLevel: event.reflectionOutcome == .regrettedIt || event.reflectionOutcome == .feltEmptier ? .high : .medium,
+            taskGraphSummary: "Quick check history for \(event.scenario.title.lowercased()).",
+            reopenHint: "Reopen this with a pause instead of replaying the same urge.",
+            interventionHistorySummary: event.reflectionNote
         )
     }
 
@@ -58,7 +68,13 @@ enum TomorrowBoxItemFactory {
             detail: result.summary,
             prompt: prompt,
             entrySource: session.entrySource,
-            draft: .balance(from: session)
+            draft: .balance(from: session),
+            riskLevel: .medium,
+            brainSnapshot: session.brainState?.verificationSnapshot,
+            taskGraphSummary: result.focusTitle,
+            reopenHint: result.nextAction,
+            templateHint: session.brainState?.activeInterventionTemplateIDs.first,
+            interventionHistorySummary: session.brainState?.sessionBiases.first
         )
     }
 
@@ -76,7 +92,10 @@ enum TomorrowBoxItemFactory {
             detail: record.focusSummary,
             prompt: prompt,
             entrySource: entrySource,
-            draft: .balance(from: record)
+            draft: .balance(from: record),
+            riskLevel: .medium,
+            taskGraphSummary: record.focusTitle,
+            reopenHint: record.nextAction
         )
     }
 
@@ -95,7 +114,13 @@ enum TomorrowBoxItemFactory {
             detail: result.coreTension,
             prompt: prompt,
             entrySource: session.entrySource,
-            draft: .mirror(from: session)
+            draft: .mirror(from: session),
+            riskLevel: .high,
+            brainSnapshot: session.brainState?.verificationSnapshot,
+            taskGraphSummary: result.nextActionTitle,
+            reopenHint: result.nextAction,
+            templateHint: session.brainState?.activeInterventionTemplateIDs.first,
+            interventionHistorySummary: session.brainState?.sessionBiases.first
         )
     }
 
@@ -113,7 +138,10 @@ enum TomorrowBoxItemFactory {
             detail: record.coreTension,
             prompt: prompt,
             entrySource: entrySource,
-            draft: .mirror(from: record)
+            draft: .mirror(from: record),
+            riskLevel: .high,
+            taskGraphSummary: record.nextActionTitle,
+            reopenHint: record.nextAction
         )
     }
 
@@ -136,7 +164,11 @@ enum TomorrowBoxItemFactory {
             detail: detail,
             prompt: prompt,
             entrySource: entrySource,
-            draft: draft
+            draft: draft,
+            riskLevel: .medium,
+            taskGraphSummary: request.summary,
+            reopenHint: request.reply ?? request.summary,
+            interventionHistorySummary: request.message
         )
     }
 
@@ -155,8 +187,23 @@ enum TomorrowBoxItemFactory {
             detail: trimmed(item.detail),
             prompt: trimmed(item.prompt),
             entrySource: entrySource,
-            draft: draft
+            draft: draft,
+            riskLevel: .medium,
+            taskGraphSummary: trimmed(item.title),
+            reopenHint: trimmed(item.detail),
+            interventionHistorySummary: trimmed(item.prompt)
         )
+    }
+
+    private static func quickRiskLevel(for result: QuickCheckResult) -> InterventionRiskLevel {
+        switch result.verdict {
+        case .goAhead:
+            .low
+        case .pause:
+            .medium
+        case .notRecommended:
+            .high
+        }
     }
 
     private static func dueDate(

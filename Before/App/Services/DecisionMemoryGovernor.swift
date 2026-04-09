@@ -160,7 +160,8 @@ enum DecisionMemoryGovernor {
             provenanceSummary: draft.provenanceSummary,
             lastWriteOperation: .noop,
             lastGovernanceDecision: governanceAssessment.decision,
-            governanceReason: governanceAssessment.reason
+            governanceReason: governanceAssessment.reason,
+            tier: draft.tier
         )
     }
 
@@ -185,6 +186,7 @@ enum DecisionMemoryGovernor {
         candidate.provenanceSummary = draft.provenanceSummary
         candidate.lastGovernanceDecisionRaw = governanceAssessment.decision.rawValue
         candidate.governanceReason = governanceAssessment.reason
+        candidate.tierRaw = draft.tier.rawValue
         if observedNewFingerprint {
             candidate.confirmationCount += 1
             candidate.lastObservationFingerprint = fingerprint
@@ -290,6 +292,7 @@ enum DecisionMemoryGovernor {
         let originalEvidenceCount = record.evidenceCount
         let originalObservationCount = record.observationCount
         let originalProvenanceSummary = record.provenanceSummary
+        let originalTierRaw = record.tierRaw
 
         record.typeRaw = draft.type.rawValue
         record.topic = draft.topic
@@ -304,6 +307,7 @@ enum DecisionMemoryGovernor {
         record.evidenceCount = draft.evidenceCount
         record.observationCount = candidate.confirmationCount
         record.provenanceSummary = draft.provenanceSummary
+        record.tierRaw = draft.tier.rawValue
         record.lifecycleStateRaw = DecisionMemoryLifecycleState.active.rawValue
         record.lastReviewedAt = max(record.reviewedAt, draft.lastConfirmedAt)
 
@@ -319,7 +323,8 @@ enum DecisionMemoryGovernor {
             originalRetrievalTagsBlob != record.retrievalTagsBlob ||
             originalEvidenceCount != record.evidenceCount ||
             originalObservationCount != record.observationCount ||
-            originalProvenanceSummary != record.provenanceSummary
+            originalProvenanceSummary != record.provenanceSummary ||
+            originalTierRaw != record.tierRaw
     }
 
     private static func transitionLifecycle(

@@ -22,12 +22,14 @@ struct OpenQuickCheckIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult {
-        PendingLaunchRequestStore.enqueue(
-            PendingLaunchRequest(
+        DecisionIntentEnvelopeStore.enqueue(
+            DecisionIntentEnvelope(
+                kind: .quickCapture,
+                sourceSurface: entrySource == .siri ? .siri : .shortcut,
                 entrySource: entrySource,
                 preferredMode: .quick,
                 scenario: scenario,
-                requestedAt: .now
+                riskLevel: .low
             )
         )
         return .result()
@@ -62,12 +64,13 @@ struct OpenDecisionModeIntent: AppIntent {
 
     func perform() async throws -> some IntentResult {
         let cleanedPrompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines)
-        PendingLaunchRequestStore.enqueue(
-            PendingLaunchRequest(
+        DecisionIntentEnvelopeStore.enqueue(
+            DecisionIntentEnvelope(
+                kind: .openMode,
+                sourceSurface: entrySource == .siri ? .siri : .shortcut,
                 entrySource: entrySource,
                 preferredMode: mode,
-                prompt: cleanedPrompt?.isEmpty == true ? nil : cleanedPrompt,
-                requestedAt: .now
+                promptSeed: cleanedPrompt?.isEmpty == true ? nil : cleanedPrompt
             )
         )
         return .result()

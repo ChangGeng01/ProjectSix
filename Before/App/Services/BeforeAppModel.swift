@@ -16,6 +16,8 @@ final class BeforeAppModel: ObservableObject {
     @Published var activeBalanceSession: BalanceBoardSession?
     @Published var activeMirrorSession: MirrorWorkspaceSession?
     @Published private(set) var activeTaskGraph: DecisionTaskGraphSnapshot?
+    @Published private(set) var currentBrainState: CurrentBrainState?
+    @Published var interventionCandidate: InterventionPredictionCandidate?
     @Published var reflectionContext: ReflectionContext?
     @Published var letGoContext: LetGoContext?
     @Published var startupNotice: String?
@@ -71,9 +73,11 @@ final class BeforeAppModel: ObservableObject {
 
     func handleInitialAppearance() {
         refreshDecisionMemoryStore()
+        refreshGlobalBrainState(source: .launch)
         presentPendingReflectionIfNeeded()
         consumePendingLaunchRequestIfNeeded()
         restoreActiveWorkspaceIfNeeded()
+        refreshPredictedIntervention()
         syncWidgetSnapshot()
     }
 
@@ -176,6 +180,10 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func consumePendingLaunchRequestIfNeeded() {
+        if let envelope = WatchHandoffCoordinator.consume() {
+            consumeDecisionIntentEnvelope(envelope)
+            return
+        }
         guard let request = PendingLaunchRequestStore.consume() else { return }
         switch LaunchRequestResolver.resolve(request) {
         case let .quick(scenario, prompt):
@@ -194,15 +202,19 @@ final class BeforeAppModel: ObservableObject {
     func handleScenePhase(_ phase: ScenePhase) {
         switch phase {
         case .active:
+            refreshDecisionMemoryStore()
+            refreshGlobalBrainState(source: .sceneActive)
             presentPendingReflectionIfNeeded()
             consumePendingLaunchRequestIfNeeded()
             restoreActiveWorkspaceIfNeeded()
+            refreshPredictedIntervention()
         case .background:
             if pendingReflectionContext != nil {
                 shouldPromptReflectionAfterBackground = true
                 persistPendingReflectionState()
             }
             persistActiveWorkspaceState()
+            schedulePredictiveInterventionIfNeeded()
         case .inactive:
             persistActiveWorkspaceState()
         default:
@@ -371,6 +383,18 @@ final class BeforeAppModel: ObservableObject {
         }
 
         removeTomorrowBoxItem(item)
+        if let riskLevel = item.riskLevel, riskLevel != .low {
+            interventionCandidate = InterventionPredictionCandidate(
+                riskLevel: riskLevel,
+                title: item.reopenHint ?? item.title,
+                detail: item.interventionHistorySummary ?? item.detail,
+                suggestedMode: item.mode,
+                reason: item.templateHint ?? "A previous hold suggests reopening this with more structure.",
+                expiresAt: .now.addingTimeInterval(60 * 30)
+            )
+        } else {
+            refreshPredictedIntervention()
+        }
         selectedTab = .home
         persistActiveWorkspaceState()
     }
@@ -507,6 +531,16 @@ final class BeforeAppModel: ObservableObject {
             event.reflectionOutcomeRaw = outcome.rawValue
             let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
             event.reflectionNote = trimmedNote.isEmpty ? nil : trimmedNote
+            DecisionReactionBanditStore.update(
+                mode: .quick,
+                riskLevel: inferredRiskLevel(for: event, outcome: outcome),
+                languageMode: DecisionLanguageMode.detect(
+                    preferredLanguages: Locale.preferredLanguages,
+                    sampleTexts: [event.note, trimmedNote]
+                ),
+                chosenArmID: chosenArmID(for: event.finalAction),
+                reward: reflectionReward(outcome)
+            )
         }
 
         if let reminderText {
@@ -530,6 +564,8 @@ final class BeforeAppModel: ObservableObject {
         }
 
         persistContext(context, operation: "saving reflection follow-up")
+        refreshGlobalBrainState(source: .explicitRefresh)
+        refreshPredictedIntervention()
         refreshWidgetSurfaces()
         pendingReflectionContext = nil
         shouldPromptReflectionAfterBackground = false
@@ -666,11 +702,17 @@ final class BeforeAppModel: ObservableObject {
         deleteAll(SelfReminder.self, in: context)
         deleteAll(DecisionMemoryRecord.self, in: context)
         deleteAll(DecisionMemoryCandidateRecord.self, in: context)
+        deleteAll(BrainStateUpdate.self, in: context)
+        deleteAll(InterventionTrigger.self, in: context)
+        deleteAll(InterventionTemplateRecord.self, in: context)
+        deleteAll(FailurePatternRecord.self, in: context)
         clearTomorrowBox()
         supportInbox.clearAll()
         sharedLifeStore.clearAll()
 
         PendingLaunchRequestStore.clear()
+        DecisionIntentEnvelopeStore.clear()
+        DecisionReactionBanditStore.clear()
         WidgetSnapshotStore.clear()
         resetTransientState()
         refreshWidgetSurfaces()
@@ -688,6 +730,148 @@ final class BeforeAppModel: ObservableObject {
             updatedAt: .now
         )
         WidgetSnapshotStore.save(snapshot)
+    }
+
+    func dismissInterventionCandidate() {
+        if let interventionCandidate {
+            NotificationService.shared.cancelPredictiveInterventionNotification(candidateID: interventionCandidate.id)
+        }
+        interventionCandidate = nil
+    }
+
+    func applyInterventionCandidate(_ candidate: InterventionPredictionCandidate) {
+        interventionCandidate = nil
+        switch candidate.riskLevel {
+        case .low:
+            selectedTab = .box
+        case .medium, .high:
+            if let mode = candidate.suggestedMode {
+                startDecisionMode(mode, entrySource: .app, prompt: candidate.title)
+            } else {
+                selectedTab = .box
+            }
+        }
+    }
+
+    func portraitPanelState() -> BrainPortraitPanelState {
+        let context = modelContainer.mainContext
+        let records = DecisionMemorySystem.fetchMemoryRecords(in: context)
+        let candidates = DecisionMemorySystem.fetchCandidateRecords(in: context)
+        let memories =
+            records.map {
+                BrainPortraitMemoryItem(
+                    id: $0.id,
+                    title: $0.headline,
+                    detail: $0.provenanceSummary,
+                    source: $0.source,
+                    confidence: $0.confidence,
+                    tier: $0.tier,
+                    isPending: false,
+                    lastConfirmedAt: $0.lastConfirmedAt,
+                    governanceStatus: .admitted
+                )
+            } +
+            candidates.map {
+                BrainPortraitMemoryItem(
+                    id: $0.id,
+                    title: $0.headline,
+                    detail: $0.provenanceSummary,
+                    source: $0.source,
+                    confidence: $0.confidence,
+                    tier: $0.tier,
+                    isPending: true,
+                    lastConfirmedAt: $0.lastObservedAt,
+                    governanceStatus: $0.lastGovernanceDecision == .deferred ? .deferred : .pending
+                )
+            }
+
+        return BrainPortraitPanelState(
+            currentBrainState: currentBrainState,
+            memories: memories.sorted { $0.confidence > $1.confidence },
+            templates: InterventionTemplateStore.selectTemplates(
+                in: context,
+                mode: currentBrainState?.mode ?? .quick,
+                riskLevel: interventionCandidate?.riskLevel ?? .low,
+                recommendedArmIDs: currentBrainState?.activeTemplateIDs ?? []
+            )
+            .map {
+                BrainPortraitTemplateItem(
+                    id: $0.id,
+                    title: $0.title,
+                    summary: $0.summary,
+                    body: $0.body,
+                    mode: $0.mode,
+                    riskLevel: $0.riskLevel,
+                    isPinned: $0.isPinned,
+                    successCount: $0.successCount
+                )
+            },
+            failurePatterns: FailurePatternStore.selectedFailurePatterns(
+                in: context,
+                mode: currentBrainState?.mode ?? .quick
+            )
+            .map {
+                BrainPortraitFailurePatternItem(
+                    id: $0.id,
+                    title: $0.title,
+                    detail: $0.detail,
+                    mode: $0.mode,
+                    cadenceTag: $0.cadenceTag,
+                    suppressionWeight: $0.suppressionWeight,
+                    evidenceCount: $0.evidenceCount
+                )
+            },
+            generatedAt: .now
+        )
+    }
+
+    func deleteBrainPortraitMemory(id: String) {
+        let context = modelContainer.mainContext
+        if let record = DecisionMemorySystem.fetchMemoryRecords(in: context).first(where: { $0.id == id }) {
+            context.delete(record)
+        }
+        if let candidate = DecisionMemorySystem.fetchCandidateRecords(in: context).first(where: { $0.id == id }) {
+            context.delete(candidate)
+        }
+        persistContext(context, operation: "deleting portrait memory", refreshMemoryProjection: true)
+        refreshGlobalBrainState(source: .explicitRefresh)
+    }
+
+    func downgradeBrainPortraitMemory(id: String) {
+        let context = modelContainer.mainContext
+        if let record = DecisionMemorySystem.fetchMemoryRecords(in: context).first(where: { $0.id == id }) {
+            record.confidence = max(0.2, record.confidence - 0.2)
+            record.priority = max(0.2, record.priority - 0.2)
+            record.lifecycleStateRaw = DecisionMemoryLifecycleState.aging.rawValue
+        }
+        if let candidate = DecisionMemorySystem.fetchCandidateRecords(in: context).first(where: { $0.id == id }) {
+            candidate.confidence = max(0.2, candidate.confidence - 0.2)
+        }
+        persistContext(context, operation: "downgrading portrait memory", refreshMemoryProjection: true)
+        refreshGlobalBrainState(source: .explicitRefresh)
+    }
+
+    func markBrainPortraitMemoryAsNotMe(id: String) {
+        let context = modelContainer.mainContext
+        if let record = DecisionMemorySystem.fetchMemoryRecords(in: context).first(where: { $0.id == id }) {
+            record.lifecycleStateRaw = DecisionMemoryLifecycleState.retired.rawValue
+            record.priority = 0
+        }
+        if let candidate = DecisionMemorySystem.fetchCandidateRecords(in: context).first(where: { $0.id == id }) {
+            context.delete(candidate)
+        }
+        persistContext(context, operation: "retiring portrait memory", refreshMemoryProjection: true)
+        refreshGlobalBrainState(source: .explicitRefresh)
+    }
+
+    func pinInterventionTemplate(id: String) {
+        let context = modelContainer.mainContext
+        let descriptor = FetchDescriptor<InterventionTemplateRecord>()
+        if let template = (try? context.fetch(descriptor))?.first(where: { $0.id == id }) {
+            template.isPinned = true
+            persistContext(context, operation: "pinning intervention template")
+            refreshGlobalBrainState(source: .explicitRefresh)
+        }
     }
 
     func syncWorkspacePersistence() {
@@ -845,6 +1029,7 @@ final class BeforeAppModel: ObservableObject {
         activeBalanceSession = nil
         activeMirrorSession = nil
         activeTaskGraph = nil
+        currentBrainState = nil
         DecisionTaskGraphStore.clear()
     }
 
@@ -949,6 +1134,7 @@ final class BeforeAppModel: ObservableObject {
 
         selectedTab = .home
         refreshActiveTaskGraphSnapshot()
+        refreshPredictedIntervention()
     }
 
     private func persistActiveWorkspaceState() {
@@ -1015,7 +1201,10 @@ final class BeforeAppModel: ObservableObject {
 
     private func refreshDecisionMemoryStore(force: Bool = false) {
         guard force || isMemoryProjectionDirty || memoryProjection == nil else { return }
-        memoryProjection = DecisionMemorySystem.refreshProjection(in: modelContainer.mainContext)
+        let context = modelContainer.mainContext
+        InterventionTemplateStore.ensureDefaults(in: context)
+        FailurePatternStore.syncFromHistory(in: context)
+        memoryProjection = DecisionMemorySystem.refreshProjection(in: context)
         isMemoryProjectionDirty = false
         if let notice = PersistenceIssueRecorder.latestNotice() ?? StateStorageIssueRecorder.latestNotice() {
             publishStartupNotice(notice)
@@ -1027,14 +1216,16 @@ final class BeforeAppModel: ObservableObject {
         let strategy = DecisionIntelligenceCoordinator
             .executionProfile(preferences: preferences)
             .strategy(for: .quick)
-        session.loadBrainState(
-            DecisionMemorySystem.loadBrainState(
-                mode: .quick,
-                prompt: quickPromptSeed(for: session),
-                projection: currentMemoryProjection(),
-                retrievalMode: strategy.retrievalMode
-            )
+        currentBrainState = CurrentBrainStateLoader.bootstrapCurrentBrainState(
+            mode: .quick,
+            prompt: quickPromptSeed(for: session),
+            source: .sessionPrime,
+            taskGraph: activeTaskGraph,
+            context: modelContainer.mainContext,
+            projection: currentMemoryProjection(),
+            retrievalMode: strategy.retrievalMode
         )
+        session.loadBrainState(currentBrainState?.brainState)
     }
 
     private func primeBalanceSession(_ session: BalanceBoardSession) {
@@ -1042,14 +1233,16 @@ final class BeforeAppModel: ObservableObject {
         let strategy = DecisionIntelligenceCoordinator
             .executionProfile(preferences: preferences)
             .strategy(for: .balance)
-        session.loadBrainState(
-            DecisionMemorySystem.loadBrainState(
-                mode: .balance,
-                prompt: balancePromptSeed(for: session),
-                projection: currentMemoryProjection(),
-                retrievalMode: strategy.retrievalMode
-            )
+        currentBrainState = CurrentBrainStateLoader.bootstrapCurrentBrainState(
+            mode: .balance,
+            prompt: balancePromptSeed(for: session),
+            source: .sessionPrime,
+            taskGraph: activeTaskGraph,
+            context: modelContainer.mainContext,
+            projection: currentMemoryProjection(),
+            retrievalMode: strategy.retrievalMode
         )
+        session.loadBrainState(currentBrainState?.brainState)
     }
 
     private func primeMirrorSession(_ session: MirrorWorkspaceSession) {
@@ -1057,14 +1250,16 @@ final class BeforeAppModel: ObservableObject {
         let strategy = DecisionIntelligenceCoordinator
             .executionProfile(preferences: preferences)
             .strategy(for: .mirror)
-        session.loadBrainState(
-            DecisionMemorySystem.loadBrainState(
-                mode: .mirror,
-                prompt: mirrorPromptSeed(for: session),
-                projection: currentMemoryProjection(),
-                retrievalMode: strategy.retrievalMode
-            )
+        currentBrainState = CurrentBrainStateLoader.bootstrapCurrentBrainState(
+            mode: .mirror,
+            prompt: mirrorPromptSeed(for: session),
+            source: .sessionPrime,
+            taskGraph: activeTaskGraph,
+            context: modelContainer.mainContext,
+            projection: currentMemoryProjection(),
+            retrievalMode: strategy.retrievalMode
         )
+        session.loadBrainState(currentBrainState?.brainState)
     }
 
     private func quickPromptSeed(for session: QuickCheckSession) -> String {
@@ -1105,6 +1300,173 @@ final class BeforeAppModel: ObservableObject {
         .map(trimmed)
         .filter { !$0.isEmpty }
         .joined(separator: " ")
+    }
+
+    private func refreshGlobalBrainState(source: BrainStateUpdateSource) {
+        refreshDecisionMemoryStore()
+
+        let mode: DecisionMode
+        let promptSeed: String
+
+        if let activeQuickSession {
+            mode = .quick
+            promptSeed = quickPromptSeed(for: activeQuickSession)
+        } else if let activeBalanceSession {
+            mode = .balance
+            promptSeed = balancePromptSeed(for: activeBalanceSession)
+        } else if let activeMirrorSession {
+            mode = .mirror
+            promptSeed = mirrorPromptSeed(for: activeMirrorSession)
+        } else if let activeTaskGraph, let taskMode = activeTaskGraph.mode {
+            mode = taskMode
+            promptSeed = activeTaskGraph.promptSeed
+        } else {
+            mode = .quick
+            promptSeed = ""
+        }
+
+        let traceKind: DecisionIntelligenceTraceKind
+        switch mode {
+        case .quick:
+            traceKind = .quick
+        case .balance:
+            traceKind = .balance
+        case .mirror:
+            traceKind = .mirror
+        }
+
+        let strategy = DecisionIntelligenceCoordinator
+            .executionProfile(preferences: preferences)
+            .strategy(for: traceKind)
+
+        currentBrainState = CurrentBrainStateLoader.bootstrapCurrentBrainState(
+            mode: mode,
+            prompt: promptSeed,
+            source: source,
+            taskGraph: activeTaskGraph,
+            context: modelContainer.mainContext,
+            projection: currentMemoryProjection(),
+            retrievalMode: strategy.retrievalMode
+        )
+    }
+
+    private func consumeDecisionIntentEnvelope(_ envelope: DecisionIntentEnvelope) {
+        switch envelope.kind {
+        case .quickCapture:
+            startQuickCheck(
+                entrySource: envelope.entrySource,
+                scenario: envelope.scenario,
+                prompt: envelope.promptSeed ?? ""
+            )
+        case .openMode:
+            startDecisionMode(
+                envelope.preferredMode ?? .quick,
+                entrySource: envelope.entrySource,
+                prompt: envelope.promptSeed ?? ""
+            )
+        case .reopenTomorrowItem:
+            selectedTab = .box
+            startDecisionMode(
+                envelope.preferredMode ?? .quick,
+                entrySource: envelope.entrySource,
+                prompt: envelope.promptSeed ?? ""
+            )
+        case .predictiveIntervention:
+            interventionCandidate = InterventionPredictionCandidate(
+                riskLevel: envelope.riskLevel ?? .medium,
+                title: envelope.promptSeed ?? "Pause before you decide.",
+                detail: "A predicted pattern says a slower move is safer here.",
+                suggestedMode: envelope.preferredMode,
+                reason: envelope.triggerReason ?? "A recent pattern suggests more friction before acting.",
+                expiresAt: envelope.expiresAt
+            )
+        case .resumeCurrentDecision:
+            restoreActiveWorkspaceIfNeeded()
+        }
+
+        refreshGlobalBrainState(source: envelope.sourceSurface == .watch ? .watchHandoff : .explicitRefresh)
+    }
+
+    private func refreshPredictedIntervention() {
+        let next = InterventionPredictionEngine.predictCandidate(
+            currentBrainState: currentBrainState,
+            context: modelContainer.mainContext,
+            preferences: preferences
+        )
+        if let existing = interventionCandidate, let next,
+           existing.riskLevel == next.riskLevel,
+           existing.title == next.title,
+           existing.detail == next.detail,
+           existing.reason == next.reason,
+           existing.suggestedMode == next.suggestedMode {
+            interventionCandidate = existing
+        } else {
+            interventionCandidate = next
+        }
+    }
+
+    private func schedulePredictiveInterventionIfNeeded() {
+        guard preferences.predictiveInterventionsEnabled,
+              let interventionCandidate,
+              interventionCandidate.riskLevel != .low else {
+            return
+        }
+
+        let context = modelContainer.mainContext
+        context.insert(
+            InterventionTrigger(
+                riskLevel: interventionCandidate.riskLevel,
+                title: interventionCandidate.title,
+                detail: interventionCandidate.detail,
+                reason: interventionCandidate.reason,
+                suggestedMode: interventionCandidate.suggestedMode,
+                wasDelivered: true
+            )
+        )
+        persistContext(context, operation: "recording predictive intervention trigger")
+
+        Task {
+            await NotificationService.shared.schedulePredictiveInterventionNotification(interventionCandidate)
+        }
+    }
+
+    private func reflectionReward(_ outcome: ReflectionOutcome) -> Bool {
+        switch outcome {
+        case .betterThanExpected, .okay, .notNeeded:
+            true
+        case .regrettedIt, .feltEmptier:
+            false
+        }
+    }
+
+    private func chosenArmID(for action: CheckAction) -> String {
+        switch action {
+        case .decideTomorrow, .wait90s:
+            "tomorrow_box_interrupt"
+        case .leaveStimulus:
+            "slow_delay_guard"
+        case .goAheadAnyway, .continueMindfully:
+            "brief_warm_nudge"
+        }
+    }
+
+    private func inferredRiskLevel(
+        for event: CheckEvent,
+        outcome: ReflectionOutcome
+    ) -> InterventionRiskLevel {
+        switch outcome {
+        case .regrettedIt, .feltEmptier:
+            .high
+        case .okay:
+            .medium
+        case .betterThanExpected, .notNeeded:
+            switch event.finalAction {
+            case .goAheadAnyway, .continueMindfully:
+                .medium
+            case .wait90s, .leaveStimulus, .decideTomorrow:
+                .low
+            }
+        }
     }
 
     private func refreshActiveTaskGraphSnapshot() {

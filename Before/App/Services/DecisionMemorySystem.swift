@@ -16,6 +16,7 @@ struct DecisionMemoryDraft: Sendable {
     let evidenceCount: Int
     let provenanceSummary: String
     let promotionPolicy: PromotionPolicy
+    let tier: DecisionMemoryTier = .warm
 
     var fingerprint: String {
         [
@@ -56,7 +57,8 @@ struct DecisionMemoryDraft: Sendable {
             observationCount: observationCount,
             provenanceSummary: provenanceSummary,
             lifecycleState: lifecycleState,
-            lastReviewedAt: lastReviewedAt
+            lastReviewedAt: lastReviewedAt,
+            tier: tier
         )
     }
 }
@@ -107,6 +109,7 @@ enum DecisionMemorySystem {
         let isPending: Bool
         let provenanceSummary: String
         let sourceTrustProfile: DecisionMemoryTrustProfile
+        let tier: DecisionMemoryTier
 
         init(record: DecisionMemoryRecord) {
             id = record.id
@@ -123,6 +126,7 @@ enum DecisionMemorySystem {
             governanceStatus = .admitted
             isPending = false
             provenanceSummary = record.provenanceSummary
+            tier = record.tier
             sourceTrustProfile = DecisionMemoryTrustEngine.profile(
                 source: record.source,
                 evidenceCount: record.evidenceCount,
@@ -148,6 +152,7 @@ enum DecisionMemorySystem {
             governanceStatus = candidate.lastGovernanceDecision == .deferred ? .deferred : .pending
             isPending = candidate.status == .pending
             provenanceSummary = candidate.provenanceSummary
+            tier = candidate.tier
             sourceTrustProfile = DecisionMemoryTrustEngine.profile(
                 source: candidate.source,
                 evidenceCount: candidate.evidenceCount,
@@ -247,8 +252,19 @@ enum DecisionMemorySystem {
             resolvedCandidates = candidates
         }
 
+        let checkEvents = fetchCheckEvents(in: context)
+        let balanceRecords = fetchBalanceRecords(in: context)
+        let mirrorRecords = fetchMirrorRecords(in: context)
+        EmbeddingMemoryStore.rebuildIndex(
+            records: resolvedRecords,
+            candidates: resolvedCandidates,
+            checkEvents: checkEvents,
+            balance: balanceRecords,
+            mirror: mirrorRecords
+        )
+
         return BrainStateProjection(
-            checkEvents: fetchCheckEvents(in: context),
+            checkEvents: checkEvents,
             records: resolvedRecords,
             candidates: resolvedCandidates,
             governanceSnapshot: governanceSnapshot,
@@ -302,10 +318,18 @@ enum DecisionMemorySystem {
         }
 
         let queryTags = queryTags(for: mode, prompt: prompt)
+        let embeddingScores = Dictionary(
+            uniqueKeysWithValues: EmbeddingMemoryStore.query(
+                prompt,
+                allowedTiers: [.hot, .warm],
+                limit: 12
+            )
+            .map { ($0.id, $0.score) }
+        )
         let retrievalPlan = retrievalPlan(for: mode, retrievalMode: retrievalMode)
         let orderedItems = brainItems.sorted {
-            score($0, mode: mode, queryTags: queryTags, now: now) >
-                score($1, mode: mode, queryTags: queryTags, now: now)
+            score($0, mode: mode, queryTags: queryTags, embeddingScores: embeddingScores, now: now) >
+                score($1, mode: mode, queryTags: queryTags, embeddingScores: embeddingScores, now: now)
         }
         let retrievalPool = orderedItems
             .filter { retrievalPlan.includesPendingCandidates || !$0.isPending }
@@ -426,6 +450,22 @@ enum DecisionMemorySystem {
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         descriptor.fetchLimit = projectionCheckEventLimit
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    static func fetchBalanceRecords(in context: ModelContext) -> [BalanceDecisionRecord] {
+        var descriptor = FetchDescriptor<BalanceDecisionRecord>(
+            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 36
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    static func fetchMirrorRecords(in context: ModelContext) -> [MirrorDecisionRecord] {
+        var descriptor = FetchDescriptor<MirrorDecisionRecord>(
+            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 36
         return (try? context.fetch(descriptor)) ?? []
     }
 
@@ -1103,6 +1143,7 @@ enum DecisionMemorySystem {
         _ memory: BrainMemoryItem,
         mode: DecisionMode,
         queryTags: Set<String>,
+        embeddingScores: [String: Double],
         now: Date
     ) -> Double {
         let overlap = Double(
@@ -1143,7 +1184,13 @@ enum DecisionMemorySystem {
         }
 
         let pendingPenalty = memory.isPending ? 0.88 : 1.0
-        return ((memory.priority * 5) + (memory.effectiveConfidence * 3) + overlap + typeBoost) *
+        let tierBoost: Double = switch memory.tier {
+        case .hot: 1.2
+        case .warm: 0.6
+        case .cold: -0.4
+        }
+        let embeddingBoost = (embeddingScores[memory.id] ?? 0) * 3.2
+        return ((memory.priority * 5) + (memory.effectiveConfidence * 3) + overlap + typeBoost + tierBoost + embeddingBoost) *
             decayMultiplier *
             pendingPenalty
     }

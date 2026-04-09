@@ -95,6 +95,10 @@ struct PersistenceBootstrap {
             MirrorDecisionRecord.self,
             DecisionMemoryRecord.self,
             DecisionMemoryCandidateRecord.self,
+            BrainStateUpdate.self,
+            InterventionTrigger.self,
+            InterventionTemplateRecord.self,
+            FailurePatternRecord.self,
             TomorrowBoxItem.self,
             configurations: configuration(for: mode)
         )

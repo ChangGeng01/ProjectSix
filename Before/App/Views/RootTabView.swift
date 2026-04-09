@@ -35,6 +35,12 @@ struct RootTabView: View {
                 }
                 .tag(AppTab.history)
 
+            SelfPortraitView()
+                .tabItem {
+                    Label("Portrait", systemImage: "person.crop.circle.badge.checkmark")
+                }
+                .tag(AppTab.portrait)
+
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "slider.horizontal.3")

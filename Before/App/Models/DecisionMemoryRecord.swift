@@ -48,6 +48,13 @@ enum DecisionMemoryLifecycleState: String, Codable, Sendable {
     case retired
 }
 
+enum DecisionMemorySourceType: String, Codable, Sendable {
+    case userConfirmed
+    case repeatedBehavior
+    case reflectionInference
+    case externalRetrieval
+}
+
 @Model
 final class DecisionMemoryRecord {
     @Attribute(.unique) var id: String
@@ -66,6 +73,7 @@ final class DecisionMemoryRecord {
     var provenanceSummary: String
     var lifecycleStateRaw: String?
     var lastReviewedAt: Date?
+    var tierRaw: String?
 
     init(
         id: String,
@@ -83,7 +91,8 @@ final class DecisionMemoryRecord {
         observationCount: Int,
         provenanceSummary: String,
         lifecycleState: DecisionMemoryLifecycleState = .active,
-        lastReviewedAt: Date? = nil
+        lastReviewedAt: Date? = nil,
+        tier: DecisionMemoryTier = .warm
     ) {
         self.id = id
         self.typeRaw = type.rawValue
@@ -101,6 +110,7 @@ final class DecisionMemoryRecord {
         self.provenanceSummary = provenanceSummary
         self.lifecycleStateRaw = lifecycleState.rawValue
         self.lastReviewedAt = lastReviewedAt ?? lastConfirmedAt
+        self.tierRaw = tier.rawValue
     }
 }
 
@@ -126,6 +136,7 @@ final class DecisionMemoryCandidateRecord {
     var lastWriteOperationRaw: String
     var lastGovernanceDecisionRaw: String
     var governanceReason: String
+    var tierRaw: String?
 
     init(
         id: String,
@@ -147,7 +158,8 @@ final class DecisionMemoryCandidateRecord {
         provenanceSummary: String,
         lastWriteOperation: DecisionMemoryWriteOperation,
         lastGovernanceDecision: DecisionMemoryGovernanceDecision,
-        governanceReason: String
+        governanceReason: String,
+        tier: DecisionMemoryTier = .warm
     ) {
         self.id = id
         self.typeRaw = type.rawValue
@@ -169,6 +181,7 @@ final class DecisionMemoryCandidateRecord {
         self.lastWriteOperationRaw = lastWriteOperation.rawValue
         self.lastGovernanceDecisionRaw = lastGovernanceDecision.rawValue
         self.governanceReason = governanceReason
+        self.tierRaw = tier.rawValue
     }
 }
 
@@ -191,6 +204,10 @@ extension DecisionMemoryRecord {
 
     var lifecycleState: DecisionMemoryLifecycleState {
         DecisionMemoryLifecycleState(rawValue: lifecycleStateRaw ?? "") ?? .active
+    }
+
+    var tier: DecisionMemoryTier {
+        DecisionMemoryTier(rawValue: tierRaw ?? "") ?? .warm
     }
 
     var reviewedAt: Date {
@@ -242,5 +259,9 @@ extension DecisionMemoryCandidateRecord {
 
     var retrievalTags: [String] {
         DecisionMemoryRecord.decodeTags(retrievalTagsBlob)
+    }
+
+    var tier: DecisionMemoryTier {
+        DecisionMemoryTier(rawValue: tierRaw ?? "") ?? .warm
     }
 }

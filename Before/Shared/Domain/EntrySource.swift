@@ -3,6 +3,7 @@ import Foundation
 
 enum EntrySource: String, CaseIterable, Codable, Identifiable, Sendable {
     case app
+    case watch
     case homeWidgetSmall
     case homeWidgetMedium
     case lockScreenWidget
@@ -15,6 +16,7 @@ enum EntrySource: String, CaseIterable, Codable, Identifiable, Sendable {
     var label: String {
         switch self {
         case .app: "App"
+        case .watch: "Watch"
         case .homeWidgetSmall: "Small Widget"
         case .homeWidgetMedium: "Medium Widget"
         case .lockScreenWidget: "Lock Screen Widget"
@@ -30,6 +32,7 @@ extension EntrySource: AppEnum {
 
     static let caseDisplayRepresentations: [EntrySource: DisplayRepresentation] = [
         .app: "App",
+        .watch: "Watch",
         .homeWidgetSmall: "Small Widget",
         .homeWidgetMedium: "Medium Widget",
         .lockScreenWidget: "Lock Screen Widget",

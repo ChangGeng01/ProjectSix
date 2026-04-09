@@ -108,6 +108,8 @@ struct BeforePreferences: Codable, Equatable, Sendable {
     var quickBufferDuration: QuickBufferDuration
     var restoreInProgressWorkspaces: Bool
     var showReviewInsights: Bool
+    var predictiveInterventionsEnabled: Bool
+    var healthTrendSignalsEnabled: Bool
     var onDeviceIntelligenceMode: OnDeviceIntelligenceMode
     var preferredIntelligenceProvider: DecisionModelProviderPreference
     var allowModelFallbacks: Bool
@@ -117,6 +119,8 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         quickBufferDuration: BeforePolicy.QuickCheck.defaultBufferDuration,
         restoreInProgressWorkspaces: true,
         showReviewInsights: true,
+        predictiveInterventionsEnabled: true,
+        healthTrendSignalsEnabled: false,
         onDeviceIntelligenceMode: .assistive,
         preferredIntelligenceProvider: .gemmaE4B,
         allowModelFallbacks: true
@@ -127,6 +131,8 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         case quickBufferDuration
         case restoreInProgressWorkspaces
         case showReviewInsights
+        case predictiveInterventionsEnabled
+        case healthTrendSignalsEnabled
         case onDeviceIntelligenceMode
         case preferredIntelligenceProvider
         case allowModelFallbacks
@@ -137,6 +143,8 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         quickBufferDuration: QuickBufferDuration,
         restoreInProgressWorkspaces: Bool,
         showReviewInsights: Bool,
+        predictiveInterventionsEnabled: Bool = true,
+        healthTrendSignalsEnabled: Bool = false,
         onDeviceIntelligenceMode: OnDeviceIntelligenceMode,
         preferredIntelligenceProvider: DecisionModelProviderPreference,
         allowModelFallbacks: Bool = true
@@ -145,6 +153,8 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         self.quickBufferDuration = quickBufferDuration
         self.restoreInProgressWorkspaces = restoreInProgressWorkspaces
         self.showReviewInsights = showReviewInsights
+        self.predictiveInterventionsEnabled = predictiveInterventionsEnabled
+        self.healthTrendSignalsEnabled = healthTrendSignalsEnabled
         self.onDeviceIntelligenceMode = onDeviceIntelligenceMode
         self.preferredIntelligenceProvider = preferredIntelligenceProvider
         self.allowModelFallbacks = allowModelFallbacks
@@ -156,6 +166,8 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         self.quickBufferDuration = try container.decodeIfPresent(QuickBufferDuration.self, forKey: .quickBufferDuration) ?? BeforePreferences.default.quickBufferDuration
         self.restoreInProgressWorkspaces = try container.decodeIfPresent(Bool.self, forKey: .restoreInProgressWorkspaces) ?? BeforePreferences.default.restoreInProgressWorkspaces
         self.showReviewInsights = try container.decodeIfPresent(Bool.self, forKey: .showReviewInsights) ?? BeforePreferences.default.showReviewInsights
+        self.predictiveInterventionsEnabled = try container.decodeIfPresent(Bool.self, forKey: .predictiveInterventionsEnabled) ?? BeforePreferences.default.predictiveInterventionsEnabled
+        self.healthTrendSignalsEnabled = try container.decodeIfPresent(Bool.self, forKey: .healthTrendSignalsEnabled) ?? BeforePreferences.default.healthTrendSignalsEnabled
         self.onDeviceIntelligenceMode = try container.decodeIfPresent(OnDeviceIntelligenceMode.self, forKey: .onDeviceIntelligenceMode) ?? BeforePreferences.default.onDeviceIntelligenceMode
         self.preferredIntelligenceProvider = try container.decodeIfPresent(DecisionModelProviderPreference.self, forKey: .preferredIntelligenceProvider) ?? BeforePreferences.default.preferredIntelligenceProvider
         self.allowModelFallbacks = try container.decodeIfPresent(Bool.self, forKey: .allowModelFallbacks) ?? BeforePreferences.default.allowModelFallbacks
