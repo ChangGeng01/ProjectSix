@@ -65,6 +65,7 @@
 		444E192897E256E0ED28CD41 /* LetGoMotionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AE75E02F04EBA937CA1B8A3 /* LetGoMotionDetector.swift */; };
 		464F2EAD3B73B90469A0C6B3 /* ActiveDecisionWorkspaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACE14AA595C9EA5B7FEB035 /* ActiveDecisionWorkspaceStore.swift */; };
 		4748856CD39AAB0011CC84A1 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93C10CF269564FEA13A19731 /* HomeView.swift */; };
+		48106A05FDBABC17AC420338 /* DecisionIntelligenceCacheGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A383F06B1663734D08B24001 /* DecisionIntelligenceCacheGuard.swift */; };
 		486753A8A1E653585E9C636F /* QuickCheckAnswers.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8A05C41C31FF92FED7AB83 /* QuickCheckAnswers.swift */; };
 		48FFA40F346FCC7310AF01CA /* SupportRequestFactoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD17481B92151CE94BC45836 /* SupportRequestFactoryTests.swift */; };
 		4969D37725010235EDB286FC /* LetGoCopyLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FFF495962DBEFB2CBCD451 /* LetGoCopyLibrary.swift */; };
@@ -410,6 +411,7 @@
 		A05E06826B9C52DE8D6875DC /* MirrorEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MirrorEngine.swift; sourceTree = "<group>"; };
 		A25779E30F91D917702DC456 /* DecisionModeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionModeCard.swift; sourceTree = "<group>"; };
 		A2710C9DCEDCB00295552131 /* BeforePreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforePreferencesStore.swift; sourceTree = "<group>"; };
+		A383F06B1663734D08B24001 /* DecisionIntelligenceCacheGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligenceCacheGuard.swift; sourceTree = "<group>"; };
 		A5EAECB9C7486720CA147BCE /* TomorrowBoxItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxItem.swift; sourceTree = "<group>"; };
 		A61DB79FB9E3DC311CE85256 /* SectionHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionHeader.swift; sourceTree = "<group>"; };
 		A9E33F27723396B6B342EB59 /* CheckRuleEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckRuleEngineTests.swift; sourceTree = "<group>"; };
@@ -551,6 +553,7 @@
 				74351E75833B220A7BE890EE /* DecisionAdaptiveRuntimeMatrix.swift */,
 				BD7AE8679F2717EDE797F325 /* DecisionContextLifecycle.swift */,
 				402D41628B5C240AB71A450C /* DecisionIntelligenceAdmissionController.swift */,
+				A383F06B1663734D08B24001 /* DecisionIntelligenceCacheGuard.swift */,
 				12C065A104EC376E9703AB10 /* DecisionIntelligenceCircuitBreaker.swift */,
 				2F047738D148D3433E732FA5 /* DecisionIntelligenceCoordinator.swift */,
 				D128D25C85A9030D123405C2 /* DecisionIntelligenceDebugStore.swift */,
@@ -1045,6 +1048,7 @@
 				86C0AF0FFC0C65E491F002E2 /* DecisionFieldSuggestionLibrary.swift in Sources */,
 				05DE60BF21270D62ED8AEA08 /* DecisionFrontstageState.swift in Sources */,
 				62B2D14B7432B2D253940BA0 /* DecisionIntelligenceAdmissionController.swift in Sources */,
+				48106A05FDBABC17AC420338 /* DecisionIntelligenceCacheGuard.swift in Sources */,
 				658958BBC8FE92921B90057A /* DecisionIntelligenceCircuitBreaker.swift in Sources */,
 				7D6E2C32F1B7CF33CD9B7910 /* DecisionIntelligenceCoordinator.swift in Sources */,
 				9B391CD6FD31BB6092442103 /* DecisionIntelligenceDebugStore.swift in Sources */,

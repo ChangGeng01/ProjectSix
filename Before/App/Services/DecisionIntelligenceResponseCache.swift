@@ -6,6 +6,8 @@ struct DecisionIntelligenceCacheTelemetrySnapshot: Equatable, Sendable {
     let missCountByKind: [DecisionIntelligenceTraceKind: Int]
     let storeCountByKind: [DecisionIntelligenceTraceKind: Int]
     let evictionCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let rejectedStoreCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let quarantinedHitCountByKind: [DecisionIntelligenceTraceKind: Int]
 
     var totalHits: Int {
         hitCountByKind.values.reduce(0, +)
@@ -21,6 +23,14 @@ struct DecisionIntelligenceCacheTelemetrySnapshot: Equatable, Sendable {
 
     var totalEvictions: Int {
         evictionCountByKind.values.reduce(0, +)
+    }
+
+    var totalRejectedStores: Int {
+        rejectedStoreCountByKind.values.reduce(0, +)
+    }
+
+    var totalQuarantinedHits: Int {
+        quarantinedHitCountByKind.values.reduce(0, +)
     }
 }
 
@@ -40,41 +50,95 @@ actor DecisionIntelligenceResponseCache {
     private var missCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
     private var storeCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
     private var evictionCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
+    private var rejectedStoreCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
+    private var quarantinedHitCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
 
     init(limit: Int = BeforePolicy.Settings.intelligenceResponseCacheLimit) {
         self.limit = max(1, limit)
     }
 
     func quickResult(for key: String) -> QuickCheckResult? {
-        cachedValue(for: key, kind: .quick, storage: &quickStorage, order: &quickOrder)
+        cachedValue(
+            for: key,
+            kind: .quick,
+            storage: &quickStorage,
+            order: &quickOrder,
+            validator: DecisionIntelligenceCacheGuard.validate
+        )
     }
 
     func storeQuickResult(_ result: QuickCheckResult, for key: String) {
-        storeValue(result, for: key, kind: .quick, storage: &quickStorage, order: &quickOrder)
+        storeValue(
+            result,
+            for: key,
+            kind: .quick,
+            storage: &quickStorage,
+            order: &quickOrder,
+            validator: DecisionIntelligenceCacheGuard.validate
+        )
     }
 
     func balanceResult(for key: String) -> BalanceBoardResult? {
-        cachedValue(for: key, kind: .balance, storage: &balanceStorage, order: &balanceOrder)
+        cachedValue(
+            for: key,
+            kind: .balance,
+            storage: &balanceStorage,
+            order: &balanceOrder,
+            validator: DecisionIntelligenceCacheGuard.validate
+        )
     }
 
     func storeBalanceResult(_ result: BalanceBoardResult, for key: String) {
-        storeValue(result, for: key, kind: .balance, storage: &balanceStorage, order: &balanceOrder)
+        storeValue(
+            result,
+            for: key,
+            kind: .balance,
+            storage: &balanceStorage,
+            order: &balanceOrder,
+            validator: DecisionIntelligenceCacheGuard.validate
+        )
     }
 
     func mirrorResult(for key: String) -> MirrorResult? {
-        cachedValue(for: key, kind: .mirror, storage: &mirrorStorage, order: &mirrorOrder)
+        cachedValue(
+            for: key,
+            kind: .mirror,
+            storage: &mirrorStorage,
+            order: &mirrorOrder,
+            validator: DecisionIntelligenceCacheGuard.validate
+        )
     }
 
     func storeMirrorResult(_ result: MirrorResult, for key: String) {
-        storeValue(result, for: key, kind: .mirror, storage: &mirrorStorage, order: &mirrorOrder)
+        storeValue(
+            result,
+            for: key,
+            kind: .mirror,
+            storage: &mirrorStorage,
+            order: &mirrorOrder,
+            validator: DecisionIntelligenceCacheGuard.validate
+        )
     }
 
     func reminder(for key: String) -> ReminderSelectionCandidate? {
-        cachedValue(for: key, kind: .reminder, storage: &reminderStorage, order: &reminderOrder)
+        cachedValue(
+            for: key,
+            kind: .reminder,
+            storage: &reminderStorage,
+            order: &reminderOrder,
+            validator: DecisionIntelligenceCacheGuard.validate
+        )
     }
 
     func storeReminder(_ candidate: ReminderSelectionCandidate, for key: String) {
-        storeValue(candidate, for: key, kind: .reminder, storage: &reminderStorage, order: &reminderOrder)
+        storeValue(
+            candidate,
+            for: key,
+            kind: .reminder,
+            storage: &reminderStorage,
+            order: &reminderOrder,
+            validator: DecisionIntelligenceCacheGuard.validate
+        )
     }
 
     func telemetrySnapshot() -> DecisionIntelligenceCacheTelemetrySnapshot {
@@ -88,7 +152,9 @@ actor DecisionIntelligenceResponseCache {
             hitCountByKind: hitCountByKind,
             missCountByKind: missCountByKind,
             storeCountByKind: storeCountByKind,
-            evictionCountByKind: evictionCountByKind
+            evictionCountByKind: evictionCountByKind,
+            rejectedStoreCountByKind: rejectedStoreCountByKind,
+            quarantinedHitCountByKind: quarantinedHitCountByKind
         )
     }
 
@@ -105,15 +171,25 @@ actor DecisionIntelligenceResponseCache {
         missCountByKind.removeAll()
         storeCountByKind.removeAll()
         evictionCountByKind.removeAll()
+        rejectedStoreCountByKind.removeAll()
+        quarantinedHitCountByKind.removeAll()
     }
 
     private func cachedValue<Value>(
         for key: String,
         kind: DecisionIntelligenceTraceKind,
         storage: inout [String: Value],
-        order: inout [String]
+        order: inout [String],
+        validator: (Value) -> DecisionIntelligenceCacheGuardReason?
     ) -> Value? {
         guard let value = storage[key] else {
+            missCountByKind[kind, default: 0] += 1
+            return nil
+        }
+        if validator(value) != nil {
+            storage.removeValue(forKey: key)
+            order.removeAll { $0 == key }
+            quarantinedHitCountByKind[kind, default: 0] += 1
             missCountByKind[kind, default: 0] += 1
             return nil
         }
@@ -127,8 +203,13 @@ actor DecisionIntelligenceResponseCache {
         for key: String,
         kind: DecisionIntelligenceTraceKind,
         storage: inout [String: Value],
-        order: inout [String]
+        order: inout [String],
+        validator: (Value) -> DecisionIntelligenceCacheGuardReason?
     ) {
+        if validator(value) != nil {
+            rejectedStoreCountByKind[kind, default: 0] += 1
+            return
+        }
         storage[key] = value
         storeCountByKind[kind, default: 0] += 1
         touchKey(key, order: &order)

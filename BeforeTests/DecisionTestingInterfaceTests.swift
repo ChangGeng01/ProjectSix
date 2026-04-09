@@ -311,6 +311,8 @@ struct DecisionTestingInterfaceTests {
         #expect(telemetrySnapshot.reminderRetrievalBypassRate == 0)
         #expect(cacheSnapshot.hitCountByKind[.reminder] == 1)
         #expect(cacheSnapshot.storeCountByKind[.reminder] == 1)
+        #expect(cacheSnapshot.totalRejectedStores == 0)
+        #expect(cacheSnapshot.totalQuarantinedHits == 0)
     }
 
     @Test
@@ -490,6 +492,8 @@ struct DecisionTestingInterfaceTests {
         #expect(export.runtimeSnapshot.runtimeStatus.preferred == .gemmaE4B)
         #expect(export.intelligenceTelemetry.totalRequests == 1)
         #expect(export.cacheTelemetry.storeCountByKind[.quick] == 1)
+        #expect(export.summary.totalCacheRejectedStores == 0)
+        #expect(export.summary.totalCacheQuarantinedHits == 0)
         #expect(export.recentTraces.count == 1)
         #expect(export.recentReplay.count == 1)
         #expect(export.summary.activeProvider == export.runtimeSnapshot.runtimeStatus.active)

@@ -275,6 +275,12 @@ struct DecisionTestingRuntimeExport {
             traceCount: recentTraces.count,
             replayCount: recentReplay.count,
             totalCacheEntries: cacheTelemetry.entryCountByKind.values.reduce(0, +),
+            totalCacheRejectedStores: cacheTelemetry.totalRejectedStores,
+            totalCacheQuarantinedHits: cacheTelemetry.totalQuarantinedHits,
+            cacheQuarantineRate: rate(
+                numerator: cacheTelemetry.totalQuarantinedHits,
+                denominator: cacheTelemetry.totalHits + cacheTelemetry.totalMisses
+            ),
             dominantGemmaBackend: dominantGemmaBackend,
             registeredProviderCount: registeredProviders.count,
             registeredOpenModelProviderCount: registeredProviders.filter { $0.track == .builtInOpenModel }.count,
@@ -712,6 +718,9 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let traceCount: Int
     let replayCount: Int
     let totalCacheEntries: Int
+    let totalCacheRejectedStores: Int
+    let totalCacheQuarantinedHits: Int
+    let cacheQuarantineRate: Double
     let dominantGemmaBackend: InferenceBackendKind?
     let registeredProviderCount: Int
     let registeredOpenModelProviderCount: Int

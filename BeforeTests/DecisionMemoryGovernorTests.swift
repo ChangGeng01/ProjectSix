@@ -3,6 +3,27 @@ import SwiftData
 @testable import Before
 
 final class DecisionMemoryGovernorTests: XCTestCase {
+    func testTrustProfileUsesSourceWeightedDecayGrace() {
+        let reminderProfile = DecisionMemoryTrustEngine.profile(
+            source: .reminder,
+            evidenceCount: 3,
+            decayPolicy: .medium,
+            governanceStatus: .admitted,
+            isPending: false,
+            provenanceSummary: "Confirmed by repeated reminder outcomes."
+        )
+        let reflectionProfile = DecisionMemoryTrustEngine.profile(
+            source: .reflection,
+            evidenceCount: 3,
+            decayPolicy: .medium,
+            governanceStatus: .admitted,
+            isPending: false,
+            provenanceSummary: "Inferred from one reflective pattern."
+        )
+
+        XCTAssertGreaterThan(reminderProfile.decayGraceMultiplier, reflectionProfile.decayGraceMultiplier)
+    }
+
     func testAssessRejectsLowConfidenceSingletonDraft() {
         let assessment = DecisionMemoryGovernor.assess(
             draft: DecisionMemoryDraft(
@@ -132,5 +153,62 @@ final class DecisionMemoryGovernorTests: XCTestCase {
         XCTAssertEqual(records.first?.id, "semantic.repeat.buy")
         XCTAssertNotEqual(records.first?.lifecycleState, .retired)
         XCTAssertNotNil(records.first?.lastReviewedAt)
+    }
+
+    @MainActor
+    func testReconcileRetiresReflectionMemoryBeforeReminderMemoryAtSameAge() throws {
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: DecisionMemoryRecord.self,
+            DecisionMemoryCandidateRecord.self,
+            configurations: configuration
+        )
+        let context = container.mainContext
+        let oldDate = Calendar.current.date(byAdding: .day, value: -50, to: .now) ?? .now
+
+        let reminderRecord = DecisionMemoryRecord(
+            id: "goal.sleep.buffer",
+            type: .goal,
+            topic: "sleep",
+            headline: "Sleep buffer matters.",
+            value: "sleep",
+            confidence: 0.86,
+            priority: 0.84,
+            source: .reminder,
+            lastConfirmedAt: oldDate,
+            decayPolicy: .medium,
+            retrievalTags: ["sleep", "goal"],
+            evidenceCount: 3,
+            observationCount: 3,
+            provenanceSummary: "Repeated reminder completions confirmed this goal."
+        )
+        let reflectionRecord = DecisionMemoryRecord(
+            id: "support.late_night.reflective",
+            type: .support,
+            topic: "night_support",
+            headline: "Late-night reflection pattern.",
+            value: "night_support",
+            confidence: 0.8,
+            priority: 0.72,
+            source: .reflection,
+            lastConfirmedAt: oldDate,
+            decayPolicy: .medium,
+            retrievalTags: ["night", "support"],
+            evidenceCount: 3,
+            observationCount: 2,
+            provenanceSummary: "Single reflective pattern inferred from prior sessions."
+        )
+
+        context.insert(reminderRecord)
+        context.insert(reflectionRecord)
+        try context.save()
+
+        let records = DecisionMemoryGovernor.reconcile(drafts: [], in: context)
+
+        let resolvedReminder = try XCTUnwrap(records.first(where: { $0.id == reminderRecord.id }))
+        let resolvedReflection = try XCTUnwrap(records.first(where: { $0.id == reflectionRecord.id }))
+
+        XCTAssertNotEqual(resolvedReminder.lifecycleState, .retired)
+        XCTAssertEqual(resolvedReflection.lifecycleState, .retired)
     }
 }

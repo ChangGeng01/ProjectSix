@@ -73,14 +73,45 @@ enum DecisionMemoryTrustEngine {
         }
 
         let confidenceMultiplier = 0.55 + (score * 0.45)
-        let decayGraceMultiplier: Double = switch tier {
+        let tierDecayMultiplier: Double = switch tier {
         case .high:
-            1.25
+            1.18
         case .medium:
             1.0
         case .low:
-            0.72
+            0.78
         }
+        let sourceDecayMultiplier: Double = switch source {
+        case .reminder:
+            1.32
+        case .pattern:
+            1.12
+        case .history:
+            0.96
+        case .reflection:
+            0.78
+        }
+        let governanceDecayMultiplier: Double = switch governanceStatus {
+        case .admitted:
+            1.08
+        case .deferred:
+            0.92
+        case .pending:
+            0.82
+        }
+        let evidenceDecayMultiplier = 1 + min(0.18, Double(max(0, evidenceCount - 1)) * 0.04)
+        let pendingDecayPenalty = isPending ? 0.82 : 1.0
+        let provenanceDecayPenalty = provenanceRisk ? 0.55 : 1.0
+        let decayGraceMultiplier = clamp(
+            tierDecayMultiplier *
+                sourceDecayMultiplier *
+                governanceDecayMultiplier *
+                evidenceDecayMultiplier *
+                pendingDecayPenalty *
+                provenanceDecayPenalty,
+            min: 0.45,
+            max: 1.95
+        )
 
         return DecisionMemoryTrustProfile(
             score: score,
