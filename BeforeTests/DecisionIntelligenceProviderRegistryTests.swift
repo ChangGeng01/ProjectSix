@@ -14,6 +14,8 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
         XCTAssertEqual(openModelDescriptor?.openModel?.stableID, "before/open-model-slot")
         XCTAssertEqual(gemmaDescriptor?.affinity(for: .mirror), 100)
         XCTAssertEqual(foundationDescriptor?.affinity(for: .quick), 100)
+        XCTAssertEqual(gemmaDescriptor?.capabilityProfile.modelID, "google/gemma-4-e4b-it")
+        XCTAssertEqual(foundationDescriptor?.capabilityProfile.latencyClass, .low)
     }
 
     func testRegistryCanSwapOpenModelAdapterWithoutChangingPipelineKinds() {
@@ -76,6 +78,193 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
         )
 
         XCTAssertEqual(ordered, [.foundationModels])
+    }
+
+    func testTaskRouterCanUseCapabilityProfileToDemoteOpenModelWhenLanguageDoesNotFit() {
+        let registry = DecisionIntelligenceProviderRegistry(
+            providersByKind: [:],
+            descriptorsByKind: [
+                .openModel: DecisionModelProviderDescriptor(
+                    kind: .openModel,
+                    title: "Open model runtime",
+                    detail: "Reserved slot.",
+                    track: .builtInOpenModel,
+                    openModel: DecisionOpenModelDescriptor(
+                        stableID: "lab/open-en",
+                        family: "Lab",
+                        version: "1",
+                        title: "Open EN",
+                        detail: "English-only experimental runtime.",
+                        taskAffinities: [
+                            .quick: 98,
+                            .balance: 92,
+                            .mirror: 90,
+                            .reminder: 88
+                        ],
+                        capabilityProfile: DecisionModelCapabilityProfile(
+                            modelID: "lab/open-en",
+                            strengths: [.shortDialogue, .structuredOutput, .lowLatency],
+                            weaknesses: [.multilingualChinese],
+                            latencyClass: .low,
+                            memoryClass: .low,
+                            supportedResponseLanguages: [.english],
+                            supportsThinking: false,
+                            supportsStructuredOutput: true,
+                            supportsToolUse: true,
+                            bestFor: [.quick, .reminder]
+                        )
+                    ),
+                    taskAffinities: [
+                        .quick: 98,
+                        .balance: 92,
+                        .mirror: 90,
+                        .reminder: 88
+                    ]
+                ),
+                .gemmaE4B: DecisionModelProviderDescriptor(
+                    kind: .gemmaE4B,
+                    title: "Gemma",
+                    detail: "Multilingual runtime.",
+                    track: .builtInOpenModel,
+                    openModel: nil,
+                    taskAffinities: [
+                        .quick: 88,
+                        .balance: 90,
+                        .mirror: 94,
+                        .reminder: 86
+                    ],
+                    capabilityProfile: DecisionModelCapabilityProfile(
+                        modelID: "google/gemma",
+                        strengths: [.structuredOutput, .multilingualChinese],
+                        weaknesses: [],
+                        latencyClass: .medium,
+                        memoryClass: .medium,
+                        supportedResponseLanguages: [.english, .chinese, .mixed],
+                        supportsThinking: true,
+                        supportsStructuredOutput: true,
+                        supportsToolUse: true,
+                        bestFor: [.balance, .mirror]
+                    )
+                )
+            ]
+        )
+
+        let strategy = DecisionAdaptiveTaskStrategy(
+            kind: .quick,
+            entropy: .low,
+            preferredProvider: .openModel,
+            contextBudget: 220,
+            retrievalMode: .off,
+            thinkingMode: .off,
+            outputMode: .guidedShort,
+            tone: .briefWarm,
+            actionSpace: ["encourage", "next_step"],
+            responseLanguage: .chinese,
+            allowsModelInvocation: true
+        )
+
+        let ordered = DecisionIntelligenceTaskRouter.orderedKinds(
+            for: .quick,
+            preference: .openModel,
+            allowFallbacks: true,
+            registry: registry,
+            strategy: strategy
+        )
+
+        XCTAssertEqual(ordered.first, .gemmaE4B)
+    }
+
+    func testTaskRouterCanUseCapabilityProfileToPromoteThinkingReadyProvider() {
+        let registry = DecisionIntelligenceProviderRegistry(
+            providersByKind: [:],
+            descriptorsByKind: [
+                .foundationModels: DecisionModelProviderDescriptor(
+                    kind: .foundationModels,
+                    title: "Foundation",
+                    detail: "Fast runtime.",
+                    track: .builtInSystem,
+                    openModel: nil,
+                    taskAffinities: [
+                        .mirror: 100
+                    ],
+                    capabilityProfile: DecisionModelCapabilityProfile(
+                        modelID: "apple/foundation",
+                        strengths: [.shortDialogue, .structuredOutput, .lowLatency],
+                        weaknesses: [.deepReflection],
+                        latencyClass: .low,
+                        memoryClass: .low,
+                        supportedResponseLanguages: [.english, .mixed],
+                        supportsThinking: false,
+                        supportsStructuredOutput: true,
+                        supportsToolUse: true,
+                        bestFor: [.quick]
+                    )
+                ),
+                .gemmaE4B: DecisionModelProviderDescriptor(
+                    kind: .gemmaE4B,
+                    title: "Gemma",
+                    detail: "Reflective runtime.",
+                    track: .builtInOpenModel,
+                    openModel: nil,
+                    taskAffinities: [
+                        .mirror: 96
+                    ],
+                    capabilityProfile: DecisionModelCapabilityProfile(
+                        modelID: "google/gemma",
+                        strengths: [.structuredOutput, .deepReflection, .retrievalGrounding],
+                        weaknesses: [],
+                        latencyClass: .medium,
+                        memoryClass: .medium,
+                        supportedResponseLanguages: [.english, .mixed],
+                        supportsThinking: true,
+                        supportsStructuredOutput: true,
+                        supportsToolUse: true,
+                        bestFor: [.mirror]
+                    )
+                )
+            ]
+        )
+
+        let strategy = DecisionAdaptiveTaskStrategy(
+            kind: .mirror,
+            entropy: .high,
+            preferredProvider: .foundationModels,
+            contextBudget: 540,
+            retrievalMode: .adaptive,
+            thinkingMode: .gated,
+            outputMode: .reflectiveStructured,
+            tone: .reflectiveClear,
+            actionSpace: ["name_pattern", "name_boundary"],
+            responseLanguage: .english,
+            allowsModelInvocation: true
+        )
+
+        let ordered = DecisionIntelligenceTaskRouter.orderedKinds(
+            for: .mirror,
+            preference: .foundationModels,
+            allowFallbacks: true,
+            registry: registry,
+            strategy: strategy
+        )
+
+        XCTAssertEqual(ordered.first, .gemmaE4B)
+    }
+
+    func testCapabilityProfileTreatsBilingualSupportAsMixedLanguageReady() {
+        let profile = DecisionModelCapabilityProfile(
+            modelID: "lab/bilingual",
+            strengths: [.structuredOutput, .multilingualChinese],
+            weaknesses: [],
+            latencyClass: .medium,
+            memoryClass: .medium,
+            supportedResponseLanguages: [.english, .chinese],
+            supportsThinking: false,
+            supportsStructuredOutput: true,
+            supportsToolUse: false,
+            bestFor: [.quick]
+        )
+
+        XCTAssertTrue(profile.supports(responseLanguage: .mixed))
     }
 }
 

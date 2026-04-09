@@ -203,6 +203,7 @@ enum DecisionIntelligenceProviderPipeline {
 
         let providers = await orderedProviders(
             task: .quick,
+            strategy: strategy,
             for: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
@@ -442,6 +443,7 @@ enum DecisionIntelligenceProviderPipeline {
 
         let providers = await orderedProviders(
             task: .balance,
+            strategy: strategy,
             for: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
@@ -681,6 +683,7 @@ enum DecisionIntelligenceProviderPipeline {
 
         let providers = await orderedProviders(
             task: .mirror,
+            strategy: strategy,
             for: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
@@ -907,6 +910,7 @@ enum DecisionIntelligenceProviderPipeline {
         }
         let providers = await orderedProviders(
             task: .reminder,
+            strategy: strategy,
             for: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile
@@ -1051,6 +1055,7 @@ enum DecisionIntelligenceProviderPipeline {
 
     private static func orderedProviders(
         task: DecisionIntelligenceTraceKind,
+        strategy: DecisionAdaptiveTaskStrategy?,
         for preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile?
@@ -1064,7 +1069,8 @@ enum DecisionIntelligenceProviderPipeline {
             preference: preference,
             allowFallbacks: allowFallbacks,
             excluding: suspendedKinds,
-            registry: registry
+            registry: registry,
+            strategy: strategy
         )
         .compactMap { registry.provider(for: $0) }
         .filter { $0.availabilityStatus.isAvailable }

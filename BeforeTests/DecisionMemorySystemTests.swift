@@ -219,6 +219,23 @@ final class DecisionMemorySystemTests: XCTestCase {
     }
 
     @MainActor
+    func testLoadBrainStateAddsLanguageAndScriptTagsForChinesePrompt() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let brainState = DecisionMemorySystem.loadBrainState(
+            mode: .quick,
+            prompt: "我今晚又想买这个。",
+            context: context,
+            now: date("2026-04-09T23:10:00Z")
+        )
+
+        XCTAssertTrue(brainState.retrievalTags.contains("lang:chinese"))
+        XCTAssertTrue(brainState.retrievalTags.contains("script:han"))
+        XCTAssertTrue(brainState.retrievalTags.contains(where: { $0.contains("今晚") || $0.contains("想买") }))
+    }
+
+    @MainActor
     private func makeContainer() throws -> ModelContainer {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         return try ModelContainer(

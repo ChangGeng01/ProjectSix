@@ -27,6 +27,16 @@ enum DecisionLanguageMode: String, Equatable, Sendable {
     case unknown
 
     static func detect(preferredLanguages: [String]) -> DecisionLanguageMode {
+        detect(preferredLanguages: preferredLanguages, sampleTexts: [])
+    }
+
+    static func detect(
+        preferredLanguages: [String],
+        sampleTexts: [String]
+    ) -> DecisionLanguageMode {
+        let sampled = detect(sampleTexts: sampleTexts)
+        guard sampled == .unknown else { return sampled }
+
         let codes = preferredLanguages
             .prefix(3)
             .compactMap { Locale(identifier: $0).language.languageCode?.identifier }
@@ -49,6 +59,48 @@ enum DecisionLanguageMode: String, Equatable, Sendable {
             return .english
         default:
             return .unknown
+        }
+    }
+
+    static func detect(sampleTexts: [String]) -> DecisionLanguageMode {
+        var sawHan = false
+        var sawLatin = false
+        var sawOtherLetter = false
+
+        for scalar in sampleTexts.joined(separator: " ").unicodeScalars {
+            guard CharacterSet.letters.contains(scalar) else { continue }
+            if scalar.properties.isIdeographic {
+                sawHan = true
+            } else if scalar.value >= 0x41 && scalar.value <= 0x5A ||
+                scalar.value >= 0x61 && scalar.value <= 0x7A {
+                sawLatin = true
+            } else {
+                sawOtherLetter = true
+            }
+        }
+
+        switch (sawHan, sawLatin, sawOtherLetter) {
+        case (true, true, _), (true, false, true), (false, true, true):
+            return .mixed
+        case (true, false, false):
+            return .chinese
+        case (false, true, false):
+            return .english
+        default:
+            return .unknown
+        }
+    }
+
+    var retrievalTags: [String] {
+        switch self {
+        case .english:
+            ["lang:english", "script:latin"]
+        case .chinese:
+            ["lang:chinese", "script:han"]
+        case .mixed:
+            ["lang:mixed", "script:mixed"]
+        case .unknown:
+            []
         }
     }
 }
@@ -142,6 +194,7 @@ extension DecisionAdaptiveTaskStrategy {
         var thinkingMode = thinkingMode
         var tone = tone
         var actionSpace = actionSpace
+        var responseLanguage = responseLanguage
 
         let minimumBudget: Int = switch kind {
         case .quick:
@@ -232,6 +285,13 @@ extension DecisionAdaptiveTaskStrategy {
             }
         }
 
+        if let inferredResponseLanguage = inferredResponseLanguage(
+            from: brainState?.retrievalTags ?? [],
+            fallback: responseLanguage
+        ) {
+            responseLanguage = inferredResponseLanguage
+        }
+
         return DecisionAdaptiveTaskStrategy(
             kind: kind,
             entropy: entropy,
@@ -245,6 +305,22 @@ extension DecisionAdaptiveTaskStrategy {
             responseLanguage: responseLanguage,
             allowsModelInvocation: allowsModelInvocation
         )
+    }
+
+    private func inferredResponseLanguage(
+        from retrievalTags: [String],
+        fallback: DecisionAdaptiveResponseLanguage
+    ) -> DecisionAdaptiveResponseLanguage? {
+        if retrievalTags.contains("lang:chinese") {
+            return .chinese
+        }
+        if retrievalTags.contains("lang:mixed") || retrievalTags.contains("script:mixed") {
+            return .mixed
+        }
+        if retrievalTags.contains("lang:english") {
+            return .english
+        }
+        return fallback
     }
 }
 

@@ -201,6 +201,39 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
         XCTAssertEqual(adapted.retrievalMode, .filtered)
     }
 
+    func testAdaptiveStrategyCanShiftResponseLanguageFromBrainStateTags() {
+        let profile = DecisionIntelligenceExecutionProfileResolver.resolve(
+            preferences: assistivePreferences,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true,
+                physicalMemoryBytes: 8 * 1_073_741_824,
+                isLowPowerModeEnabled: false
+            ),
+            foundationStatus: unavailableFoundation,
+            gemmaStatus: availableGemma,
+            preferredLanguages: ["en-AU"]
+        )
+
+        let baseStrategy = profile.strategy(for: .quick)
+        XCTAssertEqual(baseStrategy.responseLanguage, .english)
+
+        let adapted = baseStrategy.adapting(
+            brainState: DecisionBrainState(
+                profileCore: [],
+                activeGoals: [],
+                relevantMemories: [],
+                sessionBiases: [],
+                retrievalTags: ["quick", "lang:chinese", "script:han", "我今晚又想买"],
+                reactionWeights: .defaults(for: .quick),
+                loadedAt: .now
+            )
+        )
+
+        XCTAssertEqual(adapted.responseLanguage, .chinese)
+    }
+
     private var assistivePreferences: BeforePreferences {
         BeforePreferences(
             homePromptAction: .autoRoute,

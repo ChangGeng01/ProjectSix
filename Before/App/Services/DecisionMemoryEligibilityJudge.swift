@@ -81,6 +81,10 @@ enum DecisionMemoryEligibilityJudge {
             "repeat"
         ])
 
-        return Set(tags.map { $0.lowercased() }).subtracting(ignored)
+        return Set(tags.map { $0.lowercased() })
+            .subtracting(ignored)
+            .filter { tag in
+                !tag.hasPrefix("lang:") && !tag.hasPrefix("script:")
+            }
     }
 }

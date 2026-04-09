@@ -929,7 +929,11 @@ enum DecisionMemorySystem {
         queryTags: Set<String>,
         now: Date
     ) -> Double {
-        let overlap = Double(Set(memory.retrievalTags).intersection(queryTags).count)
+        let overlap = Double(
+            Set(relevantRetrievalTags(memory.retrievalTags))
+                .intersection(relevantRetrievalTags(Array(queryTags)))
+                .count
+        )
         let typeBoost: Double = switch (mode, memory.type) {
         case (.quick, .support):
             3.4
@@ -1077,13 +1081,49 @@ enum DecisionMemorySystem {
             "maybe", "because", "when", "what", "where", "while", "into"
         ]
 
-        let tokens = normalized(text)
+        let languageMode = DecisionLanguageMode.detect(sampleTexts: [text])
+        let latinTokens = normalized(text)
             .lowercased()
             .split { !$0.isLetter && !$0.isNumber }
             .map(String.init)
             .filter { $0.count > 2 && !stopwords.contains($0) }
 
-        return orderedUnique(Array(tokens.prefix(8)))
+        let tags = languageMode.retrievalTags +
+            Array(latinTokens.prefix(6)) +
+            hanTokens(from: text)
+
+        return orderedUnique(Array(tags.prefix(10)))
+    }
+
+    private static func hanTokens(from text: String) -> [String] {
+        let characters = Array(
+            normalized(text)
+                .filter { character in
+                    character.unicodeScalars.contains(where: { $0.properties.isIdeographic })
+                }
+        )
+
+        guard !characters.isEmpty else { return [] }
+
+        var tokens: [String] = []
+        let joined = String(characters)
+        if joined.count <= 8 {
+            tokens.append(joined)
+        }
+
+        if characters.count >= 2 {
+            for index in 0..<(characters.count - 1) {
+                tokens.append(String(characters[index...index + 1]))
+            }
+        }
+
+        if characters.count >= 3 {
+            for index in 0..<(characters.count - 2) {
+                tokens.append(String(characters[index...index + 2]))
+            }
+        }
+
+        return Array(orderedUnique(tokens).prefix(6))
     }
 
     private static func maxDate(_ values: [Date], fallback: Date) -> Date {
@@ -1093,6 +1133,13 @@ enum DecisionMemorySystem {
     private static func orderedUnique(_ values: [String]) -> [String] {
         var seen = Set<String>()
         return values.filter { seen.insert($0).inserted }
+    }
+
+    private static func relevantRetrievalTags(_ tags: [String]) -> [String] {
+        tags.filter { tag in
+            let lowered = tag.lowercased()
+            return !lowered.hasPrefix("lang:") && !lowered.hasPrefix("script:")
+        }
     }
 
     private static func clamped(_ weights: DecisionReactionWeights) -> DecisionReactionWeights {

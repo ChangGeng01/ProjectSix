@@ -1,5 +1,76 @@
 import Foundation
 
+enum DecisionModelCapability: String, CaseIterable, Codable, Sendable {
+    case shortDialogue = "short_dialogue"
+    case structuredOutput = "structured_output"
+    case lightToolUse = "light_tool_use"
+    case deepReflection = "deep_reflection"
+    case retrievalGrounding = "retrieval_grounding"
+    case multilingualChinese = "multilingual_chinese"
+    case lowLatency = "low_latency"
+    case lowMemory = "low_memory"
+}
+
+enum DecisionModelLatencyClass: String, Codable, Equatable, Sendable {
+    case low
+    case medium
+    case high
+}
+
+enum DecisionModelMemoryClass: String, Codable, Equatable, Sendable {
+    case low
+    case medium
+    case high
+}
+
+struct DecisionModelCapabilityProfile: Equatable, Sendable {
+    let modelID: String
+    let strengths: [DecisionModelCapability]
+    let weaknesses: [DecisionModelCapability]
+    let latencyClass: DecisionModelLatencyClass
+    let memoryClass: DecisionModelMemoryClass
+    let supportedResponseLanguages: [DecisionAdaptiveResponseLanguage]
+    let supportsThinking: Bool
+    let supportsStructuredOutput: Bool
+    let supportsToolUse: Bool
+    let bestFor: [DecisionIntelligenceTraceKind]
+
+    func supports(_ capability: DecisionModelCapability) -> Bool {
+        strengths.contains(capability) && !weaknesses.contains(capability)
+    }
+
+    func supports(responseLanguage: DecisionAdaptiveResponseLanguage) -> Bool {
+        if supportedResponseLanguages.contains(responseLanguage) {
+            return true
+        }
+
+        if responseLanguage == .mixed {
+            return supportedResponseLanguages.contains(.english) &&
+                supportedResponseLanguages.contains(.chinese)
+        }
+
+        return false
+    }
+
+    static func generic(
+        modelID: String,
+        bestFor: [DecisionIntelligenceTraceKind] = []
+    ) -> DecisionModelCapabilityProfile {
+        DecisionModelCapabilityProfile(
+            modelID: modelID,
+            strengths: [.structuredOutput],
+            weaknesses: [],
+            latencyClass: .medium,
+            memoryClass: .medium,
+            supportedResponseLanguages: [.english],
+            supportsThinking: false,
+            supportsStructuredOutput: true,
+            supportsToolUse: false,
+            bestFor: bestFor
+        )
+    }
+}
+
 protocol DecisionIntelligenceProviding: Sendable {
     var kind: DecisionModelProviderKind { get }
     var availabilityStatus: DecisionModelProviderStatus { get }
@@ -87,6 +158,28 @@ struct DecisionOpenModelDescriptor: Equatable, Sendable {
     let title: String
     let detail: String
     let taskAffinities: [DecisionIntelligenceTraceKind: Int]
+    let capabilityProfile: DecisionModelCapabilityProfile
+
+    init(
+        stableID: String,
+        family: String,
+        version: String,
+        title: String,
+        detail: String,
+        taskAffinities: [DecisionIntelligenceTraceKind: Int],
+        capabilityProfile: DecisionModelCapabilityProfile? = nil
+    ) {
+        self.stableID = stableID
+        self.family = family
+        self.version = version
+        self.title = title
+        self.detail = detail
+        self.taskAffinities = taskAffinities
+        self.capabilityProfile = capabilityProfile ?? .generic(
+            modelID: stableID,
+            bestFor: Array(taskAffinities.keys)
+        )
+    }
 }
 
 enum DecisionModelProviderTrack: String, Equatable, Sendable {
@@ -103,6 +196,28 @@ struct DecisionModelProviderDescriptor: Equatable, Sendable {
     let track: DecisionModelProviderTrack
     let openModel: DecisionOpenModelDescriptor?
     let taskAffinities: [DecisionIntelligenceTraceKind: Int]
+    let capabilityProfile: DecisionModelCapabilityProfile
+
+    init(
+        kind: DecisionModelProviderKind,
+        title: String,
+        detail: String,
+        track: DecisionModelProviderTrack,
+        openModel: DecisionOpenModelDescriptor?,
+        taskAffinities: [DecisionIntelligenceTraceKind: Int],
+        capabilityProfile: DecisionModelCapabilityProfile? = nil
+    ) {
+        self.kind = kind
+        self.title = title
+        self.detail = detail
+        self.track = track
+        self.openModel = openModel
+        self.taskAffinities = taskAffinities
+        self.capabilityProfile = capabilityProfile ?? openModel?.capabilityProfile ?? .generic(
+            modelID: kind.rawValue,
+            bestFor: Array(taskAffinities.keys)
+        )
+    }
 
     func affinity(for task: DecisionIntelligenceTraceKind) -> Int {
         taskAffinities[task] ?? 0
@@ -200,7 +315,24 @@ struct GemmaOpenModelAdapter: DecisionOpenModelAdapting {
             .balance: 94,
             .mirror: 100,
             .reminder: 84
-        ]
+        ],
+        capabilityProfile: DecisionModelCapabilityProfile(
+            modelID: "google/gemma-4-e4b-it",
+            strengths: [
+                .structuredOutput,
+                .deepReflection,
+                .retrievalGrounding,
+                .multilingualChinese
+            ],
+            weaknesses: [],
+            latencyClass: .medium,
+            memoryClass: .medium,
+            supportedResponseLanguages: [.english, .chinese, .mixed],
+            supportsThinking: true,
+            supportsStructuredOutput: true,
+            supportsToolUse: true,
+            bestFor: [.balance, .mirror, .reminder]
+        )
     )
 
     var availabilityStatus: DecisionModelProviderStatus {
@@ -294,7 +426,25 @@ struct ReservedOpenModelAdapter: DecisionOpenModelAdapting {
             .balance: 90,
             .mirror: 92,
             .reminder: 86
-        ]
+        ],
+        capabilityProfile: DecisionModelCapabilityProfile(
+            modelID: "before/open-model-slot",
+            strengths: [
+                .shortDialogue,
+                .structuredOutput,
+                .lightToolUse
+            ],
+            weaknesses: [
+                .deepReflection
+            ],
+            latencyClass: .low,
+            memoryClass: .low,
+            supportedResponseLanguages: [.english],
+            supportsThinking: false,
+            supportsStructuredOutput: true,
+            supportsToolUse: true,
+            bestFor: [.quick, .reminder]
+        )
     )
 
     var availabilityStatus: DecisionModelProviderStatus {
@@ -496,7 +646,8 @@ final class DecisionIntelligenceProviderRegistry: @unchecked Sendable {
                 detail: adapter.descriptor.detail,
                 track: .builtInOpenModel,
                 openModel: adapter.descriptor,
-                taskAffinities: adapter.descriptor.taskAffinities
+                taskAffinities: adapter.descriptor.taskAffinities,
+                capabilityProfile: adapter.descriptor.capabilityProfile
             )
         )
     }
@@ -520,7 +671,8 @@ final class DecisionIntelligenceProviderRegistry: @unchecked Sendable {
                 detail: gemmaDescriptor.detail,
                 track: .builtInOpenModel,
                 openModel: gemmaDescriptor,
-                taskAffinities: gemmaDescriptor.taskAffinities
+                taskAffinities: gemmaDescriptor.taskAffinities,
+                capabilityProfile: gemmaDescriptor.capabilityProfile
             ),
             .foundationModels: DecisionModelProviderDescriptor(
                 kind: .foundationModels,
@@ -528,7 +680,26 @@ final class DecisionIntelligenceProviderRegistry: @unchecked Sendable {
                 detail: "Built-in system-managed language provider.",
                 track: .builtInSystem,
                 openModel: nil,
-                taskAffinities: defaultTaskAffinities(for: .foundationModels)
+                taskAffinities: defaultTaskAffinities(for: .foundationModels),
+                capabilityProfile: DecisionModelCapabilityProfile(
+                    modelID: "apple/foundation-model-default",
+                    strengths: [
+                        .shortDialogue,
+                        .structuredOutput,
+                        .lightToolUse,
+                        .lowLatency,
+                        .lowMemory,
+                        .multilingualChinese
+                    ],
+                    weaknesses: [],
+                    latencyClass: .low,
+                    memoryClass: .low,
+                    supportedResponseLanguages: [.english, .chinese, .mixed],
+                    supportsThinking: false,
+                    supportsStructuredOutput: true,
+                    supportsToolUse: true,
+                    bestFor: [.quick, .reminder]
+                )
             ),
             .openModel: DecisionModelProviderDescriptor(
                 kind: .openModel,
@@ -536,7 +707,8 @@ final class DecisionIntelligenceProviderRegistry: @unchecked Sendable {
                 detail: reservedOpenModelDescriptor.detail,
                 track: .builtInOpenModel,
                 openModel: reservedOpenModelDescriptor,
-                taskAffinities: reservedOpenModelDescriptor.taskAffinities
+                taskAffinities: reservedOpenModelDescriptor.taskAffinities,
+                capabilityProfile: reservedOpenModelDescriptor.capabilityProfile
             )
         ]
     }
@@ -590,7 +762,8 @@ enum DecisionIntelligenceTaskRouter {
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
         excluding suspendedKinds: Set<DecisionModelProviderKind> = [],
-        registry: DecisionIntelligenceProviderRegistry = .shared
+        registry: DecisionIntelligenceProviderRegistry = .shared,
+        strategy: DecisionAdaptiveTaskStrategy? = nil
     ) -> [DecisionModelProviderKind] {
         let baseKinds = DecisionIntelligenceProviderPipeline.orderedKinds(
             for: preference,
@@ -613,14 +786,16 @@ enum DecisionIntelligenceTaskRouter {
                 task: task,
                 preferredKind: preference.kind,
                 descriptor: descriptorByKind[lhs],
-                baseIndex: baseIndexByKind[lhs] ?? 0
+                baseIndex: baseIndexByKind[lhs] ?? 0,
+                strategy: strategy
             )
             let rhsScore = routingScore(
                 kind: rhs,
                 task: task,
                 preferredKind: preference.kind,
                 descriptor: descriptorByKind[rhs],
-                baseIndex: baseIndexByKind[rhs] ?? 0
+                baseIndex: baseIndexByKind[rhs] ?? 0,
+                strategy: strategy
             )
 
             if lhsScore == rhsScore {
@@ -636,11 +811,71 @@ enum DecisionIntelligenceTaskRouter {
         task: DecisionIntelligenceTraceKind,
         preferredKind: DecisionModelProviderKind,
         descriptor: DecisionModelProviderDescriptor?,
-        baseIndex: Int
+        baseIndex: Int,
+        strategy: DecisionAdaptiveTaskStrategy?
     ) -> Int {
         let affinity = descriptor?.affinity(for: task) ?? 0
         let preferredBias = kind == preferredKind ? 8 : 0
         let baseBias = max(0, 24 - (baseIndex * 12))
-        return (affinity * 10) + preferredBias + baseBias
+        let capabilityBias = strategy.map {
+            capabilityScore(for: $0, descriptor: descriptor)
+        } ?? 0
+        return (affinity * 10) + preferredBias + baseBias + capabilityBias
+    }
+
+    private static func capabilityScore(
+        for strategy: DecisionAdaptiveTaskStrategy,
+        descriptor: DecisionModelProviderDescriptor?
+    ) -> Int {
+        guard let profile = descriptor?.capabilityProfile else { return 0 }
+
+        var score = 0
+
+        if profile.bestFor.contains(strategy.kind) {
+            score += 14
+        }
+
+        if strategy.outputMode != .deterministicTemplate {
+            score += profile.supportsStructuredOutput ? 12 : -120
+        }
+
+        if strategy.thinkingMode == .gated {
+            score += profile.supportsThinking ? 18 : -120
+        }
+
+        if strategy.retrievalMode == .adaptive {
+            score += profile.supports(.retrievalGrounding) ? 10 : -8
+        }
+
+        switch strategy.entropy {
+        case .low:
+            switch profile.latencyClass {
+            case .low: score += 10
+            case .medium: score += 4
+            case .high: score -= 6
+            }
+        case .medium:
+            score += profile.supports(.structuredOutput) ? 6 : 0
+        case .high:
+            score += profile.supports(.deepReflection) ? 14 : -10
+            switch profile.memoryClass {
+            case .high: score += 6
+            case .medium: score += 2
+            case .low: score -= 4
+            }
+        }
+
+        if profile.supports(responseLanguage: strategy.responseLanguage) {
+            score += 12
+        } else {
+            score -= 160
+        }
+
+        if strategy.actionSpace.contains("stay_brief") {
+            score += profile.supports(.lowLatency) ? 6 : 0
+            score += profile.supports(.lowMemory) ? 6 : 0
+        }
+
+        return score
     }
 }
