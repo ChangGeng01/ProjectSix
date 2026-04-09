@@ -80,6 +80,10 @@ struct DecisionMemoryGovernanceState: Codable, Equatable, Sendable {
     var promotedCandidateCount: Int
     var loadedPromotedMemoryCount: Int
     var loadedPendingMemoryCount: Int
+    var deferredCandidateCount: Int = 0
+    var admittedCandidateCount: Int = 0
+    var screenedOutMemoryCount: Int = 0
+    var screenedOutPendingMemoryCount: Int = 0
 
     static let empty = DecisionMemoryGovernanceState(
         totalRecordCount: 0,

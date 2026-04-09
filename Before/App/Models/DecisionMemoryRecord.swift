@@ -36,6 +36,12 @@ enum DecisionMemoryCandidateStatus: String, Codable, Sendable {
     case promoted
 }
 
+enum DecisionMemoryGovernanceDecision: String, Codable, Sendable {
+    case admit
+    case deferred
+    case reject
+}
+
 @Model
 final class DecisionMemoryRecord {
     @Attribute(.unique) var id: String
@@ -106,6 +112,8 @@ final class DecisionMemoryCandidateRecord {
     var statusRaw: String
     var provenanceSummary: String
     var lastWriteOperationRaw: String
+    var lastGovernanceDecisionRaw: String
+    var governanceReason: String
 
     init(
         id: String,
@@ -125,7 +133,9 @@ final class DecisionMemoryCandidateRecord {
         lastObservationFingerprint: String,
         status: DecisionMemoryCandidateStatus,
         provenanceSummary: String,
-        lastWriteOperation: DecisionMemoryWriteOperation
+        lastWriteOperation: DecisionMemoryWriteOperation,
+        lastGovernanceDecision: DecisionMemoryGovernanceDecision,
+        governanceReason: String
     ) {
         self.id = id
         self.typeRaw = type.rawValue
@@ -145,6 +155,8 @@ final class DecisionMemoryCandidateRecord {
         self.statusRaw = status.rawValue
         self.provenanceSummary = provenanceSummary
         self.lastWriteOperationRaw = lastWriteOperation.rawValue
+        self.lastGovernanceDecisionRaw = lastGovernanceDecision.rawValue
+        self.governanceReason = governanceReason
     }
 }
 
@@ -202,6 +214,10 @@ extension DecisionMemoryCandidateRecord {
 
     var lastWriteOperation: DecisionMemoryWriteOperation {
         DecisionMemoryWriteOperation(rawValue: lastWriteOperationRaw) ?? .noop
+    }
+
+    var lastGovernanceDecision: DecisionMemoryGovernanceDecision {
+        DecisionMemoryGovernanceDecision(rawValue: lastGovernanceDecisionRaw) ?? .deferred
     }
 
     var retrievalTags: [String] {

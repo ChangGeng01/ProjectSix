@@ -92,6 +92,11 @@ enum DecisionMemorySystem {
         }
     }
 
+    private struct RetrievalJudgeResult {
+        let allowedItems: [BrainMemoryItem]
+        let screenedOutItems: [BrainMemoryItem]
+    }
+
     static func refreshStoredMemories(
         in context: ModelContext,
         now: Date = .now
@@ -153,16 +158,23 @@ enum DecisionMemorySystem {
             score($0, mode: mode, queryTags: queryTags, now: now) >
                 score($1, mode: mode, queryTags: queryTags, now: now)
         }
+        let retrievalJudgeResult = judgeRetrievalCandidates(
+            from: orderedItems,
+            mode: mode,
+            queryTags: queryTags,
+            now: now
+        )
+        let retrievalQualifiedItems = retrievalJudgeResult.allowedItems
 
         let profileItems = selectItems(
-            from: orderedItems,
+            from: retrievalQualifiedItems,
             limit: 2,
             matching: { $0.type == .identity || $0.type == .preference }
         )
         let profileCore = orderedUnique(profileItems.map(\.headline))
 
         let goalItems = selectItems(
-            from: orderedItems,
+            from: retrievalQualifiedItems,
             limit: 2,
             excludingIDs: Set(profileItems.map(\.id)),
             matching: { $0.type == .goal }
@@ -170,7 +182,7 @@ enum DecisionMemorySystem {
         let activeGoals = orderedUnique(goalItems.map(\.headline))
 
         let relevantItems = selectItems(
-            from: orderedItems,
+            from: retrievalQualifiedItems,
             limit: 3,
             excludingIDs: Set(profileItems.map(\.id) + goalItems.map(\.id)),
             matching: { _ in true }
@@ -181,7 +193,7 @@ enum DecisionMemorySystem {
         let reactionWeights = buildReactionWeights(
             mode: mode,
             queryTags: queryTags,
-            orderedItems: orderedItems,
+            orderedItems: retrievalQualifiedItems,
             checkEvents: recentCheckEvents,
             records: resolvedRecords,
             profileCore: profileCore,
@@ -192,7 +204,8 @@ enum DecisionMemorySystem {
         let memoryGovernance = buildMemoryGovernanceState(
             records: resolvedRecords,
             candidates: resolvedCandidates,
-            selectedItems: selectedItems
+            selectedItems: selectedItems,
+            screenedOutItems: retrievalJudgeResult.screenedOutItems
         )
 
         let sessionBiases = buildSessionBiases(
@@ -253,11 +266,15 @@ enum DecisionMemorySystem {
     private static func buildMemoryGovernanceState(
         records: [DecisionMemoryRecord],
         candidates: [DecisionMemoryCandidateRecord],
-        selectedItems: [BrainMemoryItem]
+        selectedItems: [BrainMemoryItem],
+        screenedOutItems: [BrainMemoryItem]
     ) -> DecisionMemoryGovernanceState {
         let pendingCandidateCount = candidates.filter { $0.status == .pending }.count
         let promotedCandidateCount = candidates.filter { $0.status == .promoted }.count
         let loadedPendingMemoryCount = selectedItems.filter(\.isPending).count
+        let deferredCandidateCount = candidates.filter { $0.lastGovernanceDecision == .deferred }.count
+        let admittedCandidateCount = candidates.filter { $0.lastGovernanceDecision == .admit }.count
+        let screenedOutPendingMemoryCount = screenedOutItems.filter(\.isPending).count
 
         return DecisionMemoryGovernanceState(
             totalRecordCount: records.count,
@@ -265,8 +282,69 @@ enum DecisionMemorySystem {
             pendingCandidateCount: pendingCandidateCount,
             promotedCandidateCount: promotedCandidateCount,
             loadedPromotedMemoryCount: selectedItems.count - loadedPendingMemoryCount,
-            loadedPendingMemoryCount: loadedPendingMemoryCount
+            loadedPendingMemoryCount: loadedPendingMemoryCount,
+            deferredCandidateCount: deferredCandidateCount,
+            admittedCandidateCount: admittedCandidateCount,
+            screenedOutMemoryCount: screenedOutItems.count,
+            screenedOutPendingMemoryCount: screenedOutPendingMemoryCount
         )
+    }
+
+    private static func judgeRetrievalCandidates(
+        from orderedItems: [BrainMemoryItem],
+        mode: DecisionMode,
+        queryTags: Set<String>,
+        now: Date
+    ) -> RetrievalJudgeResult {
+        var allowed: [BrainMemoryItem] = []
+        var screenedOut: [BrainMemoryItem] = []
+
+        for item in orderedItems {
+            if shouldLoadIntoFrontstage(item, mode: mode, queryTags: queryTags, now: now) {
+                allowed.append(item)
+            } else {
+                screenedOut.append(item)
+            }
+        }
+
+        return RetrievalJudgeResult(allowedItems: allowed, screenedOutItems: screenedOut)
+    }
+
+    private static func shouldLoadIntoFrontstage(
+        _ item: BrainMemoryItem,
+        mode: DecisionMode,
+        queryTags: Set<String>,
+        now: Date
+    ) -> Bool {
+        if item.type == .identity || item.type == .goal {
+            return true
+        }
+
+        let itemTags = frontstageRelevantTags(item.retrievalTags)
+        let meaningfulQueryTags = frontstageRelevantTags(Array(queryTags))
+        let hasTagOverlap = !itemTags.intersection(meaningfulQueryTags).isEmpty
+        let ageHours = max(0, now.timeIntervalSince(item.lastConfirmedAt) / 3_600)
+
+        if item.isPending {
+            return hasTagOverlap || ageHours <= 18
+        }
+
+        if item.decayPolicy == .fast {
+            return hasTagOverlap || ageHours <= 24
+        }
+
+        if item.confidence < 0.62, !hasTagOverlap {
+            return false
+        }
+
+        if item.type == .support || item.type == .semantic {
+            let baseline = mode == .mirror ? 0.58 : 0.64
+            if item.priority < baseline, !hasTagOverlap {
+                return false
+            }
+        }
+
+        return true
     }
 
     private static func deriveMemoryDrafts(
@@ -779,6 +857,21 @@ enum DecisionMemorySystem {
             tagsSet.insert("mirror")
         }
         return tagsSet
+    }
+
+    private static func frontstageRelevantTags(_ tags: [String]) -> Set<String> {
+        let lowSignalTags: Set<String> = [
+            "quick",
+            "balance",
+            "mirror",
+            "recent",
+            "goal",
+            "long_term",
+            "pattern",
+            "repeat"
+        ]
+
+        return Set(tags.map { $0.lowercased() }).subtracting(lowSignalTags)
     }
 
     private static func score(

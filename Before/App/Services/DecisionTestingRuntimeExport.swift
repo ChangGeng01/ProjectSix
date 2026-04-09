@@ -133,9 +133,14 @@ struct DecisionTestingRuntimeExport {
         let averageLoadedPendingMemoryCountByKind = averageBrainMetricByKind { $0.memoryGovernance.loadedPendingMemoryCount }
         let averagePendingCandidateCountByKind = averageBrainMetricByKind { $0.memoryGovernance.pendingCandidateCount }
         let averagePromotedRecordCountByKind = averageBrainMetricByKind { $0.memoryGovernance.totalRecordCount }
+        let averageScreenedOutMemoryCountByKind = averageBrainMetricByKind { $0.memoryGovernance.screenedOutMemoryCount }
         let pendingMemoryLoadRateByKind = memoryLoadRateByKind(
             promotedByKind: averageLoadedPromotedMemoryCountByKind,
             pendingByKind: averageLoadedPendingMemoryCountByKind
+        )
+        let retrievalRejectionRateByKind = memoryLoadRateByKind(
+            promotedByKind: averageRelevantMemoryCountByKind,
+            pendingByKind: averageScreenedOutMemoryCountByKind
         )
 
         return DecisionTestingBrainSummary(
@@ -148,7 +153,9 @@ struct DecisionTestingRuntimeExport {
             averageLoadedPendingMemoryCountByKind: averageLoadedPendingMemoryCountByKind,
             averagePendingCandidateCountByKind: averagePendingCandidateCountByKind,
             averagePromotedRecordCountByKind: averagePromotedRecordCountByKind,
-            pendingMemoryLoadRateByKind: pendingMemoryLoadRateByKind
+            averageScreenedOutMemoryCountByKind: averageScreenedOutMemoryCountByKind,
+            pendingMemoryLoadRateByKind: pendingMemoryLoadRateByKind,
+            retrievalRejectionRateByKind: retrievalRejectionRateByKind
         )
     }
 
@@ -211,6 +218,7 @@ struct DecisionTestingRuntimeExport {
             brainTraceCount: brainSummary.brainTraceCount,
             dominantReactionWeightByKind: brainSummary.dominantReactionWeightByKind,
             pendingMemoryLoadRateByKind: brainSummary.pendingMemoryLoadRateByKind,
+            retrievalRejectionRateByKind: brainSummary.retrievalRejectionRateByKind,
             traceCount: recentTraces.count,
             replayCount: recentReplay.count,
             totalCacheEntries: cacheTelemetry.entryCountByKind.values.reduce(0, +),
@@ -460,7 +468,9 @@ struct DecisionTestingBrainSummary: Equatable, Sendable {
     let averageLoadedPendingMemoryCountByKind: [DecisionIntelligenceTraceKind: Double]
     let averagePendingCandidateCountByKind: [DecisionIntelligenceTraceKind: Double]
     let averagePromotedRecordCountByKind: [DecisionIntelligenceTraceKind: Double]
+    let averageScreenedOutMemoryCountByKind: [DecisionIntelligenceTraceKind: Double]
     let pendingMemoryLoadRateByKind: [DecisionIntelligenceTraceKind: Double]
+    let retrievalRejectionRateByKind: [DecisionIntelligenceTraceKind: Double]
 }
 
 struct DecisionTestingRuntimeSummary: Equatable, Sendable {
@@ -521,6 +531,7 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let brainTraceCount: Int
     let dominantReactionWeightByKind: [DecisionIntelligenceTraceKind: DecisionReactionWeightKey]
     let pendingMemoryLoadRateByKind: [DecisionIntelligenceTraceKind: Double]
+    let retrievalRejectionRateByKind: [DecisionIntelligenceTraceKind: Double]
     let traceCount: Int
     let replayCount: Int
     let totalCacheEntries: Int

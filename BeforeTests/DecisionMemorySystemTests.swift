@@ -88,6 +88,7 @@ final class DecisionMemorySystemTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(brainState.memoryGovernance.totalRecordCount, 4)
         XCTAssertGreaterThanOrEqual(brainState.memoryGovernance.pendingCandidateCount, 1)
         XCTAssertGreaterThanOrEqual(brainState.memoryGovernance.loadedPromotedMemoryCount, 1)
+        XCTAssertGreaterThanOrEqual(brainState.memoryGovernance.deferredCandidateCount, 1)
         XCTAssertTrue(brainState.retrievalTags.contains("quick"))
         XCTAssertTrue(brainState.retrievalTags.contains("buy"))
     }
@@ -142,6 +143,26 @@ final class DecisionMemorySystemTests: XCTestCase {
 
         XCTAssertGreaterThanOrEqual(brainState.reactionWeights.interruptiveActionBias, 0.95)
         XCTAssertGreaterThanOrEqual(brainState.reactionWeights.lowCognitiveLoad, 0.85)
+    }
+
+    @MainActor
+    func testLoadBrainStateScreensOutStalePendingMemoriesWhenTheyAreNotRelevant() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        seedHistory(into: context)
+        _ = DecisionMemorySystem.refreshStoredMemories(in: context)
+
+        let brainState = DecisionMemorySystem.loadBrainState(
+            mode: .quick,
+            prompt: "Help me think about whether I should cook at home tonight.",
+            context: context,
+            now: date("2026-04-10T18:00:00Z")
+        )
+
+        XCTAssertEqual(brainState.memoryGovernance.loadedPendingMemoryCount, 0)
+        XCTAssertGreaterThanOrEqual(brainState.memoryGovernance.screenedOutMemoryCount, 1)
+        XCTAssertGreaterThanOrEqual(brainState.memoryGovernance.screenedOutPendingMemoryCount, 1)
     }
 
     @MainActor

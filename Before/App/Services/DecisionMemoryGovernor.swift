@@ -2,6 +2,11 @@ import Foundation
 import SwiftData
 
 enum DecisionMemoryGovernor {
+    struct GovernanceAssessment: Equatable, Sendable {
+        let decision: DecisionMemoryGovernanceDecision
+        let reason: String
+    }
+
     static func reconcile(
         drafts: [DecisionMemoryDraft],
         in context: ModelContext
@@ -17,7 +22,25 @@ enum DecisionMemoryGovernor {
             seenDraftIDs.insert(draft.id)
 
             let fingerprint = draft.fingerprint
-            let candidate = candidatesByID[draft.id] ?? makeCandidate(from: draft, fingerprint: fingerprint)
+            let assessment = assess(draft: draft)
+
+            if assessment.decision == .reject {
+                if let record = recordsByID[draft.id] {
+                    context.delete(record)
+                    recordsByID[draft.id] = nil
+                }
+                if let candidate = candidatesByID[draft.id] {
+                    context.delete(candidate)
+                    candidatesByID[draft.id] = nil
+                }
+                continue
+            }
+
+            let candidate = candidatesByID[draft.id] ?? makeCandidate(
+                from: draft,
+                fingerprint: fingerprint,
+                governanceAssessment: assessment
+            )
             let isNewCandidate = candidatesByID[draft.id] == nil
             let observedNewFingerprint = candidate.lastObservationFingerprint != fingerprint
 
@@ -26,14 +49,22 @@ enum DecisionMemoryGovernor {
                 candidatesByID[draft.id] = candidate
             }
 
-            update(candidate: candidate, from: draft, fingerprint: fingerprint, observedNewFingerprint: observedNewFingerprint)
+            update(
+                candidate: candidate,
+                from: draft,
+                fingerprint: fingerprint,
+                observedNewFingerprint: observedNewFingerprint,
+                governanceAssessment: assessment
+            )
 
             let shouldPromote = draft.promotionPolicy.shouldPromote(
                 candidate: candidate
             )
-            candidate.statusRaw = (shouldPromote ? DecisionMemoryCandidateStatus.promoted : .pending).rawValue
+            let effectiveStatus: DecisionMemoryCandidateStatus =
+                assessment.decision == .deferred || !shouldPromote ? .pending : .promoted
+            candidate.statusRaw = effectiveStatus.rawValue
 
-            if shouldPromote, !draft.promotionPolicy.isCandidateOnly {
+            if effectiveStatus == .promoted, !draft.promotionPolicy.isCandidateOnly {
                 if let record = recordsByID[draft.id] {
                     if applyRecordUpdateIfNeeded(record, from: draft, candidate: candidate) {
                         candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation.update.rawValue
@@ -95,7 +126,8 @@ enum DecisionMemoryGovernor {
 
     private static func makeCandidate(
         from draft: DecisionMemoryDraft,
-        fingerprint: String
+        fingerprint: String,
+        governanceAssessment: GovernanceAssessment
     ) -> DecisionMemoryCandidateRecord {
         DecisionMemoryCandidateRecord(
             id: draft.id,
@@ -115,7 +147,9 @@ enum DecisionMemoryGovernor {
             lastObservationFingerprint: fingerprint,
             status: .pending,
             provenanceSummary: draft.provenanceSummary,
-            lastWriteOperation: .noop
+            lastWriteOperation: .noop,
+            lastGovernanceDecision: governanceAssessment.decision,
+            governanceReason: governanceAssessment.reason
         )
     }
 
@@ -123,7 +157,8 @@ enum DecisionMemoryGovernor {
         candidate: DecisionMemoryCandidateRecord,
         from draft: DecisionMemoryDraft,
         fingerprint: String,
-        observedNewFingerprint: Bool
+        observedNewFingerprint: Bool,
+        governanceAssessment: GovernanceAssessment
     ) {
         candidate.typeRaw = draft.type.rawValue
         candidate.topic = draft.topic
@@ -137,10 +172,47 @@ enum DecisionMemoryGovernor {
         candidate.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(draft.retrievalTags)
         candidate.evidenceCount = max(candidate.evidenceCount, draft.evidenceCount)
         candidate.provenanceSummary = draft.provenanceSummary
+        candidate.lastGovernanceDecisionRaw = governanceAssessment.decision.rawValue
+        candidate.governanceReason = governanceAssessment.reason
         if observedNewFingerprint {
             candidate.confirmationCount += 1
             candidate.lastObservationFingerprint = fingerprint
         }
+    }
+
+    static func assess(draft: DecisionMemoryDraft) -> GovernanceAssessment {
+        if draft.promotionPolicy.isCandidateOnly || draft.type == .situational {
+            return GovernanceAssessment(
+                decision: .deferred,
+                reason: "Situational memory stays staged until a later session proves it matters."
+            )
+        }
+
+        if draft.confidence < 0.58, draft.evidenceCount <= 1 {
+            return GovernanceAssessment(
+                decision: .reject,
+                reason: "Single low-confidence signal is not allowed into the long-term memory path."
+            )
+        }
+
+        if draft.decayPolicy == .fast, draft.priority < 0.7, draft.evidenceCount <= 1 {
+            return GovernanceAssessment(
+                decision: .reject,
+                reason: "Fast-decay low-priority draft is treated as noise instead of memory."
+            )
+        }
+
+        if draft.type == .support, draft.evidenceCount < 2 {
+            return GovernanceAssessment(
+                decision: .deferred,
+                reason: "Support patterns need to repeat before they count as policy."
+            )
+        }
+
+        return GovernanceAssessment(
+            decision: .admit,
+            reason: "Structured evidence is strong enough to participate in governed memory."
+        )
     }
 
     private static func applyRecordUpdateIfNeeded(

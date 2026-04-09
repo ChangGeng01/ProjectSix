@@ -71,6 +71,9 @@ struct BeforeWidgetView: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Before")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.7))
+                Text(entry.snapshot.messageHeadline)
                     .font(.headline)
                     .foregroundStyle(.white)
                 if let verdict = entry.snapshot.latestVerdict {

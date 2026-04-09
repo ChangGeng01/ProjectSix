@@ -6,8 +6,16 @@ struct WidgetSnapshot: Codable, Sendable {
     var latestScenario: ScenarioType?
     var updatedAt: Date
 
+    var messageHeadline: String {
+        safeMessage?.headline ?? WidgetSafeMessage.generic.headline
+    }
+
     var messageBody: String {
         safeMessage?.body ?? WidgetSafeMessage.generic.body
+    }
+
+    var messageSurface: WidgetMessageSurface {
+        safeMessage?.surface ?? .publicSafe
     }
 
     static let empty = WidgetSnapshot(
