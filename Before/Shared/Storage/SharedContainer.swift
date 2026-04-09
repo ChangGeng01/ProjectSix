@@ -46,9 +46,14 @@ enum SharedContainer {
         }
 
         let notice: String
-        if containerURL == nil {
-            notice = "Shared surfaces are using local fallback storage, so widgets and shortcuts may not stay in sync until app-group access is restored."
-        } else {
+        switch (resolvedDefaults == nil, containerURL == nil) {
+        case (true, true):
+            notice = "Shared surfaces are using local fallback storage because both the app-group defaults and shared container are unavailable, so widgets and shortcuts may not stay in sync until app-group access is restored."
+        case (true, false):
+            notice = "Shared surfaces are using local fallback defaults because the app-group preferences container is unavailable, so widgets and shortcuts may not stay in sync until app-group access is restored."
+        case (false, true):
+            notice = "Shared surfaces are using local fallback storage because the shared container URL is unavailable, so widgets and shortcuts may not stay in sync until app-group access is restored."
+        case (false, false):
             notice = "Shared surfaces are using local fallback storage, so widgets and shortcuts may not stay in sync until app-group access is restored."
         }
 

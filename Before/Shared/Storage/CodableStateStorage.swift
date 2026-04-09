@@ -3,19 +3,24 @@ import Foundation
 struct CodableStateStorage: @unchecked Sendable {
     private let loadValueBlock: ((any Decodable.Type, String) -> Any?)?
     private let loadDataBlock: (String) -> Data?
-    private let saveDataBlock: (Data, String) -> Void
+    private let saveDataBlock: (Data, String) -> Bool
     private let clearBlock: (String) -> Void
+    private let recordIssueBlock: (Error, String) -> Void
 
     init(
         loadValue: ((any Decodable.Type, String) -> Any?)? = nil,
         loadData: @escaping (String) -> Data?,
-        saveData: @escaping (Data, String) -> Void,
-        clear: @escaping (String) -> Void
+        saveData: @escaping (Data, String) -> Bool,
+        clear: @escaping (String) -> Void,
+        recordIssue: @escaping (Error, String) -> Void = { error, operation in
+            _ = StateStorageIssueRecorder.record(error: error, operation: operation)
+        }
     ) {
         self.loadValueBlock = loadValue
         self.loadDataBlock = loadData
         self.saveDataBlock = saveData
         self.clearBlock = clear
+        self.recordIssueBlock = recordIssue
     }
 
     func load<Value: Decodable>(_ type: Value.Type, key: String) -> Value? {
@@ -37,12 +42,19 @@ struct CodableStateStorage: @unchecked Sendable {
         loadDataBlock(key)
     }
 
-    func save<Value: Encodable>(_ value: Value, key: String) {
-        guard let data = try? JSONEncoder().encode(value) else { return }
-        saveDataBlock(data, key)
+    @discardableResult
+    func save<Value: Encodable>(_ value: Value, key: String) -> Bool {
+        do {
+            let data = try JSONEncoder().encode(value)
+            return saveDataBlock(data, key)
+        } catch {
+            recordIssueBlock(error, "encoding structured state for \(key)")
+            return false
+        }
     }
 
-    func saveData(_ data: Data, key: String) {
+    @discardableResult
+    func saveData(_ data: Data, key: String) -> Bool {
         saveDataBlock(data, key)
     }
 
@@ -74,7 +86,10 @@ struct CodableStateStorage: @unchecked Sendable {
     static func userDefaults(_ defaults: UserDefaults) -> CodableStateStorage {
         CodableStateStorage(
             loadData: { defaults.data(forKey: $0) },
-            saveData: { defaults.set($0, forKey: $1) },
+            saveData: {
+                defaults.set($0, forKey: $1)
+                return true
+            },
             clear: { defaults.removeObject(forKey: $0) }
         )
     }

@@ -7,14 +7,20 @@ enum ProtectedLocalStateStore {
     private static let logger = Logger(subsystem: "Before", category: "ProtectedLocalStateStore")
 
     static func load<Value: Decodable>(_ type: Value.Type, key: String) -> Value? {
-        guard let fileURL = try? fileURL(for: key) else { return nil }
-        guard let data = loadData(from: fileURL, key: key) else { return nil }
+        let targetURL: URL
+        do {
+            targetURL = try fileURL(for: key)
+        } catch {
+            recordStorageIssue(error, operation: "preparing protected local state for \(key)")
+            return nil
+        }
+        guard let data = loadData(from: targetURL, key: key) else { return nil }
 
         do {
             return try JSONDecoder().decode(type, from: data)
         } catch {
             quarantineCorruptedFile(
-                at: fileURL,
+                at: targetURL,
                 key: key,
                 operation: "decoding protected local state",
                 underlyingError: error
@@ -24,35 +30,64 @@ enum ProtectedLocalStateStore {
     }
 
     static func loadData(key: String) -> Data? {
-        guard let fileURL = try? fileURL(for: key) else { return nil }
-        return loadData(from: fileURL, key: key)
+        let targetURL: URL
+        do {
+            targetURL = try fileURL(for: key)
+        } catch {
+            recordStorageIssue(error, operation: "preparing protected local state for \(key)")
+            return nil
+        }
+        return loadData(from: targetURL, key: key)
     }
 
-    static func save<Value: Encodable>(_ value: Value, key: String) {
-        guard let data = try? JSONEncoder().encode(value) else { return }
-        saveData(data, key: key)
+    @discardableResult
+    static func save<Value: Encodable>(_ value: Value, key: String) -> Bool {
+        do {
+            let data = try JSONEncoder().encode(value)
+            return saveData(data, key: key)
+        } catch {
+            recordStorageIssue(error, operation: "encoding protected local state for \(key)")
+            return false
+        }
     }
 
-    static func saveData(_ data: Data, key: String) {
-        guard let fileURL = try? fileURL(for: key) else { return }
+    @discardableResult
+    static func saveData(_ data: Data, key: String) -> Bool {
+        let targetURL: URL
+        do {
+            targetURL = try fileURL(for: key)
+        } catch {
+            recordStorageIssue(error, operation: "preparing protected local state for \(key)")
+            return false
+        }
 
         do {
-            try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
+            try data.write(to: targetURL, options: [.atomic, .completeFileProtection])
             try FileManager.default.setAttributes(
                 [.protectionKey: FileProtectionType.complete],
-                ofItemAtPath: fileURL.path
+                ofItemAtPath: targetURL.path
             )
+            return true
         } catch {
+            recordStorageIssue(error, operation: "saving protected local state for \(key)")
             logger.error("Failed to save protected local state: \(error.localizedDescription, privacy: .public)")
+            return false
         }
     }
 
     static func clear(key: String) {
-        guard let fileURL = try? fileURL(for: key) else { return }
+        let targetURL: URL
         do {
-            try FileManager.default.removeItem(at: fileURL)
+            targetURL = try fileURL(for: key)
+        } catch {
+            recordStorageIssue(error, operation: "preparing protected local state for \(key)")
+            return
+        }
+        do {
+            try FileManager.default.removeItem(at: targetURL)
         } catch {
             guard (error as NSError).code != NSFileNoSuchFileError else { return }
+            recordStorageIssue(error, operation: "clearing protected local state for \(key)")
             logger.error("Failed to clear protected local state: \(error.localizedDescription, privacy: .public)")
         }
     }
@@ -174,5 +209,10 @@ enum ProtectedLocalStateStore {
         logger.error(
             "Quarantined protected local state for key \(key, privacy: .public): \(underlyingError.localizedDescription, privacy: .public)"
         )
+    }
+
+    private static func recordStorageIssue(_ error: Error, operation: String) {
+        _ = StateStorageIssueRecorder.record(error: error, operation: operation)
+        logger.error("Protected local state issue while \(operation, privacy: .public): \(error.localizedDescription, privacy: .public)")
     }
 }

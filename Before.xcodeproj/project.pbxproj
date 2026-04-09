@@ -118,6 +118,7 @@
 		7D04494DF147348DDB230C23 /* DecisionIntelligencePromptLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 645A67931102F242BF694CBB /* DecisionIntelligencePromptLibrary.swift */; };
 		7D6E2C32F1B7CF33CD9B7910 /* DecisionIntelligenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F047738D148D3433E732FA5 /* DecisionIntelligenceCoordinator.swift */; };
 		7E702A3E19D063CE60540333 /* ReminderSourceType.swift in Sources */ = {isa = PBXBuildFile; fileRef = C94A031C4F195FB7A25E444F /* ReminderSourceType.swift */; };
+		7E9DD5DEE37968ADD0306CA1 /* StateStorageIssueRecorderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99E770283B63A8FAE734E97F /* StateStorageIssueRecorderTests.swift */; };
 		7F10177EA6726A9ECC93531E /* LocalModelAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23F476A392EB99124E0CBDBF /* LocalModelAdapter.swift */; };
 		803A163B61B327AD0E611DEE /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAFAB4D7AB512041EFC3A51F /* OnboardingView.swift */; };
 		84559BF58EFD90CA6BFB97FA /* ProtectedLocalStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ECDE0CE15D946CD950732D2 /* ProtectedLocalStateStore.swift */; };
@@ -207,6 +208,7 @@
 		D4D4D87CDD71BCB343271A00 /* PendingReflectionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9D7646F8281FD71B4902F9 /* PendingReflectionStoreTests.swift */; };
 		D508BAC239303E3FE5A18318 /* ReminderTemplateLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18D1942BFFCAF7130FAF127F /* ReminderTemplateLibrary.swift */; };
 		D67E0D9EB69DF26F0CB7D934 /* DecisionMemoryEligibilityJudge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AA663D462085CEDA18F4339 /* DecisionMemoryEligibilityJudge.swift */; };
+		D8B09C24F2D691F5F3D0D7C9 /* CodableStateStorageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A30E910753EB5E5BB4EAEAE /* CodableStateStorageTests.swift */; };
 		D8C10F91552AED40EC948DFC /* QuickCheckSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BAE04A71B8826BDE45EAF6E /* QuickCheckSession.swift */; };
 		D946B10D8FB631D6C5C61A4B /* DecisionTestingRuntimeExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8116ADEB650BEA3CC214DAC2 /* DecisionTestingRuntimeExport.swift */; };
 		D95E6740672BA7080A66DF1D /* DecisionModeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25779E30F91D917702DC456 /* DecisionModeCard.swift */; };
@@ -355,6 +357,7 @@
 		44CADF38945C264E4DE6F821 /* DecisionModeRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionModeRouter.swift; sourceTree = "<group>"; };
 		47EBB9A1A6B11F195895C43F /* TestingDecisionIntelligenceProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestingDecisionIntelligenceProvider.swift; sourceTree = "<group>"; };
 		49F58C3C28378D4CF9CD86DE /* DecisionMemoryEligibilityJudgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionMemoryEligibilityJudgeTests.swift; sourceTree = "<group>"; };
+		4A30E910753EB5E5BB4EAEAE /* CodableStateStorageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodableStateStorageTests.swift; sourceTree = "<group>"; };
 		4C1CF4BDBA8776C1E59C9B45 /* CheckAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckAction.swift; sourceTree = "<group>"; };
 		4C202B77A6D3DD97C78CDC6F /* GemmaLocalRuntimeBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GemmaLocalRuntimeBridge.swift; sourceTree = "<group>"; };
 		4DDB21D625F2F95F5D016974 /* TomorrowBoxDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxDraft.swift; sourceTree = "<group>"; };
@@ -425,6 +428,7 @@
 		95FFF495962DBEFB2CBCD451 /* LetGoCopyLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetGoCopyLibrary.swift; sourceTree = "<group>"; };
 		9981DC0C62B0CC0F075EDC39 /* TomorrowBoxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxView.swift; sourceTree = "<group>"; };
 		99854F0C3B64AD633AB248A0 /* DecisionMemoryTrustEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionMemoryTrustEngine.swift; sourceTree = "<group>"; };
+		99E770283B63A8FAE734E97F /* StateStorageIssueRecorderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateStorageIssueRecorderTests.swift; sourceTree = "<group>"; };
 		9A5EC40417B021F9CAFFD08C /* DecisionStarterLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionStarterLibraryTests.swift; sourceTree = "<group>"; };
 		9A6F46446EAB4BE1B81889BC /* BeforeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeApp.swift; sourceTree = "<group>"; };
 		9AC8A2627946D1F97C7C09CE /* GemmaRuntimeLibraryCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GemmaRuntimeLibraryCatalog.swift; sourceTree = "<group>"; };
@@ -661,6 +665,7 @@
 				D5476CF22FF1B67A4F1E4502 /* BalanceBoardEngineTests.swift */,
 				4FC15551C8847566B4860806 /* BeforePreferencesStoreTests.swift */,
 				A9E33F27723396B6B342EB59 /* CheckRuleEngineTests.swift */,
+				4A30E910753EB5E5BB4EAEAE /* CodableStateStorageTests.swift */,
 				167E5FF74A76B475CE75CC1F /* DecisionContextLifecycleTests.swift */,
 				ED9ED7A91142A6380075D141 /* DecisionFieldSuggestionLibraryTests.swift */,
 				13CA4CCE8E080D56C166ED5A /* DecisionIntelligenceAdmissionControllerTests.swift */,
@@ -703,6 +708,7 @@
 				D14BBBFC879A75D527348A3A /* SharedContainerTests.swift */,
 				078D41DF98B71E11CD93C772 /* SharedLifeItemFactoryTests.swift */,
 				F28C38C791E2C0F608142BBA /* SharedLifeStoreTests.swift */,
+				99E770283B63A8FAE734E97F /* StateStorageIssueRecorderTests.swift */,
 				24184A62A2B7E01F7BEA869A /* SupportInboxStoreTests.swift */,
 				AD17481B92151CE94BC45836 /* SupportRequestFactoryTests.swift */,
 				E920EDE589F5E07C3D3C2C1F /* SupportRequestKindTests.swift */,
@@ -1257,6 +1263,7 @@
 				CC15D4EE356A7EB095BD13DE /* BalanceBoardEngineTests.swift in Sources */,
 				2D4A09066D8554D48DDA9195 /* BeforePreferencesStoreTests.swift in Sources */,
 				EC4B3A79C4659AFCAD798083 /* CheckRuleEngineTests.swift in Sources */,
+				D8B09C24F2D691F5F3D0D7C9 /* CodableStateStorageTests.swift in Sources */,
 				F9BD2BED06676E7550F737F7 /* DecisionContextLifecycleTests.swift in Sources */,
 				BB74CD533C51228C40787E52 /* DecisionFieldSuggestionLibraryTests.swift in Sources */,
 				B85E951908A4087DEFAF730F /* DecisionIntelligenceAdmissionControllerTests.swift in Sources */,
@@ -1299,6 +1306,7 @@
 				542CC720483001216062BDAF /* SharedContainerTests.swift in Sources */,
 				412F0EAEC5583E89FA48617F /* SharedLifeItemFactoryTests.swift in Sources */,
 				E66E1D9557452208BD2DB5A3 /* SharedLifeStoreTests.swift in Sources */,
+				7E9DD5DEE37968ADD0306CA1 /* StateStorageIssueRecorderTests.swift in Sources */,
 				FC0E461363A93C5121E51141 /* SupportInboxStoreTests.swift in Sources */,
 				48FFA40F346FCC7310AF01CA /* SupportRequestFactoryTests.swift in Sources */,
 				063B95CB0003BED2CEFA42C0 /* SupportRequestKindTests.swift in Sources */,

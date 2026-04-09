@@ -178,4 +178,26 @@ final class PendingLaunchRequestStoreTests: XCTestCase {
         XCTAssertEqual(SharedProtectedStateStore.quarantinedData(key: key), raw)
         XCTAssertNotNil(StateStorageIssueRecorder.latestNotice())
     }
+
+    func testConsumeRemovesOrphanProtectedPayloads() {
+        PendingLaunchRequestStore.clear()
+
+        let orphanKey = "before.pending.launch.request.payload.12345678-1234-1234-1234-1234567890ab"
+        XCTAssertTrue(SharedProtectedStateStore.saveData(Data("orphan".utf8), key: orphanKey))
+
+        XCTAssertNil(PendingLaunchRequestStore.consume())
+        XCTAssertNil(SharedProtectedStateStore.loadData(key: orphanKey))
+    }
+
+    func testUnreadableQueueCleanupRemovesOrphanPayloads() {
+        PendingLaunchRequestStore.clear()
+
+        let queueKey = "before.pending.launch.request"
+        let orphanKey = "before.pending.launch.request.payload.aaaaaaaa-1234-5678-90ab-aaaaaaaaaaaa"
+        XCTAssertTrue(SharedProtectedStateStore.saveData(Data("broken-queue".utf8), key: queueKey))
+        XCTAssertTrue(SharedProtectedStateStore.saveData(Data("orphan".utf8), key: orphanKey))
+
+        XCTAssertNil(PendingLaunchRequestStore.consume())
+        XCTAssertNil(SharedProtectedStateStore.loadData(key: orphanKey))
+    }
 }

@@ -7,15 +7,32 @@ enum SharedProtectedStateStore {
     private static let quarantineDirectoryName = "ProtectedSharedRuntimeStateQuarantine"
     private static let logger = Logger(subsystem: "Before", category: "SharedProtectedStateStore")
 
+    private enum StorageKind {
+        case primary
+        case quarantine
+    }
+
+    private struct StorageContext {
+        let baseDirectory: URL
+        let protection: FileProtectionType
+    }
+
     static func load<Value: Decodable>(_ type: Value.Type, key: String) -> Value? {
-        guard let fileURL = try? fileURL(for: key) else { return nil }
-        guard let data = loadData(from: fileURL, key: key) else { return nil }
+        let targetURL: URL
+        do {
+            targetURL = try fileURL(for: key)
+        } catch {
+            recordStorageIssue(error, operation: "preparing shared protected state for \(key)")
+            return nil
+        }
+
+        guard let data = loadData(from: targetURL, key: key) else { return nil }
 
         do {
             return try JSONDecoder().decode(type, from: data)
         } catch {
             quarantineCorruptedFile(
-                at: fileURL,
+                at: targetURL,
                 key: key,
                 operation: "decoding shared protected state",
                 underlyingError: error
@@ -25,35 +42,68 @@ enum SharedProtectedStateStore {
     }
 
     static func loadData(key: String) -> Data? {
-        guard let fileURL = try? fileURL(for: key) else { return nil }
-        return loadData(from: fileURL, key: key)
+        let targetURL: URL
+        do {
+            targetURL = try fileURL(for: key)
+        } catch {
+            recordStorageIssue(error, operation: "preparing shared protected state for \(key)")
+            return nil
+        }
+
+        return loadData(from: targetURL, key: key)
     }
 
-    static func save<Value: Encodable>(_ value: Value, key: String) {
-        guard let data = try? JSONEncoder().encode(value) else { return }
-        saveData(data, key: key)
+    @discardableResult
+    static func save<Value: Encodable>(_ value: Value, key: String) -> Bool {
+        do {
+            let data = try JSONEncoder().encode(value)
+            return saveData(data, key: key)
+        } catch {
+            recordStorageIssue(error, operation: "encoding shared protected state for \(key)")
+            return false
+        }
     }
 
-    static func saveData(_ data: Data, key: String) {
-        guard let fileURL = try? fileURL(for: key) else { return }
+    @discardableResult
+    static func saveData(_ data: Data, key: String) -> Bool {
+        let targetURL: URL
+        let context: StorageContext
+        do {
+            context = try storageContext()
+            targetURL = try fileURL(for: key, storageContext: context)
+        } catch {
+            recordStorageIssue(error, operation: "preparing shared protected state for \(key)")
+            return false
+        }
 
         do {
-            try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            try data.write(to: targetURL, options: writeOptions(for: context.protection))
             try FileManager.default.setAttributes(
-                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
-                ofItemAtPath: fileURL.path
+                [.protectionKey: context.protection],
+                ofItemAtPath: targetURL.path
             )
+            return true
         } catch {
+            recordStorageIssue(error, operation: "saving shared protected state for \(key)")
             logger.error("Failed to save shared protected state: \(error.localizedDescription, privacy: .public)")
+            return false
         }
     }
 
     static func clear(key: String) {
-        guard let fileURL = try? fileURL(for: key) else { return }
+        let targetURL: URL
         do {
-            try FileManager.default.removeItem(at: fileURL)
+            targetURL = try fileURL(for: key)
+        } catch {
+            recordStorageIssue(error, operation: "preparing shared protected state for \(key)")
+            return
+        }
+
+        do {
+            try FileManager.default.removeItem(at: targetURL)
         } catch {
             guard (error as NSError).code != NSFileNoSuchFileError else { return }
+            recordStorageIssue(error, operation: "clearing shared protected state for \(key)")
             logger.error("Failed to clear shared protected state: \(error.localizedDescription, privacy: .public)")
         }
     }
@@ -75,7 +125,28 @@ enum SharedProtectedStateStore {
             try FileManager.default.removeItem(at: fileURL)
         } catch {
             guard (error as NSError).code != NSFileNoSuchFileError else { return }
+            recordStorageIssue(error, operation: "clearing shared protected quarantine for \(key)")
             logger.error("Failed to clear shared protected quarantine: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    static func storedKeys(withPrefix prefix: String) -> [String] {
+        do {
+            let context = try storageContext()
+            let directory = try directoryURL(for: .primary, storageContext: context)
+            let urls = try FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            )
+
+            return urls
+                .filter { $0.pathExtension == "json" }
+                .map { $0.deletingPathExtension().lastPathComponent }
+                .filter { $0.hasPrefix(prefix) }
+        } catch {
+            recordStorageIssue(error, operation: "enumerating shared protected state keys for \(prefix)")
+            return []
         }
     }
 
@@ -88,13 +159,14 @@ enum SharedProtectedStateStore {
         _ = StateStorageIssueRecorder.record(error: noticeError, operation: operation)
 
         do {
-            let destination = try quarantineFileURL(for: key)
+            let context = try storageContext()
+            let destination = try quarantineFileURL(for: key, storageContext: context)
             if FileManager.default.fileExists(atPath: destination.path) {
                 try FileManager.default.removeItem(at: destination)
             }
-            try data.write(to: destination, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            try data.write(to: destination, options: writeOptions(for: context.protection))
             try FileManager.default.setAttributes(
-                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                [.protectionKey: context.protection],
                 ofItemAtPath: destination.path
             )
         } catch {
@@ -103,38 +175,31 @@ enum SharedProtectedStateStore {
     }
 
     private static func fileURL(for key: String) throws -> URL {
-        let baseDirectory = try baseDirectoryURL()
+        let context = try storageContext()
+        return try fileURL(for: key, storageContext: context)
+    }
 
-        let directory = baseDirectory.appendingPathComponent(directoryName, isDirectory: true)
-        if !FileManager.default.fileExists(atPath: directory.path) {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try FileManager.default.setAttributes(
-                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
-                ofItemAtPath: directory.path
-            )
-        }
-
+    private static func fileURL(for key: String, storageContext: StorageContext) throws -> URL {
+        let directory = try directoryURL(for: .primary, storageContext: storageContext)
         return directory.appendingPathComponent("\(key).json", isDirectory: false)
     }
 
     private static func quarantineFileURL(for key: String) throws -> URL {
-        let baseDirectory = try baseDirectoryURL()
+        let context = try storageContext()
+        return try quarantineFileURL(for: key, storageContext: context)
+    }
 
-        let directory = baseDirectory.appendingPathComponent(quarantineDirectoryName, isDirectory: true)
-        if !FileManager.default.fileExists(atPath: directory.path) {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try FileManager.default.setAttributes(
-                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
-                ofItemAtPath: directory.path
-            )
-        }
-
+    private static func quarantineFileURL(for key: String, storageContext: StorageContext) throws -> URL {
+        let directory = try directoryURL(for: .quarantine, storageContext: storageContext)
         return directory.appendingPathComponent("\(key).json", isDirectory: false)
     }
 
-    private static func baseDirectoryURL() throws -> URL {
+    private static func storageContext() throws -> StorageContext {
         if let containerURL = SharedContainer.containerURL {
-            return containerURL
+            return StorageContext(
+                baseDirectory: containerURL,
+                protection: .completeUntilFirstUserAuthentication
+            )
         }
 
         let applicationSupport = try FileManager.default.url(
@@ -148,18 +213,33 @@ enum SharedProtectedStateStore {
             .appendingPathComponent("Before", isDirectory: true)
             .appendingPathComponent(fallbackDirectoryName, isDirectory: true)
 
-        if !FileManager.default.fileExists(atPath: fallbackDirectory.path) {
-            try FileManager.default.createDirectory(
-                at: fallbackDirectory,
-                withIntermediateDirectories: true
-            )
-            try FileManager.default.setAttributes(
-                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
-                ofItemAtPath: fallbackDirectory.path
-            )
+        return StorageContext(
+            baseDirectory: fallbackDirectory,
+            protection: .complete
+        )
+    }
+
+    private static func directoryURL(
+        for kind: StorageKind,
+        storageContext: StorageContext
+    ) throws -> URL {
+        let targetName: String
+        switch kind {
+        case .primary:
+            targetName = directoryName
+        case .quarantine:
+            targetName = quarantineDirectoryName
         }
 
-        return fallbackDirectory
+        let directory = storageContext.baseDirectory.appendingPathComponent(targetName, isDirectory: true)
+        if !FileManager.default.fileExists(atPath: directory.path) {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        try FileManager.default.setAttributes(
+            [.protectionKey: storageContext.protection],
+            ofItemAtPath: directory.path
+        )
+        return directory
     }
 
     private static func loadData(from fileURL: URL, key: String) -> Data? {
@@ -195,13 +275,14 @@ enum SharedProtectedStateStore {
 
         do {
             guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
-            let destination = try quarantineFileURL(for: key)
+            let context = try storageContext()
+            let destination = try quarantineFileURL(for: key, storageContext: context)
             if FileManager.default.fileExists(atPath: destination.path) {
                 try FileManager.default.removeItem(at: destination)
             }
             try FileManager.default.moveItem(at: fileURL, to: destination)
             try FileManager.default.setAttributes(
-                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                [.protectionKey: context.protection],
                 ofItemAtPath: destination.path
             )
         } catch {
@@ -211,5 +292,19 @@ enum SharedProtectedStateStore {
         logger.error(
             "Quarantined shared protected state for key \(key, privacy: .public): \(underlyingError.localizedDescription, privacy: .public)"
         )
+    }
+
+    private static func recordStorageIssue(_ error: Error, operation: String) {
+        _ = StateStorageIssueRecorder.record(error: error, operation: operation)
+        logger.error("Shared protected state issue while \(operation, privacy: .public): \(error.localizedDescription, privacy: .public)")
+    }
+
+    private static func writeOptions(for protection: FileProtectionType) -> Data.WritingOptions {
+        switch protection {
+        case .complete:
+            [.atomic, .completeFileProtection]
+        default:
+            [.atomic, .completeFileProtectionUntilFirstUserAuthentication]
+        }
     }
 }

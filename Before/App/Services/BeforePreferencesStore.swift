@@ -177,7 +177,11 @@ enum BeforePreferencesStore {
     }
 
     static func save(_ preferences: BeforePreferences) {
-        guard let data = try? JSONEncoder().encode(preferences) else { return }
-        UserDefaults.standard.set(data, forKey: key)
+        do {
+            let data = try JSONEncoder().encode(preferences)
+            UserDefaults.standard.set(data, forKey: key)
+        } catch {
+            _ = PersistenceIssueRecorder.record(error: error, operation: "encoding app preferences")
+        }
     }
 }

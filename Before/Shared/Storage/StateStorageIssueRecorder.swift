@@ -1,25 +1,29 @@
 import Foundation
 
 enum StateStorageIssueRecorder {
-    private static let queue = DispatchQueue(label: "before.state.storage.issue.recorder")
-    nonisolated(unsafe) private static var latestMessage: String?
+    private final class Storage: @unchecked Sendable {
+        let queue = DispatchQueue(label: "before.state.storage.issue.recorder")
+        var latestMessage: String?
+    }
+
+    private static let storage = Storage()
 
     @discardableResult
     static func record(error: Error, operation: String) -> String {
         let message = "Before isolated a local state artifact while \(operation). Recent in-progress state may be reset until storage stabilizes. (\(error.localizedDescription))"
-        queue.sync {
-            latestMessage = message
+        storage.queue.sync {
+            storage.latestMessage = message
         }
         return message
     }
 
     static func latestNotice() -> String? {
-        queue.sync { latestMessage }
+        storage.queue.sync { storage.latestMessage }
     }
 
     static func clear() {
-        queue.sync {
-            latestMessage = nil
+        storage.queue.sync {
+            storage.latestMessage = nil
         }
     }
 }
