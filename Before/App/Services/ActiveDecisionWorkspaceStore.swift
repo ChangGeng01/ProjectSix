@@ -147,6 +147,8 @@ enum ActiveDecisionWorkspaceStore {
     private static let key = "before.active.decision.workspace"
 
     static func load() -> ActiveDecisionWorkspaceState? {
+        // Sensitive in-progress workspace state only lives in protected local storage.
+        // UserDefaults is retained solely to scrub legacy payloads from older builds.
         scrubLegacyStorage()
         return ProtectedLocalStateStore.load(ActiveDecisionWorkspaceState.self, key: key)
     }

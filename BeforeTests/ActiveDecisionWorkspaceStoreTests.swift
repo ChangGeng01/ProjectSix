@@ -104,6 +104,30 @@ final class ActiveDecisionWorkspaceStoreTests: XCTestCase {
         XCTAssertNotNil(restored?.intelligenceLifecycleSnapshot.fieldRecords[DecisionContextFieldKey.mirrorEmotion.rawValue])
     }
 
+    func testSaveStoresWorkspaceOnlyInProtectedLocalState() throws {
+        ActiveDecisionWorkspaceStore.clear()
+
+        let session = QuickCheckSession(entrySource: .app, initialNote: "Do I buy this now?")
+        session.scenario = .buy
+        session.motivation = .reward
+        session.expectedOutcome = .temporaryRelief
+        session.controlLevel = .maybe
+
+        guard let state = ActiveDecisionWorkspaceState.capture(from: session) else {
+            XCTFail("Expected workspace state")
+            return
+        }
+
+        let key = "before.active.decision.workspace"
+        ActiveDecisionWorkspaceStore.save(state)
+
+        XCTAssertNil(UserDefaults.standard.data(forKey: key))
+        XCTAssertEqual(
+            ProtectedLocalStateStore.load(ActiveDecisionWorkspaceState.self, key: key),
+            state
+        )
+    }
+
     func testLoadPurgesLegacyUserDefaultsWorkspaceWithoutRestoringIt() throws {
         ActiveDecisionWorkspaceStore.clear()
 
@@ -123,6 +147,31 @@ final class ActiveDecisionWorkspaceStoreTests: XCTestCase {
         UserDefaults.standard.set(data, forKey: key)
 
         XCTAssertNil(ActiveDecisionWorkspaceStore.load())
+        XCTAssertNil(UserDefaults.standard.data(forKey: key))
+    }
+
+    func testClearRemovesProtectedWorkspaceAndLegacyDefaults() throws {
+        ActiveDecisionWorkspaceStore.clear()
+
+        let session = QuickCheckSession(entrySource: .app, initialNote: "Do I buy this now?")
+        session.scenario = .buy
+        session.motivation = .reward
+        session.expectedOutcome = .temporaryRelief
+        session.controlLevel = .maybe
+
+        guard let state = ActiveDecisionWorkspaceState.capture(from: session) else {
+            XCTFail("Expected workspace state")
+            return
+        }
+
+        let key = "before.active.decision.workspace"
+        ActiveDecisionWorkspaceStore.save(state)
+        let legacyData = try JSONEncoder().encode(state)
+        UserDefaults.standard.set(legacyData, forKey: key)
+
+        ActiveDecisionWorkspaceStore.clear()
+
+        XCTAssertNil(ProtectedLocalStateStore.loadData(key: key))
         XCTAssertNil(UserDefaults.standard.data(forKey: key))
     }
 }
