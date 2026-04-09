@@ -51,6 +51,20 @@ final class DecisionIntelligenceAdmissionControllerTests: XCTestCase {
     }
 
     func testQuickAdmissionSkipsWhenPromptBudgetIsExceeded() {
+        let strategy = DecisionAdaptiveTaskStrategy(
+            kind: .quick,
+            entropy: .low,
+            runtimeGear: .low,
+            preferredProvider: .gemmaE4B,
+            contextBudget: 120,
+            retrievalMode: .off,
+            thinkingMode: .off,
+            outputMode: .guidedShort,
+            tone: .briefWarm,
+            actionSpace: ["encourage", "next_step"],
+            responseLanguage: .english,
+            allowsModelInvocation: true
+        )
         let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
             base: QuickCheckResult(
                 currentPerspective: "You want relief.",
@@ -66,6 +80,7 @@ final class DecisionIntelligenceAdmissionControllerTests: XCTestCase {
                 controlLevel: .maybe,
                 note: "Short note."
             ),
+            strategy: strategy,
             neuralState: DecisionNeuralState(
                 mode: .quick,
                 dominantActivations: [

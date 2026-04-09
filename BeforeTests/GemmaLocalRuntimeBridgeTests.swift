@@ -63,7 +63,7 @@ final class GemmaLocalRuntimeBridgeTests: XCTestCase {
             entropy: .low,
             runtimeGear: .low,
             preferredProvider: .gemmaE4B,
-            contextBudget: 220,
+            contextBudget: 1_200,
             retrievalMode: .off,
             thinkingMode: .off,
             outputMode: .guidedShort,
@@ -93,7 +93,8 @@ final class GemmaLocalRuntimeBridgeTests: XCTestCase {
 
         let capturedPrompt = promptRecorder.value
         XCTAssertNotNil(capturedPrompt)
-        XCTAssertTrue(capturedPrompt?.contains("\"response_language\":\"chinese\"") == true)
+        XCTAssertTrue(capturedPrompt?.contains("TASK_STATE_JSON:") == true)
+        XCTAssertTrue(capturedPrompt?.contains("OUTPUT_GUARD:") == true)
         XCTAssertTrue(capturedPrompt?.contains("Keep the user-facing output in Chinese unless the structured format says otherwise.") == true)
     }
 

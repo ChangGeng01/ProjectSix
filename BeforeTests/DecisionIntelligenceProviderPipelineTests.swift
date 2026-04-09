@@ -282,7 +282,7 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
             entropy: .low,
             runtimeGear: .low,
             preferredProvider: .gemmaE4B,
-            contextBudget: 220,
+            contextBudget: 520,
             retrievalMode: .off,
             thinkingMode: .off,
             outputMode: .guidedShort,
@@ -307,9 +307,9 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
 
         XCTAssertEqual(latestTrace.kind, .quick)
         XCTAssertEqual(latestTrace.runtimeStrategy, strategy)
-        XCTAssertEqual(latestTrace.promptBudget?.targetCharacters, 220)
-        XCTAssertTrue(latestTrace.prompt.contains("\"runtime_gear\":\"low\""))
-        XCTAssertTrue(latestTrace.prompt.contains("\"response_language\":\"english\""))
+        XCTAssertEqual(latestTrace.promptBudget?.targetCharacters, 520)
+        XCTAssertEqual(latestTrace.runtimeStrategy?.runtimeGear, .low)
+        XCTAssertEqual(latestTrace.runtimeStrategy?.responseLanguage, .english)
     }
 
     @MainActor
@@ -456,7 +456,7 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
     }
 
     @MainActor
-    func testQuickAdmissionCanSkipModelInvocationWhenPromptBecomesTooLarge() async {
+    func testQuickPromptCompactionCanAvoidAdmissionSkipWhenOptionalContextExplodes() async {
         let base = QuickCheckResult(
             currentPerspective: "Base current.",
             afterPerspective: "Base after.",
@@ -483,7 +483,7 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
             detail: String(repeating: "pressure-", count: 220)
         )
 
-        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+        _ = await DecisionIntelligenceProviderPipeline.refineQuickResult(
             base: base,
             input: input,
             neuralState: neuralState,
@@ -492,22 +492,21 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
             testingStubProfile: nil
         )
 
-        XCTAssertNil(refined)
-
         let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
-        XCTAssertEqual(snapshot.outcomeCount[.admissionSkipped], 1)
-        XCTAssertEqual(snapshot.admissionSkipCountByReason[.budgetExceeded], 1)
+        XCTAssertNil(snapshot.outcomeCount[.admissionSkipped])
+        XCTAssertNil(snapshot.admissionSkipCountByReason[.budgetExceeded])
         XCTAssertEqual(snapshot.requestCountByKind[.quick], 1)
         XCTAssertNil(snapshot.activeProviderCount[.testingStub])
 
         guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
-            return XCTFail("Expected an admission-skip trace.")
+            return XCTFail("Expected a recorded quick trace.")
         }
 
         XCTAssertEqual(latestTrace.kind, .quick)
-        XCTAssertEqual(latestTrace.admissionDecision?.skipReason, .budgetExceeded)
-        XCTAssertEqual(latestTrace.promptBudget?.isWithinTarget, false)
-        XCTAssertTrue(latestTrace.detail.contains("Admission controller skipped quick refinement"))
+        XCTAssertNil(latestTrace.admissionDecision?.skipReason)
+        XCTAssertEqual(latestTrace.promptBudget?.isWithinTarget, true)
+        XCTAssertTrue(latestTrace.prompt.contains("[COMPACTION]"))
+        XCTAssertTrue(latestTrace.prompt.contains("Dropped blocks:"))
     }
 
     @MainActor

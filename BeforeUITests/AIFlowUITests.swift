@@ -52,7 +52,7 @@ final class AIFlowUITests: XCTestCase {
         )
 
         let focus = app.staticTexts["balance.result.focusTitle"]
-        XCTAssertTrue(focus.waitForExistence(timeout: timeout))
+        XCTAssertTrue(reveal(focus, in: app))
         waitForLabel(
             containingAny: [
                 "Stub priority",
@@ -154,5 +154,35 @@ final class AIFlowUITests: XCTestCase {
         let predicate = NSCompoundPredicate(orPredicateWithSubpredicates: predicates)
         expectation(for: predicate, evaluatedWith: element)
         waitForExpectations(timeout: timeout)
+    }
+
+    private func reveal(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        maxSwipes: Int = 6
+    ) -> Bool {
+        if element.waitForExistence(timeout: 1) {
+            return true
+        }
+
+        let scrollContainers = [
+            app.scrollViews.firstMatch,
+            app.tables.firstMatch,
+            app.collectionViews.firstMatch
+        ]
+
+        for _ in 0..<maxSwipes {
+            if element.exists {
+                return true
+            }
+
+            if let container = scrollContainers.first(where: \.exists) {
+                container.swipeUp()
+            } else {
+                app.swipeUp()
+            }
+        }
+
+        return element.waitForExistence(timeout: 1)
     }
 }

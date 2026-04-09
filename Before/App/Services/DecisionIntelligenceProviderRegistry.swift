@@ -779,8 +779,18 @@ enum DecisionIntelligenceTaskRouter {
         let baseIndexByKind = Dictionary(
             uniqueKeysWithValues: baseKinds.enumerated().map { ($0.element, $0.offset) }
         )
+        let compatibleKinds = strategy.map { strategy in
+            baseKinds.filter { kind in
+                isCompatible(
+                    with: strategy,
+                    descriptor: descriptorByKind[kind]
+                )
+            }
+        } ?? baseKinds
 
-        return baseKinds.sorted { lhs, rhs in
+        guard !compatibleKinds.isEmpty else { return [] }
+
+        return compatibleKinds.sorted { lhs, rhs in
             let lhsScore = routingScore(
                 kind: lhs,
                 task: task,
@@ -804,6 +814,27 @@ enum DecisionIntelligenceTaskRouter {
 
             return lhsScore > rhsScore
         }
+    }
+
+    private static func isCompatible(
+        with strategy: DecisionAdaptiveTaskStrategy,
+        descriptor: DecisionModelProviderDescriptor?
+    ) -> Bool {
+        guard let profile = descriptor?.capabilityProfile else { return true }
+
+        if !profile.supports(responseLanguage: strategy.responseLanguage) {
+            return false
+        }
+
+        if strategy.thinkingMode == .gated, !profile.supportsThinking {
+            return false
+        }
+
+        if strategy.outputMode != .deterministicTemplate, !profile.supportsStructuredOutput {
+            return false
+        }
+
+        return true
     }
 
     private static func routingScore(

@@ -106,6 +106,64 @@ enum DecisionIntelligencePromptContract {
         }
     }
 
+    enum PromptBlockKind: String, Equatable, Sendable {
+        case frontstageState = "frontstage_state"
+        case compactionPolicy = "compaction_policy"
+        case scopedContext = "scoped_context"
+        case runtimeStrategy = "runtime_strategy"
+        case taskState = "task_state"
+        case contextLifecycle = "context_lifecycle"
+        case neuralState = "neural_state"
+        case brainState = "brain_state"
+        case evidenceSnippets = "evidence_snippets"
+        case outputGuard = "output_guard"
+    }
+
+    enum PromptBlockRetention: String, Equatable, Sendable {
+        case required
+        case preferred
+        case optional
+    }
+
+    struct PromptBlock: Equatable, Sendable {
+        let kind: PromptBlockKind
+        let header: String
+        let body: String
+        let retention: PromptBlockRetention
+        let priority: Int
+
+        var rendered: String {
+            [header, body].joined(separator: "\n")
+        }
+    }
+
+    struct PromptAssembly: Equatable, Sendable {
+        let allBlocks: [PromptBlock]
+        let retainedBlocks: [PromptBlock]
+        let droppedBlocks: [PromptBlock]
+        let suffixTargetCharacters: Int
+
+        var payload: String {
+            retainedBlocks.map(\.rendered).joined(separator: "\n")
+        }
+
+        var retainedBlockKinds: [PromptBlockKind] {
+            retainedBlocks.map(\.kind)
+        }
+
+        var droppedBlockKinds: [PromptBlockKind] {
+            droppedBlocks.map(\.kind)
+        }
+    }
+
+    struct PromptCompactionPolicy: Equatable, Sendable {
+        let preservedKinds: [PromptBlockKind]
+        let preferredKinds: [PromptBlockKind]
+        let dropOrder: [PromptBlockKind]
+        let guidance: [String]
+        let suffixTargetCharacters: Int
+    }
+
     struct PromptEnvelope: Equatable, Sendable {
         let kind: TaskKind
         let instructions: String
@@ -113,6 +171,7 @@ enum DecisionIntelligencePromptContract {
         let debugPrompt: String
         let budget: ContextBudget
         let layers: PromptLayers
+        let assembly: PromptAssembly
         let frontstageState: DecisionFrontstageState
         let openTextSignalCount: Int
 
@@ -481,6 +540,7 @@ enum DecisionIntelligencePromptContract {
             evidence,
             maxRetained: evidenceRetentionBudget(for: kind, strategy: strategy)
         )
+        let scopedContext = scopedContext(brainState: brainState)
         var guardedOutput = strategy.map(runtimeOutputGuard(for:)) ?? []
         guardedOutput.append(contentsOf: outputGuard)
         if evidenceFilter.droppedInjectedCount > 0 {
@@ -505,56 +565,40 @@ enum DecisionIntelligencePromptContract {
             neuralState: neuralState,
             brainState: brainState
         )
-        var sections = [
-            "FRONTSTAGE_STATE_JSON:",
-            frontstageStateJSONString(preparedFrontstageState),
-            "TASK_STATE_JSON:",
-            stateJSONString(state),
-        ]
-
-        if let strategy {
-            sections += [
-                "RUNTIME_STRATEGY_JSON:",
-                runtimeStrategyJSONString(strategy)
-            ]
-        }
-
-        if let contextState {
-            sections += [
-                "CONTEXT_LIFECYCLE_JSON:",
-                contextStateJSONString(contextState)
-            ]
-        }
-
-        if let neuralState {
-            sections += [
-                "NEURAL_STATE_JSON:",
-                neuralStateJSONString(neuralState)
-            ]
-        }
-
-        if let brainState, !brainState.isEmpty {
-            sections += [
-                "BRAIN_STATE_JSON:",
-                brainStateJSONString(brainState)
-            ]
-        }
-
-        sections += [
-            "EVIDENCE_SNIPPETS:",
-            evidenceBlock(evidenceFilter.retained),
-            "OUTPUT_GUARD:",
-            bulletList(guardedOutput)
-        ]
-
-        let payload = sections.joined(separator: "\n")
+        let targetCharacters = strategy?.contextBudget ?? kind.targetCharacters
+        let suffixTarget = suffixTargetCharacters(
+            targetCharacters: targetCharacters,
+            immutablePrefix: immutablePrefix,
+            adaptivePrefix: adaptivePrefix
+        )
+        let compactionPolicy = promptCompactionPolicy(
+            kind: kind,
+            suffixTargetCharacters: suffixTarget,
+            hasScopedContext: scopedContext != nil
+        )
+        let assembly = assemblePayloadBlocks(
+            blocks: promptBlocks(
+                state: state,
+                evidence: evidenceFilter.retained,
+                guardedOutput: guardedOutput,
+                strategy: strategy,
+                contextState: contextState,
+                neuralState: neuralState,
+                brainState: brainState,
+                frontstageState: preparedFrontstageState,
+                scopedContext: scopedContext,
+                compactionPolicy: compactionPolicy
+            ),
+            suffixTargetCharacters: suffixTarget,
+            policy: compactionPolicy
+        )
+        let payload = assembly.payload
         let layers = PromptLayers(
             immutablePrefix: immutablePrefix,
             adaptivePrefix: adaptivePrefix,
             volatileSuffix: payload
         )
-
-        let debugPrompt = [
+        var debugPromptSections = [
             "[IMMUTABLE PREFIX]",
             immutablePrefix,
             "",
@@ -564,7 +608,14 @@ enum DecisionIntelligencePromptContract {
             "[VOLATILE SUFFIX]",
             payload
         ]
-        .joined(separator: "\n")
+        if !assembly.droppedBlocks.isEmpty {
+            debugPromptSections += [
+                "",
+                "[COMPACTION]",
+                "Dropped blocks: \(assembly.droppedBlockKinds.map(\.rawValue).joined(separator: ", "))"
+            ]
+        }
+        let debugPrompt = debugPromptSections.joined(separator: "\n")
 
         return PromptEnvelope(
             kind: kind,
@@ -572,15 +623,259 @@ enum DecisionIntelligencePromptContract {
             payload: payload,
             debugPrompt: debugPrompt,
             budget: ContextBudget(
-                targetCharacters: strategy?.contextBudget ?? kind.targetCharacters,
+                targetCharacters: targetCharacters,
                 prefixCharacters: instructions.count,
                 suffixCharacters: payload.count,
                 immutablePrefixCharacters: immutablePrefix.count,
                 adaptivePrefixCharacters: adaptivePrefix.count
             ),
             layers: layers,
+            assembly: assembly,
             frontstageState: preparedFrontstageState,
             openTextSignalCount: openTextSignalCount
+        )
+    }
+
+    private static func promptBlocks(
+        state: [String: Any?],
+        evidence: [String],
+        guardedOutput: [String],
+        strategy: DecisionAdaptiveTaskStrategy?,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?,
+        frontstageState: DecisionFrontstageState,
+        scopedContext: [String: Any]?,
+        compactionPolicy: PromptCompactionPolicy
+    ) -> [PromptBlock] {
+        var blocks: [PromptBlock] = [
+            PromptBlock(
+                kind: .frontstageState,
+                header: "FRONTSTAGE_STATE_JSON:",
+                body: frontstageStateJSONString(frontstageState),
+                retention: .required,
+                priority: 100
+            ),
+            PromptBlock(
+                kind: .compactionPolicy,
+                header: "COMPACTION_POLICY_JSON:",
+                body: compactionPolicyJSONString(compactionPolicy),
+                retention: .preferred,
+                priority: 108
+            ),
+            PromptBlock(
+                kind: .taskState,
+                header: "TASK_STATE_JSON:",
+                body: stateJSONString(state),
+                retention: .required,
+                priority: 95
+            )
+        ]
+
+        if let scopedContext {
+            blocks.append(
+                PromptBlock(
+                    kind: .scopedContext,
+                    header: "SCOPED_CONTEXT_JSON:",
+                    body: stateJSONString(scopedContext),
+                    retention: .preferred,
+                    priority: 92
+                )
+            )
+        }
+
+        if let strategy {
+            blocks.append(
+                PromptBlock(
+                    kind: .runtimeStrategy,
+                    header: "RUNTIME_STRATEGY_JSON:",
+                    body: runtimeStrategyJSONString(strategy),
+                    retention: .preferred,
+                    priority: 80
+                )
+            )
+        }
+
+        if let contextState {
+            blocks.append(
+                PromptBlock(
+                    kind: .contextLifecycle,
+                    header: "CONTEXT_LIFECYCLE_JSON:",
+                    body: contextStateJSONString(contextState),
+                    retention: .preferred,
+                    priority: 70
+                )
+            )
+        }
+
+        if let neuralState {
+            blocks.append(
+                PromptBlock(
+                    kind: .neuralState,
+                    header: "NEURAL_STATE_JSON:",
+                    body: neuralStateJSONString(neuralState),
+                    retention: .optional,
+                    priority: 40
+                )
+            )
+        }
+
+        if let brainState, !brainState.isEmpty {
+            blocks.append(
+                PromptBlock(
+                    kind: .brainState,
+                    header: "BRAIN_STATE_JSON:",
+                    body: brainStateJSONString(brainState),
+                    retention: .optional,
+                    priority: 35
+                )
+            )
+        }
+
+        blocks += [
+            PromptBlock(
+                kind: .evidenceSnippets,
+                header: "EVIDENCE_SNIPPETS:",
+                body: evidenceBlock(evidence),
+                retention: .required,
+                priority: 90
+            ),
+            PromptBlock(
+                kind: .outputGuard,
+                header: "OUTPUT_GUARD:",
+                body: bulletList(guardedOutput),
+                retention: .required,
+                priority: 110
+            )
+        ]
+
+        return blocks
+    }
+
+    private static func assemblePayloadBlocks(
+        blocks: [PromptBlock],
+        suffixTargetCharacters: Int,
+        policy: PromptCompactionPolicy
+    ) -> PromptAssembly {
+        var retained = blocks
+        var dropped: [PromptBlock] = []
+
+        func renderedLength(of blocks: [PromptBlock]) -> Int {
+            blocks.map(\.rendered).joined(separator: "\n").count
+        }
+
+        func retentionRank(_ retention: PromptBlockRetention) -> Int {
+            switch retention {
+            case .optional:
+                0
+            case .preferred:
+                1
+            case .required:
+                2
+            }
+        }
+
+        let preservedKinds = Set(policy.preservedKinds)
+        let dropOrderIndex = Dictionary(
+            uniqueKeysWithValues: policy.dropOrder.enumerated().map { ($0.element, $0.offset) }
+        )
+
+        while renderedLength(of: retained) > suffixTargetCharacters {
+            guard let dropIndex = retained.enumerated()
+                .filter({ !preservedKinds.contains($0.element.kind) })
+                .sorted(by: { lhs, rhs in
+                    let lhsDropRank = dropOrderIndex[lhs.element.kind] ?? Int.max
+                    let rhsDropRank = dropOrderIndex[rhs.element.kind] ?? Int.max
+                    if lhsDropRank != rhsDropRank {
+                        return lhsDropRank < rhsDropRank
+                    }
+
+                    let lhsRetentionRank = retentionRank(lhs.element.retention)
+                    let rhsRetentionRank = retentionRank(rhs.element.retention)
+                    if lhsRetentionRank != rhsRetentionRank {
+                        return lhsRetentionRank < rhsRetentionRank
+                    }
+
+                    if lhs.element.priority == rhs.element.priority {
+                        return lhs.offset > rhs.offset
+                    }
+                    return lhs.element.priority < rhs.element.priority
+                })
+                .first?.offset else {
+                break
+            }
+            dropped.append(retained.remove(at: dropIndex))
+        }
+
+        return PromptAssembly(
+            allBlocks: blocks,
+            retainedBlocks: retained,
+            droppedBlocks: dropped,
+            suffixTargetCharacters: suffixTargetCharacters
+        )
+    }
+
+    private static func suffixTargetCharacters(
+        targetCharacters: Int,
+        immutablePrefix: String,
+        adaptivePrefix: String
+    ) -> Int {
+        let stablePrefix = [immutablePrefix, adaptivePrefix]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
+        return max(180, targetCharacters - stablePrefix.count)
+    }
+
+    private static func promptCompactionPolicy(
+        kind: TaskKind,
+        suffixTargetCharacters: Int,
+        hasScopedContext: Bool
+    ) -> PromptCompactionPolicy {
+        var preservedKinds: [PromptBlockKind] = [
+            .frontstageState,
+            .taskState,
+            .evidenceSnippets,
+            .outputGuard
+        ]
+        if hasScopedContext {
+            preservedKinds.append(.scopedContext)
+        }
+
+        let guidance: [String] = switch kind {
+        case .quick:
+            [
+                "Preserve the interruption goal, current state, and retained evidence before any historical detail.",
+                "Prefer stable user patterns and active goals over full historical projections."
+            ]
+        case .balance:
+            [
+                "Preserve the trade-off state and live evidence before reflective depth.",
+                "Keep active goals and local biases in view even if deeper history is trimmed."
+            ]
+        case .mirror:
+            [
+                "Preserve the core tension, active goals, and local boundary biases before deeper history.",
+                "Retain stable identity and goal anchors even when reflective detail is compacted."
+            ]
+        case .reminder:
+            [
+                "Preserve the current state and governed memory scope before broader history.",
+                "Choose from retained candidates without inventing new reminders."
+            ]
+        }
+
+        return PromptCompactionPolicy(
+            preservedKinds: preservedKinds,
+            preferredKinds: hasScopedContext ? [.scopedContext, .runtimeStrategy, .contextLifecycle] : [.runtimeStrategy, .contextLifecycle],
+            dropOrder: [
+                .neuralState,
+                .brainState,
+                .contextLifecycle,
+                .runtimeStrategy,
+                .scopedContext
+            ],
+            guidance: guidance,
+            suffixTargetCharacters: suffixTargetCharacters
         )
     }
 
@@ -787,6 +1082,35 @@ enum DecisionIntelligencePromptContract {
         }
 
         return json
+    }
+
+    private static func compactionPolicyJSONString(_ policy: PromptCompactionPolicy) -> String {
+        let payload: [String: Any] = [
+            "preserve_blocks": policy.preservedKinds.map(\.rawValue),
+            "drop_order": policy.dropOrder.map(\.rawValue),
+            "suffix_target_characters": policy.suffixTargetCharacters
+        ]
+
+        guard JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+
+        return json
+    }
+
+    private static func scopedContext(brainState: DecisionBrainState?) -> [String: Any]? {
+        guard let brainState, !brainState.isEmpty else { return nil }
+
+        return [
+            "user_profile": brainState.profileCore,
+            "active_goals": brainState.activeGoals,
+            "local_biases": brainState.sessionBiases,
+            "auto_memory": Array(brainState.relevantMemories.prefix(Limit.frontstageSignalCount)),
+            "retrieval_tags": Array(brainState.retrievalTags.prefix(Limit.frontstageSignalCount)),
+            "dominant_reaction_weight": brainState.reactionWeights.dominantKey.rawValue
+        ]
     }
 
     private static func brainStateJSONString(_ brainState: DecisionBrainState) -> String {
