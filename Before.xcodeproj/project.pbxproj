@@ -290,7 +290,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		01576E7A17B752C41D1A782C /* BeforeWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BeforeWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		01576E7A17B752C41D1A782C /* BeforeWidgetExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = BeforeWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		05412B6E47A277E56EC0236E /* StarterPromptRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarterPromptRow.swift; sourceTree = "<group>"; };
 		078D41DF98B71E11CD93C772 /* SharedLifeItemFactoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLifeItemFactoryTests.swift; sourceTree = "<group>"; };
 		07A2BDA791F079B89E195EE2 /* DecisionNeuralEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionNeuralEngine.swift; sourceTree = "<group>"; };
@@ -414,7 +414,7 @@
 		8803C58B37023CB5C616CD7C /* DecisionMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionMode.swift; sourceTree = "<group>"; };
 		89976181A6C6D07117C3220F /* GemmaE4BIntelligenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GemmaE4BIntelligenceService.swift; sourceTree = "<group>"; };
 		8B45BDE0A0AC8F56688BBF51 /* InferenceBackendPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceBackendPolicy.swift; sourceTree = "<group>"; };
-		8B51E3D57D268624717EAA40 /* gemma-4-E4B-it.litertlm */ = {isa = PBXFileReference; lastKnownFileType = file; path = "gemma-4-E4B-it.litertlm"; sourceTree = "<group>"; };
+		8B51E3D57D268624717EAA40 /* gemma-4-E4B-it.litertlm */ = {isa = PBXFileReference; path = "gemma-4-E4B-it.litertlm"; sourceTree = "<group>"; };
 		8C770A8A464D7D5BFFD53D19 /* BeforeWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeforeWidgetExtension.entitlements; sourceTree = "<group>"; };
 		8E450413459695751644CD73 /* DecisionIntelligenceResponseCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligenceResponseCache.swift; sourceTree = "<group>"; };
 		8FDBF1730457BB2E21337458 /* DecisionRecordRestoration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionRecordRestoration.swift; sourceTree = "<group>"; };
@@ -457,7 +457,7 @@
 		C3BFFCA464A287525714042A /* BeforeUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BeforeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C5ACF20A0EA2C52984402595 /* DecisionRoutePreviewCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionRoutePreviewCard.swift; sourceTree = "<group>"; };
 		C5F94CB71B4918233F505006 /* DecisionContextPreparedState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionContextPreparedState.swift; sourceTree = "<group>"; };
-		C7258A3716547911357AAAC2 /* Before.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Before.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C7258A3716547911357AAAC2 /* Before.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Before.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C94A031C4F195FB7A25E444F /* ReminderSourceType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderSourceType.swift; sourceTree = "<group>"; };
 		CA397A6976B8F73DC063B15C /* SharedLifeRuleEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLifeRuleEditorView.swift; sourceTree = "<group>"; };
 		CB620C2127CA7D236179E618 /* TomorrowBoxItemFactoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxItemFactoryTests.swift; sourceTree = "<group>"; };
@@ -997,9 +997,15 @@
 					2CE655EF0522BDA24E1B5AE4 = {
 						DevelopmentTeam = "";
 					};
+					6B20317314DDC900999C505E = {
+						DevelopmentTeam = "";
+					};
 					7AC0D588057D461E1ECAB994 = {
 						DevelopmentTeam = "";
 						TestTargetID = 6B20317314DDC900999C505E;
+					};
+					865A4C5052B47BCF917BE9C4 = {
+						DevelopmentTeam = "";
 					};
 				};
 			};
@@ -1375,7 +1381,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				CODE_SIGN_ENTITLEMENTS = Before/App/Before.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = U4ZLQM8399;
 				INFOPLIST_KEY_CFBundleDisplayName = Before;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSWidgetWantsLocation = NO;
@@ -1399,7 +1404,6 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				CODE_SIGN_ENTITLEMENTS = BeforeWidgetExtension/BeforeWidgetExtension.entitlements;
-				DEVELOPMENT_TEAM = U4ZLQM8399;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BeforeWidgetExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -1422,7 +1426,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				CODE_SIGN_ENTITLEMENTS = Before/App/Before.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = U4ZLQM8399;
 				INFOPLIST_KEY_CFBundleDisplayName = Before;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSWidgetWantsLocation = NO;
@@ -1464,7 +1467,6 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				CODE_SIGN_ENTITLEMENTS = BeforeWidgetExtension/BeforeWidgetExtension.entitlements;
-				DEVELOPMENT_TEAM = U4ZLQM8399;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BeforeWidgetExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
