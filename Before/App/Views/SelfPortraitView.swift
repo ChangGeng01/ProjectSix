@@ -2,6 +2,8 @@ import SwiftUI
 
 struct SelfPortraitView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
+    @State private var systemFlightDeck: DecisionSystemFlightDeck?
+    @State private var isLoadingSystemFlightDeck = false
 
     var body: some View {
         let panel = appModel.portraitPanelState()
@@ -18,6 +20,7 @@ struct SelfPortraitView: View {
                             subtitle: "The goal is not mystery. It is a visible, editable picture of how the local brain is loading you."
                         )
 
+                        systemFlightDeckCard(systemFlightDeck)
                         currentBrainCard(panel.currentBrainState)
 
                         if let candidate = appModel.interventionCandidate {
@@ -43,6 +46,88 @@ struct SelfPortraitView: View {
                 }
             }
             .navigationTitle("Portrait")
+            .task {
+                await refreshSystemFlightDeck()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func systemFlightDeckCard(_ flightDeck: DecisionSystemFlightDeck?) -> some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("System flight deck")
+                            .font(.headline)
+                        Text("The local cognition stack across runtime, memory, safety, orchestration, and delivery.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    BeforeActionButton(
+                        isLoadingSystemFlightDeck ? "Refreshing…" : "Refresh",
+                        style: .secondary
+                    ) {
+                        Task {
+                            await refreshSystemFlightDeck()
+                        }
+                    }
+                    .disabled(isLoadingSystemFlightDeck)
+                }
+
+                if let flightDeck {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("\(flightDeck.overallScore)")
+                            .font(.system(size: 42, weight: .bold, design: .rounded))
+                            .foregroundStyle(BeforeTheme.ink)
+                        Text("/ 100")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text(flightDeck.overallHealth.title)
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(healthColor(flightDeck.overallHealth))
+                            Text(flightDeck.isPureLocalClosedLoop ? "Pure local" : "Mixed runtime")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    ForEach(flightDeck.layerReports) { report in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(report.layer.title)
+                                    .font(.subheadline.bold())
+                                Spacer()
+                                Text("\(report.score)")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(healthColor(report.health))
+                            }
+
+                            Text(report.headline)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            if let firstBlocker = report.blockers.first {
+                                Text("Blocker: \(firstBlocker)")
+                                    .font(.caption2)
+                                    .foregroundStyle(healthColor(report.health))
+                            } else if let firstSignal = report.signals.first {
+                                Text(firstSignal)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.top, 2)
+                    }
+                } else {
+                    Text("The flight deck has not been generated yet.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
@@ -231,5 +316,23 @@ struct SelfPortraitView: View {
 
     private func readableReactionLabel(_ key: DecisionReactionWeightKey) -> String {
         key.rawValue.replacingOccurrences(of: "_", with: " ")
+    }
+
+    private func healthColor(_ health: DecisionSystemLayerHealth) -> Color {
+        switch health {
+        case .strong:
+            BeforeTheme.ember
+        case .watch:
+            .orange
+        case .critical:
+            .red
+        }
+    }
+
+    @MainActor
+    private func refreshSystemFlightDeck() async {
+        isLoadingSystemFlightDeck = true
+        systemFlightDeck = await appModel.systemFlightDeck()
+        isLoadingSystemFlightDeck = false
     }
 }

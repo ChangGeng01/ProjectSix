@@ -100,6 +100,7 @@
 		52737B94451BEBEE58D6A018 /* BeforeTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FBEC07A4802202A55F07273 /* BeforeTheme.swift */; };
 		52C12D06470D02C5A92EE481 /* DecisionStarterLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5EC40417B021F9CAFFD08C /* DecisionStarterLibraryTests.swift */; };
 		542CC720483001216062BDAF /* SharedContainerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14BBBFC879A75D527348A3A /* SharedContainerTests.swift */; };
+		56FCD11F38A0DDA41677D8A4 /* DecisionSystemFlightDeck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DF194C50878CC172717E2DB /* DecisionSystemFlightDeck.swift */; };
 		574A6FB243FDE3722FF35CB5 /* SharedPublicStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F41ADE0FDB9CDEAC94131E4 /* SharedPublicStateStore.swift */; };
 		587E65F036C4AE0D7A655A9A /* QuickCheckInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F68FB2BE9FA50C05DD3BB89 /* QuickCheckInput.swift */; };
 		5888AC82F3C7C85C034AB622 /* WidgetSafeCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E7431FC89A250D4D0C9BB0B /* WidgetSafeCopyTests.swift */; };
@@ -427,6 +428,7 @@
 		375B68124108DDEB478DD2EE /* DeveloperDecisionReplayBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperDecisionReplayBuilder.swift; sourceTree = "<group>"; };
 		38B6040A74F189418060A171 /* SharedLifeItemFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLifeItemFactory.swift; sourceTree = "<group>"; };
 		3B469617D4620292515EC675 /* SelfReminder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfReminder.swift; sourceTree = "<group>"; };
+		3DF194C50878CC172717E2DB /* DecisionSystemFlightDeck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionSystemFlightDeck.swift; sourceTree = "<group>"; };
 		3E52D8626077CC37592F9F0B /* DecisionMemoryGovernor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionMemoryGovernor.swift; sourceTree = "<group>"; };
 		3FBEC07A4802202A55F07273 /* BeforeTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeTheme.swift; sourceTree = "<group>"; };
 		402D41628B5C240AB71A450C /* DecisionIntelligenceAdmissionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligenceAdmissionController.swift; sourceTree = "<group>"; };
@@ -700,6 +702,7 @@
 				8FDBF1730457BB2E21337458 /* DecisionRecordRestoration.swift */,
 				7B2D947D30BE6BCB8C3A28A6 /* DecisionReviewEngine.swift */,
 				1D900CAAC9F53880921790B3 /* DecisionStarterLibrary.swift */,
+				3DF194C50878CC172717E2DB /* DecisionSystemFlightDeck.swift */,
 				1550D0698BB22272A7707D93 /* DecisionTaskGraphStore.swift */,
 				3418C7D3898FC17BBD65C3DB /* DecisionTestingInterface.swift */,
 				8116ADEB650BEA3CC214DAC2 /* DecisionTestingRuntimeExport.swift */,
@@ -1271,6 +1274,7 @@
 				A67CDCCE9D03D5DBB3D500FB /* DecisionReviewEngine.swift in Sources */,
 				67EE16CD290619AAB8F5A647 /* DecisionRoutePreviewCard.swift in Sources */,
 				1B16408FE6065B5938D2C51C /* DecisionStarterLibrary.swift in Sources */,
+				56FCD11F38A0DDA41677D8A4 /* DecisionSystemFlightDeck.swift in Sources */,
 				B751F4F07F063CB145023558 /* DecisionTaskGraphStore.swift in Sources */,
 				73D203E36532ADCAC6538D01 /* DecisionTestingInterface.swift in Sources */,
 				D946B10D8FB631D6C5C61A4B /* DecisionTestingRuntimeExport.swift in Sources */,

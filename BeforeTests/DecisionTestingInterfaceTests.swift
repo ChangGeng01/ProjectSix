@@ -675,6 +675,16 @@ struct DecisionTestingInterfaceTests {
         #expect((export.summary.brainSnapshotFingerprintByKind[.quick] ?? "").isEmpty == false)
         #expect(export.summary.brainSnapshotVariantCountByKind[.quick] == 1)
         #expect(export.summary.lowTrustMemoryLoadRateByKind[.quick] == 0)
+        #expect(export.flightDeck.layerReports.count == DecisionSystemLayer.allCases.count)
+        #expect(export.flightDeck.overallScore > 0)
+        #expect(export.flightDeck.isPureLocalClosedLoop == true)
+        #expect(export.flightDeck.layerReports.contains(where: { $0.layer == .runtime }))
+        #expect(export.flightDeck.layerReports.contains(where: { $0.layer == .delivery }))
+        #expect(
+            export.flightDeck.layerReports.first(where: { $0.layer == .data })?.signals.contains(where: {
+                $0.contains("Replay entries")
+            }) == true
+        )
     }
 
     @Test

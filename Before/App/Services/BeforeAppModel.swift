@@ -825,6 +825,17 @@ final class BeforeAppModel: ObservableObject {
         )
     }
 
+    func systemFlightDeck() async -> DecisionSystemFlightDeck {
+        let context = modelContainer.mainContext
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: DecisionMemorySystem.fetchCheckEvents(in: context),
+            balance: DecisionMemorySystem.fetchBalanceRecords(in: context),
+            mirror: DecisionMemorySystem.fetchMirrorRecords(in: context),
+            preferences: preferences
+        )
+        return export.flightDeck
+    }
+
     func deleteBrainPortraitMemory(id: String) {
         let context = modelContainer.mainContext
         if let record = DecisionMemorySystem.fetchMemoryRecords(in: context).first(where: { $0.id == id }) {

@@ -10,6 +10,10 @@ struct DecisionTestingRuntimeExport {
     let recentTraces: [DecisionIntelligenceTrace]
     let recentReplay: [DeveloperDecisionReplayEntry]
 
+    var flightDeck: DecisionSystemFlightDeck {
+        DecisionSystemFlightDeckBuilder.build(from: self)
+    }
+
     var lifecycleSummary: DecisionTestingLifecycleSummary {
         let contextAwareTraces = recentTraces.compactMap(\.contextState)
         let rebuildCountByKind = Dictionary(
