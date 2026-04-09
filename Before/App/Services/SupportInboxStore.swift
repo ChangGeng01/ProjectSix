@@ -3,19 +3,19 @@ import Foundation
 @MainActor
 final class SupportInboxStore: ObservableObject {
     @Published private(set) var requests: [SupportRequest]
-    private let defaults: UserDefaults
+    private let storage: CodableStateStorage
     private let key: String
     private let seed: Bool
 
     init(
-        defaults: UserDefaults = .standard,
+        storage: CodableStateStorage = .protectedLocal,
         key: String = "before.support.inbox",
         seed: Bool = true
     ) {
-        self.defaults = defaults
+        self.storage = storage
         self.key = key
         self.seed = seed
-        self.requests = Self.load(defaults: defaults, key: key) ?? (seed ? Self.seededRequests : [])
+        self.requests = storage.load([SupportRequest].self, key: key) ?? (seed ? Self.seededRequests : [])
     }
 
     var activeRequests: [SupportRequest] {
@@ -70,23 +70,7 @@ final class SupportInboxStore: ObservableObject {
     }
 
     private func persist() {
-        Self.save(requests, defaults: defaults, key: key)
-    }
-
-    private static func load(defaults: UserDefaults, key: String) -> [SupportRequest]? {
-        guard
-            let data = defaults.data(forKey: key),
-            let requests = try? JSONDecoder().decode([SupportRequest].self, from: data)
-        else {
-            return nil
-        }
-
-        return requests
-    }
-
-    private static func save(_ requests: [SupportRequest], defaults: UserDefaults, key: String) {
-        guard let data = try? JSONEncoder().encode(requests) else { return }
-        defaults.set(data, forKey: key)
+        storage.save(requests, key: key)
     }
 
     private static let seededRequests: [SupportRequest] = [

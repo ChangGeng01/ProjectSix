@@ -6,7 +6,7 @@ final class SharedLifeStoreTests: XCTestCase {
     func testSeededStoreStartsWithRulesAndBoxItems() {
         let storage = makeIsolatedStorage()
         let store = SharedLifeStore(
-            defaults: storage.defaults,
+            storage: .userDefaults(storage.defaults),
             rulesKey: storage.rulesKey,
             boxKey: storage.boxKey
         )
@@ -19,7 +19,7 @@ final class SharedLifeStoreTests: XCTestCase {
     func testToggleAndStatusChangesPersistAcrossInstances() throws {
         let storage = makeIsolatedStorage()
         let first = SharedLifeStore(
-            defaults: storage.defaults,
+            storage: .userDefaults(storage.defaults),
             rulesKey: storage.rulesKey,
             boxKey: storage.boxKey,
             seed: false
@@ -41,7 +41,7 @@ final class SharedLifeStoreTests: XCTestCase {
         first.markReviewing(item.id)
 
         let second = SharedLifeStore(
-            defaults: storage.defaults,
+            storage: .userDefaults(storage.defaults),
             rulesKey: storage.rulesKey,
             boxKey: storage.boxKey,
             seed: false
@@ -55,7 +55,7 @@ final class SharedLifeStoreTests: XCTestCase {
     func testClearAllResetsToConfiguredSeedChoice() {
         let storage = makeIsolatedStorage()
         let store = SharedLifeStore(
-            defaults: storage.defaults,
+            storage: .userDefaults(storage.defaults),
             rulesKey: storage.rulesKey,
             boxKey: storage.boxKey,
             seed: false
@@ -71,7 +71,7 @@ final class SharedLifeStoreTests: XCTestCase {
     func testUpsertRuleReplacesExistingRuleInsteadOfDuplicatingIt() {
         let storage = makeIsolatedStorage()
         let store = SharedLifeStore(
-            defaults: storage.defaults,
+            storage: .userDefaults(storage.defaults),
             rulesKey: storage.rulesKey,
             boxKey: storage.boxKey,
             seed: false
@@ -105,7 +105,7 @@ final class SharedLifeStoreTests: XCTestCase {
     func testRemoveRuleDeletesCustomRule() {
         let storage = makeIsolatedStorage()
         let store = SharedLifeStore(
-            defaults: storage.defaults,
+            storage: .userDefaults(storage.defaults),
             rulesKey: storage.rulesKey,
             boxKey: storage.boxKey,
             seed: false
@@ -126,7 +126,7 @@ final class SharedLifeStoreTests: XCTestCase {
     func testRemovingCustomRuleAndItemPersists() {
         let storage = makeIsolatedStorage()
         let first = SharedLifeStore(
-            defaults: storage.defaults,
+            storage: .userDefaults(storage.defaults),
             rulesKey: storage.rulesKey,
             boxKey: storage.boxKey,
             seed: false
@@ -148,7 +148,7 @@ final class SharedLifeStoreTests: XCTestCase {
         first.removeItem(item.id)
 
         let second = SharedLifeStore(
-            defaults: storage.defaults,
+            storage: .userDefaults(storage.defaults),
             rulesKey: storage.rulesKey,
             boxKey: storage.boxKey,
             seed: false

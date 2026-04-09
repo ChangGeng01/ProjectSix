@@ -13,6 +13,8 @@
 		0504573E50B4E25F56B23950 /* DecisionMemoryGovernorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBAE5FCADB7777436BB5F668 /* DecisionMemoryGovernorTests.swift */; };
 		05DE60BF21270D62ED8AEA08 /* DecisionFrontstageState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1EF1DBB04E66319BF5C80E /* DecisionFrontstageState.swift */; };
 		063B95CB0003BED2CEFA42C0 /* SupportRequestKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E920EDE589F5E07C3D3C2C1F /* SupportRequestKindTests.swift */; };
+		07457F421CA95B94ED48C8C6 /* CodableStateStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D4DCB98641E43A533CDF23 /* CodableStateStorage.swift */; };
+		08AAF44BA0112CC0995586EE /* SharedProtectedStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29B2D56D159527FCF85EB5E4 /* SharedProtectedStateStore.swift */; };
 		08E0CF120EEAFE9A355FA71F /* CheckEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB33E572D887CB4574F01A2 /* CheckEvent.swift */; };
 		09C7278F68876D47C852BB34 /* BeforeBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 788D0A8A1D8137BDA6A5EDE0 /* BeforeBackground.swift */; };
 		0B3DB7350AD390CF01A8FB61 /* BalanceBoardEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB16610FFDAC0B269A585C1 /* BalanceBoardEngine.swift */; };
@@ -35,6 +37,7 @@
 		18C8A6D0E76968EB5CB7A174 /* DecisionTestingStubProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0902DDCE1D710D597D2B43DF /* DecisionTestingStubProfile.swift */; };
 		1912360C43CECEE3A107BBE2 /* MirrorWorkspaceSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70A414A2528AF11F510CD25 /* MirrorWorkspaceSession.swift */; };
 		19263068F7BD5DEF2A611842 /* TomorrowBoxDelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B506CA81E60C2268F94BB49 /* TomorrowBoxDelay.swift */; };
+		1AB6463EC84EE694C9C25014 /* SharedProtectedStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29B2D56D159527FCF85EB5E4 /* SharedProtectedStateStore.swift */; };
 		1B16408FE6065B5938D2C51C /* DecisionStarterLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D900CAAC9F53880921790B3 /* DecisionStarterLibrary.swift */; };
 		1C369C889014AD149DC50FD4 /* BeforePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DAB364E56E5EA8CCC7204F3 /* BeforePolicy.swift */; };
 		1C817A6C32A9FDB942853C9E /* ResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6E1FD7F02BE18A0F653DE4 /* ResultView.swift */; };
@@ -133,6 +136,7 @@
 		935762696332C27C6E44D685 /* TomorrowBoxItemFactoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB620C2127CA7D236179E618 /* TomorrowBoxItemFactoryTests.swift */; };
 		9375F89FA25D82B0679A4A99 /* CheckAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1CF4BDBA8776C1E59C9B45 /* CheckAction.swift */; };
 		9464D1D17061F99484D9BD1B /* DecisionIntelligenceProviderPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F788DC25F71EA91470E50FF /* DecisionIntelligenceProviderPipelineTests.swift */; };
+		96FA328039C9A8851637A8B4 /* CodableStateStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D4DCB98641E43A533CDF23 /* CodableStateStorage.swift */; };
 		97229440C03B71286BB0544A /* LaunchRequestResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC3ED6E2F02764281FE79FDD /* LaunchRequestResolver.swift */; };
 		9773181DF93728680681B811 /* DecisionIntelligencePromptContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2869C61692150B11BE791AD8 /* DecisionIntelligencePromptContract.swift */; };
 		97C51D0659C57FEAD7D96D35 /* TomorrowBoxDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D9B5A5DF817EBD959F0B018 /* TomorrowBoxDraftTests.swift */; };
@@ -318,6 +322,7 @@
 		274CBE36C805B3D2578B1AC1 /* DecisionPromptEvidenceGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionPromptEvidenceGuard.swift; sourceTree = "<group>"; };
 		28559294F554136C5D9334B2 /* QuickBufferDuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickBufferDuration.swift; sourceTree = "<group>"; };
 		2869C61692150B11BE791AD8 /* DecisionIntelligencePromptContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligencePromptContract.swift; sourceTree = "<group>"; };
+		29B2D56D159527FCF85EB5E4 /* SharedProtectedStateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedProtectedStateStore.swift; sourceTree = "<group>"; };
 		2A7B6A83F0C81717A9A5D601 /* BeforeActionButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeActionButton.swift; sourceTree = "<group>"; };
 		2AF30BA404040B6ECD5A2652 /* PendingLaunchRequestStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingLaunchRequestStoreTests.swift; sourceTree = "<group>"; };
 		2BF5DACA08082B764C73C19F /* WidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshot.swift; sourceTree = "<group>"; };
@@ -463,6 +468,7 @@
 		DDDD081226C6B85C84D8D0FA /* LetGoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetGoView.swift; sourceTree = "<group>"; };
 		DE042EFEC57B6C8465029270 /* DecisionTaskGraphStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionTaskGraphStoreTests.swift; sourceTree = "<group>"; };
 		DFDA8C2C4F4EB349F7763323 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		E0D4DCB98641E43A533CDF23 /* CodableStateStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodableStateStorage.swift; sourceTree = "<group>"; };
 		E1751505C20AF41F3E50CBBA /* PersistenceIssueRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceIssueRecorder.swift; sourceTree = "<group>"; };
 		E46912BAE7CADD3F30767FCC /* SupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportView.swift; sourceTree = "<group>"; };
 		E63D346FC718230713E7B30B /* SharedContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedContainer.swift; sourceTree = "<group>"; };
@@ -804,9 +810,11 @@
 		C74A410B48EC3195D8849256 /* Storage */ = {
 			isa = PBXGroup;
 			children = (
+				E0D4DCB98641E43A533CDF23 /* CodableStateStorage.swift */,
 				0E0334A8565803EF7707BB38 /* PendingLaunchRequestStore.swift */,
 				7ECDE0CE15D946CD950732D2 /* ProtectedLocalStateStore.swift */,
 				E63D346FC718230713E7B30B /* SharedContainer.swift */,
+				29B2D56D159527FCF85EB5E4 /* SharedProtectedStateStore.swift */,
 				2BF5DACA08082B764C73C19F /* WidgetSnapshot.swift */,
 			);
 			path = Storage;
@@ -1052,6 +1060,7 @@
 				08E0CF120EEAFE9A355FA71F /* CheckEvent.swift in Sources */,
 				0CE526D8FB890D53DAA2B4D7 /* CheckRuleEngine.swift in Sources */,
 				8D6E53B8156501A71CF98272 /* CheckVerdict.swift in Sources */,
+				96FA328039C9A8851637A8B4 /* CodableStateStorage.swift in Sources */,
 				00AC3EF33DF8F61EC6529EDA /* DecisionAdaptiveRuntimeMatrix.swift in Sources */,
 				F3A6B4B1B10E5498DAD4408F /* DecisionBrainState.swift in Sources */,
 				988BFED074AB0E4CDF0082CF /* DecisionContextFieldKey.swift in Sources */,
@@ -1152,6 +1161,7 @@
 				2F292FA96ED25C07EA06AF6D /* SharedLifeRuleEditorView.swift in Sources */,
 				F909ED2CEE7C28192307364D /* SharedLifeSection.swift in Sources */,
 				E1BF6E00B7DCD9D76165024D /* SharedLifeStore.swift in Sources */,
+				1AB6463EC84EE694C9C25014 /* SharedProtectedStateStore.swift in Sources */,
 				A6F69284943D1182E1B51CAF /* StarterPromptRow.swift in Sources */,
 				6DA412FD0DD7AC208999EBF5 /* SupportInboxStore.swift in Sources */,
 				8778D84FF644B965A734E2AE /* SupportMetricBlock.swift in Sources */,
@@ -1186,6 +1196,7 @@
 				C68A6B36A45AE8D6D6249813 /* CheckAction.swift in Sources */,
 				DC772636D1CBA8BC844DAF50 /* CheckRuleEngine.swift in Sources */,
 				EAE10804F80292499C127ABB /* CheckVerdict.swift in Sources */,
+				07457F421CA95B94ED48C8C6 /* CodableStateStorage.swift in Sources */,
 				FA6CD0411FF0C7906E7A36A5 /* DecisionBrainState.swift in Sources */,
 				FFE9B155120181A57899A64D /* DecisionContextFieldKey.swift in Sources */,
 				108A911D2F173D9E68E54B6C /* DecisionContextPreparedState.swift in Sources */,
@@ -1212,6 +1223,7 @@
 				D508BAC239303E3FE5A18318 /* ReminderTemplateLibrary.swift in Sources */,
 				AA8B9D1227CD427C509C62B4 /* ScenarioType.swift in Sources */,
 				CF27D67C84FD09BF673A2FDB /* SharedContainer.swift in Sources */,
+				08AAF44BA0112CC0995586EE /* SharedProtectedStateStore.swift in Sources */,
 				724B3ED07F43AD1C16829158 /* SupportSurfaceTarget.swift in Sources */,
 				19263068F7BD5DEF2A611842 /* TomorrowBoxDelay.swift in Sources */,
 				A1F804F13673E29E07AFAE94 /* WidgetSafeCopy.swift in Sources */,

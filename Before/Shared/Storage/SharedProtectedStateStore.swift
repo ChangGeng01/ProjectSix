@@ -1,9 +1,9 @@
 import Foundation
 import OSLog
 
-enum ProtectedLocalStateStore {
-    private static let directoryName = "ProtectedRuntimeState"
-    private static let logger = Logger(subsystem: "Before", category: "ProtectedLocalStateStore")
+enum SharedProtectedStateStore {
+    private static let directoryName = "ProtectedSharedRuntimeState"
+    private static let logger = Logger(subsystem: "Before", category: "SharedProtectedStateStore")
 
     static func load<Value: Decodable>(_ type: Value.Type, key: String) -> Value? {
         guard
@@ -36,13 +36,13 @@ enum ProtectedLocalStateStore {
         guard let fileURL = try? fileURL(for: key) else { return }
 
         do {
-            try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
+            try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
             try FileManager.default.setAttributes(
-                [.protectionKey: FileProtectionType.complete],
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
                 ofItemAtPath: fileURL.path
             )
         } catch {
-            logger.error("Failed to save protected local state: \(error.localizedDescription, privacy: .public)")
+            logger.error("Failed to save shared protected state: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -52,28 +52,22 @@ enum ProtectedLocalStateStore {
             try FileManager.default.removeItem(at: fileURL)
         } catch {
             guard (error as NSError).code != NSFileNoSuchFileError else { return }
-            logger.error("Failed to clear protected local state: \(error.localizedDescription, privacy: .public)")
+            logger.error("Failed to clear shared protected state: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     private static func fileURL(for key: String) throws -> URL {
-        let baseDirectory = try FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        let directory = baseDirectory
-            .appendingPathComponent("Before", isDirectory: true)
-            .appendingPathComponent(directoryName, isDirectory: true)
+        guard let baseDirectory = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: SharedContainer.appGroupID
+        ) else {
+            throw CocoaError(.fileNoSuchFile)
+        }
 
+        let directory = baseDirectory.appendingPathComponent(directoryName, isDirectory: true)
         if !FileManager.default.fileExists(atPath: directory.path) {
-            try FileManager.default.createDirectory(
-                at: directory,
-                withIntermediateDirectories: true
-            )
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             try FileManager.default.setAttributes(
-                [.protectionKey: FileProtectionType.complete],
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
                 ofItemAtPath: directory.path
             )
         }

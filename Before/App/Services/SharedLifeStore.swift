@@ -5,23 +5,23 @@ final class SharedLifeStore: ObservableObject {
     @Published private(set) var rules: [SharedLifeRule]
     @Published private(set) var boxItems: [SharedLifeBoxItem]
 
-    private let defaults: UserDefaults
+    private let storage: CodableStateStorage
     private let rulesKey: String
     private let boxKey: String
     private let seed: Bool
 
     init(
-        defaults: UserDefaults = .standard,
+        storage: CodableStateStorage = .protectedLocal,
         rulesKey: String = "before.sharedlife.rules",
         boxKey: String = "before.sharedlife.box",
         seed: Bool = true
     ) {
-        self.defaults = defaults
+        self.storage = storage
         self.rulesKey = rulesKey
         self.boxKey = boxKey
         self.seed = seed
-        self.rules = Self.load([SharedLifeRule].self, defaults: defaults, key: rulesKey) ?? (seed ? Self.seededRules : [])
-        self.boxItems = Self.load([SharedLifeBoxItem].self, defaults: defaults, key: boxKey) ?? (seed ? Self.seededBoxItems : [])
+        self.rules = storage.load([SharedLifeRule].self, key: rulesKey) ?? (seed ? Self.seededRules : [])
+        self.boxItems = storage.load([SharedLifeBoxItem].self, key: boxKey) ?? (seed ? Self.seededBoxItems : [])
     }
 
     var enabledRules: [SharedLifeRule] {
@@ -100,26 +100,11 @@ final class SharedLifeStore: ObservableObject {
     }
 
     private func persistRules() {
-        Self.save(rules, defaults: defaults, key: rulesKey)
+        storage.save(rules, key: rulesKey)
     }
 
     private func persistBox() {
-        Self.save(boxItems, defaults: defaults, key: boxKey)
-    }
-
-    private static func load<T: Decodable>(_ type: T.Type, defaults: UserDefaults, key: String) -> T? {
-        guard
-            let data = defaults.data(forKey: key),
-            let value = try? JSONDecoder().decode(T.self, from: data)
-        else {
-            return nil
-        }
-        return value
-    }
-
-    private static func save<T: Encodable>(_ value: T, defaults: UserDefaults, key: String) {
-        guard let data = try? JSONEncoder().encode(value) else { return }
-        defaults.set(data, forKey: key)
+        storage.save(boxItems, key: boxKey)
     }
 
     private static let seededRules: [SharedLifeRule] = [

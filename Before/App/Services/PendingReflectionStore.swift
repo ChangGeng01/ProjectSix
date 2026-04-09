@@ -2,12 +2,10 @@ import Foundation
 
 enum PendingReflectionStore {
     private static let key = "before.pending.reflection.state"
+    private static let storage = CodableStateStorage.protectedLocal
 
     static func load() -> PendingReflectionState {
-        guard
-            let data = UserDefaults.standard.data(forKey: key),
-            let state = try? JSONDecoder().decode(PendingReflectionState.self, from: data)
-        else {
+        guard let state = storage.load(PendingReflectionState.self, key: key) else {
             return PendingReflectionState(context: nil, shouldPromptOnNextActive: false)
         }
 
@@ -15,11 +13,10 @@ enum PendingReflectionStore {
     }
 
     static func save(_ state: PendingReflectionState) {
-        guard let data = try? JSONEncoder().encode(state) else { return }
-        UserDefaults.standard.set(data, forKey: key)
+        storage.save(state, key: key)
     }
 
     static func clear() {
-        UserDefaults.standard.removeObject(forKey: key)
+        storage.clear(key: key)
     }
 }

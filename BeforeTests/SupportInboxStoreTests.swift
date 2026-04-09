@@ -5,7 +5,7 @@ import XCTest
 final class SupportInboxStoreTests: XCTestCase {
     func testSeededInboxStartsWithLocalItems() {
         let storage = makeIsolatedStorage()
-        let store = SupportInboxStore(defaults: storage.defaults, key: storage.key)
+        let store = SupportInboxStore(storage: .userDefaults(storage.defaults), key: storage.key)
 
         XCTAssertEqual(store.requests.count, 3)
         XCTAssertGreaterThan(store.pendingCount, 0)
@@ -14,7 +14,7 @@ final class SupportInboxStoreTests: XCTestCase {
 
     func testCreatingAndArchivingSupportRequestsUpdatesCounts() throws {
         let storage = makeIsolatedStorage()
-        let store = SupportInboxStore(defaults: storage.defaults, key: storage.key, seed: false)
+        let store = SupportInboxStore(storage: .userDefaults(storage.defaults), key: storage.key, seed: false)
 
         store.create(kind: .helpMeJudgeThis, message: "Help me see the trade-off.")
         let createdID = try XCTUnwrap(store.requests.first?.id)
@@ -35,10 +35,10 @@ final class SupportInboxStoreTests: XCTestCase {
 
     func testRequestsPersistAcrossStoreInstances() {
         let storage = makeIsolatedStorage()
-        let first = SupportInboxStore(defaults: storage.defaults, key: storage.key, seed: false)
+        let first = SupportInboxStore(storage: .userDefaults(storage.defaults), key: storage.key, seed: false)
         first.create(kind: .holdMe10Minutes, message: "Stay with me for a moment.")
 
-        let second = SupportInboxStore(defaults: storage.defaults, key: storage.key, seed: false)
+        let second = SupportInboxStore(storage: .userDefaults(storage.defaults), key: storage.key, seed: false)
 
         XCTAssertEqual(second.requests.count, 1)
         XCTAssertEqual(second.requests.first?.kind, .holdMe10Minutes)
@@ -47,7 +47,7 @@ final class SupportInboxStoreTests: XCTestCase {
 
     func testClearAllResetsToSeedStateChoice() {
         let storage = makeIsolatedStorage()
-        let store = SupportInboxStore(defaults: storage.defaults, key: storage.key, seed: false)
+        let store = SupportInboxStore(storage: .userDefaults(storage.defaults), key: storage.key, seed: false)
         store.create(kind: .iAmGettingBlurry, message: "I need a clearer read.")
 
         store.clearAll()

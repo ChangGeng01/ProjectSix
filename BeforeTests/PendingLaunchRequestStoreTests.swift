@@ -35,7 +35,7 @@ final class PendingLaunchRequestStoreTests: XCTestCase {
         XCTAssertEqual(queue.first?.entrySource, .shortcut)
     }
 
-    func testPendingLaunchRequestPreservesModeAndPrompt() throws {
+    func testNormalizedQueueDropsLegacyPromptPayloadFromDefaultsData() throws {
         let now = Date(timeIntervalSince1970: 500)
         let request = PendingLaunchRequest(
             entrySource: .shortcut,
@@ -48,6 +48,30 @@ final class PendingLaunchRequestStoreTests: XCTestCase {
         let queue = PendingLaunchRequestStore.normalizedQueue(from: data, now: now)
 
         XCTAssertEqual(queue.first?.preferredMode, .mirror)
-        XCTAssertEqual(queue.first?.prompt, "Should I leave this relationship?")
+        XCTAssertNil(queue.first?.prompt)
+    }
+
+    func testNormalizedQueueDecodesEnvelopePayloadWithoutPromptInDefaults() throws {
+        let now = Date(timeIntervalSince1970: 500)
+        let data = """
+        [
+          {
+            "id": "\(UUID().uuidString)",
+            "entrySource": "shortcut",
+            "preferredModeRaw": "mirror",
+            "scenarioRaw": null,
+            "requestedAt": \(now.timeIntervalSince1970),
+            "expiresAt": \(now.addingTimeInterval(60).timeIntervalSince1970),
+            "schemaVersion": 1,
+            "hasProtectedPayload": true
+          }
+        ]
+        """.data(using: .utf8)!
+
+        let queue = PendingLaunchRequestStore.normalizedQueue(from: data, now: now)
+
+        XCTAssertEqual(queue.count, 1)
+        XCTAssertEqual(queue.first?.preferredMode, .mirror)
+        XCTAssertNil(queue.first?.prompt)
     }
 }

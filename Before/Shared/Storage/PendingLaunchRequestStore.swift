@@ -43,6 +43,41 @@ struct PendingLaunchRequest: Codable, Sendable, Equatable {
     }
 }
 
+private struct PendingLaunchRequestEnvelope: Codable, Equatable {
+    var id: UUID
+    var entrySource: EntrySource
+    var preferredModeRaw: String?
+    var scenarioRaw: String?
+    var requestedAt: Date
+    var expiresAt: Date
+    var schemaVersion: Int
+    var hasProtectedPayload: Bool
+
+    init(request: PendingLaunchRequest, preservingProtectedPayload: Bool = true) {
+        self.id = request.id
+        self.entrySource = request.entrySource
+        self.preferredModeRaw = request.preferredModeRaw
+        self.scenarioRaw = request.scenarioRaw
+        self.requestedAt = request.requestedAt
+        self.expiresAt = request.expiresAt
+        self.schemaVersion = request.schemaVersion
+        self.hasProtectedPayload = preservingProtectedPayload
+            && !(request.prompt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    }
+
+    var preferredMode: DecisionMode? {
+        preferredModeRaw.flatMap(DecisionMode.init(rawValue:))
+    }
+
+    var scenario: ScenarioType? {
+        scenarioRaw.flatMap(ScenarioType.init(rawValue:))
+    }
+}
+
+private struct PendingLaunchRequestPayload: Codable, Equatable {
+    var prompt: String?
+}
+
 private struct LegacyPendingLaunchRequest: Codable {
     var entrySource: EntrySource
     var requestedAt: Date
@@ -52,8 +87,11 @@ enum PendingLaunchRequestStore {
     private static let key = "before.pending.launch.request"
 
     static func enqueue(_ request: PendingLaunchRequest) {
-        let current = normalizedQueue(from: SharedContainer.defaults.data(forKey: key))
-        let merged = Array((current + [request]).suffix(BeforePolicy.LaunchRequests.maxQueuedRequests))
+        persistProtectedPayload(for: request)
+
+        let current = normalizedEnvelopeQueue(from: SharedContainer.defaults.data(forKey: key))
+        let merged = Array((current + [PendingLaunchRequestEnvelope(request: request)]).suffix(BeforePolicy.LaunchRequests.maxQueuedRequests))
+        pruneProtectedPayloads(previousQueue: current, nextQueue: merged)
         save(merged)
     }
 
@@ -62,7 +100,7 @@ enum PendingLaunchRequestStore {
     }
 
     static func consume() -> PendingLaunchRequest? {
-        var queue = normalizedQueue(from: SharedContainer.defaults.data(forKey: key))
+        var queue = normalizedEnvelopeQueue(from: SharedContainer.defaults.data(forKey: key))
         guard !queue.isEmpty else {
             SharedContainer.defaults.removeObject(forKey: key)
             return nil
@@ -70,26 +108,41 @@ enum PendingLaunchRequestStore {
 
         let next = queue.removeFirst()
         save(queue)
-        return next
+        defer { clearProtectedPayload(for: next.id) }
+        return materialize(next)
     }
 
     static func clear() {
+        normalizedEnvelopeQueue(from: SharedContainer.defaults.data(forKey: key))
+            .forEach { clearProtectedPayload(for: $0.id) }
         SharedContainer.defaults.removeObject(forKey: key)
     }
 
     static func normalizedQueue(from data: Data?, now: Date = .now) -> [PendingLaunchRequest] {
-        let decoded: [PendingLaunchRequest]
+        normalizedEnvelopeQueue(from: data, now: now).map(materialize)
+    }
 
+    private static func normalizedEnvelopeQueue(from data: Data?, now: Date = .now) -> [PendingLaunchRequestEnvelope] {
+        let decoded: [PendingLaunchRequestEnvelope]
         if
             let data,
-            let requests = try? JSONDecoder().decode([PendingLaunchRequest].self, from: data)
+            let requests = try? JSONDecoder().decode([PendingLaunchRequestEnvelope].self, from: data)
         {
             decoded = requests
         } else if
             let data,
+            let requests = try? JSONDecoder().decode([PendingLaunchRequest].self, from: data)
+        {
+            decoded = requests.map { PendingLaunchRequestEnvelope(request: $0, preservingProtectedPayload: false) }
+        } else if
+            let data,
             let legacyRequest = try? JSONDecoder().decode(LegacyPendingLaunchRequest.self, from: data)
         {
-            decoded = [PendingLaunchRequest(entrySource: legacyRequest.entrySource, requestedAt: legacyRequest.requestedAt)]
+            decoded = [
+                PendingLaunchRequestEnvelope(
+                    request: PendingLaunchRequest(entrySource: legacyRequest.entrySource, requestedAt: legacyRequest.requestedAt)
+                )
+            ]
         } else {
             decoded = []
         }
@@ -98,7 +151,63 @@ enum PendingLaunchRequestStore {
         return Array(valid.suffix(BeforePolicy.LaunchRequests.maxQueuedRequests))
     }
 
-    private static func save(_ requests: [PendingLaunchRequest]) {
+    private static func materialize(_ envelope: PendingLaunchRequestEnvelope) -> PendingLaunchRequest {
+        let payload: PendingLaunchRequestPayload?
+        if envelope.hasProtectedPayload {
+            payload = CodableStateStorage.sharedProtected.load(
+                PendingLaunchRequestPayload.self,
+                key: payloadKey(for: envelope.id)
+            )
+        } else {
+            payload = nil
+        }
+
+        return PendingLaunchRequest(
+            id: envelope.id,
+            entrySource: envelope.entrySource,
+            preferredMode: envelope.preferredMode,
+            scenario: envelope.scenario,
+            prompt: payload?.prompt,
+            requestedAt: envelope.requestedAt,
+            expiresAt: envelope.expiresAt,
+            schemaVersion: envelope.schemaVersion
+        )
+    }
+
+    private static func persistProtectedPayload(for request: PendingLaunchRequest) {
+        guard
+            let prompt = request.prompt?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !prompt.isEmpty
+        else {
+            clearProtectedPayload(for: request.id)
+            return
+        }
+
+        CodableStateStorage.sharedProtected.save(
+            PendingLaunchRequestPayload(prompt: prompt),
+            key: payloadKey(for: request.id)
+        )
+    }
+
+    private static func clearProtectedPayload(for id: UUID) {
+        CodableStateStorage.sharedProtected.clear(key: payloadKey(for: id))
+    }
+
+    private static func pruneProtectedPayloads(
+        previousQueue: [PendingLaunchRequestEnvelope],
+        nextQueue: [PendingLaunchRequestEnvelope]
+    ) {
+        let retainedIDs = Set(nextQueue.map(\.id))
+        previousQueue
+            .filter { !retainedIDs.contains($0.id) }
+            .forEach { clearProtectedPayload(for: $0.id) }
+    }
+
+    private static func payloadKey(for id: UUID) -> String {
+        "before.pending.launch.request.payload.\(id.uuidString.lowercased())"
+    }
+
+    private static func save(_ requests: [PendingLaunchRequestEnvelope]) {
         guard !requests.isEmpty else {
             clear()
             return
