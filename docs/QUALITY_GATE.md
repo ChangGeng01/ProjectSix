@@ -12,6 +12,16 @@ This gate is intentionally stricter than "the default suite is green." It is des
 - on-device adaptability
 - shared-state hygiene
 
+## Apex Standard Library
+
+The executable `20 / 20` gate is the release floor.
+
+The full `200`-standard apex library lives at:
+
+- [QUALITY_GATE_200.md](/Users/changgeng/Project/Project06/Project06/docs/QUALITY_GATE_200.md)
+
+That document defines the long-range operating-system-grade standard. The runnable gate should evolve by sampling more of that library over time, not by inventing a fresh bar on each iteration.
+
 ## 20-Point Standard
 
 Each item is worth `1` point. The branch passes only at `20 / 20`.
