@@ -193,6 +193,10 @@ struct DecisionTestingRuntimeExport {
             preferredProviderByKind: strategyMap(\.preferredProvider),
             allowsModelInvocationByKind: strategyMap(\.allowsModelInvocation),
             contextBudgetByKind: strategyMap(\.contextBudget),
+            outputCharacterBudgetByKind: strategyMap(\.outputCharacterBudget),
+            timeBudgetMsByKind: strategyMap(\.timeBudgetMs),
+            toolCallBudgetByKind: strategyMap(\.toolCallBudget),
+            retrievalItemBudgetByKind: strategyMap(\.retrievalItemBudget),
             retrievalModeByKind: strategyMap(\.retrievalMode),
             thinkingModeByKind: strategyMap(\.thinkingMode),
             outputModeByKind: strategyMap(\.outputMode),
@@ -202,6 +206,10 @@ struct DecisionTestingRuntimeExport {
             effectiveRuntimeGearByKind: effectiveStrategyMap(\.runtimeGear),
             effectivePreferredProviderByKind: effectiveStrategyMap(\.preferredProvider),
             effectiveContextBudgetByKind: effectiveStrategyMap(\.contextBudget),
+            effectiveOutputCharacterBudgetByKind: effectiveStrategyMap(\.outputCharacterBudget),
+            effectiveTimeBudgetMsByKind: effectiveStrategyMap(\.timeBudgetMs),
+            effectiveToolCallBudgetByKind: effectiveStrategyMap(\.toolCallBudget),
+            effectiveRetrievalItemBudgetByKind: effectiveStrategyMap(\.retrievalItemBudget),
             effectiveRetrievalModeByKind: effectiveStrategyMap(\.retrievalMode),
             effectiveThinkingModeByKind: effectiveStrategyMap(\.thinkingMode),
             effectiveOutputModeByKind: effectiveStrategyMap(\.outputMode),
@@ -636,6 +644,10 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let preferredProviderByKind: [DecisionIntelligenceTraceKind: DecisionModelProviderPreference]
     let allowsModelInvocationByKind: [DecisionIntelligenceTraceKind: Bool]
     let contextBudgetByKind: [DecisionIntelligenceTraceKind: Int]
+    let outputCharacterBudgetByKind: [DecisionIntelligenceTraceKind: Int]
+    let timeBudgetMsByKind: [DecisionIntelligenceTraceKind: Int]
+    let toolCallBudgetByKind: [DecisionIntelligenceTraceKind: Int]
+    let retrievalItemBudgetByKind: [DecisionIntelligenceTraceKind: Int]
     let retrievalModeByKind: [DecisionIntelligenceTraceKind: DecisionRetrievalMode]
     let thinkingModeByKind: [DecisionIntelligenceTraceKind: DecisionThinkingMode]
     let outputModeByKind: [DecisionIntelligenceTraceKind: DecisionOutputMode]
@@ -645,6 +657,10 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let effectiveRuntimeGearByKind: [DecisionIntelligenceTraceKind: DecisionRuntimeGear]
     let effectivePreferredProviderByKind: [DecisionIntelligenceTraceKind: DecisionModelProviderPreference]
     let effectiveContextBudgetByKind: [DecisionIntelligenceTraceKind: Int]
+    let effectiveOutputCharacterBudgetByKind: [DecisionIntelligenceTraceKind: Int]
+    let effectiveTimeBudgetMsByKind: [DecisionIntelligenceTraceKind: Int]
+    let effectiveToolCallBudgetByKind: [DecisionIntelligenceTraceKind: Int]
+    let effectiveRetrievalItemBudgetByKind: [DecisionIntelligenceTraceKind: Int]
     let effectiveRetrievalModeByKind: [DecisionIntelligenceTraceKind: DecisionRetrievalMode]
     let effectiveThinkingModeByKind: [DecisionIntelligenceTraceKind: DecisionThinkingMode]
     let effectiveOutputModeByKind: [DecisionIntelligenceTraceKind: DecisionOutputMode]

@@ -1066,6 +1066,13 @@ enum DecisionIntelligencePromptContract {
             "runtime_gear": strategy.runtimeGear.rawValue,
             "provider": strategy.preferredProvider.rawValue,
             "context_budget": strategy.contextBudget,
+            "runtime_budget": [
+                "context_budget": strategy.contextBudget,
+                "output_character_budget": strategy.outputCharacterBudget,
+                "time_budget_ms": strategy.timeBudgetMs,
+                "tool_call_budget": strategy.toolCallBudget,
+                "retrieval_item_budget": strategy.retrievalItemBudget
+            ],
             "retrieval_mode": strategy.retrievalMode.rawValue,
             "thinking_mode": strategy.thinkingMode.rawValue,
             "output_mode": strategy.outputMode.rawValue,

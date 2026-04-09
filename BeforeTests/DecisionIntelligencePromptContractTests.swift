@@ -372,6 +372,9 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertTrue(runtimeStrategyBlock.body.contains("\"tone\":\"briefWarm\""))
         XCTAssertTrue(runtimeStrategyBlock.body.contains("\"response_language\":\"english\""))
         XCTAssertTrue(runtimeStrategyBlock.body.contains("\"allows_model_invocation\":true"))
+        XCTAssertTrue(runtimeStrategyBlock.body.contains("\"runtime_budget\""))
+        XCTAssertTrue(runtimeStrategyBlock.body.contains("\"output_character_budget\":180"))
+        XCTAssertTrue(runtimeStrategyBlock.body.contains("\"tool_call_budget\":1"))
         XCTAssertTrue(
             envelope.assembly.allBlocks.contains(where: { block in
                 block.kind == .compactionPolicy &&

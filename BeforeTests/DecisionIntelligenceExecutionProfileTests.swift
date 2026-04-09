@@ -151,6 +151,8 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
         )
 
         XCTAssertLessThan(adapted.contextBudget, baseStrategy.contextBudget)
+        XCTAssertLessThan(adapted.outputCharacterBudget, baseStrategy.outputCharacterBudget)
+        XCTAssertLessThan(adapted.timeBudgetMs, baseStrategy.timeBudgetMs)
         XCTAssertEqual(adapted.runtimeGear, .low)
         XCTAssertEqual(adapted.tone, .briefWarm)
         XCTAssertEqual(adapted.thinkingMode, .off)
@@ -207,6 +209,8 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
         XCTAssertEqual(adapted.thinkingMode, .gated)
         XCTAssertTrue(adapted.actionSpace.contains("name_boundary"))
         XCTAssertGreaterThanOrEqual(adapted.contextBudget, baseStrategy.contextBudget)
+        XCTAssertGreaterThanOrEqual(adapted.outputCharacterBudget, baseStrategy.outputCharacterBudget)
+        XCTAssertGreaterThanOrEqual(adapted.timeBudgetMs, baseStrategy.timeBudgetMs)
     }
 
     func testAdaptiveStrategyGuardsRetrievalWhenLifecycleIsStale() {

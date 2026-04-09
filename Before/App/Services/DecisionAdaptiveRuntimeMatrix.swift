@@ -143,12 +143,20 @@ enum DecisionToneProfile: String, Equatable, Sendable {
     case reflectiveClear
 }
 
+struct DecisionRuntimeBudget: Equatable, Sendable {
+    let contextBudget: Int
+    let outputCharacterBudget: Int
+    let timeBudgetMs: Int
+    let toolCallBudget: Int
+    let retrievalItemBudget: Int
+}
+
 struct DecisionAdaptiveTaskStrategy: Equatable, Sendable {
     let kind: DecisionIntelligenceTraceKind
     let entropy: DecisionTaskEntropyClass
     let runtimeGear: DecisionRuntimeGear
     let preferredProvider: DecisionModelProviderPreference
-    let contextBudget: Int
+    let runtimeBudget: DecisionRuntimeBudget
     let retrievalMode: DecisionRetrievalMode
     let thinkingMode: DecisionThinkingMode
     let outputMode: DecisionOutputMode
@@ -157,12 +165,22 @@ struct DecisionAdaptiveTaskStrategy: Equatable, Sendable {
     let responseLanguage: DecisionAdaptiveResponseLanguage
     let allowsModelInvocation: Bool
 
+    var contextBudget: Int { runtimeBudget.contextBudget }
+    var outputCharacterBudget: Int { runtimeBudget.outputCharacterBudget }
+    var timeBudgetMs: Int { runtimeBudget.timeBudgetMs }
+    var toolCallBudget: Int { runtimeBudget.toolCallBudget }
+    var retrievalItemBudget: Int { runtimeBudget.retrievalItemBudget }
+
     init(
         kind: DecisionIntelligenceTraceKind,
         entropy: DecisionTaskEntropyClass,
         runtimeGear: DecisionRuntimeGear = .balanced,
         preferredProvider: DecisionModelProviderPreference,
         contextBudget: Int,
+        outputCharacterBudget: Int? = nil,
+        timeBudgetMs: Int? = nil,
+        toolCallBudget: Int? = nil,
+        retrievalItemBudget: Int? = nil,
         retrievalMode: DecisionRetrievalMode,
         thinkingMode: DecisionThinkingMode,
         outputMode: DecisionOutputMode,
@@ -175,7 +193,33 @@ struct DecisionAdaptiveTaskStrategy: Equatable, Sendable {
         self.entropy = entropy
         self.runtimeGear = runtimeGear
         self.preferredProvider = preferredProvider
-        self.contextBudget = contextBudget
+        self.runtimeBudget = DecisionRuntimeBudget(
+            contextBudget: contextBudget,
+            outputCharacterBudget: outputCharacterBudget ??
+                Self.defaultOutputCharacterBudget(
+                    for: kind,
+                    gear: runtimeGear,
+                    allowsModelInvocation: allowsModelInvocation,
+                    outputMode: outputMode
+                ),
+            timeBudgetMs: timeBudgetMs ??
+                Self.defaultTimeBudgetMs(
+                    for: kind,
+                    gear: runtimeGear,
+                    allowsModelInvocation: allowsModelInvocation,
+                    thinkingMode: thinkingMode
+                ),
+            toolCallBudget: toolCallBudget ??
+                Self.defaultToolCallBudget(
+                    for: kind,
+                    allowsModelInvocation: allowsModelInvocation
+                ),
+            retrievalItemBudget: retrievalItemBudget ??
+                Self.defaultRetrievalItemBudget(
+                    for: kind,
+                    retrievalMode: retrievalMode
+                )
+        )
         self.retrievalMode = retrievalMode
         self.thinkingMode = thinkingMode
         self.outputMode = outputMode
@@ -183,6 +227,142 @@ struct DecisionAdaptiveTaskStrategy: Equatable, Sendable {
         self.actionSpace = actionSpace
         self.responseLanguage = responseLanguage
         self.allowsModelInvocation = allowsModelInvocation
+    }
+
+    private static func defaultOutputCharacterBudget(
+        for kind: DecisionIntelligenceTraceKind,
+        gear: DecisionRuntimeGear,
+        allowsModelInvocation: Bool,
+        outputMode: DecisionOutputMode
+    ) -> Int {
+        guard allowsModelInvocation else {
+            switch kind {
+            case .quick, .reminder:
+                return 180
+            case .balance:
+                return 260
+            case .mirror:
+                return 320
+            }
+        }
+
+        let base: Int = switch (gear, kind) {
+        case (.low, .quick):
+            180
+        case (.low, .balance):
+            260
+        case (.low, .mirror):
+            320
+        case (.low, .reminder):
+            140
+        case (.balanced, .quick):
+            220
+        case (.balanced, .balance):
+            340
+        case (.balanced, .mirror):
+            440
+        case (.balanced, .reminder):
+            160
+        case (.high, .quick):
+            260
+        case (.high, .balance):
+            420
+        case (.high, .mirror):
+            560
+        case (.high, .reminder):
+            180
+        }
+
+        let schemaPenalty: Int = switch outputMode {
+        case .jsonShort, .deterministicTemplate:
+            20
+        case .guidedShort:
+            0
+        case .structuredBoard:
+            10
+        case .reflectiveStructured:
+            0
+        }
+
+        return max(120, base - schemaPenalty)
+    }
+
+    private static func defaultTimeBudgetMs(
+        for kind: DecisionIntelligenceTraceKind,
+        gear: DecisionRuntimeGear,
+        allowsModelInvocation: Bool,
+        thinkingMode: DecisionThinkingMode
+    ) -> Int {
+        guard allowsModelInvocation else {
+            switch kind {
+            case .quick, .reminder:
+                return 350
+            case .balance:
+                return 500
+            case .mirror:
+                return 650
+            }
+        }
+
+        let base: Int = switch (gear, kind) {
+        case (.low, .quick):
+            500
+        case (.low, .balance):
+            700
+        case (.low, .mirror):
+            900
+        case (.low, .reminder):
+            350
+        case (.balanced, .quick):
+            700
+        case (.balanced, .balance):
+            1000
+        case (.balanced, .mirror):
+            1300
+        case (.balanced, .reminder):
+            450
+        case (.high, .quick):
+            900
+        case (.high, .balance):
+            1400
+        case (.high, .mirror):
+            1800
+        case (.high, .reminder):
+            550
+        }
+
+        return thinkingMode == .gated ? base + 250 : base
+    }
+
+    private static func defaultToolCallBudget(
+        for kind: DecisionIntelligenceTraceKind,
+        allowsModelInvocation: Bool
+    ) -> Int {
+        guard allowsModelInvocation else { return 0 }
+        return switch kind {
+        case .quick:
+            1
+        case .balance:
+            2
+        case .mirror:
+            2
+        case .reminder:
+            1
+        }
+    }
+
+    private static func defaultRetrievalItemBudget(
+        for kind: DecisionIntelligenceTraceKind,
+        retrievalMode: DecisionRetrievalMode
+    ) -> Int {
+        switch retrievalMode {
+        case .off:
+            return 0
+        case .filtered:
+            return kind == .reminder ? 2 : 3
+        case .adaptive:
+            return kind == .mirror ? 5 : 4
+        }
     }
 }
 
@@ -194,6 +374,10 @@ extension DecisionAdaptiveTaskStrategy {
     ) -> DecisionAdaptiveTaskStrategy {
         var runtimeGear = runtimeGear
         var contextBudget = contextBudget
+        var outputCharacterBudget = outputCharacterBudget
+        var timeBudgetMs = timeBudgetMs
+        var toolCallBudget = toolCallBudget
+        var retrievalItemBudget = retrievalItemBudget
         var retrievalMode = retrievalMode
         var thinkingMode = thinkingMode
         var tone = tone
@@ -240,6 +424,10 @@ extension DecisionAdaptiveTaskStrategy {
                 20
             }
             contextBudget = max(minimumBudget, contextBudget - reduction)
+            outputCharacterBudget = max(120, outputCharacterBudget - max(40, reduction))
+            timeBudgetMs = max(300, timeBudgetMs - max(120, reduction * 4))
+            toolCallBudget = max(0, toolCallBudget - 1)
+            retrievalItemBudget = max(0, retrievalItemBudget - 1)
             tone = .briefWarm
             thinkingMode = .off
             if !actionSpace.contains("stay_brief") {
@@ -255,6 +443,8 @@ extension DecisionAdaptiveTaskStrategy {
         if kind == .quick, interruptiveBias >= 0.82 {
             runtimeGear = .low
             contextBudget = max(minimumBudget, contextBudget - 20)
+            outputCharacterBudget = max(120, outputCharacterBudget - 40)
+            timeBudgetMs = max(300, timeBudgetMs - 120)
             thinkingMode = .off
             tone = .briefWarm
             if !actionSpace.contains("save_state") {
@@ -276,6 +466,9 @@ extension DecisionAdaptiveTaskStrategy {
            briefBias < 0.72 {
             runtimeGear = .high
             contextBudget += 40
+            outputCharacterBudget += 60
+            timeBudgetMs += 220
+            retrievalItemBudget += 1
             if thinkingMode == .off {
                 thinkingMode = .gated
             }
@@ -292,6 +485,9 @@ extension DecisionAdaptiveTaskStrategy {
            briefBias < 0.72 {
             runtimeGear = .high
             contextBudget += 30
+            outputCharacterBudget += 50
+            timeBudgetMs += 180
+            retrievalItemBudget += 1
             if thinkingMode == .off {
                 thinkingMode = .gated
             }
@@ -308,8 +504,10 @@ extension DecisionAdaptiveTaskStrategy {
             switch retrievalMode {
             case .adaptive:
                 retrievalMode = .filtered
+                retrievalItemBudget = min(retrievalItemBudget, kind == .mirror ? 3 : 2)
             case .filtered where kind == .reminder:
                 retrievalMode = .off
+                retrievalItemBudget = 0
             case .off, .filtered:
                 break
             }
@@ -328,6 +526,10 @@ extension DecisionAdaptiveTaskStrategy {
             runtimeGear: runtimeGear,
             preferredProvider: preferredProvider,
             contextBudget: contextBudget,
+            outputCharacterBudget: outputCharacterBudget,
+            timeBudgetMs: timeBudgetMs,
+            toolCallBudget: toolCallBudget,
+            retrievalItemBudget: retrievalItemBudget,
             retrievalMode: retrievalMode,
             thinkingMode: thinkingMode,
             outputMode: outputMode,
@@ -500,6 +702,30 @@ enum DecisionAdaptiveRuntimeMatrixResolver {
                 deviceClass: deviceClass,
                 languageMode: languageMode
             ),
+            outputCharacterBudget: outputCharacterBudget(
+                for: kind,
+                gear: taskGear,
+                allowsModelInvocation: allowsModelInvocation,
+                environmentClass: environmentClass,
+                deviceClass: deviceClass
+            ),
+            timeBudgetMs: timeBudgetMs(
+                for: kind,
+                gear: taskGear,
+                allowsModelInvocation: allowsModelInvocation,
+                environmentClass: environmentClass,
+                deviceClass: deviceClass
+            ),
+            toolCallBudget: toolCallBudget(
+                for: kind,
+                allowsModelInvocation: allowsModelInvocation,
+                environmentClass: environmentClass
+            ),
+            retrievalItemBudget: retrievalItemBudget(
+                for: kind,
+                allowsModelInvocation: allowsModelInvocation,
+                environmentClass: environmentClass
+            ),
             retrievalMode: retrievalMode(
                 for: kind,
                 gear: taskGear,
@@ -660,6 +886,115 @@ enum DecisionAdaptiveRuntimeMatrixResolver {
         }
 
         return max(minimumBudget, base - environmentPenalty - devicePenalty - languagePenalty)
+    }
+
+    private static func outputCharacterBudget(
+        for kind: DecisionIntelligenceTraceKind,
+        gear: DecisionRuntimeGear,
+        allowsModelInvocation: Bool,
+        environmentClass: DecisionEnvironmentClass,
+        deviceClass: DecisionDevicePerformanceClass
+    ) -> Int {
+        let base = DecisionAdaptiveTaskStrategy(
+            kind: kind,
+            entropy: entropy(for: kind),
+            runtimeGear: gear,
+            preferredProvider: allowsModelInvocation ? .gemmaE4B : .template,
+            contextBudget: 0,
+            retrievalMode: .off,
+            thinkingMode: .off,
+            outputMode: outputMode(for: kind, allowsModelInvocation: allowsModelInvocation),
+            tone: .neutral,
+            actionSpace: [],
+            allowsModelInvocation: allowsModelInvocation
+        ).outputCharacterBudget
+
+        let environmentPenalty: Int = switch environmentClass {
+        case .simulator: 30
+        case .lowPower: 50
+        case .memoryConstrained: 30
+        case .normal: 0
+        }
+        let devicePenalty: Int = switch deviceClass {
+        case .simulator: 10
+        case .memoryConstrainedPhone: 30
+        case .balancedPhone: 10
+        case .fullPhone: 0
+        }
+
+        return max(120, base - environmentPenalty - devicePenalty)
+    }
+
+    private static func timeBudgetMs(
+        for kind: DecisionIntelligenceTraceKind,
+        gear: DecisionRuntimeGear,
+        allowsModelInvocation: Bool,
+        environmentClass: DecisionEnvironmentClass,
+        deviceClass: DecisionDevicePerformanceClass
+    ) -> Int {
+        let base = DecisionAdaptiveTaskStrategy(
+            kind: kind,
+            entropy: entropy(for: kind),
+            runtimeGear: gear,
+            preferredProvider: allowsModelInvocation ? .gemmaE4B : .template,
+            contextBudget: 0,
+            retrievalMode: .off,
+            thinkingMode: .off,
+            outputMode: outputMode(for: kind, allowsModelInvocation: allowsModelInvocation),
+            tone: .neutral,
+            actionSpace: [],
+            allowsModelInvocation: allowsModelInvocation
+        ).timeBudgetMs
+
+        let environmentPenalty: Int = switch environmentClass {
+        case .simulator: 120
+        case .lowPower: 180
+        case .memoryConstrained: 100
+        case .normal: 0
+        }
+        let devicePenalty: Int = switch deviceClass {
+        case .simulator: 60
+        case .memoryConstrainedPhone: 120
+        case .balancedPhone: 60
+        case .fullPhone: 0
+        }
+
+        return max(300, base - environmentPenalty - devicePenalty)
+    }
+
+    private static func toolCallBudget(
+        for kind: DecisionIntelligenceTraceKind,
+        allowsModelInvocation: Bool,
+        environmentClass: DecisionEnvironmentClass
+    ) -> Int {
+        guard allowsModelInvocation else { return 0 }
+        let base: Int = switch kind {
+        case .quick, .reminder:
+            1
+        case .balance, .mirror:
+            2
+        }
+        return environmentClass == .normal ? base : max(0, base - 1)
+    }
+
+    private static func retrievalItemBudget(
+        for kind: DecisionIntelligenceTraceKind,
+        allowsModelInvocation: Bool,
+        environmentClass: DecisionEnvironmentClass
+    ) -> Int {
+        guard allowsModelInvocation else { return 0 }
+        let base: Int = switch kind {
+        case .quick:
+            0
+        case .reminder:
+            2
+        case .balance:
+            3
+        case .mirror:
+            5
+        }
+
+        return environmentClass == .normal ? base : max(0, base - 1)
     }
 
     private static func retrievalMode(
