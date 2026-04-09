@@ -4,7 +4,9 @@ import XCTest
 final class WidgetSnapshotStoreTests: XCTestCase {
     override func tearDown() {
         WidgetSnapshotStore.clear()
+        SharedPublicStateStore.clearQuarantine(key: "before.widget.snapshot")
         SharedContainer.defaults.removeObject(forKey: "before.widget.snapshot")
+        StateStorageIssueRecorder.clear()
         super.tearDown()
     }
 
@@ -55,5 +57,21 @@ final class WidgetSnapshotStoreTests: XCTestCase {
         XCTAssertEqual(loaded.messageBody, "A little distance can change a buying answer.")
         XCTAssertNil(SharedContainer.defaults.data(forKey: "before.widget.snapshot"))
         XCTAssertNotNil(SharedPublicStateStore.loadData(key: "before.widget.snapshot"))
+    }
+
+    func testLoadQuarantinesCorruptedSharedPublicSnapshot() {
+        WidgetSnapshotStore.clear()
+
+        let key = "before.widget.snapshot"
+        let raw = Data("broken-snapshot".utf8)
+        SharedPublicStateStore.saveData(raw, key: key)
+
+        let loaded = WidgetSnapshotStore.load()
+
+        XCTAssertEqual(loaded.messageHeadline, WidgetSnapshot.empty.messageHeadline)
+        XCTAssertEqual(loaded.messageBody, WidgetSnapshot.empty.messageBody)
+        XCTAssertNil(SharedPublicStateStore.loadData(key: key))
+        XCTAssertEqual(SharedPublicStateStore.quarantinedData(key: key), raw)
+        XCTAssertNotNil(StateStorageIssueRecorder.latestNotice())
     }
 }

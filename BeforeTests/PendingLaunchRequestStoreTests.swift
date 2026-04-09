@@ -4,7 +4,9 @@ import XCTest
 final class PendingLaunchRequestStoreTests: XCTestCase {
     override func tearDown() {
         PendingLaunchRequestStore.clear()
+        SharedProtectedStateStore.clearQuarantine(key: "before.pending.launch.request")
         SharedContainer.defaults.removeObject(forKey: "before.pending.launch.request")
+        StateStorageIssueRecorder.clear()
         super.tearDown()
     }
 
@@ -162,5 +164,18 @@ final class PendingLaunchRequestStoreTests: XCTestCase {
         XCTAssertNil(PendingLaunchRequestStore.consume())
         XCTAssertNil(SharedContainer.defaults.data(forKey: "before.pending.launch.request"))
         XCTAssertNil(SharedProtectedStateStore.loadData(key: "before.pending.launch.request"))
+    }
+
+    func testConsumeQuarantinesUnreadableSharedProtectedQueue() {
+        PendingLaunchRequestStore.clear()
+
+        let key = "before.pending.launch.request"
+        let raw = Data("broken-queue".utf8)
+        SharedProtectedStateStore.saveData(raw, key: key)
+
+        XCTAssertNil(PendingLaunchRequestStore.consume())
+        XCTAssertNil(SharedProtectedStateStore.loadData(key: key))
+        XCTAssertEqual(SharedProtectedStateStore.quarantinedData(key: key), raw)
+        XCTAssertNotNil(StateStorageIssueRecorder.latestNotice())
     }
 }

@@ -5,6 +5,8 @@ import XCTest
 final class ActiveDecisionWorkspaceStoreTests: XCTestCase {
     override func tearDown() {
         ActiveDecisionWorkspaceStore.clear()
+        ProtectedLocalStateStore.clearQuarantine(key: "before.active.decision.workspace")
+        StateStorageIssueRecorder.clear()
         UserDefaults.standard.removeObject(forKey: "before.active.decision.workspace")
         super.tearDown()
     }
@@ -173,5 +175,34 @@ final class ActiveDecisionWorkspaceStoreTests: XCTestCase {
 
         XCTAssertNil(ProtectedLocalStateStore.loadData(key: key))
         XCTAssertNil(UserDefaults.standard.data(forKey: key))
+    }
+
+    func testLoadQuarantinesCorruptedProtectedWorkspacePayload() {
+        ActiveDecisionWorkspaceStore.clear()
+
+        let key = "before.active.decision.workspace"
+        ProtectedLocalStateStore.saveData(Data("not-json".utf8), key: key)
+
+        XCTAssertNil(ActiveDecisionWorkspaceStore.load())
+        XCTAssertNil(ProtectedLocalStateStore.loadData(key: key))
+        XCTAssertEqual(ProtectedLocalStateStore.quarantinedData(key: key), Data("not-json".utf8))
+        XCTAssertNotNil(StateStorageIssueRecorder.latestNotice())
+    }
+
+    func testLoadClearsExpiredWorkspaceState() {
+        ActiveDecisionWorkspaceStore.clear()
+
+        let state = ActiveDecisionWorkspaceState(
+            savedAt: Date(timeIntervalSince1970: 10),
+            mode: .quick,
+            entrySource: .app,
+            draft: TomorrowBoxDraft(prompt: "Old workspace", note: "Old workspace")
+        )
+
+        ActiveDecisionWorkspaceStore.save(state)
+
+        let now = Date(timeIntervalSince1970: 10 + BeforePolicy.RuntimeState.workspaceRetentionInterval + 1)
+        XCTAssertNil(ActiveDecisionWorkspaceStore.load(now: now))
+        XCTAssertNil(ProtectedLocalStateStore.loadData(key: "before.active.decision.workspace"))
     }
 }

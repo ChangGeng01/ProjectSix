@@ -83,6 +83,12 @@ private struct LegacyPendingLaunchRequest: Codable {
     var requestedAt: Date
 }
 
+private enum PendingLaunchRequestEnvelopeDecodeResult {
+    case missing
+    case success([PendingLaunchRequestEnvelope])
+    case unreadable
+}
+
 enum PendingLaunchRequestStore {
     private static let key = "before.pending.launch.request"
     private static let queueStorage = CodableStateStorage.sharedProtected
@@ -127,7 +133,18 @@ enum PendingLaunchRequestStore {
 
     private static func loadStoredEnvelopeQueue(now: Date = .now) -> [PendingLaunchRequestEnvelope] {
         scrubLegacyStorage()
-        let stored = decodedEnvelopeQueue(from: queueStorage.loadData(key: key))
+        let storedData = queueStorage.loadData(key: key)
+        let stored: [PendingLaunchRequestEnvelope]
+        switch decodeEnvelopeQueue(from: storedData) {
+        case .missing:
+            stored = []
+        case .success(let queue):
+            stored = queue
+        case .unreadable:
+            quarantineUnreadableQueuePayload(storedData!)
+            return []
+        }
+
         let valid = Array(
             stored
                 .filter { $0.expiresAt > now }
@@ -143,37 +160,54 @@ enum PendingLaunchRequestStore {
     }
 
     private static func normalizedEnvelopeQueue(from data: Data?, now: Date = .now) -> [PendingLaunchRequestEnvelope] {
-        let decoded = decodedEnvelopeQueue(from: data)
+        let decoded: [PendingLaunchRequestEnvelope]
+        switch decodeEnvelopeQueue(from: data) {
+        case .missing, .unreadable:
+            decoded = []
+        case .success(let queue):
+            decoded = queue
+        }
         let valid = decoded.filter { $0.expiresAt > now }
         return Array(valid.suffix(BeforePolicy.LaunchRequests.maxQueuedRequests))
     }
 
-    private static func decodedEnvelopeQueue(from data: Data?) -> [PendingLaunchRequestEnvelope] {
-        let decoded: [PendingLaunchRequestEnvelope]
+    private static func decodeEnvelopeQueue(from data: Data?) -> PendingLaunchRequestEnvelopeDecodeResult {
+        guard let data else { return .missing }
         if
-            let data,
             let requests = try? JSONDecoder().decode([PendingLaunchRequestEnvelope].self, from: data)
         {
-            decoded = requests
-        } else if
-            let data,
+            return .success(requests)
+        }
+
+        if
             let requests = try? JSONDecoder().decode([PendingLaunchRequest].self, from: data)
         {
-            decoded = requests.map { PendingLaunchRequestEnvelope(request: $0, preservingProtectedPayload: false) }
-        } else if
-            let data,
+            return .success(
+                requests.map { PendingLaunchRequestEnvelope(request: $0, preservingProtectedPayload: false) }
+            )
+        }
+
+        if
             let legacyRequest = try? JSONDecoder().decode(LegacyPendingLaunchRequest.self, from: data)
         {
-            decoded = [
+            return .success([
                 PendingLaunchRequestEnvelope(
                     request: PendingLaunchRequest(entrySource: legacyRequest.entrySource, requestedAt: legacyRequest.requestedAt)
                 )
-            ]
-        } else {
-            decoded = []
+            ])
         }
 
-        return decoded
+        return .unreadable
+    }
+
+    private static func quarantineUnreadableQueuePayload(_ data: Data) {
+        SharedProtectedStateStore.quarantineData(
+            data,
+            key: key,
+            operation: "loading pending launch queue",
+            reason: "Unreadable pending launch queue was isolated to protect launch-state continuity."
+        )
+        queueStorage.clear(key: key)
     }
 
     private static func materialize(_ envelope: PendingLaunchRequestEnvelope) -> PendingLaunchRequest {

@@ -1017,7 +1017,7 @@ final class BeforeAppModel: ObservableObject {
         guard force || isMemoryProjectionDirty || memoryProjection == nil else { return }
         memoryProjection = DecisionMemorySystem.refreshProjection(in: modelContainer.mainContext)
         isMemoryProjectionDirty = false
-        if let notice = PersistenceIssueRecorder.latestNotice() {
+        if let notice = PersistenceIssueRecorder.latestNotice() ?? StateStorageIssueRecorder.latestNotice() {
             publishStartupNotice(notice)
         }
     }

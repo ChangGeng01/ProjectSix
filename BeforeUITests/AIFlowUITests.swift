@@ -176,7 +176,7 @@ final class AIFlowUITests: XCTestCase {
                 return true
             }
 
-            if let container = scrollContainers.first(where: \.exists) {
+            if let container = scrollContainers.first(where: { $0.exists && !$0.frame.isEmpty }) {
                 container.swipeUp()
             } else {
                 app.swipeUp()

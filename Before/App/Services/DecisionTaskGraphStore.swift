@@ -86,6 +86,10 @@ struct DecisionTaskGraphSnapshot: Codable, Equatable, Sendable {
         ) == continuityFingerprint
     }
 
+    func isExpired(relativeTo now: Date = .now) -> Bool {
+        updatedAt.addingTimeInterval(BeforePolicy.RuntimeState.taskGraphRetentionInterval) <= now
+    }
+
     @MainActor
     static func capture(from session: QuickCheckSession) -> DecisionTaskGraphSnapshot? {
         let draft = TomorrowBoxDraft.quick(from: session)
@@ -344,10 +348,18 @@ struct DecisionTaskGraphSnapshot: Codable, Equatable, Sendable {
 enum DecisionTaskGraphStore {
     private static let key = "before.decision.task.graph"
 
-    static func load() -> DecisionTaskGraphSnapshot? {
+    static func load(now: Date = .now) -> DecisionTaskGraphSnapshot? {
         scrubLegacyStorage()
         if let snapshot = ProtectedLocalStateStore.load(DecisionTaskGraphSnapshot.self, key: key) {
-            return snapshot.hasValidContinuityFingerprint ? snapshot : nil
+            guard snapshot.hasValidContinuityFingerprint else {
+                ProtectedLocalStateStore.clear(key: key)
+                return nil
+            }
+            guard !snapshot.isExpired(relativeTo: now) else {
+                ProtectedLocalStateStore.clear(key: key)
+                return nil
+            }
+            return snapshot
         }
         return nil
     }

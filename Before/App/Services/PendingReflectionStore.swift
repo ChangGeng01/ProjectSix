@@ -4,8 +4,13 @@ enum PendingReflectionStore {
     private static let key = "before.pending.reflection.state"
     private static let storage = CodableStateStorage.protectedLocal
 
-    static func load() -> PendingReflectionState {
+    static func load(now: Date = .now) -> PendingReflectionState {
         guard let state = storage.load(PendingReflectionState.self, key: key) else {
+            return PendingReflectionState(context: nil, shouldPromptOnNextActive: false)
+        }
+
+        guard !state.isExpired(relativeTo: now) else {
+            clear()
             return PendingReflectionState(context: nil, shouldPromptOnNextActive: false)
         }
 

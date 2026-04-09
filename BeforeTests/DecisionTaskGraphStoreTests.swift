@@ -79,6 +79,7 @@ final class DecisionTaskGraphStoreTests: XCTestCase {
         DecisionTaskGraphStore.save(tampered)
 
         XCTAssertNil(DecisionTaskGraphStore.load())
+        XCTAssertNil(ProtectedLocalStateStore.loadData(key: "before.decision.task.graph"))
     }
 
     func testLoadPurgesLegacyUserDefaultsTaskGraphWithoutRestoringIt() throws {
@@ -101,5 +102,34 @@ final class DecisionTaskGraphStoreTests: XCTestCase {
 
         XCTAssertNil(DecisionTaskGraphStore.load())
         XCTAssertNil(UserDefaults.standard.data(forKey: key))
+    }
+
+    func testLoadClearsExpiredTaskGraphSnapshot() {
+        let session = QuickCheckSession(entrySource: .app, initialNote: "Do I buy this now?")
+        session.scenario = .buy
+        session.motivation = .reward
+        session.expectedOutcome = .temporaryRelief
+        session.controlLevel = .maybe
+
+        guard let snapshot = DecisionTaskGraphSnapshot.capture(from: session) else {
+            XCTFail("Expected task graph snapshot")
+            return
+        }
+
+        let expiredSnapshot = DecisionTaskGraphSnapshot(
+            schemaVersion: snapshot.schemaVersion,
+            mode: snapshot.mode ?? .quick,
+            promptSeed: snapshot.promptSeed,
+            nextActionHint: snapshot.nextActionHint,
+            continuityFingerprint: snapshot.continuityFingerprint,
+            tasks: snapshot.tasks,
+            updatedAt: Date(timeIntervalSince1970: 10)
+        )
+
+        DecisionTaskGraphStore.save(expiredSnapshot)
+
+        let now = Date(timeIntervalSince1970: 10 + BeforePolicy.RuntimeState.taskGraphRetentionInterval + 1)
+        XCTAssertNil(DecisionTaskGraphStore.load(now: now))
+        XCTAssertNil(ProtectedLocalStateStore.loadData(key: "before.decision.task.graph"))
     }
 }

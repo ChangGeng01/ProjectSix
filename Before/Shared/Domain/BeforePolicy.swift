@@ -62,4 +62,10 @@ enum BeforePolicy {
         static let maxQueuedRequests = 5
         static let expirationInterval: TimeInterval = 60 * 10
     }
+
+    enum RuntimeState {
+        static let workspaceRetentionInterval: TimeInterval = 60 * 60 * 24
+        static let taskGraphRetentionInterval: TimeInterval = 60 * 60 * 24
+        static let pendingReflectionRetentionInterval: TimeInterval = 60 * 60 * 12
+    }
 }
