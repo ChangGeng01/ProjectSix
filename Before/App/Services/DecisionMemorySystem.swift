@@ -66,41 +66,76 @@ enum DecisionMemorySystem {
         let id: String
         let type: DecisionMemoryType
         let headline: String
+        let source: DecisionMemorySource
         let priority: Double
         let confidence: Double
         let retrievalTags: [String]
         let lastConfirmedAt: Date
         let decayPolicy: DecisionMemoryDecayPolicy
+        let lifecycleState: DecisionMemoryLifecycleState
+        let governanceStatus: DecisionGovernedMemoryStatus
         let isPending: Bool
+        let provenanceSummary: String
 
         init(record: DecisionMemoryRecord) {
             id = record.id
             type = record.type
             headline = record.headline
+            source = record.source
             priority = record.priority
             confidence = record.confidence
             retrievalTags = record.retrievalTags
             lastConfirmedAt = record.lastConfirmedAt
             decayPolicy = record.decayPolicy
+            lifecycleState = record.lifecycleState
+            governanceStatus = .admitted
             isPending = false
+            provenanceSummary = record.provenanceSummary
         }
 
         init(candidate: DecisionMemoryCandidateRecord) {
             id = candidate.id
             type = candidate.type
             headline = candidate.headline
+            source = candidate.source
             priority = candidate.priority
             confidence = candidate.confidence
             retrievalTags = candidate.retrievalTags
             lastConfirmedAt = candidate.lastObservedAt
             decayPolicy = candidate.decayPolicy
+            lifecycleState = .active
+            governanceStatus = candidate.lastGovernanceDecision == .deferred ? .deferred : .pending
             isPending = candidate.status == .pending
+            provenanceSummary = candidate.provenanceSummary
+        }
+
+        var eligibilityCandidate: DecisionMemoryEligibilityCandidate {
+            DecisionMemoryEligibilityCandidate(
+                id: id,
+                type: type,
+                headline: headline,
+                source: source,
+                confidence: confidence,
+                priority: priority,
+                retrievalTags: retrievalTags,
+                lastConfirmedAt: lastConfirmedAt,
+                decayPolicy: decayPolicy,
+                lifecycleState: lifecycleState,
+                governanceStatus: governanceStatus,
+                isPending: isPending,
+                provenanceSummary: provenanceSummary
+            )
         }
     }
 
+    private struct EvaluatedBrainMemoryItem {
+        let item: BrainMemoryItem
+        let eligibility: DecisionMemoryEligibilityDecision
+    }
+
     private struct RetrievalJudgeResult {
-        let allowedItems: [BrainMemoryItem]
-        let screenedOutItems: [BrainMemoryItem]
+        let allowedItems: [EvaluatedBrainMemoryItem]
+        let screenedOutItems: [EvaluatedBrainMemoryItem]
     }
 
     static func refreshStoredMemories(
@@ -177,29 +212,34 @@ enum DecisionMemorySystem {
             limit: 2,
             matching: { $0.type == .identity || $0.type == .preference }
         )
-        let profileCore = orderedUnique(profileItems.map(\.headline))
+        let profileCore = orderedUnique(profileItems.map(\.item.headline))
 
         let goalItems = selectItems(
             from: retrievalQualifiedItems,
             limit: 2,
-            excludingIDs: Set(profileItems.map(\.id)),
+            excludingIDs: Set(profileItems.map(\.item.id)),
             matching: { $0.type == .goal }
         )
-        let activeGoals = orderedUnique(goalItems.map(\.headline))
+        let activeGoals = orderedUnique(goalItems.map(\.item.headline))
 
         let relevantItems = selectItems(
             from: retrievalQualifiedItems,
             limit: 3,
-            excludingIDs: Set(profileItems.map(\.id) + goalItems.map(\.id)),
+            excludingIDs: Set(profileItems.map(\.item.id) + goalItems.map(\.item.id)),
             matching: { _ in true }
         )
-        let relevantMemories = orderedUnique(relevantItems.map(\.headline))
+        let relevantMemories = orderedUnique(relevantItems.map(\.item.headline))
         let selectedItems = profileItems + goalItems + relevantItems
+        let memorySlices = buildMemorySlices(
+            profileItems: profileItems,
+            goalItems: goalItems,
+            relevantItems: relevantItems
+        )
 
         let reactionWeights = buildReactionWeights(
             mode: mode,
             queryTags: queryTags,
-            orderedItems: retrievalQualifiedItems,
+            orderedItems: retrievalQualifiedItems.map(\.item),
             checkEvents: recentCheckEvents,
             records: resolvedRecords,
             profileCore: profileCore,
@@ -225,9 +265,7 @@ enum DecisionMemorySystem {
         )
 
         return DecisionBrainState(
-            profileCore: profileCore,
-            activeGoals: activeGoals,
-            relevantMemories: relevantMemories,
+            memorySlices: memorySlices,
             sessionBiases: sessionBiases,
             retrievalTags: Array(queryTags).sorted(),
             reactionWeights: reactionWeights,
@@ -274,15 +312,15 @@ enum DecisionMemorySystem {
     private static func buildMemoryGovernanceState(
         records: [DecisionMemoryRecord],
         candidates: [DecisionMemoryCandidateRecord],
-        selectedItems: [BrainMemoryItem],
-        screenedOutItems: [BrainMemoryItem]
+        selectedItems: [EvaluatedBrainMemoryItem],
+        screenedOutItems: [EvaluatedBrainMemoryItem]
     ) -> DecisionMemoryGovernanceState {
         let pendingCandidateCount = candidates.filter { $0.status == .pending }.count
         let promotedCandidateCount = candidates.filter { $0.status == .promoted }.count
-        let loadedPendingMemoryCount = selectedItems.filter(\.isPending).count
+        let loadedPendingMemoryCount = selectedItems.filter(\.item.isPending).count
         let deferredCandidateCount = candidates.filter { $0.lastGovernanceDecision == .deferred }.count
         let admittedCandidateCount = candidates.filter { $0.lastGovernanceDecision == .admit }.count
-        let screenedOutPendingMemoryCount = screenedOutItems.filter(\.isPending).count
+        let screenedOutPendingMemoryCount = screenedOutItems.filter(\.item.isPending).count
 
         return DecisionMemoryGovernanceState(
             totalRecordCount: records.count,
@@ -294,7 +332,9 @@ enum DecisionMemorySystem {
             deferredCandidateCount: deferredCandidateCount,
             admittedCandidateCount: admittedCandidateCount,
             screenedOutMemoryCount: screenedOutItems.count,
-            screenedOutPendingMemoryCount: screenedOutPendingMemoryCount
+            screenedOutPendingMemoryCount: screenedOutPendingMemoryCount,
+            loadedReasonCounts: reasonCounts(for: selectedItems.map(\.eligibility)),
+            screenedOutReasonCounts: reasonCounts(for: screenedOutItems.map(\.eligibility))
         )
     }
 
@@ -304,55 +344,26 @@ enum DecisionMemorySystem {
         queryTags: Set<String>,
         now: Date
     ) -> RetrievalJudgeResult {
-        var allowed: [BrainMemoryItem] = []
-        var screenedOut: [BrainMemoryItem] = []
+        var allowed: [EvaluatedBrainMemoryItem] = []
+        var screenedOut: [EvaluatedBrainMemoryItem] = []
 
         for item in orderedItems {
-            if shouldLoadIntoFrontstage(item, mode: mode, queryTags: queryTags, now: now) {
-                allowed.append(item)
+            let eligibility = DecisionMemoryEligibilityJudge.decide(
+                candidate: item.eligibilityCandidate,
+                mode: mode,
+                queryTags: queryTags,
+                now: now
+            )
+            let evaluated = EvaluatedBrainMemoryItem(item: item, eligibility: eligibility)
+
+            if eligibility.isAllowed {
+                allowed.append(evaluated)
             } else {
-                screenedOut.append(item)
+                screenedOut.append(evaluated)
             }
         }
 
         return RetrievalJudgeResult(allowedItems: allowed, screenedOutItems: screenedOut)
-    }
-
-    private static func shouldLoadIntoFrontstage(
-        _ item: BrainMemoryItem,
-        mode: DecisionMode,
-        queryTags: Set<String>,
-        now: Date
-    ) -> Bool {
-        if item.type == .identity || item.type == .goal {
-            return true
-        }
-
-        let itemTags = frontstageRelevantTags(item.retrievalTags)
-        let meaningfulQueryTags = frontstageRelevantTags(Array(queryTags))
-        let hasTagOverlap = !itemTags.intersection(meaningfulQueryTags).isEmpty
-        let ageHours = max(0, now.timeIntervalSince(item.lastConfirmedAt) / 3_600)
-
-        if item.isPending {
-            return hasTagOverlap || ageHours <= 18
-        }
-
-        if item.decayPolicy == .fast {
-            return hasTagOverlap || ageHours <= 24
-        }
-
-        if item.confidence < 0.62, !hasTagOverlap {
-            return false
-        }
-
-        if item.type == .support || item.type == .semantic {
-            let baseline = mode == .mirror ? 0.58 : 0.64
-            if item.priority < baseline, !hasTagOverlap {
-                return false
-            }
-        }
-
-        return true
     }
 
     private static func deriveMemoryDrafts(
@@ -867,21 +878,6 @@ enum DecisionMemorySystem {
         return tagsSet
     }
 
-    private static func frontstageRelevantTags(_ tags: [String]) -> Set<String> {
-        let lowSignalTags: Set<String> = [
-            "quick",
-            "balance",
-            "mirror",
-            "recent",
-            "goal",
-            "long_term",
-            "pattern",
-            "repeat"
-        ]
-
-        return Set(tags.map { $0.lowercased() }).subtracting(lowSignalTags)
-    }
-
     private static func score(
         _ memory: BrainMemoryItem,
         mode: DecisionMode,
@@ -942,24 +938,64 @@ enum DecisionMemorySystem {
     }
 
     private static func selectItems(
-        from orderedItems: [BrainMemoryItem],
+        from orderedItems: [EvaluatedBrainMemoryItem],
         limit: Int,
         excludingIDs: Set<String> = [],
         matching predicate: (BrainMemoryItem) -> Bool
-    ) -> [BrainMemoryItem] {
-        var selected: [BrainMemoryItem] = []
+    ) -> [EvaluatedBrainMemoryItem] {
+        var selected: [EvaluatedBrainMemoryItem] = []
         var seenHeadlines = Set<String>()
 
-        for item in orderedItems where predicate(item) {
-            guard !excludingIDs.contains(item.id) else { continue }
-            guard seenHeadlines.insert(item.headline).inserted else { continue }
-            selected.append(item)
+        for evaluated in orderedItems where predicate(evaluated.item) {
+            guard !excludingIDs.contains(evaluated.item.id) else { continue }
+            guard seenHeadlines.insert(evaluated.item.headline).inserted else { continue }
+            selected.append(evaluated)
             if selected.count == limit {
                 break
             }
         }
 
         return selected
+    }
+
+    private static func buildMemorySlices(
+        profileItems: [EvaluatedBrainMemoryItem],
+        goalItems: [EvaluatedBrainMemoryItem],
+        relevantItems: [EvaluatedBrainMemoryItem]
+    ) -> [DecisionGovernedMemorySlice] {
+        profileItems.map { makeMemorySlice(from: $0, role: .profile) } +
+            goalItems.map { makeMemorySlice(from: $0, role: .goal) } +
+            relevantItems.map { makeMemorySlice(from: $0, role: .relevant) }
+    }
+
+    private static func makeMemorySlice(
+        from evaluated: EvaluatedBrainMemoryItem,
+        role: DecisionBrainMemoryRole
+    ) -> DecisionGovernedMemorySlice {
+        let item = evaluated.item
+        return DecisionGovernedMemorySlice(
+            id: item.id,
+            role: role,
+            type: item.type.rawValue,
+            headline: item.headline,
+            source: item.source.rawValue,
+            confidence: item.confidence,
+            priority: item.priority,
+            lifecycleState: item.lifecycleState.rawValue,
+            governanceStatus: item.governanceStatus,
+            eligibility: evaluated.eligibility,
+            retrievalTags: item.retrievalTags,
+            isPending: item.isPending,
+            provenanceSummary: item.provenanceSummary
+        )
+    }
+
+    private static func reasonCounts(
+        for decisions: [DecisionMemoryEligibilityDecision]
+    ) -> [DecisionMemoryEligibilityReason: Int] {
+        decisions.reduce(into: [:]) { partialResult, decision in
+            partialResult[decision.reason, default: 0] += 1
+        }
     }
 
     private static func normalized(_ value: String) -> String {

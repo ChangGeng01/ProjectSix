@@ -73,6 +73,60 @@ struct DecisionReactionWeights: Codable, Equatable, Sendable {
     }
 }
 
+enum DecisionBrainMemoryRole: String, Codable, Sendable {
+    case profile
+    case goal
+    case relevant
+}
+
+enum DecisionMemoryEligibilityReason: String, CaseIterable, Codable, Sendable {
+    case identityOverride = "identity_override"
+    case goalOverride = "goal_override"
+    case pendingTagOverlap = "pending_tag_overlap"
+    case pendingGraceWindow = "pending_grace_window"
+    case fastDecayTagOverlap = "fast_decay_tag_overlap"
+    case fastDecayGraceWindow = "fast_decay_grace_window"
+    case confidenceNoOverlap = "confidence_no_overlap"
+    case supportPriorityNoOverlap = "support_priority_no_overlap"
+    case semanticPriorityNoOverlap = "semantic_priority_no_overlap"
+    case defaultAllowed = "default_allowed"
+}
+
+struct DecisionMemoryEligibilityDecision: Codable, Equatable, Sendable {
+    let isAllowed: Bool
+    let reason: DecisionMemoryEligibilityReason
+
+    static func allowed(_ reason: DecisionMemoryEligibilityReason) -> DecisionMemoryEligibilityDecision {
+        DecisionMemoryEligibilityDecision(isAllowed: true, reason: reason)
+    }
+
+    static func screenedOut(_ reason: DecisionMemoryEligibilityReason) -> DecisionMemoryEligibilityDecision {
+        DecisionMemoryEligibilityDecision(isAllowed: false, reason: reason)
+    }
+}
+
+enum DecisionGovernedMemoryStatus: String, Codable, Sendable {
+    case admitted
+    case deferred
+    case pending
+}
+
+struct DecisionGovernedMemorySlice: Codable, Equatable, Identifiable, Sendable {
+    let id: String
+    let role: DecisionBrainMemoryRole
+    let type: String
+    let headline: String
+    let source: String
+    let confidence: Double
+    let priority: Double
+    let lifecycleState: String
+    let governanceStatus: DecisionGovernedMemoryStatus
+    let eligibility: DecisionMemoryEligibilityDecision
+    let retrievalTags: [String]
+    let isPending: Bool
+    let provenanceSummary: String
+}
+
 struct DecisionMemoryGovernanceState: Codable, Equatable, Sendable {
     var totalRecordCount: Int
     var totalCandidateCount: Int
@@ -84,6 +138,8 @@ struct DecisionMemoryGovernanceState: Codable, Equatable, Sendable {
     var admittedCandidateCount: Int = 0
     var screenedOutMemoryCount: Int = 0
     var screenedOutPendingMemoryCount: Int = 0
+    var loadedReasonCounts: [DecisionMemoryEligibilityReason: Int] = [:]
+    var screenedOutReasonCounts: [DecisionMemoryEligibilityReason: Int] = [:]
 
     static let empty = DecisionMemoryGovernanceState(
         totalRecordCount: 0,
@@ -96,20 +152,145 @@ struct DecisionMemoryGovernanceState: Codable, Equatable, Sendable {
 }
 
 struct DecisionBrainState: Codable, Equatable, Sendable {
-    var profileCore: [String]
-    var activeGoals: [String]
-    var relevantMemories: [String]
+    var memorySlices: [DecisionGovernedMemorySlice]
     var sessionBiases: [String]
     var retrievalTags: [String]
     var reactionWeights: DecisionReactionWeights
     var memoryGovernance: DecisionMemoryGovernanceState = .empty
     var loadedAt: Date
 
+    init(
+        memorySlices: [DecisionGovernedMemorySlice],
+        sessionBiases: [String],
+        retrievalTags: [String],
+        reactionWeights: DecisionReactionWeights,
+        memoryGovernance: DecisionMemoryGovernanceState = .empty,
+        loadedAt: Date
+    ) {
+        self.memorySlices = memorySlices
+        self.sessionBiases = sessionBiases
+        self.retrievalTags = retrievalTags
+        self.reactionWeights = reactionWeights
+        self.memoryGovernance = memoryGovernance
+        self.loadedAt = loadedAt
+    }
+
+    init(
+        profileCore: [String],
+        activeGoals: [String],
+        relevantMemories: [String],
+        sessionBiases: [String],
+        retrievalTags: [String],
+        reactionWeights: DecisionReactionWeights,
+        memoryGovernance: DecisionMemoryGovernanceState = .empty,
+        loadedAt: Date = .now
+    ) {
+        self.init(
+            memorySlices: Self.legacyMemorySlices(
+                profileCore: profileCore,
+                activeGoals: activeGoals,
+                relevantMemories: relevantMemories
+            ),
+            sessionBiases: sessionBiases,
+            retrievalTags: retrievalTags,
+            reactionWeights: reactionWeights,
+            memoryGovernance: memoryGovernance,
+            loadedAt: loadedAt
+        )
+    }
+
+    var profileCoreSlices: [DecisionGovernedMemorySlice] {
+        memorySlices.filter { $0.role == .profile }
+    }
+
+    var activeGoalSlices: [DecisionGovernedMemorySlice] {
+        memorySlices.filter { $0.role == .goal }
+    }
+
+    var relevantMemorySlices: [DecisionGovernedMemorySlice] {
+        memorySlices.filter { $0.role == .relevant }
+    }
+
+    var profileCore: [String] {
+        profileCoreSlices.map(\.headline)
+    }
+
+    var activeGoals: [String] {
+        activeGoalSlices.map(\.headline)
+    }
+
+    var relevantMemories: [String] {
+        relevantMemorySlices.map(\.headline)
+    }
+
     var isEmpty: Bool {
-        profileCore.isEmpty &&
-            activeGoals.isEmpty &&
-            relevantMemories.isEmpty &&
+        memorySlices.isEmpty &&
             sessionBiases.isEmpty &&
             retrievalTags.isEmpty
+    }
+
+    private static func legacyMemorySlices(
+        profileCore: [String],
+        activeGoals: [String],
+        relevantMemories: [String]
+    ) -> [DecisionGovernedMemorySlice] {
+        let defaultEligibility = DecisionMemoryEligibilityDecision.allowed(.defaultAllowed)
+        let defaultTags: [String] = []
+
+        let profileSlices = profileCore.enumerated().map { index, headline in
+            DecisionGovernedMemorySlice(
+                id: "legacy.profile.\(index)",
+                role: .profile,
+                type: "preference",
+                headline: headline,
+                source: "pattern",
+                confidence: 1,
+                priority: 1,
+                lifecycleState: "active",
+                governanceStatus: .admitted,
+                eligibility: defaultEligibility,
+                retrievalTags: defaultTags,
+                isPending: false,
+                provenanceSummary: "Legacy profile core projection."
+            )
+        }
+
+        let goalSlices = activeGoals.enumerated().map { index, headline in
+            DecisionGovernedMemorySlice(
+                id: "legacy.goal.\(index)",
+                role: .goal,
+                type: "goal",
+                headline: headline,
+                source: "history",
+                confidence: 1,
+                priority: 1,
+                lifecycleState: "active",
+                governanceStatus: .admitted,
+                eligibility: defaultEligibility,
+                retrievalTags: defaultTags,
+                isPending: false,
+                provenanceSummary: "Legacy active-goal projection."
+            )
+        }
+
+        let relevantSlices = relevantMemories.enumerated().map { index, headline in
+            DecisionGovernedMemorySlice(
+                id: "legacy.relevant.\(index)",
+                role: .relevant,
+                type: "semantic",
+                headline: headline,
+                source: "history",
+                confidence: 1,
+                priority: 1,
+                lifecycleState: "active",
+                governanceStatus: .admitted,
+                eligibility: defaultEligibility,
+                retrievalTags: defaultTags,
+                isPending: false,
+                provenanceSummary: "Legacy relevant-memory projection."
+            )
+        }
+
+        return profileSlices + goalSlices + relevantSlices
     }
 }

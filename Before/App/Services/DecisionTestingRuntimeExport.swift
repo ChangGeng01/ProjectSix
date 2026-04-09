@@ -134,6 +134,8 @@ struct DecisionTestingRuntimeExport {
         let averagePendingCandidateCountByKind = averageBrainMetricByKind { $0.memoryGovernance.pendingCandidateCount }
         let averagePromotedRecordCountByKind = averageBrainMetricByKind { $0.memoryGovernance.totalRecordCount }
         let averageScreenedOutMemoryCountByKind = averageBrainMetricByKind { $0.memoryGovernance.screenedOutMemoryCount }
+        let loadedEligibilityReasonCountsByKind = aggregatedBrainReasonCountsByKind(\.loadedReasonCounts)
+        let screenedOutEligibilityReasonCountsByKind = aggregatedBrainReasonCountsByKind(\.screenedOutReasonCounts)
         let pendingMemoryLoadRateByKind = memoryLoadRateByKind(
             promotedByKind: averageLoadedPromotedMemoryCountByKind,
             pendingByKind: averageLoadedPendingMemoryCountByKind
@@ -154,6 +156,8 @@ struct DecisionTestingRuntimeExport {
             averagePendingCandidateCountByKind: averagePendingCandidateCountByKind,
             averagePromotedRecordCountByKind: averagePromotedRecordCountByKind,
             averageScreenedOutMemoryCountByKind: averageScreenedOutMemoryCountByKind,
+            loadedEligibilityReasonCountsByKind: loadedEligibilityReasonCountsByKind,
+            screenedOutEligibilityReasonCountsByKind: screenedOutEligibilityReasonCountsByKind,
             pendingMemoryLoadRateByKind: pendingMemoryLoadRateByKind,
             retrievalRejectionRateByKind: retrievalRejectionRateByKind
         )
@@ -217,6 +221,8 @@ struct DecisionTestingRuntimeExport {
             suppressedBehaviorCount: neuralSummary.suppressedBehaviorCount,
             brainTraceCount: brainSummary.brainTraceCount,
             dominantReactionWeightByKind: brainSummary.dominantReactionWeightByKind,
+            loadedEligibilityReasonCountsByKind: brainSummary.loadedEligibilityReasonCountsByKind,
+            screenedOutEligibilityReasonCountsByKind: brainSummary.screenedOutEligibilityReasonCountsByKind,
             pendingMemoryLoadRateByKind: brainSummary.pendingMemoryLoadRateByKind,
             retrievalRejectionRateByKind: brainSummary.retrievalRejectionRateByKind,
             traceCount: recentTraces.count,
@@ -395,6 +401,24 @@ struct DecisionTestingRuntimeExport {
         }
     }
 
+    private func aggregatedBrainReasonCountsByKind(
+        _ keyPath: KeyPath<DecisionMemoryGovernanceState, [DecisionMemoryEligibilityReason: Int]>
+    ) -> [DecisionIntelligenceTraceKind: [DecisionMemoryEligibilityReason: Int]] {
+        Dictionary(
+            grouping: recentTraces.compactMap { trace in
+                trace.brainState.map { (trace.kind, $0) }
+            },
+            by: \.0
+        )
+        .mapValues { grouped in
+            grouped.reduce(into: [:]) { partialResult, item in
+                for (reason, count) in item.1.memoryGovernance[keyPath: keyPath] {
+                    partialResult[reason, default: 0] += count
+                }
+            }
+        }
+    }
+
     private func evidenceRateByKind(
         numeratorByKind: [DecisionIntelligenceTraceKind: Int]
     ) -> [DecisionIntelligenceTraceKind: Double] {
@@ -469,6 +493,8 @@ struct DecisionTestingBrainSummary: Equatable, Sendable {
     let averagePendingCandidateCountByKind: [DecisionIntelligenceTraceKind: Double]
     let averagePromotedRecordCountByKind: [DecisionIntelligenceTraceKind: Double]
     let averageScreenedOutMemoryCountByKind: [DecisionIntelligenceTraceKind: Double]
+    let loadedEligibilityReasonCountsByKind: [DecisionIntelligenceTraceKind: [DecisionMemoryEligibilityReason: Int]]
+    let screenedOutEligibilityReasonCountsByKind: [DecisionIntelligenceTraceKind: [DecisionMemoryEligibilityReason: Int]]
     let pendingMemoryLoadRateByKind: [DecisionIntelligenceTraceKind: Double]
     let retrievalRejectionRateByKind: [DecisionIntelligenceTraceKind: Double]
 }
@@ -530,6 +556,8 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let suppressedBehaviorCount: Int
     let brainTraceCount: Int
     let dominantReactionWeightByKind: [DecisionIntelligenceTraceKind: DecisionReactionWeightKey]
+    let loadedEligibilityReasonCountsByKind: [DecisionIntelligenceTraceKind: [DecisionMemoryEligibilityReason: Int]]
+    let screenedOutEligibilityReasonCountsByKind: [DecisionIntelligenceTraceKind: [DecisionMemoryEligibilityReason: Int]]
     let pendingMemoryLoadRateByKind: [DecisionIntelligenceTraceKind: Double]
     let retrievalRejectionRateByKind: [DecisionIntelligenceTraceKind: Double]
     let traceCount: Int

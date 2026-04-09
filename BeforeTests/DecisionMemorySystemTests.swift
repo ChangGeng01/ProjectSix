@@ -91,6 +91,15 @@ final class DecisionMemorySystemTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(brainState.memoryGovernance.deferredCandidateCount, 1)
         XCTAssertTrue(brainState.retrievalTags.contains("quick"))
         XCTAssertTrue(brainState.retrievalTags.contains("buy"))
+        XCTAssertTrue(brainState.memorySlices.contains(where: {
+            $0.role == .profile &&
+                $0.governanceStatus == .admitted &&
+                $0.eligibility == .allowed(.defaultAllowed)
+        }))
+        XCTAssertTrue(brainState.memorySlices.contains(where: {
+            $0.role == .goal &&
+                $0.eligibility == .allowed(.goalOverride)
+        }))
     }
 
     @MainActor
@@ -163,6 +172,11 @@ final class DecisionMemorySystemTests: XCTestCase {
         XCTAssertEqual(brainState.memoryGovernance.loadedPendingMemoryCount, 0)
         XCTAssertGreaterThanOrEqual(brainState.memoryGovernance.screenedOutMemoryCount, 1)
         XCTAssertGreaterThanOrEqual(brainState.memoryGovernance.screenedOutPendingMemoryCount, 1)
+        XCTAssertGreaterThanOrEqual(
+            brainState.memoryGovernance.screenedOutReasonCounts[.confidenceNoOverlap] ?? 0,
+            1
+        )
+        XCTAssertFalse(brainState.memorySlices.contains(where: \.isPending))
     }
 
     @MainActor

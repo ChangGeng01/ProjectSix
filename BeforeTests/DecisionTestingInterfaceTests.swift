@@ -378,7 +378,15 @@ struct DecisionTestingInterfaceTests {
                     pendingCandidateCount: 1,
                     promotedCandidateCount: 2,
                     loadedPromotedMemoryCount: 3,
-                    loadedPendingMemoryCount: 1
+                    loadedPendingMemoryCount: 1,
+                    loadedReasonCounts: [
+                        .goalOverride: 1,
+                        .defaultAllowed: 2,
+                        .pendingTagOverlap: 1
+                    ],
+                    screenedOutReasonCounts: [
+                        .confidenceNoOverlap: 1
+                    ]
                 ),
                 loadedAt: .now
             ),
@@ -546,9 +554,13 @@ struct DecisionTestingInterfaceTests {
         #expect(export.brainSummary.averageLoadedPendingMemoryCountByKind[.quick] == 1)
         #expect(export.brainSummary.averagePendingCandidateCountByKind[.quick] == 1)
         #expect(export.brainSummary.averagePromotedRecordCountByKind[.quick] == 6)
+        #expect(export.brainSummary.loadedEligibilityReasonCountsByKind[.quick]?[.goalOverride] == 1)
+        #expect(export.brainSummary.screenedOutEligibilityReasonCountsByKind[.quick]?[.confidenceNoOverlap] == 1)
         #expect(export.brainSummary.pendingMemoryLoadRateByKind[.quick] == 0.25)
         #expect(export.summary.brainTraceCount == 1)
         #expect(export.summary.dominantReactionWeightByKind[.quick] == .interruptiveActionBias)
+        #expect(export.summary.loadedEligibilityReasonCountsByKind[.quick]?[.goalOverride] == 1)
+        #expect(export.summary.screenedOutEligibilityReasonCountsByKind[.quick]?[.confidenceNoOverlap] == 1)
         #expect(export.summary.pendingMemoryLoadRateByKind[.quick] == 0.25)
     }
 }
