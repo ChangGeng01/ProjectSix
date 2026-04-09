@@ -375,6 +375,7 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertTrue(runtimeStrategyBlock.body.contains("\"runtime_budget\""))
         XCTAssertTrue(runtimeStrategyBlock.body.contains("\"output_character_budget\":180"))
         XCTAssertTrue(runtimeStrategyBlock.body.contains("\"tool_call_budget\":1"))
+        XCTAssertTrue(envelope.payload.contains("roughly 180 characters"))
         XCTAssertTrue(
             envelope.assembly.allBlocks.contains(where: { block in
                 block.kind == .compactionPolicy &&
@@ -382,6 +383,42 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
             })
         )
         XCTAssertEqual(envelope.budget.targetCharacters, 520)
+    }
+
+    func testReminderEvidenceRetentionHonorsRuntimeRetrievalBudget() {
+        let candidates = [
+            ReminderSelectionCandidate(id: UUID(), content: "A"),
+            ReminderSelectionCandidate(id: UUID(), content: "B"),
+            ReminderSelectionCandidate(id: UUID(), content: "C"),
+            ReminderSelectionCandidate(id: UUID(), content: "D")
+        ]
+        let strategy = DecisionAdaptiveTaskStrategy(
+            kind: .reminder,
+            entropy: .low,
+            runtimeGear: .balanced,
+            preferredProvider: .gemmaE4B,
+            contextBudget: 220,
+            retrievalItemBudget: 2,
+            retrievalMode: .filtered,
+            thinkingMode: .off,
+            outputMode: .jsonShort,
+            tone: .briefWarm,
+            actionSpace: ["select_reminder"],
+            responseLanguage: .english,
+            allowsModelInvocation: true
+        )
+
+        let selection = DecisionIntelligencePromptContract.reminderSelectionEnvelope(
+            candidates: candidates,
+            scenario: .buy,
+            prompt: "Pick the one that fits tonight.",
+            mode: .quick,
+            strategy: strategy
+        )
+
+        XCTAssertEqual(selection.candidates.count, 3)
+        XCTAssertEqual(selection.prompt.frontstageState.retainedEvidenceCount, 2)
+        XCTAssertEqual(selection.prompt.frontstageState.droppedBudgetEvidenceCount, 1)
     }
 
     func testPromptAssemblyDropsOptionalBlocksBeforeRequiredBlocks() {

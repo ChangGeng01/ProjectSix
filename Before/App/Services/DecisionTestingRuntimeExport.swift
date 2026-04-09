@@ -250,6 +250,8 @@ struct DecisionTestingRuntimeExport {
             stablePrefixPollutionRateByKind: stablePrefixPollutionRateByKind,
             slowRequestRate: intelligenceTelemetry.slowRequestRate,
             slowRequestRateByKind: intelligenceTelemetry.slowRequestRateByKind,
+            overTimeBudgetRate: intelligenceTelemetry.overTimeBudgetRate,
+            overTimeBudgetRateByKind: intelligenceTelemetry.overTimeBudgetRateByKind,
             overTargetBudgetRate: intelligenceTelemetry.overTargetBudgetRate,
             fallbackActivations: intelligenceTelemetry.fallbackActivations,
             admissionSkipCount: intelligenceTelemetry.outcomeCount[.admissionSkipped] ?? 0,
@@ -701,6 +703,8 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let stablePrefixPollutionRateByKind: [DecisionIntelligenceTraceKind: Double]
     let slowRequestRate: Double
     let slowRequestRateByKind: [DecisionIntelligenceTraceKind: Double]
+    let overTimeBudgetRate: Double
+    let overTimeBudgetRateByKind: [DecisionIntelligenceTraceKind: Double]
     let overTargetBudgetRate: Double
     let fallbackActivations: Int
     let admissionSkipCount: Int

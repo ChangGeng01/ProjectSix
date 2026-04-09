@@ -1201,13 +1201,27 @@ enum DecisionIntelligencePromptContract {
         }
 
         guard let strategy else { return base }
-        switch strategy.retrievalMode {
+        let modeBudget: Int = switch strategy.retrievalMode {
         case .off:
-            return max(2, base - 1)
+            max(2, base - 1)
         case .filtered:
-            return base
+            base
         case .adaptive:
-            return base + 1
+            base + 1
+        }
+
+        guard strategy.retrievalItemBudget > 0 else { return modeBudget }
+        return max(2, min(modeBudget, strategy.retrievalItemBudget))
+    }
+
+    private static func outputBudgetGuidance(
+        for strategy: DecisionAdaptiveTaskStrategy
+    ) -> String {
+        switch strategy.outputMode {
+        case .jsonShort:
+            "Keep the full response under roughly \(strategy.outputCharacterBudget) characters while preserving valid compact JSON."
+        case .deterministicTemplate, .guidedShort, .structuredBoard, .reflectiveStructured:
+            "Keep the user-facing output under roughly \(strategy.outputCharacterBudget) characters."
         }
     }
 
@@ -1270,6 +1284,14 @@ enum DecisionIntelligencePromptContract {
             lines.append("Keep the user-facing output in Chinese unless the structured format says otherwise.")
         case .mixed:
             lines.append("Match the user's latest language and avoid mixed-language output unless the input is mixed.")
+        }
+
+        lines.append(outputBudgetGuidance(for: strategy))
+
+        if strategy.toolCallBudget == 0 {
+            lines.append("Do not invent tool calls or action side effects beyond the declared response contract.")
+        } else {
+            lines.append("Stay within \(strategy.toolCallBudget) tool-sized action decisions for this turn.")
         }
 
         return lines

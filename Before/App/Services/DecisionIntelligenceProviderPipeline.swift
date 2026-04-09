@@ -142,7 +142,8 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                promptBudget: envelope.budget
+                promptBudget: envelope.budget,
+                runtimeStrategy: strategy
             )
             recordTrace(
                 kind: .quick,
@@ -177,6 +178,7 @@ enum DecisionIntelligenceProviderPipeline {
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                 promptBudget: envelope.budget,
+                runtimeStrategy: strategy,
                 admissionDecision: admissionDecision
             )
             recordTrace(
@@ -230,6 +232,7 @@ enum DecisionIntelligenceProviderPipeline {
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                     promptBudget: envelope.budget,
+                    runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
                 )
                 recordTrace(
@@ -282,6 +285,7 @@ enum DecisionIntelligenceProviderPipeline {
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                     promptBudget: envelope.budget,
+                    runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
                 )
                 recordTrace(
@@ -324,6 +328,7 @@ enum DecisionIntelligenceProviderPipeline {
             attemptedProviders: actualAttemptedKinds,
             durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
             promptBudget: envelope.budget,
+            runtimeStrategy: strategy,
             admissionDecision: admissionDecision
         )
         recordTrace(
@@ -382,7 +387,8 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                promptBudget: envelope.budget
+                promptBudget: envelope.budget,
+                runtimeStrategy: strategy
             )
             recordTrace(
                 kind: .balance,
@@ -417,6 +423,7 @@ enum DecisionIntelligenceProviderPipeline {
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                 promptBudget: envelope.budget,
+                runtimeStrategy: strategy,
                 admissionDecision: admissionDecision
             )
             recordTrace(
@@ -470,6 +477,7 @@ enum DecisionIntelligenceProviderPipeline {
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                     promptBudget: envelope.budget,
+                    runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
                 )
                 recordTrace(
@@ -522,6 +530,7 @@ enum DecisionIntelligenceProviderPipeline {
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                     promptBudget: envelope.budget,
+                    runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
                 )
                 recordTrace(
@@ -564,6 +573,7 @@ enum DecisionIntelligenceProviderPipeline {
             attemptedProviders: actualAttemptedKinds,
             durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
             promptBudget: envelope.budget,
+            runtimeStrategy: strategy,
             admissionDecision: admissionDecision
         )
         recordTrace(
@@ -622,7 +632,8 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                promptBudget: envelope.budget
+                promptBudget: envelope.budget,
+                runtimeStrategy: strategy
             )
             recordTrace(
                 kind: .mirror,
@@ -657,6 +668,7 @@ enum DecisionIntelligenceProviderPipeline {
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                 promptBudget: envelope.budget,
+                runtimeStrategy: strategy,
                 admissionDecision: admissionDecision
             )
             recordTrace(
@@ -710,6 +722,7 @@ enum DecisionIntelligenceProviderPipeline {
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                     promptBudget: envelope.budget,
+                    runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
                 )
                 recordTrace(
@@ -762,6 +775,7 @@ enum DecisionIntelligenceProviderPipeline {
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                     promptBudget: envelope.budget,
+                    runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
                 )
                 recordTrace(
@@ -804,6 +818,7 @@ enum DecisionIntelligenceProviderPipeline {
             attemptedProviders: actualAttemptedKinds,
             durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
             promptBudget: envelope.budget,
+            runtimeStrategy: strategy,
             admissionDecision: admissionDecision
         )
         recordTrace(
@@ -868,7 +883,8 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                promptBudget: selection.prompt.budget
+                promptBudget: selection.prompt.budget,
+                runtimeStrategy: strategy
             )
             return nil
         }
@@ -888,6 +904,7 @@ enum DecisionIntelligenceProviderPipeline {
                 attemptedProviders: [],
                 durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                 promptBudget: selection.prompt.budget,
+                runtimeStrategy: strategy,
                 admissionDecision: admissionDecision
             )
             recordTrace(
@@ -938,6 +955,7 @@ enum DecisionIntelligenceProviderPipeline {
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                     promptBudget: selection.prompt.budget,
+                    runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
                 )
                 recordTrace(
@@ -986,6 +1004,7 @@ enum DecisionIntelligenceProviderPipeline {
                     attemptedProviders: actualAttemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                     promptBudget: selection.prompt.budget,
+                    runtimeStrategy: strategy,
                     admissionDecision: admissionDecision
                 )
                 recordTrace(
@@ -1025,6 +1044,7 @@ enum DecisionIntelligenceProviderPipeline {
             attemptedProviders: actualAttemptedKinds,
             durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
             promptBudget: selection.prompt.budget,
+            runtimeStrategy: strategy,
             admissionDecision: admissionDecision
         )
         recordTrace(
@@ -1185,6 +1205,7 @@ enum DecisionIntelligenceProviderPipeline {
         attemptedProviders: [DecisionModelProviderKind],
         durationMs: Double,
         promptBudget: DecisionIntelligencePromptContract.ContextBudget? = nil,
+        runtimeStrategy: DecisionAdaptiveTaskStrategy? = nil,
         admissionDecision: DecisionIntelligenceAdmissionDecision? = nil
     ) async {
         await DecisionIntelligenceTelemetryStore.shared.record(
@@ -1195,6 +1216,7 @@ enum DecisionIntelligenceProviderPipeline {
             usedFallback: activeProvider != nil && activeProvider != preferredProvider,
             durationMs: durationMs,
             promptBudget: promptBudget,
+            runtimeStrategy: runtimeStrategy,
             admissionDecision: admissionDecision,
             gemmaBackendResolution: activeProvider == .gemmaE4B
                 ? GemmaE4BIntelligenceService.backendResolution(

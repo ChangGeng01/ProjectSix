@@ -263,6 +263,7 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
         )
 
         XCTAssertEqual(adapted.retrievalMode, .filtered)
+        XCTAssertLessThanOrEqual(adapted.retrievalItemBudget, 3)
     }
 
     func testAdaptiveStrategyGuardsRetrievalWhenBrainSnapshotShowsLowTrustLoad() {
@@ -321,6 +322,7 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
         )
 
         XCTAssertEqual(adapted.retrievalMode, .filtered)
+        XCTAssertLessThanOrEqual(adapted.retrievalItemBudget, 3)
     }
 
     func testAdaptiveStrategyCanShiftResponseLanguageFromBrainStateTags() {

@@ -4,6 +4,34 @@ import XCTest
 final class DecisionIntelligenceTelemetryStoreTests: XCTestCase {
     func testSnapshotTracksFallbacksAndGemmaBackends() async {
         let store = DecisionIntelligenceTelemetryStore()
+        let quickStrategy = DecisionAdaptiveTaskStrategy(
+            kind: .quick,
+            entropy: .low,
+            runtimeGear: .balanced,
+            preferredProvider: .gemmaE4B,
+            contextBudget: 220,
+            timeBudgetMs: 200,
+            retrievalMode: .off,
+            thinkingMode: .off,
+            outputMode: .guidedShort,
+            tone: .briefWarm,
+            actionSpace: ["encourage", "next_step"],
+            allowsModelInvocation: true
+        )
+        let mirrorStrategy = DecisionAdaptiveTaskStrategy(
+            kind: .mirror,
+            entropy: .high,
+            runtimeGear: .balanced,
+            preferredProvider: .gemmaE4B,
+            contextBudget: 320,
+            timeBudgetMs: 900,
+            retrievalMode: .filtered,
+            thinkingMode: .gated,
+            outputMode: .reflectiveStructured,
+            tone: .reflectiveClear,
+            actionSpace: ["clarify", "surface_pattern"],
+            allowsModelInvocation: true
+        )
 
         await store.record(
             kind: .quick,
@@ -12,6 +40,7 @@ final class DecisionIntelligenceTelemetryStoreTests: XCTestCase {
             attemptedProviders: [.gemmaE4B],
             usedFallback: false,
             durationMs: 120,
+            runtimeStrategy: quickStrategy,
             admissionDecision: DecisionIntelligenceAdmissionDecision(
                 isAllowed: true,
                 pressure: .low,
@@ -33,7 +62,8 @@ final class DecisionIntelligenceTelemetryStoreTests: XCTestCase {
             activeProvider: nil,
             attemptedProviders: [.foundationModels, .gemmaE4B],
             usedFallback: false,
-            durationMs: 2_400
+            durationMs: 2_400,
+            runtimeStrategy: mirrorStrategy
         )
 
         let snapshot = await store.snapshot()
@@ -53,6 +83,8 @@ final class DecisionIntelligenceTelemetryStoreTests: XCTestCase {
         XCTAssertEqual(snapshot.averageRequestDurationMsByGemmaBackend[.coreML] ?? 0, 120, accuracy: 0.0001)
         XCTAssertEqual(snapshot.slowRequestRate, 0.5, accuracy: 0.0001)
         XCTAssertEqual(snapshot.slowRequestRateByKind[.mirror] ?? 0, 1, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.overTimeBudgetRate, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.overTimeBudgetRateByKind[.mirror] ?? 0, 1, accuracy: 0.0001)
         XCTAssertEqual(snapshot.avoidableModelCallRate, 0, accuracy: 0.0001)
     }
 

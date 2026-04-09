@@ -17,6 +17,7 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
     let fallbackActivations: Int
     let gemmaBackendCount: [InferenceBackendKind: Int]
     let slowRequestCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let overTimeBudgetCountByKind: [DecisionIntelligenceTraceKind: Int]
     let requestDurationTotalMsByKind: [DecisionIntelligenceTraceKind: Double]
     let activeProviderDurationTotalMs: [DecisionModelProviderKind: Double]
     let gemmaBackendDurationTotalMs: [InferenceBackendKind: Double]
@@ -263,6 +264,21 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
         )
     }
 
+    var overTimeBudgetRate: Double {
+        rate(
+            numerator: overTimeBudgetCountByKind.values.reduce(0, +),
+            denominator: totalRequests
+        )
+    }
+
+    var overTimeBudgetRateByKind: [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: requestCountByKind.map { kind, count in
+                (kind, rate(numerator: overTimeBudgetCountByKind[kind] ?? 0, denominator: count))
+            }
+        )
+    }
+
     private func averageCharactersByKind(
         from totalsByKind: [DecisionIntelligenceTraceKind: Int]
     ) -> [DecisionIntelligenceTraceKind: Double] {
@@ -302,6 +318,7 @@ actor DecisionIntelligenceTelemetryStore {
     private var fallbackActivations = 0
     private var gemmaBackendCount: [InferenceBackendKind: Int] = [:]
     private var slowRequestCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
+    private var overTimeBudgetCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
     private var requestDurationTotalMsByKind: [DecisionIntelligenceTraceKind: Double] = [:]
     private var activeProviderDurationTotalMs: [DecisionModelProviderKind: Double] = [:]
     private var gemmaBackendDurationTotalMs: [InferenceBackendKind: Double] = [:]
@@ -339,6 +356,7 @@ actor DecisionIntelligenceTelemetryStore {
         usedFallback: Bool,
         durationMs: Double,
         promptBudget: DecisionIntelligencePromptContract.ContextBudget? = nil,
+        runtimeStrategy: DecisionAdaptiveTaskStrategy? = nil,
         admissionDecision: DecisionIntelligenceAdmissionDecision? = nil,
         gemmaBackendResolution: InferenceBackendResolution? = nil
     ) {
@@ -350,6 +368,9 @@ actor DecisionIntelligenceTelemetryStore {
         requestDurationTotalMsByKind[kind, default: 0] += durationMs
         if durationMs >= Self.slowRequestThresholdMs(for: kind) {
             slowRequestCountByKind[kind, default: 0] += 1
+        }
+        if let runtimeStrategy, durationMs > Double(runtimeStrategy.timeBudgetMs) {
+            overTimeBudgetCountByKind[kind, default: 0] += 1
         }
 
         for provider in attemptedProviders {
@@ -411,6 +432,7 @@ actor DecisionIntelligenceTelemetryStore {
             fallbackActivations: fallbackActivations,
             gemmaBackendCount: gemmaBackendCount,
             slowRequestCountByKind: slowRequestCountByKind,
+            overTimeBudgetCountByKind: overTimeBudgetCountByKind,
             requestDurationTotalMsByKind: requestDurationTotalMsByKind,
             activeProviderDurationTotalMs: activeProviderDurationTotalMs,
             gemmaBackendDurationTotalMs: gemmaBackendDurationTotalMs,
@@ -437,6 +459,7 @@ actor DecisionIntelligenceTelemetryStore {
         fallbackActivations = 0
         gemmaBackendCount.removeAll()
         slowRequestCountByKind.removeAll()
+        overTimeBudgetCountByKind.removeAll()
         requestDurationTotalMsByKind.removeAll()
         activeProviderDurationTotalMs.removeAll()
         gemmaBackendDurationTotalMs.removeAll()

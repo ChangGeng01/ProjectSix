@@ -616,6 +616,8 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.stablePrefixPollutionRateByKind[.quick] == 0)
         #expect(export.summary.slowRequestRate == 0)
         #expect(export.summary.slowRequestRateByKind[.quick] == 0)
+        #expect(export.summary.overTimeBudgetRate == 0)
+        #expect(export.summary.overTimeBudgetRateByKind[.quick] == 0)
         #expect(export.lifecycleSummary.contextAwareTraceCount == 1)
         #expect(export.lifecycleSummary.rebuildCount == 1)
         #expect(export.lifecycleSummary.retainedEvidenceCount == 2)
