@@ -305,4 +305,48 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertEqual(envelope.frontstageState.retainedEvidenceCount, 4)
         XCTAssertTrue(envelope.payload.contains("\"danger_signals\":[\"Identity drift\"]"))
     }
+
+    func testQuickEnvelopeIncludesRuntimeStrategyAndUsesAdaptiveBudget() {
+        let strategy = DecisionAdaptiveTaskStrategy(
+            kind: .quick,
+            entropy: .low,
+            preferredProvider: .gemmaE4B,
+            contextBudget: 220,
+            retrievalMode: .off,
+            thinkingMode: .off,
+            outputMode: .guidedShort,
+            tone: .briefWarm,
+            actionSpace: ["encourage", "next_step"],
+            allowsModelInvocation: true
+        )
+
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
+            base: QuickCheckResult(
+                currentPerspective: "You want the quick relief.",
+                afterPerspective: "Tomorrow may feel different.",
+                verdict: .pause,
+                primaryAction: .wait90s,
+                secondaryActions: []
+            ),
+            input: QuickCheckInput(
+                scenario: .buy,
+                motivation: .reward,
+                expectedOutcome: .temporaryRelief,
+                controlLevel: .maybe,
+                note: "Today was rough."
+            ),
+            strategy: strategy
+        )
+
+        XCTAssertTrue(envelope.payload.contains("RUNTIME_STRATEGY_JSON:"))
+        XCTAssertTrue(envelope.payload.contains("\"provider\":\"gemmaE4B\""))
+        XCTAssertTrue(envelope.payload.contains("\"output_mode\":\"guidedShort\""))
+        XCTAssertTrue(envelope.payload.contains("\"tone\":\"briefWarm\""))
+        XCTAssertTrue(envelope.payload.contains("\"response_language\":\"english\""))
+        XCTAssertTrue(envelope.payload.contains("\"allows_model_invocation\":true"))
+        XCTAssertTrue(envelope.payload.contains("Keep the rewrite short and guided, not expansive."))
+        XCTAssertTrue(envelope.payload.contains("Keep the tone brief, calm, and warm."))
+        XCTAssertTrue(envelope.payload.contains("Keep the user-facing output in English unless the structured format says otherwise."))
+        XCTAssertEqual(envelope.budget.targetCharacters, 220)
+    }
 }

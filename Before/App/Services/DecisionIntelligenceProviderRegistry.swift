@@ -7,6 +7,7 @@ protocol DecisionIntelligenceProviding: Sendable {
     func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -15,6 +16,7 @@ protocol DecisionIntelligenceProviding: Sendable {
     func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -23,6 +25,7 @@ protocol DecisionIntelligenceProviding: Sendable {
     func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -32,7 +35,8 @@ protocol DecisionIntelligenceProviding: Sendable {
         from candidates: [ReminderSelectionCandidate],
         scenario: ScenarioType,
         prompt: String,
-        mode: DecisionMode?
+        mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy?
     ) async -> ReminderSelectionCandidate?
 }
 
@@ -43,6 +47,7 @@ protocol DecisionOpenModelAdapting: Sendable {
     func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -51,6 +56,7 @@ protocol DecisionOpenModelAdapting: Sendable {
     func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -59,6 +65,7 @@ protocol DecisionOpenModelAdapting: Sendable {
     func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -68,7 +75,8 @@ protocol DecisionOpenModelAdapting: Sendable {
         from candidates: [ReminderSelectionCandidate],
         scenario: ScenarioType,
         prompt: String,
-        mode: DecisionMode?
+        mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy?
     ) async -> ReminderSelectionCandidate?
 }
 
@@ -112,6 +120,7 @@ struct OpenModelDecisionIntelligenceProvider: DecisionIntelligenceProviding {
     func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -119,6 +128,7 @@ struct OpenModelDecisionIntelligenceProvider: DecisionIntelligenceProviding {
         await adapter.refineQuickResult(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -128,6 +138,7 @@ struct OpenModelDecisionIntelligenceProvider: DecisionIntelligenceProviding {
     func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -135,6 +146,7 @@ struct OpenModelDecisionIntelligenceProvider: DecisionIntelligenceProviding {
         await adapter.refineBalanceResult(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -144,6 +156,7 @@ struct OpenModelDecisionIntelligenceProvider: DecisionIntelligenceProviding {
     func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -151,6 +164,7 @@ struct OpenModelDecisionIntelligenceProvider: DecisionIntelligenceProviding {
         await adapter.refineMirrorResult(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -161,13 +175,15 @@ struct OpenModelDecisionIntelligenceProvider: DecisionIntelligenceProviding {
         from candidates: [ReminderSelectionCandidate],
         scenario: ScenarioType,
         prompt: String,
-        mode: DecisionMode?
+        mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy?
     ) async -> ReminderSelectionCandidate? {
         await adapter.pickReminder(
             from: candidates,
             scenario: scenario,
             prompt: prompt,
-            mode: mode
+            mode: mode,
+            strategy: strategy
         )
     }
 }
@@ -194,6 +210,7 @@ struct GemmaOpenModelAdapter: DecisionOpenModelAdapting {
     func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -201,6 +218,7 @@ struct GemmaOpenModelAdapter: DecisionOpenModelAdapting {
         await GemmaE4BIntelligenceService.refineQuickResult(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState,
@@ -211,6 +229,7 @@ struct GemmaOpenModelAdapter: DecisionOpenModelAdapting {
     func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -218,6 +237,7 @@ struct GemmaOpenModelAdapter: DecisionOpenModelAdapting {
         await GemmaE4BIntelligenceService.refineBalanceResult(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState,
@@ -228,6 +248,7 @@ struct GemmaOpenModelAdapter: DecisionOpenModelAdapting {
     func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -235,6 +256,7 @@ struct GemmaOpenModelAdapter: DecisionOpenModelAdapting {
         await GemmaE4BIntelligenceService.refineMirrorResult(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState,
@@ -246,13 +268,15 @@ struct GemmaOpenModelAdapter: DecisionOpenModelAdapting {
         from candidates: [ReminderSelectionCandidate],
         scenario: ScenarioType,
         prompt: String,
-        mode: DecisionMode?
+        mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy?
     ) async -> ReminderSelectionCandidate? {
         await GemmaE4BIntelligenceService.pickReminder(
             from: candidates,
             scenario: scenario,
             prompt: prompt,
             mode: mode,
+            strategy: strategy,
             backendPolicy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
         )
     }
@@ -285,6 +309,7 @@ struct ReservedOpenModelAdapter: DecisionOpenModelAdapting {
     func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -295,6 +320,7 @@ struct ReservedOpenModelAdapter: DecisionOpenModelAdapting {
     func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -305,6 +331,7 @@ struct ReservedOpenModelAdapter: DecisionOpenModelAdapting {
     func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -316,7 +343,8 @@ struct ReservedOpenModelAdapter: DecisionOpenModelAdapting {
         from candidates: [ReminderSelectionCandidate],
         scenario: ScenarioType,
         prompt: String,
-        mode: DecisionMode?
+        mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy?
     ) async -> ReminderSelectionCandidate? {
         nil
     }
@@ -329,6 +357,7 @@ struct FoundationDecisionIntelligenceProvider: DecisionIntelligenceProviding {
     func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -336,6 +365,7 @@ struct FoundationDecisionIntelligenceProvider: DecisionIntelligenceProviding {
         await FoundationModelsIntelligenceService.refineQuickResult(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -345,6 +375,7 @@ struct FoundationDecisionIntelligenceProvider: DecisionIntelligenceProviding {
     func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -352,6 +383,7 @@ struct FoundationDecisionIntelligenceProvider: DecisionIntelligenceProviding {
         await FoundationModelsIntelligenceService.refineBalanceResult(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -361,6 +393,7 @@ struct FoundationDecisionIntelligenceProvider: DecisionIntelligenceProviding {
     func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -368,6 +401,7 @@ struct FoundationDecisionIntelligenceProvider: DecisionIntelligenceProviding {
         await FoundationModelsIntelligenceService.refineMirrorResult(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -378,13 +412,15 @@ struct FoundationDecisionIntelligenceProvider: DecisionIntelligenceProviding {
         from candidates: [ReminderSelectionCandidate],
         scenario: ScenarioType,
         prompt: String,
-        mode: DecisionMode?
+        mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy?
     ) async -> ReminderSelectionCandidate? {
         await FoundationModelsIntelligenceService.pickReminder(
             from: candidates,
             scenario: scenario,
             prompt: prompt,
-            mode: mode
+            mode: mode,
+            strategy: strategy
         )
     }
 }

@@ -114,6 +114,7 @@ enum DecisionIntelligenceProviderPipeline {
     static func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
@@ -126,6 +127,7 @@ enum DecisionIntelligenceProviderPipeline {
         let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -148,6 +150,7 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [.template],
                 allowFallbacks: allowFallbacks,
+                runtimeStrategy: strategy,
                 frontstageState: envelope.frontstageState,
                 contextState: contextState,
                 neuralState: neuralState,
@@ -182,6 +185,7 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 allowFallbacks: allowFallbacks,
+                runtimeStrategy: strategy,
                 frontstageState: envelope.frontstageState,
                 contextState: contextState,
                 neuralState: neuralState,
@@ -204,7 +208,6 @@ enum DecisionIntelligenceProviderPipeline {
             testingStubProfile: testingStubProfile
         )
         let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
-        let attemptedKinds = providers.map(\.kind)
         var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
         for provider in providers {
@@ -232,8 +235,9 @@ enum DecisionIntelligenceProviderPipeline {
                     kind: .quick,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: attemptedKinds,
+                    attemptedProviders: actualAttemptedKinds,
                     allowFallbacks: allowFallbacks,
+                    runtimeStrategy: strategy,
                     frontstageState: envelope.frontstageState,
                     contextState: contextState,
                     neuralState: neuralState,
@@ -256,6 +260,7 @@ enum DecisionIntelligenceProviderPipeline {
             if let refined = await provider.refineQuickResult(
                 base: base,
                 input: input,
+                strategy: strategy,
                 contextState: contextState,
                 neuralState: neuralState,
                 brainState: brainState
@@ -282,8 +287,9 @@ enum DecisionIntelligenceProviderPipeline {
                     kind: .quick,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: attemptedKinds,
+                    attemptedProviders: actualAttemptedKinds,
                     allowFallbacks: allowFallbacks,
+                    runtimeStrategy: strategy,
                     frontstageState: envelope.frontstageState,
                     contextState: contextState,
                     neuralState: neuralState,
@@ -323,8 +329,9 @@ enum DecisionIntelligenceProviderPipeline {
             kind: .quick,
             preferredProvider: preference.kind,
             activeProvider: nil,
-            attemptedProviders: attemptedKinds,
+            attemptedProviders: actualAttemptedKinds,
             allowFallbacks: allowFallbacks,
+            runtimeStrategy: strategy,
             frontstageState: envelope.frontstageState,
             contextState: contextState,
             neuralState: neuralState,
@@ -346,6 +353,7 @@ enum DecisionIntelligenceProviderPipeline {
     static func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
@@ -358,6 +366,7 @@ enum DecisionIntelligenceProviderPipeline {
         let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -380,6 +389,7 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [.template],
                 allowFallbacks: allowFallbacks,
+                runtimeStrategy: strategy,
                 frontstageState: envelope.frontstageState,
                 contextState: contextState,
                 neuralState: neuralState,
@@ -414,6 +424,7 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 allowFallbacks: allowFallbacks,
+                runtimeStrategy: strategy,
                 frontstageState: envelope.frontstageState,
                 contextState: contextState,
                 neuralState: neuralState,
@@ -436,7 +447,6 @@ enum DecisionIntelligenceProviderPipeline {
             testingStubProfile: testingStubProfile
         )
         let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
-        let attemptedKinds = providers.map(\.kind)
         var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
         for provider in providers {
@@ -464,8 +474,9 @@ enum DecisionIntelligenceProviderPipeline {
                     kind: .balance,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: attemptedKinds,
+                    attemptedProviders: actualAttemptedKinds,
                     allowFallbacks: allowFallbacks,
+                    runtimeStrategy: strategy,
                     frontstageState: envelope.frontstageState,
                     contextState: contextState,
                     neuralState: neuralState,
@@ -488,6 +499,7 @@ enum DecisionIntelligenceProviderPipeline {
             if let refined = await provider.refineBalanceResult(
                 base: base,
                 input: input,
+                strategy: strategy,
                 contextState: contextState,
                 neuralState: neuralState,
                 brainState: brainState
@@ -514,8 +526,9 @@ enum DecisionIntelligenceProviderPipeline {
                     kind: .balance,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: attemptedKinds,
+                    attemptedProviders: actualAttemptedKinds,
                     allowFallbacks: allowFallbacks,
+                    runtimeStrategy: strategy,
                     frontstageState: envelope.frontstageState,
                     contextState: contextState,
                     neuralState: neuralState,
@@ -555,8 +568,9 @@ enum DecisionIntelligenceProviderPipeline {
             kind: .balance,
             preferredProvider: preference.kind,
             activeProvider: nil,
-            attemptedProviders: attemptedKinds,
+            attemptedProviders: actualAttemptedKinds,
             allowFallbacks: allowFallbacks,
+            runtimeStrategy: strategy,
             frontstageState: envelope.frontstageState,
             contextState: contextState,
             neuralState: neuralState,
@@ -578,6 +592,7 @@ enum DecisionIntelligenceProviderPipeline {
     static func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
@@ -590,6 +605,7 @@ enum DecisionIntelligenceProviderPipeline {
         let envelope = DecisionIntelligencePromptContract.mirrorRefinementEnvelope(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -612,6 +628,7 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [.template],
                 allowFallbacks: allowFallbacks,
+                runtimeStrategy: strategy,
                 frontstageState: envelope.frontstageState,
                 contextState: contextState,
                 neuralState: neuralState,
@@ -646,6 +663,7 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 allowFallbacks: allowFallbacks,
+                runtimeStrategy: strategy,
                 frontstageState: envelope.frontstageState,
                 contextState: contextState,
                 neuralState: neuralState,
@@ -668,7 +686,6 @@ enum DecisionIntelligenceProviderPipeline {
             testingStubProfile: testingStubProfile
         )
         let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
-        let attemptedKinds = providers.map(\.kind)
         var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
         for provider in providers {
@@ -696,8 +713,9 @@ enum DecisionIntelligenceProviderPipeline {
                     kind: .mirror,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: attemptedKinds,
+                    attemptedProviders: actualAttemptedKinds,
                     allowFallbacks: allowFallbacks,
+                    runtimeStrategy: strategy,
                     frontstageState: envelope.frontstageState,
                     contextState: contextState,
                     neuralState: neuralState,
@@ -720,6 +738,7 @@ enum DecisionIntelligenceProviderPipeline {
             if let refined = await provider.refineMirrorResult(
                 base: base,
                 input: input,
+                strategy: strategy,
                 contextState: contextState,
                 neuralState: neuralState,
                 brainState: brainState
@@ -746,8 +765,9 @@ enum DecisionIntelligenceProviderPipeline {
                     kind: .mirror,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: attemptedKinds,
+                    attemptedProviders: actualAttemptedKinds,
                     allowFallbacks: allowFallbacks,
+                    runtimeStrategy: strategy,
                     frontstageState: envelope.frontstageState,
                     contextState: contextState,
                     neuralState: neuralState,
@@ -787,8 +807,9 @@ enum DecisionIntelligenceProviderPipeline {
             kind: .mirror,
             preferredProvider: preference.kind,
             activeProvider: nil,
-            attemptedProviders: attemptedKinds,
+            attemptedProviders: actualAttemptedKinds,
             allowFallbacks: allowFallbacks,
+            runtimeStrategy: strategy,
             frontstageState: envelope.frontstageState,
             contextState: contextState,
             neuralState: neuralState,
@@ -812,6 +833,7 @@ enum DecisionIntelligenceProviderPipeline {
         scenario: ScenarioType,
         prompt: String,
         mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
@@ -822,7 +844,8 @@ enum DecisionIntelligenceProviderPipeline {
             candidates: candidates,
             scenario: scenario,
             prompt: prompt,
-            mode: mode
+            mode: mode,
+            strategy: strategy
         )
         let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: selection.prompt)
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: selection.prompt)
@@ -870,6 +893,7 @@ enum DecisionIntelligenceProviderPipeline {
                 activeProvider: nil,
                 attemptedProviders: [],
                 allowFallbacks: allowFallbacks,
+                runtimeStrategy: strategy,
                 frontstageState: selection.prompt.frontstageState,
                 promptBudget: selection.prompt.budget,
                 admissionDecision: admissionDecision,
@@ -888,7 +912,6 @@ enum DecisionIntelligenceProviderPipeline {
             testingStubProfile: testingStubProfile
         )
         let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
-        let attemptedKinds = providers.map(\.kind)
         var actualAttemptedKinds: [DecisionModelProviderKind] = []
 
         for provider in providers {
@@ -917,8 +940,9 @@ enum DecisionIntelligenceProviderPipeline {
                     kind: .reminder,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: attemptedKinds,
+                    attemptedProviders: actualAttemptedKinds,
                     allowFallbacks: allowFallbacks,
+                    runtimeStrategy: strategy,
                     frontstageState: selection.prompt.frontstageState,
                     promptBudget: selection.prompt.budget,
                     admissionDecision: admissionDecision,
@@ -939,7 +963,8 @@ enum DecisionIntelligenceProviderPipeline {
                 from: clippedCandidates,
                 scenario: scenario,
                 prompt: prompt,
-                mode: mode
+                mode: mode,
+                strategy: strategy
             ) {
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
@@ -963,8 +988,9 @@ enum DecisionIntelligenceProviderPipeline {
                     kind: .reminder,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: attemptedKinds,
+                    attemptedProviders: actualAttemptedKinds,
                     allowFallbacks: allowFallbacks,
+                    runtimeStrategy: strategy,
                     frontstageState: selection.prompt.frontstageState,
                     promptBudget: selection.prompt.budget,
                     admissionDecision: admissionDecision,
@@ -1001,8 +1027,9 @@ enum DecisionIntelligenceProviderPipeline {
             kind: .reminder,
             preferredProvider: preference.kind,
             activeProvider: nil,
-            attemptedProviders: attemptedKinds,
+            attemptedProviders: actualAttemptedKinds,
             allowFallbacks: allowFallbacks,
+            runtimeStrategy: strategy,
             frontstageState: selection.prompt.frontstageState,
             promptBudget: selection.prompt.budget,
             admissionDecision: admissionDecision,
@@ -1058,6 +1085,7 @@ enum DecisionIntelligenceProviderPipeline {
         activeProvider: DecisionModelProviderKind?,
         attemptedProviders: [DecisionModelProviderKind],
         allowFallbacks: Bool,
+        runtimeStrategy: DecisionAdaptiveTaskStrategy? = nil,
         frontstageState: DecisionFrontstageState? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
@@ -1081,6 +1109,7 @@ enum DecisionIntelligenceProviderPipeline {
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState,
+            runtimeStrategy: runtimeStrategy,
             promptBudget: promptBudget,
             admissionDecision: admissionDecision,
             semanticPromptFingerprint: semanticPromptFingerprint,

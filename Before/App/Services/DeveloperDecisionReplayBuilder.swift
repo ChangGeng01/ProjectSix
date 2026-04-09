@@ -96,7 +96,7 @@ enum DeveloperDecisionReplayRecord: Identifiable {
 
 struct DeveloperDecisionReplayEntry: Identifiable {
     let record: DeveloperDecisionReplayRecord
-    let trace: DecisionIntelligenceTrace?
+    let trace: DeveloperDecisionReplayTraceSummary?
 
     var id: String { record.id }
     var mode: DecisionMode { record.mode }
@@ -106,6 +106,32 @@ struct DeveloperDecisionReplayEntry: Identifiable {
     var subtitle: String { record.subtitle }
     var statusTitle: String { record.statusTitle }
     var summaryLine: String { record.summaryLine }
+}
+
+struct DeveloperDecisionReplayTraceSummary: Equatable, Sendable {
+    let createdAt: Date
+    let kind: DecisionIntelligenceTraceKind
+    let preferredProvider: DecisionModelProviderKind
+    let activeProvider: DecisionModelProviderKind?
+    let attemptedProviders: [DecisionModelProviderKind]
+    let allowFallbacks: Bool
+    let usedFallback: Bool
+    let prompt: String
+    let outputPreview: String
+    let detail: String
+
+    init(trace: DecisionIntelligenceTrace) {
+        self.createdAt = trace.createdAt
+        self.kind = trace.kind
+        self.preferredProvider = trace.preferredProvider
+        self.activeProvider = trace.activeProvider
+        self.attemptedProviders = trace.attemptedProviders
+        self.allowFallbacks = trace.allowFallbacks
+        self.usedFallback = trace.usedFallback
+        self.prompt = trace.prompt
+        self.outputPreview = trace.outputPreview
+        self.detail = trace.detail
+    }
 }
 
 enum DeveloperDecisionReplayBuilder {
@@ -134,7 +160,10 @@ enum DeveloperDecisionReplayBuilder {
                 for: record,
                 unmatchedTraces: &unmatchedTraces
             )
-            return DeveloperDecisionReplayEntry(record: record, trace: trace)
+            return DeveloperDecisionReplayEntry(
+                record: record,
+                trace: trace.map(DeveloperDecisionReplayTraceSummary.init)
+            )
         }
     }
 

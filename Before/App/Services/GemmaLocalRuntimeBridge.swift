@@ -13,6 +13,7 @@ protocol GemmaLocalRuntimeBridging: Sendable {
     func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -21,6 +22,7 @@ protocol GemmaLocalRuntimeBridging: Sendable {
     func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -29,6 +31,7 @@ protocol GemmaLocalRuntimeBridging: Sendable {
     func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -38,7 +41,8 @@ protocol GemmaLocalRuntimeBridging: Sendable {
         from candidates: [ReminderSelectionCandidate],
         scenario: ScenarioType,
         prompt: String,
-        mode: DecisionMode?
+        mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy?
     ) async -> ReminderSelectionCandidate?
 }
 
@@ -94,6 +98,7 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
     func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
@@ -103,6 +108,7 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
         let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -149,6 +155,7 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
     func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
@@ -158,6 +165,7 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
         let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -220,6 +228,7 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
     func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
@@ -229,6 +238,7 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
         let envelope = DecisionIntelligencePromptContract.mirrorRefinementEnvelope(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -285,7 +295,8 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
         from candidates: [ReminderSelectionCandidate],
         scenario: ScenarioType,
         prompt: String,
-        mode: DecisionMode?
+        mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy? = nil
     ) async -> ReminderSelectionCandidate? {
         guard case let .ready(_, generator) = cachedLoadState,
               let modelPath = modelPathProvider() else { return nil }
@@ -293,7 +304,8 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
             candidates: candidates,
             scenario: scenario,
             prompt: prompt,
-            mode: mode
+            mode: mode,
+            strategy: strategy
         )
         let clippedCandidates = selection.candidates
         guard clippedCandidates.count > 1 else { return clippedCandidates.first }

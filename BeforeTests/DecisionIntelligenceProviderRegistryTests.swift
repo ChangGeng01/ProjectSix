@@ -106,6 +106,7 @@ private struct FakeOpenModelAdapter: DecisionOpenModelAdapting {
     func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -116,6 +117,7 @@ private struct FakeOpenModelAdapter: DecisionOpenModelAdapting {
     func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -126,6 +128,7 @@ private struct FakeOpenModelAdapter: DecisionOpenModelAdapting {
     func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -137,7 +140,8 @@ private struct FakeOpenModelAdapter: DecisionOpenModelAdapting {
         from candidates: [ReminderSelectionCandidate],
         scenario: ScenarioType,
         prompt: String,
-        mode: DecisionMode?
+        mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy?
     ) async -> ReminderSelectionCandidate? {
         candidates.first
     }

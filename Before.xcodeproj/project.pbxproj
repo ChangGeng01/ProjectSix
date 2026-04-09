@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		00AC3EF33DF8F61EC6529EDA /* DecisionAdaptiveRuntimeMatrix.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74351E75833B220A7BE890EE /* DecisionAdaptiveRuntimeMatrix.swift */; };
 		0435BCEFA8A07CE59796719A /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EDEFDEA19B8C992836638F9 /* AppTab.swift */; };
 		046F56A2947A1E8287D8392E /* DecisionContextPreparedState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F94CB71B4918233F505006 /* DecisionContextPreparedState.swift */; };
 		0504573E50B4E25F56B23950 /* DecisionMemoryGovernorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBAE5FCADB7777436BB5F668 /* DecisionMemoryGovernorTests.swift */; };
@@ -369,6 +370,7 @@
 		7084BBE94DCFAE7AF1AF2241 /* ReflectionPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReflectionPromptView.swift; sourceTree = "<group>"; };
 		7152E91B0D3E0D96AA280B51 /* ReminderSelectionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderSelectionPolicyTests.swift; sourceTree = "<group>"; };
 		734F52EF13FFB8B1DA81BC96 /* MirrorEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MirrorEngineTests.swift; sourceTree = "<group>"; };
+		74351E75833B220A7BE890EE /* DecisionAdaptiveRuntimeMatrix.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionAdaptiveRuntimeMatrix.swift; sourceTree = "<group>"; };
 		75B72D5126B9C441ACCC72B5 /* LetGoContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetGoContext.swift; sourceTree = "<group>"; };
 		75E4941F2642ED065722A6F2 /* BuddySupportSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddySupportSection.swift; sourceTree = "<group>"; };
 		762115548A918265DAC1DFF1 /* SharedLifeItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLifeItemDetailView.swift; sourceTree = "<group>"; };
@@ -544,6 +546,7 @@
 				B6A240A4A08405C8D91821CD /* BalanceBoardSession.swift */,
 				2FF0AE4C04AAF5821C532270 /* BeforeAppModel.swift */,
 				A2710C9DCEDCB00295552131 /* BeforePreferencesStore.swift */,
+				74351E75833B220A7BE890EE /* DecisionAdaptiveRuntimeMatrix.swift */,
 				BD7AE8679F2717EDE797F325 /* DecisionContextLifecycle.swift */,
 				402D41628B5C240AB71A450C /* DecisionIntelligenceAdmissionController.swift */,
 				12C065A104EC376E9703AB10 /* DecisionIntelligenceCircuitBreaker.swift */,
@@ -1030,6 +1033,7 @@
 				08E0CF120EEAFE9A355FA71F /* CheckEvent.swift in Sources */,
 				0CE526D8FB890D53DAA2B4D7 /* CheckRuleEngine.swift in Sources */,
 				8D6E53B8156501A71CF98272 /* CheckVerdict.swift in Sources */,
+				00AC3EF33DF8F61EC6529EDA /* DecisionAdaptiveRuntimeMatrix.swift in Sources */,
 				F3A6B4B1B10E5498DAD4408F /* DecisionBrainState.swift in Sources */,
 				988BFED074AB0E4CDF0082CF /* DecisionContextFieldKey.swift in Sources */,
 				E0EBF7F86996CD952329873D /* DecisionContextLifecycle.swift in Sources */,

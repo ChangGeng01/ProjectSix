@@ -338,6 +338,7 @@ final class BeforeAppModel: ObservableObject {
 
     func reopenTomorrowBoxItem(_ item: TomorrowBoxItem) {
         clearActiveDecisionFlows()
+        refreshDecisionMemoryStore()
 
         switch item.mode {
         case .quick:
@@ -369,6 +370,21 @@ final class BeforeAppModel: ObservableObject {
         removeTomorrowBoxItem(item)
         selectedTab = .home
         persistActiveWorkspaceState()
+    }
+
+    func refreshQuickBrainState(_ session: QuickCheckSession) {
+        refreshDecisionMemoryStore()
+        primeQuickSession(session)
+    }
+
+    func refreshBalanceBrainState(_ session: BalanceBoardSession) {
+        refreshDecisionMemoryStore()
+        primeBalanceSession(session)
+    }
+
+    func refreshMirrorBrainState(_ session: MirrorWorkspaceSession) {
+        refreshDecisionMemoryStore()
+        primeMirrorSession(session)
     }
 
     func reopenCheckEvent(_ event: CheckEvent) {
@@ -958,31 +974,43 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func primeQuickSession(_ session: QuickCheckSession) {
+        let strategy = DecisionIntelligenceCoordinator
+            .executionProfile(preferences: preferences)
+            .strategy(for: .quick)
         session.loadBrainState(
             DecisionMemorySystem.loadBrainState(
                 mode: .quick,
                 prompt: quickPromptSeed(for: session),
-                context: modelContainer.mainContext
+                context: modelContainer.mainContext,
+                retrievalMode: strategy.retrievalMode
             )
         )
     }
 
     private func primeBalanceSession(_ session: BalanceBoardSession) {
+        let strategy = DecisionIntelligenceCoordinator
+            .executionProfile(preferences: preferences)
+            .strategy(for: .balance)
         session.loadBrainState(
             DecisionMemorySystem.loadBrainState(
                 mode: .balance,
                 prompt: balancePromptSeed(for: session),
-                context: modelContainer.mainContext
+                context: modelContainer.mainContext,
+                retrievalMode: strategy.retrievalMode
             )
         )
     }
 
     private func primeMirrorSession(_ session: MirrorWorkspaceSession) {
+        let strategy = DecisionIntelligenceCoordinator
+            .executionProfile(preferences: preferences)
+            .strategy(for: .mirror)
         session.loadBrainState(
             DecisionMemorySystem.loadBrainState(
                 mode: .mirror,
                 prompt: mirrorPromptSeed(for: session),
-                context: modelContainer.mainContext
+                context: modelContainer.mainContext,
+                retrievalMode: strategy.retrievalMode
             )
         )
     }

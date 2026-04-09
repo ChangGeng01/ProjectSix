@@ -13,7 +13,8 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
                 isLowPowerModeEnabled: false
             ),
             foundationStatus: unavailableFoundation,
-            gemmaStatus: availableGemma
+            gemmaStatus: availableGemma,
+            preferredLanguages: ["en-AU"]
         )
 
         XCTAssertEqual(profile.tier, .conservativeDeterministic)
@@ -22,6 +23,12 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
         XCTAssertFalse(profile.allowsBalanceRefinement)
         XCTAssertFalse(profile.allowsMirrorRefinement)
         XCTAssertFalse(profile.allowsReminderSelection)
+        XCTAssertEqual(profile.adaptationMatrix.runtimeGear, .low)
+        XCTAssertEqual(profile.adaptationMatrix.deviceClass, .memoryConstrainedPhone)
+        XCTAssertEqual(profile.adaptationMatrix.languageMode, .english)
+        XCTAssertEqual(profile.strategy(for: .quick).preferredProvider, .template)
+        XCTAssertEqual(profile.strategy(for: .mirror).outputMode, .deterministicTemplate)
+        XCTAssertEqual(profile.strategy(for: .mirror).responseLanguage, .english)
         XCTAssertTrue(profile.detail.contains("iPhone 14"))
     }
 
@@ -36,7 +43,8 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
                 isLowPowerModeEnabled: false
             ),
             foundationStatus: unavailableFoundation,
-            gemmaStatus: availableGemma
+            gemmaStatus: availableGemma,
+            preferredLanguages: ["en-AU", "zh-Hans"]
         )
 
         XCTAssertEqual(profile.tier, .balancedGemma)
@@ -45,6 +53,13 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
         XCTAssertTrue(profile.allowsBalanceRefinement)
         XCTAssertTrue(profile.allowsMirrorRefinement)
         XCTAssertTrue(profile.allowsReminderSelection)
+        XCTAssertEqual(profile.adaptationMatrix.runtimeGear, .balanced)
+        XCTAssertEqual(profile.adaptationMatrix.languageMode, .mixed)
+        XCTAssertEqual(profile.strategy(for: .quick).preferredProvider, .template)
+        XCTAssertEqual(profile.strategy(for: .balance).preferredProvider, .gemmaE4B)
+        XCTAssertEqual(profile.strategy(for: .mirror).retrievalMode, .filtered)
+        XCTAssertEqual(profile.strategy(for: .mirror).responseLanguage, .mixed)
+        XCTAssertEqual(profile.strategy(for: .mirror).tone, .groundedDirect)
     }
 
     func testFoundationAvailabilityWinsOnDevice() {
@@ -63,7 +78,8 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
                 title: "Available",
                 detail: "Apple is ready."
             ),
-            gemmaStatus: availableGemma
+            gemmaStatus: availableGemma,
+            preferredLanguages: ["zh-Hans"]
         )
 
         XCTAssertEqual(profile.tier, .systemManaged)
@@ -72,6 +88,117 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
         XCTAssertTrue(profile.allowsBalanceRefinement)
         XCTAssertTrue(profile.allowsMirrorRefinement)
         XCTAssertTrue(profile.allowsReminderSelection)
+        XCTAssertEqual(profile.adaptationMatrix.runtimeGear, .balanced)
+        XCTAssertEqual(profile.adaptationMatrix.languageMode, .chinese)
+        XCTAssertEqual(profile.strategy(for: .quick).preferredProvider, .foundationModels)
+        XCTAssertEqual(profile.strategy(for: .reminder).outputMode, .jsonShort)
+        XCTAssertEqual(profile.strategy(for: .balance).thinkingMode, .off)
+        XCTAssertEqual(profile.strategy(for: .quick).responseLanguage, .chinese)
+    }
+
+    func testAdaptiveStrategyShortensMirrorWorkWhenBrainStateRequestsLowLoad() {
+        let profile = DecisionIntelligenceExecutionProfileResolver.resolve(
+            preferences: assistivePreferences,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true,
+                physicalMemoryBytes: 8 * 1_073_741_824,
+                isLowPowerModeEnabled: false
+            ),
+            foundationStatus: unavailableFoundation,
+            gemmaStatus: availableGemma,
+            preferredLanguages: ["en-AU"]
+        )
+
+        let baseStrategy = profile.strategy(for: .mirror)
+        let brainState = DecisionBrainState(
+            profileCore: ["Short, direct language lands better."],
+            activeGoals: ["Protect sleep."],
+            relevantMemories: ["Heavy analysis backfires at night."],
+            sessionBiases: ["Keep the language short and concrete."],
+            retrievalTags: ["mirror", "sleep"],
+            reactionWeights: DecisionReactionWeights(
+                briefLanguage: 0.92,
+                warmDirectTone: 0.72,
+                lowCognitiveLoad: 0.88,
+                interruptiveActionBias: 0.44,
+                boundaryNamingBias: 0.74,
+                tradeoffClarityBias: 0.42
+            ),
+            loadedAt: .now
+        )
+        let neuralState = DecisionNeuralState(
+            mode: .mirror,
+            dominantActivations: [
+                DecisionActivation(signal: .emotionLoad, strength: 0.82)
+            ],
+            candidateActions: [],
+            suppressedBehaviors: [],
+            detail: "Low-load preference."
+        )
+
+        let adapted = baseStrategy.adapting(
+            neuralState: neuralState,
+            brainState: brainState
+        )
+
+        XCTAssertLessThan(adapted.contextBudget, baseStrategy.contextBudget)
+        XCTAssertEqual(adapted.tone, .briefWarm)
+        XCTAssertEqual(adapted.thinkingMode, .off)
+        XCTAssertTrue(adapted.actionSpace.contains("stay_brief"))
+    }
+
+    func testAdaptiveStrategyGuardsRetrievalWhenLifecycleIsStale() {
+        let profile = DecisionIntelligenceExecutionProfileResolver.resolve(
+            preferences: assistivePreferences,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true,
+                physicalMemoryBytes: 8 * 1_073_741_824,
+                isLowPowerModeEnabled: false
+            ),
+            foundationStatus: unavailableFoundation,
+            gemmaStatus: availableGemma,
+            preferredLanguages: ["en-AU"]
+        )
+
+        let baseStrategy = profile.strategy(for: .mirror)
+        XCTAssertEqual(baseStrategy.retrievalMode, .adaptive)
+
+        let adapted = baseStrategy.adapting(
+            contextState: DecisionContextPreparedState(
+                rebuiltSession: true,
+                generation: 4,
+                anchorFields: [.mirrorPrompt],
+                activeFields: [.mirrorPrompt],
+                staleFields: [.mirrorEmotion]
+            ),
+            brainState: DecisionBrainState(
+                profileCore: [],
+                activeGoals: [],
+                relevantMemories: [],
+                sessionBiases: [],
+                retrievalTags: [],
+                reactionWeights: .defaults(for: .mirror),
+                memoryGovernance: DecisionMemoryGovernanceState(
+                    totalRecordCount: 5,
+                    totalCandidateCount: 2,
+                    pendingCandidateCount: 1,
+                    promotedCandidateCount: 4,
+                    loadedPromotedMemoryCount: 2,
+                    loadedPendingMemoryCount: 1,
+                    deferredCandidateCount: 0,
+                    admittedCandidateCount: 1,
+                    screenedOutMemoryCount: 4,
+                    screenedOutPendingMemoryCount: 1
+                ),
+                loadedAt: .now
+            )
+        )
+
+        XCTAssertEqual(adapted.retrievalMode, .filtered)
     }
 
     private var assistivePreferences: BeforePreferences {

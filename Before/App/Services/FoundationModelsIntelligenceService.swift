@@ -48,6 +48,7 @@ enum FoundationModelsIntelligenceService {
     static func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
@@ -57,6 +58,7 @@ enum FoundationModelsIntelligenceService {
         let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -99,6 +101,7 @@ enum FoundationModelsIntelligenceService {
     static func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
@@ -108,6 +111,7 @@ enum FoundationModelsIntelligenceService {
         let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -158,6 +162,7 @@ enum FoundationModelsIntelligenceService {
     static func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
@@ -167,6 +172,7 @@ enum FoundationModelsIntelligenceService {
         let envelope = DecisionIntelligencePromptContract.mirrorRefinementEnvelope(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -213,7 +219,8 @@ enum FoundationModelsIntelligenceService {
         from candidates: [ReminderSelectionCandidate],
         scenario: ScenarioType,
         prompt: String,
-        mode: DecisionMode?
+        mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy? = nil
     ) async -> ReminderSelectionCandidate? {
 #if canImport(FoundationModels)
         guard #available(iOS 26.0, *), availabilityStatus.isAvailable else { return nil }
@@ -221,7 +228,8 @@ enum FoundationModelsIntelligenceService {
             candidates: candidates,
             scenario: scenario,
             prompt: prompt,
-            mode: mode
+            mode: mode,
+            strategy: strategy
         )
         let clippedCandidates = selection.candidates
         guard clippedCandidates.count > 1 else { return clippedCandidates.first }

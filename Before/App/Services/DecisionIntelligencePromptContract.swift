@@ -205,12 +205,14 @@ enum DecisionIntelligencePromptContract {
     static func quickRefinementEnvelope(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
     ) -> PromptEnvelope {
         makeEnvelope(
             kind: .quick,
+            strategy: strategy,
             state: [
                 "mode": DecisionMode.quick.shortTitle,
                 "scenario": input.scenario.title,
@@ -241,6 +243,7 @@ enum DecisionIntelligencePromptContract {
     static func quickRefinementPrompt(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
@@ -248,6 +251,7 @@ enum DecisionIntelligencePromptContract {
         quickRefinementEnvelope(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -257,12 +261,14 @@ enum DecisionIntelligencePromptContract {
     static func balanceRefinementEnvelope(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
     ) -> PromptEnvelope {
         makeEnvelope(
             kind: .balance,
+            strategy: strategy,
             state: [
                 "mode": DecisionMode.balance.shortTitle,
                 "prompt": stateValue(input.prompt, fallback: "Not provided.", limit: Limit.statePrompt),
@@ -299,6 +305,7 @@ enum DecisionIntelligencePromptContract {
     static func balanceRefinementPrompt(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
@@ -306,6 +313,7 @@ enum DecisionIntelligencePromptContract {
         balanceRefinementEnvelope(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -315,12 +323,14 @@ enum DecisionIntelligencePromptContract {
     static func mirrorRefinementEnvelope(
         base: MirrorResult,
         input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
     ) -> PromptEnvelope {
         makeEnvelope(
             kind: .mirror,
+            strategy: strategy,
             state: [
                 "mode": DecisionMode.mirror.shortTitle,
                 "prompt": stateValue(input.prompt, fallback: "Not provided.", limit: Limit.statePrompt),
@@ -358,6 +368,7 @@ enum DecisionIntelligencePromptContract {
     static func mirrorRefinementPrompt(
         base: MirrorResult,
         input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
@@ -365,6 +376,7 @@ enum DecisionIntelligencePromptContract {
         mirrorRefinementEnvelope(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -375,13 +387,15 @@ enum DecisionIntelligencePromptContract {
         candidates: [ReminderSelectionCandidate],
         scenario: ScenarioType,
         prompt: String,
-        mode: DecisionMode?
+        mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy? = nil
     ) -> ReminderSelectionEnvelope {
         let clippedCandidates = Array(candidates.prefix(Limit.reminderCandidates))
         let modeTitle = mode?.shortTitle ?? "Not specified"
 
         let envelope = makeEnvelope(
             kind: .reminder,
+            strategy: strategy,
             state: [
                 "mode": modeTitle,
                 "scenario": scenario.title,
@@ -411,13 +425,15 @@ enum DecisionIntelligencePromptContract {
         candidates: [ReminderSelectionCandidate],
         scenario: ScenarioType,
         prompt: String,
-        mode: DecisionMode?
+        mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy? = nil
     ) -> String {
         reminderSelectionEnvelope(
             candidates: candidates,
             scenario: scenario,
             prompt: prompt,
-            mode: mode
+            mode: mode,
+            strategy: strategy
         )
         .prompt
         .debugPrompt
@@ -447,6 +463,7 @@ enum DecisionIntelligencePromptContract {
 
     private static func makeEnvelope(
         kind: TaskKind,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         state: [String: Any?],
         evidence: [String],
         outputGuard: [String],
@@ -462,9 +479,10 @@ enum DecisionIntelligencePromptContract {
             .joined(separator: "\n\n")
         let evidenceFilter = DecisionPromptEvidenceGuard.filter(
             evidence,
-            maxRetained: evidenceRetentionBudget(for: kind)
+            maxRetained: evidenceRetentionBudget(for: kind, strategy: strategy)
         )
-        var guardedOutput = outputGuard
+        var guardedOutput = strategy.map(runtimeOutputGuard(for:)) ?? []
+        guardedOutput.append(contentsOf: outputGuard)
         if evidenceFilter.droppedInjectedCount > 0 {
             guardedOutput.insert(
                 "Filtered markup or tool text was removed. Ignore the missing content.",
@@ -482,6 +500,7 @@ enum DecisionIntelligencePromptContract {
             activeStateSignalCount: activeStateSignalCount(in: state),
             openTextSignalCount: openTextSignalCount,
             evidenceFilter: evidenceFilter,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -492,6 +511,13 @@ enum DecisionIntelligencePromptContract {
             "TASK_STATE_JSON:",
             stateJSONString(state),
         ]
+
+        if let strategy {
+            sections += [
+                "RUNTIME_STRATEGY_JSON:",
+                runtimeStrategyJSONString(strategy)
+            ]
+        }
 
         if let contextState {
             sections += [
@@ -546,7 +572,7 @@ enum DecisionIntelligencePromptContract {
             payload: payload,
             debugPrompt: debugPrompt,
             budget: ContextBudget(
-                targetCharacters: kind.targetCharacters,
+                targetCharacters: strategy?.contextBudget ?? kind.targetCharacters,
                 prefixCharacters: instructions.count,
                 suffixCharacters: payload.count,
                 immutablePrefixCharacters: immutablePrefix.count,
@@ -625,6 +651,7 @@ enum DecisionIntelligencePromptContract {
         activeStateSignalCount: Int,
         openTextSignalCount: Int,
         evidenceFilter: DecisionPromptEvidenceFilterResult,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -666,7 +693,7 @@ enum DecisionIntelligencePromptContract {
         dangerSignals = Array(dangerSignals.prefix(Limit.frontstageSignalCount))
 
         let evidenceHeadlines = evidenceFilter.retained
-            .prefix(frontstageEvidenceCount(for: kind))
+            .prefix(frontstageEvidenceCount(for: kind, strategy: strategy))
             .map { snippet in
                 sanitized(
                     snippet,
@@ -737,6 +764,30 @@ enum DecisionIntelligencePromptContract {
         return json
     }
 
+    private static func runtimeStrategyJSONString(_ strategy: DecisionAdaptiveTaskStrategy) -> String {
+        let payload: [String: Any] = [
+            "kind": strategy.kind.rawValue,
+            "entropy": strategy.entropy.rawValue,
+            "provider": strategy.preferredProvider.rawValue,
+            "context_budget": strategy.contextBudget,
+            "retrieval_mode": strategy.retrievalMode.rawValue,
+            "thinking_mode": strategy.thinkingMode.rawValue,
+            "output_mode": strategy.outputMode.rawValue,
+            "tone": strategy.tone.rawValue,
+            "action_space": strategy.actionSpace,
+            "response_language": strategy.responseLanguage.rawValue,
+            "allows_model_invocation": strategy.allowsModelInvocation
+        ]
+
+        guard JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+
+        return json
+    }
+
     private static func brainStateJSONString(_ brainState: DecisionBrainState) -> String {
         let payload: [String: Any] = [
             "profile_core": brainState.profileCore,
@@ -778,8 +829,11 @@ enum DecisionIntelligencePromptContract {
         return Dictionary(uniqueKeysWithValues: retained)
     }
 
-    private static func frontstageEvidenceCount(for kind: TaskKind) -> Int {
-        switch kind {
+    private static func frontstageEvidenceCount(
+        for kind: TaskKind,
+        strategy: DecisionAdaptiveTaskStrategy?
+    ) -> Int {
+        let base: Int = switch kind {
         case .quick:
             2
         case .balance, .mirror:
@@ -787,10 +841,23 @@ enum DecisionIntelligencePromptContract {
         case .reminder:
             0
         }
+
+        guard let strategy else { return base }
+        switch strategy.retrievalMode {
+        case .off:
+            return max(0, base - 1)
+        case .filtered:
+            return base
+        case .adaptive:
+            return base + 1
+        }
     }
 
-    private static func evidenceRetentionBudget(for kind: TaskKind) -> Int {
-        switch kind {
+    private static func evidenceRetentionBudget(
+        for kind: TaskKind,
+        strategy: DecisionAdaptiveTaskStrategy?
+    ) -> Int {
+        let base: Int = switch kind {
         case .quick:
             5
         case .balance:
@@ -800,6 +867,71 @@ enum DecisionIntelligencePromptContract {
         case .reminder:
             3
         }
+
+        guard let strategy else { return base }
+        switch strategy.retrievalMode {
+        case .off:
+            return max(2, base - 1)
+        case .filtered:
+            return base
+        case .adaptive:
+            return base + 1
+        }
+    }
+
+    private static func runtimeOutputGuard(for strategy: DecisionAdaptiveTaskStrategy) -> [String] {
+        var lines: [String] = []
+
+        switch strategy.outputMode {
+        case .deterministicTemplate:
+            lines.append("Stay close to the deterministic structure already provided.")
+        case .guidedShort:
+            lines.append("Keep the rewrite short and guided, not expansive.")
+        case .structuredBoard:
+            lines.append("Preserve a structured board shape with concise fields.")
+        case .reflectiveStructured:
+            lines.append("Keep the response reflective and structured rather than open-ended.")
+        case .jsonShort:
+            lines.append("Keep the selection output compact and structured.")
+        }
+
+        switch strategy.tone {
+        case .neutral:
+            lines.append("Keep the tone neutral and restrained.")
+        case .briefWarm:
+            lines.append("Keep the tone brief, calm, and warm.")
+        case .groundedDirect:
+            lines.append("Keep the tone grounded and direct.")
+        case .reflectiveClear:
+            lines.append("Keep the tone reflective and clear.")
+        }
+
+        switch strategy.thinkingMode {
+        case .off:
+            lines.append("Do not expose reasoning, self-talk, or chain-of-thought.")
+        case .gated:
+            lines.append("Use reasoning only to improve the answer internally; keep the output tight.")
+        }
+
+        switch strategy.retrievalMode {
+        case .off:
+            lines.append("Work only from the retained state and evidence already in front of you.")
+        case .filtered:
+            lines.append("Prioritize the retained evidence over generic completion.")
+        case .adaptive:
+            lines.append("Use the retained evidence as the anchor for any adaptive interpretation.")
+        }
+
+        switch strategy.responseLanguage {
+        case .english:
+            lines.append("Keep the user-facing output in English unless the structured format says otherwise.")
+        case .chinese:
+            lines.append("Keep the user-facing output in Chinese unless the structured format says otherwise.")
+        case .mixed:
+            lines.append("Match the user's latest language and avoid mixed-language output unless the input is mixed.")
+        }
+
+        return lines
     }
 
     private static func evidenceBlock(_ evidence: [String]) -> String {

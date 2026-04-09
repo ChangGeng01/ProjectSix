@@ -164,9 +164,34 @@ struct DecisionTestingRuntimeExport {
     }
 
     var summary: DecisionTestingRuntimeSummary {
-        DecisionTestingRuntimeSummary(
+        let adaptationMatrix = runtimeSnapshot.executionProfile.adaptationMatrix
+        return DecisionTestingRuntimeSummary(
             activeProvider: runtimeSnapshot.runtimeStatus.active,
             fallbackProvider: runtimeSnapshot.runtimeStatus.fallback,
+            runtimeGear: adaptationMatrix.runtimeGear,
+            environmentClass: adaptationMatrix.environmentClass,
+            deviceClass: adaptationMatrix.deviceClass,
+            languageMode: adaptationMatrix.languageMode,
+            taskEntropyByKind: strategyMap(\.entropy),
+            preferredProviderByKind: strategyMap(\.preferredProvider),
+            allowsModelInvocationByKind: strategyMap(\.allowsModelInvocation),
+            contextBudgetByKind: strategyMap(\.contextBudget),
+            retrievalModeByKind: strategyMap(\.retrievalMode),
+            thinkingModeByKind: strategyMap(\.thinkingMode),
+            outputModeByKind: strategyMap(\.outputMode),
+            toneByKind: strategyMap(\.tone),
+            actionSpaceByKind: strategyMap(\.actionSpace),
+            responseLanguageByKind: strategyMap(\.responseLanguage),
+            effectivePreferredProviderByKind: effectiveStrategyMap(\.preferredProvider),
+            effectiveContextBudgetByKind: effectiveStrategyMap(\.contextBudget),
+            effectiveRetrievalModeByKind: effectiveStrategyMap(\.retrievalMode),
+            effectiveThinkingModeByKind: effectiveStrategyMap(\.thinkingMode),
+            effectiveOutputModeByKind: effectiveStrategyMap(\.outputMode),
+            effectiveToneByKind: effectiveStrategyMap(\.tone),
+            effectiveActionSpaceByKind: effectiveStrategyMap(\.actionSpace),
+            effectiveResponseLanguageByKind: effectiveStrategyMap(\.responseLanguage),
+            firstAttemptedProviderByKind: firstAttemptedProviderByKind,
+            effectiveProviderOrderByKind: effectiveProviderOrderByKind,
             totalRequests: intelligenceTelemetry.totalRequests,
             totalProviderAttempts: intelligenceTelemetry.totalProviderAttempts,
             cacheHitRate: intelligenceTelemetry.cacheHitRate,
@@ -243,6 +268,39 @@ struct DecisionTestingRuntimeExport {
         intelligenceTelemetry.gemmaBackendCount
             .max { lhs, rhs in lhs.value < rhs.value }?
             .key
+    }
+
+    private func strategyMap<Value>(
+        _ keyPath: KeyPath<DecisionAdaptiveTaskStrategy, Value>
+    ) -> [DecisionIntelligenceTraceKind: Value] {
+        runtimeSnapshot.executionProfile.adaptationMatrix.strategiesByKind.mapValues { strategy in
+            strategy[keyPath: keyPath]
+        }
+    }
+
+    private func effectiveStrategyMap<Value>(
+        _ keyPath: KeyPath<DecisionAdaptiveTaskStrategy, Value>
+    ) -> [DecisionIntelligenceTraceKind: Value] {
+        Dictionary(grouping: recentTraces.compactMap { trace in
+            trace.runtimeStrategy.map { (trace.kind, $0) }
+        }, by: \.0)
+        .compactMapValues { grouped in
+            grouped.first?.1[keyPath: keyPath]
+        }
+    }
+
+    private var firstAttemptedProviderByKind: [DecisionIntelligenceTraceKind: DecisionModelProviderKind] {
+        Dictionary(grouping: recentTraces.filter { !$0.attemptedProviders.isEmpty }, by: \.kind)
+            .compactMapValues { grouped in
+                grouped.first?.attemptedProviders.first
+            }
+    }
+
+    private var effectiveProviderOrderByKind: [DecisionIntelligenceTraceKind: [DecisionModelProviderKind]] {
+        Dictionary(grouping: recentTraces.filter { !$0.attemptedProviders.isEmpty }, by: \.kind)
+            .compactMapValues { grouped in
+                grouped.first?.attemptedProviders
+            }
     }
 
     private var latestGenerationByKind: [DecisionIntelligenceTraceKind: Int] {
@@ -502,6 +560,30 @@ struct DecisionTestingBrainSummary: Equatable, Sendable {
 struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let activeProvider: DecisionModelProviderKind
     let fallbackProvider: DecisionModelProviderKind?
+    let runtimeGear: DecisionRuntimeGear
+    let environmentClass: DecisionEnvironmentClass
+    let deviceClass: DecisionDevicePerformanceClass
+    let languageMode: DecisionLanguageMode
+    let taskEntropyByKind: [DecisionIntelligenceTraceKind: DecisionTaskEntropyClass]
+    let preferredProviderByKind: [DecisionIntelligenceTraceKind: DecisionModelProviderPreference]
+    let allowsModelInvocationByKind: [DecisionIntelligenceTraceKind: Bool]
+    let contextBudgetByKind: [DecisionIntelligenceTraceKind: Int]
+    let retrievalModeByKind: [DecisionIntelligenceTraceKind: DecisionRetrievalMode]
+    let thinkingModeByKind: [DecisionIntelligenceTraceKind: DecisionThinkingMode]
+    let outputModeByKind: [DecisionIntelligenceTraceKind: DecisionOutputMode]
+    let toneByKind: [DecisionIntelligenceTraceKind: DecisionToneProfile]
+    let actionSpaceByKind: [DecisionIntelligenceTraceKind: [String]]
+    let responseLanguageByKind: [DecisionIntelligenceTraceKind: DecisionAdaptiveResponseLanguage]
+    let effectivePreferredProviderByKind: [DecisionIntelligenceTraceKind: DecisionModelProviderPreference]
+    let effectiveContextBudgetByKind: [DecisionIntelligenceTraceKind: Int]
+    let effectiveRetrievalModeByKind: [DecisionIntelligenceTraceKind: DecisionRetrievalMode]
+    let effectiveThinkingModeByKind: [DecisionIntelligenceTraceKind: DecisionThinkingMode]
+    let effectiveOutputModeByKind: [DecisionIntelligenceTraceKind: DecisionOutputMode]
+    let effectiveToneByKind: [DecisionIntelligenceTraceKind: DecisionToneProfile]
+    let effectiveActionSpaceByKind: [DecisionIntelligenceTraceKind: [String]]
+    let effectiveResponseLanguageByKind: [DecisionIntelligenceTraceKind: DecisionAdaptiveResponseLanguage]
+    let firstAttemptedProviderByKind: [DecisionIntelligenceTraceKind: DecisionModelProviderKind]
+    let effectiveProviderOrderByKind: [DecisionIntelligenceTraceKind: [DecisionModelProviderKind]]
     let totalRequests: Int
     let totalProviderAttempts: Int
     let cacheHitRate: Double

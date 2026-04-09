@@ -78,6 +78,7 @@ struct QuickCheckView: View {
 
                         BeforeActionButton("Show me the call", isEnabled: session.canEvaluate, accessibilityIdentifier: "quick.evaluate") {
                             Task {
+                                appModel.refreshQuickBrainState(session)
                                 await session.evaluateWithIntelligence(preferences: appModel.preferences)
                             }
                         }

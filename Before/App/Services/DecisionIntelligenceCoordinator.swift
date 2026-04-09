@@ -165,9 +165,9 @@ enum DecisionIntelligenceCoordinator {
 
         let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let profile = executionProfile(preferences: preferences)
+        let reminderStrategy = profile.strategy(for: .reminder)
         guard preferences.onDeviceIntelligenceMode.isEnabled,
-              profile.allowsReminderSelection,
-              profile.effectiveProviderPreference != .template,
+              reminderStrategy.allowsModelInvocation,
               !trimmedPrompt.isEmpty else {
             return deterministic
         }
@@ -188,7 +188,8 @@ enum DecisionIntelligenceCoordinator {
             scenario: scenario,
             prompt: trimmedPrompt,
             mode: mode,
-            preference: profile.effectiveProviderPreference,
+            strategy: reminderStrategy,
+            preference: reminderStrategy.preferredProvider,
             allowFallbacks: profile.allowFallbacks
         ) else {
             return deterministic
@@ -206,15 +207,23 @@ enum DecisionIntelligenceCoordinator {
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> QuickCheckResult? {
         let profile = executionProfile(preferences: preferences)
+        let quickStrategy = profile
+            .strategy(for: .quick)
+            .adapting(
+                contextState: contextState,
+                neuralState: neuralState,
+                brainState: brainState
+            )
         guard preferences.onDeviceIntelligenceMode.isEnabled,
-              profile.allowsQuickRefinement else { return nil }
+              quickStrategy.allowsModelInvocation else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineQuickResult(
             base: base,
             input: input,
+            strategy: quickStrategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState,
-            preference: profile.effectiveProviderPreference,
+            preference: quickStrategy.preferredProvider,
             allowFallbacks: profile.allowFallbacks
         )
     }
@@ -228,15 +237,23 @@ enum DecisionIntelligenceCoordinator {
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> BalanceBoardResult? {
         let profile = executionProfile(preferences: preferences)
+        let balanceStrategy = profile
+            .strategy(for: .balance)
+            .adapting(
+                contextState: contextState,
+                neuralState: neuralState,
+                brainState: brainState
+            )
         guard preferences.onDeviceIntelligenceMode.isEnabled,
-              profile.allowsBalanceRefinement else { return nil }
+              balanceStrategy.allowsModelInvocation else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineBalanceResult(
             base: base,
             input: input,
+            strategy: balanceStrategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState,
-            preference: profile.effectiveProviderPreference,
+            preference: balanceStrategy.preferredProvider,
             allowFallbacks: profile.allowFallbacks
         )
     }
@@ -250,15 +267,23 @@ enum DecisionIntelligenceCoordinator {
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> MirrorResult? {
         let profile = executionProfile(preferences: preferences)
+        let mirrorStrategy = profile
+            .strategy(for: .mirror)
+            .adapting(
+                contextState: contextState,
+                neuralState: neuralState,
+                brainState: brainState
+            )
         guard preferences.onDeviceIntelligenceMode.isEnabled,
-              profile.allowsMirrorRefinement else { return nil }
+              mirrorStrategy.allowsModelInvocation else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineMirrorResult(
             base: base,
             input: input,
+            strategy: mirrorStrategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState,
-            preference: profile.effectiveProviderPreference,
+            preference: mirrorStrategy.preferredProvider,
             allowFallbacks: profile.allowFallbacks
         )
     }

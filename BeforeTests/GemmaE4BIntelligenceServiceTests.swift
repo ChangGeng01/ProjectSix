@@ -97,6 +97,7 @@ private struct MockGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging {
     func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -107,6 +108,7 @@ private struct MockGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging {
     func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -117,6 +119,7 @@ private struct MockGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging {
     func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
         contextState: DecisionContextPreparedState?,
         neuralState: DecisionNeuralState?,
         brainState: DecisionBrainState?
@@ -128,7 +131,8 @@ private struct MockGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging {
         from candidates: [ReminderSelectionCandidate],
         scenario: ScenarioType,
         prompt: String,
-        mode: DecisionMode?
+        mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy?
     ) async -> ReminderSelectionCandidate? {
         nil
     }

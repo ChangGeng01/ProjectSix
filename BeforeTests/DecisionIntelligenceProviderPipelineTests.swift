@@ -262,6 +262,55 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
     }
 
     @MainActor
+    func testQuickRefinementTracePersistsEffectiveRuntimeStrategy() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let strategy = DecisionAdaptiveTaskStrategy(
+            kind: .quick,
+            entropy: .low,
+            preferredProvider: .gemmaE4B,
+            contextBudget: 220,
+            retrievalMode: .off,
+            thinkingMode: .off,
+            outputMode: .guidedShort,
+            tone: .briefWarm,
+            actionSpace: ["encourage", "next_step", "fallback_to_template"],
+            responseLanguage: .english,
+            allowsModelInvocation: true
+        )
+
+        _ = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            strategy: strategy,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected a recorded quick trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .quick)
+        XCTAssertEqual(latestTrace.runtimeStrategy, strategy)
+        XCTAssertEqual(latestTrace.promptBudget?.targetCharacters, 220)
+        XCTAssertTrue(latestTrace.prompt.contains("\"response_language\":\"english\""))
+    }
+
+    @MainActor
     func testTestingStubCanSelectReminderWithoutLiveProvider() async {
         let selected = await DecisionIntelligenceProviderPipeline.pickReminder(
             from: [

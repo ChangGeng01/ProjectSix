@@ -180,6 +180,45 @@ final class DecisionMemorySystemTests: XCTestCase {
     }
 
     @MainActor
+    func testLoadBrainStateMakesRetrievalModeExecutable() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        seedHistory(into: context)
+        _ = DecisionMemorySystem.refreshStoredMemories(in: context)
+
+        let filtered = DecisionMemorySystem.loadBrainState(
+            mode: .quick,
+            prompt: "Late at night I want to buy this again.",
+            context: context,
+            retrievalMode: .filtered,
+            now: date("2026-04-09T23:10:00Z")
+        )
+
+        let off = DecisionMemorySystem.loadBrainState(
+            mode: .quick,
+            prompt: "Late at night I want to buy this again.",
+            context: context,
+            retrievalMode: .off,
+            now: date("2026-04-09T23:10:00Z")
+        )
+
+        let adaptive = DecisionMemorySystem.loadBrainState(
+            mode: .mirror,
+            prompt: "Should I stay in this relationship?",
+            context: context,
+            retrievalMode: .adaptive,
+            now: date("2026-04-09T23:10:00Z")
+        )
+
+        XCTAssertGreaterThan(filtered.memorySlices.count, off.memorySlices.count)
+        XCTAssertGreaterThan(filtered.memoryGovernance.loadedPendingMemoryCount, off.memoryGovernance.loadedPendingMemoryCount)
+        XCTAssertEqual(off.memoryGovernance.loadedPendingMemoryCount, 0)
+        XCTAssertLessThanOrEqual(off.relevantMemories.count, 1)
+        XCTAssertGreaterThanOrEqual(adaptive.relevantMemories.count, 2)
+    }
+
+    @MainActor
     private func makeContainer() throws -> ModelContainer {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         return try ModelContainer(

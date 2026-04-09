@@ -26,14 +26,16 @@ final class GemmaLocalRuntimeBridgeTests: XCTestCase {
     }
 
     func testQuickRefinementUsesRuntimeOutputAndPreservesVerdictAndActions() async {
+        let promptRecorder = PromptRecorder()
         let bridge = DynamicGemmaLocalRuntimeBridge(
             loadState: .ready(
                 GemmaRuntimeLibraryAsset(
                     fileName: "LiteRTLM",
                     path: "/tmp/LiteRTLM"
                 ),
-                { _, _, _ in
-                    """
+                { prompt, _, _ in
+                    promptRecorder.store(prompt)
+                    return """
                     CURRENT: You want relief quickly, not another loop.
                     AFTER: Tomorrow this will probably feel more like a patch than a choice.
                     """
@@ -56,8 +58,25 @@ final class GemmaLocalRuntimeBridgeTests: XCTestCase {
             controlLevel: .maybe,
             note: "I am tired."
         )
+        let strategy = DecisionAdaptiveTaskStrategy(
+            kind: .quick,
+            entropy: .low,
+            preferredProvider: .gemmaE4B,
+            contextBudget: 220,
+            retrievalMode: .off,
+            thinkingMode: .off,
+            outputMode: .guidedShort,
+            tone: .briefWarm,
+            actionSpace: ["encourage", "next_step"],
+            responseLanguage: .chinese,
+            allowsModelInvocation: true
+        )
 
-        let refined = await bridge.refineQuickResult(base: base, input: input)
+        let refined = await bridge.refineQuickResult(
+            base: base,
+            input: input,
+            strategy: strategy
+        )
 
         XCTAssertEqual(
             refined?.currentPerspective,
@@ -70,6 +89,11 @@ final class GemmaLocalRuntimeBridgeTests: XCTestCase {
         XCTAssertEqual(refined?.verdict, .pause)
         XCTAssertEqual(refined?.primaryAction, .wait90s)
         XCTAssertEqual(refined?.secondaryActions, [.decideTomorrow, .goAheadAnyway])
+
+        let capturedPrompt = promptRecorder.value
+        XCTAssertNotNil(capturedPrompt)
+        XCTAssertTrue(capturedPrompt?.contains("\"response_language\":\"chinese\"") == true)
+        XCTAssertTrue(capturedPrompt?.contains("Keep the user-facing output in Chinese unless the structured format says otherwise.") == true)
     }
 
     func testQuickRefinementReturnsNilWithoutModelPath() async {
@@ -107,5 +131,22 @@ final class GemmaLocalRuntimeBridgeTests: XCTestCase {
         let refined = await bridge.refineQuickResult(base: base, input: input)
 
         XCTAssertNil(refined)
+    }
+}
+
+private final class PromptRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedValue: String?
+
+    var value: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedValue
+    }
+
+    func store(_ prompt: String) {
+        lock.lock()
+        storedValue = prompt
+        lock.unlock()
     }
 }

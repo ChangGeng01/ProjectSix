@@ -89,6 +89,7 @@ enum GemmaE4BIntelligenceService {
     static func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
@@ -100,6 +101,7 @@ enum GemmaE4BIntelligenceService {
         return await runtime.refineQuickResult(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -109,6 +111,7 @@ enum GemmaE4BIntelligenceService {
     static func refineBalanceResult(
         base: BalanceBoardResult,
         input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
@@ -120,6 +123,7 @@ enum GemmaE4BIntelligenceService {
         return await runtime.refineBalanceResult(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -129,6 +133,7 @@ enum GemmaE4BIntelligenceService {
     static func refineMirrorResult(
         base: MirrorResult,
         input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
@@ -140,6 +145,7 @@ enum GemmaE4BIntelligenceService {
         return await runtime.refineMirrorResult(
             base: base,
             input: input,
+            strategy: strategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -151,6 +157,7 @@ enum GemmaE4BIntelligenceService {
         scenario: ScenarioType,
         prompt: String,
         mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
         backendPolicy: InferenceBackendPolicy = DecisionTestingInterface.effectiveInferenceBackendPolicy(),
         runtime: any GemmaLocalRuntimeBridging = GemmaLocalRuntimeBridge.shared
     ) async -> ReminderSelectionCandidate? {
@@ -160,7 +167,8 @@ enum GemmaE4BIntelligenceService {
             from: candidates,
             scenario: scenario,
             prompt: prompt,
-            mode: mode
+            mode: mode,
+            strategy: strategy
         )
     }
 }

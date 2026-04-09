@@ -60,6 +60,9 @@ struct DecisionTestingInterfaceTests {
             device: snapshot.deviceCapabilities
         ))
         #expect(snapshot.runtimeStatus.active == .template)
+        #expect(snapshot.executionProfile.adaptationMatrix.runtimeGear == .low)
+        #expect(snapshot.executionProfile.strategy(for: .quick).preferredProvider == .template)
+        #expect(snapshot.executionProfile.strategy(for: .reminder).outputMode == .deterministicTemplate)
     }
 
     @Test
@@ -390,6 +393,19 @@ struct DecisionTestingInterfaceTests {
                 ),
                 loadedAt: .now
             ),
+            runtimeStrategy: DecisionAdaptiveTaskStrategy(
+                kind: .quick,
+                entropy: .low,
+                preferredProvider: .gemmaE4B,
+                contextBudget: 220,
+                retrievalMode: .off,
+                thinkingMode: .off,
+                outputMode: .guidedShort,
+                tone: .briefWarm,
+                actionSpace: ["encourage", "next_step", "fallback_to_template"],
+                responseLanguage: .english,
+                allowsModelInvocation: true
+            ),
             semanticPromptFingerprint: "semantic-quick-1",
             stablePrefixFingerprint: "prefix-quick-1",
             prompt: "Quick prompt",
@@ -476,6 +492,26 @@ struct DecisionTestingInterfaceTests {
         #expect(export.recentTraces.count == 1)
         #expect(export.recentReplay.count == 1)
         #expect(export.summary.activeProvider == export.runtimeSnapshot.runtimeStatus.active)
+        #expect(export.summary.runtimeGear == export.runtimeSnapshot.executionProfile.adaptationMatrix.runtimeGear)
+        #expect(export.summary.environmentClass == export.runtimeSnapshot.executionProfile.adaptationMatrix.environmentClass)
+        #expect(export.summary.deviceClass == export.runtimeSnapshot.executionProfile.adaptationMatrix.deviceClass)
+        #expect(export.summary.contextBudgetByKind[.quick] == export.runtimeSnapshot.executionProfile.strategy(for: .quick).contextBudget)
+        #expect(export.summary.taskEntropyByKind[.mirror] == .high)
+        #expect(export.summary.retrievalModeByKind[.mirror] == export.runtimeSnapshot.executionProfile.strategy(for: .mirror).retrievalMode)
+        #expect(export.summary.outputModeByKind[.quick] == export.runtimeSnapshot.executionProfile.strategy(for: .quick).outputMode)
+        #expect(export.summary.allowsModelInvocationByKind[.quick] == export.runtimeSnapshot.executionProfile.strategy(for: .quick).allowsModelInvocation)
+        #expect(export.summary.actionSpaceByKind[.quick] == export.runtimeSnapshot.executionProfile.strategy(for: .quick).actionSpace)
+        #expect(export.summary.responseLanguageByKind[.quick] == export.runtimeSnapshot.executionProfile.strategy(for: .quick).responseLanguage)
+        #expect(export.summary.effectivePreferredProviderByKind[.quick] == .gemmaE4B)
+        #expect(export.summary.effectiveContextBudgetByKind[.quick] == 220)
+        #expect(export.summary.effectiveRetrievalModeByKind[.quick] == .off)
+        #expect(export.summary.effectiveThinkingModeByKind[.quick] == .off)
+        #expect(export.summary.effectiveOutputModeByKind[.quick] == .guidedShort)
+        #expect(export.summary.effectiveToneByKind[.quick] == .briefWarm)
+        #expect(export.summary.effectiveActionSpaceByKind[.quick] == ["encourage", "next_step", "fallback_to_template"])
+        #expect(export.summary.effectiveResponseLanguageByKind[.quick] == .english)
+        #expect(export.summary.firstAttemptedProviderByKind[.quick] == .gemmaE4B)
+        #expect(export.summary.effectiveProviderOrderByKind[.quick] == [.gemmaE4B])
         #expect(export.summary.totalRequests == 1)
         #expect(export.summary.totalCacheEntries == 1)
         #expect(export.summary.dominantGemmaBackend == .cpu)

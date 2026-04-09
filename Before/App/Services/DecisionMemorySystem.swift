@@ -62,6 +62,14 @@ struct DecisionMemoryDraft: Sendable {
 }
 
 enum DecisionMemorySystem {
+    private struct RetrievalPlan {
+        let candidateLimit: Int
+        let profileLimit: Int
+        let goalLimit: Int
+        let relevantLimit: Int
+        let includesPendingCandidates: Bool
+    }
+
     private struct BrainMemoryItem {
         let id: String
         let type: DecisionMemoryType
@@ -160,6 +168,7 @@ enum DecisionMemorySystem {
         mode: DecisionMode,
         prompt: String,
         context: ModelContext,
+        retrievalMode: DecisionRetrievalMode = .filtered,
         now: Date = .now
     ) -> DecisionBrainState {
         let recentCheckEvents = fetchCheckEvents(in: context)
@@ -195,12 +204,16 @@ enum DecisionMemorySystem {
         }
 
         let queryTags = queryTags(for: mode, prompt: prompt)
+        let retrievalPlan = retrievalPlan(for: mode, retrievalMode: retrievalMode)
         let orderedItems = brainItems.sorted {
             score($0, mode: mode, queryTags: queryTags, now: now) >
                 score($1, mode: mode, queryTags: queryTags, now: now)
         }
+        let retrievalCandidates = orderedItems
+            .filter { retrievalPlan.includesPendingCandidates || !$0.isPending }
+            .prefix(retrievalPlan.candidateLimit)
         let retrievalJudgeResult = judgeRetrievalCandidates(
-            from: orderedItems,
+            from: Array(retrievalCandidates),
             mode: mode,
             queryTags: queryTags,
             now: now
@@ -209,14 +222,14 @@ enum DecisionMemorySystem {
 
         let profileItems = selectItems(
             from: retrievalQualifiedItems,
-            limit: 2,
+            limit: retrievalPlan.profileLimit,
             matching: { $0.type == .identity || $0.type == .preference }
         )
         let profileCore = orderedUnique(profileItems.map(\.item.headline))
 
         let goalItems = selectItems(
             from: retrievalQualifiedItems,
-            limit: 2,
+            limit: retrievalPlan.goalLimit,
             excludingIDs: Set(profileItems.map(\.item.id)),
             matching: { $0.type == .goal }
         )
@@ -224,7 +237,7 @@ enum DecisionMemorySystem {
 
         let relevantItems = selectItems(
             from: retrievalQualifiedItems,
-            limit: 3,
+            limit: retrievalPlan.relevantLimit,
             excludingIDs: Set(profileItems.map(\.item.id) + goalItems.map(\.item.id)),
             matching: { _ in true }
         )
@@ -336,6 +349,38 @@ enum DecisionMemorySystem {
             loadedReasonCounts: reasonCounts(for: selectedItems.map(\.eligibility)),
             screenedOutReasonCounts: reasonCounts(for: screenedOutItems.map(\.eligibility))
         )
+    }
+
+    private static func retrievalPlan(
+        for mode: DecisionMode,
+        retrievalMode: DecisionRetrievalMode
+    ) -> RetrievalPlan {
+        switch retrievalMode {
+        case .off:
+            return RetrievalPlan(
+                candidateLimit: mode == .quick ? 4 : 5,
+                profileLimit: 1,
+                goalLimit: mode == .quick ? 1 : 2,
+                relevantLimit: 1,
+                includesPendingCandidates: false
+            )
+        case .filtered:
+            return RetrievalPlan(
+                candidateLimit: 8,
+                profileLimit: 2,
+                goalLimit: 2,
+                relevantLimit: 3,
+                includesPendingCandidates: true
+            )
+        case .adaptive:
+            return RetrievalPlan(
+                candidateLimit: 12,
+                profileLimit: 2,
+                goalLimit: 2,
+                relevantLimit: mode == .mirror ? 4 : 3,
+                includesPendingCandidates: true
+            )
+        }
     }
 
     private static func judgeRetrievalCandidates(

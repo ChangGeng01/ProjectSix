@@ -1,6 +1,6 @@
 import Foundation
 
-enum DecisionIntelligenceTraceKind: String, Identifiable, Sendable {
+enum DecisionIntelligenceTraceKind: String, CaseIterable, Identifiable, Sendable {
     case quick
     case balance
     case mirror
@@ -31,6 +31,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
     let contextState: DecisionContextPreparedState?
     let neuralState: DecisionNeuralState?
     let brainState: DecisionBrainState?
+    let runtimeStrategy: DecisionAdaptiveTaskStrategy?
     let promptBudget: DecisionIntelligencePromptContract.ContextBudget?
     let admissionDecision: DecisionIntelligenceAdmissionDecision?
     let semanticPromptFingerprint: String?
@@ -52,6 +53,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
+        runtimeStrategy: DecisionAdaptiveTaskStrategy? = nil,
         promptBudget: DecisionIntelligencePromptContract.ContextBudget? = nil,
         admissionDecision: DecisionIntelligenceAdmissionDecision? = nil,
         semanticPromptFingerprint: String? = nil,
@@ -72,6 +74,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
         self.contextState = contextState
         self.neuralState = neuralState
         self.brainState = brainState
+        self.runtimeStrategy = runtimeStrategy
         self.promptBudget = promptBudget
         self.admissionDecision = admissionDecision
         self.semanticPromptFingerprint = semanticPromptFingerprint
