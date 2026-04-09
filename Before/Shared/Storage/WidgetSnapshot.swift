@@ -36,20 +36,39 @@ struct WidgetSnapshot: Codable, Sendable {
 
 enum WidgetSnapshotStore {
     private static let key = "before.widget.snapshot"
+    private static let storage = CodableStateStorage.sharedPublic
 
     static func save(_ snapshot: WidgetSnapshot) {
-        guard let data = try? JSONEncoder().encode(snapshot) else { return }
-        SharedContainer.defaults.set(data, forKey: key)
+        storage.save(sanitized(snapshot), key: key)
+        scrubLegacyStorage()
     }
 
     static func load() -> WidgetSnapshot {
-        guard
-            let data = SharedContainer.defaults.data(forKey: key),
-            let snapshot = try? JSONDecoder().decode(WidgetSnapshot.self, from: data)
-        else {
-            return .empty
+        if let snapshot = storage.load(WidgetSnapshot.self, key: key) {
+            return sanitized(snapshot)
         }
-        return WidgetSnapshot(
+
+        if
+            let data = SharedContainer.defaults.data(forKey: key),
+            let legacy = try? JSONDecoder().decode(WidgetSnapshot.self, from: data)
+        {
+            let sanitizedSnapshot = sanitized(legacy)
+            storage.save(sanitizedSnapshot, key: key)
+            scrubLegacyStorage()
+            return sanitizedSnapshot
+        }
+
+        scrubLegacyStorage()
+        return .empty
+    }
+
+    static func clear() {
+        storage.clear(key: key)
+        scrubLegacyStorage()
+    }
+
+    private static func sanitized(_ snapshot: WidgetSnapshot) -> WidgetSnapshot {
+        WidgetSnapshot(
             safeMessage: snapshot.sanitizedMessage,
             latestVerdict: snapshot.latestVerdict,
             latestScenario: snapshot.latestScenario,
@@ -57,7 +76,7 @@ enum WidgetSnapshotStore {
         )
     }
 
-    static func clear() {
+    private static func scrubLegacyStorage() {
         SharedContainer.defaults.removeObject(forKey: key)
     }
 }

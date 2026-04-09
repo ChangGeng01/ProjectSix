@@ -1,10 +1,10 @@
 import Foundation
 import OSLog
 
-enum SharedProtectedStateStore {
-    private static let directoryName = "ProtectedSharedRuntimeState"
-    private static let fallbackDirectoryName = "ProtectedSharedRuntimeStateFallback"
-    private static let logger = Logger(subsystem: "Before", category: "SharedProtectedStateStore")
+enum SharedPublicStateStore {
+    private static let directoryName = "SharedRuntimeState"
+    private static let fallbackDirectoryName = "SharedRuntimeStateFallback"
+    private static let logger = Logger(subsystem: "Before", category: "SharedPublicStateStore")
 
     static func load<Value: Decodable>(_ type: Value.Type, key: String) -> Value? {
         guard
@@ -43,7 +43,7 @@ enum SharedProtectedStateStore {
                 ofItemAtPath: fileURL.path
             )
         } catch {
-            logger.error("Failed to save shared protected state: \(error.localizedDescription, privacy: .public)")
+            logger.error("Failed to save shared public state: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -53,7 +53,7 @@ enum SharedProtectedStateStore {
             try FileManager.default.removeItem(at: fileURL)
         } catch {
             guard (error as NSError).code != NSFileNoSuchFileError else { return }
-            logger.error("Failed to clear shared protected state: \(error.localizedDescription, privacy: .public)")
+            logger.error("Failed to clear shared public state: \(error.localizedDescription, privacy: .public)")
         }
     }
 

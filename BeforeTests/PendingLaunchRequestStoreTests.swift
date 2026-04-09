@@ -2,6 +2,12 @@ import XCTest
 @testable import Before
 
 final class PendingLaunchRequestStoreTests: XCTestCase {
+    override func tearDown() {
+        PendingLaunchRequestStore.clear()
+        SharedContainer.defaults.removeObject(forKey: "before.pending.launch.request")
+        super.tearDown()
+    }
+
     func testNormalizedQueueDropsExpiredRequests() throws {
         let now = Date(timeIntervalSince1970: 1_000)
         let fresh = PendingLaunchRequest(
@@ -73,5 +79,88 @@ final class PendingLaunchRequestStoreTests: XCTestCase {
         XCTAssertEqual(queue.count, 1)
         XCTAssertEqual(queue.first?.preferredMode, .mirror)
         XCTAssertNil(queue.first?.prompt)
+    }
+
+    func testEnqueueAndConsumeRoundTripUsesSharedProtectedQueueInsteadOfDefaults() {
+        PendingLaunchRequestStore.clear()
+
+        let now = Date()
+        let request = PendingLaunchRequest(
+            id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+            entrySource: .shortcut,
+            preferredMode: .mirror,
+            prompt: "Keep this private.",
+            requestedAt: now
+        )
+
+        PendingLaunchRequestStore.enqueue(request)
+
+        XCTAssertNil(SharedContainer.defaults.data(forKey: "before.pending.launch.request"))
+        XCTAssertNotNil(SharedProtectedStateStore.loadData(key: "before.pending.launch.request"))
+        XCTAssertNotNil(
+            SharedProtectedStateStore.loadData(
+                key: "before.pending.launch.request.payload.aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+            )
+        )
+
+        let restored = PendingLaunchRequestStore.consume()
+
+        XCTAssertEqual(restored?.preferredMode, .mirror)
+        XCTAssertEqual(restored?.prompt, "Keep this private.")
+        XCTAssertNil(SharedContainer.defaults.data(forKey: "before.pending.launch.request"))
+        XCTAssertNil(SharedProtectedStateStore.loadData(key: "before.pending.launch.request"))
+        XCTAssertNil(
+            SharedProtectedStateStore.loadData(
+                key: "before.pending.launch.request.payload.aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+            )
+        )
+    }
+
+    func testExpiredProtectedPayloadIsPurgedWhenQueueIsLoaded() {
+        PendingLaunchRequestStore.clear()
+
+        let now = Date()
+        let expiredRequest = PendingLaunchRequest(
+            id: UUID(uuidString: "FFFFFFFF-1111-2222-3333-444444444444")!,
+            entrySource: .shortcut,
+            preferredMode: .quick,
+            prompt: "Expired sensitive prompt",
+            requestedAt: now.addingTimeInterval(-BeforePolicy.LaunchRequests.expirationInterval - 30)
+        )
+
+        PendingLaunchRequestStore.enqueue(expiredRequest)
+
+        XCTAssertNotNil(
+            SharedProtectedStateStore.loadData(
+                key: "before.pending.launch.request.payload.ffffffff-1111-2222-3333-444444444444"
+            )
+        )
+
+        XCTAssertNil(PendingLaunchRequestStore.consume())
+        XCTAssertNil(SharedProtectedStateStore.loadData(key: "before.pending.launch.request"))
+        XCTAssertNil(
+            SharedProtectedStateStore.loadData(
+                key: "before.pending.launch.request.payload.ffffffff-1111-2222-3333-444444444444"
+            )
+        )
+    }
+
+    func testConsumePurgesLegacySharedDefaultsQueueWithoutRestoringIt() throws {
+        PendingLaunchRequestStore.clear()
+
+        let now = Date(timeIntervalSince1970: 900)
+        let request = PendingLaunchRequest(
+            entrySource: .shortcut,
+            preferredMode: .balance,
+            prompt: "Legacy sensitive launch prompt",
+            requestedAt: now
+        )
+
+        let data = try JSONEncoder().encode([request])
+        SharedContainer.defaults.set(data, forKey: "before.pending.launch.request")
+
+        XCTAssertNil(PendingLaunchRequestStore.consume())
+        XCTAssertNil(SharedContainer.defaults.data(forKey: "before.pending.launch.request"))
+        XCTAssertNil(SharedProtectedStateStore.loadData(key: "before.pending.launch.request"))
     }
 }

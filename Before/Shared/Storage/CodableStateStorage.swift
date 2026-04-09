@@ -26,8 +26,16 @@ struct CodableStateStorage: @unchecked Sendable {
         return value
     }
 
+    func loadData(key: String) -> Data? {
+        loadDataBlock(key)
+    }
+
     func save<Value: Encodable>(_ value: Value, key: String) {
         guard let data = try? JSONEncoder().encode(value) else { return }
+        saveDataBlock(data, key)
+    }
+
+    func saveData(_ data: Data, key: String) {
         saveDataBlock(data, key)
     }
 
@@ -45,6 +53,12 @@ struct CodableStateStorage: @unchecked Sendable {
         loadData: { SharedProtectedStateStore.loadData(key: $0) },
         saveData: { SharedProtectedStateStore.saveData($0, key: $1) },
         clear: { SharedProtectedStateStore.clear(key: $0) }
+    )
+
+    static let sharedPublic = CodableStateStorage(
+        loadData: { SharedPublicStateStore.loadData(key: $0) },
+        saveData: { SharedPublicStateStore.saveData($0, key: $1) },
+        clear: { SharedPublicStateStore.clear(key: $0) }
     )
 
     static func userDefaults(_ defaults: UserDefaults) -> CodableStateStorage {

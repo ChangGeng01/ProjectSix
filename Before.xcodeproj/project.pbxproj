@@ -77,6 +77,7 @@
 		52737B94451BEBEE58D6A018 /* BeforeTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FBEC07A4802202A55F07273 /* BeforeTheme.swift */; };
 		52C12D06470D02C5A92EE481 /* DecisionStarterLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5EC40417B021F9CAFFD08C /* DecisionStarterLibraryTests.swift */; };
 		542CC720483001216062BDAF /* SharedContainerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14BBBFC879A75D527348A3A /* SharedContainerTests.swift */; };
+		574A6FB243FDE3722FF35CB5 /* SharedPublicStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F41ADE0FDB9CDEAC94131E4 /* SharedPublicStateStore.swift */; };
 		5888AC82F3C7C85C034AB622 /* WidgetSafeCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E7431FC89A250D4D0C9BB0B /* WidgetSafeCopyTests.swift */; };
 		60AEC6FBDF45B8D0280528C0 /* LetGoMotionDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E0B7539AAB41B84DEC5DCAC /* LetGoMotionDetectorTests.swift */; };
 		6155DA5D7A284986C8864148 /* GemmaE4BIntelligenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89976181A6C6D07117C3220F /* GemmaE4BIntelligenceService.swift */; };
@@ -111,6 +112,7 @@
 		766027F5F2D5A2B69C5E84B4 /* LetGoContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B72D5126B9C441ACCC72B5 /* LetGoContext.swift */; };
 		779171EC7127A1C3DDCBF6BC /* DecisionIntelligenceProviderRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF24C471572013108E4445E5 /* DecisionIntelligenceProviderRegistry.swift */; };
 		7875D22095FB3EE7EC48DA38 /* FinishStateScaffold.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2208969F9B4D024D571795D8 /* FinishStateScaffold.swift */; };
+		791E1711F13D94E4650C007A /* WidgetSnapshotStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E18076377E85A081C4357DC /* WidgetSnapshotStoreTests.swift */; };
 		79EF067AA3100DD4F6B27CDC /* QuickCheckInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F68FB2BE9FA50C05DD3BB89 /* QuickCheckInput.swift */; };
 		7D04494DF147348DDB230C23 /* DecisionIntelligencePromptLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 645A67931102F242BF694CBB /* DecisionIntelligencePromptLibrary.swift */; };
 		7D6E2C32F1B7CF33CD9B7910 /* DecisionIntelligenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F047738D148D3433E732FA5 /* DecisionIntelligenceCoordinator.swift */; };
@@ -125,6 +127,7 @@
 		873075573792938B474AE0C9 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 546368DC120CDB70926CB195 /* HistoryView.swift */; };
 		8778D84FF644B965A734E2AE /* SupportMetricBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 370CE5AB9760497CFEBE0361 /* SupportMetricBlock.swift */; };
 		8955A79E10D850EECA0739CC /* DecisionIntelligencePromptContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F56AFCB0B70F9BE7E014100 /* DecisionIntelligencePromptContractTests.swift */; };
+		8990534B918CAEFAD171D850 /* SharedPublicStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F41ADE0FDB9CDEAC94131E4 /* SharedPublicStateStore.swift */; };
 		8A3AC99CE30C1E3AFD39311E /* TestingDecisionIntelligenceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47EBB9A1A6B11F195895C43F /* TestingDecisionIntelligenceProvider.swift */; };
 		8B2CA2CE45540D3CDE6F2B9B /* PersistenceBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922541BCCDEEF8FA8FE5E169 /* PersistenceBootstrap.swift */; };
 		8CC6FFDA2A4AC2892F69F2EB /* DecisionMemoryEligibilityJudgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F58C3C28378D4CF9CD86DE /* DecisionMemoryEligibilityJudgeTests.swift */; };
@@ -296,6 +299,7 @@
 		0E0334A8565803EF7707BB38 /* PendingLaunchRequestStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingLaunchRequestStore.swift; sourceTree = "<group>"; };
 		0E0B7539AAB41B84DEC5DCAC /* LetGoMotionDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetGoMotionDetectorTests.swift; sourceTree = "<group>"; };
 		0EC6D618BA06FEEFADA2ED4B /* SupportRequestKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportRequestKind.swift; sourceTree = "<group>"; };
+		0F41ADE0FDB9CDEAC94131E4 /* SharedPublicStateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedPublicStateStore.swift; sourceTree = "<group>"; };
 		0F56AFCB0B70F9BE7E014100 /* DecisionIntelligencePromptContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligencePromptContractTests.swift; sourceTree = "<group>"; };
 		0FB464506AE424E21A82A216 /* DecisionTraceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionTraceDetailView.swift; sourceTree = "<group>"; };
 		1198836DDA48CF625D5BB0E7 /* DecisionIntelligenceResponseCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligenceResponseCacheTests.swift; sourceTree = "<group>"; };
@@ -312,6 +316,7 @@
 		1CB16610FFDAC0B269A585C1 /* BalanceBoardEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceBoardEngine.swift; sourceTree = "<group>"; };
 		1D900CAAC9F53880921790B3 /* DecisionStarterLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionStarterLibrary.swift; sourceTree = "<group>"; };
 		1D9B5A5DF817EBD959F0B018 /* TomorrowBoxDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxDraftTests.swift; sourceTree = "<group>"; };
+		1E18076377E85A081C4357DC /* WidgetSnapshotStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotStoreTests.swift; sourceTree = "<group>"; };
 		1F68FB2BE9FA50C05DD3BB89 /* QuickCheckInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCheckInput.swift; sourceTree = "<group>"; };
 		2208969F9B4D024D571795D8 /* FinishStateScaffold.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishStateScaffold.swift; sourceTree = "<group>"; };
 		23EA6415495E3D7A3BFF6785 /* SharedLifeBoxItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLifeBoxItem.swift; sourceTree = "<group>"; };
@@ -699,6 +704,7 @@
 				1D9B5A5DF817EBD959F0B018 /* TomorrowBoxDraftTests.swift */,
 				CB620C2127CA7D236179E618 /* TomorrowBoxItemFactoryTests.swift */,
 				5E7431FC89A250D4D0C9BB0B /* WidgetSafeCopyTests.swift */,
+				1E18076377E85A081C4357DC /* WidgetSnapshotStoreTests.swift */,
 			);
 			path = BeforeTests;
 			sourceTree = "<group>";
@@ -815,6 +821,7 @@
 				7ECDE0CE15D946CD950732D2 /* ProtectedLocalStateStore.swift */,
 				E63D346FC718230713E7B30B /* SharedContainer.swift */,
 				29B2D56D159527FCF85EB5E4 /* SharedProtectedStateStore.swift */,
+				0F41ADE0FDB9CDEAC94131E4 /* SharedPublicStateStore.swift */,
 				2BF5DACA08082B764C73C19F /* WidgetSnapshot.swift */,
 			);
 			path = Storage;
@@ -1162,6 +1169,7 @@
 				F909ED2CEE7C28192307364D /* SharedLifeSection.swift in Sources */,
 				E1BF6E00B7DCD9D76165024D /* SharedLifeStore.swift in Sources */,
 				1AB6463EC84EE694C9C25014 /* SharedProtectedStateStore.swift in Sources */,
+				8990534B918CAEFAD171D850 /* SharedPublicStateStore.swift in Sources */,
 				A6F69284943D1182E1B51CAF /* StarterPromptRow.swift in Sources */,
 				6DA412FD0DD7AC208999EBF5 /* SupportInboxStore.swift in Sources */,
 				8778D84FF644B965A734E2AE /* SupportMetricBlock.swift in Sources */,
@@ -1224,6 +1232,7 @@
 				AA8B9D1227CD427C509C62B4 /* ScenarioType.swift in Sources */,
 				CF27D67C84FD09BF673A2FDB /* SharedContainer.swift in Sources */,
 				08AAF44BA0112CC0995586EE /* SharedProtectedStateStore.swift in Sources */,
+				574A6FB243FDE3722FF35CB5 /* SharedPublicStateStore.swift in Sources */,
 				724B3ED07F43AD1C16829158 /* SupportSurfaceTarget.swift in Sources */,
 				19263068F7BD5DEF2A611842 /* TomorrowBoxDelay.swift in Sources */,
 				A1F804F13673E29E07AFAE94 /* WidgetSafeCopy.swift in Sources */,
@@ -1287,6 +1296,7 @@
 				97C51D0659C57FEAD7D96D35 /* TomorrowBoxDraftTests.swift in Sources */,
 				935762696332C27C6E44D685 /* TomorrowBoxItemFactoryTests.swift in Sources */,
 				5888AC82F3C7C85C034AB622 /* WidgetSafeCopyTests.swift in Sources */,
+				791E1711F13D94E4650C007A /* WidgetSnapshotStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
