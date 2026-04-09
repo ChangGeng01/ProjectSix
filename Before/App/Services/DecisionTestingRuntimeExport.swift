@@ -144,6 +144,18 @@ struct DecisionTestingRuntimeExport {
             promotedByKind: averageRelevantMemoryCountByKind,
             pendingByKind: averageScreenedOutMemoryCountByKind
         )
+        let latestSnapshotByKind = Dictionary(grouping: brainTraces, by: \.0)
+            .compactMapValues { grouped in
+                grouped.first?.1.verificationSnapshot
+            }
+        let snapshotVariantCountByKind = Dictionary(grouping: brainTraces, by: \.0)
+            .mapValues { grouped in
+                Set(grouped.map { $0.1.verificationSnapshot.fingerprint }).count
+            }
+        let lowTrustMemoryLoadRateByKind = averageBrainMetricByKind {
+            $0.verificationSnapshot.lowTrustMemoryLoadRate
+        }
+        let riskFlagCountsByKind = aggregatedBrainRiskFlagCountsByKind()
 
         return DecisionTestingBrainSummary(
             brainTraceCount: brainTraces.count,
@@ -159,7 +171,11 @@ struct DecisionTestingRuntimeExport {
             loadedEligibilityReasonCountsByKind: loadedEligibilityReasonCountsByKind,
             screenedOutEligibilityReasonCountsByKind: screenedOutEligibilityReasonCountsByKind,
             pendingMemoryLoadRateByKind: pendingMemoryLoadRateByKind,
-            retrievalRejectionRateByKind: retrievalRejectionRateByKind
+            retrievalRejectionRateByKind: retrievalRejectionRateByKind,
+            latestSnapshotByKind: latestSnapshotByKind,
+            snapshotVariantCountByKind: snapshotVariantCountByKind,
+            lowTrustMemoryLoadRateByKind: lowTrustMemoryLoadRateByKind,
+            riskFlagCountsByKind: riskFlagCountsByKind
         )
     }
 
@@ -252,6 +268,10 @@ struct DecisionTestingRuntimeExport {
             screenedOutEligibilityReasonCountsByKind: brainSummary.screenedOutEligibilityReasonCountsByKind,
             pendingMemoryLoadRateByKind: brainSummary.pendingMemoryLoadRateByKind,
             retrievalRejectionRateByKind: brainSummary.retrievalRejectionRateByKind,
+            brainSnapshotFingerprintByKind: brainSummary.latestSnapshotByKind.mapValues(\.fingerprint),
+            brainSnapshotVariantCountByKind: brainSummary.snapshotVariantCountByKind,
+            lowTrustMemoryLoadRateByKind: brainSummary.lowTrustMemoryLoadRateByKind,
+            brainRiskFlagCountsByKind: brainSummary.riskFlagCountsByKind,
             traceCount: recentTraces.count,
             replayCount: recentReplay.count,
             totalCacheEntries: cacheTelemetry.entryCountByKind.values.reduce(0, +),
@@ -461,6 +481,24 @@ struct DecisionTestingRuntimeExport {
         }
     }
 
+    private func averageBrainMetricByKind(
+        _ projection: (DecisionBrainState) -> Double
+    ) -> [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            grouping: recentTraces.compactMap { trace in
+                trace.brainState.map { (trace.kind, $0) }
+            },
+            by: \.0
+        )
+        .compactMapValues { grouped in
+            guard !grouped.isEmpty else { return nil }
+            let total = grouped.reduce(0.0) { partialResult, item in
+                partialResult + projection(item.1)
+            }
+            return total / Double(grouped.count)
+        }
+    }
+
     private func aggregatedBrainReasonCountsByKind(
         _ keyPath: KeyPath<DecisionMemoryGovernanceState, [DecisionMemoryEligibilityReason: Int]>
     ) -> [DecisionIntelligenceTraceKind: [DecisionMemoryEligibilityReason: Int]] {
@@ -474,6 +512,23 @@ struct DecisionTestingRuntimeExport {
             grouped.reduce(into: [:]) { partialResult, item in
                 for (reason, count) in item.1.memoryGovernance[keyPath: keyPath] {
                     partialResult[reason, default: 0] += count
+                }
+            }
+        }
+    }
+
+    private func aggregatedBrainRiskFlagCountsByKind(
+    ) -> [DecisionIntelligenceTraceKind: [DecisionBrainStateRiskFlag: Int]] {
+        Dictionary(
+            grouping: recentTraces.compactMap { trace in
+                trace.brainState.map { (trace.kind, $0) }
+            },
+            by: \.0
+        )
+        .mapValues { grouped in
+            grouped.reduce(into: [:]) { partialResult, item in
+                for flag in item.1.verificationSnapshot.riskFlags {
+                    partialResult[flag, default: 0] += 1
                 }
             }
         }
@@ -557,6 +612,10 @@ struct DecisionTestingBrainSummary: Equatable, Sendable {
     let screenedOutEligibilityReasonCountsByKind: [DecisionIntelligenceTraceKind: [DecisionMemoryEligibilityReason: Int]]
     let pendingMemoryLoadRateByKind: [DecisionIntelligenceTraceKind: Double]
     let retrievalRejectionRateByKind: [DecisionIntelligenceTraceKind: Double]
+    let latestSnapshotByKind: [DecisionIntelligenceTraceKind: DecisionBrainStateSnapshot]
+    let snapshotVariantCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let lowTrustMemoryLoadRateByKind: [DecisionIntelligenceTraceKind: Double]
+    let riskFlagCountsByKind: [DecisionIntelligenceTraceKind: [DecisionBrainStateRiskFlag: Int]]
 }
 
 struct DecisionTestingRuntimeSummary: Equatable, Sendable {
@@ -646,6 +705,10 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let screenedOutEligibilityReasonCountsByKind: [DecisionIntelligenceTraceKind: [DecisionMemoryEligibilityReason: Int]]
     let pendingMemoryLoadRateByKind: [DecisionIntelligenceTraceKind: Double]
     let retrievalRejectionRateByKind: [DecisionIntelligenceTraceKind: Double]
+    let brainSnapshotFingerprintByKind: [DecisionIntelligenceTraceKind: String]
+    let brainSnapshotVariantCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let lowTrustMemoryLoadRateByKind: [DecisionIntelligenceTraceKind: Double]
+    let brainRiskFlagCountsByKind: [DecisionIntelligenceTraceKind: [DecisionBrainStateRiskFlag: Int]]
     let traceCount: Int
     let replayCount: Int
     let totalCacheEntries: Int

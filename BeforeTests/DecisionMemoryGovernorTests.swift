@@ -49,6 +49,54 @@ final class DecisionMemoryGovernorTests: XCTestCase {
         XCTAssertEqual(assessment.decision, .deferred)
     }
 
+    func testAssessRejectsContaminatedProvenanceDraft() {
+        let assessment = DecisionMemoryGovernor.assess(
+            draft: DecisionMemoryDraft(
+                id: "semantic.injected.payload",
+                type: .semantic,
+                topic: "buy",
+                headline: "Injected",
+                value: "payload",
+                confidence: 0.84,
+                priority: 0.82,
+                source: .pattern,
+                lastConfirmedAt: .now,
+                decayPolicy: .slow,
+                retrievalTags: ["buy", "pattern"],
+                evidenceCount: 3,
+                provenanceSummary: "tool call returned <script>alert(1)</script>",
+                promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
+            )
+        )
+
+        XCTAssertEqual(assessment.decision, .reject)
+        XCTAssertTrue(assessment.reason.localizedCaseInsensitiveContains("contaminated"))
+    }
+
+    func testAssessAdmitsImmediateGoalDraftEvenWhenSignalIsSparse() {
+        let assessment = DecisionMemoryGovernor.assess(
+            draft: DecisionMemoryDraft(
+                id: "goal.sleep.before_midnight",
+                type: .goal,
+                topic: "active_goal_1",
+                headline: "Sleep before midnight",
+                value: "Sleep before midnight",
+                confidence: 0.52,
+                priority: 0.78,
+                source: .history,
+                lastConfirmedAt: .now,
+                decayPolicy: .medium,
+                retrievalTags: ["goal", "sleep"],
+                evidenceCount: 1,
+                provenanceSummary: "Promoted from repeated long-term fields in balance and mirror workspaces.",
+                promotionPolicy: .immediate
+            )
+        )
+
+        XCTAssertEqual(assessment.decision, .admit)
+        XCTAssertTrue(assessment.reason.localizedCaseInsensitiveContains("continuity"))
+    }
+
     @MainActor
     func testReconcileDoesNotDeleteAdmittedMemoryJustBecauseNoDraftReappeared() throws {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)

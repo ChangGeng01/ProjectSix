@@ -77,6 +77,7 @@ enum DecisionMemorySystem {
         let source: DecisionMemorySource
         let priority: Double
         let confidence: Double
+        let evidenceCount: Int
         let retrievalTags: [String]
         let lastConfirmedAt: Date
         let decayPolicy: DecisionMemoryDecayPolicy
@@ -84,6 +85,7 @@ enum DecisionMemorySystem {
         let governanceStatus: DecisionGovernedMemoryStatus
         let isPending: Bool
         let provenanceSummary: String
+        let sourceTrustProfile: DecisionMemoryTrustProfile
 
         init(record: DecisionMemoryRecord) {
             id = record.id
@@ -92,6 +94,7 @@ enum DecisionMemorySystem {
             source = record.source
             priority = record.priority
             confidence = record.confidence
+            evidenceCount = record.evidenceCount
             retrievalTags = record.retrievalTags
             lastConfirmedAt = record.lastConfirmedAt
             decayPolicy = record.decayPolicy
@@ -99,6 +102,14 @@ enum DecisionMemorySystem {
             governanceStatus = .admitted
             isPending = false
             provenanceSummary = record.provenanceSummary
+            sourceTrustProfile = DecisionMemoryTrustEngine.profile(
+                source: record.source,
+                evidenceCount: record.evidenceCount,
+                decayPolicy: record.decayPolicy,
+                governanceStatus: .admitted,
+                isPending: false,
+                provenanceSummary: record.provenanceSummary
+            )
         }
 
         init(candidate: DecisionMemoryCandidateRecord) {
@@ -108,6 +119,7 @@ enum DecisionMemorySystem {
             source = candidate.source
             priority = candidate.priority
             confidence = candidate.confidence
+            evidenceCount = candidate.evidenceCount
             retrievalTags = candidate.retrievalTags
             lastConfirmedAt = candidate.lastObservedAt
             decayPolicy = candidate.decayPolicy
@@ -115,6 +127,21 @@ enum DecisionMemorySystem {
             governanceStatus = candidate.lastGovernanceDecision == .deferred ? .deferred : .pending
             isPending = candidate.status == .pending
             provenanceSummary = candidate.provenanceSummary
+            sourceTrustProfile = DecisionMemoryTrustEngine.profile(
+                source: candidate.source,
+                evidenceCount: candidate.evidenceCount,
+                decayPolicy: candidate.decayPolicy,
+                governanceStatus: candidate.lastGovernanceDecision == .deferred ? .deferred : .pending,
+                isPending: candidate.status == .pending,
+                provenanceSummary: candidate.provenanceSummary
+            )
+        }
+
+        var effectiveConfidence: Double {
+            DecisionMemoryTrustEngine.effectiveConfidence(
+                rawConfidence: confidence,
+                trustProfile: sourceTrustProfile
+            )
         }
 
         var eligibilityCandidate: DecisionMemoryEligibilityCandidate {
@@ -131,7 +158,11 @@ enum DecisionMemorySystem {
                 lifecycleState: lifecycleState,
                 governanceStatus: governanceStatus,
                 isPending: isPending,
-                provenanceSummary: provenanceSummary
+                provenanceSummary: provenanceSummary,
+                sourceTrustScore: sourceTrustProfile.score,
+                sourceTrustTier: sourceTrustProfile.tier,
+                effectiveConfidence: effectiveConfidence,
+                provenanceRisk: sourceTrustProfile.provenanceRisk
             )
         }
     }
@@ -209,16 +240,17 @@ enum DecisionMemorySystem {
             score($0, mode: mode, queryTags: queryTags, now: now) >
                 score($1, mode: mode, queryTags: queryTags, now: now)
         }
-        let retrievalCandidates = orderedItems
+        let retrievalPool = orderedItems
             .filter { retrievalPlan.includesPendingCandidates || !$0.isPending }
-            .prefix(retrievalPlan.candidateLimit)
         let retrievalJudgeResult = judgeRetrievalCandidates(
-            from: Array(retrievalCandidates),
+            from: Array(retrievalPool),
             mode: mode,
             queryTags: queryTags,
             now: now
         )
-        let retrievalQualifiedItems = retrievalJudgeResult.allowedItems
+        let retrievalQualifiedItems = Array(
+            retrievalJudgeResult.allowedItems.prefix(retrievalPlan.candidateLimit)
+        )
 
         let profileItems = selectItems(
             from: retrievalQualifiedItems,
@@ -952,19 +984,22 @@ enum DecisionMemorySystem {
         }
 
         let ageInDays = max(0, now.timeIntervalSince(memory.lastConfirmedAt) / 86_400)
+        let effectiveFastDecayWindow = 45 * memory.sourceTrustProfile.decayGraceMultiplier
+        let effectiveMediumDecayWindow = 120 * memory.sourceTrustProfile.decayGraceMultiplier
+        let effectiveSlowDecayWindow = 240 * memory.sourceTrustProfile.decayGraceMultiplier
         let decayMultiplier: Double = switch memory.decayPolicy {
         case .stable:
             1.0
         case .slow:
-            max(0.82, 1.0 - (ageInDays / 240))
+            max(0.82, 1.0 - (ageInDays / effectiveSlowDecayWindow))
         case .medium:
-            max(0.65, 1.0 - (ageInDays / 120))
+            max(0.65, 1.0 - (ageInDays / effectiveMediumDecayWindow))
         case .fast:
-            max(0.45, 1.0 - (ageInDays / 45))
+            max(0.45, 1.0 - (ageInDays / effectiveFastDecayWindow))
         }
 
         let pendingPenalty = memory.isPending ? 0.88 : 1.0
-        return ((memory.priority * 5) + (memory.confidence * 3) + overlap + typeBoost) *
+        return ((memory.priority * 5) + (memory.effectiveConfidence * 3) + overlap + typeBoost) *
             decayMultiplier *
             pendingPenalty
     }
@@ -1033,6 +1068,8 @@ enum DecisionMemorySystem {
             lifecycleState: item.lifecycleState.rawValue,
             governanceStatus: item.governanceStatus,
             eligibility: evaluated.eligibility,
+            sourceTrustScore: item.sourceTrustProfile.score,
+            sourceTrustTier: item.sourceTrustProfile.tier,
             retrievalTags: item.retrievalTags,
             isPending: item.isPending,
             provenanceSummary: item.provenanceSummary

@@ -300,7 +300,9 @@ extension DecisionAdaptiveTaskStrategy {
         let shouldGuardRetrieval =
             (contextState?.rebuiltSession == true) ||
             ((contextState?.staleFieldCount ?? 0) > 0) ||
-            ((brainState?.memoryGovernance.screenedOutMemoryCount ?? 0) >= 3)
+            ((brainState?.memoryGovernance.screenedOutMemoryCount ?? 0) >= 3) ||
+            (brainState?.verificationSnapshot.riskFlags.contains(.lowTrustLoad) == true) ||
+            (brainState?.verificationSnapshot.riskFlags.contains(.retrievalInstability) == true)
 
         if shouldGuardRetrieval {
             switch retrievalMode {

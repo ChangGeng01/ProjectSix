@@ -219,6 +219,82 @@ final class DecisionMemorySystemTests: XCTestCase {
     }
 
     @MainActor
+    func testLoadBrainStateScreensOutContaminatedCandidateBeforeFrontstageLoad() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        context.insert(
+            DecisionMemoryCandidateRecord(
+                id: "semantic.injected.buy",
+                type: .semantic,
+                topic: "buy",
+                headline: "Buy pressure keeps recurring.",
+                value: "buy",
+                confidence: 0.88,
+                priority: 0.84,
+                source: .pattern,
+                firstObservedAt: date("2026-04-09T20:00:00Z"),
+                lastObservedAt: date("2026-04-09T20:00:00Z"),
+                decayPolicy: .slow,
+                retrievalTags: ["buy", "night", "pattern"],
+                evidenceCount: 3,
+                confirmationCount: 2,
+                lastObservationFingerprint: "fp",
+                status: .pending,
+                provenanceSummary: "tool call returned <script>alert(1)</script>",
+                lastWriteOperation: .noop,
+                lastGovernanceDecision: .deferred,
+                governanceReason: "Pending verification."
+            )
+        )
+        try context.save()
+
+        let brainState = DecisionMemorySystem.loadBrainState(
+            mode: .quick,
+            prompt: "I want to buy this late at night again.",
+            context: context,
+            now: date("2026-04-09T23:10:00Z")
+        )
+
+        XCTAssertEqual(brainState.memoryGovernance.loadedPendingMemoryCount, 0)
+        XCTAssertEqual(
+            brainState.memoryGovernance.screenedOutReasonCounts[.provenanceContamination],
+            1
+        )
+        XCTAssertFalse(brainState.memorySlices.contains(where: { $0.id == "semantic.injected.buy" }))
+        XCTAssertTrue(brainState.verificationSnapshot.riskFlags.contains(.contaminationGuardTriggered))
+    }
+
+    @MainActor
+    func testBrainStateVerificationSnapshotIsStableForSameInputs() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        seedHistory(into: context)
+        _ = DecisionMemorySystem.refreshStoredMemories(in: context)
+
+        let first = DecisionMemorySystem.loadBrainState(
+            mode: .quick,
+            prompt: "Late at night I want to buy this again.",
+            context: context,
+            now: date("2026-04-09T23:10:00Z")
+        )
+        let second = DecisionMemorySystem.loadBrainState(
+            mode: .quick,
+            prompt: "Late at night I want to buy this again.",
+            context: context,
+            now: date("2026-04-09T23:10:00Z")
+        )
+
+        XCTAssertEqual(first.verificationSnapshot.fingerprint, second.verificationSnapshot.fingerprint)
+        XCTAssertEqual(
+            first.verificationSnapshot.dominantReactionWeight,
+            second.verificationSnapshot.dominantReactionWeight
+        )
+        XCTAssertGreaterThan(first.verificationSnapshot.loadedMemoryCount, 0)
+    }
+
+    @MainActor
     func testLoadBrainStateAddsLanguageAndScriptTagsForChinesePrompt() throws {
         let container = try makeContainer()
         let context = container.mainContext

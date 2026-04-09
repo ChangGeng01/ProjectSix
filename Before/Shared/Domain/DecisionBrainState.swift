@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 enum DecisionReactionWeightKey: String, CaseIterable, Codable, Sendable {
@@ -79,6 +80,12 @@ enum DecisionBrainMemoryRole: String, Codable, Sendable {
     case relevant
 }
 
+enum DecisionMemorySourceTrustTier: String, Codable, Sendable {
+    case low
+    case medium
+    case high
+}
+
 enum DecisionMemoryEligibilityReason: String, CaseIterable, Codable, Sendable {
     case identityOverride = "identity_override"
     case goalOverride = "goal_override"
@@ -89,6 +96,9 @@ enum DecisionMemoryEligibilityReason: String, CaseIterable, Codable, Sendable {
     case confidenceNoOverlap = "confidence_no_overlap"
     case supportPriorityNoOverlap = "support_priority_no_overlap"
     case semanticPriorityNoOverlap = "semantic_priority_no_overlap"
+    case provenanceContamination = "provenance_contamination"
+    case lowTrustPending = "low_trust_pending"
+    case tagFloodNoOverlap = "tag_flood_no_overlap"
     case defaultAllowed = "default_allowed"
 }
 
@@ -122,9 +132,28 @@ struct DecisionGovernedMemorySlice: Codable, Equatable, Identifiable, Sendable {
     let lifecycleState: String
     let governanceStatus: DecisionGovernedMemoryStatus
     let eligibility: DecisionMemoryEligibilityDecision
+    let sourceTrustScore: Double
+    let sourceTrustTier: DecisionMemorySourceTrustTier
     let retrievalTags: [String]
     let isPending: Bool
     let provenanceSummary: String
+}
+
+enum DecisionBrainStateRiskFlag: String, Codable, Sendable {
+    case highPendingInfluence = "high_pending_influence"
+    case lowTrustLoad = "low_trust_load"
+    case contaminationGuardTriggered = "contamination_guard_triggered"
+    case retrievalInstability = "retrieval_instability"
+    case tagFloodBlocked = "tag_flood_blocked"
+}
+
+struct DecisionBrainStateSnapshot: Codable, Equatable, Sendable {
+    let fingerprint: String
+    let dominantReactionWeight: DecisionReactionWeightKey
+    let loadedMemoryCount: Int
+    let pendingMemoryLoadRate: Double
+    let lowTrustMemoryLoadRate: Double
+    let riskFlags: [DecisionBrainStateRiskFlag]
 }
 
 struct DecisionMemoryGovernanceState: Codable, Equatable, Sendable {
@@ -229,6 +258,82 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
             retrievalTags.isEmpty
     }
 
+    var verificationSnapshot: DecisionBrainStateSnapshot {
+        let governanceLoadedMemoryCount = memoryGovernance.loadedPromotedMemoryCount +
+            memoryGovernance.loadedPendingMemoryCount
+        let loadedMemoryCount = max(memorySlices.count, governanceLoadedMemoryCount)
+        let pendingMemoryCount = max(
+            memorySlices.filter(\.isPending).count,
+            memoryGovernance.loadedPendingMemoryCount
+        )
+        let lowTrustMemoryCount = memorySlices.filter { $0.sourceTrustTier == .low }.count
+
+        let pendingMemoryLoadRate = loadedMemoryCount > 0
+            ? Double(pendingMemoryCount) / Double(loadedMemoryCount)
+            : 0
+        let lowTrustMemoryLoadRate = loadedMemoryCount > 0
+            ? Double(lowTrustMemoryCount) / Double(loadedMemoryCount)
+            : 0
+
+        var riskFlags: [DecisionBrainStateRiskFlag] = []
+        if pendingMemoryLoadRate >= 0.34 {
+            riskFlags.append(.highPendingInfluence)
+        }
+        if lowTrustMemoryLoadRate >= 0.25 {
+            riskFlags.append(.lowTrustLoad)
+        }
+        if (memoryGovernance.screenedOutReasonCounts[.provenanceContamination] ?? 0) > 0 {
+            riskFlags.append(.contaminationGuardTriggered)
+        }
+        if memoryGovernance.screenedOutMemoryCount >= max(4, loadedMemoryCount) {
+            riskFlags.append(.retrievalInstability)
+        }
+        if (memoryGovernance.screenedOutReasonCounts[.tagFloodNoOverlap] ?? 0) > 0 {
+            riskFlags.append(.tagFloodBlocked)
+        }
+
+        let material = [
+            profileCore.sorted().joined(separator: "|"),
+            activeGoals.sorted().joined(separator: "|"),
+            relevantMemories.sorted().joined(separator: "|"),
+            sessionBiases.sorted().joined(separator: "|"),
+            retrievalTags.sorted().joined(separator: "|"),
+            reactionWeights.dominantKey.rawValue,
+            memorySlices
+                .sorted { $0.id < $1.id }
+                .map { slice in
+                    [
+                        slice.id,
+                        slice.role.rawValue,
+                        slice.headline,
+                        slice.source,
+                        String(format: "%.3f", slice.sourceTrustScore),
+                        slice.sourceTrustTier.rawValue,
+                        slice.governanceStatus.rawValue,
+                        slice.isPending ? "pending" : "stable"
+                    ]
+                    .joined(separator: "::")
+                }
+                .joined(separator: "||"),
+            riskFlags.map(\.rawValue).sorted().joined(separator: "|")
+        ]
+        .joined(separator: "###")
+
+        let fingerprint = SHA256.hash(data: Data(material.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+            .prefix(20)
+
+        return DecisionBrainStateSnapshot(
+            fingerprint: String(fingerprint),
+            dominantReactionWeight: reactionWeights.dominantKey,
+            loadedMemoryCount: loadedMemoryCount,
+            pendingMemoryLoadRate: pendingMemoryLoadRate,
+            lowTrustMemoryLoadRate: lowTrustMemoryLoadRate,
+            riskFlags: riskFlags
+        )
+    }
+
     private static func legacyMemorySlices(
         profileCore: [String],
         activeGoals: [String],
@@ -249,6 +354,8 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
                 lifecycleState: "active",
                 governanceStatus: .admitted,
                 eligibility: defaultEligibility,
+                sourceTrustScore: 1,
+                sourceTrustTier: .high,
                 retrievalTags: defaultTags,
                 isPending: false,
                 provenanceSummary: "Legacy profile core projection."
@@ -267,6 +374,8 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
                 lifecycleState: "active",
                 governanceStatus: .admitted,
                 eligibility: defaultEligibility,
+                sourceTrustScore: 1,
+                sourceTrustTier: .high,
                 retrievalTags: defaultTags,
                 isPending: false,
                 provenanceSummary: "Legacy active-goal projection."
@@ -285,6 +394,8 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
                 lifecycleState: "active",
                 governanceStatus: .admitted,
                 eligibility: defaultEligibility,
+                sourceTrustScore: 1,
+                sourceTrustTier: .high,
                 retrievalTags: defaultTags,
                 isPending: false,
                 provenanceSummary: "Legacy relevant-memory projection."

@@ -596,10 +596,16 @@ struct DecisionTestingInterfaceTests {
         #expect(export.brainSummary.loadedEligibilityReasonCountsByKind[.quick]?[.goalOverride] == 1)
         #expect(export.brainSummary.screenedOutEligibilityReasonCountsByKind[.quick]?[.confidenceNoOverlap] == 1)
         #expect(export.brainSummary.pendingMemoryLoadRateByKind[.quick] == 0.25)
+        #expect(export.brainSummary.latestSnapshotByKind[.quick]?.dominantReactionWeight == .interruptiveActionBias)
+        #expect(export.brainSummary.snapshotVariantCountByKind[.quick] == 1)
+        #expect(export.brainSummary.lowTrustMemoryLoadRateByKind[.quick] == 0)
         #expect(export.summary.brainTraceCount == 1)
         #expect(export.summary.dominantReactionWeightByKind[.quick] == .interruptiveActionBias)
         #expect(export.summary.loadedEligibilityReasonCountsByKind[.quick]?[.goalOverride] == 1)
         #expect(export.summary.screenedOutEligibilityReasonCountsByKind[.quick]?[.confidenceNoOverlap] == 1)
         #expect(export.summary.pendingMemoryLoadRateByKind[.quick] == 0.25)
+        #expect((export.summary.brainSnapshotFingerprintByKind[.quick] ?? "").isEmpty == false)
+        #expect(export.summary.brainSnapshotVariantCountByKind[.quick] == 1)
+        #expect(export.summary.lowTrustMemoryLoadRateByKind[.quick] == 0)
     }
 }

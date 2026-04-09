@@ -14,6 +14,10 @@ struct DecisionMemoryEligibilityCandidate: Equatable, Sendable {
     let governanceStatus: DecisionGovernedMemoryStatus
     let isPending: Bool
     let provenanceSummary: String
+    let sourceTrustScore: Double
+    let sourceTrustTier: DecisionMemorySourceTrustTier
+    let effectiveConfidence: Double
+    let provenanceRisk: Bool
 }
 
 enum DecisionMemoryEligibilityJudge {
@@ -36,7 +40,18 @@ enum DecisionMemoryEligibilityJudge {
         let hasTagOverlap = !meaningfulItemTags.intersection(meaningfulQueryTags).isEmpty
         let ageHours = max(0, now.timeIntervalSince(candidate.lastConfirmedAt) / 3_600)
 
+        if candidate.provenanceRisk {
+            return .screenedOut(.provenanceContamination)
+        }
+
+        if meaningfulItemTags.count >= 9, !hasTagOverlap {
+            return .screenedOut(.tagFloodNoOverlap)
+        }
+
         if candidate.isPending {
+            if candidate.sourceTrustTier == .low, !hasTagOverlap, ageHours <= 18 {
+                return .screenedOut(.lowTrustPending)
+            }
             return hasTagOverlap
                 ? .allowed(.pendingTagOverlap)
                 : (ageHours <= 18 ? .allowed(.pendingGraceWindow) : .screenedOut(.confidenceNoOverlap))
@@ -48,7 +63,7 @@ enum DecisionMemoryEligibilityJudge {
                 : (ageHours <= 24 ? .allowed(.fastDecayGraceWindow) : .screenedOut(.confidenceNoOverlap))
         }
 
-        if candidate.confidence < 0.62, !hasTagOverlap {
+        if candidate.effectiveConfidence < 0.62, !hasTagOverlap {
             return .screenedOut(.confidenceNoOverlap)
         }
 
