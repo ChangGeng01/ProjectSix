@@ -1,4 +1,5 @@
 import XCTest
+import SwiftData
 @testable import Before
 
 final class DecisionMemoryGovernorTests: XCTestCase {
@@ -46,5 +47,42 @@ final class DecisionMemoryGovernorTests: XCTestCase {
         )
 
         XCTAssertEqual(assessment.decision, .deferred)
+    }
+
+    @MainActor
+    func testReconcileDoesNotDeleteAdmittedMemoryJustBecauseNoDraftReappeared() throws {
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: DecisionMemoryRecord.self,
+            DecisionMemoryCandidateRecord.self,
+            configurations: configuration
+        )
+        let context = container.mainContext
+
+        let record = DecisionMemoryRecord(
+            id: "semantic.repeat.buy",
+            type: .semantic,
+            topic: "repeat_scenario",
+            headline: "Buying pressure keeps recurring.",
+            value: "buy",
+            confidence: 0.82,
+            priority: 0.8,
+            source: .pattern,
+            lastConfirmedAt: .now,
+            decayPolicy: .slow,
+            retrievalTags: ["buy", "pattern"],
+            evidenceCount: 3,
+            observationCount: 3,
+            provenanceSummary: "Derived from repeated quick-check events."
+        )
+        context.insert(record)
+        try context.save()
+
+        let records = DecisionMemoryGovernor.reconcile(drafts: [], in: context)
+
+        XCTAssertEqual(records.count, 1)
+        XCTAssertEqual(records.first?.id, "semantic.repeat.buy")
+        XCTAssertNotEqual(records.first?.lifecycleState, .retired)
+        XCTAssertNotNil(records.first?.lastReviewedAt)
     }
 }

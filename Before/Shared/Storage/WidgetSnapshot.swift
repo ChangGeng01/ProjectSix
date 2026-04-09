@@ -6,16 +6,24 @@ struct WidgetSnapshot: Codable, Sendable {
     var latestScenario: ScenarioType?
     var updatedAt: Date
 
+    var sanitizedMessage: WidgetSafeMessage {
+        WidgetSafeCopy.sanitizedMessage(
+            safeMessage,
+            scenario: latestScenario,
+            verdict: latestVerdict
+        )
+    }
+
     var messageHeadline: String {
-        safeMessage?.headline ?? WidgetSafeMessage.generic.headline
+        sanitizedMessage.headline
     }
 
     var messageBody: String {
-        safeMessage?.body ?? WidgetSafeMessage.generic.body
+        sanitizedMessage.body
     }
 
     var messageSurface: WidgetMessageSurface {
-        safeMessage?.surface ?? .publicSafe
+        sanitizedMessage.surface
     }
 
     static let empty = WidgetSnapshot(
@@ -41,7 +49,12 @@ enum WidgetSnapshotStore {
         else {
             return .empty
         }
-        return snapshot
+        return WidgetSnapshot(
+            safeMessage: snapshot.sanitizedMessage,
+            latestVerdict: snapshot.latestVerdict,
+            latestScenario: snapshot.latestScenario,
+            updatedAt: snapshot.updatedAt
+        )
     }
 
     static func clear() {

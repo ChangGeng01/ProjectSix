@@ -42,6 +42,12 @@ enum DecisionMemoryGovernanceDecision: String, Codable, Sendable {
     case reject
 }
 
+enum DecisionMemoryLifecycleState: String, Codable, Sendable {
+    case active
+    case aging
+    case retired
+}
+
 @Model
 final class DecisionMemoryRecord {
     @Attribute(.unique) var id: String
@@ -58,6 +64,8 @@ final class DecisionMemoryRecord {
     var evidenceCount: Int
     var observationCount: Int
     var provenanceSummary: String
+    var lifecycleStateRaw: String?
+    var lastReviewedAt: Date?
 
     init(
         id: String,
@@ -73,7 +81,9 @@ final class DecisionMemoryRecord {
         retrievalTags: [String],
         evidenceCount: Int,
         observationCount: Int,
-        provenanceSummary: String
+        provenanceSummary: String,
+        lifecycleState: DecisionMemoryLifecycleState = .active,
+        lastReviewedAt: Date? = nil
     ) {
         self.id = id
         self.typeRaw = type.rawValue
@@ -89,6 +99,8 @@ final class DecisionMemoryRecord {
         self.evidenceCount = evidenceCount
         self.observationCount = observationCount
         self.provenanceSummary = provenanceSummary
+        self.lifecycleStateRaw = lifecycleState.rawValue
+        self.lastReviewedAt = lastReviewedAt ?? lastConfirmedAt
     }
 }
 
@@ -175,6 +187,14 @@ extension DecisionMemoryRecord {
 
     var retrievalTags: [String] {
         Self.decodeTags(retrievalTagsBlob)
+    }
+
+    var lifecycleState: DecisionMemoryLifecycleState {
+        DecisionMemoryLifecycleState(rawValue: lifecycleStateRaw ?? "") ?? .active
+    }
+
+    var reviewedAt: Date {
+        lastReviewedAt ?? lastConfirmedAt
     }
 
     static func encodeTags(_ tags: [String]) -> String {

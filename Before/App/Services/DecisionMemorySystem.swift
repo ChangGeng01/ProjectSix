@@ -35,7 +35,11 @@ struct DecisionMemoryDraft: Sendable {
         .joined(separator: "::")
     }
 
-    func makeRecord(observationCount: Int) -> DecisionMemoryRecord {
+    func makeRecord(
+        observationCount: Int,
+        lifecycleState: DecisionMemoryLifecycleState = .active,
+        lastReviewedAt: Date? = nil
+    ) -> DecisionMemoryRecord {
         DecisionMemoryRecord(
             id: id,
             type: type,
@@ -50,7 +54,9 @@ struct DecisionMemoryDraft: Sendable {
             retrievalTags: retrievalTags,
             evidenceCount: evidenceCount,
             observationCount: observationCount,
-            provenanceSummary: provenanceSummary
+            provenanceSummary: provenanceSummary,
+            lifecycleState: lifecycleState,
+            lastReviewedAt: lastReviewedAt
         )
     }
 }
@@ -251,7 +257,9 @@ enum DecisionMemorySystem {
         let pendingCandidates = candidates
             .filter { $0.status == .pending }
             .map(BrainMemoryItem.init(candidate:))
-        let activeRecords = records.map(BrainMemoryItem.init(record:))
+        let activeRecords = records
+            .filter { $0.lifecycleState != .retired }
+            .map(BrainMemoryItem.init(record:))
 
         var byID: [String: BrainMemoryItem] = [:]
         for item in activeRecords + pendingCandidates {

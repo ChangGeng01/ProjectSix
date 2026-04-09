@@ -11,6 +11,7 @@ enum DecisionMemoryGovernor {
         drafts: [DecisionMemoryDraft],
         in context: ModelContext
     ) -> [DecisionMemoryRecord] {
+        let reviewNow = drafts.map(\.lastConfirmedAt).max() ?? .now
         let existingRecords = fetchRecords(in: context)
         let existingCandidates = fetchCandidates(in: context)
 
@@ -72,7 +73,11 @@ enum DecisionMemoryGovernor {
                         candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation.noop.rawValue
                     }
                 } else {
-                    let record = draft.makeRecord(observationCount: candidate.confirmationCount)
+                    let record = draft.makeRecord(
+                        observationCount: candidate.confirmationCount,
+                        lifecycleState: .active,
+                        lastReviewedAt: reviewNow
+                    )
                     context.insert(record)
                     recordsByID[draft.id] = record
                     candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation.add.rawValue
@@ -91,11 +96,10 @@ enum DecisionMemoryGovernor {
         let recordIDsToDelete = recordsByID.keys.filter { !seenDraftIDs.contains($0) }
         for id in recordIDsToDelete {
             guard let record = recordsByID[id] else { continue }
-            context.delete(record)
-            if let candidate = candidatesByID[id] {
+            transitionLifecycle(for: record, reviewNow: reviewNow)
+            if let candidate = candidatesByID[id], record.lifecycleState == .retired {
                 candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation.delete.rawValue
             }
-            recordsByID[id] = nil
         }
 
         let candidateIDsToDelete = candidatesByID.keys.filter { !seenDraftIDs.contains($0) }
@@ -247,6 +251,8 @@ enum DecisionMemoryGovernor {
         record.evidenceCount = draft.evidenceCount
         record.observationCount = candidate.confirmationCount
         record.provenanceSummary = draft.provenanceSummary
+        record.lifecycleStateRaw = DecisionMemoryLifecycleState.active.rawValue
+        record.lastReviewedAt = max(record.reviewedAt, draft.lastConfirmedAt)
 
         return originalTypeRaw != record.typeRaw ||
             originalTopic != record.topic ||
@@ -261,6 +267,26 @@ enum DecisionMemoryGovernor {
             originalEvidenceCount != record.evidenceCount ||
             originalObservationCount != record.observationCount ||
             originalProvenanceSummary != record.provenanceSummary
+    }
+
+    private static func transitionLifecycle(
+        for record: DecisionMemoryRecord,
+        reviewNow: Date
+    ) {
+        let ageInDays = max(0, reviewNow.timeIntervalSince(record.lastConfirmedAt) / 86_400)
+        let nextState: DecisionMemoryLifecycleState = switch record.decayPolicy {
+        case .stable:
+            ageInDays >= 365 ? .aging : .active
+        case .slow:
+            ageInDays >= 120 ? .retired : (ageInDays >= 45 ? .aging : .active)
+        case .medium:
+            ageInDays >= 45 ? .retired : (ageInDays >= 14 ? .aging : .active)
+        case .fast:
+            ageInDays >= 10 ? .retired : (ageInDays >= 3 ? .aging : .active)
+        }
+
+        record.lifecycleStateRaw = nextState.rawValue
+        record.lastReviewedAt = reviewNow
     }
 }
 

@@ -44,8 +44,8 @@ final class WidgetSafeCopyTests: XCTestCase {
         let snapshot = try JSONDecoder().decode(WidgetSnapshot.self, from: legacyData)
 
         XCTAssertNil(snapshot.safeMessage)
-        XCTAssertEqual(snapshot.messageHeadline, WidgetSafeMessage.generic.headline)
-        XCTAssertEqual(snapshot.messageBody, WidgetSafeMessage.generic.body)
+        XCTAssertEqual(snapshot.messageHeadline, "Check the need")
+        XCTAssertEqual(snapshot.messageBody, "Pause long enough to tell hunger from comfort.")
     }
 
     func testLegacyReminderPayloadDoesNotOverrideSafeWidgetCopy() throws {
@@ -63,7 +63,8 @@ final class WidgetSafeCopyTests: XCTestCase {
 
         let snapshot = try JSONDecoder().decode(WidgetSnapshot.self, from: legacyData)
 
-        XCTAssertEqual(snapshot.messageBody, "A safe widget line.")
+        XCTAssertEqual(snapshot.messageHeadline, "Give it room")
+        XCTAssertEqual(snapshot.messageBody, "A little distance can change a buying answer.")
         XCTAssertFalse(snapshot.messageBody.contains("private reminder"))
     }
 
@@ -82,7 +83,28 @@ final class WidgetSafeCopyTests: XCTestCase {
         let snapshot = try JSONDecoder().decode(WidgetSnapshot.self, from: legacyData)
 
         XCTAssertEqual(snapshot.messageSurface, .publicSafe)
-        XCTAssertEqual(snapshot.messageHeadline, WidgetSafeMessage.generic.headline)
-        XCTAssertEqual(snapshot.messageBody, "A safe widget line.")
+        XCTAssertEqual(snapshot.messageHeadline, "Give it room")
+        XCTAssertEqual(snapshot.messageBody, "A little distance can change a buying answer.")
+    }
+
+    func testUnsafePersistedSafeMessageGetsRemappedToCanonicalWidgetCopy() throws {
+        let legacyData = """
+        {
+          "safeMessage": {
+            "surface": "publicSafe",
+            "headline": "He is ignoring me again",
+            "body": "Text him tonight and ask why he keeps doing this."
+          },
+          "latestVerdict": "pause",
+          "latestScenario": "other",
+          "updatedAt": 0
+        }
+        """.data(using: .utf8)!
+
+        let snapshot = try JSONDecoder().decode(WidgetSnapshot.self, from: legacyData)
+
+        XCTAssertEqual(snapshot.messageHeadline, "Pause the momentum")
+        XCTAssertEqual(snapshot.messageBody, "Give this one beat before you decide from momentum.")
+        XCTAssertFalse(snapshot.messageBody.contains("Text him"))
     }
 }

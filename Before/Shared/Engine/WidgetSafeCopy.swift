@@ -1,10 +1,10 @@
 import Foundation
 
-enum WidgetMessageSurface: String, Codable, Equatable, Sendable {
+enum WidgetMessageSurface: String, Codable, Equatable, Hashable, Sendable {
     case publicSafe
 }
 
-struct WidgetSafeMessage: Codable, Equatable, Sendable {
+struct WidgetSafeMessage: Codable, Equatable, Hashable, Sendable {
     let surface: WidgetMessageSurface
     let headline: String
     let body: String
@@ -36,6 +36,26 @@ struct WidgetSafeMessage: Codable, Equatable, Sendable {
 }
 
 enum WidgetSafeCopy {
+    static func sanitizedMessage(
+        _ stored: WidgetSafeMessage?,
+        scenario: ScenarioType?,
+        verdict: CheckVerdict?
+    ) -> WidgetSafeMessage {
+        let canonical = message(for: scenario, verdict: verdict)
+
+        guard
+            let stored,
+            stored.surface == .publicSafe,
+            stored.headline.count <= 32,
+            stored.body.count <= 120,
+            approvedMessages.contains(stored)
+        else {
+            return canonical
+        }
+
+        return stored
+    }
+
     static func message(for scenario: ScenarioType?, verdict: CheckVerdict?) -> WidgetSafeMessage {
         switch (scenario, verdict) {
         case (.buy, .pause):
@@ -96,4 +116,18 @@ enum WidgetSafeCopy {
             return .generic
         }
     }
+
+    private static let approvedMessages: Set<WidgetSafeMessage> = {
+        var messages: Set<WidgetSafeMessage> = [.generic]
+        let scenarios: [ScenarioType?] = [.buy, .eat, .scroll, .other, nil]
+        let verdicts: [CheckVerdict?] = [.pause, .notRecommended, .goAhead, nil]
+
+        for scenario in scenarios {
+            for verdict in verdicts {
+                messages.insert(message(for: scenario, verdict: verdict))
+            }
+        }
+
+        return messages
+    }()
 }
