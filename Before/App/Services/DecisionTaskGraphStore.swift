@@ -78,6 +78,14 @@ struct DecisionTaskGraphSnapshot: Codable, Equatable, Sendable {
         tasks.filter { $0.status == .completed }.count
     }
 
+    var hasValidContinuityFingerprint: Bool {
+        Self.continuityFingerprint(
+            mode: mode ?? .quick,
+            promptSeed: promptSeed,
+            statuses: tasks.map(\.status)
+        ) == continuityFingerprint
+    }
+
     @MainActor
     static func capture(from session: QuickCheckSession) -> DecisionTaskGraphSnapshot? {
         let draft = TomorrowBoxDraft.quick(from: session)
@@ -337,22 +345,34 @@ enum DecisionTaskGraphStore {
     private static let key = "before.decision.task.graph"
 
     static func load() -> DecisionTaskGraphSnapshot? {
+        if let snapshot = ProtectedLocalStateStore.load(DecisionTaskGraphSnapshot.self, key: key) {
+            return snapshot.hasValidContinuityFingerprint ? snapshot : nil
+        }
+
         guard
-            let data = UserDefaults.standard.data(forKey: key),
-            let snapshot = try? JSONDecoder().decode(DecisionTaskGraphSnapshot.self, from: data)
+            let legacyData = UserDefaults.standard.data(forKey: key),
+            let snapshot = try? JSONDecoder().decode(DecisionTaskGraphSnapshot.self, from: legacyData)
         else {
             return nil
         }
 
+        guard snapshot.hasValidContinuityFingerprint else {
+            UserDefaults.standard.removeObject(forKey: key)
+            return nil
+        }
+
+        ProtectedLocalStateStore.save(snapshot, key: key)
+        UserDefaults.standard.removeObject(forKey: key)
         return snapshot
     }
 
     static func save(_ snapshot: DecisionTaskGraphSnapshot) {
-        guard let data = try? JSONEncoder().encode(snapshot) else { return }
-        UserDefaults.standard.set(data, forKey: key)
+        ProtectedLocalStateStore.save(snapshot, key: key)
+        UserDefaults.standard.removeObject(forKey: key)
     }
 
     static func clear() {
+        ProtectedLocalStateStore.clear(key: key)
         UserDefaults.standard.removeObject(forKey: key)
     }
 }

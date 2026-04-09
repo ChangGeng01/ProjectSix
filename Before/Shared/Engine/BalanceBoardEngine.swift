@@ -8,7 +8,7 @@ struct BalanceBoardInput: Equatable, Sendable {
     let longTerm: String
 }
 
-struct BalanceBoardResult: Equatable, Sendable {
+struct BalanceBoardResult: Codable, Equatable, Sendable {
     let headline: String
     let summary: String
     let focusTitle: String

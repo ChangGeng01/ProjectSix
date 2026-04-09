@@ -16,14 +16,33 @@ final class ActiveDecisionWorkspaceStoreTests: XCTestCase {
         session.controlLevel = .maybe
         session.evaluate()
 
-        let state = ActiveDecisionWorkspaceState.capture(from: session)
-        let restored = state?.restoreQuickSession()
+        guard let originalResult = session.result else {
+            XCTFail("Expected evaluated quick result")
+            return
+        }
 
-        XCTAssertEqual(restored?.note, "Do I buy this now?")
-        XCTAssertEqual(restored?.motivation, .reward)
-        XCTAssertEqual(restored?.expectedOutcome, .temporaryRelief)
-        XCTAssertEqual(restored?.controlLevel, .maybe)
-        XCTAssertEqual(restored?.result?.verdict, .pause)
+        guard var state = ActiveDecisionWorkspaceState.capture(from: session) else {
+            XCTFail("Expected workspace state")
+            return
+        }
+
+        state.draft.motivationRaw = MotivationChoice.genuineNeed.rawValue
+        state.draft.expectedOutcomeRaw = OutcomeChoice.satisfied.rawValue
+        state.draft.controlLevelRaw = ControlChoice.yes.rawValue
+
+        let changedSession = state.draft.restoreQuickSession(entrySource: .app)
+        changedSession.evaluate()
+        XCTAssertEqual(changedSession.result?.verdict, .goAhead)
+
+        let restored = state.restoreQuickSession()
+
+        XCTAssertEqual(restored.note, "Do I buy this now?")
+        XCTAssertEqual(restored.motivation, .genuineNeed)
+        XCTAssertEqual(restored.expectedOutcome, .satisfied)
+        XCTAssertEqual(restored.controlLevel, .yes)
+        XCTAssertEqual(restored.result?.verdict, originalResult.verdict)
+        XCTAssertEqual(restored.result?.primaryAction, originalResult.primaryAction)
+        XCTAssertEqual(restored.result?.currentPerspective, originalResult.currentPerspective)
     }
 
     func testQuickWorkspaceRestoresWaitStateWithoutResult() {
@@ -52,20 +71,34 @@ final class ActiveDecisionWorkspaceStoreTests: XCTestCase {
         session.selfLens = "I trust myself less"
         session.evaluate()
 
-        let state = ActiveDecisionWorkspaceState.capture(from: session)
-        XCTAssertNotNil(state)
-
-        if let state {
-            ActiveDecisionWorkspaceStore.save(state)
+        guard let originalResult = session.result else {
+            XCTFail("Expected mirror result")
+            return
         }
+
+        guard var state = ActiveDecisionWorkspaceState.capture(from: session) else {
+            XCTFail("Expected workspace state")
+            return
+        }
+
+        state.draft.relationship = "I might miss them"
+        state.draft.reality = ""
+        state.draft.selfLens = "I am afraid of being alone"
+
+        let changedSession = state.draft.restoreMirrorSession(entrySource: .app)
+        changedSession.evaluate()
+        XCTAssertEqual(changedSession.result?.nextActionTitle, "Name the real question")
+
+        ActiveDecisionWorkspaceStore.save(state)
 
         let loaded = ActiveDecisionWorkspaceStore.load()
         let restored = loaded?.restoreMirrorSession()
 
         XCTAssertEqual(loaded?.mode, .mirror)
         XCTAssertEqual(restored?.prompt, "Should I leave?")
-        XCTAssertEqual(restored?.selfLens, "I trust myself less")
-        XCTAssertEqual(restored?.result?.nextActionTitle, "Write the boundary")
+        XCTAssertEqual(restored?.selfLens, "I am afraid of being alone")
+        XCTAssertEqual(restored?.result?.nextActionTitle, originalResult.nextActionTitle)
+        XCTAssertEqual(restored?.result?.coreTension, originalResult.coreTension)
         XCTAssertNotNil(loaded?.intelligenceLifecycle?.fieldRecords[DecisionContextFieldKey.mirrorEmotion.rawValue])
         XCTAssertNotNil(restored?.intelligenceLifecycleSnapshot.fieldRecords[DecisionContextFieldKey.mirrorEmotion.rawValue])
     }

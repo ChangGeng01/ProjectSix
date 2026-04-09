@@ -9,16 +9,22 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
     var wasEvaluated: Bool
     var selectedActionRaw: String?
     var isShowingWaitSheet: Bool
+    var quickResult: QuickCheckResult?
+    var balanceResult: BalanceBoardResult?
+    var mirrorResult: MirrorResult?
 
     init(
-        schemaVersion: Int = 1,
+        schemaVersion: Int = 2,
         mode: DecisionMode,
         entrySource: EntrySource,
         draft: TomorrowBoxDraft,
         intelligenceLifecycle: DecisionContextLifecycleSnapshot? = nil,
         wasEvaluated: Bool = false,
         selectedAction: CheckAction? = nil,
-        isShowingWaitSheet: Bool = false
+        isShowingWaitSheet: Bool = false,
+        quickResult: QuickCheckResult? = nil,
+        balanceResult: BalanceBoardResult? = nil,
+        mirrorResult: MirrorResult? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.modeRaw = mode.rawValue
@@ -28,6 +34,9 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         self.wasEvaluated = wasEvaluated
         self.selectedActionRaw = selectedAction?.rawValue
         self.isShowingWaitSheet = isShowingWaitSheet
+        self.quickResult = quickResult
+        self.balanceResult = balanceResult
+        self.mirrorResult = mirrorResult
     }
 
     var mode: DecisionMode? {
@@ -54,7 +63,8 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
             intelligenceLifecycle: session.intelligenceLifecycleSnapshot,
             wasEvaluated: session.result != nil,
             selectedAction: session.selectedAction,
-            isShowingWaitSheet: session.isShowingWaitSheet
+            isShowingWaitSheet: session.isShowingWaitSheet,
+            quickResult: session.result
         )
     }
 
@@ -68,7 +78,8 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
             entrySource: session.entrySource,
             draft: draft,
             intelligenceLifecycle: session.intelligenceLifecycleSnapshot,
-            wasEvaluated: session.result != nil
+            wasEvaluated: session.result != nil,
+            balanceResult: session.result
         )
     }
 
@@ -82,7 +93,8 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
             entrySource: session.entrySource,
             draft: draft,
             intelligenceLifecycle: session.intelligenceLifecycleSnapshot,
-            wasEvaluated: session.result != nil
+            wasEvaluated: session.result != nil,
+            mirrorResult: session.result
         )
     }
 
@@ -95,8 +107,8 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         session.selectedAction = selectedAction
         session.isShowingWaitSheet = isShowingWaitSheet
 
-        if wasEvaluated, session.canEvaluate, !isShowingWaitSheet {
-            session.evaluate()
+        if wasEvaluated {
+            session.result = quickResult
         }
 
         return session
@@ -109,8 +121,8 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
             session.restoreIntelligenceLifecycle(intelligenceLifecycle)
         }
 
-        if wasEvaluated, session.canEvaluate {
-            session.evaluate()
+        if wasEvaluated {
+            session.result = balanceResult
         }
 
         return session
@@ -123,8 +135,8 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
             session.restoreIntelligenceLifecycle(intelligenceLifecycle)
         }
 
-        if wasEvaluated, session.canEvaluate {
-            session.evaluate()
+        if wasEvaluated {
+            session.result = mirrorResult
         }
 
         return session
@@ -135,22 +147,29 @@ enum ActiveDecisionWorkspaceStore {
     private static let key = "before.active.decision.workspace"
 
     static func load() -> ActiveDecisionWorkspaceState? {
+        if let state = ProtectedLocalStateStore.load(ActiveDecisionWorkspaceState.self, key: key) {
+            return state
+        }
+
         guard
-            let data = UserDefaults.standard.data(forKey: key),
-            let state = try? JSONDecoder().decode(ActiveDecisionWorkspaceState.self, from: data)
+            let legacyData = UserDefaults.standard.data(forKey: key),
+            let state = try? JSONDecoder().decode(ActiveDecisionWorkspaceState.self, from: legacyData)
         else {
             return nil
         }
 
+        ProtectedLocalStateStore.save(state, key: key)
+        UserDefaults.standard.removeObject(forKey: key)
         return state
     }
 
     static func save(_ state: ActiveDecisionWorkspaceState) {
-        guard let data = try? JSONEncoder().encode(state) else { return }
-        UserDefaults.standard.set(data, forKey: key)
+        ProtectedLocalStateStore.save(state, key: key)
+        UserDefaults.standard.removeObject(forKey: key)
     }
 
     static func clear() {
+        ProtectedLocalStateStore.clear(key: key)
         UserDefaults.standard.removeObject(forKey: key)
     }
 }

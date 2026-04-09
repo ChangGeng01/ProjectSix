@@ -9,7 +9,7 @@ struct MirrorInput: Equatable, Sendable {
     let selfLens: String
 }
 
-struct MirrorResult: Equatable, Sendable {
+struct MirrorResult: Codable, Equatable, Sendable {
     let headline: String
     let coreTension: String
     let nextActionTitle: String

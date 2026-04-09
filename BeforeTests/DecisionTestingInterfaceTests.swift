@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import Before
 
@@ -674,5 +675,87 @@ struct DecisionTestingInterfaceTests {
         #expect((export.summary.brainSnapshotFingerprintByKind[.quick] ?? "").isEmpty == false)
         #expect(export.summary.brainSnapshotVariantCountByKind[.quick] == 1)
         #expect(export.summary.lowTrustMemoryLoadRateByKind[.quick] == 0)
+    }
+
+    @Test
+    func persistenceBootstrapFallsBackToRecoveredPersistentStore() throws {
+        let expectedContainer = try makePersistenceContainer()
+        var attemptedModes: [PersistenceBootstrap.LoadMode] = []
+        var quarantined = false
+
+        let bootstrap = PersistenceBootstrap.loadAppContainer(
+            createContainer: { mode in
+                attemptedModes.append(mode)
+                switch mode {
+                case .persistent:
+                    throw CocoaError(.fileReadCorruptFile)
+                case .recoveredPersistent:
+                    return expectedContainer
+                case .temporaryPersistent, .inMemoryRecovery, .unavailable:
+                    throw CocoaError(.fileNoSuchFile)
+                }
+            },
+            quarantinePrimaryStore: {
+                quarantined = true
+            }
+        )
+
+        #expect(quarantined == true)
+        #expect(attemptedModes == [.persistent, .recoveredPersistent])
+        #expect(bootstrap.container === expectedContainer)
+        #expect(bootstrap.loadMode == .recoveredPersistent)
+        #expect(bootstrap.recoveryMessage?.contains("clean local store") == true)
+    }
+
+    @Test
+    func persistenceBootstrapFallsBackToInMemoryRecoveryAfterStorageFailures() throws {
+        let expectedContainer = try makePersistenceContainer()
+        var attemptedModes: [PersistenceBootstrap.LoadMode] = []
+
+        let bootstrap = PersistenceBootstrap.loadAppContainer(
+            createContainer: { mode in
+                attemptedModes.append(mode)
+                switch mode {
+                case .persistent, .recoveredPersistent, .temporaryPersistent, .unavailable:
+                    throw CocoaError(.fileReadCorruptFile)
+                case .inMemoryRecovery:
+                    return expectedContainer
+                }
+            },
+            quarantinePrimaryStore: {}
+        )
+
+        #expect(attemptedModes == [.persistent, .recoveredPersistent, .temporaryPersistent, .inMemoryRecovery])
+        #expect(bootstrap.container === expectedContainer)
+        #expect(bootstrap.loadMode == .inMemoryRecovery)
+        #expect(bootstrap.recoveryMessage?.contains("temporary recovery mode") == true)
+    }
+
+    @Test
+    func persistenceBootstrapCanSurfaceUnavailableRecoveryState() {
+        let bootstrap = PersistenceBootstrap.loadAppContainer(
+            createContainer: { _ in
+                throw CocoaError(.fileReadCorruptFile)
+            },
+            quarantinePrimaryStore: {}
+        )
+
+        #expect(bootstrap.container == nil)
+        #expect(bootstrap.loadMode == .unavailable)
+        #expect(bootstrap.recoveryMessage?.contains("could not start its local storage runtime") == true)
+    }
+
+    private func makePersistenceContainer() throws -> ModelContainer {
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        return try ModelContainer(
+            for: CheckEvent.self,
+            SelfReminder.self,
+            BalanceDecisionRecord.self,
+            MirrorDecisionRecord.self,
+            DecisionMemoryRecord.self,
+            DecisionMemoryCandidateRecord.self,
+            TomorrowBoxItem.self,
+            configurations: configuration
+        )
     }
 }

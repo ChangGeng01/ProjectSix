@@ -62,6 +62,27 @@ struct DecisionMemoryDraft: Sendable {
 }
 
 enum DecisionMemorySystem {
+    static let projectionRecordLimit = 72
+    static let projectionCandidateLimit = 32
+    static let projectionCheckEventLimit = 96
+
+    struct BrainStateGovernanceSnapshot {
+        let totalRecordCount: Int
+        let totalCandidateCount: Int
+        let pendingCandidateCount: Int
+        let promotedCandidateCount: Int
+        let deferredCandidateCount: Int
+        let admittedCandidateCount: Int
+    }
+
+    struct BrainStateProjection {
+        let checkEvents: [CheckEvent]
+        let records: [DecisionMemoryRecord]
+        let candidates: [DecisionMemoryCandidateRecord]
+        let governanceSnapshot: BrainStateGovernanceSnapshot
+        let refreshedAt: Date
+    }
+
     private struct RetrievalPlan {
         let candidateLimit: Int
         let profileLimit: Int
@@ -195,6 +216,46 @@ enum DecisionMemorySystem {
         )
     }
 
+    static func refreshProjection(
+        in context: ModelContext,
+        now: Date = .now
+    ) -> BrainStateProjection {
+        var governanceSnapshot = fetchGovernanceSnapshot(in: context)
+        var records = fetchMemoryRecords(
+            in: context,
+            limit: projectionRecordLimit
+        )
+        var candidates = fetchCandidateRecords(
+            in: context,
+            limit: projectionCandidateLimit
+        )
+        let resolvedRecords: [DecisionMemoryRecord]
+        let resolvedCandidates: [DecisionMemoryCandidateRecord]
+
+        if governanceSnapshot.totalRecordCount == 0 && governanceSnapshot.totalCandidateCount == 0 {
+            resolvedRecords = Array(
+                refreshStoredMemories(in: context, now: now)
+                    .prefix(projectionRecordLimit)
+            )
+            governanceSnapshot = fetchGovernanceSnapshot(in: context)
+            resolvedCandidates = fetchCandidateRecords(
+                in: context,
+                limit: projectionCandidateLimit
+            )
+        } else {
+            resolvedRecords = records
+            resolvedCandidates = candidates
+        }
+
+        return BrainStateProjection(
+            checkEvents: fetchCheckEvents(in: context),
+            records: resolvedRecords,
+            candidates: resolvedCandidates,
+            governanceSnapshot: governanceSnapshot,
+            refreshedAt: now
+        )
+    }
+
     static func loadBrainState(
         mode: DecisionMode,
         prompt: String,
@@ -202,19 +263,25 @@ enum DecisionMemorySystem {
         retrievalMode: DecisionRetrievalMode = .filtered,
         now: Date = .now
     ) -> DecisionBrainState {
-        let recentCheckEvents = fetchCheckEvents(in: context)
-        let records = fetchMemoryRecords(in: context)
-        let candidates = fetchCandidateRecords(in: context)
+        loadBrainState(
+            mode: mode,
+            prompt: prompt,
+            projection: refreshProjection(in: context, now: now),
+            retrievalMode: retrievalMode,
+            now: now
+        )
+    }
 
-        let resolvedRecords: [DecisionMemoryRecord]
-        let resolvedCandidates: [DecisionMemoryCandidateRecord]
-        if records.isEmpty && candidates.isEmpty {
-            resolvedRecords = refreshStoredMemories(in: context, now: now)
-            resolvedCandidates = fetchCandidateRecords(in: context)
-        } else {
-            resolvedRecords = records
-            resolvedCandidates = candidates
-        }
+    static func loadBrainState(
+        mode: DecisionMode,
+        prompt: String,
+        projection: BrainStateProjection,
+        retrievalMode: DecisionRetrievalMode = .filtered,
+        now: Date = .now
+    ) -> DecisionBrainState {
+        let recentCheckEvents = projection.checkEvents
+        let resolvedRecords = projection.records
+        let resolvedCandidates = projection.candidates
 
         let brainItems = buildBrainItems(
             records: resolvedRecords,
@@ -293,8 +360,7 @@ enum DecisionMemorySystem {
         )
 
         let memoryGovernance = buildMemoryGovernanceState(
-            records: resolvedRecords,
-            candidates: resolvedCandidates,
+            governanceSnapshot: projection.governanceSnapshot,
             selectedItems: selectedItems,
             screenedOutItems: retrievalJudgeResult.screenedOutItems
         )
@@ -319,18 +385,48 @@ enum DecisionMemorySystem {
         )
     }
 
-    static func fetchMemoryRecords(in context: ModelContext) -> [DecisionMemoryRecord] {
-        (try? context.fetch(FetchDescriptor<DecisionMemoryRecord>())) ?? []
+    static func fetchMemoryRecords(
+        in context: ModelContext,
+        limit: Int? = nil
+    ) -> [DecisionMemoryRecord] {
+        var descriptor = FetchDescriptor<DecisionMemoryRecord>(
+            sortBy: [
+                SortDescriptor(\.priority, order: .reverse),
+                SortDescriptor(\.lastConfirmedAt, order: .reverse)
+            ]
+        )
+        if let limit {
+            descriptor.fetchLimit = limit
+        }
+        return (try? context.fetch(descriptor)) ?? []
     }
 
-    static func fetchCandidateRecords(in context: ModelContext) -> [DecisionMemoryCandidateRecord] {
-        (try? context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())) ?? []
+    static func fetchCandidateRecords(
+        in context: ModelContext,
+        limit: Int? = nil
+    ) -> [DecisionMemoryCandidateRecord] {
+        let pendingRaw = DecisionMemoryCandidateStatus.pending.rawValue
+        var descriptor = FetchDescriptor<DecisionMemoryCandidateRecord>(
+            predicate: #Predicate<DecisionMemoryCandidateRecord> {
+                $0.statusRaw == pendingRaw
+            },
+            sortBy: [
+                SortDescriptor(\.priority, order: .reverse),
+                SortDescriptor(\.lastObservedAt, order: .reverse)
+            ]
+        )
+        if let limit {
+            descriptor.fetchLimit = limit
+        }
+        return (try? context.fetch(descriptor)) ?? []
     }
 
     static func fetchCheckEvents(in context: ModelContext) -> [CheckEvent] {
-        (try? context.fetch(
-            FetchDescriptor<CheckEvent>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
-        )) ?? []
+        var descriptor = FetchDescriptor<CheckEvent>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = projectionCheckEventLimit
+        return (try? context.fetch(descriptor)) ?? []
     }
 
     private static func buildBrainItems(
@@ -355,32 +451,80 @@ enum DecisionMemorySystem {
     }
 
     private static func buildMemoryGovernanceState(
-        records: [DecisionMemoryRecord],
-        candidates: [DecisionMemoryCandidateRecord],
+        governanceSnapshot: BrainStateGovernanceSnapshot,
         selectedItems: [EvaluatedBrainMemoryItem],
         screenedOutItems: [EvaluatedBrainMemoryItem]
     ) -> DecisionMemoryGovernanceState {
-        let pendingCandidateCount = candidates.filter { $0.status == .pending }.count
-        let promotedCandidateCount = candidates.filter { $0.status == .promoted }.count
         let loadedPendingMemoryCount = selectedItems.filter(\.item.isPending).count
-        let deferredCandidateCount = candidates.filter { $0.lastGovernanceDecision == .deferred }.count
-        let admittedCandidateCount = candidates.filter { $0.lastGovernanceDecision == .admit }.count
         let screenedOutPendingMemoryCount = screenedOutItems.filter(\.item.isPending).count
 
         return DecisionMemoryGovernanceState(
-            totalRecordCount: records.count,
-            totalCandidateCount: candidates.count,
-            pendingCandidateCount: pendingCandidateCount,
-            promotedCandidateCount: promotedCandidateCount,
+            totalRecordCount: governanceSnapshot.totalRecordCount,
+            totalCandidateCount: governanceSnapshot.totalCandidateCount,
+            pendingCandidateCount: governanceSnapshot.pendingCandidateCount,
+            promotedCandidateCount: governanceSnapshot.promotedCandidateCount,
             loadedPromotedMemoryCount: selectedItems.count - loadedPendingMemoryCount,
             loadedPendingMemoryCount: loadedPendingMemoryCount,
-            deferredCandidateCount: deferredCandidateCount,
-            admittedCandidateCount: admittedCandidateCount,
+            deferredCandidateCount: governanceSnapshot.deferredCandidateCount,
+            admittedCandidateCount: governanceSnapshot.admittedCandidateCount,
             screenedOutMemoryCount: screenedOutItems.count,
             screenedOutPendingMemoryCount: screenedOutPendingMemoryCount,
             loadedReasonCounts: reasonCounts(for: selectedItems.map(\.eligibility)),
             screenedOutReasonCounts: reasonCounts(for: screenedOutItems.map(\.eligibility))
         )
+    }
+
+    private static func fetchGovernanceSnapshot(
+        in context: ModelContext
+    ) -> BrainStateGovernanceSnapshot {
+        let pendingRaw = DecisionMemoryCandidateStatus.pending.rawValue
+        let promotedRaw = DecisionMemoryCandidateStatus.promoted.rawValue
+        let deferredRaw = DecisionMemoryGovernanceDecision.deferred.rawValue
+        let admittedRaw = DecisionMemoryGovernanceDecision.admit.rawValue
+
+        return BrainStateGovernanceSnapshot(
+            totalRecordCount: fetchCount(FetchDescriptor<DecisionMemoryRecord>(), in: context),
+            totalCandidateCount: fetchCount(FetchDescriptor<DecisionMemoryCandidateRecord>(), in: context),
+            pendingCandidateCount: fetchCount(
+                FetchDescriptor<DecisionMemoryCandidateRecord>(
+                    predicate: #Predicate<DecisionMemoryCandidateRecord> {
+                        $0.statusRaw == pendingRaw
+                    }
+                ),
+                in: context
+            ),
+            promotedCandidateCount: fetchCount(
+                FetchDescriptor<DecisionMemoryCandidateRecord>(
+                    predicate: #Predicate<DecisionMemoryCandidateRecord> {
+                        $0.statusRaw == promotedRaw
+                    }
+                ),
+                in: context
+            ),
+            deferredCandidateCount: fetchCount(
+                FetchDescriptor<DecisionMemoryCandidateRecord>(
+                    predicate: #Predicate<DecisionMemoryCandidateRecord> {
+                        $0.lastGovernanceDecisionRaw == deferredRaw
+                    }
+                ),
+                in: context
+            ),
+            admittedCandidateCount: fetchCount(
+                FetchDescriptor<DecisionMemoryCandidateRecord>(
+                    predicate: #Predicate<DecisionMemoryCandidateRecord> {
+                        $0.lastGovernanceDecisionRaw == admittedRaw
+                    }
+                ),
+                in: context
+            )
+        )
+    }
+
+    private static func fetchCount<Model>(
+        _ descriptor: FetchDescriptor<Model>,
+        in context: ModelContext
+    ) -> Int where Model: PersistentModel {
+        (try? context.fetchCount(descriptor)) ?? 0
     }
 
     private static func retrievalPlan(

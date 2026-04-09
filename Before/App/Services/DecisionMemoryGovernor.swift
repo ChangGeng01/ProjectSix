@@ -109,7 +109,14 @@ enum DecisionMemoryGovernor {
             candidatesByID[id] = nil
         }
 
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            PersistenceIssueRecorder.record(
+                error: error,
+                operation: "reconciling governed memory records"
+            )
+        }
 
         return fetchRecords(in: context)
             .sorted { lhs, rhs in

@@ -1,5 +1,43 @@
 import Foundation
 
+enum DecisionIntelligenceTracePrivacy {
+    static func allowsSensitivePayload(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        considerRuntimeTestingContext: Bool = true
+    ) -> Bool {
+        environment["XCTestConfigurationFilePath"] != nil ||
+            (considerRuntimeTestingContext && NSClassFromString("XCTestCase") != nil) ||
+            DecisionTestingInterface.environmentOverride(environment: environment) != nil
+    }
+
+    static func sanitizedPrompt(
+        detail: String,
+        semanticPromptFingerprint: String?,
+        stablePrefixFingerprint: String?,
+        promptBudget: DecisionIntelligencePromptContract.ContextBudget?
+    ) -> String {
+        let budgetSummary = promptBudget.map {
+            "target=\($0.targetCharacters), actual=\($0.totalCharacters), within=\($0.isWithinTarget)"
+        } ?? "unavailable"
+
+        return [
+            "[REDACTED LIVE PROMPT]",
+            detail,
+            semanticPromptFingerprint.map { "semantic_fingerprint=\($0)" },
+            stablePrefixFingerprint.map { "stable_prefix=\($0)" },
+            "budget=\(budgetSummary)"
+        ]
+        .compactMap { $0 }
+        .joined(separator: "\n")
+    }
+
+    static func sanitizedOutputPreview(
+        outputPreview: String
+    ) -> String {
+        "[REDACTED LIVE OUTPUT PREVIEW] length=\(outputPreview.count)"
+    }
+}
+
 enum DecisionIntelligenceTraceKind: String, CaseIterable, Identifiable, Sendable {
     case quick
     case balance

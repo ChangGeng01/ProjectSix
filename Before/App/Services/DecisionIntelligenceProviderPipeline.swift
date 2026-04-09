@@ -1124,6 +1124,19 @@ enum DecisionIntelligenceProviderPipeline {
         outputPreview: String,
         detail: String
     ) {
+        let allowsSensitivePayload = DecisionIntelligenceTracePrivacy.allowsSensitivePayload()
+        let storedPrompt = allowsSensitivePayload
+            ? prompt
+            : DecisionIntelligenceTracePrivacy.sanitizedPrompt(
+                detail: detail,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
+                promptBudget: promptBudget
+            )
+        let storedOutputPreview = allowsSensitivePayload
+            ? outputPreview
+            : DecisionIntelligenceTracePrivacy.sanitizedOutputPreview(outputPreview: outputPreview)
+
         let trace = DecisionIntelligenceTrace(
             kind: kind,
             preferredProvider: preferredProvider,
@@ -1140,8 +1153,8 @@ enum DecisionIntelligenceProviderPipeline {
             admissionDecision: admissionDecision,
             semanticPromptFingerprint: semanticPromptFingerprint,
             stablePrefixFingerprint: stablePrefixFingerprint,
-            prompt: prompt,
-            outputPreview: outputPreview,
+            prompt: storedPrompt,
+            outputPreview: storedOutputPreview,
             detail: detail
         )
 

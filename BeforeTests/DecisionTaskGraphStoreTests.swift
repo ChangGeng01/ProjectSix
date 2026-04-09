@@ -53,4 +53,30 @@ final class DecisionTaskGraphStoreTests: XCTestCase {
         XCTAssertEqual(loaded?.promptSeed, "Should I leave?")
         XCTAssertFalse(loaded?.continuityFingerprint.isEmpty ?? true)
     }
+
+    func testLoadRejectsTamperedContinuityFingerprint() {
+        let session = QuickCheckSession(entrySource: .app, initialNote: "Do I buy this now?")
+        session.scenario = .buy
+        session.motivation = .reward
+        session.expectedOutcome = .temporaryRelief
+        session.controlLevel = .maybe
+
+        guard let snapshot = DecisionTaskGraphSnapshot.capture(from: session) else {
+            XCTFail("Expected task graph snapshot")
+            return
+        }
+
+        let tampered = DecisionTaskGraphSnapshot(
+            schemaVersion: snapshot.schemaVersion,
+            mode: snapshot.mode ?? .quick,
+            promptSeed: snapshot.promptSeed,
+            nextActionHint: snapshot.nextActionHint,
+            continuityFingerprint: "tampered",
+            tasks: snapshot.tasks,
+            updatedAt: snapshot.updatedAt
+        )
+        DecisionTaskGraphStore.save(tampered)
+
+        XCTAssertNil(DecisionTaskGraphStore.load())
+    }
 }

@@ -312,6 +312,76 @@ final class DecisionMemorySystemTests: XCTestCase {
     }
 
     @MainActor
+    func testRefreshProjectionUsesBoundedWorkingSetAndPreservesGovernanceCounts() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        for index in 0..<110 {
+            context.insert(
+                DecisionMemoryRecord(
+                    id: "record-\(index)",
+                    type: .semantic,
+                    topic: "topic-\(index)",
+                    headline: "Headline \(index)",
+                    value: "Value \(index)",
+                    confidence: 0.8,
+                    priority: Double(200 - index),
+                    source: .pattern,
+                    lastConfirmedAt: date("2026-04-09T23:10:00Z").addingTimeInterval(Double(-index) * 60),
+                    decayPolicy: .slow,
+                    retrievalTags: ["tag-\(index)"],
+                    evidenceCount: 2,
+                    observationCount: 2,
+                    provenanceSummary: "Synthetic record \(index)"
+                )
+            )
+        }
+
+        for index in 0..<44 {
+            context.insert(
+                DecisionMemoryCandidateRecord(
+                    id: "candidate-\(index)",
+                    type: .situational,
+                    topic: "candidate-topic-\(index)",
+                    headline: "Candidate \(index)",
+                    value: "Candidate value \(index)",
+                    confidence: 0.7,
+                    priority: Double(100 - index),
+                    source: .history,
+                    firstObservedAt: date("2026-04-09T23:10:00Z").addingTimeInterval(Double(-index) * 120),
+                    lastObservedAt: date("2026-04-09T23:10:00Z").addingTimeInterval(Double(-index) * 120),
+                    decayPolicy: .fast,
+                    retrievalTags: ["candidate-\(index)"],
+                    evidenceCount: 1,
+                    confirmationCount: 1,
+                    lastObservationFingerprint: "fingerprint-\(index)",
+                    status: index < 26 ? .pending : .promoted,
+                    provenanceSummary: "Synthetic candidate \(index)",
+                    lastWriteOperation: .add,
+                    lastGovernanceDecision: index.isMultiple(of: 2) ? .admit : .deferred,
+                    governanceReason: "synthetic"
+                )
+            )
+        }
+        try context.save()
+
+        let projection = DecisionMemorySystem.refreshProjection(
+            in: context,
+            now: date("2026-04-09T23:10:00Z")
+        )
+
+        XCTAssertEqual(projection.governanceSnapshot.totalRecordCount, 110)
+        XCTAssertEqual(projection.governanceSnapshot.totalCandidateCount, 44)
+        XCTAssertEqual(projection.governanceSnapshot.pendingCandidateCount, 26)
+        XCTAssertEqual(projection.governanceSnapshot.promotedCandidateCount, 18)
+        XCTAssertEqual(projection.governanceSnapshot.admittedCandidateCount, 22)
+        XCTAssertEqual(projection.governanceSnapshot.deferredCandidateCount, 22)
+        XCTAssertLessThanOrEqual(projection.records.count, DecisionMemorySystem.projectionRecordLimit)
+        XCTAssertLessThanOrEqual(projection.candidates.count, DecisionMemorySystem.projectionCandidateLimit)
+        XCTAssertTrue(projection.candidates.allSatisfy { $0.status == .pending })
+    }
+
+    @MainActor
     private func makeContainer() throws -> ModelContainer {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         return try ModelContainer(

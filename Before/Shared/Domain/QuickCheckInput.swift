@@ -8,7 +8,7 @@ struct QuickCheckInput: Codable, Sendable {
     var note: String
 }
 
-struct QuickCheckResult: Codable, Sendable {
+struct QuickCheckResult: Codable, Equatable, Sendable {
     var currentPerspective: String
     var afterPerspective: String
     var verdict: CheckVerdict

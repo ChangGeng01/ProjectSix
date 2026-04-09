@@ -26,6 +26,8 @@ final class BeforeAppModel: ObservableObject {
     let modelContainer: ModelContainer
     let supportInbox: SupportInboxStore
     let sharedLifeStore: SharedLifeStore
+    private var memoryProjection: DecisionMemorySystem.BrainStateProjection?
+    private var isMemoryProjectionDirty = true
     private var shouldPromptReflectionAfterBackground = false
     private var pendingReflectionContext: ReflectionContext?
 
@@ -228,8 +230,7 @@ final class BeforeAppModel: ObservableObject {
             entrySource: session.entrySource
         )
         context.insert(event)
-        try? context.save()
-        refreshDecisionMemoryStore()
+        persistContext(context, operation: "saving the completed quick check")
 
         switch action {
         case .decideTomorrow:
@@ -285,8 +286,7 @@ final class BeforeAppModel: ObservableObject {
             entrySource: session.entrySource
         )
         context.insert(record)
-        try? context.save()
-        refreshDecisionMemoryStore()
+        persistContext(context, operation: "saving the balance board")
         activeBalanceSession = nil
         presentLetGo( LetGoCopyLibrary.savedBalanceContext(for: record) )
         persistActiveWorkspaceState()
@@ -298,8 +298,7 @@ final class BeforeAppModel: ObservableObject {
         let context = modelContainer.mainContext
         let tomorrowItem = TomorrowBoxItemFactory.makeBalanceItem(from: session, result: result)
         context.insert(tomorrowItem)
-        try? context.save()
-        refreshDecisionMemoryStore()
+        persistContext(context, operation: "moving the balance board into Tomorrow Box")
         activeBalanceSession = nil
         presentLetGo(for: tomorrowItem)
         persistActiveWorkspaceState()
@@ -322,8 +321,7 @@ final class BeforeAppModel: ObservableObject {
             entrySource: session.entrySource
         )
         context.insert(record)
-        try? context.save()
-        refreshDecisionMemoryStore()
+        persistContext(context, operation: "saving the mirror workspace")
         activeMirrorSession = nil
         presentLetGo( LetGoCopyLibrary.savedMirrorContext(for: record) )
         persistActiveWorkspaceState()
@@ -335,8 +333,7 @@ final class BeforeAppModel: ObservableObject {
         let context = modelContainer.mainContext
         let tomorrowItem = TomorrowBoxItemFactory.makeMirrorItem(from: session, result: result)
         context.insert(tomorrowItem)
-        try? context.save()
-        refreshDecisionMemoryStore()
+        persistContext(context, operation: "moving the mirror workspace into Tomorrow Box")
         activeMirrorSession = nil
         presentLetGo(for: tomorrowItem)
         persistActiveWorkspaceState()
@@ -430,7 +427,11 @@ final class BeforeAppModel: ObservableObject {
         let context = modelContainer.mainContext
         let tomorrowItem = event.makeTomorrowBoxItem()
         context.insert(tomorrowItem)
-        try? context.save()
+        persistContext(
+            context,
+            operation: "moving the quick check into Tomorrow Box",
+            refreshMemoryProjection: false
+        )
         presentLetGo(for: tomorrowItem)
     }
 
@@ -438,7 +439,11 @@ final class BeforeAppModel: ObservableObject {
         let context = modelContainer.mainContext
         let tomorrowItem = record.makeTomorrowBoxItem()
         context.insert(tomorrowItem)
-        try? context.save()
+        persistContext(
+            context,
+            operation: "moving the balance record into Tomorrow Box",
+            refreshMemoryProjection: false
+        )
         presentLetGo(for: tomorrowItem)
     }
 
@@ -446,7 +451,11 @@ final class BeforeAppModel: ObservableObject {
         let context = modelContainer.mainContext
         let tomorrowItem = record.makeTomorrowBoxItem()
         context.insert(tomorrowItem)
-        try? context.save()
+        persistContext(
+            context,
+            operation: "moving the mirror record into Tomorrow Box",
+            refreshMemoryProjection: false
+        )
         presentLetGo(for: tomorrowItem)
     }
 
@@ -457,12 +466,20 @@ final class BeforeAppModel: ObservableObject {
 
         let context = modelContainer.mainContext
         context.delete(item)
-        try? context.save()
+        persistContext(
+            context,
+            operation: "removing a Tomorrow Box item",
+            refreshMemoryProjection: false
+        )
     }
 
     func delayTomorrowBoxItem(_ item: TomorrowBoxItem, by delay: TomorrowBoxDelay) {
         item.dueAt = delay.reschedule(from: item.dueAt > .now ? item.dueAt : .now)
-        try? modelContainer.mainContext.save()
+        persistContext(
+            modelContainer.mainContext,
+            operation: "rescheduling a Tomorrow Box item",
+            refreshMemoryProjection: false
+        )
 
         if let eventID = item.linkedCheckEventID {
             Task {
@@ -512,8 +529,7 @@ final class BeforeAppModel: ObservableObject {
             }
         }
 
-        try? context.save()
-        refreshDecisionMemoryStore()
+        persistContext(context, operation: "saving reflection follow-up")
         refreshWidgetSurfaces()
         pendingReflectionContext = nil
         shouldPromptReflectionAfterBackground = false
@@ -639,7 +655,7 @@ final class BeforeAppModel: ObservableObject {
             NotificationService.shared.cancelTomorrowNotification(eventID: $0)
         }
         items.forEach { context.delete($0) }
-        try? context.save()
+        persistContext(context, operation: "clearing Tomorrow Box", refreshMemoryProjection: false)
     }
 
     func resetLocalData() {
@@ -739,7 +755,11 @@ final class BeforeAppModel: ObservableObject {
         guard let item = TomorrowBoxItemFactory.makeSupportItem(from: request) else { return }
         let context = modelContainer.mainContext
         context.insert(item)
-        try? context.save()
+        persistContext(
+            context,
+            operation: "moving a support request into Tomorrow Box",
+            refreshMemoryProjection: false
+        )
         supportInbox.markHeard(request.id)
         selectedTab = .box
     }
@@ -802,7 +822,11 @@ final class BeforeAppModel: ObservableObject {
         guard let tomorrowItem = TomorrowBoxItemFactory.makeSharedLifeItem(from: item) else { return }
         let context = modelContainer.mainContext
         context.insert(tomorrowItem)
-        try? context.save()
+        persistContext(
+            context,
+            operation: "moving a shared-life item into Tomorrow Box",
+            refreshMemoryProjection: false
+        )
         sharedLifeStore.deferItem(item.id)
         selectedTab = .box
     }
@@ -843,7 +867,11 @@ final class BeforeAppModel: ObservableObject {
     private func deleteAll<Model: PersistentModel>(_ type: Model.Type, in context: ModelContext) {
         let descriptor = FetchDescriptor<Model>()
         ((try? context.fetch(descriptor)) ?? []).forEach { context.delete($0) }
-        try? context.save()
+        persistContext(
+            context,
+            operation: "clearing \(String(describing: type)) records",
+            refreshMemoryProjection: false
+        )
     }
 
     private func refreshWidgetSurfaces() {
@@ -985,11 +1013,17 @@ final class BeforeAppModel: ObservableObject {
         }
     }
 
-    private func refreshDecisionMemoryStore() {
-        _ = DecisionMemorySystem.refreshStoredMemories(in: modelContainer.mainContext)
+    private func refreshDecisionMemoryStore(force: Bool = false) {
+        guard force || isMemoryProjectionDirty || memoryProjection == nil else { return }
+        memoryProjection = DecisionMemorySystem.refreshProjection(in: modelContainer.mainContext)
+        isMemoryProjectionDirty = false
+        if let notice = PersistenceIssueRecorder.latestNotice() {
+            publishStartupNotice(notice)
+        }
     }
 
     private func primeQuickSession(_ session: QuickCheckSession) {
+        refreshDecisionMemoryStore()
         let strategy = DecisionIntelligenceCoordinator
             .executionProfile(preferences: preferences)
             .strategy(for: .quick)
@@ -997,13 +1031,14 @@ final class BeforeAppModel: ObservableObject {
             DecisionMemorySystem.loadBrainState(
                 mode: .quick,
                 prompt: quickPromptSeed(for: session),
-                context: modelContainer.mainContext,
+                projection: currentMemoryProjection(),
                 retrievalMode: strategy.retrievalMode
             )
         )
     }
 
     private func primeBalanceSession(_ session: BalanceBoardSession) {
+        refreshDecisionMemoryStore()
         let strategy = DecisionIntelligenceCoordinator
             .executionProfile(preferences: preferences)
             .strategy(for: .balance)
@@ -1011,13 +1046,14 @@ final class BeforeAppModel: ObservableObject {
             DecisionMemorySystem.loadBrainState(
                 mode: .balance,
                 prompt: balancePromptSeed(for: session),
-                context: modelContainer.mainContext,
+                projection: currentMemoryProjection(),
                 retrievalMode: strategy.retrievalMode
             )
         )
     }
 
     private func primeMirrorSession(_ session: MirrorWorkspaceSession) {
+        refreshDecisionMemoryStore()
         let strategy = DecisionIntelligenceCoordinator
             .executionProfile(preferences: preferences)
             .strategy(for: .mirror)
@@ -1025,7 +1061,7 @@ final class BeforeAppModel: ObservableObject {
             DecisionMemorySystem.loadBrainState(
                 mode: .mirror,
                 prompt: mirrorPromptSeed(for: session),
-                context: modelContainer.mainContext,
+                projection: currentMemoryProjection(),
                 retrievalMode: strategy.retrievalMode
             )
         )
@@ -1091,5 +1127,40 @@ final class BeforeAppModel: ObservableObject {
         } else {
             DecisionTaskGraphStore.clear()
         }
+    }
+
+    private func currentMemoryProjection() -> DecisionMemorySystem.BrainStateProjection {
+        if let memoryProjection {
+            return memoryProjection
+        }
+        refreshDecisionMemoryStore(force: true)
+        return memoryProjection ?? DecisionMemorySystem.refreshProjection(in: modelContainer.mainContext)
+    }
+
+    private func persistContext(
+        _ context: ModelContext,
+        operation: String,
+        refreshMemoryProjection: Bool = false
+    ) {
+        do {
+            try context.save()
+            isMemoryProjectionDirty = true
+            if refreshMemoryProjection {
+                refreshDecisionMemoryStore(force: true)
+            }
+        } catch {
+            let notice = PersistenceIssueRecorder.record(error: error, operation: operation)
+            publishStartupNotice(notice)
+        }
+    }
+
+    private func publishStartupNotice(_ notice: String) {
+        guard !notice.isEmpty else { return }
+        if let startupNotice {
+            guard !startupNotice.contains(notice) else { return }
+            self.startupNotice = "\(startupNotice)\n\n\(notice)"
+            return
+        }
+        startupNotice = notice
     }
 }
