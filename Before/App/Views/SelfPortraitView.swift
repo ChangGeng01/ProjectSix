@@ -1,9 +1,10 @@
 import SwiftUI
+import BASAdmin
 
 struct SelfPortraitView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @State private var systemFlightDeck: DecisionSystemFlightDeck?
-    @State private var substrateConsoleSnapshot: BehavioralAISubstrateBridge.ConsoleSnapshot?
+    @State private var substrateConsoleSnapshot: BASConsoleSnapshot?
     @State private var isLoadingSystemFlightDeck = false
 
     var body: some View {
@@ -138,56 +139,11 @@ struct SelfPortraitView: View {
 
     @ViewBuilder
     private func substrateConsoleCard(
-        _ snapshot: BehavioralAISubstrateBridge.ConsoleSnapshot?
+        _ snapshot: BASConsoleSnapshot?
     ) -> some View {
-        PanelCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Substrate console")
-                    .font(.headline)
-                Text("A bridge view that packages the current runtime, flight deck, and brain snapshot together.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                if let snapshot {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(snapshot.runtimeContext.runtimeGear.uppercased())
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(BeforeTheme.ember)
-                        Spacer()
-                        Text(snapshot.runtimeContext.activeProvider)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Text("Requests: \(snapshot.runtimeContext.totalRequests) • Attempts: \(snapshot.runtimeContext.totalProviderAttempts)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-
-                    if let brainSnapshot = snapshot.brainSnapshot {
-                        Text(brainSnapshot.roleTitle)
-                            .font(.subheadline.bold())
-                            .foregroundStyle(BeforeTheme.ink)
-                        Text("\(brainSnapshot.mode.title) • \(brainSnapshot.boundaryModeTitle.replacingOccurrences(of: "_", with: " "))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text("Fingerprint: \(brainSnapshot.fingerprint)")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                    } else {
-                        Text("No active brain snapshot is loaded yet.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Text("Flight deck layers: \(snapshot.flightDeck.layerReports.count) • \(snapshot.flightDeck.overallHealth.title)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("The substrate console appears after the first refresh.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+        if let snapshot {
+            PanelCard {
+                BASConsoleView(snapshot: snapshot)
             }
         }
     }
@@ -527,9 +483,8 @@ struct SelfPortraitView: View {
     @MainActor
     private func refreshSystemFlightDeck() async {
         isLoadingSystemFlightDeck = true
-        let snapshot = await appModel.substrateConsoleSnapshot()
-        systemFlightDeck = snapshot.flightDeck
-        substrateConsoleSnapshot = snapshot
+        systemFlightDeck = await appModel.systemFlightDeck()
+        substrateConsoleSnapshot = await appModel.substrateConsoleSnapshot()
         isLoadingSystemFlightDeck = false
     }
 }

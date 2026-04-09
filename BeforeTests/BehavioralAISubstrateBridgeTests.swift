@@ -1,6 +1,8 @@
 import Foundation
 import SwiftData
 import Testing
+import BASAdmin
+import BASRuntimeCore
 @testable import Before
 
 @MainActor
@@ -37,15 +39,21 @@ struct BehavioralAISubstrateBridgeTests {
             currentBrainState: brainState
         )
 
-        #expect(snapshot.flightDeck.layerReports.count == DecisionSystemLayer.allCases.count)
-        #expect(snapshot.runtimeContext.isPureLocalClosedLoop == true)
-        #expect(snapshot.runtimeContext.runtimeGear == export.runtimeSnapshot.executionProfile.adaptationMatrix.runtimeGear.rawValue)
-        #expect(snapshot.brainSnapshot?.fingerprint == brainState.verificationSnapshot.fingerprint)
-        #expect(snapshot.brainSnapshot?.roleTitle == brainState.identityProfile.role.title)
-        #expect(snapshot.brainSnapshot?.boundaryModeTitle == brainState.boundaryPolicy.mode.rawValue)
-        #expect(snapshot.brainSnapshot?.evolutionCheckpointCount == brainState.evolutionState.checkpointCount)
-        #expect(snapshot.brainSnapshot?.activeTemplateIDs == brainState.activeTemplateIDs)
-        #expect(snapshot.brainSnapshot?.failureGuardIDs == brainState.failureGuardIDs)
+        #expect(snapshot.reports.count == DecisionSystemLayer.allCases.count)
+        #expect(snapshot.isPureLocal == true)
+        #expect(snapshot.runtimeSummary?.contains(export.summary.activeProvider.title) == true)
+        #expect(snapshot.brainSummary?.contains(brainState.identityProfile.role.title) == true)
+        #expect(snapshot.overallSummary.contains("Behavioral substrate score"))
+
+        let runtimeContext = BehavioralAISubstrateBridge.runtimeContext(from: export)
+        #expect(runtimeContext.taskKind == BASTaskKind.chat)
+
+        let roleProfile = BehavioralAISubstrateBridge.roleProfile(from: brainState)
+        #expect(roleProfile?.name == brainState.identityProfile.role.title)
+
+        let substrateBrain = BehavioralAISubstrateBridge.brainSnapshot(from: brainState)
+        #expect(substrateBrain?.verificationSnapshot == brainState.verificationSnapshot.fingerprint)
+        #expect(substrateBrain?.activeConstraints == brainState.activeConstraints)
     }
 
     @MainActor

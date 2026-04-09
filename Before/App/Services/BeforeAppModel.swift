@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import SwiftUI
 import WidgetKit
+import BASAdmin
 
 struct DecisionSignal {
     let eyebrow: String
@@ -833,7 +834,7 @@ final class BeforeAppModel: ObservableObject {
         return export.flightDeck
     }
 
-    func substrateConsoleSnapshot() async -> BehavioralAISubstrateBridge.ConsoleSnapshot {
+    func substrateConsoleSnapshot() async -> BASConsoleSnapshot {
         let export = await decisionRuntimeExport()
         return BehavioralAISubstrateBridge.consoleSnapshot(
             from: export,

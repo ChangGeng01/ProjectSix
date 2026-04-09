@@ -71,4 +71,24 @@ struct BehavioralAISubstrateTests {
         #expect(result.status == .fail)
         #expect(result.blockedReason == "candidate under baseline")
     }
+
+    @Test("apple handoff summary keeps typed metadata")
+    func appleHandoffSummaryKeepsTypedMetadata() {
+        let envelope = BASAppleHandoffEnvelope(
+            surface: .watch,
+            taskKind: .plan,
+            riskLevel: .medium,
+            payloadSummary: "Hold this decision until morning."
+        )
+        let summary = BASDefaultAppleHandoffSummarizer().summarize(
+            envelope,
+            route: .local("on-device-planner")
+        )
+
+        #expect(envelope.metadata.requiresResume)
+        #expect(summary.surface == .watch)
+        #expect(summary.taskKind == .plan)
+        #expect(summary.routeKind == .local)
+        #expect(summary.detail.contains("route local"))
+    }
 }

@@ -4,6 +4,9 @@ options:
     iOS: "18.0"
     watchOS: "11.0"
   bundleIdPrefix: com.changgeng
+packages:
+  BehavioralAISubstrate:
+    path: BehavioralAISubstrate
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -44,6 +47,22 @@ targets:
     dependencies:
       - target: BeforeWidgetExtension
         embed: true
+      - package: BehavioralAISubstrate
+        product: BASRuntimeCore
+      - package: BehavioralAISubstrate
+        product: BASMemory
+      - package: BehavioralAISubstrate
+        product: BASPolicy
+      - package: BehavioralAISubstrate
+        product: BASOrchestration
+      - package: BehavioralAISubstrate
+        product: BASObservability
+      - package: BehavioralAISubstrate
+        product: BASEvaluation
+      - package: BehavioralAISubstrate
+        product: BASAdmin
+      - package: BehavioralAISubstrate
+        product: BASAppleAdapters
 
   BeforeWidgetExtension:
     type: app-extension
@@ -89,6 +108,15 @@ targets:
         INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.changgeng.before
         INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp: NO
         TARGETED_DEVICE_FAMILY: "4"
+    dependencies:
+      - package: BehavioralAISubstrate
+        product: BASRuntimeCore
+      - package: BehavioralAISubstrate
+        product: BASMemory
+      - package: BehavioralAISubstrate
+        product: BASPolicy
+      - package: BehavioralAISubstrate
+        product: BASAppleAdapters
 
   BeforeTests:
     type: bundle.unit-test
@@ -98,6 +126,20 @@ targets:
       - path: BeforeTests
     dependencies:
       - target: Before
+      - package: BehavioralAISubstrate
+        product: BASRuntimeCore
+      - package: BehavioralAISubstrate
+        product: BASMemory
+      - package: BehavioralAISubstrate
+        product: BASPolicy
+      - package: BehavioralAISubstrate
+        product: BASOrchestration
+      - package: BehavioralAISubstrate
+        product: BASObservability
+      - package: BehavioralAISubstrate
+        product: BASEvaluation
+      - package: BehavioralAISubstrate
+        product: BASAdmin
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.changgeng.before.tests

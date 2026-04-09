@@ -117,7 +117,7 @@ public struct BASGovernedMemory: Codable, Sendable, Equatable {
         confidence: Double,
         sourceType: String,
         lastConfirmedAt: Date? = nil,
-        decayScore: Double,
+        decayScore: Double = 0.0,
         governanceStatus: BASMemoryGovernanceStatus,
         provenanceSummary: String
     ) {
@@ -223,5 +223,176 @@ public struct BASFailurePattern: Codable, Sendable, Equatable {
         self.suppressedCadence = suppressedCadence
         self.confidence = confidence
         self.lastSeenAt = lastSeenAt
+    }
+}
+
+public struct BASMemoryTierFilter: Sendable {
+    public static func isFrontstageEligible(_ tier: BASMemoryTier) -> Bool {
+        tier != .cold
+    }
+
+    public static func prioritizedTiers(for scope: BASMemoryScope, sensitivity: BASMemorySensitivity) -> [BASMemoryTier] {
+        switch (scope, sensitivity) {
+        case (.session, .high), (.task, .high):
+            return [.hot, .warm]
+        case (.user, .high):
+            return [.hot, .warm, .cold]
+        case (.device, _), (_, .low):
+            return [.hot, .warm, .cold]
+        default:
+            return [.hot, .warm]
+        }
+    }
+
+    public static func frontstageEligibleMemories(_ memories: [BASGovernedMemory]) -> [BASGovernedMemory] {
+        memories.filter { isFrontstageEligible($0.tier) && $0.governanceStatus == .governed }
+    }
+
+    public static func filter(
+        _ memories: [BASGovernedMemory],
+        allowedTiers: [BASMemoryTier],
+        scope: BASMemoryScope? = nil,
+        sensitivity: BASMemorySensitivity? = nil
+    ) -> [BASGovernedMemory] {
+        memories.filter { memory in
+            guard allowedTiers.contains(memory.tier) else { return false }
+            if let scope, memory.scope != scope { return false }
+            if let sensitivity, memory.sensitivity != sensitivity { return false }
+            return memory.governanceStatus == .governed
+        }
+        .sorted {
+            if $0.tier != $1.tier {
+                return $0.tier.priority > $1.tier.priority
+            }
+            if $0.confidence != $1.confidence {
+                return $0.confidence > $1.confidence
+            }
+            return $0.id.uuidString < $1.id.uuidString
+        }
+    }
+}
+
+public struct BASMemoryGovernance: Sendable {
+    public static func shouldAdmit(candidate: BASMemoryCandidate, minimumConfidence: Double = 0.6) -> Bool {
+        candidate.confidence >= minimumConfidence
+    }
+
+    public static func promote(
+        candidate: BASMemoryCandidate,
+        lastConfirmedAt: Date? = nil,
+        decayScore: Double = 0.0,
+        provenanceSummary: String? = nil,
+        governanceStatus: BASMemoryGovernanceStatus = .governed
+    ) -> BASGovernedMemory {
+        BASGovernedMemory(
+            kind: candidate.event.kind,
+            content: candidate.event.content,
+            scope: candidate.scope,
+            sensitivity: candidate.sensitivity,
+            tier: candidate.preferredTier,
+            confidence: candidate.confidence,
+            sourceType: candidate.sourceType,
+            lastConfirmedAt: lastConfirmedAt,
+            decayScore: decayScore,
+            governanceStatus: governanceStatus,
+            provenanceSummary: provenanceSummary ?? "promoted from candidate:\(candidate.sourceType)"
+        )
+    }
+
+    public static func resolveConflict(primary: BASGovernedMemory, challenger: BASGovernedMemory) -> BASGovernedMemory {
+        guard primary.kind == challenger.kind, primary.scope == challenger.scope else {
+            return primary
+        }
+
+        if challenger.confidence > primary.confidence {
+            return challenger
+        }
+
+        if challenger.confidence == primary.confidence, challenger.decayScore < primary.decayScore {
+            return challenger
+        }
+
+        return primary
+    }
+}
+
+public struct BASCurrentBrainBootstrap: Sendable {
+    public static func bootstrap(
+        from memories: [BASGovernedMemory],
+        goalHints: [String] = [],
+        constraintHints: [String] = [],
+        mode: String = "balanced",
+        verificationSnapshot: String = "bootstrap"
+    ) -> BASCurrentBrainState {
+        let frontstage = BASMemoryTierFilter.frontstageEligibleMemories(memories)
+            .sorted {
+                if $0.tier != $1.tier {
+                    return $0.tier.priority > $1.tier.priority
+                }
+                if $0.confidence != $1.confidence {
+                    return $0.confidence > $1.confidence
+                }
+                return $0.id.uuidString < $1.id.uuidString
+            }
+
+        let profileGoals = frontstage
+            .filter { $0.kind == .profile }
+            .map(\.content)
+            .filter { !$0.isEmpty }
+
+        let dominantGoals = Self.uniqueOrdered(goalHints + profileGoals)
+
+        let highSensitivityConstraints = frontstage
+            .filter { $0.sensitivity == .high }
+            .map { "sensitive:\($0.scope.rawValue)" }
+
+        let activeConstraints = Self.uniqueOrdered(constraintHints + highSensitivityConstraints)
+
+        let activeTemplateIDs = frontstage
+            .filter { $0.kind == .template }
+            .map(\.id)
+
+        let recentFailurePatternIDs = frontstage
+            .filter { $0.kind == .failurePattern }
+            .map(\.id)
+
+        let retrievalTags = Self.uniqueOrdered(frontstage.flatMap { memory in
+            [
+                "tier:\(memory.tier.rawValue)",
+                "scope:\(memory.scope.rawValue)",
+                "kind:\(memory.kind.rawValue)",
+                "source:\(memory.sourceType)"
+            ]
+        })
+
+        return BASCurrentBrainState(
+            mode: mode,
+            dominantGoals: dominantGoals,
+            activeConstraints: activeConstraints,
+            reactionWeights: BASReactionWeights(warmth: 0.5, directness: 0.5, brevity: 0.5, actionBias: 0.5),
+            activeTemplateIDs: activeTemplateIDs,
+            recentFailurePatternIDs: recentFailurePatternIDs,
+            retrievalTags: retrievalTags,
+            verificationSnapshot: verificationSnapshot
+        )
+    }
+
+    private static func uniqueOrdered(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for value in values where seen.insert(value).inserted {
+            result.append(value)
+        }
+        return result
+    }
+}
+
+private extension BASMemoryTier {
+    var priority: Int {
+        switch self {
+        case .hot: return 3
+        case .warm: return 2
+        case .cold: return 1
+        }
     }
 }
