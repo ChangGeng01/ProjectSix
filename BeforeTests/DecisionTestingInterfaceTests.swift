@@ -34,6 +34,7 @@ struct DecisionTestingInterfaceTests {
 
     @Test
     func runtimeSnapshotUsesSameCoordinatorStatus() {
+        DecisionTaskGraphStore.clear()
         let preferences = BeforePreferences(
             homePromptAction: .autoRoute,
             quickBufferDuration: .ninetySeconds,
@@ -52,6 +53,7 @@ struct DecisionTestingInterfaceTests {
         #expect(snapshot.preferences == preferences)
         #expect(snapshot.testingStubProfile == nil)
         #expect(snapshot.executionProfile.effectiveProviderPreference == .template)
+        #expect(snapshot.activeTaskGraph == nil)
         #expect(snapshot.inferenceBackendPolicy == .auto)
         #expect(snapshot.gemmaBackendResolution.policy == .auto)
         #expect(snapshot.runtimeStatus == DecisionIntelligenceCoordinator.runtimeStatus(
@@ -63,6 +65,57 @@ struct DecisionTestingInterfaceTests {
         #expect(snapshot.executionProfile.adaptationMatrix.runtimeGear == .low)
         #expect(snapshot.executionProfile.strategy(for: .quick).preferredProvider == .template)
         #expect(snapshot.executionProfile.strategy(for: .reminder).outputMode == .deterministicTemplate)
+    }
+
+    @Test
+    func runtimeSnapshotIncludesPersistedTaskGraph() {
+        let session = QuickCheckSession(entrySource: .app, initialNote: "Do I buy this?")
+        session.scenario = .buy
+        session.motivation = .reward
+        session.expectedOutcome = .temporaryRelief
+        session.controlLevel = .maybe
+        if let snapshot = DecisionTaskGraphSnapshot.capture(from: session) {
+            DecisionTaskGraphStore.save(snapshot)
+        }
+        defer { DecisionTaskGraphStore.clear() }
+
+        let runtimeSnapshot = DecisionTestingInterface.runtimeSnapshot(
+            preferences: .default,
+            environment: [:]
+        )
+
+        #expect(runtimeSnapshot.activeTaskGraph?.mode == .quick)
+        #expect(runtimeSnapshot.activeTaskGraph?.tasks.count == 4)
+    }
+
+    @Test
+    func runtimeSnapshotHidesPersistedTaskGraphWhenWorkspaceRestoreIsDisabled() {
+        let session = QuickCheckSession(entrySource: .app, initialNote: "Do I buy this?")
+        session.scenario = .buy
+        session.motivation = .reward
+        session.expectedOutcome = .temporaryRelief
+        session.controlLevel = .maybe
+        if let snapshot = DecisionTaskGraphSnapshot.capture(from: session) {
+            DecisionTaskGraphStore.save(snapshot)
+        }
+        defer { DecisionTaskGraphStore.clear() }
+
+        let preferences = BeforePreferences(
+            homePromptAction: .autoRoute,
+            quickBufferDuration: .ninetySeconds,
+            restoreInProgressWorkspaces: false,
+            showReviewInsights: true,
+            onDeviceIntelligenceMode: .assistive,
+            preferredIntelligenceProvider: .template,
+            allowModelFallbacks: true
+        )
+
+        let runtimeSnapshot = DecisionTestingInterface.runtimeSnapshot(
+            preferences: preferences,
+            environment: [:]
+        )
+
+        #expect(runtimeSnapshot.activeTaskGraph == nil)
     }
 
     @Test

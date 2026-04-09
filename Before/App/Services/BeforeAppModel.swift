@@ -15,6 +15,7 @@ final class BeforeAppModel: ObservableObject {
     @Published var activeQuickSession: QuickCheckSession?
     @Published var activeBalanceSession: BalanceBoardSession?
     @Published var activeMirrorSession: MirrorWorkspaceSession?
+    @Published private(set) var activeTaskGraph: DecisionTaskGraphSnapshot?
     @Published var reflectionContext: ReflectionContext?
     @Published var letGoContext: LetGoContext?
     @Published var startupNotice: String?
@@ -35,6 +36,9 @@ final class BeforeAppModel: ObservableObject {
         self.preferences = DecisionTestingInterface.effectivePreferences()
         self.supportInbox = SupportInboxStore()
         self.sharedLifeStore = SharedLifeStore()
+        self.activeTaskGraph = (testingLaunchOptions.cleanLaunch || !preferences.restoreInProgressWorkspaces)
+            ? nil
+            : DecisionTaskGraphStore.load()
         applyTestingLaunchOptions(testingLaunchOptions)
         restorePendingReflectionState()
     }
@@ -122,6 +126,8 @@ final class BeforeAppModel: ObservableObject {
             persistActiveWorkspaceState()
         } else {
             ActiveDecisionWorkspaceStore.clear()
+            DecisionTaskGraphStore.clear()
+            activeTaskGraph = nil
         }
     }
 
@@ -375,16 +381,19 @@ final class BeforeAppModel: ObservableObject {
     func refreshQuickBrainState(_ session: QuickCheckSession) {
         refreshDecisionMemoryStore()
         primeQuickSession(session)
+        refreshActiveTaskGraphSnapshot()
     }
 
     func refreshBalanceBrainState(_ session: BalanceBoardSession) {
         refreshDecisionMemoryStore()
         primeBalanceSession(session)
+        refreshActiveTaskGraphSnapshot()
     }
 
     func refreshMirrorBrainState(_ session: MirrorWorkspaceSession) {
         refreshDecisionMemoryStore()
         primeMirrorSession(session)
+        refreshActiveTaskGraphSnapshot()
     }
 
     func reopenCheckEvent(_ event: CheckEvent) {
@@ -811,6 +820,8 @@ final class BeforeAppModel: ObservableObject {
         activeQuickSession = nil
         activeBalanceSession = nil
         activeMirrorSession = nil
+        activeTaskGraph = nil
+        DecisionTaskGraphStore.clear()
     }
 
     private func presentLetGo(for item: TomorrowBoxItem) {
@@ -909,6 +920,7 @@ final class BeforeAppModel: ObservableObject {
         }
 
         selectedTab = .home
+        refreshActiveTaskGraphSnapshot()
     }
 
     private func persistActiveWorkspaceState() {
@@ -929,6 +941,8 @@ final class BeforeAppModel: ObservableObject {
         } else {
             ActiveDecisionWorkspaceStore.clear()
         }
+
+        refreshActiveTaskGraphSnapshot()
     }
 
     private func trimmed(_ value: String) -> String {
@@ -942,6 +956,7 @@ final class BeforeAppModel: ObservableObject {
             PendingLaunchRequestStore.clear()
             PendingReflectionStore.clear()
             ActiveDecisionWorkspaceStore.clear()
+            DecisionTaskGraphStore.clear()
             WidgetSnapshotStore.clear()
             Task {
                 await DecisionTestingInterface.resetTransientIntelligenceState()
@@ -962,6 +977,7 @@ final class BeforeAppModel: ObservableObject {
             letGoContext = nil
             pendingReflectionContext = nil
             shouldPromptReflectionAfterBackground = false
+            activeTaskGraph = nil
         }
 
         if options.skipOnboarding {
@@ -1053,5 +1069,27 @@ final class BeforeAppModel: ObservableObject {
         .map(trimmed)
         .filter { !$0.isEmpty }
         .joined(separator: " ")
+    }
+
+    private func refreshActiveTaskGraphSnapshot() {
+        let snapshot: DecisionTaskGraphSnapshot?
+
+        if let session = activeQuickSession {
+            snapshot = DecisionTaskGraphSnapshot.capture(from: session)
+        } else if let session = activeBalanceSession {
+            snapshot = DecisionTaskGraphSnapshot.capture(from: session)
+        } else if let session = activeMirrorSession {
+            snapshot = DecisionTaskGraphSnapshot.capture(from: session)
+        } else {
+            snapshot = nil
+        }
+
+        activeTaskGraph = snapshot
+
+        if let snapshot {
+            DecisionTaskGraphStore.save(snapshot)
+        } else {
+            DecisionTaskGraphStore.clear()
+        }
     }
 }

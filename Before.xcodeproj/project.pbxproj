@@ -163,9 +163,11 @@
 		B6401C0BE7236DB94F7E0FD4 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12B18D0B36378C98DA6A44EA /* NotificationServiceTests.swift */; };
 		B6AAF5251B4B0DA6FA01D697 /* DecisionIntelligenceResponseCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1198836DDA48CF625D5BB0E7 /* DecisionIntelligenceResponseCacheTests.swift */; };
 		B6E70AA86FC879983276E1CF /* View+BeforeAccessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87503431F48B21095076A259 /* View+BeforeAccessibility.swift */; };
+		B751F4F07F063CB145023558 /* DecisionTaskGraphStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1550D0698BB22272A7707D93 /* DecisionTaskGraphStore.swift */; };
 		B85E951908A4087DEFAF730F /* DecisionIntelligenceAdmissionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13CA4CCE8E080D56C166ED5A /* DecisionIntelligenceAdmissionControllerTests.swift */; };
 		B93169E7C80A5958DC963E22 /* SupportRequestKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EC6D618BA06FEEFADA2ED4B /* SupportRequestKind.swift */; };
 		BA99C96ABD658EADEE79DE5B /* EntrySource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5263B35DEB9254806060CCA3 /* EntrySource.swift */; };
+		BAE4CDE23B930FB97DC8F64C /* DecisionTaskGraphStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE042EFEC57B6C8465029270 /* DecisionTaskGraphStoreTests.swift */; };
 		BB20F5F880F9E66C3754665A /* DecisionFrontstageState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1EF1DBB04E66319BF5C80E /* DecisionFrontstageState.swift */; };
 		BB67511098C3741B7E832995 /* SharedContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E63D346FC718230713E7B30B /* SharedContainer.swift */; };
 		BB74CD533C51228C40787E52 /* DecisionFieldSuggestionLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9ED7A91142A6380075D141 /* DecisionFieldSuggestionLibraryTests.swift */; };
@@ -293,6 +295,7 @@
 		12B18D0B36378C98DA6A44EA /* NotificationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationServiceTests.swift; sourceTree = "<group>"; };
 		12C065A104EC376E9703AB10 /* DecisionIntelligenceCircuitBreaker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligenceCircuitBreaker.swift; sourceTree = "<group>"; };
 		13CA4CCE8E080D56C166ED5A /* DecisionIntelligenceAdmissionControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligenceAdmissionControllerTests.swift; sourceTree = "<group>"; };
+		1550D0698BB22272A7707D93 /* DecisionTaskGraphStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionTaskGraphStore.swift; sourceTree = "<group>"; };
 		15786A7BDA5F624F94D347DA /* DecisionContextFieldKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionContextFieldKey.swift; sourceTree = "<group>"; };
 		167E5FF74A76B475CE75CC1F /* DecisionContextLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionContextLifecycleTests.swift; sourceTree = "<group>"; };
 		183E2BE17146F7EE91141F65 /* DecisionIntelligenceCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligenceCoordinatorTests.swift; sourceTree = "<group>"; };
@@ -454,6 +457,7 @@
 		DA1C0C323D158521A815D9BE /* DecisionBrainState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionBrainState.swift; sourceTree = "<group>"; };
 		DDB7F1306151CE6EAB2CA002 /* WidgetSafeCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSafeCopy.swift; sourceTree = "<group>"; };
 		DDDD081226C6B85C84D8D0FA /* LetGoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetGoView.swift; sourceTree = "<group>"; };
+		DE042EFEC57B6C8465029270 /* DecisionTaskGraphStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionTaskGraphStoreTests.swift; sourceTree = "<group>"; };
 		DFDA8C2C4F4EB349F7763323 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		E46912BAE7CADD3F30767FCC /* SupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportView.swift; sourceTree = "<group>"; };
 		E63D346FC718230713E7B30B /* SharedContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedContainer.swift; sourceTree = "<group>"; };
@@ -572,6 +576,7 @@
 				8FDBF1730457BB2E21337458 /* DecisionRecordRestoration.swift */,
 				7B2D947D30BE6BCB8C3A28A6 /* DecisionReviewEngine.swift */,
 				1D900CAAC9F53880921790B3 /* DecisionStarterLibrary.swift */,
+				1550D0698BB22272A7707D93 /* DecisionTaskGraphStore.swift */,
 				3418C7D3898FC17BBD65C3DB /* DecisionTestingInterface.swift */,
 				8116ADEB650BEA3CC214DAC2 /* DecisionTestingRuntimeExport.swift */,
 				0902DDCE1D710D597D2B43DF /* DecisionTestingStubProfile.swift */,
@@ -654,6 +659,7 @@
 				438899EA716D6093E4500048 /* DecisionRecordRestorationTests.swift */,
 				EE5ECF006D7648F3C667BF84 /* DecisionReviewEngineTests.swift */,
 				9A5EC40417B021F9CAFFD08C /* DecisionStarterLibraryTests.swift */,
+				DE042EFEC57B6C8465029270 /* DecisionTaskGraphStoreTests.swift */,
 				BADC4370F3CA744EA14B6709 /* DecisionTestingInterfaceTests.swift */,
 				C295B421EA1EA970FA5D1475 /* DeveloperDecisionReplayBuilderTests.swift */,
 				B26E7755077AFB3B6FF8CA22 /* GemmaE4BIntelligenceServiceTests.swift */,
@@ -1074,6 +1080,7 @@
 				A67CDCCE9D03D5DBB3D500FB /* DecisionReviewEngine.swift in Sources */,
 				67EE16CD290619AAB8F5A647 /* DecisionRoutePreviewCard.swift in Sources */,
 				1B16408FE6065B5938D2C51C /* DecisionStarterLibrary.swift in Sources */,
+				B751F4F07F063CB145023558 /* DecisionTaskGraphStore.swift in Sources */,
 				73D203E36532ADCAC6538D01 /* DecisionTestingInterface.swift in Sources */,
 				D946B10D8FB631D6C5C61A4B /* DecisionTestingRuntimeExport.swift in Sources */,
 				18C8A6D0E76968EB5CB7A174 /* DecisionTestingStubProfile.swift in Sources */,
@@ -1230,6 +1237,7 @@
 				D99FF9332959DCD349DD6FF6 /* DecisionRecordRestorationTests.swift in Sources */,
 				11F77E80EE0F2B45F51AE79E /* DecisionReviewEngineTests.swift in Sources */,
 				52C12D06470D02C5A92EE481 /* DecisionStarterLibraryTests.swift in Sources */,
+				BAE4CDE23B930FB97DC8F64C /* DecisionTaskGraphStoreTests.swift in Sources */,
 				984E116FAA12D9F9F0BE2037 /* DecisionTestingInterfaceTests.swift in Sources */,
 				97FDA83B408FA19BA1EC1608 /* DeveloperDecisionReplayBuilderTests.swift in Sources */,
 				9A0E4EDC0F6E89753B5D6449 /* GemmaE4BIntelligenceServiceTests.swift in Sources */,

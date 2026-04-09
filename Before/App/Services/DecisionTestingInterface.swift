@@ -4,6 +4,7 @@ struct DecisionTestingRuntimeSnapshot: Equatable, Sendable {
     let preferences: BeforePreferences
     let testingStubProfile: DecisionTestingStubProfile?
     let executionProfile: DecisionIntelligenceExecutionProfile
+    let activeTaskGraph: DecisionTaskGraphSnapshot?
     let inferenceBackendPolicy: InferenceBackendPolicy
     let deviceCapabilities: DeviceCapabilitySnapshot
     let gemmaBackendResolution: InferenceBackendResolution
@@ -178,6 +179,7 @@ enum DecisionTestingInterface {
             preferences: preferences,
             testingStubProfile: stubProfile,
             executionProfile: executionProfile,
+            activeTaskGraph: preferences.restoreInProgressWorkspaces ? DecisionTaskGraphStore.load() : nil,
             inferenceBackendPolicy: backendPolicy,
             deviceCapabilities: deviceCapabilities,
             gemmaBackendResolution: gemmaBackendResolution,
