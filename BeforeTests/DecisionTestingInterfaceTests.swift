@@ -358,6 +358,30 @@ struct DecisionTestingInterfaceTests {
                 suppressedBehaviors: ["long_explanation"],
                 detail: "Quick neural routing is active."
             ),
+            brainState: DecisionBrainState(
+                profileCore: ["Short, direct language lands better."],
+                activeGoals: ["Sleep before midnight"],
+                relevantMemories: ["Putting it into Tomorrow Box often breaks the loop."],
+                sessionBiases: ["Keep the language short and concrete."],
+                retrievalTags: ["quick", "buy", "night"],
+                reactionWeights: DecisionReactionWeights(
+                    briefLanguage: 0.92,
+                    warmDirectTone: 0.71,
+                    lowCognitiveLoad: 0.83,
+                    interruptiveActionBias: 0.94,
+                    boundaryNamingBias: 0.28,
+                    tradeoffClarityBias: 0.33
+                ),
+                memoryGovernance: DecisionMemoryGovernanceState(
+                    totalRecordCount: 6,
+                    totalCandidateCount: 3,
+                    pendingCandidateCount: 1,
+                    promotedCandidateCount: 2,
+                    loadedPromotedMemoryCount: 3,
+                    loadedPendingMemoryCount: 1
+                ),
+                loadedAt: .now
+            ),
             semanticPromptFingerprint: "semantic-quick-1",
             stablePrefixFingerprint: "prefix-quick-1",
             prompt: "Quick prompt",
@@ -513,5 +537,18 @@ struct DecisionTestingInterfaceTests {
         #expect(export.neuralSummary.strongestSignalByKind[.quick] == .urgency)
         #expect(export.summary.neuralTraceCount == 1)
         #expect(export.summary.suppressedBehaviorCount == 1)
+        #expect(export.brainSummary.brainTraceCount == 1)
+        #expect(export.brainSummary.dominantReactionWeightByKind[.quick] == .interruptiveActionBias)
+        #expect(export.brainSummary.averageProfileCoreCountByKind[.quick] == 1)
+        #expect(export.brainSummary.averageActiveGoalCountByKind[.quick] == 1)
+        #expect(export.brainSummary.averageRelevantMemoryCountByKind[.quick] == 1)
+        #expect(export.brainSummary.averageLoadedPromotedMemoryCountByKind[.quick] == 3)
+        #expect(export.brainSummary.averageLoadedPendingMemoryCountByKind[.quick] == 1)
+        #expect(export.brainSummary.averagePendingCandidateCountByKind[.quick] == 1)
+        #expect(export.brainSummary.averagePromotedRecordCountByKind[.quick] == 6)
+        #expect(export.brainSummary.pendingMemoryLoadRateByKind[.quick] == 0.25)
+        #expect(export.summary.brainTraceCount == 1)
+        #expect(export.summary.dominantReactionWeightByKind[.quick] == .interruptiveActionBias)
+        #expect(export.summary.pendingMemoryLoadRateByKind[.quick] == 0.25)
     }
 }

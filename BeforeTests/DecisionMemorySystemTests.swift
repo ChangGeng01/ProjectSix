@@ -82,6 +82,12 @@ final class DecisionMemorySystemTests: XCTestCase {
         }))
         XCTAssertTrue(brainState.sessionBiases.contains("Keep the language short and concrete."))
         XCTAssertTrue(brainState.sessionBiases.contains(where: { $0.localizedCaseInsensitiveContains("late at night") }))
+        XCTAssertGreaterThanOrEqual(brainState.reactionWeights.briefLanguage, 0.9)
+        XCTAssertGreaterThanOrEqual(brainState.reactionWeights.lowCognitiveLoad, 0.8)
+        XCTAssertGreaterThanOrEqual(brainState.reactionWeights.interruptiveActionBias, 0.9)
+        XCTAssertGreaterThanOrEqual(brainState.memoryGovernance.totalRecordCount, 4)
+        XCTAssertGreaterThanOrEqual(brainState.memoryGovernance.pendingCandidateCount, 1)
+        XCTAssertGreaterThanOrEqual(brainState.memoryGovernance.loadedPromotedMemoryCount, 1)
         XCTAssertTrue(brainState.retrievalTags.contains("quick"))
         XCTAssertTrue(brainState.retrievalTags.contains("buy"))
     }

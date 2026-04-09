@@ -141,6 +141,8 @@ enum DecisionMemorySystem {
                 relevantMemories: [],
                 sessionBiases: defaultSessionBiases(for: mode),
                 retrievalTags: Array(queryTags(for: mode, prompt: prompt)).sorted(),
+                reactionWeights: DecisionReactionWeights.defaults(for: mode),
+                memoryGovernance: .empty,
                 loadedAt: now
             )
         }
@@ -151,25 +153,44 @@ enum DecisionMemorySystem {
                 score($1, mode: mode, queryTags: queryTags, now: now)
         }
 
-        let profileCore = orderedUnique(
-            orderedItems
-                .filter { $0.type == .identity || $0.type == .preference }
-                .prefix(2)
-                .map(\.headline)
+        let profileItems = selectItems(
+            from: orderedItems,
+            limit: 2,
+            matching: { $0.type == .identity || $0.type == .preference }
+        )
+        let profileCore = orderedUnique(profileItems.map(\.headline))
+
+        let goalItems = selectItems(
+            from: orderedItems,
+            limit: 2,
+            excludingIDs: Set(profileItems.map(\.id)),
+            matching: { $0.type == .goal }
+        )
+        let activeGoals = orderedUnique(goalItems.map(\.headline))
+
+        let relevantItems = selectItems(
+            from: orderedItems,
+            limit: 3,
+            excludingIDs: Set(profileItems.map(\.id) + goalItems.map(\.id)),
+            matching: { _ in true }
+        )
+        let relevantMemories = orderedUnique(relevantItems.map(\.headline))
+        let selectedItems = profileItems + goalItems + relevantItems
+
+        let reactionWeights = buildReactionWeights(
+            mode: mode,
+            queryTags: queryTags,
+            orderedItems: orderedItems,
+            records: resolvedRecords,
+            profileCore: profileCore,
+            activeGoals: activeGoals,
+            relevantMemories: relevantMemories
         )
 
-        let activeGoals = orderedUnique(
-            orderedItems
-                .filter { $0.type == .goal }
-                .prefix(2)
-                .map(\.headline)
-        )
-
-        let relevantMemories = orderedUnique(
-            orderedItems
-                .filter { !profileCore.contains($0.headline) && !activeGoals.contains($0.headline) }
-                .prefix(3)
-                .map(\.headline)
+        let memoryGovernance = buildMemoryGovernanceState(
+            records: resolvedRecords,
+            candidates: resolvedCandidates,
+            selectedItems: selectedItems
         )
 
         let sessionBiases = buildSessionBiases(
@@ -178,6 +199,7 @@ enum DecisionMemorySystem {
             records: resolvedRecords,
             profileCore: profileCore,
             relevantMemories: relevantMemories,
+            reactionWeights: reactionWeights,
             now: now
         )
 
@@ -187,6 +209,8 @@ enum DecisionMemorySystem {
             relevantMemories: relevantMemories,
             sessionBiases: sessionBiases,
             retrievalTags: Array(queryTags).sorted(),
+            reactionWeights: reactionWeights,
+            memoryGovernance: memoryGovernance,
             loadedAt: now
         )
     }
@@ -216,6 +240,25 @@ enum DecisionMemorySystem {
             byID[item.id] = item
         }
         return Array(byID.values)
+    }
+
+    private static func buildMemoryGovernanceState(
+        records: [DecisionMemoryRecord],
+        candidates: [DecisionMemoryCandidateRecord],
+        selectedItems: [BrainMemoryItem]
+    ) -> DecisionMemoryGovernanceState {
+        let pendingCandidateCount = candidates.filter { $0.status == .pending }.count
+        let promotedCandidateCount = candidates.filter { $0.status == .promoted }.count
+        let loadedPendingMemoryCount = selectedItems.filter(\.isPending).count
+
+        return DecisionMemoryGovernanceState(
+            totalRecordCount: records.count,
+            totalCandidateCount: candidates.count,
+            pendingCandidateCount: pendingCandidateCount,
+            promotedCandidateCount: promotedCandidateCount,
+            loadedPromotedMemoryCount: selectedItems.count - loadedPendingMemoryCount,
+            loadedPendingMemoryCount: loadedPendingMemoryCount
+        )
     }
 
     private static func deriveMemoryDrafts(
@@ -541,11 +584,13 @@ enum DecisionMemorySystem {
         records: [DecisionMemoryRecord],
         profileCore: [String],
         relevantMemories: [String],
+        reactionWeights: DecisionReactionWeights,
         now: Date
     ) -> [String] {
         var biases = defaultSessionBiases(for: mode)
 
-        if profileCore.contains(where: { $0.localizedCaseInsensitiveContains("short") || $0.localizedCaseInsensitiveContains("direct") }) {
+        if reactionWeights.briefLanguage >= 0.7 ||
+            profileCore.contains(where: { $0.localizedCaseInsensitiveContains("short") || $0.localizedCaseInsensitiveContains("direct") }) {
             biases.append("Keep the language short and concrete.")
         }
 
@@ -558,13 +603,26 @@ enum DecisionMemorySystem {
             biases.append("Keep the cognitive load light right now.")
         }
 
+        if reactionWeights.lowCognitiveLoad >= 0.72 {
+            biases.append("Keep the cognitive load light right now.")
+        }
+
         if mode == .quick,
+           (reactionWeights.interruptiveActionBias >= 0.74 ||
            relevantMemories.contains(where: {
                $0.localizedCaseInsensitiveContains("Tomorrow Box") ||
                $0.localizedCaseInsensitiveContains("pause") ||
                $0.localizedCaseInsensitiveContains("trigger")
-           }) {
+           })) {
             biases.append("Favor interruptive next steps over extra analysis.")
+        }
+
+        if mode == .mirror, reactionWeights.boundaryNamingBias >= 0.8 {
+            biases.append("Name the real boundary before softening it.")
+        }
+
+        if mode == .balance, reactionWeights.tradeoffClarityBias >= 0.8 {
+            biases.append("Keep the trade-off explicit before polishing the language.")
         }
 
         let hour = Calendar.current.component(.hour, from: now)
@@ -584,6 +642,71 @@ enum DecisionMemorySystem {
         case .mirror:
             ["Name the tension before suggesting anything."]
         }
+    }
+
+    private static func buildReactionWeights(
+        mode: DecisionMode,
+        queryTags: Set<String>,
+        orderedItems: [BrainMemoryItem],
+        records: [DecisionMemoryRecord],
+        profileCore: [String],
+        activeGoals: [String],
+        relevantMemories: [String]
+    ) -> DecisionReactionWeights {
+        var weights = DecisionReactionWeights.defaults(for: mode)
+        let memoryText = (
+            profileCore +
+            activeGoals +
+            relevantMemories +
+            orderedItems.prefix(6).map(\.headline)
+        )
+        .joined(separator: " ")
+        .lowercased()
+
+        if records.contains(where: { $0.id == "preference.communication.concise" }) ||
+            memoryText.contains("short") ||
+            memoryText.contains("direct") {
+            weights.briefLanguage += 0.24
+            weights.warmDirectTone += 0.08
+        }
+
+        if queryTags.contains("night") ||
+            queryTags.contains("late") ||
+            records.contains(where: { $0.id == "semantic.pattern.late_night" }) {
+            weights.lowCognitiveLoad += 0.3
+            weights.briefLanguage += 0.12
+            weights.warmDirectTone += 0.06
+        }
+
+        if mode == .quick &&
+            (records.contains(where: { $0.id == "support.action.decideTomorrow" }) ||
+             records.contains(where: { $0.id == "support.action.wait90s" }) ||
+             records.contains(where: { $0.id == "support.action.leaveStimulus" }) ||
+             memoryText.contains("tomorrow box") ||
+             memoryText.contains("pause") ||
+             memoryText.contains("trigger")) {
+            weights.interruptiveActionBias += 0.24
+        }
+
+        if mode == .mirror ||
+            memoryText.contains("shrinking") ||
+            memoryText.contains("boundary") ||
+            memoryText.contains("cost") ||
+            memoryText.contains("relationship") {
+            weights.boundaryNamingBias += 0.18
+            weights.warmDirectTone += 0.06
+        }
+
+        if mode == .balance ||
+            queryTags.contains("tradeoff") ||
+            queryTags.contains("constraint") ||
+            memoryText.contains("trade-off") ||
+            memoryText.contains("cash versus") ||
+            memoryText.contains("protect sleep") {
+            weights.tradeoffClarityBias += 0.22
+        }
+
+        return rounded(clamped(weights))
     }
 
     private static func queryTags(for mode: DecisionMode, prompt: String) -> Set<String> {
@@ -659,6 +782,27 @@ enum DecisionMemorySystem {
         return lhs.priority > rhs.priority
     }
 
+    private static func selectItems(
+        from orderedItems: [BrainMemoryItem],
+        limit: Int,
+        excludingIDs: Set<String> = [],
+        matching predicate: (BrainMemoryItem) -> Bool
+    ) -> [BrainMemoryItem] {
+        var selected: [BrainMemoryItem] = []
+        var seenHeadlines = Set<String>()
+
+        for item in orderedItems where predicate(item) {
+            guard !excludingIDs.contains(item.id) else { continue }
+            guard seenHeadlines.insert(item.headline).inserted else { continue }
+            selected.append(item)
+            if selected.count == limit {
+                break
+            }
+        }
+
+        return selected
+    }
+
     private static func normalized(_ value: String) -> String {
         value
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -709,5 +853,31 @@ enum DecisionMemorySystem {
     private static func orderedUnique(_ values: [String]) -> [String] {
         var seen = Set<String>()
         return values.filter { seen.insert($0).inserted }
+    }
+
+    private static func clamped(_ weights: DecisionReactionWeights) -> DecisionReactionWeights {
+        DecisionReactionWeights(
+            briefLanguage: max(0, min(1, weights.briefLanguage)),
+            warmDirectTone: max(0, min(1, weights.warmDirectTone)),
+            lowCognitiveLoad: max(0, min(1, weights.lowCognitiveLoad)),
+            interruptiveActionBias: max(0, min(1, weights.interruptiveActionBias)),
+            boundaryNamingBias: max(0, min(1, weights.boundaryNamingBias)),
+            tradeoffClarityBias: max(0, min(1, weights.tradeoffClarityBias))
+        )
+    }
+
+    private static func rounded(_ weights: DecisionReactionWeights) -> DecisionReactionWeights {
+        DecisionReactionWeights(
+            briefLanguage: roundedWeight(weights.briefLanguage),
+            warmDirectTone: roundedWeight(weights.warmDirectTone),
+            lowCognitiveLoad: roundedWeight(weights.lowCognitiveLoad),
+            interruptiveActionBias: roundedWeight(weights.interruptiveActionBias),
+            boundaryNamingBias: roundedWeight(weights.boundaryNamingBias),
+            tradeoffClarityBias: roundedWeight(weights.tradeoffClarityBias)
+        )
+    }
+
+    private static func roundedWeight(_ value: Double) -> Double {
+        (value * 100).rounded() / 100
     }
 }

@@ -135,6 +135,14 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
             relevantMemories: ["Late sessions need lighter, shorter guidance."],
             sessionBiases: ["Keep the language short and concrete."],
             retrievalTags: ["sleep", "night", "tradeoff"],
+            reactionWeights: DecisionReactionWeights(
+                briefLanguage: 0.86,
+                warmDirectTone: 0.74,
+                lowCognitiveLoad: 0.79,
+                interruptiveActionBias: 0.42,
+                boundaryNamingBias: 0.38,
+                tradeoffClarityBias: 0.81
+            ),
             loadedAt: .now
         )
 
@@ -179,6 +187,9 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertTrue(envelope.payload.contains("\"active_goals\":[\"Protect sleep and energy.\"]"))
         XCTAssertTrue(envelope.payload.contains("\"relevant_memories\":[\"Late sessions need lighter, shorter guidance.\"]"))
         XCTAssertTrue(envelope.payload.contains("\"session_biases\":[\"Keep the language short and concrete.\"]"))
+        XCTAssertTrue(envelope.payload.contains("\"reaction_weights\":"))
+        XCTAssertTrue(envelope.payload.contains("\"brief\":"))
+        XCTAssertTrue(envelope.payload.contains("\"tradeoff\":"))
         XCTAssertTrue(envelope.payload.contains("\"route\":\"setBoundary\""))
         XCTAssertTrue(envelope.payload.contains("\"signal\":\"constraintPressure\""))
         XCTAssertTrue(envelope.payload.contains("\"suppressed_behaviors\":[\"instant_verdict\"]"))

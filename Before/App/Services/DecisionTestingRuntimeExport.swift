@@ -116,6 +116,42 @@ struct DecisionTestingRuntimeExport {
         )
     }
 
+    var brainSummary: DecisionTestingBrainSummary {
+        let brainTraces = recentTraces.compactMap { trace in
+            trace.brainState.map { (trace.kind, $0) }
+        }
+
+        let dominantReactionWeightByKind = Dictionary(grouping: brainTraces, by: \.0)
+            .compactMapValues { grouped in
+                grouped.first?.1.reactionWeights.dominantKey
+            }
+
+        let averageProfileCoreCountByKind = averageBrainMetricByKind { $0.profileCore.count }
+        let averageActiveGoalCountByKind = averageBrainMetricByKind { $0.activeGoals.count }
+        let averageRelevantMemoryCountByKind = averageBrainMetricByKind { $0.relevantMemories.count }
+        let averageLoadedPromotedMemoryCountByKind = averageBrainMetricByKind { $0.memoryGovernance.loadedPromotedMemoryCount }
+        let averageLoadedPendingMemoryCountByKind = averageBrainMetricByKind { $0.memoryGovernance.loadedPendingMemoryCount }
+        let averagePendingCandidateCountByKind = averageBrainMetricByKind { $0.memoryGovernance.pendingCandidateCount }
+        let averagePromotedRecordCountByKind = averageBrainMetricByKind { $0.memoryGovernance.totalRecordCount }
+        let pendingMemoryLoadRateByKind = memoryLoadRateByKind(
+            promotedByKind: averageLoadedPromotedMemoryCountByKind,
+            pendingByKind: averageLoadedPendingMemoryCountByKind
+        )
+
+        return DecisionTestingBrainSummary(
+            brainTraceCount: brainTraces.count,
+            dominantReactionWeightByKind: dominantReactionWeightByKind,
+            averageProfileCoreCountByKind: averageProfileCoreCountByKind,
+            averageActiveGoalCountByKind: averageActiveGoalCountByKind,
+            averageRelevantMemoryCountByKind: averageRelevantMemoryCountByKind,
+            averageLoadedPromotedMemoryCountByKind: averageLoadedPromotedMemoryCountByKind,
+            averageLoadedPendingMemoryCountByKind: averageLoadedPendingMemoryCountByKind,
+            averagePendingCandidateCountByKind: averagePendingCandidateCountByKind,
+            averagePromotedRecordCountByKind: averagePromotedRecordCountByKind,
+            pendingMemoryLoadRateByKind: pendingMemoryLoadRateByKind
+        )
+    }
+
     var summary: DecisionTestingRuntimeSummary {
         DecisionTestingRuntimeSummary(
             activeProvider: runtimeSnapshot.runtimeStatus.active,
@@ -172,6 +208,9 @@ struct DecisionTestingRuntimeExport {
             budgetTrimRateByKind: budgetTrimRateByKind,
             neuralTraceCount: neuralSummary.neuralTraceCount,
             suppressedBehaviorCount: neuralSummary.suppressedBehaviorCount,
+            brainTraceCount: brainSummary.brainTraceCount,
+            dominantReactionWeightByKind: brainSummary.dominantReactionWeightByKind,
+            pendingMemoryLoadRateByKind: brainSummary.pendingMemoryLoadRateByKind,
             traceCount: recentTraces.count,
             replayCount: recentReplay.count,
             totalCacheEntries: cacheTelemetry.entryCountByKind.values.reduce(0, +),
@@ -316,6 +355,38 @@ struct DecisionTestingRuntimeExport {
         )
     }
 
+    private func memoryLoadRateByKind(
+        promotedByKind: [DecisionIntelligenceTraceKind: Double],
+        pendingByKind: [DecisionIntelligenceTraceKind: Double]
+    ) -> [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            uniqueKeysWithValues: intelligenceTelemetry.requestCountByKind.keys.map { kind in
+                let promoted = promotedByKind[kind] ?? 0
+                let pending = pendingByKind[kind] ?? 0
+                let total = promoted + pending
+                return (kind, total > 0 ? pending / total : 0)
+            }
+        )
+    }
+
+    private func averageBrainMetricByKind(
+        _ projection: (DecisionBrainState) -> Int
+    ) -> [DecisionIntelligenceTraceKind: Double] {
+        Dictionary(
+            grouping: recentTraces.compactMap { trace in
+                trace.brainState.map { (trace.kind, $0) }
+            },
+            by: \.0
+        )
+        .compactMapValues { grouped in
+            guard !grouped.isEmpty else { return nil }
+            let total = grouped.reduce(0) { partialResult, item in
+                partialResult + projection(item.1)
+            }
+            return Double(total) / Double(grouped.count)
+        }
+    }
+
     private func evidenceRateByKind(
         numeratorByKind: [DecisionIntelligenceTraceKind: Int]
     ) -> [DecisionIntelligenceTraceKind: Double] {
@@ -379,6 +450,19 @@ struct DecisionTestingNeuralSummary: Equatable, Sendable {
     let strongestSignalByKind: [DecisionIntelligenceTraceKind: DecisionNeuralSignal]
 }
 
+struct DecisionTestingBrainSummary: Equatable, Sendable {
+    let brainTraceCount: Int
+    let dominantReactionWeightByKind: [DecisionIntelligenceTraceKind: DecisionReactionWeightKey]
+    let averageProfileCoreCountByKind: [DecisionIntelligenceTraceKind: Double]
+    let averageActiveGoalCountByKind: [DecisionIntelligenceTraceKind: Double]
+    let averageRelevantMemoryCountByKind: [DecisionIntelligenceTraceKind: Double]
+    let averageLoadedPromotedMemoryCountByKind: [DecisionIntelligenceTraceKind: Double]
+    let averageLoadedPendingMemoryCountByKind: [DecisionIntelligenceTraceKind: Double]
+    let averagePendingCandidateCountByKind: [DecisionIntelligenceTraceKind: Double]
+    let averagePromotedRecordCountByKind: [DecisionIntelligenceTraceKind: Double]
+    let pendingMemoryLoadRateByKind: [DecisionIntelligenceTraceKind: Double]
+}
+
 struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let activeProvider: DecisionModelProviderKind
     let fallbackProvider: DecisionModelProviderKind?
@@ -434,6 +518,9 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let budgetTrimRateByKind: [DecisionIntelligenceTraceKind: Double]
     let neuralTraceCount: Int
     let suppressedBehaviorCount: Int
+    let brainTraceCount: Int
+    let dominantReactionWeightByKind: [DecisionIntelligenceTraceKind: DecisionReactionWeightKey]
+    let pendingMemoryLoadRateByKind: [DecisionIntelligenceTraceKind: Double]
     let traceCount: Int
     let replayCount: Int
     let totalCacheEntries: Int

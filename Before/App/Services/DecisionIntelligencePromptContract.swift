@@ -742,7 +742,8 @@ enum DecisionIntelligencePromptContract {
             "profile_core": brainState.profileCore,
             "active_goals": brainState.activeGoals,
             "relevant_memories": brainState.relevantMemories,
-            "session_biases": brainState.sessionBiases
+            "session_biases": brainState.sessionBiases,
+            "reaction_weights": reactionWeightsJSONObject(brainState.reactionWeights)
         ]
 
         guard JSONSerialization.isValidJSONObject(payload),
@@ -752,6 +753,29 @@ enum DecisionIntelligencePromptContract {
         }
 
         return json
+    }
+
+    private static func reactionWeightsJSONObject(_ weights: DecisionReactionWeights) -> [String: Double] {
+        let allWeights: [(String, Double)] = [
+            ("brief", weights.briefLanguage),
+            ("warm_direct", weights.warmDirectTone),
+            ("low_load", weights.lowCognitiveLoad),
+            ("interruptive", weights.interruptiveActionBias),
+            ("boundary", weights.boundaryNamingBias),
+            ("tradeoff", weights.tradeoffClarityBias)
+        ]
+
+        let prioritized = allWeights
+            .filter { $0.1 >= 0.6 }
+            .sorted { lhs, rhs in
+                if lhs.1 == rhs.1 {
+                    return lhs.0 < rhs.0
+                }
+                return lhs.1 > rhs.1
+            }
+
+        let retained = Array((prioritized.isEmpty ? allWeights.sorted { $0.1 > $1.1 } : prioritized).prefix(3))
+        return Dictionary(uniqueKeysWithValues: retained)
     }
 
     private static func frontstageEvidenceCount(for kind: TaskKind) -> Int {

@@ -30,6 +30,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
     let frontstageState: DecisionFrontstageState?
     let contextState: DecisionContextPreparedState?
     let neuralState: DecisionNeuralState?
+    let brainState: DecisionBrainState?
     let promptBudget: DecisionIntelligencePromptContract.ContextBudget?
     let admissionDecision: DecisionIntelligenceAdmissionDecision?
     let semanticPromptFingerprint: String?
@@ -50,6 +51,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
         frontstageState: DecisionFrontstageState? = nil,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
+        brainState: DecisionBrainState? = nil,
         promptBudget: DecisionIntelligencePromptContract.ContextBudget? = nil,
         admissionDecision: DecisionIntelligenceAdmissionDecision? = nil,
         semanticPromptFingerprint: String? = nil,
@@ -69,6 +71,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
         self.frontstageState = frontstageState
         self.contextState = contextState
         self.neuralState = neuralState
+        self.brainState = brainState
         self.promptBudget = promptBudget
         self.admissionDecision = admissionDecision
         self.semanticPromptFingerprint = semanticPromptFingerprint
