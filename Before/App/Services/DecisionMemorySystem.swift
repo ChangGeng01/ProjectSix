@@ -116,6 +116,7 @@ enum DecisionMemorySystem {
         context: ModelContext,
         now: Date = .now
     ) -> DecisionBrainState {
+        let recentCheckEvents = fetchCheckEvents(in: context)
         let records = fetchMemoryRecords(in: context)
         let candidates = fetchCandidateRecords(in: context)
 
@@ -181,6 +182,7 @@ enum DecisionMemorySystem {
             mode: mode,
             queryTags: queryTags,
             orderedItems: orderedItems,
+            checkEvents: recentCheckEvents,
             records: resolvedRecords,
             profileCore: profileCore,
             activeGoals: activeGoals,
@@ -221,6 +223,12 @@ enum DecisionMemorySystem {
 
     static func fetchCandidateRecords(in context: ModelContext) -> [DecisionMemoryCandidateRecord] {
         (try? context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())) ?? []
+    }
+
+    static func fetchCheckEvents(in context: ModelContext) -> [CheckEvent] {
+        (try? context.fetch(
+            FetchDescriptor<CheckEvent>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
+        )) ?? []
     }
 
     private static func buildBrainItems(
@@ -648,6 +656,7 @@ enum DecisionMemorySystem {
         mode: DecisionMode,
         queryTags: Set<String>,
         orderedItems: [BrainMemoryItem],
+        checkEvents: [CheckEvent],
         records: [DecisionMemoryRecord],
         profileCore: [String],
         activeGoals: [String],
@@ -684,8 +693,35 @@ enum DecisionMemorySystem {
              records.contains(where: { $0.id == "support.action.leaveStimulus" }) ||
              memoryText.contains("tomorrow box") ||
              memoryText.contains("pause") ||
-             memoryText.contains("trigger")) {
+            memoryText.contains("trigger")) {
             weights.interruptiveActionBias += 0.24
+        }
+
+        let positiveInterruptiveReflections = checkEvents.filter { event in
+            guard let reflection = event.reflectionOutcome else { return false }
+            return interruptiveActions.contains(event.finalAction) && positiveReflectionOutcomes.contains(reflection)
+        }.count
+
+        let negativeProceedReflections = checkEvents.filter { event in
+            guard let reflection = event.reflectionOutcome else { return false }
+            return proceedActions.contains(event.finalAction) && negativeReflectionOutcomes.contains(reflection)
+        }.count
+
+        let positiveProceedReflections = checkEvents.filter { event in
+            guard let reflection = event.reflectionOutcome else { return false }
+            return proceedActions.contains(event.finalAction) && positiveReflectionOutcomes.contains(reflection)
+        }.count
+
+        if positiveInterruptiveReflections > 0 || negativeProceedReflections > 0 {
+            let interruptiveBoost = Double(positiveInterruptiveReflections + negativeProceedReflections) * 0.08
+            weights.interruptiveActionBias += min(0.28, interruptiveBoost)
+            weights.lowCognitiveLoad += min(0.16, Double(positiveInterruptiveReflections) * 0.05)
+        }
+
+        if positiveProceedReflections > 0 {
+            let proceedStability = min(0.18, Double(positiveProceedReflections) * 0.05)
+            weights.interruptiveActionBias -= proceedStability
+            weights.warmDirectTone += min(0.1, Double(positiveProceedReflections) * 0.03)
         }
 
         if mode == .mirror ||
@@ -708,6 +744,28 @@ enum DecisionMemorySystem {
 
         return rounded(clamped(weights))
     }
+
+    private static let interruptiveActions: Set<CheckAction> = [
+        .wait90s,
+        .leaveStimulus,
+        .decideTomorrow
+    ]
+
+    private static let proceedActions: Set<CheckAction> = [
+        .goAheadAnyway,
+        .continueMindfully
+    ]
+
+    private static let positiveReflectionOutcomes: Set<ReflectionOutcome> = [
+        .betterThanExpected,
+        .okay,
+        .notNeeded
+    ]
+
+    private static let negativeReflectionOutcomes: Set<ReflectionOutcome> = [
+        .regrettedIt,
+        .feltEmptier
+    ]
 
     private static func queryTags(for mode: DecisionMode, prompt: String) -> Set<String> {
         var tagsSet = Set(tags(from: prompt))

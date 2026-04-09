@@ -93,6 +93,58 @@ final class DecisionMemorySystemTests: XCTestCase {
     }
 
     @MainActor
+    func testLoadBrainStateRaisesInterruptiveBiasWhenReflectionsRewardPausePaths() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        seedHistory(into: context)
+        context.insert(
+            CheckEvent(
+                createdAt: date("2026-04-09T08:10:00Z"),
+                scenario: .buy,
+                motivation: .reward,
+                expectedOutcome: .temporaryRelief,
+                controlLevel: .maybe,
+                note: "I almost bought it again after a stressful morning.",
+                currentPerspective: "You want relief fast.",
+                afterPerspective: "Tomorrow usually feels quieter.",
+                verdict: .pause,
+                finalAction: .wait90s,
+                reflectionOutcome: .notNeeded,
+                entrySource: .app
+            )
+        )
+        context.insert(
+            CheckEvent(
+                createdAt: date("2026-04-09T09:10:00Z"),
+                scenario: .buy,
+                motivation: .reward,
+                expectedOutcome: .temporaryRelief,
+                controlLevel: .maybe,
+                note: "I pushed through anyway and felt worse.",
+                currentPerspective: "You want relief fast.",
+                afterPerspective: "It usually feels noisy tomorrow.",
+                verdict: .pause,
+                finalAction: .goAheadAnyway,
+                reflectionOutcome: .feltEmptier,
+                entrySource: .app
+            )
+        )
+
+        _ = DecisionMemorySystem.refreshStoredMemories(in: context)
+
+        let brainState = DecisionMemorySystem.loadBrainState(
+            mode: .quick,
+            prompt: "I want to buy this again late at night.",
+            context: context,
+            now: date("2026-04-09T23:20:00Z")
+        )
+
+        XCTAssertGreaterThanOrEqual(brainState.reactionWeights.interruptiveActionBias, 0.95)
+        XCTAssertGreaterThanOrEqual(brainState.reactionWeights.lowCognitiveLoad, 0.85)
+    }
+
+    @MainActor
     private func makeContainer() throws -> ModelContainer {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         return try ModelContainer(

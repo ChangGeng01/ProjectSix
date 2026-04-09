@@ -87,7 +87,8 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
         let prepared = intelligenceLifecycle.prepareMirrorInput(input)
         let neuralState = DecisionNeuralEngine.mirrorState(
             input: prepared.input,
-            contextState: prepared.state
+            contextState: prepared.state,
+            brainState: brainState
         )
         if let refined = await DecisionIntelligenceCoordinator.refineMirrorResult(
             base: base,

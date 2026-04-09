@@ -80,7 +80,8 @@ final class BalanceBoardSession: ObservableObject, Identifiable {
         let prepared = intelligenceLifecycle.prepareBalanceInput(input)
         let neuralState = DecisionNeuralEngine.balanceState(
             input: prepared.input,
-            contextState: prepared.state
+            contextState: prepared.state,
+            brainState: brainState
         )
         if let refined = await DecisionIntelligenceCoordinator.refineBalanceResult(
             base: base,

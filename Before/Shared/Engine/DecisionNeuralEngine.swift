@@ -91,9 +91,11 @@ struct DecisionNeuralState: Codable, Equatable, Sendable {
 enum DecisionNeuralEngine {
     static func quickState(
         input: QuickCheckInput,
-        contextState: DecisionContextPreparedState? = nil
+        contextState: DecisionContextPreparedState? = nil,
+        brainState: DecisionBrainState? = nil
     ) -> DecisionNeuralState {
         let note = input.note.lowercased()
+        let weights = brainState?.reactionWeights
         let rewardSeeking = clamp(
             base(for: input.motivation, need: 0.15, reward: 0.70, stressed: 0.30, avoiding: 0.20)
         )
@@ -120,10 +122,37 @@ enum DecisionNeuralEngine {
         ])
 
         let candidates = orderedCandidates([
-            (.waitBuffer, weightedAverage([urgency, regret, controlStrain])),
-            (.stepAway, max(avoidance, controlStrain, regret)),
-            (.moveToTomorrow, weightedAverage([regret, controlStrain, fatigue])),
-            (.continueMindfully, clamp(1 - weightedAverage([regret, controlStrain]) + rewardSeeking * 0.2))
+            (
+                .waitBuffer,
+                clamp(
+                    weightedAverage([urgency, regret, controlStrain]) +
+                        ((weights?.lowCognitiveLoad ?? 0) * 0.12) +
+                        ((weights?.interruptiveActionBias ?? 0) * 0.08)
+                )
+            ),
+            (
+                .stepAway,
+                clamp(
+                    max(avoidance, controlStrain, regret) +
+                        ((weights?.interruptiveActionBias ?? 0) * 0.16)
+                )
+            ),
+            (
+                .moveToTomorrow,
+                clamp(
+                    weightedAverage([regret, controlStrain, fatigue]) +
+                        ((weights?.interruptiveActionBias ?? 0) * 0.18) +
+                        ((weights?.lowCognitiveLoad ?? 0) * 0.06)
+                )
+            ),
+            (
+                .continueMindfully,
+                clamp(
+                    1 - weightedAverage([regret, controlStrain]) +
+                        rewardSeeking * 0.2 -
+                        ((weights?.interruptiveActionBias ?? 0) * 0.18)
+                )
+            )
         ])
 
         return DecisionNeuralState(
@@ -133,21 +162,26 @@ enum DecisionNeuralEngine {
             suppressedBehaviors: suppressedBehaviors(
                 ["long_explanation": urgency > 0.55],
                 ["extra_options": regret > 0.60 || controlStrain > 0.60],
-                ["freeform_generation": fatigue > 0.60]
+                ["freeform_generation": fatigue > 0.60],
+                ["multi_step_planning": (weights?.lowCognitiveLoad ?? 0) > 0.75]
             ),
-            detail: "Quick state is being routed through urgency, control strain, and regret instead of asking the model to improvise the decision."
+            detail: brainState == nil
+                ? "Quick state is being routed through urgency, control strain, and regret instead of asking the model to improvise the decision."
+                : "Quick state is being routed through urgency, control strain, regret, and learned reaction weights instead of asking the model to improvise the decision."
         )
     }
 
     static func balanceState(
         input: BalanceBoardInput,
-        contextState: DecisionContextPreparedState? = nil
+        contextState: DecisionContextPreparedState? = nil,
+        brainState: DecisionBrainState? = nil
     ) -> DecisionNeuralState {
         let prompt = input.prompt.lowercased()
         let desire = input.desire.lowercased()
         let concern = input.concern.lowercased()
         let constraint = input.constraint.lowercased()
         let longTerm = input.longTerm.lowercased()
+        let weights = brainState?.reactionWeights
 
         let desirePull = clamp(presenceScore(input.desire, base: 0.55) + keywordBoost(desire, keywords: ["want", "need", "love", "relief", "momentum"], boost: 0.20))
         let concernWeight = clamp(presenceScore(input.concern, base: 0.55) + keywordBoost(concern, keywords: ["worry", "burn", "risk", "lose", "cost"], boost: 0.20))
@@ -169,10 +203,37 @@ enum DecisionNeuralEngine {
         ])
 
         let candidates = orderedCandidates([
-            (.clarifyPriority, weightedAverage([desirePull, concernWeight, longTermWeight])),
-            (.setBoundary, clamp(constraintPressure * 0.70 + explicitBoundary)),
-            (.askSecondRead, weightedAverage([concernWeight, longTermWeight])),
-            (.moveToTomorrow, clamp(weightedAverage([constraintPressure, concernWeight, longTermWeight]) - 0.10 + (contextState?.staleFieldCount ?? 0 > 0 ? 0.10 : 0)))
+            (
+                .clarifyPriority,
+                clamp(
+                    weightedAverage([desirePull, concernWeight, longTermWeight]) +
+                        ((weights?.tradeoffClarityBias ?? 0) * 0.16)
+                )
+            ),
+            (
+                .setBoundary,
+                clamp(
+                    constraintPressure * 0.70 + explicitBoundary +
+                        ((weights?.boundaryNamingBias ?? 0) * 0.12)
+                )
+            ),
+            (
+                .askSecondRead,
+                clamp(
+                    weightedAverage([concernWeight, longTermWeight]) +
+                        ((weights?.tradeoffClarityBias ?? 0) * 0.06)
+                )
+            ),
+            (
+                .moveToTomorrow,
+                clamp(
+                    weightedAverage([constraintPressure, concernWeight, longTermWeight]) -
+                        0.10 +
+                        (contextState?.staleFieldCount ?? 0 > 0 ? 0.10 : 0) +
+                        ((weights?.lowCognitiveLoad ?? 0) * 0.08) -
+                        ((weights?.tradeoffClarityBias ?? 0) * 0.05)
+                )
+            )
         ])
 
         return DecisionNeuralState(
@@ -182,21 +243,26 @@ enum DecisionNeuralEngine {
             suppressedBehaviors: suppressedBehaviors(
                 ["instant_verdict": concernWeight > 0.40 || longTermWeight > 0.40],
                 ["single_axis_reasoning": activations.count > 1],
-                ["over_explaining": (contextState?.rebuiltSession ?? false)]
+                ["over_explaining": (contextState?.rebuiltSession ?? false)],
+                ["soft_focus": (weights?.tradeoffClarityBias ?? 0) > 0.8]
             ),
-            detail: "Balance state is being handled as competing weights, so the model receives a structured trade-off instead of an open-ended dilemma."
+            detail: brainState == nil
+                ? "Balance state is being handled as competing weights, so the model receives a structured trade-off instead of an open-ended dilemma."
+                : "Balance state is being handled as competing weights plus learned trade-off biases, so the model receives a structured trade-off instead of an open-ended dilemma."
         )
     }
 
     static func mirrorState(
         input: MirrorInput,
-        contextState: DecisionContextPreparedState? = nil
+        contextState: DecisionContextPreparedState? = nil,
+        brainState: DecisionBrainState? = nil
     ) -> DecisionNeuralState {
         let emotion = input.emotion.lowercased()
         let relationship = input.relationship.lowercased()
         let reality = input.reality.lowercased()
         let longTerm = input.longTerm.lowercased()
         let selfLens = input.selfLens.lowercased()
+        let weights = brainState?.reactionWeights
 
         let emotionLoad = clamp(presenceScore(input.emotion, base: 0.50) + keywordBoost(emotion, keywords: ["sad", "angry", "tired", "exhausted", "hurt", "afraid"], boost: 0.25))
         let repetitionRisk = clamp(keywordBoost(relationship + " " + longTerm, keywords: ["again", "repeat", "cycle", "always", "every time", "pattern"], boost: 0.85))
@@ -215,11 +281,42 @@ enum DecisionNeuralEngine {
         ])
 
         let candidates = orderedCandidates([
-            (.setBoundary, max(boundaryRisk, identityDrift)),
-            (.splitEmotionFromReality, max(emotionLoad, realityPressure)),
-            (.protectSelf, max(identityDrift, repetitionRisk)),
-            (.saveAndPause, clamp(weightedAverage([emotionLoad, lossFear, realityPressure]) + (contextState?.rebuiltSession == true ? 0.10 : 0))),
-            (.askSecondRead, weightedAverage([lossFear, repetitionRisk, emotionLoad]))
+            (
+                .setBoundary,
+                clamp(
+                    max(boundaryRisk, identityDrift) +
+                        ((weights?.boundaryNamingBias ?? 0) * 0.16)
+                )
+            ),
+            (
+                .splitEmotionFromReality,
+                clamp(
+                    max(emotionLoad, realityPressure) +
+                        ((weights?.tradeoffClarityBias ?? 0) * 0.05)
+                )
+            ),
+            (
+                .protectSelf,
+                clamp(
+                    max(identityDrift, repetitionRisk) +
+                        ((weights?.boundaryNamingBias ?? 0) * 0.1)
+                )
+            ),
+            (
+                .saveAndPause,
+                clamp(
+                    weightedAverage([emotionLoad, lossFear, realityPressure]) +
+                        (contextState?.rebuiltSession == true ? 0.10 : 0) +
+                        ((weights?.lowCognitiveLoad ?? 0) * 0.14)
+                )
+            ),
+            (
+                .askSecondRead,
+                clamp(
+                    weightedAverage([lossFear, repetitionRisk, emotionLoad]) -
+                        ((weights?.boundaryNamingBias ?? 0) * 0.08)
+                )
+            )
         ])
 
         return DecisionNeuralState(
@@ -229,9 +326,12 @@ enum DecisionNeuralEngine {
             suppressedBehaviors: suppressedBehaviors(
                 ["yes_no_verdict": true],
                 ["forced_optimism": emotionLoad > 0.45],
-                ["hard_correction": boundaryRisk > 0.35 || lossFear > 0.35]
+                ["hard_correction": boundaryRisk > 0.35 || lossFear > 0.35],
+                ["boundary_blurring": (weights?.boundaryNamingBias ?? 0) > 0.8]
             ),
-            detail: "Mirror state is being routed through emotional load, pattern risk, self protection, and reality pressure before any language is generated."
+            detail: brainState == nil
+                ? "Mirror state is being routed through emotional load, pattern risk, self protection, and reality pressure before any language is generated."
+                : "Mirror state is being routed through emotional load, pattern risk, self protection, reality pressure, and learned boundary weights before any language is generated."
         )
     }
 
