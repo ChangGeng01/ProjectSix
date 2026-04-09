@@ -5,6 +5,7 @@ import XCTest
 final class DecisionTaskGraphStoreTests: XCTestCase {
     override func tearDown() {
         DecisionTaskGraphStore.clear()
+        UserDefaults.standard.removeObject(forKey: "before.decision.task.graph")
         super.tearDown()
     }
 
@@ -78,5 +79,27 @@ final class DecisionTaskGraphStoreTests: XCTestCase {
         DecisionTaskGraphStore.save(tampered)
 
         XCTAssertNil(DecisionTaskGraphStore.load())
+    }
+
+    func testLoadPurgesLegacyUserDefaultsTaskGraphWithoutRestoringIt() throws {
+        DecisionTaskGraphStore.clear()
+
+        let session = QuickCheckSession(entrySource: .app, initialNote: "Do I buy this now?")
+        session.scenario = .buy
+        session.motivation = .reward
+        session.expectedOutcome = .temporaryRelief
+        session.controlLevel = .maybe
+
+        guard let snapshot = DecisionTaskGraphSnapshot.capture(from: session) else {
+            XCTFail("Expected task graph snapshot")
+            return
+        }
+
+        let key = "before.decision.task.graph"
+        let data = try JSONEncoder().encode(snapshot)
+        UserDefaults.standard.set(data, forKey: key)
+
+        XCTAssertNil(DecisionTaskGraphStore.load())
+        XCTAssertNil(UserDefaults.standard.data(forKey: key))
     }
 }

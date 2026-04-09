@@ -5,6 +5,7 @@ import XCTest
 final class ActiveDecisionWorkspaceStoreTests: XCTestCase {
     override func tearDown() {
         ActiveDecisionWorkspaceStore.clear()
+        UserDefaults.standard.removeObject(forKey: "before.active.decision.workspace")
         super.tearDown()
     }
 
@@ -101,5 +102,27 @@ final class ActiveDecisionWorkspaceStoreTests: XCTestCase {
         XCTAssertEqual(restored?.result?.coreTension, originalResult.coreTension)
         XCTAssertNotNil(loaded?.intelligenceLifecycle?.fieldRecords[DecisionContextFieldKey.mirrorEmotion.rawValue])
         XCTAssertNotNil(restored?.intelligenceLifecycleSnapshot.fieldRecords[DecisionContextFieldKey.mirrorEmotion.rawValue])
+    }
+
+    func testLoadPurgesLegacyUserDefaultsWorkspaceWithoutRestoringIt() throws {
+        ActiveDecisionWorkspaceStore.clear()
+
+        let session = QuickCheckSession(entrySource: .app, initialNote: "Do I buy this now?")
+        session.scenario = .buy
+        session.motivation = .reward
+        session.expectedOutcome = .temporaryRelief
+        session.controlLevel = .maybe
+
+        guard let state = ActiveDecisionWorkspaceState.capture(from: session) else {
+            XCTFail("Expected workspace state")
+            return
+        }
+
+        let key = "before.active.decision.workspace"
+        let data = try JSONEncoder().encode(state)
+        UserDefaults.standard.set(data, forKey: key)
+
+        XCTAssertNil(ActiveDecisionWorkspaceStore.load())
+        XCTAssertNil(UserDefaults.standard.data(forKey: key))
     }
 }

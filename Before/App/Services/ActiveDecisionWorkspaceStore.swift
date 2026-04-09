@@ -147,29 +147,21 @@ enum ActiveDecisionWorkspaceStore {
     private static let key = "before.active.decision.workspace"
 
     static func load() -> ActiveDecisionWorkspaceState? {
-        if let state = ProtectedLocalStateStore.load(ActiveDecisionWorkspaceState.self, key: key) {
-            return state
-        }
-
-        guard
-            let legacyData = UserDefaults.standard.data(forKey: key),
-            let state = try? JSONDecoder().decode(ActiveDecisionWorkspaceState.self, from: legacyData)
-        else {
-            return nil
-        }
-
-        ProtectedLocalStateStore.save(state, key: key)
-        UserDefaults.standard.removeObject(forKey: key)
-        return state
+        scrubLegacyStorage()
+        return ProtectedLocalStateStore.load(ActiveDecisionWorkspaceState.self, key: key)
     }
 
     static func save(_ state: ActiveDecisionWorkspaceState) {
         ProtectedLocalStateStore.save(state, key: key)
-        UserDefaults.standard.removeObject(forKey: key)
+        scrubLegacyStorage()
     }
 
     static func clear() {
         ProtectedLocalStateStore.clear(key: key)
+        scrubLegacyStorage()
+    }
+
+    private static func scrubLegacyStorage() {
         UserDefaults.standard.removeObject(forKey: key)
     }
 }

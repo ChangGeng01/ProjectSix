@@ -345,34 +345,24 @@ enum DecisionTaskGraphStore {
     private static let key = "before.decision.task.graph"
 
     static func load() -> DecisionTaskGraphSnapshot? {
+        scrubLegacyStorage()
         if let snapshot = ProtectedLocalStateStore.load(DecisionTaskGraphSnapshot.self, key: key) {
             return snapshot.hasValidContinuityFingerprint ? snapshot : nil
         }
-
-        guard
-            let legacyData = UserDefaults.standard.data(forKey: key),
-            let snapshot = try? JSONDecoder().decode(DecisionTaskGraphSnapshot.self, from: legacyData)
-        else {
-            return nil
-        }
-
-        guard snapshot.hasValidContinuityFingerprint else {
-            UserDefaults.standard.removeObject(forKey: key)
-            return nil
-        }
-
-        ProtectedLocalStateStore.save(snapshot, key: key)
-        UserDefaults.standard.removeObject(forKey: key)
-        return snapshot
+        return nil
     }
 
     static func save(_ snapshot: DecisionTaskGraphSnapshot) {
         ProtectedLocalStateStore.save(snapshot, key: key)
-        UserDefaults.standard.removeObject(forKey: key)
+        scrubLegacyStorage()
     }
 
     static func clear() {
         ProtectedLocalStateStore.clear(key: key)
+        scrubLegacyStorage()
+    }
+
+    private static func scrubLegacyStorage() {
         UserDefaults.standard.removeObject(forKey: key)
     }
 }
