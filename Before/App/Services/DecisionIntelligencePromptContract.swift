@@ -574,7 +574,8 @@ enum DecisionIntelligencePromptContract {
         let compactionPolicy = promptCompactionPolicy(
             kind: kind,
             suffixTargetCharacters: suffixTarget,
-            hasScopedContext: scopedContext != nil
+            hasScopedContext: scopedContext != nil,
+            hasContextLifecycle: contextState != nil
         )
         let assembly = assemblePayloadBlocks(
             blocks: promptBlocks(
@@ -829,7 +830,8 @@ enum DecisionIntelligencePromptContract {
     private static func promptCompactionPolicy(
         kind: TaskKind,
         suffixTargetCharacters: Int,
-        hasScopedContext: Bool
+        hasScopedContext: Bool,
+        hasContextLifecycle: Bool
     ) -> PromptCompactionPolicy {
         var preservedKinds: [PromptBlockKind] = [
             .frontstageState,
@@ -839,6 +841,9 @@ enum DecisionIntelligencePromptContract {
         ]
         if hasScopedContext {
             preservedKinds.append(.scopedContext)
+        }
+        if hasContextLifecycle {
+            preservedKinds.append(.contextLifecycle)
         }
 
         let guidance: [String] = switch kind {
@@ -870,8 +875,9 @@ enum DecisionIntelligencePromptContract {
             dropOrder: [
                 .neuralState,
                 .brainState,
-                .contextLifecycle,
+                .compactionPolicy,
                 .runtimeStrategy,
+                .contextLifecycle,
                 .scopedContext
             ],
             guidance: guidance,
@@ -1116,7 +1122,12 @@ enum DecisionIntelligencePromptContract {
             "local_biases": brainState.sessionBiases,
             "auto_memory": Array(brainState.relevantMemories.prefix(Limit.frontstageSignalCount)),
             "retrieval_tags": Array(brainState.retrievalTags.prefix(Limit.frontstageSignalCount)),
-            "dominant_reaction_weight": brainState.reactionWeights.dominantKey.rawValue
+            "dominant_reaction_weight": brainState.reactionWeights.dominantKey.rawValue,
+            "identity_role": brainState.identityProfile.role.rawValue,
+            "boundary_mode": brainState.boundaryPolicy.mode.rawValue,
+            "boundary_constraints": brainState.boundaryPolicy.activeConstraints.map(\.rawValue),
+            "calibration_status": brainState.calibrationState.status.rawValue,
+            "calibration_alerts": brainState.calibrationState.alerts.map(\.rawValue)
         ]
     }
 
@@ -1126,7 +1137,22 @@ enum DecisionIntelligencePromptContract {
             "active_goals": brainState.activeGoals,
             "relevant_memories": brainState.relevantMemories,
             "session_biases": brainState.sessionBiases,
-            "reaction_weights": reactionWeightsJSONObject(brainState.reactionWeights)
+            "reaction_weights": reactionWeightsJSONObject(brainState.reactionWeights),
+            "identity": [
+                "role": brainState.identityProfile.role.rawValue,
+                "posture": brainState.identityProfile.posture.rawValue,
+                "initiative": brainState.identityProfile.initiative.rawValue,
+                "confidence_ceiling": brainState.identityProfile.confidenceCeiling
+            ],
+            "boundary_policy": [
+                "mode": brainState.boundaryPolicy.mode.rawValue,
+                "constraints": brainState.boundaryPolicy.activeConstraints.map(\.rawValue),
+                "required_confirmations": brainState.boundaryPolicy.requiredConfirmations
+            ],
+            "calibration": [
+                "status": brainState.calibrationState.status.rawValue,
+                "alerts": brainState.calibrationState.alerts.map(\.rawValue)
+            ]
         ]
 
         guard JSONSerialization.isValidJSONObject(payload),

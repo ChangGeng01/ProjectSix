@@ -72,5 +72,7 @@ enum BeforePolicy {
         static let workspaceRetentionInterval: TimeInterval = 60 * 60 * 24
         static let taskGraphRetentionInterval: TimeInterval = 60 * 60 * 24
         static let pendingReflectionRetentionInterval: TimeInterval = 60 * 60 * 12
+        static let evolutionCheckpointRetentionInterval: TimeInterval = 60 * 60 * 24 * 30
+        static let evolutionCheckpointLimit = 40
     }
 }

@@ -160,6 +160,30 @@ struct DecisionTestingRuntimeExport {
             $0.verificationSnapshot.lowTrustMemoryLoadRate
         }
         let riskFlagCountsByKind = aggregatedBrainRiskFlagCountsByKind()
+        let identityRoleByKind = Dictionary(grouping: brainTraces, by: \.0)
+            .compactMapValues { grouped in
+                grouped.first?.1.identityProfile.role
+            }
+        let boundaryModeByKind = Dictionary(grouping: brainTraces, by: \.0)
+            .compactMapValues { grouped in
+                grouped.first?.1.boundaryPolicy.mode
+            }
+        let boundaryConstraintCountsByKind = aggregatedBrainBoundaryConstraintCountsByKind()
+        let calibrationStatusByKind = Dictionary(grouping: brainTraces, by: \.0)
+            .compactMapValues { grouped in
+                grouped.first?.1.calibrationState.status
+            }
+        let calibrationAlertCountsByKind = aggregatedBrainCalibrationAlertCountsByKind()
+        let evolutionCheckpointCountByKind = averageBrainMetricByKind {
+            Double($0.evolutionState.checkpointCount)
+        }
+        let evolutionPendingReviewCountByKind = averageBrainMetricByKind {
+            Double($0.evolutionState.pendingReviewCount)
+        }
+        let evolutionRollbackReadyByKind = Dictionary(grouping: brainTraces, by: \.0)
+            .mapValues { grouped in
+                grouped.contains { $0.1.evolutionState.rollbackReady }
+            }
 
         return DecisionTestingBrainSummary(
             brainTraceCount: brainTraces.count,
@@ -179,7 +203,15 @@ struct DecisionTestingRuntimeExport {
             latestSnapshotByKind: latestSnapshotByKind,
             snapshotVariantCountByKind: snapshotVariantCountByKind,
             lowTrustMemoryLoadRateByKind: lowTrustMemoryLoadRateByKind,
-            riskFlagCountsByKind: riskFlagCountsByKind
+            riskFlagCountsByKind: riskFlagCountsByKind,
+            identityRoleByKind: identityRoleByKind,
+            boundaryModeByKind: boundaryModeByKind,
+            boundaryConstraintCountsByKind: boundaryConstraintCountsByKind,
+            calibrationStatusByKind: calibrationStatusByKind,
+            calibrationAlertCountsByKind: calibrationAlertCountsByKind,
+            evolutionCheckpointCountByKind: evolutionCheckpointCountByKind,
+            evolutionPendingReviewCountByKind: evolutionPendingReviewCountByKind,
+            evolutionRollbackReadyByKind: evolutionRollbackReadyByKind
         )
     }
 
@@ -293,6 +325,14 @@ struct DecisionTestingRuntimeExport {
             brainSnapshotVariantCountByKind: brainSummary.snapshotVariantCountByKind,
             lowTrustMemoryLoadRateByKind: brainSummary.lowTrustMemoryLoadRateByKind,
             brainRiskFlagCountsByKind: brainSummary.riskFlagCountsByKind,
+            identityRoleByKind: brainSummary.identityRoleByKind,
+            boundaryModeByKind: brainSummary.boundaryModeByKind,
+            boundaryConstraintCountsByKind: brainSummary.boundaryConstraintCountsByKind,
+            calibrationStatusByKind: brainSummary.calibrationStatusByKind,
+            calibrationAlertCountsByKind: brainSummary.calibrationAlertCountsByKind,
+            evolutionCheckpointCountByKind: brainSummary.evolutionCheckpointCountByKind,
+            evolutionPendingReviewCountByKind: brainSummary.evolutionPendingReviewCountByKind,
+            evolutionRollbackReadyByKind: brainSummary.evolutionRollbackReadyByKind,
             traceCount: recentTraces.count,
             replayCount: recentReplay.count,
             totalCacheEntries: cacheTelemetry.entryCountByKind.values.reduce(0, +),
@@ -561,6 +601,40 @@ struct DecisionTestingRuntimeExport {
         }
     }
 
+    private func aggregatedBrainBoundaryConstraintCountsByKind(
+    ) -> [DecisionIntelligenceTraceKind: [DecisionBoundaryConstraint: Int]] {
+        Dictionary(
+            grouping: recentTraces.compactMap { trace in
+                trace.brainState.map { (trace.kind, $0) }
+            },
+            by: \.0
+        )
+        .mapValues { grouped in
+            grouped.reduce(into: [:]) { partialResult, item in
+                for constraint in item.1.boundaryPolicy.activeConstraints {
+                    partialResult[constraint, default: 0] += 1
+                }
+            }
+        }
+    }
+
+    private func aggregatedBrainCalibrationAlertCountsByKind(
+    ) -> [DecisionIntelligenceTraceKind: [DecisionCalibrationAlert: Int]] {
+        Dictionary(
+            grouping: recentTraces.compactMap { trace in
+                trace.brainState.map { (trace.kind, $0) }
+            },
+            by: \.0
+        )
+        .mapValues { grouped in
+            grouped.reduce(into: [:]) { partialResult, item in
+                for alert in item.1.calibrationState.alerts {
+                    partialResult[alert, default: 0] += 1
+                }
+            }
+        }
+    }
+
     private func evidenceRateByKind(
         numeratorByKind: [DecisionIntelligenceTraceKind: Int]
     ) -> [DecisionIntelligenceTraceKind: Double] {
@@ -643,6 +717,14 @@ struct DecisionTestingBrainSummary: Equatable, Sendable {
     let snapshotVariantCountByKind: [DecisionIntelligenceTraceKind: Int]
     let lowTrustMemoryLoadRateByKind: [DecisionIntelligenceTraceKind: Double]
     let riskFlagCountsByKind: [DecisionIntelligenceTraceKind: [DecisionBrainStateRiskFlag: Int]]
+    let identityRoleByKind: [DecisionIntelligenceTraceKind: DecisionIdentityRole]
+    let boundaryModeByKind: [DecisionIntelligenceTraceKind: DecisionBoundaryPolicyMode]
+    let boundaryConstraintCountsByKind: [DecisionIntelligenceTraceKind: [DecisionBoundaryConstraint: Int]]
+    let calibrationStatusByKind: [DecisionIntelligenceTraceKind: DecisionCalibrationStatus]
+    let calibrationAlertCountsByKind: [DecisionIntelligenceTraceKind: [DecisionCalibrationAlert: Int]]
+    let evolutionCheckpointCountByKind: [DecisionIntelligenceTraceKind: Double]
+    let evolutionPendingReviewCountByKind: [DecisionIntelligenceTraceKind: Double]
+    let evolutionRollbackReadyByKind: [DecisionIntelligenceTraceKind: Bool]
 }
 
 struct DecisionTestingRuntimeSummary: Equatable, Sendable {
@@ -753,6 +835,14 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let brainSnapshotVariantCountByKind: [DecisionIntelligenceTraceKind: Int]
     let lowTrustMemoryLoadRateByKind: [DecisionIntelligenceTraceKind: Double]
     let brainRiskFlagCountsByKind: [DecisionIntelligenceTraceKind: [DecisionBrainStateRiskFlag: Int]]
+    let identityRoleByKind: [DecisionIntelligenceTraceKind: DecisionIdentityRole]
+    let boundaryModeByKind: [DecisionIntelligenceTraceKind: DecisionBoundaryPolicyMode]
+    let boundaryConstraintCountsByKind: [DecisionIntelligenceTraceKind: [DecisionBoundaryConstraint: Int]]
+    let calibrationStatusByKind: [DecisionIntelligenceTraceKind: DecisionCalibrationStatus]
+    let calibrationAlertCountsByKind: [DecisionIntelligenceTraceKind: [DecisionCalibrationAlert: Int]]
+    let evolutionCheckpointCountByKind: [DecisionIntelligenceTraceKind: Double]
+    let evolutionPendingReviewCountByKind: [DecisionIntelligenceTraceKind: Double]
+    let evolutionRollbackReadyByKind: [DecisionIntelligenceTraceKind: Bool]
     let traceCount: Int
     let replayCount: Int
     let totalCacheEntries: Int

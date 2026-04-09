@@ -62,6 +62,7 @@
 		25B2D539409B99D33B0EF144 /* SharedLifeItemComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B4E206F0B0AA65A62183017 /* SharedLifeItemComposerView.swift */; };
 		25FF848C4F40976993BC659B /* SharedProtectedStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29B2D56D159527FCF85EB5E4 /* SharedProtectedStateStore.swift */; };
 		26B3CACAC74872FFFA895FC2 /* DecisionPromptEvidenceGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 274CBE36C805B3D2578B1AC1 /* DecisionPromptEvidenceGuard.swift */; };
+		2B6130DE095C1E5924C86314 /* DecisionIdentityRoleSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C1F3A82087402050EA7F089 /* DecisionIdentityRoleSystem.swift */; };
 		2B896148BB8B6031FE855296 /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EDEFDEA19B8C992836638F9 /* AppTab.swift */; };
 		2D4A09066D8554D48DDA9195 /* BeforePreferencesStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FC15551C8847566B4860806 /* BeforePreferencesStoreTests.swift */; };
 		2E6AB693F6A668555042B3A6 /* AIFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E80E1EA06D6EC8301974704 /* AIFlowUITests.swift */; };
@@ -71,6 +72,7 @@
 		2FBA7E9C24DACAA361AE1A87 /* QuickCheckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 808EB61307CDE69C81AE5BBE /* QuickCheckView.swift */; };
 		30B7C7F83352774B5CB49CB7 /* PendingReflectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CEADE1FA1884D9F8FEB7950 /* PendingReflectionStore.swift */; };
 		323DB6BB7275505F3E7A7617 /* GemmaModelAssetCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BE1F483720C3F9E3812F4C4 /* GemmaModelAssetCatalogTests.swift */; };
+		32954AFD554826EF983B760D /* DecisionIdentityAndBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58D741C80714E2F912C4FCEE /* DecisionIdentityAndBoundaryTests.swift */; };
 		363FCCE5A44EAEE05030BAF0 /* WatchBrainGlanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7B621573407076C026A73C /* WatchBrainGlanceView.swift */; };
 		3671D50FE2556C6C7D0E7FA4 /* PendingLaunchRequestStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E0334A8565803EF7707BB38 /* PendingLaunchRequestStore.swift */; };
 		380F7C45B23650825486EC51 /* WatchHandoffCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D165C4A6D28879BC0C05145E /* WatchHandoffCoordinator.swift */; };
@@ -82,11 +84,14 @@
 		3E42715FBE871E2C86C124F4 /* BeforeTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FBEC07A4802202A55F07273 /* BeforeTheme.swift */; };
 		3FA6A6CEB2949EBCAEC944FF /* MirrorEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 734F52EF13FFB8B1DA81BC96 /* MirrorEngineTests.swift */; };
 		402984E1B9C592B27915A179 /* PendingLaunchRequestStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AF30BA404040B6ECD5A2652 /* PendingLaunchRequestStoreTests.swift */; };
+		40AA91C87955AFA35C1991E5 /* DecisionBoundaryPolicyEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2197030F36D4A2B149384D05 /* DecisionBoundaryPolicyEngine.swift */; };
 		40CDCC53B762BF3B98144AF4 /* DecisionRecordRestoration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FDBF1730457BB2E21337458 /* DecisionRecordRestoration.swift */; };
 		412F0EAEC5583E89FA48617F /* SharedLifeItemFactoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 078D41DF98B71E11CD93C772 /* SharedLifeItemFactoryTests.swift */; };
 		419A62D88904D8DF8A659610 /* ProtectedLocalStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ECDE0CE15D946CD950732D2 /* ProtectedLocalStateStore.swift */; };
 		41AD1DA946062CDD67101DBF /* FoundationModelsIntelligenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9236FC498B39FD0A29ED234 /* FoundationModelsIntelligenceService.swift */; };
 		4239B45EBF703430D7135660 /* WatchPauseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B78509745C2147801CE72B0F /* WatchPauseView.swift */; };
+		4296EA6BEDD9D8F451647BEE /* DecisionCognitionSubstrate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49722E89E23670BC138C7228 /* DecisionCognitionSubstrate.swift */; };
+		4331855BA82900212ECC1F48 /* DecisionEvolutionEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1CA6C9695EDAE1B9506F27 /* DecisionEvolutionEngineTests.swift */; };
 		43E60A718312659C56628FC6 /* SupportSurfaceTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1594A5642C704A6DD529579 /* SupportSurfaceTarget.swift */; };
 		444E192897E256E0ED28CD41 /* LetGoMotionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AE75E02F04EBA937CA1B8A3 /* LetGoMotionDetector.swift */; };
 		45A06D31FA2184EF64353442 /* MirrorEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A05E06826B9C52DE8D6875DC /* MirrorEngine.swift */; };
@@ -102,6 +107,7 @@
 		52737B94451BEBEE58D6A018 /* BeforeTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FBEC07A4802202A55F07273 /* BeforeTheme.swift */; };
 		52C12D06470D02C5A92EE481 /* DecisionStarterLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5EC40417B021F9CAFFD08C /* DecisionStarterLibraryTests.swift */; };
 		542CC720483001216062BDAF /* SharedContainerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14BBBFC879A75D527348A3A /* SharedContainerTests.swift */; };
+		55EA1F2058351F7B3A5D1C34 /* DecisionCalibrationEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0656CAE27BF88BE30C8D92B /* DecisionCalibrationEngineTests.swift */; };
 		56FCD11F38A0DDA41677D8A4 /* DecisionSystemFlightDeck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DF194C50878CC172717E2DB /* DecisionSystemFlightDeck.swift */; };
 		574A6FB243FDE3722FF35CB5 /* SharedPublicStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F41ADE0FDB9CDEAC94131E4 /* SharedPublicStateStore.swift */; };
 		587E65F036C4AE0D7A655A9A /* QuickCheckInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F68FB2BE9FA50C05DD3BB89 /* QuickCheckInput.swift */; };
@@ -191,6 +197,7 @@
 		96FA328039C9A8851637A8B4 /* CodableStateStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D4DCB98641E43A533CDF23 /* CodableStateStorage.swift */; };
 		97229440C03B71286BB0544A /* LaunchRequestResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC3ED6E2F02764281FE79FDD /* LaunchRequestResolver.swift */; };
 		9773181DF93728680681B811 /* DecisionIntelligencePromptContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2869C61692150B11BE791AD8 /* DecisionIntelligencePromptContract.swift */; };
+		97992D80BEEA79ACC39B7933 /* DecisionEvolutionCheckpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBA45C9352ADB08ABB450160 /* DecisionEvolutionCheckpoint.swift */; };
 		97C51D0659C57FEAD7D96D35 /* TomorrowBoxDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D9B5A5DF817EBD959F0B018 /* TomorrowBoxDraftTests.swift */; };
 		97FDA83B408FA19BA1EC1608 /* DeveloperDecisionReplayBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C295B421EA1EA970FA5D1475 /* DeveloperDecisionReplayBuilderTests.swift */; };
 		984E116FAA12D9F9F0BE2037 /* DecisionTestingInterfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BADC4370F3CA744EA14B6709 /* DecisionTestingInterfaceTests.swift */; };
@@ -225,6 +232,7 @@
 		AD9C7688CB6EE2C6C0F16816 /* DecisionCognitionTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 358F63E1785D9998B02612A4 /* DecisionCognitionTypes.swift */; };
 		AE683FC0122CD846CE89E5FE /* DecisionReactionBanditStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8542ED779AC935FCA4150D35 /* DecisionReactionBanditStore.swift */; };
 		AF866F34C8C9CE112C41C176 /* DecisionPromptEvidenceGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 274CBE36C805B3D2578B1AC1 /* DecisionPromptEvidenceGuard.swift */; };
+		B04934985D5FA457EFC493DE /* DecisionCalibrationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA7A66830751DC2AD2C69DB1 /* DecisionCalibrationEngine.swift */; };
 		B3A95EBD594597E4716A51D3 /* DecisionIntelligenceTelemetryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69781CDF0B11766FBB071AAF /* DecisionIntelligenceTelemetryStoreTests.swift */; };
 		B4C6A1A2C6D54C9FFB877E81 /* BeforeTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FBEC07A4802202A55F07273 /* BeforeTheme.swift */; };
 		B6401C0BE7236DB94F7E0FD4 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12B18D0B36378C98DA6A44EA /* NotificationServiceTests.swift */; };
@@ -285,6 +293,7 @@
 		DC772636D1CBA8BC844DAF50 /* CheckRuleEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F454C1445FA6FD73087FAC8 /* CheckRuleEngine.swift */; };
 		DE34F729495D2206CCFAD372 /* InferenceBackendPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B45BDE0A0AC8F56688BBF51 /* InferenceBackendPolicy.swift */; };
 		E033D97E672981C08CDE1425 /* SharedPublicStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F41ADE0FDB9CDEAC94131E4 /* SharedPublicStateStore.swift */; };
+		E0B86DFF2B45133C62C15F02 /* DecisionCognitionSubstrate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49722E89E23670BC138C7228 /* DecisionCognitionSubstrate.swift */; };
 		E0EBF7F86996CD952329873D /* DecisionContextLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD7AE8679F2717EDE797F325 /* DecisionContextLifecycle.swift */; };
 		E1BF6E00B7DCD9D76165024D /* SharedLifeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4E4A461F591B98157441D75 /* SharedLifeStore.swift */; };
 		E26E00E7C901CA23180ACB41 /* WatchTomorrowBoxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08CEBF2FAB4686BA6F8A0403 /* WatchTomorrowBoxView.swift */; };
@@ -308,6 +317,7 @@
 		F374442A214A8ADA30095D13 /* ActiveDecisionWorkspaceStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91300F510722B505F828AB0B /* ActiveDecisionWorkspaceStoreTests.swift */; };
 		F39BE9725DE419FD38706696 /* GemmaLocalRuntimeBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B84D9F2F5EE51F18371CEB03 /* GemmaLocalRuntimeBridgeTests.swift */; };
 		F3A6B4B1B10E5498DAD4408F /* DecisionBrainState.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1C0C323D158521A815D9BE /* DecisionBrainState.swift */; };
+		F5AC0FC0230A9508EED4C17C /* DecisionEvolutionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F217DE95C70EB8B0D4D19295 /* DecisionEvolutionEngine.swift */; };
 		F6130B346740F14D025CE845 /* PanelCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B421144DE1D5D71F3CFC70 /* PanelCard.swift */; };
 		F7043664BAA9CC8E546F6A0E /* DecisionIntelligenceResponseCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E450413459695751644CD73 /* DecisionIntelligenceResponseCache.swift */; };
 		F77392EB77FD05C6CE462A84 /* SupportRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E14988718F0EFD9D9259A35 /* SupportRequest.swift */; };
@@ -321,6 +331,7 @@
 		FC0E461363A93C5121E51141 /* SupportInboxStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24184A62A2B7E01F7BEA869A /* SupportInboxStoreTests.swift */; };
 		FD5DE461606E818CE5229E43 /* OpenQuickCheckIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEDCB8C02350F6CC22C4DAAC /* OpenQuickCheckIntent.swift */; };
 		FE34BE8C0AC5BFC49A90771B /* WidgetSafeCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDB7F1306151CE6EAB2CA002 /* WidgetSafeCopy.swift */; };
+		FE76F2ACE67FB7B6CE1598E4 /* DecisionCognitionSubstrate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49722E89E23670BC138C7228 /* DecisionCognitionSubstrate.swift */; };
 		FF8818ABD3CE2840697F5DB9 /* QuickBufferDuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28559294F554136C5D9334B2 /* QuickBufferDuration.swift */; };
 		FFE9B155120181A57899A64D /* DecisionContextFieldKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15786A7BDA5F624F94D347DA /* DecisionContextFieldKey.swift */; };
 		FFEFBAAC6A158CEB42BF96E8 /* DecisionModelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EF86CEA609BCC614EAAB7D0 /* DecisionModelProvider.swift */; };
@@ -399,6 +410,7 @@
 		1D9B5A5DF817EBD959F0B018 /* TomorrowBoxDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxDraftTests.swift; sourceTree = "<group>"; };
 		1E18076377E85A081C4357DC /* WidgetSnapshotStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotStoreTests.swift; sourceTree = "<group>"; };
 		1F68FB2BE9FA50C05DD3BB89 /* QuickCheckInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCheckInput.swift; sourceTree = "<group>"; };
+		2197030F36D4A2B149384D05 /* DecisionBoundaryPolicyEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionBoundaryPolicyEngine.swift; sourceTree = "<group>"; };
 		2208969F9B4D024D571795D8 /* FinishStateScaffold.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinishStateScaffold.swift; sourceTree = "<group>"; };
 		23EA6415495E3D7A3BFF6785 /* SharedLifeBoxItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLifeBoxItem.swift; sourceTree = "<group>"; };
 		23F476A392EB99124E0CBDBF /* LocalModelAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModelAdapter.swift; sourceTree = "<group>"; };
@@ -430,6 +442,7 @@
 		375B68124108DDEB478DD2EE /* DeveloperDecisionReplayBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperDecisionReplayBuilder.swift; sourceTree = "<group>"; };
 		38B6040A74F189418060A171 /* SharedLifeItemFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLifeItemFactory.swift; sourceTree = "<group>"; };
 		3B469617D4620292515EC675 /* SelfReminder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfReminder.swift; sourceTree = "<group>"; };
+		3C1F3A82087402050EA7F089 /* DecisionIdentityRoleSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIdentityRoleSystem.swift; sourceTree = "<group>"; };
 		3DF194C50878CC172717E2DB /* DecisionSystemFlightDeck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionSystemFlightDeck.swift; sourceTree = "<group>"; };
 		3E52D8626077CC37592F9F0B /* DecisionMemoryGovernor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionMemoryGovernor.swift; sourceTree = "<group>"; };
 		3FBEC07A4802202A55F07273 /* BeforeTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeTheme.swift; sourceTree = "<group>"; };
@@ -438,6 +451,7 @@
 		438899EA716D6093E4500048 /* DecisionRecordRestorationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionRecordRestorationTests.swift; sourceTree = "<group>"; };
 		44CADF38945C264E4DE6F821 /* DecisionModeRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionModeRouter.swift; sourceTree = "<group>"; };
 		47EBB9A1A6B11F195895C43F /* TestingDecisionIntelligenceProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestingDecisionIntelligenceProvider.swift; sourceTree = "<group>"; };
+		49722E89E23670BC138C7228 /* DecisionCognitionSubstrate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionCognitionSubstrate.swift; sourceTree = "<group>"; };
 		49F58C3C28378D4CF9CD86DE /* DecisionMemoryEligibilityJudgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionMemoryEligibilityJudgeTests.swift; sourceTree = "<group>"; };
 		4A30E910753EB5E5BB4EAEAE /* CodableStateStorageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodableStateStorageTests.swift; sourceTree = "<group>"; };
 		4C1CF4BDBA8776C1E59C9B45 /* CheckAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckAction.swift; sourceTree = "<group>"; };
@@ -458,6 +472,7 @@
 		57CEE4B714F87CF1DE2F112F /* DecisionIntelligenceTelemetryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligenceTelemetryStore.swift; sourceTree = "<group>"; };
 		58B8955E44D8F1A24CF2D10D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		58C429E74F83380B3EB5DD21 /* CheckVerdict.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckVerdict.swift; sourceTree = "<group>"; };
+		58D741C80714E2F912C4FCEE /* DecisionIdentityAndBoundaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIdentityAndBoundaryTests.swift; sourceTree = "<group>"; };
 		59374002EA69AF9657742152 /* CurrentBrainStateLoaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrentBrainStateLoaderTests.swift; sourceTree = "<group>"; };
 		5AA663D462085CEDA18F4339 /* DecisionMemoryEligibilityJudge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionMemoryEligibilityJudge.swift; sourceTree = "<group>"; };
 		5B506CA81E60C2268F94BB49 /* TomorrowBoxDelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxDelay.swift; sourceTree = "<group>"; };
@@ -549,6 +564,7 @@
 		BADC4370F3CA744EA14B6709 /* DecisionTestingInterfaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionTestingInterfaceTests.swift; sourceTree = "<group>"; };
 		BD7AE8679F2717EDE797F325 /* DecisionContextLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionContextLifecycle.swift; sourceTree = "<group>"; };
 		BDD4397723D9974AFA82AC54 /* WatchQuickCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchQuickCaptureView.swift; sourceTree = "<group>"; };
+		BE1CA6C9695EDAE1B9506F27 /* DecisionEvolutionEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionEngineTests.swift; sourceTree = "<group>"; };
 		BEDCB8C02350F6CC22C4DAAC /* OpenQuickCheckIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenQuickCheckIntent.swift; sourceTree = "<group>"; };
 		C1594A5642C704A6DD529579 /* SupportSurfaceTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportSurfaceTarget.swift; sourceTree = "<group>"; };
 		C295B421EA1EA970FA5D1475 /* DeveloperDecisionReplayBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperDecisionReplayBuilderTests.swift; sourceTree = "<group>"; };
@@ -559,6 +575,7 @@
 		C94A031C4F195FB7A25E444F /* ReminderSourceType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderSourceType.swift; sourceTree = "<group>"; };
 		CA397A6976B8F73DC063B15C /* SharedLifeRuleEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLifeRuleEditorView.swift; sourceTree = "<group>"; };
 		CB620C2127CA7D236179E618 /* TomorrowBoxItemFactoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomorrowBoxItemFactoryTests.swift; sourceTree = "<group>"; };
+		CBA45C9352ADB08ABB450160 /* DecisionEvolutionCheckpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionCheckpoint.swift; sourceTree = "<group>"; };
 		CC3ED6E2F02764281FE79FDD /* LaunchRequestResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchRequestResolver.swift; sourceTree = "<group>"; };
 		CC7AFD8BAE5FD8656546EA60 /* ReminderSelectionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderSelectionPolicy.swift; sourceTree = "<group>"; };
 		CE61325D62DB9B360C987740 /* InterventionNotificationPolicyEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterventionNotificationPolicyEngineTests.swift; sourceTree = "<group>"; };
@@ -580,6 +597,7 @@
 		DE042EFEC57B6C8465029270 /* DecisionTaskGraphStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionTaskGraphStoreTests.swift; sourceTree = "<group>"; };
 		DFD2868E97EE717A12832586 /* BrainStateUpdate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainStateUpdate.swift; sourceTree = "<group>"; };
 		DFDA8C2C4F4EB349F7763323 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		E0656CAE27BF88BE30C8D92B /* DecisionCalibrationEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionCalibrationEngineTests.swift; sourceTree = "<group>"; };
 		E0D4DCB98641E43A533CDF23 /* CodableStateStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodableStateStorage.swift; sourceTree = "<group>"; };
 		E1751505C20AF41F3E50CBBA /* PersistenceIssueRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceIssueRecorder.swift; sourceTree = "<group>"; };
 		E46912BAE7CADD3F30767FCC /* SupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportView.swift; sourceTree = "<group>"; };
@@ -588,11 +606,13 @@
 		E840ED006682BD4A660B8F99 /* HistoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryDetailView.swift; sourceTree = "<group>"; };
 		E920EDE589F5E07C3D3C2C1F /* SupportRequestKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportRequestKindTests.swift; sourceTree = "<group>"; };
 		E9236FC498B39FD0A29ED234 /* FoundationModelsIntelligenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoundationModelsIntelligenceService.swift; sourceTree = "<group>"; };
+		EA7A66830751DC2AD2C69DB1 /* DecisionCalibrationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionCalibrationEngine.swift; sourceTree = "<group>"; };
 		EAFAB4D7AB512041EFC3A51F /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		EBAE5FCADB7777436BB5F668 /* DecisionMemoryGovernorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionMemoryGovernorTests.swift; sourceTree = "<group>"; };
 		ED9ED7A91142A6380075D141 /* DecisionFieldSuggestionLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionFieldSuggestionLibraryTests.swift; sourceTree = "<group>"; };
 		EE5ECF006D7648F3C667BF84 /* DecisionReviewEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionReviewEngineTests.swift; sourceTree = "<group>"; };
 		F1548E93121C0DEC8D3A983A /* ReflectionContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReflectionContext.swift; sourceTree = "<group>"; };
+		F217DE95C70EB8B0D4D19295 /* DecisionEvolutionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionEngine.swift; sourceTree = "<group>"; };
 		F28C38C791E2C0F608142BBA /* SharedLifeStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLifeStoreTests.swift; sourceTree = "<group>"; };
 		F3163BA3375D030F9A4BECEA /* SupportRequestFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportRequestFactory.swift; sourceTree = "<group>"; };
 		F388709EC424ECDBAAC8681E /* SelfPortraitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfPortraitView.swift; sourceTree = "<group>"; };
@@ -647,6 +667,7 @@
 				4C1CF4BDBA8776C1E59C9B45 /* CheckAction.swift */,
 				58C429E74F83380B3EB5DD21 /* CheckVerdict.swift */,
 				DA1C0C323D158521A815D9BE /* DecisionBrainState.swift */,
+				49722E89E23670BC138C7228 /* DecisionCognitionSubstrate.swift */,
 				358F63E1785D9998B02612A4 /* DecisionCognitionTypes.swift */,
 				15786A7BDA5F624F94D347DA /* DecisionContextFieldKey.swift */,
 				C5F94CB71B4918233F505006 /* DecisionContextPreparedState.swift */,
@@ -684,7 +705,11 @@
 				A2710C9DCEDCB00295552131 /* BeforePreferencesStore.swift */,
 				56F75D80F2FAF917D0662B4C /* CurrentBrainStateLoader.swift */,
 				74351E75833B220A7BE890EE /* DecisionAdaptiveRuntimeMatrix.swift */,
+				2197030F36D4A2B149384D05 /* DecisionBoundaryPolicyEngine.swift */,
+				EA7A66830751DC2AD2C69DB1 /* DecisionCalibrationEngine.swift */,
 				BD7AE8679F2717EDE797F325 /* DecisionContextLifecycle.swift */,
+				F217DE95C70EB8B0D4D19295 /* DecisionEvolutionEngine.swift */,
+				3C1F3A82087402050EA7F089 /* DecisionIdentityRoleSystem.swift */,
 				402D41628B5C240AB71A450C /* DecisionIntelligenceAdmissionController.swift */,
 				A383F06B1663734D08B24001 /* DecisionIntelligenceCacheGuard.swift */,
 				12C065A104EC376E9703AB10 /* DecisionIntelligenceCircuitBreaker.swift */,
@@ -778,8 +803,11 @@
 				A9E33F27723396B6B342EB59 /* CheckRuleEngineTests.swift */,
 				4A30E910753EB5E5BB4EAEAE /* CodableStateStorageTests.swift */,
 				59374002EA69AF9657742152 /* CurrentBrainStateLoaderTests.swift */,
+				E0656CAE27BF88BE30C8D92B /* DecisionCalibrationEngineTests.swift */,
 				167E5FF74A76B475CE75CC1F /* DecisionContextLifecycleTests.swift */,
+				BE1CA6C9695EDAE1B9506F27 /* DecisionEvolutionEngineTests.swift */,
 				ED9ED7A91142A6380075D141 /* DecisionFieldSuggestionLibraryTests.swift */,
+				58D741C80714E2F912C4FCEE /* DecisionIdentityAndBoundaryTests.swift */,
 				13CA4CCE8E080D56C166ED5A /* DecisionIntelligenceAdmissionControllerTests.swift */,
 				321C60A119DD6B81B1E5CF4F /* DecisionIntelligenceCircuitBreakerTests.swift */,
 				183E2BE17146F7EE91141F65 /* DecisionIntelligenceCoordinatorTests.swift */,
@@ -1038,6 +1066,7 @@
 				DFD2868E97EE717A12832586 /* BrainStateUpdate.swift */,
 				5CB33E572D887CB4574F01A2 /* CheckEvent.swift */,
 				DBBDAD19C76A4A4772BB84E6 /* DecisionCognitionAppTypes.swift */,
+				CBA45C9352ADB08ABB450160 /* DecisionEvolutionCheckpoint.swift */,
 				240EEA8B14ECCC0FB6527A59 /* DecisionMemoryRecord.swift */,
 				F5D6E8FDD046A39543E12464 /* MirrorDecisionRecord.swift */,
 				3B469617D4620292515EC675 /* SelfReminder.swift */,
@@ -1242,15 +1271,21 @@
 				96FA328039C9A8851637A8B4 /* CodableStateStorage.swift in Sources */,
 				79A87964729818D038B1F223 /* CurrentBrainStateLoader.swift in Sources */,
 				00AC3EF33DF8F61EC6529EDA /* DecisionAdaptiveRuntimeMatrix.swift in Sources */,
+				40AA91C87955AFA35C1991E5 /* DecisionBoundaryPolicyEngine.swift in Sources */,
 				F3A6B4B1B10E5498DAD4408F /* DecisionBrainState.swift in Sources */,
+				B04934985D5FA457EFC493DE /* DecisionCalibrationEngine.swift in Sources */,
 				12A1C943D53816DA41F32737 /* DecisionCognitionAppTypes.swift in Sources */,
+				FE76F2ACE67FB7B6CE1598E4 /* DecisionCognitionSubstrate.swift in Sources */,
 				AD9C7688CB6EE2C6C0F16816 /* DecisionCognitionTypes.swift in Sources */,
 				988BFED074AB0E4CDF0082CF /* DecisionContextFieldKey.swift in Sources */,
 				E0EBF7F86996CD952329873D /* DecisionContextLifecycle.swift in Sources */,
 				046F56A2947A1E8287D8392E /* DecisionContextPreparedState.swift in Sources */,
 				CC5EF4FD96DC5D33D7F92A37 /* DecisionContinuationActions.swift in Sources */,
+				97992D80BEEA79ACC39B7933 /* DecisionEvolutionCheckpoint.swift in Sources */,
+				F5AC0FC0230A9508EED4C17C /* DecisionEvolutionEngine.swift in Sources */,
 				86C0AF0FFC0C65E491F002E2 /* DecisionFieldSuggestionLibrary.swift in Sources */,
 				05DE60BF21270D62ED8AEA08 /* DecisionFrontstageState.swift in Sources */,
+				2B6130DE095C1E5924C86314 /* DecisionIdentityRoleSystem.swift in Sources */,
 				62B2D14B7432B2D253940BA0 /* DecisionIntelligenceAdmissionController.swift in Sources */,
 				48106A05FDBABC17AC420338 /* DecisionIntelligenceCacheGuard.swift in Sources */,
 				658958BBC8FE92921B90057A /* DecisionIntelligenceCircuitBreaker.swift in Sources */,
@@ -1392,6 +1427,7 @@
 				EAE10804F80292499C127ABB /* CheckVerdict.swift in Sources */,
 				07457F421CA95B94ED48C8C6 /* CodableStateStorage.swift in Sources */,
 				FA6CD0411FF0C7906E7A36A5 /* DecisionBrainState.swift in Sources */,
+				E0B86DFF2B45133C62C15F02 /* DecisionCognitionSubstrate.swift in Sources */,
 				77EBDE1A8400EBA1B9075DF6 /* DecisionCognitionTypes.swift in Sources */,
 				FFE9B155120181A57899A64D /* DecisionContextFieldKey.swift in Sources */,
 				108A911D2F173D9E68E54B6C /* DecisionContextPreparedState.swift in Sources */,
@@ -1440,8 +1476,11 @@
 				EC4B3A79C4659AFCAD798083 /* CheckRuleEngineTests.swift in Sources */,
 				D8B09C24F2D691F5F3D0D7C9 /* CodableStateStorageTests.swift in Sources */,
 				7A37146E113485821439845C /* CurrentBrainStateLoaderTests.swift in Sources */,
+				55EA1F2058351F7B3A5D1C34 /* DecisionCalibrationEngineTests.swift in Sources */,
 				F9BD2BED06676E7550F737F7 /* DecisionContextLifecycleTests.swift in Sources */,
+				4331855BA82900212ECC1F48 /* DecisionEvolutionEngineTests.swift in Sources */,
 				BB74CD533C51228C40787E52 /* DecisionFieldSuggestionLibraryTests.swift in Sources */,
+				32954AFD554826EF983B760D /* DecisionIdentityAndBoundaryTests.swift in Sources */,
 				B85E951908A4087DEFAF730F /* DecisionIntelligenceAdmissionControllerTests.swift in Sources */,
 				71AE6882F4838E9233655E43 /* DecisionIntelligenceCircuitBreakerTests.swift in Sources */,
 				D0623BE96ACB7A8EC567EC26 /* DecisionIntelligenceCoordinatorTests.swift in Sources */,
@@ -1513,6 +1552,7 @@
 				2083F903B1932C7A50B9F0BE /* CheckVerdict.swift in Sources */,
 				71A84DB2ADAB8BAA6286DD9A /* CodableStateStorage.swift in Sources */,
 				7D416F2F43340B1D79041100 /* DecisionBrainState.swift in Sources */,
+				4296EA6BEDD9D8F451647BEE /* DecisionCognitionSubstrate.swift in Sources */,
 				F19A40446A08FF8CD717E23E /* DecisionCognitionTypes.swift in Sources */,
 				70FF7385887E7529CBC76BE3 /* DecisionContextFieldKey.swift in Sources */,
 				9DBC40DD0B08493EBE363D27 /* DecisionContextPreparedState.swift in Sources */,

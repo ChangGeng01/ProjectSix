@@ -283,6 +283,10 @@ enum DecisionSystemFlightDeckBuilder {
         var blockers: [String] = []
 
         let lowTrustRate = average(brain.lowTrustMemoryLoadRateByKind.values)
+        let lockedSensitiveCoverage = brain.boundaryConstraintCountsByKind.values.reduce(0) { partialResult, counts in
+            partialResult + (counts[.lockSensitiveMemory] ?? 0)
+        }
+        let localBoundaryModes = Set(brain.boundaryModeByKind.values)
 
         if summary.evidencePollutionRate > 0.2 {
             score -= 25
@@ -304,11 +308,22 @@ enum DecisionSystemFlightDeckBuilder {
             blockers.append("One or more providers are in circuit-open cooldown.")
         }
 
+        if localBoundaryModes.isEmpty {
+            score -= 20
+            blockers.append("No dynamic boundary policy state is attached to sampled brain traces.")
+        }
+
+        if lockedSensitiveCoverage == 0 {
+            score -= 15
+            blockers.append("Sensitive-memory lock coverage is not visible in boundary policy traces.")
+        }
+
         let signals = [
             "Evidence pollution: \(percent(summary.evidencePollutionRate))",
             "Low-trust load: \(percent(lowTrustRate))",
             "Cache quarantine: \(percent(summary.cacheQuarantineRate))",
-            "Circuit trips: \(summary.circuitTripCount)"
+            "Circuit trips: \(summary.circuitTripCount)",
+            "Boundary modes: \(localBoundaryModes.count)"
         ]
 
         return DecisionSystemLayerReport(
@@ -423,8 +438,14 @@ enum DecisionSystemFlightDeckBuilder {
         export: DecisionTestingRuntimeExport
     ) -> DecisionSystemLayerReport {
         let summary = export.summary
+        let brain = export.brainSummary
         var score = 100
         var blockers: [String] = []
+
+        let driftingKinds = brain.calibrationStatusByKind.compactMap { kind, status in
+            status == .drifting ? kind.title : nil
+        }
+        let pendingReviewAverage = average(brain.evolutionPendingReviewCountByKind.values)
 
         if summary.totalRequests == 0 {
             score -= 30
@@ -446,11 +467,27 @@ enum DecisionSystemFlightDeckBuilder {
             blockers.append("Prompt-shape drift metrics are missing.")
         }
 
+        if brain.calibrationStatusByKind.isEmpty {
+            score -= 20
+            blockers.append("Calibration state is not attached to sampled brain traces.")
+        }
+
+        if !driftingKinds.isEmpty {
+            score -= 20
+            blockers.append("Calibration is drifting for \(driftingKinds.joined(separator: ", ")).")
+        }
+
+        if pendingReviewAverage > 0 {
+            score -= 10
+            blockers.append("Safe-evolution review debt is accumulating.")
+        }
+
         let signals = [
             "Total requests: \(summary.totalRequests)",
             "Brain traces: \(summary.brainTraceCount)",
             "Prompt variants tracked: \(summary.semanticPromptVariantCountByKind.count)",
-            "Over-target budget: \(percent(summary.overTargetBudgetRate))"
+            "Over-target budget: \(percent(summary.overTargetBudgetRate))",
+            "Calibration kinds: \(brain.calibrationStatusByKind.count)"
         ]
 
         return DecisionSystemLayerReport(
@@ -468,8 +505,12 @@ enum DecisionSystemFlightDeckBuilder {
     ) -> DecisionSystemLayerReport {
         let summary = export.summary
         let snapshot = export.runtimeSnapshot
+        let brain = export.brainSummary
         var score = 100
         var blockers: [String] = []
+
+        let averageCheckpointCount = average(brain.evolutionCheckpointCountByKind.values)
+        let rollbackReadyCount = brain.evolutionRollbackReadyByKind.values.filter { $0 }.count
 
         if summary.registeredProviderCount < 3 {
             score -= 25
@@ -491,11 +532,22 @@ enum DecisionSystemFlightDeckBuilder {
             blockers.append("No fallback provider is configured.")
         }
 
+        if averageCheckpointCount == 0 {
+            score -= 20
+            blockers.append("No safe-evolution checkpoints are being recorded.")
+        }
+
+        if rollbackReadyCount == 0 && !brain.evolutionRollbackReadyByKind.isEmpty {
+            score -= 15
+            blockers.append("Evolution checkpoints are not marked rollback-ready.")
+        }
+
         let signals = [
             "Providers: \(summary.registeredProviderCount)",
             "Open adapters: \(summary.registeredOpenModelProviderCount)",
             "Fallback: \(snapshot.runtimeStatus.fallback?.title ?? "none")",
-            "Local closed loop: yes"
+            "Local closed loop: yes",
+            "Checkpoints: \(Int(averageCheckpointCount.rounded()))"
         ]
 
         return DecisionSystemLayerReport(

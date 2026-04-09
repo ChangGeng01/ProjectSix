@@ -17,6 +17,7 @@ enum CurrentBrainStateLoader {
         InterventionTemplateStore.ensureDefaults(in: context)
         FailurePatternStore.syncFromHistory(in: context)
 
+        let sourceSurface = envelope?.sourceSurface ?? defaultSourceSurface(for: source)
         let languageMode = DecisionLanguageMode.detect(
             preferredLanguages: Locale.preferredLanguages,
             sampleTexts: [prompt]
@@ -45,10 +46,50 @@ enum CurrentBrainStateLoader {
         )
         brainState.activeInterventionTemplateIDs = templates.map(\.id)
         brainState.failureGuardIDs = failurePatterns.map(\.id)
-        let activeConstraints = Array(brainState.sessionBiases.prefix(3))
+        let identityProfile = DecisionIdentityRoleSystem.resolve(
+            mode: mode,
+            source: source,
+            sourceSurface: sourceSurface,
+            riskLevel: riskLevel
+        )
+        let boundaryPolicy = DecisionBoundaryPolicyEngine.evaluate(
+            mode: mode,
+            source: source,
+            sourceSurface: sourceSurface,
+            riskLevel: riskLevel,
+            identityProfile: identityProfile,
+            brainState: brainState,
+            taskGraph: taskGraph
+        )
+        brainState.identityProfile = identityProfile
+        brainState.boundaryPolicy = boundaryPolicy
+        brainState.calibrationState = DecisionCalibrationEngine.evaluate(
+            brainState: brainState,
+            riskLevel: riskLevel,
+            identityProfile: identityProfile,
+            boundaryPolicy: boundaryPolicy,
+            now: now
+        )
+        brainState.evolutionState = DecisionEvolutionEngine.recordCheckpoint(
+            mode: mode,
+            source: source,
+            brainState: brainState,
+            context: context,
+            now: now
+        )
+        let activeConstraints = Array(
+            orderedUnique(
+                brainState.sessionBiases +
+                    brainState.boundaryPolicy.activeConstraints.map(\.title)
+            )
+            .prefix(4)
+        )
+
         let current = CurrentBrainState(
             source: source,
+            sourceSurface: sourceSurface,
             mode: mode,
+            riskLevel: riskLevel,
             taskGraph: taskGraph,
             brainState: brainState,
             dominantGoal: brainState.activeGoals.first,
@@ -93,6 +134,28 @@ enum CurrentBrainStateLoader {
             return .medium
         }
         return .low
+    }
+
+    private static func defaultSourceSurface(
+        for source: BrainStateUpdateSource
+    ) -> DecisionIntentSourceSurface {
+        switch source {
+        case .watchHandoff:
+            .watch
+        case .notification:
+            .notification
+        case .widget:
+            .widget
+        case .launch, .sceneActive, .explicitRefresh, .sessionPrime:
+            .app
+        }
+    }
+
+    private static func orderedUnique(_ values: [String]) -> [String] {
+        var seen: Set<String> = []
+        return values.filter { value in
+            seen.insert(value).inserted
+        }
     }
 
     private static func trimOldUpdates(in context: ModelContext, now: Date) {

@@ -12,7 +12,9 @@ enum BrainStateUpdateSource: String, Codable, Sendable {
 
 struct CurrentBrainState: Equatable, Sendable {
     let source: BrainStateUpdateSource
+    let sourceSurface: DecisionIntentSourceSurface
     let mode: DecisionMode
+    let riskLevel: InterventionRiskLevel
     let taskGraph: DecisionTaskGraphSnapshot?
     let brainState: DecisionBrainState
     let dominantGoal: String?
@@ -28,6 +30,22 @@ struct CurrentBrainState: Equatable, Sendable {
 
     var dominantReactionWeight: DecisionReactionWeightKey {
         brainState.reactionWeights.dominantKey
+    }
+
+    var identityProfile: DecisionIdentityProfile {
+        brainState.identityProfile
+    }
+
+    var boundaryPolicy: DecisionBoundaryPolicyState {
+        brainState.boundaryPolicy
+    }
+
+    var calibrationState: DecisionCalibrationState {
+        brainState.calibrationState
+    }
+
+    var evolutionState: DecisionEvolutionState {
+        brainState.evolutionState
     }
 }
 

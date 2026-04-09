@@ -50,7 +50,9 @@ final class InterventionPredictionEngineTests: XCTestCase {
         let context = container.mainContext
         let current = CurrentBrainState(
             source: .explicitRefresh,
+            sourceSurface: .app,
             mode: .quick,
+            riskLevel: .medium,
             taskGraph: nil,
             brainState: DecisionBrainState(
                 profileCore: [],

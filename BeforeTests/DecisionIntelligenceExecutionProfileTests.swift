@@ -305,6 +305,8 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
                 sessionBiases: [],
                 retrievalTags: ["mirror"],
                 reactionWeights: .defaults(for: .mirror),
+                identityProfile: .default(for: .mirror),
+                boundaryPolicy: .default(riskLevel: .medium),
                 memoryGovernance: DecisionMemoryGovernanceState(
                     totalRecordCount: 2,
                     totalCandidateCount: 2,

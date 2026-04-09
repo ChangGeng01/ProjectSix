@@ -185,6 +185,10 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
     var sessionBiases: [String]
     var retrievalTags: [String]
     var reactionWeights: DecisionReactionWeights
+    var identityProfile: DecisionIdentityProfile
+    var boundaryPolicy: DecisionBoundaryPolicyState
+    var calibrationState: DecisionCalibrationState
+    var evolutionState: DecisionEvolutionState
     var activeInterventionTemplateIDs: [String]
     var failureGuardIDs: [String]
     var memoryGovernance: DecisionMemoryGovernanceState = .empty
@@ -195,6 +199,10 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
         sessionBiases: [String],
         retrievalTags: [String],
         reactionWeights: DecisionReactionWeights,
+        identityProfile: DecisionIdentityProfile,
+        boundaryPolicy: DecisionBoundaryPolicyState,
+        calibrationState: DecisionCalibrationState = .stable(),
+        evolutionState: DecisionEvolutionState = .empty,
         activeInterventionTemplateIDs: [String] = [],
         failureGuardIDs: [String] = [],
         memoryGovernance: DecisionMemoryGovernanceState = .empty,
@@ -204,6 +212,10 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
         self.sessionBiases = sessionBiases
         self.retrievalTags = retrievalTags
         self.reactionWeights = reactionWeights
+        self.identityProfile = identityProfile
+        self.boundaryPolicy = boundaryPolicy
+        self.calibrationState = calibrationState
+        self.evolutionState = evolutionState
         self.activeInterventionTemplateIDs = activeInterventionTemplateIDs
         self.failureGuardIDs = failureGuardIDs
         self.memoryGovernance = memoryGovernance
@@ -217,11 +229,17 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
         sessionBiases: [String],
         retrievalTags: [String],
         reactionWeights: DecisionReactionWeights,
+        identityProfile: DecisionIdentityProfile? = nil,
+        boundaryPolicy: DecisionBoundaryPolicyState? = nil,
+        calibrationState: DecisionCalibrationState = .stable(),
+        evolutionState: DecisionEvolutionState = .empty,
         activeInterventionTemplateIDs: [String] = [],
         failureGuardIDs: [String] = [],
         memoryGovernance: DecisionMemoryGovernanceState = .empty,
         loadedAt: Date = .now
     ) {
+        let resolvedIdentity = identityProfile ?? DecisionIdentityProfile.default(for: .quick)
+        let resolvedBoundary = boundaryPolicy ?? DecisionBoundaryPolicyState.default(riskLevel: .low)
         self.init(
             memorySlices: Self.legacyMemorySlices(
                 profileCore: profileCore,
@@ -231,6 +249,10 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
             sessionBiases: sessionBiases,
             retrievalTags: retrievalTags,
             reactionWeights: reactionWeights,
+            identityProfile: resolvedIdentity,
+            boundaryPolicy: resolvedBoundary,
+            calibrationState: calibrationState,
+            evolutionState: evolutionState,
             activeInterventionTemplateIDs: activeInterventionTemplateIDs,
             failureGuardIDs: failureGuardIDs,
             memoryGovernance: memoryGovernance,
@@ -267,7 +289,9 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
             sessionBiases.isEmpty &&
             retrievalTags.isEmpty &&
             activeInterventionTemplateIDs.isEmpty &&
-            failureGuardIDs.isEmpty
+            failureGuardIDs.isEmpty &&
+            calibrationState.alerts.isEmpty &&
+            evolutionState.checkpointCount == 0
     }
 
     var verificationSnapshot: DecisionBrainStateSnapshot {
@@ -304,32 +328,50 @@ struct DecisionBrainState: Codable, Equatable, Sendable {
             riskFlags.append(.tagFloodBlocked)
         }
 
-        let material = [
+        let boundaryConstraintMaterial = boundaryPolicy.activeConstraints
+            .map(\.rawValue)
+            .sorted()
+            .joined(separator: "|")
+        let calibrationAlertMaterial = calibrationState.alerts
+            .map(\.rawValue)
+            .sorted()
+            .joined(separator: "|")
+        let memorySliceMaterial = memorySlices
+            .sorted { $0.id < $1.id }
+            .map { slice in
+                [
+                    slice.id,
+                    slice.role.rawValue,
+                    slice.headline,
+                    slice.source,
+                    String(format: "%.3f", slice.sourceTrustScore),
+                    slice.sourceTrustTier.rawValue,
+                    slice.governanceStatus.rawValue,
+                    slice.isPending ? "pending" : "stable"
+                ]
+                .joined(separator: "::")
+            }
+            .joined(separator: "||")
+        let riskFlagMaterial = riskFlags.map(\.rawValue).sorted().joined(separator: "|")
+
+        let materialParts = [
             profileCore.sorted().joined(separator: "|"),
             activeGoals.sorted().joined(separator: "|"),
             relevantMemories.sorted().joined(separator: "|"),
             sessionBiases.sorted().joined(separator: "|"),
             retrievalTags.sorted().joined(separator: "|"),
             reactionWeights.dominantKey.rawValue,
-            memorySlices
-                .sorted { $0.id < $1.id }
-                .map { slice in
-                    [
-                        slice.id,
-                        slice.role.rawValue,
-                        slice.headline,
-                        slice.source,
-                        String(format: "%.3f", slice.sourceTrustScore),
-                        slice.sourceTrustTier.rawValue,
-                        slice.governanceStatus.rawValue,
-                        slice.isPending ? "pending" : "stable"
-                    ]
-                    .joined(separator: "::")
-                }
-                .joined(separator: "||"),
-            riskFlags.map(\.rawValue).sorted().joined(separator: "|")
+            identityProfile.role.rawValue,
+            identityProfile.posture.rawValue,
+            identityProfile.initiative.rawValue,
+            boundaryPolicy.mode.rawValue,
+            boundaryConstraintMaterial,
+            calibrationState.status.rawValue,
+            calibrationAlertMaterial,
+            memorySliceMaterial,
+            riskFlagMaterial
         ]
-        .joined(separator: "###")
+        let material = materialParts.joined(separator: "###")
 
         let fingerprint = SHA256.hash(data: Data(material.utf8))
             .map { String(format: "%02x", $0) }

@@ -312,6 +312,8 @@ enum DecisionMemorySystem {
                 sessionBiases: defaultSessionBiases(for: mode),
                 retrievalTags: Array(queryTags(for: mode, prompt: prompt)).sorted(),
                 reactionWeights: DecisionReactionWeights.defaults(for: mode),
+                identityProfile: DecisionIdentityProfile.default(for: mode),
+                boundaryPolicy: DecisionBoundaryPolicyState.default(riskLevel: .low),
                 memoryGovernance: .empty,
                 loadedAt: now
             )
@@ -404,6 +406,8 @@ enum DecisionMemorySystem {
             sessionBiases: sessionBiases,
             retrievalTags: Array(queryTags).sorted(),
             reactionWeights: reactionWeights,
+            identityProfile: DecisionIdentityProfile.default(for: mode),
+            boundaryPolicy: DecisionBoundaryPolicyState.default(riskLevel: .low),
             memoryGovernance: memoryGovernance,
             loadedAt: now
         )

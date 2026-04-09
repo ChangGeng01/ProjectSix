@@ -96,6 +96,7 @@ struct PersistenceBootstrap {
             DecisionMemoryRecord.self,
             DecisionMemoryCandidateRecord.self,
             BrainStateUpdate.self,
+            DecisionEvolutionCheckpoint.self,
             InterventionTrigger.self,
             InterventionTemplateRecord.self,
             FailurePatternRecord.self,

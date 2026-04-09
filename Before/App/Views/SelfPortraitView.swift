@@ -22,6 +22,9 @@ struct SelfPortraitView: View {
 
                         systemFlightDeckCard(systemFlightDeck)
                         currentBrainCard(panel.currentBrainState)
+                        boundaryCard(panel.currentBrainState)
+                        calibrationCard(panel.currentBrainState)
+                        evolutionCard(panel.currentBrainState)
 
                         if let candidate = appModel.interventionCandidate {
                             PanelCard {
@@ -143,6 +146,10 @@ struct SelfPortraitView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(BeforeTheme.ember)
 
+                    Text(state.identityProfile.role.title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
                     if let dominantGoal = state.dominantGoal, !dominantGoal.isEmpty {
                         Text(dominantGoal)
                             .font(.title3.bold())
@@ -172,6 +179,125 @@ struct SelfPortraitView: View {
                         .textSelection(.enabled)
                 } else {
                     Text("The brain has not been bootstrapped yet.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func boundaryCard(_ state: CurrentBrainState?) -> some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Boundary policy")
+                    .font(.headline)
+
+                if let state {
+                    Text(state.boundaryPolicy.auditHeadline)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Text(state.boundaryPolicy.mode.rawValue.replacingOccurrences(of: "_", with: " "))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.ember)
+
+                    if !state.boundaryPolicy.activeConstraints.isEmpty {
+                        ForEach(state.boundaryPolicy.activeConstraints, id: \.rawValue) { constraint in
+                            Text("• \(constraint.title)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if !state.boundaryPolicy.requiredConfirmations.isEmpty {
+                        Text("Requires confirmation: \(state.boundaryPolicy.requiredConfirmations.joined(separator: ", "))")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text("Boundary policy appears after the current brain is loaded.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func calibrationCard(_ state: CurrentBrainState?) -> some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Calibration")
+                    .font(.headline)
+
+                if let state {
+                    Text(state.calibrationState.status.rawValue.capitalized)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(healthColor(health(from: state.calibrationState.status)))
+
+                    Text("Drift score: \(Int((state.calibrationState.driftScore * 100).rounded()))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    if state.calibrationState.alerts.isEmpty {
+                        Text("No active calibration alerts.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(state.calibrationState.alerts, id: \.rawValue) { alert in
+                            Text("• \(alert.rawValue.replacingOccurrences(of: "_", with: " "))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if !state.calibrationState.suggestedAdjustments.isEmpty {
+                        Text(state.calibrationState.suggestedAdjustments.first ?? "")
+                            .font(.caption2)
+                            .foregroundStyle(BeforeTheme.ember)
+                    }
+                } else {
+                    Text("Calibration state appears after the current brain is loaded.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func evolutionCard(_ state: CurrentBrainState?) -> some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Safe evolution")
+                    .font(.headline)
+
+                if let state {
+                    Text("Checkpoints: \(state.evolutionState.checkpointCount)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.ember)
+
+                    Text(state.evolutionState.rollbackReady ? "Rollback ready" : "Rollback unavailable")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    if let checkpoint = state.evolutionState.latestCheckpoint {
+                        Text("Latest checkpoint: \(checkpoint.id)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+
+                    if !state.evolutionState.recentDiffSummary.isEmpty {
+                        ForEach(state.evolutionState.recentDiffSummary, id: \.self) { diff in
+                            Text("• \(diff)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } else {
+                    Text("Evolution checkpoints appear after the current brain is loaded.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -326,6 +452,17 @@ struct SelfPortraitView: View {
             .orange
         case .critical:
             .red
+        }
+    }
+
+    private func health(from status: DecisionCalibrationStatus) -> DecisionSystemLayerHealth {
+        switch status {
+        case .stable:
+            .strong
+        case .watch:
+            .watch
+        case .drifting:
+            .critical
         }
     }
 

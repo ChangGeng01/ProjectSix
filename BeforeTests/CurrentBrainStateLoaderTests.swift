@@ -30,10 +30,19 @@ final class CurrentBrainStateLoaderTests: XCTestCase {
 
         let updates = try context.fetch(FetchDescriptor<BrainStateUpdate>())
         let templates = try context.fetch(FetchDescriptor<InterventionTemplateRecord>())
+        let checkpoints = try context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())
 
         XCTAssertEqual(current.source, .launch)
+        XCTAssertEqual(current.sourceSurface, .app)
+        XCTAssertEqual(current.riskLevel, .low)
         XCTAssertFalse(current.activeTemplateIDs.isEmpty)
         XCTAssertFalse(templates.isEmpty)
+        XCTAssertEqual(current.identityProfile.role, .pauseCompanion)
+        XCTAssertEqual(current.boundaryPolicy.mode, .localOnlyAdvisory)
+        XCTAssertEqual(current.calibrationState.status, .stable)
+        XCTAssertEqual(checkpoints.count, 1)
+        XCTAssertEqual(current.evolutionState.checkpointCount, 1)
+        XCTAssertTrue(current.evolutionState.rollbackReady)
         XCTAssertEqual(updates.count, 1)
         XCTAssertEqual(updates.first?.fingerprint, current.verificationSnapshot.fingerprint)
         XCTAssertEqual(updates.first?.activeTemplateIDs, current.activeTemplateIDs)
@@ -182,11 +191,13 @@ final class CurrentBrainStateLoaderTests: XCTestCase {
         let templates = try context.fetch(FetchDescriptor<InterventionTemplateRecord>())
         let failurePatterns = try context.fetch(FetchDescriptor<FailurePatternRecord>())
         let updates = try context.fetch(FetchDescriptor<BrainStateUpdate>())
+        let checkpoints = try context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())
 
         XCTAssertEqual(Set(templates.map(\.id)).count, templates.count)
         XCTAssertEqual(Set(failurePatterns.map(\.id)).count, failurePatterns.count)
         XCTAssertEqual(templates.count, 4)
         XCTAssertLessThanOrEqual(updates.count, 60)
+        XCTAssertLessThanOrEqual(checkpoints.count, BeforePolicy.RuntimeState.evolutionCheckpointLimit)
         XCTAssertTrue(failurePatterns.contains(where: { $0.id == "night_fast_path_failure" }))
     }
 
@@ -199,6 +210,7 @@ final class CurrentBrainStateLoaderTests: XCTestCase {
             BalanceDecisionRecord.self,
             MirrorDecisionRecord.self,
             BrainStateUpdate.self,
+            DecisionEvolutionCheckpoint.self,
             InterventionTemplateRecord.self,
             FailurePatternRecord.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)

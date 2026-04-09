@@ -704,6 +704,7 @@ final class BeforeAppModel: ObservableObject {
         deleteAll(DecisionMemoryRecord.self, in: context)
         deleteAll(DecisionMemoryCandidateRecord.self, in: context)
         deleteAll(BrainStateUpdate.self, in: context)
+        deleteAll(DecisionEvolutionCheckpoint.self, in: context)
         deleteAll(InterventionTrigger.self, in: context)
         deleteAll(InterventionTemplateRecord.self, in: context)
         deleteAll(FailurePatternRecord.self, in: context)
