@@ -37,7 +37,12 @@ enum DecisionReactionBanditStore {
         let snapshot = loadSnapshot()
         let states = snapshot.buckets[bucket]?.arms ?? defaultArmStates()
         return states
-            .sorted { $0.value.score > $1.value.score }
+            .sorted {
+                if $0.value.score == $1.value.score {
+                    return $0.key < $1.key
+                }
+                return $0.value.score > $1.value.score
+            }
             .map(\.key)
     }
 

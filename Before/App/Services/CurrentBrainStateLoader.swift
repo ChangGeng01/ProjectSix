@@ -60,6 +60,7 @@ enum CurrentBrainStateLoader {
         )
 
         let update = BrainStateUpdate(
+            createdAt: now,
             source: source,
             mode: mode,
             dominantGoal: current.dominantGoal,

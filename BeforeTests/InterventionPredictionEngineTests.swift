@@ -81,6 +81,46 @@ final class InterventionPredictionEngineTests: XCTestCase {
     }
 
     @MainActor
+    func testPredictCandidateDoesNotEscalateToHighRiskDuringDaylightForSameHistory() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        seedNegativeQuickEvent(into: context, at: localDate(year: 2026, month: 4, day: 9, hour: 22, minute: 5), action: .goAheadAnyway)
+        seedNegativeQuickEvent(into: context, at: localDate(year: 2026, month: 4, day: 9, hour: 23, minute: 5), action: .continueMindfully)
+        try context.save()
+
+        let now = localDate(year: 2026, month: 4, day: 10, hour: 14, minute: 0)
+
+        let candidate = InterventionPredictionEngine.predictCandidate(
+            currentBrainState: nil,
+            context: context,
+            preferences: .default,
+            now: now
+        )
+
+        XCTAssertEqual(candidate?.riskLevel, .medium)
+        XCTAssertNotEqual(candidate?.riskLevel, .high)
+        XCTAssertEqual(candidate?.suggestedMode, .mirror)
+    }
+
+    @MainActor
+    func testPredictCandidateDefaultsToLowRiskQuickPathWithoutSignals() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = localDate(year: 2026, month: 4, day: 10, hour: 11, minute: 0)
+
+        let candidate = InterventionPredictionEngine.predictCandidate(
+            currentBrainState: nil,
+            context: context,
+            preferences: .default,
+            now: now
+        )
+
+        XCTAssertEqual(candidate?.riskLevel, .low)
+        XCTAssertEqual(candidate?.suggestedMode, .quick)
+        XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("low-friction pause") == true)
+    }
+
+    @MainActor
     private func makeContainer() throws -> ModelContainer {
         try ModelContainer(
             for: CheckEvent.self,

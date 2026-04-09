@@ -70,6 +70,90 @@ final class CurrentBrainStateLoaderTests: XCTestCase {
     }
 
     @MainActor
+    func testBootstrapCurrentBrainStateIsStableAcrossRepeatedLoadsForSameProjection() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        seedQuickHistory(into: context)
+        try context.save()
+
+        let bootstrapDate = localDate(year: 2026, month: 4, day: 10, hour: 21, minute: 15)
+        let projection = DecisionMemorySystem.refreshProjection(in: context, now: bootstrapDate)
+
+        let first = CurrentBrainStateLoader.bootstrapCurrentBrainState(
+            mode: .quick,
+            prompt: "Should I buy this tonight?",
+            source: .launch,
+            taskGraph: nil,
+            context: context,
+            projection: projection,
+            retrievalMode: .filtered,
+            now: bootstrapDate
+        )
+        let second = CurrentBrainStateLoader.bootstrapCurrentBrainState(
+            mode: .quick,
+            prompt: "Should I buy this tonight?",
+            source: .launch,
+            taskGraph: nil,
+            context: context,
+            projection: projection,
+            retrievalMode: .filtered,
+            now: bootstrapDate
+        )
+
+        XCTAssertEqual(first.verificationSnapshot.fingerprint, second.verificationSnapshot.fingerprint)
+        XCTAssertEqual(first.activeTemplateIDs, second.activeTemplateIDs)
+        XCTAssertEqual(first.failureGuardIDs, second.failureGuardIDs)
+        XCTAssertEqual(first.activeConstraints, second.activeConstraints)
+    }
+
+    @MainActor
+    func testBootstrapCurrentBrainStateTrimsHistoricalUpdatesToSixtyEntries() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        seedQuickHistory(into: context)
+
+        let baseDate = localDate(year: 2026, month: 4, day: 10, hour: 18, minute: 0)
+        for index in 0..<80 {
+            context.insert(
+                BrainStateUpdate(
+                    createdAt: baseDate.addingTimeInterval(Double(-index) * 60),
+                    source: .explicitRefresh,
+                    mode: .quick,
+                    dominantGoal: "goal-\(index)",
+                    dominantReactionWeight: .briefLanguage,
+                    fingerprint: "fingerprint-\(index)",
+                    activeConstraints: [],
+                    activeTemplateIDs: [],
+                    failureGuardIDs: []
+                )
+            )
+        }
+        try context.save()
+
+        let bootstrapDate = baseDate.addingTimeInterval(60)
+        let projection = DecisionMemorySystem.refreshProjection(in: context, now: bootstrapDate)
+        _ = CurrentBrainStateLoader.bootstrapCurrentBrainState(
+            mode: .quick,
+            prompt: "Should I text them?",
+            source: .sessionPrime,
+            taskGraph: nil,
+            context: context,
+            projection: projection,
+            retrievalMode: .filtered,
+            now: bootstrapDate
+        )
+
+        let updates = try context.fetch(
+            FetchDescriptor<BrainStateUpdate>(
+                sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+            )
+        )
+
+        XCTAssertLessThanOrEqual(updates.count, 60)
+        XCTAssertTrue(updates.contains { $0.source == .sessionPrime })
+    }
+
+    @MainActor
     private func makeContainer() throws -> ModelContainer {
         try ModelContainer(
             for: CheckEvent.self,
