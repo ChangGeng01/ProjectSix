@@ -566,3 +566,71 @@ public enum BASRuntimeAvailabilityNarrator {
         }
     }
 }
+
+public struct BASRuntimeStatusSummary: Codable, Equatable, Sendable {
+    public var preferredProviderID: String
+    public var activeProviderID: String
+    public var fallbackProviderID: String?
+    public var detail: String
+    public var orderedProviderIDs: [String]
+
+    public init(
+        preferredProviderID: String,
+        activeProviderID: String,
+        fallbackProviderID: String?,
+        detail: String,
+        orderedProviderIDs: [String]
+    ) {
+        self.preferredProviderID = preferredProviderID
+        self.activeProviderID = activeProviderID
+        self.fallbackProviderID = fallbackProviderID
+        self.detail = detail
+        self.orderedProviderIDs = orderedProviderIDs
+    }
+}
+
+public enum BASRuntimeStatusResolver {
+    public static func resolve(
+        preferredProviderID: String,
+        allowFallbacks: Bool,
+        runtimeEnabled: Bool,
+        deterministicProviderID: String,
+        preferenceOrderings: [BASProviderPreferenceOrdering],
+        statusesByID: [String: BASProviderStatusRecord],
+        suspendedProviderIDs: Set<String> = [],
+        testingOverrideProviderID: String? = nil,
+        testingOverrideTitle: String? = nil
+    ) -> BASRuntimeStatusSummary {
+        let orderedProviderIDs = BASProviderOrderingResolver.orderedProviderIDs(
+            preferredProviderID: preferredProviderID,
+            allowFallbacks: allowFallbacks,
+            deterministicProviderID: deterministicProviderID,
+            preferenceOrderings: preferenceOrderings,
+            suspendedProviderIDs: suspendedProviderIDs
+        )
+        let plan = BASRuntimeAvailabilityResolver.resolve(
+            preferredProviderID: preferredProviderID,
+            allowFallbacks: allowFallbacks,
+            runtimeEnabled: runtimeEnabled,
+            deterministicProviderID: deterministicProviderID,
+            orderedProviderIDs: orderedProviderIDs,
+            statusesByID: statusesByID,
+            testingOverrideProviderID: testingOverrideProviderID
+        )
+        let detail = BASRuntimeAvailabilityNarrator.detail(
+            plan: plan,
+            allowFallbacks: allowFallbacks,
+            statusesByID: statusesByID,
+            orderedProviderIDs: orderedProviderIDs,
+            testingOverrideTitle: testingOverrideTitle
+        )
+
+        return BASRuntimeStatusSummary(
+            preferredProviderID: preferredProviderID,
+            activeProviderID: plan.activeProviderID,
+            fallbackProviderID: plan.fallbackProviderID,
+            detail: detail,
+            orderedProviderIDs: orderedProviderIDs
+        )
+    }
+}

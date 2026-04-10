@@ -63,15 +63,12 @@ enum DecisionIntelligenceProviderPipeline {
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) -> DecisionModelRuntimeStatus {
         let preferred = preferences.preferredIntelligenceProvider.kind
-        let plan = BASRuntimeAvailabilityResolver.resolve(
+        let summary = BASRuntimeStatusResolver.resolve(
             preferredProviderID: preferred.rawValue,
             allowFallbacks: preferences.allowModelFallbacks,
             runtimeEnabled: preferences.onDeviceIntelligenceMode.isEnabled,
             deterministicProviderID: DecisionModelProviderKind.template.rawValue,
-            orderedProviderIDs: orderedKinds(
-                for: preferences.preferredIntelligenceProvider,
-                allowFallbacks: preferences.allowModelFallbacks
-            ).map(\.rawValue),
+            preferenceOrderings: preferenceOrderings,
             statusesByID: Dictionary(
                 uniqueKeysWithValues: statusesByKind.map { entry in
                     (
@@ -85,39 +82,17 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 }
             ),
-            testingOverrideProviderID: testingStubProfile.map { _ in DecisionModelProviderKind.testingStub.rawValue }
-        )
-
-        let active = DecisionModelProviderKind(rawValue: plan.activeProviderID) ?? .template
-        let fallback = plan.fallbackProviderID.flatMap(DecisionModelProviderKind.init(rawValue:))
-        let detail = BASRuntimeAvailabilityNarrator.detail(
-            plan: plan,
-            allowFallbacks: preferences.allowModelFallbacks,
-            statusesByID: Dictionary(
-                uniqueKeysWithValues: statusesByKind.map { entry in
-                    (
-                        entry.key.rawValue,
-                        BASProviderStatusRecord(
-                            providerID: entry.key.rawValue,
-                            isAvailable: entry.value.isAvailable,
-                            title: entry.value.title,
-                            detail: entry.value.detail
-                        )
-                    )
-                }
-            ),
-            orderedProviderIDs: orderedKinds(
-                for: preferences.preferredIntelligenceProvider,
-                allowFallbacks: preferences.allowModelFallbacks
-            ).map(\.rawValue),
+            testingOverrideProviderID: testingStubProfile.map { _ in DecisionModelProviderKind.testingStub.rawValue },
             testingOverrideTitle: testingStubProfile?.title
         )
+        let active = DecisionModelProviderKind(rawValue: summary.activeProviderID) ?? .template
+        let fallback = summary.fallbackProviderID.flatMap(DecisionModelProviderKind.init(rawValue:))
 
         return DecisionModelRuntimeStatus(
             preferred: preferred,
             active: active,
             fallback: fallback,
-            detail: detail
+            detail: summary.detail
         )
     }
 

@@ -872,6 +872,41 @@ struct BASRuntimeCoreTests {
         )
     }
 
+    @Test("runtime status resolver composes ordering availability and narration")
+    func runtimeStatusResolverComposesOrderingAvailabilityAndNarration() {
+        let summary = BASRuntimeStatusResolver.resolve(
+            preferredProviderID: "foundation",
+            allowFallbacks: true,
+            runtimeEnabled: true,
+            deterministicProviderID: "template",
+            preferenceOrderings: [
+                BASProviderPreferenceOrdering(
+                    preferredProviderID: "foundation",
+                    orderedProviderIDs: ["foundation", "gemma"]
+                )
+            ],
+            statusesByID: [
+                "foundation": BASProviderStatusRecord(
+                    providerID: "foundation",
+                    isAvailable: false,
+                    title: "Foundation",
+                    detail: "Foundation is unavailable."
+                ),
+                "gemma": BASProviderStatusRecord(
+                    providerID: "gemma",
+                    isAvailable: true,
+                    title: "Gemma",
+                    detail: "Gemma is ready."
+                )
+            ]
+        )
+
+        #expect(summary.orderedProviderIDs == ["foundation", "gemma"])
+        #expect(summary.activeProviderID == "gemma")
+        #expect(summary.fallbackProviderID == "gemma")
+        #expect(summary.detail.contains("Foundation is not available"))
+    }
+
     @Test("runtime availability narrator explains deterministic fallback when fallback is disabled")
     func runtimeAvailabilityNarratorExplainsDeterministicFallback() {
         let detail = BASRuntimeAvailabilityNarrator.detail(
