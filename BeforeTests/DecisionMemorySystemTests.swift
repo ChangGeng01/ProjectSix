@@ -76,7 +76,10 @@ final class DecisionMemorySystemTests: XCTestCase {
         )
 
         XCTAssertTrue(brainState.profileCore.contains("Short, direct language lands better."))
-        XCTAssertTrue(brainState.activeGoals.contains(where: { $0.contains("Sleep before midnight") }))
+        XCTAssertTrue(
+            brainState.activeGoals.contains(where: { $0.contains("Sleep before midnight") }),
+            "Expected sleep goal in \(brainState.activeGoals)"
+        )
         XCTAssertTrue(brainState.relevantMemories.contains(where: { $0.contains("Buy pressure keeps recurring.") }))
         XCTAssertTrue(brainState.relevantMemories.contains(where: {
             $0.contains("Tomorrow Box") || $0.contains("lighter, shorter guidance")

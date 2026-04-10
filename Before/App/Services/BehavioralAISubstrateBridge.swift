@@ -105,59 +105,57 @@ enum BehavioralAISubstrateBridge {
         let primaryKind = export.recentTraces.first?.kind ?? .quick
         let strategy = adaptationMatrix.strategy(for: primaryKind)
 
-        return BASRuntimeContext(
-            taskKind: taskKind(from: export.recentTraces.first?.kind),
-            gear: runtimeGear(from: adaptationMatrix.runtimeGear),
-            deviceProfile: BASDeviceProfile(
-                modelName: adaptationMatrix.deviceClass.rawValue,
-                memoryMB: memoryMB(for: adaptationMatrix.deviceClass),
-                batteryLevel: 1.0,
-                lowPowerMode: adaptationMatrix.environmentClass == .lowPower,
-                thermalState: adaptationMatrix.environmentClass.rawValue
-            ),
-            privacyMode: .localOnly,
-            riskLevel: riskLevel(from: currentRiskBand(in: export)),
-            networkAvailable: false,
-            budget: BASExecutionBudget(
-                contextTokens: strategy.contextBudget,
-                outputTokens: strategy.outputCharacterBudget,
-                retrievalItems: strategy.retrievalItemBudget,
-                toolCalls: strategy.toolCallBudget,
-                timeBudgetMs: strategy.timeBudgetMs
+        return BASAppleInspectionBridgeBuilder.runtimeContext(
+            from: BASAppleRuntimeContextSourceInput(
+                primaryTraceKind: export.recentTraces.first?.kind.rawValue,
+                runtimeGear: runtimeGear(from: adaptationMatrix.runtimeGear),
+                environmentClass: environmentClass(from: adaptationMatrix.environmentClass),
+                deviceClass: devicePerformanceClass(from: adaptationMatrix.deviceClass),
+                riskLevel: riskLevel(from: currentRiskBand(in: export)),
+                budget: BASAdaptiveRuntimeBudget(
+                    contextBudget: strategy.contextBudget,
+                    outputCharacterBudget: strategy.outputCharacterBudget,
+                    timeBudgetMs: strategy.timeBudgetMs,
+                    toolCallBudget: strategy.toolCallBudget,
+                    retrievalItemBudget: strategy.retrievalItemBudget
+                )
             )
         )
     }
 
     static func roleProfile(from currentBrainState: CurrentBrainState?) -> BASRoleProfile? {
-        guard let currentBrainState else { return nil }
-        return BASRoleProfile(
-            name: currentBrainState.identityProfile.role.title,
-            posture: posture(from: currentBrainState.identityProfile.posture),
-            initiative: initiative(from: currentBrainState.identityProfile.initiative),
-            confidenceCeiling: currentBrainState.identityProfile.confidenceCeiling,
-            roleBoundaryPreset: currentBrainState.identityProfile.relationshipBoundary
+        BASAppleInspectionBridgeBuilder.roleProfile(
+            from: currentBrainState.map { currentBrainState in
+                BASAppleRoleProfileSourceInput(
+                    name: currentBrainState.identityProfile.role.title,
+                    postureID: currentBrainState.identityProfile.posture.rawValue,
+                    initiativeID: currentBrainState.identityProfile.initiative.rawValue,
+                    confidenceCeiling: currentBrainState.identityProfile.confidenceCeiling,
+                    roleBoundaryPreset: currentBrainState.identityProfile.relationshipBoundary
+                )
+            }
         )
     }
 
     static func brainSnapshot(
         from currentBrainState: CurrentBrainState?
     ) -> BASCurrentBrainState? {
-        guard let currentBrainState else { return nil }
-
-        return BASCurrentBrainState(
-            mode: currentBrainState.mode.rawValue,
-            dominantGoals: currentBrainState.dominantGoal.map { [$0] } ?? [],
-            activeConstraints: currentBrainState.activeConstraints,
-            reactionWeights: BASReactionWeights(
-                warmth: currentBrainState.brainState.reactionWeights.warmDirectTone,
-                directness: currentBrainState.brainState.reactionWeights.tradeoffClarityBias,
-                brevity: currentBrainState.brainState.reactionWeights.briefLanguage,
-                actionBias: currentBrainState.brainState.reactionWeights.interruptiveActionBias
-            ),
-            activeTemplateIDs: currentBrainState.activeTemplateIDs.compactMap(UUID.init(uuidString:)),
-            recentFailurePatternIDs: currentBrainState.failureGuardIDs.compactMap(UUID.init(uuidString:)),
-            retrievalTags: currentBrainState.brainState.retrievalTags,
-            verificationSnapshot: currentBrainState.verificationSnapshot.fingerprint
+        BASAppleInspectionBridgeBuilder.brainSnapshot(
+            from: currentBrainState.map { currentBrainState in
+                BASAppleBrainSnapshotSourceInput(
+                    mode: currentBrainState.mode.rawValue,
+                    dominantGoals: currentBrainState.dominantGoal.map { [$0] } ?? [],
+                    activeConstraints: currentBrainState.activeConstraints,
+                    warmth: currentBrainState.brainState.reactionWeights.warmDirectTone,
+                    directness: currentBrainState.brainState.reactionWeights.tradeoffClarityBias,
+                    brevity: currentBrainState.brainState.reactionWeights.briefLanguage,
+                    actionBias: currentBrainState.brainState.reactionWeights.interruptiveActionBias,
+                    activeTemplateIDs: currentBrainState.activeTemplateIDs,
+                    recentFailurePatternIDs: currentBrainState.failureGuardIDs,
+                    retrievalTags: currentBrainState.brainState.retrievalTags,
+                    verificationSnapshot: currentBrainState.verificationSnapshot.fingerprint
+                )
+            }
         )
     }
 
@@ -170,18 +168,18 @@ enum BehavioralAISubstrateBridge {
         let brainSnapshot = brainSnapshot(from: currentBrainState)
         let roleProfile = roleProfile(from: currentBrainState)
 
-        return BASAppleConsoleSnapshotBuilder.build(
-            from: BASAppleConsoleSnapshotSourceInput(
+        return BASAppleInspectionBridgeBuilder.consoleSnapshot(
+            from: BASAppleConsoleBridgeSourceInput(
                 generatedAt: export.generatedAt,
                 flightDeckCompilation: flightDeckCompilation,
                 activeProviderTitle: export.runtimeSnapshot.runtimeStatus.active.title,
-                runtimeGearID: runtimeContext.gear.rawValue,
                 totalRequests: export.basRuntimeInspectionSummary.totalRequests,
                 totalProviderAttempts: export.basRuntimeInspectionSummary.totalProviderAttempts,
-                roleName: roleProfile?.name,
+                runtimeContext: runtimeContext,
+                roleProfile: roleProfile,
                 boundaryModeID: currentBrainState?.boundaryPolicy.mode.rawValue,
                 calibrationStatusID: currentBrainState?.calibrationState.status.rawValue,
-                verificationSnapshot: brainSnapshot?.verificationSnapshot,
+                brainState: brainSnapshot,
                 capabilityCoverage: DecisionCapabilityCoverageBuilder.build(
                     from: export,
                     currentBrainState: currentBrainState
@@ -500,6 +498,17 @@ enum BehavioralAISubstrateBridge {
         )
     }
 
+    private static func runtimeGear(from gear: DecisionRuntimeGear) -> BASRuntimeGear {
+        switch gear {
+        case .low:
+            .low
+        case .balanced:
+            .balanced
+        case .high:
+            .high
+        }
+    }
+
     private static func taskKind(from kind: DecisionIntelligenceTraceKind?) -> BASTaskKind {
         switch kind {
         case .quick, .reminder:
@@ -513,27 +522,33 @@ enum BehavioralAISubstrateBridge {
         }
     }
 
-    private static func runtimeGear(from gear: DecisionRuntimeGear) -> BASRuntimeGear {
-        switch gear {
-        case .low:
-            .low
-        case .balanced:
-            .balanced
-        case .high:
-            .high
+    private static func devicePerformanceClass(
+        from deviceClass: DecisionDevicePerformanceClass
+    ) -> BASDevicePerformanceClass {
+        switch deviceClass {
+        case .simulator:
+            .simulator
+        case .memoryConstrainedPhone:
+            .memoryConstrainedPhone
+        case .balancedPhone:
+            .balancedPhone
+        case .fullPhone:
+            .fullPhone
         }
     }
 
-    private static func memoryMB(for deviceClass: DecisionDevicePerformanceClass) -> Int {
-        switch deviceClass {
+    private static func environmentClass(
+        from environmentClass: DecisionEnvironmentClass
+    ) -> BASEnvironmentClass {
+        switch environmentClass {
         case .simulator:
-            8192
-        case .memoryConstrainedPhone:
-            4096
-        case .balancedPhone:
-            6144
-        case .fullPhone:
-            8192
+            .simulator
+        case .lowPower:
+            .lowPower
+        case .memoryConstrained:
+            .memoryConstrained
+        case .normal:
+            .normal
         }
     }
 
@@ -604,28 +619,6 @@ enum BehavioralAISubstrateBridge {
             return .medium
         }
         return .low
-    }
-
-    private static func posture(from posture: DecisionIdentityPosture) -> BASRolePosture {
-        switch posture {
-        case .reflective:
-            .observe
-        case .coaching:
-            .coach
-        case .protective:
-            .guardian
-        }
-    }
-
-    private static func initiative(from initiative: DecisionIdentityInitiative) -> BASRoleInitiative {
-        switch initiative {
-        case .passive:
-            .passive
-        case .guided:
-            .balanced
-        case .assertive:
-            .assertive
-        }
     }
 
     private static func map(_ layer: DecisionSystemLayer) -> BASLayerKind {
@@ -718,15 +711,6 @@ enum BehavioralAISubstrateBridge {
         case nil:
             nil
         }
-    }
-
-    private static func brainSummary(
-        currentBrainState: CurrentBrainState?,
-        roleProfile: BASRoleProfile?,
-        brainSnapshot: BASCurrentBrainState?
-    ) -> String? {
-        guard let currentBrainState, let roleProfile, let brainSnapshot else { return nil }
-        return "\(roleProfile.name) • \(currentBrainState.boundaryPolicy.mode.rawValue) • \(currentBrainState.calibrationState.status.rawValue) • fingerprint \(brainSnapshot.verificationSnapshot)"
     }
 
     private static func taskGraphHint(from snapshot: DecisionTaskGraphSnapshot) -> BASTaskGraphHint {
