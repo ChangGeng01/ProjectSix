@@ -3,9 +3,14 @@ import Testing
 @testable import BASObservability
 @testable import BASOrchestration
 @testable import BASPolicy
+@testable import BASRuntimeCore
 
 @Suite("BASApple Provider Outcome Observer")
 struct BASAppleProviderOutcomeObserverTests {
+    private struct MockProvider: Sendable {
+        let id: String
+    }
+
     @Test("observer owns provider narrative variants and consistency rejection details")
     func observerBuildsNarratives() {
         let live = BASAppleProviderOutcomeObserver.providerDetail(
@@ -108,5 +113,91 @@ struct BASAppleProviderOutcomeObserverTests {
         #expect(telemetry.compilation.exceedsTimeBudget)
         #expect(telemetry.compilation.lowPressureModelCall)
         #expect(telemetry.compilation.usedFallback)
+    }
+
+    @Test("observer can compile provider request events into trace telemetry and circuit outputs")
+    func observerCompilesObservedProviderEvents() {
+        let context = BASAppleProviderObservationContext(
+            kind: "quick",
+            preferredProviderID: "foundationModels",
+            allowFallbacks: true,
+            providerProfilesByID: [
+                "foundationModels": BASAppleProviderProfile(
+                    providerID: "foundationModels",
+                    title: "Foundation"
+                ),
+                "gemmaE4B": BASAppleProviderProfile(
+                    providerID: "gemmaE4B",
+                    title: "Gemma",
+                    activeResolutionDetail: "Core ML: on-device",
+                    activeBackendID: "coreML"
+                )
+            ],
+            promptBudget: BASPromptBudget(
+                targetCharacters: 220,
+                prefixCharacters: 80,
+                suffixCharacters: 60
+            ),
+            brainState: nil,
+            admissionPressureID: "low",
+            runtimeTimeBudgetMs: 1_000,
+            admissionReason: "Pressure is low.",
+            semanticPromptFingerprint: "semantic-1",
+            stablePrefixFingerprint: "prefix-1",
+            prompt: "live prompt",
+            templatePinnedOutputPreview: "template preview",
+            admissionSkippedOutputPreview: "admission preview",
+            deterministicFallbackOutputPreview: "fallback preview",
+            templatePinnedDetail: "Template pinned.",
+            admissionSkippedDetailPrefix: "Admission skipped.",
+            deterministicFallbackBase: "No provider returned a result.",
+            cachedConsistencySource: "cached quick refinement",
+            providerConsistencySource: "provider quick refinement",
+            recordsTemplatePinnedTrace: true
+        )
+        let event = BASProviderRequestEvent.providerSuccess(
+            BASProviderRequestAttemptEvent(
+                planSummary: BASProviderRequestPlanSummary(
+                    task: .quick,
+                    preferredProviderID: "foundationModels",
+                    orderedProviderIDs: ["foundationModels", "gemmaE4B"],
+                    resolvedProviderIDs: ["foundationModels", "gemmaE4B"],
+                    compatibleProviderIDs: ["foundationModels", "gemmaE4B"],
+                    incompatibleProviderIDs: [],
+                    suspendedProviderIDs: [],
+                    usedTestingOverride: false,
+                    providerSelectionDurationMs: 12
+                ),
+                provider: MockProvider(id: "gemmaE4B"),
+                result: "ignored",
+                assessment: BASProviderReleaseAssessment(
+                    outputPreview: "provider output",
+                    consistencyCheck: nil
+                ),
+                attemptedProviderIDs: ["foundationModels", "gemmaE4B"]
+            )
+        )
+
+        let observation = BASAppleProviderOutcomeObserver.observeEvent(
+            event,
+            context: context,
+            durationMs: 640,
+            promptPreparedMs: 30,
+            admissionEvaluatedMs: 50,
+            providerID: { $0.id }
+        )
+
+        #expect(observation.telemetryObservation?.input.activeProviderID == "gemmaE4B")
+        #expect(observation.telemetryObservation?.compilation.activeBackendID == "coreML")
+        #expect(observation.trace?.activeProviderID == "gemmaE4B")
+        #expect(observation.trace?.observation.detail.contains("Foundation") == true)
+        #expect(observation.trace?.observation.detail.contains("Gemma") == true)
+        #expect(observation.circuitEvents == [
+            BASAppleProviderCircuitEvent.providerSuccess(
+                providerID: "gemmaE4B",
+                kind: "quick",
+                durationMs: 640
+            )
+        ])
     }
 }
