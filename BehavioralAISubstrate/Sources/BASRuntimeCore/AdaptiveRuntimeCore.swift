@@ -391,6 +391,209 @@ public struct BASAdaptiveTaskStrategy: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASAdaptiveRuntimeSignals: Codable, Equatable, Sendable {
+    public let briefBias: Double
+    public let fatigueSignal: Double
+    public let hasBriefSessionBias: Bool
+    public let interruptiveBias: Double
+    public let boundaryBias: Double
+    public let tradeoffBias: Double
+    public let rebuiltSession: Bool
+    public let staleFieldCount: Int
+    public let screenedOutMemoryCount: Int
+    public let lowTrustLoad: Bool
+    public let retrievalInstability: Bool
+    public let retrievalTags: [String]
+
+    public init(
+        briefBias: Double,
+        fatigueSignal: Double,
+        hasBriefSessionBias: Bool,
+        interruptiveBias: Double,
+        boundaryBias: Double,
+        tradeoffBias: Double,
+        rebuiltSession: Bool,
+        staleFieldCount: Int,
+        screenedOutMemoryCount: Int,
+        lowTrustLoad: Bool,
+        retrievalInstability: Bool,
+        retrievalTags: [String]
+    ) {
+        self.briefBias = briefBias
+        self.fatigueSignal = fatigueSignal
+        self.hasBriefSessionBias = hasBriefSessionBias
+        self.interruptiveBias = interruptiveBias
+        self.boundaryBias = boundaryBias
+        self.tradeoffBias = tradeoffBias
+        self.rebuiltSession = rebuiltSession
+        self.staleFieldCount = staleFieldCount
+        self.screenedOutMemoryCount = screenedOutMemoryCount
+        self.lowTrustLoad = lowTrustLoad
+        self.retrievalInstability = retrievalInstability
+        self.retrievalTags = retrievalTags
+    }
+}
+
+public extension BASAdaptiveTaskStrategy {
+    func adapting(signals: BASAdaptiveRuntimeSignals) -> BASAdaptiveTaskStrategy {
+        var runtimeGear = runtimeGear
+        var contextBudget = contextBudget
+        var outputCharacterBudget = outputCharacterBudget
+        var timeBudgetMs = timeBudgetMs
+        var toolCallBudget = toolCallBudget
+        var retrievalItemBudget = retrievalItemBudget
+        var retrievalMode = retrievalMode
+        var thinkingMode = thinkingMode
+        var tone = tone
+        var actionSpace = actionSpace
+        var responseLanguage = responseLanguage
+
+        let minimumBudget: Int = switch kind {
+        case .quick:
+            160
+        case .balance:
+            220
+        case .mirror:
+            260
+        case .reminder:
+            140
+        }
+
+        if signals.briefBias >= 0.78 || signals.fatigueSignal >= 0.68 || signals.hasBriefSessionBias {
+            runtimeGear = .low
+            let reduction: Int = switch kind {
+            case .quick:
+                40
+            case .balance:
+                60
+            case .mirror:
+                80
+            case .reminder:
+                20
+            }
+            contextBudget = max(minimumBudget, contextBudget - reduction)
+            outputCharacterBudget = max(120, outputCharacterBudget - max(40, reduction))
+            timeBudgetMs = max(300, timeBudgetMs - max(120, reduction * 4))
+            toolCallBudget = max(0, toolCallBudget - 1)
+            retrievalItemBudget = max(0, retrievalItemBudget - 1)
+            tone = .briefWarm
+            thinkingMode = .off
+            if !actionSpace.contains("stay_brief") {
+                actionSpace.append("stay_brief")
+            }
+        }
+
+        if kind == .quick, signals.interruptiveBias >= 0.82 {
+            runtimeGear = .low
+            contextBudget = max(minimumBudget, contextBudget - 20)
+            outputCharacterBudget = max(120, outputCharacterBudget - 40)
+            timeBudgetMs = max(300, timeBudgetMs - 120)
+            thinkingMode = .off
+            tone = .briefWarm
+            if !actionSpace.contains("save_state") {
+                actionSpace.append("save_state")
+            }
+        }
+
+        if kind == .mirror, signals.boundaryBias >= 0.78, !actionSpace.contains("name_boundary") {
+            actionSpace.append("name_boundary")
+        }
+        if kind == .mirror,
+           runtimeGear != .low,
+           signals.boundaryBias >= 0.88,
+           signals.fatigueSignal < 0.55,
+           signals.briefBias < 0.72 {
+            runtimeGear = .high
+            contextBudget += 40
+            outputCharacterBudget += 60
+            timeBudgetMs += 220
+            retrievalItemBudget += 1
+            if thinkingMode == .off {
+                thinkingMode = .gated
+            }
+        }
+
+        if kind == .balance, signals.tradeoffBias >= 0.78, !actionSpace.contains("surface_priority") {
+            actionSpace.append("surface_priority")
+        }
+        if kind == .balance,
+           runtimeGear == .balanced,
+           signals.tradeoffBias >= 0.86,
+           signals.fatigueSignal < 0.55,
+           signals.briefBias < 0.72 {
+            runtimeGear = .high
+            contextBudget += 30
+            outputCharacterBudget += 50
+            timeBudgetMs += 180
+            retrievalItemBudget += 1
+            if thinkingMode == .off {
+                thinkingMode = .gated
+            }
+        }
+
+        let shouldGuardRetrieval =
+            signals.rebuiltSession ||
+            (signals.staleFieldCount > 0) ||
+            (signals.screenedOutMemoryCount >= 3) ||
+            signals.lowTrustLoad ||
+            signals.retrievalInstability
+
+        if shouldGuardRetrieval {
+            switch retrievalMode {
+            case .adaptive:
+                retrievalMode = .filtered
+                retrievalItemBudget = min(retrievalItemBudget, kind == .mirror ? 3 : 2)
+            case .filtered where kind == .reminder:
+                retrievalMode = .off
+                retrievalItemBudget = 0
+            case .off, .filtered:
+                break
+            }
+        }
+
+        if let inferredResponseLanguage = inferredResponseLanguage(
+            from: signals.retrievalTags,
+            fallback: responseLanguage
+        ) {
+            responseLanguage = inferredResponseLanguage
+        }
+
+        return BASAdaptiveTaskStrategy(
+            kind: kind,
+            entropy: entropy,
+            runtimeGear: runtimeGear,
+            contextBudget: contextBudget,
+            outputCharacterBudget: outputCharacterBudget,
+            timeBudgetMs: timeBudgetMs,
+            toolCallBudget: toolCallBudget,
+            retrievalItemBudget: retrievalItemBudget,
+            retrievalMode: retrievalMode,
+            thinkingMode: thinkingMode,
+            outputMode: outputMode,
+            tone: tone,
+            actionSpace: actionSpace,
+            responseLanguage: responseLanguage,
+            allowsModelInvocation: allowsModelInvocation
+        )
+    }
+
+    private func inferredResponseLanguage(
+        from retrievalTags: [String],
+        fallback: BASAdaptiveResponseLanguage
+    ) -> BASAdaptiveResponseLanguage? {
+        if retrievalTags.contains("lang:chinese") {
+            return .chinese
+        }
+        if retrievalTags.contains("lang:mixed") || retrievalTags.contains("script:mixed") {
+            return .mixed
+        }
+        if retrievalTags.contains("lang:english") {
+            return .english
+        }
+        return fallback
+    }
+}
+
 public struct BASAdaptiveRuntimeMatrix: Codable, Equatable, Sendable {
     public let runtimeGear: BASRuntimeGear
     public let environmentClass: BASEnvironmentClass

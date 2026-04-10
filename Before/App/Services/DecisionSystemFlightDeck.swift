@@ -1,6 +1,5 @@
 import Foundation
 import BASAdmin
-import BASPolicy
 
 enum DecisionSystemLayer: String, CaseIterable, Identifiable, Sendable {
     case runtime
@@ -77,115 +76,20 @@ enum DecisionSystemFlightDeckBuilder {
         from export: DecisionTestingRuntimeExport
     ) -> BASReferenceFlightDeckInput {
         let snapshot = export.runtimeSnapshot
-        let summary = export.summary
-        let kindsOverFirstPresentableBudget = summary.averageFirstPresentableMsByKind.map { kind, averageMs in
-            averageMs > Double(summary.timeBudgetMsByKind[kind] ?? Int.max) ? kind.title : nil
-        }
-        .compactMap { $0 }
-        let brain = export.brainSummary
-        let averagePromoted = average(brain.averagePromotedRecordCountByKind.values)
-        let averagePending = average(brain.averagePendingCandidateCountByKind.values)
-        let averageLowTrust = average(brain.lowTrustMemoryLoadRateByKind.values)
-        let pendingLoadRate = average(brain.pendingMemoryLoadRateByKind.values)
-        let averagePrefillShare = average(summary.averagePrefillEquivalentShareByKind.values)
-        let lowTrustRate = averageLowTrust
-        let lockedSensitiveCoverage = brain.boundaryConstraintCountsByKind.values.reduce(0) { partialResult, counts in
-            partialResult + (counts[.lockSensitiveMemory] ?? 0)
-        }
-        let localBoundaryModes = Set(brain.boundaryModeByKind.values)
-        let forbiddenActionViolations = summary.consistencyViolationCounts[.forbiddenAction] ?? 0
-        let actionSurfaceCount = summary.effectiveActionSpaceByKind.values.reduce(0) { partial, actions in
-            partial + actions.count
-        }
-        let driftingKinds = brain.calibrationStatusByKind.compactMap { kind, status in
-            status == .drifting ? kind.title : nil
-        }
-        let pendingReviewAverage = average(brain.evolutionPendingReviewCountByKind.values)
-        let averageCheckpointCount = average(brain.evolutionCheckpointCountByKind.values)
-        let rollbackReadyCount = brain.evolutionRollbackReadyByKind.values.filter { $0 }.count
-
-        return BASReferenceFlightDeckInput(
-            generatedAt: export.generatedAt,
-            isPureLocalClosedLoop: export.registeredProviders.allSatisfy { $0.kind != .testingStub },
-            runtime: BASReferenceRuntimeLayerInput(
-                activeProviderTitle: summary.activeProvider.title,
-                runtimeGear: summary.runtimeGear.rawValue,
-                averageRequestDurationMs: summary.averageRequestDurationMs,
-                averageFirstPresentableMs: summary.averageFirstPresentableMs,
-                frontLoadShare: averagePrefillShare,
+        return BASReferenceFlightDeckInputBuilder.build(
+            from: BASReferenceFlightDeckAssemblyInput(
+                generatedAt: export.generatedAt,
+                isPureLocalClosedLoop: export.registeredProviders.allSatisfy { $0.kind != .testingStub },
+                activeProviderTitle: export.summary.activeProvider.title,
                 backendTitle: snapshot.gemmaBackendResolution.effectiveBackend.title,
-                activeRuntimeUsingDeterministicFallback: summary.activeProvider == .template &&
-                    snapshot.preferences.onDeviceIntelligenceMode != .off,
-                overTimeBudgetRate: summary.overTimeBudgetRate,
-                slowRequestRate: summary.slowRequestRate,
-                kindsOverFirstPresentableBudget: kindsOverFirstPresentableBudget,
+                activeTaskGraphTaskCount: snapshot.activeTaskGraph?.tasks.count ?? 0,
                 hardwareAccelerationActive: snapshot.gemmaBackendResolution.isHardwareAccelerated ||
-                    snapshot.deviceCapabilities.isSimulator
-            ),
-            data: BASReferenceDataLayerInput(
-                traceCount: summary.traceCount,
-                replayCount: summary.replayCount,
-                contextAwareTraceCount: summary.contextAwareTraceCount,
-                activeTaskGraphTaskCount: snapshot.activeTaskGraph?.tasks.count ?? 0
-            ),
-            memory: BASReferenceMemoryLayerInput(
-                brainTraceCount: brain.brainTraceCount,
-                averagePromotedRecordCount: averagePromoted,
-                averagePendingCandidateCount: averagePending,
-                lowTrustMemoryLoadRate: averageLowTrust,
-                pendingMemoryLoadRate: pendingLoadRate,
-                snapshotVariantCount: brain.snapshotVariantCountByKind.values.reduce(0, +)
-            ),
-            safety: BASReferenceSafetyLayerInput(
-                traceCount: summary.traceCount,
-                evidencePollutionRate: summary.evidencePollutionRate,
-                lowTrustMemoryLoadRate: lowTrustRate,
-                cacheQuarantineRate: summary.cacheQuarantineRate,
-                circuitTripCount: summary.circuitTripCount,
-                circuitOpenProviderCount: summary.circuitOpenProviderCount,
-                boundaryModeCount: localBoundaryModes.count,
-                lockedSensitiveCoverage: lockedSensitiveCoverage,
-                consistencyCheckedTraceCount: summary.consistencyCheckedTraceCount,
-                consistencyRejectRate: summary.consistencyRejectRate,
-                forbiddenActionViolations: forbiddenActionViolations
-            ),
-            orchestration: BASReferenceOrchestrationLayerInput(
-                traceCount: summary.traceCount,
-                lifecycleRebuildCount: summary.lifecycleRebuildCount,
-                exercisedKindCount: summary.firstAttemptedProviderByKind.count,
-                fallbackActivations: summary.fallbackActivations,
-                totalRequests: summary.totalRequests,
-                actionSurfaceCount: actionSurfaceCount
-            ),
-            observability: BASReferenceObservabilityLayerInput(
-                traceCount: summary.traceCount,
-                replayCount: summary.replayCount,
-                totalRequests: summary.totalRequests,
-                promptMetricsPresent: !summary.averagePromptCharactersByKind.isEmpty,
-                firstPresentableTracked: summary.totalRequests == 0 || summary.averageFirstPresentableMs > 0,
-                consistencyCheckedTraceCount: summary.consistencyCheckedTraceCount,
-                consistencyCheckCoverageRate: summary.consistencyCheckCoverageRate,
-                totalCacheEntries: summary.totalCacheEntries,
-                averageFirstPresentableMs: summary.averageFirstPresentableMs
-            ),
-            evaluation: BASReferenceEvaluationLayerInput(
-                totalRequests: summary.totalRequests,
-                traceCount: summary.traceCount,
-                brainTraceCount: summary.brainTraceCount,
-                promptVariantCount: summary.semanticPromptVariantCountByKind.count,
-                calibrationKindCount: brain.calibrationStatusByKind.count,
-                driftingKinds: driftingKinds,
-                pendingReviewAverage: pendingReviewAverage,
-                overTargetBudgetRate: summary.overTargetBudgetRate
-            ),
-            delivery: BASReferenceDeliveryLayerInput(
-                registeredProviderCount: summary.registeredProviderCount,
-                registeredOpenModelProviderCount: summary.registeredOpenModelProviderCount,
-                activeProviderIsTestingStub: summary.activeProvider == .testingStub,
-                hasFallbackProvider: snapshot.runtimeStatus.fallback != nil,
+                    snapshot.deviceCapabilities.isSimulator,
+                activeRuntimeUsingDeterministicFallback: export.summary.activeProvider == .template &&
+                    snapshot.preferences.onDeviceIntelligenceMode != .off,
                 fallbackTitle: snapshot.runtimeStatus.fallback?.title,
-                averageCheckpointCount: averageCheckpointCount,
-                rollbackReadyCount: rollbackReadyCount
+                inspectionSummary: export.basRuntimeInspectionSummary,
+                brainSummary: export.basBrainSummary
             )
         )
     }
@@ -202,15 +106,6 @@ enum DecisionSystemFlightDeckBuilder {
             signals: assessment.signals,
             blockers: assessment.blockers
         )
-    }
-
-    private static func average<T: BinaryFloatingPoint>(_ values: some Sequence<T>) -> Double {
-        let array = Array(values)
-        guard !array.isEmpty else { return 0 }
-        let total = array.reduce(0.0) { partial, value in
-            partial + Double(value)
-        }
-        return total / Double(array.count)
     }
 
     private static func overallHealth(

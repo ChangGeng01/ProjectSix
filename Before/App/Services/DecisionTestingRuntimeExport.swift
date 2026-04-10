@@ -33,19 +33,19 @@ struct DecisionTestingRuntimeExport {
         DecisionTestingRuntimeSummary(basSummary: basRuntimeInspectionSummary)
     }
 
-    private var basLifecycleSummary: BASLifecycleSummary {
+    var basLifecycleSummary: BASLifecycleSummary {
         BASLifecycleSummaryBuilder.build(from: lifecycleTraceInputs)
     }
 
-    private var basNeuralSummary: BASNeuralSummary {
+    var basNeuralSummary: BASNeuralSummary {
         BASNeuralSummaryBuilder.build(from: neuralTraceInputs)
     }
 
-    private var basBrainSummary: BASBrainSummary {
+    var basBrainSummary: BASBrainSummary {
         BASBrainSummaryBuilder.build(from: brainTraceInputs)
     }
 
-    private var basRuntimeInspectionSummary: BASRuntimeInspectionSummary {
+    var basRuntimeInspectionSummary: BASRuntimeInspectionSummary {
         BASRuntimeInspectionBuilder.build(from: basRuntimeInspectionInput)
     }
 

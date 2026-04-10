@@ -812,6 +812,159 @@ struct BASRuntimeCoreTests {
         #expect(BASLanguageMode.detect(preferredLanguages: ["en-AU"], sampleTexts: ["我今晚又想买东西"]) == .chinese)
     }
 
+    @Test("adaptive task strategy compacts low-load mirror work with brief-session signals")
+    func adaptiveTaskStrategyCompactsLowLoadMirrorWorkWithBriefSignals() {
+        let base = BASAdaptiveTaskStrategy(
+            kind: .mirror,
+            entropy: .high,
+            runtimeGear: .high,
+            contextBudget: 620,
+            retrievalMode: .adaptive,
+            thinkingMode: .gated,
+            outputMode: .reflectiveStructured,
+            tone: .reflectiveClear,
+            actionSpace: ["name_pattern"],
+            responseLanguage: .english,
+            allowsModelInvocation: true
+        )
+
+        let adapted = base.adapting(
+            signals: BASAdaptiveRuntimeSignals(
+                briefBias: 0.92,
+                fatigueSignal: 0.82,
+                hasBriefSessionBias: true,
+                interruptiveBias: 0.41,
+                boundaryBias: 0.3,
+                tradeoffBias: 0.22,
+                rebuiltSession: false,
+                staleFieldCount: 0,
+                screenedOutMemoryCount: 0,
+                lowTrustLoad: false,
+                retrievalInstability: false,
+                retrievalTags: []
+            )
+        )
+
+        #expect(adapted.runtimeGear == .low)
+        #expect(adapted.contextBudget < base.contextBudget)
+        #expect(adapted.outputCharacterBudget < base.outputCharacterBudget)
+        #expect(adapted.timeBudgetMs < base.timeBudgetMs)
+        #expect(adapted.thinkingMode == .off)
+        #expect(adapted.tone == .briefWarm)
+        #expect(adapted.actionSpace.contains("stay_brief"))
+    }
+
+    @Test("adaptive task strategy guards retrieval and infers response language from governed tags")
+    func adaptiveTaskStrategyGuardsRetrievalAndInfersResponseLanguage() {
+        let base = BASAdaptiveTaskStrategy(
+            kind: .mirror,
+            entropy: .high,
+            runtimeGear: .balanced,
+            contextBudget: 520,
+            retrievalMode: .adaptive,
+            thinkingMode: .off,
+            outputMode: .reflectiveStructured,
+            tone: .reflectiveClear,
+            actionSpace: ["name_pattern"],
+            responseLanguage: .english,
+            allowsModelInvocation: true
+        )
+
+        let adapted = base.adapting(
+            signals: BASAdaptiveRuntimeSignals(
+                briefBias: 0.18,
+                fatigueSignal: 0.22,
+                hasBriefSessionBias: false,
+                interruptiveBias: 0.1,
+                boundaryBias: 0.28,
+                tradeoffBias: 0.24,
+                rebuiltSession: true,
+                staleFieldCount: 2,
+                screenedOutMemoryCount: 4,
+                lowTrustLoad: true,
+                retrievalInstability: false,
+                retrievalTags: ["mirror", "lang:chinese", "relationship"]
+            )
+        )
+
+        #expect(adapted.retrievalMode == .filtered)
+        #expect(adapted.retrievalItemBudget <= 3)
+        #expect(adapted.responseLanguage == .chinese)
+    }
+
+    @Test("adaptive task strategy promotes boundary-first mirror work and tradeoff-first balance work")
+    func adaptiveTaskStrategyPromotesBoundaryAndTradeoffWorkWhenSignalsAreStrong() {
+        let mirrorBase = BASAdaptiveTaskStrategy(
+            kind: .mirror,
+            entropy: .high,
+            runtimeGear: .balanced,
+            contextBudget: 520,
+            retrievalMode: .adaptive,
+            thinkingMode: .off,
+            outputMode: .reflectiveStructured,
+            tone: .reflectiveClear,
+            actionSpace: ["name_pattern"],
+            responseLanguage: .english,
+            allowsModelInvocation: true
+        )
+        let mirrorAdapted = mirrorBase.adapting(
+            signals: BASAdaptiveRuntimeSignals(
+                briefBias: 0.3,
+                fatigueSignal: 0.2,
+                hasBriefSessionBias: false,
+                interruptiveBias: 0.15,
+                boundaryBias: 0.92,
+                tradeoffBias: 0.24,
+                rebuiltSession: false,
+                staleFieldCount: 0,
+                screenedOutMemoryCount: 0,
+                lowTrustLoad: false,
+                retrievalInstability: false,
+                retrievalTags: []
+            )
+        )
+
+        #expect(mirrorAdapted.runtimeGear == .high)
+        #expect(mirrorAdapted.thinkingMode == .gated)
+        #expect(mirrorAdapted.actionSpace.contains("name_boundary"))
+        #expect(mirrorAdapted.contextBudget > mirrorBase.contextBudget)
+
+        let balanceBase = BASAdaptiveTaskStrategy(
+            kind: .balance,
+            entropy: .medium,
+            runtimeGear: .balanced,
+            contextBudget: 440,
+            retrievalMode: .filtered,
+            thinkingMode: .off,
+            outputMode: .structuredBoard,
+            tone: .groundedDirect,
+            actionSpace: ["name_tradeoff"],
+            responseLanguage: .english,
+            allowsModelInvocation: true
+        )
+        let balanceAdapted = balanceBase.adapting(
+            signals: BASAdaptiveRuntimeSignals(
+                briefBias: 0.24,
+                fatigueSignal: 0.18,
+                hasBriefSessionBias: false,
+                interruptiveBias: 0.12,
+                boundaryBias: 0.22,
+                tradeoffBias: 0.91,
+                rebuiltSession: false,
+                staleFieldCount: 0,
+                screenedOutMemoryCount: 0,
+                lowTrustLoad: false,
+                retrievalInstability: false,
+                retrievalTags: []
+            )
+        )
+
+        #expect(balanceAdapted.runtimeGear == .high)
+        #expect(balanceAdapted.thinkingMode == .gated)
+        #expect(balanceAdapted.actionSpace.contains("surface_priority"))
+        #expect(balanceAdapted.contextBudget > balanceBase.contextBudget)
+    }
+
     @Test("provider planner filters incompatible providers before scoring")
     func providerPlannerFiltersIncompatibleProvidersBeforeScoring() {
         let strategy = BASAdaptiveTaskStrategy(

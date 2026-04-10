@@ -319,188 +319,45 @@ extension DecisionAdaptiveTaskStrategy {
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
     ) -> DecisionAdaptiveTaskStrategy {
-        var runtimeGear = runtimeGear
-        var contextBudget = contextBudget
-        var outputCharacterBudget = outputCharacterBudget
-        var timeBudgetMs = timeBudgetMs
-        var toolCallBudget = toolCallBudget
-        var retrievalItemBudget = retrievalItemBudget
-        var retrievalMode = retrievalMode
-        var thinkingMode = thinkingMode
-        var tone = tone
-        var actionSpace = actionSpace
-        var responseLanguage = responseLanguage
-
-        let minimumBudget: Int = switch kind {
-        case .quick:
-            160
-        case .balance:
-            220
-        case .mirror:
-            260
-        case .reminder:
-            140
-        }
-
-        let briefBias = max(
-            brainState?.reactionWeights.briefLanguage ?? 0,
-            brainState?.reactionWeights.lowCognitiveLoad ?? 0
+        DecisionAdaptiveTaskStrategy(
+            substrate: basAdaptiveTaskStrategy
+                .adapting(
+                    signals: BASAdaptiveRuntimeSignals(
+                        briefBias: max(
+                            brainState?.reactionWeights.briefLanguage ?? 0,
+                            brainState?.reactionWeights.lowCognitiveLoad ?? 0
+                        ),
+                        fatigueSignal: max(
+                            neuralState?.strength(for: .fatigue) ?? 0,
+                            neuralState?.strength(for: .emotionLoad) ?? 0
+                        ),
+                        hasBriefSessionBias: brainState?.sessionBiases.contains(where: { bias in
+                            let normalized = bias.lowercased()
+                            return normalized.contains("short") ||
+                                normalized.contains("brief") ||
+                                normalized.contains("concrete") ||
+                                normalized.contains("avoid heavy analysis")
+                        }) == true,
+                        interruptiveBias: max(
+                            brainState?.reactionWeights.interruptiveActionBias ?? 0,
+                            neuralState?.strength(for: .urgency) ?? 0,
+                            neuralState?.strength(for: .fatigue) ?? 0
+                        ),
+                        boundaryBias: max(
+                            brainState?.reactionWeights.boundaryNamingBias ?? 0,
+                            neuralState?.strength(for: .boundaryRisk) ?? 0
+                        ),
+                        tradeoffBias: brainState?.reactionWeights.tradeoffClarityBias ?? 0,
+                        rebuiltSession: contextState?.rebuiltSession == true,
+                        staleFieldCount: contextState?.staleFieldCount ?? 0,
+                        screenedOutMemoryCount: brainState?.memoryGovernance.screenedOutMemoryCount ?? 0,
+                        lowTrustLoad: brainState?.verificationSnapshot.riskFlags.contains(.lowTrustLoad) == true,
+                        retrievalInstability: brainState?.verificationSnapshot.riskFlags.contains(.retrievalInstability) == true,
+                        retrievalTags: brainState?.retrievalTags ?? []
+                    )
+                ),
+            preferredProvider: preferredProvider
         )
-        let fatigueSignal = max(
-            neuralState?.strength(for: .fatigue) ?? 0,
-            neuralState?.strength(for: .emotionLoad) ?? 0
-        )
-        let hasBriefSessionBias = brainState?.sessionBiases.contains(where: { bias in
-            let normalized = bias.lowercased()
-            return normalized.contains("short") ||
-                normalized.contains("brief") ||
-                normalized.contains("concrete") ||
-                normalized.contains("avoid heavy analysis")
-        }) == true
-
-        if briefBias >= 0.78 || fatigueSignal >= 0.68 || hasBriefSessionBias {
-            runtimeGear = .low
-            let reduction: Int = switch kind {
-            case .quick:
-                40
-            case .balance:
-                60
-            case .mirror:
-                80
-            case .reminder:
-                20
-            }
-            contextBudget = max(minimumBudget, contextBudget - reduction)
-            outputCharacterBudget = max(120, outputCharacterBudget - max(40, reduction))
-            timeBudgetMs = max(300, timeBudgetMs - max(120, reduction * 4))
-            toolCallBudget = max(0, toolCallBudget - 1)
-            retrievalItemBudget = max(0, retrievalItemBudget - 1)
-            tone = .briefWarm
-            thinkingMode = .off
-            if !actionSpace.contains("stay_brief") {
-                actionSpace.append("stay_brief")
-            }
-        }
-
-        let interruptiveBias = max(
-            brainState?.reactionWeights.interruptiveActionBias ?? 0,
-            neuralState?.strength(for: .urgency) ?? 0,
-            neuralState?.strength(for: .fatigue) ?? 0
-        )
-        if kind == .quick, interruptiveBias >= 0.82 {
-            runtimeGear = .low
-            contextBudget = max(minimumBudget, contextBudget - 20)
-            outputCharacterBudget = max(120, outputCharacterBudget - 40)
-            timeBudgetMs = max(300, timeBudgetMs - 120)
-            thinkingMode = .off
-            tone = .briefWarm
-            if !actionSpace.contains("save_state") {
-                actionSpace.append("save_state")
-            }
-        }
-
-        let boundaryBias = max(
-            brainState?.reactionWeights.boundaryNamingBias ?? 0,
-            neuralState?.strength(for: .boundaryRisk) ?? 0
-        )
-        if kind == .mirror, boundaryBias >= 0.78, !actionSpace.contains("name_boundary") {
-            actionSpace.append("name_boundary")
-        }
-        if kind == .mirror,
-           runtimeGear != .low,
-           boundaryBias >= 0.88,
-           fatigueSignal < 0.55,
-           briefBias < 0.72 {
-            runtimeGear = .high
-            contextBudget += 40
-            outputCharacterBudget += 60
-            timeBudgetMs += 220
-            retrievalItemBudget += 1
-            if thinkingMode == .off {
-                thinkingMode = .gated
-            }
-        }
-
-        let tradeoffBias = brainState?.reactionWeights.tradeoffClarityBias ?? 0
-        if kind == .balance, tradeoffBias >= 0.78, !actionSpace.contains("surface_priority") {
-            actionSpace.append("surface_priority")
-        }
-        if kind == .balance,
-           runtimeGear == .balanced,
-           tradeoffBias >= 0.86,
-           fatigueSignal < 0.55,
-           briefBias < 0.72 {
-            runtimeGear = .high
-            contextBudget += 30
-            outputCharacterBudget += 50
-            timeBudgetMs += 180
-            retrievalItemBudget += 1
-            if thinkingMode == .off {
-                thinkingMode = .gated
-            }
-        }
-
-        let shouldGuardRetrieval =
-            (contextState?.rebuiltSession == true) ||
-            ((contextState?.staleFieldCount ?? 0) > 0) ||
-            ((brainState?.memoryGovernance.screenedOutMemoryCount ?? 0) >= 3) ||
-            (brainState?.verificationSnapshot.riskFlags.contains(.lowTrustLoad) == true) ||
-            (brainState?.verificationSnapshot.riskFlags.contains(.retrievalInstability) == true)
-
-        if shouldGuardRetrieval {
-            switch retrievalMode {
-            case .adaptive:
-                retrievalMode = .filtered
-                retrievalItemBudget = min(retrievalItemBudget, kind == .mirror ? 3 : 2)
-            case .filtered where kind == .reminder:
-                retrievalMode = .off
-                retrievalItemBudget = 0
-            case .off, .filtered:
-                break
-            }
-        }
-
-        if let inferredResponseLanguage = inferredResponseLanguage(
-            from: brainState?.retrievalTags ?? [],
-            fallback: responseLanguage
-        ) {
-            responseLanguage = inferredResponseLanguage
-        }
-
-        return DecisionAdaptiveTaskStrategy(
-            kind: kind,
-            entropy: entropy,
-            runtimeGear: runtimeGear,
-            preferredProvider: preferredProvider,
-            contextBudget: contextBudget,
-            outputCharacterBudget: outputCharacterBudget,
-            timeBudgetMs: timeBudgetMs,
-            toolCallBudget: toolCallBudget,
-            retrievalItemBudget: retrievalItemBudget,
-            retrievalMode: retrievalMode,
-            thinkingMode: thinkingMode,
-            outputMode: outputMode,
-            tone: tone,
-            actionSpace: actionSpace,
-            responseLanguage: responseLanguage,
-            allowsModelInvocation: allowsModelInvocation
-        )
-    }
-
-    private func inferredResponseLanguage(
-        from retrievalTags: [String],
-        fallback: DecisionAdaptiveResponseLanguage
-    ) -> DecisionAdaptiveResponseLanguage? {
-        if retrievalTags.contains("lang:chinese") {
-            return .chinese
-        }
-        if retrievalTags.contains("lang:mixed") || retrievalTags.contains("script:mixed") {
-            return .mixed
-        }
-        if retrievalTags.contains("lang:english") {
-            return .english
-        }
-        return fallback
     }
 }
 
@@ -634,6 +491,26 @@ enum DecisionAdaptiveRuntimeMatrixResolver {
 }
 
 private extension DecisionAdaptiveTaskStrategy {
+    var basAdaptiveTaskStrategy: BASAdaptiveTaskStrategy {
+        BASAdaptiveTaskStrategy(
+            kind: kind.basAdaptiveTraceKind,
+            entropy: entropy.basTaskEntropyClass,
+            runtimeGear: runtimeGear.basRuntimeGear,
+            contextBudget: contextBudget,
+            outputCharacterBudget: outputCharacterBudget,
+            timeBudgetMs: timeBudgetMs,
+            toolCallBudget: toolCallBudget,
+            retrievalItemBudget: retrievalItemBudget,
+            retrievalMode: retrievalMode.basRetrievalMode,
+            thinkingMode: thinkingMode.basThinkingMode,
+            outputMode: outputMode.basOutputMode,
+            tone: tone.basToneProfile,
+            actionSpace: actionSpace,
+            responseLanguage: responseLanguage.basAdaptiveResponseLanguage,
+            allowsModelInvocation: allowsModelInvocation
+        )
+    }
+
     init(
         substrate strategy: BASAdaptiveTaskStrategy,
         preferredProvider: DecisionModelProviderPreference
@@ -770,6 +647,17 @@ private extension DecisionLanguageMode {
 }
 
 private extension DecisionAdaptiveResponseLanguage {
+    var basAdaptiveResponseLanguage: BASAdaptiveResponseLanguage {
+        switch self {
+        case .english:
+            .english
+        case .chinese:
+            .chinese
+        case .mixed:
+            .mixed
+        }
+    }
+
     init(_ responseLanguage: BASAdaptiveResponseLanguage) {
         switch responseLanguage {
         case .english:
@@ -783,6 +671,17 @@ private extension DecisionAdaptiveResponseLanguage {
 }
 
 private extension DecisionTaskEntropyClass {
+    var basTaskEntropyClass: BASTaskEntropyClass {
+        switch self {
+        case .low:
+            .low
+        case .medium:
+            .medium
+        case .high:
+            .high
+        }
+    }
+
     init(_ entropy: BASTaskEntropyClass) {
         switch entropy {
         case .low:
@@ -796,6 +695,17 @@ private extension DecisionTaskEntropyClass {
 }
 
 private extension DecisionRetrievalMode {
+    var basRetrievalMode: BASRetrievalMode {
+        switch self {
+        case .off:
+            .off
+        case .filtered:
+            .filtered
+        case .adaptive:
+            .adaptive
+        }
+    }
+
     init(_ retrievalMode: BASRetrievalMode) {
         switch retrievalMode {
         case .off:
@@ -809,6 +719,15 @@ private extension DecisionRetrievalMode {
 }
 
 private extension DecisionThinkingMode {
+    var basThinkingMode: BASThinkingMode {
+        switch self {
+        case .off:
+            .off
+        case .gated:
+            .gated
+        }
+    }
+
     init(_ thinkingMode: BASThinkingMode) {
         switch thinkingMode {
         case .off:
@@ -820,6 +739,21 @@ private extension DecisionThinkingMode {
 }
 
 private extension DecisionOutputMode {
+    var basOutputMode: BASOutputMode {
+        switch self {
+        case .deterministicTemplate:
+            .deterministicTemplate
+        case .guidedShort:
+            .guidedShort
+        case .structuredBoard:
+            .structuredBoard
+        case .reflectiveStructured:
+            .reflectiveStructured
+        case .jsonShort:
+            .jsonShort
+        }
+    }
+
     init(_ outputMode: BASOutputMode) {
         switch outputMode {
         case .deterministicTemplate:
@@ -837,6 +771,19 @@ private extension DecisionOutputMode {
 }
 
 private extension DecisionToneProfile {
+    var basToneProfile: BASToneProfile {
+        switch self {
+        case .neutral:
+            .neutral
+        case .briefWarm:
+            .briefWarm
+        case .groundedDirect:
+            .groundedDirect
+        case .reflectiveClear:
+            .reflectiveClear
+        }
+    }
+
     init(_ tone: BASToneProfile) {
         switch tone {
         case .neutral:

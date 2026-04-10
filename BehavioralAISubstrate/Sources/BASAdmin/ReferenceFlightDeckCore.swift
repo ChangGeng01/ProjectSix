@@ -1,4 +1,7 @@
 import Foundation
+import BASObservability
+import BASPolicy
+import BASRuntimeCore
 
 public struct BASReferenceRuntimeLayerInput: Codable, Sendable, Equatable {
     public var activeProviderTitle: String
@@ -276,6 +279,165 @@ public struct BASReferenceFlightDeckInput: Codable, Sendable, Equatable {
         self.observability = observability
         self.evaluation = evaluation
         self.delivery = delivery
+    }
+}
+
+public struct BASReferenceFlightDeckAssemblyInput: Codable, Sendable, Equatable {
+    public var generatedAt: Date
+    public var isPureLocalClosedLoop: Bool
+    public var activeProviderTitle: String
+    public var backendTitle: String
+    public var activeTaskGraphTaskCount: Int
+    public var hardwareAccelerationActive: Bool
+    public var activeRuntimeUsingDeterministicFallback: Bool
+    public var fallbackTitle: String?
+    public var inspectionSummary: BASRuntimeInspectionSummary
+    public var brainSummary: BASBrainSummary
+
+    public init(
+        generatedAt: Date = .now,
+        isPureLocalClosedLoop: Bool,
+        activeProviderTitle: String,
+        backendTitle: String,
+        activeTaskGraphTaskCount: Int,
+        hardwareAccelerationActive: Bool,
+        activeRuntimeUsingDeterministicFallback: Bool,
+        fallbackTitle: String?,
+        inspectionSummary: BASRuntimeInspectionSummary,
+        brainSummary: BASBrainSummary
+    ) {
+        self.generatedAt = generatedAt
+        self.isPureLocalClosedLoop = isPureLocalClosedLoop
+        self.activeProviderTitle = activeProviderTitle
+        self.backendTitle = backendTitle
+        self.activeTaskGraphTaskCount = activeTaskGraphTaskCount
+        self.hardwareAccelerationActive = hardwareAccelerationActive
+        self.activeRuntimeUsingDeterministicFallback = activeRuntimeUsingDeterministicFallback
+        self.fallbackTitle = fallbackTitle
+        self.inspectionSummary = inspectionSummary
+        self.brainSummary = brainSummary
+    }
+}
+
+public enum BASReferenceFlightDeckInputBuilder {
+    public static func build(
+        from input: BASReferenceFlightDeckAssemblyInput
+    ) -> BASReferenceFlightDeckInput {
+        let summary = input.inspectionSummary
+        let brain = input.brainSummary
+        let kindsOverFirstPresentableBudget = summary.averageFirstPresentableMsByKind.compactMap { kind, averageMs in
+            averageMs > Double(summary.timeBudgetMsByKind[kind] ?? Int.max) ? kind.capitalized : nil
+        }
+        let averagePromoted = average(brain.averagePromotedRecordCountByKind.values)
+        let averagePending = average(brain.averagePendingCandidateCountByKind.values)
+        let averageLowTrust = average(brain.lowTrustMemoryLoadRateByKind.values)
+        let pendingLoadRate = average(brain.pendingMemoryLoadRateByKind.values)
+        let averagePrefillShare = average(summary.averagePrefillEquivalentShareByKind.values)
+        let lockedSensitiveCoverage = brain.boundaryConstraintCountsByKind.values.reduce(0) { partialResult, counts in
+            partialResult + (counts[.lockSensitiveMemory] ?? 0)
+        }
+        let localBoundaryModes = Set(brain.boundaryModeByKind.values)
+        let forbiddenActionViolations = summary.consistencyViolationCounts[.forbiddenAction] ?? 0
+        let actionSurfaceCount = summary.effectiveActionSpaceByKind.values.reduce(0) { partial, actions in
+            partial + actions.count
+        }
+        let driftingKinds = brain.calibrationStatusByKind.compactMap { kind, status in
+            status == .drifting ? kind.capitalized : nil
+        }
+        let pendingReviewAverage = average(brain.evolutionPendingReviewCountByKind.values)
+        let averageCheckpointCount = average(brain.evolutionCheckpointCountByKind.values)
+        let rollbackReadyCount = brain.evolutionRollbackReadyByKind.values.filter { $0 }.count
+
+        return BASReferenceFlightDeckInput(
+            generatedAt: input.generatedAt,
+            isPureLocalClosedLoop: input.isPureLocalClosedLoop,
+            runtime: BASReferenceRuntimeLayerInput(
+                activeProviderTitle: input.activeProviderTitle,
+                runtimeGear: summary.runtimeGear.rawValue,
+                averageRequestDurationMs: summary.averageRequestDurationMs,
+                averageFirstPresentableMs: summary.averageFirstPresentableMs,
+                frontLoadShare: averagePrefillShare,
+                backendTitle: input.backendTitle,
+                activeRuntimeUsingDeterministicFallback: input.activeRuntimeUsingDeterministicFallback,
+                overTimeBudgetRate: summary.overTimeBudgetRate,
+                slowRequestRate: summary.slowRequestRate,
+                kindsOverFirstPresentableBudget: kindsOverFirstPresentableBudget,
+                hardwareAccelerationActive: input.hardwareAccelerationActive
+            ),
+            data: BASReferenceDataLayerInput(
+                traceCount: summary.traceCount,
+                replayCount: summary.replayCount,
+                contextAwareTraceCount: summary.contextAwareTraceCount,
+                activeTaskGraphTaskCount: input.activeTaskGraphTaskCount
+            ),
+            memory: BASReferenceMemoryLayerInput(
+                brainTraceCount: summary.brainTraceCount,
+                averagePromotedRecordCount: averagePromoted,
+                averagePendingCandidateCount: averagePending,
+                lowTrustMemoryLoadRate: averageLowTrust,
+                pendingMemoryLoadRate: pendingLoadRate,
+                snapshotVariantCount: brain.snapshotVariantCountByKind.values.reduce(0, +)
+            ),
+            safety: BASReferenceSafetyLayerInput(
+                traceCount: summary.traceCount,
+                evidencePollutionRate: summary.evidencePollutionRate,
+                lowTrustMemoryLoadRate: averageLowTrust,
+                cacheQuarantineRate: summary.cacheQuarantineRate,
+                circuitTripCount: summary.circuitTripCount,
+                circuitOpenProviderCount: summary.circuitOpenProviderCount,
+                boundaryModeCount: localBoundaryModes.count,
+                lockedSensitiveCoverage: lockedSensitiveCoverage,
+                consistencyCheckedTraceCount: summary.consistencyCheckedTraceCount,
+                consistencyRejectRate: summary.consistencyRejectRate,
+                forbiddenActionViolations: forbiddenActionViolations
+            ),
+            orchestration: BASReferenceOrchestrationLayerInput(
+                traceCount: summary.traceCount,
+                lifecycleRebuildCount: summary.lifecycleRebuildCount,
+                exercisedKindCount: summary.firstAttemptedProviderByKind.count,
+                fallbackActivations: summary.fallbackActivations,
+                totalRequests: summary.totalRequests,
+                actionSurfaceCount: actionSurfaceCount
+            ),
+            observability: BASReferenceObservabilityLayerInput(
+                traceCount: summary.traceCount,
+                replayCount: summary.replayCount,
+                totalRequests: summary.totalRequests,
+                promptMetricsPresent: !summary.averagePromptCharactersByKind.isEmpty,
+                firstPresentableTracked: summary.totalRequests == 0 || summary.averageFirstPresentableMs > 0,
+                consistencyCheckedTraceCount: summary.consistencyCheckedTraceCount,
+                consistencyCheckCoverageRate: summary.consistencyCheckCoverageRate,
+                totalCacheEntries: summary.totalCacheEntries,
+                averageFirstPresentableMs: summary.averageFirstPresentableMs
+            ),
+            evaluation: BASReferenceEvaluationLayerInput(
+                totalRequests: summary.totalRequests,
+                traceCount: summary.traceCount,
+                brainTraceCount: summary.brainTraceCount,
+                promptVariantCount: summary.semanticPromptVariantCountByKind.count,
+                calibrationKindCount: brain.calibrationStatusByKind.count,
+                driftingKinds: driftingKinds,
+                pendingReviewAverage: pendingReviewAverage,
+                overTargetBudgetRate: summary.overTargetBudgetRate
+            ),
+            delivery: BASReferenceDeliveryLayerInput(
+                registeredProviderCount: summary.registeredProviderCount,
+                registeredOpenModelProviderCount: summary.registeredOpenModelProviderCount,
+                activeProviderIsTestingStub: summary.activeProviderID == BASReferenceProviderRuntime.testingStubProviderID,
+                hasFallbackProvider: summary.fallbackProviderID != nil,
+                fallbackTitle: input.fallbackTitle,
+                averageCheckpointCount: averageCheckpointCount,
+                rollbackReadyCount: rollbackReadyCount
+            )
+        )
+    }
+
+    private static func average<T: BinaryFloatingPoint>(_ values: some Sequence<T>) -> Double {
+        let array = Array(values)
+        guard !array.isEmpty else { return 0 }
+        return array.reduce(0.0) { partial, value in
+            partial + Double(value)
+        } / Double(array.count)
     }
 }
 
