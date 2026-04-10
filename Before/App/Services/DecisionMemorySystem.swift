@@ -4,9 +4,9 @@ import BASAppleAdapters
 import BASMemory
 
 enum DecisionMemorySystem {
-    static let projectionRecordLimit = 72
-    static let projectionCandidateLimit = 32
-    static let projectionCheckEventLimit = 96
+    static let projectionRecordLimit = BASAppleMemoryProjectionRefreshLimits.default.recordLimit
+    static let projectionCandidateLimit = BASAppleMemoryProjectionRefreshLimits.default.candidateLimit
+    static let projectionCheckEventLimit = BASAppleMemoryProjectionRefreshLimits.default.checkEventLimit
 
     struct BrainStateGovernanceSnapshot {
         let totalRecordCount: Int
@@ -58,65 +58,55 @@ enum DecisionMemorySystem {
         in context: ModelContext,
         now: Date = .now
     ) -> BrainStateProjection {
-        var governanceSnapshot = fetchGovernanceSnapshot(in: context)
-        let records = fetchMemoryRecords(
+        let refreshed = BASAppleMemoryProjectionRefreshAdapter.refreshProjection(
             in: context,
-            limit: projectionRecordLimit
-        )
-        let candidates = fetchCandidateRecords(
-            in: context,
-            limit: projectionCandidateLimit
-        )
-        let resolvedRecords: [DecisionMemoryRecord]
-        let resolvedCandidates: [DecisionMemoryCandidateRecord]
-
-        if governanceSnapshot.totalRecordCount == 0 && governanceSnapshot.totalCandidateCount == 0 {
-            resolvedRecords = Array(
-                refreshStoredMemories(in: context, now: now)
-                    .prefix(projectionRecordLimit)
-            )
-            governanceSnapshot = fetchGovernanceSnapshot(in: context)
-            resolvedCandidates = fetchCandidateRecords(
-                in: context,
-                limit: projectionCandidateLimit
-            )
-        } else {
-            resolvedRecords = records
-            resolvedCandidates = candidates
-        }
-
-        let checkEvents = fetchCheckEvents(in: context)
-        let balanceRecords = fetchBalanceRecords(in: context)
-        let mirrorRecords = fetchMirrorRecords(in: context)
-        EmbeddingMemoryStore.rebuildIndex(
-            records: resolvedRecords,
-            candidates: resolvedCandidates,
-            checkEvents: checkEvents,
-            balance: balanceRecords,
-            mirror: mirrorRecords
+            now: now,
+            governanceSnapshot: substrateGovernanceSnapshot(
+                from: fetchGovernanceSnapshot(in: context)
+            ),
+            refreshGovernanceSnapshot: { substrateGovernanceSnapshot(from: fetchGovernanceSnapshot(in: $0)) },
+            reminderType: SelfReminder.self,
+            checkEventType: CheckEvent.self,
+            balanceRecordType: BalanceDecisionRecord.self,
+            mirrorRecordType: MirrorDecisionRecord.self,
+            fetchRecords: { fetchMemoryRecords(in: $0, limit: $1) },
+            fetchCandidates: { fetchCandidateRecords(in: $0, limit: $1) },
+            fetchCheckEvents: { fetchCheckEvents(in: $0, limit: $1) },
+            fetchBalanceRecords: { fetchBalanceRecords(in: $0, limit: $1) },
+            fetchMirrorRecords: { fetchMirrorRecords(in: $0, limit: $1) },
+            rebuildEmbeddings: { records, candidates, checkEvents, balanceRecords, mirrorRecords in
+                EmbeddingMemoryStore.rebuildIndex(
+                    records: records,
+                    candidates: candidates,
+                    checkEvents: checkEvents,
+                    balance: balanceRecords,
+                    mirror: mirrorRecords
+                )
+            },
+            onSaveError: { error in
+                PersistenceIssueRecorder.record(
+                    error: error,
+                    operation: "reconciling governed memory records"
+                )
+            }
         )
 
         return BrainStateProjection(
-            baseProjection: BASAppleMemoryProjectionAdapter.compileProjection(
-                records: resolvedRecords,
-                candidates: resolvedCandidates,
-                events: checkEvents,
-                governanceSnapshot: BASAppleProjectionGovernanceSnapshot(
-                    totalRecordCount: governanceSnapshot.totalRecordCount,
-                    totalCandidateCount: governanceSnapshot.totalCandidateCount,
-                    pendingCandidateCount: governanceSnapshot.pendingCandidateCount,
-                    promotedCandidateCount: governanceSnapshot.promotedCandidateCount,
-                    deferredCandidateCount: governanceSnapshot.deferredCandidateCount,
-                    admittedCandidateCount: governanceSnapshot.admittedCandidateCount
-                )
+            baseProjection: refreshed.baseProjection,
+            governanceSnapshot: BrainStateGovernanceSnapshot(
+                totalRecordCount: refreshed.governanceSnapshot.totalRecordCount,
+                totalCandidateCount: refreshed.governanceSnapshot.totalCandidateCount,
+                pendingCandidateCount: refreshed.governanceSnapshot.pendingCandidateCount,
+                promotedCandidateCount: refreshed.governanceSnapshot.promotedCandidateCount,
+                deferredCandidateCount: refreshed.governanceSnapshot.deferredCandidateCount,
+                admittedCandidateCount: refreshed.governanceSnapshot.admittedCandidateCount
             ),
-            governanceSnapshot: governanceSnapshot,
             diagnostics: BrainStateProjection.Diagnostics(
-                recordCount: resolvedRecords.count,
-                candidateCount: resolvedCandidates.count,
-                allCandidatesPending: resolvedCandidates.allSatisfy { $0.status == .pending }
+                recordCount: refreshed.diagnostics.recordCount,
+                candidateCount: refreshed.diagnostics.candidateCount,
+                allCandidatesPending: refreshed.diagnostics.allCandidatesPending
             ),
-            refreshedAt: now
+            refreshedAt: refreshed.refreshedAt
         )
     }
 
@@ -195,27 +185,36 @@ enum DecisionMemorySystem {
         return (try? context.fetch(descriptor)) ?? []
     }
 
-    static func fetchCheckEvents(in context: ModelContext) -> [CheckEvent] {
+    static func fetchCheckEvents(
+        in context: ModelContext,
+        limit: Int = projectionCheckEventLimit
+    ) -> [CheckEvent] {
         var descriptor = FetchDescriptor<CheckEvent>(
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
-        descriptor.fetchLimit = projectionCheckEventLimit
+        descriptor.fetchLimit = limit
         return (try? context.fetch(descriptor)) ?? []
     }
 
-    static func fetchBalanceRecords(in context: ModelContext) -> [BalanceDecisionRecord] {
+    static func fetchBalanceRecords(
+        in context: ModelContext,
+        limit: Int = BASAppleMemoryProjectionRefreshLimits.default.balanceRecordLimit
+    ) -> [BalanceDecisionRecord] {
         var descriptor = FetchDescriptor<BalanceDecisionRecord>(
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
         )
-        descriptor.fetchLimit = 36
+        descriptor.fetchLimit = limit
         return (try? context.fetch(descriptor)) ?? []
     }
 
-    static func fetchMirrorRecords(in context: ModelContext) -> [MirrorDecisionRecord] {
+    static func fetchMirrorRecords(
+        in context: ModelContext,
+        limit: Int = BASAppleMemoryProjectionRefreshLimits.default.mirrorRecordLimit
+    ) -> [MirrorDecisionRecord] {
         var descriptor = FetchDescriptor<MirrorDecisionRecord>(
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
         )
-        descriptor.fetchLimit = 36
+        descriptor.fetchLimit = limit
         return (try? context.fetch(descriptor)) ?? []
     }
 
@@ -270,5 +269,18 @@ enum DecisionMemorySystem {
         in context: ModelContext
     ) -> Int where Model: PersistentModel {
         (try? context.fetchCount(descriptor)) ?? 0
+    }
+
+    private static func substrateGovernanceSnapshot(
+        from snapshot: BrainStateGovernanceSnapshot
+    ) -> BASAppleProjectionGovernanceSnapshot {
+        BASAppleProjectionGovernanceSnapshot(
+            totalRecordCount: snapshot.totalRecordCount,
+            totalCandidateCount: snapshot.totalCandidateCount,
+            pendingCandidateCount: snapshot.pendingCandidateCount,
+            promotedCandidateCount: snapshot.promotedCandidateCount,
+            deferredCandidateCount: snapshot.deferredCandidateCount,
+            admittedCandidateCount: snapshot.admittedCandidateCount
+        )
     }
 }
