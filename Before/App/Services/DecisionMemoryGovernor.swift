@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import BASMemory
 
 enum DecisionMemoryGovernor {
     struct GovernanceAssessment: Equatable, Sendable {
@@ -58,8 +59,10 @@ enum DecisionMemoryGovernor {
                 governanceAssessment: assessment
             )
 
-            let shouldPromote = draft.promotionPolicy.shouldPromote(
-                candidate: candidate
+            let shouldPromote = BASMemoryGovernance.shouldPromote(
+                policy: draft.promotionPolicy,
+                confirmationCount: candidate.confirmationCount,
+                evidenceCount: candidate.evidenceCount
             )
             let effectiveStatus: DecisionMemoryCandidateStatus =
                 assessment.decision == .deferred || !shouldPromote ? .pending : .promoted
@@ -194,83 +197,12 @@ enum DecisionMemoryGovernor {
     }
 
     static func assess(draft: DecisionMemoryDraft) -> GovernanceAssessment {
-        let continuityProtected =
-            draft.type == .goal ||
-            draft.type == .identity ||
-            draft.promotionPolicy.isImmediate
-
-        let trustProfile = DecisionMemoryTrustEngine.profile(
-            source: draft.source,
-            evidenceCount: draft.evidenceCount,
-            decayPolicy: draft.decayPolicy,
-            governanceStatus: .pending,
-            isPending: draft.promotionPolicy.isCandidateOnly || draft.type == .situational,
-            provenanceSummary: draft.provenanceSummary
+        let substrateAssessment = BASMemoryGovernance.assess(
+            draft: draft.governanceDraftInput
         )
-
-        if trustProfile.provenanceRisk {
-            return GovernanceAssessment(
-                decision: .reject,
-                reason: "Contaminated or tool-shaped provenance is blocked from the long-term memory path."
-            )
-        }
-
-        if draft.promotionPolicy.isCandidateOnly || draft.type == .situational {
-            return GovernanceAssessment(
-                decision: .deferred,
-                reason: "Situational memory stays staged until a later session proves it matters."
-            )
-        }
-
-        if draft.confidence < 0.58, draft.evidenceCount <= 1 {
-            if continuityProtected {
-                return GovernanceAssessment(
-                    decision: .admit,
-                    reason: "Continuity-critical memory gets preserved even when the first signal is sparse."
-                )
-            }
-            return GovernanceAssessment(
-                decision: .reject,
-                reason: "Single low-confidence signal is not allowed into the long-term memory path."
-            )
-        }
-
-        if trustProfile.tier == .low, draft.evidenceCount <= 1 {
-            if continuityProtected {
-                return GovernanceAssessment(
-                    decision: .admit,
-                    reason: "Continuity-critical memory bypasses low-trust singleton rejection."
-                )
-            }
-            return GovernanceAssessment(
-                decision: .reject,
-                reason: "Low-trust singleton draft is treated as noise instead of durable memory."
-            )
-        }
-
-        if draft.decayPolicy == .fast, draft.priority < 0.7, draft.evidenceCount <= 1 {
-            if continuityProtected {
-                return GovernanceAssessment(
-                    decision: .admit,
-                    reason: "Continuity-critical memory keeps a durable slot even under fast decay."
-                )
-            }
-            return GovernanceAssessment(
-                decision: .reject,
-                reason: "Fast-decay low-priority draft is treated as noise instead of memory."
-            )
-        }
-
-        if draft.type == .support, draft.evidenceCount < 2 {
-            return GovernanceAssessment(
-                decision: .deferred,
-                reason: "Support patterns need to repeat before they count as policy."
-            )
-        }
-
         return GovernanceAssessment(
-            decision: .admit,
-            reason: "Structured evidence is strong enough to participate in governed memory."
+            decision: DecisionMemoryGovernanceDecision(substrateAssessment.decision),
+            reason: substrateAssessment.reason
         )
     }
 
@@ -331,70 +263,19 @@ enum DecisionMemoryGovernor {
         for record: DecisionMemoryRecord,
         reviewNow: Date
     ) {
-        let ageInDays = max(0, reviewNow.timeIntervalSince(record.lastConfirmedAt) / 86_400)
-        let trustProfile = DecisionMemoryTrustEngine.profile(
-            source: record.source,
-            evidenceCount: record.evidenceCount,
-            decayPolicy: record.decayPolicy,
-            governanceStatus: .admitted,
-            isPending: false,
-            provenanceSummary: record.provenanceSummary
+        let nextState = DecisionMemoryLifecycleState(
+            BASMemoryGovernance.nextLifecycleState(
+                for: BASMemoryLifecycleReviewInput(
+                    source: record.source.basSource,
+                    evidenceCount: record.evidenceCount,
+                    decayPolicy: record.decayPolicy.basDecayPolicy,
+                    provenanceSummary: record.provenanceSummary,
+                    lastConfirmedAt: record.lastConfirmedAt,
+                    reviewNow: reviewNow
+                )
+            )
         )
-        let stableDays = 365 * trustProfile.decayGraceMultiplier
-        let slowAgingDays = 45 * trustProfile.decayGraceMultiplier
-        let slowRetireDays = 120 * trustProfile.decayGraceMultiplier
-        let mediumAgingDays = 14 * trustProfile.decayGraceMultiplier
-        let mediumRetireDays = 45 * trustProfile.decayGraceMultiplier
-        let fastAgingDays = 3 * trustProfile.decayGraceMultiplier
-        let fastRetireDays = 10 * trustProfile.decayGraceMultiplier
-        let nextState: DecisionMemoryLifecycleState = switch record.decayPolicy {
-        case .stable:
-            ageInDays >= stableDays ? .aging : .active
-        case .slow:
-            ageInDays >= slowRetireDays ? .retired : (ageInDays >= slowAgingDays ? .aging : .active)
-        case .medium:
-            ageInDays >= mediumRetireDays ? .retired : (ageInDays >= mediumAgingDays ? .aging : .active)
-        case .fast:
-            ageInDays >= fastRetireDays ? .retired : (ageInDays >= fastAgingDays ? .aging : .active)
-        }
-
         record.lifecycleStateRaw = nextState.rawValue
         record.lastReviewedAt = reviewNow
-    }
-}
-
-extension DecisionMemoryDraft {
-    enum PromotionPolicy: Sendable {
-        case immediate
-        case repeated(minConfirmationCount: Int, minEvidenceCount: Int)
-        case candidateOnly
-
-        var isImmediate: Bool {
-            if case .immediate = self {
-                return true
-            }
-            return false
-        }
-
-        var isCandidateOnly: Bool {
-            if case .candidateOnly = self {
-                return true
-            }
-            return false
-        }
-
-        func shouldPromote(
-            candidate: DecisionMemoryCandidateRecord
-        ) -> Bool {
-            switch self {
-            case .immediate:
-                true
-            case let .repeated(minConfirmationCount, minEvidenceCount):
-                candidate.confirmationCount >= minConfirmationCount ||
-                    candidate.evidenceCount >= minEvidenceCount
-            case .candidateOnly:
-                false
-            }
-        }
     }
 }

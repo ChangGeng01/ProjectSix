@@ -16,7 +16,7 @@ struct DecisionMemoryDraft: Sendable {
     let retrievalTags: [String]
     let evidenceCount: Int
     let provenanceSummary: String
-    let promotionPolicy: PromotionPolicy
+    let promotionPolicy: BASDraftPromotionPolicy
     let tier: DecisionMemoryTier = .warm
 
     var fingerprint: String {
@@ -453,24 +453,7 @@ enum DecisionMemorySystem {
             retrievalTags: derived.retrievalTags,
             evidenceCount: derived.evidenceCount,
             provenanceSummary: derived.provenanceSummary,
-            promotionPolicy: promotionPolicy(from: derived.promotionPolicy)
+            promotionPolicy: derived.promotionPolicy
         )
     }
-
-    private static func promotionPolicy(
-        from policy: BASDraftPromotionPolicy
-    ) -> DecisionMemoryDraft.PromotionPolicy {
-        switch policy {
-        case .immediate:
-            .immediate
-        case let .repeated(minConfirmationCount, minEvidenceCount):
-            .repeated(
-                minConfirmationCount: minConfirmationCount,
-                minEvidenceCount: minEvidenceCount
-            )
-        case .candidateOnly:
-            .candidateOnly
-        }
-    }
-
 }

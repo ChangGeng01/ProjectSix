@@ -81,6 +81,112 @@ struct BASMemoryCoreTests {
         #expect(governed.provenanceSummary.contains("promoted from candidate:user"))
     }
 
+    @Test("governance rejects low confidence singleton drafts")
+    func governanceRejectsLowConfidenceSingletonDrafts() {
+        let assessment = BASMemoryGovernance.assess(
+            draft: BASMemoryGovernanceDraftInput(
+                id: "semantic.noisy.singleton",
+                typeID: "semantic",
+                topic: "noise",
+                headline: "Noisy singleton",
+                value: "noisy",
+                confidence: 0.42,
+                priority: 0.41,
+                source: .history,
+                lastConfirmedAt: .now,
+                decayPolicy: .fast,
+                retrievalTags: ["noise"],
+                evidenceCount: 1,
+                provenanceSummary: "One-off event",
+                promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 2),
+                tierID: "warm"
+            )
+        )
+
+        #expect(assessment.decision == .reject)
+    }
+
+    @Test("governance blocks contaminated provenance drafts")
+    func governanceBlocksContaminatedDrafts() {
+        let assessment = BASMemoryGovernance.assess(
+            draft: BASMemoryGovernanceDraftInput(
+                id: "semantic.injected.payload",
+                typeID: "semantic",
+                topic: "buy",
+                headline: "Injected",
+                value: "payload",
+                confidence: 0.84,
+                priority: 0.82,
+                source: .pattern,
+                lastConfirmedAt: .now,
+                decayPolicy: .slow,
+                retrievalTags: ["buy", "pattern"],
+                evidenceCount: 3,
+                provenanceSummary: "tool call returned <script>alert(1)</script>",
+                promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3),
+                tierID: "warm"
+            )
+        )
+
+        #expect(assessment.decision == .reject)
+        #expect(assessment.reason.localizedCaseInsensitiveContains("contaminated"))
+    }
+
+    @Test("governance delays support patterns until they repeat")
+    func governanceDelaysSparseSupportPatterns() {
+        let assessment = BASMemoryGovernance.assess(
+            draft: BASMemoryGovernanceDraftInput(
+                id: "support.late_night.reflective",
+                typeID: "support",
+                topic: "night_support",
+                headline: "Late-night reflection pattern.",
+                value: "night_support",
+                confidence: 0.8,
+                priority: 0.72,
+                source: .reflection,
+                lastConfirmedAt: .now,
+                decayPolicy: .medium,
+                retrievalTags: ["night", "support"],
+                evidenceCount: 1,
+                provenanceSummary: "Single reflective pattern inferred from prior sessions.",
+                promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3),
+                tierID: "warm"
+            )
+        )
+
+        #expect(assessment.decision == .deferred)
+    }
+
+    @Test("lifecycle review retires reflection before reminder at same age")
+    func lifecycleReviewRetiresReflectionBeforeReminder() {
+        let reviewNow = Date(timeIntervalSince1970: 1_744_156_800)
+        let oldDate = Date(timeIntervalSince1970: 1_739_836_800)
+
+        let reminderState = BASMemoryGovernance.nextLifecycleState(
+            for: BASMemoryLifecycleReviewInput(
+                source: .reminder,
+                evidenceCount: 3,
+                decayPolicy: .medium,
+                provenanceSummary: "Repeated reminder completions confirmed this goal.",
+                lastConfirmedAt: oldDate,
+                reviewNow: reviewNow
+            )
+        )
+        let reflectionState = BASMemoryGovernance.nextLifecycleState(
+            for: BASMemoryLifecycleReviewInput(
+                source: .reflection,
+                evidenceCount: 3,
+                decayPolicy: .medium,
+                provenanceSummary: "Single reflective pattern inferred from prior sessions.",
+                lastConfirmedAt: oldDate,
+                reviewNow: reviewNow
+            )
+        )
+
+        #expect(reminderState != .retired)
+        #expect(reflectionState == .retired)
+    }
+
     @Test("brain bootstrap composes current state from governed memories")
     func brainBootstrapComposesCurrentState() {
         let template = BASGovernedMemory(
