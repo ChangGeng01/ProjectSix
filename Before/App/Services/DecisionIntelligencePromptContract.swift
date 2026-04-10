@@ -362,20 +362,6 @@ enum DecisionIntelligencePromptContract {
         )
     }
 
-    static func consistencyTruthState(
-        for kind: DecisionIntelligenceTraceKind,
-        brainState: DecisionBrainState?,
-        reminderMode: DecisionMode? = nil
-    ) -> BASStructuredTruthState? {
-        BASStructuredTruthCompiler.truthState(
-            for: BASStructuredTruthRequest(
-                kind: adaptiveTraceKind(for: kind),
-                brainState: brainState,
-                reminderSurfaceMode: reminderMode.map(substrateMode(from:))
-            )
-        )
-    }
-
     private static func stateValue(_ value: String, fallback: String, limit: Int) -> String {
         sanitized(value, fallback: fallback, limit: limit)
     }

@@ -4,11 +4,6 @@ import BASPolicy
 import BASRuntimeCore
 
 enum DecisionIntelligenceProviderPipeline {
-    private struct ProviderAttemptAssessment: Sendable {
-        let outputPreview: String
-        let consistencyCheck: BASConsistencyCheckResult?
-    }
-
     private static let registry = DecisionIntelligenceProviderRegistry.shared
     private static let responseCache = DecisionIntelligenceResponseCache.shared
     static let preferenceOrderings: [BASProviderPreferenceOrdering] = [
@@ -1624,16 +1619,16 @@ enum DecisionIntelligenceProviderPipeline {
         testingStubProfile: DecisionTestingStubProfile?,
         admissionAllowed: Bool,
         loadCachedResult: @escaping ((any DecisionIntelligenceProviding)) async -> Result?,
-        assessCachedResult: @escaping (Result) -> BASProviderExecutionVerdict<ProviderAttemptAssessment>,
+        assessCachedResult: @escaping (Result) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment>,
         quarantineCachedResult: @escaping ((any DecisionIntelligenceProviding)) async -> Void,
         invokeProvider: @escaping ((any DecisionIntelligenceProviding)) async -> Result?,
-        assessProviderResult: @escaping (Result) -> BASProviderExecutionVerdict<ProviderAttemptAssessment>,
-        onCachedRejected: (((BASProviderRequestPlanSummary), (any DecisionIntelligenceProviding), Result, ProviderAttemptAssessment, [String]) async -> Void)? = nil,
-        onCacheHit: (((BASProviderRequestPlanSummary), (any DecisionIntelligenceProviding), Result, ProviderAttemptAssessment, [String]) async -> Void)? = nil,
-        onProviderRejected: (((BASProviderRequestPlanSummary), (any DecisionIntelligenceProviding), Result, ProviderAttemptAssessment, [String]) async -> Void)? = nil,
-        onProviderSuccess: (((BASProviderRequestPlanSummary), (any DecisionIntelligenceProviding), Result, ProviderAttemptAssessment, [String]) async -> Void)? = nil,
+        assessProviderResult: @escaping (Result) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment>,
+        onCachedRejected: (((BASProviderRequestPlanSummary), (any DecisionIntelligenceProviding), Result, BASProviderReleaseAssessment, [String]) async -> Void)? = nil,
+        onCacheHit: (((BASProviderRequestPlanSummary), (any DecisionIntelligenceProviding), Result, BASProviderReleaseAssessment, [String]) async -> Void)? = nil,
+        onProviderRejected: (((BASProviderRequestPlanSummary), (any DecisionIntelligenceProviding), Result, BASProviderReleaseAssessment, [String]) async -> Void)? = nil,
+        onProviderSuccess: (((BASProviderRequestPlanSummary), (any DecisionIntelligenceProviding), Result, BASProviderReleaseAssessment, [String]) async -> Void)? = nil,
         onProviderMiss: (((BASProviderRequestPlanSummary), (any DecisionIntelligenceProviding), [String]) async -> Void)? = nil
-    ) async -> BASProviderRequestOutcome<Result, ProviderAttemptAssessment> {
+    ) async -> BASProviderRequestOutcome<Result, BASProviderReleaseAssessment> {
         let suspendedProviderIDs = Set(
             await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders.map(\.rawValue)
         )
@@ -1803,47 +1798,23 @@ enum DecisionIntelligenceProviderPipeline {
         kernelSnapshot: BASCognitionKernelSnapshot,
         brainState: DecisionBrainState?,
         reminderMode: DecisionMode? = nil
-    ) -> BASProviderExecutionVerdict<ProviderAttemptAssessment> {
-        let decision = releaseDecision(
-            kind: kind,
-            outputPreview: outputPreview,
-            kernelSnapshot: kernelSnapshot,
-            brainState: brainState,
-            reminderMode: reminderMode
+    ) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment> {
+        BASProviderReleaseGate.verdict(
+            for: BASProviderReleaseEvaluationRequest(
+                kind: basTraceKind(for: kind),
+                outputPreview: outputPreview,
+                kernelSnapshot: kernelSnapshot,
+                brainState: brainState,
+                reminderSurfaceMode: reminderMode.map(substrateMode(from:)),
+                referencedFacts: brainState?.activeGoals.first.map { ["current_goal": $0] } ?? [:]
+            )
         )
-        let assessment = ProviderAttemptAssessment(
-            outputPreview: outputPreview,
-            consistencyCheck: decision.consistencyCheck
-        )
-        return decision.kind == .allow ? .allow(assessment) : .reject(assessment)
     }
 
     private static func attemptedKinds(
         from providerIDs: [String]
     ) -> [DecisionModelProviderKind] {
         providerIDs.compactMap(DecisionModelProviderKind.init(rawValue:))
-    }
-
-    private static func releaseDecision(
-        kind: DecisionIntelligenceTraceKind,
-        outputPreview: String,
-        kernelSnapshot: BASCognitionKernelSnapshot,
-        brainState: DecisionBrainState?,
-        reminderMode: DecisionMode? = nil
-    ) -> BASCognitionKernelReleaseDecision {
-        BASExecutionGovernance.releaseDecision(
-            for: BASReleaseEvaluationRequest(
-                kind: basTraceKind(for: kind),
-                outputPreview: outputPreview,
-                kernelSnapshot: kernelSnapshot,
-                truthStateFallback: DecisionIntelligencePromptContract.consistencyTruthState(
-                    for: kind,
-                    brainState: brainState,
-                    reminderMode: reminderMode
-                ),
-                referencedFacts: brainState?.activeGoals.first.map { ["current_goal": $0] } ?? [:]
-            )
-        )
     }
 
     private static func basTraceKind(
@@ -1866,11 +1837,11 @@ enum DecisionIntelligenceProviderPipeline {
         result: BASConsistencyCheckResult,
         source: String
     ) -> String {
-        let violations = result.violations
-            .prefix(3)
-            .map(\.message)
-            .joined(separator: " ")
-        return "\(base) Consistency harness rejected the \(source). \(violations)"
+        BASProviderReleaseGate.rejectedConsistencyDetail(
+            base: base,
+            result: result,
+            source: source
+        )
     }
 
     private static func recordTelemetry(
