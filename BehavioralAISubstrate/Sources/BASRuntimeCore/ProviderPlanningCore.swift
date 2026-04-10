@@ -139,6 +139,19 @@ public struct BASProviderStatusRecord: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASProviderPreferenceOrdering: Codable, Equatable, Sendable {
+    public var preferredProviderID: String
+    public var orderedProviderIDs: [String]
+
+    public init(
+        preferredProviderID: String,
+        orderedProviderIDs: [String]
+    ) {
+        self.preferredProviderID = preferredProviderID
+        self.orderedProviderIDs = orderedProviderIDs
+    }
+}
+
 public enum BASRuntimeAvailabilitySource: String, Codable, Equatable, Sendable {
     case runtimeDisabled
     case testingOverride
@@ -146,6 +159,32 @@ public enum BASRuntimeAvailabilitySource: String, Codable, Equatable, Sendable {
     case preferredProvider
     case fallbackProvider
     case deterministicFallback
+}
+
+public enum BASProviderOrderingResolver {
+    public static func orderedProviderIDs(
+        preferredProviderID: String,
+        allowFallbacks: Bool,
+        deterministicProviderID: String,
+        preferenceOrderings: [BASProviderPreferenceOrdering],
+        suspendedProviderIDs: Set<String> = []
+    ) -> [String] {
+        if preferredProviderID != deterministicProviderID,
+           suspendedProviderIDs.contains(preferredProviderID),
+           !allowFallbacks {
+            return []
+        }
+
+        if !allowFallbacks {
+            return suspendedProviderIDs.contains(preferredProviderID) ? [] : [preferredProviderID]
+        }
+
+        let baseOrdered = preferenceOrderings.first(where: {
+            $0.preferredProviderID == preferredProviderID
+        })?.orderedProviderIDs ?? [preferredProviderID]
+
+        return baseOrdered.filter { !suspendedProviderIDs.contains($0) }
+    }
 }
 
 public struct BASRuntimeAvailabilityPlan: Codable, Equatable, Sendable {
@@ -436,5 +475,47 @@ public enum BASRuntimeAvailabilityResolver {
             source: .deterministicFallback,
             unavailableProviderID: preferredProviderID
         )
+    }
+}
+
+public enum BASRuntimeAvailabilityNarrator {
+    public static func detail(
+        plan: BASRuntimeAvailabilityPlan,
+        allowFallbacks: Bool,
+        statusesByID: [String: BASProviderStatusRecord],
+        orderedProviderIDs: [String],
+        testingOverrideTitle: String? = nil
+    ) -> String {
+        let preferredTitle = statusesByID[plan.preferredProviderID]?.title ?? plan.preferredProviderID
+        let activeTitle = statusesByID[plan.activeProviderID]?.title ?? plan.activeProviderID
+
+        switch plan.source {
+        case .runtimeDisabled:
+            return "On-device intelligence is off, so Before is using the deterministic decision system only."
+        case .testingOverride:
+            return "Testing stub profile '\(testingOverrideTitle ?? "Unknown")' is overriding live providers so the AI path can be verified without a model runtime."
+        case .templatePinned:
+            return "Deterministic local copy is pinned, so Before is not using a model provider for assistive refinement."
+        case .preferredProvider:
+            return statusesByID[plan.preferredProviderID].map { "\($0.title). \($0.detail)" }
+                ?? "\(preferredTitle) is active."
+        case .fallbackProvider:
+            return statusesByID[plan.activeProviderID].map {
+                "\(preferredTitle) is not available. Before is using \($0.title.lowercased()) instead."
+            } ?? "\(preferredTitle) is not available. Before is using \(activeTitle.lowercased()) instead."
+        case .deterministicFallback:
+            if !allowFallbacks {
+                return "\(preferredTitle) is not available. Automatic model fallback is off, so Before is using deterministic local copy instead."
+            }
+
+            let orderedStatuses = orderedProviderIDs.compactMap { statusesByID[$0] }
+            let fallbackSource = orderedStatuses.first(where: {
+                !$0.isAvailable && $0.providerID == plan.preferredProviderID
+            }) ?? orderedStatuses.first
+
+            return fallbackSource.map {
+                "\(preferredTitle) is not available. \($0.detail) Before is falling back to deterministic local copy."
+            } ?? "No assistive provider is available. Before is falling back to deterministic local copy."
+        }
     }
 }

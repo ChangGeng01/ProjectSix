@@ -169,6 +169,61 @@ enum BehavioralAISubstrateBridge {
         )
     }
 
+    static func inferredRiskLevel(
+        mode: DecisionMode,
+        prompt: String,
+        now: Date
+    ) -> InterventionRiskLevel {
+        interventionRiskLevel(
+            from: BASBrainBootstrapAdvisor.inferRiskLevel(
+                mode: substrateMode(from: mode),
+                prompt: prompt,
+                now: now
+            )
+        )
+    }
+
+    static func orderedTemplateIDs(
+        mode: DecisionMode,
+        riskLevel: InterventionRiskLevel,
+        recommendedTemplateIDs: [String],
+        templates: [InterventionTemplateRecord]
+    ) -> [String] {
+        BASBrainBootstrapAdvisor.orderedTemplateIDs(
+            mode: substrateMode(from: mode),
+            riskLevel: self.riskLevel(from: riskLevel),
+            recommendedTemplateIDs: recommendedTemplateIDs,
+            templates: templates.map { template in
+                BASInterventionTemplateDescriptor(
+                    id: template.id,
+                    mode: substrateMode(from: template.mode),
+                    riskLevel: self.riskLevel(from: template.riskLevel),
+                    isPinned: template.isPinned,
+                    successCount: template.successCount,
+                    updatedAt: template.updatedAt
+                )
+            }
+        )
+    }
+
+    static func orderedFailurePatternIDs(
+        mode: DecisionMode,
+        failurePatterns: [FailurePatternRecord]
+    ) -> [String] {
+        BASBrainBootstrapAdvisor.orderedFailurePatternIDs(
+            mode: substrateMode(from: mode),
+            failurePatterns: failurePatterns.map { pattern in
+                BASFailurePatternDescriptor(
+                    id: pattern.id,
+                    mode: substrateMode(from: pattern.mode),
+                    suppressionWeight: pattern.suppressionWeight,
+                    evidenceCount: pattern.evidenceCount,
+                    updatedAt: pattern.updatedAt
+                )
+            }
+        )
+    }
+
     static func enrichBrainState(
         brainState: DecisionBrainState,
         mode: DecisionMode,
@@ -282,6 +337,19 @@ enum BehavioralAISubstrateBridge {
     }
 
     private static func riskLevel(from riskLevel: InterventionRiskLevel) -> BASRiskLevel {
+        switch riskLevel {
+        case .low:
+            .low
+        case .medium:
+            .medium
+        case .high:
+            .high
+        }
+    }
+
+    private static func interventionRiskLevel(
+        from riskLevel: BASRiskLevel
+    ) -> InterventionRiskLevel {
         switch riskLevel {
         case .low:
             .low

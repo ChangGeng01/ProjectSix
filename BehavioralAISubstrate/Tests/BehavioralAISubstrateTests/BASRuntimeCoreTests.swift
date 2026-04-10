@@ -4,6 +4,42 @@ import Testing
 
 @Suite("BASRuntimeCore")
 struct BASRuntimeCoreTests {
+    @Test("executable provider resolver applies testing override and availability filtering")
+    func executableProviderResolverAppliesOverrideAndAvailability() {
+        struct FakeProvider: Equatable {
+            let id: String
+            let available: Bool
+        }
+
+        let providers = [
+            "local-a": FakeProvider(id: "local-a", available: true),
+            "local-b": FakeProvider(id: "local-b", available: false),
+            "local-c": FakeProvider(id: "local-c", available: true)
+        ]
+
+        let normal = BASExecutableProviderResolver.resolve(
+            orderedProviderIDs: ["local-a", "local-b", "local-a", "local-c"],
+            providerID: \.id,
+            providerForID: { providers[$0] },
+            isAvailable: \.available
+        )
+        let overridden = BASExecutableProviderResolver.resolve(
+            orderedProviderIDs: ["local-a", "local-c"],
+            testingOverrideProvider: FakeProvider(id: "testing-stub", available: true),
+            providerID: \.id,
+            providerForID: { providers[$0] },
+            isAvailable: \.available
+        )
+
+        #expect(normal.providers == [FakeProvider(id: "local-a", available: true), FakeProvider(id: "local-c", available: true)])
+        #expect(normal.resolvedProviderIDs == ["local-a", "local-c"])
+        #expect(!normal.usedTestingOverride)
+
+        #expect(overridden.providers == [FakeProvider(id: "testing-stub", available: true)])
+        #expect(overridden.resolvedProviderIDs == ["testing-stub"])
+        #expect(overridden.usedTestingOverride)
+    }
+
     @Test("local only routing stays on device and keeps deterministic fallbacks")
     func localOnlyRoutingStaysOnDevice() {
         let registry = BASCapabilityRegistry(descriptors: [
@@ -517,6 +553,66 @@ struct BASRuntimeCoreTests {
         #expect(plan.source == .runtimeDisabled)
         #expect(plan.activeProviderID == "template")
         #expect(plan.fallbackProviderID == nil)
+    }
+
+    @Test("provider ordering resolver applies preference chain and suspended filtering")
+    func providerOrderingResolverAppliesPreferenceChainAndFiltering() {
+        let orderings = [
+            BASProviderPreferenceOrdering(
+                preferredProviderID: "open-model",
+                orderedProviderIDs: ["open-model", "gemma", "foundation"]
+            ),
+            BASProviderPreferenceOrdering(
+                preferredProviderID: "foundation",
+                orderedProviderIDs: ["foundation", "gemma"]
+            )
+        ]
+
+        #expect(
+            BASProviderOrderingResolver.orderedProviderIDs(
+                preferredProviderID: "open-model",
+                allowFallbacks: true,
+                deterministicProviderID: "template",
+                preferenceOrderings: orderings,
+                suspendedProviderIDs: ["open-model"]
+            ) == ["gemma", "foundation"]
+        )
+
+        #expect(
+            BASProviderOrderingResolver.orderedProviderIDs(
+                preferredProviderID: "foundation",
+                allowFallbacks: false,
+                deterministicProviderID: "template",
+                preferenceOrderings: orderings,
+                suspendedProviderIDs: []
+            ) == ["foundation"]
+        )
+    }
+
+    @Test("runtime availability narrator explains deterministic fallback when fallback is disabled")
+    func runtimeAvailabilityNarratorExplainsDeterministicFallback() {
+        let detail = BASRuntimeAvailabilityNarrator.detail(
+            plan: BASRuntimeAvailabilityPlan(
+                preferredProviderID: "foundation",
+                activeProviderID: "template",
+                fallbackProviderID: "template",
+                source: .deterministicFallback,
+                unavailableProviderID: "foundation"
+            ),
+            allowFallbacks: false,
+            statusesByID: [
+                "foundation": BASProviderStatusRecord(
+                    providerID: "foundation",
+                    isAvailable: false,
+                    title: "Foundation",
+                    detail: "Foundation is unavailable."
+                )
+            ],
+            orderedProviderIDs: ["foundation", "gemma"]
+        )
+
+        #expect(detail.contains("Automatic model fallback is off"))
+        #expect(detail.contains("deterministic local copy"))
     }
 
     private func context(

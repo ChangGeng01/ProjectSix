@@ -32,7 +32,22 @@ enum FailurePatternStore {
         let descriptor = FetchDescriptor<FailurePatternRecord>(
             sortBy: [SortDescriptor(\.suppressionWeight, order: .reverse), SortDescriptor(\.updatedAt, order: .reverse)]
         )
-        return ((try? context.fetch(descriptor)) ?? []).filter { $0.mode == mode }
+        let patterns = (try? context.fetch(descriptor)) ?? []
+        let orderedIDs = BehavioralAISubstrateBridge.orderedFailurePatternIDs(
+            mode: mode,
+            failurePatterns: patterns
+        )
+        let priorityByID = Dictionary(uniqueKeysWithValues: orderedIDs.enumerated().map { ($0.element, $0.offset) })
+        return patterns
+            .filter { priorityByID[$0.id] != nil }
+            .sorted { lhs, rhs in
+                let lhsPriority = priorityByID[lhs.id] ?? Int.max
+                let rhsPriority = priorityByID[rhs.id] ?? Int.max
+                if lhsPriority == rhsPriority {
+                    return lhs.id < rhs.id
+                }
+                return lhsPriority < rhsPriority
+            }
     }
 
     private static func recentFailurePatterns(in context: ModelContext) -> [FailurePatternRecord] {

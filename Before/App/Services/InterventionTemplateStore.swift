@@ -24,13 +24,20 @@ enum InterventionTemplateStore {
             sortBy: [SortDescriptor(\.successCount, order: .reverse), SortDescriptor(\.updatedAt, order: .reverse)]
         )
         let templates = (try? context.fetch(descriptor)) ?? []
+        let orderedIDs = BehavioralAISubstrateBridge.orderedTemplateIDs(
+            mode: mode,
+            riskLevel: riskLevel,
+            recommendedTemplateIDs: recommendedArmIDs,
+            templates: templates
+        )
+        let priorityByID = Dictionary(uniqueKeysWithValues: orderedIDs.enumerated().map { ($0.element, $0.offset) })
         return templates
-            .filter { $0.mode == mode && $0.riskLevel == riskLevel }
+            .filter { priorityByID[$0.id] != nil }
             .sorted { lhs, rhs in
-                let lhsPriority = recommendedArmIDs.firstIndex(of: lhs.id) ?? Int.max
-                let rhsPriority = recommendedArmIDs.firstIndex(of: rhs.id) ?? Int.max
+                let lhsPriority = priorityByID[lhs.id] ?? Int.max
+                let rhsPriority = priorityByID[rhs.id] ?? Int.max
                 if lhsPriority == rhsPriority {
-                    return lhs.isPinned && !rhs.isPinned
+                    return lhs.id < rhs.id
                 }
                 return lhsPriority < rhsPriority
             }

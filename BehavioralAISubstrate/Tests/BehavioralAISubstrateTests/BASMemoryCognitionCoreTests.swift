@@ -1,9 +1,112 @@
 import Foundation
 import Testing
 @testable import BASMemory
+import BASRuntimeCore
 
 @Suite("BASMemory Cognition Core")
 struct BASMemoryCognitionCoreTests {
+    @Test("brain bootstrap advisor infers higher risk for late-night impulse prompts")
+    func brainBootstrapAdvisorInfersRiskLevel() {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.timeZone = TimeZone.autoupdatingCurrent
+        components.year = 2026
+        components.month = 4
+        components.day = 10
+        components.hour = 23
+        components.minute = 30
+        let lateNight = components.date ?? .distantPast
+
+        components.hour = 14
+        components.minute = 0
+        let daytime = components.date ?? .distantPast
+
+        let nightMessageRisk = BASBrainBootstrapAdvisor.inferRiskLevel(
+            mode: .quick,
+            prompt: "I want to send this message right now.",
+            now: lateNight
+        )
+        let dayQuickRisk = BASBrainBootstrapAdvisor.inferRiskLevel(
+            mode: .quick,
+            prompt: "Should I text them tonight?",
+            now: daytime
+        )
+        let mirrorRisk = BASBrainBootstrapAdvisor.inferRiskLevel(
+            mode: .mirror,
+            prompt: "Why am I spiraling again?",
+            now: daytime
+        )
+
+        #expect(nightMessageRisk == .high)
+        #expect(dayQuickRisk == .low)
+        #expect(mirrorRisk == .medium)
+    }
+
+    @Test("brain bootstrap advisor orders templates and failure patterns deterministically")
+    func brainBootstrapAdvisorOrdersInterventionsDeterministically() {
+        let now = Date(timeIntervalSince1970: 1_744_321_800)
+        let templateIDs = BASBrainBootstrapAdvisor.orderedTemplateIDs(
+            mode: .quick,
+            riskLevel: .medium,
+            recommendedTemplateIDs: ["tomorrow_box_interrupt", "fallback_template"],
+            templates: [
+                BASInterventionTemplateDescriptor(
+                    id: "fallback_template",
+                    mode: .quick,
+                    riskLevel: .medium,
+                    isPinned: false,
+                    successCount: 9,
+                    updatedAt: now
+                ),
+                BASInterventionTemplateDescriptor(
+                    id: "tomorrow_box_interrupt",
+                    mode: .quick,
+                    riskLevel: .medium,
+                    isPinned: true,
+                    successCount: 2,
+                    updatedAt: now.addingTimeInterval(-60)
+                ),
+                BASInterventionTemplateDescriptor(
+                    id: "ignore_me",
+                    mode: .mirror,
+                    riskLevel: .medium,
+                    isPinned: true,
+                    successCount: 50,
+                    updatedAt: now
+                )
+            ]
+        )
+        let failureIDs = BASBrainBootstrapAdvisor.orderedFailurePatternIDs(
+            mode: .quick,
+            failurePatterns: [
+                BASFailurePatternDescriptor(
+                    id: "night_fast_path_failure",
+                    mode: .quick,
+                    suppressionWeight: 0.9,
+                    evidenceCount: 2,
+                    updatedAt: now.addingTimeInterval(-120)
+                ),
+                BASFailurePatternDescriptor(
+                    id: "proceed_without_pause_failure",
+                    mode: .quick,
+                    suppressionWeight: 0.9,
+                    evidenceCount: 4,
+                    updatedAt: now.addingTimeInterval(-300)
+                ),
+                BASFailurePatternDescriptor(
+                    id: "mirror_only_failure",
+                    mode: .mirror,
+                    suppressionWeight: 1.0,
+                    evidenceCount: 8,
+                    updatedAt: now
+                )
+            ]
+        )
+
+        #expect(templateIDs == ["tomorrow_box_interrupt", "fallback_template"])
+        #expect(failureIDs == ["proceed_without_pause_failure", "night_fast_path_failure"])
+    }
+
     @Test("trust engine detects contamination and lowers confidence")
     func trustEngineDetectsContamination() {
         let profile = BASMemoryTrustEngine.profile(

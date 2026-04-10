@@ -24,7 +24,11 @@ enum CurrentBrainStateLoader {
             preferredLanguages: Locale.preferredLanguages,
             sampleTexts: [prompt]
         )
-        let riskLevel = envelope?.riskLevel ?? inferredRiskLevel(mode: mode, prompt: prompt, now: now)
+        let riskLevel = envelope?.riskLevel ?? BehavioralAISubstrateBridge.inferredRiskLevel(
+            mode: mode,
+            prompt: prompt,
+            now: now
+        )
         let armIDs = DecisionReactionBanditStore.recommendedArmIDs(
             mode: mode,
             riskLevel: riskLevel,
@@ -92,25 +96,6 @@ enum CurrentBrainStateLoader {
         trimOldUpdates(in: context, now: now)
         try? context.save()
         return current
-    }
-
-    private static func inferredRiskLevel(
-        mode: DecisionMode,
-        prompt: String,
-        now: Date
-    ) -> InterventionRiskLevel {
-        let lowercased = prompt.lowercased()
-        let hour = Calendar.autoupdatingCurrent.component(.hour, from: now)
-        if hour >= 22 || hour < 5 {
-            if lowercased.contains("message") || lowercased.contains("reply") || lowercased.contains("text") {
-                return .high
-            }
-            return mode == .quick ? .medium : .high
-        }
-        if mode == .mirror {
-            return .medium
-        }
-        return .low
     }
 
     private static func defaultSourceSurface(

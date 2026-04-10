@@ -6,32 +6,50 @@ import BASRuntimeCore
 enum DecisionIntelligenceProviderPipeline {
     private static let registry = DecisionIntelligenceProviderRegistry.shared
     private static let responseCache = DecisionIntelligenceResponseCache.shared
+    private static let preferenceOrderings: [BASProviderPreferenceOrdering] = [
+        BASProviderPreferenceOrdering(
+            preferredProviderID: DecisionModelProviderKind.gemmaE4B.rawValue,
+            orderedProviderIDs: [
+                DecisionModelProviderKind.gemmaE4B.rawValue,
+                DecisionModelProviderKind.foundationModels.rawValue
+            ]
+        ),
+        BASProviderPreferenceOrdering(
+            preferredProviderID: DecisionModelProviderKind.openModel.rawValue,
+            orderedProviderIDs: [
+                DecisionModelProviderKind.openModel.rawValue,
+                DecisionModelProviderKind.gemmaE4B.rawValue,
+                DecisionModelProviderKind.foundationModels.rawValue
+            ]
+        ),
+        BASProviderPreferenceOrdering(
+            preferredProviderID: DecisionModelProviderKind.foundationModels.rawValue,
+            orderedProviderIDs: [
+                DecisionModelProviderKind.foundationModels.rawValue,
+                DecisionModelProviderKind.gemmaE4B.rawValue
+            ]
+        ),
+        BASProviderPreferenceOrdering(
+            preferredProviderID: DecisionModelProviderKind.template.rawValue,
+            orderedProviderIDs: [
+                DecisionModelProviderKind.template.rawValue
+            ]
+        )
+    ]
 
     static func orderedKinds(
         for preference: DecisionModelProviderPreference,
         allowFallbacks: Bool = true,
         excluding suspendedKinds: Set<DecisionModelProviderKind> = []
     ) -> [DecisionModelProviderKind] {
-        if preference != .template, suspendedKinds.contains(preference.kind), !allowFallbacks {
-            return []
-        }
-
-        if !allowFallbacks {
-            return suspendedKinds.contains(preference.kind) ? [] : [preference.kind]
-        }
-
-        let ordered: [DecisionModelProviderKind] = switch preference {
-        case .gemmaE4B:
-            [.gemmaE4B, .foundationModels]
-        case .openModel:
-            [.openModel, .gemmaE4B, .foundationModels]
-        case .foundationModels:
-            [.foundationModels, .gemmaE4B]
-        case .template:
-            [.template]
-        }
-
-        return ordered.filter { !suspendedKinds.contains($0) }
+        BASProviderOrderingResolver.orderedProviderIDs(
+            preferredProviderID: preference.kind.rawValue,
+            allowFallbacks: allowFallbacks,
+            deterministicProviderID: DecisionModelProviderKind.template.rawValue,
+            preferenceOrderings: preferenceOrderings,
+            suspendedProviderIDs: Set(suspendedKinds.map(\.rawValue))
+        )
+        .compactMap(DecisionModelProviderKind.init(rawValue:))
     }
 
     static func runtimeStatus(
@@ -67,35 +85,28 @@ enum DecisionIntelligenceProviderPipeline {
 
         let active = DecisionModelProviderKind(rawValue: plan.activeProviderID) ?? .template
         let fallback = plan.fallbackProviderID.flatMap(DecisionModelProviderKind.init(rawValue:))
-        let orderedStatuses = orderedKinds(
-            for: preferences.preferredIntelligenceProvider,
-            allowFallbacks: preferences.allowModelFallbacks
-        ).compactMap { statusesByKind[$0] }
-
-        let detail: String
-        switch plan.source {
-        case .runtimeDisabled:
-            detail = "On-device intelligence is off, so Before is using the deterministic decision system only."
-        case .testingOverride:
-            detail = "Testing stub profile '\(testingStubProfile?.title ?? "Unknown")' is overriding live providers so the AI path can be verified without a model runtime."
-        case .templatePinned:
-            detail = "Deterministic local copy is pinned, so Before is not using a model provider for assistive refinement."
-        case .preferredProvider:
-            detail = statusesByKind[preferred].map { "\($0.title). \($0.detail)" }
-                ?? "\(preferred.title) is active."
-        case .fallbackProvider:
-            detail = statusesByKind[active].map {
-                "\(preferred.title) is not available. Before is using \($0.title.lowercased()) instead."
-            } ?? "\(preferred.title) is not available. Before is using \(active.title.lowercased()) instead."
-        case .deterministicFallback:
-            if !preferences.allowModelFallbacks {
-                detail = "\(preferred.title) is not available. Automatic model fallback is off, so Before is using deterministic local copy instead."
-            } else {
-                let fallbackSource = orderedStatuses.first(where: { !$0.isAvailable && $0.kind == preferred }) ?? orderedStatuses.first
-                detail = fallbackSource.map { "\(preferred.title) is not available. \($0.detail) Before is falling back to deterministic local copy." }
-                    ?? "No assistive provider is available. Before is falling back to deterministic local copy."
-            }
-        }
+        let detail = BASRuntimeAvailabilityNarrator.detail(
+            plan: plan,
+            allowFallbacks: preferences.allowModelFallbacks,
+            statusesByID: Dictionary(
+                uniqueKeysWithValues: statusesByKind.map { entry in
+                    (
+                        entry.key.rawValue,
+                        BASProviderStatusRecord(
+                            providerID: entry.key.rawValue,
+                            isAvailable: entry.value.isAvailable,
+                            title: entry.value.title,
+                            detail: entry.value.detail
+                        )
+                    )
+                }
+            ),
+            orderedProviderIDs: orderedKinds(
+                for: preferences.preferredIntelligenceProvider,
+                allowFallbacks: preferences.allowModelFallbacks
+            ).map(\.rawValue),
+            testingOverrideTitle: testingStubProfile?.title
+        )
 
         return DecisionModelRuntimeStatus(
             preferred: preferred,
@@ -1558,20 +1569,27 @@ enum DecisionIntelligenceProviderPipeline {
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile?
     ) async -> [any DecisionIntelligenceProviding] {
-        if let testingStubProfile, preference != .template {
-            return [TestingDecisionIntelligenceProvider(profile: testingStubProfile)]
-        }
         let suspendedKinds = Set(await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders)
-        return DecisionIntelligenceTaskRouter.orderedKinds(
+        let orderedProviderIDs = DecisionIntelligenceTaskRouter.orderedKinds(
             for: task,
             preference: preference,
             allowFallbacks: allowFallbacks,
             excluding: suspendedKinds,
             registry: registry,
             strategy: strategy
-        )
-        .compactMap { registry.provider(for: $0) }
-        .filter { $0.availabilityStatus.isAvailable }
+        ).map(\.rawValue)
+        let testingOverrideProvider: (any DecisionIntelligenceProviding)? = testingStubProfile.flatMap { profile in
+            preference != .template ? TestingDecisionIntelligenceProvider(profile: profile) : nil
+        }
+        return BASExecutableProviderResolver.resolve(
+            orderedProviderIDs: orderedProviderIDs,
+            testingOverrideProvider: testingOverrideProvider,
+            providerID: { $0.kind.rawValue },
+            providerForID: { providerID in
+                DecisionModelProviderKind(rawValue: providerID).flatMap(registry.provider(for:))
+            },
+            isAvailable: { $0.availabilityStatus.isAvailable }
+        ).providers
     }
 
     private static func deterministicFallbackDetail(
