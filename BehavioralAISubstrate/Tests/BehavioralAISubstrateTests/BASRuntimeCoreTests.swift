@@ -4,6 +4,148 @@ import Testing
 
 @Suite("BASRuntimeCore")
 struct BASRuntimeCoreTests {
+    @Test("provider attempt executor can reject cached output and continue to a successful provider result")
+    func providerAttemptExecutorRejectsCacheAndContinues() async {
+        struct FakeProvider: Equatable {
+            let id: String
+        }
+
+        struct Assessment: Sendable, Equatable {
+            let label: String
+        }
+
+        let providers = [
+            FakeProvider(id: "local-a"),
+            FakeProvider(id: "local-b")
+        ]
+        let cached: [String: String] = [
+            "local-a": "cached-a"
+        ]
+        let generated: [String: String] = [
+            "local-b": "fresh-b"
+        ]
+
+        actor Recorder {
+            var quarantined: [String] = []
+            var events: [String] = []
+
+            func quarantine(_ id: String) {
+                quarantined.append(id)
+            }
+
+            func record(_ value: String) {
+                events.append(value)
+            }
+        }
+
+        let recorder = Recorder()
+        let outcome = await BASProviderAttemptExecutor.execute(
+            providers: providers,
+            providerID: \.id,
+            loadCachedResult: { provider in
+                cached[provider.id]
+            },
+            assessCachedResult: { value in
+                value == "cached-a" ? .reject(Assessment(label: "reject-cache")) : .allow(Assessment(label: "cache"))
+            },
+            quarantineCachedResult: { provider in
+                await recorder.quarantine(provider.id)
+            },
+            invokeProvider: { provider in
+                generated[provider.id]
+            },
+            assessProviderResult: { value in
+                .allow(Assessment(label: "allow-\(value)"))
+            },
+            onCachedRejected: { provider, _, assessment, attempted in
+                await recorder.record("cached-reject:\(provider.id):\(assessment.label):\(attempted.joined(separator: ","))")
+            },
+            onProviderSuccess: { provider, _, assessment, attempted in
+                await recorder.record("provider-success:\(provider.id):\(assessment.label):\(attempted.joined(separator: ","))")
+            },
+            onProviderMiss: { provider, attempted in
+                await recorder.record("provider-miss:\(provider.id):\(attempted.joined(separator: ","))")
+            }
+        )
+
+        switch outcome {
+        case .resolved(let resolution):
+            #expect(resolution.source == .providerSuccess)
+            #expect(resolution.providerID == "local-b")
+            #expect(resolution.attemptedProviderIDs == ["local-a", "local-b"])
+            #expect(resolution.result == "fresh-b")
+            #expect(resolution.assessment == Assessment(label: "allow-fresh-b"))
+        case .noResult:
+            Issue.record("Expected provider success after rejecting cached output.")
+        }
+
+        let quarantined = await recorder.quarantined
+        let events = await recorder.events
+        #expect(quarantined == ["local-a"])
+        #expect(events == [
+            "cached-reject:local-a:reject-cache:local-a",
+            "provider-success:local-b:allow-fresh-b:local-a,local-b"
+        ])
+    }
+
+    @Test("provider attempt executor reports no result after misses and rejected outputs")
+    func providerAttemptExecutorReportsNoResult() async {
+        struct FakeProvider: Equatable {
+            let id: String
+        }
+
+        struct Assessment: Sendable, Equatable {
+            let label: String
+        }
+
+        let providers = [
+            FakeProvider(id: "local-a"),
+            FakeProvider(id: "local-b")
+        ]
+
+        actor Recorder {
+            var events: [String] = []
+
+            func record(_ value: String) {
+                events.append(value)
+            }
+        }
+
+        let recorder = Recorder()
+        let outcome = await BASProviderAttemptExecutor.execute(
+            providers: providers,
+            providerID: \.id,
+            loadCachedResult: { _ in nil },
+            assessCachedResult: { _ in .allow(Assessment(label: "unused")) },
+            quarantineCachedResult: { _ in },
+            invokeProvider: { provider in
+                provider.id == "local-b" ? "reject-me" : nil
+            },
+            assessProviderResult: { value in
+                .reject(Assessment(label: value))
+            },
+            onProviderRejected: { provider, _, assessment, attempted in
+                await recorder.record("provider-reject:\(provider.id):\(assessment.label):\(attempted.joined(separator: ","))")
+            },
+            onProviderMiss: { provider, attempted in
+                await recorder.record("provider-miss:\(provider.id):\(attempted.joined(separator: ","))")
+            }
+        )
+
+        switch outcome {
+        case .resolved:
+            Issue.record("Expected no result after miss and rejected provider outputs.")
+        case .noResult(let attemptedProviderIDs):
+            #expect(attemptedProviderIDs == ["local-a", "local-b"])
+        }
+
+        let events = await recorder.events
+        #expect(events == [
+            "provider-miss:local-a:local-a",
+            "provider-reject:local-b:reject-me:local-a,local-b"
+        ])
+    }
+
     @Test("executable provider resolver applies testing override and availability filtering")
     func executableProviderResolverAppliesOverrideAndAvailability() {
         struct FakeProvider: Equatable {
