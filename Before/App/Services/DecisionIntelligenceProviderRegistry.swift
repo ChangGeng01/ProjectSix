@@ -766,17 +766,13 @@ enum DecisionIntelligenceTaskRouter {
         registry: DecisionIntelligenceProviderRegistry = .shared,
         strategy: DecisionAdaptiveTaskStrategy? = nil
     ) -> [DecisionModelProviderKind] {
-        let baseKinds = DecisionIntelligenceProviderPipeline.orderedKinds(
-            for: preference,
-            allowFallbacks: allowFallbacks,
-            excluding: suspendedKinds
-        )
-
-        guard allowFallbacks, baseKinds.count > 1 else { return baseKinds }
-        let plan = BASProviderPlanner.plan(
+        let plan = BASProviderRouteResolver.resolve(
             task: substrateTraceKind(task),
             preferredProviderID: preference.kind.rawValue,
-            baseOrderedProviderIDs: baseKinds.map(\.rawValue),
+            allowFallbacks: allowFallbacks,
+            deterministicProviderID: DecisionModelProviderKind.template.rawValue,
+            preferenceOrderings: DecisionIntelligenceProviderPipeline.preferenceOrderings,
+            suspendedProviderIDs: Set(suspendedKinds.map(\.rawValue)),
             strategy: strategy.map(substrateAdaptiveStrategy),
             descriptors: registry.descriptors().map(substrateProviderDescriptor)
         )

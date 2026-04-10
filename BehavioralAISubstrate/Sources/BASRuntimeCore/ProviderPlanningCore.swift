@@ -416,6 +416,53 @@ public enum BASProviderPlanner {
     }
 }
 
+public enum BASProviderRouteResolver {
+    public static func resolve(
+        task: BASAdaptiveTraceKind,
+        preferredProviderID: String,
+        allowFallbacks: Bool,
+        deterministicProviderID: String,
+        preferenceOrderings: [BASProviderPreferenceOrdering],
+        suspendedProviderIDs: Set<String> = [],
+        strategy: BASAdaptiveTaskStrategy? = nil,
+        descriptors: [BASProviderDescriptor]
+    ) -> BASProviderSelectionPlan {
+        let baseOrderedProviderIDs = BASProviderOrderingResolver.orderedProviderIDs(
+            preferredProviderID: preferredProviderID,
+            allowFallbacks: allowFallbacks,
+            deterministicProviderID: deterministicProviderID,
+            preferenceOrderings: preferenceOrderings,
+            suspendedProviderIDs: suspendedProviderIDs
+        )
+
+        guard allowFallbacks, baseOrderedProviderIDs.count > 1 else {
+            let rationale: [String]
+            if !allowFallbacks {
+                rationale = ["Fallbacks disabled, so runtime stays pinned to the preferred provider lane."]
+            } else {
+                rationale = ["Only one provider remains after base ordering, so no task-aware reordering was applied."]
+            }
+
+            return BASProviderSelectionPlan(
+                task: task,
+                preferredProviderID: preferredProviderID,
+                orderedProviderIDs: baseOrderedProviderIDs,
+                compatibleProviderIDs: baseOrderedProviderIDs,
+                incompatibleProviderIDs: [],
+                rationale: rationale
+            )
+        }
+
+        return BASProviderPlanner.plan(
+            task: task,
+            preferredProviderID: preferredProviderID,
+            baseOrderedProviderIDs: baseOrderedProviderIDs,
+            strategy: strategy,
+            descriptors: descriptors
+        )
+    }
+}
+
 public enum BASRuntimeAvailabilityResolver {
     public static func resolve(
         preferredProviderID: String,

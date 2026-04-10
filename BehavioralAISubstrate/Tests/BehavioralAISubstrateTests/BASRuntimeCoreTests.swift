@@ -182,6 +182,68 @@ struct BASRuntimeCoreTests {
         #expect(overridden.usedTestingOverride)
     }
 
+    @Test("provider route resolver combines base ordering with task-aware planning")
+    func providerRouteResolverCombinesBaseOrderingAndPlanning() {
+        let plan = BASProviderRouteResolver.resolve(
+            task: .mirror,
+            preferredProviderID: "local-fast",
+            allowFallbacks: true,
+            deterministicProviderID: "template",
+            preferenceOrderings: [
+                BASProviderPreferenceOrdering(
+                    preferredProviderID: "local-fast",
+                    orderedProviderIDs: ["local-fast", "reflective-large", "template"]
+                )
+            ],
+            strategy: BASAdaptiveTaskStrategy(
+                kind: .mirror,
+                entropy: .high,
+                runtimeGear: .high,
+                contextBudget: 1800,
+                retrievalMode: .adaptive,
+                thinkingMode: .gated,
+                outputMode: .reflectiveStructured,
+                tone: .reflectiveClear,
+                actionSpace: ["reflect", "stay_brief"],
+                responseLanguage: .english,
+                allowsModelInvocation: true
+            ),
+            descriptors: [
+                providerDescriptor(
+                    id: "local-fast",
+                    bestFor: [.quick],
+                    strengths: [.structuredOutput, .lowLatency, .lowMemory],
+                    latencyClass: .low,
+                    memoryClass: .low,
+                    languages: [.english],
+                    supportsThinking: false
+                ),
+                providerDescriptor(
+                    id: "reflective-large",
+                    bestFor: [.mirror],
+                    strengths: [.structuredOutput, .deepReflection, .retrievalGrounding],
+                    latencyClass: .high,
+                    memoryClass: .high,
+                    languages: [.english],
+                    supportsThinking: true
+                ),
+                providerDescriptor(
+                    id: "template",
+                    bestFor: [.quick],
+                    strengths: [.structuredOutput, .lowLatency],
+                    latencyClass: .low,
+                    memoryClass: .low,
+                    languages: [.english],
+                    supportsThinking: false
+                )
+            ]
+        )
+
+        #expect(plan.orderedProviderIDs.first == "reflective-large")
+        #expect(plan.compatibleProviderIDs.contains("reflective-large"))
+        #expect(plan.rationale.contains(where: { $0.contains("Selected reflective-large ahead of the preferred provider") }))
+    }
+
     @Test("local only routing stays on device and keeps deterministic fallbacks")
     func localOnlyRoutingStaysOnDevice() {
         let registry = BASCapabilityRegistry(descriptors: [

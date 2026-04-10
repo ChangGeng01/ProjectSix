@@ -11,7 +11,7 @@ enum DecisionIntelligenceProviderPipeline {
 
     private static let registry = DecisionIntelligenceProviderRegistry.shared
     private static let responseCache = DecisionIntelligenceResponseCache.shared
-    private static let preferenceOrderings: [BASProviderPreferenceOrdering] = [
+    static let preferenceOrderings: [BASProviderPreferenceOrdering] = [
         BASProviderPreferenceOrdering(
             preferredProviderID: DecisionModelProviderKind.gemmaE4B.rawValue,
             orderedProviderIDs: [
