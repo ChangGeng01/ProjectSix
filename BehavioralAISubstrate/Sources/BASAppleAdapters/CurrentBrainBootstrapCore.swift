@@ -225,6 +225,19 @@ public struct BASAppleCurrentBrainBootstrapRequest: Codable, Equatable, Sendable
     }
 }
 
+public struct BASAppleCurrentBrainBootstrapArtifact: Codable, Equatable, Sendable {
+    public var execution: BASCurrentBrainBootstrapExecution
+    public var persistenceInput: BASCurrentBrainUpdatePersistenceInput
+
+    public init(
+        execution: BASCurrentBrainBootstrapExecution,
+        persistenceInput: BASCurrentBrainUpdatePersistenceInput
+    ) {
+        self.execution = execution
+        self.persistenceInput = persistenceInput
+    }
+}
+
 public enum BASCurrentBrainBootstrapCoordinator {
     public static func prepare(
         request: BASCurrentBrainBootstrapPreparationRequest
@@ -341,6 +354,19 @@ public enum BASAppleCurrentBrainBootstrapAdapter {
                         updatedAt: pattern.updatedAt
                     )
                 }
+            )
+        )
+    }
+
+    public static func artifact(
+        request: BASAppleCurrentBrainBootstrapRequest
+    ) -> BASAppleCurrentBrainBootstrapArtifact {
+        let execution = bootstrap(request: request)
+        return BASAppleCurrentBrainBootstrapArtifact(
+            execution: execution,
+            persistenceInput: BASCurrentBrainPersistenceApplier.updateInput(
+                mode: request.preparation.mode.rawValue,
+                bootstrapped: execution.bootstrapped
             )
         )
     }

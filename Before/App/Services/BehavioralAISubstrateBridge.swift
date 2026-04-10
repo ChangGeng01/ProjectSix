@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import BASAdmin
 import BASAppleAdapters
 import BASMemory
@@ -18,6 +19,16 @@ struct CurrentBrainBootstrapExecution: Equatable, Sendable {
     let bootstrapped: BASBootstrappedBrainState
     let activeTemplateIDs: [String]
     let failureGuardIDs: [String]
+}
+
+struct CurrentBrainBootstrapArtifact: Equatable, Sendable {
+    let sourceSurface: DecisionIntentSourceSurface
+    let riskLevel: InterventionRiskLevel
+    let languageMode: DecisionLanguageMode
+    let bootstrapped: BASBootstrappedBrainState
+    let activeTemplateIDs: [String]
+    let failureGuardIDs: [String]
+    let persistenceInput: BASCurrentBrainUpdatePersistenceInput
 }
 
 enum BehavioralAISubstrateBridge {
@@ -146,6 +157,88 @@ enum BehavioralAISubstrateBridge {
                 createdAt: envelope.requestedAt
             ),
             route: nil
+        )
+    }
+
+    static func bootstrapCurrentBrainStateArtifact(
+        mode: DecisionMode,
+        prompt: String,
+        source: BrainStateUpdateSource,
+        envelope: DecisionIntentEnvelope?,
+        taskGraph: DecisionTaskGraphSnapshot?,
+        context: ModelContext,
+        projection: DecisionMemorySystem.BrainStateProjection,
+        retrievalMode: DecisionRetrievalMode,
+        now: Date
+    ) -> CurrentBrainBootstrapArtifact {
+        let preparation = BASCurrentBrainBootstrapCoordinator.prepare(
+            request: BASCurrentBrainBootstrapPreparationRequest(
+                mode: substrateMode(from: mode),
+                prompt: prompt,
+                trigger: currentBrainBootstrapTrigger(from: source),
+                sourceSurfaceOverride: envelope.map { interactionSurface(from: $0.sourceSurface) },
+                riskLevelOverride: envelope?.riskLevel.map(riskLevel(from:)),
+                preferredLanguages: Locale.preferredLanguages,
+                now: now
+            )
+        )
+        let languageMode = decisionLanguageMode(from: preparation.languageMode)
+        let riskLevel = interventionRiskLevel(from: preparation.riskLevel)
+        let recommendedArmIDs = DecisionReactionBanditStore.recommendedArmIDs(
+            mode: mode,
+            riskLevel: riskLevel,
+            languageMode: languageMode,
+            now: now
+        )
+        let templates = InterventionTemplateStore.selectTemplates(
+            in: context,
+            mode: mode,
+            riskLevel: riskLevel,
+            recommendedArmIDs: recommendedArmIDs
+        )
+        let failurePatterns = FailurePatternStore.selectedFailurePatterns(in: context, mode: mode)
+        let artifact = BASAppleCurrentBrainBootstrapAdapter.artifact(
+            request: BASAppleCurrentBrainBootstrapRequest(
+                preparation: preparation,
+                baseProjection: projection.baseProjection,
+                embeddingScores: EmbeddingMemoryStore.query(
+                    preparation.prompt,
+                    allowedTiers: [.hot, .warm],
+                    limit: 12
+                ).map { BASAppleEmbeddingScoreInput(id: $0.id, score: $0.score) },
+                taskGraphHint: taskGraph.map(taskGraphHint(from:)),
+                retrievalMode: retrievalMode.rawValue,
+                recommendedTemplateIDs: recommendedArmIDs,
+                templates: templates.map { template in
+                    BASAppleCurrentBrainBootstrapTemplateInput(
+                        id: template.id,
+                        mode: substrateMode(from: template.mode),
+                        riskLevel: self.riskLevel(from: template.riskLevel),
+                        isPinned: template.isPinned,
+                        successCount: template.successCount,
+                        updatedAt: template.updatedAt
+                    )
+                },
+                failurePatterns: failurePatterns.map { pattern in
+                    BASAppleCurrentBrainBootstrapFailurePatternInput(
+                        id: pattern.id,
+                        mode: substrateMode(from: pattern.mode),
+                        suppressionWeight: pattern.suppressionWeight,
+                        evidenceCount: pattern.evidenceCount,
+                        updatedAt: pattern.updatedAt
+                    )
+                }
+            )
+        )
+
+        return CurrentBrainBootstrapArtifact(
+            sourceSurface: sourceSurface(from: preparation.sourceSurface),
+            riskLevel: riskLevel,
+            languageMode: languageMode,
+            bootstrapped: artifact.execution.bootstrapped,
+            activeTemplateIDs: artifact.execution.orderedTemplateIDs,
+            failureGuardIDs: artifact.execution.orderedFailurePatternIDs,
+            persistenceInput: artifact.persistenceInput
         )
     }
 

@@ -216,4 +216,75 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(execution.bootstrapped.brainState.boundaryPolicy.riskLevel == .high)
         #expect(execution.bootstrapped.brainState.memorySlices.contains(where: { $0.headline.contains("Protect sleep") }))
     }
+
+    @Test("apple bootstrap artifact also owns persistence input shaping")
+    func appleBootstrapArtifactOwnsPersistenceInputShaping() {
+        let now = Date(timeIntervalSince1970: 1_744_322_000)
+        let preparation = BASCurrentBrainBootstrapPreparation(
+            mode: .quick,
+            prompt: "Should I wait until tomorrow?",
+            trigger: .notification,
+            sourceSurface: .notification,
+            riskLevel: .medium,
+            languageMode: .english,
+            memorySource: .reminder,
+            now: now
+        )
+
+        let artifact = BASAppleCurrentBrainBootstrapAdapter.artifact(
+            request: BASAppleCurrentBrainBootstrapRequest(
+                preparation: preparation,
+                baseProjection: BASBrainProjection(
+                    records: [
+                        BASGovernedMemory(
+                            kind: .goal,
+                            content: "Protect tomorrow morning energy.",
+                            scope: .user,
+                            sensitivity: .low,
+                            tier: .hot,
+                            confidence: 0.92,
+                            sourceType: "history",
+                            governanceStatus: .governed,
+                            provenanceSummary: "Repeated reflection"
+                        )
+                    ],
+                    candidates: [],
+                    recentEvents: []
+                ),
+                taskGraphHint: BASBrainTaskGraphHint(
+                    headline: "Pause until morning.",
+                    activeNodeCount: 1,
+                    hasResumeCandidate: true,
+                    resumeHint: "Reopen after sleep."
+                ),
+                retrievalMode: "filtered",
+                recommendedTemplateIDs: ["night_message_cooling"],
+                templates: [
+                    BASAppleCurrentBrainBootstrapTemplateInput(
+                        id: "night_message_cooling",
+                        mode: .quick,
+                        riskLevel: .medium,
+                        isPinned: true,
+                        successCount: 2,
+                        updatedAt: now
+                    )
+                ],
+                failurePatterns: [
+                    BASAppleCurrentBrainBootstrapFailurePatternInput(
+                        id: "night_fast_path_failure",
+                        mode: .quick,
+                        suppressionWeight: 0.95,
+                        evidenceCount: 2,
+                        updatedAt: now
+                    )
+                ]
+            )
+        )
+
+        #expect(artifact.execution.orderedTemplateIDs == ["night_message_cooling"])
+        #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.rawValue)
+        #expect(artifact.persistenceInput.fingerprint == artifact.execution.bootstrapped.brainState.verificationSnapshot.fingerprint)
+        #expect(Set(artifact.persistenceInput.activeTemplateIDs) == Set(artifact.execution.orderedTemplateIDs))
+        #expect(Set(artifact.persistenceInput.failureGuardIDs) == Set(artifact.execution.orderedFailurePatternIDs))
+    }
 }

@@ -19,37 +19,18 @@ enum CurrentBrainStateLoader {
         InterventionTemplateStore.ensureDefaults(in: context)
         FailurePatternStore.syncFromHistory(in: context)
 
-        let preparation = BehavioralAISubstrateBridge.prepareCurrentBrainBootstrap(
+        let artifact = BehavioralAISubstrateBridge.bootstrapCurrentBrainStateArtifact(
             mode: mode,
             prompt: prompt,
             source: source,
             envelope: envelope,
-            now: now
-        )
-        let armIDs = DecisionReactionBanditStore.recommendedArmIDs(
-            mode: mode,
-            riskLevel: preparation.riskLevel,
-            languageMode: preparation.languageMode,
-            now: now
-        )
-        let templates = InterventionTemplateStore.selectTemplates(
-            in: context,
-            mode: mode,
-            riskLevel: preparation.riskLevel,
-            recommendedArmIDs: armIDs
-        )
-        let failurePatterns = FailurePatternStore.selectedFailurePatterns(in: context, mode: mode)
-
-        var execution = BehavioralAISubstrateBridge.executeCurrentBrainBootstrap(
-            preparation: preparation,
             taskGraph: taskGraph,
+            context: context,
             projection: projection,
             retrievalMode: retrievalMode,
-            recommendedTemplateIDs: armIDs,
-            templates: templates,
-            failurePatterns: failurePatterns
+            now: now
         )
-        var brainState = execution.bootstrapped.brainState
+        var brainState = artifact.bootstrapped.brainState
         brainState.evolutionState = DecisionEvolutionEngine.recordCheckpoint(
             mode: mode,
             source: source,
@@ -57,31 +38,18 @@ enum CurrentBrainStateLoader {
             context: context,
             now: now
         )
-        execution = CurrentBrainBootstrapExecution(
-            preparation: execution.preparation,
-            bootstrapped: BASBootstrappedBrainState(
-                brainState: brainState,
-                dominantGoal: execution.bootstrapped.dominantGoal,
-                activeConstraints: execution.bootstrapped.activeConstraints,
-                activeTemplateIDs: execution.bootstrapped.activeTemplateIDs,
-                failureGuardIDs: execution.bootstrapped.failureGuardIDs,
-                taskGraphHint: execution.bootstrapped.taskGraphHint
-            ),
-            activeTemplateIDs: execution.activeTemplateIDs,
-            failureGuardIDs: execution.failureGuardIDs
-        )
 
         let current = CurrentBrainState(
             source: source,
-            sourceSurface: preparation.sourceSurface,
+            sourceSurface: artifact.sourceSurface,
             mode: mode,
-            riskLevel: preparation.riskLevel,
+            riskLevel: artifact.riskLevel,
             taskGraph: taskGraph,
             brainState: brainState,
-            dominantGoal: execution.bootstrapped.dominantGoal,
-            activeConstraints: execution.bootstrapped.activeConstraints,
-            activeTemplateIDs: execution.activeTemplateIDs,
-            failureGuardIDs: execution.failureGuardIDs,
+            dominantGoal: artifact.bootstrapped.dominantGoal,
+            activeConstraints: artifact.bootstrapped.activeConstraints,
+            activeTemplateIDs: artifact.activeTemplateIDs,
+            failureGuardIDs: artifact.failureGuardIDs,
             sourceIntentEnvelope: envelope,
             loadedAt: now
         )
@@ -90,10 +58,7 @@ enum CurrentBrainStateLoader {
             storedFields: BASCurrentBrainPersistenceApplier.updateFields(
                 createdAt: now,
                 source: source.rawValue,
-                input: BASCurrentBrainPersistenceApplier.updateInput(
-                    mode: mode.rawValue,
-                    bootstrapped: execution.bootstrapped
-                )
+                input: artifact.persistenceInput
             )
         )
         context.insert(update)
