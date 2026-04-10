@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import BASAppleAdapters
 import BASMemory
 
 enum DecisionMemoryGovernor {
@@ -15,9 +16,9 @@ enum DecisionMemoryGovernor {
         let reviewNow = drafts.map(\.lastConfirmedAt).max() ?? .now
         let existingRecords = fetchRecords(in: context)
         let existingCandidates = fetchCandidates(in: context)
-        let plan = BASMemoryReconciler.plan(
-            BASMemoryReconciliationRequest(
-                drafts: drafts.map(\.reconciliationDraftInput),
+        let outcome = BASAppleMemoryPersistenceAdapter.reconcile(
+            BASAppleMemoryPersistenceRequest(
+                drafts: drafts,
                 existingRecords: existingRecords.map(\.basSnapshot),
                 existingCandidates: existingCandidates.map(\.basSnapshot),
                 reviewNow: reviewNow
@@ -27,12 +28,12 @@ enum DecisionMemoryGovernor {
         var recordsByID = Dictionary(uniqueKeysWithValues: existingRecords.map { ($0.id, $0) })
         var candidatesByID = Dictionary(uniqueKeysWithValues: existingCandidates.map { ($0.id, $0) })
 
-        for recordPlan in plan.recordPlans {
-            apply(recordPlan: recordPlan, in: context, recordsByID: &recordsByID)
+        for recordMutation in outcome.recordMutations {
+            apply(recordMutation: recordMutation, in: context, recordsByID: &recordsByID)
         }
 
-        for candidatePlan in plan.candidatePlans {
-            apply(candidatePlan: candidatePlan, in: context, candidatesByID: &candidatesByID)
+        for candidateMutation in outcome.candidateMutations {
+            apply(candidateMutation: candidateMutation, in: context, candidatesByID: &candidatesByID)
         }
 
         do {
@@ -46,15 +47,12 @@ enum DecisionMemoryGovernor {
 
         let resolvedRecords = fetchRecords(in: context)
         let ordering = Dictionary(
-            uniqueKeysWithValues: BASMemoryPersistenceApplier
-                .canonicalGovernedOrder(for: resolvedRecords.map(\.basSnapshot))
-                .enumerated()
-                .map { ($0.element, $0.offset) }
+            uniqueKeysWithValues: outcome.orderedRecordIDs.enumerated().map { ($0.element, $0.offset) }
         )
 
         return resolvedRecords.sorted { lhs, rhs in
-            let lhsIndex = ordering[lhs.id] ?? .max
-            let rhsIndex = ordering[rhs.id] ?? .max
+            let lhsIndex = ordering[lhs.id] ?? Int.max
+            let rhsIndex = ordering[rhs.id] ?? Int.max
             if lhsIndex == rhsIndex {
                 return lhs.id < rhs.id
             }
@@ -81,19 +79,18 @@ enum DecisionMemoryGovernor {
     }
 
     private static func apply(
-        recordPlan: BASGovernedMemoryWritePlan,
+        recordMutation: BASAppleGovernedMemoryMutation,
         in context: ModelContext,
         recordsByID: inout [String: DecisionMemoryRecord]
     ) {
-        switch recordPlan.operation {
+        switch recordMutation.operation {
         case .delete:
-            guard let existing = recordsByID[recordPlan.id] else { return }
+            guard let existing = recordsByID[recordMutation.id] else { return }
             context.delete(existing)
-            recordsByID[recordPlan.id] = nil
+            recordsByID[recordMutation.id] = nil
         case .add, .update, .noop:
-            guard let snapshot = recordPlan.snapshot else { return }
-            let fields = BASMemoryPersistenceApplier.governedFields(from: snapshot)
-            if let existing = recordsByID[recordPlan.id] {
+            guard let fields = recordMutation.fields else { return }
+            if let existing = recordsByID[recordMutation.id] {
                 apply(recordFields: fields, to: existing)
             } else {
                 let record = makeRecord(from: fields)
@@ -104,19 +101,18 @@ enum DecisionMemoryGovernor {
     }
 
     private static func apply(
-        candidatePlan: BASCandidateMemoryWritePlan,
+        candidateMutation: BASAppleCandidateMemoryMutation,
         in context: ModelContext,
         candidatesByID: inout [String: DecisionMemoryCandidateRecord]
     ) {
-        switch candidatePlan.operation {
+        switch candidateMutation.operation {
         case .delete:
-            guard let existing = candidatesByID[candidatePlan.id] else { return }
+            guard let existing = candidatesByID[candidateMutation.id] else { return }
             context.delete(existing)
-            candidatesByID[candidatePlan.id] = nil
+            candidatesByID[candidateMutation.id] = nil
         case .add, .update, .noop:
-            guard let snapshot = candidatePlan.snapshot else { return }
-            let fields = BASMemoryPersistenceApplier.candidateFields(from: snapshot)
-            if let existing = candidatesByID[candidatePlan.id] {
+            guard let fields = candidateMutation.fields else { return }
+            if let existing = candidatesByID[candidateMutation.id] {
                 apply(candidateFields: fields, to: existing)
             } else {
                 let candidate = makeCandidate(from: fields)
