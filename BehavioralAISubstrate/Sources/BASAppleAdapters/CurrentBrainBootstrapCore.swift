@@ -147,6 +147,84 @@ public struct BASCurrentBrainBootstrapExecution: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASAppleCurrentBrainBootstrapTemplateInput: Codable, Equatable, Sendable {
+    public var id: String
+    public var mode: BASDecisionMode
+    public var riskLevel: BASRiskLevel
+    public var isPinned: Bool
+    public var successCount: Int
+    public var updatedAt: Date
+
+    public init(
+        id: String,
+        mode: BASDecisionMode,
+        riskLevel: BASRiskLevel,
+        isPinned: Bool,
+        successCount: Int,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.mode = mode
+        self.riskLevel = riskLevel
+        self.isPinned = isPinned
+        self.successCount = successCount
+        self.updatedAt = updatedAt
+    }
+}
+
+public struct BASAppleCurrentBrainBootstrapFailurePatternInput: Codable, Equatable, Sendable {
+    public var id: String
+    public var mode: BASDecisionMode
+    public var suppressionWeight: Double
+    public var evidenceCount: Int
+    public var updatedAt: Date
+
+    public init(
+        id: String,
+        mode: BASDecisionMode,
+        suppressionWeight: Double,
+        evidenceCount: Int,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.mode = mode
+        self.suppressionWeight = suppressionWeight
+        self.evidenceCount = evidenceCount
+        self.updatedAt = updatedAt
+    }
+}
+
+public struct BASAppleCurrentBrainBootstrapRequest: Codable, Equatable, Sendable {
+    public var preparation: BASCurrentBrainBootstrapPreparation
+    public var baseProjection: BASBrainProjection
+    public var embeddingScores: [BASAppleEmbeddingScoreInput]
+    public var taskGraphHint: BASBrainTaskGraphHint?
+    public var retrievalMode: String
+    public var recommendedTemplateIDs: [String]
+    public var templates: [BASAppleCurrentBrainBootstrapTemplateInput]
+    public var failurePatterns: [BASAppleCurrentBrainBootstrapFailurePatternInput]
+
+    public init(
+        preparation: BASCurrentBrainBootstrapPreparation,
+        baseProjection: BASBrainProjection,
+        embeddingScores: [BASAppleEmbeddingScoreInput] = [],
+        taskGraphHint: BASBrainTaskGraphHint? = nil,
+        retrievalMode: String,
+        recommendedTemplateIDs: [String] = [],
+        templates: [BASAppleCurrentBrainBootstrapTemplateInput],
+        failurePatterns: [BASAppleCurrentBrainBootstrapFailurePatternInput]
+    ) {
+        self.preparation = preparation
+        self.baseProjection = baseProjection
+        self.embeddingScores = embeddingScores
+        self.taskGraphHint = taskGraphHint
+        self.retrievalMode = retrievalMode
+        self.recommendedTemplateIDs = recommendedTemplateIDs
+        self.templates = templates
+        self.failurePatterns = failurePatterns
+    }
+}
+
 public enum BASCurrentBrainBootstrapCoordinator {
     public static func prepare(
         request: BASCurrentBrainBootstrapPreparationRequest
@@ -227,5 +305,43 @@ public enum BASCurrentBrainBootstrapCoordinator {
         default:
             sourceSurface
         }
+    }
+}
+
+public enum BASAppleCurrentBrainBootstrapAdapter {
+    public static func bootstrap(
+        request: BASAppleCurrentBrainBootstrapRequest
+    ) -> BASCurrentBrainBootstrapExecution {
+        BASCurrentBrainBootstrapCoordinator.bootstrap(
+            request: BASCurrentBrainBootstrapExecutionRequest(
+                preparation: request.preparation,
+                projection: BASAppleMemoryProjectionAdapter.overlayEmbeddingScores(
+                    request.embeddingScores,
+                    on: request.baseProjection
+                ),
+                taskGraphHint: request.taskGraphHint,
+                retrievalMode: request.retrievalMode,
+                recommendedTemplateIDs: request.recommendedTemplateIDs,
+                templates: request.templates.map { template in
+                    BASInterventionTemplateDescriptor(
+                        id: template.id,
+                        mode: template.mode,
+                        riskLevel: template.riskLevel,
+                        isPinned: template.isPinned,
+                        successCount: template.successCount,
+                        updatedAt: template.updatedAt
+                    )
+                },
+                failurePatterns: request.failurePatterns.map { pattern in
+                    BASFailurePatternDescriptor(
+                        id: pattern.id,
+                        mode: pattern.mode,
+                        suppressionWeight: pattern.suppressionWeight,
+                        evidenceCount: pattern.evidenceCount,
+                        updatedAt: pattern.updatedAt
+                    )
+                }
+            )
+        )
     }
 }

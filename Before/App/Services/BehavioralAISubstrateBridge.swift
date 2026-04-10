@@ -185,18 +185,20 @@ enum BehavioralAISubstrateBridge {
         templates: [InterventionTemplateRecord],
         failurePatterns: [FailurePatternRecord]
     ) -> CurrentBrainBootstrapExecution {
-        let execution = BASCurrentBrainBootstrapCoordinator.bootstrap(
-            request: BASCurrentBrainBootstrapExecutionRequest(
+        let execution = BASAppleCurrentBrainBootstrapAdapter.bootstrap(
+            request: BASAppleCurrentBrainBootstrapRequest(
                 preparation: preparation.substratePreparation,
-                projection: brainProjection(
-                    from: projection,
-                    prompt: preparation.substratePreparation.prompt
-                ),
+                baseProjection: projection.baseProjection,
+                embeddingScores: EmbeddingMemoryStore.query(
+                    preparation.substratePreparation.prompt,
+                    allowedTiers: [.hot, .warm],
+                    limit: 12
+                ).map { BASAppleEmbeddingScoreInput(id: $0.id, score: $0.score) },
                 taskGraphHint: taskGraph.map(taskGraphHint(from:)),
                 retrievalMode: retrievalMode.rawValue,
                 recommendedTemplateIDs: recommendedTemplateIDs,
                 templates: templates.map { template in
-                    BASInterventionTemplateDescriptor(
+                    BASAppleCurrentBrainBootstrapTemplateInput(
                         id: template.id,
                         mode: substrateMode(from: template.mode),
                         riskLevel: self.riskLevel(from: template.riskLevel),
@@ -206,7 +208,7 @@ enum BehavioralAISubstrateBridge {
                     )
                 },
                 failurePatterns: failurePatterns.map { pattern in
-                    BASFailurePatternDescriptor(
+                    BASAppleCurrentBrainBootstrapFailurePatternInput(
                         id: pattern.id,
                         mode: substrateMode(from: pattern.mode),
                         suppressionWeight: pattern.suppressionWeight,
@@ -251,15 +253,20 @@ enum BehavioralAISubstrateBridge {
             memorySource: memorySource(for: source, mode: mode),
             now: now
         )
-        let execution = BASCurrentBrainBootstrapCoordinator.bootstrap(
-            request: BASCurrentBrainBootstrapExecutionRequest(
+        let execution = BASAppleCurrentBrainBootstrapAdapter.bootstrap(
+            request: BASAppleCurrentBrainBootstrapRequest(
                 preparation: preparation,
-                projection: brainProjection(from: projection, prompt: prompt),
+                baseProjection: projection.baseProjection,
+                embeddingScores: EmbeddingMemoryStore.query(
+                    prompt,
+                    allowedTiers: [.hot, .warm],
+                    limit: 12
+                ).map { BASAppleEmbeddingScoreInput(id: $0.id, score: $0.score) },
                 taskGraphHint: taskGraph.map(taskGraphHint(from:)),
                 retrievalMode: retrievalMode.rawValue,
                 recommendedTemplateIDs: activeTemplateIDs,
                 templates: activeTemplateIDs.map {
-                    BASInterventionTemplateDescriptor(
+                    BASAppleCurrentBrainBootstrapTemplateInput(
                         id: $0,
                         mode: substrateMode(from: mode),
                         riskLevel: self.riskLevel(from: riskLevel),
@@ -269,7 +276,7 @@ enum BehavioralAISubstrateBridge {
                     )
                 },
                 failurePatterns: failureGuardIDs.map {
-                    BASFailurePatternDescriptor(
+                    BASAppleCurrentBrainBootstrapFailurePatternInput(
                         id: $0,
                         mode: substrateMode(from: mode),
                         suppressionWeight: 1,
@@ -382,20 +389,6 @@ enum BehavioralAISubstrateBridge {
             riskLevel: substrateRiskLevel(from: riskLevel),
             retrievalMode: retrievalMode.rawValue,
             now: now
-        )
-    }
-
-    static func brainProjection(
-        from projection: DecisionMemorySystem.BrainStateProjection,
-        prompt: String
-    ) -> BASBrainProjection {
-        BASAppleMemoryProjectionAdapter.overlayEmbeddingScores(
-            EmbeddingMemoryStore.query(
-                prompt,
-                allowedTiers: [.hot, .warm],
-                limit: 12
-            ).map { BASAppleEmbeddingScoreInput(id: $0.id, score: $0.score) },
-            on: projection.baseProjection
         )
     }
 

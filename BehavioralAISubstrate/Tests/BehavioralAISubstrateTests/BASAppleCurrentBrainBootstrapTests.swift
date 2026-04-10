@@ -127,4 +127,93 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(execution.bootstrapped.brainState.boundaryPolicy.riskLevel == .medium)
         #expect(execution.bootstrapped.brainState.memorySlices.contains(where: { $0.role == .goal }))
     }
+
+    @Test("apple bootstrap adapter owns projection enrichment and intervention descriptor shaping")
+    func appleBootstrapAdapterOwnsProjectionEnrichmentAndDescriptors() {
+        let now = Date(timeIntervalSince1970: 1_744_321_900)
+        let preparation = BASCurrentBrainBootstrapPreparation(
+            mode: .mirror,
+            prompt: "Should I reopen this conflict tonight?",
+            trigger: .watchHandoff,
+            sourceSurface: .watch,
+            riskLevel: .high,
+            languageMode: .english,
+            memorySource: .reflection,
+            now: now
+        )
+        let baseProjection = BASBrainProjection(
+            records: [
+                BASGovernedMemory(
+                    id: UUID(uuidString: "00000000-0000-0000-0000-000000000111")!,
+                    kind: .goal,
+                    content: "Protect sleep before replying at night.",
+                    scope: .user,
+                    sensitivity: .low,
+                    tier: .hot,
+                    confidence: 0.95,
+                    sourceType: "history",
+                    governanceStatus: .governed,
+                    provenanceSummary: "Repeated reflection"
+                )
+            ],
+            candidates: [],
+            recentEvents: []
+        )
+
+        let execution = BASAppleCurrentBrainBootstrapAdapter.bootstrap(
+            request: BASAppleCurrentBrainBootstrapRequest(
+                preparation: preparation,
+                baseProjection: baseProjection,
+                embeddingScores: [
+                    BASAppleEmbeddingScoreInput(
+                        id: "00000000-0000-0000-0000-000000000111",
+                        score: 0.88
+                    )
+                ],
+                taskGraphHint: BASBrainTaskGraphHint(
+                    headline: "Wait until morning before sending anything.",
+                    activeNodeCount: 2,
+                    hasResumeCandidate: true,
+                    resumeHint: "Review after sleep."
+                ),
+                retrievalMode: "adaptive",
+                recommendedTemplateIDs: ["night_message_cooling"],
+                templates: [
+                    BASAppleCurrentBrainBootstrapTemplateInput(
+                        id: "fallback_template",
+                        mode: .mirror,
+                        riskLevel: .high,
+                        isPinned: false,
+                        successCount: 4,
+                        updatedAt: now
+                    ),
+                    BASAppleCurrentBrainBootstrapTemplateInput(
+                        id: "night_message_cooling",
+                        mode: .mirror,
+                        riskLevel: .high,
+                        isPinned: true,
+                        successCount: 2,
+                        updatedAt: now.addingTimeInterval(-30)
+                    )
+                ],
+                failurePatterns: [
+                    BASAppleCurrentBrainBootstrapFailurePatternInput(
+                        id: "night_fast_path_failure",
+                        mode: .mirror,
+                        suppressionWeight: 0.95,
+                        evidenceCount: 3,
+                        updatedAt: now
+                    )
+                ]
+            )
+        )
+
+        #expect(execution.orderedTemplateIDs == ["night_message_cooling", "fallback_template"])
+        #expect(execution.orderedFailurePatternIDs == ["night_fast_path_failure"])
+        #expect(execution.bootstrapped.taskGraphHint?.headline == "Wait until morning before sending anything.")
+        #expect(execution.bootstrapped.activeTemplateIDs == execution.orderedTemplateIDs)
+        #expect(execution.bootstrapped.failureGuardIDs == execution.orderedFailurePatternIDs)
+        #expect(execution.bootstrapped.brainState.boundaryPolicy.riskLevel == .high)
+        #expect(execution.bootstrapped.brainState.memorySlices.contains(where: { $0.headline.contains("Protect sleep") }))
+    }
 }

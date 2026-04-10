@@ -56,7 +56,93 @@ public struct BASAppleAdaptiveRuntimeInput: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASAppleAdaptiveMatrixRequest: Codable, Equatable, Sendable {
+    public var executionTierID: String
+    public var preferredProviderID: String
+    public var allowFallbacks: Bool
+    public var isSimulator: Bool
+    public var physicalMemoryGB: Int
+    public var isLowPowerModeEnabled: Bool
+    public var preferredLanguages: [String]
+
+    public init(
+        executionTierID: String,
+        preferredProviderID: String,
+        allowFallbacks: Bool,
+        isSimulator: Bool,
+        physicalMemoryGB: Int,
+        isLowPowerModeEnabled: Bool,
+        preferredLanguages: [String]
+    ) {
+        self.executionTierID = executionTierID
+        self.preferredProviderID = preferredProviderID
+        self.allowFallbacks = allowFallbacks
+        self.isSimulator = isSimulator
+        self.physicalMemoryGB = physicalMemoryGB
+        self.isLowPowerModeEnabled = isLowPowerModeEnabled
+        self.preferredLanguages = preferredLanguages
+    }
+}
+
+public struct BASAppleAdaptiveMatrixCompilation: Codable, Equatable, Sendable {
+    public var matrix: BASAdaptiveRuntimeMatrix
+    public var preferredProviderIDByKind: [String: String]
+
+    public init(
+        matrix: BASAdaptiveRuntimeMatrix,
+        preferredProviderIDByKind: [String: String]
+    ) {
+        self.matrix = matrix
+        self.preferredProviderIDByKind = preferredProviderIDByKind
+    }
+}
+
 public enum BASAppleAdaptiveRuntimeAdapter {
+    public static func compileMatrix(
+        request: BASAppleAdaptiveMatrixRequest
+    ) -> BASAppleAdaptiveMatrixCompilation {
+        let runtimeGear = runtimeGear(for: request.executionTierID)
+        let languageMode = BASLanguageMode.detect(preferredLanguages: request.preferredLanguages)
+        let deviceProfile = substrateDeviceProfile(for: request)
+        let matrix = BASAdaptiveRuntimeMatrixResolver.resolve(
+            request: BASAdaptiveRuntimeMatrixRequest(
+                runtimeGear: runtimeGear,
+                environmentClass: BASAdaptiveRuntimeMatrixResolver.environmentClass(for: deviceProfile),
+                deviceClass: BASAdaptiveRuntimeMatrixResolver.deviceClass(for: deviceProfile),
+                languageMode: languageMode,
+                allowFallbacks: request.allowFallbacks,
+                allowsModelInvocationByKind: Dictionary(
+                    uniqueKeysWithValues: BASAdaptiveTraceKind.allCases.map { kind in
+                        (
+                            kind,
+                            providerPreferenceID(
+                                for: kind.rawValue,
+                                executionTierID: request.executionTierID,
+                                preferredProviderID: request.preferredProviderID
+                            ) != BASReferenceProviderRuntime.templateProviderID
+                        )
+                    }
+                )
+            )
+        )
+
+        return BASAppleAdaptiveMatrixCompilation(
+            matrix: matrix,
+            preferredProviderIDByKind: Dictionary(
+                uniqueKeysWithValues: BASAdaptiveTraceKind.allCases.map { kind in
+                    (
+                        kind.rawValue,
+                        providerPreferenceID(
+                            for: kind.rawValue,
+                            executionTierID: request.executionTierID,
+                            preferredProviderID: request.preferredProviderID
+                        )
+                    )
+                }
+            )
+        )
+    }
+
     public static func compileSignals(
         from input: BASAppleAdaptiveRuntimeInput
     ) -> BASAdaptiveRuntimeSignals {
@@ -103,6 +189,50 @@ public enum BASAppleAdaptiveRuntimeAdapter {
                 normalized.contains("brief") ||
                 normalized.contains("concrete") ||
                 normalized.contains("avoid heavy analysis")
+        }
+    }
+
+    private static func substrateDeviceProfile(
+        for request: BASAppleAdaptiveMatrixRequest
+    ) -> BASDeviceProfile {
+        BASDeviceProfile(
+            modelName: request.isSimulator ? "simulator" : "iphone-\(request.physicalMemoryGB)gb",
+            memoryMB: request.physicalMemoryGB * 1024,
+            batteryLevel: request.isLowPowerModeEnabled ? 0.18 : 1.0,
+            lowPowerMode: request.isLowPowerModeEnabled,
+            thermalState: request.isLowPowerModeEnabled ? "low_power" : "nominal"
+        )
+    }
+
+    private static func runtimeGear(for executionTierID: String) -> BASRuntimeGear {
+        switch executionTierID {
+        case "testingOverride", "fullGemma":
+            .high
+        case "balancedGemma", "systemManaged":
+            .balanced
+        case "off", "simulator", "conservativeDeterministic":
+            .low
+        default:
+            .low
+        }
+    }
+
+    private static func providerPreferenceID(
+        for kindID: String,
+        executionTierID: String,
+        preferredProviderID: String
+    ) -> String {
+        switch executionTierID {
+        case "off", "simulator", "conservativeDeterministic":
+            BASReferenceProviderRuntime.templateProviderID
+        case "balancedGemma":
+            kindID == BASAdaptiveTraceKind.quick.rawValue
+                ? BASReferenceProviderRuntime.templateProviderID
+                : preferredProviderID
+        case "testingOverride", "fullGemma", "systemManaged":
+            preferredProviderID
+        default:
+            preferredProviderID
         }
     }
 }

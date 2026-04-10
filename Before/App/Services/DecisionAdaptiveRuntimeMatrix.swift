@@ -386,42 +386,27 @@ enum DecisionAdaptiveRuntimeMatrixResolver {
         device: DeviceCapabilitySnapshot,
         preferredLanguages: [String] = Locale.preferredLanguages
     ) -> DecisionAdaptiveRuntimeMatrix {
-        let runtimeGear = runtimeGear(for: tier)
-        let languageMode = DecisionLanguageMode.detect(preferredLanguages: preferredLanguages)
-        let deviceProfile = substrateDeviceProfile(for: device)
-        let substrateMatrix = BASAdaptiveRuntimeMatrixResolver.resolve(
-            request: BASAdaptiveRuntimeMatrixRequest(
-                runtimeGear: runtimeGear.basRuntimeGear,
-                environmentClass: BASAdaptiveRuntimeMatrixResolver.environmentClass(for: deviceProfile),
-                deviceClass: BASAdaptiveRuntimeMatrixResolver.deviceClass(for: deviceProfile),
-                languageMode: languageMode.basLanguageMode,
+        let compilation = BASAppleAdaptiveRuntimeAdapter.compileMatrix(
+            request: BASAppleAdaptiveMatrixRequest(
+                executionTierID: tier.rawValue,
+                preferredProviderID: preference.rawValue,
                 allowFallbacks: allowFallbacks,
-                allowsModelInvocationByKind: Dictionary(
-                    uniqueKeysWithValues: DecisionIntelligenceTraceKind.allCases.map { kind in
-                        (
-                            kind.basAdaptiveTraceKind,
-                            providerPreference(
-                                for: kind,
-                                tier: tier,
-                                preference: preference
-                            ) != .template
-                        )
-                    }
-                )
+                isSimulator: device.isSimulator,
+                physicalMemoryGB: device.physicalMemoryGB,
+                isLowPowerModeEnabled: device.isLowPowerModeEnabled,
+                preferredLanguages: preferredLanguages
             )
         )
 
         let strategies = Dictionary(
             uniqueKeysWithValues: DecisionIntelligenceTraceKind.allCases.map { kind in
-                let preferredProvider = providerPreference(
-                    for: kind,
-                    tier: tier,
-                    preference: preference
-                )
+                let preferredProvider = compilation.preferredProviderIDByKind[kind.rawValue]
+                    .flatMap(DecisionModelProviderPreference.init(rawValue:))
+                    ?? .template
                 return (
                     kind,
                     DecisionAdaptiveTaskStrategy(
-                        substrate: substrateMatrix.strategy(for: kind.basAdaptiveTraceKind),
+                        substrate: compilation.matrix.strategy(for: kind.basAdaptiveTraceKind),
                         preferredProvider: preferredProvider
                     )
                 )
@@ -429,50 +414,12 @@ enum DecisionAdaptiveRuntimeMatrixResolver {
         )
 
         return DecisionAdaptiveRuntimeMatrix(
-            runtimeGear: DecisionRuntimeGear(substrateMatrix.runtimeGear),
-            environmentClass: DecisionEnvironmentClass(substrateMatrix.environmentClass),
-            deviceClass: DecisionDevicePerformanceClass(substrateMatrix.deviceClass),
-            languageMode: DecisionLanguageMode(substrateMatrix.languageMode),
+            runtimeGear: DecisionRuntimeGear(compilation.matrix.runtimeGear),
+            environmentClass: DecisionEnvironmentClass(compilation.matrix.environmentClass),
+            deviceClass: DecisionDevicePerformanceClass(compilation.matrix.deviceClass),
+            languageMode: DecisionLanguageMode(compilation.matrix.languageMode),
             strategiesByKind: strategies
         )
-    }
-
-    private static func substrateDeviceProfile(
-        for device: DeviceCapabilitySnapshot
-    ) -> BASDeviceProfile {
-        BASDeviceProfile(
-            modelName: device.isSimulator ? "simulator" : "iphone-\(device.physicalMemoryGB)gb",
-            memoryMB: device.physicalMemoryGB * 1024,
-            batteryLevel: device.isLowPowerModeEnabled ? 0.18 : 1.0,
-            lowPowerMode: device.isLowPowerModeEnabled,
-            thermalState: device.isLowPowerModeEnabled ? "low_power" : "nominal"
-        )
-    }
-
-    private static func runtimeGear(for tier: DecisionIntelligenceExecutionTier) -> DecisionRuntimeGear {
-        switch tier {
-        case .off, .simulator, .conservativeDeterministic:
-            .low
-        case .balancedGemma, .systemManaged:
-            .balanced
-        case .testingOverride, .fullGemma:
-            .high
-        }
-    }
-
-    private static func providerPreference(
-        for kind: DecisionIntelligenceTraceKind,
-        tier: DecisionIntelligenceExecutionTier,
-        preference: DecisionModelProviderPreference
-    ) -> DecisionModelProviderPreference {
-        switch tier {
-        case .off, .simulator, .conservativeDeterministic:
-            return .template
-        case .balancedGemma:
-            return kind == .quick ? .template : preference
-        case .testingOverride, .fullGemma, .systemManaged:
-            return preference
-        }
     }
 }
 
