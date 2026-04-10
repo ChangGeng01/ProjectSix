@@ -94,6 +94,25 @@ public struct BASAppleRuntimeInspectionAdapterInput: Codable, Sendable, Equatabl
     }
 }
 
+public struct BASAppleRuntimeInspectionTraceSourceInput: Codable, Sendable, Equatable {
+    public var lifecycle: BASLifecycleTraceInput?
+    public var neural: BASNeuralTraceInput?
+    public var brain: BASBrainTraceInput?
+    public var runtimeInspection: BASRuntimeInspectionTraceInput
+
+    public init(
+        lifecycle: BASLifecycleTraceInput? = nil,
+        neural: BASNeuralTraceInput? = nil,
+        brain: BASBrainTraceInput? = nil,
+        runtimeInspection: BASRuntimeInspectionTraceInput
+    ) {
+        self.lifecycle = lifecycle
+        self.neural = neural
+        self.brain = brain
+        self.runtimeInspection = runtimeInspection
+    }
+}
+
 public struct BASAppleRuntimeInspectionSourceInput: Codable, Sendable, Equatable {
     public var activeProviderID: String
     public var fallbackProviderID: String?
@@ -105,10 +124,7 @@ public struct BASAppleRuntimeInspectionSourceInput: Codable, Sendable, Equatable
     public var preferredProviderRawValueByKind: [String: String]
     public var strategyByKind: [String: BASAdaptiveTaskStrategy]
     public var effectivePreferredProviderRawValueByKind: [String: String]
-    public var lifecycleTraceInputs: [BASLifecycleTraceInput]
-    public var neuralTraceInputs: [BASNeuralTraceInput]
-    public var brainTraceInputs: [BASBrainTraceInput]
-    public var traceInputs: [BASRuntimeInspectionTraceInput]
+    public var traceSources: [BASAppleRuntimeInspectionTraceSourceInput]
     public var telemetrySummary: BASTelemetrySummary
     public var totalCacheEntries: Int
     public var totalCacheLookupCount: Int
@@ -135,10 +151,7 @@ public struct BASAppleRuntimeInspectionSourceInput: Codable, Sendable, Equatable
         preferredProviderRawValueByKind: [String: String],
         strategyByKind: [String: BASAdaptiveTaskStrategy],
         effectivePreferredProviderRawValueByKind: [String: String],
-        lifecycleTraceInputs: [BASLifecycleTraceInput],
-        neuralTraceInputs: [BASNeuralTraceInput],
-        brainTraceInputs: [BASBrainTraceInput],
-        traceInputs: [BASRuntimeInspectionTraceInput],
+        traceSources: [BASAppleRuntimeInspectionTraceSourceInput],
         telemetrySummary: BASTelemetrySummary,
         totalCacheEntries: Int,
         totalCacheLookupCount: Int,
@@ -164,10 +177,7 @@ public struct BASAppleRuntimeInspectionSourceInput: Codable, Sendable, Equatable
         self.preferredProviderRawValueByKind = preferredProviderRawValueByKind
         self.strategyByKind = strategyByKind
         self.effectivePreferredProviderRawValueByKind = effectivePreferredProviderRawValueByKind
-        self.lifecycleTraceInputs = lifecycleTraceInputs
-        self.neuralTraceInputs = neuralTraceInputs
-        self.brainTraceInputs = brainTraceInputs
-        self.traceInputs = traceInputs
+        self.traceSources = traceSources
         self.telemetrySummary = telemetrySummary
         self.totalCacheEntries = totalCacheEntries
         self.totalCacheLookupCount = totalCacheLookupCount
@@ -211,14 +221,19 @@ public enum BASAppleRuntimeInspectionBuilder {
     public static func build(
         from input: BASAppleRuntimeInspectionSourceInput
     ) -> BASAppleRuntimeInspectionCompilation {
+        let lifecycleTraceInputs = input.traceSources.compactMap(\.lifecycle)
+        let neuralTraceInputs = input.traceSources.compactMap(\.neural)
+        let brainTraceInputs = input.traceSources.compactMap(\.brain)
+        let runtimeInspectionTraceInputs = input.traceSources.map(\.runtimeInspection)
+
         let lifecycleSummary = BASLifecycleSummaryBuilder.build(
-            from: input.lifecycleTraceInputs
+            from: lifecycleTraceInputs
         )
         let neuralSummary = BASNeuralSummaryBuilder.build(
-            from: input.neuralTraceInputs
+            from: neuralTraceInputs
         )
         let brainSummary = BASBrainSummaryBuilder.build(
-            from: input.brainTraceInputs
+            from: brainTraceInputs
         )
         let runtimeInspectionInput = BASAppleObservabilityAdapter.compileRuntimeInspectionInput(
             from: BASAppleRuntimeInspectionAdapterInput(
@@ -232,7 +247,7 @@ public enum BASAppleRuntimeInspectionBuilder {
                 preferredProviderRawValueByKind: input.preferredProviderRawValueByKind,
                 strategyByKind: input.strategyByKind,
                 effectivePreferredProviderRawValueByKind: input.effectivePreferredProviderRawValueByKind,
-                traceInputs: input.traceInputs,
+                traceInputs: runtimeInspectionTraceInputs,
                 telemetrySummary: input.telemetrySummary,
                 lifecycleSummary: lifecycleSummary,
                 neuralSummary: neuralSummary,

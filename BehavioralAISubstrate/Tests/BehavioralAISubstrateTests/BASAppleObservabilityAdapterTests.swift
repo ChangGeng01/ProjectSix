@@ -363,83 +363,79 @@ struct BASAppleObservabilityAdapterTests {
                     )
                 ],
                 effectivePreferredProviderRawValueByKind: ["quick": "gemmaE4B"],
-                lifecycleTraceInputs: [
-                    BASLifecycleTraceInput(
-                        kind: "quick",
-                        hasContextState: true,
-                        generation: 3,
-                        rebuiltSession: true,
-                        staleFieldCount: 1,
-                        anchorFieldCount: 2,
-                        hasFrontstageState: true,
-                        retainedEvidenceCount: 2,
-                        droppedEvidenceCount: 1,
-                        droppedInjectedEvidenceCount: 1,
-                        droppedDuplicateEvidenceCount: 0,
-                        droppedBudgetEvidenceCount: 0
-                    )
-                ],
-                neuralTraceInputs: [
-                    BASNeuralTraceInput(
-                        kind: "quick",
-                        suppressedBehaviorCount: 1,
-                        dominantActionRawValue: "encourage",
-                        strongestSignalRawValue: "urgency"
-                    )
-                ],
-                brainTraceInputs: [
-                    BASBrainTraceInput(
-                        kind: "quick",
-                        dominantReactionWeight: .briefLanguage,
-                        profileCoreCount: 1,
-                        activeGoalCount: 1,
-                        relevantMemoryCount: 2,
-                        loadedPromotedMemoryCount: 2,
-                        loadedPendingMemoryCount: 1,
-                        pendingCandidateCount: 1,
-                        promotedRecordCount: 4,
-                        screenedOutMemoryCount: 0,
-                        loadedEligibilityReasonCounts: [:],
-                        screenedOutEligibilityReasonCounts: [:],
-                        snapshotFingerprint: "brain_fp",
-                        lowTrustMemoryLoadRate: 0.25,
-                        riskFlags: [.lowTrustLoad],
-                        identityRole: .pauseCompanion,
-                        boundaryMode: .localOnlyAdvisory,
-                        activeConstraints: [.lockSensitiveMemory],
-                        calibrationStatus: .stable,
-                        calibrationAlerts: [],
-                        evolutionCheckpointCount: 2,
-                        evolutionPendingReviewCount: 0,
-                        evolutionRollbackReady: true
-                    )
-                ],
-                traceInputs: [
-                    BASRuntimeInspectionTraceInput(
-                        kind: "quick",
-                        attemptedProviderIDs: ["gemmaE4B"],
-                        runtimeStrategy: BASAdaptiveTaskStrategy(
-                            kind: .quick,
-                            entropy: .low,
-                            runtimeGear: .balanced,
-                            contextBudget: 320,
-                            outputCharacterBudget: 180,
-                            timeBudgetMs: 900,
-                            toolCallBudget: 0,
-                            retrievalItemBudget: 2,
-                            retrievalMode: .filtered,
-                            thinkingMode: .off,
-                            outputMode: .guidedShort,
-                            tone: .briefWarm,
-                            actionSpace: ["encourage"],
-                            responseLanguage: .english,
-                            allowsModelInvocation: true
+                traceSources: [
+                    BASAppleRuntimeInspectionTraceSourceInput(
+                        lifecycle: BASLifecycleTraceInput(
+                            kind: "quick",
+                            hasContextState: true,
+                            generation: 3,
+                            rebuiltSession: true,
+                            staleFieldCount: 1,
+                            anchorFieldCount: 2,
+                            hasFrontstageState: true,
+                            retainedEvidenceCount: 2,
+                            droppedEvidenceCount: 1,
+                            droppedInjectedEvidenceCount: 1,
+                            droppedDuplicateEvidenceCount: 0,
+                            droppedBudgetEvidenceCount: 0
                         ),
-                        semanticPromptFingerprint: "semantic_fp",
-                        stablePrefixFingerprint: "prefix_fp",
-                        consistencyChecked: true,
-                        consistencyRejected: false,
-                        consistencyViolationKinds: []
+                        neural: BASNeuralTraceInput(
+                            kind: "quick",
+                            suppressedBehaviorCount: 1,
+                            dominantActionRawValue: "encourage",
+                            strongestSignalRawValue: "urgency"
+                        ),
+                        brain: BASBrainTraceInput(
+                            kind: "quick",
+                            dominantReactionWeight: .briefLanguage,
+                            profileCoreCount: 1,
+                            activeGoalCount: 1,
+                            relevantMemoryCount: 2,
+                            loadedPromotedMemoryCount: 2,
+                            loadedPendingMemoryCount: 1,
+                            pendingCandidateCount: 1,
+                            promotedRecordCount: 4,
+                            screenedOutMemoryCount: 0,
+                            loadedEligibilityReasonCounts: [:],
+                            screenedOutEligibilityReasonCounts: [:],
+                            snapshotFingerprint: "brain_fp",
+                            lowTrustMemoryLoadRate: 0.25,
+                            riskFlags: [.lowTrustLoad],
+                            identityRole: .pauseCompanion,
+                            boundaryMode: .localOnlyAdvisory,
+                            activeConstraints: [.lockSensitiveMemory],
+                            calibrationStatus: .stable,
+                            calibrationAlerts: [],
+                            evolutionCheckpointCount: 2,
+                            evolutionPendingReviewCount: 0,
+                            evolutionRollbackReady: true
+                        ),
+                        runtimeInspection: BASRuntimeInspectionTraceInput(
+                            kind: "quick",
+                            attemptedProviderIDs: ["gemmaE4B"],
+                            runtimeStrategy: BASAdaptiveTaskStrategy(
+                                kind: .quick,
+                                entropy: .low,
+                                runtimeGear: .balanced,
+                                contextBudget: 320,
+                                outputCharacterBudget: 180,
+                                timeBudgetMs: 900,
+                                toolCallBudget: 0,
+                                retrievalItemBudget: 2,
+                                retrievalMode: .filtered,
+                                thinkingMode: .off,
+                                outputMode: .guidedShort,
+                                tone: .briefWarm,
+                                actionSpace: ["encourage"],
+                                responseLanguage: .english,
+                                allowsModelInvocation: true
+                            ),
+                            semanticPromptFingerprint: "semantic_fp",
+                            stablePrefixFingerprint: "prefix_fp",
+                            consistencyChecked: true,
+                            consistencyRejected: false,
+                            consistencyViolationKinds: []
+                        )
                     )
                 ],
                 telemetrySummary: telemetrySummary,

@@ -69,79 +69,68 @@ struct DecisionTestingRuntimeExport {
         )
     }
 
-    private var lifecycleTraceInputs: [BASLifecycleTraceInput] {
+    private var traceSources: [BASAppleRuntimeInspectionTraceSourceInput] {
         recentTraces.map { trace in
-            BASLifecycleTraceInput(
-                kind: trace.kind.rawValue,
-                hasContextState: trace.contextState != nil,
-                generation: trace.contextState?.generation,
-                rebuiltSession: trace.contextState?.rebuiltSession ?? false,
-                staleFieldCount: trace.contextState?.staleFieldCount ?? 0,
-                anchorFieldCount: trace.contextState?.anchorFieldCount ?? 0,
-                hasFrontstageState: trace.frontstageState != nil,
-                retainedEvidenceCount: trace.frontstageState?.retainedEvidenceCount ?? 0,
-                droppedEvidenceCount: trace.frontstageState?.droppedEvidenceCount ?? 0,
-                droppedInjectedEvidenceCount: trace.frontstageState?.droppedInjectedEvidenceCount ?? 0,
-                droppedDuplicateEvidenceCount: trace.frontstageState?.droppedDuplicateEvidenceCount ?? 0,
-                droppedBudgetEvidenceCount: trace.frontstageState?.droppedBudgetEvidenceCount ?? 0
-            )
-        }
-    }
-
-    private var neuralTraceInputs: [BASNeuralTraceInput] {
-        recentTraces.compactMap { trace in
-            guard let neuralState = trace.neuralState else { return nil }
-            return BASNeuralTraceInput(
-                kind: trace.kind.rawValue,
-                suppressedBehaviorCount: neuralState.suppressedBehaviors.count,
-                dominantActionRawValue: neuralState.dominantAction?.rawValue,
-                strongestSignalRawValue: neuralState.dominantActivations.first?.signal.rawValue
-            )
-        }
-    }
-
-    private var brainTraceInputs: [BASBrainTraceInput] {
-        recentTraces.compactMap { trace in
-            guard let brainState = trace.brainState else { return nil }
-            return BASBrainTraceInput(
-                kind: trace.kind.rawValue,
-                dominantReactionWeight: brainState.reactionWeights.dominantKey,
-                profileCoreCount: brainState.profileCore.count,
-                activeGoalCount: brainState.activeGoals.count,
-                relevantMemoryCount: brainState.relevantMemories.count,
-                loadedPromotedMemoryCount: brainState.memoryGovernance.loadedPromotedMemoryCount,
-                loadedPendingMemoryCount: brainState.memoryGovernance.loadedPendingMemoryCount,
-                pendingCandidateCount: brainState.memoryGovernance.pendingCandidateCount,
-                promotedRecordCount: brainState.memoryGovernance.totalRecordCount,
-                screenedOutMemoryCount: brainState.memoryGovernance.screenedOutMemoryCount,
-                loadedEligibilityReasonCounts: brainState.memoryGovernance.loadedReasonCounts,
-                screenedOutEligibilityReasonCounts: brainState.memoryGovernance.screenedOutReasonCounts,
-                snapshotFingerprint: brainState.verificationSnapshot.fingerprint,
-                lowTrustMemoryLoadRate: brainState.verificationSnapshot.lowTrustMemoryLoadRate,
-                riskFlags: brainState.verificationSnapshot.riskFlags,
-                identityRole: brainState.identityProfile.role,
-                boundaryMode: brainState.boundaryPolicy.mode,
-                activeConstraints: brainState.boundaryPolicy.activeConstraints,
-                calibrationStatus: brainState.calibrationState.status,
-                calibrationAlerts: brainState.calibrationState.alerts,
-                evolutionCheckpointCount: brainState.evolutionState.checkpointCount,
-                evolutionPendingReviewCount: brainState.evolutionState.pendingReviewCount,
-                evolutionRollbackReady: brainState.evolutionState.rollbackReady
-            )
-        }
-    }
-
-    private var runtimeInspectionTraceInputs: [BASRuntimeInspectionTraceInput] {
-        recentTraces.map { trace in
-            BASRuntimeInspectionTraceInput(
-                kind: trace.kind.rawValue,
-                attemptedProviderIDs: trace.attemptedProviders.map(\.rawValue),
-                runtimeStrategy: trace.runtimeStrategy.map(substrateAdaptiveStrategy),
-                semanticPromptFingerprint: trace.semanticPromptFingerprint,
-                stablePrefixFingerprint: trace.stablePrefixFingerprint,
-                consistencyChecked: trace.consistencyCheck != nil,
-                consistencyRejected: trace.consistencyRejected,
-                consistencyViolationKinds: trace.consistencyCheck?.violations.map(\.kind) ?? []
+            BASAppleRuntimeInspectionTraceSourceInput(
+                lifecycle: BASLifecycleTraceInput(
+                    kind: trace.kind.rawValue,
+                    hasContextState: trace.contextState != nil,
+                    generation: trace.contextState?.generation,
+                    rebuiltSession: trace.contextState?.rebuiltSession ?? false,
+                    staleFieldCount: trace.contextState?.staleFieldCount ?? 0,
+                    anchorFieldCount: trace.contextState?.anchorFieldCount ?? 0,
+                    hasFrontstageState: trace.frontstageState != nil,
+                    retainedEvidenceCount: trace.frontstageState?.retainedEvidenceCount ?? 0,
+                    droppedEvidenceCount: trace.frontstageState?.droppedEvidenceCount ?? 0,
+                    droppedInjectedEvidenceCount: trace.frontstageState?.droppedInjectedEvidenceCount ?? 0,
+                    droppedDuplicateEvidenceCount: trace.frontstageState?.droppedDuplicateEvidenceCount ?? 0,
+                    droppedBudgetEvidenceCount: trace.frontstageState?.droppedBudgetEvidenceCount ?? 0
+                ),
+                neural: trace.neuralState.map { neuralState in
+                    BASNeuralTraceInput(
+                        kind: trace.kind.rawValue,
+                        suppressedBehaviorCount: neuralState.suppressedBehaviors.count,
+                        dominantActionRawValue: neuralState.dominantAction?.rawValue,
+                        strongestSignalRawValue: neuralState.dominantActivations.first?.signal.rawValue
+                    )
+                },
+                brain: trace.brainState.map { brainState in
+                    BASBrainTraceInput(
+                        kind: trace.kind.rawValue,
+                        dominantReactionWeight: brainState.reactionWeights.dominantKey,
+                        profileCoreCount: brainState.profileCore.count,
+                        activeGoalCount: brainState.activeGoals.count,
+                        relevantMemoryCount: brainState.relevantMemories.count,
+                        loadedPromotedMemoryCount: brainState.memoryGovernance.loadedPromotedMemoryCount,
+                        loadedPendingMemoryCount: brainState.memoryGovernance.loadedPendingMemoryCount,
+                        pendingCandidateCount: brainState.memoryGovernance.pendingCandidateCount,
+                        promotedRecordCount: brainState.memoryGovernance.totalRecordCount,
+                        screenedOutMemoryCount: brainState.memoryGovernance.screenedOutMemoryCount,
+                        loadedEligibilityReasonCounts: brainState.memoryGovernance.loadedReasonCounts,
+                        screenedOutEligibilityReasonCounts: brainState.memoryGovernance.screenedOutReasonCounts,
+                        snapshotFingerprint: brainState.verificationSnapshot.fingerprint,
+                        lowTrustMemoryLoadRate: brainState.verificationSnapshot.lowTrustMemoryLoadRate,
+                        riskFlags: brainState.verificationSnapshot.riskFlags,
+                        identityRole: brainState.identityProfile.role,
+                        boundaryMode: brainState.boundaryPolicy.mode,
+                        activeConstraints: brainState.boundaryPolicy.activeConstraints,
+                        calibrationStatus: brainState.calibrationState.status,
+                        calibrationAlerts: brainState.calibrationState.alerts,
+                        evolutionCheckpointCount: brainState.evolutionState.checkpointCount,
+                        evolutionPendingReviewCount: brainState.evolutionState.pendingReviewCount,
+                        evolutionRollbackReady: brainState.evolutionState.rollbackReady
+                    )
+                },
+                runtimeInspection: BASRuntimeInspectionTraceInput(
+                    kind: trace.kind.rawValue,
+                    attemptedProviderIDs: trace.attemptedProviders.map(\.rawValue),
+                    runtimeStrategy: trace.runtimeStrategy.map(substrateAdaptiveStrategy),
+                    semanticPromptFingerprint: trace.semanticPromptFingerprint,
+                    stablePrefixFingerprint: trace.stablePrefixFingerprint,
+                    consistencyChecked: trace.consistencyCheck != nil,
+                    consistencyRejected: trace.consistencyRejected,
+                    consistencyViolationKinds: trace.consistencyCheck?.violations.map(\.kind) ?? []
+                )
             )
         }
     }
@@ -175,10 +164,7 @@ struct DecisionTestingRuntimeExport {
                 .compactMapValues { grouped in
                     grouped.first?.1
                 },
-                lifecycleTraceInputs: lifecycleTraceInputs,
-                neuralTraceInputs: neuralTraceInputs,
-                brainTraceInputs: brainTraceInputs,
-                traceInputs: runtimeInspectionTraceInputs,
+                traceSources: traceSources,
                 telemetrySummary: intelligenceTelemetry.substrateSummary,
                 totalCacheEntries: cacheTelemetry.entryCountByKind.values.reduce(0, +),
                 totalCacheLookupCount: cacheTelemetry.totalHits + cacheTelemetry.totalMisses,
