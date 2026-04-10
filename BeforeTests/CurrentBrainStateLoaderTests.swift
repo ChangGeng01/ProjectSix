@@ -80,6 +80,41 @@ final class CurrentBrainStateLoaderTests: XCTestCase {
     }
 
     @MainActor
+    func testBootstrapCurrentBrainStateUsesEnvelopeSurfaceAndRiskOverrides() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        seedQuickHistory(into: context)
+        try context.save()
+
+        let bootstrapDate = localDate(year: 2026, month: 4, day: 10, hour: 21, minute: 0)
+        let projection = DecisionMemorySystem.refreshProjection(in: context, now: bootstrapDate)
+
+        let current = CurrentBrainStateLoader.bootstrapCurrentBrainState(
+            mode: .quick,
+            prompt: "Should I send this tonight?",
+            source: .launch,
+            envelope: DecisionIntentEnvelope(
+                kind: .resumeCurrentDecision,
+                sourceSurface: .notification,
+                entrySource: .app,
+                preferredMode: .quick,
+                promptSeed: "Should I send this tonight?",
+                riskLevel: .high,
+                triggerReason: "prediction"
+            ),
+            taskGraph: nil,
+            context: context,
+            projection: projection,
+            retrievalMode: .filtered,
+            now: bootstrapDate
+        )
+
+        XCTAssertEqual(current.sourceSurface, .notification)
+        XCTAssertEqual(current.riskLevel, .high)
+        XCTAssertEqual(current.boundaryPolicy.riskLevel, .high)
+    }
+
+    @MainActor
     func testBootstrapCurrentBrainStateIsStableAcrossRepeatedLoadsForSameProjection() throws {
         let container = try makeContainer()
         let context = container.mainContext

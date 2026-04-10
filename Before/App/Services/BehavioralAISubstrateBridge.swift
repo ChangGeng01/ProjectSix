@@ -6,6 +6,20 @@ import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
 
+struct CurrentBrainBootstrapPreparation: Equatable, Sendable {
+    let sourceSurface: DecisionIntentSourceSurface
+    let riskLevel: InterventionRiskLevel
+    let languageMode: DecisionLanguageMode
+    fileprivate let substratePreparation: BASCurrentBrainBootstrapPreparation
+}
+
+struct CurrentBrainBootstrapExecution: Equatable, Sendable {
+    let preparation: CurrentBrainBootstrapPreparation
+    let bootstrapped: BASBootstrappedBrainState
+    let activeTemplateIDs: [String]
+    let failureGuardIDs: [String]
+}
+
 enum BehavioralAISubstrateBridge {
     static func runtimeContext(from export: DecisionTestingRuntimeExport) -> BASRuntimeContext {
         let adaptationMatrix = export.runtimeSnapshot.executionProfile.adaptationMatrix
@@ -135,6 +149,82 @@ enum BehavioralAISubstrateBridge {
         )
     }
 
+    static func prepareCurrentBrainBootstrap(
+        mode: DecisionMode,
+        prompt: String,
+        source: BrainStateUpdateSource,
+        envelope: DecisionIntentEnvelope?,
+        now: Date
+    ) -> CurrentBrainBootstrapPreparation {
+        let preparation = BASCurrentBrainBootstrapCoordinator.prepare(
+            request: BASCurrentBrainBootstrapPreparationRequest(
+                mode: substrateMode(from: mode),
+                prompt: prompt,
+                trigger: currentBrainBootstrapTrigger(from: source),
+                sourceSurfaceOverride: envelope.map { interactionSurface(from: $0.sourceSurface) },
+                riskLevelOverride: envelope?.riskLevel.map(riskLevel(from:)),
+                preferredLanguages: Locale.preferredLanguages,
+                now: now
+            )
+        )
+
+        return CurrentBrainBootstrapPreparation(
+            sourceSurface: sourceSurface(from: preparation.sourceSurface),
+            riskLevel: interventionRiskLevel(from: preparation.riskLevel),
+            languageMode: decisionLanguageMode(from: preparation.languageMode),
+            substratePreparation: preparation
+        )
+    }
+
+    static func executeCurrentBrainBootstrap(
+        preparation: CurrentBrainBootstrapPreparation,
+        taskGraph: DecisionTaskGraphSnapshot?,
+        projection: DecisionMemorySystem.BrainStateProjection,
+        retrievalMode: DecisionRetrievalMode,
+        recommendedTemplateIDs: [String],
+        templates: [InterventionTemplateRecord],
+        failurePatterns: [FailurePatternRecord]
+    ) -> CurrentBrainBootstrapExecution {
+        let execution = BASCurrentBrainBootstrapCoordinator.bootstrap(
+            request: BASCurrentBrainBootstrapExecutionRequest(
+                preparation: preparation.substratePreparation,
+                projection: brainProjection(
+                    from: projection,
+                    prompt: preparation.substratePreparation.prompt
+                ),
+                taskGraphHint: taskGraph.map(taskGraphHint(from:)),
+                retrievalMode: retrievalMode.rawValue,
+                recommendedTemplateIDs: recommendedTemplateIDs,
+                templates: templates.map { template in
+                    BASInterventionTemplateDescriptor(
+                        id: template.id,
+                        mode: substrateMode(from: template.mode),
+                        riskLevel: self.riskLevel(from: template.riskLevel),
+                        isPinned: template.isPinned,
+                        successCount: template.successCount,
+                        updatedAt: template.updatedAt
+                    )
+                },
+                failurePatterns: failurePatterns.map { pattern in
+                    BASFailurePatternDescriptor(
+                        id: pattern.id,
+                        mode: substrateMode(from: pattern.mode),
+                        suppressionWeight: pattern.suppressionWeight,
+                        evidenceCount: pattern.evidenceCount,
+                        updatedAt: pattern.updatedAt
+                    )
+                }
+            )
+        )
+
+        return CurrentBrainBootstrapExecution(
+            preparation: preparation,
+            bootstrapped: execution.bootstrapped,
+            activeTemplateIDs: execution.orderedTemplateIDs,
+            failureGuardIDs: execution.orderedFailurePatternIDs
+        )
+    }
+
     static func bootstrapBrainState(
         mode: DecisionMode,
         prompt: String,
@@ -148,24 +238,48 @@ enum BehavioralAISubstrateBridge {
         failureGuardIDs: [String],
         now: Date
     ) -> BASBootstrappedBrainState {
-        BASCognitionBootstrapper.bootstrap(
-            request: brainBootstrapRequest(
-                mode: mode,
-                prompt: prompt,
-                source: source,
-                sourceSurface: sourceSurface,
-                riskLevel: riskLevel,
-                retrievalMode: retrievalMode,
-                now: now
+        let preparation = BASCurrentBrainBootstrapPreparation(
+            mode: substrateMode(from: mode),
+            prompt: prompt,
+            trigger: currentBrainBootstrapTrigger(from: source),
+            sourceSurface: interactionSurface(from: sourceSurface),
+            riskLevel: self.riskLevel(from: riskLevel),
+            languageMode: BASLanguageMode.detect(
+                preferredLanguages: Locale.preferredLanguages,
+                sampleTexts: [prompt]
             ),
-            projection: brainProjection(
-                from: projection,
-                prompt: prompt,
-                taskGraph: taskGraph,
-                activeTemplateIDs: activeTemplateIDs,
-                failureGuardIDs: failureGuardIDs
+            memorySource: memorySource(for: source, mode: mode),
+            now: now
+        )
+        let execution = BASCurrentBrainBootstrapCoordinator.bootstrap(
+            request: BASCurrentBrainBootstrapExecutionRequest(
+                preparation: preparation,
+                projection: brainProjection(from: projection, prompt: prompt),
+                taskGraphHint: taskGraph.map(taskGraphHint(from:)),
+                retrievalMode: retrievalMode.rawValue,
+                recommendedTemplateIDs: activeTemplateIDs,
+                templates: activeTemplateIDs.map {
+                    BASInterventionTemplateDescriptor(
+                        id: $0,
+                        mode: substrateMode(from: mode),
+                        riskLevel: self.riskLevel(from: riskLevel),
+                        isPinned: false,
+                        successCount: 0,
+                        updatedAt: now
+                    )
+                },
+                failurePatterns: failureGuardIDs.map {
+                    BASFailurePatternDescriptor(
+                        id: $0,
+                        mode: substrateMode(from: mode),
+                        suppressionWeight: 1,
+                        evidenceCount: 1,
+                        updatedAt: now
+                    )
+                }
             )
         )
+        return execution.bootstrapped
     }
 
     static func inferredRiskLevel(
@@ -273,10 +387,7 @@ enum BehavioralAISubstrateBridge {
 
     static func brainProjection(
         from projection: DecisionMemorySystem.BrainStateProjection,
-        prompt: String,
-        taskGraph: DecisionTaskGraphSnapshot?,
-        activeTemplateIDs: [String],
-        failureGuardIDs: [String]
+        prompt: String
     ) -> BASBrainProjection {
         let embeddingScores = Dictionary(
             uniqueKeysWithValues: EmbeddingMemoryStore.query(
@@ -287,9 +398,6 @@ enum BehavioralAISubstrateBridge {
         )
         var compiled = projection.baseProjection
         compiled.embeddingScoresByID = embeddingScores
-        compiled.taskGraphHint = taskGraph.map(taskGraphHint(from:))
-        compiled.activeTemplateIDs = activeTemplateIDs
-        compiled.failureGuardIDs = failureGuardIDs
         return compiled
     }
 
@@ -351,6 +459,40 @@ enum BehavioralAISubstrateBridge {
             .medium
         case .high:
             .high
+        }
+    }
+
+    private static func sourceSurface(
+        from sourceSurface: BASInteractionSurface
+    ) -> DecisionIntentSourceSurface {
+        switch sourceSurface {
+        case .app, .system:
+            .app
+        case .watch:
+            .watch
+        case .widget:
+            .widget
+        case .shortcut:
+            .shortcut
+        case .siri:
+            .siri
+        case .notification:
+            .notification
+        }
+    }
+
+    private static func decisionLanguageMode(
+        from languageMode: BASLanguageMode
+    ) -> DecisionLanguageMode {
+        switch languageMode {
+        case .english:
+            .english
+        case .chinese:
+            .chinese
+        case .mixed:
+            .mixed
+        case .unknown:
+            .unknown
         }
     }
 
@@ -511,6 +653,27 @@ enum BehavioralAISubstrateBridge {
             return .pattern
         case .launch, .sceneActive:
             return .history
+        }
+    }
+
+    private static func currentBrainBootstrapTrigger(
+        from source: BrainStateUpdateSource
+    ) -> BASCurrentBrainBootstrapTrigger {
+        switch source {
+        case .launch:
+            .launch
+        case .sceneActive:
+            .sceneActive
+        case .watchHandoff:
+            .watchHandoff
+        case .notification:
+            .notification
+        case .widget:
+            .widget
+        case .explicitRefresh:
+            .explicitRefresh
+        case .sessionPrime:
+            .sessionPrime
         }
     }
 

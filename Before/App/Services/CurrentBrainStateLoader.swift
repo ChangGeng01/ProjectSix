@@ -19,44 +19,37 @@ enum CurrentBrainStateLoader {
         InterventionTemplateStore.ensureDefaults(in: context)
         FailurePatternStore.syncFromHistory(in: context)
 
-        let sourceSurface = envelope?.sourceSurface ?? defaultSourceSurface(for: source)
-        let languageMode = DecisionLanguageMode.detect(
-            preferredLanguages: Locale.preferredLanguages,
-            sampleTexts: [prompt]
-        )
-        let riskLevel = envelope?.riskLevel ?? BehavioralAISubstrateBridge.inferredRiskLevel(
+        let preparation = BehavioralAISubstrateBridge.prepareCurrentBrainBootstrap(
             mode: mode,
             prompt: prompt,
+            source: source,
+            envelope: envelope,
             now: now
         )
         let armIDs = DecisionReactionBanditStore.recommendedArmIDs(
             mode: mode,
-            riskLevel: riskLevel,
-            languageMode: languageMode,
+            riskLevel: preparation.riskLevel,
+            languageMode: preparation.languageMode,
             now: now
         )
         let templates = InterventionTemplateStore.selectTemplates(
             in: context,
             mode: mode,
-            riskLevel: riskLevel,
+            riskLevel: preparation.riskLevel,
             recommendedArmIDs: armIDs
         )
         let failurePatterns = FailurePatternStore.selectedFailurePatterns(in: context, mode: mode)
 
-        var bootstrapped = BehavioralAISubstrateBridge.bootstrapBrainState(
-            mode: mode,
-            prompt: prompt,
-            source: source,
-            sourceSurface: sourceSurface,
-            riskLevel: riskLevel,
+        var execution = BehavioralAISubstrateBridge.executeCurrentBrainBootstrap(
+            preparation: preparation,
             taskGraph: taskGraph,
             projection: projection,
             retrievalMode: retrievalMode,
-            activeTemplateIDs: templates.map(\.id),
-            failureGuardIDs: failurePatterns.map(\.id),
-            now: now
+            recommendedTemplateIDs: armIDs,
+            templates: templates,
+            failurePatterns: failurePatterns
         )
-        var brainState = bootstrapped.brainState
+        var brainState = execution.bootstrapped.brainState
         brainState.evolutionState = DecisionEvolutionEngine.recordCheckpoint(
             mode: mode,
             source: source,
@@ -64,19 +57,31 @@ enum CurrentBrainStateLoader {
             context: context,
             now: now
         )
-        bootstrapped.brainState = brainState
+        execution = CurrentBrainBootstrapExecution(
+            preparation: execution.preparation,
+            bootstrapped: BASBootstrappedBrainState(
+                brainState: brainState,
+                dominantGoal: execution.bootstrapped.dominantGoal,
+                activeConstraints: execution.bootstrapped.activeConstraints,
+                activeTemplateIDs: execution.bootstrapped.activeTemplateIDs,
+                failureGuardIDs: execution.bootstrapped.failureGuardIDs,
+                taskGraphHint: execution.bootstrapped.taskGraphHint
+            ),
+            activeTemplateIDs: execution.activeTemplateIDs,
+            failureGuardIDs: execution.failureGuardIDs
+        )
 
         let current = CurrentBrainState(
             source: source,
-            sourceSurface: sourceSurface,
+            sourceSurface: preparation.sourceSurface,
             mode: mode,
-            riskLevel: riskLevel,
+            riskLevel: preparation.riskLevel,
             taskGraph: taskGraph,
             brainState: brainState,
-            dominantGoal: bootstrapped.dominantGoal,
-            activeConstraints: bootstrapped.activeConstraints,
-            activeTemplateIDs: bootstrapped.activeTemplateIDs,
-            failureGuardIDs: bootstrapped.failureGuardIDs,
+            dominantGoal: execution.bootstrapped.dominantGoal,
+            activeConstraints: execution.bootstrapped.activeConstraints,
+            activeTemplateIDs: execution.activeTemplateIDs,
+            failureGuardIDs: execution.failureGuardIDs,
             sourceIntentEnvelope: envelope,
             loadedAt: now
         )
@@ -96,21 +101,6 @@ enum CurrentBrainStateLoader {
         trimOldUpdates(in: context, now: now)
         try? context.save()
         return current
-    }
-
-    private static func defaultSourceSurface(
-        for source: BrainStateUpdateSource
-    ) -> DecisionIntentSourceSurface {
-        switch source {
-        case .watchHandoff:
-            .watch
-        case .notification:
-            .notification
-        case .widget:
-            .widget
-        case .launch, .sceneActive, .explicitRefresh, .sessionPrime:
-            .app
-        }
     }
 
     private static func trimOldUpdates(in context: ModelContext, now: Date) {

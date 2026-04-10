@@ -114,6 +114,30 @@ struct BehavioralAISubstrateBridgeTests {
     }
 
     @Test
+    func bridgeCurrentBrainPreparationMapsHostSourceAndEnvelopeIntoSubstratePreparation() {
+        let now = date("2026-04-10T23:30:00Z")
+        let preparation = BehavioralAISubstrateBridge.prepareCurrentBrainBootstrap(
+            mode: .quick,
+            prompt: "我想现在就发这条消息",
+            source: .launch,
+            envelope: DecisionIntentEnvelope(
+                kind: .resumeCurrentDecision,
+                sourceSurface: .notification,
+                entrySource: .app,
+                preferredMode: .quick,
+                promptSeed: "我想现在就发这条消息",
+                riskLevel: .high,
+                triggerReason: "prediction"
+            ),
+            now: now
+        )
+
+        #expect(preparation.sourceSurface == .notification)
+        #expect(preparation.riskLevel == .high)
+        #expect(preparation.languageMode == .chinese)
+    }
+
+    @Test
     func bridgeBootstrapCompilesProjectionIntoSubstrateBrainState() async throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -198,6 +222,95 @@ struct BehavioralAISubstrateBridgeTests {
             $0.type == BASMemoryKind.support.rawValue || $0.headline.contains("Tomorrow Box")
         }))
         #expect(bootstrapped.brainState.boundaryPolicy.riskLevel == .medium)
+    }
+
+    @Test
+    func bridgeExecuteCurrentBrainBootstrapOrdersHostTemplatesAndFailurePatterns() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        seedHistory(into: context)
+        try context.save()
+
+        let now = date("2026-04-10T21:30:00Z")
+        let projection = DecisionMemorySystem.refreshProjection(in: context, now: now)
+        let preparation = BehavioralAISubstrateBridge.prepareCurrentBrainBootstrap(
+            mode: .quick,
+            prompt: "Should I send this tonight?",
+            source: .notification,
+            envelope: DecisionIntentEnvelope(
+                kind: .resumeCurrentDecision,
+                sourceSurface: .notification,
+                entrySource: .app,
+                preferredMode: .quick,
+                promptSeed: "Should I send this tonight?",
+                riskLevel: .high,
+                triggerReason: "prediction"
+            ),
+            now: now
+        )
+
+        let execution = BehavioralAISubstrateBridge.executeCurrentBrainBootstrap(
+            preparation: preparation,
+            taskGraph: DecisionTaskGraphSnapshot(
+                mode: .quick,
+                promptSeed: "Should I send this tonight?",
+                nextActionHint: "Pause before you send.",
+                continuityFingerprint: "fp",
+                tasks: [
+                    DecisionTaskNode(
+                        kind: .clarifyQuestion,
+                        title: "Catch the urge",
+                        detail: "Name it cleanly.",
+                        status: .inProgress
+                    )
+                ],
+                updatedAt: now
+            ),
+            projection: projection,
+            retrievalMode: .filtered,
+            recommendedTemplateIDs: ["night_message_cooling"],
+            templates: [
+                InterventionTemplateRecord(
+                    id: "fallback_template",
+                    updatedAt: now,
+                    title: "Fallback",
+                    summary: "Fallback",
+                    body: ["Fallback"],
+                    mode: .quick,
+                    riskLevel: .high,
+                    isPinned: false,
+                    successCount: 8
+                ),
+                InterventionTemplateRecord(
+                    id: "night_message_cooling",
+                    updatedAt: now.addingTimeInterval(-60),
+                    title: "Night Message Cooling",
+                    summary: "Cooling",
+                    body: ["Cooling"],
+                    mode: .quick,
+                    riskLevel: preparation.riskLevel,
+                    isPinned: true,
+                    successCount: 1
+                )
+            ],
+            failurePatterns: [
+                FailurePatternRecord(
+                    id: "night_fast_path_failure",
+                    updatedAt: now,
+                    mode: .quick,
+                    title: "Night fast path",
+                    detail: "Too fast at night.",
+                    cadenceTag: "night",
+                    suppressionWeight: 0.9,
+                    evidenceCount: 3
+                )
+            ]
+        )
+
+        #expect(execution.activeTemplateIDs == ["night_message_cooling", "fallback_template"])
+        #expect(execution.failureGuardIDs == ["night_fast_path_failure"])
+        #expect(execution.bootstrapped.taskGraphHint?.headline == "Pause before you send.")
+        #expect(execution.bootstrapped.brainState.boundaryPolicy.riskLevel == .high)
     }
 
     @MainActor
