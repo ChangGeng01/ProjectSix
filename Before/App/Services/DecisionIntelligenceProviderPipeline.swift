@@ -1401,32 +1401,63 @@ enum DecisionIntelligenceProviderPipeline {
         )
         let providerSelectionMs = elapsedMilliseconds(since: requestStart, clock: clock)
         let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
-        var actualAttemptedKinds: [DecisionModelProviderKind] = []
-
-        for provider in providers {
-            actualAttemptedKinds.append(provider.kind)
-            let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
-                provider: provider.kind,
-                envelope: selection.prompt
-            )
-            if let cached = await responseCache.reminder(for: cacheKey),
-               clippedCandidates.contains(where: { $0.id == cached.id }) {
-                let preview = reminderPreview(from: cached)
-                let releaseDecision = releaseDecision(
+        let outcome = await BASProviderAttemptExecutor.execute(
+            providers: providers,
+            providerID: { $0.kind.rawValue },
+            loadCachedResult: { provider in
+                let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+                    provider: provider.kind,
+                    envelope: selection.prompt
+                )
+                let cached = await responseCache.reminder(for: cacheKey)
+                guard let cached,
+                      clippedCandidates.contains(where: { $0.id == cached.id }) else {
+                    return nil
+                }
+                return cached
+            },
+            assessCachedResult: { cached in
+                providerAttemptVerdict(
                     kind: .reminder,
-                    outputPreview: preview,
+                    outputPreview: reminderPreview(from: cached),
                     kernelSnapshot: selection.prompt.assembly.kernelSnapshot,
                     brainState: nil,
                     reminderMode: mode
                 )
-                let consistencyCheck = releaseDecision.consistencyCheck
-                if releaseDecision.kind != .allow, let consistencyCheck {
-                    await responseCache.quarantineReminder(for: cacheKey)
+            },
+            quarantineCachedResult: { provider in
+                let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+                    provider: provider.kind,
+                    envelope: selection.prompt
+                )
+                await responseCache.quarantineReminder(for: cacheKey)
+            },
+            invokeProvider: { provider in
+                await provider.pickReminder(
+                    from: clippedCandidates,
+                    scenario: scenario,
+                    prompt: prompt,
+                    mode: mode,
+                    strategy: strategy
+                )
+            },
+            assessProviderResult: { selected in
+                providerAttemptVerdict(
+                    kind: .reminder,
+                    outputPreview: reminderPreview(from: selected),
+                    kernelSnapshot: selection.prompt.assembly.kernelSnapshot,
+                    brainState: nil,
+                    reminderMode: mode
+                )
+            },
+            onCachedRejected: { provider, _, assessment, attemptedProviderIDs in
+                let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
+                if let consistencyCheck = assessment.consistencyCheck {
                     recordTrace(
                         kind: .reminder,
                         preferredProvider: preference.kind,
                         activeProvider: provider.kind,
-                        attemptedProviders: actualAttemptedKinds,
+                        attemptedProviders: attemptedKinds,
                         allowFallbacks: allowFallbacks,
                         runtimeStrategy: strategy,
                         frontstageState: selection.prompt.frontstageState,
@@ -1437,7 +1468,7 @@ enum DecisionIntelligenceProviderPipeline {
                         consistencyCheck: consistencyCheck,
                         consistencyRejected: true,
                         prompt: selection.prompt.debugPrompt,
-                        outputPreview: preview,
+                        outputPreview: assessment.outputPreview,
                         detail: rejectedConsistencyDetail(
                             base: cachedDetail(
                                 preferred: preference.kind,
@@ -1448,8 +1479,10 @@ enum DecisionIntelligenceProviderPipeline {
                             source: "cached reminder selection"
                         )
                     )
-                    continue
                 }
+            },
+            onCacheHit: { provider, _, assessment, attemptedProviderIDs in
+                let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
                     event: .cacheHit
@@ -1459,7 +1492,7 @@ enum DecisionIntelligenceProviderPipeline {
                     outcome: .cacheHit,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: actualAttemptedKinds,
+                    attemptedProviders: attemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                     lifecycleMetrics: lifecycleMetrics(
                         requestStart: requestStart,
@@ -1476,7 +1509,7 @@ enum DecisionIntelligenceProviderPipeline {
                     kind: .reminder,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: actualAttemptedKinds,
+                    attemptedProviders: attemptedKinds,
                     allowFallbacks: allowFallbacks,
                     runtimeStrategy: strategy,
                     frontstageState: selection.prompt.frontstageState,
@@ -1484,44 +1517,28 @@ enum DecisionIntelligenceProviderPipeline {
                     admissionDecision: admissionDecision,
                     semanticPromptFingerprint: semanticPromptFingerprint,
                     stablePrefixFingerprint: stablePrefixFingerprint,
-                    consistencyCheck: consistencyCheck,
+                    consistencyCheck: assessment.consistencyCheck,
                     prompt: selection.prompt.debugPrompt,
-                    outputPreview: preview,
+                    outputPreview: assessment.outputPreview,
                     detail: cachedDetail(
                         preferred: preference.kind,
                         active: provider.kind,
                         allowFallbacks: allowFallbacks
                     )
                 )
-                return cached
-            }
-
-            if let selected = await provider.pickReminder(
-                from: clippedCandidates,
-                scenario: scenario,
-                prompt: prompt,
-                mode: mode,
-                strategy: strategy
-            ) {
-                let preview = reminderPreview(from: selected)
-                let releaseDecision = releaseDecision(
-                    kind: .reminder,
-                    outputPreview: preview,
-                    kernelSnapshot: selection.prompt.assembly.kernelSnapshot,
-                    brainState: nil,
-                    reminderMode: mode
+            },
+            onProviderRejected: { provider, _, assessment, attemptedProviderIDs in
+                let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
+                await DecisionIntelligenceCircuitBreaker.shared.record(
+                    provider: provider.kind,
+                    event: .providerFailure
                 )
-                let consistencyCheck = releaseDecision.consistencyCheck
-                if releaseDecision.kind != .allow, let consistencyCheck {
-                    await DecisionIntelligenceCircuitBreaker.shared.record(
-                        provider: provider.kind,
-                        event: .providerFailure
-                    )
+                if let consistencyCheck = assessment.consistencyCheck {
                     recordTrace(
                         kind: .reminder,
                         preferredProvider: preference.kind,
                         activeProvider: provider.kind,
-                        attemptedProviders: actualAttemptedKinds,
+                        attemptedProviders: attemptedKinds,
                         allowFallbacks: allowFallbacks,
                         runtimeStrategy: strategy,
                         frontstageState: selection.prompt.frontstageState,
@@ -1532,7 +1549,7 @@ enum DecisionIntelligenceProviderPipeline {
                         consistencyCheck: consistencyCheck,
                         consistencyRejected: true,
                         prompt: selection.prompt.debugPrompt,
-                        outputPreview: preview,
+                        outputPreview: assessment.outputPreview,
                         detail: rejectedConsistencyDetail(
                             base: detail(
                                 preferred: preference.kind,
@@ -1543,8 +1560,14 @@ enum DecisionIntelligenceProviderPipeline {
                             source: "provider reminder selection"
                         )
                     )
-                    continue
                 }
+            },
+            onProviderSuccess: { provider, selected, assessment, attemptedProviderIDs in
+                let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
+                let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+                    provider: provider.kind,
+                    envelope: selection.prompt
+                )
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
                     event: .providerSuccess(
@@ -1558,7 +1581,7 @@ enum DecisionIntelligenceProviderPipeline {
                     outcome: .providerSuccess,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: actualAttemptedKinds,
+                    attemptedProviders: attemptedKinds,
                     durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                     lifecycleMetrics: lifecycleMetrics(
                         requestStart: requestStart,
@@ -1575,7 +1598,7 @@ enum DecisionIntelligenceProviderPipeline {
                     kind: .reminder,
                     preferredProvider: preference.kind,
                     activeProvider: provider.kind,
-                    attemptedProviders: actualAttemptedKinds,
+                    attemptedProviders: attemptedKinds,
                     allowFallbacks: allowFallbacks,
                     runtimeStrategy: strategy,
                     frontstageState: selection.prompt.frontstageState,
@@ -1583,62 +1606,69 @@ enum DecisionIntelligenceProviderPipeline {
                     admissionDecision: admissionDecision,
                     semanticPromptFingerprint: semanticPromptFingerprint,
                     stablePrefixFingerprint: stablePrefixFingerprint,
-                    consistencyCheck: consistencyCheck,
+                    consistencyCheck: assessment.consistencyCheck,
                     prompt: selection.prompt.debugPrompt,
-                    outputPreview: preview,
+                    outputPreview: assessment.outputPreview,
                     detail: detail(
                         preferred: preference.kind,
                         active: provider.kind,
                         allowFallbacks: allowFallbacks
                     )
                 )
-                return selected
+            },
+            onProviderMiss: { provider, _ in
+                await DecisionIntelligenceCircuitBreaker.shared.record(
+                    provider: provider.kind,
+                    event: .providerFailure
+                )
             }
+        )
 
-            await DecisionIntelligenceCircuitBreaker.shared.record(
-                provider: provider.kind,
-                event: .providerFailure
+        switch outcome {
+        case .resolved(let resolution):
+            return resolution.result
+        case .noResult(let attemptedProviderIDs):
+            let actualAttemptedKinds = attemptedKinds(from: attemptedProviderIDs)
+
+            await recordTelemetry(
+                kind: .reminder,
+                outcome: .deterministicFallback,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: actualAttemptedKinds,
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs,
+                    admissionEvaluatedMs: admissionEvaluatedMs,
+                    providerSelectionMs: providerSelectionMs
+                ),
+                promptBudget: selection.prompt.budget,
+                runtimeStrategy: strategy,
+                admissionDecision: admissionDecision
             )
+            recordTrace(
+                kind: .reminder,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: actualAttemptedKinds,
+                allowFallbacks: allowFallbacks,
+                runtimeStrategy: strategy,
+                frontstageState: selection.prompt.frontstageState,
+                promptBudget: selection.prompt.budget,
+                admissionDecision: admissionDecision,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
+                prompt: selection.prompt.debugPrompt,
+                outputPreview: "No reminder selected",
+                detail: deterministicFallbackDetail(
+                    base: "No provider returned a reminder selection, so Before kept the deterministic reminder ordering.",
+                    suspendedKinds: suspendedKinds
+                )
+            )
+            return nil
         }
-
-        await recordTelemetry(
-            kind: .reminder,
-            outcome: .deterministicFallback,
-            preferredProvider: preference.kind,
-            activeProvider: nil,
-            attemptedProviders: actualAttemptedKinds,
-            durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-            lifecycleMetrics: lifecycleMetrics(
-                requestStart: requestStart,
-                clock: clock,
-                promptPreparedMs: promptPreparedMs,
-                admissionEvaluatedMs: admissionEvaluatedMs,
-                providerSelectionMs: providerSelectionMs
-            ),
-            promptBudget: selection.prompt.budget,
-            runtimeStrategy: strategy,
-            admissionDecision: admissionDecision
-        )
-        recordTrace(
-            kind: .reminder,
-            preferredProvider: preference.kind,
-            activeProvider: nil,
-            attemptedProviders: actualAttemptedKinds,
-            allowFallbacks: allowFallbacks,
-            runtimeStrategy: strategy,
-            frontstageState: selection.prompt.frontstageState,
-            promptBudget: selection.prompt.budget,
-            admissionDecision: admissionDecision,
-            semanticPromptFingerprint: semanticPromptFingerprint,
-            stablePrefixFingerprint: stablePrefixFingerprint,
-            prompt: selection.prompt.debugPrompt,
-            outputPreview: "No reminder selected",
-            detail: deterministicFallbackDetail(
-                base: "No provider returned a reminder selection, so Before kept the deterministic reminder ordering.",
-                suspendedKinds: suspendedKinds
-            )
-        )
-        return nil
     }
 
     static func defaultStatusesByKind() -> [DecisionModelProviderKind: DecisionModelProviderStatus] {
