@@ -592,6 +592,25 @@ public enum BASAppleCurrentBrainBootstrapAdapter {
     }
 }
 
+public enum BASAppleBrainBootstrapRuntime {
+    public static func bootstrap(
+        request: BASBrainBootstrapRequest,
+        projection: BASBrainProjection,
+        taskGraphHint: BASBrainTaskGraphHint? = nil,
+        activeTemplateIDs: [String] = [],
+        failureGuardIDs: [String] = []
+    ) -> BASBootstrappedBrainState {
+        var enrichedProjection = projection
+        enrichedProjection.taskGraphHint = taskGraphHint
+        enrichedProjection.activeTemplateIDs = activeTemplateIDs
+        enrichedProjection.failureGuardIDs = failureGuardIDs
+        return BASCognitionBootstrapper.bootstrap(
+            request: request,
+            projection: enrichedProjection
+        )
+    }
+}
+
 public enum BASAppleCurrentBrainBootstrapPlanner {
     public static func request(
         from input: BASAppleCurrentBrainBootstrapPlanningSourceInput

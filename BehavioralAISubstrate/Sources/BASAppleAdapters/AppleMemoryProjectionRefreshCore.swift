@@ -152,3 +152,67 @@ public enum BASAppleMemoryProjectionRefreshAdapter {
         )
     }
 }
+
+public enum BASAppleMemoryProjectionRuntime {
+    public static func refresh<
+        Governed: BASAppleGovernedMemoryEntity,
+        Candidate: BASAppleCandidateMemoryEntity,
+        Reminder: BASAppleReminderMemoryEntity,
+        Event: BASAppleCheckEventMemoryEntity & BASAppleProjectionEventSource,
+        Balance: BASAppleBalanceMemoryEntity,
+        Mirror: BASAppleMirrorMemoryEntity
+    >(
+        in context: ModelContext,
+        now: Date,
+        limits: BASAppleMemoryProjectionRefreshLimits = .default,
+        recordType: Governed.Type,
+        candidateType: Candidate.Type,
+        reminderType: Reminder.Type,
+        checkEventType: Event.Type,
+        balanceRecordType: Balance.Type,
+        mirrorRecordType: Mirror.Type,
+        fetchRecords: (ModelContext, Int) -> [Governed],
+        fetchCandidates: (ModelContext, Int) -> [Candidate],
+        fetchCheckEvents: (ModelContext, Int) -> [Event],
+        fetchBalanceRecords: (ModelContext, Int) -> [Balance],
+        fetchMirrorRecords: (ModelContext, Int) -> [Mirror],
+        rebuildEmbeddings: (
+            _ records: [Governed],
+            _ candidates: [Candidate],
+            _ checkEvents: [Event],
+            _ balanceRecords: [Balance],
+            _ mirrorRecords: [Mirror]
+        ) -> Void,
+        onSaveError: ((Error) -> Void)? = nil
+    ) -> BASAppleMemoryProjectionRefreshResult {
+        let governanceSnapshot = BASAppleMemoryProjectionSelectionAdapter.governanceSnapshot(
+            in: context,
+            recordType: recordType,
+            candidateType: candidateType
+        )
+        return BASAppleMemoryProjectionRefreshAdapter.refreshProjection(
+            in: context,
+            now: now,
+            governanceSnapshot: governanceSnapshot,
+            refreshGovernanceSnapshot: {
+                BASAppleMemoryProjectionSelectionAdapter.governanceSnapshot(
+                    in: $0,
+                    recordType: recordType,
+                    candidateType: candidateType
+                )
+            },
+            limits: limits,
+            reminderType: reminderType,
+            checkEventType: checkEventType,
+            balanceRecordType: balanceRecordType,
+            mirrorRecordType: mirrorRecordType,
+            fetchRecords: fetchRecords,
+            fetchCandidates: fetchCandidates,
+            fetchCheckEvents: fetchCheckEvents,
+            fetchBalanceRecords: fetchBalanceRecords,
+            fetchMirrorRecords: fetchMirrorRecords,
+            rebuildEmbeddings: rebuildEmbeddings,
+            onSaveError: onSaveError
+        )
+    }
+}

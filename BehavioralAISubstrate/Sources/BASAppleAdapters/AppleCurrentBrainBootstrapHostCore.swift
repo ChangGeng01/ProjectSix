@@ -118,6 +118,90 @@ public struct BASAppleCurrentBrainBootstrapHostSourceInput: Codable, Equatable, 
     }
 }
 
+public struct BASAppleCurrentBrainBootstrapHostBuildContext: Codable, Equatable, Sendable {
+    public var modeID: String
+    public var prompt: String
+    public var triggerID: String
+    public var sourceSurfaceOverrideID: String?
+    public var riskLevelOverrideID: String?
+    public var preferredLanguages: [String]
+    public var now: Date
+    public var projection: BASBrainProjection
+    public var embeddingScores: [BASAppleEmbeddingScoreInput]
+    public var taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput?
+    public var retrievalMode: String
+    public var recommendedTemplateIDs: [String]
+
+    public init(
+        modeID: String,
+        prompt: String,
+        triggerID: String,
+        sourceSurfaceOverrideID: String? = nil,
+        riskLevelOverrideID: String? = nil,
+        preferredLanguages: [String] = [],
+        now: Date = .now,
+        projection: BASBrainProjection,
+        embeddingScores: [BASAppleEmbeddingScoreInput] = [],
+        taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput? = nil,
+        retrievalMode: String,
+        recommendedTemplateIDs: [String] = []
+    ) {
+        self.modeID = modeID
+        self.prompt = prompt
+        self.triggerID = triggerID
+        self.sourceSurfaceOverrideID = sourceSurfaceOverrideID
+        self.riskLevelOverrideID = riskLevelOverrideID
+        self.preferredLanguages = preferredLanguages
+        self.now = now
+        self.projection = projection
+        self.embeddingScores = embeddingScores
+        self.taskGraphHint = taskGraphHint
+        self.retrievalMode = retrievalMode
+        self.recommendedTemplateIDs = recommendedTemplateIDs
+    }
+}
+
+public enum BASAppleCurrentBrainBootstrapHostInputBuilder {
+    public static func taskGraphInput(
+        headline: String?,
+        activeNodeCount: Int,
+        hasResumeCandidate: Bool,
+        resumeHint: String?
+    ) -> BASAppleCurrentBrainBootstrapHostTaskGraphInput {
+        BASAppleCurrentBrainBootstrapHostTaskGraphInput(
+            headline: headline,
+            activeNodeCount: activeNodeCount,
+            hasResumeCandidate: hasResumeCandidate,
+            resumeHint: resumeHint
+        )
+    }
+
+    public static func build<Template, FailurePattern>(
+        context: BASAppleCurrentBrainBootstrapHostBuildContext,
+        templates: [Template],
+        failurePatterns: [FailurePattern],
+        mapTemplate: (Template) -> BASAppleCurrentBrainBootstrapHostTemplateInput,
+        mapFailurePattern: (FailurePattern) -> BASAppleCurrentBrainBootstrapHostFailurePatternInput
+    ) -> BASAppleCurrentBrainBootstrapHostSourceInput {
+        BASAppleCurrentBrainBootstrapHostSourceInput(
+            modeID: context.modeID,
+            prompt: context.prompt,
+            triggerID: context.triggerID,
+            sourceSurfaceOverrideID: context.sourceSurfaceOverrideID,
+            riskLevelOverrideID: context.riskLevelOverrideID,
+            preferredLanguages: context.preferredLanguages,
+            now: context.now,
+            projection: context.projection,
+            embeddingScores: context.embeddingScores,
+            taskGraphHint: context.taskGraphHint,
+            retrievalMode: context.retrievalMode,
+            recommendedTemplateIDs: context.recommendedTemplateIDs,
+            templates: templates.map(mapTemplate),
+            failurePatterns: failurePatterns.map(mapFailurePattern)
+        )
+    }
+}
+
 public enum BASAppleCurrentBrainBootstrapHostAdapter {
     public static func prepare(
         from input: BASAppleCurrentBrainBootstrapHostSourceInput
@@ -197,6 +281,30 @@ public enum BASAppleCurrentBrainBootstrapHostAdapter {
 
 public enum BASAppleCurrentBrainBootstrapCoordinator {
     public static func artifact<Template, FailurePattern>(
+        context: BASAppleCurrentBrainBootstrapHostBuildContext,
+        recommendTemplateIDs: (BASCurrentBrainBootstrapPreparation) -> [String],
+        selectTemplates: (BASCurrentBrainBootstrapPreparation, [String]) -> [Template],
+        selectFailurePatterns: (BASCurrentBrainBootstrapPreparation) -> [FailurePattern],
+        mapTemplate: (Template) -> BASAppleCurrentBrainBootstrapHostTemplateInput,
+        mapFailurePattern: (FailurePattern) -> BASAppleCurrentBrainBootstrapHostFailurePatternInput
+    ) -> BASAppleCurrentBrainBootstrapArtifact {
+        artifact(
+            baseInput: BASAppleCurrentBrainBootstrapHostInputBuilder.build(
+                context: context,
+                templates: [Template](),
+                failurePatterns: [FailurePattern](),
+                mapTemplate: mapTemplate,
+                mapFailurePattern: mapFailurePattern
+            ),
+            recommendTemplateIDs: recommendTemplateIDs,
+            selectTemplates: selectTemplates,
+            selectFailurePatterns: selectFailurePatterns,
+            mapTemplate: mapTemplate,
+            mapFailurePattern: mapFailurePattern
+        )
+    }
+
+    public static func artifact<Template, FailurePattern>(
         baseInput: BASAppleCurrentBrainBootstrapHostSourceInput,
         recommendTemplateIDs: (BASCurrentBrainBootstrapPreparation) -> [String],
         selectTemplates: (BASCurrentBrainBootstrapPreparation, [String]) -> [Template],
@@ -226,6 +334,49 @@ public enum BASAppleCurrentBrainBootstrapCoordinator {
                 templates: templates,
                 failurePatterns: failurePatterns
             )
+        )
+    }
+}
+
+public enum BASAppleBrainBootstrapRequestAdapter {
+    public static func request(
+        modeID: String,
+        prompt: String,
+        triggerID: String,
+        sourceSurfaceOverrideID: String? = nil,
+        riskLevelOverrideID: String? = nil,
+        preferredLanguages: [String] = [],
+        now: Date = .now,
+        retrievalMode: String
+    ) -> BASBrainBootstrapRequest {
+        let request = BASAppleCurrentBrainBootstrapHostAdapter.request(
+            from: BASAppleCurrentBrainBootstrapHostInputBuilder.build(
+                context: BASAppleCurrentBrainBootstrapHostBuildContext(
+                    modeID: modeID,
+                    prompt: prompt,
+                    triggerID: triggerID,
+                    sourceSurfaceOverrideID: sourceSurfaceOverrideID,
+                    riskLevelOverrideID: riskLevelOverrideID,
+                    preferredLanguages: preferredLanguages,
+                    now: now,
+                    projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+                    retrievalMode: retrievalMode
+                ),
+                templates: [BASAppleCurrentBrainBootstrapHostTemplateInput](),
+                failurePatterns: [BASAppleCurrentBrainBootstrapHostFailurePatternInput](),
+                mapTemplate: { $0 },
+                mapFailurePattern: { $0 }
+            )
+        ).preparation
+
+        return BASBrainBootstrapRequest(
+            mode: request.mode,
+            prompt: request.prompt,
+            source: request.memorySource,
+            sourceSurface: request.sourceSurface,
+            riskLevel: request.riskLevel,
+            retrievalMode: retrievalMode,
+            now: request.now
         )
     }
 }

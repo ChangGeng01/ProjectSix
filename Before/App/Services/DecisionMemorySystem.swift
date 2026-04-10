@@ -8,27 +8,7 @@ enum DecisionMemorySystem {
     static let projectionCandidateLimit = BASAppleMemoryProjectionRefreshLimits.default.candidateLimit
     static let projectionCheckEventLimit = BASAppleMemoryProjectionRefreshLimits.default.checkEventLimit
 
-    struct BrainStateGovernanceSnapshot {
-        let totalRecordCount: Int
-        let totalCandidateCount: Int
-        let pendingCandidateCount: Int
-        let promotedCandidateCount: Int
-        let deferredCandidateCount: Int
-        let admittedCandidateCount: Int
-    }
-
-    struct BrainStateProjection {
-        struct Diagnostics {
-            let recordCount: Int
-            let candidateCount: Int
-            let allCandidatesPending: Bool
-        }
-
-        let baseProjection: BASBrainProjection
-        let governanceSnapshot: BrainStateGovernanceSnapshot
-        let diagnostics: Diagnostics
-        let refreshedAt: Date
-    }
+    typealias BrainStateProjection = BASAppleMemoryProjectionRefreshResult
 
     static func refreshStoredMemories(
         in context: ModelContext,
@@ -58,22 +38,11 @@ enum DecisionMemorySystem {
         in context: ModelContext,
         now: Date = .now
     ) -> BrainStateProjection {
-        let governanceSnapshot = BASAppleMemoryProjectionSelectionAdapter.governanceSnapshot(
-            in: context,
-            recordType: DecisionMemoryRecord.self,
-            candidateType: DecisionMemoryCandidateRecord.self
-        )
-        let refreshed = BASAppleMemoryProjectionRefreshAdapter.refreshProjection(
+        BASAppleMemoryProjectionRuntime.refresh(
             in: context,
             now: now,
-            governanceSnapshot: governanceSnapshot,
-            refreshGovernanceSnapshot: {
-                BASAppleMemoryProjectionSelectionAdapter.governanceSnapshot(
-                    in: $0,
-                    recordType: DecisionMemoryRecord.self,
-                    candidateType: DecisionMemoryCandidateRecord.self
-                )
-            },
+            recordType: DecisionMemoryRecord.self,
+            candidateType: DecisionMemoryCandidateRecord.self,
             reminderType: SelfReminder.self,
             checkEventType: CheckEvent.self,
             balanceRecordType: BalanceDecisionRecord.self,
@@ -111,24 +80,6 @@ enum DecisionMemorySystem {
                 )
             }
         )
-
-        return BrainStateProjection(
-            baseProjection: refreshed.baseProjection,
-            governanceSnapshot: BrainStateGovernanceSnapshot(
-                totalRecordCount: refreshed.governanceSnapshot.totalRecordCount,
-                totalCandidateCount: refreshed.governanceSnapshot.totalCandidateCount,
-                pendingCandidateCount: refreshed.governanceSnapshot.pendingCandidateCount,
-                promotedCandidateCount: refreshed.governanceSnapshot.promotedCandidateCount,
-                deferredCandidateCount: refreshed.governanceSnapshot.deferredCandidateCount,
-                admittedCandidateCount: refreshed.governanceSnapshot.admittedCandidateCount
-            ),
-            diagnostics: BrainStateProjection.Diagnostics(
-                recordCount: refreshed.diagnostics.recordCount,
-                candidateCount: refreshed.diagnostics.candidateCount,
-                allCandidatesPending: refreshed.diagnostics.allCandidatesPending
-            ),
-            refreshedAt: refreshed.refreshedAt
-        )
     }
 
     static func loadBrainState(
@@ -154,20 +105,20 @@ enum DecisionMemorySystem {
         retrievalMode: DecisionRetrievalMode = .filtered,
         now: Date = .now
     ) -> DecisionBrainState {
-        let bootstrapped = BehavioralAISubstrateBridge.bootstrapBrainState(
-            mode: mode,
+        let request = BASAppleBrainBootstrapRequestAdapter.request(
+            modeID: mode.rawValue,
             prompt: prompt,
-            source: .sessionPrime,
-            sourceSurface: .app,
-            riskLevel: .low,
-            taskGraph: nil,
-            projection: projection,
-            retrievalMode: retrievalMode,
-            activeTemplateIDs: [],
-            failureGuardIDs: [],
-            now: now
+            triggerID: BrainStateUpdateSource.sessionPrime.rawValue,
+            sourceSurfaceOverrideID: DecisionIntentSourceSurface.app.rawValue,
+            riskLevelOverrideID: InterventionRiskLevel.low.rawValue,
+            preferredLanguages: Locale.preferredLanguages,
+            now: now,
+            retrievalMode: retrievalMode.rawValue
         )
-        return bootstrapped.brainState
+        return BASAppleBrainBootstrapRuntime.bootstrap(
+            request: request,
+            projection: projection.baseProjection
+        ).brainState
     }
 
     static func fetchMemoryRecords(

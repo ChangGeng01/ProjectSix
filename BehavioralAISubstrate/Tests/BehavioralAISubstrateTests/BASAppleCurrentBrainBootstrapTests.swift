@@ -3,9 +3,87 @@ import Testing
 @testable import BASAppleAdapters
 @testable import BASMemory
 @testable import BASPolicy
+@testable import BASRuntimeCore
 
 @Suite("BASApple Current Brain Bootstrap")
 struct BASAppleCurrentBrainBootstrapTests {
+    @Test("host input builder centralizes host-source compilation for apple bootstrap")
+    func hostInputBuilderCompilesContextAndDescriptors() {
+        let now = Date(timeIntervalSince1970: 1_744_322_100)
+        let input = BASAppleCurrentBrainBootstrapHostInputBuilder.build(
+            context: BASAppleCurrentBrainBootstrapHostBuildContext(
+                modeID: BASDecisionMode.quick.rawValue,
+                prompt: "Should I wait until tomorrow?",
+                triggerID: BASCurrentBrainBootstrapTrigger.notification.rawValue,
+                sourceSurfaceOverrideID: BASInteractionSurface.notification.rawValue,
+                riskLevelOverrideID: BASRiskLevel.high.rawValue,
+                preferredLanguages: ["en-AU"],
+                now: now,
+                projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+                embeddingScores: [
+                    BASAppleEmbeddingScoreInput(id: "memory-1", score: 0.91)
+                ],
+                taskGraphHint: BASAppleCurrentBrainBootstrapHostInputBuilder.taskGraphInput(
+                    headline: "Pause before sending.",
+                    activeNodeCount: 1,
+                    hasResumeCandidate: true,
+                    resumeHint: "Resume tomorrow."
+                ),
+                retrievalMode: "filtered",
+                recommendedTemplateIDs: ["night_message_cooling"]
+            ),
+            templates: [
+                BASAppleCurrentBrainBootstrapHostTemplateInput(
+                    id: "night_message_cooling",
+                    modeID: BASDecisionMode.quick.rawValue,
+                    riskLevelID: BASRiskLevel.high.rawValue,
+                    isPinned: true,
+                    successCount: 3,
+                    updatedAt: now
+                )
+            ],
+            failurePatterns: [
+                BASAppleCurrentBrainBootstrapHostFailurePatternInput(
+                    id: "night_fast_path_failure",
+                    modeID: BASDecisionMode.quick.rawValue,
+                    suppressionWeight: 0.9,
+                    evidenceCount: 2,
+                    updatedAt: now
+                )
+            ],
+            mapTemplate: { $0 },
+            mapFailurePattern: { $0 }
+        )
+
+        #expect(input.modeID == BASDecisionMode.quick.rawValue)
+        #expect(input.embeddingScores.map { $0.id } == ["memory-1"])
+        #expect(input.taskGraphHint?.headline == "Pause before sending.")
+        #expect(input.templates.map { $0.id } == ["night_message_cooling"])
+        #expect(input.failurePatterns.map { $0.id } == ["night_fast_path_failure"])
+    }
+
+    @Test("brain bootstrap request adapter compiles minimal local request without host bridge")
+    func brainBootstrapRequestAdapterBuildsRequest() {
+        let now = Date(timeIntervalSince1970: 1_744_322_120)
+        let request = BASAppleBrainBootstrapRequestAdapter.request(
+            modeID: BASDecisionMode.quick.rawValue,
+            prompt: "Should I send this tonight?",
+            triggerID: BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue,
+            sourceSurfaceOverrideID: BASInteractionSurface.app.rawValue,
+            riskLevelOverrideID: BASRiskLevel.low.rawValue,
+            preferredLanguages: ["en-AU"],
+            now: now,
+            retrievalMode: "filtered"
+        )
+
+        #expect(request.mode == BASDecisionMode.quick)
+        #expect(request.source == BASMemorySource.pattern)
+        #expect(request.sourceSurface == BASInteractionSurface.app)
+        #expect(request.riskLevel == BASRiskLevel.low)
+        #expect(request.retrievalMode == "filtered")
+        #expect(request.now == now)
+    }
+
     @Test("prepare resolves default surface, language mode, memory source, and risk overrides")
     func prepareResolvesBootstrapInputs() {
         var components = DateComponents()
