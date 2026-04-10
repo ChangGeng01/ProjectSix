@@ -109,6 +109,78 @@ struct BehavioralAISubstrateTests {
         #expect(summary.detail.contains("route local"))
     }
 
+    @Test("apple prompt input adapter normalizes lifecycle and neural inputs")
+    func applePromptInputAdapterNormalizesLifecycleAndNeuralInputs() {
+        let lifecycle = BASApplePromptInputAdapter.lifecycleSnapshot(
+            from: BASApplePromptLifecycleInput(
+                rebuiltSession: true,
+                generation: 3,
+                anchorFields: [" prompt ", "prompt", "mode"],
+                activeFields: [" mode ", "goal"],
+                staleFields: [" note ", "note"],
+                anchorTitles: [" Current prompt ", "", "Mode"]
+            )
+        )
+        let neural = BASApplePromptInputAdapter.neuralSnapshot(
+            from: BASApplePromptNeuralInput(
+                dominantActivations: [
+                    BASApplePromptActivationInput(signal: " urgency ", displayTitle: " Urgency "),
+                    BASApplePromptActivationInput(signal: "urgency", displayTitle: "Urgency")
+                ],
+                candidateActions: [
+                    BASApplePromptActionCandidateInput(route: " pause "),
+                    BASApplePromptActionCandidateInput(route: "pause"),
+                    BASApplePromptActionCandidateInput(route: "reflect")
+                ],
+                suppressedBehaviors: [" long_explanation ", "", "long_explanation", "topic_switch"]
+            )
+        )
+
+        #expect(lifecycle.anchorFields == ["prompt", "mode"])
+        #expect(lifecycle.activeFields == ["mode", "goal"])
+        #expect(lifecycle.staleFields == ["note"])
+        #expect(lifecycle.anchorTitles == ["Current prompt", "Mode"])
+        #expect(neural.dominantActivations.count == 1)
+        #expect(neural.dominantActivations.first?.signal == "urgency")
+        #expect(neural.dominantActivations.first?.displayTitle == "Urgency")
+        #expect(neural.candidateActions.map(\.route) == ["pause", "reflect"])
+        #expect(neural.suppressedBehaviors == ["long_explanation", "topic_switch"])
+    }
+
+    @Test("apple prompt input adapter preserves adaptive strategy budgets and dedupes action space")
+    func applePromptInputAdapterBuildsAdaptiveStrategy() {
+        let strategy = BASApplePromptInputAdapter.adaptiveStrategy(
+            from: BASAppleAdaptiveStrategyInput(
+                kind: .quick,
+                entropy: .low,
+                runtimeGear: .low,
+                contextBudget: 220,
+                outputCharacterBudget: 120,
+                timeBudgetMs: 1100,
+                toolCallBudget: 0,
+                retrievalItemBudget: 1,
+                retrievalMode: .off,
+                thinkingMode: .off,
+                outputMode: .guidedShort,
+                tone: .briefWarm,
+                actionSpace: ["encourage", "encourage", "next_step", " next_step "],
+                responseLanguage: .english,
+                allowsModelInvocation: true
+            )
+        )
+
+        #expect(strategy.kind == .quick)
+        #expect(strategy.runtimeGear == .low)
+        #expect(strategy.contextBudget == 220)
+        #expect(strategy.outputCharacterBudget == 120)
+        #expect(strategy.timeBudgetMs == 1100)
+        #expect(strategy.toolCallBudget == 0)
+        #expect(strategy.retrievalItemBudget == 1)
+        #expect(strategy.actionSpace == ["encourage", "next_step"])
+        #expect(strategy.responseLanguage == .english)
+        #expect(strategy.allowsModelInvocation)
+    }
+
     @Test("console snapshot builder materializes all eight layers")
     func consoleSnapshotBuilderMaterializesAllEightLayers() {
         let metrics = BASFlightDeckMetrics(

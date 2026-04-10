@@ -1,4 +1,5 @@
 import Foundation
+import BASAppleAdapters
 import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
@@ -267,138 +268,58 @@ enum DecisionIntelligencePromptContract {
     private static func promptContextLifecycleSnapshot(
         _ contextState: DecisionContextPreparedState
     ) -> BASPromptContextLifecycleSnapshot {
-        BASPromptContextLifecycleSnapshot(
-            rebuiltSession: contextState.rebuiltSession,
-            generation: contextState.generation,
-            anchorFields: contextState.anchorFields.map(\.rawValue),
-            activeFields: contextState.activeFields.map(\.rawValue),
-            staleFields: contextState.staleFields.map(\.rawValue),
-            anchorTitles: contextState.anchorFields.map(\.title)
+        BASApplePromptInputAdapter.lifecycleSnapshot(
+            from: BASApplePromptLifecycleInput(
+                rebuiltSession: contextState.rebuiltSession,
+                generation: contextState.generation,
+                anchorFields: contextState.anchorFields.map(\.rawValue),
+                activeFields: contextState.activeFields.map(\.rawValue),
+                staleFields: contextState.staleFields.map(\.rawValue),
+                anchorTitles: contextState.anchorFields.map(\.title)
+            )
         )
     }
 
     private static func promptNeuralSnapshot(
         _ neuralState: DecisionNeuralState
     ) -> BASPromptNeuralSnapshot {
-        BASPromptNeuralSnapshot(
-            dominantActivations: neuralState.dominantActivations.map {
-                BASPromptNeuralActivationSnapshot(
-                    signal: $0.signal.rawValue,
-                    displayTitle: $0.signal.title
-                )
-            },
-            candidateActions: neuralState.candidateActions.map {
-                BASPromptNeuralActionCandidateSnapshot(route: $0.route.rawValue)
-            },
-            suppressedBehaviors: neuralState.suppressedBehaviors
+        BASApplePromptInputAdapter.neuralSnapshot(
+            from: BASApplePromptNeuralInput(
+                dominantActivations: neuralState.dominantActivations.map {
+                    BASApplePromptActivationInput(
+                        signal: $0.signal.rawValue,
+                        displayTitle: $0.signal.title
+                    )
+                },
+                candidateActions: neuralState.candidateActions.map {
+                    BASApplePromptActionCandidateInput(route: $0.route.rawValue)
+                },
+                suppressedBehaviors: neuralState.suppressedBehaviors
+            )
         )
     }
 
     private static func substrateAdaptiveStrategy(
         _ strategy: DecisionAdaptiveTaskStrategy
     ) -> BASAdaptiveTaskStrategy {
-        let kind: BASAdaptiveTraceKind
-        switch strategy.kind {
-        case .quick:
-            kind = .quick
-        case .balance:
-            kind = .balance
-        case .mirror:
-            kind = .mirror
-        case .reminder:
-            kind = .reminder
-        }
-
-        let entropy: BASTaskEntropyClass
-        switch strategy.entropy {
-        case .low:
-            entropy = .low
-        case .medium:
-            entropy = .medium
-        case .high:
-            entropy = .high
-        }
-
-        let runtimeGear: BASRuntimeGear
-        switch strategy.runtimeGear {
-        case .low:
-            runtimeGear = .low
-        case .balanced:
-            runtimeGear = .balanced
-        case .high:
-            runtimeGear = .high
-        }
-
-        let retrievalMode: BASRetrievalMode
-        switch strategy.retrievalMode {
-        case .off:
-            retrievalMode = .off
-        case .filtered:
-            retrievalMode = .filtered
-        case .adaptive:
-            retrievalMode = .adaptive
-        }
-
-        let thinkingMode: BASThinkingMode
-        switch strategy.thinkingMode {
-        case .off:
-            thinkingMode = .off
-        case .gated:
-            thinkingMode = .gated
-        }
-
-        let outputMode: BASOutputMode
-        switch strategy.outputMode {
-        case .deterministicTemplate:
-            outputMode = .deterministicTemplate
-        case .guidedShort:
-            outputMode = .guidedShort
-        case .structuredBoard:
-            outputMode = .structuredBoard
-        case .reflectiveStructured:
-            outputMode = .reflectiveStructured
-        case .jsonShort:
-            outputMode = .jsonShort
-        }
-
-        let tone: BASToneProfile
-        switch strategy.tone {
-        case .neutral:
-            tone = .neutral
-        case .briefWarm:
-            tone = .briefWarm
-        case .groundedDirect:
-            tone = .groundedDirect
-        case .reflectiveClear:
-            tone = .reflectiveClear
-        }
-
-        let responseLanguage: BASAdaptiveResponseLanguage
-        switch strategy.responseLanguage {
-        case .english:
-            responseLanguage = .english
-        case .chinese:
-            responseLanguage = .chinese
-        case .mixed:
-            responseLanguage = .mixed
-        }
-
-        return BASAdaptiveTaskStrategy(
-            kind: kind,
-            entropy: entropy,
-            runtimeGear: runtimeGear,
-            contextBudget: strategy.contextBudget,
-            outputCharacterBudget: strategy.outputCharacterBudget,
-            timeBudgetMs: strategy.timeBudgetMs,
-            toolCallBudget: strategy.toolCallBudget,
-            retrievalItemBudget: strategy.retrievalItemBudget,
-            retrievalMode: retrievalMode,
-            thinkingMode: thinkingMode,
-            outputMode: outputMode,
-            tone: tone,
-            actionSpace: strategy.actionSpace,
-            responseLanguage: responseLanguage,
-            allowsModelInvocation: strategy.allowsModelInvocation
+        BASApplePromptInputAdapter.adaptiveStrategy(
+            from: BASAppleAdaptiveStrategyInput(
+                kind: BASAdaptiveTraceKind(rawValue: strategy.kind.rawValue) ?? .quick,
+                entropy: BASTaskEntropyClass(rawValue: strategy.entropy.rawValue) ?? .medium,
+                runtimeGear: BASRuntimeGear(rawValue: strategy.runtimeGear.rawValue) ?? .balanced,
+                contextBudget: strategy.contextBudget,
+                outputCharacterBudget: strategy.outputCharacterBudget,
+                timeBudgetMs: strategy.timeBudgetMs,
+                toolCallBudget: strategy.toolCallBudget,
+                retrievalItemBudget: strategy.retrievalItemBudget,
+                retrievalMode: BASRetrievalMode(rawValue: strategy.retrievalMode.rawValue) ?? .adaptive,
+                thinkingMode: BASThinkingMode(rawValue: strategy.thinkingMode.rawValue) ?? .gated,
+                outputMode: BASOutputMode(rawValue: strategy.outputMode.rawValue) ?? .guidedShort,
+                tone: BASToneProfile(rawValue: strategy.tone.rawValue) ?? .neutral,
+                actionSpace: strategy.actionSpace,
+                responseLanguage: BASAdaptiveResponseLanguage(rawValue: strategy.responseLanguage.rawValue) ?? .english,
+                allowsModelInvocation: strategy.allowsModelInvocation
+            )
         )
     }
 }
