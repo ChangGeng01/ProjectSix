@@ -389,16 +389,14 @@ enum BehavioralAISubstrateBridge {
         from projection: DecisionMemorySystem.BrainStateProjection,
         prompt: String
     ) -> BASBrainProjection {
-        let embeddingScores = Dictionary(
-            uniqueKeysWithValues: EmbeddingMemoryStore.query(
+        BASAppleMemoryProjectionAdapter.overlayEmbeddingScores(
+            EmbeddingMemoryStore.query(
                 prompt,
                 allowedTiers: [.hot, .warm],
                 limit: 12
-            ).map { ($0.id, $0.score) }
+            ).map { BASAppleEmbeddingScoreInput(id: $0.id, score: $0.score) },
+            on: projection.baseProjection
         )
-        var compiled = projection.baseProjection
-        compiled.embeddingScoresByID = embeddingScores
-        return compiled
     }
 
     private static func taskKind(from kind: DecisionIntelligenceTraceKind?) -> BASTaskKind {

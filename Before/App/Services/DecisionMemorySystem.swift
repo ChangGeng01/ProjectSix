@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import BASAppleAdapters
 import BASMemory
 
 struct DecisionMemoryDraft: Sendable {
@@ -326,7 +327,7 @@ enum DecisionMemorySystem {
         checkEvents: [CheckEvent],
         governanceSnapshot: BrainStateGovernanceSnapshot
     ) -> BASBrainProjection {
-        BASBrainProjectionCompiler.compile(
+        BASAppleMemoryProjectionAdapter.compile(
             BASBrainProjectionCompileRequest(
                 records: records.map { record in
                     BASProjectionGovernedMemoryInput(

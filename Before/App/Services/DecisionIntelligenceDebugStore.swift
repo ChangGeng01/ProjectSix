@@ -1,4 +1,6 @@
 import Foundation
+import BASAppleAdapters
+import BASObservability
 import BASPolicy
 
 enum DecisionIntelligenceTracePrivacy {
@@ -6,9 +8,12 @@ enum DecisionIntelligenceTracePrivacy {
         environment: [String: String] = ProcessInfo.processInfo.environment,
         considerRuntimeTestingContext: Bool = true
     ) -> Bool {
-        environment["XCTestConfigurationFilePath"] != nil ||
-            (considerRuntimeTestingContext && NSClassFromString("XCTestCase") != nil) ||
-            DecisionTestingInterface.environmentOverride(environment: environment) != nil
+        BASAppleObservabilityAdapter.allowsSensitivePayload(
+            environment: environment,
+            considerRuntimeTestingContext: considerRuntimeTestingContext,
+            runtimeTestingContextDetected: NSClassFromString("XCTestCase") != nil,
+            testingOverridePresent: DecisionTestingInterface.environmentOverride(environment: environment) != nil
+        )
     }
 
     static func sanitizedPrompt(
@@ -17,25 +22,18 @@ enum DecisionIntelligenceTracePrivacy {
         stablePrefixFingerprint: String?,
         promptBudget: DecisionIntelligencePromptContract.ContextBudget?
     ) -> String {
-        let budgetSummary = promptBudget.map {
-            "target=\($0.targetCharacters), actual=\($0.totalCharacters), within=\($0.isWithinTarget)"
-        } ?? "unavailable"
-
-        return [
-            "[REDACTED LIVE PROMPT]",
-            detail,
-            semanticPromptFingerprint.map { "semantic_fingerprint=\($0)" },
-            stablePrefixFingerprint.map { "stable_prefix=\($0)" },
-            "budget=\(budgetSummary)"
-        ]
-        .compactMap { $0 }
-        .joined(separator: "\n")
+        BASAppleObservabilityAdapter.sanitizedPrompt(
+            detail: detail,
+            semanticPromptFingerprint: semanticPromptFingerprint,
+            stablePrefixFingerprint: stablePrefixFingerprint,
+            promptBudget: promptBudget
+        )
     }
 
     static func sanitizedOutputPreview(
         outputPreview: String
     ) -> String {
-        "[REDACTED LIVE OUTPUT PREVIEW] length=\(outputPreview.count)"
+        BASAppleObservabilityAdapter.sanitizedOutputPreview(outputPreview: outputPreview)
     }
 }
 
@@ -77,6 +75,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
     let stablePrefixFingerprint: String?
     let consistencyCheck: BASConsistencyCheckResult?
     let consistencyRejected: Bool
+    let substrateTrace: BASExecutionTrace?
     let prompt: String
     let outputPreview: String
     let detail: String
@@ -101,6 +100,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
         stablePrefixFingerprint: String? = nil,
         consistencyCheck: BASConsistencyCheckResult? = nil,
         consistencyRejected: Bool = false,
+        substrateTrace: BASExecutionTrace? = nil,
         prompt: String,
         outputPreview: String,
         detail: String
@@ -124,6 +124,7 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
         self.stablePrefixFingerprint = stablePrefixFingerprint
         self.consistencyCheck = consistencyCheck
         self.consistencyRejected = consistencyRejected
+        self.substrateTrace = substrateTrace
         self.prompt = prompt
         self.outputPreview = outputPreview
         self.detail = detail

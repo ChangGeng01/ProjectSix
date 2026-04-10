@@ -1,4 +1,5 @@
 import Foundation
+import BASAppleAdapters
 import BASRuntimeCore
 
 enum DecisionRuntimeGear: String, Equatable, Sendable {
@@ -320,42 +321,27 @@ extension DecisionAdaptiveTaskStrategy {
         brainState: DecisionBrainState? = nil
     ) -> DecisionAdaptiveTaskStrategy {
         DecisionAdaptiveTaskStrategy(
-            substrate: basAdaptiveTaskStrategy
-                .adapting(
-                    signals: BASAdaptiveRuntimeSignals(
-                        briefBias: max(
-                            brainState?.reactionWeights.briefLanguage ?? 0,
-                            brainState?.reactionWeights.lowCognitiveLoad ?? 0
-                        ),
-                        fatigueSignal: max(
-                            neuralState?.strength(for: .fatigue) ?? 0,
-                            neuralState?.strength(for: .emotionLoad) ?? 0
-                        ),
-                        hasBriefSessionBias: brainState?.sessionBiases.contains(where: { bias in
-                            let normalized = bias.lowercased()
-                            return normalized.contains("short") ||
-                                normalized.contains("brief") ||
-                                normalized.contains("concrete") ||
-                                normalized.contains("avoid heavy analysis")
-                        }) == true,
-                        interruptiveBias: max(
-                            brainState?.reactionWeights.interruptiveActionBias ?? 0,
-                            neuralState?.strength(for: .urgency) ?? 0,
-                            neuralState?.strength(for: .fatigue) ?? 0
-                        ),
-                        boundaryBias: max(
-                            brainState?.reactionWeights.boundaryNamingBias ?? 0,
-                            neuralState?.strength(for: .boundaryRisk) ?? 0
-                        ),
-                        tradeoffBias: brainState?.reactionWeights.tradeoffClarityBias ?? 0,
-                        rebuiltSession: contextState?.rebuiltSession == true,
-                        staleFieldCount: contextState?.staleFieldCount ?? 0,
-                        screenedOutMemoryCount: brainState?.memoryGovernance.screenedOutMemoryCount ?? 0,
-                        lowTrustLoad: brainState?.verificationSnapshot.riskFlags.contains(.lowTrustLoad) == true,
-                        retrievalInstability: brainState?.verificationSnapshot.riskFlags.contains(.retrievalInstability) == true,
-                        retrievalTags: brainState?.retrievalTags ?? []
-                    )
-                ),
+            substrate: BASAppleAdaptiveRuntimeAdapter.adapt(
+                strategy: basAdaptiveTaskStrategy,
+                with: BASAppleAdaptiveRuntimeInput(
+                    briefLanguageWeight: brainState?.reactionWeights.briefLanguage ?? 0,
+                    lowCognitiveLoadWeight: brainState?.reactionWeights.lowCognitiveLoad ?? 0,
+                    fatigueStrength: neuralState?.strength(for: .fatigue) ?? 0,
+                    emotionLoadStrength: neuralState?.strength(for: .emotionLoad) ?? 0,
+                    sessionBiases: brainState?.sessionBiases ?? [],
+                    interruptiveActionBias: brainState?.reactionWeights.interruptiveActionBias ?? 0,
+                    urgencyStrength: neuralState?.strength(for: .urgency) ?? 0,
+                    boundaryNamingBias: brainState?.reactionWeights.boundaryNamingBias ?? 0,
+                    boundaryRiskStrength: neuralState?.strength(for: .boundaryRisk) ?? 0,
+                    tradeoffClarityBias: brainState?.reactionWeights.tradeoffClarityBias ?? 0,
+                    rebuiltSession: contextState?.rebuiltSession == true,
+                    staleFieldCount: contextState?.staleFieldCount ?? 0,
+                    screenedOutMemoryCount: brainState?.memoryGovernance.screenedOutMemoryCount ?? 0,
+                    lowTrustLoad: brainState?.verificationSnapshot.riskFlags.contains(.lowTrustLoad) == true,
+                    retrievalInstability: brainState?.verificationSnapshot.riskFlags.contains(.retrievalInstability) == true,
+                    retrievalTags: brainState?.retrievalTags ?? []
+                )
+            ),
             preferredProvider: preferredProvider
         )
     }

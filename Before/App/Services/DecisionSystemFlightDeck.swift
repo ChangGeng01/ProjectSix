@@ -1,5 +1,6 @@
 import Foundation
 import BASAdmin
+import BASAppleAdapters
 
 enum DecisionSystemLayer: String, CaseIterable, Identifiable, Sendable {
     case runtime
@@ -59,96 +60,52 @@ struct DecisionSystemFlightDeck: Equatable, Sendable {
 
 enum DecisionSystemFlightDeckBuilder {
     static func build(from export: DecisionTestingRuntimeExport) -> DecisionSystemFlightDeck {
-        let reference = BASReferenceFlightDeckBuilder.build(from: referenceInput(from: export))
-        let reports = reference.assessments.map(layerReport(from:))
+        let compilation = BASAppleFlightDeckAdapter.compile(
+            from: referenceInput(from: export)
+        )
+        let reports = compilation.layerReports.map(layerReport(from:))
 
         return DecisionSystemFlightDeck(
-            generatedAt: reference.generatedAt,
-            overallScore: reference.overallScore,
-            overallHealth: overallHealth(for: reports),
+            generatedAt: compilation.generatedAt,
+            overallScore: compilation.overallScore,
+            overallHealth: DecisionSystemLayerHealth(rawValue: compilation.overallHealthID) ?? .watch,
             layerReports: reports,
-            isPureLocalClosedLoop: reference.isPureLocalClosedLoop,
-            dominantBlockers: reference.dominantBlockers
+            isPureLocalClosedLoop: compilation.isPureLocalClosedLoop,
+            dominantBlockers: compilation.dominantBlockers
         )
     }
 
     private static func referenceInput(
         from export: DecisionTestingRuntimeExport
-    ) -> BASReferenceFlightDeckInput {
+    ) -> BASReferenceFlightDeckAssemblyInput {
         let snapshot = export.runtimeSnapshot
-        return BASReferenceFlightDeckInputBuilder.build(
-            from: BASReferenceFlightDeckAssemblyInput(
-                generatedAt: export.generatedAt,
-                isPureLocalClosedLoop: export.registeredProviders.allSatisfy { $0.kind != .testingStub },
-                activeProviderTitle: export.summary.activeProvider.title,
-                backendTitle: snapshot.gemmaBackendResolution.effectiveBackend.title,
-                activeTaskGraphTaskCount: snapshot.activeTaskGraph?.tasks.count ?? 0,
-                hardwareAccelerationActive: snapshot.gemmaBackendResolution.isHardwareAccelerated ||
-                    snapshot.deviceCapabilities.isSimulator,
-                activeRuntimeUsingDeterministicFallback: export.summary.activeProvider == .template &&
-                    snapshot.preferences.onDeviceIntelligenceMode != .off,
-                fallbackTitle: snapshot.runtimeStatus.fallback?.title,
-                inspectionSummary: export.basRuntimeInspectionSummary,
-                brainSummary: export.basBrainSummary
-            )
+        return BASReferenceFlightDeckAssemblyInput(
+            generatedAt: export.generatedAt,
+            isPureLocalClosedLoop: export.registeredProviders.allSatisfy { $0.kind != .testingStub },
+            activeProviderTitle: export.summary.activeProvider.title,
+            backendTitle: snapshot.gemmaBackendResolution.effectiveBackend.title,
+            activeTaskGraphTaskCount: snapshot.activeTaskGraph?.tasks.count ?? 0,
+            hardwareAccelerationActive: snapshot.gemmaBackendResolution.isHardwareAccelerated ||
+                snapshot.deviceCapabilities.isSimulator,
+            activeRuntimeUsingDeterministicFallback: export.summary.activeProvider == .template &&
+                snapshot.preferences.onDeviceIntelligenceMode != .off,
+            fallbackTitle: snapshot.runtimeStatus.fallback?.title,
+            inspectionSummary: export.basRuntimeInspectionSummary,
+            brainSummary: export.basBrainSummary
         )
     }
 
     private static func layerReport(
-        from assessment: BASReferenceLayerAssessment
+        from report: BASAppleFlightDeckLayerReport
     ) -> DecisionSystemLayerReport {
-        let layer = map(assessment.kind)
+        let layer = DecisionSystemLayer(rawValue: report.layerID) ?? .observability
         return DecisionSystemLayerReport(
             layer: layer,
-            score: assessment.score,
-            health: health(for: assessment.score),
-            headline: assessment.headline,
-            signals: assessment.signals,
-            blockers: assessment.blockers
+            score: report.score,
+            health: DecisionSystemLayerHealth(rawValue: report.healthID) ?? .watch,
+            headline: report.headline,
+            signals: report.signals,
+            blockers: report.blockers
         )
-    }
-
-    private static func overallHealth(
-        for reports: [DecisionSystemLayerReport]
-    ) -> DecisionSystemLayerHealth {
-        if reports.contains(where: { $0.health == .critical }) {
-            return .critical
-        }
-        if reports.contains(where: { $0.health == .watch }) {
-            return .watch
-        }
-        return .strong
-    }
-
-    private static func health(for score: Int) -> DecisionSystemLayerHealth {
-        switch score {
-        case 85...:
-            .strong
-        case 60...:
-            .watch
-        default:
-            .critical
-        }
-    }
-
-    private static func map(_ layer: BASLayerKind) -> DecisionSystemLayer {
-        switch layer {
-        case .runtime:
-            .runtime
-        case .data:
-            .data
-        case .memory:
-            .memory
-        case .security:
-            .safety
-        case .orchestration:
-            .orchestration
-        case .observability:
-            .observability
-        case .evaluation:
-            .evaluation
-        case .delivery:
-            .delivery
-        }
     }
 }

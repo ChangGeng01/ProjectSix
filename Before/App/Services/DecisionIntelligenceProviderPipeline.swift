@@ -1,4 +1,5 @@
 import Foundation
+import BASAppleAdapters
 import BASOrchestration
 import BASObservability
 import BASPolicy
@@ -1645,7 +1646,7 @@ enum DecisionIntelligenceProviderPipeline {
         base: String,
         suspendedKinds: [DecisionModelProviderKind]
     ) -> String {
-        BASProviderTraceNarrator.deterministicFallbackDetail(
+        BASAppleObservabilityAdapter.deterministicFallbackDetail(
             base: base,
             suspendedProviderTitles: suspendedKinds.map(\.title)
         )
@@ -1672,18 +1673,25 @@ enum DecisionIntelligenceProviderPipeline {
         outputPreview: String,
         detail: String
     ) {
-        let allowsSensitivePayload = DecisionIntelligenceTracePrivacy.allowsSensitivePayload()
-        let storedPrompt = allowsSensitivePayload
-            ? prompt
-            : DecisionIntelligenceTracePrivacy.sanitizedPrompt(
+        let traceCompilation = BASAppleObservabilityAdapter.compileProviderTrace(
+            from: BASAppleProviderTraceInput(
+                testingOverridePresent: DecisionTestingInterface.environmentOverride() != nil,
+                kind: kind.rawValue,
+                preferredProviderID: preferredProvider.rawValue,
+                activeProviderID: activeProvider?.rawValue,
+                attemptedProviderIDs: attemptedProviders.map(\.rawValue),
+                allowFallbacks: allowFallbacks,
+                prompt: prompt,
+                outputPreview: outputPreview,
                 detail: detail,
                 semanticPromptFingerprint: semanticPromptFingerprint,
                 stablePrefixFingerprint: stablePrefixFingerprint,
-                promptBudget: promptBudget
+                promptBudget: promptBudget,
+                brainState: brainState,
+                consistencyRejected: consistencyRejected,
+                consistencyViolationKinds: consistencyCheck?.violations.map(\.kind.rawValue) ?? []
             )
-        let storedOutputPreview = allowsSensitivePayload
-            ? outputPreview
-            : DecisionIntelligenceTracePrivacy.sanitizedOutputPreview(outputPreview: outputPreview)
+        )
 
         let trace = DecisionIntelligenceTrace(
             kind: kind,
@@ -1703,8 +1711,9 @@ enum DecisionIntelligenceProviderPipeline {
             stablePrefixFingerprint: stablePrefixFingerprint,
             consistencyCheck: consistencyCheck,
             consistencyRejected: consistencyRejected,
-            prompt: storedPrompt,
-            outputPreview: storedOutputPreview,
+            substrateTrace: traceCompilation.executionTrace,
+            prompt: traceCompilation.storedPrompt,
+            outputPreview: traceCompilation.storedOutputPreview,
             detail: detail
         )
 
@@ -1718,7 +1727,7 @@ enum DecisionIntelligenceProviderPipeline {
         active: DecisionModelProviderKind,
         allowFallbacks: Bool
     ) -> String {
-        BASProviderTraceNarrator.detail(
+        BASAppleObservabilityAdapter.providerDetail(
             preferredTitle: preferred.title,
             activeTitle: active.title,
             allowFallbacks: allowFallbacks,
@@ -1738,12 +1747,18 @@ enum DecisionIntelligenceProviderPipeline {
         active: DecisionModelProviderKind,
         allowFallbacks: Bool
     ) -> String {
-        BASProviderTraceNarrator.cachedDetail(
-            base: detail(
-                preferred: preferred,
-                active: active,
-                allowFallbacks: allowFallbacks
-            )
+        BASAppleObservabilityAdapter.cachedProviderDetail(
+            preferredTitle: preferred.title,
+            activeTitle: active.title,
+            allowFallbacks: allowFallbacks,
+            activeResolutionDetail: active == .gemmaE4B
+                ? {
+                    let resolution = GemmaE4BIntelligenceService.backendResolution(
+                        policy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
+                    )
+                    return "\(resolution.title): \(resolution.detail)"
+                }()
+                : nil
         )
     }
 
@@ -1770,13 +1785,15 @@ enum DecisionIntelligenceProviderPipeline {
         brainState: DecisionBrainState?,
         reminderMode: DecisionMode? = nil
     ) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment> {
-        BASProviderReleaseEvaluator.verdict(
-            traceKindRawValue: kind.rawValue,
-            outputPreview: outputPreview,
-            kernelSnapshot: kernelSnapshot,
-            brainState: brainState,
-            reminderSurfaceModeRawValue: reminderMode?.rawValue,
-            referencedFacts: brainState?.activeGoals.first.map { ["current_goal": $0] } ?? [:]
+        BASAppleProviderReleaseAdapter.verdict(
+            from: BASAppleProviderReleaseInput(
+                traceKindRawValue: kind.rawValue,
+                outputPreview: outputPreview,
+                kernelSnapshot: kernelSnapshot,
+                brainState: brainState,
+                reminderSurfaceModeRawValue: reminderMode?.rawValue,
+                referencedFacts: brainState?.activeGoals.first.map { ["current_goal": $0] } ?? [:]
+            )
         )
     }
 
@@ -1791,7 +1808,7 @@ enum DecisionIntelligenceProviderPipeline {
         result: BASConsistencyCheckResult,
         source: String
     ) -> String {
-        BASProviderReleaseGate.rejectedConsistencyDetail(
+        BASAppleProviderReleaseAdapter.rejectedConsistencyDetail(
             base: base,
             result: result,
             source: source
@@ -1847,8 +1864,8 @@ enum DecisionIntelligenceProviderPipeline {
         admissionEvaluatedMs: Double? = nil,
         providerSelectionMs: Double? = nil
     ) -> DecisionRequestLifecycleMetrics {
-        BASLifecycleMetricsCompiler.compile(
-            promptAssemblyMs: promptPreparedMs,
+        BASAppleObservabilityAdapter.compileLifecycleMetrics(
+            promptPreparedMs: promptPreparedMs,
             admissionEvaluatedMs: admissionEvaluatedMs,
             providerSelectionMs: providerSelectionMs,
             firstPresentableMs: elapsedMilliseconds(since: requestStart, clock: clock)

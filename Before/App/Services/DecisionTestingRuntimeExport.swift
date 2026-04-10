@@ -1,4 +1,5 @@
 import Foundation
+import BASAppleAdapters
 import BASObservability
 import BASPolicy
 import BASRuntimeCore
@@ -129,53 +130,55 @@ struct DecisionTestingRuntimeExport {
     private var basRuntimeInspectionInput: BASRuntimeInspectionInput {
         let adaptationMatrix = runtimeSnapshot.executionProfile.adaptationMatrix
 
-        return BASRuntimeInspectionInput(
-            activeProviderID: runtimeSnapshot.runtimeStatus.active.rawValue,
-            fallbackProviderID: runtimeSnapshot.runtimeStatus.fallback?.rawValue,
-            runtimeGear: BASRuntimeGear(rawValue: adaptationMatrix.runtimeGear.rawValue) ?? .balanced,
-            environmentClass: BASEnvironmentClass(rawValue: adaptationMatrix.environmentClass.rawValue) ?? .normal,
-            deviceClass: BASDevicePerformanceClass(rawValue: adaptationMatrix.deviceClass.rawValue) ?? .balancedPhone,
-            languageMode: BASLanguageMode(rawValue: adaptationMatrix.languageMode.rawValue) ?? .unknown,
-            taskEntropyByKind: adaptationMatrix.strategiesByKind.reduce(into: [:]) { partialResult, item in
-                partialResult[item.key.rawValue] = BASTaskEntropyClass(rawValue: item.value.entropy.rawValue) ?? .medium
-            },
-            preferredProviderRawValueByKind: adaptationMatrix.strategiesByKind.reduce(into: [:]) { partialResult, item in
-                partialResult[item.key.rawValue] = item.value.preferredProvider.rawValue
-            },
-            strategyByKind: adaptationMatrix.strategiesByKind.reduce(into: [:]) { partialResult, item in
-                partialResult[item.key.rawValue] = substrateAdaptiveStrategy(item.value)
-            },
-            effectivePreferredProviderRawValueByKind: Dictionary(
-                grouping: recentTraces.compactMap { trace in
-                    trace.runtimeStrategy.map { (trace.kind.rawValue, $0.preferredProvider.rawValue) }
+        return BASAppleObservabilityAdapter.compileRuntimeInspectionInput(
+            from: BASAppleRuntimeInspectionAdapterInput(
+                activeProviderID: runtimeSnapshot.runtimeStatus.active.rawValue,
+                fallbackProviderID: runtimeSnapshot.runtimeStatus.fallback?.rawValue,
+                runtimeGear: BASRuntimeGear(rawValue: adaptationMatrix.runtimeGear.rawValue) ?? .balanced,
+                environmentClass: BASEnvironmentClass(rawValue: adaptationMatrix.environmentClass.rawValue) ?? .normal,
+                deviceClass: BASDevicePerformanceClass(rawValue: adaptationMatrix.deviceClass.rawValue) ?? .balancedPhone,
+                languageMode: BASLanguageMode(rawValue: adaptationMatrix.languageMode.rawValue) ?? .unknown,
+                taskEntropyByKind: adaptationMatrix.strategiesByKind.reduce(into: [:]) { partialResult, item in
+                    partialResult[item.key.rawValue] = BASTaskEntropyClass(rawValue: item.value.entropy.rawValue) ?? .medium
                 },
-                by: \.0
+                preferredProviderRawValueByKind: adaptationMatrix.strategiesByKind.reduce(into: [:]) { partialResult, item in
+                    partialResult[item.key.rawValue] = item.value.preferredProvider.rawValue
+                },
+                strategyByKind: adaptationMatrix.strategiesByKind.reduce(into: [:]) { partialResult, item in
+                    partialResult[item.key.rawValue] = substrateAdaptiveStrategy(item.value)
+                },
+                effectivePreferredProviderRawValueByKind: Dictionary(
+                    grouping: recentTraces.compactMap { trace in
+                        trace.runtimeStrategy.map { (trace.kind.rawValue, $0.preferredProvider.rawValue) }
+                    },
+                    by: \.0
+                )
+                .compactMapValues { grouped in
+                    grouped.first?.1
+                },
+                traceInputs: runtimeInspectionTraceInputs,
+                telemetrySummary: intelligenceTelemetry.substrateSummary,
+                lifecycleSummary: basLifecycleSummary,
+                neuralSummary: basNeuralSummary,
+                brainSummary: basBrainSummary,
+                totalCacheEntries: cacheTelemetry.entryCountByKind.values.reduce(0, +),
+                totalCacheLookupCount: cacheTelemetry.totalHits + cacheTelemetry.totalMisses,
+                totalCacheRejectedStores: cacheTelemetry.totalRejectedStores,
+                totalCacheQuarantinedHits: cacheTelemetry.totalQuarantinedHits,
+                dominantBackendID: dominantGemmaBackend?.rawValue,
+                registeredProviderCount: registeredProviders.count,
+                registeredOpenModelProviderCount: registeredProviders.filter { $0.track == .builtInOpenModel }.count,
+                activeCircuitProviderIDs: circuitBreakerSnapshot.activeProviders.map(\.rawValue),
+                circuitTripCount: circuitBreakerSnapshot.totalTripCount,
+                circuitTripCountByProvider: circuitBreakerSnapshot.totalTripCountByProvider.reduce(into: [:]) { partialResult, item in
+                    partialResult[item.key.rawValue] = item.value
+                },
+                circuitTripCountByReason: circuitBreakerSnapshot.totalTripCountByReason.reduce(into: [:]) { partialResult, item in
+                    partialResult[item.key.rawValue] = item.value
+                },
+                traceCount: recentTraces.count,
+                replayCount: recentReplay.count
             )
-            .compactMapValues { grouped in
-                grouped.first?.1
-            },
-            traceInputs: runtimeInspectionTraceInputs,
-            telemetrySummary: intelligenceTelemetry.substrateSummary,
-            lifecycleSummary: basLifecycleSummary,
-            neuralSummary: basNeuralSummary,
-            brainSummary: basBrainSummary,
-            totalCacheEntries: cacheTelemetry.entryCountByKind.values.reduce(0, +),
-            totalCacheLookupCount: cacheTelemetry.totalHits + cacheTelemetry.totalMisses,
-            totalCacheRejectedStores: cacheTelemetry.totalRejectedStores,
-            totalCacheQuarantinedHits: cacheTelemetry.totalQuarantinedHits,
-            dominantBackendID: dominantGemmaBackend?.rawValue,
-            registeredProviderCount: registeredProviders.count,
-            registeredOpenModelProviderCount: registeredProviders.filter { $0.track == .builtInOpenModel }.count,
-            activeCircuitProviderIDs: circuitBreakerSnapshot.activeProviders.map(\.rawValue),
-            circuitTripCount: circuitBreakerSnapshot.totalTripCount,
-            circuitTripCountByProvider: circuitBreakerSnapshot.totalTripCountByProvider.reduce(into: [:]) { partialResult, item in
-                partialResult[item.key.rawValue] = item.value
-            },
-            circuitTripCountByReason: circuitBreakerSnapshot.totalTripCountByReason.reduce(into: [:]) { partialResult, item in
-                partialResult[item.key.rawValue] = item.value
-            },
-            traceCount: recentTraces.count,
-            replayCount: recentReplay.count
         )
     }
 

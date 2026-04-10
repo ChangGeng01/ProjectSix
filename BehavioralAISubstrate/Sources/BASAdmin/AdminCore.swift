@@ -563,10 +563,7 @@ public struct BASConsoleView: View {
             }
 
             if let brainSummary = snapshot.brainSummary {
-                Text(brainSummary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+                platformSelectableBrainSummary(brainSummary)
             }
 
             ForEach(snapshot.reports) { report in
@@ -770,5 +767,19 @@ public struct BASConsoleView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func platformSelectableBrainSummary(_ summary: String) -> some View {
+        #if os(watchOS)
+        Text(summary)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        #else
+        Text(summary)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
+        #endif
     }
 }

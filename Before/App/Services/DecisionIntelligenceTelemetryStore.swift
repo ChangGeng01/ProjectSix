@@ -1,4 +1,5 @@
 import Foundation
+import BASAppleAdapters
 import BASObservability
 
 typealias DecisionIntelligenceRequestOutcome = BASRequestOutcome
@@ -323,19 +324,6 @@ actor DecisionIntelligenceTelemetryStore {
     private var overTargetBudgetCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
     private var lowPressureModelCallCountByKind: [DecisionIntelligenceTraceKind: Int] = [:]
 
-    private static func slowRequestThresholdMs(
-        for kind: DecisionIntelligenceTraceKind
-    ) -> Double {
-        switch kind {
-        case .quick:
-            return 800
-        case .balance, .mirror:
-            return 1_500
-        case .reminder:
-            return 450
-        }
-    }
-
     func record(
         kind: DecisionIntelligenceTraceKind,
         outcome: DecisionIntelligenceRequestOutcome,
@@ -349,23 +337,41 @@ actor DecisionIntelligenceTelemetryStore {
         admissionDecision: DecisionIntelligenceAdmissionDecision? = nil,
         gemmaBackendResolution: InferenceBackendResolution? = nil
     ) {
+        let compilation = BASAppleObservabilityAdapter.compileTelemetryRecord(
+            from: BASAppleTelemetryRecordInput(
+                kind: kind.rawValue,
+                outcome: outcome,
+                activeProviderID: activeProvider?.rawValue,
+                attemptedProviderIDs: attemptedProviders.map(\.rawValue),
+                usedFallback: usedFallback,
+                durationMs: durationMs,
+                lifecycleMetrics: lifecycleMetrics,
+                promptBudget: promptBudget,
+                runtimeTimeBudgetMs: runtimeStrategy?.timeBudgetMs,
+                admissionPressureID: admissionDecision?.pressure.rawValue,
+                admissionSkipReasonID: admissionDecision?.skipReason?.rawValue,
+                reminderSelectionNeedID: admissionDecision?.reminderSelectionNeed?.rawValue,
+                activeBackendID: gemmaBackendResolution?.effectiveBackend.rawValue
+            )
+        )
+
         requestCountByKind[kind, default: 0] += 1
-        outcomeCount[outcome, default: 0] += 1
+        outcomeCount[compilation.outcome, default: 0] += 1
         var countsForOutcome = outcomeCountByKind[outcome, default: [:]]
         countsForOutcome[kind, default: 0] += 1
         outcomeCountByKind[outcome] = countsForOutcome
-        requestDurationTotalMsByKind[kind, default: 0] += durationMs
-        if let lifecycleMetrics {
+        requestDurationTotalMsByKind[kind, default: 0] += compilation.durationMs
+        if let lifecycleMetrics = compilation.lifecycleMetrics {
             firstPresentableTotalMsByKind[kind, default: 0] += lifecycleMetrics.firstPresentableMs
             promptAssemblyTotalMsByKind[kind, default: 0] += lifecycleMetrics.promptAssemblyMs
             admissionEvaluationTotalMsByKind[kind, default: 0] += lifecycleMetrics.admissionEvaluationMs
             providerSelectionTotalMsByKind[kind, default: 0] += lifecycleMetrics.providerSelectionMs
             executionTotalMsByKind[kind, default: 0] += lifecycleMetrics.executionMs
         }
-        if durationMs >= Self.slowRequestThresholdMs(for: kind) {
+        if compilation.isSlowRequest {
             slowRequestCountByKind[kind, default: 0] += 1
         }
-        if let runtimeStrategy, durationMs > Double(runtimeStrategy.timeBudgetMs) {
+        if compilation.exceedsTimeBudget {
             overTimeBudgetCountByKind[kind, default: 0] += 1
         }
 
@@ -375,27 +381,27 @@ actor DecisionIntelligenceTelemetryStore {
 
         if let activeProvider {
             activeProviderCount[activeProvider, default: 0] += 1
-            activeProviderDurationTotalMs[activeProvider, default: 0] += durationMs
+            activeProviderDurationTotalMs[activeProvider, default: 0] += compilation.durationMs
         }
 
         if usedFallback {
             fallbackActivations += 1
         }
 
-        if let promptBudget {
+        if let promptBudget = compilation.promptBudget {
             promptCharactersTotalByKind[kind, default: 0] += promptBudget.totalCharacters
             prefixCharactersTotalByKind[kind, default: 0] += promptBudget.prefixCharacters
             immutablePrefixCharactersTotalByKind[kind, default: 0] += promptBudget.immutablePrefixCharacters
             adaptivePrefixCharactersTotalByKind[kind, default: 0] += promptBudget.adaptivePrefixCharacters
             suffixCharactersTotalByKind[kind, default: 0] += promptBudget.suffixCharacters
-            if !promptBudget.isWithinTarget {
+            if compilation.overTargetPromptBudget {
                 overTargetBudgetCountByKind[kind, default: 0] += 1
             }
         }
 
         if let admissionDecision {
             promptPressureCount[admissionDecision.pressure, default: 0] += 1
-            if outcome == .providerSuccess, admissionDecision.pressure == .low {
+            if compilation.lowPressureModelCall {
                 lowPressureModelCallCountByKind[kind, default: 0] += 1
             }
             if let reminderSelectionNeed = admissionDecision.reminderSelectionNeed {
@@ -414,7 +420,7 @@ actor DecisionIntelligenceTelemetryStore {
 
         if let gemmaBackendResolution {
             gemmaBackendCount[gemmaBackendResolution.effectiveBackend, default: 0] += 1
-            gemmaBackendDurationTotalMs[gemmaBackendResolution.effectiveBackend, default: 0] += durationMs
+            gemmaBackendDurationTotalMs[gemmaBackendResolution.effectiveBackend, default: 0] += compilation.durationMs
         }
     }
 
