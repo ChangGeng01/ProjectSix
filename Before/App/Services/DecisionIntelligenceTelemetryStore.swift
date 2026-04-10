@@ -412,6 +412,12 @@ actor DecisionIntelligenceTelemetryStore {
         )
     }
 
+    func record(
+        observation: BASAppleProviderTelemetryObservation
+    ) async {
+        await accumulator.record(from: observation.input)
+    }
+
     func snapshot() async -> DecisionIntelligenceTelemetrySnapshot {
         DecisionIntelligenceTelemetrySnapshot(substrateSnapshot: await accumulator.snapshot())
     }

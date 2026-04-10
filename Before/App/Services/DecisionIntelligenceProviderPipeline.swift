@@ -1646,7 +1646,7 @@ enum DecisionIntelligenceProviderPipeline {
         base: String,
         suspendedKinds: [DecisionModelProviderKind]
     ) -> String {
-        BASAppleObservabilityAdapter.deterministicFallbackDetail(
+        BASAppleProviderOutcomeObserver.deterministicFallbackDetail(
             base: base,
             suspendedProviderTitles: suspendedKinds.map(\.title)
         )
@@ -1673,7 +1673,7 @@ enum DecisionIntelligenceProviderPipeline {
         outputPreview: String,
         detail: String
     ) {
-        let traceCompilation = BASAppleObservabilityAdapter.compileProviderTrace(
+        let traceObservation = BASAppleProviderOutcomeObserver.traceObservation(
             from: BASAppleProviderTraceInput(
                 testingOverridePresent: DecisionTestingInterface.environmentOverride() != nil,
                 kind: kind.rawValue,
@@ -1711,10 +1711,10 @@ enum DecisionIntelligenceProviderPipeline {
             stablePrefixFingerprint: stablePrefixFingerprint,
             consistencyCheck: consistencyCheck,
             consistencyRejected: consistencyRejected,
-            substrateTrace: traceCompilation.executionTrace,
-            prompt: traceCompilation.storedPrompt,
-            outputPreview: traceCompilation.storedOutputPreview,
-            detail: detail
+            substrateTrace: traceObservation.compilation.executionTrace,
+            prompt: traceObservation.compilation.storedPrompt,
+            outputPreview: traceObservation.compilation.storedOutputPreview,
+            detail: traceObservation.detail
         )
 
         Task { @MainActor in
@@ -1727,7 +1727,7 @@ enum DecisionIntelligenceProviderPipeline {
         active: DecisionModelProviderKind,
         allowFallbacks: Bool
     ) -> String {
-        BASAppleObservabilityAdapter.providerDetail(
+        BASAppleProviderOutcomeObserver.providerDetail(
             preferredTitle: preferred.title,
             activeTitle: active.title,
             allowFallbacks: allowFallbacks,
@@ -1747,7 +1747,7 @@ enum DecisionIntelligenceProviderPipeline {
         active: DecisionModelProviderKind,
         allowFallbacks: Bool
     ) -> String {
-        BASAppleObservabilityAdapter.cachedProviderDetail(
+        BASAppleProviderOutcomeObserver.cachedProviderDetail(
             preferredTitle: preferred.title,
             activeTitle: active.title,
             allowFallbacks: allowFallbacks,
@@ -1808,7 +1808,7 @@ enum DecisionIntelligenceProviderPipeline {
         result: BASConsistencyCheckResult,
         source: String
     ) -> String {
-        BASAppleProviderReleaseAdapter.rejectedConsistencyDetail(
+        BASAppleProviderOutcomeObserver.rejectedConsistencyDetail(
             base: base,
             result: result,
             source: source
@@ -1828,21 +1828,27 @@ enum DecisionIntelligenceProviderPipeline {
         admissionDecision: DecisionIntelligenceAdmissionDecision? = nil
     ) async {
         await DecisionIntelligenceTelemetryStore.shared.record(
-            kind: kind,
-            outcome: outcome,
-            activeProvider: activeProvider,
-            attemptedProviders: attemptedProviders,
-            usedFallback: activeProvider != nil && activeProvider != preferredProvider,
-            durationMs: durationMs,
-            lifecycleMetrics: lifecycleMetrics,
-            promptBudget: promptBudget,
-            runtimeStrategy: runtimeStrategy,
-            admissionDecision: admissionDecision,
-            gemmaBackendResolution: activeProvider == .gemmaE4B
-                ? GemmaE4BIntelligenceService.backendResolution(
-                    policy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
+            observation: BASAppleProviderOutcomeObserver.telemetryObservation(
+                from: BASAppleTelemetryRecordInput(
+                    kind: kind.rawValue,
+                    outcome: outcome,
+                    activeProviderID: activeProvider?.rawValue,
+                    attemptedProviderIDs: attemptedProviders.map(\.rawValue),
+                    usedFallback: activeProvider != nil && activeProvider != preferredProvider,
+                    durationMs: durationMs,
+                    lifecycleMetrics: lifecycleMetrics,
+                    promptBudget: promptBudget,
+                    runtimeTimeBudgetMs: runtimeStrategy?.timeBudgetMs,
+                    admissionPressureID: admissionDecision?.pressure.rawValue,
+                    admissionSkipReasonID: admissionDecision?.skipReason?.rawValue,
+                    reminderSelectionNeedID: admissionDecision?.reminderSelectionNeed?.rawValue,
+                    activeBackendID: activeProvider == .gemmaE4B
+                        ? GemmaE4BIntelligenceService.backendResolution(
+                            policy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
+                        ).effectiveBackend.rawValue
+                        : nil
                 )
-                : nil
+            )
         )
     }
 
@@ -1864,7 +1870,7 @@ enum DecisionIntelligenceProviderPipeline {
         admissionEvaluatedMs: Double? = nil,
         providerSelectionMs: Double? = nil
     ) -> DecisionRequestLifecycleMetrics {
-        BASAppleObservabilityAdapter.compileLifecycleMetrics(
+        BASAppleProviderOutcomeObserver.lifecycleMetrics(
             promptPreparedMs: promptPreparedMs,
             admissionEvaluatedMs: admissionEvaluatedMs,
             providerSelectionMs: providerSelectionMs,
