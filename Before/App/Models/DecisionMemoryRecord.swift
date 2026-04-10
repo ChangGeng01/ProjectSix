@@ -268,7 +268,29 @@ extension DecisionMemoryCandidateRecord {
     }
 }
 
-extension DecisionMemoryRecord: BASAppleGovernedMemoryMutable {
+extension DecisionMemoryRecord: BASAppleGovernedMemoryEntity {
+    static func basMake(from fields: BASGovernedMemoryStoredFields) -> Self {
+        Self(
+            id: fields.id,
+            type: DecisionMemoryType(basRawValue: fields.typeID),
+            topic: fields.topic,
+            headline: fields.headline,
+            value: fields.value,
+            confidence: fields.confidence,
+            priority: fields.priority,
+            source: DecisionMemorySource(fields.source),
+            lastConfirmedAt: fields.lastConfirmedAt,
+            decayPolicy: DecisionMemoryDecayPolicy(fields.decayPolicy),
+            retrievalTags: fields.retrievalTags,
+            evidenceCount: fields.evidenceCount,
+            observationCount: fields.observationCount,
+            provenanceSummary: fields.provenanceSummary,
+            lifecycleState: DecisionMemoryLifecycleState(fields.lifecycleState),
+            lastReviewedAt: fields.lastReviewedAt,
+            tier: DecisionMemoryTier(basRawValue: fields.tierID)
+        )
+    }
+
     var basID: String { id }
     var basTypeID: String {
         get { typeRaw }
@@ -336,7 +358,33 @@ extension DecisionMemoryRecord: BASAppleGovernedMemoryMutable {
     }
 }
 
-extension DecisionMemoryCandidateRecord: BASAppleCandidateMemoryMutable {
+extension DecisionMemoryCandidateRecord: BASAppleCandidateMemoryEntity {
+    static func basMake(from fields: BASCandidateMemoryStoredFields) -> Self {
+        Self(
+            id: fields.id,
+            type: DecisionMemoryType(basRawValue: fields.typeID),
+            topic: fields.topic,
+            headline: fields.headline,
+            value: fields.value,
+            confidence: fields.confidence,
+            priority: fields.priority,
+            source: DecisionMemorySource(fields.source),
+            firstObservedAt: fields.firstObservedAt,
+            lastObservedAt: fields.lastObservedAt,
+            decayPolicy: DecisionMemoryDecayPolicy(fields.decayPolicy),
+            retrievalTags: fields.retrievalTags,
+            evidenceCount: fields.evidenceCount,
+            confirmationCount: fields.confirmationCount,
+            lastObservationFingerprint: fields.lastObservationFingerprint,
+            status: DecisionMemoryCandidateStatus(fields.status),
+            provenanceSummary: fields.provenanceSummary,
+            lastWriteOperation: DecisionMemoryWriteOperation(fields.lastWriteOperation),
+            lastGovernanceDecision: DecisionMemoryGovernanceDecision(fields.lastGovernanceDecision),
+            governanceReason: fields.governanceReason,
+            tier: DecisionMemoryTier(basRawValue: fields.tierID)
+        )
+    }
+
     var basID: String { id }
     var basTypeID: String {
         get { typeRaw }

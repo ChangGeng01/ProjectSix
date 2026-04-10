@@ -14,58 +14,25 @@ enum DecisionMemoryGovernor {
         in context: ModelContext
     ) -> [DecisionMemoryRecord] {
         let reviewNow = drafts.map(\.lastConfirmedAt).max() ?? .now
-        let existingRecords = fetchRecords(in: context)
-        let existingCandidates = fetchCandidates(in: context)
-        let outcome = BASAppleMemoryPersistenceAdapter.reconcile(
+        let result: BASAppleMemoryReconciliationWriteResult<
+            DecisionMemoryRecord,
+            DecisionMemoryCandidateRecord
+        > = BASAppleMemoryReconciliationWriter.reconcile(
             BASAppleMemoryPersistenceRequest(
                 drafts: drafts,
-                existingRecords: existingRecords.map(\.basSnapshot),
-                existingCandidates: existingCandidates.map(\.basSnapshot),
+                existingRecords: [],
+                existingCandidates: [],
                 reviewNow: reviewNow
-            )
-        )
-
-        var recordsByID = Dictionary(uniqueKeysWithValues: existingRecords.map { ($0.id, $0) })
-        var candidatesByID = Dictionary(uniqueKeysWithValues: existingCandidates.map { ($0.id, $0) })
-
-        for recordMutation in outcome.recordMutations {
-            apply(recordMutation: recordMutation, in: context, recordsByID: &recordsByID)
-        }
-
-        for candidateMutation in outcome.candidateMutations {
-            apply(candidateMutation: candidateMutation, in: context, candidatesByID: &candidatesByID)
-        }
-
-        do {
-            try context.save()
-        } catch {
-            PersistenceIssueRecorder.record(
-                error: error,
-                operation: "reconciling governed memory records"
-            )
-        }
-
-        let resolvedRecords = fetchRecords(in: context)
-        let ordering = Dictionary(
-            uniqueKeysWithValues: outcome.orderedRecordIDs.enumerated().map { ($0.element, $0.offset) }
-        )
-
-        return resolvedRecords.sorted { lhs, rhs in
-            let lhsIndex = ordering[lhs.id] ?? Int.max
-            let rhsIndex = ordering[rhs.id] ?? Int.max
-            if lhsIndex == rhsIndex {
-                return lhs.id < rhs.id
+            ),
+            in: context,
+            onSaveError: { error in
+                PersistenceIssueRecorder.record(
+                    error: error,
+                    operation: "reconciling governed memory records"
+                )
             }
-            return lhsIndex < rhsIndex
-        }
-    }
-
-    private static func fetchRecords(in context: ModelContext) -> [DecisionMemoryRecord] {
-        (try? context.fetch(FetchDescriptor<DecisionMemoryRecord>())) ?? []
-    }
-
-    private static func fetchCandidates(in context: ModelContext) -> [DecisionMemoryCandidateRecord] {
-        (try? context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())) ?? []
+        )
+        return result.orderedRecords
     }
 
     static func assess(draft: BASDerivedMemoryDraft) -> GovernanceAssessment {
@@ -77,107 +44,4 @@ enum DecisionMemoryGovernor {
             reason: substrateAssessment.reason
         )
     }
-
-    private static func apply(
-        recordMutation: BASAppleGovernedMemoryMutation,
-        in context: ModelContext,
-        recordsByID: inout [String: DecisionMemoryRecord]
-    ) {
-        switch recordMutation.operation {
-        case .delete:
-            guard let existing = recordsByID[recordMutation.id] else { return }
-            context.delete(existing)
-            recordsByID[recordMutation.id] = nil
-        case .add, .update, .noop:
-            let record = BASAppleMemoryMutationWriter.apply(
-                recordMutation,
-                existing: recordsByID[recordMutation.id],
-                make: makeRecord(from:)
-            )
-            if let record {
-                if recordsByID[recordMutation.id] == nil {
-                    context.insert(record)
-                }
-                recordsByID[record.id] = record
-            }
-        }
-    }
-
-    private static func apply(
-        candidateMutation: BASAppleCandidateMemoryMutation,
-        in context: ModelContext,
-        candidatesByID: inout [String: DecisionMemoryCandidateRecord]
-    ) {
-        switch candidateMutation.operation {
-        case .delete:
-            guard let existing = candidatesByID[candidateMutation.id] else { return }
-            context.delete(existing)
-            candidatesByID[candidateMutation.id] = nil
-        case .add, .update, .noop:
-            let candidate = BASAppleMemoryMutationWriter.apply(
-                candidateMutation,
-                existing: candidatesByID[candidateMutation.id],
-                make: makeCandidate(from:)
-            )
-            if let candidate {
-                if candidatesByID[candidateMutation.id] == nil {
-                    context.insert(candidate)
-                }
-                candidatesByID[candidate.id] = candidate
-            }
-        }
-    }
-
-    private static func makeRecord(
-        from fields: BASGovernedMemoryStoredFields
-    ) -> DecisionMemoryRecord {
-        DecisionMemoryRecord(
-            id: fields.id,
-            type: DecisionMemoryType(basRawValue: fields.typeID),
-            topic: fields.topic,
-            headline: fields.headline,
-            value: fields.value,
-            confidence: fields.confidence,
-            priority: fields.priority,
-            source: DecisionMemorySource(fields.source),
-            lastConfirmedAt: fields.lastConfirmedAt,
-            decayPolicy: DecisionMemoryDecayPolicy(fields.decayPolicy),
-            retrievalTags: fields.retrievalTags,
-            evidenceCount: fields.evidenceCount,
-            observationCount: fields.observationCount,
-            provenanceSummary: fields.provenanceSummary,
-            lifecycleState: DecisionMemoryLifecycleState(fields.lifecycleState),
-            lastReviewedAt: fields.lastReviewedAt,
-            tier: DecisionMemoryTier(basRawValue: fields.tierID)
-        )
-    }
-
-    private static func makeCandidate(
-        from fields: BASCandidateMemoryStoredFields
-    ) -> DecisionMemoryCandidateRecord {
-        DecisionMemoryCandidateRecord(
-            id: fields.id,
-            type: DecisionMemoryType(basRawValue: fields.typeID),
-            topic: fields.topic,
-            headline: fields.headline,
-            value: fields.value,
-            confidence: fields.confidence,
-            priority: fields.priority,
-            source: DecisionMemorySource(fields.source),
-            firstObservedAt: fields.firstObservedAt,
-            lastObservedAt: fields.lastObservedAt,
-            decayPolicy: DecisionMemoryDecayPolicy(fields.decayPolicy),
-            retrievalTags: fields.retrievalTags,
-            evidenceCount: fields.evidenceCount,
-            confirmationCount: fields.confirmationCount,
-            lastObservationFingerprint: fields.lastObservationFingerprint,
-            status: DecisionMemoryCandidateStatus(fields.status),
-            provenanceSummary: fields.provenanceSummary,
-            lastWriteOperation: DecisionMemoryWriteOperation(fields.lastWriteOperation),
-            lastGovernanceDecision: DecisionMemoryGovernanceDecision(fields.lastGovernanceDecision),
-            governanceReason: fields.governanceReason,
-            tier: DecisionMemoryTier(basRawValue: fields.tierID)
-        )
-    }
-
 }
