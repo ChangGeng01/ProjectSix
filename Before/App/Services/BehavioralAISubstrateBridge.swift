@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 import BASAdmin
 import BASAppleAdapters
@@ -287,15 +286,63 @@ enum BehavioralAISubstrateBridge {
             ).map { ($0.id, $0.score) }
         )
 
-        return BASBrainProjection(
-            records: projection.records.map(governedMemory(from:)),
-            candidates: projection.candidates.map(memoryCandidate(from:)),
-            recentEvents: projection.checkEvents.map(eventRecord(from:)),
-            embeddingScoresByID: embeddingScores,
-            governanceSnapshot: memoryGovernance(from: projection.governanceSnapshot),
-            taskGraphHint: taskGraph.map(taskGraphHint(from:)),
-            activeTemplateIDs: activeTemplateIDs,
-            failureGuardIDs: failureGuardIDs
+        return BASBrainProjectionCompiler.compile(
+            BASBrainProjectionCompileRequest(
+                records: projection.records.map { record in
+                    BASProjectionGovernedMemoryInput(
+                        id: record.id,
+                        typeID: record.type.rawValue,
+                        headline: record.headline,
+                        confidence: record.confidence,
+                        sourceID: record.source.rawValue,
+                        lastConfirmedAt: record.lastConfirmedAt,
+                        lifecycleStateID: record.lifecycleState.rawValue,
+                        tierID: record.tier.rawValue,
+                        provenanceSummary: record.provenanceSummary
+                    )
+                },
+                candidates: projection.candidates.map { candidate in
+                    BASProjectionCandidateInput(
+                        id: candidate.id,
+                        typeID: candidate.type.rawValue,
+                        headline: candidate.headline,
+                        confidence: candidate.confidence,
+                        priority: candidate.priority,
+                        sourceID: candidate.source.rawValue,
+                        retrievalTags: candidate.retrievalTags,
+                        lastObservedAt: candidate.lastObservedAt,
+                        decayPolicyID: candidate.decayPolicy.rawValue,
+                        statusID: candidate.status.rawValue,
+                        governanceDecisionID: candidate.lastGovernanceDecision.rawValue,
+                        evidenceCount: candidate.evidenceCount,
+                        provenanceSummary: candidate.provenanceSummary
+                    )
+                },
+                events: projection.checkEvents.map { event in
+                    BASProjectionEventInput(
+                        id: event.id.uuidString,
+                        note: event.note,
+                        fallbackContent: event.scenario.title,
+                        createdAt: event.createdAt,
+                        scenarioID: event.scenario.rawValue,
+                        actionID: event.finalAction.rawValue,
+                        reflectionOutcomeID: event.reflectionOutcome?.rawValue,
+                        entrySourceID: event.entrySource.rawValue
+                    )
+                },
+                embeddingScoresByID: embeddingScores,
+                governanceSnapshot: BASProjectionGovernanceInput(
+                    totalRecordCount: projection.governanceSnapshot.totalRecordCount,
+                    totalCandidateCount: projection.governanceSnapshot.totalCandidateCount,
+                    pendingCandidateCount: projection.governanceSnapshot.pendingCandidateCount,
+                    promotedCandidateCount: projection.governanceSnapshot.promotedCandidateCount,
+                    deferredCandidateCount: projection.governanceSnapshot.deferredCandidateCount,
+                    admittedCandidateCount: projection.governanceSnapshot.admittedCandidateCount
+                ),
+                taskGraphHint: taskGraph.map(taskGraphHint(from:)),
+                activeTemplateIDs: activeTemplateIDs,
+                failureGuardIDs: failureGuardIDs
+            )
         )
     }
 
@@ -503,172 +550,6 @@ enum BehavioralAISubstrateBridge {
         )
     }
 
-    private static func governedMemory(from record: DecisionMemoryRecord) -> BASGovernedMemory {
-        BASGovernedMemory(
-            id: stableUUID(for: record.id),
-            kind: memoryKind(from: record.type),
-            content: record.headline,
-            scope: memoryScope(from: record.type),
-            sensitivity: memorySensitivity(from: record.type),
-            tier: memoryTier(from: record.tier),
-            confidence: record.confidence,
-            sourceType: record.source.rawValue,
-            lastConfirmedAt: record.lastConfirmedAt,
-            decayScore: decayScore(for: record.lifecycleState),
-            governanceStatus: .governed,
-            provenanceSummary: record.provenanceSummary
-        )
-    }
-
-    private static func memoryCandidate(from candidate: DecisionMemoryCandidateRecord) -> BASMemoryEligibilityCandidate {
-        let source = memorySource(from: candidate.source)
-        let governanceStatus = memoryLoadStatus(from: candidate)
-        let decayPolicy = memoryDecayPolicy(from: candidate.decayPolicy)
-        let trustProfile = BASMemoryTrustEngine.profile(
-            source: source,
-            evidenceCount: candidate.evidenceCount,
-            decayPolicy: decayPolicy,
-            governanceStatus: governanceStatus,
-            isPending: candidate.status == .pending,
-            provenanceSummary: candidate.provenanceSummary
-        )
-
-        return BASMemoryEligibilityCandidate(
-            id: candidate.id,
-            role: memoryRole(from: candidate.type),
-            kind: memoryKind(from: candidate.type),
-            headline: candidate.headline,
-            source: source,
-            scope: memoryScope(from: candidate.type),
-            sensitivity: memorySensitivity(from: candidate.type),
-            confidence: candidate.confidence,
-            priority: candidate.priority,
-            retrievalTags: candidate.retrievalTags,
-            lastConfirmedAt: candidate.lastObservedAt,
-            decayPolicy: decayPolicy,
-            lifecycleState: candidate.status.rawValue,
-            governanceStatus: governanceStatus,
-            isPending: candidate.status == .pending,
-            provenanceSummary: candidate.provenanceSummary,
-            sourceTrustScore: trustProfile.score,
-            sourceTrustTier: trustProfile.tier,
-            effectiveConfidence: BASMemoryTrustEngine.effectiveConfidence(
-                rawConfidence: candidate.confidence,
-                trustProfile: trustProfile
-            ),
-            provenanceRisk: trustProfile.provenanceRisk
-        )
-    }
-
-    private static func eventRecord(from event: CheckEvent) -> BASEventRecord {
-        BASEventRecord(
-            id: event.id,
-            kind: .episodic,
-            content: event.note.isEmpty ? event.scenario.title : event.note,
-            timestamp: event.createdAt,
-            tags: Array(
-                Set(
-                    [
-                        event.scenario.rawValue,
-                        event.finalAction.rawValue,
-                        event.entrySource.rawValue
-                    ] + lexicalTags(from: event.note)
-                )
-            ).sorted(),
-            scenarioID: event.scenario.rawValue,
-            actionID: event.finalAction.rawValue,
-            reflectionOutcomeID: event.reflectionOutcome?.rawValue,
-            entrySourceID: event.entrySource.rawValue
-        )
-    }
-
-    private static func memoryGovernance(
-        from snapshot: DecisionMemorySystem.BrainStateGovernanceSnapshot
-    ) -> BASMemoryGovernanceState {
-        BASMemoryGovernanceState(
-            totalRecordCount: snapshot.totalRecordCount,
-            totalCandidateCount: snapshot.totalCandidateCount,
-            pendingCandidateCount: snapshot.pendingCandidateCount,
-            promotedCandidateCount: snapshot.promotedCandidateCount,
-            loadedPromotedMemoryCount: 0,
-            loadedPendingMemoryCount: 0,
-            deferredCandidateCount: snapshot.deferredCandidateCount,
-            admittedCandidateCount: snapshot.admittedCandidateCount
-        )
-    }
-
-    private static func memoryKind(from type: DecisionMemoryType) -> BASMemoryKind {
-        switch type {
-        case .identity, .preference:
-            .profile
-        case .goal:
-            .goal
-        case .situational:
-            .situational
-        case .semantic:
-            .semantic
-        case .support:
-            .support
-        }
-    }
-
-    private static func memoryRole(from type: DecisionMemoryType) -> BASBrainMemoryRole {
-        switch type {
-        case .identity, .preference:
-            .profile
-        case .goal:
-            .goal
-        case .situational, .semantic, .support:
-            .relevant
-        }
-    }
-
-    private static func memoryScope(from type: DecisionMemoryType) -> BASMemoryScope {
-        switch type {
-        case .situational:
-            .session
-        case .support:
-            .task
-        case .identity, .preference, .goal, .semantic:
-            .user
-        }
-    }
-
-    private static func memorySensitivity(from type: DecisionMemoryType) -> BASMemorySensitivity {
-        switch type {
-        case .identity, .goal:
-            .high
-        case .preference, .situational, .support:
-            .medium
-        case .semantic:
-            .low
-        }
-    }
-
-    private static func memoryTier(from tier: DecisionMemoryTier) -> BASMemoryTier {
-        switch tier {
-        case .hot:
-            .hot
-        case .warm:
-            .warm
-        case .cold:
-            .cold
-        }
-    }
-
-    private static func memorySource(from source: DecisionMemorySource) -> BASMemorySource {
-        switch source {
-        case .history:
-            .history
-        case .reflection:
-            .reflection
-        case .reminder:
-            .reminder
-        case .pattern:
-            .pattern
-        }
-    }
-
     private static func memorySource(
         for source: BrainStateUpdateSource,
         mode: DecisionMode
@@ -713,49 +594,6 @@ enum BehavioralAISubstrateBridge {
         return interactionSurface(from: sourceSurface)
     }
 
-    private static func memoryLoadStatus(from candidate: DecisionMemoryCandidateRecord) -> BASMemoryLoadStatus {
-        switch candidate.lastGovernanceDecision {
-        case .admit:
-            .admitted
-        case .deferred:
-            .deferred
-        case .reject:
-            .pending
-        }
-    }
-
-    private static func memoryDecayPolicy(from decayPolicy: DecisionMemoryDecayPolicy) -> BASMemoryDecayPolicy {
-        switch decayPolicy {
-        case .stable:
-            .stable
-        case .slow:
-            .slow
-        case .medium:
-            .medium
-        case .fast:
-            .fast
-        }
-    }
-
-    private static func decayScore(for lifecycleState: DecisionMemoryLifecycleState) -> Double {
-        switch lifecycleState {
-        case .active:
-            0
-        case .aging:
-            0.18
-        case .retired:
-            0.82
-        }
-    }
-
-    private static func lexicalTags(from text: String) -> [String] {
-        text
-            .lowercased()
-            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
-            .map(String.init)
-            .filter { $0.count >= 2 }
-    }
-
     private static func orderedUnique(_ values: [String]) -> [String] {
         var seen = Set<String>()
         var ordered: [String] = []
@@ -763,30 +601,5 @@ enum BehavioralAISubstrateBridge {
             ordered.append(value)
         }
         return ordered
-    }
-
-    private static func average<C: Collection>(_ values: C) -> Double where C.Element == Double {
-        guard !values.isEmpty else { return 0 }
-        return values.reduce(0, +) / Double(values.count)
-    }
-
-    private static func stableUUID(for value: String) -> UUID {
-        if let uuid = UUID(uuidString: value) {
-            return uuid
-        }
-
-        let digest = SHA256.hash(data: Data(value.utf8))
-        let bytes = Array(digest.prefix(16))
-        let encoded = bytes.enumerated().map { index, byte in
-            let separator: String = switch index {
-            case 4, 6, 8, 10:
-                "-"
-            default:
-                ""
-            }
-            return separator + String(format: "%02x", byte)
-        }.joined()
-
-        return UUID(uuidString: encoded) ?? UUID()
     }
 }
