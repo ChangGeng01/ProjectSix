@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import BASMemory
 
 @Model
 final class DecisionEvolutionCheckpoint {
@@ -44,6 +45,23 @@ final class DecisionEvolutionCheckpoint {
         self.rollbackReady = rollbackReady
     }
 
+    convenience init(storedFields: BASEvolutionCheckpointStoredFields) {
+        self.init(
+            id: storedFields.id,
+            createdAt: storedFields.createdAt,
+            fingerprint: storedFields.fingerprint,
+            previousCheckpointID: storedFields.previousCheckpointID,
+            mode: DecisionMode(rawValue: storedFields.modeName) ?? .quick,
+            source: BrainStateUpdateSource(rawValue: storedFields.sourceID) ?? .explicitRefresh,
+            identityRole: storedFields.identityRole,
+            boundaryMode: storedFields.boundaryMode,
+            calibrationStatus: storedFields.calibrationStatus,
+            diffSummary: storedFields.diffSummary,
+            approvalState: storedFields.approvalState,
+            rollbackReady: storedFields.rollbackReady
+        )
+    }
+
     var mode: DecisionMode {
         DecisionMode(rawValue: modeRaw) ?? .quick
     }
@@ -70,5 +88,22 @@ final class DecisionEvolutionCheckpoint {
 
     var approvalState: DecisionEvolutionApprovalState {
         DecisionEvolutionApprovalState(rawValue: approvalStateRaw) ?? .automatic
+    }
+
+    var storedFields: BASEvolutionCheckpointStoredFields {
+        BASEvolutionCheckpointStoredFields(
+            id: id,
+            createdAt: createdAt,
+            fingerprint: fingerprint,
+            previousCheckpointID: previousCheckpointID,
+            modeName: mode.rawValue,
+            sourceID: source.rawValue,
+            identityRole: identityRole,
+            boundaryMode: boundaryMode,
+            calibrationStatus: calibrationStatus,
+            diffSummary: diffSummary,
+            approvalState: approvalState,
+            rollbackReady: rollbackReady
+        )
     }
 }
