@@ -28,25 +28,15 @@ enum DecisionIntelligenceProviderPipeline {
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) -> DecisionModelRuntimeStatus {
         let preferred = preferences.preferredIntelligenceProvider.kind
-        let summary = BASReferenceProviderRuntime.runtimeStatusSummary(
-            preferredProviderID: preferred.rawValue,
-            allowFallbacks: preferences.allowModelFallbacks,
-            runtimeEnabled: preferences.onDeviceIntelligenceMode.isEnabled,
-            statusesByID: Dictionary(
-                uniqueKeysWithValues: statusesByKind.map { entry in
-                    (
-                        entry.key.rawValue,
-                        BASProviderStatusRecord(
-                            providerID: entry.key.rawValue,
-                            isAvailable: entry.value.isAvailable,
-                            title: entry.value.title,
-                            detail: entry.value.detail
-                        )
-                    )
-                }
-            ),
-            testingOverrideEnabled: testingStubProfile != nil,
-            testingOverrideTitle: testingStubProfile?.title
+        let summary = BASAppleProviderRuntimeStatusAdapter.runtimeStatus(
+            from: BASAppleProviderRuntimeStatusInput(
+                preferredProviderID: preferred.rawValue,
+                allowFallbacks: preferences.allowModelFallbacks,
+                runtimeEnabled: preferences.onDeviceIntelligenceMode.isEnabled,
+                statusesByID: substrateStatuses(statusesByKind),
+                testingOverrideEnabled: testingStubProfile != nil,
+                testingOverrideTitle: testingStubProfile?.title
+            )
         )
         let active = DecisionModelProviderKind(rawValue: summary.activeProviderID) ?? .template
         let fallback = summary.fallbackProviderID.flatMap(DecisionModelProviderKind.init(rawValue:))
@@ -56,6 +46,24 @@ enum DecisionIntelligenceProviderPipeline {
             active: active,
             fallback: fallback,
             detail: summary.detail
+        )
+    }
+
+    static func substrateStatuses(
+        _ statusesByKind: [DecisionModelProviderKind: DecisionModelProviderStatus]
+    ) -> [String: BASProviderStatusRecord] {
+        Dictionary(
+            uniqueKeysWithValues: statusesByKind.map { entry in
+                (
+                    entry.key.rawValue,
+                    BASProviderStatusRecord(
+                        providerID: entry.key.rawValue,
+                        isAvailable: entry.value.isAvailable,
+                        title: entry.value.title,
+                        detail: entry.value.detail
+                    )
+                )
+            }
         )
     }
 

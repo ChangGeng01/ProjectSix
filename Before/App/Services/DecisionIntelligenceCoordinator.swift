@@ -1,4 +1,5 @@
 import Foundation
+import BASAppleAdapters
 
 enum DecisionIntelligenceCoordinator {
     private static let adapter: any LocalModelAdapting = TemplateLocalModelAdapter()
@@ -45,47 +46,31 @@ enum DecisionIntelligenceCoordinator {
             device: device,
             openModelStatus: openModelStatus,
             gemmaStatus: gemmaStatus,
-            foundationStatus: foundationStatus
+                foundationStatus: foundationStatus
         )
-        let runtimePreferences = BeforePreferences(
-            homePromptAction: preferences.homePromptAction,
-            quickBufferDuration: preferences.quickBufferDuration,
-            restoreInProgressWorkspaces: preferences.restoreInProgressWorkspaces,
-            showReviewInsights: preferences.showReviewInsights,
-            onDeviceIntelligenceMode: preferences.onDeviceIntelligenceMode,
-            preferredIntelligenceProvider: profile.effectiveProviderPreference,
-            allowModelFallbacks: profile.allowFallbacks
-        )
-
-        var status = DecisionIntelligenceProviderPipeline.runtimeStatus(
-            preferences: runtimePreferences,
-            statusesByKind: [
-                .openModel: openModelStatus,
-                .gemmaE4B: gemmaStatus,
-                .foundationModels: foundationStatus
-            ],
-            testingStubProfile: testingStubProfile
-        )
-
-        if status.active == .template || profile.effectiveProviderPreference != preferences.preferredIntelligenceProvider {
-            let fallback: DecisionModelProviderKind?
-            if status.active == .template && preferences.preferredIntelligenceProvider != .template {
-                fallback = .template
-            } else if status.active != preferences.preferredIntelligenceProvider.kind {
-                fallback = status.active
-            } else {
-                fallback = status.fallback
-            }
-
-            status = DecisionModelRuntimeStatus(
-                preferred: preferences.preferredIntelligenceProvider.kind,
-                active: status.active,
-                fallback: fallback,
-                detail: profile.detail
+        let summary = BASAppleProviderRuntimeStatusAdapter.hostVisibleRuntimeStatus(
+            from: BASAppleHostVisibleRuntimeStatusInput(
+                requestedProviderID: preferences.preferredIntelligenceProvider.kind.rawValue,
+                effectiveProviderID: profile.effectiveProviderPreference.kind.rawValue,
+                allowFallbacks: profile.allowFallbacks,
+                runtimeEnabled: preferences.onDeviceIntelligenceMode.isEnabled,
+                statusesByID: DecisionIntelligenceProviderPipeline.substrateStatuses([
+                    .openModel: openModelStatus,
+                    .gemmaE4B: gemmaStatus,
+                    .foundationModels: foundationStatus
+                ]),
+                testingOverrideEnabled: testingStubProfile != nil,
+                testingOverrideTitle: testingStubProfile?.title,
+                profileDetail: profile.detail
             )
-        }
+        )
 
-        return status
+        return DecisionModelRuntimeStatus(
+            preferred: preferences.preferredIntelligenceProvider.kind,
+            active: DecisionModelProviderKind(rawValue: summary.activeProviderID) ?? .template,
+            fallback: summary.fallbackProviderID.flatMap(DecisionModelProviderKind.init(rawValue:)),
+            detail: summary.detail
+        )
     }
 
     static func route(
