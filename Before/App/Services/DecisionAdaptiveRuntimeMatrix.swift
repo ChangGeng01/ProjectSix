@@ -92,32 +92,63 @@ enum DecisionToneProfile: String, Equatable, Sendable {
 }
 
 struct DecisionRuntimeBudget: Equatable, Sendable {
+    let substrate: BASAdaptiveRuntimeBudget
+
     let contextBudget: Int
     let outputCharacterBudget: Int
     let timeBudgetMs: Int
     let toolCallBudget: Int
     let retrievalItemBudget: Int
+
+    init(
+        contextBudget: Int,
+        outputCharacterBudget: Int,
+        timeBudgetMs: Int,
+        toolCallBudget: Int,
+        retrievalItemBudget: Int
+    ) {
+        let substrate = BASAdaptiveRuntimeBudget(
+            contextBudget: contextBudget,
+            outputCharacterBudget: outputCharacterBudget,
+            timeBudgetMs: timeBudgetMs,
+            toolCallBudget: toolCallBudget,
+            retrievalItemBudget: retrievalItemBudget
+        )
+        self.init(substrate: substrate)
+    }
+
+    init(substrate: BASAdaptiveRuntimeBudget) {
+        self.substrate = substrate
+        self.contextBudget = substrate.contextBudget
+        self.outputCharacterBudget = substrate.outputCharacterBudget
+        self.timeBudgetMs = substrate.timeBudgetMs
+        self.toolCallBudget = substrate.toolCallBudget
+        self.retrievalItemBudget = substrate.retrievalItemBudget
+    }
 }
 
 struct DecisionAdaptiveTaskStrategy: Equatable, Sendable {
-    let kind: DecisionIntelligenceTraceKind
-    let entropy: DecisionTaskEntropyClass
-    let runtimeGear: DecisionRuntimeGear
+    let substrate: BASAdaptiveTaskStrategy
     let preferredProvider: DecisionModelProviderPreference
-    let runtimeBudget: DecisionRuntimeBudget
-    let retrievalMode: DecisionRetrievalMode
-    let thinkingMode: DecisionThinkingMode
-    let outputMode: DecisionOutputMode
-    let tone: DecisionToneProfile
-    let actionSpace: [String]
-    let responseLanguage: DecisionAdaptiveResponseLanguage
-    let allowsModelInvocation: Bool
 
-    var contextBudget: Int { runtimeBudget.contextBudget }
-    var outputCharacterBudget: Int { runtimeBudget.outputCharacterBudget }
-    var timeBudgetMs: Int { runtimeBudget.timeBudgetMs }
-    var toolCallBudget: Int { runtimeBudget.toolCallBudget }
-    var retrievalItemBudget: Int { runtimeBudget.retrievalItemBudget }
+    var kind: DecisionIntelligenceTraceKind { DecisionIntelligenceTraceKind(substrate.kind) }
+    var entropy: DecisionTaskEntropyClass { DecisionTaskEntropyClass(substrate.entropy) }
+    var runtimeGear: DecisionRuntimeGear { DecisionRuntimeGear(substrate.runtimeGear) }
+    var runtimeBudget: DecisionRuntimeBudget { DecisionRuntimeBudget(substrate: substrate.runtimeBudget) }
+    var retrievalMode: DecisionRetrievalMode { DecisionRetrievalMode(substrate.retrievalMode) }
+    var thinkingMode: DecisionThinkingMode { DecisionThinkingMode(substrate.thinkingMode) }
+    var outputMode: DecisionOutputMode { DecisionOutputMode(substrate.outputMode) }
+    var tone: DecisionToneProfile { DecisionToneProfile(substrate.tone) }
+    var actionSpace: [String] { substrate.actionSpace }
+    var responseLanguage: DecisionAdaptiveResponseLanguage {
+        DecisionAdaptiveResponseLanguage(substrate.responseLanguage)
+    }
+    var allowsModelInvocation: Bool { substrate.allowsModelInvocation }
+    var contextBudget: Int { substrate.contextBudget }
+    var outputCharacterBudget: Int { substrate.outputCharacterBudget }
+    var timeBudgetMs: Int { substrate.timeBudgetMs }
+    var toolCallBudget: Int { substrate.toolCallBudget }
+    var retrievalItemBudget: Int { substrate.retrievalItemBudget }
 
     init(
         kind: DecisionIntelligenceTraceKind,
@@ -137,180 +168,32 @@ struct DecisionAdaptiveTaskStrategy: Equatable, Sendable {
         responseLanguage: DecisionAdaptiveResponseLanguage = .english,
         allowsModelInvocation: Bool
     ) {
-        self.kind = kind
-        self.entropy = entropy
-        self.runtimeGear = runtimeGear
-        self.preferredProvider = preferredProvider
-        self.runtimeBudget = DecisionRuntimeBudget(
+        self.substrate = BASAdaptiveTaskStrategy(
+            kind: kind.basAdaptiveTraceKind,
+            entropy: entropy.basTaskEntropyClass,
+            runtimeGear: runtimeGear.basRuntimeGear,
             contextBudget: contextBudget,
-            outputCharacterBudget: outputCharacterBudget ??
-                Self.defaultOutputCharacterBudget(
-                    for: kind,
-                    gear: runtimeGear,
-                    allowsModelInvocation: allowsModelInvocation,
-                    outputMode: outputMode
-                ),
-            timeBudgetMs: timeBudgetMs ??
-                Self.defaultTimeBudgetMs(
-                    for: kind,
-                    gear: runtimeGear,
-                    allowsModelInvocation: allowsModelInvocation,
-                    thinkingMode: thinkingMode
-                ),
-            toolCallBudget: toolCallBudget ??
-                Self.defaultToolCallBudget(
-                    for: kind,
-                    allowsModelInvocation: allowsModelInvocation
-                ),
-            retrievalItemBudget: retrievalItemBudget ??
-                Self.defaultRetrievalItemBudget(
-                    for: kind,
-                    retrievalMode: retrievalMode
-                )
+            outputCharacterBudget: outputCharacterBudget,
+            timeBudgetMs: timeBudgetMs,
+            toolCallBudget: toolCallBudget,
+            retrievalItemBudget: retrievalItemBudget,
+            retrievalMode: retrievalMode.basRetrievalMode,
+            thinkingMode: thinkingMode.basThinkingMode,
+            outputMode: outputMode.basOutputMode,
+            tone: tone.basToneProfile,
+            actionSpace: actionSpace,
+            responseLanguage: responseLanguage.basAdaptiveResponseLanguage,
+            allowsModelInvocation: allowsModelInvocation
         )
-        self.retrievalMode = retrievalMode
-        self.thinkingMode = thinkingMode
-        self.outputMode = outputMode
-        self.tone = tone
-        self.actionSpace = actionSpace
-        self.responseLanguage = responseLanguage
-        self.allowsModelInvocation = allowsModelInvocation
+        self.preferredProvider = preferredProvider
     }
 
-    private static func defaultOutputCharacterBudget(
-        for kind: DecisionIntelligenceTraceKind,
-        gear: DecisionRuntimeGear,
-        allowsModelInvocation: Bool,
-        outputMode: DecisionOutputMode
-    ) -> Int {
-        guard allowsModelInvocation else {
-            switch kind {
-            case .quick, .reminder:
-                return 180
-            case .balance:
-                return 260
-            case .mirror:
-                return 320
-            }
-        }
-
-        let base: Int = switch (gear, kind) {
-        case (.low, .quick):
-            180
-        case (.low, .balance):
-            260
-        case (.low, .mirror):
-            320
-        case (.low, .reminder):
-            140
-        case (.balanced, .quick):
-            220
-        case (.balanced, .balance):
-            340
-        case (.balanced, .mirror):
-            440
-        case (.balanced, .reminder):
-            160
-        case (.high, .quick):
-            260
-        case (.high, .balance):
-            420
-        case (.high, .mirror):
-            560
-        case (.high, .reminder):
-            180
-        }
-
-        let schemaPenalty: Int = switch outputMode {
-        case .jsonShort, .deterministicTemplate:
-            20
-        case .guidedShort:
-            0
-        case .structuredBoard:
-            10
-        case .reflectiveStructured:
-            0
-        }
-
-        return max(120, base - schemaPenalty)
-    }
-
-    private static func defaultTimeBudgetMs(
-        for kind: DecisionIntelligenceTraceKind,
-        gear: DecisionRuntimeGear,
-        allowsModelInvocation: Bool,
-        thinkingMode: DecisionThinkingMode
-    ) -> Int {
-        guard allowsModelInvocation else {
-            switch kind {
-            case .quick, .reminder:
-                return 350
-            case .balance:
-                return 500
-            case .mirror:
-                return 650
-            }
-        }
-
-        let base: Int = switch (gear, kind) {
-        case (.low, .quick):
-            500
-        case (.low, .balance):
-            700
-        case (.low, .mirror):
-            900
-        case (.low, .reminder):
-            350
-        case (.balanced, .quick):
-            700
-        case (.balanced, .balance):
-            1000
-        case (.balanced, .mirror):
-            1300
-        case (.balanced, .reminder):
-            450
-        case (.high, .quick):
-            900
-        case (.high, .balance):
-            1400
-        case (.high, .mirror):
-            1800
-        case (.high, .reminder):
-            550
-        }
-
-        return thinkingMode == .gated ? base + 250 : base
-    }
-
-    private static func defaultToolCallBudget(
-        for kind: DecisionIntelligenceTraceKind,
-        allowsModelInvocation: Bool
-    ) -> Int {
-        guard allowsModelInvocation else { return 0 }
-        return switch kind {
-        case .quick:
-            1
-        case .balance:
-            2
-        case .mirror:
-            2
-        case .reminder:
-            1
-        }
-    }
-
-    private static func defaultRetrievalItemBudget(
-        for kind: DecisionIntelligenceTraceKind,
-        retrievalMode: DecisionRetrievalMode
-    ) -> Int {
-        switch retrievalMode {
-        case .off:
-            return 0
-        case .filtered:
-            return kind == .reminder ? 2 : 3
-        case .adaptive:
-            return kind == .mirror ? 5 : 4
-        }
+    init(
+        substrate strategy: BASAdaptiveTaskStrategy,
+        preferredProvider: DecisionModelProviderPreference
+    ) {
+        self.substrate = strategy
+        self.preferredProvider = preferredProvider
     }
 }
 
@@ -425,47 +308,7 @@ enum DecisionAdaptiveRuntimeMatrixResolver {
 
 private extension DecisionAdaptiveTaskStrategy {
     var basAdaptiveTaskStrategy: BASAdaptiveTaskStrategy {
-        BASAdaptiveTaskStrategy(
-            kind: kind.basAdaptiveTraceKind,
-            entropy: entropy.basTaskEntropyClass,
-            runtimeGear: runtimeGear.basRuntimeGear,
-            contextBudget: contextBudget,
-            outputCharacterBudget: outputCharacterBudget,
-            timeBudgetMs: timeBudgetMs,
-            toolCallBudget: toolCallBudget,
-            retrievalItemBudget: retrievalItemBudget,
-            retrievalMode: retrievalMode.basRetrievalMode,
-            thinkingMode: thinkingMode.basThinkingMode,
-            outputMode: outputMode.basOutputMode,
-            tone: tone.basToneProfile,
-            actionSpace: actionSpace,
-            responseLanguage: responseLanguage.basAdaptiveResponseLanguage,
-            allowsModelInvocation: allowsModelInvocation
-        )
-    }
-
-    init(
-        substrate strategy: BASAdaptiveTaskStrategy,
-        preferredProvider: DecisionModelProviderPreference
-    ) {
-        self.init(
-            kind: DecisionIntelligenceTraceKind(strategy.kind),
-            entropy: DecisionTaskEntropyClass(strategy.entropy),
-            runtimeGear: DecisionRuntimeGear(strategy.runtimeGear),
-            preferredProvider: preferredProvider,
-            contextBudget: strategy.contextBudget,
-            outputCharacterBudget: strategy.outputCharacterBudget,
-            timeBudgetMs: strategy.timeBudgetMs,
-            toolCallBudget: strategy.toolCallBudget,
-            retrievalItemBudget: strategy.retrievalItemBudget,
-            retrievalMode: DecisionRetrievalMode(strategy.retrievalMode),
-            thinkingMode: DecisionThinkingMode(strategy.thinkingMode),
-            outputMode: DecisionOutputMode(strategy.outputMode),
-            tone: DecisionToneProfile(strategy.tone),
-            actionSpace: strategy.actionSpace,
-            responseLanguage: DecisionAdaptiveResponseLanguage(strategy.responseLanguage),
-            allowsModelInvocation: strategy.allowsModelInvocation
-        )
+        substrate
     }
 }
 
