@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import BASMemory
 
 public struct BASAppleEmbeddingScoreInput: Codable, Equatable, Sendable {
@@ -13,6 +14,22 @@ public struct BASAppleEmbeddingScoreInput: Codable, Equatable, Sendable {
 
 public protocol BASAppleProjectionEventSource {
     var basProjectionEventInput: BASProjectionEventInput { get }
+}
+
+public protocol BASAppleReminderMemoryEntity: PersistentModel {
+    var basReminderMemoryInput: BASSelfReminderMemoryInput { get }
+}
+
+public protocol BASAppleCheckEventMemoryEntity: PersistentModel {
+    var basCheckEventMemoryInput: BASCheckEventMemoryInput { get }
+}
+
+public protocol BASAppleBalanceMemoryEntity: PersistentModel {
+    var basBalanceMemoryInput: BASBalanceMemoryInput { get }
+}
+
+public protocol BASAppleMirrorMemoryEntity: PersistentModel {
+    var basMirrorMemoryInput: BASMirrorMemoryInput { get }
 }
 
 public struct BASAppleProjectionGovernanceSnapshot: Codable, Equatable, Sendable {
@@ -116,5 +133,71 @@ public enum BASAppleMemoryProjectionAdapter {
             uniquingKeysWith: max
         )
         return updated
+    }
+}
+
+public enum BASAppleMemoryDraftDerivationAdapter {
+    public static func deriveDrafts(
+        _ request: BASMemoryDerivationRequest
+    ) -> [BASDerivedMemoryDraft] {
+        BASMemoryDraftCompiler.derive(request)
+    }
+
+    public static func deriveDrafts<
+        Reminder: BASAppleReminderMemoryEntity,
+        Event: BASAppleCheckEventMemoryEntity,
+        Balance: BASAppleBalanceMemoryEntity,
+        Mirror: BASAppleMirrorMemoryEntity
+    >(
+        reminders: [Reminder],
+        checkEvents: [Event],
+        balanceRecords: [Balance],
+        mirrorRecords: [Mirror],
+        now: Date
+    ) -> [BASDerivedMemoryDraft] {
+        deriveDrafts(
+            BASMemoryDerivationRequest(
+                reminders: reminders
+                    .map(\.basReminderMemoryInput)
+                    .sorted { $0.lastUsedAt > $1.lastUsedAt },
+                checkEvents: checkEvents
+                    .map(\.basCheckEventMemoryInput)
+                    .sorted { $0.createdAt > $1.createdAt },
+                balanceRecords: balanceRecords
+                    .map(\.basBalanceMemoryInput)
+                    .sorted { $0.updatedAt > $1.updatedAt },
+                mirrorRecords: mirrorRecords
+                    .map(\.basMirrorMemoryInput)
+                    .sorted { $0.updatedAt > $1.updatedAt },
+                now: now
+            )
+        )
+    }
+
+    public static func deriveDrafts<
+        Reminder: BASAppleReminderMemoryEntity,
+        Event: BASAppleCheckEventMemoryEntity,
+        Balance: BASAppleBalanceMemoryEntity,
+        Mirror: BASAppleMirrorMemoryEntity
+    >(
+        in context: ModelContext,
+        now: Date,
+        reminderType: Reminder.Type,
+        checkEventType: Event.Type,
+        balanceRecordType: Balance.Type,
+        mirrorRecordType: Mirror.Type
+    ) -> [BASDerivedMemoryDraft] {
+        let reminders = (try? context.fetch(FetchDescriptor<Reminder>())) ?? []
+        let checkEvents = (try? context.fetch(FetchDescriptor<Event>())) ?? []
+        let balanceRecords = (try? context.fetch(FetchDescriptor<Balance>())) ?? []
+        let mirrorRecords = (try? context.fetch(FetchDescriptor<Mirror>())) ?? []
+
+        return deriveDrafts(
+            reminders: reminders,
+            checkEvents: checkEvents,
+            balanceRecords: balanceRecords,
+            mirrorRecords: mirrorRecords,
+            now: now
+        )
     }
 }

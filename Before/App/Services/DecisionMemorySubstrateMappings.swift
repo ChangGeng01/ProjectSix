@@ -185,6 +185,29 @@ extension DecisionMemoryCandidateRecord {
     }
 }
 
+extension SelfReminder: BASAppleReminderMemoryEntity {
+    var basReminderMemoryInput: BASSelfReminderMemoryInput {
+        BASSelfReminderMemoryInput(
+            content: content,
+            lastUsedAt: lastUsedAt
+        )
+    }
+}
+
+extension CheckEvent: BASAppleCheckEventMemoryEntity {
+    var basCheckEventMemoryInput: BASCheckEventMemoryInput {
+        BASCheckEventMemoryInput(
+            id: id.uuidString,
+            scenarioID: scenario.rawValue,
+            scenarioTitle: scenario.title,
+            actionID: finalAction.rawValue,
+            actionTitle: finalAction.title,
+            note: note,
+            createdAt: createdAt
+        )
+    }
+}
+
 extension CheckEvent: BASAppleProjectionEventSource {
     var basProjectionEventInput: BASProjectionEventInput {
         BASProjectionEventInput(
@@ -196,6 +219,26 @@ extension CheckEvent: BASAppleProjectionEventSource {
             actionID: finalAction.rawValue,
             reflectionOutcomeID: reflectionOutcome?.rawValue,
             entrySourceID: entrySource.rawValue
+        )
+    }
+}
+
+extension BalanceDecisionRecord: BASAppleBalanceMemoryEntity {
+    var basBalanceMemoryInput: BASBalanceMemoryInput {
+        BASBalanceMemoryInput(
+            prompt: prompt,
+            longTerm: longTerm,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+extension MirrorDecisionRecord: BASAppleMirrorMemoryEntity {
+    var basMirrorMemoryInput: BASMirrorMemoryInput {
+        BASMirrorMemoryInput(
+            prompt: prompt,
+            longTerm: longTerm,
+            updatedAt: updatedAt
         )
     }
 }

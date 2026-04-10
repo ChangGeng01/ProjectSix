@@ -270,54 +270,13 @@ enum DecisionMemorySystem {
         in context: ModelContext,
         now: Date
     ) -> [BASDerivedMemoryDraft] {
-        let checkEvents = (try? context.fetch(
-            FetchDescriptor<CheckEvent>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
-        )) ?? []
-        let balanceRecords = (try? context.fetch(
-            FetchDescriptor<BalanceDecisionRecord>(sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
-        )) ?? []
-        let mirrorRecords = (try? context.fetch(
-            FetchDescriptor<MirrorDecisionRecord>(sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
-        )) ?? []
-        let reminders = (try? context.fetch(
-            FetchDescriptor<SelfReminder>(sortBy: [SortDescriptor(\.lastUsedAt, order: .reverse)])
-        )) ?? []
-
-        return BASMemoryDraftCompiler.derive(
-            BASMemoryDerivationRequest(
-                reminders: reminders.map {
-                    BASSelfReminderMemoryInput(
-                        content: $0.content,
-                        lastUsedAt: $0.lastUsedAt
-                    )
-                },
-                checkEvents: checkEvents.map { event in
-                    BASCheckEventMemoryInput(
-                        id: event.id.uuidString,
-                        scenarioID: event.scenario.rawValue,
-                        scenarioTitle: event.scenario.title,
-                        actionID: event.finalAction.rawValue,
-                        actionTitle: event.finalAction.title,
-                        note: event.note,
-                        createdAt: event.createdAt
-                    )
-                },
-                balanceRecords: balanceRecords.map {
-                    BASBalanceMemoryInput(
-                        prompt: $0.prompt,
-                        longTerm: $0.longTerm,
-                        updatedAt: $0.updatedAt
-                    )
-                },
-                mirrorRecords: mirrorRecords.map {
-                    BASMirrorMemoryInput(
-                        prompt: $0.prompt,
-                        longTerm: $0.longTerm,
-                        updatedAt: $0.updatedAt
-                    )
-                },
-                now: now
-            )
+        BASAppleMemoryDraftDerivationAdapter.deriveDrafts(
+            in: context,
+            now: now,
+            reminderType: SelfReminder.self,
+            checkEventType: CheckEvent.self,
+            balanceRecordType: BalanceDecisionRecord.self,
+            mirrorRecordType: MirrorDecisionRecord.self
         )
     }
 }
