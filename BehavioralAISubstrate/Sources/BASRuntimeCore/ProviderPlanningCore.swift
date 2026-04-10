@@ -152,6 +152,81 @@ public struct BASProviderPreferenceOrdering: Codable, Equatable, Sendable {
     }
 }
 
+public enum BASReferenceProviderRuntime {
+    public static let gemmaE4BProviderID = "gemmaE4B"
+    public static let openModelProviderID = "openModel"
+    public static let foundationModelsProviderID = "foundationModels"
+    public static let testingStubProviderID = "testingStub"
+    public static let templateProviderID = "template"
+
+    public static let preferenceOrderings: [BASProviderPreferenceOrdering] = [
+        BASProviderPreferenceOrdering(
+            preferredProviderID: gemmaE4BProviderID,
+            orderedProviderIDs: [
+                gemmaE4BProviderID,
+                foundationModelsProviderID
+            ]
+        ),
+        BASProviderPreferenceOrdering(
+            preferredProviderID: openModelProviderID,
+            orderedProviderIDs: [
+                openModelProviderID,
+                gemmaE4BProviderID,
+                foundationModelsProviderID
+            ]
+        ),
+        BASProviderPreferenceOrdering(
+            preferredProviderID: foundationModelsProviderID,
+            orderedProviderIDs: [
+                foundationModelsProviderID,
+                gemmaE4BProviderID
+            ]
+        ),
+        BASProviderPreferenceOrdering(
+            preferredProviderID: templateProviderID,
+            orderedProviderIDs: [
+                templateProviderID
+            ]
+        )
+    ]
+
+    public static func orderedProviderIDs(
+        preferredProviderID: String,
+        allowFallbacks: Bool = true,
+        suspendedProviderIDs: Set<String> = []
+    ) -> [String] {
+        BASProviderOrderingResolver.orderedProviderIDs(
+            preferredProviderID: preferredProviderID,
+            allowFallbacks: allowFallbacks,
+            deterministicProviderID: templateProviderID,
+            preferenceOrderings: preferenceOrderings,
+            suspendedProviderIDs: suspendedProviderIDs
+        )
+    }
+
+    public static func runtimeStatusSummary(
+        preferredProviderID: String,
+        allowFallbacks: Bool,
+        runtimeEnabled: Bool,
+        statusesByID: [String: BASProviderStatusRecord],
+        suspendedProviderIDs: Set<String> = [],
+        testingOverrideEnabled: Bool = false,
+        testingOverrideTitle: String? = nil
+    ) -> BASRuntimeStatusSummary {
+        BASRuntimeStatusResolver.resolve(
+            preferredProviderID: preferredProviderID,
+            allowFallbacks: allowFallbacks,
+            runtimeEnabled: runtimeEnabled,
+            deterministicProviderID: templateProviderID,
+            preferenceOrderings: preferenceOrderings,
+            statusesByID: statusesByID,
+            suspendedProviderIDs: suspendedProviderIDs,
+            testingOverrideProviderID: testingOverrideEnabled ? testingStubProviderID : nil,
+            testingOverrideTitle: testingOverrideTitle
+        )
+    }
+}
+
 public enum BASRuntimeAvailabilitySource: String, Codable, Equatable, Sendable {
     case runtimeDisabled
     case testingOverride

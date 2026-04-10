@@ -6,47 +6,15 @@ import BASRuntimeCore
 enum DecisionIntelligenceProviderPipeline {
     private static let registry = DecisionIntelligenceProviderRegistry.shared
     private static let responseCache = DecisionIntelligenceResponseCache.shared
-    static let preferenceOrderings: [BASProviderPreferenceOrdering] = [
-        BASProviderPreferenceOrdering(
-            preferredProviderID: DecisionModelProviderKind.gemmaE4B.rawValue,
-            orderedProviderIDs: [
-                DecisionModelProviderKind.gemmaE4B.rawValue,
-                DecisionModelProviderKind.foundationModels.rawValue
-            ]
-        ),
-        BASProviderPreferenceOrdering(
-            preferredProviderID: DecisionModelProviderKind.openModel.rawValue,
-            orderedProviderIDs: [
-                DecisionModelProviderKind.openModel.rawValue,
-                DecisionModelProviderKind.gemmaE4B.rawValue,
-                DecisionModelProviderKind.foundationModels.rawValue
-            ]
-        ),
-        BASProviderPreferenceOrdering(
-            preferredProviderID: DecisionModelProviderKind.foundationModels.rawValue,
-            orderedProviderIDs: [
-                DecisionModelProviderKind.foundationModels.rawValue,
-                DecisionModelProviderKind.gemmaE4B.rawValue
-            ]
-        ),
-        BASProviderPreferenceOrdering(
-            preferredProviderID: DecisionModelProviderKind.template.rawValue,
-            orderedProviderIDs: [
-                DecisionModelProviderKind.template.rawValue
-            ]
-        )
-    ]
 
     static func orderedKinds(
         for preference: DecisionModelProviderPreference,
         allowFallbacks: Bool = true,
         excluding suspendedKinds: Set<DecisionModelProviderKind> = []
     ) -> [DecisionModelProviderKind] {
-        BASProviderOrderingResolver.orderedProviderIDs(
+        BASReferenceProviderRuntime.orderedProviderIDs(
             preferredProviderID: preference.kind.rawValue,
             allowFallbacks: allowFallbacks,
-            deterministicProviderID: DecisionModelProviderKind.template.rawValue,
-            preferenceOrderings: preferenceOrderings,
             suspendedProviderIDs: Set(suspendedKinds.map(\.rawValue))
         )
         .compactMap(DecisionModelProviderKind.init(rawValue:))
@@ -58,12 +26,10 @@ enum DecisionIntelligenceProviderPipeline {
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) -> DecisionModelRuntimeStatus {
         let preferred = preferences.preferredIntelligenceProvider.kind
-        let summary = BASRuntimeStatusResolver.resolve(
+        let summary = BASReferenceProviderRuntime.runtimeStatusSummary(
             preferredProviderID: preferred.rawValue,
             allowFallbacks: preferences.allowModelFallbacks,
             runtimeEnabled: preferences.onDeviceIntelligenceMode.isEnabled,
-            deterministicProviderID: DecisionModelProviderKind.template.rawValue,
-            preferenceOrderings: preferenceOrderings,
             statusesByID: Dictionary(
                 uniqueKeysWithValues: statusesByKind.map { entry in
                     (
@@ -77,7 +43,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 }
             ),
-            testingOverrideProviderID: testingStubProfile.map { _ in DecisionModelProviderKind.testingStub.rawValue },
+            testingOverrideEnabled: testingStubProfile != nil,
             testingOverrideTitle: testingStubProfile?.title
         )
         let active = DecisionModelProviderKind(rawValue: summary.activeProviderID) ?? .template
@@ -1637,8 +1603,8 @@ enum DecisionIntelligenceProviderPipeline {
             task: DecisionIntelligenceTaskRouter.substrateTraceKind(task),
             preferredProviderID: preference.kind.rawValue,
             allowFallbacks: allowFallbacks,
-            deterministicProviderID: DecisionModelProviderKind.template.rawValue,
-            preferenceOrderings: preferenceOrderings,
+            deterministicProviderID: BASReferenceProviderRuntime.templateProviderID,
+            preferenceOrderings: BASReferenceProviderRuntime.preferenceOrderings,
             suspendedProviderIDs: suspendedProviderIDs,
             strategy: strategy.map(DecisionIntelligenceTaskRouter.substrateAdaptiveStrategy),
             descriptors: registry.descriptors().map(DecisionIntelligenceTaskRouter.substrateProviderDescriptor),

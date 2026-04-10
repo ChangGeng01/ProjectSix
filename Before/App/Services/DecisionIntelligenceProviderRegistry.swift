@@ -770,8 +770,8 @@ enum DecisionIntelligenceTaskRouter {
             task: substrateTraceKind(task),
             preferredProviderID: preference.kind.rawValue,
             allowFallbacks: allowFallbacks,
-            deterministicProviderID: DecisionModelProviderKind.template.rawValue,
-            preferenceOrderings: DecisionIntelligenceProviderPipeline.preferenceOrderings,
+            deterministicProviderID: BASReferenceProviderRuntime.templateProviderID,
+            preferenceOrderings: BASReferenceProviderRuntime.preferenceOrderings,
             suspendedProviderIDs: Set(suspendedKinds.map(\.rawValue)),
             strategy: strategy.map(substrateAdaptiveStrategy),
             descriptors: registry.descriptors().map(substrateProviderDescriptor)

@@ -1063,6 +1063,58 @@ struct BASRuntimeCoreTests {
         #expect(summary.detail.contains("Foundation is not available"))
     }
 
+    @Test("reference provider runtime exposes default fallback ordering")
+    func referenceProviderRuntimeExposesDefaultFallbackOrdering() {
+        #expect(
+            BASReferenceProviderRuntime.orderedProviderIDs(
+                preferredProviderID: BASReferenceProviderRuntime.openModelProviderID,
+                allowFallbacks: true,
+                suspendedProviderIDs: [BASReferenceProviderRuntime.openModelProviderID]
+            ) == [
+                BASReferenceProviderRuntime.gemmaE4BProviderID,
+                BASReferenceProviderRuntime.foundationModelsProviderID
+            ]
+        )
+
+        #expect(
+            BASReferenceProviderRuntime.orderedProviderIDs(
+                preferredProviderID: BASReferenceProviderRuntime.foundationModelsProviderID,
+                allowFallbacks: false
+            ) == [
+                BASReferenceProviderRuntime.foundationModelsProviderID
+            ]
+        )
+    }
+
+    @Test("reference provider runtime composes active status with testing override")
+    func referenceProviderRuntimeComposesActiveStatusWithTestingOverride() {
+        let summary = BASReferenceProviderRuntime.runtimeStatusSummary(
+            preferredProviderID: BASReferenceProviderRuntime.foundationModelsProviderID,
+            allowFallbacks: true,
+            runtimeEnabled: true,
+            statusesByID: [
+                BASReferenceProviderRuntime.foundationModelsProviderID: BASProviderStatusRecord(
+                    providerID: BASReferenceProviderRuntime.foundationModelsProviderID,
+                    isAvailable: false,
+                    title: "Foundation",
+                    detail: "Foundation is unavailable."
+                ),
+                BASReferenceProviderRuntime.gemmaE4BProviderID: BASProviderStatusRecord(
+                    providerID: BASReferenceProviderRuntime.gemmaE4BProviderID,
+                    isAvailable: true,
+                    title: "Gemma",
+                    detail: "Gemma is ready."
+                )
+            ],
+            testingOverrideEnabled: true,
+            testingOverrideTitle: "Stub runtime"
+        )
+
+        #expect(summary.activeProviderID == BASReferenceProviderRuntime.testingStubProviderID)
+        #expect(summary.fallbackProviderID == BASReferenceProviderRuntime.testingStubProviderID)
+        #expect(summary.detail.contains("Stub runtime"))
+    }
+
     @Test("runtime availability narrator explains deterministic fallback when fallback is disabled")
     func runtimeAvailabilityNarratorExplainsDeterministicFallback() {
         let detail = BASRuntimeAvailabilityNarrator.detail(
