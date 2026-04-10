@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import BASAppleAdapters
 import BASMemory
 import BASPolicy
 
@@ -54,30 +55,20 @@ enum CurrentBrainStateLoader {
             loadedAt: now
         )
 
-        let update = BrainStateUpdate(
-            storedFields: BASCurrentBrainPersistenceApplier.updateFields(
+        _ = BASAppleCurrentBrainUpdateWriter.persist(
+            BASCurrentBrainPersistenceApplier.updateFields(
                 createdAt: now,
                 source: source.rawValue,
                 input: artifact.persistenceInput
-            )
-        )
-        context.insert(update)
-        trimOldUpdates(in: context, now: now)
-        try? context.save()
+            ),
+            in: context,
+            onSaveError: { error in
+                PersistenceIssueRecorder.record(
+                    error: error,
+                    operation: "persisting current brain updates"
+                )
+            }
+        ) as BASAppleCurrentBrainUpdateWriteResult<BrainStateUpdate>
         return current
-    }
-
-    private static func trimOldUpdates(in context: ModelContext, now: Date) {
-        let descriptor = FetchDescriptor<BrainStateUpdate>(
-            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
-        )
-        let updates = (try? context.fetch(descriptor)) ?? []
-        let retainedIDs = BASCurrentBrainPersistenceApplier.retainedUpdateIDs(
-            in: updates.map(\.storedFields),
-            now: now
-        )
-        for stale in updates where !retainedIDs.contains(stale.id) {
-            context.delete(stale)
-        }
     }
 }

@@ -242,3 +242,23 @@ extension MirrorDecisionRecord: BASAppleMirrorMemoryEntity {
         )
     }
 }
+
+extension BrainStateUpdate: BASAppleCurrentBrainUpdateEntity {
+    static func basMake(from fields: BASCurrentBrainUpdateStoredFields) -> BrainStateUpdate {
+        BrainStateUpdate(storedFields: fields)
+    }
+
+    var basSnapshot: BASCurrentBrainUpdateStoredFields {
+        storedFields
+    }
+}
+
+extension DecisionEvolutionCheckpoint: BASAppleEvolutionCheckpointEntity {
+    static func basMake(from fields: BASEvolutionCheckpointStoredFields) -> DecisionEvolutionCheckpoint {
+        DecisionEvolutionCheckpoint(storedFields: fields)
+    }
+
+    var basSnapshot: BASEvolutionCheckpointStoredFields {
+        storedFields
+    }
+}
