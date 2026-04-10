@@ -203,6 +203,10 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
         mapKindDictionary(basSummary.overTimeBudgetRateByKind)
     }
 
+    var substrateSummary: BASTelemetrySummary {
+        basSummary
+    }
+
     private var basSummary: BASTelemetrySummary {
         BASTelemetrySummaryBuilder.build(
             from: BASTelemetrySummaryInput(

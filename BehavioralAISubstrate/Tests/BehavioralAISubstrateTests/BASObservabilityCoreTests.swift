@@ -311,6 +311,7 @@ struct BASObservabilityCoreTests {
         #expect(summary.rebuildCountByKind["quick"] == 1)
         #expect(summary.staleFieldDropCount == 3)
         #expect(summary.retainedEvidenceCount == 6)
+        #expect(summary.retainedEvidenceCountByKind["quick"] == 3)
         #expect(summary.droppedEvidenceCount == 3)
         #expect(summary.droppedInjectedEvidenceCountByKind["quick"] == 1)
         #expect(summary.droppedDuplicateEvidenceCountByKind["quick"] == 1)
@@ -449,6 +450,196 @@ struct BASObservabilityCoreTests {
         #expect(summary.evolutionCheckpointCountByKind["quick"] == 3)
         #expect(summary.evolutionPendingReviewCountByKind["quick"] == 2)
         #expect(summary.evolutionRollbackReadyByKind["quick"] == true)
+    }
+
+    @Test("runtime inspection builder compiles cross-domain summary from substrate inputs")
+    func runtimeInspectionBuilderCompilesCrossDomainSummary() {
+        let telemetry = BASTelemetrySummaryBuilder.build(
+            from: BASTelemetrySummaryInput(
+                requestCountByKind: ["quick": 2],
+                outcomeCount: [.providerSuccess: 1, .cacheHit: 1],
+                outcomeCountByKind: [
+                    .providerSuccess: ["quick": 1],
+                    .cacheHit: ["quick": 1]
+                ],
+                activeProviderCount: ["gemmaE4B": 1],
+                attemptedProviderCount: ["gemmaE4B": 1],
+                fallbackActivations: 0,
+                backendCount: ["cpu": 1],
+                slowRequestCountByKind: [:],
+                overTimeBudgetCountByKind: [:],
+                requestDurationTotalMsByKind: ["quick": 220],
+                firstPresentableTotalMsByKind: ["quick": 140],
+                promptAssemblyTotalMsByKind: ["quick": 40],
+                admissionEvaluationTotalMsByKind: ["quick": 20],
+                providerSelectionTotalMsByKind: ["quick": 10],
+                executionTotalMsByKind: ["quick": 70],
+                activeProviderDurationTotalMs: ["gemmaE4B": 220],
+                backendDurationTotalMs: ["cpu": 220],
+                admissionSkipCountByReason: [:],
+                admissionSkipCountByReasonAndKind: [:],
+                reminderSelectionNeedCount: [:],
+                promptCharactersTotalByKind: ["quick": 480],
+                prefixCharactersTotalByKind: ["quick": 180],
+                immutablePrefixCharactersTotalByKind: ["quick": 120],
+                adaptivePrefixCharactersTotalByKind: ["quick": 60],
+                suffixCharactersTotalByKind: ["quick": 300],
+                overTargetBudgetCountByKind: [:],
+                lowPressureModelCallCountByKind: ["quick": 1],
+                reminderKindRawValue: "reminder",
+                reminderKnowledgeNeedRawValue: "knowledge",
+                reminderControlNeedRawValue: "control",
+                reminderRetrievalBypassReasonRawValues: ["retrievalNotNeeded", "insufficientReminderChoice"],
+                avoidableSkipReasonRawValues: ["templateAlreadySufficient", "insufficientSourceMaterial"]
+            )
+        )
+        let lifecycle = BASLifecycleSummaryBuilder.build(
+            from: [
+                BASLifecycleTraceInput(
+                    kind: "quick",
+                    hasContextState: true,
+                    generation: 4,
+                    rebuiltSession: true,
+                    staleFieldCount: 0,
+                    anchorFieldCount: 1,
+                    hasFrontstageState: true,
+                    retainedEvidenceCount: 2,
+                    droppedEvidenceCount: 1,
+                    droppedInjectedEvidenceCount: 1,
+                    droppedDuplicateEvidenceCount: 0,
+                    droppedBudgetEvidenceCount: 0
+                )
+            ]
+        )
+        let neural = BASNeuralSummaryBuilder.build(
+            from: [
+                BASNeuralTraceInput(
+                    kind: "quick",
+                    suppressedBehaviorCount: 1,
+                    dominantActionRawValue: "waitBuffer",
+                    strongestSignalRawValue: "urgency"
+                )
+            ]
+        )
+        let brain = BASBrainSummaryBuilder.build(
+            from: [
+                BASBrainTraceInput(
+                    kind: "quick",
+                    dominantReactionWeight: .interruptiveActionBias,
+                    profileCoreCount: 1,
+                    activeGoalCount: 1,
+                    relevantMemoryCount: 1,
+                    loadedPromotedMemoryCount: 3,
+                    loadedPendingMemoryCount: 1,
+                    pendingCandidateCount: 1,
+                    promotedRecordCount: 6,
+                    screenedOutMemoryCount: 1,
+                    loadedEligibilityReasonCounts: [.goalOverride: 1],
+                    screenedOutEligibilityReasonCounts: [.confidenceNoOverlap: 1],
+                    snapshotFingerprint: "fp-q",
+                    lowTrustMemoryLoadRate: 0,
+                    riskFlags: [],
+                    identityRole: .pauseCompanion,
+                    boundaryMode: .localOnlyAdvisory,
+                    activeConstraints: [.lockSensitiveMemory],
+                    calibrationStatus: .stable,
+                    calibrationAlerts: [],
+                    evolutionCheckpointCount: 0,
+                    evolutionPendingReviewCount: 0,
+                    evolutionRollbackReady: false
+                )
+            ]
+        )
+
+        let summary = BASRuntimeInspectionBuilder.build(
+            from: BASRuntimeInspectionInput(
+                activeProviderID: "gemmaE4B",
+                fallbackProviderID: nil,
+                runtimeGear: .low,
+                environmentClass: .normal,
+                deviceClass: .balancedPhone,
+                languageMode: .english,
+                taskEntropyByKind: ["quick": .low],
+                preferredProviderRawValueByKind: ["quick": "gemmaE4B"],
+                strategyByKind: [
+                    "quick": BASAdaptiveTaskStrategy(
+                        kind: .quick,
+                        entropy: .low,
+                        runtimeGear: .low,
+                        contextBudget: 220,
+                        outputCharacterBudget: 180,
+                        timeBudgetMs: 500,
+                        toolCallBudget: 1,
+                        retrievalItemBudget: 0,
+                        retrievalMode: .off,
+                        thinkingMode: .off,
+                        outputMode: .guidedShort,
+                        tone: .briefWarm,
+                        actionSpace: ["encourage", "next_step", "fallback_to_template"],
+                        responseLanguage: .english,
+                        allowsModelInvocation: true
+                    )
+                ],
+                effectivePreferredProviderRawValueByKind: ["quick": "gemmaE4B"],
+                traceInputs: [
+                    BASRuntimeInspectionTraceInput(
+                        kind: "quick",
+                        attemptedProviderIDs: ["gemmaE4B"],
+                        runtimeStrategy: BASAdaptiveTaskStrategy(
+                            kind: .quick,
+                            entropy: .low,
+                            runtimeGear: .low,
+                            contextBudget: 220,
+                            outputCharacterBudget: 180,
+                            timeBudgetMs: 500,
+                            toolCallBudget: 1,
+                            retrievalItemBudget: 0,
+                            retrievalMode: .off,
+                            thinkingMode: .off,
+                            outputMode: .guidedShort,
+                            tone: .briefWarm,
+                            actionSpace: ["encourage", "next_step", "fallback_to_template"],
+                            responseLanguage: .english,
+                            allowsModelInvocation: true
+                        ),
+                        semanticPromptFingerprint: "semantic-q-1",
+                        stablePrefixFingerprint: "stable-q-1",
+                        consistencyChecked: true
+                    )
+                ],
+                telemetrySummary: telemetry,
+                lifecycleSummary: lifecycle,
+                neuralSummary: neural,
+                brainSummary: brain,
+                totalCacheEntries: 1,
+                totalCacheLookupCount: 1,
+                totalCacheRejectedStores: 0,
+                totalCacheQuarantinedHits: 0,
+                dominantBackendID: "cpu",
+                registeredProviderCount: 4,
+                registeredOpenModelProviderCount: 2,
+                activeCircuitProviderIDs: ["gemmaE4B"],
+                circuitTripCount: 1,
+                circuitTripCountByProvider: ["gemmaE4B": 1],
+                circuitTripCountByReason: ["repeatedProviderFailure": 1],
+                traceCount: 1,
+                replayCount: 1
+            )
+        )
+
+        #expect(summary.activeProviderID == "gemmaE4B")
+        #expect(summary.runtimeGearByKind["quick"] == .low)
+        #expect(summary.effectiveRuntimeGearByKind["quick"] == .low)
+        #expect(summary.firstAttemptedProviderByKind["quick"] == "gemmaE4B")
+        #expect(summary.effectiveProviderOrderByKind["quick"] == ["gemmaE4B"])
+        #expect(summary.semanticPromptVariantCountByKind["quick"] == 1)
+        #expect(summary.stablePrefixVariantCountByKind["quick"] == 1)
+        #expect(summary.consistencyCheckedTraceCount == 1)
+        #expect(summary.consistencyRejectedTraceCount == 0)
+        #expect(summary.evidenceRetentionRatio == 2.0 / 3.0)
+        #expect(summary.evidencePollutionRateByKind["quick"] == 1.0 / 3.0)
+        #expect(summary.averageRequestDurationMsByBackend["cpu"] == 220)
+        #expect(summary.boundaryModeByKind["quick"] == .localOnlyAdvisory)
     }
 
     private func makeReplayBundle() -> BASReplayBundle {

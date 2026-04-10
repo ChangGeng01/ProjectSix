@@ -800,6 +800,7 @@ public struct BASLifecycleSummary: Codable, Sendable, Equatable {
     public var staleFieldDropCount: Int
     public var staleFieldDropCountByKind: [String: Int]
     public var retainedEvidenceCount: Int
+    public var retainedEvidenceCountByKind: [String: Int]
     public var droppedEvidenceCount: Int
     public var droppedEvidenceCountByKind: [String: Int]
     public var droppedInjectedEvidenceCount: Int
@@ -819,6 +820,7 @@ public struct BASLifecycleSummary: Codable, Sendable, Equatable {
         staleFieldDropCount: Int,
         staleFieldDropCountByKind: [String: Int],
         retainedEvidenceCount: Int,
+        retainedEvidenceCountByKind: [String: Int],
         droppedEvidenceCount: Int,
         droppedEvidenceCountByKind: [String: Int],
         droppedInjectedEvidenceCount: Int,
@@ -837,6 +839,7 @@ public struct BASLifecycleSummary: Codable, Sendable, Equatable {
         self.staleFieldDropCount = staleFieldDropCount
         self.staleFieldDropCountByKind = staleFieldDropCountByKind
         self.retainedEvidenceCount = retainedEvidenceCount
+        self.retainedEvidenceCountByKind = retainedEvidenceCountByKind
         self.droppedEvidenceCount = droppedEvidenceCount
         self.droppedEvidenceCountByKind = droppedEvidenceCountByKind
         self.droppedInjectedEvidenceCount = droppedInjectedEvidenceCount
@@ -865,6 +868,7 @@ public enum BASLifecycleSummaryBuilder {
             staleFieldDropCount: contextAwareTraces.reduce(0) { $0 + $1.staleFieldCount },
             staleFieldDropCountByKind: sumByKind(from: traces, value: \.staleFieldCount),
             retainedEvidenceCount: traces.reduce(0) { $0 + $1.retainedEvidenceCount },
+            retainedEvidenceCountByKind: sumByKind(from: traces, value: \.retainedEvidenceCount),
             droppedEvidenceCount: traces.reduce(0) { $0 + $1.droppedEvidenceCount },
             droppedEvidenceCountByKind: sumByKind(from: traces, value: \.droppedEvidenceCount),
             droppedInjectedEvidenceCount: traces.reduce(0) { $0 + $1.droppedInjectedEvidenceCount },
@@ -1135,6 +1139,476 @@ public enum BASBrainSummaryBuilder {
     }
 }
 
+public struct BASRuntimeInspectionTraceInput: Codable, Sendable, Equatable {
+    public var kind: String
+    public var attemptedProviderIDs: [String]
+    public var runtimeStrategy: BASAdaptiveTaskStrategy?
+    public var semanticPromptFingerprint: String?
+    public var stablePrefixFingerprint: String?
+    public var consistencyChecked: Bool
+    public var consistencyRejected: Bool
+    public var consistencyViolationKinds: [BASConsistencyViolationKind]
+
+    public init(
+        kind: String,
+        attemptedProviderIDs: [String],
+        runtimeStrategy: BASAdaptiveTaskStrategy? = nil,
+        semanticPromptFingerprint: String? = nil,
+        stablePrefixFingerprint: String? = nil,
+        consistencyChecked: Bool = false,
+        consistencyRejected: Bool = false,
+        consistencyViolationKinds: [BASConsistencyViolationKind] = []
+    ) {
+        self.kind = kind
+        self.attemptedProviderIDs = attemptedProviderIDs
+        self.runtimeStrategy = runtimeStrategy
+        self.semanticPromptFingerprint = semanticPromptFingerprint
+        self.stablePrefixFingerprint = stablePrefixFingerprint
+        self.consistencyChecked = consistencyChecked
+        self.consistencyRejected = consistencyRejected
+        self.consistencyViolationKinds = consistencyViolationKinds
+    }
+}
+
+public struct BASRuntimeInspectionInput: Codable, Sendable, Equatable {
+    public var activeProviderID: String
+    public var fallbackProviderID: String?
+    public var runtimeGear: BASRuntimeGear
+    public var environmentClass: BASEnvironmentClass
+    public var deviceClass: BASDevicePerformanceClass
+    public var languageMode: BASLanguageMode
+    public var taskEntropyByKind: [String: BASTaskEntropyClass]
+    public var preferredProviderRawValueByKind: [String: String]
+    public var strategyByKind: [String: BASAdaptiveTaskStrategy]
+    public var effectivePreferredProviderRawValueByKind: [String: String]
+    public var traceInputs: [BASRuntimeInspectionTraceInput]
+    public var telemetrySummary: BASTelemetrySummary
+    public var lifecycleSummary: BASLifecycleSummary
+    public var neuralSummary: BASNeuralSummary
+    public var brainSummary: BASBrainSummary
+    public var totalCacheEntries: Int
+    public var totalCacheLookupCount: Int
+    public var totalCacheRejectedStores: Int
+    public var totalCacheQuarantinedHits: Int
+    public var dominantBackendID: String?
+    public var registeredProviderCount: Int
+    public var registeredOpenModelProviderCount: Int
+    public var activeCircuitProviderIDs: [String]
+    public var circuitTripCount: Int
+    public var circuitTripCountByProvider: [String: Int]
+    public var circuitTripCountByReason: [String: Int]
+    public var traceCount: Int
+    public var replayCount: Int
+
+    public init(
+        activeProviderID: String,
+        fallbackProviderID: String?,
+        runtimeGear: BASRuntimeGear,
+        environmentClass: BASEnvironmentClass,
+        deviceClass: BASDevicePerformanceClass,
+        languageMode: BASLanguageMode,
+        taskEntropyByKind: [String: BASTaskEntropyClass],
+        preferredProviderRawValueByKind: [String: String],
+        strategyByKind: [String: BASAdaptiveTaskStrategy],
+        effectivePreferredProviderRawValueByKind: [String: String],
+        traceInputs: [BASRuntimeInspectionTraceInput],
+        telemetrySummary: BASTelemetrySummary,
+        lifecycleSummary: BASLifecycleSummary,
+        neuralSummary: BASNeuralSummary,
+        brainSummary: BASBrainSummary,
+        totalCacheEntries: Int,
+        totalCacheLookupCount: Int,
+        totalCacheRejectedStores: Int,
+        totalCacheQuarantinedHits: Int,
+        dominantBackendID: String?,
+        registeredProviderCount: Int,
+        registeredOpenModelProviderCount: Int,
+        activeCircuitProviderIDs: [String],
+        circuitTripCount: Int,
+        circuitTripCountByProvider: [String: Int],
+        circuitTripCountByReason: [String: Int],
+        traceCount: Int,
+        replayCount: Int
+    ) {
+        self.activeProviderID = activeProviderID
+        self.fallbackProviderID = fallbackProviderID
+        self.runtimeGear = runtimeGear
+        self.environmentClass = environmentClass
+        self.deviceClass = deviceClass
+        self.languageMode = languageMode
+        self.taskEntropyByKind = taskEntropyByKind
+        self.preferredProviderRawValueByKind = preferredProviderRawValueByKind
+        self.strategyByKind = strategyByKind
+        self.effectivePreferredProviderRawValueByKind = effectivePreferredProviderRawValueByKind
+        self.traceInputs = traceInputs
+        self.telemetrySummary = telemetrySummary
+        self.lifecycleSummary = lifecycleSummary
+        self.neuralSummary = neuralSummary
+        self.brainSummary = brainSummary
+        self.totalCacheEntries = totalCacheEntries
+        self.totalCacheLookupCount = totalCacheLookupCount
+        self.totalCacheRejectedStores = totalCacheRejectedStores
+        self.totalCacheQuarantinedHits = totalCacheQuarantinedHits
+        self.dominantBackendID = dominantBackendID
+        self.registeredProviderCount = registeredProviderCount
+        self.registeredOpenModelProviderCount = registeredOpenModelProviderCount
+        self.activeCircuitProviderIDs = activeCircuitProviderIDs
+        self.circuitTripCount = circuitTripCount
+        self.circuitTripCountByProvider = circuitTripCountByProvider
+        self.circuitTripCountByReason = circuitTripCountByReason
+        self.traceCount = traceCount
+        self.replayCount = replayCount
+    }
+}
+
+public struct BASRuntimeInspectionSummary: Codable, Sendable, Equatable {
+    public var activeProviderID: String
+    public var fallbackProviderID: String?
+    public var runtimeGear: BASRuntimeGear
+    public var environmentClass: BASEnvironmentClass
+    public var deviceClass: BASDevicePerformanceClass
+    public var languageMode: BASLanguageMode
+    public var taskEntropyByKind: [String: BASTaskEntropyClass]
+    public var preferredProviderRawValueByKind: [String: String]
+    public var runtimeGearByKind: [String: BASRuntimeGear]
+    public var allowsModelInvocationByKind: [String: Bool]
+    public var contextBudgetByKind: [String: Int]
+    public var outputCharacterBudgetByKind: [String: Int]
+    public var timeBudgetMsByKind: [String: Int]
+    public var toolCallBudgetByKind: [String: Int]
+    public var retrievalItemBudgetByKind: [String: Int]
+    public var retrievalModeByKind: [String: BASRetrievalMode]
+    public var thinkingModeByKind: [String: BASThinkingMode]
+    public var outputModeByKind: [String: BASOutputMode]
+    public var toneByKind: [String: BASToneProfile]
+    public var actionSpaceByKind: [String: [String]]
+    public var responseLanguageByKind: [String: BASAdaptiveResponseLanguage]
+    public var effectivePreferredProviderRawValueByKind: [String: String]
+    public var effectiveRuntimeGearByKind: [String: BASRuntimeGear]
+    public var effectiveContextBudgetByKind: [String: Int]
+    public var effectiveOutputCharacterBudgetByKind: [String: Int]
+    public var effectiveTimeBudgetMsByKind: [String: Int]
+    public var effectiveToolCallBudgetByKind: [String: Int]
+    public var effectiveRetrievalItemBudgetByKind: [String: Int]
+    public var effectiveRetrievalModeByKind: [String: BASRetrievalMode]
+    public var effectiveThinkingModeByKind: [String: BASThinkingMode]
+    public var effectiveOutputModeByKind: [String: BASOutputMode]
+    public var effectiveToneByKind: [String: BASToneProfile]
+    public var effectiveActionSpaceByKind: [String: [String]]
+    public var effectiveResponseLanguageByKind: [String: BASAdaptiveResponseLanguage]
+    public var firstAttemptedProviderByKind: [String: String]
+    public var effectiveProviderOrderByKind: [String: [String]]
+    public var totalRequests: Int
+    public var totalProviderAttempts: Int
+    public var cacheHitRate: Double
+    public var admissionSkipRate: Double
+    public var providerBypassRate: Double
+    public var providerBypassRateByKind: [String: Double]
+    public var lowPressureModelCallRate: Double
+    public var lowPressureModelCallRateByKind: [String: Double]
+    public var avoidableModelCallRate: Double
+    public var avoidableModelCallRateByKind: [String: Double]
+    public var reminderRequestCount: Int
+    public var reminderKnowledgeNeedRate: Double
+    public var reminderControlOnlyRate: Double
+    public var reminderRetrievalBypassRate: Double
+    public var deterministicFallbackRate: Double
+    public var averageRequestDurationMs: Double
+    public var averageRequestDurationMsByKind: [String: Double]
+    public var averageFirstPresentableMs: Double
+    public var averageFirstPresentableMsByKind: [String: Double]
+    public var averagePromptAssemblyMsByKind: [String: Double]
+    public var averageAdmissionEvaluationMsByKind: [String: Double]
+    public var averageProviderSelectionMsByKind: [String: Double]
+    public var averageExecutionMsByKind: [String: Double]
+    public var averagePrefillEquivalentShareByKind: [String: Double]
+    public var averageRequestDurationMsByActiveProvider: [String: Double]
+    public var averageRequestDurationMsByBackend: [String: Double]
+    public var averagePromptCharactersByKind: [String: Double]
+    public var averagePrefixCharactersByKind: [String: Double]
+    public var averageImmutablePrefixCharactersByKind: [String: Double]
+    public var averageAdaptivePrefixCharactersByKind: [String: Double]
+    public var averageSuffixCharactersByKind: [String: Double]
+    public var averageStablePrefixShareByKind: [String: Double]
+    public var semanticPromptVariantCountByKind: [String: Int]
+    public var semanticPromptReuseRateByKind: [String: Double]
+    public var stablePrefixVariantCountByKind: [String: Int]
+    public var stablePrefixReuseRateByKind: [String: Double]
+    public var stablePrefixPollutionRateByKind: [String: Double]
+    public var slowRequestRate: Double
+    public var slowRequestRateByKind: [String: Double]
+    public var overTimeBudgetRate: Double
+    public var overTimeBudgetRateByKind: [String: Double]
+    public var overTargetBudgetRate: Double
+    public var fallbackActivations: Int
+    public var admissionSkipCount: Int
+    public var contextAwareTraceCount: Int
+    public var lifecycleRebuildCount: Int
+    public var staleFieldDropCount: Int
+    public var retainedEvidenceCount: Int
+    public var evidenceRetentionRatio: Double
+    public var droppedEvidenceCount: Int
+    public var droppedInjectedEvidenceCount: Int
+    public var droppedDuplicateEvidenceCount: Int
+    public var droppedBudgetEvidenceCount: Int
+    public var evidencePollutionRate: Double
+    public var evidencePollutionRateByKind: [String: Double]
+    public var duplicateEvidenceDropRate: Double
+    public var duplicateEvidenceDropRateByKind: [String: Double]
+    public var budgetTrimRate: Double
+    public var budgetTrimRateByKind: [String: Double]
+    public var neuralTraceCount: Int
+    public var suppressedBehaviorCount: Int
+    public var brainTraceCount: Int
+    public var dominantReactionWeightByKind: [String: BASReactionWeightKey]
+    public var loadedEligibilityReasonCountsByKind: [String: [BASMemoryEligibilityReason: Int]]
+    public var screenedOutEligibilityReasonCountsByKind: [String: [BASMemoryEligibilityReason: Int]]
+    public var pendingMemoryLoadRateByKind: [String: Double]
+    public var retrievalRejectionRateByKind: [String: Double]
+    public var brainSnapshotFingerprintByKind: [String: String]
+    public var brainSnapshotVariantCountByKind: [String: Int]
+    public var lowTrustMemoryLoadRateByKind: [String: Double]
+    public var brainRiskFlagCountsByKind: [String: [BASBrainStateRiskFlag: Int]]
+    public var identityRoleByKind: [String: BASIdentityRole]
+    public var boundaryModeByKind: [String: BASBoundaryPolicyMode]
+    public var boundaryConstraintCountsByKind: [String: [BASBoundaryConstraint: Int]]
+    public var calibrationStatusByKind: [String: BASCalibrationStatus]
+    public var calibrationAlertCountsByKind: [String: [BASCalibrationAlert: Int]]
+    public var evolutionCheckpointCountByKind: [String: Double]
+    public var evolutionPendingReviewCountByKind: [String: Double]
+    public var evolutionRollbackReadyByKind: [String: Bool]
+    public var traceCount: Int
+    public var replayCount: Int
+    public var totalCacheEntries: Int
+    public var totalCacheRejectedStores: Int
+    public var totalCacheQuarantinedHits: Int
+    public var cacheQuarantineRate: Double
+    public var dominantBackendID: String?
+    public var registeredProviderCount: Int
+    public var registeredOpenModelProviderCount: Int
+    public var circuitOpenProviderCount: Int
+    public var activeCircuitProviderIDs: [String]
+    public var circuitTripCount: Int
+    public var circuitTripCountByProvider: [String: Int]
+    public var circuitTripCountByReason: [String: Int]
+    public var consistencyCheckedTraceCount: Int
+    public var consistencyRejectedTraceCount: Int
+    public var consistencyCheckCoverageRate: Double
+    public var consistencyRejectRate: Double
+    public var consistencyRejectedCountByKind: [String: Int]
+    public var consistencyViolationCounts: [BASConsistencyViolationKind: Int]
+}
+
+public enum BASRuntimeInspectionBuilder {
+    public static func build(from input: BASRuntimeInspectionInput) -> BASRuntimeInspectionSummary {
+        let effectiveStrategiesByKind = firstStrategyByKind(from: input.traceInputs)
+        let semanticPromptVariantCountByKind = variantCountByKind(
+            from: input.traceInputs.compactMap { trace in
+                trace.semanticPromptFingerprint.map { (trace.kind, $0) }
+            }
+        )
+        let stablePrefixVariantCountByKind = variantCountByKind(
+            from: input.traceInputs.compactMap { trace in
+                trace.stablePrefixFingerprint.map { (trace.kind, $0) }
+            }
+        )
+        let firstAttemptedProviderByKind = firstAttemptedProviderByKind(from: input.traceInputs)
+        let effectiveProviderOrderByKind = effectiveProviderOrderByKind(from: input.traceInputs)
+        let consistencyCheckedTraceCount = input.traceInputs.filter(\.consistencyChecked).count
+        let consistencyRejectedTraceCount = input.traceInputs.filter(\.consistencyRejected).count
+        let consistencyRejectedCountByKind = Dictionary(
+            grouping: input.traceInputs.filter(\.consistencyRejected),
+            by: \.kind
+        )
+        .mapValues(\.count)
+        let consistencyViolationCounts = input.traceInputs
+            .flatMap(\.consistencyViolationKinds)
+            .reduce(into: [BASConsistencyViolationKind: Int]()) { partialResult, kind in
+                partialResult[kind, default: 0] += 1
+            }
+
+        return BASRuntimeInspectionSummary(
+            activeProviderID: input.activeProviderID,
+            fallbackProviderID: input.fallbackProviderID,
+            runtimeGear: input.runtimeGear,
+            environmentClass: input.environmentClass,
+            deviceClass: input.deviceClass,
+            languageMode: input.languageMode,
+            taskEntropyByKind: input.taskEntropyByKind,
+            preferredProviderRawValueByKind: input.preferredProviderRawValueByKind,
+            runtimeGearByKind: strategyMap(input.strategyByKind, value: \.runtimeGear),
+            allowsModelInvocationByKind: strategyMap(input.strategyByKind, value: \.allowsModelInvocation),
+            contextBudgetByKind: strategyMap(input.strategyByKind, value: \.contextBudget),
+            outputCharacterBudgetByKind: strategyMap(input.strategyByKind, value: \.outputCharacterBudget),
+            timeBudgetMsByKind: strategyMap(input.strategyByKind, value: \.timeBudgetMs),
+            toolCallBudgetByKind: strategyMap(input.strategyByKind, value: \.toolCallBudget),
+            retrievalItemBudgetByKind: strategyMap(input.strategyByKind, value: \.retrievalItemBudget),
+            retrievalModeByKind: strategyMap(input.strategyByKind, value: \.retrievalMode),
+            thinkingModeByKind: strategyMap(input.strategyByKind, value: \.thinkingMode),
+            outputModeByKind: strategyMap(input.strategyByKind, value: \.outputMode),
+            toneByKind: strategyMap(input.strategyByKind, value: \.tone),
+            actionSpaceByKind: strategyMap(input.strategyByKind, value: \.actionSpace),
+            responseLanguageByKind: strategyMap(input.strategyByKind, value: \.responseLanguage),
+            effectivePreferredProviderRawValueByKind: input.effectivePreferredProviderRawValueByKind,
+            effectiveRuntimeGearByKind: strategyMap(effectiveStrategiesByKind, value: \.runtimeGear),
+            effectiveContextBudgetByKind: strategyMap(effectiveStrategiesByKind, value: \.contextBudget),
+            effectiveOutputCharacterBudgetByKind: strategyMap(effectiveStrategiesByKind, value: \.outputCharacterBudget),
+            effectiveTimeBudgetMsByKind: strategyMap(effectiveStrategiesByKind, value: \.timeBudgetMs),
+            effectiveToolCallBudgetByKind: strategyMap(effectiveStrategiesByKind, value: \.toolCallBudget),
+            effectiveRetrievalItemBudgetByKind: strategyMap(effectiveStrategiesByKind, value: \.retrievalItemBudget),
+            effectiveRetrievalModeByKind: strategyMap(effectiveStrategiesByKind, value: \.retrievalMode),
+            effectiveThinkingModeByKind: strategyMap(effectiveStrategiesByKind, value: \.thinkingMode),
+            effectiveOutputModeByKind: strategyMap(effectiveStrategiesByKind, value: \.outputMode),
+            effectiveToneByKind: strategyMap(effectiveStrategiesByKind, value: \.tone),
+            effectiveActionSpaceByKind: strategyMap(effectiveStrategiesByKind, value: \.actionSpace),
+            effectiveResponseLanguageByKind: strategyMap(effectiveStrategiesByKind, value: \.responseLanguage),
+            firstAttemptedProviderByKind: firstAttemptedProviderByKind,
+            effectiveProviderOrderByKind: effectiveProviderOrderByKind,
+            totalRequests: input.telemetrySummary.totalRequests,
+            totalProviderAttempts: input.telemetrySummary.totalProviderAttempts,
+            cacheHitRate: input.telemetrySummary.cacheHitRate,
+            admissionSkipRate: input.telemetrySummary.admissionSkipRate,
+            providerBypassRate: input.telemetrySummary.providerBypassRate,
+            providerBypassRateByKind: input.telemetrySummary.providerBypassRateByKind,
+            lowPressureModelCallRate: input.telemetrySummary.lowPressureModelCallRate,
+            lowPressureModelCallRateByKind: input.telemetrySummary.lowPressureModelCallRateByKind,
+            avoidableModelCallRate: input.telemetrySummary.avoidableModelCallRate,
+            avoidableModelCallRateByKind: input.telemetrySummary.avoidableModelCallRateByKind,
+            reminderRequestCount: input.telemetrySummary.reminderRequestCount,
+            reminderKnowledgeNeedRate: input.telemetrySummary.reminderKnowledgeNeedRate,
+            reminderControlOnlyRate: input.telemetrySummary.reminderControlOnlyRate,
+            reminderRetrievalBypassRate: input.telemetrySummary.reminderRetrievalBypassRate,
+            deterministicFallbackRate: input.telemetrySummary.deterministicFallbackRate,
+            averageRequestDurationMs: input.telemetrySummary.averageRequestDurationMs,
+            averageRequestDurationMsByKind: input.telemetrySummary.averageRequestDurationMsByKind,
+            averageFirstPresentableMs: input.telemetrySummary.averageFirstPresentableMs,
+            averageFirstPresentableMsByKind: input.telemetrySummary.averageFirstPresentableMsByKind,
+            averagePromptAssemblyMsByKind: input.telemetrySummary.averagePromptAssemblyMsByKind,
+            averageAdmissionEvaluationMsByKind: input.telemetrySummary.averageAdmissionEvaluationMsByKind,
+            averageProviderSelectionMsByKind: input.telemetrySummary.averageProviderSelectionMsByKind,
+            averageExecutionMsByKind: input.telemetrySummary.averageExecutionMsByKind,
+            averagePrefillEquivalentShareByKind: input.telemetrySummary.averagePrefillEquivalentShareByKind,
+            averageRequestDurationMsByActiveProvider: input.telemetrySummary.averageRequestDurationMsByActiveProvider,
+            averageRequestDurationMsByBackend: input.telemetrySummary.averageRequestDurationMsByBackend,
+            averagePromptCharactersByKind: input.telemetrySummary.averagePromptCharactersByKind,
+            averagePrefixCharactersByKind: input.telemetrySummary.averagePrefixCharactersByKind,
+            averageImmutablePrefixCharactersByKind: input.telemetrySummary.averageImmutablePrefixCharactersByKind,
+            averageAdaptivePrefixCharactersByKind: input.telemetrySummary.averageAdaptivePrefixCharactersByKind,
+            averageSuffixCharactersByKind: input.telemetrySummary.averageSuffixCharactersByKind,
+            averageStablePrefixShareByKind: input.telemetrySummary.averageStablePrefixShareByKind,
+            semanticPromptVariantCountByKind: semanticPromptVariantCountByKind,
+            semanticPromptReuseRateByKind: reuseRateByKind(
+                requestCountByKind: input.telemetrySummary.input.requestCountByKind,
+                variantCountByKind: semanticPromptVariantCountByKind
+            ),
+            stablePrefixVariantCountByKind: stablePrefixVariantCountByKind,
+            stablePrefixReuseRateByKind: reuseRateByKind(
+                requestCountByKind: input.telemetrySummary.input.requestCountByKind,
+                variantCountByKind: stablePrefixVariantCountByKind
+            ),
+            stablePrefixPollutionRateByKind: stablePrefixPollutionRateByKind(
+                requestCountByKind: input.telemetrySummary.input.requestCountByKind,
+                stablePrefixVariantCountByKind: stablePrefixVariantCountByKind
+            ),
+            slowRequestRate: input.telemetrySummary.slowRequestRate,
+            slowRequestRateByKind: input.telemetrySummary.slowRequestRateByKind,
+            overTimeBudgetRate: input.telemetrySummary.overTimeBudgetRate,
+            overTimeBudgetRateByKind: input.telemetrySummary.overTimeBudgetRateByKind,
+            overTargetBudgetRate: input.telemetrySummary.overTargetBudgetRate,
+            fallbackActivations: input.telemetrySummary.input.fallbackActivations,
+            admissionSkipCount: input.telemetrySummary.input.outcomeCount[.admissionSkipped] ?? 0,
+            contextAwareTraceCount: input.lifecycleSummary.contextAwareTraceCount,
+            lifecycleRebuildCount: input.lifecycleSummary.rebuildCount,
+            staleFieldDropCount: input.lifecycleSummary.staleFieldDropCount,
+            retainedEvidenceCount: input.lifecycleSummary.retainedEvidenceCount,
+            evidenceRetentionRatio: evidenceRetentionRatio(lifecycleSummary: input.lifecycleSummary),
+            droppedEvidenceCount: input.lifecycleSummary.droppedEvidenceCount,
+            droppedInjectedEvidenceCount: input.lifecycleSummary.droppedInjectedEvidenceCount,
+            droppedDuplicateEvidenceCount: input.lifecycleSummary.droppedDuplicateEvidenceCount,
+            droppedBudgetEvidenceCount: input.lifecycleSummary.droppedBudgetEvidenceCount,
+            evidencePollutionRate: evidenceRate(
+                numerator: input.lifecycleSummary.droppedInjectedEvidenceCount,
+                retained: input.lifecycleSummary.retainedEvidenceCount,
+                dropped: input.lifecycleSummary.droppedEvidenceCount
+            ),
+            evidencePollutionRateByKind: evidenceRateByKind(
+                numeratorByKind: input.lifecycleSummary.droppedInjectedEvidenceCountByKind,
+                retainedEvidenceCountByKind: input.lifecycleSummary.retainedEvidenceCountByKind,
+                droppedEvidenceCountByKind: input.lifecycleSummary.droppedEvidenceCountByKind
+            ),
+            duplicateEvidenceDropRate: evidenceRate(
+                numerator: input.lifecycleSummary.droppedDuplicateEvidenceCount,
+                retained: input.lifecycleSummary.retainedEvidenceCount,
+                dropped: input.lifecycleSummary.droppedEvidenceCount
+            ),
+            duplicateEvidenceDropRateByKind: evidenceRateByKind(
+                numeratorByKind: input.lifecycleSummary.droppedDuplicateEvidenceCountByKind,
+                retainedEvidenceCountByKind: input.lifecycleSummary.retainedEvidenceCountByKind,
+                droppedEvidenceCountByKind: input.lifecycleSummary.droppedEvidenceCountByKind
+            ),
+            budgetTrimRate: evidenceRate(
+                numerator: input.lifecycleSummary.droppedBudgetEvidenceCount,
+                retained: input.lifecycleSummary.retainedEvidenceCount,
+                dropped: input.lifecycleSummary.droppedEvidenceCount
+            ),
+            budgetTrimRateByKind: evidenceRateByKind(
+                numeratorByKind: input.lifecycleSummary.droppedBudgetEvidenceCountByKind,
+                retainedEvidenceCountByKind: input.lifecycleSummary.retainedEvidenceCountByKind,
+                droppedEvidenceCountByKind: input.lifecycleSummary.droppedEvidenceCountByKind
+            ),
+            neuralTraceCount: input.neuralSummary.neuralTraceCount,
+            suppressedBehaviorCount: input.neuralSummary.suppressedBehaviorCount,
+            brainTraceCount: input.brainSummary.brainTraceCount,
+            dominantReactionWeightByKind: input.brainSummary.dominantReactionWeightByKind,
+            loadedEligibilityReasonCountsByKind: input.brainSummary.loadedEligibilityReasonCountsByKind,
+            screenedOutEligibilityReasonCountsByKind: input.brainSummary.screenedOutEligibilityReasonCountsByKind,
+            pendingMemoryLoadRateByKind: input.brainSummary.pendingMemoryLoadRateByKind,
+            retrievalRejectionRateByKind: input.brainSummary.retrievalRejectionRateByKind,
+            brainSnapshotFingerprintByKind: input.brainSummary.latestSnapshotFingerprintByKind,
+            brainSnapshotVariantCountByKind: input.brainSummary.snapshotVariantCountByKind,
+            lowTrustMemoryLoadRateByKind: input.brainSummary.lowTrustMemoryLoadRateByKind,
+            brainRiskFlagCountsByKind: input.brainSummary.riskFlagCountsByKind,
+            identityRoleByKind: input.brainSummary.identityRoleByKind,
+            boundaryModeByKind: input.brainSummary.boundaryModeByKind,
+            boundaryConstraintCountsByKind: input.brainSummary.boundaryConstraintCountsByKind,
+            calibrationStatusByKind: input.brainSummary.calibrationStatusByKind,
+            calibrationAlertCountsByKind: input.brainSummary.calibrationAlertCountsByKind,
+            evolutionCheckpointCountByKind: input.brainSummary.evolutionCheckpointCountByKind,
+            evolutionPendingReviewCountByKind: input.brainSummary.evolutionPendingReviewCountByKind,
+            evolutionRollbackReadyByKind: input.brainSummary.evolutionRollbackReadyByKind,
+            traceCount: input.traceCount,
+            replayCount: input.replayCount,
+            totalCacheEntries: input.totalCacheEntries,
+            totalCacheRejectedStores: input.totalCacheRejectedStores,
+            totalCacheQuarantinedHits: input.totalCacheQuarantinedHits,
+            cacheQuarantineRate: inspectionRate(
+                numerator: input.totalCacheQuarantinedHits,
+                denominator: input.totalCacheLookupCount
+            ),
+            dominantBackendID: input.dominantBackendID,
+            registeredProviderCount: input.registeredProviderCount,
+            registeredOpenModelProviderCount: input.registeredOpenModelProviderCount,
+            circuitOpenProviderCount: input.activeCircuitProviderIDs.count,
+            activeCircuitProviderIDs: input.activeCircuitProviderIDs,
+            circuitTripCount: input.circuitTripCount,
+            circuitTripCountByProvider: input.circuitTripCountByProvider,
+            circuitTripCountByReason: input.circuitTripCountByReason,
+            consistencyCheckedTraceCount: consistencyCheckedTraceCount,
+            consistencyRejectedTraceCount: consistencyRejectedTraceCount,
+            consistencyCheckCoverageRate: inspectionRate(
+                numerator: consistencyCheckedTraceCount,
+                denominator: input.traceCount
+            ),
+            consistencyRejectRate: inspectionRate(
+                numerator: consistencyRejectedTraceCount,
+                denominator: consistencyCheckedTraceCount
+            ),
+            consistencyRejectedCountByKind: consistencyRejectedCountByKind,
+            consistencyViolationCounts: consistencyViolationCounts
+        )
+    }
+}
+
 private func countByKind(
     from values: [BASLifecycleTraceInput]
 ) -> [String: Int] {
@@ -1204,6 +1678,118 @@ private func averageBrainByKind(
             }
             return total / Double(grouped.count)
         }
+}
+
+private func firstStrategyByKind(
+    from traces: [BASRuntimeInspectionTraceInput]
+) -> [String: BASAdaptiveTaskStrategy] {
+    Dictionary(grouping: traces.compactMap { trace in
+        trace.runtimeStrategy.map { (trace.kind, $0) }
+    }, by: \.0)
+    .compactMapValues { grouped in
+        grouped.first?.1
+    }
+}
+
+private func firstAttemptedProviderByKind(
+    from traces: [BASRuntimeInspectionTraceInput]
+) -> [String: String] {
+    Dictionary(grouping: traces.filter { !$0.attemptedProviderIDs.isEmpty }, by: \.kind)
+        .compactMapValues { grouped in
+            grouped.first?.attemptedProviderIDs.first
+        }
+}
+
+private func effectiveProviderOrderByKind(
+    from traces: [BASRuntimeInspectionTraceInput]
+) -> [String: [String]] {
+    Dictionary(grouping: traces.filter { !$0.attemptedProviderIDs.isEmpty }, by: \.kind)
+        .compactMapValues { grouped in
+            grouped.first?.attemptedProviderIDs
+        }
+}
+
+private func strategyMap<Value>(
+    _ strategiesByKind: [String: BASAdaptiveTaskStrategy],
+    value: KeyPath<BASAdaptiveTaskStrategy, Value>
+) -> [String: Value] {
+    strategiesByKind.mapValues { strategy in
+        strategy[keyPath: value]
+    }
+}
+
+private func reuseRateByKind(
+    requestCountByKind: [String: Int],
+    variantCountByKind: [String: Int]
+) -> [String: Double] {
+    Dictionary(
+        uniqueKeysWithValues: requestCountByKind.map { kind, requestCount in
+            let variants = min(variantCountByKind[kind] ?? requestCount, requestCount)
+            let reused = max(0, requestCount - variants)
+            return (kind, inspectionRate(numerator: reused, denominator: requestCount))
+        }
+    )
+}
+
+private func stablePrefixPollutionRateByKind(
+    requestCountByKind: [String: Int],
+    stablePrefixVariantCountByKind: [String: Int]
+) -> [String: Double] {
+    Dictionary(
+        uniqueKeysWithValues: requestCountByKind.map { kind, requestCount in
+            let variants = stablePrefixVariantCountByKind[kind] ?? 0
+            let pollutionEvents = max(0, variants - 1)
+            return (kind, inspectionRate(numerator: pollutionEvents, denominator: requestCount))
+        }
+    )
+}
+
+private func evidenceRetentionRatio(
+    lifecycleSummary: BASLifecycleSummary
+) -> Double {
+    let total = lifecycleSummary.retainedEvidenceCount + lifecycleSummary.droppedEvidenceCount
+    guard total > 0 else { return 0 }
+    return Double(lifecycleSummary.retainedEvidenceCount) / Double(total)
+}
+
+private func evidenceRate(
+    numerator: Int,
+    retained: Int,
+    dropped: Int
+) -> Double {
+    inspectionRate(numerator: numerator, denominator: retained + dropped)
+}
+
+private func evidenceRateByKind(
+    numeratorByKind: [String: Int],
+    retainedEvidenceCountByKind: [String: Int],
+    droppedEvidenceCountByKind: [String: Int]
+) -> [String: Double] {
+    let kinds = Set(retainedEvidenceCountByKind.keys)
+        .union(droppedEvidenceCountByKind.keys)
+        .union(numeratorByKind.keys)
+
+    return Dictionary(
+        uniqueKeysWithValues: kinds.map { kind in
+            let retained = retainedEvidenceCountByKind[kind] ?? 0
+            let dropped = droppedEvidenceCountByKind[kind] ?? 0
+            return (
+                kind,
+                inspectionRate(
+                    numerator: numeratorByKind[kind] ?? 0,
+                    denominator: retained + dropped
+                )
+            )
+        }
+    )
+}
+
+private func inspectionRate(
+    numerator: Int,
+    denominator: Int
+) -> Double {
+    guard denominator > 0 else { return 0 }
+    return Double(numerator) / Double(denominator)
 }
 
 private func aggregatedCountMapByKind<Value: Hashable>(

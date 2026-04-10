@@ -1,6 +1,7 @@
 import Foundation
 import BASObservability
 import BASPolicy
+import BASRuntimeCore
 
 struct DecisionTestingRuntimeExport {
     let generatedAt: Date
@@ -17,232 +18,35 @@ struct DecisionTestingRuntimeExport {
     }
 
     var lifecycleSummary: DecisionTestingLifecycleSummary {
-        let summary = BASLifecycleSummaryBuilder.build(from: lifecycleTraceInputs)
-        return DecisionTestingLifecycleSummary(
-            contextAwareTraceCount: summary.contextAwareTraceCount,
-            rebuildCount: summary.rebuildCount,
-            rebuildCountByKind: mapKindDictionary(summary.rebuildCountByKind),
-            staleFieldDropCount: summary.staleFieldDropCount,
-            staleFieldDropCountByKind: mapKindDictionary(summary.staleFieldDropCountByKind),
-            retainedEvidenceCount: summary.retainedEvidenceCount,
-            droppedEvidenceCount: summary.droppedEvidenceCount,
-            droppedEvidenceCountByKind: mapKindDictionary(summary.droppedEvidenceCountByKind),
-            droppedInjectedEvidenceCount: summary.droppedInjectedEvidenceCount,
-            droppedInjectedEvidenceCountByKind: mapKindDictionary(summary.droppedInjectedEvidenceCountByKind),
-            droppedDuplicateEvidenceCount: summary.droppedDuplicateEvidenceCount,
-            droppedDuplicateEvidenceCountByKind: mapKindDictionary(summary.droppedDuplicateEvidenceCountByKind),
-            droppedBudgetEvidenceCount: summary.droppedBudgetEvidenceCount,
-            droppedBudgetEvidenceCountByKind: mapKindDictionary(summary.droppedBudgetEvidenceCountByKind),
-            averageRetainedEvidenceCountByKind: mapKindDictionary(summary.averageRetainedEvidenceCountByKind),
-            averageAnchorFieldCountByKind: mapKindDictionary(summary.averageAnchorFieldCountByKind),
-            latestGenerationByKind: mapKindDictionary(summary.latestGenerationByKind)
-        )
+        DecisionTestingLifecycleSummary(basSummary: basLifecycleSummary)
     }
 
     var neuralSummary: DecisionTestingNeuralSummary {
-        let summary = BASNeuralSummaryBuilder.build(from: neuralTraceInputs)
-        return DecisionTestingNeuralSummary(
-            neuralTraceCount: summary.neuralTraceCount,
-            suppressedBehaviorCount: summary.suppressedBehaviorCount,
-            dominantActionByKind: mapKindDictionary(summary.dominantActionByKind) { DecisionActionRoute(rawValue: $0) },
-            strongestSignalByKind: mapKindDictionary(summary.strongestSignalByKind) { DecisionNeuralSignal(rawValue: $0) }
-        )
+        DecisionTestingNeuralSummary(basSummary: basNeuralSummary)
     }
 
     var brainSummary: DecisionTestingBrainSummary {
-        let summary = BASBrainSummaryBuilder.build(from: brainTraceInputs)
-        return DecisionTestingBrainSummary(
-            brainTraceCount: summary.brainTraceCount,
-            dominantReactionWeightByKind: mapKindDictionary(summary.dominantReactionWeightByKind),
-            averageProfileCoreCountByKind: mapKindDictionary(summary.averageProfileCoreCountByKind),
-            averageActiveGoalCountByKind: mapKindDictionary(summary.averageActiveGoalCountByKind),
-            averageRelevantMemoryCountByKind: mapKindDictionary(summary.averageRelevantMemoryCountByKind),
-            averageLoadedPromotedMemoryCountByKind: mapKindDictionary(summary.averageLoadedPromotedMemoryCountByKind),
-            averageLoadedPendingMemoryCountByKind: mapKindDictionary(summary.averageLoadedPendingMemoryCountByKind),
-            averagePendingCandidateCountByKind: mapKindDictionary(summary.averagePendingCandidateCountByKind),
-            averagePromotedRecordCountByKind: mapKindDictionary(summary.averagePromotedRecordCountByKind),
-            averageScreenedOutMemoryCountByKind: mapKindDictionary(summary.averageScreenedOutMemoryCountByKind),
-            loadedEligibilityReasonCountsByKind: mapKindDictionary(summary.loadedEligibilityReasonCountsByKind),
-            screenedOutEligibilityReasonCountsByKind: mapKindDictionary(summary.screenedOutEligibilityReasonCountsByKind),
-            pendingMemoryLoadRateByKind: mapKindDictionary(summary.pendingMemoryLoadRateByKind),
-            retrievalRejectionRateByKind: mapKindDictionary(summary.retrievalRejectionRateByKind),
-            latestSnapshotFingerprintByKind: mapKindDictionary(summary.latestSnapshotFingerprintByKind),
-            snapshotVariantCountByKind: mapKindDictionary(summary.snapshotVariantCountByKind),
-            lowTrustMemoryLoadRateByKind: mapKindDictionary(summary.lowTrustMemoryLoadRateByKind),
-            riskFlagCountsByKind: mapKindDictionary(summary.riskFlagCountsByKind),
-            identityRoleByKind: mapKindDictionary(summary.identityRoleByKind),
-            boundaryModeByKind: mapKindDictionary(summary.boundaryModeByKind),
-            boundaryConstraintCountsByKind: mapKindDictionary(summary.boundaryConstraintCountsByKind),
-            calibrationStatusByKind: mapKindDictionary(summary.calibrationStatusByKind),
-            calibrationAlertCountsByKind: mapKindDictionary(summary.calibrationAlertCountsByKind),
-            evolutionCheckpointCountByKind: mapKindDictionary(summary.evolutionCheckpointCountByKind),
-            evolutionPendingReviewCountByKind: mapKindDictionary(summary.evolutionPendingReviewCountByKind),
-            evolutionRollbackReadyByKind: mapKindDictionary(summary.evolutionRollbackReadyByKind)
-        )
+        DecisionTestingBrainSummary(basSummary: basBrainSummary)
     }
 
     var summary: DecisionTestingRuntimeSummary {
-        let adaptationMatrix = runtimeSnapshot.executionProfile.adaptationMatrix
-        let consistencyCheckedTraceCount = recentTraces.filter { $0.consistencyCheck != nil }.count
-        let consistencyRejectedTraceCount = recentTraces.filter(\.consistencyRejected).count
-        let consistencyRejectedCountByKind = Dictionary(
-            grouping: recentTraces.filter(\.consistencyRejected),
-            by: \.kind
-        )
-        .mapValues(\.count)
-        let consistencyViolationCounts = recentTraces
-            .compactMap(\.consistencyCheck)
-            .flatMap(\.violations)
-            .reduce(into: [BASConsistencyViolationKind: Int]()) { partialResult, violation in
-                partialResult[violation.kind, default: 0] += 1
-            }
+        DecisionTestingRuntimeSummary(basSummary: basRuntimeInspectionSummary)
+    }
 
-        return DecisionTestingRuntimeSummary(
-            activeProvider: runtimeSnapshot.runtimeStatus.active,
-            fallbackProvider: runtimeSnapshot.runtimeStatus.fallback,
-            runtimeGear: adaptationMatrix.runtimeGear,
-            environmentClass: adaptationMatrix.environmentClass,
-            deviceClass: adaptationMatrix.deviceClass,
-            languageMode: adaptationMatrix.languageMode,
-            taskEntropyByKind: strategyMap(\.entropy),
-            runtimeGearByKind: strategyMap(\.runtimeGear),
-            preferredProviderByKind: strategyMap(\.preferredProvider),
-            allowsModelInvocationByKind: strategyMap(\.allowsModelInvocation),
-            contextBudgetByKind: strategyMap(\.contextBudget),
-            outputCharacterBudgetByKind: strategyMap(\.outputCharacterBudget),
-            timeBudgetMsByKind: strategyMap(\.timeBudgetMs),
-            toolCallBudgetByKind: strategyMap(\.toolCallBudget),
-            retrievalItemBudgetByKind: strategyMap(\.retrievalItemBudget),
-            retrievalModeByKind: strategyMap(\.retrievalMode),
-            thinkingModeByKind: strategyMap(\.thinkingMode),
-            outputModeByKind: strategyMap(\.outputMode),
-            toneByKind: strategyMap(\.tone),
-            actionSpaceByKind: strategyMap(\.actionSpace),
-            responseLanguageByKind: strategyMap(\.responseLanguage),
-            effectiveRuntimeGearByKind: effectiveStrategyMap(\.runtimeGear),
-            effectivePreferredProviderByKind: effectiveStrategyMap(\.preferredProvider),
-            effectiveContextBudgetByKind: effectiveStrategyMap(\.contextBudget),
-            effectiveOutputCharacterBudgetByKind: effectiveStrategyMap(\.outputCharacterBudget),
-            effectiveTimeBudgetMsByKind: effectiveStrategyMap(\.timeBudgetMs),
-            effectiveToolCallBudgetByKind: effectiveStrategyMap(\.toolCallBudget),
-            effectiveRetrievalItemBudgetByKind: effectiveStrategyMap(\.retrievalItemBudget),
-            effectiveRetrievalModeByKind: effectiveStrategyMap(\.retrievalMode),
-            effectiveThinkingModeByKind: effectiveStrategyMap(\.thinkingMode),
-            effectiveOutputModeByKind: effectiveStrategyMap(\.outputMode),
-            effectiveToneByKind: effectiveStrategyMap(\.tone),
-            effectiveActionSpaceByKind: effectiveStrategyMap(\.actionSpace),
-            effectiveResponseLanguageByKind: effectiveStrategyMap(\.responseLanguage),
-            firstAttemptedProviderByKind: firstAttemptedProviderByKind,
-            effectiveProviderOrderByKind: effectiveProviderOrderByKind,
-            totalRequests: intelligenceTelemetry.totalRequests,
-            totalProviderAttempts: intelligenceTelemetry.totalProviderAttempts,
-            cacheHitRate: intelligenceTelemetry.cacheHitRate,
-            admissionSkipRate: intelligenceTelemetry.admissionSkipRate,
-            providerBypassRate: intelligenceTelemetry.providerBypassRate,
-            providerBypassRateByKind: intelligenceTelemetry.providerBypassRateByKind,
-            lowPressureModelCallRate: intelligenceTelemetry.lowPressureModelCallRate,
-            lowPressureModelCallRateByKind: intelligenceTelemetry.lowPressureModelCallRateByKind,
-            avoidableModelCallRate: intelligenceTelemetry.avoidableModelCallRate,
-            avoidableModelCallRateByKind: intelligenceTelemetry.avoidableModelCallRateByKind,
-            reminderRequestCount: intelligenceTelemetry.requestCountByKind[.reminder] ?? 0,
-            reminderKnowledgeNeedRate: intelligenceTelemetry.reminderKnowledgeNeedRate,
-            reminderControlOnlyRate: intelligenceTelemetry.reminderControlOnlyRate,
-            reminderRetrievalBypassRate: intelligenceTelemetry.reminderRetrievalBypassRate,
-            deterministicFallbackRate: intelligenceTelemetry.deterministicFallbackRate,
-            averageRequestDurationMs: intelligenceTelemetry.averageRequestDurationMs,
-            averageRequestDurationMsByKind: intelligenceTelemetry.averageRequestDurationMsByKind,
-            averageFirstPresentableMs: intelligenceTelemetry.averageFirstPresentableMs,
-            averageFirstPresentableMsByKind: intelligenceTelemetry.averageFirstPresentableMsByKind,
-            averagePromptAssemblyMsByKind: intelligenceTelemetry.averagePromptAssemblyMsByKind,
-            averageAdmissionEvaluationMsByKind: intelligenceTelemetry.averageAdmissionEvaluationMsByKind,
-            averageProviderSelectionMsByKind: intelligenceTelemetry.averageProviderSelectionMsByKind,
-            averageExecutionMsByKind: intelligenceTelemetry.averageExecutionMsByKind,
-            averagePrefillEquivalentShareByKind: intelligenceTelemetry.averagePrefillEquivalentShareByKind,
-            averageRequestDurationMsByProvider: intelligenceTelemetry.averageRequestDurationMsByActiveProvider,
-            averageRequestDurationMsByGemmaBackend: intelligenceTelemetry.averageRequestDurationMsByGemmaBackend,
-            averagePromptCharactersByKind: intelligenceTelemetry.averagePromptCharactersByKind,
-            averagePrefixCharactersByKind: intelligenceTelemetry.averagePrefixCharactersByKind,
-            averageImmutablePrefixCharactersByKind: intelligenceTelemetry.averageImmutablePrefixCharactersByKind,
-            averageAdaptivePrefixCharactersByKind: intelligenceTelemetry.averageAdaptivePrefixCharactersByKind,
-            averageSuffixCharactersByKind: intelligenceTelemetry.averageSuffixCharactersByKind,
-            averageStablePrefixShareByKind: intelligenceTelemetry.averageStablePrefixShareByKind,
-            semanticPromptVariantCountByKind: semanticPromptVariantCountByKind,
-            semanticPromptReuseRateByKind: semanticPromptReuseRateByKind,
-            stablePrefixVariantCountByKind: stablePrefixVariantCountByKind,
-            stablePrefixReuseRateByKind: stablePrefixReuseRateByKind,
-            stablePrefixPollutionRateByKind: stablePrefixPollutionRateByKind,
-            slowRequestRate: intelligenceTelemetry.slowRequestRate,
-            slowRequestRateByKind: intelligenceTelemetry.slowRequestRateByKind,
-            overTimeBudgetRate: intelligenceTelemetry.overTimeBudgetRate,
-            overTimeBudgetRateByKind: intelligenceTelemetry.overTimeBudgetRateByKind,
-            overTargetBudgetRate: intelligenceTelemetry.overTargetBudgetRate,
-            fallbackActivations: intelligenceTelemetry.fallbackActivations,
-            admissionSkipCount: intelligenceTelemetry.outcomeCount[.admissionSkipped] ?? 0,
-            contextAwareTraceCount: lifecycleSummary.contextAwareTraceCount,
-            lifecycleRebuildCount: lifecycleSummary.rebuildCount,
-            staleFieldDropCount: lifecycleSummary.staleFieldDropCount,
-            retainedEvidenceCount: lifecycleSummary.retainedEvidenceCount,
-            evidenceRetentionRatio: evidenceRetentionRatio,
-            droppedEvidenceCount: lifecycleSummary.droppedEvidenceCount,
-            droppedInjectedEvidenceCount: lifecycleSummary.droppedInjectedEvidenceCount,
-            droppedDuplicateEvidenceCount: lifecycleSummary.droppedDuplicateEvidenceCount,
-            droppedBudgetEvidenceCount: lifecycleSummary.droppedBudgetEvidenceCount,
-            evidencePollutionRate: evidencePollutionRate,
-            evidencePollutionRateByKind: evidencePollutionRateByKind,
-            duplicateEvidenceDropRate: duplicateEvidenceDropRate,
-            duplicateEvidenceDropRateByKind: duplicateEvidenceDropRateByKind,
-            budgetTrimRate: budgetTrimRate,
-            budgetTrimRateByKind: budgetTrimRateByKind,
-            neuralTraceCount: neuralSummary.neuralTraceCount,
-            suppressedBehaviorCount: neuralSummary.suppressedBehaviorCount,
-            brainTraceCount: brainSummary.brainTraceCount,
-            dominantReactionWeightByKind: brainSummary.dominantReactionWeightByKind,
-            loadedEligibilityReasonCountsByKind: brainSummary.loadedEligibilityReasonCountsByKind,
-            screenedOutEligibilityReasonCountsByKind: brainSummary.screenedOutEligibilityReasonCountsByKind,
-            pendingMemoryLoadRateByKind: brainSummary.pendingMemoryLoadRateByKind,
-            retrievalRejectionRateByKind: brainSummary.retrievalRejectionRateByKind,
-            brainSnapshotFingerprintByKind: brainSummary.latestSnapshotFingerprintByKind,
-            brainSnapshotVariantCountByKind: brainSummary.snapshotVariantCountByKind,
-            lowTrustMemoryLoadRateByKind: brainSummary.lowTrustMemoryLoadRateByKind,
-            brainRiskFlagCountsByKind: brainSummary.riskFlagCountsByKind,
-            identityRoleByKind: brainSummary.identityRoleByKind,
-            boundaryModeByKind: brainSummary.boundaryModeByKind,
-            boundaryConstraintCountsByKind: brainSummary.boundaryConstraintCountsByKind,
-            calibrationStatusByKind: brainSummary.calibrationStatusByKind,
-            calibrationAlertCountsByKind: brainSummary.calibrationAlertCountsByKind,
-            evolutionCheckpointCountByKind: brainSummary.evolutionCheckpointCountByKind,
-            evolutionPendingReviewCountByKind: brainSummary.evolutionPendingReviewCountByKind,
-            evolutionRollbackReadyByKind: brainSummary.evolutionRollbackReadyByKind,
-            traceCount: recentTraces.count,
-            replayCount: recentReplay.count,
-            totalCacheEntries: cacheTelemetry.entryCountByKind.values.reduce(0, +),
-            totalCacheRejectedStores: cacheTelemetry.totalRejectedStores,
-            totalCacheQuarantinedHits: cacheTelemetry.totalQuarantinedHits,
-            cacheQuarantineRate: rate(
-                numerator: cacheTelemetry.totalQuarantinedHits,
-                denominator: cacheTelemetry.totalHits + cacheTelemetry.totalMisses
-            ),
-            dominantGemmaBackend: dominantGemmaBackend,
-            registeredProviderCount: registeredProviders.count,
-            registeredOpenModelProviderCount: registeredProviders.filter { $0.track == .builtInOpenModel }.count,
-            circuitOpenProviderCount: circuitBreakerSnapshot.activeProviders.count,
-            activeCircuitProviders: circuitBreakerSnapshot.activeProviders,
-            circuitTripCount: circuitBreakerSnapshot.totalTripCount,
-            circuitTripCountByProvider: circuitBreakerSnapshot.totalTripCountByProvider,
-            circuitTripCountByReason: circuitBreakerSnapshot.totalTripCountByReason,
-            consistencyCheckedTraceCount: consistencyCheckedTraceCount,
-            consistencyRejectedTraceCount: consistencyRejectedTraceCount,
-            consistencyCheckCoverageRate: rate(
-                numerator: consistencyCheckedTraceCount,
-                denominator: recentTraces.count
-            ),
-            consistencyRejectRate: rate(
-                numerator: consistencyRejectedTraceCount,
-                denominator: consistencyCheckedTraceCount
-            ),
-            consistencyRejectedCountByKind: consistencyRejectedCountByKind,
-            consistencyViolationCounts: consistencyViolationCounts
-        )
+    private var basLifecycleSummary: BASLifecycleSummary {
+        BASLifecycleSummaryBuilder.build(from: lifecycleTraceInputs)
+    }
+
+    private var basNeuralSummary: BASNeuralSummary {
+        BASNeuralSummaryBuilder.build(from: neuralTraceInputs)
+    }
+
+    private var basBrainSummary: BASBrainSummary {
+        BASBrainSummaryBuilder.build(from: brainTraceInputs)
+    }
+
+    private var basRuntimeInspectionSummary: BASRuntimeInspectionSummary {
+        BASRuntimeInspectionBuilder.build(from: basRuntimeInspectionInput)
     }
 
     private var lifecycleTraceInputs: [BASLifecycleTraceInput] {
@@ -305,6 +109,74 @@ struct DecisionTestingRuntimeExport {
                 evolutionRollbackReady: brainState.evolutionState.rollbackReady
             )
         }
+    }
+
+    private var runtimeInspectionTraceInputs: [BASRuntimeInspectionTraceInput] {
+        recentTraces.map { trace in
+            BASRuntimeInspectionTraceInput(
+                kind: trace.kind.rawValue,
+                attemptedProviderIDs: trace.attemptedProviders.map(\.rawValue),
+                runtimeStrategy: trace.runtimeStrategy.map(substrateAdaptiveStrategy),
+                semanticPromptFingerprint: trace.semanticPromptFingerprint,
+                stablePrefixFingerprint: trace.stablePrefixFingerprint,
+                consistencyChecked: trace.consistencyCheck != nil,
+                consistencyRejected: trace.consistencyRejected,
+                consistencyViolationKinds: trace.consistencyCheck?.violations.map(\.kind) ?? []
+            )
+        }
+    }
+
+    private var basRuntimeInspectionInput: BASRuntimeInspectionInput {
+        let adaptationMatrix = runtimeSnapshot.executionProfile.adaptationMatrix
+
+        return BASRuntimeInspectionInput(
+            activeProviderID: runtimeSnapshot.runtimeStatus.active.rawValue,
+            fallbackProviderID: runtimeSnapshot.runtimeStatus.fallback?.rawValue,
+            runtimeGear: BASRuntimeGear(rawValue: adaptationMatrix.runtimeGear.rawValue) ?? .balanced,
+            environmentClass: BASEnvironmentClass(rawValue: adaptationMatrix.environmentClass.rawValue) ?? .normal,
+            deviceClass: BASDevicePerformanceClass(rawValue: adaptationMatrix.deviceClass.rawValue) ?? .balancedPhone,
+            languageMode: BASLanguageMode(rawValue: adaptationMatrix.languageMode.rawValue) ?? .unknown,
+            taskEntropyByKind: adaptationMatrix.strategiesByKind.reduce(into: [:]) { partialResult, item in
+                partialResult[item.key.rawValue] = BASTaskEntropyClass(rawValue: item.value.entropy.rawValue) ?? .medium
+            },
+            preferredProviderRawValueByKind: adaptationMatrix.strategiesByKind.reduce(into: [:]) { partialResult, item in
+                partialResult[item.key.rawValue] = item.value.preferredProvider.rawValue
+            },
+            strategyByKind: adaptationMatrix.strategiesByKind.reduce(into: [:]) { partialResult, item in
+                partialResult[item.key.rawValue] = substrateAdaptiveStrategy(item.value)
+            },
+            effectivePreferredProviderRawValueByKind: Dictionary(
+                grouping: recentTraces.compactMap { trace in
+                    trace.runtimeStrategy.map { (trace.kind.rawValue, $0.preferredProvider.rawValue) }
+                },
+                by: \.0
+            )
+            .compactMapValues { grouped in
+                grouped.first?.1
+            },
+            traceInputs: runtimeInspectionTraceInputs,
+            telemetrySummary: intelligenceTelemetry.substrateSummary,
+            lifecycleSummary: basLifecycleSummary,
+            neuralSummary: basNeuralSummary,
+            brainSummary: basBrainSummary,
+            totalCacheEntries: cacheTelemetry.entryCountByKind.values.reduce(0, +),
+            totalCacheLookupCount: cacheTelemetry.totalHits + cacheTelemetry.totalMisses,
+            totalCacheRejectedStores: cacheTelemetry.totalRejectedStores,
+            totalCacheQuarantinedHits: cacheTelemetry.totalQuarantinedHits,
+            dominantBackendID: dominantGemmaBackend?.rawValue,
+            registeredProviderCount: registeredProviders.count,
+            registeredOpenModelProviderCount: registeredProviders.filter { $0.track == .builtInOpenModel }.count,
+            activeCircuitProviderIDs: circuitBreakerSnapshot.activeProviders.map(\.rawValue),
+            circuitTripCount: circuitBreakerSnapshot.totalTripCount,
+            circuitTripCountByProvider: circuitBreakerSnapshot.totalTripCountByProvider.reduce(into: [:]) { partialResult, item in
+                partialResult[item.key.rawValue] = item.value
+            },
+            circuitTripCountByReason: circuitBreakerSnapshot.totalTripCountByReason.reduce(into: [:]) { partialResult, item in
+                partialResult[item.key.rawValue] = item.value
+            },
+            traceCount: recentTraces.count,
+            replayCount: recentReplay.count
+        )
     }
 
     private var dominantGemmaBackend: InferenceBackendKind? {
@@ -644,6 +516,138 @@ struct DecisionTestingRuntimeExport {
             partialResult[kind] = mappedValue
         }
     }
+
+    private func substrateAdaptiveStrategy(
+        _ strategy: DecisionAdaptiveTaskStrategy
+    ) -> BASAdaptiveTaskStrategy {
+        BASAdaptiveTaskStrategy(
+            kind: substrateTraceKind(strategy.kind),
+            entropy: substrateTaskEntropy(strategy.entropy),
+            runtimeGear: substrateRuntimeGear(strategy.runtimeGear),
+            contextBudget: strategy.contextBudget,
+            outputCharacterBudget: strategy.outputCharacterBudget,
+            timeBudgetMs: strategy.timeBudgetMs,
+            toolCallBudget: strategy.toolCallBudget,
+            retrievalItemBudget: strategy.retrievalItemBudget,
+            retrievalMode: substrateRetrievalMode(strategy.retrievalMode),
+            thinkingMode: substrateThinkingMode(strategy.thinkingMode),
+            outputMode: substrateOutputMode(strategy.outputMode),
+            tone: substrateTone(strategy.tone),
+            actionSpace: strategy.actionSpace,
+            responseLanguage: substrateResponseLanguage(strategy.responseLanguage),
+            allowsModelInvocation: strategy.allowsModelInvocation
+        )
+    }
+
+    private func substrateTraceKind(
+        _ kind: DecisionIntelligenceTraceKind
+    ) -> BASAdaptiveTraceKind {
+        switch kind {
+        case .quick:
+            .quick
+        case .balance:
+            .balance
+        case .mirror:
+            .mirror
+        case .reminder:
+            .reminder
+        }
+    }
+
+    private func substrateTaskEntropy(
+        _ entropy: DecisionTaskEntropyClass
+    ) -> BASTaskEntropyClass {
+        switch entropy {
+        case .low:
+            .low
+        case .medium:
+            .medium
+        case .high:
+            .high
+        }
+    }
+
+    private func substrateRuntimeGear(
+        _ gear: DecisionRuntimeGear
+    ) -> BASRuntimeGear {
+        switch gear {
+        case .low:
+            .low
+        case .balanced:
+            .balanced
+        case .high:
+            .high
+        }
+    }
+
+    private func substrateRetrievalMode(
+        _ mode: DecisionRetrievalMode
+    ) -> BASRetrievalMode {
+        switch mode {
+        case .off:
+            .off
+        case .filtered:
+            .filtered
+        case .adaptive:
+            .adaptive
+        }
+    }
+
+    private func substrateThinkingMode(
+        _ mode: DecisionThinkingMode
+    ) -> BASThinkingMode {
+        switch mode {
+        case .off:
+            .off
+        case .gated:
+            .gated
+        }
+    }
+
+    private func substrateOutputMode(
+        _ mode: DecisionOutputMode
+    ) -> BASOutputMode {
+        switch mode {
+        case .deterministicTemplate:
+            .deterministicTemplate
+        case .guidedShort:
+            .guidedShort
+        case .structuredBoard:
+            .structuredBoard
+        case .reflectiveStructured:
+            .reflectiveStructured
+        case .jsonShort:
+            .jsonShort
+        }
+    }
+
+    private func substrateTone(
+        _ tone: DecisionToneProfile
+    ) -> BASToneProfile {
+        switch tone {
+        case .neutral:
+            .neutral
+        case .briefWarm:
+            .briefWarm
+        case .groundedDirect:
+            .groundedDirect
+        case .reflectiveClear:
+            .reflectiveClear
+        }
+    }
+
+    private func substrateResponseLanguage(
+        _ responseLanguage: DecisionAdaptiveResponseLanguage
+    ) -> BASAdaptiveResponseLanguage {
+        switch responseLanguage {
+        case .english:
+            .english
+        case .chinese:
+            .chinese
+        case .mixed:
+            .mixed
+        }
+    }
 }
 
 struct DecisionTestingLifecycleSummary: Equatable, Sendable {
@@ -838,4 +842,316 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let consistencyRejectRate: Double
     let consistencyRejectedCountByKind: [DecisionIntelligenceTraceKind: Int]
     let consistencyViolationCounts: [BASConsistencyViolationKind: Int]
+}
+
+private extension DecisionTestingLifecycleSummary {
+    init(basSummary: BASLifecycleSummary) {
+        self.init(
+            contextAwareTraceCount: basSummary.contextAwareTraceCount,
+            rebuildCount: basSummary.rebuildCount,
+            rebuildCountByKind: mapTraceKindDictionary(basSummary.rebuildCountByKind),
+            staleFieldDropCount: basSummary.staleFieldDropCount,
+            staleFieldDropCountByKind: mapTraceKindDictionary(basSummary.staleFieldDropCountByKind),
+            retainedEvidenceCount: basSummary.retainedEvidenceCount,
+            droppedEvidenceCount: basSummary.droppedEvidenceCount,
+            droppedEvidenceCountByKind: mapTraceKindDictionary(basSummary.droppedEvidenceCountByKind),
+            droppedInjectedEvidenceCount: basSummary.droppedInjectedEvidenceCount,
+            droppedInjectedEvidenceCountByKind: mapTraceKindDictionary(basSummary.droppedInjectedEvidenceCountByKind),
+            droppedDuplicateEvidenceCount: basSummary.droppedDuplicateEvidenceCount,
+            droppedDuplicateEvidenceCountByKind: mapTraceKindDictionary(basSummary.droppedDuplicateEvidenceCountByKind),
+            droppedBudgetEvidenceCount: basSummary.droppedBudgetEvidenceCount,
+            droppedBudgetEvidenceCountByKind: mapTraceKindDictionary(basSummary.droppedBudgetEvidenceCountByKind),
+            averageRetainedEvidenceCountByKind: mapTraceKindDictionary(basSummary.averageRetainedEvidenceCountByKind),
+            averageAnchorFieldCountByKind: mapTraceKindDictionary(basSummary.averageAnchorFieldCountByKind),
+            latestGenerationByKind: mapTraceKindDictionary(basSummary.latestGenerationByKind)
+        )
+    }
+}
+
+private extension DecisionTestingNeuralSummary {
+    init(basSummary: BASNeuralSummary) {
+        self.init(
+            neuralTraceCount: basSummary.neuralTraceCount,
+            suppressedBehaviorCount: basSummary.suppressedBehaviorCount,
+            dominantActionByKind: mapTraceKindDictionary(basSummary.dominantActionByKind) {
+                DecisionActionRoute(rawValue: $0)
+            },
+            strongestSignalByKind: mapTraceKindDictionary(basSummary.strongestSignalByKind) {
+                DecisionNeuralSignal(rawValue: $0)
+            }
+        )
+    }
+}
+
+private extension DecisionTestingBrainSummary {
+    init(basSummary: BASBrainSummary) {
+        self.init(
+            brainTraceCount: basSummary.brainTraceCount,
+            dominantReactionWeightByKind: mapTraceKindDictionary(basSummary.dominantReactionWeightByKind) {
+                DecisionReactionWeightKey(rawValue: $0.rawValue)
+            },
+            averageProfileCoreCountByKind: mapTraceKindDictionary(basSummary.averageProfileCoreCountByKind),
+            averageActiveGoalCountByKind: mapTraceKindDictionary(basSummary.averageActiveGoalCountByKind),
+            averageRelevantMemoryCountByKind: mapTraceKindDictionary(basSummary.averageRelevantMemoryCountByKind),
+            averageLoadedPromotedMemoryCountByKind: mapTraceKindDictionary(basSummary.averageLoadedPromotedMemoryCountByKind),
+            averageLoadedPendingMemoryCountByKind: mapTraceKindDictionary(basSummary.averageLoadedPendingMemoryCountByKind),
+            averagePendingCandidateCountByKind: mapTraceKindDictionary(basSummary.averagePendingCandidateCountByKind),
+            averagePromotedRecordCountByKind: mapTraceKindDictionary(basSummary.averagePromotedRecordCountByKind),
+            averageScreenedOutMemoryCountByKind: mapTraceKindDictionary(basSummary.averageScreenedOutMemoryCountByKind),
+            loadedEligibilityReasonCountsByKind: mapTraceKindDictionary(basSummary.loadedEligibilityReasonCountsByKind),
+            screenedOutEligibilityReasonCountsByKind: mapTraceKindDictionary(basSummary.screenedOutEligibilityReasonCountsByKind),
+            pendingMemoryLoadRateByKind: mapTraceKindDictionary(basSummary.pendingMemoryLoadRateByKind),
+            retrievalRejectionRateByKind: mapTraceKindDictionary(basSummary.retrievalRejectionRateByKind),
+            latestSnapshotFingerprintByKind: mapTraceKindDictionary(basSummary.latestSnapshotFingerprintByKind),
+            snapshotVariantCountByKind: mapTraceKindDictionary(basSummary.snapshotVariantCountByKind),
+            lowTrustMemoryLoadRateByKind: mapTraceKindDictionary(basSummary.lowTrustMemoryLoadRateByKind),
+            riskFlagCountsByKind: mapTraceKindDictionary(basSummary.riskFlagCountsByKind),
+            identityRoleByKind: mapTraceKindDictionary(basSummary.identityRoleByKind) {
+                DecisionIdentityRole(rawValue: $0.rawValue)
+            },
+            boundaryModeByKind: mapTraceKindDictionary(basSummary.boundaryModeByKind) {
+                DecisionBoundaryPolicyMode(rawValue: $0.rawValue)
+            },
+            boundaryConstraintCountsByKind: mapTraceKindDictionary(basSummary.boundaryConstraintCountsByKind),
+            calibrationStatusByKind: mapTraceKindDictionary(basSummary.calibrationStatusByKind) {
+                DecisionCalibrationStatus(rawValue: $0.rawValue)
+            },
+            calibrationAlertCountsByKind: mapTraceKindDictionary(basSummary.calibrationAlertCountsByKind),
+            evolutionCheckpointCountByKind: mapTraceKindDictionary(basSummary.evolutionCheckpointCountByKind),
+            evolutionPendingReviewCountByKind: mapTraceKindDictionary(basSummary.evolutionPendingReviewCountByKind),
+            evolutionRollbackReadyByKind: mapTraceKindDictionary(basSummary.evolutionRollbackReadyByKind)
+        )
+    }
+}
+
+private extension DecisionTestingRuntimeSummary {
+    init(basSummary: BASRuntimeInspectionSummary) {
+        self.init(
+            activeProvider: DecisionModelProviderKind(rawValue: basSummary.activeProviderID) ?? .template,
+            fallbackProvider: basSummary.fallbackProviderID.flatMap(DecisionModelProviderKind.init(rawValue:)),
+            runtimeGear: DecisionRuntimeGear(rawValue: basSummary.runtimeGear.rawValue) ?? .balanced,
+            environmentClass: DecisionEnvironmentClass(rawValue: basSummary.environmentClass.rawValue) ?? .normal,
+            deviceClass: DecisionDevicePerformanceClass(rawValue: basSummary.deviceClass.rawValue) ?? .balancedPhone,
+            languageMode: DecisionLanguageMode(rawValue: basSummary.languageMode.rawValue) ?? .unknown,
+            taskEntropyByKind: mapTraceKindDictionary(basSummary.taskEntropyByKind) {
+                DecisionTaskEntropyClass(rawValue: $0.rawValue)
+            },
+            runtimeGearByKind: mapTraceKindDictionary(basSummary.runtimeGearByKind) {
+                DecisionRuntimeGear(rawValue: $0.rawValue)
+            },
+            preferredProviderByKind: mapTraceKindDictionary(basSummary.preferredProviderRawValueByKind) {
+                DecisionModelProviderPreference(rawValue: $0)
+            },
+            allowsModelInvocationByKind: mapTraceKindDictionary(basSummary.allowsModelInvocationByKind),
+            contextBudgetByKind: mapTraceKindDictionary(basSummary.contextBudgetByKind),
+            outputCharacterBudgetByKind: mapTraceKindDictionary(basSummary.outputCharacterBudgetByKind),
+            timeBudgetMsByKind: mapTraceKindDictionary(basSummary.timeBudgetMsByKind),
+            toolCallBudgetByKind: mapTraceKindDictionary(basSummary.toolCallBudgetByKind),
+            retrievalItemBudgetByKind: mapTraceKindDictionary(basSummary.retrievalItemBudgetByKind),
+            retrievalModeByKind: mapTraceKindDictionary(basSummary.retrievalModeByKind) {
+                DecisionRetrievalMode(rawValue: $0.rawValue)
+            },
+            thinkingModeByKind: mapTraceKindDictionary(basSummary.thinkingModeByKind) {
+                DecisionThinkingMode(rawValue: $0.rawValue)
+            },
+            outputModeByKind: mapTraceKindDictionary(basSummary.outputModeByKind) {
+                DecisionOutputMode(rawValue: $0.rawValue)
+            },
+            toneByKind: mapTraceKindDictionary(basSummary.toneByKind) {
+                DecisionToneProfile(rawValue: $0.rawValue)
+            },
+            actionSpaceByKind: mapTraceKindDictionary(basSummary.actionSpaceByKind),
+            responseLanguageByKind: mapTraceKindDictionary(basSummary.responseLanguageByKind) {
+                DecisionAdaptiveResponseLanguage(rawValue: $0.rawValue)
+            },
+            effectiveRuntimeGearByKind: mapTraceKindDictionary(basSummary.effectiveRuntimeGearByKind) {
+                DecisionRuntimeGear(rawValue: $0.rawValue)
+            },
+            effectivePreferredProviderByKind: mapTraceKindDictionary(basSummary.effectivePreferredProviderRawValueByKind) {
+                DecisionModelProviderPreference(rawValue: $0)
+            },
+            effectiveContextBudgetByKind: mapTraceKindDictionary(basSummary.effectiveContextBudgetByKind),
+            effectiveOutputCharacterBudgetByKind: mapTraceKindDictionary(basSummary.effectiveOutputCharacterBudgetByKind),
+            effectiveTimeBudgetMsByKind: mapTraceKindDictionary(basSummary.effectiveTimeBudgetMsByKind),
+            effectiveToolCallBudgetByKind: mapTraceKindDictionary(basSummary.effectiveToolCallBudgetByKind),
+            effectiveRetrievalItemBudgetByKind: mapTraceKindDictionary(basSummary.effectiveRetrievalItemBudgetByKind),
+            effectiveRetrievalModeByKind: mapTraceKindDictionary(basSummary.effectiveRetrievalModeByKind) {
+                DecisionRetrievalMode(rawValue: $0.rawValue)
+            },
+            effectiveThinkingModeByKind: mapTraceKindDictionary(basSummary.effectiveThinkingModeByKind) {
+                DecisionThinkingMode(rawValue: $0.rawValue)
+            },
+            effectiveOutputModeByKind: mapTraceKindDictionary(basSummary.effectiveOutputModeByKind) {
+                DecisionOutputMode(rawValue: $0.rawValue)
+            },
+            effectiveToneByKind: mapTraceKindDictionary(basSummary.effectiveToneByKind) {
+                DecisionToneProfile(rawValue: $0.rawValue)
+            },
+            effectiveActionSpaceByKind: mapTraceKindDictionary(basSummary.effectiveActionSpaceByKind),
+            effectiveResponseLanguageByKind: mapTraceKindDictionary(basSummary.effectiveResponseLanguageByKind) {
+                DecisionAdaptiveResponseLanguage(rawValue: $0.rawValue)
+            },
+            firstAttemptedProviderByKind: mapTraceKindDictionary(basSummary.firstAttemptedProviderByKind) {
+                DecisionModelProviderKind(rawValue: $0)
+            },
+            effectiveProviderOrderByKind: mapTraceKindDictionary(basSummary.effectiveProviderOrderByKind) { values in
+                values.compactMap(DecisionModelProviderKind.init(rawValue:))
+            },
+            totalRequests: basSummary.totalRequests,
+            totalProviderAttempts: basSummary.totalProviderAttempts,
+            cacheHitRate: basSummary.cacheHitRate,
+            admissionSkipRate: basSummary.admissionSkipRate,
+            providerBypassRate: basSummary.providerBypassRate,
+            providerBypassRateByKind: mapTraceKindDictionary(basSummary.providerBypassRateByKind),
+            lowPressureModelCallRate: basSummary.lowPressureModelCallRate,
+            lowPressureModelCallRateByKind: mapTraceKindDictionary(basSummary.lowPressureModelCallRateByKind),
+            avoidableModelCallRate: basSummary.avoidableModelCallRate,
+            avoidableModelCallRateByKind: mapTraceKindDictionary(basSummary.avoidableModelCallRateByKind),
+            reminderRequestCount: basSummary.reminderRequestCount,
+            reminderKnowledgeNeedRate: basSummary.reminderKnowledgeNeedRate,
+            reminderControlOnlyRate: basSummary.reminderControlOnlyRate,
+            reminderRetrievalBypassRate: basSummary.reminderRetrievalBypassRate,
+            deterministicFallbackRate: basSummary.deterministicFallbackRate,
+            averageRequestDurationMs: basSummary.averageRequestDurationMs,
+            averageRequestDurationMsByKind: mapTraceKindDictionary(basSummary.averageRequestDurationMsByKind),
+            averageFirstPresentableMs: basSummary.averageFirstPresentableMs,
+            averageFirstPresentableMsByKind: mapTraceKindDictionary(basSummary.averageFirstPresentableMsByKind),
+            averagePromptAssemblyMsByKind: mapTraceKindDictionary(basSummary.averagePromptAssemblyMsByKind),
+            averageAdmissionEvaluationMsByKind: mapTraceKindDictionary(basSummary.averageAdmissionEvaluationMsByKind),
+            averageProviderSelectionMsByKind: mapTraceKindDictionary(basSummary.averageProviderSelectionMsByKind),
+            averageExecutionMsByKind: mapTraceKindDictionary(basSummary.averageExecutionMsByKind),
+            averagePrefillEquivalentShareByKind: mapTraceKindDictionary(basSummary.averagePrefillEquivalentShareByKind),
+            averageRequestDurationMsByProvider: mapProviderKindDictionary(basSummary.averageRequestDurationMsByActiveProvider),
+            averageRequestDurationMsByGemmaBackend: mapBackendKindDictionary(basSummary.averageRequestDurationMsByBackend),
+            averagePromptCharactersByKind: mapTraceKindDictionary(basSummary.averagePromptCharactersByKind),
+            averagePrefixCharactersByKind: mapTraceKindDictionary(basSummary.averagePrefixCharactersByKind),
+            averageImmutablePrefixCharactersByKind: mapTraceKindDictionary(basSummary.averageImmutablePrefixCharactersByKind),
+            averageAdaptivePrefixCharactersByKind: mapTraceKindDictionary(basSummary.averageAdaptivePrefixCharactersByKind),
+            averageSuffixCharactersByKind: mapTraceKindDictionary(basSummary.averageSuffixCharactersByKind),
+            averageStablePrefixShareByKind: mapTraceKindDictionary(basSummary.averageStablePrefixShareByKind),
+            semanticPromptVariantCountByKind: mapTraceKindDictionary(basSummary.semanticPromptVariantCountByKind),
+            semanticPromptReuseRateByKind: mapTraceKindDictionary(basSummary.semanticPromptReuseRateByKind),
+            stablePrefixVariantCountByKind: mapTraceKindDictionary(basSummary.stablePrefixVariantCountByKind),
+            stablePrefixReuseRateByKind: mapTraceKindDictionary(basSummary.stablePrefixReuseRateByKind),
+            stablePrefixPollutionRateByKind: mapTraceKindDictionary(basSummary.stablePrefixPollutionRateByKind),
+            slowRequestRate: basSummary.slowRequestRate,
+            slowRequestRateByKind: mapTraceKindDictionary(basSummary.slowRequestRateByKind),
+            overTimeBudgetRate: basSummary.overTimeBudgetRate,
+            overTimeBudgetRateByKind: mapTraceKindDictionary(basSummary.overTimeBudgetRateByKind),
+            overTargetBudgetRate: basSummary.overTargetBudgetRate,
+            fallbackActivations: basSummary.fallbackActivations,
+            admissionSkipCount: basSummary.admissionSkipCount,
+            contextAwareTraceCount: basSummary.contextAwareTraceCount,
+            lifecycleRebuildCount: basSummary.lifecycleRebuildCount,
+            staleFieldDropCount: basSummary.staleFieldDropCount,
+            retainedEvidenceCount: basSummary.retainedEvidenceCount,
+            evidenceRetentionRatio: basSummary.evidenceRetentionRatio,
+            droppedEvidenceCount: basSummary.droppedEvidenceCount,
+            droppedInjectedEvidenceCount: basSummary.droppedInjectedEvidenceCount,
+            droppedDuplicateEvidenceCount: basSummary.droppedDuplicateEvidenceCount,
+            droppedBudgetEvidenceCount: basSummary.droppedBudgetEvidenceCount,
+            evidencePollutionRate: basSummary.evidencePollutionRate,
+            evidencePollutionRateByKind: mapTraceKindDictionary(basSummary.evidencePollutionRateByKind),
+            duplicateEvidenceDropRate: basSummary.duplicateEvidenceDropRate,
+            duplicateEvidenceDropRateByKind: mapTraceKindDictionary(basSummary.duplicateEvidenceDropRateByKind),
+            budgetTrimRate: basSummary.budgetTrimRate,
+            budgetTrimRateByKind: mapTraceKindDictionary(basSummary.budgetTrimRateByKind),
+            neuralTraceCount: basSummary.neuralTraceCount,
+            suppressedBehaviorCount: basSummary.suppressedBehaviorCount,
+            brainTraceCount: basSummary.brainTraceCount,
+            dominantReactionWeightByKind: mapTraceKindDictionary(basSummary.dominantReactionWeightByKind) {
+                DecisionReactionWeightKey(rawValue: $0.rawValue)
+            },
+            loadedEligibilityReasonCountsByKind: mapTraceKindDictionary(basSummary.loadedEligibilityReasonCountsByKind),
+            screenedOutEligibilityReasonCountsByKind: mapTraceKindDictionary(basSummary.screenedOutEligibilityReasonCountsByKind),
+            pendingMemoryLoadRateByKind: mapTraceKindDictionary(basSummary.pendingMemoryLoadRateByKind),
+            retrievalRejectionRateByKind: mapTraceKindDictionary(basSummary.retrievalRejectionRateByKind),
+            brainSnapshotFingerprintByKind: mapTraceKindDictionary(basSummary.brainSnapshotFingerprintByKind),
+            brainSnapshotVariantCountByKind: mapTraceKindDictionary(basSummary.brainSnapshotVariantCountByKind),
+            lowTrustMemoryLoadRateByKind: mapTraceKindDictionary(basSummary.lowTrustMemoryLoadRateByKind),
+            brainRiskFlagCountsByKind: mapTraceKindDictionary(basSummary.brainRiskFlagCountsByKind),
+            identityRoleByKind: mapTraceKindDictionary(basSummary.identityRoleByKind) {
+                DecisionIdentityRole(rawValue: $0.rawValue)
+            },
+            boundaryModeByKind: mapTraceKindDictionary(basSummary.boundaryModeByKind) {
+                DecisionBoundaryPolicyMode(rawValue: $0.rawValue)
+            },
+            boundaryConstraintCountsByKind: mapTraceKindDictionary(basSummary.boundaryConstraintCountsByKind),
+            calibrationStatusByKind: mapTraceKindDictionary(basSummary.calibrationStatusByKind) {
+                DecisionCalibrationStatus(rawValue: $0.rawValue)
+            },
+            calibrationAlertCountsByKind: mapTraceKindDictionary(basSummary.calibrationAlertCountsByKind),
+            evolutionCheckpointCountByKind: mapTraceKindDictionary(basSummary.evolutionCheckpointCountByKind),
+            evolutionPendingReviewCountByKind: mapTraceKindDictionary(basSummary.evolutionPendingReviewCountByKind),
+            evolutionRollbackReadyByKind: mapTraceKindDictionary(basSummary.evolutionRollbackReadyByKind),
+            traceCount: basSummary.traceCount,
+            replayCount: basSummary.replayCount,
+            totalCacheEntries: basSummary.totalCacheEntries,
+            totalCacheRejectedStores: basSummary.totalCacheRejectedStores,
+            totalCacheQuarantinedHits: basSummary.totalCacheQuarantinedHits,
+            cacheQuarantineRate: basSummary.cacheQuarantineRate,
+            dominantGemmaBackend: basSummary.dominantBackendID.flatMap(InferenceBackendKind.init(rawValue:)),
+            registeredProviderCount: basSummary.registeredProviderCount,
+            registeredOpenModelProviderCount: basSummary.registeredOpenModelProviderCount,
+            circuitOpenProviderCount: basSummary.circuitOpenProviderCount,
+            activeCircuitProviders: basSummary.activeCircuitProviderIDs.compactMap(DecisionModelProviderKind.init(rawValue:)),
+            circuitTripCount: basSummary.circuitTripCount,
+            circuitTripCountByProvider: mapProviderKindDictionary(basSummary.circuitTripCountByProvider),
+            circuitTripCountByReason: mapCircuitReasonDictionary(basSummary.circuitTripCountByReason),
+            consistencyCheckedTraceCount: basSummary.consistencyCheckedTraceCount,
+            consistencyRejectedTraceCount: basSummary.consistencyRejectedTraceCount,
+            consistencyCheckCoverageRate: basSummary.consistencyCheckCoverageRate,
+            consistencyRejectRate: basSummary.consistencyRejectRate,
+            consistencyRejectedCountByKind: mapTraceKindDictionary(basSummary.consistencyRejectedCountByKind),
+            consistencyViolationCounts: basSummary.consistencyViolationCounts
+        )
+    }
+}
+
+private func mapTraceKindDictionary<Value>(
+    _ values: [String: Value]
+) -> [DecisionIntelligenceTraceKind: Value] {
+    mapTraceKindDictionary(values) { $0 }
+}
+
+private func mapTraceKindDictionary<Input, Output>(
+    _ values: [String: Input],
+    transform: (Input) -> Output?
+) -> [DecisionIntelligenceTraceKind: Output] {
+    values.reduce(into: [:]) { partialResult, item in
+        guard
+            let kind = DecisionIntelligenceTraceKind(rawValue: item.key),
+            let mappedValue = transform(item.value)
+        else {
+            return
+        }
+        partialResult[kind] = mappedValue
+    }
+}
+
+private func mapProviderKindDictionary<Value>(
+    _ values: [String: Value]
+) -> [DecisionModelProviderKind: Value] {
+    values.reduce(into: [:]) { partialResult, item in
+        guard let provider = DecisionModelProviderKind(rawValue: item.key) else { return }
+        partialResult[provider] = item.value
+    }
+}
+
+private func mapBackendKindDictionary<Value>(
+    _ values: [String: Value]
+) -> [InferenceBackendKind: Value] {
+    values.reduce(into: [:]) { partialResult, item in
+        guard let backend = InferenceBackendKind(rawValue: item.key) else { return }
+        partialResult[backend] = item.value
+    }
+}
+
+private func mapCircuitReasonDictionary<Value>(
+    _ values: [String: Value]
+) -> [DecisionIntelligenceCircuitTripReason: Value] {
+    values.reduce(into: [:]) { partialResult, item in
+        guard let reason = DecisionIntelligenceCircuitTripReason(rawValue: item.key) else { return }
+        partialResult[reason] = item.value
+    }
 }

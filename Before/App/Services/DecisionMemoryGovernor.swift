@@ -15,101 +15,24 @@ enum DecisionMemoryGovernor {
         let reviewNow = drafts.map(\.lastConfirmedAt).max() ?? .now
         let existingRecords = fetchRecords(in: context)
         let existingCandidates = fetchCandidates(in: context)
+        let plan = BASMemoryReconciler.plan(
+            BASMemoryReconciliationRequest(
+                drafts: drafts.map(\.reconciliationDraftInput),
+                existingRecords: existingRecords.map(\.basSnapshot),
+                existingCandidates: existingCandidates.map(\.basSnapshot),
+                reviewNow: reviewNow
+            )
+        )
 
         var recordsByID = Dictionary(uniqueKeysWithValues: existingRecords.map { ($0.id, $0) })
         var candidatesByID = Dictionary(uniqueKeysWithValues: existingCandidates.map { ($0.id, $0) })
-        var seenDraftIDs = Set<String>()
 
-        for draft in drafts {
-            seenDraftIDs.insert(draft.id)
-
-            let fingerprint = draft.fingerprint
-            let assessment = assess(draft: draft)
-
-            if assessment.decision == .reject {
-                if let record = recordsByID[draft.id] {
-                    context.delete(record)
-                    recordsByID[draft.id] = nil
-                }
-                if let candidate = candidatesByID[draft.id] {
-                    context.delete(candidate)
-                    candidatesByID[draft.id] = nil
-                }
-                continue
-            }
-
-            let candidate = candidatesByID[draft.id] ?? makeCandidate(
-                from: draft,
-                fingerprint: fingerprint,
-                governanceAssessment: assessment
-            )
-            let isNewCandidate = candidatesByID[draft.id] == nil
-            let observedNewFingerprint = candidate.lastObservationFingerprint != fingerprint
-
-            if isNewCandidate {
-                context.insert(candidate)
-                candidatesByID[draft.id] = candidate
-            }
-
-            update(
-                candidate: candidate,
-                from: draft,
-                fingerprint: fingerprint,
-                observedNewFingerprint: observedNewFingerprint,
-                governanceAssessment: assessment
-            )
-
-            let shouldPromote = BASMemoryGovernance.shouldPromote(
-                policy: draft.promotionPolicy,
-                confirmationCount: candidate.confirmationCount,
-                evidenceCount: candidate.evidenceCount
-            )
-            let effectiveStatus: DecisionMemoryCandidateStatus =
-                assessment.decision == .deferred || !shouldPromote ? .pending : .promoted
-            candidate.statusRaw = effectiveStatus.rawValue
-
-            if effectiveStatus == .promoted, !draft.promotionPolicy.isCandidateOnly {
-                if let record = recordsByID[draft.id] {
-                    if applyRecordUpdateIfNeeded(record, from: draft, candidate: candidate) {
-                        candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation.update.rawValue
-                    } else {
-                        candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation.noop.rawValue
-                    }
-                } else {
-                    let record = draft.makeRecord(
-                        observationCount: candidate.confirmationCount,
-                        lifecycleState: .active,
-                        lastReviewedAt: reviewNow
-                    )
-                    context.insert(record)
-                    recordsByID[draft.id] = record
-                    candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation.add.rawValue
-                }
-            } else {
-                if let record = recordsByID[draft.id], draft.promotionPolicy.isCandidateOnly {
-                    context.delete(record)
-                    recordsByID[draft.id] = nil
-                    candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation.delete.rawValue
-                } else {
-                    candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation.noop.rawValue
-                }
-            }
+        for recordPlan in plan.recordPlans {
+            apply(recordPlan: recordPlan, in: context, recordsByID: &recordsByID)
         }
 
-        let recordIDsToDelete = recordsByID.keys.filter { !seenDraftIDs.contains($0) }
-        for id in recordIDsToDelete {
-            guard let record = recordsByID[id] else { continue }
-            transitionLifecycle(for: record, reviewNow: reviewNow)
-            if let candidate = candidatesByID[id], record.lifecycleState == .retired {
-                candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation.delete.rawValue
-            }
-        }
-
-        let candidateIDsToDelete = candidatesByID.keys.filter { !seenDraftIDs.contains($0) }
-        for id in candidateIDsToDelete {
-            guard let candidate = candidatesByID[id] else { continue }
-            context.delete(candidate)
-            candidatesByID[id] = nil
+        for candidatePlan in plan.candidatePlans {
+            apply(candidatePlan: candidatePlan, in: context, candidatesByID: &candidatesByID)
         }
 
         do {
@@ -138,64 +61,6 @@ enum DecisionMemoryGovernor {
         (try? context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())) ?? []
     }
 
-    private static func makeCandidate(
-        from draft: DecisionMemoryDraft,
-        fingerprint: String,
-        governanceAssessment: GovernanceAssessment
-    ) -> DecisionMemoryCandidateRecord {
-        DecisionMemoryCandidateRecord(
-            id: draft.id,
-            type: draft.type,
-            topic: draft.topic,
-            headline: draft.headline,
-            value: draft.value,
-            confidence: draft.confidence,
-            priority: draft.priority,
-            source: draft.source,
-            firstObservedAt: draft.lastConfirmedAt,
-            lastObservedAt: draft.lastConfirmedAt,
-            decayPolicy: draft.decayPolicy,
-            retrievalTags: draft.retrievalTags,
-            evidenceCount: draft.evidenceCount,
-            confirmationCount: 1,
-            lastObservationFingerprint: fingerprint,
-            status: .pending,
-            provenanceSummary: draft.provenanceSummary,
-            lastWriteOperation: .noop,
-            lastGovernanceDecision: governanceAssessment.decision,
-            governanceReason: governanceAssessment.reason,
-            tier: draft.tier
-        )
-    }
-
-    private static func update(
-        candidate: DecisionMemoryCandidateRecord,
-        from draft: DecisionMemoryDraft,
-        fingerprint: String,
-        observedNewFingerprint: Bool,
-        governanceAssessment: GovernanceAssessment
-    ) {
-        candidate.typeRaw = draft.type.rawValue
-        candidate.topic = draft.topic
-        candidate.headline = draft.headline
-        candidate.value = draft.value
-        candidate.confidence = draft.confidence
-        candidate.priority = draft.priority
-        candidate.sourceRaw = draft.source.rawValue
-        candidate.lastObservedAt = max(candidate.lastObservedAt, draft.lastConfirmedAt)
-        candidate.decayPolicyRaw = draft.decayPolicy.rawValue
-        candidate.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(draft.retrievalTags)
-        candidate.evidenceCount = max(candidate.evidenceCount, draft.evidenceCount)
-        candidate.provenanceSummary = draft.provenanceSummary
-        candidate.lastGovernanceDecisionRaw = governanceAssessment.decision.rawValue
-        candidate.governanceReason = governanceAssessment.reason
-        candidate.tierRaw = draft.tier.rawValue
-        if observedNewFingerprint {
-            candidate.confirmationCount += 1
-            candidate.lastObservationFingerprint = fingerprint
-        }
-    }
-
     static func assess(draft: DecisionMemoryDraft) -> GovernanceAssessment {
         let substrateAssessment = BASMemoryGovernance.assess(
             draft: draft.governanceDraftInput
@@ -206,76 +71,147 @@ enum DecisionMemoryGovernor {
         )
     }
 
-    private static func applyRecordUpdateIfNeeded(
-        _ record: DecisionMemoryRecord,
-        from draft: DecisionMemoryDraft,
-        candidate: DecisionMemoryCandidateRecord
-    ) -> Bool {
-        let originalTypeRaw = record.typeRaw
-        let originalTopic = record.topic
-        let originalHeadline = record.headline
-        let originalValue = record.value
-        let originalConfidence = record.confidence
-        let originalPriority = record.priority
-        let originalSourceRaw = record.sourceRaw
-        let originalLastConfirmedAt = record.lastConfirmedAt
-        let originalDecayPolicyRaw = record.decayPolicyRaw
-        let originalRetrievalTagsBlob = record.retrievalTagsBlob
-        let originalEvidenceCount = record.evidenceCount
-        let originalObservationCount = record.observationCount
-        let originalProvenanceSummary = record.provenanceSummary
-        let originalTierRaw = record.tierRaw
-
-        record.typeRaw = draft.type.rawValue
-        record.topic = draft.topic
-        record.headline = draft.headline
-        record.value = draft.value
-        record.confidence = draft.confidence
-        record.priority = draft.priority
-        record.sourceRaw = draft.source.rawValue
-        record.lastConfirmedAt = draft.lastConfirmedAt
-        record.decayPolicyRaw = draft.decayPolicy.rawValue
-        record.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(draft.retrievalTags)
-        record.evidenceCount = draft.evidenceCount
-        record.observationCount = candidate.confirmationCount
-        record.provenanceSummary = draft.provenanceSummary
-        record.tierRaw = draft.tier.rawValue
-        record.lifecycleStateRaw = DecisionMemoryLifecycleState.active.rawValue
-        record.lastReviewedAt = max(record.reviewedAt, draft.lastConfirmedAt)
-
-        return originalTypeRaw != record.typeRaw ||
-            originalTopic != record.topic ||
-            originalHeadline != record.headline ||
-            originalValue != record.value ||
-            originalConfidence != record.confidence ||
-            originalPriority != record.priority ||
-            originalSourceRaw != record.sourceRaw ||
-            originalLastConfirmedAt != record.lastConfirmedAt ||
-            originalDecayPolicyRaw != record.decayPolicyRaw ||
-            originalRetrievalTagsBlob != record.retrievalTagsBlob ||
-            originalEvidenceCount != record.evidenceCount ||
-            originalObservationCount != record.observationCount ||
-            originalProvenanceSummary != record.provenanceSummary ||
-            originalTierRaw != record.tierRaw
+    private static func apply(
+        recordPlan: BASGovernedMemoryWritePlan,
+        in context: ModelContext,
+        recordsByID: inout [String: DecisionMemoryRecord]
+    ) {
+        switch recordPlan.operation {
+        case .delete:
+            guard let existing = recordsByID[recordPlan.id] else { return }
+            context.delete(existing)
+            recordsByID[recordPlan.id] = nil
+        case .add, .update, .noop:
+            guard let snapshot = recordPlan.snapshot else { return }
+            if let existing = recordsByID[recordPlan.id] {
+                apply(recordSnapshot: snapshot, to: existing)
+            } else {
+                let record = makeRecord(from: snapshot)
+                context.insert(record)
+                recordsByID[record.id] = record
+            }
+        }
     }
 
-    private static func transitionLifecycle(
-        for record: DecisionMemoryRecord,
-        reviewNow: Date
+    private static func apply(
+        candidatePlan: BASCandidateMemoryWritePlan,
+        in context: ModelContext,
+        candidatesByID: inout [String: DecisionMemoryCandidateRecord]
     ) {
-        let nextState = DecisionMemoryLifecycleState(
-            BASMemoryGovernance.nextLifecycleState(
-                for: BASMemoryLifecycleReviewInput(
-                    source: record.source.basSource,
-                    evidenceCount: record.evidenceCount,
-                    decayPolicy: record.decayPolicy.basDecayPolicy,
-                    provenanceSummary: record.provenanceSummary,
-                    lastConfirmedAt: record.lastConfirmedAt,
-                    reviewNow: reviewNow
-                )
-            )
+        switch candidatePlan.operation {
+        case .delete:
+            guard let existing = candidatesByID[candidatePlan.id] else { return }
+            context.delete(existing)
+            candidatesByID[candidatePlan.id] = nil
+        case .add, .update, .noop:
+            guard let snapshot = candidatePlan.snapshot else { return }
+            if let existing = candidatesByID[candidatePlan.id] {
+                apply(candidateSnapshot: snapshot, to: existing)
+            } else {
+                let candidate = makeCandidate(from: snapshot)
+                context.insert(candidate)
+                candidatesByID[candidate.id] = candidate
+            }
+        }
+    }
+
+    private static func makeRecord(
+        from snapshot: BASExistingGovernedMemorySnapshot
+    ) -> DecisionMemoryRecord {
+        DecisionMemoryRecord(
+            id: snapshot.id,
+            type: DecisionMemoryType(rawValue: snapshot.typeID) ?? .semantic,
+            topic: snapshot.topic,
+            headline: snapshot.headline,
+            value: snapshot.value,
+            confidence: snapshot.confidence,
+            priority: snapshot.priority,
+            source: DecisionMemorySource(rawValue: snapshot.source.rawValue) ?? .history,
+            lastConfirmedAt: snapshot.lastConfirmedAt,
+            decayPolicy: DecisionMemoryDecayPolicy(rawValue: snapshot.decayPolicy.rawValue) ?? .medium,
+            retrievalTags: snapshot.retrievalTags,
+            evidenceCount: snapshot.evidenceCount,
+            observationCount: snapshot.observationCount,
+            provenanceSummary: snapshot.provenanceSummary,
+            lifecycleState: DecisionMemoryLifecycleState(snapshot.lifecycleState),
+            lastReviewedAt: snapshot.lastReviewedAt,
+            tier: DecisionMemoryTier(rawValue: snapshot.tierID) ?? .warm
         )
-        record.lifecycleStateRaw = nextState.rawValue
-        record.lastReviewedAt = reviewNow
+    }
+
+    private static func apply(
+        recordSnapshot: BASExistingGovernedMemorySnapshot,
+        to record: DecisionMemoryRecord
+    ) {
+        record.typeRaw = recordSnapshot.typeID
+        record.topic = recordSnapshot.topic
+        record.headline = recordSnapshot.headline
+        record.value = recordSnapshot.value
+        record.confidence = recordSnapshot.confidence
+        record.priority = recordSnapshot.priority
+        record.sourceRaw = recordSnapshot.source.rawValue
+        record.lastConfirmedAt = recordSnapshot.lastConfirmedAt
+        record.decayPolicyRaw = recordSnapshot.decayPolicy.rawValue
+        record.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(recordSnapshot.retrievalTags)
+        record.evidenceCount = recordSnapshot.evidenceCount
+        record.observationCount = recordSnapshot.observationCount
+        record.provenanceSummary = recordSnapshot.provenanceSummary
+        record.lifecycleStateRaw = DecisionMemoryLifecycleState(recordSnapshot.lifecycleState).rawValue
+        record.lastReviewedAt = recordSnapshot.lastReviewedAt
+        record.tierRaw = recordSnapshot.tierID
+    }
+
+    private static func makeCandidate(
+        from snapshot: BASExistingCandidateMemorySnapshot
+    ) -> DecisionMemoryCandidateRecord {
+        DecisionMemoryCandidateRecord(
+            id: snapshot.id,
+            type: DecisionMemoryType(rawValue: snapshot.typeID) ?? .semantic,
+            topic: snapshot.topic,
+            headline: snapshot.headline,
+            value: snapshot.value,
+            confidence: snapshot.confidence,
+            priority: snapshot.priority,
+            source: DecisionMemorySource(rawValue: snapshot.source.rawValue) ?? .history,
+            firstObservedAt: snapshot.firstObservedAt,
+            lastObservedAt: snapshot.lastObservedAt,
+            decayPolicy: DecisionMemoryDecayPolicy(rawValue: snapshot.decayPolicy.rawValue) ?? .medium,
+            retrievalTags: snapshot.retrievalTags,
+            evidenceCount: snapshot.evidenceCount,
+            confirmationCount: snapshot.confirmationCount,
+            lastObservationFingerprint: snapshot.lastObservationFingerprint,
+            status: DecisionMemoryCandidateStatus(snapshot.status),
+            provenanceSummary: snapshot.provenanceSummary,
+            lastWriteOperation: DecisionMemoryWriteOperation(snapshot.lastWriteOperation),
+            lastGovernanceDecision: DecisionMemoryGovernanceDecision(snapshot.lastGovernanceDecision),
+            governanceReason: snapshot.governanceReason,
+            tier: DecisionMemoryTier(rawValue: snapshot.tierID) ?? .warm
+        )
+    }
+
+    private static func apply(
+        candidateSnapshot: BASExistingCandidateMemorySnapshot,
+        to candidate: DecisionMemoryCandidateRecord
+    ) {
+        candidate.typeRaw = candidateSnapshot.typeID
+        candidate.topic = candidateSnapshot.topic
+        candidate.headline = candidateSnapshot.headline
+        candidate.value = candidateSnapshot.value
+        candidate.confidence = candidateSnapshot.confidence
+        candidate.priority = candidateSnapshot.priority
+        candidate.sourceRaw = candidateSnapshot.source.rawValue
+        candidate.firstObservedAt = candidateSnapshot.firstObservedAt
+        candidate.lastObservedAt = candidateSnapshot.lastObservedAt
+        candidate.decayPolicyRaw = candidateSnapshot.decayPolicy.rawValue
+        candidate.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(candidateSnapshot.retrievalTags)
+        candidate.evidenceCount = candidateSnapshot.evidenceCount
+        candidate.confirmationCount = candidateSnapshot.confirmationCount
+        candidate.lastObservationFingerprint = candidateSnapshot.lastObservationFingerprint
+        candidate.statusRaw = DecisionMemoryCandidateStatus(candidateSnapshot.status).rawValue
+        candidate.provenanceSummary = candidateSnapshot.provenanceSummary
+        candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation(candidateSnapshot.lastWriteOperation).rawValue
+        candidate.lastGovernanceDecisionRaw = DecisionMemoryGovernanceDecision(candidateSnapshot.lastGovernanceDecision).rawValue
+        candidate.governanceReason = candidateSnapshot.governanceReason
+        candidate.tierRaw = candidateSnapshot.tierID
     }
 }

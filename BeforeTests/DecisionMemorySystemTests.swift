@@ -41,17 +41,18 @@ final class DecisionMemorySystemTests: XCTestCase {
     func testRefreshStoredMemoriesUsesExplicitMemoryWriteOperations() throws {
         let container = try makeContainer()
         let context = container.mainContext
+        let stableNow = date("2026-04-09T23:10:00Z")
 
         seedHistory(into: context)
 
-        _ = DecisionMemorySystem.refreshStoredMemories(in: context)
+        _ = DecisionMemorySystem.refreshStoredMemories(in: context, now: stableNow)
         var candidates = try context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())
 
         let supportCandidate = try XCTUnwrap(candidates.first(where: { $0.id == "support.action.decideTomorrow" }))
         XCTAssertEqual(supportCandidate.status, .promoted)
         XCTAssertEqual(supportCandidate.lastWriteOperation, .add)
 
-        _ = DecisionMemorySystem.refreshStoredMemories(in: context)
+        _ = DecisionMemorySystem.refreshStoredMemories(in: context, now: stableNow)
         candidates = try context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())
 
         let unchangedSupportCandidate = try XCTUnwrap(candidates.first(where: { $0.id == "support.action.decideTomorrow" }))
