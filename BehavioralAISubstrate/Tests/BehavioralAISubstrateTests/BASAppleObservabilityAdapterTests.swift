@@ -463,4 +463,80 @@ struct BASAppleObservabilityAdapterTests {
         #expect(compilation.runtimeInspectionSummary.brainTraceCount == 1)
         #expect(compilation.runtimeInspectionSummary.consistencyCheckedTraceCount == 1)
     }
+
+    @Test("runtime inspection trace source builder owns flat record expansion")
+    func runtimeInspectionTraceSourceBuilderExpandsFlatRecord() {
+        let source = BASAppleRuntimeInspectionBuilder.traceSource(
+            from: BASAppleRuntimeInspectionTraceRecordInput(
+                kind: "quick",
+                hasContextState: true,
+                generation: 4,
+                rebuiltSession: true,
+                staleFieldCount: 1,
+                anchorFieldCount: 2,
+                hasFrontstageState: true,
+                retainedEvidenceCount: 3,
+                droppedEvidenceCount: 1,
+                droppedInjectedEvidenceCount: 1,
+                droppedDuplicateEvidenceCount: 0,
+                droppedBudgetEvidenceCount: 0,
+                suppressedBehaviorCount: 2,
+                dominantActionRawValue: "encourage",
+                strongestSignalRawValue: "urgency",
+                dominantReactionWeight: .briefLanguage,
+                profileCoreCount: 1,
+                activeGoalCount: 2,
+                relevantMemoryCount: 3,
+                loadedPromotedMemoryCount: 4,
+                loadedPendingMemoryCount: 1,
+                pendingCandidateCount: 1,
+                promotedRecordCount: 5,
+                screenedOutMemoryCount: 1,
+                loadedEligibilityReasonCounts: [.goalOverride: 1],
+                screenedOutEligibilityReasonCounts: [.supportPriorityNoOverlap: 1],
+                snapshotFingerprint: "brain_fp",
+                lowTrustMemoryLoadRate: 0.25,
+                riskFlags: [.lowTrustLoad],
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyAdvisory,
+                activeConstraints: [.lockSensitiveMemory],
+                calibrationStatus: .watch,
+                calibrationAlerts: [.lowTrustLoad],
+                evolutionCheckpointCount: 2,
+                evolutionPendingReviewCount: 1,
+                evolutionRollbackReady: true,
+                attemptedProviderIDs: ["gemmaE4B", "foundationModels"],
+                runtimeStrategy: BASAdaptiveTaskStrategy(
+                    kind: .quick,
+                    entropy: .low,
+                    runtimeGear: .balanced,
+                    contextBudget: 320,
+                    outputCharacterBudget: 180,
+                    timeBudgetMs: 900,
+                    toolCallBudget: 0,
+                    retrievalItemBudget: 2,
+                    retrievalMode: .filtered,
+                    thinkingMode: .off,
+                    outputMode: .guidedShort,
+                    tone: .briefWarm,
+                    actionSpace: ["encourage"],
+                    responseLanguage: .english,
+                    allowsModelInvocation: true
+                ),
+                semanticPromptFingerprint: "semantic_fp",
+                stablePrefixFingerprint: "prefix_fp",
+                consistencyChecked: true,
+                consistencyRejected: false,
+                consistencyViolationKinds: []
+            )
+        )
+
+        #expect(source.lifecycle?.generation == 4)
+        #expect(source.neural?.suppressedBehaviorCount == 2)
+        #expect(source.brain?.snapshotFingerprint == "brain_fp")
+        #expect(source.brain?.calibrationStatus == .watch)
+        #expect(source.runtimeInspection.attemptedProviderIDs == ["gemmaE4B", "foundationModels"])
+        #expect(source.runtimeInspection.runtimeStrategy?.kind == .quick)
+        #expect(source.runtimeInspection.semanticPromptFingerprint == "semantic_fp")
+    }
 }
