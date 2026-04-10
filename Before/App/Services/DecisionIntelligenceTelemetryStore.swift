@@ -1,29 +1,8 @@
 import Foundation
+import BASObservability
 
-enum DecisionIntelligenceRequestOutcome: String, CaseIterable, Sendable {
-    case templatePinned
-    case cacheHit
-    case providerSuccess
-    case admissionSkipped
-    case deterministicFallback
-}
-
-struct DecisionRequestLifecycleMetrics: Equatable, Sendable {
-    let promptAssemblyMs: Double
-    let admissionEvaluationMs: Double
-    let providerSelectionMs: Double
-    let firstPresentableMs: Double
-    let executionMs: Double
-
-    var prefillEquivalentMs: Double {
-        promptAssemblyMs + admissionEvaluationMs + providerSelectionMs
-    }
-
-    var prefillEquivalentShare: Double {
-        guard firstPresentableMs > 0 else { return 0 }
-        return prefillEquivalentMs / firstPresentableMs
-    }
-}
+typealias DecisionIntelligenceRequestOutcome = BASRequestOutcome
+typealias DecisionRequestLifecycleMetrics = BASRequestLifecycleMetrics
 
 struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
     let requestCountByKind: [DecisionIntelligenceTraceKind: Int]
@@ -57,326 +36,253 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
     let lowPressureModelCallCountByKind: [DecisionIntelligenceTraceKind: Int]
 
     var totalRequests: Int {
-        requestCountByKind.values.reduce(0, +)
+        basSummary.totalRequests
     }
 
     var totalProviderAttempts: Int {
-        attemptedProviderCount.values.reduce(0, +)
+        basSummary.totalProviderAttempts
     }
 
     var cacheHitRate: Double {
-        rate(
-            numerator: outcomeCount[.cacheHit] ?? 0,
-            denominator: totalRequests
-        )
+        basSummary.cacheHitRate
     }
 
     var admissionSkipRate: Double {
-        rate(
-            numerator: outcomeCount[.admissionSkipped] ?? 0,
-            denominator: totalRequests
-        )
+        basSummary.admissionSkipRate
     }
 
     var providerBypassRate: Double {
-        rate(
-            numerator: providerBypassCount,
-            denominator: totalRequests
-        )
+        basSummary.providerBypassRate
     }
 
     var deterministicFallbackRate: Double {
-        rate(
-            numerator: outcomeCount[.deterministicFallback] ?? 0,
-            denominator: totalRequests
-        )
+        basSummary.deterministicFallbackRate
     }
 
     var averageRequestDurationMs: Double {
-        average(
-            totals: requestDurationTotalMsByKind.values.reduce(0, +),
-            count: totalRequests
-        )
+        basSummary.averageRequestDurationMs
     }
 
     var averageRequestDurationMsByKind: [DecisionIntelligenceTraceKind: Double] {
-        Dictionary(
-            uniqueKeysWithValues: requestDurationTotalMsByKind.map { kind, total in
-                (kind, average(totals: total, count: requestCountByKind[kind] ?? 0))
-            }
-        )
+        mapKindDictionary(basSummary.averageRequestDurationMsByKind)
     }
 
     var averageFirstPresentableMs: Double {
-        average(
-            totals: firstPresentableTotalMsByKind.values.reduce(0, +),
-            count: totalRequests
-        )
+        basSummary.averageFirstPresentableMs
     }
 
     var averageFirstPresentableMsByKind: [DecisionIntelligenceTraceKind: Double] {
-        averageStageByKind(from: firstPresentableTotalMsByKind)
+        mapKindDictionary(basSummary.averageFirstPresentableMsByKind)
     }
 
     var averagePromptAssemblyMsByKind: [DecisionIntelligenceTraceKind: Double] {
-        averageStageByKind(from: promptAssemblyTotalMsByKind)
+        mapKindDictionary(basSummary.averagePromptAssemblyMsByKind)
     }
 
     var averageAdmissionEvaluationMsByKind: [DecisionIntelligenceTraceKind: Double] {
-        averageStageByKind(from: admissionEvaluationTotalMsByKind)
+        mapKindDictionary(basSummary.averageAdmissionEvaluationMsByKind)
     }
 
     var averageProviderSelectionMsByKind: [DecisionIntelligenceTraceKind: Double] {
-        averageStageByKind(from: providerSelectionTotalMsByKind)
+        mapKindDictionary(basSummary.averageProviderSelectionMsByKind)
     }
 
     var averageExecutionMsByKind: [DecisionIntelligenceTraceKind: Double] {
-        averageStageByKind(from: executionTotalMsByKind)
+        mapKindDictionary(basSummary.averageExecutionMsByKind)
     }
 
     var averagePrefillEquivalentShareByKind: [DecisionIntelligenceTraceKind: Double] {
-        Dictionary(
-            uniqueKeysWithValues: requestCountByKind.map { kind, count in
-                let firstPresentable = firstPresentableTotalMsByKind[kind] ?? 0
-                let prefillEquivalent =
-                    (promptAssemblyTotalMsByKind[kind] ?? 0) +
-                    (admissionEvaluationTotalMsByKind[kind] ?? 0) +
-                    (providerSelectionTotalMsByKind[kind] ?? 0)
-                let ratio = firstPresentable > 0 ? prefillEquivalent / firstPresentable : 0
-                return (kind, count > 0 ? ratio : 0)
-            }
-        )
+        mapKindDictionary(basSummary.averagePrefillEquivalentShareByKind)
     }
 
     var averageRequestDurationMsByActiveProvider: [DecisionModelProviderKind: Double] {
-        Dictionary(
-            uniqueKeysWithValues: activeProviderDurationTotalMs.map { provider, total in
-                (provider, average(totals: total, count: activeProviderCount[provider] ?? 0))
-            }
-        )
+        mapProviderDictionary(basSummary.averageRequestDurationMsByActiveProvider)
     }
 
     var averageRequestDurationMsByGemmaBackend: [InferenceBackendKind: Double] {
-        Dictionary(
-            uniqueKeysWithValues: gemmaBackendDurationTotalMs.map { backend, total in
-                (backend, average(totals: total, count: gemmaBackendCount[backend] ?? 0))
-            }
-        )
+        mapBackendDictionary(basSummary.averageRequestDurationMsByBackend)
     }
 
     var averagePromptCharactersByKind: [DecisionIntelligenceTraceKind: Double] {
-        averageCharactersByKind(from: promptCharactersTotalByKind)
+        mapKindDictionary(basSummary.averagePromptCharactersByKind)
     }
 
     var averagePrefixCharactersByKind: [DecisionIntelligenceTraceKind: Double] {
-        averageCharactersByKind(from: prefixCharactersTotalByKind)
+        mapKindDictionary(basSummary.averagePrefixCharactersByKind)
     }
 
     var averageImmutablePrefixCharactersByKind: [DecisionIntelligenceTraceKind: Double] {
-        averageCharactersByKind(from: immutablePrefixCharactersTotalByKind)
+        mapKindDictionary(basSummary.averageImmutablePrefixCharactersByKind)
     }
 
     var averageAdaptivePrefixCharactersByKind: [DecisionIntelligenceTraceKind: Double] {
-        averageCharactersByKind(from: adaptivePrefixCharactersTotalByKind)
+        mapKindDictionary(basSummary.averageAdaptivePrefixCharactersByKind)
     }
 
     var averageSuffixCharactersByKind: [DecisionIntelligenceTraceKind: Double] {
-        averageCharactersByKind(from: suffixCharactersTotalByKind)
+        mapKindDictionary(basSummary.averageSuffixCharactersByKind)
     }
 
     var averageStablePrefixShareByKind: [DecisionIntelligenceTraceKind: Double] {
-        Dictionary(
-            uniqueKeysWithValues: requestCountByKind.map { kind, count in
-                let totalPrompt = promptCharactersTotalByKind[kind] ?? 0
-                let totalPrefix = prefixCharactersTotalByKind[kind] ?? 0
-                let ratio = totalPrompt > 0 ? Double(totalPrefix) / Double(totalPrompt) : 0
-                return (kind, count > 0 ? ratio : 0)
-            }
-        )
+        mapKindDictionary(basSummary.averageStablePrefixShareByKind)
     }
 
     var providerBypassRateByKind: [DecisionIntelligenceTraceKind: Double] {
-        Dictionary(
-            uniqueKeysWithValues: requestCountByKind.map { kind, count in
-                let bypass = providerBypassCountByKind[kind] ?? 0
-                return (kind, rate(numerator: bypass, denominator: count))
-            }
-        )
+        mapKindDictionary(basSummary.providerBypassRateByKind)
     }
 
     var lowPressureModelCallRate: Double {
-        rate(
-            numerator: lowPressureModelCallCountByKind.values.reduce(0, +),
-            denominator: totalRequests
-        )
+        basSummary.lowPressureModelCallRate
     }
 
     var lowPressureModelCallRateByKind: [DecisionIntelligenceTraceKind: Double] {
-        Dictionary(
-            uniqueKeysWithValues: requestCountByKind.map { kind, count in
-                let lowPressureCalls = lowPressureModelCallCountByKind[kind] ?? 0
-                return (kind, rate(numerator: lowPressureCalls, denominator: count))
-            }
-        )
+        mapKindDictionary(basSummary.lowPressureModelCallRateByKind)
     }
 
     var avoidableModelCallRate: Double {
-        rate(
-            numerator: avoidableModelCallCount,
-            denominator: totalRequests
-        )
+        basSummary.avoidableModelCallRate
     }
 
     var avoidableModelCallRateByKind: [DecisionIntelligenceTraceKind: Double] {
-        Dictionary(
-            uniqueKeysWithValues: requestCountByKind.map { kind, count in
-                let avoidableSkips = avoidableModelCallCountByKind[kind] ?? 0
-                return (kind, rate(numerator: avoidableSkips, denominator: count))
-            }
-        )
+        mapKindDictionary(basSummary.avoidableModelCallRateByKind)
     }
 
     var avoidableModelCallCount: Int {
-        avoidableModelCallCountByKind.values.reduce(0, +)
+        basSummary.avoidableModelCallCount
     }
 
     var providerBypassCount: Int {
-        providerBypassCountByKind.values.reduce(0, +)
+        basSummary.providerBypassCount
     }
 
     private var providerBypassCountByKind: [DecisionIntelligenceTraceKind: Int] {
-        Dictionary(
-            uniqueKeysWithValues: requestCountByKind.keys.map { kind in
-                let templatePinned = outcomeCountForKind(.templatePinned, kind: kind)
-                let admissionSkipped = outcomeCountForKind(.admissionSkipped, kind: kind)
-                let cacheHit = outcomeCountForKind(.cacheHit, kind: kind)
-                return (kind, templatePinned + admissionSkipped + cacheHit)
-            }
-        )
+        mapKindDictionary(basSummary.providerBypassCountByKind)
     }
 
     private var avoidableModelCallCountByKind: [DecisionIntelligenceTraceKind: Int] {
-        let trackedReasons: [DecisionIntelligenceAdmissionSkipReason] = [
-            .templateAlreadySufficient,
-            .insufficientSourceMaterial
-        ]
-
-        return Dictionary(
-            uniqueKeysWithValues: requestCountByKind.keys.map { kind in
-                let count = trackedReasons.reduce(0) { partialResult, reason in
-                    partialResult + (admissionSkipCountByReasonAndKind[reason]?[kind] ?? 0)
-                }
-                return (kind, count)
-            }
-        )
+        mapKindDictionary(basSummary.avoidableModelCallCountByKind)
     }
 
     var overTargetBudgetRate: Double {
-        rate(
-            numerator: overTargetBudgetCountByKind.values.reduce(0, +),
-            denominator: totalRequests
-        )
+        basSummary.overTargetBudgetRate
     }
 
     var overTargetBudgetRateByKind: [DecisionIntelligenceTraceKind: Double] {
-        Dictionary(
-            uniqueKeysWithValues: requestCountByKind.map { kind, count in
-                (kind, rate(numerator: overTargetBudgetCountByKind[kind] ?? 0, denominator: count))
-            }
-        )
+        mapKindDictionary(basSummary.overTargetBudgetRateByKind)
     }
 
     var reminderKnowledgeNeedRate: Double {
-        rate(
-            numerator: reminderSelectionNeedCount[.knowledge] ?? 0,
-            denominator: requestCountByKind[.reminder] ?? 0
-        )
+        basSummary.reminderKnowledgeNeedRate
     }
 
     var reminderControlOnlyRate: Double {
-        rate(
-            numerator: reminderSelectionNeedCount[.control] ?? 0,
-            denominator: requestCountByKind[.reminder] ?? 0
-        )
+        basSummary.reminderControlOnlyRate
     }
 
     var reminderRetrievalBypassRate: Double {
-        rate(
-            numerator: reminderRetrievalBypassCount,
-            denominator: requestCountByKind[.reminder] ?? 0
-        )
+        basSummary.reminderRetrievalBypassRate
     }
 
     var reminderRetrievalBypassCount: Int {
-        (admissionSkipCountByReason[.insufficientReminderChoice] ?? 0)
-            + (admissionSkipCountByReason[.retrievalNotNeeded] ?? 0)
+        basSummary.reminderRetrievalBypassCount
     }
 
     var slowRequestRate: Double {
-        rate(
-            numerator: slowRequestCountByKind.values.reduce(0, +),
-            denominator: totalRequests
-        )
+        basSummary.slowRequestRate
     }
 
     var slowRequestRateByKind: [DecisionIntelligenceTraceKind: Double] {
-        Dictionary(
-            uniqueKeysWithValues: requestCountByKind.map { kind, count in
-                (kind, rate(numerator: slowRequestCountByKind[kind] ?? 0, denominator: count))
-            }
-        )
+        mapKindDictionary(basSummary.slowRequestRateByKind)
     }
 
     var overTimeBudgetRate: Double {
-        rate(
-            numerator: overTimeBudgetCountByKind.values.reduce(0, +),
-            denominator: totalRequests
-        )
+        basSummary.overTimeBudgetRate
     }
 
     var overTimeBudgetRateByKind: [DecisionIntelligenceTraceKind: Double] {
-        Dictionary(
-            uniqueKeysWithValues: requestCountByKind.map { kind, count in
-                (kind, rate(numerator: overTimeBudgetCountByKind[kind] ?? 0, denominator: count))
-            }
+        mapKindDictionary(basSummary.overTimeBudgetRateByKind)
+    }
+
+    private var basSummary: BASTelemetrySummary {
+        BASTelemetrySummaryBuilder.build(
+            from: BASTelemetrySummaryInput(
+                requestCountByKind: rawKeyDictionary(requestCountByKind),
+                outcomeCount: outcomeCount,
+                outcomeCountByKind: outcomeCountByKind.mapValues { rawKeyDictionary($0) },
+                activeProviderCount: rawKeyDictionary(activeProviderCount),
+                attemptedProviderCount: rawKeyDictionary(attemptedProviderCount),
+                fallbackActivations: fallbackActivations,
+                backendCount: rawKeyDictionary(gemmaBackendCount),
+                slowRequestCountByKind: rawKeyDictionary(slowRequestCountByKind),
+                overTimeBudgetCountByKind: rawKeyDictionary(overTimeBudgetCountByKind),
+                requestDurationTotalMsByKind: rawKeyDictionary(requestDurationTotalMsByKind),
+                firstPresentableTotalMsByKind: rawKeyDictionary(firstPresentableTotalMsByKind),
+                promptAssemblyTotalMsByKind: rawKeyDictionary(promptAssemblyTotalMsByKind),
+                admissionEvaluationTotalMsByKind: rawKeyDictionary(admissionEvaluationTotalMsByKind),
+                providerSelectionTotalMsByKind: rawKeyDictionary(providerSelectionTotalMsByKind),
+                executionTotalMsByKind: rawKeyDictionary(executionTotalMsByKind),
+                activeProviderDurationTotalMs: rawKeyDictionary(activeProviderDurationTotalMs),
+                backendDurationTotalMs: rawKeyDictionary(gemmaBackendDurationTotalMs),
+                admissionSkipCountByReason: rawKeyDictionary(admissionSkipCountByReason),
+                admissionSkipCountByReasonAndKind: admissionSkipCountByReasonAndKind.reduce(into: [:]) { partialResult, item in
+                    partialResult[item.key.rawValue] = rawKeyDictionary(item.value)
+                },
+                reminderSelectionNeedCount: rawKeyDictionary(reminderSelectionNeedCount),
+                promptCharactersTotalByKind: rawKeyDictionary(promptCharactersTotalByKind),
+                prefixCharactersTotalByKind: rawKeyDictionary(prefixCharactersTotalByKind),
+                immutablePrefixCharactersTotalByKind: rawKeyDictionary(immutablePrefixCharactersTotalByKind),
+                adaptivePrefixCharactersTotalByKind: rawKeyDictionary(adaptivePrefixCharactersTotalByKind),
+                suffixCharactersTotalByKind: rawKeyDictionary(suffixCharactersTotalByKind),
+                overTargetBudgetCountByKind: rawKeyDictionary(overTargetBudgetCountByKind),
+                lowPressureModelCallCountByKind: rawKeyDictionary(lowPressureModelCallCountByKind),
+                reminderKindRawValue: DecisionIntelligenceTraceKind.reminder.rawValue,
+                reminderKnowledgeNeedRawValue: ReminderSelectionNeed.knowledge.rawValue,
+                reminderControlNeedRawValue: ReminderSelectionNeed.control.rawValue,
+                reminderRetrievalBypassReasonRawValues: [
+                    DecisionIntelligenceAdmissionSkipReason.insufficientReminderChoice.rawValue,
+                    DecisionIntelligenceAdmissionSkipReason.retrievalNotNeeded.rawValue
+                ],
+                avoidableSkipReasonRawValues: [
+                    DecisionIntelligenceAdmissionSkipReason.templateAlreadySufficient.rawValue,
+                    DecisionIntelligenceAdmissionSkipReason.insufficientSourceMaterial.rawValue
+                ]
+            )
         )
     }
 
-    private func averageCharactersByKind(
-        from totalsByKind: [DecisionIntelligenceTraceKind: Int]
-    ) -> [DecisionIntelligenceTraceKind: Double] {
-        Dictionary(
-            uniqueKeysWithValues: totalsByKind.map { kind, total in
-                (kind, average(totals: Double(total), count: requestCountByKind[kind] ?? 0))
-            }
-        )
+    private func mapKindDictionary<Value>(
+        _ values: [String: Value]
+    ) -> [DecisionIntelligenceTraceKind: Value] {
+        values.reduce(into: [:]) { partialResult, item in
+            guard let kind = DecisionIntelligenceTraceKind(rawValue: item.key) else { return }
+            partialResult[kind] = item.value
+        }
     }
 
-    private func averageStageByKind(
-        from totalsByKind: [DecisionIntelligenceTraceKind: Double]
-    ) -> [DecisionIntelligenceTraceKind: Double] {
-        Dictionary(
-            uniqueKeysWithValues: requestCountByKind.map { kind, count in
-                (kind, average(totals: totalsByKind[kind] ?? 0, count: count))
-            }
-        )
+    private func mapProviderDictionary<Value>(
+        _ values: [String: Value]
+    ) -> [DecisionModelProviderKind: Value] {
+        values.reduce(into: [:]) { partialResult, item in
+            guard let provider = DecisionModelProviderKind(rawValue: item.key) else { return }
+            partialResult[provider] = item.value
+        }
     }
 
-    private func rate(numerator: Int, denominator: Int) -> Double {
-        guard denominator > 0 else { return 0 }
-        return Double(numerator) / Double(denominator)
+    private func mapBackendDictionary<Value>(
+        _ values: [String: Value]
+    ) -> [InferenceBackendKind: Value] {
+        values.reduce(into: [:]) { partialResult, item in
+            guard let backend = InferenceBackendKind(rawValue: item.key) else { return }
+            partialResult[backend] = item.value
+        }
     }
 
-    private func average(totals: Double, count: Int) -> Double {
-        guard count > 0 else { return 0 }
-        return totals / Double(count)
-    }
-
-    private func outcomeCountForKind(
-        _ outcome: DecisionIntelligenceRequestOutcome,
-        kind: DecisionIntelligenceTraceKind
-    ) -> Int {
-        outcomeCountByKind[outcome]?[kind] ?? 0
+    private func rawKeyDictionary<Key: RawRepresentable, Value>(
+        _ values: [Key: Value]
+    ) -> [String: Value] where Key.RawValue == String {
+        values.reduce(into: [:]) { partialResult, item in
+            partialResult[item.key.rawValue] = item.value
+        }
     }
 }
 

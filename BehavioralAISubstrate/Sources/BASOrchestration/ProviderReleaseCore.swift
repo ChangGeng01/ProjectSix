@@ -85,3 +85,25 @@ public enum BASProviderReleaseGate {
         return "\(base) Consistency harness rejected the \(source). \(violations)"
     }
 }
+
+public enum BASProviderReleaseEvaluator {
+    public static func verdict(
+        traceKindRawValue: String,
+        outputPreview: String,
+        kernelSnapshot: BASCognitionKernelSnapshot,
+        brainState: BASDecisionBrainState?,
+        reminderSurfaceModeRawValue: String? = nil,
+        referencedFacts: [String: String] = [:]
+    ) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment> {
+        BASProviderReleaseGate.verdict(
+            for: BASProviderReleaseEvaluationRequest(
+                kind: BASAdaptiveTraceKind(rawValue: traceKindRawValue) ?? .quick,
+                outputPreview: outputPreview,
+                kernelSnapshot: kernelSnapshot,
+                brainState: brainState,
+                reminderSurfaceMode: reminderSurfaceModeRawValue.flatMap(BASDecisionMode.init(rawValue:)),
+                referencedFacts: referencedFacts
+            )
+        )
+    }
+}

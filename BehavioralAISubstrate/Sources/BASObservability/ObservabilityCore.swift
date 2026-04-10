@@ -4,6 +4,461 @@ import BASMemory
 import BASPolicy
 import BASRuntimeCore
 
+public enum BASRequestOutcome: String, CaseIterable, Codable, Sendable {
+    case templatePinned
+    case cacheHit
+    case providerSuccess
+    case admissionSkipped
+    case deterministicFallback
+}
+
+public struct BASRequestLifecycleMetrics: Codable, Sendable, Equatable {
+    public var promptAssemblyMs: Double
+    public var admissionEvaluationMs: Double
+    public var providerSelectionMs: Double
+    public var firstPresentableMs: Double
+    public var executionMs: Double
+
+    public init(
+        promptAssemblyMs: Double,
+        admissionEvaluationMs: Double,
+        providerSelectionMs: Double,
+        firstPresentableMs: Double,
+        executionMs: Double
+    ) {
+        self.promptAssemblyMs = promptAssemblyMs
+        self.admissionEvaluationMs = admissionEvaluationMs
+        self.providerSelectionMs = providerSelectionMs
+        self.firstPresentableMs = firstPresentableMs
+        self.executionMs = executionMs
+    }
+
+    public var prefillEquivalentMs: Double {
+        promptAssemblyMs + admissionEvaluationMs + providerSelectionMs
+    }
+
+    public var prefillEquivalentShare: Double {
+        guard firstPresentableMs > 0 else { return 0 }
+        return prefillEquivalentMs / firstPresentableMs
+    }
+}
+
+public enum BASLifecycleMetricsCompiler {
+    public static func compile(
+        promptAssemblyMs: Double,
+        admissionEvaluatedMs: Double? = nil,
+        providerSelectionMs: Double? = nil,
+        firstPresentableMs: Double
+    ) -> BASRequestLifecycleMetrics {
+        let promptBoundary = max(0, promptAssemblyMs)
+        let admissionBoundary = max(promptBoundary, admissionEvaluatedMs ?? promptBoundary)
+        let providerBoundary = max(admissionBoundary, providerSelectionMs ?? admissionBoundary)
+        let presentationBoundary = max(providerBoundary, firstPresentableMs)
+
+        return BASRequestLifecycleMetrics(
+            promptAssemblyMs: promptBoundary,
+            admissionEvaluationMs: max(0, admissionBoundary - promptBoundary),
+            providerSelectionMs: max(0, providerBoundary - admissionBoundary),
+            firstPresentableMs: presentationBoundary,
+            executionMs: max(0, presentationBoundary - providerBoundary)
+        )
+    }
+}
+
+public struct BASTelemetrySummaryInput: Codable, Sendable, Equatable {
+    public var requestCountByKind: [String: Int]
+    public var outcomeCount: [BASRequestOutcome: Int]
+    public var outcomeCountByKind: [BASRequestOutcome: [String: Int]]
+    public var activeProviderCount: [String: Int]
+    public var attemptedProviderCount: [String: Int]
+    public var fallbackActivations: Int
+    public var backendCount: [String: Int]
+    public var slowRequestCountByKind: [String: Int]
+    public var overTimeBudgetCountByKind: [String: Int]
+    public var requestDurationTotalMsByKind: [String: Double]
+    public var firstPresentableTotalMsByKind: [String: Double]
+    public var promptAssemblyTotalMsByKind: [String: Double]
+    public var admissionEvaluationTotalMsByKind: [String: Double]
+    public var providerSelectionTotalMsByKind: [String: Double]
+    public var executionTotalMsByKind: [String: Double]
+    public var activeProviderDurationTotalMs: [String: Double]
+    public var backendDurationTotalMs: [String: Double]
+    public var admissionSkipCountByReason: [String: Int]
+    public var admissionSkipCountByReasonAndKind: [String: [String: Int]]
+    public var reminderSelectionNeedCount: [String: Int]
+    public var promptCharactersTotalByKind: [String: Int]
+    public var prefixCharactersTotalByKind: [String: Int]
+    public var immutablePrefixCharactersTotalByKind: [String: Int]
+    public var adaptivePrefixCharactersTotalByKind: [String: Int]
+    public var suffixCharactersTotalByKind: [String: Int]
+    public var overTargetBudgetCountByKind: [String: Int]
+    public var lowPressureModelCallCountByKind: [String: Int]
+    public var reminderKindRawValue: String
+    public var reminderKnowledgeNeedRawValue: String
+    public var reminderControlNeedRawValue: String
+    public var reminderRetrievalBypassReasonRawValues: [String]
+    public var avoidableSkipReasonRawValues: [String]
+
+    public init(
+        requestCountByKind: [String: Int],
+        outcomeCount: [BASRequestOutcome: Int],
+        outcomeCountByKind: [BASRequestOutcome: [String: Int]],
+        activeProviderCount: [String: Int],
+        attemptedProviderCount: [String: Int],
+        fallbackActivations: Int,
+        backendCount: [String: Int],
+        slowRequestCountByKind: [String: Int],
+        overTimeBudgetCountByKind: [String: Int],
+        requestDurationTotalMsByKind: [String: Double],
+        firstPresentableTotalMsByKind: [String: Double],
+        promptAssemblyTotalMsByKind: [String: Double],
+        admissionEvaluationTotalMsByKind: [String: Double],
+        providerSelectionTotalMsByKind: [String: Double],
+        executionTotalMsByKind: [String: Double],
+        activeProviderDurationTotalMs: [String: Double],
+        backendDurationTotalMs: [String: Double],
+        admissionSkipCountByReason: [String: Int],
+        admissionSkipCountByReasonAndKind: [String: [String: Int]],
+        reminderSelectionNeedCount: [String: Int],
+        promptCharactersTotalByKind: [String: Int],
+        prefixCharactersTotalByKind: [String: Int],
+        immutablePrefixCharactersTotalByKind: [String: Int],
+        adaptivePrefixCharactersTotalByKind: [String: Int],
+        suffixCharactersTotalByKind: [String: Int],
+        overTargetBudgetCountByKind: [String: Int],
+        lowPressureModelCallCountByKind: [String: Int],
+        reminderKindRawValue: String,
+        reminderKnowledgeNeedRawValue: String,
+        reminderControlNeedRawValue: String,
+        reminderRetrievalBypassReasonRawValues: [String],
+        avoidableSkipReasonRawValues: [String]
+    ) {
+        self.requestCountByKind = requestCountByKind
+        self.outcomeCount = outcomeCount
+        self.outcomeCountByKind = outcomeCountByKind
+        self.activeProviderCount = activeProviderCount
+        self.attemptedProviderCount = attemptedProviderCount
+        self.fallbackActivations = fallbackActivations
+        self.backendCount = backendCount
+        self.slowRequestCountByKind = slowRequestCountByKind
+        self.overTimeBudgetCountByKind = overTimeBudgetCountByKind
+        self.requestDurationTotalMsByKind = requestDurationTotalMsByKind
+        self.firstPresentableTotalMsByKind = firstPresentableTotalMsByKind
+        self.promptAssemblyTotalMsByKind = promptAssemblyTotalMsByKind
+        self.admissionEvaluationTotalMsByKind = admissionEvaluationTotalMsByKind
+        self.providerSelectionTotalMsByKind = providerSelectionTotalMsByKind
+        self.executionTotalMsByKind = executionTotalMsByKind
+        self.activeProviderDurationTotalMs = activeProviderDurationTotalMs
+        self.backendDurationTotalMs = backendDurationTotalMs
+        self.admissionSkipCountByReason = admissionSkipCountByReason
+        self.admissionSkipCountByReasonAndKind = admissionSkipCountByReasonAndKind
+        self.reminderSelectionNeedCount = reminderSelectionNeedCount
+        self.promptCharactersTotalByKind = promptCharactersTotalByKind
+        self.prefixCharactersTotalByKind = prefixCharactersTotalByKind
+        self.immutablePrefixCharactersTotalByKind = immutablePrefixCharactersTotalByKind
+        self.adaptivePrefixCharactersTotalByKind = adaptivePrefixCharactersTotalByKind
+        self.suffixCharactersTotalByKind = suffixCharactersTotalByKind
+        self.overTargetBudgetCountByKind = overTargetBudgetCountByKind
+        self.lowPressureModelCallCountByKind = lowPressureModelCallCountByKind
+        self.reminderKindRawValue = reminderKindRawValue
+        self.reminderKnowledgeNeedRawValue = reminderKnowledgeNeedRawValue
+        self.reminderControlNeedRawValue = reminderControlNeedRawValue
+        self.reminderRetrievalBypassReasonRawValues = reminderRetrievalBypassReasonRawValues
+        self.avoidableSkipReasonRawValues = avoidableSkipReasonRawValues
+    }
+}
+
+public struct BASTelemetrySummary: Codable, Sendable, Equatable {
+    public var input: BASTelemetrySummaryInput
+
+    public init(input: BASTelemetrySummaryInput) {
+        self.input = input
+    }
+
+    public var totalRequests: Int {
+        input.requestCountByKind.values.reduce(0, +)
+    }
+
+    public var totalProviderAttempts: Int {
+        input.attemptedProviderCount.values.reduce(0, +)
+    }
+
+    public var cacheHitRate: Double {
+        rate(numerator: input.outcomeCount[.cacheHit] ?? 0, denominator: totalRequests)
+    }
+
+    public var admissionSkipRate: Double {
+        rate(numerator: input.outcomeCount[.admissionSkipped] ?? 0, denominator: totalRequests)
+    }
+
+    public var providerBypassRate: Double {
+        rate(numerator: providerBypassCount, denominator: totalRequests)
+    }
+
+    public var deterministicFallbackRate: Double {
+        rate(numerator: input.outcomeCount[.deterministicFallback] ?? 0, denominator: totalRequests)
+    }
+
+    public var averageRequestDurationMs: Double {
+        average(totals: input.requestDurationTotalMsByKind.values.reduce(0, +), count: totalRequests)
+    }
+
+    public var averageRequestDurationMsByKind: [String: Double] {
+        Dictionary(
+            uniqueKeysWithValues: input.requestCountByKind.map { kind, count in
+                (kind, average(totals: input.requestDurationTotalMsByKind[kind] ?? 0, count: count))
+            }
+        )
+    }
+
+    public var averageFirstPresentableMs: Double {
+        average(totals: input.firstPresentableTotalMsByKind.values.reduce(0, +), count: totalRequests)
+    }
+
+    public var averageFirstPresentableMsByKind: [String: Double] {
+        averageByKind(from: input.firstPresentableTotalMsByKind)
+    }
+
+    public var averagePromptAssemblyMsByKind: [String: Double] {
+        averageByKind(from: input.promptAssemblyTotalMsByKind)
+    }
+
+    public var averageAdmissionEvaluationMsByKind: [String: Double] {
+        averageByKind(from: input.admissionEvaluationTotalMsByKind)
+    }
+
+    public var averageProviderSelectionMsByKind: [String: Double] {
+        averageByKind(from: input.providerSelectionTotalMsByKind)
+    }
+
+    public var averageExecutionMsByKind: [String: Double] {
+        averageByKind(from: input.executionTotalMsByKind)
+    }
+
+    public var averagePrefillEquivalentShareByKind: [String: Double] {
+        Dictionary(
+            uniqueKeysWithValues: input.requestCountByKind.map { kind, count in
+                let firstPresentable = input.firstPresentableTotalMsByKind[kind] ?? 0
+                let prefillEquivalent =
+                    (input.promptAssemblyTotalMsByKind[kind] ?? 0) +
+                    (input.admissionEvaluationTotalMsByKind[kind] ?? 0) +
+                    (input.providerSelectionTotalMsByKind[kind] ?? 0)
+                let ratio = firstPresentable > 0 ? prefillEquivalent / firstPresentable : 0
+                return (kind, count > 0 ? ratio : 0)
+            }
+        )
+    }
+
+    public var averageRequestDurationMsByActiveProvider: [String: Double] {
+        Dictionary(
+            uniqueKeysWithValues: input.activeProviderDurationTotalMs.map { provider, total in
+                (provider, average(totals: total, count: input.activeProviderCount[provider] ?? 0))
+            }
+        )
+    }
+
+    public var averageRequestDurationMsByBackend: [String: Double] {
+        Dictionary(
+            uniqueKeysWithValues: input.backendDurationTotalMs.map { backend, total in
+                (backend, average(totals: total, count: input.backendCount[backend] ?? 0))
+            }
+        )
+    }
+
+    public var averagePromptCharactersByKind: [String: Double] {
+        averageCharacterByKind(from: input.promptCharactersTotalByKind)
+    }
+
+    public var averagePrefixCharactersByKind: [String: Double] {
+        averageCharacterByKind(from: input.prefixCharactersTotalByKind)
+    }
+
+    public var averageImmutablePrefixCharactersByKind: [String: Double] {
+        averageCharacterByKind(from: input.immutablePrefixCharactersTotalByKind)
+    }
+
+    public var averageAdaptivePrefixCharactersByKind: [String: Double] {
+        averageCharacterByKind(from: input.adaptivePrefixCharactersTotalByKind)
+    }
+
+    public var averageSuffixCharactersByKind: [String: Double] {
+        averageCharacterByKind(from: input.suffixCharactersTotalByKind)
+    }
+
+    public var averageStablePrefixShareByKind: [String: Double] {
+        Dictionary(
+            uniqueKeysWithValues: input.requestCountByKind.map { kind, count in
+                let totalPrompt = input.promptCharactersTotalByKind[kind] ?? 0
+                let totalPrefix = input.prefixCharactersTotalByKind[kind] ?? 0
+                let ratio = totalPrompt > 0 ? Double(totalPrefix) / Double(totalPrompt) : 0
+                return (kind, count > 0 ? ratio : 0)
+            }
+        )
+    }
+
+    public var providerBypassRateByKind: [String: Double] {
+        Dictionary(
+            uniqueKeysWithValues: input.requestCountByKind.map { kind, count in
+                (kind, rate(numerator: providerBypassCountByKind[kind] ?? 0, denominator: count))
+            }
+        )
+    }
+
+    public var lowPressureModelCallRate: Double {
+        rate(numerator: input.lowPressureModelCallCountByKind.values.reduce(0, +), denominator: totalRequests)
+    }
+
+    public var lowPressureModelCallRateByKind: [String: Double] {
+        Dictionary(
+            uniqueKeysWithValues: input.requestCountByKind.map { kind, count in
+                (kind, rate(numerator: input.lowPressureModelCallCountByKind[kind] ?? 0, denominator: count))
+            }
+        )
+    }
+
+    public var avoidableModelCallRate: Double {
+        rate(numerator: avoidableModelCallCount, denominator: totalRequests)
+    }
+
+    public var avoidableModelCallRateByKind: [String: Double] {
+        Dictionary(
+            uniqueKeysWithValues: input.requestCountByKind.map { kind, count in
+                (kind, rate(numerator: avoidableModelCallCountByKind[kind] ?? 0, denominator: count))
+            }
+        )
+    }
+
+    public var avoidableModelCallCount: Int {
+        avoidableModelCallCountByKind.values.reduce(0, +)
+    }
+
+    public var providerBypassCount: Int {
+        providerBypassCountByKind.values.reduce(0, +)
+    }
+
+    public var overTargetBudgetRate: Double {
+        rate(numerator: input.overTargetBudgetCountByKind.values.reduce(0, +), denominator: totalRequests)
+    }
+
+    public var overTargetBudgetRateByKind: [String: Double] {
+        Dictionary(
+            uniqueKeysWithValues: input.requestCountByKind.map { kind, count in
+                (kind, rate(numerator: input.overTargetBudgetCountByKind[kind] ?? 0, denominator: count))
+            }
+        )
+    }
+
+    public var reminderKnowledgeNeedRate: Double {
+        rate(
+            numerator: input.reminderSelectionNeedCount[input.reminderKnowledgeNeedRawValue] ?? 0,
+            denominator: reminderRequestCount
+        )
+    }
+
+    public var reminderControlOnlyRate: Double {
+        rate(
+            numerator: input.reminderSelectionNeedCount[input.reminderControlNeedRawValue] ?? 0,
+            denominator: reminderRequestCount
+        )
+    }
+
+    public var reminderRetrievalBypassRate: Double {
+        rate(numerator: reminderRetrievalBypassCount, denominator: reminderRequestCount)
+    }
+
+    public var reminderRequestCount: Int {
+        input.requestCountByKind[input.reminderKindRawValue] ?? 0
+    }
+
+    public var reminderRetrievalBypassCount: Int {
+        input.reminderRetrievalBypassReasonRawValues.reduce(0) { partialResult, reason in
+            partialResult + (input.admissionSkipCountByReason[reason] ?? 0)
+        }
+    }
+
+    public var slowRequestRate: Double {
+        rate(numerator: input.slowRequestCountByKind.values.reduce(0, +), denominator: totalRequests)
+    }
+
+    public var slowRequestRateByKind: [String: Double] {
+        Dictionary(
+            uniqueKeysWithValues: input.requestCountByKind.map { kind, count in
+                (kind, rate(numerator: input.slowRequestCountByKind[kind] ?? 0, denominator: count))
+            }
+        )
+    }
+
+    public var overTimeBudgetRate: Double {
+        rate(numerator: input.overTimeBudgetCountByKind.values.reduce(0, +), denominator: totalRequests)
+    }
+
+    public var overTimeBudgetRateByKind: [String: Double] {
+        Dictionary(
+            uniqueKeysWithValues: input.requestCountByKind.map { kind, count in
+                (kind, rate(numerator: input.overTimeBudgetCountByKind[kind] ?? 0, denominator: count))
+            }
+        )
+    }
+
+    public var providerBypassCountByKind: [String: Int] {
+        Dictionary(
+            uniqueKeysWithValues: input.requestCountByKind.keys.map { kind in
+                let templatePinned = outcomeCountForKind(.templatePinned, kind: kind)
+                let admissionSkipped = outcomeCountForKind(.admissionSkipped, kind: kind)
+                let cacheHit = outcomeCountForKind(.cacheHit, kind: kind)
+                return (kind, templatePinned + admissionSkipped + cacheHit)
+            }
+        )
+    }
+
+    public var avoidableModelCallCountByKind: [String: Int] {
+        Dictionary(
+            uniqueKeysWithValues: input.requestCountByKind.keys.map { kind in
+                let count = input.avoidableSkipReasonRawValues.reduce(0) { partialResult, reason in
+                    partialResult + (input.admissionSkipCountByReasonAndKind[reason]?[kind] ?? 0)
+                }
+                return (kind, count)
+            }
+        )
+    }
+
+    private func averageByKind(from totalsByKind: [String: Double]) -> [String: Double] {
+        Dictionary(
+            uniqueKeysWithValues: input.requestCountByKind.map { kind, count in
+                (kind, average(totals: totalsByKind[kind] ?? 0, count: count))
+            }
+        )
+    }
+
+    private func averageCharacterByKind(from totalsByKind: [String: Int]) -> [String: Double] {
+        Dictionary(
+            uniqueKeysWithValues: totalsByKind.map { kind, total in
+                (kind, average(totals: Double(total), count: input.requestCountByKind[kind] ?? 0))
+            }
+        )
+    }
+
+    private func rate(numerator: Int, denominator: Int) -> Double {
+        guard denominator > 0 else { return 0 }
+        return Double(numerator) / Double(denominator)
+    }
+
+    private func average(totals: Double, count: Int) -> Double {
+        guard count > 0 else { return 0 }
+        return totals / Double(count)
+    }
+
+    private func outcomeCountForKind(_ outcome: BASRequestOutcome, kind: String) -> Int {
+        input.outcomeCountByKind[outcome]?[kind] ?? 0
+    }
+}
+
+public enum BASTelemetrySummaryBuilder {
+    public static func build(from input: BASTelemetrySummaryInput) -> BASTelemetrySummary {
+        BASTelemetrySummary(input: input)
+    }
+}
+
 public struct BASTraceLatencyBreakdown: Codable, Sendable, Equatable {
     public var routeSelectionMs: Int
     public var retrievalMs: Int

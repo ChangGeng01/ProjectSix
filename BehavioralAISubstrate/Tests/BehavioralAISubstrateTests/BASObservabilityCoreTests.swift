@@ -7,6 +7,146 @@ import Testing
 
 @Suite("BASObservability")
 struct BASObservabilityCoreTests {
+    @Test("lifecycle metrics compiler turns stage boundaries into stable timings")
+    func lifecycleMetricsCompilerBuildsStageDurations() {
+        let metrics = BASLifecycleMetricsCompiler.compile(
+            promptAssemblyMs: 40,
+            admissionEvaluatedMs: 60,
+            providerSelectionMs: 70,
+            firstPresentableMs: 180
+        )
+
+        #expect(metrics.promptAssemblyMs == 40)
+        #expect(metrics.admissionEvaluationMs == 20)
+        #expect(metrics.providerSelectionMs == 10)
+        #expect(metrics.firstPresentableMs == 180)
+        #expect(metrics.executionMs == 110)
+        #expect(metrics.prefillEquivalentMs == 70)
+        #expect(metrics.prefillEquivalentShare == 70.0 / 180.0)
+    }
+
+    @Test("lifecycle metrics compiler clamps missing stages without going negative")
+    func lifecycleMetricsCompilerClampsMissingStages() {
+        let metrics = BASLifecycleMetricsCompiler.compile(
+            promptAssemblyMs: 24,
+            admissionEvaluatedMs: nil,
+            providerSelectionMs: 18,
+            firstPresentableMs: 12
+        )
+
+        #expect(metrics.promptAssemblyMs == 24)
+        #expect(metrics.admissionEvaluationMs == 0)
+        #expect(metrics.providerSelectionMs == 0)
+        #expect(metrics.firstPresentableMs == 24)
+        #expect(metrics.executionMs == 0)
+    }
+
+    @Test("telemetry summary builder tracks latency skip and bypass semantics")
+    func telemetrySummaryBuilderTracksRates() {
+        let summary = BASTelemetrySummaryBuilder.build(
+            from: BASTelemetrySummaryInput(
+                requestCountByKind: ["quick": 2, "mirror": 1],
+                outcomeCount: [.providerSuccess: 1, .cacheHit: 1, .admissionSkipped: 1],
+                outcomeCountByKind: [
+                    .providerSuccess: ["quick": 1],
+                    .cacheHit: ["quick": 1],
+                    .admissionSkipped: ["mirror": 1]
+                ],
+                activeProviderCount: ["gemmaE4B": 1],
+                attemptedProviderCount: ["gemmaE4B": 1, "foundationModels": 1],
+                fallbackActivations: 0,
+                backendCount: ["coreML": 1],
+                slowRequestCountByKind: ["mirror": 1],
+                overTimeBudgetCountByKind: ["mirror": 1],
+                requestDurationTotalMsByKind: ["quick": 510, "mirror": 2_400],
+                firstPresentableTotalMsByKind: ["quick": 216],
+                promptAssemblyTotalMsByKind: ["quick": 58],
+                admissionEvaluationTotalMsByKind: ["quick": 26],
+                providerSelectionTotalMsByKind: ["quick": 14],
+                executionTotalMsByKind: ["quick": 118],
+                activeProviderDurationTotalMs: ["gemmaE4B": 120],
+                backendDurationTotalMs: ["coreML": 120],
+                admissionSkipCountByReason: ["templateAlreadySufficient": 1],
+                admissionSkipCountByReasonAndKind: ["templateAlreadySufficient": ["mirror": 1]],
+                reminderSelectionNeedCount: [:],
+                promptCharactersTotalByKind: ["quick": 200],
+                prefixCharactersTotalByKind: ["quick": 80],
+                immutablePrefixCharactersTotalByKind: ["quick": 48],
+                adaptivePrefixCharactersTotalByKind: ["quick": 32],
+                suffixCharactersTotalByKind: ["quick": 120],
+                overTargetBudgetCountByKind: ["mirror": 1],
+                lowPressureModelCallCountByKind: ["quick": 1],
+                reminderKindRawValue: "reminder",
+                reminderKnowledgeNeedRawValue: "knowledge",
+                reminderControlNeedRawValue: "control",
+                reminderRetrievalBypassReasonRawValues: ["retrievalNotNeeded", "insufficientReminderChoice"],
+                avoidableSkipReasonRawValues: ["templateAlreadySufficient", "insufficientSourceMaterial"]
+            )
+        )
+
+        #expect(summary.totalRequests == 3)
+        #expect(summary.totalProviderAttempts == 2)
+        #expect(summary.cacheHitRate == 1.0 / 3.0)
+        #expect(summary.admissionSkipRate == 1.0 / 3.0)
+        #expect(summary.providerBypassRate == 2.0 / 3.0)
+        #expect(summary.lowPressureModelCallRate == 1.0 / 3.0)
+        #expect(summary.avoidableModelCallRate == 1.0 / 3.0)
+        #expect(summary.slowRequestRateByKind["mirror"] == 1)
+        #expect(summary.overTimeBudgetRateByKind["mirror"] == 1)
+        #expect(summary.averageRequestDurationMsByActiveProvider["gemmaE4B"] == 120)
+        #expect(summary.averageRequestDurationMsByBackend["coreML"] == 120)
+        #expect(summary.averagePrefillEquivalentShareByKind["quick"] == 98.0 / 216.0)
+    }
+
+    @Test("telemetry summary builder tracks reminder retrieval bypass")
+    func telemetrySummaryBuilderTracksReminderBypass() {
+        let summary = BASTelemetrySummaryBuilder.build(
+            from: BASTelemetrySummaryInput(
+                requestCountByKind: ["reminder": 2],
+                outcomeCount: [.admissionSkipped: 1, .providerSuccess: 1],
+                outcomeCountByKind: [
+                    .admissionSkipped: ["reminder": 1],
+                    .providerSuccess: ["reminder": 1]
+                ],
+                activeProviderCount: ["gemmaE4B": 1],
+                attemptedProviderCount: ["gemmaE4B": 1],
+                fallbackActivations: 0,
+                backendCount: [:],
+                slowRequestCountByKind: [:],
+                overTimeBudgetCountByKind: [:],
+                requestDurationTotalMsByKind: ["reminder": 148],
+                firstPresentableTotalMsByKind: [:],
+                promptAssemblyTotalMsByKind: [:],
+                admissionEvaluationTotalMsByKind: [:],
+                providerSelectionTotalMsByKind: [:],
+                executionTotalMsByKind: [:],
+                activeProviderDurationTotalMs: [:],
+                backendDurationTotalMs: [:],
+                admissionSkipCountByReason: ["retrievalNotNeeded": 1],
+                admissionSkipCountByReasonAndKind: [:],
+                reminderSelectionNeedCount: ["knowledge": 1, "control": 1],
+                promptCharactersTotalByKind: [:],
+                prefixCharactersTotalByKind: [:],
+                immutablePrefixCharactersTotalByKind: [:],
+                adaptivePrefixCharactersTotalByKind: [:],
+                suffixCharactersTotalByKind: [:],
+                overTargetBudgetCountByKind: [:],
+                lowPressureModelCallCountByKind: [:],
+                reminderKindRawValue: "reminder",
+                reminderKnowledgeNeedRawValue: "knowledge",
+                reminderControlNeedRawValue: "control",
+                reminderRetrievalBypassReasonRawValues: ["retrievalNotNeeded", "insufficientReminderChoice"],
+                avoidableSkipReasonRawValues: ["templateAlreadySufficient", "insufficientSourceMaterial"]
+            )
+        )
+
+        #expect(summary.reminderRequestCount == 2)
+        #expect(summary.reminderKnowledgeNeedRate == 0.5)
+        #expect(summary.reminderControlOnlyRate == 0.5)
+        #expect(summary.reminderRetrievalBypassCount == 1)
+        #expect(summary.reminderRetrievalBypassRate == 0.5)
+    }
+
     @Test("replay fingerprint is stable for identical bundles")
     func replayFingerprintIsStable() {
         let bundle = makeReplayBundle()

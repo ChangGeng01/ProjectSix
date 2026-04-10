@@ -1,5 +1,6 @@
 import Foundation
 import BASOrchestration
+import BASObservability
 import BASPolicy
 import BASRuntimeCore
 
@@ -1769,15 +1770,13 @@ enum DecisionIntelligenceProviderPipeline {
         brainState: DecisionBrainState?,
         reminderMode: DecisionMode? = nil
     ) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment> {
-        BASProviderReleaseGate.verdict(
-            for: BASProviderReleaseEvaluationRequest(
-                kind: basTraceKind(for: kind),
-                outputPreview: outputPreview,
-                kernelSnapshot: kernelSnapshot,
-                brainState: brainState,
-                reminderSurfaceMode: reminderMode.map(substrateMode(from:)),
-                referencedFacts: brainState?.activeGoals.first.map { ["current_goal": $0] } ?? [:]
-            )
+        BASProviderReleaseEvaluator.verdict(
+            traceKindRawValue: kind.rawValue,
+            outputPreview: outputPreview,
+            kernelSnapshot: kernelSnapshot,
+            brainState: brainState,
+            reminderSurfaceModeRawValue: reminderMode?.rawValue,
+            referencedFacts: brainState?.activeGoals.first.map { ["current_goal": $0] } ?? [:]
         )
     }
 
@@ -1785,21 +1784,6 @@ enum DecisionIntelligenceProviderPipeline {
         from providerIDs: [String]
     ) -> [DecisionModelProviderKind] {
         providerIDs.compactMap(DecisionModelProviderKind.init(rawValue:))
-    }
-
-    private static func basTraceKind(
-        for kind: DecisionIntelligenceTraceKind
-    ) -> BASAdaptiveTraceKind {
-        switch kind {
-        case .quick:
-            .quick
-        case .balance:
-            .balance
-        case .mirror:
-            .mirror
-        case .reminder:
-            .reminder
-        }
     }
 
     private static func rejectedConsistencyDetail(
@@ -1863,21 +1847,11 @@ enum DecisionIntelligenceProviderPipeline {
         admissionEvaluatedMs: Double? = nil,
         providerSelectionMs: Double? = nil
     ) -> DecisionRequestLifecycleMetrics {
-        let firstPresentableMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        let admissionStageMs = max(0, (admissionEvaluatedMs ?? promptPreparedMs) - promptPreparedMs)
-        let providerStageMs = max(
-            0,
-            (providerSelectionMs ?? (admissionEvaluatedMs ?? promptPreparedMs)) -
-                (admissionEvaluatedMs ?? promptPreparedMs)
-        )
-        let executionMs = max(0, firstPresentableMs - (providerSelectionMs ?? firstPresentableMs))
-
-        return DecisionRequestLifecycleMetrics(
-            promptAssemblyMs: max(0, promptPreparedMs),
-            admissionEvaluationMs: admissionStageMs,
-            providerSelectionMs: providerStageMs,
-            firstPresentableMs: max(0, firstPresentableMs),
-            executionMs: executionMs
+        BASLifecycleMetricsCompiler.compile(
+            promptAssemblyMs: promptPreparedMs,
+            admissionEvaluatedMs: admissionEvaluatedMs,
+            providerSelectionMs: providerSelectionMs,
+            firstPresentableMs: elapsedMilliseconds(since: requestStart, clock: clock)
         )
     }
 }

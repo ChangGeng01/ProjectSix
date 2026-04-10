@@ -72,6 +72,25 @@ struct BASProviderReleaseCoreTests {
         #expect(!detail.contains("Fourth."))
     }
 
+    @Test("raw value evaluator bridges host trace kinds without host-owned mapping")
+    func rawValueEvaluatorBridgesTraceKinds() {
+        let verdict = BASProviderReleaseEvaluator.verdict(
+            traceKindRawValue: "reminder",
+            outputPreview: "Wait and reuse the reminder you trust.",
+            kernelSnapshot: kernelWithoutTruthState(),
+            brainState: reminderBrainState(),
+            reminderSurfaceModeRawValue: "quick",
+            referencedFacts: ["current_goal": "Protect sleep"]
+        )
+
+        switch verdict {
+        case let .allow(assessment):
+            #expect(assessment.consistencyCheck?.isConsistent == true)
+        case .reject:
+            Issue.record("Expected raw-value evaluator to preserve allowed reminder release.")
+        }
+    }
+
     private func kernelWithoutTruthState() -> BASCognitionKernelSnapshot {
         BASCognitionKernel.compile(
             BASCognitionKernelRequest(
