@@ -1683,19 +1683,18 @@ enum DecisionIntelligenceProviderPipeline {
         testingStubProfile: DecisionTestingStubProfile?
     ) async -> [any DecisionIntelligenceProviding] {
         let suspendedKinds = Set(await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders)
-        let orderedProviderIDs = DecisionIntelligenceTaskRouter.orderedKinds(
-            for: task,
-            preference: preference,
-            allowFallbacks: allowFallbacks,
-            excluding: suspendedKinds,
-            registry: registry,
-            strategy: strategy
-        ).map(\.rawValue)
         let testingOverrideProvider: (any DecisionIntelligenceProviding)? = testingStubProfile.flatMap { profile in
             preference != .template ? TestingDecisionIntelligenceProvider(profile: profile) : nil
         }
-        return BASExecutableProviderResolver.resolve(
-            orderedProviderIDs: orderedProviderIDs,
+        return BASExecutableProviderPlanner.resolve(
+            task: DecisionIntelligenceTaskRouter.substrateTraceKind(task),
+            preferredProviderID: preference.kind.rawValue,
+            allowFallbacks: allowFallbacks,
+            deterministicProviderID: DecisionModelProviderKind.template.rawValue,
+            preferenceOrderings: preferenceOrderings,
+            suspendedProviderIDs: Set(suspendedKinds.map(\.rawValue)),
+            strategy: strategy.map(DecisionIntelligenceTaskRouter.substrateAdaptiveStrategy),
+            descriptors: registry.descriptors().map(DecisionIntelligenceTaskRouter.substrateProviderDescriptor),
             testingOverrideProvider: testingOverrideProvider,
             providerID: { $0.kind.rawValue },
             providerForID: { providerID in

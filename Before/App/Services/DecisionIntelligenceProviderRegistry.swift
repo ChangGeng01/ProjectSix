@@ -780,7 +780,7 @@ enum DecisionIntelligenceTaskRouter {
         return plan.orderedProviderIDs.compactMap(DecisionModelProviderKind.init(rawValue:))
     }
 
-    private static func substrateTraceKind(_ task: DecisionIntelligenceTraceKind) -> BASAdaptiveTraceKind {
+    static func substrateTraceKind(_ task: DecisionIntelligenceTraceKind) -> BASAdaptiveTraceKind {
         switch task {
         case .quick:
             .quick
@@ -793,7 +793,7 @@ enum DecisionIntelligenceTaskRouter {
         }
     }
 
-    private static func substrateAdaptiveStrategy(
+    static func substrateAdaptiveStrategy(
         _ strategy: DecisionAdaptiveTaskStrategy
     ) -> BASAdaptiveTaskStrategy {
         let responseLanguage: BASAdaptiveResponseLanguage
@@ -889,7 +889,7 @@ enum DecisionIntelligenceTaskRouter {
         )
     }
 
-    private static func substrateProviderDescriptor(
+    static func substrateProviderDescriptor(
         _ descriptor: DecisionModelProviderDescriptor
     ) -> BASProviderDescriptor {
         BASProviderDescriptor(

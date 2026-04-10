@@ -16,6 +16,23 @@ public struct BASExecutableProviderResolutionResult<Provider> {
     }
 }
 
+public struct BASExecutableProviderPlanningResult<Provider> {
+    public var plan: BASProviderSelectionPlan
+    public var resolution: BASExecutableProviderResolutionResult<Provider>
+
+    public init(
+        plan: BASProviderSelectionPlan,
+        resolution: BASExecutableProviderResolutionResult<Provider>
+    ) {
+        self.plan = plan
+        self.resolution = resolution
+    }
+
+    public var providers: [Provider] { resolution.providers }
+    public var resolvedProviderIDs: [String] { resolution.resolvedProviderIDs }
+    public var usedTestingOverride: Bool { resolution.usedTestingOverride }
+}
+
 public enum BASProviderExecutionVerdict<Assessment: Sendable>: Sendable {
     case allow(Assessment)
     case reject(Assessment)
@@ -105,6 +122,46 @@ public enum BASExecutableProviderResolver {
             providers: providers,
             usedTestingOverride: false,
             resolvedProviderIDs: resolvedIDs
+        )
+    }
+}
+
+public enum BASExecutableProviderPlanner {
+    public static func resolve<Provider>(
+        task: BASAdaptiveTraceKind,
+        preferredProviderID: String,
+        allowFallbacks: Bool,
+        deterministicProviderID: String,
+        preferenceOrderings: [BASProviderPreferenceOrdering],
+        suspendedProviderIDs: Set<String> = [],
+        strategy: BASAdaptiveTaskStrategy? = nil,
+        descriptors: [BASProviderDescriptor],
+        testingOverrideProvider: Provider? = nil,
+        providerID: (Provider) -> String,
+        providerForID: (String) -> Provider?,
+        isAvailable: (Provider) -> Bool
+    ) -> BASExecutableProviderPlanningResult<Provider> {
+        let plan = BASProviderRouteResolver.resolve(
+            task: task,
+            preferredProviderID: preferredProviderID,
+            allowFallbacks: allowFallbacks,
+            deterministicProviderID: deterministicProviderID,
+            preferenceOrderings: preferenceOrderings,
+            suspendedProviderIDs: suspendedProviderIDs,
+            strategy: strategy,
+            descriptors: descriptors
+        )
+        let resolution = BASExecutableProviderResolver.resolve(
+            orderedProviderIDs: plan.orderedProviderIDs,
+            testingOverrideProvider: testingOverrideProvider,
+            providerID: providerID,
+            providerForID: providerForID,
+            isAvailable: isAvailable
+        )
+
+        return BASExecutableProviderPlanningResult(
+            plan: plan,
+            resolution: resolution
         )
     }
 }
