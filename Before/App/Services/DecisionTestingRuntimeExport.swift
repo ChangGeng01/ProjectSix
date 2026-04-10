@@ -1,4 +1,5 @@
 import Foundation
+import BASObservability
 import BASPolicy
 
 struct DecisionTestingRuntimeExport {
@@ -16,203 +17,67 @@ struct DecisionTestingRuntimeExport {
     }
 
     var lifecycleSummary: DecisionTestingLifecycleSummary {
-        let contextAwareTraces = recentTraces.compactMap(\.contextState)
-        let rebuildCountByKind = Dictionary(
-            grouping: recentTraces.filter { $0.contextState?.rebuiltSession == true },
-            by: \.kind
-        )
-        .mapValues(\.count)
-
-        let staleFieldCountByKind = Dictionary(
-            grouping: recentTraces.filter { ($0.contextState?.staleFieldCount ?? 0) > 0 },
-            by: \.kind
-        )
-        .mapValues { traces in
-            traces.reduce(0) { partialResult, trace in
-                partialResult + (trace.contextState?.staleFieldCount ?? 0)
-            }
-        }
-
-        let droppedEvidenceCountByKind = Dictionary(
-            grouping: recentTraces.filter { ($0.frontstageState?.droppedEvidenceCount ?? 0) > 0 },
-            by: \.kind
-        )
-        .mapValues { traces in
-            traces.reduce(0) { partialResult, trace in
-                partialResult + (trace.frontstageState?.droppedEvidenceCount ?? 0)
-            }
-        }
-
-        let droppedInjectedEvidenceCountByKind = Dictionary(
-            grouping: recentTraces.filter { ($0.frontstageState?.droppedInjectedEvidenceCount ?? 0) > 0 },
-            by: \.kind
-        )
-        .mapValues { traces in
-            traces.reduce(0) { partialResult, trace in
-                partialResult + (trace.frontstageState?.droppedInjectedEvidenceCount ?? 0)
-            }
-        }
-
-        let droppedDuplicateEvidenceCountByKind = Dictionary(
-            grouping: recentTraces.filter { ($0.frontstageState?.droppedDuplicateEvidenceCount ?? 0) > 0 },
-            by: \.kind
-        )
-        .mapValues { traces in
-            traces.reduce(0) { partialResult, trace in
-                partialResult + (trace.frontstageState?.droppedDuplicateEvidenceCount ?? 0)
-            }
-        }
-
-        let droppedBudgetEvidenceCountByKind = Dictionary(
-            grouping: recentTraces.filter { ($0.frontstageState?.droppedBudgetEvidenceCount ?? 0) > 0 },
-            by: \.kind
-        )
-        .mapValues { traces in
-            traces.reduce(0) { partialResult, trace in
-                partialResult + (trace.frontstageState?.droppedBudgetEvidenceCount ?? 0)
-            }
-        }
-
+        let summary = BASLifecycleSummaryBuilder.build(from: lifecycleTraceInputs)
         return DecisionTestingLifecycleSummary(
-            contextAwareTraceCount: contextAwareTraces.count,
-            rebuildCount: contextAwareTraces.filter(\.rebuiltSession).count,
-            rebuildCountByKind: rebuildCountByKind,
-            staleFieldDropCount: contextAwareTraces.reduce(0) { $0 + $1.staleFieldCount },
-            staleFieldDropCountByKind: staleFieldCountByKind,
-            retainedEvidenceCount: recentTraces.reduce(0) { $0 + ($1.frontstageState?.retainedEvidenceCount ?? 0) },
-            droppedEvidenceCount: recentTraces.reduce(0) { $0 + ($1.frontstageState?.droppedEvidenceCount ?? 0) },
-            droppedEvidenceCountByKind: droppedEvidenceCountByKind,
-            droppedInjectedEvidenceCount: recentTraces.reduce(0) { $0 + ($1.frontstageState?.droppedInjectedEvidenceCount ?? 0) },
-            droppedInjectedEvidenceCountByKind: droppedInjectedEvidenceCountByKind,
-            droppedDuplicateEvidenceCount: recentTraces.reduce(0) { $0 + ($1.frontstageState?.droppedDuplicateEvidenceCount ?? 0) },
-            droppedDuplicateEvidenceCountByKind: droppedDuplicateEvidenceCountByKind,
-            droppedBudgetEvidenceCount: recentTraces.reduce(0) { $0 + ($1.frontstageState?.droppedBudgetEvidenceCount ?? 0) },
-            droppedBudgetEvidenceCountByKind: droppedBudgetEvidenceCountByKind,
-            averageRetainedEvidenceCountByKind: averageRetainedEvidenceCountByKind,
-            averageAnchorFieldCountByKind: averageAnchorFieldCountByKind,
-            latestGenerationByKind: latestGenerationByKind
+            contextAwareTraceCount: summary.contextAwareTraceCount,
+            rebuildCount: summary.rebuildCount,
+            rebuildCountByKind: mapKindDictionary(summary.rebuildCountByKind),
+            staleFieldDropCount: summary.staleFieldDropCount,
+            staleFieldDropCountByKind: mapKindDictionary(summary.staleFieldDropCountByKind),
+            retainedEvidenceCount: summary.retainedEvidenceCount,
+            droppedEvidenceCount: summary.droppedEvidenceCount,
+            droppedEvidenceCountByKind: mapKindDictionary(summary.droppedEvidenceCountByKind),
+            droppedInjectedEvidenceCount: summary.droppedInjectedEvidenceCount,
+            droppedInjectedEvidenceCountByKind: mapKindDictionary(summary.droppedInjectedEvidenceCountByKind),
+            droppedDuplicateEvidenceCount: summary.droppedDuplicateEvidenceCount,
+            droppedDuplicateEvidenceCountByKind: mapKindDictionary(summary.droppedDuplicateEvidenceCountByKind),
+            droppedBudgetEvidenceCount: summary.droppedBudgetEvidenceCount,
+            droppedBudgetEvidenceCountByKind: mapKindDictionary(summary.droppedBudgetEvidenceCountByKind),
+            averageRetainedEvidenceCountByKind: mapKindDictionary(summary.averageRetainedEvidenceCountByKind),
+            averageAnchorFieldCountByKind: mapKindDictionary(summary.averageAnchorFieldCountByKind),
+            latestGenerationByKind: mapKindDictionary(summary.latestGenerationByKind)
         )
     }
 
     var neuralSummary: DecisionTestingNeuralSummary {
-        let neuralTraces = recentTraces.compactMap { trace in
-            trace.neuralState.map { (trace.kind, $0) }
-        }
-
-        let dominantActionByKind = Dictionary(grouping: neuralTraces, by: \.0)
-            .compactMapValues { grouped in
-                grouped
-                    .compactMap(\.1.dominantAction)
-                    .first
-            }
-
-        let strongestSignalByKind = Dictionary(grouping: neuralTraces, by: \.0)
-            .compactMapValues { grouped in
-                grouped
-                    .compactMap { $0.1.dominantActivations.first?.signal }
-                    .first
-            }
-
+        let summary = BASNeuralSummaryBuilder.build(from: neuralTraceInputs)
         return DecisionTestingNeuralSummary(
-            neuralTraceCount: neuralTraces.count,
-            suppressedBehaviorCount: neuralTraces.reduce(0) { $0 + $1.1.suppressedBehaviors.count },
-            dominantActionByKind: dominantActionByKind,
-            strongestSignalByKind: strongestSignalByKind
+            neuralTraceCount: summary.neuralTraceCount,
+            suppressedBehaviorCount: summary.suppressedBehaviorCount,
+            dominantActionByKind: mapKindDictionary(summary.dominantActionByKind) { DecisionActionRoute(rawValue: $0) },
+            strongestSignalByKind: mapKindDictionary(summary.strongestSignalByKind) { DecisionNeuralSignal(rawValue: $0) }
         )
     }
 
     var brainSummary: DecisionTestingBrainSummary {
-        let brainTraces = recentTraces.compactMap { trace in
-            trace.brainState.map { (trace.kind, $0) }
-        }
-
-        let dominantReactionWeightByKind = Dictionary(grouping: brainTraces, by: \.0)
-            .compactMapValues { grouped in
-                grouped.first?.1.reactionWeights.dominantKey
-            }
-
-        let averageProfileCoreCountByKind = averageBrainMetricByKind { $0.profileCore.count }
-        let averageActiveGoalCountByKind = averageBrainMetricByKind { $0.activeGoals.count }
-        let averageRelevantMemoryCountByKind = averageBrainMetricByKind { $0.relevantMemories.count }
-        let averageLoadedPromotedMemoryCountByKind = averageBrainMetricByKind { $0.memoryGovernance.loadedPromotedMemoryCount }
-        let averageLoadedPendingMemoryCountByKind = averageBrainMetricByKind { $0.memoryGovernance.loadedPendingMemoryCount }
-        let averagePendingCandidateCountByKind = averageBrainMetricByKind { $0.memoryGovernance.pendingCandidateCount }
-        let averagePromotedRecordCountByKind = averageBrainMetricByKind { $0.memoryGovernance.totalRecordCount }
-        let averageScreenedOutMemoryCountByKind = averageBrainMetricByKind { $0.memoryGovernance.screenedOutMemoryCount }
-        let loadedEligibilityReasonCountsByKind = aggregatedBrainReasonCountsByKind(\.loadedReasonCounts)
-        let screenedOutEligibilityReasonCountsByKind = aggregatedBrainReasonCountsByKind(\.screenedOutReasonCounts)
-        let pendingMemoryLoadRateByKind = memoryLoadRateByKind(
-            promotedByKind: averageLoadedPromotedMemoryCountByKind,
-            pendingByKind: averageLoadedPendingMemoryCountByKind
-        )
-        let retrievalRejectionRateByKind = memoryLoadRateByKind(
-            promotedByKind: averageRelevantMemoryCountByKind,
-            pendingByKind: averageScreenedOutMemoryCountByKind
-        )
-        let latestSnapshotByKind = Dictionary(grouping: brainTraces, by: \.0)
-            .compactMapValues { grouped in
-                grouped.first?.1.verificationSnapshot
-            }
-        let snapshotVariantCountByKind = Dictionary(grouping: brainTraces, by: \.0)
-            .mapValues { grouped in
-                Set(grouped.map { $0.1.verificationSnapshot.fingerprint }).count
-            }
-        let lowTrustMemoryLoadRateByKind = averageBrainMetricByKind {
-            $0.verificationSnapshot.lowTrustMemoryLoadRate
-        }
-        let riskFlagCountsByKind = aggregatedBrainRiskFlagCountsByKind()
-        let identityRoleByKind = Dictionary(grouping: brainTraces, by: \.0)
-            .compactMapValues { grouped in
-                grouped.first?.1.identityProfile.role
-            }
-        let boundaryModeByKind = Dictionary(grouping: brainTraces, by: \.0)
-            .compactMapValues { grouped in
-                grouped.first?.1.boundaryPolicy.mode
-            }
-        let boundaryConstraintCountsByKind = aggregatedBrainBoundaryConstraintCountsByKind()
-        let calibrationStatusByKind = Dictionary(grouping: brainTraces, by: \.0)
-            .compactMapValues { grouped in
-                grouped.first?.1.calibrationState.status
-            }
-        let calibrationAlertCountsByKind = aggregatedBrainCalibrationAlertCountsByKind()
-        let evolutionCheckpointCountByKind = averageBrainMetricByKind {
-            Double($0.evolutionState.checkpointCount)
-        }
-        let evolutionPendingReviewCountByKind = averageBrainMetricByKind {
-            Double($0.evolutionState.pendingReviewCount)
-        }
-        let evolutionRollbackReadyByKind = Dictionary(grouping: brainTraces, by: \.0)
-            .mapValues { grouped in
-                grouped.contains { $0.1.evolutionState.rollbackReady }
-            }
-
+        let summary = BASBrainSummaryBuilder.build(from: brainTraceInputs)
         return DecisionTestingBrainSummary(
-            brainTraceCount: brainTraces.count,
-            dominantReactionWeightByKind: dominantReactionWeightByKind,
-            averageProfileCoreCountByKind: averageProfileCoreCountByKind,
-            averageActiveGoalCountByKind: averageActiveGoalCountByKind,
-            averageRelevantMemoryCountByKind: averageRelevantMemoryCountByKind,
-            averageLoadedPromotedMemoryCountByKind: averageLoadedPromotedMemoryCountByKind,
-            averageLoadedPendingMemoryCountByKind: averageLoadedPendingMemoryCountByKind,
-            averagePendingCandidateCountByKind: averagePendingCandidateCountByKind,
-            averagePromotedRecordCountByKind: averagePromotedRecordCountByKind,
-            averageScreenedOutMemoryCountByKind: averageScreenedOutMemoryCountByKind,
-            loadedEligibilityReasonCountsByKind: loadedEligibilityReasonCountsByKind,
-            screenedOutEligibilityReasonCountsByKind: screenedOutEligibilityReasonCountsByKind,
-            pendingMemoryLoadRateByKind: pendingMemoryLoadRateByKind,
-            retrievalRejectionRateByKind: retrievalRejectionRateByKind,
-            latestSnapshotByKind: latestSnapshotByKind,
-            snapshotVariantCountByKind: snapshotVariantCountByKind,
-            lowTrustMemoryLoadRateByKind: lowTrustMemoryLoadRateByKind,
-            riskFlagCountsByKind: riskFlagCountsByKind,
-            identityRoleByKind: identityRoleByKind,
-            boundaryModeByKind: boundaryModeByKind,
-            boundaryConstraintCountsByKind: boundaryConstraintCountsByKind,
-            calibrationStatusByKind: calibrationStatusByKind,
-            calibrationAlertCountsByKind: calibrationAlertCountsByKind,
-            evolutionCheckpointCountByKind: evolutionCheckpointCountByKind,
-            evolutionPendingReviewCountByKind: evolutionPendingReviewCountByKind,
-            evolutionRollbackReadyByKind: evolutionRollbackReadyByKind
+            brainTraceCount: summary.brainTraceCount,
+            dominantReactionWeightByKind: mapKindDictionary(summary.dominantReactionWeightByKind),
+            averageProfileCoreCountByKind: mapKindDictionary(summary.averageProfileCoreCountByKind),
+            averageActiveGoalCountByKind: mapKindDictionary(summary.averageActiveGoalCountByKind),
+            averageRelevantMemoryCountByKind: mapKindDictionary(summary.averageRelevantMemoryCountByKind),
+            averageLoadedPromotedMemoryCountByKind: mapKindDictionary(summary.averageLoadedPromotedMemoryCountByKind),
+            averageLoadedPendingMemoryCountByKind: mapKindDictionary(summary.averageLoadedPendingMemoryCountByKind),
+            averagePendingCandidateCountByKind: mapKindDictionary(summary.averagePendingCandidateCountByKind),
+            averagePromotedRecordCountByKind: mapKindDictionary(summary.averagePromotedRecordCountByKind),
+            averageScreenedOutMemoryCountByKind: mapKindDictionary(summary.averageScreenedOutMemoryCountByKind),
+            loadedEligibilityReasonCountsByKind: mapKindDictionary(summary.loadedEligibilityReasonCountsByKind),
+            screenedOutEligibilityReasonCountsByKind: mapKindDictionary(summary.screenedOutEligibilityReasonCountsByKind),
+            pendingMemoryLoadRateByKind: mapKindDictionary(summary.pendingMemoryLoadRateByKind),
+            retrievalRejectionRateByKind: mapKindDictionary(summary.retrievalRejectionRateByKind),
+            latestSnapshotFingerprintByKind: mapKindDictionary(summary.latestSnapshotFingerprintByKind),
+            snapshotVariantCountByKind: mapKindDictionary(summary.snapshotVariantCountByKind),
+            lowTrustMemoryLoadRateByKind: mapKindDictionary(summary.lowTrustMemoryLoadRateByKind),
+            riskFlagCountsByKind: mapKindDictionary(summary.riskFlagCountsByKind),
+            identityRoleByKind: mapKindDictionary(summary.identityRoleByKind),
+            boundaryModeByKind: mapKindDictionary(summary.boundaryModeByKind),
+            boundaryConstraintCountsByKind: mapKindDictionary(summary.boundaryConstraintCountsByKind),
+            calibrationStatusByKind: mapKindDictionary(summary.calibrationStatusByKind),
+            calibrationAlertCountsByKind: mapKindDictionary(summary.calibrationAlertCountsByKind),
+            evolutionCheckpointCountByKind: mapKindDictionary(summary.evolutionCheckpointCountByKind),
+            evolutionPendingReviewCountByKind: mapKindDictionary(summary.evolutionPendingReviewCountByKind),
+            evolutionRollbackReadyByKind: mapKindDictionary(summary.evolutionRollbackReadyByKind)
         )
     }
 
@@ -336,7 +201,7 @@ struct DecisionTestingRuntimeExport {
             screenedOutEligibilityReasonCountsByKind: brainSummary.screenedOutEligibilityReasonCountsByKind,
             pendingMemoryLoadRateByKind: brainSummary.pendingMemoryLoadRateByKind,
             retrievalRejectionRateByKind: brainSummary.retrievalRejectionRateByKind,
-            brainSnapshotFingerprintByKind: brainSummary.latestSnapshotByKind.mapValues(\.fingerprint),
+            brainSnapshotFingerprintByKind: brainSummary.latestSnapshotFingerprintByKind,
             brainSnapshotVariantCountByKind: brainSummary.snapshotVariantCountByKind,
             lowTrustMemoryLoadRateByKind: brainSummary.lowTrustMemoryLoadRateByKind,
             brainRiskFlagCountsByKind: brainSummary.riskFlagCountsByKind,
@@ -378,6 +243,68 @@ struct DecisionTestingRuntimeExport {
             consistencyRejectedCountByKind: consistencyRejectedCountByKind,
             consistencyViolationCounts: consistencyViolationCounts
         )
+    }
+
+    private var lifecycleTraceInputs: [BASLifecycleTraceInput] {
+        recentTraces.map { trace in
+            BASLifecycleTraceInput(
+                kind: trace.kind.rawValue,
+                hasContextState: trace.contextState != nil,
+                generation: trace.contextState?.generation,
+                rebuiltSession: trace.contextState?.rebuiltSession ?? false,
+                staleFieldCount: trace.contextState?.staleFieldCount ?? 0,
+                anchorFieldCount: trace.contextState?.anchorFieldCount ?? 0,
+                hasFrontstageState: trace.frontstageState != nil,
+                retainedEvidenceCount: trace.frontstageState?.retainedEvidenceCount ?? 0,
+                droppedEvidenceCount: trace.frontstageState?.droppedEvidenceCount ?? 0,
+                droppedInjectedEvidenceCount: trace.frontstageState?.droppedInjectedEvidenceCount ?? 0,
+                droppedDuplicateEvidenceCount: trace.frontstageState?.droppedDuplicateEvidenceCount ?? 0,
+                droppedBudgetEvidenceCount: trace.frontstageState?.droppedBudgetEvidenceCount ?? 0
+            )
+        }
+    }
+
+    private var neuralTraceInputs: [BASNeuralTraceInput] {
+        recentTraces.compactMap { trace in
+            guard let neuralState = trace.neuralState else { return nil }
+            return BASNeuralTraceInput(
+                kind: trace.kind.rawValue,
+                suppressedBehaviorCount: neuralState.suppressedBehaviors.count,
+                dominantActionRawValue: neuralState.dominantAction?.rawValue,
+                strongestSignalRawValue: neuralState.dominantActivations.first?.signal.rawValue
+            )
+        }
+    }
+
+    private var brainTraceInputs: [BASBrainTraceInput] {
+        recentTraces.compactMap { trace in
+            guard let brainState = trace.brainState else { return nil }
+            return BASBrainTraceInput(
+                kind: trace.kind.rawValue,
+                dominantReactionWeight: brainState.reactionWeights.dominantKey,
+                profileCoreCount: brainState.profileCore.count,
+                activeGoalCount: brainState.activeGoals.count,
+                relevantMemoryCount: brainState.relevantMemories.count,
+                loadedPromotedMemoryCount: brainState.memoryGovernance.loadedPromotedMemoryCount,
+                loadedPendingMemoryCount: brainState.memoryGovernance.loadedPendingMemoryCount,
+                pendingCandidateCount: brainState.memoryGovernance.pendingCandidateCount,
+                promotedRecordCount: brainState.memoryGovernance.totalRecordCount,
+                screenedOutMemoryCount: brainState.memoryGovernance.screenedOutMemoryCount,
+                loadedEligibilityReasonCounts: brainState.memoryGovernance.loadedReasonCounts,
+                screenedOutEligibilityReasonCounts: brainState.memoryGovernance.screenedOutReasonCounts,
+                snapshotFingerprint: brainState.verificationSnapshot.fingerprint,
+                lowTrustMemoryLoadRate: brainState.verificationSnapshot.lowTrustMemoryLoadRate,
+                riskFlags: brainState.verificationSnapshot.riskFlags,
+                identityRole: brainState.identityProfile.role,
+                boundaryMode: brainState.boundaryPolicy.mode,
+                activeConstraints: brainState.boundaryPolicy.activeConstraints,
+                calibrationStatus: brainState.calibrationState.status,
+                calibrationAlerts: brainState.calibrationState.alerts,
+                evolutionCheckpointCount: brainState.evolutionState.checkpointCount,
+                evolutionPendingReviewCount: brainState.evolutionState.pendingReviewCount,
+                evolutionRollbackReady: brainState.evolutionState.rollbackReady
+            )
+        }
     }
 
     private var dominantGemmaBackend: InferenceBackendKind? {
@@ -696,6 +623,27 @@ struct DecisionTestingRuntimeExport {
         guard denominator > 0 else { return 0 }
         return Double(numerator) / Double(denominator)
     }
+
+    private func mapKindDictionary<Value>(
+        _ values: [String: Value]
+    ) -> [DecisionIntelligenceTraceKind: Value] {
+        mapKindDictionary(values) { $0 }
+    }
+
+    private func mapKindDictionary<Input, Output>(
+        _ values: [String: Input],
+        transform: (Input) -> Output?
+    ) -> [DecisionIntelligenceTraceKind: Output] {
+        values.reduce(into: [:]) { partialResult, item in
+            guard
+                let kind = DecisionIntelligenceTraceKind(rawValue: item.key),
+                let mappedValue = transform(item.value)
+            else {
+                return
+            }
+            partialResult[kind] = mappedValue
+        }
+    }
 }
 
 struct DecisionTestingLifecycleSummary: Equatable, Sendable {
@@ -740,7 +688,7 @@ struct DecisionTestingBrainSummary: Equatable, Sendable {
     let screenedOutEligibilityReasonCountsByKind: [DecisionIntelligenceTraceKind: [DecisionMemoryEligibilityReason: Int]]
     let pendingMemoryLoadRateByKind: [DecisionIntelligenceTraceKind: Double]
     let retrievalRejectionRateByKind: [DecisionIntelligenceTraceKind: Double]
-    let latestSnapshotByKind: [DecisionIntelligenceTraceKind: DecisionBrainStateSnapshot]
+    let latestSnapshotFingerprintByKind: [DecisionIntelligenceTraceKind: String]
     let snapshotVariantCountByKind: [DecisionIntelligenceTraceKind: Int]
     let lowTrustMemoryLoadRateByKind: [DecisionIntelligenceTraceKind: Double]
     let riskFlagCountsByKind: [DecisionIntelligenceTraceKind: [DecisionBrainStateRiskFlag: Int]]
