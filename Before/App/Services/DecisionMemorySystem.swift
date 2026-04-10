@@ -34,18 +34,24 @@ enum DecisionMemorySystem {
         in context: ModelContext,
         now: Date = .now
     ) -> [DecisionMemoryRecord] {
-        let drafts = deriveMemoryDrafts(in: context, now: now)
-            .sorted { lhs, rhs in
-                if lhs.priority == rhs.priority {
-                    return lhs.lastConfirmedAt > rhs.lastConfirmedAt
-                }
-                return lhs.priority > rhs.priority
+        let result: BASAppleMemoryReconciliationWriteResult<
+            DecisionMemoryRecord,
+            DecisionMemoryCandidateRecord
+        > = BASAppleMemoryGovernanceAdapter.refreshStoredMemories(
+            in: context,
+            now: now,
+            reminderType: SelfReminder.self,
+            checkEventType: CheckEvent.self,
+            balanceRecordType: BalanceDecisionRecord.self,
+            mirrorRecordType: MirrorDecisionRecord.self,
+            onSaveError: { error in
+                PersistenceIssueRecorder.record(
+                    error: error,
+                    operation: "reconciling governed memory records"
+                )
             }
-
-        return DecisionMemoryGovernor.reconcile(
-            drafts: drafts,
-            in: context
         )
+        return result.orderedRecords
     }
 
     static func refreshProjection(
@@ -264,19 +270,5 @@ enum DecisionMemorySystem {
         in context: ModelContext
     ) -> Int where Model: PersistentModel {
         (try? context.fetchCount(descriptor)) ?? 0
-    }
-
-    private static func deriveMemoryDrafts(
-        in context: ModelContext,
-        now: Date
-    ) -> [BASDerivedMemoryDraft] {
-        BASAppleMemoryDraftDerivationAdapter.deriveDrafts(
-            in: context,
-            now: now,
-            reminderType: SelfReminder.self,
-            checkEventType: CheckEvent.self,
-            balanceRecordType: BalanceDecisionRecord.self,
-            mirrorRecordType: MirrorDecisionRecord.self
-        )
     }
 }

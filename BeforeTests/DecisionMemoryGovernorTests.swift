@@ -1,5 +1,6 @@
 import XCTest
 import SwiftData
+import BASAppleAdapters
 import BASMemory
 @testable import Before
 
@@ -26,7 +27,7 @@ final class DecisionMemoryGovernorTests: XCTestCase {
     }
 
     func testAssessRejectsLowConfidenceSingletonDraft() {
-        let assessment = DecisionMemoryGovernor.assess(
+        let assessment = BASAppleMemoryGovernanceAdapter.assess(
             draft: BASDerivedMemoryDraft(
                 id: "semantic.noisy.singleton",
                 typeID: "semantic",
@@ -49,7 +50,7 @@ final class DecisionMemoryGovernorTests: XCTestCase {
     }
 
     func testAssessDefersCandidateOnlySituationalDraft() {
-        let assessment = DecisionMemoryGovernor.assess(
+        let assessment = BASAppleMemoryGovernanceAdapter.assess(
             draft: BASDerivedMemoryDraft(
                 id: "situational.quick.latest",
                 typeID: "situational",
@@ -72,7 +73,7 @@ final class DecisionMemoryGovernorTests: XCTestCase {
     }
 
     func testAssessRejectsContaminatedProvenanceDraft() {
-        let assessment = DecisionMemoryGovernor.assess(
+        let assessment = BASAppleMemoryGovernanceAdapter.assess(
             draft: BASDerivedMemoryDraft(
                 id: "semantic.injected.payload",
                 typeID: "semantic",
@@ -96,7 +97,7 @@ final class DecisionMemoryGovernorTests: XCTestCase {
     }
 
     func testAssessAdmitsImmediateGoalDraftEvenWhenSignalIsSparse() {
-        let assessment = DecisionMemoryGovernor.assess(
+        let assessment = BASAppleMemoryGovernanceAdapter.assess(
             draft: BASDerivedMemoryDraft(
                 id: "goal.sleep.before_midnight",
                 typeID: "goal",
@@ -148,7 +149,7 @@ final class DecisionMemoryGovernorTests: XCTestCase {
         context.insert(record)
         try context.save()
 
-        let records = DecisionMemoryGovernor.reconcile(drafts: [], in: context)
+        let records = reconcile(drafts: [], in: context)
 
         XCTAssertEqual(records.count, 1)
         XCTAssertEqual(records.first?.id, "semantic.repeat.buy")
@@ -204,7 +205,7 @@ final class DecisionMemoryGovernorTests: XCTestCase {
         context.insert(reflectionRecord)
         try context.save()
 
-        let records = DecisionMemoryGovernor.reconcile(drafts: [], in: context)
+        let records = reconcile(drafts: [], in: context)
 
         let resolvedReminder = try XCTUnwrap(records.first(where: { $0.id == reminderRecord.id }))
         let resolvedReflection = try XCTUnwrap(records.first(where: { $0.id == reflectionRecord.id }))
@@ -260,8 +261,27 @@ final class DecisionMemoryGovernorTests: XCTestCase {
         context.insert(aRecord)
         try context.save()
 
-        let records = DecisionMemoryGovernor.reconcile(drafts: [], in: context)
+        let records = reconcile(drafts: [], in: context)
 
         XCTAssertEqual(records.map(\.id), ["a-id", "z-id"])
     }
+}
+
+private func reconcile(
+    drafts: [BASDerivedMemoryDraft],
+    in context: ModelContext
+) -> [DecisionMemoryRecord] {
+    let result: BASAppleMemoryReconciliationWriteResult<
+        DecisionMemoryRecord,
+        DecisionMemoryCandidateRecord
+    > = BASAppleMemoryReconciliationWriter.reconcile(
+        BASAppleMemoryPersistenceRequest(
+            drafts: drafts,
+            existingRecords: [],
+            existingCandidates: [],
+            reviewNow: drafts.map(\.lastConfirmedAt).max() ?? .now
+        ),
+        in: context
+    )
+    return result.orderedRecords
 }
