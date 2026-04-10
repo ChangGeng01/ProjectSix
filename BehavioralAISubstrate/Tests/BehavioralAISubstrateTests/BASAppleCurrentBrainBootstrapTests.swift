@@ -433,4 +433,77 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(artifact.execution.orderedFailurePatternIDs == ["night_fast_path_failure"])
         #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.rawValue)
     }
+
+    @Test("bootstrap coordinator sequences recommendation and selection before compiling artifact")
+    func bootstrapCoordinatorSequencesRecommendationAndSelection() {
+        let now = Date(timeIntervalSince1970: 1_744_322_300)
+        let baseInput = BASAppleCurrentBrainBootstrapHostSourceInput(
+            modeID: "quick",
+            prompt: "Should I send this tonight?",
+            triggerID: "sessionPrime",
+            riskLevelOverrideID: "medium",
+            preferredLanguages: ["en-AU"],
+            now: now,
+            projection: BASBrainProjection(
+                records: [
+                    BASGovernedMemory(
+                        kind: .goal,
+                        content: "Protect sleep before late-night replies.",
+                        scope: .user,
+                        sensitivity: .low,
+                        tier: .hot,
+                        confidence: 0.93,
+                        sourceType: "history",
+                        governanceStatus: .governed,
+                        provenanceSummary: "goal"
+                    )
+                ],
+                candidates: [],
+                recentEvents: []
+            ),
+            retrievalMode: "filtered",
+            templates: [],
+            failurePatterns: []
+        )
+
+        var sawPreparation = false
+        let artifact = BASAppleCurrentBrainBootstrapCoordinator.artifact(
+            baseInput: baseInput,
+            recommendTemplateIDs: { preparation in
+                sawPreparation = true
+                #expect(preparation.mode == .quick)
+                return ["night_message_cooling"]
+            },
+            selectTemplates: { _, recommendedTemplateIDs in
+                #expect(recommendedTemplateIDs == ["night_message_cooling"])
+                return recommendedTemplateIDs.map {
+                    BASAppleCurrentBrainBootstrapHostTemplateInput(
+                        id: $0,
+                        modeID: "quick",
+                        riskLevelID: "medium",
+                        isPinned: true,
+                        successCount: 4,
+                        updatedAt: now
+                    )
+                }
+            },
+            selectFailurePatterns: { _ in
+                [
+                    BASAppleCurrentBrainBootstrapHostFailurePatternInput(
+                        id: "night_fast_path_failure",
+                        modeID: "quick",
+                        suppressionWeight: 0.95,
+                        evidenceCount: 2,
+                        updatedAt: now
+                    )
+                ]
+            },
+            mapTemplate: { $0 },
+            mapFailurePattern: { $0 }
+        )
+
+        #expect(sawPreparation)
+        #expect(artifact.execution.orderedTemplateIDs == ["night_message_cooling"])
+        #expect(artifact.execution.orderedFailurePatternIDs == ["night_fast_path_failure"])
+    }
 }

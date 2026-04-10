@@ -194,3 +194,38 @@ public enum BASAppleCurrentBrainBootstrapHostAdapter {
         )
     }
 }
+
+public enum BASAppleCurrentBrainBootstrapCoordinator {
+    public static func artifact<Template, FailurePattern>(
+        baseInput: BASAppleCurrentBrainBootstrapHostSourceInput,
+        recommendTemplateIDs: (BASCurrentBrainBootstrapPreparation) -> [String],
+        selectTemplates: (BASCurrentBrainBootstrapPreparation, [String]) -> [Template],
+        selectFailurePatterns: (BASCurrentBrainBootstrapPreparation) -> [FailurePattern],
+        mapTemplate: (Template) -> BASAppleCurrentBrainBootstrapHostTemplateInput,
+        mapFailurePattern: (FailurePattern) -> BASAppleCurrentBrainBootstrapHostFailurePatternInput
+    ) -> BASAppleCurrentBrainBootstrapArtifact {
+        let preparation = BASAppleCurrentBrainBootstrapHostAdapter.prepare(from: baseInput)
+        let recommendedTemplateIDs = recommendTemplateIDs(preparation)
+        let templates = selectTemplates(preparation, recommendedTemplateIDs).map(mapTemplate)
+        let failurePatterns = selectFailurePatterns(preparation).map(mapFailurePattern)
+
+        return BASAppleCurrentBrainBootstrapHostAdapter.artifact(
+            from: BASAppleCurrentBrainBootstrapHostSourceInput(
+                modeID: baseInput.modeID,
+                prompt: baseInput.prompt,
+                triggerID: baseInput.triggerID,
+                sourceSurfaceOverrideID: baseInput.sourceSurfaceOverrideID,
+                riskLevelOverrideID: baseInput.riskLevelOverrideID,
+                preferredLanguages: baseInput.preferredLanguages,
+                now: baseInput.now,
+                projection: baseInput.projection,
+                embeddingScores: baseInput.embeddingScores,
+                taskGraphHint: baseInput.taskGraphHint,
+                retrievalMode: baseInput.retrievalMode,
+                recommendedTemplateIDs: recommendedTemplateIDs,
+                templates: templates,
+                failurePatterns: failurePatterns
+            )
+        )
+    }
+}

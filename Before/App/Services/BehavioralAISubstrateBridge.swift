@@ -208,30 +208,8 @@ enum BehavioralAISubstrateBridge {
         retrievalMode: DecisionRetrievalMode,
         now: Date
     ) -> BASAppleCurrentBrainBootstrapArtifact {
-        let preparation = prepareCurrentBrainBootstrap(
-            mode: mode,
-            prompt: prompt,
-            source: source,
-            envelope: envelope,
-            now: now
-        )
-        let languageMode = decisionLanguageMode(from: preparation.languageMode)
-        let riskLevel = interventionRiskLevel(from: preparation.riskLevel)
-        let recommendedArmIDs = DecisionReactionBanditStore.recommendedArmIDs(
-            mode: mode,
-            riskLevel: riskLevel,
-            languageMode: languageMode,
-            now: now
-        )
-        let templates = InterventionTemplateStore.selectTemplates(
-            in: context,
-            mode: mode,
-            riskLevel: riskLevel,
-            recommendedArmIDs: recommendedArmIDs
-        )
-        let failurePatterns = FailurePatternStore.selectedFailurePatterns(in: context, mode: mode)
-        return BASAppleCurrentBrainBootstrapHostAdapter.artifact(
-            from: hostBootstrapSourceInput(
+        BASAppleCurrentBrainBootstrapCoordinator.artifact(
+            baseInput: hostBootstrapSourceInput(
                 mode: mode,
                 prompt: prompt,
                 source: source,
@@ -240,11 +218,49 @@ enum BehavioralAISubstrateBridge {
                 projection: projection.baseProjection,
                 taskGraph: taskGraph,
                 retrievalMode: retrievalMode.rawValue,
-                recommendedTemplateIDs: recommendedArmIDs,
-                templates: templates,
-                failurePatterns: failurePatterns,
+                recommendedTemplateIDs: [],
+                templates: [],
+                failurePatterns: [],
                 now: now
-            )
+            ),
+            recommendTemplateIDs: { preparation in
+                DecisionReactionBanditStore.recommendedArmIDs(
+                    mode: mode,
+                    riskLevel: interventionRiskLevel(from: preparation.riskLevel),
+                    languageMode: decisionLanguageMode(from: preparation.languageMode),
+                    now: preparation.now
+                )
+            },
+            selectTemplates: { preparation, recommendedTemplateIDs in
+                InterventionTemplateStore.selectTemplates(
+                    in: context,
+                    mode: mode,
+                    riskLevel: interventionRiskLevel(from: preparation.riskLevel),
+                    recommendedArmIDs: recommendedTemplateIDs
+                )
+            },
+            selectFailurePatterns: { _ in
+                FailurePatternStore.selectedFailurePatterns(in: context, mode: mode)
+            },
+            mapTemplate: { template in
+                BASAppleCurrentBrainBootstrapHostTemplateInput(
+                    id: template.id,
+                    modeID: template.mode.rawValue,
+                    riskLevelID: template.riskLevel.rawValue,
+                    isPinned: template.isPinned,
+                    successCount: template.successCount,
+                    updatedAt: template.updatedAt
+                )
+            },
+            mapFailurePattern: { pattern in
+                BASAppleCurrentBrainBootstrapHostFailurePatternInput(
+                    id: pattern.id,
+                    modeID: pattern.mode.rawValue,
+                    suppressionWeight: pattern.suppressionWeight,
+                    evidenceCount: pattern.evidenceCount,
+                    updatedAt: pattern.updatedAt
+                )
+            }
         )
     }
 

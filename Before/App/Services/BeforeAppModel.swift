@@ -3,6 +3,7 @@ import SwiftData
 import SwiftUI
 import WidgetKit
 import BASAdmin
+import BASAppleAdapters
 
 struct DecisionSignal {
     let eyebrow: String
@@ -535,13 +536,20 @@ final class BeforeAppModel: ObservableObject {
             event.reflectionNote = trimmedNote.isEmpty ? nil : trimmedNote
             DecisionReactionBanditStore.update(
                 mode: .quick,
-                riskLevel: inferredRiskLevel(for: event, outcome: outcome),
+                riskLevel: InterventionRiskLevel(
+                    rawValue: BASAppleReflectionAdaptationAdvisor.riskLevel(
+                        finalActionID: event.finalAction.rawValue,
+                        outcomeID: outcome.rawValue
+                    ).rawValue
+                ) ?? .medium,
                 languageMode: DecisionLanguageMode.detect(
                     preferredLanguages: Locale.preferredLanguages,
                     sampleTexts: [event.note, trimmedNote]
                 ),
-                chosenArmID: chosenArmID(for: event.finalAction),
-                reward: reflectionReward(outcome)
+                chosenArmID: BASAppleReflectionAdaptationAdvisor.chosenArmID(
+                    finalActionID: event.finalAction.rawValue
+                ),
+                reward: BASAppleReflectionAdaptationAdvisor.reward(outcomeID: outcome.rawValue)
             )
         }
 
@@ -1460,45 +1468,6 @@ final class BeforeAppModel: ObservableObject {
 
         Task {
             await NotificationService.shared.schedulePredictiveInterventionNotification(interventionCandidate)
-        }
-    }
-
-    private func reflectionReward(_ outcome: ReflectionOutcome) -> Bool {
-        switch outcome {
-        case .betterThanExpected, .okay, .notNeeded:
-            true
-        case .regrettedIt, .feltEmptier:
-            false
-        }
-    }
-
-    private func chosenArmID(for action: CheckAction) -> String {
-        switch action {
-        case .decideTomorrow, .wait90s:
-            "tomorrow_box_interrupt"
-        case .leaveStimulus:
-            "slow_delay_guard"
-        case .goAheadAnyway, .continueMindfully:
-            "brief_warm_nudge"
-        }
-    }
-
-    private func inferredRiskLevel(
-        for event: CheckEvent,
-        outcome: ReflectionOutcome
-    ) -> InterventionRiskLevel {
-        switch outcome {
-        case .regrettedIt, .feltEmptier:
-            .high
-        case .okay:
-            .medium
-        case .betterThanExpected, .notNeeded:
-            switch event.finalAction {
-            case .goAheadAnyway, .continueMindfully:
-                .medium
-            case .wait90s, .leaveStimulus, .decideTomorrow:
-                .low
-            }
         }
     }
 
