@@ -138,6 +138,50 @@ struct BehavioralAISubstrateBridgeTests {
     }
 
     @Test
+    func bridgeBootstrapCurrentBrainStateCommitsAndMaterializesHostState() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        seedHistory(into: context)
+        try context.save()
+
+        let now = date("2026-04-10T21:45:00Z")
+        let projection = DecisionMemorySystem.refreshProjection(in: context, now: now)
+
+        let current = BehavioralAISubstrateBridge.bootstrapCurrentBrainState(
+            mode: .quick,
+            prompt: "Should I send this tonight?",
+            source: .launch,
+            envelope: DecisionIntentEnvelope(
+                kind: .resumeCurrentDecision,
+                sourceSurface: .notification,
+                entrySource: .app,
+                preferredMode: .quick,
+                promptSeed: "Should I send this tonight?",
+                riskLevel: .high,
+                triggerReason: "prediction"
+            ),
+            taskGraph: nil,
+            context: context,
+            projection: projection,
+            retrievalMode: .filtered,
+            now: now
+        )
+
+        let updates = try context.fetch(FetchDescriptor<BrainStateUpdate>())
+        let checkpoints = try context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())
+        let templates = try context.fetch(FetchDescriptor<InterventionTemplateRecord>())
+
+        #expect(current.sourceSurface == .notification)
+        #expect(current.riskLevel == .high)
+        #expect(!templates.isEmpty)
+        #expect(checkpoints.count == 1)
+        #expect(updates.count == 1)
+        #expect(updates.first?.fingerprint == current.verificationSnapshot.fingerprint)
+        #expect(current.identityProfile.role == .predictiveSentinel)
+        #expect(current.boundaryPolicy.riskLevel == .high)
+    }
+
+    @Test
     func bridgeBootstrapCompilesProjectionIntoSubstrateBrainState() async throws {
         let container = try makeContainer()
         let context = container.mainContext
