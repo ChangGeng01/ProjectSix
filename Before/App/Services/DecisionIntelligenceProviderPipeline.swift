@@ -1678,9 +1678,10 @@ enum DecisionIntelligenceProviderPipeline {
         base: String,
         suspendedKinds: [DecisionModelProviderKind]
     ) -> String {
-        guard !suspendedKinds.isEmpty else { return base }
-        let titles = suspendedKinds.map(\.title).joined(separator: ", ")
-        return "\(base) Active runtime cooldown: \(titles)."
+        BASProviderTraceNarrator.deterministicFallbackDetail(
+            base: base,
+            suspendedProviderTitles: suspendedKinds.map(\.title)
+        )
     }
 
     private static func recordTrace(
@@ -1750,21 +1751,19 @@ enum DecisionIntelligenceProviderPipeline {
         active: DecisionModelProviderKind,
         allowFallbacks: Bool
     ) -> String {
-        let base: String
-        if active == preferred {
-            base = allowFallbacks
-                ? "Before used the preferred provider without needing a fallback."
-                : "Before used the pinned provider with fallback disabled."
-        } else {
-            base = "Before switched away from \(preferred.title) and used \(active.title) for this refinement."
-        }
-
-        guard active == .gemmaE4B else { return base }
-
-        let resolution = GemmaE4BIntelligenceService.backendResolution(
-            policy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
+        BASProviderTraceNarrator.detail(
+            preferredTitle: preferred.title,
+            activeTitle: active.title,
+            allowFallbacks: allowFallbacks,
+            activeResolutionDetail: active == .gemmaE4B
+                ? {
+                    let resolution = GemmaE4BIntelligenceService.backendResolution(
+                        policy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
+                    )
+                    return "\(resolution.title): \(resolution.detail)"
+                }()
+                : nil
         )
-        return "\(base) \(resolution.title): \(resolution.detail)"
     }
 
     private static func cachedDetail(
@@ -1772,8 +1771,13 @@ enum DecisionIntelligenceProviderPipeline {
         active: DecisionModelProviderKind,
         allowFallbacks: Bool
     ) -> String {
-        detail(preferred: preferred, active: active, allowFallbacks: allowFallbacks)
-            + " Before served the response from the structured prompt cache instead of recomputing it."
+        BASProviderTraceNarrator.cachedDetail(
+            base: detail(
+                preferred: preferred,
+                active: active,
+                allowFallbacks: allowFallbacks
+            )
+        )
     }
 
     private static func quickPreview(from result: QuickCheckResult) -> String {

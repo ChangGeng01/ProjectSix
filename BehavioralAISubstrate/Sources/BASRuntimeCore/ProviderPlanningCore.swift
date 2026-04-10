@@ -567,6 +567,42 @@ public enum BASRuntimeAvailabilityNarrator {
     }
 }
 
+public enum BASProviderTraceNarrator {
+    public static func detail(
+        preferredTitle: String,
+        activeTitle: String,
+        allowFallbacks: Bool,
+        activeResolutionDetail: String? = nil
+    ) -> String {
+        let base: String
+        if activeTitle == preferredTitle {
+            base = allowFallbacks
+                ? "Before used the preferred provider without needing a fallback."
+                : "Before used the pinned provider with fallback disabled."
+        } else {
+            base = "Before switched away from \(preferredTitle) and used \(activeTitle) for this refinement."
+        }
+
+        guard let activeResolutionDetail, !activeResolutionDetail.isEmpty else {
+            return base
+        }
+
+        return "\(base) \(activeResolutionDetail)"
+    }
+
+    public static func cachedDetail(base: String) -> String {
+        base + " Before served the response from the structured prompt cache instead of recomputing it."
+    }
+
+    public static func deterministicFallbackDetail(
+        base: String,
+        suspendedProviderTitles: [String]
+    ) -> String {
+        guard !suspendedProviderTitles.isEmpty else { return base }
+        return "\(base) Active runtime cooldown: \(suspendedProviderTitles.joined(separator: ", "))."
+    }
+}
+
 public struct BASRuntimeStatusSummary: Codable, Equatable, Sendable {
     public var preferredProviderID: String
     public var activeProviderID: String
