@@ -58,19 +58,40 @@ enum DecisionMemorySystem {
         in context: ModelContext,
         now: Date = .now
     ) -> BrainStateProjection {
+        let governanceSnapshot = BASAppleMemoryProjectionSelectionAdapter.governanceSnapshot(
+            in: context,
+            recordType: DecisionMemoryRecord.self,
+            candidateType: DecisionMemoryCandidateRecord.self
+        )
         let refreshed = BASAppleMemoryProjectionRefreshAdapter.refreshProjection(
             in: context,
             now: now,
-            governanceSnapshot: substrateGovernanceSnapshot(
-                from: fetchGovernanceSnapshot(in: context)
-            ),
-            refreshGovernanceSnapshot: { substrateGovernanceSnapshot(from: fetchGovernanceSnapshot(in: $0)) },
+            governanceSnapshot: governanceSnapshot,
+            refreshGovernanceSnapshot: {
+                BASAppleMemoryProjectionSelectionAdapter.governanceSnapshot(
+                    in: $0,
+                    recordType: DecisionMemoryRecord.self,
+                    candidateType: DecisionMemoryCandidateRecord.self
+                )
+            },
             reminderType: SelfReminder.self,
             checkEventType: CheckEvent.self,
             balanceRecordType: BalanceDecisionRecord.self,
             mirrorRecordType: MirrorDecisionRecord.self,
-            fetchRecords: { fetchMemoryRecords(in: $0, limit: $1) },
-            fetchCandidates: { fetchCandidateRecords(in: $0, limit: $1) },
+            fetchRecords: {
+                BASAppleMemoryProjectionSelectionAdapter.fetchProjectionRecords(
+                    in: $0,
+                    recordType: DecisionMemoryRecord.self,
+                    limit: $1
+                )
+            },
+            fetchCandidates: {
+                BASAppleMemoryProjectionSelectionAdapter.fetchPendingProjectionCandidates(
+                    in: $0,
+                    candidateType: DecisionMemoryCandidateRecord.self,
+                    limit: $1
+                )
+            },
             fetchCheckEvents: { fetchCheckEvents(in: $0, limit: $1) },
             fetchBalanceRecords: { fetchBalanceRecords(in: $0, limit: $1) },
             fetchMirrorRecords: { fetchMirrorRecords(in: $0, limit: $1) },
@@ -153,36 +174,22 @@ enum DecisionMemorySystem {
         in context: ModelContext,
         limit: Int? = nil
     ) -> [DecisionMemoryRecord] {
-        var descriptor = FetchDescriptor<DecisionMemoryRecord>(
-            sortBy: [
-                SortDescriptor(\.priority, order: .reverse),
-                SortDescriptor(\.lastConfirmedAt, order: .reverse)
-            ]
+        BASAppleMemoryProjectionSelectionAdapter.fetchProjectionRecords(
+            in: context,
+            recordType: DecisionMemoryRecord.self,
+            limit: limit
         )
-        if let limit {
-            descriptor.fetchLimit = limit
-        }
-        return (try? context.fetch(descriptor)) ?? []
     }
 
     static func fetchCandidateRecords(
         in context: ModelContext,
         limit: Int? = nil
     ) -> [DecisionMemoryCandidateRecord] {
-        let pendingRaw = DecisionMemoryCandidateStatus.pending.rawValue
-        var descriptor = FetchDescriptor<DecisionMemoryCandidateRecord>(
-            predicate: #Predicate<DecisionMemoryCandidateRecord> {
-                $0.statusRaw == pendingRaw
-            },
-            sortBy: [
-                SortDescriptor(\.priority, order: .reverse),
-                SortDescriptor(\.lastObservedAt, order: .reverse)
-            ]
+        BASAppleMemoryProjectionSelectionAdapter.fetchPendingProjectionCandidates(
+            in: context,
+            candidateType: DecisionMemoryCandidateRecord.self,
+            limit: limit
         )
-        if let limit {
-            descriptor.fetchLimit = limit
-        }
-        return (try? context.fetch(descriptor)) ?? []
     }
 
     static func fetchCheckEvents(
@@ -218,69 +225,4 @@ enum DecisionMemorySystem {
         return (try? context.fetch(descriptor)) ?? []
     }
 
-    private static func fetchGovernanceSnapshot(
-        in context: ModelContext
-    ) -> BrainStateGovernanceSnapshot {
-        let pendingRaw = DecisionMemoryCandidateStatus.pending.rawValue
-        let promotedRaw = DecisionMemoryCandidateStatus.promoted.rawValue
-        let deferredRaw = DecisionMemoryGovernanceDecision.deferred.rawValue
-        let admittedRaw = DecisionMemoryGovernanceDecision.admit.rawValue
-
-        return BrainStateGovernanceSnapshot(
-            totalRecordCount: fetchCount(FetchDescriptor<DecisionMemoryRecord>(), in: context),
-            totalCandidateCount: fetchCount(FetchDescriptor<DecisionMemoryCandidateRecord>(), in: context),
-            pendingCandidateCount: fetchCount(
-                FetchDescriptor<DecisionMemoryCandidateRecord>(
-                    predicate: #Predicate<DecisionMemoryCandidateRecord> {
-                        $0.statusRaw == pendingRaw
-                    }
-                ),
-                in: context
-            ),
-            promotedCandidateCount: fetchCount(
-                FetchDescriptor<DecisionMemoryCandidateRecord>(
-                    predicate: #Predicate<DecisionMemoryCandidateRecord> {
-                        $0.statusRaw == promotedRaw
-                    }
-                ),
-                in: context
-            ),
-            deferredCandidateCount: fetchCount(
-                FetchDescriptor<DecisionMemoryCandidateRecord>(
-                    predicate: #Predicate<DecisionMemoryCandidateRecord> {
-                        $0.lastGovernanceDecisionRaw == deferredRaw
-                    }
-                ),
-                in: context
-            ),
-            admittedCandidateCount: fetchCount(
-                FetchDescriptor<DecisionMemoryCandidateRecord>(
-                    predicate: #Predicate<DecisionMemoryCandidateRecord> {
-                        $0.lastGovernanceDecisionRaw == admittedRaw
-                    }
-                ),
-                in: context
-            )
-        )
-    }
-
-    private static func fetchCount<Model>(
-        _ descriptor: FetchDescriptor<Model>,
-        in context: ModelContext
-    ) -> Int where Model: PersistentModel {
-        (try? context.fetchCount(descriptor)) ?? 0
-    }
-
-    private static func substrateGovernanceSnapshot(
-        from snapshot: BrainStateGovernanceSnapshot
-    ) -> BASAppleProjectionGovernanceSnapshot {
-        BASAppleProjectionGovernanceSnapshot(
-            totalRecordCount: snapshot.totalRecordCount,
-            totalCandidateCount: snapshot.totalCandidateCount,
-            pendingCandidateCount: snapshot.pendingCandidateCount,
-            promotedCandidateCount: snapshot.promotedCandidateCount,
-            deferredCandidateCount: snapshot.deferredCandidateCount,
-            admittedCandidateCount: snapshot.admittedCandidateCount
-        )
-    }
 }
