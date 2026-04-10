@@ -50,20 +50,6 @@ enum DecisionIntelligencePromptContract {
         let candidates: [ReminderSelectionCandidate]
     }
 
-    enum PrefixCache {
-        static func instructions(for kind: TaskKind) -> String {
-            BASPromptPrefixCatalog.instructions(for: semanticTaskKind(for: kind))
-        }
-
-        static func immutablePrefix(for kind: TaskKind) -> String {
-            BASPromptPrefixCatalog.immutablePrefix(for: semanticTaskKind(for: kind))
-        }
-
-        static func adaptivePrefix(for kind: TaskKind) -> String {
-            BASPromptPrefixCatalog.adaptivePrefix(for: semanticTaskKind(for: kind))
-        }
-    }
-
     static func sanitized(_ value: String, fallback: String, limit: Int) -> String {
         BASPromptTextSanitizer.sanitized(value, fallback: fallback, limit: limit)
     }
@@ -80,12 +66,12 @@ enum DecisionIntelligencePromptContract {
             kind: .quick,
             strategy: strategy,
             state: [
-                "mode": DecisionMode.quick.shortTitle,
-                "scenario": input.scenario.title,
-                "motivation": input.motivation.title,
-                "expected_outcome": input.expectedOutcome.title,
-                "control_level": input.controlLevel.title,
-                "note": stateValue(input.note, fallback: "Not provided.", limit: Limit.stateField)
+                "mode": .string(DecisionMode.quick.shortTitle),
+                "scenario": .string(input.scenario.title),
+                "motivation": .string(input.motivation.title),
+                "expected_outcome": .string(input.expectedOutcome.title),
+                "control_level": .string(input.controlLevel.title),
+                "note": .string(stateValue(input.note, fallback: "Not provided.", limit: Limit.stateField))
             ],
             evidence: [
                 "Current perspective: \(evidenceValue(base.currentPerspective, limit: Limit.evidenceSnippet))",
@@ -136,12 +122,12 @@ enum DecisionIntelligencePromptContract {
             kind: .balance,
             strategy: strategy,
             state: [
-                "mode": DecisionMode.balance.shortTitle,
-                "prompt": stateValue(input.prompt, fallback: "Not provided.", limit: Limit.statePrompt),
-                "want": stateValue(input.desire, fallback: "Not provided.", limit: Limit.stateField),
-                "concern": stateValue(input.concern, fallback: "Not provided.", limit: Limit.stateField),
-                "reality": stateValue(input.constraint, fallback: "Not provided.", limit: Limit.stateField),
-                "long_term": stateValue(input.longTerm, fallback: "Not provided.", limit: Limit.stateField)
+                "mode": .string(DecisionMode.balance.shortTitle),
+                "prompt": .string(stateValue(input.prompt, fallback: "Not provided.", limit: Limit.statePrompt)),
+                "want": .string(stateValue(input.desire, fallback: "Not provided.", limit: Limit.stateField)),
+                "concern": .string(stateValue(input.concern, fallback: "Not provided.", limit: Limit.stateField)),
+                "reality": .string(stateValue(input.constraint, fallback: "Not provided.", limit: Limit.stateField)),
+                "long_term": .string(stateValue(input.longTerm, fallback: "Not provided.", limit: Limit.stateField))
             ],
             evidence: [
                 "Current headline: \(evidenceValue(base.headline, limit: Limit.evidenceSnippet))",
@@ -198,13 +184,13 @@ enum DecisionIntelligencePromptContract {
             kind: .mirror,
             strategy: strategy,
             state: [
-                "mode": DecisionMode.mirror.shortTitle,
-                "prompt": stateValue(input.prompt, fallback: "Not provided.", limit: Limit.statePrompt),
-                "emotion": stateValue(input.emotion, fallback: "Not provided.", limit: Limit.stateField),
-                "relationship": stateValue(input.relationship, fallback: "Not provided.", limit: Limit.stateField),
-                "reality": stateValue(input.reality, fallback: "Not provided.", limit: Limit.stateField),
-                "long_term": stateValue(input.longTerm, fallback: "Not provided.", limit: Limit.stateField),
-                "self_lens": stateValue(input.selfLens, fallback: "Not provided.", limit: Limit.stateField)
+                "mode": .string(DecisionMode.mirror.shortTitle),
+                "prompt": .string(stateValue(input.prompt, fallback: "Not provided.", limit: Limit.statePrompt)),
+                "emotion": .string(stateValue(input.emotion, fallback: "Not provided.", limit: Limit.stateField)),
+                "relationship": .string(stateValue(input.relationship, fallback: "Not provided.", limit: Limit.stateField)),
+                "reality": .string(stateValue(input.reality, fallback: "Not provided.", limit: Limit.stateField)),
+                "long_term": .string(stateValue(input.longTerm, fallback: "Not provided.", limit: Limit.stateField)),
+                "self_lens": .string(stateValue(input.selfLens, fallback: "Not provided.", limit: Limit.stateField))
             ],
             evidence: [
                 "Current headline: \(evidenceValue(base.headline, limit: Limit.evidenceSnippet))",
@@ -263,10 +249,10 @@ enum DecisionIntelligencePromptContract {
             kind: .reminder,
             strategy: strategy,
             state: [
-                "mode": modeTitle,
-                "scenario": scenario.title,
-                "current_prompt": stateValue(prompt, fallback: "Not provided.", limit: Limit.statePrompt),
-                "candidate_count": clippedCandidates.count
+                "mode": .string(modeTitle),
+                "scenario": .string(scenario.title),
+                "current_prompt": .string(stateValue(prompt, fallback: "Not provided.", limit: Limit.statePrompt)),
+                "candidate_count": .integer(clippedCandidates.count)
             ],
             evidence: clippedCandidates.enumerated().map { index, candidate in
                 let safeContent = sanitized(
@@ -344,7 +330,7 @@ enum DecisionIntelligencePromptContract {
     private static func makeEnvelope(
         kind: TaskKind,
         strategy: DecisionAdaptiveTaskStrategy? = nil,
-        state: [String: Any?],
+        state: [String: BASPromptStateValue?],
         evidence: [String],
         outputGuard: [String],
         openTextSignalCount: Int = 0,
@@ -354,69 +340,24 @@ enum DecisionIntelligencePromptContract {
         structuredTruthOverride: BASStructuredTruthState? = nil,
         includeStructuredTruthBlock: Bool = true
     ) -> PromptEnvelope {
-        let immutablePrefix = PrefixCache.immutablePrefix(for: kind)
-        let adaptivePrefix = PrefixCache.adaptivePrefix(for: kind)
-        let structuredTruth = structuredTruthOverride ?? BASStructuredTruthCompiler.truthState(
-            for: BASStructuredTruthRequest(
-                kind: adaptiveTraceKind(for: kind),
-                brainState: brainState
-            )
-        )
-        let renderedStructuredTruth = includeStructuredTruthBlock ? structuredTruth : nil
         let substrateStrategy = strategy.map { substrateAdaptiveStrategy($0) }
-        let scopedContextJSON = BASScopedContextCompiler.compile(
-            kind: adaptiveTraceKind(for: kind),
-            strategy: substrateStrategy,
-            brainState: brainState
-        )
-        .map(BASScopedContextCompiler.jsonString(for:))
-        let frontstageInput = BASPromptContractFrontstageInput(
-            kind: adaptiveTraceKind(for: kind),
-            activeStateSignalCount: activeStateSignalCount(in: state),
-            openTextSignalCount: openTextSignalCount,
-            contextWasRebuilt: contextState?.rebuiltSession == true,
-            staleFieldCount: contextState?.staleFieldCount ?? 0,
-            anchorTitles: (contextState?.anchorFields ?? []).map(\.title),
-            dominantSignalTitles: (neuralState?.dominantActivations ?? []).map(\.signal.title),
-            suppressedBehaviors: neuralState?.suppressedBehaviors ?? [],
-            memoryHeadlines: brainState?.relevantMemories ?? [],
-            sessionBiases: brainState?.sessionBiases ?? []
-        )
-        let targetCharacters = strategy?.contextBudget ?? kind.targetCharacters
-        let suffixFloor: Int
-        if strategy?.runtimeGear == .low {
-            switch kind {
-            case .quick, .reminder:
-                suffixFloor = 120
-            case .balance, .mirror:
-                suffixFloor = 150
-            }
-        } else {
-            suffixFloor = 180
-        }
-
-        return BASPromptContractCompiler.compile(
-            BASPromptContractRequest(
+        return BASPromptPreparationCompiler.compile(
+            BASPromptPreparationRequest(
                 kind: kind,
                 semanticKind: semanticTaskKind(for: kind),
                 adaptiveKind: adaptiveTraceKind(for: kind),
-                immutablePrefix: immutablePrefix,
-                adaptivePrefix: adaptivePrefix,
-                taskStateJSON: stateJSONString(state),
+                taskState: state,
                 evidenceSnippets: evidence,
-                evidenceRetentionBudget: evidenceRetentionBudget(for: kind, strategy: strategy),
                 outputGuard: outputGuard,
-                frontstageInput: frontstageInput,
-                targetCharacters: targetCharacters,
-                suffixFloorCharacters: suffixFloor,
+                openTextSignalCount: openTextSignalCount,
+                defaultTargetCharacters: kind.targetCharacters,
                 strategy: substrateStrategy,
-                structuredTruth: structuredTruth,
-                includeStructuredTruthBlock: renderedStructuredTruth != nil,
-                scopedContextJSON: scopedContextJSON,
+                contextLifecycleSnapshot: contextState.map(promptContextLifecycleSnapshot),
+                neuralSnapshot: neuralState.map(promptNeuralSnapshot),
+                brainState: brainState,
+                structuredTruthOverride: structuredTruthOverride,
+                includeStructuredTruthBlock: includeStructuredTruthBlock,
                 providerIdentifier: strategy.map(\.preferredProvider.rawValue),
-                contextLifecycleJSON: contextState.map(contextStateJSONString),
-                neuralStateJSON: neuralState.map(neuralStateJSONString),
-                brainStateJSON: brainState.flatMap { $0.isEmpty ? nil : brainStateJSONString($0) }
             )
         )
     }
@@ -435,129 +376,6 @@ enum DecisionIntelligencePromptContract {
         )
     }
 
-    private static func stateJSONString(_ state: [String: Any?]) -> String {
-        let compactState = state.reduce(into: [String: Any]()) { result, pair in
-            guard let value = pair.value else { return }
-            result[pair.key] = value
-        }
-
-        guard JSONSerialization.isValidJSONObject(compactState),
-              let data = try? JSONSerialization.data(withJSONObject: compactState, options: [.sortedKeys]),
-              let json = String(data: data, encoding: .utf8) else {
-            return "{}"
-        }
-
-        return json
-    }
-
-    private static func contextStateJSONString(_ contextState: DecisionContextPreparedState) -> String {
-        let payload: [String: Any] = [
-            "rebuilt_session": contextState.rebuiltSession,
-            "generation": contextState.generation,
-            "anchor_fields": contextState.anchorFields.map(\.rawValue),
-            "active_fields": contextState.activeFields.map(\.rawValue),
-            "stale_fields": contextState.staleFields.map(\.rawValue)
-        ]
-
-        guard JSONSerialization.isValidJSONObject(payload),
-              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
-              let json = String(data: data, encoding: .utf8) else {
-            return "{}"
-        }
-
-        return json
-    }
-
-    private static func neuralStateJSONString(_ neuralState: DecisionNeuralState) -> String {
-        let payload: [String: Any] = [
-            "dominant_signals": neuralState.dominantActivations.map { activation in
-                [
-                    "signal": activation.signal.rawValue
-                ]
-            },
-            "candidate_actions": neuralState.candidateActions.map { candidate in
-                [
-                    "route": candidate.route.rawValue
-                ]
-            },
-            "suppressed_behaviors": neuralState.suppressedBehaviors
-        ]
-
-        guard JSONSerialization.isValidJSONObject(payload),
-              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
-              let json = String(data: data, encoding: .utf8) else {
-            return "{}"
-        }
-
-        return json
-    }
-
-    private static func brainStateJSONString(_ brainState: DecisionBrainState) -> String {
-        let payload: [String: Any] = [
-            "profile_core": brainState.profileCore,
-            "active_goals": brainState.activeGoals,
-            "relevant_memories": brainState.relevantMemories,
-            "session_biases": brainState.sessionBiases,
-            "reaction_weights": reactionWeightsJSONObject(brainState.reactionWeights),
-            "identity": [
-                "role": brainState.identityProfile.role.rawValue,
-                "posture": brainState.identityProfile.posture.rawValue,
-                "initiative": brainState.identityProfile.initiative.rawValue,
-                "confidence_ceiling": brainState.identityProfile.confidenceCeiling
-            ],
-            "boundary_policy": [
-                "mode": brainState.boundaryPolicy.mode.rawValue,
-                "constraints": brainState.boundaryPolicy.activeConstraints.map(\.rawValue),
-                "required_confirmations": brainState.boundaryPolicy.requiredConfirmations
-            ],
-            "calibration": [
-                "status": brainState.calibrationState.status.rawValue,
-                "alerts": brainState.calibrationState.alerts.map(\.rawValue)
-            ]
-        ]
-
-        guard JSONSerialization.isValidJSONObject(payload),
-              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
-              let json = String(data: data, encoding: .utf8) else {
-            return "{}"
-        }
-
-        return json
-    }
-
-    private static func reactionWeightsJSONObject(_ weights: DecisionReactionWeights) -> [String: Double] {
-        let allWeights: [(String, Double)] = [
-            ("brief", weights.briefLanguage),
-            ("warm_direct", weights.warmDirectTone),
-            ("low_load", weights.lowCognitiveLoad),
-            ("interruptive", weights.interruptiveActionBias),
-            ("boundary", weights.boundaryNamingBias),
-            ("tradeoff", weights.tradeoffClarityBias)
-        ]
-
-        let prioritized = allWeights
-            .filter { $0.1 >= 0.6 }
-            .sorted { lhs, rhs in
-                if lhs.1 == rhs.1 {
-                    return lhs.0 < rhs.0
-                }
-                return lhs.1 > rhs.1
-            }
-
-        let retained = Array((prioritized.isEmpty ? allWeights.sorted { $0.1 > $1.1 } : prioritized).prefix(3))
-        return Dictionary(uniqueKeysWithValues: retained)
-    }
-
-    private static func evidenceRetentionBudget(
-        for kind: TaskKind,
-        strategy: DecisionAdaptiveTaskStrategy?
-    ) -> Int {
-        BASPromptRetentionAdvisor.evidenceRetentionBudget(
-            for: semanticTaskKind(for: kind),
-            strategy: strategy.map(substrateAdaptiveStrategy)
-        )
-    }
-
     private static func stateValue(_ value: String, fallback: String, limit: Int) -> String {
         sanitized(value, fallback: fallback, limit: limit)
     }
@@ -566,26 +384,6 @@ enum DecisionIntelligencePromptContract {
         values.reduce(0) { partialResult, value in
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? partialResult : partialResult + 1
-        }
-    }
-
-    private static func activeStateSignalCount(in state: [String: Any?]) -> Int {
-        state.reduce(0) { partialResult, pair in
-            guard let value = pair.value else { return partialResult }
-
-            if let string = value as? String {
-                let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmed.isEmpty || trimmed == "Not provided." || trimmed == "Not specified" {
-                    return partialResult
-                }
-                return partialResult + 1
-            }
-
-            if let number = value as? Int {
-                return number > 0 ? partialResult + 1 : partialResult
-            }
-
-            return partialResult + 1
         }
     }
 
@@ -642,6 +440,36 @@ enum DecisionIntelligencePromptContract {
         case .reminder:
             .reminder
         }
+    }
+
+    private static func promptContextLifecycleSnapshot(
+        _ contextState: DecisionContextPreparedState
+    ) -> BASPromptContextLifecycleSnapshot {
+        BASPromptContextLifecycleSnapshot(
+            rebuiltSession: contextState.rebuiltSession,
+            generation: contextState.generation,
+            anchorFields: contextState.anchorFields.map(\.rawValue),
+            activeFields: contextState.activeFields.map(\.rawValue),
+            staleFields: contextState.staleFields.map(\.rawValue),
+            anchorTitles: contextState.anchorFields.map(\.title)
+        )
+    }
+
+    private static func promptNeuralSnapshot(
+        _ neuralState: DecisionNeuralState
+    ) -> BASPromptNeuralSnapshot {
+        BASPromptNeuralSnapshot(
+            dominantActivations: neuralState.dominantActivations.map {
+                BASPromptNeuralActivationSnapshot(
+                    signal: $0.signal.rawValue,
+                    displayTitle: $0.signal.title
+                )
+            },
+            candidateActions: neuralState.candidateActions.map {
+                BASPromptNeuralActionCandidateSnapshot(route: $0.route.rawValue)
+            },
+            suppressedBehaviors: neuralState.suppressedBehaviors
+        )
     }
 
     private static func substrateAdaptiveStrategy(
