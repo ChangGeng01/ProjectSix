@@ -287,4 +287,76 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(Set(artifact.persistenceInput.activeTemplateIDs) == Set(artifact.execution.orderedTemplateIDs))
         #expect(Set(artifact.persistenceInput.failureGuardIDs) == Set(artifact.execution.orderedFailurePatternIDs))
     }
+
+    @Test("source input artifact owns preparation plus execution assembly")
+    func sourceInputArtifactOwnsPreparationAndExecutionAssembly() {
+        let now = Date(timeIntervalSince1970: 1_744_322_100)
+        let artifact = BASAppleCurrentBrainBootstrapAdapter.artifact(
+            source: BASAppleCurrentBrainBootstrapSourceInput(
+                preparationRequest: BASCurrentBrainBootstrapPreparationRequest(
+                    mode: .quick,
+                    prompt: "我是不是该等到明天？",
+                    trigger: .notification,
+                    riskLevelOverride: .high,
+                    preferredLanguages: ["zh-Hans-AU"],
+                    now: now
+                ),
+                projection: BASBrainProjection(
+                    records: [
+                        BASGovernedMemory(
+                            kind: .goal,
+                            content: "Sleep before sending night messages.",
+                            scope: .user,
+                            sensitivity: .low,
+                            tier: .hot,
+                            confidence: 0.9,
+                            sourceType: "history",
+                            governanceStatus: .governed,
+                            provenanceSummary: "Repeated goal"
+                        )
+                    ],
+                    candidates: [],
+                    recentEvents: []
+                ),
+                embeddingScores: [
+                    BASAppleEmbeddingScoreInput(
+                        id: "00000000-0000-0000-0000-000000000001",
+                        score: 0.82
+                    )
+                ],
+                taskGraphHint: BASBrainTaskGraphHint(
+                    headline: "Wait until tomorrow morning.",
+                    activeNodeCount: 1,
+                    hasResumeCandidate: true,
+                    resumeHint: "Resume after sleep."
+                ),
+                retrievalMode: "filtered",
+                recommendedTemplateIDs: ["night_message_cooling"],
+                templates: [
+                    BASInterventionTemplateDescriptor(
+                        id: "night_message_cooling",
+                        mode: .quick,
+                        riskLevel: .high,
+                        isPinned: true,
+                        successCount: 2,
+                        updatedAt: now
+                    )
+                ],
+                failurePatterns: [
+                    BASFailurePatternDescriptor(
+                        id: "night_fast_path_failure",
+                        mode: .quick,
+                        suppressionWeight: 0.95,
+                        evidenceCount: 2,
+                        updatedAt: now
+                    )
+                ]
+            )
+        )
+
+        #expect(artifact.execution.preparation.languageMode == .chinese)
+        #expect(artifact.execution.preparation.riskLevel == .high)
+        #expect(artifact.execution.orderedTemplateIDs == ["night_message_cooling"])
+        #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.rawValue)
+    }
 }
