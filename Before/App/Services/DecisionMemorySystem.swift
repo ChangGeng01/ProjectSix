@@ -91,11 +91,18 @@ enum DecisionMemorySystem {
         )
 
         return BrainStateProjection(
-            baseProjection: compileBaseProjection(
+            baseProjection: BASAppleMemoryProjectionAdapter.compileProjection(
                 records: resolvedRecords,
                 candidates: resolvedCandidates,
-                checkEvents: checkEvents,
-                governanceSnapshot: governanceSnapshot
+                events: checkEvents,
+                governanceSnapshot: BASAppleProjectionGovernanceSnapshot(
+                    totalRecordCount: governanceSnapshot.totalRecordCount,
+                    totalCandidateCount: governanceSnapshot.totalCandidateCount,
+                    pendingCandidateCount: governanceSnapshot.pendingCandidateCount,
+                    promotedCandidateCount: governanceSnapshot.promotedCandidateCount,
+                    deferredCandidateCount: governanceSnapshot.deferredCandidateCount,
+                    admittedCandidateCount: governanceSnapshot.admittedCandidateCount
+                )
             ),
             governanceSnapshot: governanceSnapshot,
             diagnostics: BrainStateProjection.Diagnostics(
@@ -257,68 +264,6 @@ enum DecisionMemorySystem {
         in context: ModelContext
     ) -> Int where Model: PersistentModel {
         (try? context.fetchCount(descriptor)) ?? 0
-    }
-
-    private static func compileBaseProjection(
-        records: [DecisionMemoryRecord],
-        candidates: [DecisionMemoryCandidateRecord],
-        checkEvents: [CheckEvent],
-        governanceSnapshot: BrainStateGovernanceSnapshot
-    ) -> BASBrainProjection {
-        BASAppleMemoryProjectionAdapter.compile(
-            BASBrainProjectionCompileRequest(
-                records: records.map { record in
-                    BASProjectionGovernedMemoryInput(
-                        id: record.id,
-                        typeID: record.type.rawValue,
-                        headline: record.headline,
-                        confidence: record.confidence,
-                        sourceID: record.source.rawValue,
-                        lastConfirmedAt: record.lastConfirmedAt,
-                        lifecycleStateID: record.lifecycleState.rawValue,
-                        tierID: record.tier.rawValue,
-                        provenanceSummary: record.provenanceSummary
-                    )
-                },
-                candidates: candidates.map { candidate in
-                    BASProjectionCandidateInput(
-                        id: candidate.id,
-                        typeID: candidate.type.rawValue,
-                        headline: candidate.headline,
-                        confidence: candidate.confidence,
-                        priority: candidate.priority,
-                        sourceID: candidate.source.rawValue,
-                        retrievalTags: candidate.retrievalTags,
-                        lastObservedAt: candidate.lastObservedAt,
-                        decayPolicyID: candidate.decayPolicy.rawValue,
-                        statusID: candidate.status.rawValue,
-                        governanceDecisionID: candidate.lastGovernanceDecision.rawValue,
-                        evidenceCount: candidate.evidenceCount,
-                        provenanceSummary: candidate.provenanceSummary
-                    )
-                },
-                events: checkEvents.map { event in
-                    BASProjectionEventInput(
-                        id: event.id.uuidString,
-                        note: event.note,
-                        fallbackContent: event.scenario.title,
-                        createdAt: event.createdAt,
-                        scenarioID: event.scenario.rawValue,
-                        actionID: event.finalAction.rawValue,
-                        reflectionOutcomeID: event.reflectionOutcome?.rawValue,
-                        entrySourceID: event.entrySource.rawValue
-                    )
-                },
-                governanceSnapshot: BASProjectionGovernanceInput(
-                    totalRecordCount: governanceSnapshot.totalRecordCount,
-                    totalCandidateCount: governanceSnapshot.totalCandidateCount,
-                    pendingCandidateCount: governanceSnapshot.pendingCandidateCount,
-                    promotedCandidateCount: governanceSnapshot.promotedCandidateCount,
-                    deferredCandidateCount: governanceSnapshot.deferredCandidateCount,
-                    admittedCandidateCount: governanceSnapshot.admittedCandidateCount
-                )
-            )
-        )
     }
 
     private static func deriveMemoryDrafts(

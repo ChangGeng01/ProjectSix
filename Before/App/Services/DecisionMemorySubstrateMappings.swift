@@ -1,4 +1,5 @@
 import Foundation
+import BASAppleAdapters
 import BASMemory
 
 extension DecisionMemorySource {
@@ -180,6 +181,21 @@ extension DecisionMemoryCandidateRecord {
             lastGovernanceDecision: BASMemoryGovernanceDecision(rawValue: lastGovernanceDecision.rawValue) ?? .deferred,
             governanceReason: governanceReason,
             tierID: tier.rawValue
+        )
+    }
+}
+
+extension CheckEvent: BASAppleProjectionEventSource {
+    var basProjectionEventInput: BASProjectionEventInput {
+        BASProjectionEventInput(
+            id: id.uuidString,
+            note: note,
+            fallbackContent: scenario.title,
+            createdAt: createdAt,
+            scenarioID: scenario.rawValue,
+            actionID: finalAction.rawValue,
+            reflectionOutcomeID: reflectionOutcome?.rawValue,
+            entrySourceID: entrySource.rawValue
         )
     }
 }
