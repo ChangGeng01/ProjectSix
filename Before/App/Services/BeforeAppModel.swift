@@ -1445,6 +1445,7 @@ final class BeforeAppModel: ObservableObject {
         let policyDecision = InterventionNotificationPolicyEngine.decide(
             candidate: interventionCandidate,
             preferences: preferences,
+            currentBrainState: currentBrainState,
             context: context
         )
         upsertInterventionTrigger(

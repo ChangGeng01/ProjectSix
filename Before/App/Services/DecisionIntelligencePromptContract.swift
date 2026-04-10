@@ -1,5 +1,8 @@
 import CryptoKit
 import Foundation
+import BASOrchestration
+import BASPolicy
+import BASRuntimeCore
 
 enum DecisionIntelligencePromptContract {
     enum Limit {
@@ -17,11 +20,6 @@ enum DecisionIntelligencePromptContract {
         static let stateField = 140
         static let statePrompt = 170
         static let evidenceSnippet = 180
-        static let frontstageSignal = 48
-        static let frontstageEvidence = 96
-        static let frontstageSignalCount = 3
-        static let brainHeadline = 110
-        static let sessionBias = 72
     }
 
     enum TaskKind: Equatable, Sendable {
@@ -40,145 +38,13 @@ enum DecisionIntelligencePromptContract {
         }
     }
 
-    struct ContextBudget: Equatable, Sendable {
-        let targetCharacters: Int
-        let prefixCharacters: Int
-        let suffixCharacters: Int
-        let immutablePrefixCharacters: Int
-        let adaptivePrefixCharacters: Int
-
-        var totalCharacters: Int {
-            prefixCharacters + suffixCharacters
-        }
-
-        var isWithinTarget: Bool {
-            totalCharacters <= targetCharacters
-        }
-
-        var utilizationRatio: Double {
-            guard targetCharacters > 0 else { return 0 }
-            return Double(totalCharacters) / Double(targetCharacters)
-        }
-
-        var stablePrefixShare: Double {
-            guard totalCharacters > 0 else { return 0 }
-            return Double(prefixCharacters) / Double(totalCharacters)
-        }
-
-        var volatileSuffixShare: Double {
-            guard totalCharacters > 0 else { return 0 }
-            return Double(suffixCharacters) / Double(totalCharacters)
-        }
-
-        init(
-            targetCharacters: Int,
-            prefixCharacters: Int,
-            suffixCharacters: Int,
-            immutablePrefixCharacters: Int? = nil,
-            adaptivePrefixCharacters: Int? = nil
-        ) {
-            self.targetCharacters = targetCharacters
-            self.prefixCharacters = prefixCharacters
-            self.suffixCharacters = suffixCharacters
-
-            let resolvedImmutable = immutablePrefixCharacters ?? prefixCharacters
-            let resolvedAdaptive = adaptivePrefixCharacters ?? max(0, prefixCharacters - resolvedImmutable)
-            self.immutablePrefixCharacters = resolvedImmutable
-            self.adaptivePrefixCharacters = resolvedAdaptive
-        }
-    }
-
-    struct PromptLayers: Equatable, Sendable {
-        let immutablePrefix: String
-        let adaptivePrefix: String
-        let volatileSuffix: String
-
-        var stablePrefix: String {
-            [immutablePrefix, adaptivePrefix]
-                .filter { !$0.isEmpty }
-                .joined(separator: "\n\n")
-        }
-
-        var runtimePrompt: String {
-            [stablePrefix, volatileSuffix]
-                .filter { !$0.isEmpty }
-                .joined(separator: "\n\n")
-        }
-    }
-
-    enum PromptBlockKind: String, Equatable, Sendable {
-        case frontstageState = "frontstage_state"
-        case compactionPolicy = "compaction_policy"
-        case scopedContext = "scoped_context"
-        case runtimeStrategy = "runtime_strategy"
-        case taskState = "task_state"
-        case contextLifecycle = "context_lifecycle"
-        case neuralState = "neural_state"
-        case brainState = "brain_state"
-        case evidenceSnippets = "evidence_snippets"
-        case outputGuard = "output_guard"
-    }
-
-    enum PromptBlockRetention: String, Equatable, Sendable {
-        case required
-        case preferred
-        case optional
-    }
-
-    struct PromptBlock: Equatable, Sendable {
-        let kind: PromptBlockKind
-        let header: String
-        let body: String
-        let retention: PromptBlockRetention
-        let priority: Int
-
-        var rendered: String {
-            [header, body].joined(separator: "\n")
-        }
-    }
-
-    struct PromptAssembly: Equatable, Sendable {
-        let allBlocks: [PromptBlock]
-        let retainedBlocks: [PromptBlock]
-        let droppedBlocks: [PromptBlock]
-        let suffixTargetCharacters: Int
-
-        var payload: String {
-            retainedBlocks.map(\.rendered).joined(separator: "\n")
-        }
-
-        var retainedBlockKinds: [PromptBlockKind] {
-            retainedBlocks.map(\.kind)
-        }
-
-        var droppedBlockKinds: [PromptBlockKind] {
-            droppedBlocks.map(\.kind)
-        }
-    }
-
-    struct PromptCompactionPolicy: Equatable, Sendable {
-        let preservedKinds: [PromptBlockKind]
-        let preferredKinds: [PromptBlockKind]
-        let dropOrder: [PromptBlockKind]
-        let guidance: [String]
-        let suffixTargetCharacters: Int
-    }
-
-    struct PromptEnvelope: Equatable, Sendable {
-        let kind: TaskKind
-        let instructions: String
-        let payload: String
-        let debugPrompt: String
-        let budget: ContextBudget
-        let layers: PromptLayers
-        let assembly: PromptAssembly
-        let frontstageState: DecisionFrontstageState
-        let openTextSignalCount: Int
-
-        var runtimePrompt: String {
-            layers.runtimePrompt
-        }
-    }
+    typealias ContextBudget = BASPromptBudget
+    typealias PromptLayers = BASPromptLayers
+    typealias PromptBlockKind = BASSemanticPromptBlockKind
+    typealias PromptBlockRetention = BASSemanticPromptBlockRetention
+    typealias PromptBlock = BASSemanticPromptBlock
+    typealias PromptAssembly = BASSemanticContextAssembly
+    typealias PromptEnvelope = BASPromptEnvelope<TaskKind, DecisionFrontstageState>
 
     struct ReminderSelectionEnvelope: Equatable, Sendable {
         let prompt: PromptEnvelope
@@ -344,9 +210,9 @@ enum DecisionIntelligencePromptContract {
                 "Next action: \(evidenceValue(base.nextAction, limit: Limit.evidenceSnippet))"
             ],
             outputGuard: [
-                "Keep the same focus and next-step intent.",
-                "Do not invent facts or turn the board into a verdict.",
-                "Return tighter language only."
+                "Keep the same focus and next step.",
+                "Do not invent facts or force a verdict.",
+                "Tighten language only."
             ],
             openTextSignalCount: nonEmptySignalCount([
                 input.prompt,
@@ -474,7 +340,15 @@ enum DecisionIntelligencePromptContract {
                 "Do not rewrite, combine, or invent reminder text.",
                 "Prefer the reminder that most directly matches the current state."
             ],
-            openTextSignalCount: nonEmptySignalCount([prompt])
+            openTextSignalCount: nonEmptySignalCount([prompt]),
+            structuredTruthOverride: BASStructuredTruthCompiler.truthState(
+                for: BASStructuredTruthRequest(
+                    kind: .reminder,
+                    brainState: nil,
+                    reminderSurfaceMode: mode.map(substrateMode(from:))
+                )
+            ),
+            includeStructuredTruthBlock: false
         )
 
         return ReminderSelectionEnvelope(prompt: envelope, candidates: clippedCandidates)
@@ -529,359 +403,88 @@ enum DecisionIntelligencePromptContract {
         openTextSignalCount: Int = 0,
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
-        brainState: DecisionBrainState? = nil
+        brainState: DecisionBrainState? = nil,
+        structuredTruthOverride: BASStructuredTruthState? = nil,
+        includeStructuredTruthBlock: Bool = true
     ) -> PromptEnvelope {
         let immutablePrefix = PrefixCache.immutablePrefix(for: kind)
         let adaptivePrefix = PrefixCache.adaptivePrefix(for: kind)
-        let instructions = [immutablePrefix, adaptivePrefix]
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n\n")
-        let evidenceFilter = DecisionPromptEvidenceGuard.filter(
-            evidence,
-            maxRetained: evidenceRetentionBudget(for: kind, strategy: strategy)
+        let structuredTruth = structuredTruthOverride ?? BASStructuredTruthCompiler.truthState(
+            for: BASStructuredTruthRequest(
+                kind: adaptiveTraceKind(for: kind),
+                brainState: brainState
+            )
         )
-        let scopedContext = scopedContext(brainState: brainState)
-        var guardedOutput = strategy.map(runtimeOutputGuard(for:)) ?? []
-        guardedOutput.append(contentsOf: outputGuard)
-        if evidenceFilter.droppedInjectedCount > 0 {
-            guardedOutput.insert(
-                "Filtered markup or tool text was removed. Ignore the missing content.",
-                at: 0
-            )
-        }
-        if evidenceFilter.droppedBudgetCount > 0 {
-            guardedOutput.insert(
-                "Lower-value evidence was trimmed. Work only from the retained evidence.",
-                at: guardedOutput.isEmpty ? 0 : min(guardedOutput.count, 1)
-            )
-        }
-        let preparedFrontstageState = frontstageState(
-            kind: kind,
-            activeStateSignalCount: activeStateSignalCount(in: state),
-            openTextSignalCount: openTextSignalCount,
-            evidenceFilter: evidenceFilter,
-            strategy: strategy,
-            contextState: contextState,
-            neuralState: neuralState,
+        let renderedStructuredTruth = includeStructuredTruthBlock ? structuredTruth : nil
+        let substrateStrategy = strategy.map { substrateAdaptiveStrategy($0) }
+        let scopedContextJSON = BASScopedContextCompiler.compile(
+            kind: adaptiveTraceKind(for: kind),
+            strategy: substrateStrategy,
             brainState: brainState
         )
+        .map(BASScopedContextCompiler.jsonString(for:))
+        let frontstageInput = BASPromptContractFrontstageInput(
+            kind: adaptiveTraceKind(for: kind),
+            activeStateSignalCount: activeStateSignalCount(in: state),
+            openTextSignalCount: openTextSignalCount,
+            contextWasRebuilt: contextState?.rebuiltSession == true,
+            staleFieldCount: contextState?.staleFieldCount ?? 0,
+            anchorTitles: (contextState?.anchorFields ?? []).map(\.title),
+            dominantSignalTitles: (neuralState?.dominantActivations ?? []).map(\.signal.title),
+            suppressedBehaviors: neuralState?.suppressedBehaviors ?? [],
+            memoryHeadlines: brainState?.relevantMemories ?? [],
+            sessionBiases: brainState?.sessionBiases ?? []
+        )
         let targetCharacters = strategy?.contextBudget ?? kind.targetCharacters
-        let suffixTarget = suffixTargetCharacters(
-            targetCharacters: targetCharacters,
-            immutablePrefix: immutablePrefix,
-            adaptivePrefix: adaptivePrefix
-        )
-        let compactionPolicy = promptCompactionPolicy(
-            kind: kind,
-            suffixTargetCharacters: suffixTarget,
-            hasScopedContext: scopedContext != nil,
-            hasContextLifecycle: contextState != nil
-        )
-        let assembly = assemblePayloadBlocks(
-            blocks: promptBlocks(
-                state: state,
-                evidence: evidenceFilter.retained,
-                guardedOutput: guardedOutput,
-                strategy: strategy,
-                contextState: contextState,
-                neuralState: neuralState,
-                brainState: brainState,
-                frontstageState: preparedFrontstageState,
-                scopedContext: scopedContext,
-                compactionPolicy: compactionPolicy
-            ),
-            suffixTargetCharacters: suffixTarget,
-            policy: compactionPolicy
-        )
-        let payload = assembly.payload
-        let layers = PromptLayers(
-            immutablePrefix: immutablePrefix,
-            adaptivePrefix: adaptivePrefix,
-            volatileSuffix: payload
-        )
-        var debugPromptSections = [
-            "[IMMUTABLE PREFIX]",
-            immutablePrefix,
-            "",
-            "[ADAPTIVE PREFIX]",
-            adaptivePrefix,
-            "",
-            "[VOLATILE SUFFIX]",
-            payload
-        ]
-        if !assembly.droppedBlocks.isEmpty {
-            debugPromptSections += [
-                "",
-                "[COMPACTION]",
-                "Dropped blocks: \(assembly.droppedBlockKinds.map(\.rawValue).joined(separator: ", "))"
-            ]
+        let suffixFloor: Int
+        if strategy?.runtimeGear == .low {
+            switch kind {
+            case .quick, .reminder:
+                suffixFloor = 120
+            case .balance, .mirror:
+                suffixFloor = 150
+            }
+        } else {
+            suffixFloor = 180
         }
-        let debugPrompt = debugPromptSections.joined(separator: "\n")
 
-        return PromptEnvelope(
-            kind: kind,
-            instructions: instructions,
-            payload: payload,
-            debugPrompt: debugPrompt,
-            budget: ContextBudget(
+        return BASPromptContractCompiler.compile(
+            BASPromptContractRequest(
+                kind: kind,
+                semanticKind: semanticTaskKind(for: kind),
+                adaptiveKind: adaptiveTraceKind(for: kind),
+                immutablePrefix: immutablePrefix,
+                adaptivePrefix: adaptivePrefix,
+                taskStateJSON: stateJSONString(state),
+                evidenceSnippets: evidence,
+                evidenceRetentionBudget: evidenceRetentionBudget(for: kind, strategy: strategy),
+                outputGuard: outputGuard,
+                frontstageInput: frontstageInput,
                 targetCharacters: targetCharacters,
-                prefixCharacters: instructions.count,
-                suffixCharacters: payload.count,
-                immutablePrefixCharacters: immutablePrefix.count,
-                adaptivePrefixCharacters: adaptivePrefix.count
-            ),
-            layers: layers,
-            assembly: assembly,
-            frontstageState: preparedFrontstageState,
-            openTextSignalCount: openTextSignalCount
+                suffixFloorCharacters: suffixFloor,
+                strategy: substrateStrategy,
+                structuredTruth: structuredTruth,
+                includeStructuredTruthBlock: renderedStructuredTruth != nil,
+                scopedContextJSON: scopedContextJSON,
+                providerIdentifier: strategy.map(\.preferredProvider.rawValue),
+                contextLifecycleJSON: contextState.map(contextStateJSONString),
+                neuralStateJSON: neuralState.map(neuralStateJSONString),
+                brainStateJSON: brainState.flatMap { $0.isEmpty ? nil : brainStateJSONString($0) }
+            )
         )
     }
 
-    private static func promptBlocks(
-        state: [String: Any?],
-        evidence: [String],
-        guardedOutput: [String],
-        strategy: DecisionAdaptiveTaskStrategy?,
-        contextState: DecisionContextPreparedState?,
-        neuralState: DecisionNeuralState?,
+    static func consistencyTruthState(
+        for kind: DecisionIntelligenceTraceKind,
         brainState: DecisionBrainState?,
-        frontstageState: DecisionFrontstageState,
-        scopedContext: [String: Any]?,
-        compactionPolicy: PromptCompactionPolicy
-    ) -> [PromptBlock] {
-        var blocks: [PromptBlock] = [
-            PromptBlock(
-                kind: .frontstageState,
-                header: "FRONTSTAGE_STATE_JSON:",
-                body: frontstageStateJSONString(frontstageState),
-                retention: .required,
-                priority: 100
-            ),
-            PromptBlock(
-                kind: .compactionPolicy,
-                header: "COMPACTION_POLICY_JSON:",
-                body: compactionPolicyJSONString(compactionPolicy),
-                retention: .preferred,
-                priority: 108
-            ),
-            PromptBlock(
-                kind: .taskState,
-                header: "TASK_STATE_JSON:",
-                body: stateJSONString(state),
-                retention: .required,
-                priority: 95
+        reminderMode: DecisionMode? = nil
+    ) -> BASStructuredTruthState? {
+        BASStructuredTruthCompiler.truthState(
+            for: BASStructuredTruthRequest(
+                kind: adaptiveTraceKind(for: kind),
+                brainState: brainState,
+                reminderSurfaceMode: reminderMode.map(substrateMode(from:))
             )
-        ]
-
-        if let scopedContext {
-            blocks.append(
-                PromptBlock(
-                    kind: .scopedContext,
-                    header: "SCOPED_CONTEXT_JSON:",
-                    body: stateJSONString(scopedContext),
-                    retention: .preferred,
-                    priority: 92
-                )
-            )
-        }
-
-        if let strategy {
-            blocks.append(
-                PromptBlock(
-                    kind: .runtimeStrategy,
-                    header: "RUNTIME_STRATEGY_JSON:",
-                    body: runtimeStrategyJSONString(strategy),
-                    retention: .preferred,
-                    priority: 80
-                )
-            )
-        }
-
-        if let contextState {
-            blocks.append(
-                PromptBlock(
-                    kind: .contextLifecycle,
-                    header: "CONTEXT_LIFECYCLE_JSON:",
-                    body: contextStateJSONString(contextState),
-                    retention: .preferred,
-                    priority: 70
-                )
-            )
-        }
-
-        if let neuralState {
-            blocks.append(
-                PromptBlock(
-                    kind: .neuralState,
-                    header: "NEURAL_STATE_JSON:",
-                    body: neuralStateJSONString(neuralState),
-                    retention: .optional,
-                    priority: 40
-                )
-            )
-        }
-
-        if let brainState, !brainState.isEmpty {
-            blocks.append(
-                PromptBlock(
-                    kind: .brainState,
-                    header: "BRAIN_STATE_JSON:",
-                    body: brainStateJSONString(brainState),
-                    retention: .optional,
-                    priority: 35
-                )
-            )
-        }
-
-        blocks += [
-            PromptBlock(
-                kind: .evidenceSnippets,
-                header: "EVIDENCE_SNIPPETS:",
-                body: evidenceBlock(evidence),
-                retention: .required,
-                priority: 90
-            ),
-            PromptBlock(
-                kind: .outputGuard,
-                header: "OUTPUT_GUARD:",
-                body: bulletList(guardedOutput),
-                retention: .required,
-                priority: 110
-            )
-        ]
-
-        return blocks
-    }
-
-    private static func assemblePayloadBlocks(
-        blocks: [PromptBlock],
-        suffixTargetCharacters: Int,
-        policy: PromptCompactionPolicy
-    ) -> PromptAssembly {
-        var retained = blocks
-        var dropped: [PromptBlock] = []
-
-        func renderedLength(of blocks: [PromptBlock]) -> Int {
-            blocks.map(\.rendered).joined(separator: "\n").count
-        }
-
-        func retentionRank(_ retention: PromptBlockRetention) -> Int {
-            switch retention {
-            case .optional:
-                0
-            case .preferred:
-                1
-            case .required:
-                2
-            }
-        }
-
-        let preservedKinds = Set(policy.preservedKinds)
-        let dropOrderIndex = Dictionary(
-            uniqueKeysWithValues: policy.dropOrder.enumerated().map { ($0.element, $0.offset) }
-        )
-
-        while renderedLength(of: retained) > suffixTargetCharacters {
-            guard let dropIndex = retained.enumerated()
-                .filter({ !preservedKinds.contains($0.element.kind) })
-                .sorted(by: { lhs, rhs in
-                    let lhsDropRank = dropOrderIndex[lhs.element.kind] ?? Int.max
-                    let rhsDropRank = dropOrderIndex[rhs.element.kind] ?? Int.max
-                    if lhsDropRank != rhsDropRank {
-                        return lhsDropRank < rhsDropRank
-                    }
-
-                    let lhsRetentionRank = retentionRank(lhs.element.retention)
-                    let rhsRetentionRank = retentionRank(rhs.element.retention)
-                    if lhsRetentionRank != rhsRetentionRank {
-                        return lhsRetentionRank < rhsRetentionRank
-                    }
-
-                    if lhs.element.priority == rhs.element.priority {
-                        return lhs.offset > rhs.offset
-                    }
-                    return lhs.element.priority < rhs.element.priority
-                })
-                .first?.offset else {
-                break
-            }
-            dropped.append(retained.remove(at: dropIndex))
-        }
-
-        return PromptAssembly(
-            allBlocks: blocks,
-            retainedBlocks: retained,
-            droppedBlocks: dropped,
-            suffixTargetCharacters: suffixTargetCharacters
-        )
-    }
-
-    private static func suffixTargetCharacters(
-        targetCharacters: Int,
-        immutablePrefix: String,
-        adaptivePrefix: String
-    ) -> Int {
-        let stablePrefix = [immutablePrefix, adaptivePrefix]
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n\n")
-        return max(180, targetCharacters - stablePrefix.count)
-    }
-
-    private static func promptCompactionPolicy(
-        kind: TaskKind,
-        suffixTargetCharacters: Int,
-        hasScopedContext: Bool,
-        hasContextLifecycle: Bool
-    ) -> PromptCompactionPolicy {
-        var preservedKinds: [PromptBlockKind] = [
-            .frontstageState,
-            .taskState,
-            .evidenceSnippets,
-            .outputGuard
-        ]
-        if hasScopedContext {
-            preservedKinds.append(.scopedContext)
-        }
-        if hasContextLifecycle {
-            preservedKinds.append(.contextLifecycle)
-        }
-
-        let guidance: [String] = switch kind {
-        case .quick:
-            [
-                "Preserve the interruption goal, current state, and retained evidence before any historical detail.",
-                "Prefer stable user patterns and active goals over full historical projections."
-            ]
-        case .balance:
-            [
-                "Preserve the trade-off state and live evidence before reflective depth.",
-                "Keep active goals and local biases in view even if deeper history is trimmed."
-            ]
-        case .mirror:
-            [
-                "Preserve the core tension, active goals, and local boundary biases before deeper history.",
-                "Retain stable identity and goal anchors even when reflective detail is compacted."
-            ]
-        case .reminder:
-            [
-                "Preserve the current state and governed memory scope before broader history.",
-                "Choose from retained candidates without inventing new reminders."
-            ]
-        }
-
-        return PromptCompactionPolicy(
-            preservedKinds: preservedKinds,
-            preferredKinds: hasScopedContext ? [.scopedContext, .runtimeStrategy, .contextLifecycle] : [.runtimeStrategy, .contextLifecycle],
-            dropOrder: [
-                .neuralState,
-                .brainState,
-                .compactionPolicy,
-                .runtimeStrategy,
-                .contextLifecycle,
-                .scopedContext
-            ],
-            guidance: guidance,
-            suffixTargetCharacters: suffixTargetCharacters
         )
     }
 
@@ -947,190 +550,6 @@ enum DecisionIntelligencePromptContract {
         return json
     }
 
-    private static func frontstageState(
-        kind: TaskKind,
-        activeStateSignalCount: Int,
-        openTextSignalCount: Int,
-        evidenceFilter: DecisionPromptEvidenceFilterResult,
-        strategy: DecisionAdaptiveTaskStrategy? = nil,
-        contextState: DecisionContextPreparedState?,
-        neuralState: DecisionNeuralState?,
-        brainState: DecisionBrainState?
-    ) -> DecisionFrontstageState {
-        let focusGoal: String = switch kind {
-        case .quick:
-            "Interrupt the automatic reaction before it locks in."
-        case .balance:
-            "Surface the real trade-off before choosing a side."
-        case .mirror:
-            "Name the core tension without forcing a yes-no answer."
-        case .reminder:
-            "Pick the one reminder that best fits the current state."
-        }
-
-        var dangerSignals = neuralState?
-            .dominantActivations
-            .prefix(Limit.frontstageSignalCount)
-            .map { activation in
-                sanitized(
-                    activation.signal.title,
-                    fallback: activation.signal.title,
-                    limit: Limit.frontstageSignal
-                )
-            } ?? []
-
-        if contextState?.rebuiltSession == true {
-            dangerSignals.append("Session rebuild")
-        }
-        if let staleFieldCount = contextState?.staleFieldCount, staleFieldCount > 0 {
-            dangerSignals.append("Stale fields dropped")
-        }
-        if evidenceFilter.droppedInjectedCount > 0 {
-            dangerSignals.append("Evidence filtered")
-        }
-        if evidenceFilter.droppedBudgetCount > 0 {
-            dangerSignals.append("Frontstage trimmed")
-        }
-        dangerSignals = Array(dangerSignals.prefix(Limit.frontstageSignalCount))
-
-        let evidenceHeadlines = evidenceFilter.retained
-            .prefix(frontstageEvidenceCount(for: kind, strategy: strategy))
-            .map { snippet in
-                sanitized(
-                    snippet,
-                    fallback: snippet,
-                    limit: Limit.frontstageEvidence
-                )
-            }
-
-        let anchorHeadlines = Array(
-            (contextState?.anchorFields ?? [])
-                .map(\.title)
-                .map { sanitized($0, fallback: $0, limit: Limit.frontstageEvidence) }
-                .prefix(Limit.frontstageSignalCount)
-        )
-
-        let memoryHeadlines = Array(
-            (brainState?.relevantMemories ?? [])
-                .map { sanitized($0, fallback: $0, limit: Limit.brainHeadline) }
-                .prefix(Limit.frontstageSignalCount)
-        )
-
-        let suppressionHints = Array(
-            (neuralState?.suppressedBehaviors ?? [])
-                .map { sanitized($0, fallback: $0, limit: Limit.frontstageSignal) }
-                .prefix(Limit.frontstageSignalCount)
-        )
-
-        let sessionBiases = Array(
-            (brainState?.sessionBiases ?? [])
-                .map { sanitized($0, fallback: $0, limit: Limit.sessionBias) }
-                .prefix(Limit.frontstageSignalCount)
-        )
-
-        return DecisionFrontstageState(
-            focusGoal: focusGoal,
-            activeStateSignalCount: activeStateSignalCount,
-            openTextSignalCount: openTextSignalCount,
-            dangerSignals: dangerSignals,
-            evidenceHeadlines: evidenceHeadlines,
-            anchorHeadlines: anchorHeadlines,
-            memoryHeadlines: memoryHeadlines,
-            retainedEvidenceCount: evidenceFilter.retainedCount,
-            droppedEvidenceCount: evidenceFilter.droppedCount,
-            droppedInjectedEvidenceCount: evidenceFilter.droppedInjectedCount,
-            droppedDuplicateEvidenceCount: evidenceFilter.droppedDuplicateCount,
-            droppedBudgetEvidenceCount: evidenceFilter.droppedBudgetCount,
-            suppressionHints: suppressionHints,
-            sessionBiases: sessionBiases
-        )
-    }
-
-    private static func frontstageStateJSONString(_ frontstageState: DecisionFrontstageState) -> String {
-        let payload: [String: Any] = [
-            "focus_goal": frontstageState.focusGoal,
-            "danger_signals": frontstageState.dangerSignals,
-            "evidence_headlines": frontstageState.evidenceHeadlines,
-            "anchor_headlines": frontstageState.anchorHeadlines,
-            "dropped_budget_evidence_count": frontstageState.droppedBudgetEvidenceCount,
-            "suppression_hints": frontstageState.suppressionHints
-        ]
-
-        guard JSONSerialization.isValidJSONObject(payload),
-              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
-              let json = String(data: data, encoding: .utf8) else {
-            return "{}"
-        }
-
-        return json
-    }
-
-    private static func runtimeStrategyJSONString(_ strategy: DecisionAdaptiveTaskStrategy) -> String {
-        let payload: [String: Any] = [
-            "kind": strategy.kind.rawValue,
-            "entropy": strategy.entropy.rawValue,
-            "runtime_gear": strategy.runtimeGear.rawValue,
-            "provider": strategy.preferredProvider.rawValue,
-            "context_budget": strategy.contextBudget,
-            "runtime_budget": [
-                "context_budget": strategy.contextBudget,
-                "output_character_budget": strategy.outputCharacterBudget,
-                "time_budget_ms": strategy.timeBudgetMs,
-                "tool_call_budget": strategy.toolCallBudget,
-                "retrieval_item_budget": strategy.retrievalItemBudget
-            ],
-            "retrieval_mode": strategy.retrievalMode.rawValue,
-            "thinking_mode": strategy.thinkingMode.rawValue,
-            "output_mode": strategy.outputMode.rawValue,
-            "tone": strategy.tone.rawValue,
-            "action_space": strategy.actionSpace,
-            "response_language": strategy.responseLanguage.rawValue,
-            "allows_model_invocation": strategy.allowsModelInvocation
-        ]
-
-        guard JSONSerialization.isValidJSONObject(payload),
-              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
-              let json = String(data: data, encoding: .utf8) else {
-            return "{}"
-        }
-
-        return json
-    }
-
-    private static func compactionPolicyJSONString(_ policy: PromptCompactionPolicy) -> String {
-        let payload: [String: Any] = [
-            "preserve_blocks": policy.preservedKinds.map(\.rawValue),
-            "drop_order": policy.dropOrder.map(\.rawValue),
-            "suffix_target_characters": policy.suffixTargetCharacters
-        ]
-
-        guard JSONSerialization.isValidJSONObject(payload),
-              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
-              let json = String(data: data, encoding: .utf8) else {
-            return "{}"
-        }
-
-        return json
-    }
-
-    private static func scopedContext(brainState: DecisionBrainState?) -> [String: Any]? {
-        guard let brainState, !brainState.isEmpty else { return nil }
-
-        return [
-            "user_profile": brainState.profileCore,
-            "active_goals": brainState.activeGoals,
-            "local_biases": brainState.sessionBiases,
-            "auto_memory": Array(brainState.relevantMemories.prefix(Limit.frontstageSignalCount)),
-            "retrieval_tags": Array(brainState.retrievalTags.prefix(Limit.frontstageSignalCount)),
-            "dominant_reaction_weight": brainState.reactionWeights.dominantKey.rawValue,
-            "identity_role": brainState.identityProfile.role.rawValue,
-            "boundary_mode": brainState.boundaryPolicy.mode.rawValue,
-            "boundary_constraints": brainState.boundaryPolicy.activeConstraints.map(\.rawValue),
-            "calibration_status": brainState.calibrationState.status.rawValue,
-            "calibration_alerts": brainState.calibrationState.alerts.map(\.rawValue)
-        ]
-    }
-
     private static func brainStateJSONString(_ brainState: DecisionBrainState) -> String {
         let payload: [String: Any] = [
             "profile_core": brainState.profileCore,
@@ -1187,30 +606,6 @@ enum DecisionIntelligencePromptContract {
         return Dictionary(uniqueKeysWithValues: retained)
     }
 
-    private static func frontstageEvidenceCount(
-        for kind: TaskKind,
-        strategy: DecisionAdaptiveTaskStrategy?
-    ) -> Int {
-        let base: Int = switch kind {
-        case .quick:
-            2
-        case .balance, .mirror:
-            1
-        case .reminder:
-            0
-        }
-
-        guard let strategy else { return base }
-        switch strategy.retrievalMode {
-        case .off:
-            return max(0, base - 1)
-        case .filtered:
-            return base
-        case .adaptive:
-            return base + 1
-        }
-    }
-
     private static func evidenceRetentionBudget(
         for kind: TaskKind,
         strategy: DecisionAdaptiveTaskStrategy?
@@ -1236,91 +631,17 @@ enum DecisionIntelligencePromptContract {
             base + 1
         }
 
-        guard strategy.retrievalItemBudget > 0 else { return modeBudget }
-        return max(2, min(modeBudget, strategy.retrievalItemBudget))
-    }
-
-    private static func outputBudgetGuidance(
-        for strategy: DecisionAdaptiveTaskStrategy
-    ) -> String {
-        switch strategy.outputMode {
-        case .jsonShort:
-            "Keep the full response under roughly \(strategy.outputCharacterBudget) characters while preserving valid compact JSON."
-        case .deterministicTemplate, .guidedShort, .structuredBoard, .reflectiveStructured:
-            "Keep the user-facing output under roughly \(strategy.outputCharacterBudget) characters."
-        }
-    }
-
-    private static func runtimeOutputGuard(for strategy: DecisionAdaptiveTaskStrategy) -> [String] {
-        var lines: [String] = []
-
-        switch strategy.runtimeGear {
-        case .low:
-            lines.append("Stay in the low-gear lane: fast, brief, and low-cost.")
-        case .balanced:
-            lines.append("Stay in the balanced lane: concise, but allow enough depth to ground the answer.")
-        case .high:
-            lines.append("Use the high-gear lane only where deeper reflection materially improves clarity.")
-        }
-
-        switch strategy.outputMode {
-        case .deterministicTemplate:
-            lines.append("Stay close to the deterministic structure already provided.")
-        case .guidedShort:
-            lines.append("Keep the rewrite short and guided, not expansive.")
-        case .structuredBoard:
-            lines.append("Preserve a structured board shape with concise fields.")
-        case .reflectiveStructured:
-            lines.append("Keep the response reflective and structured rather than open-ended.")
-        case .jsonShort:
-            lines.append("Keep the selection output compact and structured.")
-        }
-
-        switch strategy.tone {
-        case .neutral:
-            lines.append("Keep the tone neutral and restrained.")
-        case .briefWarm:
-            lines.append("Keep the tone brief, calm, and warm.")
-        case .groundedDirect:
-            lines.append("Keep the tone grounded and direct.")
-        case .reflectiveClear:
-            lines.append("Keep the tone reflective and clear.")
-        }
-
-        switch strategy.thinkingMode {
-        case .off:
-            lines.append("Do not expose reasoning, self-talk, or chain-of-thought.")
-        case .gated:
-            lines.append("Use reasoning only to improve the answer internally; keep the output tight.")
-        }
-
-        switch strategy.retrievalMode {
-        case .off:
-            lines.append("Work only from the retained state and evidence already in front of you.")
-        case .filtered:
-            lines.append("Prioritize the retained evidence over generic completion.")
-        case .adaptive:
-            lines.append("Use the retained evidence as the anchor for any adaptive interpretation.")
-        }
-
-        switch strategy.responseLanguage {
-        case .english:
-            lines.append("Keep the user-facing output in English unless the structured format says otherwise.")
-        case .chinese:
-            lines.append("Keep the user-facing output in Chinese unless the structured format says otherwise.")
-        case .mixed:
-            lines.append("Match the user's latest language and avoid mixed-language output unless the input is mixed.")
-        }
-
-        lines.append(outputBudgetGuidance(for: strategy))
-
-        if strategy.toolCallBudget == 0 {
-            lines.append("Do not invent tool calls or action side effects beyond the declared response contract.")
+        let retrievalBounded = if strategy.retrievalItemBudget > 0 {
+            max(2, min(modeBudget, strategy.retrievalItemBudget))
         } else {
-            lines.append("Stay within \(strategy.toolCallBudget) tool-sized action decisions for this turn.")
+            modeBudget
         }
 
-        return lines
+        if strategy.runtimeGear == .low && (kind == .quick || kind == .reminder) {
+            return min(retrievalBounded, 3)
+        }
+
+        return retrievalBounded
     }
 
     private static func evidenceBlock(_ evidence: [String]) -> String {
@@ -1375,5 +696,158 @@ enum DecisionIntelligencePromptContract {
         guard !actions.isEmpty else { return "Secondary actions: None." }
         let titles = actions.map(\.title).joined(separator: ", ")
         return "Secondary actions: \(titles)"
+    }
+
+    private static func semanticTaskKind(
+        for kind: TaskKind
+    ) -> BASSemanticTaskKind {
+        switch kind {
+        case .quick:
+            .quick
+        case .balance:
+            .balance
+        case .mirror:
+            .mirror
+        case .reminder:
+            .reminder
+        }
+    }
+
+    private static func adaptiveTraceKind(
+        for kind: TaskKind
+    ) -> BASAdaptiveTraceKind {
+        switch kind {
+        case .quick:
+            .quick
+        case .balance:
+            .balance
+        case .mirror:
+            .mirror
+        case .reminder:
+            .reminder
+        }
+    }
+
+    private static func adaptiveTraceKind(
+        for kind: DecisionIntelligenceTraceKind
+    ) -> BASAdaptiveTraceKind {
+        switch kind {
+        case .quick:
+            .quick
+        case .balance:
+            .balance
+        case .mirror:
+            .mirror
+        case .reminder:
+            .reminder
+        }
+    }
+
+    private static func substrateAdaptiveStrategy(
+        _ strategy: DecisionAdaptiveTaskStrategy
+    ) -> BASAdaptiveTaskStrategy {
+        let kind: BASAdaptiveTraceKind
+        switch strategy.kind {
+        case .quick:
+            kind = .quick
+        case .balance:
+            kind = .balance
+        case .mirror:
+            kind = .mirror
+        case .reminder:
+            kind = .reminder
+        }
+
+        let entropy: BASTaskEntropyClass
+        switch strategy.entropy {
+        case .low:
+            entropy = .low
+        case .medium:
+            entropy = .medium
+        case .high:
+            entropy = .high
+        }
+
+        let runtimeGear: BASRuntimeGear
+        switch strategy.runtimeGear {
+        case .low:
+            runtimeGear = .low
+        case .balanced:
+            runtimeGear = .balanced
+        case .high:
+            runtimeGear = .high
+        }
+
+        let retrievalMode: BASRetrievalMode
+        switch strategy.retrievalMode {
+        case .off:
+            retrievalMode = .off
+        case .filtered:
+            retrievalMode = .filtered
+        case .adaptive:
+            retrievalMode = .adaptive
+        }
+
+        let thinkingMode: BASThinkingMode
+        switch strategy.thinkingMode {
+        case .off:
+            thinkingMode = .off
+        case .gated:
+            thinkingMode = .gated
+        }
+
+        let outputMode: BASOutputMode
+        switch strategy.outputMode {
+        case .deterministicTemplate:
+            outputMode = .deterministicTemplate
+        case .guidedShort:
+            outputMode = .guidedShort
+        case .structuredBoard:
+            outputMode = .structuredBoard
+        case .reflectiveStructured:
+            outputMode = .reflectiveStructured
+        case .jsonShort:
+            outputMode = .jsonShort
+        }
+
+        let tone: BASToneProfile
+        switch strategy.tone {
+        case .neutral:
+            tone = .neutral
+        case .briefWarm:
+            tone = .briefWarm
+        case .groundedDirect:
+            tone = .groundedDirect
+        case .reflectiveClear:
+            tone = .reflectiveClear
+        }
+
+        let responseLanguage: BASAdaptiveResponseLanguage
+        switch strategy.responseLanguage {
+        case .english:
+            responseLanguage = .english
+        case .chinese:
+            responseLanguage = .chinese
+        case .mixed:
+            responseLanguage = .mixed
+        }
+
+        return BASAdaptiveTaskStrategy(
+            kind: kind,
+            entropy: entropy,
+            runtimeGear: runtimeGear,
+            contextBudget: strategy.contextBudget,
+            outputCharacterBudget: strategy.outputCharacterBudget,
+            timeBudgetMs: strategy.timeBudgetMs,
+            toolCallBudget: strategy.toolCallBudget,
+            retrievalItemBudget: strategy.retrievalItemBudget,
+            retrievalMode: retrievalMode,
+            thinkingMode: thinkingMode,
+            outputMode: outputMode,
+            tone: tone,
+            actionSpace: strategy.actionSpace,
+            responseLanguage: responseLanguage,
+            allowsModelInvocation: strategy.allowsModelInvocation
+        )
     }
 }

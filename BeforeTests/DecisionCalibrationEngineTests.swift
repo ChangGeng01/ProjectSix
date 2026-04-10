@@ -1,4 +1,5 @@
 import XCTest
+import BASEvaluation
 @testable import Before
 
 final class DecisionCalibrationEngineTests: XCTestCase {
@@ -73,5 +74,7 @@ final class DecisionCalibrationEngineTests: XCTestCase {
         XCTAssertTrue(calibration.alerts.contains(.underConstrainedHighRisk))
         XCTAssertTrue(calibration.alerts.contains(.templateCoverageGap))
         XCTAssertGreaterThan(calibration.driftScore, 0.5)
+        XCTAssertEqual(calibration.packageCalibrationReport.status, BASRegressionStatus.fail)
+        XCTAssertFalse(calibration.packageCalibrationReport.summary.isEmpty)
     }
 }

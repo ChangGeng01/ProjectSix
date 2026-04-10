@@ -1,4 +1,5 @@
 import Foundation
+import BASPolicy
 
 struct DecisionTestingRuntimeExport {
     let generatedAt: Date
@@ -217,6 +218,20 @@ struct DecisionTestingRuntimeExport {
 
     var summary: DecisionTestingRuntimeSummary {
         let adaptationMatrix = runtimeSnapshot.executionProfile.adaptationMatrix
+        let consistencyCheckedTraceCount = recentTraces.filter { $0.consistencyCheck != nil }.count
+        let consistencyRejectedTraceCount = recentTraces.filter(\.consistencyRejected).count
+        let consistencyRejectedCountByKind = Dictionary(
+            grouping: recentTraces.filter(\.consistencyRejected),
+            by: \.kind
+        )
+        .mapValues(\.count)
+        let consistencyViolationCounts = recentTraces
+            .compactMap(\.consistencyCheck)
+            .flatMap(\.violations)
+            .reduce(into: [BASConsistencyViolationKind: Int]()) { partialResult, violation in
+                partialResult[violation.kind, default: 0] += 1
+            }
+
         return DecisionTestingRuntimeSummary(
             activeProvider: runtimeSnapshot.runtimeStatus.active,
             fallbackProvider: runtimeSnapshot.runtimeStatus.fallback,
@@ -349,7 +364,19 @@ struct DecisionTestingRuntimeExport {
             activeCircuitProviders: circuitBreakerSnapshot.activeProviders,
             circuitTripCount: circuitBreakerSnapshot.totalTripCount,
             circuitTripCountByProvider: circuitBreakerSnapshot.totalTripCountByProvider,
-            circuitTripCountByReason: circuitBreakerSnapshot.totalTripCountByReason
+            circuitTripCountByReason: circuitBreakerSnapshot.totalTripCountByReason,
+            consistencyCheckedTraceCount: consistencyCheckedTraceCount,
+            consistencyRejectedTraceCount: consistencyRejectedTraceCount,
+            consistencyCheckCoverageRate: rate(
+                numerator: consistencyCheckedTraceCount,
+                denominator: recentTraces.count
+            ),
+            consistencyRejectRate: rate(
+                numerator: consistencyRejectedTraceCount,
+                denominator: consistencyCheckedTraceCount
+            ),
+            consistencyRejectedCountByKind: consistencyRejectedCountByKind,
+            consistencyViolationCounts: consistencyViolationCounts
         )
     }
 
@@ -857,4 +884,10 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let circuitTripCount: Int
     let circuitTripCountByProvider: [DecisionModelProviderKind: Int]
     let circuitTripCountByReason: [DecisionIntelligenceCircuitTripReason: Int]
+    let consistencyCheckedTraceCount: Int
+    let consistencyRejectedTraceCount: Int
+    let consistencyCheckCoverageRate: Double
+    let consistencyRejectRate: Double
+    let consistencyRejectedCountByKind: [DecisionIntelligenceTraceKind: Int]
+    let consistencyViolationCounts: [BASConsistencyViolationKind: Int]
 }

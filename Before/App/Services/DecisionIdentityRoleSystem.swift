@@ -1,4 +1,6 @@
 import Foundation
+import BASMemory
+import BASPolicy
 
 enum DecisionIdentityRoleSystem {
     static func resolve(
@@ -7,47 +9,31 @@ enum DecisionIdentityRoleSystem {
         sourceSurface: DecisionIntentSourceSurface,
         riskLevel: InterventionRiskLevel
     ) -> DecisionIdentityProfile {
-        var profile = DecisionIdentityProfile.default(for: mode)
+        return BASIdentityRoleResolver.resolve(
+            mode: substrateMode(from: mode),
+            sourceSurface: resolvedSurface(source: source, sourceSurface: sourceSurface),
+            riskLevel: substrateRiskLevel(from: riskLevel)
+        )
+    }
 
-        if source == .notification || sourceSurface == .notification {
-            profile = DecisionIdentityProfile(
-                role: .predictiveSentinel,
-                posture: riskLevel == .high ? .protective : .coaching,
-                initiative: riskLevel == .high ? .assertive : .guided,
-                confidenceCeiling: riskLevel == .high ? 0.62 : 0.58,
-                canAdvise: true,
-                canExecuteActions: false,
-                canEscalateToCloud: false,
-                relationshipBoundary: "Interrupt momentum, but do not overtake the user's agency."
-            )
+    private static func resolvedSurface(
+        source: BrainStateUpdateSource,
+        sourceSurface: DecisionIntentSourceSurface
+    ) -> BASInteractionSurface {
+        if source == .notification { return .notification }
+        switch sourceSurface {
+        case .app:
+            return .app
+        case .watch:
+            return .watch
+        case .widget:
+            return .widget
+        case .shortcut:
+            return .shortcut
+        case .siri:
+            return .siri
+        case .notification:
+            return .notification
         }
-
-        if sourceSurface == .watch {
-            return DecisionIdentityProfile(
-                role: profile.role == .mirrorWitness ? .pauseCompanion : profile.role,
-                posture: riskLevel == .high ? .protective : profile.posture,
-                initiative: profile.initiative == .assertive ? .guided : profile.initiative,
-                confidenceCeiling: min(profile.confidenceCeiling, 0.64),
-                canAdvise: profile.canAdvise,
-                canExecuteActions: false,
-                canEscalateToCloud: false,
-                relationshipBoundary: "Keep the watch surface lightweight, interruptive, and local."
-            )
-        }
-
-        if riskLevel == .high {
-            return DecisionIdentityProfile(
-                role: profile.role,
-                posture: .protective,
-                initiative: profile.role == .mirrorWitness ? .guided : .assertive,
-                confidenceCeiling: min(profile.confidenceCeiling, 0.66),
-                canAdvise: true,
-                canExecuteActions: false,
-                canEscalateToCloud: false,
-                relationshipBoundary: "Slow the decision down before offering any stronger interpretation."
-            )
-        }
-
-        return profile
     }
 }

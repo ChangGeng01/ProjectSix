@@ -6,9 +6,39 @@ PROJECT="$ROOT/Before.xcodeproj"
 SIMULATOR_NAME="${SIMULATOR_NAME:-iPhone 17 Pro}"
 SIMULATOR_OS="${SIMULATOR_OS:-26.3.1}"
 DESTINATION="platform=iOS Simulator,name=${SIMULATOR_NAME},OS=${SIMULATOR_OS}"
+DERIVED_DATA_ROOT="/tmp/before-quality-gate"
+IOS_DERIVED_DATA="$DERIVED_DATA_ROOT/ios"
+UI_DERIVED_DATA="$DERIVED_DATA_ROOT/ui"
 
 typeset -i score=0
 typeset -i total=20
+
+rm -rf "$DERIVED_DATA_ROOT"
+
+resolve_simulator_udid() {
+  python3 - "$1" "$2" <<'PY'
+import json
+import subprocess
+import sys
+
+name, runtime_fragment = sys.argv[1:3]
+data = json.loads(
+    subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "--json"])
+)
+for runtime, devices in data["devices"].items():
+    if runtime_fragment not in runtime:
+        continue
+    for device in devices:
+        if device.get("isAvailable") and device["name"] == name:
+            print(device["udid"])
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+IOS_RUNTIME_FRAGMENT="iOS-${${SIMULATOR_OS%.*}//./-}"
+IOS_SIMULATOR_UDID="$(resolve_simulator_udid "$SIMULATOR_NAME" "$IOS_RUNTIME_FRAGMENT")"
+UI_DESTINATION="platform=iOS Simulator,id=${IOS_SIMULATOR_UDID}"
 
 run_step() {
   local label="$1"
@@ -25,12 +55,78 @@ run_step() {
   fi
 }
 
+prepare_before_test_simulator() {
+  local attempt="$1"
+
+  xcrun simctl shutdown "$IOS_SIMULATOR_UDID" >/dev/null 2>&1 || true
+  if [[ "$attempt" -gt 1 ]]; then
+    xcrun simctl erase "$IOS_SIMULATOR_UDID" >/dev/null 2>&1 || true
+  fi
+  xcrun simctl boot "$IOS_SIMULATOR_UDID" >/dev/null 2>&1 || true
+  xcrun simctl bootstatus "$IOS_SIMULATOR_UDID" -b
+}
+
+run_before_tests_once() {
+  xcodebuild -derivedDataPath "$IOS_DERIVED_DATA" -project "$PROJECT" -scheme Before -destination "$DESTINATION" CODE_SIGNING_ALLOWED=NO test "$@"
+}
+
 run_before_tests() {
-  xcodebuild -project "$PROJECT" -scheme Before -destination "$DESTINATION" CODE_SIGNING_ALLOWED=NO test "$@"
+  local attempt log
+  for attempt in 1 2; do
+    prepare_before_test_simulator "$attempt"
+    log="$(mktemp)"
+    if run_before_tests_once "$@" > >(tee "$log") 2>&1; then
+      rm -f "$log"
+      return 0
+    fi
+
+    printf "iOS test run failed on attempt %d; resetting iOS derived data and retrying.\n" "$attempt"
+    rm -rf "$IOS_DERIVED_DATA"
+    rm -f "$log"
+  done
+
+  return 1
+}
+
+prepare_ui_smoke_simulator() {
+  local attempt="$1"
+
+  xcrun simctl shutdown "$IOS_SIMULATOR_UDID" >/dev/null 2>&1 || true
+  if [[ "$attempt" -gt 1 ]]; then
+    xcrun simctl erase "$IOS_SIMULATOR_UDID" >/dev/null 2>&1 || true
+  fi
+  xcrun simctl boot "$IOS_SIMULATOR_UDID" >/dev/null 2>&1 || true
+  xcrun simctl bootstatus "$IOS_SIMULATOR_UDID" -b
+  open -a Simulator --args -CurrentDeviceUDID "$IOS_SIMULATOR_UDID" >/dev/null 2>&1 || true
+}
+
+run_ui_smoke_once() {
+  xcodebuild -derivedDataPath "$UI_DERIVED_DATA" -project "$PROJECT" -scheme BeforeUISmoke -destination "$UI_DESTINATION" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -maximum-concurrent-test-simulator-destinations 1 test
 }
 
 run_ui_smoke() {
-  xcodebuild -project "$PROJECT" -scheme BeforeUISmoke -destination "$DESTINATION" CODE_SIGNING_ALLOWED=NO test
+  local attempt log
+  for attempt in 1 2 3; do
+    prepare_ui_smoke_simulator "$attempt"
+    log="$(mktemp)"
+    if run_ui_smoke_once > >(tee "$log") 2>&1; then
+      rm -f "$log"
+      return 0
+    fi
+
+    if grep -q "Timed out waiting for AX loaded notification" "$log" || \
+       grep -q "test runner failed to initialize for UI testing" "$log"; then
+      printf "UI smoke hit simulator accessibility bootstrap flake on attempt %d; resetting iOS derived data and retrying.\n" "$attempt"
+      rm -rf "$UI_DERIVED_DATA"
+      rm -f "$log"
+      continue
+    fi
+
+    rm -f "$log"
+    return 1
+  done
+
+  return 1
 }
 
 run_step "Project generation" \

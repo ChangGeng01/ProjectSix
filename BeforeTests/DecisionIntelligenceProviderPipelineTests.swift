@@ -1,4 +1,5 @@
 import XCTest
+import BASPolicy
 @testable import Before
 
 final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
@@ -654,5 +655,180 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         XCTAssertEqual(latestTrace.kind, .balance)
         XCTAssertEqual(latestTrace.activeProvider, .testingStub)
         XCTAssertTrue(latestTrace.admissionDecision?.isAllowed == true)
+    }
+
+    @MainActor
+    func testQuickConsistencyHarnessRejectsProviderResultOutsideBoundaryActionSpace() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            brainState: blockedGuidanceBrainState(mode: .quick),
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNil(refined)
+
+        guard let rejectionTrace = DecisionIntelligenceDebugStore.shared.traces.first(where: \.consistencyRejected) else {
+            return XCTFail("Expected a consistency rejection trace.")
+        }
+
+        XCTAssertEqual(rejectionTrace.kind, .quick)
+        XCTAssertEqual(rejectionTrace.activeProvider, .testingStub)
+        XCTAssertEqual(rejectionTrace.consistencyCheck?.violations.first?.kind, .forbiddenAction)
+        XCTAssertTrue(rejectionTrace.detail.contains("Consistency harness rejected"))
+    }
+
+    @MainActor
+    func testQuickConsistencyHarnessQuarantinesCachedResultBeforeServingIt() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let brainState = blockedGuidanceBrainState(mode: .quick)
+        let cached = QuickCheckResult(
+            currentPerspective: "Stub current: cached version",
+            afterPerspective: "Stub after: cached version",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
+            base: base,
+            input: input,
+            brainState: brainState
+        )
+        let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+            provider: .testingStub,
+            envelope: envelope
+        )
+        await DecisionIntelligenceResponseCache.shared.storeQuickResult(cached, for: cacheKey)
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            brainState: brainState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNil(refined)
+
+        let cacheSnapshot = await DecisionIntelligenceResponseCache.shared.telemetrySnapshot()
+        XCTAssertEqual(cacheSnapshot.totalQuarantinedHits, 1)
+        XCTAssertTrue(
+            DecisionIntelligenceDebugStore.shared.traces.contains {
+                $0.consistencyRejected && $0.detail.contains("cached quick refinement")
+            }
+        )
+    }
+
+    @MainActor
+    func testBalanceTraceIncludesPassingConsistencyCheckWhenBrainStateIsAvailable() async {
+        let base = BalanceBoardResult(
+            headline: "Base headline",
+            summary: "Base summary",
+            focusTitle: "Base focus",
+            focusDescription: "Base description",
+            nextAction: "Base next action"
+        )
+        let input = BalanceBoardInput(
+            prompt: "Should I take this side project?",
+            desire: "Momentum",
+            concern: "Burnout",
+            constraint: "My week is already full.",
+            longTerm: "I want steadier energy next month."
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
+            base: base,
+            input: input,
+            brainState: permissiveBrainState(mode: .balance),
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertEqual(refined?.headline, "Stub balance board")
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected a recorded balance trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .balance)
+        XCTAssertFalse(latestTrace.consistencyRejected)
+        XCTAssertNotNil(latestTrace.consistencyCheck)
+        XCTAssertTrue(latestTrace.consistencyCheck?.isConsistent == true)
+    }
+
+    private func permissiveBrainState(mode: DecisionMode) -> DecisionBrainState {
+        let boundaryPolicy = DecisionBoundaryPolicyState(
+            mode: .localOnlyAdvisory,
+            riskLevel: .low,
+            allowedActionClasses: ["render_local_guidance", "load_governed_memory"],
+            blockedActionClasses: ["cloud_escalation"],
+            requiredConfirmations: [],
+            activeConstraints: [.noCloudEscalation],
+            auditHeadline: "Stay local."
+        )
+        return DecisionBrainState(
+            profileCore: ["Values clarity over speed."],
+            activeGoals: ["Protect tomorrow's judgment."],
+            relevantMemories: ["Waiting overnight usually helps."],
+            sessionBiases: ["句子短"],
+            retrievalTags: ["cooldown"],
+            reactionWeights: .defaults(for: mode),
+            boundaryPolicy: boundaryPolicy,
+            loadedAt: .now
+        )
+    }
+
+    private func blockedGuidanceBrainState(mode: DecisionMode) -> DecisionBrainState {
+        let boundaryPolicy = DecisionBoundaryPolicyState(
+            mode: .localOnlyProtective,
+            riskLevel: .high,
+            allowedActionClasses: ["load_governed_memory"],
+            blockedActionClasses: ["render_local_guidance", "cloud_escalation"],
+            requiredConfirmations: ["irreversible_decision"],
+            activeConstraints: [.noCloudEscalation, .lockSensitiveMemory],
+            auditHeadline: "Hold the line."
+        )
+        return DecisionBrainState(
+            profileCore: ["Protect the boundary first."],
+            activeGoals: ["Do not turn signal into action yet."],
+            relevantMemories: ["Fast guidance is not allowed here."],
+            sessionBiases: ["句子短"],
+            retrievalTags: ["protective"],
+            reactionWeights: .defaults(for: mode),
+            boundaryPolicy: boundaryPolicy,
+            loadedAt: .now
+        )
     }
 }

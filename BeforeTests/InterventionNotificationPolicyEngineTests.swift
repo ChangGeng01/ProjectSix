@@ -208,6 +208,61 @@ final class InterventionNotificationPolicyEngineTests: XCTestCase {
     }
 
     @MainActor
+    func testBlocksWhenConsistencyHarnessRejectsHarshNotificationCopy() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = localDate(year: 2026, month: 4, day: 11, hour: 15, minute: 30)
+        let brainState = DecisionBrainState(
+            profileCore: ["Gentle, bounded interventions work best."],
+            activeGoals: ["Protect sleep before midnight."],
+            relevantMemories: ["Night pushes need lighter language."],
+            sessionBiases: ["Keep the tone gentle and brief."],
+            retrievalTags: ["sleep", "night"],
+            reactionWeights: DecisionReactionWeights.defaults(for: .quick),
+            loadedAt: now
+        )
+        let currentBrainState = CurrentBrainState(
+            source: .notification,
+            sourceSurface: .notification,
+            mode: .quick,
+            riskLevel: .high,
+            taskGraph: nil,
+            brainState: brainState,
+            dominantGoal: "Protect sleep before midnight.",
+            activeConstraints: ["require_confirmation"],
+            activeTemplateIDs: [],
+            failureGuardIDs: [],
+            sourceIntentEnvelope: nil,
+            loadedAt: now
+        )
+        let candidate = InterventionPredictionCandidate(
+            riskLevel: .high,
+            title: "You should have known better",
+            detail: "You failed this before and obviously need to stop right now.",
+            evidenceSignalCount: 2,
+            suggestedMode: .mirror,
+            reason: "Night pressure is high.",
+            createdAt: now,
+            expiresAt: now.addingTimeInterval(60 * 30)
+        )
+
+        let decision = InterventionNotificationPolicyEngine.decide(
+            candidate: candidate,
+            preferences: .default,
+            currentBrainState: currentBrainState,
+            context: context,
+            now: now
+        )
+
+        XCTAssertFalse(decision.isAllowed)
+        XCTAssertEqual(decision.blockReason, .consistencyRejected)
+        XCTAssertNotNil(decision.consistencyCheck)
+        XCTAssertTrue(
+            decision.consistencyCheck?.violations.contains(where: { $0.kind == .personaDrift }) == true
+        )
+    }
+
+    @MainActor
     private func makeContainer() throws -> ModelContainer {
         try ModelContainer(
             for: InterventionTrigger.self,

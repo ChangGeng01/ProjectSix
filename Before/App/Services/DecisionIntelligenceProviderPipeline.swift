@@ -1,4 +1,7 @@
 import Foundation
+import BASOrchestration
+import BASPolicy
+import BASRuntimeCore
 
 enum DecisionIntelligenceProviderPipeline {
     private static let registry = DecisionIntelligenceProviderRegistry.shared
@@ -37,76 +40,67 @@ enum DecisionIntelligenceProviderPipeline {
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) -> DecisionModelRuntimeStatus {
         let preferred = preferences.preferredIntelligenceProvider.kind
+        let plan = BASRuntimeAvailabilityResolver.resolve(
+            preferredProviderID: preferred.rawValue,
+            allowFallbacks: preferences.allowModelFallbacks,
+            runtimeEnabled: preferences.onDeviceIntelligenceMode.isEnabled,
+            deterministicProviderID: DecisionModelProviderKind.template.rawValue,
+            orderedProviderIDs: orderedKinds(
+                for: preferences.preferredIntelligenceProvider,
+                allowFallbacks: preferences.allowModelFallbacks
+            ).map(\.rawValue),
+            statusesByID: Dictionary(
+                uniqueKeysWithValues: statusesByKind.map { entry in
+                    (
+                        entry.key.rawValue,
+                        BASProviderStatusRecord(
+                            providerID: entry.key.rawValue,
+                            isAvailable: entry.value.isAvailable,
+                            title: entry.value.title,
+                            detail: entry.value.detail
+                        )
+                    )
+                }
+            ),
+            testingOverrideProviderID: testingStubProfile.map { _ in DecisionModelProviderKind.testingStub.rawValue }
+        )
 
-        guard preferences.onDeviceIntelligenceMode.isEnabled else {
-            return DecisionModelRuntimeStatus(
-                preferred: preferred,
-                active: .template,
-                fallback: nil,
-                detail: "On-device intelligence is off, so Before is using the deterministic decision system only."
-            )
-        }
-
-        if let testingStubProfile, preferred != .template {
-            return DecisionModelRuntimeStatus(
-                preferred: preferred,
-                active: .testingStub,
-                fallback: .testingStub,
-                detail: "Testing stub profile '\(testingStubProfile.title)' is overriding live providers so the AI path can be verified without a model runtime."
-            )
-        }
-
-        if preferred == .template {
-            return DecisionModelRuntimeStatus(
-                preferred: .template,
-                active: .template,
-                fallback: nil,
-                detail: "Deterministic local copy is pinned, so Before is not using a model provider for assistive refinement."
-            )
-        }
-
+        let active = DecisionModelProviderKind(rawValue: plan.activeProviderID) ?? .template
+        let fallback = plan.fallbackProviderID.flatMap(DecisionModelProviderKind.init(rawValue:))
         let orderedStatuses = orderedKinds(
             for: preferences.preferredIntelligenceProvider,
             allowFallbacks: preferences.allowModelFallbacks
-        )
-            .compactMap { statusesByKind[$0] }
+        ).compactMap { statusesByKind[$0] }
 
-        if let active = orderedStatuses.first(where: \.isAvailable) {
-            let fallback = active.kind == preferred ? nil : active.kind
-            let detail: String
-            if active.kind == preferred {
-                detail = "\(active.title). \(active.detail)"
+        let detail: String
+        switch plan.source {
+        case .runtimeDisabled:
+            detail = "On-device intelligence is off, so Before is using the deterministic decision system only."
+        case .testingOverride:
+            detail = "Testing stub profile '\(testingStubProfile?.title ?? "Unknown")' is overriding live providers so the AI path can be verified without a model runtime."
+        case .templatePinned:
+            detail = "Deterministic local copy is pinned, so Before is not using a model provider for assistive refinement."
+        case .preferredProvider:
+            detail = statusesByKind[preferred].map { "\($0.title). \($0.detail)" }
+                ?? "\(preferred.title) is active."
+        case .fallbackProvider:
+            detail = statusesByKind[active].map {
+                "\(preferred.title) is not available. Before is using \($0.title.lowercased()) instead."
+            } ?? "\(preferred.title) is not available. Before is using \(active.title.lowercased()) instead."
+        case .deterministicFallback:
+            if !preferences.allowModelFallbacks {
+                detail = "\(preferred.title) is not available. Automatic model fallback is off, so Before is using deterministic local copy instead."
             } else {
-                detail = "\(preferred.title) is not available. Before is using \(active.title.lowercased()) instead."
+                let fallbackSource = orderedStatuses.first(where: { !$0.isAvailable && $0.kind == preferred }) ?? orderedStatuses.first
+                detail = fallbackSource.map { "\(preferred.title) is not available. \($0.detail) Before is falling back to deterministic local copy." }
+                    ?? "No assistive provider is available. Before is falling back to deterministic local copy."
             }
-
-            return DecisionModelRuntimeStatus(
-                preferred: preferred,
-                active: active.kind,
-                fallback: fallback,
-                detail: detail
-            )
         }
-
-        if !preferences.allowModelFallbacks {
-            let detail = "\(preferred.title) is not available. Automatic model fallback is off, so Before is using deterministic local copy instead."
-
-            return DecisionModelRuntimeStatus(
-                preferred: preferred,
-                active: .template,
-                fallback: .template,
-                detail: detail
-            )
-        }
-
-        let fallbackSource = orderedStatuses.first(where: { !$0.isAvailable && $0.kind == preferred }) ?? orderedStatuses.first
-        let detail = fallbackSource.map { "\(preferred.title) is not available. \($0.detail) Before is falling back to deterministic local copy." }
-            ?? "No assistive provider is available. Before is falling back to deterministic local copy."
 
         return DecisionModelRuntimeStatus(
             preferred: preferred,
-            active: .template,
-            fallback: .template,
+            active: active,
+            fallback: fallback,
             detail: detail
         )
     }
@@ -234,6 +228,47 @@ enum DecisionIntelligenceProviderPipeline {
                 envelope: envelope
             )
             if let cached = await responseCache.quickResult(for: cacheKey) {
+                let preview = quickPreview(from: cached)
+                let releaseDecision = releaseDecision(
+                    kind: .quick,
+                    outputPreview: preview,
+                    kernelSnapshot: envelope.assembly.kernelSnapshot,
+                    brainState: brainState
+                )
+                let consistencyCheck = releaseDecision.consistencyCheck
+                if releaseDecision.kind != .allow, let consistencyCheck {
+                    await responseCache.quarantineQuickResult(for: cacheKey)
+                    recordTrace(
+                        kind: .quick,
+                        preferredProvider: preference.kind,
+                        activeProvider: provider.kind,
+                        attemptedProviders: actualAttemptedKinds,
+                        allowFallbacks: allowFallbacks,
+                        runtimeStrategy: strategy,
+                        frontstageState: envelope.frontstageState,
+                        contextState: contextState,
+                        neuralState: neuralState,
+                        brainState: brainState,
+                        promptBudget: envelope.budget,
+                        admissionDecision: admissionDecision,
+                        semanticPromptFingerprint: semanticPromptFingerprint,
+                        stablePrefixFingerprint: stablePrefixFingerprint,
+                        consistencyCheck: consistencyCheck,
+                        consistencyRejected: true,
+                        prompt: envelope.debugPrompt,
+                        outputPreview: preview,
+                        detail: rejectedConsistencyDetail(
+                            base: cachedDetail(
+                                preferred: preference.kind,
+                                active: provider.kind,
+                                allowFallbacks: allowFallbacks
+                            ),
+                            result: consistencyCheck,
+                            source: "cached quick refinement"
+                        )
+                    )
+                    continue
+                }
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
                     event: .cacheHit
@@ -271,8 +306,9 @@ enum DecisionIntelligenceProviderPipeline {
                     admissionDecision: admissionDecision,
                     semanticPromptFingerprint: semanticPromptFingerprint,
                     stablePrefixFingerprint: stablePrefixFingerprint,
+                    consistencyCheck: consistencyCheck,
                     prompt: envelope.debugPrompt,
-                    outputPreview: quickPreview(from: cached),
+                    outputPreview: preview,
                     detail: cachedDetail(
                         preferred: preference.kind,
                         active: provider.kind,
@@ -290,6 +326,50 @@ enum DecisionIntelligenceProviderPipeline {
                 neuralState: neuralState,
                 brainState: brainState
             ) {
+                let preview = quickPreview(from: refined)
+                let releaseDecision = releaseDecision(
+                    kind: .quick,
+                    outputPreview: preview,
+                    kernelSnapshot: envelope.assembly.kernelSnapshot,
+                    brainState: brainState
+                )
+                let consistencyCheck = releaseDecision.consistencyCheck
+                if releaseDecision.kind != .allow, let consistencyCheck {
+                    await DecisionIntelligenceCircuitBreaker.shared.record(
+                        provider: provider.kind,
+                        event: .providerFailure
+                    )
+                    recordTrace(
+                        kind: .quick,
+                        preferredProvider: preference.kind,
+                        activeProvider: provider.kind,
+                        attemptedProviders: actualAttemptedKinds,
+                        allowFallbacks: allowFallbacks,
+                        runtimeStrategy: strategy,
+                        frontstageState: envelope.frontstageState,
+                        contextState: contextState,
+                        neuralState: neuralState,
+                        brainState: brainState,
+                        promptBudget: envelope.budget,
+                        admissionDecision: admissionDecision,
+                        semanticPromptFingerprint: semanticPromptFingerprint,
+                        stablePrefixFingerprint: stablePrefixFingerprint,
+                        consistencyCheck: consistencyCheck,
+                        consistencyRejected: true,
+                        prompt: envelope.debugPrompt,
+                        outputPreview: preview,
+                        detail: rejectedConsistencyDetail(
+                            base: detail(
+                                preferred: preference.kind,
+                                active: provider.kind,
+                                allowFallbacks: allowFallbacks
+                            ),
+                            result: consistencyCheck,
+                            source: "provider quick refinement"
+                        )
+                    )
+                    continue
+                }
                 await responseCache.storeQuickResult(refined, for: cacheKey)
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
@@ -331,8 +411,9 @@ enum DecisionIntelligenceProviderPipeline {
                     admissionDecision: admissionDecision,
                     semanticPromptFingerprint: semanticPromptFingerprint,
                     stablePrefixFingerprint: stablePrefixFingerprint,
+                    consistencyCheck: consistencyCheck,
                     prompt: envelope.debugPrompt,
-                    outputPreview: quickPreview(from: refined),
+                    outputPreview: preview,
                     detail: detail(
                         preferred: preference.kind,
                         active: provider.kind,
@@ -514,6 +595,47 @@ enum DecisionIntelligenceProviderPipeline {
                 envelope: envelope
             )
             if let cached = await responseCache.balanceResult(for: cacheKey) {
+                let preview = balancePreview(from: cached)
+                let releaseDecision = releaseDecision(
+                    kind: .balance,
+                    outputPreview: preview,
+                    kernelSnapshot: envelope.assembly.kernelSnapshot,
+                    brainState: brainState
+                )
+                let consistencyCheck = releaseDecision.consistencyCheck
+                if releaseDecision.kind != .allow, let consistencyCheck {
+                    await responseCache.quarantineBalanceResult(for: cacheKey)
+                    recordTrace(
+                        kind: .balance,
+                        preferredProvider: preference.kind,
+                        activeProvider: provider.kind,
+                        attemptedProviders: actualAttemptedKinds,
+                        allowFallbacks: allowFallbacks,
+                        runtimeStrategy: strategy,
+                        frontstageState: envelope.frontstageState,
+                        contextState: contextState,
+                        neuralState: neuralState,
+                        brainState: brainState,
+                        promptBudget: envelope.budget,
+                        admissionDecision: admissionDecision,
+                        semanticPromptFingerprint: semanticPromptFingerprint,
+                        stablePrefixFingerprint: stablePrefixFingerprint,
+                        consistencyCheck: consistencyCheck,
+                        consistencyRejected: true,
+                        prompt: envelope.debugPrompt,
+                        outputPreview: preview,
+                        detail: rejectedConsistencyDetail(
+                            base: cachedDetail(
+                                preferred: preference.kind,
+                                active: provider.kind,
+                                allowFallbacks: allowFallbacks
+                            ),
+                            result: consistencyCheck,
+                            source: "cached balance refinement"
+                        )
+                    )
+                    continue
+                }
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
                     event: .cacheHit
@@ -551,8 +673,9 @@ enum DecisionIntelligenceProviderPipeline {
                     admissionDecision: admissionDecision,
                     semanticPromptFingerprint: semanticPromptFingerprint,
                     stablePrefixFingerprint: stablePrefixFingerprint,
+                    consistencyCheck: consistencyCheck,
                     prompt: envelope.debugPrompt,
-                    outputPreview: balancePreview(from: cached),
+                    outputPreview: preview,
                     detail: cachedDetail(
                         preferred: preference.kind,
                         active: provider.kind,
@@ -570,6 +693,50 @@ enum DecisionIntelligenceProviderPipeline {
                 neuralState: neuralState,
                 brainState: brainState
             ) {
+                let preview = balancePreview(from: refined)
+                let releaseDecision = releaseDecision(
+                    kind: .balance,
+                    outputPreview: preview,
+                    kernelSnapshot: envelope.assembly.kernelSnapshot,
+                    brainState: brainState
+                )
+                let consistencyCheck = releaseDecision.consistencyCheck
+                if releaseDecision.kind != .allow, let consistencyCheck {
+                    await DecisionIntelligenceCircuitBreaker.shared.record(
+                        provider: provider.kind,
+                        event: .providerFailure
+                    )
+                    recordTrace(
+                        kind: .balance,
+                        preferredProvider: preference.kind,
+                        activeProvider: provider.kind,
+                        attemptedProviders: actualAttemptedKinds,
+                        allowFallbacks: allowFallbacks,
+                        runtimeStrategy: strategy,
+                        frontstageState: envelope.frontstageState,
+                        contextState: contextState,
+                        neuralState: neuralState,
+                        brainState: brainState,
+                        promptBudget: envelope.budget,
+                        admissionDecision: admissionDecision,
+                        semanticPromptFingerprint: semanticPromptFingerprint,
+                        stablePrefixFingerprint: stablePrefixFingerprint,
+                        consistencyCheck: consistencyCheck,
+                        consistencyRejected: true,
+                        prompt: envelope.debugPrompt,
+                        outputPreview: preview,
+                        detail: rejectedConsistencyDetail(
+                            base: detail(
+                                preferred: preference.kind,
+                                active: provider.kind,
+                                allowFallbacks: allowFallbacks
+                            ),
+                            result: consistencyCheck,
+                            source: "provider balance refinement"
+                        )
+                    )
+                    continue
+                }
                 await responseCache.storeBalanceResult(refined, for: cacheKey)
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
@@ -611,8 +778,9 @@ enum DecisionIntelligenceProviderPipeline {
                     admissionDecision: admissionDecision,
                     semanticPromptFingerprint: semanticPromptFingerprint,
                     stablePrefixFingerprint: stablePrefixFingerprint,
+                    consistencyCheck: consistencyCheck,
                     prompt: envelope.debugPrompt,
-                    outputPreview: balancePreview(from: refined),
+                    outputPreview: preview,
                     detail: detail(
                         preferred: preference.kind,
                         active: provider.kind,
@@ -794,6 +962,47 @@ enum DecisionIntelligenceProviderPipeline {
                 envelope: envelope
             )
             if let cached = await responseCache.mirrorResult(for: cacheKey) {
+                let preview = mirrorPreview(from: cached)
+                let releaseDecision = releaseDecision(
+                    kind: .mirror,
+                    outputPreview: preview,
+                    kernelSnapshot: envelope.assembly.kernelSnapshot,
+                    brainState: brainState
+                )
+                let consistencyCheck = releaseDecision.consistencyCheck
+                if releaseDecision.kind != .allow, let consistencyCheck {
+                    await responseCache.quarantineMirrorResult(for: cacheKey)
+                    recordTrace(
+                        kind: .mirror,
+                        preferredProvider: preference.kind,
+                        activeProvider: provider.kind,
+                        attemptedProviders: actualAttemptedKinds,
+                        allowFallbacks: allowFallbacks,
+                        runtimeStrategy: strategy,
+                        frontstageState: envelope.frontstageState,
+                        contextState: contextState,
+                        neuralState: neuralState,
+                        brainState: brainState,
+                        promptBudget: envelope.budget,
+                        admissionDecision: admissionDecision,
+                        semanticPromptFingerprint: semanticPromptFingerprint,
+                        stablePrefixFingerprint: stablePrefixFingerprint,
+                        consistencyCheck: consistencyCheck,
+                        consistencyRejected: true,
+                        prompt: envelope.debugPrompt,
+                        outputPreview: preview,
+                        detail: rejectedConsistencyDetail(
+                            base: cachedDetail(
+                                preferred: preference.kind,
+                                active: provider.kind,
+                                allowFallbacks: allowFallbacks
+                            ),
+                            result: consistencyCheck,
+                            source: "cached mirror refinement"
+                        )
+                    )
+                    continue
+                }
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
                     event: .cacheHit
@@ -831,8 +1040,9 @@ enum DecisionIntelligenceProviderPipeline {
                     admissionDecision: admissionDecision,
                     semanticPromptFingerprint: semanticPromptFingerprint,
                     stablePrefixFingerprint: stablePrefixFingerprint,
+                    consistencyCheck: consistencyCheck,
                     prompt: envelope.debugPrompt,
-                    outputPreview: mirrorPreview(from: cached),
+                    outputPreview: preview,
                     detail: cachedDetail(
                         preferred: preference.kind,
                         active: provider.kind,
@@ -850,6 +1060,50 @@ enum DecisionIntelligenceProviderPipeline {
                 neuralState: neuralState,
                 brainState: brainState
             ) {
+                let preview = mirrorPreview(from: refined)
+                let releaseDecision = releaseDecision(
+                    kind: .mirror,
+                    outputPreview: preview,
+                    kernelSnapshot: envelope.assembly.kernelSnapshot,
+                    brainState: brainState
+                )
+                let consistencyCheck = releaseDecision.consistencyCheck
+                if releaseDecision.kind != .allow, let consistencyCheck {
+                    await DecisionIntelligenceCircuitBreaker.shared.record(
+                        provider: provider.kind,
+                        event: .providerFailure
+                    )
+                    recordTrace(
+                        kind: .mirror,
+                        preferredProvider: preference.kind,
+                        activeProvider: provider.kind,
+                        attemptedProviders: actualAttemptedKinds,
+                        allowFallbacks: allowFallbacks,
+                        runtimeStrategy: strategy,
+                        frontstageState: envelope.frontstageState,
+                        contextState: contextState,
+                        neuralState: neuralState,
+                        brainState: brainState,
+                        promptBudget: envelope.budget,
+                        admissionDecision: admissionDecision,
+                        semanticPromptFingerprint: semanticPromptFingerprint,
+                        stablePrefixFingerprint: stablePrefixFingerprint,
+                        consistencyCheck: consistencyCheck,
+                        consistencyRejected: true,
+                        prompt: envelope.debugPrompt,
+                        outputPreview: preview,
+                        detail: rejectedConsistencyDetail(
+                            base: detail(
+                                preferred: preference.kind,
+                                active: provider.kind,
+                                allowFallbacks: allowFallbacks
+                            ),
+                            result: consistencyCheck,
+                            source: "provider mirror refinement"
+                        )
+                    )
+                    continue
+                }
                 await responseCache.storeMirrorResult(refined, for: cacheKey)
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
@@ -891,8 +1145,9 @@ enum DecisionIntelligenceProviderPipeline {
                     admissionDecision: admissionDecision,
                     semanticPromptFingerprint: semanticPromptFingerprint,
                     stablePrefixFingerprint: stablePrefixFingerprint,
+                    consistencyCheck: consistencyCheck,
                     prompt: envelope.debugPrompt,
-                    outputPreview: mirrorPreview(from: refined),
+                    outputPreview: preview,
                     detail: detail(
                         preferred: preference.kind,
                         active: provider.kind,
@@ -1062,6 +1317,45 @@ enum DecisionIntelligenceProviderPipeline {
             )
             if let cached = await responseCache.reminder(for: cacheKey),
                clippedCandidates.contains(where: { $0.id == cached.id }) {
+                let preview = reminderPreview(from: cached)
+                let releaseDecision = releaseDecision(
+                    kind: .reminder,
+                    outputPreview: preview,
+                    kernelSnapshot: selection.prompt.assembly.kernelSnapshot,
+                    brainState: nil,
+                    reminderMode: mode
+                )
+                let consistencyCheck = releaseDecision.consistencyCheck
+                if releaseDecision.kind != .allow, let consistencyCheck {
+                    await responseCache.quarantineReminder(for: cacheKey)
+                    recordTrace(
+                        kind: .reminder,
+                        preferredProvider: preference.kind,
+                        activeProvider: provider.kind,
+                        attemptedProviders: actualAttemptedKinds,
+                        allowFallbacks: allowFallbacks,
+                        runtimeStrategy: strategy,
+                        frontstageState: selection.prompt.frontstageState,
+                        promptBudget: selection.prompt.budget,
+                        admissionDecision: admissionDecision,
+                        semanticPromptFingerprint: semanticPromptFingerprint,
+                        stablePrefixFingerprint: stablePrefixFingerprint,
+                        consistencyCheck: consistencyCheck,
+                        consistencyRejected: true,
+                        prompt: selection.prompt.debugPrompt,
+                        outputPreview: preview,
+                        detail: rejectedConsistencyDetail(
+                            base: cachedDetail(
+                                preferred: preference.kind,
+                                active: provider.kind,
+                                allowFallbacks: allowFallbacks
+                            ),
+                            result: consistencyCheck,
+                            source: "cached reminder selection"
+                        )
+                    )
+                    continue
+                }
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
                     event: .cacheHit
@@ -1096,8 +1390,9 @@ enum DecisionIntelligenceProviderPipeline {
                     admissionDecision: admissionDecision,
                     semanticPromptFingerprint: semanticPromptFingerprint,
                     stablePrefixFingerprint: stablePrefixFingerprint,
+                    consistencyCheck: consistencyCheck,
                     prompt: selection.prompt.debugPrompt,
-                    outputPreview: reminderPreview(from: cached),
+                    outputPreview: preview,
                     detail: cachedDetail(
                         preferred: preference.kind,
                         active: provider.kind,
@@ -1114,6 +1409,48 @@ enum DecisionIntelligenceProviderPipeline {
                 mode: mode,
                 strategy: strategy
             ) {
+                let preview = reminderPreview(from: selected)
+                let releaseDecision = releaseDecision(
+                    kind: .reminder,
+                    outputPreview: preview,
+                    kernelSnapshot: selection.prompt.assembly.kernelSnapshot,
+                    brainState: nil,
+                    reminderMode: mode
+                )
+                let consistencyCheck = releaseDecision.consistencyCheck
+                if releaseDecision.kind != .allow, let consistencyCheck {
+                    await DecisionIntelligenceCircuitBreaker.shared.record(
+                        provider: provider.kind,
+                        event: .providerFailure
+                    )
+                    recordTrace(
+                        kind: .reminder,
+                        preferredProvider: preference.kind,
+                        activeProvider: provider.kind,
+                        attemptedProviders: actualAttemptedKinds,
+                        allowFallbacks: allowFallbacks,
+                        runtimeStrategy: strategy,
+                        frontstageState: selection.prompt.frontstageState,
+                        promptBudget: selection.prompt.budget,
+                        admissionDecision: admissionDecision,
+                        semanticPromptFingerprint: semanticPromptFingerprint,
+                        stablePrefixFingerprint: stablePrefixFingerprint,
+                        consistencyCheck: consistencyCheck,
+                        consistencyRejected: true,
+                        prompt: selection.prompt.debugPrompt,
+                        outputPreview: preview,
+                        detail: rejectedConsistencyDetail(
+                            base: detail(
+                                preferred: preference.kind,
+                                active: provider.kind,
+                                allowFallbacks: allowFallbacks
+                            ),
+                            result: consistencyCheck,
+                            source: "provider reminder selection"
+                        )
+                    )
+                    continue
+                }
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
                     event: .providerSuccess(
@@ -1152,8 +1489,9 @@ enum DecisionIntelligenceProviderPipeline {
                     admissionDecision: admissionDecision,
                     semanticPromptFingerprint: semanticPromptFingerprint,
                     stablePrefixFingerprint: stablePrefixFingerprint,
+                    consistencyCheck: consistencyCheck,
                     prompt: selection.prompt.debugPrompt,
-                    outputPreview: reminderPreview(from: selected),
+                    outputPreview: preview,
                     detail: detail(
                         preferred: preference.kind,
                         active: provider.kind,
@@ -1260,6 +1598,8 @@ enum DecisionIntelligenceProviderPipeline {
         admissionDecision: DecisionIntelligenceAdmissionDecision? = nil,
         semanticPromptFingerprint: String? = nil,
         stablePrefixFingerprint: String? = nil,
+        consistencyCheck: BASConsistencyCheckResult? = nil,
+        consistencyRejected: Bool = false,
         prompt: String,
         outputPreview: String,
         detail: String
@@ -1293,6 +1633,8 @@ enum DecisionIntelligenceProviderPipeline {
             admissionDecision: admissionDecision,
             semanticPromptFingerprint: semanticPromptFingerprint,
             stablePrefixFingerprint: stablePrefixFingerprint,
+            consistencyCheck: consistencyCheck,
+            consistencyRejected: consistencyRejected,
             prompt: storedPrompt,
             outputPreview: storedOutputPreview,
             detail: detail
@@ -1348,6 +1690,55 @@ enum DecisionIntelligenceProviderPipeline {
 
     private static func reminderPreview(from candidate: ReminderSelectionCandidate) -> String {
         candidate.content
+    }
+
+    private static func releaseDecision(
+        kind: DecisionIntelligenceTraceKind,
+        outputPreview: String,
+        kernelSnapshot: BASCognitionKernelSnapshot,
+        brainState: DecisionBrainState?,
+        reminderMode: DecisionMode? = nil
+    ) -> BASCognitionKernelReleaseDecision {
+        BASExecutionGovernance.releaseDecision(
+            for: BASReleaseEvaluationRequest(
+                kind: basTraceKind(for: kind),
+                outputPreview: outputPreview,
+                kernelSnapshot: kernelSnapshot,
+                truthStateFallback: DecisionIntelligencePromptContract.consistencyTruthState(
+                    for: kind,
+                    brainState: brainState,
+                    reminderMode: reminderMode
+                ),
+                referencedFacts: brainState?.activeGoals.first.map { ["current_goal": $0] } ?? [:]
+            )
+        )
+    }
+
+    private static func basTraceKind(
+        for kind: DecisionIntelligenceTraceKind
+    ) -> BASAdaptiveTraceKind {
+        switch kind {
+        case .quick:
+            .quick
+        case .balance:
+            .balance
+        case .mirror:
+            .mirror
+        case .reminder:
+            .reminder
+        }
+    }
+
+    private static func rejectedConsistencyDetail(
+        base: String,
+        result: BASConsistencyCheckResult,
+        source: String
+    ) -> String {
+        let violations = result.violations
+            .prefix(3)
+            .map(\.message)
+            .joined(separator: " ")
+        return "\(base) Consistency harness rejected the \(source). \(violations)"
     }
 
     private static func recordTelemetry(

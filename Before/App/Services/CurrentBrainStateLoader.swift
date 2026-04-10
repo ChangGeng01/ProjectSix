@@ -1,5 +1,7 @@
 import Foundation
 import SwiftData
+import BASMemory
+import BASPolicy
 
 enum CurrentBrainStateLoader {
     @discardableResult
@@ -37,39 +39,20 @@ enum CurrentBrainStateLoader {
         )
         let failurePatterns = FailurePatternStore.selectedFailurePatterns(in: context, mode: mode)
 
-        var brainState = DecisionMemorySystem.loadBrainState(
+        var bootstrapped = BehavioralAISubstrateBridge.bootstrapBrainState(
             mode: mode,
             prompt: prompt,
+            source: source,
+            sourceSurface: sourceSurface,
+            riskLevel: riskLevel,
+            taskGraph: taskGraph,
             projection: projection,
             retrievalMode: retrievalMode,
+            activeTemplateIDs: templates.map(\.id),
+            failureGuardIDs: failurePatterns.map(\.id),
             now: now
         )
-        brainState.activeInterventionTemplateIDs = templates.map(\.id)
-        brainState.failureGuardIDs = failurePatterns.map(\.id)
-        let identityProfile = DecisionIdentityRoleSystem.resolve(
-            mode: mode,
-            source: source,
-            sourceSurface: sourceSurface,
-            riskLevel: riskLevel
-        )
-        let boundaryPolicy = DecisionBoundaryPolicyEngine.evaluate(
-            mode: mode,
-            source: source,
-            sourceSurface: sourceSurface,
-            riskLevel: riskLevel,
-            identityProfile: identityProfile,
-            brainState: brainState,
-            taskGraph: taskGraph
-        )
-        brainState.identityProfile = identityProfile
-        brainState.boundaryPolicy = boundaryPolicy
-        brainState.calibrationState = DecisionCalibrationEngine.evaluate(
-            brainState: brainState,
-            riskLevel: riskLevel,
-            identityProfile: identityProfile,
-            boundaryPolicy: boundaryPolicy,
-            now: now
-        )
+        var brainState = bootstrapped.brainState
         brainState.evolutionState = DecisionEvolutionEngine.recordCheckpoint(
             mode: mode,
             source: source,
@@ -77,13 +60,7 @@ enum CurrentBrainStateLoader {
             context: context,
             now: now
         )
-        let activeConstraints = Array(
-            orderedUnique(
-                brainState.sessionBiases +
-                    brainState.boundaryPolicy.activeConstraints.map(\.title)
-            )
-            .prefix(4)
-        )
+        bootstrapped.brainState = brainState
 
         let current = CurrentBrainState(
             source: source,
@@ -92,10 +69,10 @@ enum CurrentBrainStateLoader {
             riskLevel: riskLevel,
             taskGraph: taskGraph,
             brainState: brainState,
-            dominantGoal: brainState.activeGoals.first,
-            activeConstraints: activeConstraints,
-            activeTemplateIDs: templates.map(\.id),
-            failureGuardIDs: failurePatterns.map(\.id),
+            dominantGoal: bootstrapped.dominantGoal,
+            activeConstraints: bootstrapped.activeConstraints,
+            activeTemplateIDs: bootstrapped.activeTemplateIDs,
+            failureGuardIDs: bootstrapped.failureGuardIDs,
             sourceIntentEnvelope: envelope,
             loadedAt: now
         )
@@ -148,13 +125,6 @@ enum CurrentBrainStateLoader {
             .widget
         case .launch, .sceneActive, .explicitRefresh, .sessionPrime:
             .app
-        }
-    }
-
-    private static func orderedUnique(_ values: [String]) -> [String] {
-        var seen: Set<String> = []
-        return values.filter { value in
-            seen.insert(value).inserted
         }
     }
 

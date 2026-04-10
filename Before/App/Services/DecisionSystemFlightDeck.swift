@@ -1,4 +1,5 @@
 import Foundation
+import BASPolicy
 
 enum DecisionSystemLayer: String, CaseIterable, Identifiable, Sendable {
     case runtime
@@ -287,6 +288,7 @@ enum DecisionSystemFlightDeckBuilder {
             partialResult + (counts[.lockSensitiveMemory] ?? 0)
         }
         let localBoundaryModes = Set(brain.boundaryModeByKind.values)
+        let forbiddenActionViolations = summary.consistencyViolationCounts[.forbiddenAction] ?? 0
 
         if summary.evidencePollutionRate > 0.2 {
             score -= 25
@@ -318,12 +320,28 @@ enum DecisionSystemFlightDeckBuilder {
             blockers.append("Sensitive-memory lock coverage is not visible in boundary policy traces.")
         }
 
+        if summary.consistencyCheckedTraceCount == 0 && summary.traceCount > 0 {
+            score -= 15
+            blockers.append("Live consistency harness results are missing from sampled traces.")
+        }
+
+        if summary.consistencyRejectRate > 0.15 {
+            score -= 15
+            blockers.append("Consistency harness is rejecting too many live outputs.")
+        }
+
+        if forbiddenActionViolations > 0 {
+            score -= 10
+            blockers.append("Consistency harness caught forbidden actions in sampled outputs.")
+        }
+
         let signals = [
             "Evidence pollution: \(percent(summary.evidencePollutionRate))",
             "Low-trust load: \(percent(lowTrustRate))",
             "Cache quarantine: \(percent(summary.cacheQuarantineRate))",
             "Circuit trips: \(summary.circuitTripCount)",
-            "Boundary modes: \(localBoundaryModes.count)"
+            "Boundary modes: \(localBoundaryModes.count)",
+            "Consistency rejected: \(summary.consistencyRejectedTraceCount)"
         ]
 
         return DecisionSystemLayerReport(
@@ -416,12 +434,23 @@ enum DecisionSystemFlightDeckBuilder {
             blockers.append("First-presentable latency is not being tracked.")
         }
 
+        if summary.traceCount > 0 && summary.consistencyCheckedTraceCount == 0 {
+            score -= 20
+            blockers.append("Trace corpus has no consistency-harness audit state.")
+        }
+
+        if summary.traceCount > 0 && summary.consistencyCheckCoverageRate < 0.6 {
+            score -= 10
+            blockers.append("Consistency-harness coverage is too shallow across sampled traces.")
+        }
+
         let signals = [
             "Requests: \(summary.totalRequests)",
             "Traces: \(summary.traceCount)",
             "Replay: \(summary.replayCount)",
             "Cache entries: \(summary.totalCacheEntries)",
-            "Avg first presentable: \(Int(summary.averageFirstPresentableMs.rounded())) ms"
+            "Avg first presentable: \(Int(summary.averageFirstPresentableMs.rounded())) ms",
+            "Consistency checked: \(summary.consistencyCheckedTraceCount)"
         ]
 
         return DecisionSystemLayerReport(

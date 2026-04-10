@@ -1,4 +1,6 @@
 import Foundation
+import BASOrchestration
+import BASRuntimeCore
 
 enum DecisionIntelligencePromptPressure: String, CaseIterable, Sendable {
     case low
@@ -43,10 +45,9 @@ enum DecisionIntelligenceAdmissionController {
         for envelope: DecisionIntelligencePromptContract.PromptEnvelope
     ) -> DecisionIntelligenceAdmissionDecision {
         DecisionIntelligenceAdmissionDecision(
-            isAllowed: true,
-            pressure: promptPressure(for: envelope.budget),
-            reason: "Testing stub bypassed admission gating so the model path can be exercised deterministically in automated tests.",
-            skipReason: nil
+            BASExecutionGovernance.testingStubAdmissionDecision(
+                for: envelope.budget.promptPressureSnapshot
+            )
         )
     }
 
@@ -55,102 +56,131 @@ enum DecisionIntelligenceAdmissionController {
         reminderCandidateCount: Int? = nil,
         reminderSelectionAssessment: ReminderSelectionAssessment? = nil
     ) -> DecisionIntelligenceAdmissionDecision {
-        let pressure = promptPressure(for: envelope.budget)
-
-        if envelope.kind == .reminder, let reminderCandidateCount, reminderCandidateCount < 2 {
-            return DecisionIntelligenceAdmissionDecision(
-                isAllowed: false,
-                pressure: pressure,
-                reason: reminderSelectionAssessment?.reason ?? "Reminder selection stayed deterministic because there was not enough choice spread to justify a model pass.",
-                skipReason: .insufficientReminderChoice,
-                reminderSelectionNeed: reminderSelectionAssessment?.need ?? .control
+        DecisionIntelligenceAdmissionDecision(
+            BASExecutionGovernance.admissionDecision(
+                for: BASAdmissionRequest(
+                    kind: envelope.kind.basTraceKind,
+                    budget: envelope.budget.promptPressureSnapshot,
+                    frontstageState: envelope.frontstageState.basSummary,
+                    reminderCandidateCount: reminderCandidateCount,
+                    reminderSelectionAssessment: reminderSelectionAssessment?.basAssessment
+                )
             )
-        }
-
-        switch envelope.kind {
-        case .quick:
-            if envelope.frontstageState.openTextSignalCount == 0,
-               envelope.frontstageState.anchorHeadlines.isEmpty,
-               envelope.frontstageState.suppressionHints.isEmpty,
-               envelope.frontstageState.evidenceHeadlines.count <= 2 {
-                return DecisionIntelligenceAdmissionDecision(
-                    isAllowed: false,
-                    pressure: pressure,
-                    reason: "Quick refinement stayed deterministic because this turn is already fully covered by the structured quick-check template and there is no extra user signal to justify a model pass.",
-                    skipReason: .templateAlreadySufficient
-                )
-            }
-            guard envelope.budget.isWithinTarget else {
-                return DecisionIntelligenceAdmissionDecision(
-                    isAllowed: false,
-                    pressure: pressure,
-                    reason: "Quick refinement stayed deterministic because the prompt is already over budget and first-token latency matters more than extra wording polish here.",
-                    skipReason: .budgetExceeded
-                )
-            }
-        case .reminder:
-            if let reminderSelectionAssessment, reminderSelectionAssessment.need == .control {
-                return DecisionIntelligenceAdmissionDecision(
-                    isAllowed: false,
-                    pressure: pressure,
-                    reason: reminderSelectionAssessment.reason,
-                    skipReason: .retrievalNotNeeded,
-                    reminderSelectionNeed: reminderSelectionAssessment.need
-                )
-            }
-
-            if pressure == .severe {
-                return DecisionIntelligenceAdmissionDecision(
-                    isAllowed: false,
-                    pressure: pressure,
-                    reason: "Reminder selection stayed deterministic because the prompt crossed the safe prefill ceiling for an on-device reminder pass.",
-                    skipReason: .prefillPressureTooHigh,
-                    reminderSelectionNeed: reminderSelectionAssessment?.need
-                )
-            }
-        case .balance, .mirror:
-            if envelope.frontstageState.openTextSignalCount < 3,
-               envelope.frontstageState.anchorHeadlines.isEmpty,
-               envelope.frontstageState.suppressionHints.isEmpty {
-                return DecisionIntelligenceAdmissionDecision(
-                    isAllowed: false,
-                    pressure: pressure,
-                    reason: "This refinement stayed deterministic because there is not enough open-text material to justify a model pass. The structured template already covers the current state.",
-                    skipReason: .insufficientSourceMaterial
-                )
-            }
-            if pressure == .severe {
-                return DecisionIntelligenceAdmissionDecision(
-                    isAllowed: false,
-                    pressure: pressure,
-                    reason: "This refinement stayed deterministic because the prompt crossed the safe prefill budget for an on-device pass.",
-                    skipReason: .budgetExceeded
-                )
-            }
-        }
-
-        return DecisionIntelligenceAdmissionDecision(
-            isAllowed: true,
-            pressure: pressure,
-            reason: "Admission controller allowed the model pass because the structured prompt stayed inside the current prefill budget.",
-            skipReason: nil,
-            reminderSelectionNeed: reminderSelectionAssessment?.need
         )
     }
 
     static func promptPressure(
         for budget: DecisionIntelligencePromptContract.ContextBudget
     ) -> DecisionIntelligencePromptPressure {
-        let ratio = budget.utilizationRatio
-        switch ratio {
-        case ..<0.55:
-            return .low
-        case ..<0.85:
-            return .elevated
-        case ...1.0:
-            return .high
-        default:
-            return .severe
+        DecisionIntelligencePromptPressure(
+            BASExecutionGovernance.promptPressure(for: budget.promptPressureSnapshot)
+        )
+    }
+}
+
+private extension DecisionFrontstageState {
+    var basSummary: BASFrontstageSignalSummary {
+        BASFrontstageSignalSummary(
+            activeStateSignalCount: activeStateSignalCount,
+            openTextSignalCount: openTextSignalCount,
+            dangerSignalCount: dangerSignals.count,
+            evidenceHeadlineCount: evidenceHeadlines.count,
+            anchorHeadlineCount: anchorHeadlines.count,
+            suppressionHintCount: suppressionHints.count
+        )
+    }
+}
+
+private extension DecisionIntelligencePromptContract.TaskKind {
+    var basTraceKind: BASAdaptiveTraceKind {
+        switch self {
+        case .quick:
+            .quick
+        case .balance:
+            .balance
+        case .mirror:
+            .mirror
+        case .reminder:
+            .reminder
         }
+    }
+}
+
+private extension ReminderSelectionAssessment {
+    var basAssessment: BASReminderSelectionAssessment {
+        BASReminderSelectionAssessment(
+            need: need.basNeed,
+            reason: reason,
+            promptTokenCount: promptTokenCount,
+            topCandidateScore: topCandidateScore,
+            secondCandidateScore: secondCandidateScore,
+            distinctCandidateCount: distinctCandidateCount
+        )
+    }
+}
+
+private extension ReminderSelectionNeed {
+    var basNeed: BASReminderSelectionNeed {
+        switch self {
+        case .control:
+            .control
+        case .knowledge:
+            .knowledge
+        }
+    }
+
+    init(_ basNeed: BASReminderSelectionNeed) {
+        switch basNeed {
+        case .control:
+            self = .control
+        case .knowledge:
+            self = .knowledge
+        }
+    }
+}
+
+private extension DecisionIntelligencePromptPressure {
+    init(_ pressure: BASPromptPressure) {
+        switch pressure {
+        case .low:
+            self = .low
+        case .elevated:
+            self = .elevated
+        case .high:
+            self = .high
+        case .severe:
+            self = .severe
+        }
+    }
+}
+
+private extension DecisionIntelligenceAdmissionSkipReason {
+    init(_ reason: BASAdmissionSkipReason) {
+        switch reason {
+        case .budgetExceeded:
+            self = .budgetExceeded
+        case .prefillPressureTooHigh:
+            self = .prefillPressureTooHigh
+        case .insufficientReminderChoice:
+            self = .insufficientReminderChoice
+        case .retrievalNotNeeded:
+            self = .retrievalNotNeeded
+        case .templateAlreadySufficient:
+            self = .templateAlreadySufficient
+        case .insufficientSourceMaterial:
+            self = .insufficientSourceMaterial
+        }
+    }
+}
+
+private extension DecisionIntelligenceAdmissionDecision {
+    init(_ decision: BASAdmissionDecision) {
+        self.init(
+            isAllowed: decision.isAllowed,
+            pressure: DecisionIntelligencePromptPressure(decision.pressure),
+            reason: decision.reason,
+            skipReason: decision.skipReason.map(DecisionIntelligenceAdmissionSkipReason.init),
+            reminderSelectionNeed: decision.reminderSelectionNeed.map(ReminderSelectionNeed.init)
+        )
     }
 }

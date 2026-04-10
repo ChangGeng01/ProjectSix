@@ -94,6 +94,7 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertTrue(envelope.payload.contains("Current perspective: \(base.currentPerspective)"))
         XCTAssertTrue(envelope.payload.contains("After perspective: \(base.afterPerspective)"))
         XCTAssertTrue(envelope.payload.contains("OUTPUT_GUARD:"))
+        XCTAssertNil(envelope.assembly.kernelSnapshot.truthState)
         XCTAssertTrue(envelope.budget.isWithinTarget)
         XCTAssertGreaterThan(envelope.budget.immutablePrefixCharacters, 0)
         XCTAssertGreaterThan(envelope.budget.adaptivePrefixCharacters, 0)
@@ -107,6 +108,92 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
             ),
             2
         )
+    }
+
+    func testLowGearQuickCompactionDropsRawEvidenceSnippetAndShrinksScopedContext() {
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "I had a hard day and want a fast relief hit."
+        )
+
+        let base = QuickCheckResult(
+            currentPerspective: "You want a little relief tonight.",
+            afterPerspective: "It may feel louder tomorrow.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+
+        let strategy = DecisionAdaptiveTaskStrategy(
+            kind: .quick,
+            entropy: .low,
+            runtimeGear: .low,
+            preferredProvider: .gemmaE4B,
+            contextBudget: 220,
+            retrievalMode: .off,
+            thinkingMode: .off,
+            outputMode: .guidedShort,
+            tone: .briefWarm,
+            actionSpace: ["encourage", "next_step"],
+            responseLanguage: .english,
+            allowsModelInvocation: true
+        )
+
+        let brainState = DecisionBrainState(
+            profileCore: [
+                "Short, direct language lands better.",
+                "Long reflective copy causes drift."
+            ],
+            activeGoals: [
+                "Protect sleep before midnight.",
+                "Avoid stress shopping."
+            ],
+            relevantMemories: [
+                "Putting it into Tomorrow Box often breaks the loop.",
+                "Late sessions need lighter, shorter guidance."
+            ],
+            sessionBiases: [
+                "Keep the language short and concrete.",
+                "Avoid sounding judgmental."
+            ],
+            retrievalTags: ["buy", "night", "relief"],
+            reactionWeights: DecisionReactionWeights(
+                briefLanguage: 0.91,
+                warmDirectTone: 0.73,
+                lowCognitiveLoad: 0.88,
+                interruptiveActionBias: 0.94,
+                boundaryNamingBias: 0.21,
+                tradeoffClarityBias: 0.26
+            ),
+            loadedAt: .now
+        )
+
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
+            base: base,
+            input: input,
+            strategy: strategy,
+            brainState: brainState
+        )
+
+        XCTAssertFalse(envelope.assembly.retainedBlockKinds.contains(.evidenceSnippets))
+        XCTAssertTrue(envelope.assembly.retainedBlockKinds.contains(.scopedContext))
+        XCTAssertTrue(envelope.payload.contains("\"user_profile\":[\"Short, direct language lands better.\"]"))
+        XCTAssertFalse(envelope.payload.contains("Long reflective copy causes drift."))
+        XCTAssertTrue(envelope.payload.contains("\"active_goals\":[\"Protect sleep before midnight.\"]"))
+        XCTAssertFalse(envelope.payload.contains("Avoid stress shopping."))
+        XCTAssertTrue(envelope.payload.contains("\"evidence_headlines\":[\"Current perspective: You want a little relief tonight.\"]"))
+        XCTAssertFalse(envelope.payload.contains("After perspective: It may feel louder tomorrow."))
+        XCTAssertTrue(envelope.payload.contains("\"auto_memory\":[\"Putting it into Tomorrow Box often breaks the loop.\"]"))
+        XCTAssertFalse(envelope.payload.contains("Late sessions need lighter, shorter guidance."))
+        XCTAssertEqual(envelope.assembly.kernelSnapshot.truthState?.mode, "quick")
+        XCTAssertEqual(
+            envelope.assembly.kernelSnapshot.truthState?.currentGoal,
+            "Protect sleep before midnight."
+        )
+        XCTAssertLessThanOrEqual(envelope.assembly.suffixTargetCharacters, 120)
     }
 
     func testBalanceRefinementEnvelopeIncludesContextLifecycleWhenProvided() {
@@ -194,6 +281,9 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
             )
         )
         XCTAssertTrue(envelope.payload.contains("\"user_profile\":[\"Short, direct language lands better.\"]"))
+        XCTAssertTrue(envelope.payload.contains("STRUCTURED_TRUTH_JSON:"))
+        XCTAssertTrue(envelope.payload.contains("\"mode\":\"balance\""))
+        XCTAssertTrue(envelope.payload.contains("\"currentGoal\":\"Protect sleep and energy.\""))
         XCTAssertTrue(envelope.payload.contains("\"local_biases\":[\"Keep the language short and concrete.\"]"))
         XCTAssertTrue(envelope.payload.contains("\"auto_memory\":[\"Late sessions need lighter, shorter guidance.\"]"))
         XCTAssertTrue(envelope.payload.contains("\"dominant_reaction_weight\":\"brief_language\""))
@@ -233,6 +323,8 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
                 DecisionIntelligencePromptContract.PromptBlockKind.compactionPolicy
             )
         )
+        XCTAssertEqual(envelope.prompt.assembly.kernelSnapshot.truthState?.mode, "reminder")
+        XCTAssertEqual(envelope.prompt.assembly.kernelSnapshot.truthState?.sessionFacts["surface_mode"], "quick")
         XCTAssertTrue(envelope.prompt.budget.isWithinTarget)
     }
 
@@ -500,6 +592,7 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertTrue(envelope.assembly.retainedBlockKinds.contains(DecisionIntelligencePromptContract.PromptBlockKind.scopedContext))
         XCTAssertTrue(envelope.assembly.retainedBlockKinds.contains(DecisionIntelligencePromptContract.PromptBlockKind.frontstageState))
         XCTAssertTrue(envelope.assembly.retainedBlockKinds.contains(DecisionIntelligencePromptContract.PromptBlockKind.taskState))
+        XCTAssertTrue(envelope.assembly.retainedBlockKinds.contains(DecisionIntelligencePromptContract.PromptBlockKind.structuredTruth))
         XCTAssertTrue(envelope.assembly.retainedBlockKinds.contains(DecisionIntelligencePromptContract.PromptBlockKind.evidenceSnippets))
         XCTAssertTrue(envelope.assembly.retainedBlockKinds.contains(DecisionIntelligencePromptContract.PromptBlockKind.outputGuard))
         XCTAssertFalse(envelope.payload.contains("NEURAL_STATE_JSON:"))
@@ -582,6 +675,7 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         )
 
         XCTAssertTrue(envelope.payload.contains("SCOPED_CONTEXT_JSON:"))
+        XCTAssertTrue(envelope.payload.contains("STRUCTURED_TRUTH_JSON:"))
         XCTAssertTrue(envelope.payload.contains("\"user_profile\":[\"Direct language helps this user stay honest.\"]"))
         XCTAssertTrue(envelope.payload.contains("\"active_goals\":[\"Protect self-respect and future capacity.\"]"))
         XCTAssertFalse(envelope.payload.contains("BRAIN_STATE_JSON:"))

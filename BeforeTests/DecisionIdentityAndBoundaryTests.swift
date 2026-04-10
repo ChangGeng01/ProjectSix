@@ -1,8 +1,20 @@
 import XCTest
+import BASMemory
+import BASPolicy
 @testable import Before
 
 final class DecisionIdentityAndBoundaryTests: XCTestCase {
     func testNotificationHighRiskUsesPredictiveSentinelProfile() {
+        let substrateProfile = BASIdentityRoleResolver.resolve(
+            mode: .quick,
+            sourceSurface: .notification,
+            riskLevel: .high
+        )
+
+        XCTAssertEqual(substrateProfile.role, .predictiveSentinel)
+        XCTAssertEqual(substrateProfile.posture, .protective)
+        XCTAssertEqual(substrateProfile.initiative, .assertive)
+
         let profile = DecisionIdentityRoleSystem.resolve(
             mode: .quick,
             source: .notification,
@@ -46,9 +58,31 @@ final class DecisionIdentityAndBoundaryTests: XCTestCase {
             sessionBiases: [],
             retrievalTags: ["mirror"],
             reactionWeights: .defaults(for: .mirror),
+            identityProfile: identity,
+            boundaryPolicy: DecisionBoundaryPolicyState.default(riskLevel: InterventionRiskLevel.high),
+            activeInterventionTemplateIDs: [],
             failureGuardIDs: ["night_fast_path_failure"],
             loadedAt: .now
         )
+
+        let substratePolicy = BASBoundaryPolicyEvaluator.evaluate(
+            mode: .mirror,
+            sourceSurface: .watch,
+            riskLevel: .high,
+            identityProfile: identity,
+            brainState: brainState,
+            taskGraphHint: BASTaskGraphHint(
+                headline: taskGraph.nextActionHint,
+                activeNodeCount: 1,
+                hasResumeCandidate: true,
+                resumeHint: taskGraph.nextActionHint
+            )
+        )
+
+        XCTAssertEqual(substratePolicy.mode, .localOnlyProtective)
+        XCTAssertTrue(substratePolicy.activeConstraints.contains(.watchSurfaceLightweight))
+        XCTAssertTrue(substratePolicy.requiredConfirmations.contains("irreversible_decision"))
+        XCTAssertTrue(substratePolicy.allowedActionClasses.contains("checkpoint_reopen"))
 
         let policy = DecisionBoundaryPolicyEngine.evaluate(
             mode: .mirror,

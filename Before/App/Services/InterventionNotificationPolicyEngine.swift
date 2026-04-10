@@ -1,11 +1,13 @@
 import Foundation
 import SwiftData
+import BASPolicy
 
 enum InterventionNotificationPolicyBlockReason: String, Equatable, Sendable {
     case featureDisabled
     case lowRisk
     case expired
     case insufficientEvidence
+    case consistencyRejected
     case quietHours
     case cooldownActive
     case dailyCapReached
@@ -16,16 +18,31 @@ struct InterventionNotificationPolicyDecision: Equatable, Sendable {
     let isAllowed: Bool
     let reason: String
     let blockReason: InterventionNotificationPolicyBlockReason?
+    let consistencyCheck: BASConsistencyCheckResult?
 
-    static func allow(_ reason: String) -> InterventionNotificationPolicyDecision {
-        InterventionNotificationPolicyDecision(isAllowed: true, reason: reason, blockReason: nil)
+    static func allow(
+        _ reason: String,
+        consistencyCheck: BASConsistencyCheckResult? = nil
+    ) -> InterventionNotificationPolicyDecision {
+        InterventionNotificationPolicyDecision(
+            isAllowed: true,
+            reason: reason,
+            blockReason: nil,
+            consistencyCheck: consistencyCheck
+        )
     }
 
     static func block(
         _ reason: InterventionNotificationPolicyBlockReason,
-        detail: String
+        detail: String,
+        consistencyCheck: BASConsistencyCheckResult? = nil
     ) -> InterventionNotificationPolicyDecision {
-        InterventionNotificationPolicyDecision(isAllowed: false, reason: detail, blockReason: reason)
+        InterventionNotificationPolicyDecision(
+            isAllowed: false,
+            reason: detail,
+            blockReason: reason,
+            consistencyCheck: consistencyCheck
+        )
     }
 }
 
@@ -33,6 +50,7 @@ enum InterventionNotificationPolicyEngine {
     static func decide(
         candidate: InterventionPredictionCandidate,
         preferences: BeforePreferences,
+        currentBrainState: CurrentBrainState? = nil,
         context: ModelContext,
         now: Date = .now,
         calendar: Calendar = .autoupdatingCurrent
@@ -62,6 +80,17 @@ enum InterventionNotificationPolicyEngine {
             return .block(
                 .insufficientEvidence,
                 detail: "Notification delivery stayed local-only because the evidence signal count is still too thin."
+            )
+        }
+
+        let consistencyCheck = currentBrainState.map {
+            notificationConsistencyCheck(candidate: candidate, currentBrainState: $0)
+        }
+        if let consistencyCheck, !consistencyCheck.isConsistent {
+            return .block(
+                .consistencyRejected,
+                detail: rejectedConsistencyDetail(result: consistencyCheck),
+                consistencyCheck: consistencyCheck
             )
         }
 
@@ -103,7 +132,8 @@ enum InterventionNotificationPolicyEngine {
         }
 
         return .allow(
-            "Notification delivery is allowed because evidence is strong enough and no cooldown or quiet-hours rule blocked it."
+            "Notification delivery is allowed because evidence is strong enough and no cooldown or quiet-hours rule blocked it.",
+            consistencyCheck: consistencyCheck
         )
     }
 
@@ -153,5 +183,68 @@ enum InterventionNotificationPolicyEngine {
         triggers.filter { trigger in
             trigger.wasDelivered && calendar.isDate(trigger.createdAt, inSameDayAs: now)
         }.count
+    }
+
+    private static func notificationConsistencyCheck(
+        candidate: InterventionPredictionCandidate,
+        currentBrainState: CurrentBrainState
+    ) -> BASConsistencyCheckResult {
+        var referencedFacts = [
+            "boundary_mode": currentBrainState.boundaryPolicy.mode.rawValue
+        ]
+        if let dominantGoal = currentBrainState.dominantGoal {
+            referencedFacts["current_goal"] = dominantGoal
+        }
+
+        let personaRules = Array(
+            orderedUnique(
+                [
+                    "Keep notification copy brief.",
+                    "Keep notification copy non-judgmental.",
+                    currentBrainState.identityProfile.relationshipBoundary
+                ] + currentBrainState.brainState.sessionBiases
+            )
+            .prefix(4)
+        )
+
+        return BASConsistencyHarness.evaluate(
+            BASConsistencyCheckInput(
+                truthState: BASStructuredTruthState(
+                    mode: "predictive_intervention_notification",
+                    currentGoal: currentBrainState.dominantGoal,
+                    allowedActions: ["send_predictive_notification"],
+                    forbiddenActions: currentBrainState.boundaryPolicy.blockedActionClasses,
+                    personaRules: personaRules,
+                    sessionFacts: [
+                        "boundary_mode": currentBrainState.boundaryPolicy.mode.rawValue
+                    ]
+                ),
+                responseMode: "predictive_intervention_notification",
+                responseText: [candidate.title, candidate.detail, candidate.reason]
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " "),
+                proposedActions: ["send_predictive_notification"],
+                referencedFacts: referencedFacts
+            )
+        )
+    }
+
+    private static func rejectedConsistencyDetail(
+        result: BASConsistencyCheckResult
+    ) -> String {
+        let violations = result.violations
+            .prefix(2)
+            .map(\.message)
+            .joined(separator: " ")
+        return "Notification delivery stayed local-only because the consistency harness rejected the copy. \(violations)"
+    }
+
+    private static func orderedUnique(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        var ordered: [String] = []
+        for value in values where seen.insert(value).inserted {
+            ordered.append(value)
+        }
+        return ordered
     }
 }

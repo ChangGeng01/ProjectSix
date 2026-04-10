@@ -1,4 +1,5 @@
 import Foundation
+import BASRuntimeCore
 
 enum DecisionRuntimeGear: String, Equatable, Sendable {
     case low
@@ -27,81 +28,27 @@ enum DecisionLanguageMode: String, Equatable, Sendable {
     case unknown
 
     static func detect(preferredLanguages: [String]) -> DecisionLanguageMode {
-        detect(preferredLanguages: preferredLanguages, sampleTexts: [])
+        DecisionLanguageMode(BASLanguageMode.detect(preferredLanguages: preferredLanguages))
     }
 
     static func detect(
         preferredLanguages: [String],
         sampleTexts: [String]
     ) -> DecisionLanguageMode {
-        let sampled = detect(sampleTexts: sampleTexts)
-        guard sampled == .unknown else { return sampled }
-
-        let codes = preferredLanguages
-            .prefix(3)
-            .compactMap { Locale(identifier: $0).language.languageCode?.identifier }
-
-        guard let first = codes.first else { return .unknown }
-        let normalized = Set(codes.map { code in
-            if code.hasPrefix("zh") { return "zh" }
-            if code.hasPrefix("en") { return "en" }
-            return code
-        })
-
-        if normalized.count > 1 {
-            return .mixed
-        }
-
-        switch first {
-        case let code where code.hasPrefix("zh"):
-            return .chinese
-        case let code where code.hasPrefix("en"):
-            return .english
-        default:
-            return .unknown
-        }
+        DecisionLanguageMode(
+            BASLanguageMode.detect(
+                preferredLanguages: preferredLanguages,
+                sampleTexts: sampleTexts
+            )
+        )
     }
 
     static func detect(sampleTexts: [String]) -> DecisionLanguageMode {
-        var sawHan = false
-        var sawLatin = false
-        var sawOtherLetter = false
-
-        for scalar in sampleTexts.joined(separator: " ").unicodeScalars {
-            guard CharacterSet.letters.contains(scalar) else { continue }
-            if scalar.properties.isIdeographic {
-                sawHan = true
-            } else if scalar.value >= 0x41 && scalar.value <= 0x5A ||
-                scalar.value >= 0x61 && scalar.value <= 0x7A {
-                sawLatin = true
-            } else {
-                sawOtherLetter = true
-            }
-        }
-
-        switch (sawHan, sawLatin, sawOtherLetter) {
-        case (true, true, _), (true, false, true), (false, true, true):
-            return .mixed
-        case (true, false, false):
-            return .chinese
-        case (false, true, false):
-            return .english
-        default:
-            return .unknown
-        }
+        DecisionLanguageMode(BASLanguageMode.detect(sampleTexts: sampleTexts))
     }
 
     var retrievalTags: [String] {
-        switch self {
-        case .english:
-            ["lang:english", "script:latin"]
-        case .chinese:
-            ["lang:chinese", "script:han"]
-        case .mixed:
-            ["lang:mixed", "script:mixed"]
-        case .unknown:
-            []
-        }
+        basLanguageMode.retrievalTags
     }
 }
 
@@ -597,34 +544,65 @@ enum DecisionAdaptiveRuntimeMatrixResolver {
         preferredLanguages: [String] = Locale.preferredLanguages
     ) -> DecisionAdaptiveRuntimeMatrix {
         let runtimeGear = runtimeGear(for: tier)
-        let environmentClass = environmentClass(for: device)
-        let deviceClass = deviceClass(for: device)
         let languageMode = DecisionLanguageMode.detect(preferredLanguages: preferredLanguages)
+        let deviceProfile = substrateDeviceProfile(for: device)
+        let substrateMatrix = BASAdaptiveRuntimeMatrixResolver.resolve(
+            request: BASAdaptiveRuntimeMatrixRequest(
+                runtimeGear: runtimeGear.basRuntimeGear,
+                environmentClass: BASAdaptiveRuntimeMatrixResolver.environmentClass(for: deviceProfile),
+                deviceClass: BASAdaptiveRuntimeMatrixResolver.deviceClass(for: deviceProfile),
+                languageMode: languageMode.basLanguageMode,
+                allowFallbacks: allowFallbacks,
+                allowsModelInvocationByKind: Dictionary(
+                    uniqueKeysWithValues: DecisionIntelligenceTraceKind.allCases.map { kind in
+                        (
+                            kind.basAdaptiveTraceKind,
+                            providerPreference(
+                                for: kind,
+                                tier: tier,
+                                preference: preference
+                            ) != .template
+                        )
+                    }
+                )
+            )
+        )
 
         let strategies = Dictionary(
             uniqueKeysWithValues: DecisionIntelligenceTraceKind.allCases.map { kind in
-                (
+                let preferredProvider = providerPreference(
+                    for: kind,
+                    tier: tier,
+                    preference: preference
+                )
+                return (
                     kind,
-                    strategy(
-                        for: kind,
-                        tier: tier,
-                        preference: preference,
-                        allowFallbacks: allowFallbacks,
-                        runtimeGear: runtimeGear,
-                        environmentClass: environmentClass,
-                        deviceClass: deviceClass,
-                        languageMode: languageMode
+                    DecisionAdaptiveTaskStrategy(
+                        substrate: substrateMatrix.strategy(for: kind.basAdaptiveTraceKind),
+                        preferredProvider: preferredProvider
                     )
                 )
             }
         )
 
         return DecisionAdaptiveRuntimeMatrix(
-            runtimeGear: runtimeGear,
-            environmentClass: environmentClass,
-            deviceClass: deviceClass,
-            languageMode: languageMode,
+            runtimeGear: DecisionRuntimeGear(substrateMatrix.runtimeGear),
+            environmentClass: DecisionEnvironmentClass(substrateMatrix.environmentClass),
+            deviceClass: DecisionDevicePerformanceClass(substrateMatrix.deviceClass),
+            languageMode: DecisionLanguageMode(substrateMatrix.languageMode),
             strategiesByKind: strategies
+        )
+    }
+
+    private static func substrateDeviceProfile(
+        for device: DeviceCapabilitySnapshot
+    ) -> BASDeviceProfile {
+        BASDeviceProfile(
+            modelName: device.isSimulator ? "simulator" : "iphone-\(device.physicalMemoryGB)gb",
+            memoryMB: device.physicalMemoryGB * 1024,
+            batteryLevel: device.isLowPowerModeEnabled ? 0.18 : 1.0,
+            lowPowerMode: device.isLowPowerModeEnabled,
+            thermalState: device.isLowPowerModeEnabled ? "low_power" : "nominal"
         )
     }
 
@@ -637,170 +615,6 @@ enum DecisionAdaptiveRuntimeMatrixResolver {
         case .testingOverride, .fullGemma:
             .high
         }
-    }
-
-    private static func environmentClass(for device: DeviceCapabilitySnapshot) -> DecisionEnvironmentClass {
-        if device.isSimulator {
-            return .simulator
-        }
-        if device.isLowPowerModeEnabled {
-            return .lowPower
-        }
-        if device.physicalMemoryGB < 7 {
-            return .memoryConstrained
-        }
-        return .normal
-    }
-
-    private static func deviceClass(for device: DeviceCapabilitySnapshot) -> DecisionDevicePerformanceClass {
-        if device.isSimulator {
-            return .simulator
-        }
-        if device.physicalMemoryGB < 7 {
-            return .memoryConstrainedPhone
-        }
-        if device.physicalMemoryGB < 8 {
-            return .balancedPhone
-        }
-        return .fullPhone
-    }
-
-    private static func strategy(
-        for kind: DecisionIntelligenceTraceKind,
-        tier: DecisionIntelligenceExecutionTier,
-        preference: DecisionModelProviderPreference,
-        allowFallbacks: Bool,
-        runtimeGear: DecisionRuntimeGear,
-        environmentClass: DecisionEnvironmentClass,
-        deviceClass: DecisionDevicePerformanceClass,
-        languageMode: DecisionLanguageMode
-    ) -> DecisionAdaptiveTaskStrategy {
-        let preferredProvider = providerPreference(
-            for: kind,
-            tier: tier,
-            preference: preference
-        )
-        let allowsModelInvocation = preferredProvider != .template
-        let taskGear = taskGear(
-            for: kind,
-            runtimeGear: runtimeGear,
-            allowsModelInvocation: allowsModelInvocation,
-            environmentClass: environmentClass,
-            deviceClass: deviceClass
-        )
-
-        return DecisionAdaptiveTaskStrategy(
-            kind: kind,
-            entropy: entropy(for: kind),
-            runtimeGear: taskGear,
-            preferredProvider: preferredProvider,
-            contextBudget: contextBudget(
-                for: kind,
-                gear: taskGear,
-                allowsModelInvocation: allowsModelInvocation,
-                environmentClass: environmentClass,
-                deviceClass: deviceClass,
-                languageMode: languageMode
-            ),
-            outputCharacterBudget: outputCharacterBudget(
-                for: kind,
-                gear: taskGear,
-                allowsModelInvocation: allowsModelInvocation,
-                environmentClass: environmentClass,
-                deviceClass: deviceClass
-            ),
-            timeBudgetMs: timeBudgetMs(
-                for: kind,
-                gear: taskGear,
-                allowsModelInvocation: allowsModelInvocation,
-                environmentClass: environmentClass,
-                deviceClass: deviceClass
-            ),
-            toolCallBudget: toolCallBudget(
-                for: kind,
-                allowsModelInvocation: allowsModelInvocation,
-                environmentClass: environmentClass
-            ),
-            retrievalItemBudget: retrievalItemBudget(
-                for: kind,
-                allowsModelInvocation: allowsModelInvocation,
-                environmentClass: environmentClass
-            ),
-            retrievalMode: retrievalMode(
-                for: kind,
-                gear: taskGear,
-                allowsModelInvocation: allowsModelInvocation,
-                environmentClass: environmentClass,
-                deviceClass: deviceClass,
-                languageMode: languageMode
-            ),
-            thinkingMode: thinkingMode(
-                for: kind,
-                gear: taskGear,
-                allowsModelInvocation: allowsModelInvocation,
-                environmentClass: environmentClass,
-                deviceClass: deviceClass,
-                languageMode: languageMode
-            ),
-            outputMode: outputMode(
-                for: kind,
-                allowsModelInvocation: allowsModelInvocation
-            ),
-            tone: tone(
-                for: kind,
-                allowsModelInvocation: allowsModelInvocation,
-                environmentClass: environmentClass,
-                languageMode: languageMode
-            ),
-            actionSpace: actionSpace(
-                for: kind,
-                allowFallbacks: allowFallbacks,
-                environmentClass: environmentClass,
-                deviceClass: deviceClass
-            ),
-            responseLanguage: responseLanguage(for: languageMode),
-            allowsModelInvocation: allowsModelInvocation
-        )
-    }
-
-    private static func taskGear(
-        for kind: DecisionIntelligenceTraceKind,
-        runtimeGear: DecisionRuntimeGear,
-        allowsModelInvocation: Bool,
-        environmentClass: DecisionEnvironmentClass,
-        deviceClass: DecisionDevicePerformanceClass
-    ) -> DecisionRuntimeGear {
-        guard allowsModelInvocation else { return .low }
-
-        let baseGear: DecisionRuntimeGear = switch kind {
-        case .quick, .reminder:
-            .low
-        case .balance:
-            runtimeGear == .low ? .low : .balanced
-        case .mirror:
-            switch runtimeGear {
-            case .low:
-                .low
-            case .balanced:
-                .balanced
-            case .high:
-                .high
-            }
-        }
-
-        if environmentClass == .simulator || environmentClass == .lowPower {
-            return .low
-        }
-
-        if deviceClass == .memoryConstrainedPhone {
-            return baseGear == .high ? .balanced : baseGear
-        }
-
-        if deviceClass == .balancedPhone && baseGear == .high {
-            return .balanced
-        }
-
-        return baseGear
     }
 
     private static func providerPreference(
@@ -817,334 +631,222 @@ enum DecisionAdaptiveRuntimeMatrixResolver {
             return preference
         }
     }
+}
 
-    private static func entropy(for kind: DecisionIntelligenceTraceKind) -> DecisionTaskEntropyClass {
-        switch kind {
-        case .quick, .reminder:
-            .low
+private extension DecisionAdaptiveTaskStrategy {
+    init(
+        substrate strategy: BASAdaptiveTaskStrategy,
+        preferredProvider: DecisionModelProviderPreference
+    ) {
+        self.init(
+            kind: DecisionIntelligenceTraceKind(strategy.kind),
+            entropy: DecisionTaskEntropyClass(strategy.entropy),
+            runtimeGear: DecisionRuntimeGear(strategy.runtimeGear),
+            preferredProvider: preferredProvider,
+            contextBudget: strategy.contextBudget,
+            outputCharacterBudget: strategy.outputCharacterBudget,
+            timeBudgetMs: strategy.timeBudgetMs,
+            toolCallBudget: strategy.toolCallBudget,
+            retrievalItemBudget: strategy.retrievalItemBudget,
+            retrievalMode: DecisionRetrievalMode(strategy.retrievalMode),
+            thinkingMode: DecisionThinkingMode(strategy.thinkingMode),
+            outputMode: DecisionOutputMode(strategy.outputMode),
+            tone: DecisionToneProfile(strategy.tone),
+            actionSpace: strategy.actionSpace,
+            responseLanguage: DecisionAdaptiveResponseLanguage(strategy.responseLanguage),
+            allowsModelInvocation: strategy.allowsModelInvocation
+        )
+    }
+}
+
+private extension DecisionIntelligenceTraceKind {
+    var basAdaptiveTraceKind: BASAdaptiveTraceKind {
+        switch self {
+        case .quick:
+            .quick
         case .balance:
-            .medium
+            .balance
         case .mirror:
+            .mirror
+        case .reminder:
+            .reminder
+        }
+    }
+
+    init(_ kind: BASAdaptiveTraceKind) {
+        switch kind {
+        case .quick:
+            self = .quick
+        case .balance:
+            self = .balance
+        case .mirror:
+            self = .mirror
+        case .reminder:
+            self = .reminder
+        }
+    }
+}
+
+private extension DecisionRuntimeGear {
+    var basRuntimeGear: BASRuntimeGear {
+        switch self {
+        case .low:
+            .low
+        case .balanced:
+            .balanced
+        case .high:
             .high
         }
     }
 
-    private static func contextBudget(
-        for kind: DecisionIntelligenceTraceKind,
-        gear: DecisionRuntimeGear,
-        allowsModelInvocation: Bool,
-        environmentClass: DecisionEnvironmentClass,
-        deviceClass: DecisionDevicePerformanceClass,
-        languageMode: DecisionLanguageMode
-    ) -> Int {
-        let base: Int
-        if !allowsModelInvocation {
-            switch kind {
-            case .quick, .reminder: base = 160
-            case .balance: base = 220
-            case .mirror: base = 240
-            }
-        } else {
-            switch (gear, kind) {
-            case (.low, .quick): base = 220
-            case (.low, .balance): base = 280
-            case (.low, .mirror): base = 320
-            case (.low, .reminder): base = 160
-            case (.balanced, .quick): base = 320
-            case (.balanced, .balance): base = 440
-            case (.balanced, .mirror): base = 520
-            case (.balanced, .reminder): base = 200
-            case (.high, .quick): base = 360
-            case (.high, .balance): base = 520
-            case (.high, .mirror): base = 620
-            case (.high, .reminder): base = 240
-            }
-        }
-
-        let environmentPenalty: Int = switch environmentClass {
-        case .simulator: 90
-        case .lowPower: 80
-        case .memoryConstrained: 50
-        case .normal: 0
-        }
-        let devicePenalty: Int = switch deviceClass {
-        case .simulator: 30
-        case .memoryConstrainedPhone: 40
-        case .balancedPhone: 20
-        case .fullPhone: 0
-        }
-        let languagePenalty: Int = switch languageMode {
-        case .mixed: 20
-        case .unknown: 10
-        case .english, .chinese: 0
-        }
-        let minimumBudget: Int = switch kind {
-        case .quick: 160
-        case .balance: 220
-        case .mirror: 260
-        case .reminder: 140
-        }
-
-        return max(minimumBudget, base - environmentPenalty - devicePenalty - languagePenalty)
-    }
-
-    private static func outputCharacterBudget(
-        for kind: DecisionIntelligenceTraceKind,
-        gear: DecisionRuntimeGear,
-        allowsModelInvocation: Bool,
-        environmentClass: DecisionEnvironmentClass,
-        deviceClass: DecisionDevicePerformanceClass
-    ) -> Int {
-        let base = DecisionAdaptiveTaskStrategy(
-            kind: kind,
-            entropy: entropy(for: kind),
-            runtimeGear: gear,
-            preferredProvider: allowsModelInvocation ? .gemmaE4B : .template,
-            contextBudget: 0,
-            retrievalMode: .off,
-            thinkingMode: .off,
-            outputMode: outputMode(for: kind, allowsModelInvocation: allowsModelInvocation),
-            tone: .neutral,
-            actionSpace: [],
-            allowsModelInvocation: allowsModelInvocation
-        ).outputCharacterBudget
-
-        let environmentPenalty: Int = switch environmentClass {
-        case .simulator: 30
-        case .lowPower: 50
-        case .memoryConstrained: 30
-        case .normal: 0
-        }
-        let devicePenalty: Int = switch deviceClass {
-        case .simulator: 10
-        case .memoryConstrainedPhone: 30
-        case .balancedPhone: 10
-        case .fullPhone: 0
-        }
-
-        return max(120, base - environmentPenalty - devicePenalty)
-    }
-
-    private static func timeBudgetMs(
-        for kind: DecisionIntelligenceTraceKind,
-        gear: DecisionRuntimeGear,
-        allowsModelInvocation: Bool,
-        environmentClass: DecisionEnvironmentClass,
-        deviceClass: DecisionDevicePerformanceClass
-    ) -> Int {
-        let base = DecisionAdaptiveTaskStrategy(
-            kind: kind,
-            entropy: entropy(for: kind),
-            runtimeGear: gear,
-            preferredProvider: allowsModelInvocation ? .gemmaE4B : .template,
-            contextBudget: 0,
-            retrievalMode: .off,
-            thinkingMode: .off,
-            outputMode: outputMode(for: kind, allowsModelInvocation: allowsModelInvocation),
-            tone: .neutral,
-            actionSpace: [],
-            allowsModelInvocation: allowsModelInvocation
-        ).timeBudgetMs
-
-        let environmentPenalty: Int = switch environmentClass {
-        case .simulator: 120
-        case .lowPower: 180
-        case .memoryConstrained: 100
-        case .normal: 0
-        }
-        let devicePenalty: Int = switch deviceClass {
-        case .simulator: 60
-        case .memoryConstrainedPhone: 120
-        case .balancedPhone: 60
-        case .fullPhone: 0
-        }
-
-        return max(300, base - environmentPenalty - devicePenalty)
-    }
-
-    private static func toolCallBudget(
-        for kind: DecisionIntelligenceTraceKind,
-        allowsModelInvocation: Bool,
-        environmentClass: DecisionEnvironmentClass
-    ) -> Int {
-        guard allowsModelInvocation else { return 0 }
-        let base: Int = switch kind {
-        case .quick, .reminder:
-            1
-        case .balance, .mirror:
-            2
-        }
-        return environmentClass == .normal ? base : max(0, base - 1)
-    }
-
-    private static func retrievalItemBudget(
-        for kind: DecisionIntelligenceTraceKind,
-        allowsModelInvocation: Bool,
-        environmentClass: DecisionEnvironmentClass
-    ) -> Int {
-        guard allowsModelInvocation else { return 0 }
-        let base: Int = switch kind {
-        case .quick:
-            0
-        case .reminder:
-            2
-        case .balance:
-            3
-        case .mirror:
-            5
-        }
-
-        return environmentClass == .normal ? base : max(0, base - 1)
-    }
-
-    private static func retrievalMode(
-        for kind: DecisionIntelligenceTraceKind,
-        gear: DecisionRuntimeGear,
-        allowsModelInvocation: Bool,
-        environmentClass: DecisionEnvironmentClass,
-        deviceClass: DecisionDevicePerformanceClass,
-        languageMode: DecisionLanguageMode
-    ) -> DecisionRetrievalMode {
-        guard allowsModelInvocation else { return .off }
-        var mode: DecisionRetrievalMode = switch kind {
-        case .quick:
-            .off
-        case .reminder:
-            .filtered
-        case .balance:
-            gear == .high ? .adaptive : .filtered
-        case .mirror:
-            .adaptive
-        }
-
-        if environmentClass == .simulator || environmentClass == .lowPower {
-            if kind == .reminder {
-                return .off
-            }
-            if mode == .adaptive {
-                mode = .filtered
-            }
-        }
-
-        if deviceClass == .memoryConstrainedPhone || deviceClass == .simulator {
-            if mode == .adaptive {
-                mode = .filtered
-            }
-        }
-
-        if languageMode == .mixed || languageMode == .unknown {
-            if mode == .adaptive {
-                mode = .filtered
-            }
-        }
-
-        return mode
-    }
-
-    private static func thinkingMode(
-        for kind: DecisionIntelligenceTraceKind,
-        gear: DecisionRuntimeGear,
-        allowsModelInvocation: Bool,
-        environmentClass: DecisionEnvironmentClass,
-        deviceClass: DecisionDevicePerformanceClass,
-        languageMode: DecisionLanguageMode
-    ) -> DecisionThinkingMode {
-        guard allowsModelInvocation else { return .off }
-        guard kind == .balance || kind == .mirror else { return .off }
-        guard gear == .high,
-              environmentClass == .normal,
-              deviceClass == .fullPhone,
-              languageMode != .mixed else {
-            return .off
-        }
-        return .gated
-    }
-
-    private static func outputMode(
-        for kind: DecisionIntelligenceTraceKind,
-        allowsModelInvocation: Bool
-    ) -> DecisionOutputMode {
-        guard allowsModelInvocation else { return .deterministicTemplate }
-        switch kind {
-        case .quick:
-            return DecisionOutputMode.guidedShort
-        case .balance:
-            return DecisionOutputMode.structuredBoard
-        case .mirror:
-            return DecisionOutputMode.reflectiveStructured
-        case .reminder:
-            return DecisionOutputMode.jsonShort
+    init(_ gear: BASRuntimeGear) {
+        switch gear {
+        case .low:
+            self = .low
+        case .balanced:
+            self = .balanced
+        case .high:
+            self = .high
         }
     }
+}
 
-    private static func tone(
-        for kind: DecisionIntelligenceTraceKind,
-        allowsModelInvocation: Bool,
-        environmentClass: DecisionEnvironmentClass,
-        languageMode: DecisionLanguageMode
-    ) -> DecisionToneProfile {
-        guard allowsModelInvocation else { return .neutral }
-        if environmentClass == .lowPower || environmentClass == .memoryConstrained {
-            return .briefWarm
-        }
-
-        if languageMode == .mixed || languageMode == .unknown {
-            switch kind {
-            case .quick, .reminder:
-                return .briefWarm
-            case .balance, .mirror:
-                return .groundedDirect
-            }
-        }
-
-        switch kind {
-        case .quick, .reminder:
-            return DecisionToneProfile.briefWarm
-        case .balance:
-            return DecisionToneProfile.groundedDirect
-        case .mirror:
-            return DecisionToneProfile.reflectiveClear
+private extension DecisionEnvironmentClass {
+    init(_ environmentClass: BASEnvironmentClass) {
+        switch environmentClass {
+        case .simulator:
+            self = .simulator
+        case .lowPower:
+            self = .lowPower
+        case .memoryConstrained:
+            self = .memoryConstrained
+        case .normal:
+            self = .normal
         }
     }
+}
 
-    private static func actionSpace(
-        for kind: DecisionIntelligenceTraceKind,
-        allowFallbacks: Bool,
-        environmentClass: DecisionEnvironmentClass,
-        deviceClass: DecisionDevicePerformanceClass
-    ) -> [String] {
-        var actions: [String] = switch kind {
-        case .quick:
-            ["encourage", "next_step", allowFallbacks ? "fallback_to_template" : "stay_deterministic"]
-        case .balance:
-            ["name_tradeoff", "surface_priority", allowFallbacks ? "fallback_to_template" : "stay_deterministic"]
-        case .mirror:
-            ["name_pattern", "name_boundary", allowFallbacks ? "fallback_to_template" : "stay_deterministic"]
-        case .reminder:
-            ["select_reminder", allowFallbacks ? "fallback_to_ranked_leader" : "stay_ranked_only"]
+private extension DecisionDevicePerformanceClass {
+    init(_ deviceClass: BASDevicePerformanceClass) {
+        switch deviceClass {
+        case .simulator:
+            self = .simulator
+        case .memoryConstrainedPhone:
+            self = .memoryConstrainedPhone
+        case .balancedPhone:
+            self = .balancedPhone
+        case .fullPhone:
+            self = .fullPhone
         }
-
-        if environmentClass != .normal && !actions.contains("save_state") {
-            actions.append("save_state")
-        }
-
-        if deviceClass == .memoryConstrainedPhone && !actions.contains("stay_brief") {
-            actions.append("stay_brief")
-        }
-
-        return actions
     }
+}
 
-    private static func responseLanguage(
-        for languageMode: DecisionLanguageMode
-    ) -> DecisionAdaptiveResponseLanguage {
-        switch languageMode {
+private extension DecisionLanguageMode {
+    var basLanguageMode: BASLanguageMode {
+        switch self {
+        case .english:
+            .english
         case .chinese:
-            return .chinese
+            .chinese
         case .mixed:
-            return .mixed
-        case .english, .unknown:
-            return .english
+            .mixed
+        case .unknown:
+            .unknown
+        }
+    }
+
+    init(_ languageMode: BASLanguageMode) {
+        switch languageMode {
+        case .english:
+            self = .english
+        case .chinese:
+            self = .chinese
+        case .mixed:
+            self = .mixed
+        case .unknown:
+            self = .unknown
+        }
+    }
+}
+
+private extension DecisionAdaptiveResponseLanguage {
+    init(_ responseLanguage: BASAdaptiveResponseLanguage) {
+        switch responseLanguage {
+        case .english:
+            self = .english
+        case .chinese:
+            self = .chinese
+        case .mixed:
+            self = .mixed
+        }
+    }
+}
+
+private extension DecisionTaskEntropyClass {
+    init(_ entropy: BASTaskEntropyClass) {
+        switch entropy {
+        case .low:
+            self = .low
+        case .medium:
+            self = .medium
+        case .high:
+            self = .high
+        }
+    }
+}
+
+private extension DecisionRetrievalMode {
+    init(_ retrievalMode: BASRetrievalMode) {
+        switch retrievalMode {
+        case .off:
+            self = .off
+        case .filtered:
+            self = .filtered
+        case .adaptive:
+            self = .adaptive
+        }
+    }
+}
+
+private extension DecisionThinkingMode {
+    init(_ thinkingMode: BASThinkingMode) {
+        switch thinkingMode {
+        case .off:
+            self = .off
+        case .gated:
+            self = .gated
+        }
+    }
+}
+
+private extension DecisionOutputMode {
+    init(_ outputMode: BASOutputMode) {
+        switch outputMode {
+        case .deterministicTemplate:
+            self = .deterministicTemplate
+        case .guidedShort:
+            self = .guidedShort
+        case .structuredBoard:
+            self = .structuredBoard
+        case .reflectiveStructured:
+            self = .reflectiveStructured
+        case .jsonShort:
+            self = .jsonShort
+        }
+    }
+}
+
+private extension DecisionToneProfile {
+    init(_ tone: BASToneProfile) {
+        switch tone {
+        case .neutral:
+            self = .neutral
+        case .briefWarm:
+            self = .briefWarm
+        case .groundedDirect:
+            self = .groundedDirect
+        case .reflectiveClear:
+            self = .reflectiveClear
         }
     }
 }

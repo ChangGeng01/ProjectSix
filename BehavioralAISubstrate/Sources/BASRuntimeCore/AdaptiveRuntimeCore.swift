@@ -1,0 +1,953 @@
+import Foundation
+
+public enum BASAdaptiveTraceKind: String, CaseIterable, Codable, Sendable {
+    case quick
+    case balance
+    case mirror
+    case reminder
+
+    public var title: String {
+        rawValue.capitalized
+    }
+}
+
+public enum BASEnvironmentClass: String, Codable, Equatable, Sendable {
+    case simulator
+    case lowPower
+    case memoryConstrained
+    case normal
+}
+
+public enum BASDevicePerformanceClass: String, Codable, Equatable, Sendable {
+    case simulator
+    case memoryConstrainedPhone
+    case balancedPhone
+    case fullPhone
+}
+
+public enum BASLanguageMode: String, Codable, Equatable, Sendable {
+    case english
+    case chinese
+    case mixed
+    case unknown
+
+    public static func detect(preferredLanguages: [String]) -> BASLanguageMode {
+        detect(preferredLanguages: preferredLanguages, sampleTexts: [])
+    }
+
+    public static func detect(
+        preferredLanguages: [String],
+        sampleTexts: [String]
+    ) -> BASLanguageMode {
+        let sampled = detect(sampleTexts: sampleTexts)
+        guard sampled == .unknown else { return sampled }
+
+        let codes = preferredLanguages
+            .prefix(3)
+            .compactMap { Locale(identifier: $0).language.languageCode?.identifier }
+
+        guard let first = codes.first else { return .unknown }
+        let normalized = Set(codes.map { code in
+            if code.hasPrefix("zh") { return "zh" }
+            if code.hasPrefix("en") { return "en" }
+            return code
+        })
+
+        if normalized.count > 1 {
+            return .mixed
+        }
+
+        switch first {
+        case let code where code.hasPrefix("zh"):
+            return .chinese
+        case let code where code.hasPrefix("en"):
+            return .english
+        default:
+            return .unknown
+        }
+    }
+
+    public static func detect(sampleTexts: [String]) -> BASLanguageMode {
+        var sawHan = false
+        var sawLatin = false
+        var sawOtherLetter = false
+
+        for scalar in sampleTexts.joined(separator: " ").unicodeScalars {
+            guard CharacterSet.letters.contains(scalar) else { continue }
+            if scalar.properties.isIdeographic {
+                sawHan = true
+            } else if scalar.value >= 0x41 && scalar.value <= 0x5A ||
+                        scalar.value >= 0x61 && scalar.value <= 0x7A {
+                sawLatin = true
+            } else {
+                sawOtherLetter = true
+            }
+        }
+
+        switch (sawHan, sawLatin, sawOtherLetter) {
+        case (true, true, _), (true, false, true), (false, true, true):
+            return .mixed
+        case (true, false, false):
+            return .chinese
+        case (false, true, false):
+            return .english
+        default:
+            return .unknown
+        }
+    }
+
+    public var retrievalTags: [String] {
+        switch self {
+        case .english:
+            ["lang:english", "script:latin"]
+        case .chinese:
+            ["lang:chinese", "script:han"]
+        case .mixed:
+            ["lang:mixed", "script:mixed"]
+        case .unknown:
+            []
+        }
+    }
+}
+
+public enum BASAdaptiveResponseLanguage: String, Codable, Equatable, Sendable {
+    case english
+    case chinese
+    case mixed
+}
+
+public enum BASTaskEntropyClass: String, Codable, Equatable, Sendable {
+    case low
+    case medium
+    case high
+}
+
+public enum BASRetrievalMode: String, Codable, Equatable, Sendable {
+    case off
+    case filtered
+    case adaptive
+}
+
+public enum BASThinkingMode: String, Codable, Equatable, Sendable {
+    case off
+    case gated
+}
+
+public enum BASOutputMode: String, Codable, Equatable, Sendable {
+    case deterministicTemplate
+    case guidedShort
+    case structuredBoard
+    case reflectiveStructured
+    case jsonShort
+}
+
+public enum BASToneProfile: String, Codable, Equatable, Sendable {
+    case neutral
+    case briefWarm
+    case groundedDirect
+    case reflectiveClear
+}
+
+public struct BASAdaptiveRuntimeBudget: Codable, Equatable, Sendable {
+    public let contextBudget: Int
+    public let outputCharacterBudget: Int
+    public let timeBudgetMs: Int
+    public let toolCallBudget: Int
+    public let retrievalItemBudget: Int
+
+    public init(
+        contextBudget: Int,
+        outputCharacterBudget: Int,
+        timeBudgetMs: Int,
+        toolCallBudget: Int,
+        retrievalItemBudget: Int
+    ) {
+        self.contextBudget = contextBudget
+        self.outputCharacterBudget = outputCharacterBudget
+        self.timeBudgetMs = timeBudgetMs
+        self.toolCallBudget = toolCallBudget
+        self.retrievalItemBudget = retrievalItemBudget
+    }
+}
+
+public struct BASAdaptiveTaskStrategy: Codable, Equatable, Sendable {
+    public let kind: BASAdaptiveTraceKind
+    public let entropy: BASTaskEntropyClass
+    public let runtimeGear: BASRuntimeGear
+    public let runtimeBudget: BASAdaptiveRuntimeBudget
+    public let retrievalMode: BASRetrievalMode
+    public let thinkingMode: BASThinkingMode
+    public let outputMode: BASOutputMode
+    public let tone: BASToneProfile
+    public let actionSpace: [String]
+    public let responseLanguage: BASAdaptiveResponseLanguage
+    public let allowsModelInvocation: Bool
+
+    public var contextBudget: Int { runtimeBudget.contextBudget }
+    public var outputCharacterBudget: Int { runtimeBudget.outputCharacterBudget }
+    public var timeBudgetMs: Int { runtimeBudget.timeBudgetMs }
+    public var toolCallBudget: Int { runtimeBudget.toolCallBudget }
+    public var retrievalItemBudget: Int { runtimeBudget.retrievalItemBudget }
+    public var executionLane: BASExecutionLane {
+        BASExecutionLanePlanner.classify(
+            traceKind: kind,
+            runtimeGear: runtimeGear,
+            retrievalMode: retrievalMode,
+            outputMode: outputMode,
+            allowsModelInvocation: allowsModelInvocation
+        )
+    }
+
+    public init(
+        kind: BASAdaptiveTraceKind,
+        entropy: BASTaskEntropyClass,
+        runtimeGear: BASRuntimeGear = .balanced,
+        contextBudget: Int,
+        outputCharacterBudget: Int? = nil,
+        timeBudgetMs: Int? = nil,
+        toolCallBudget: Int? = nil,
+        retrievalItemBudget: Int? = nil,
+        retrievalMode: BASRetrievalMode,
+        thinkingMode: BASThinkingMode,
+        outputMode: BASOutputMode,
+        tone: BASToneProfile,
+        actionSpace: [String],
+        responseLanguage: BASAdaptiveResponseLanguage = .english,
+        allowsModelInvocation: Bool
+    ) {
+        self.kind = kind
+        self.entropy = entropy
+        self.runtimeGear = runtimeGear
+        self.runtimeBudget = BASAdaptiveRuntimeBudget(
+            contextBudget: contextBudget,
+            outputCharacterBudget: outputCharacterBudget ??
+                Self.defaultOutputCharacterBudget(
+                    for: kind,
+                    gear: runtimeGear,
+                    allowsModelInvocation: allowsModelInvocation,
+                    outputMode: outputMode
+                ),
+            timeBudgetMs: timeBudgetMs ??
+                Self.defaultTimeBudgetMs(
+                    for: kind,
+                    gear: runtimeGear,
+                    allowsModelInvocation: allowsModelInvocation,
+                    thinkingMode: thinkingMode
+                ),
+            toolCallBudget: toolCallBudget ??
+                Self.defaultToolCallBudget(
+                    for: kind,
+                    allowsModelInvocation: allowsModelInvocation
+                ),
+            retrievalItemBudget: retrievalItemBudget ??
+                Self.defaultRetrievalItemBudget(
+                    for: kind,
+                    retrievalMode: retrievalMode
+                )
+        )
+        self.retrievalMode = retrievalMode
+        self.thinkingMode = thinkingMode
+        self.outputMode = outputMode
+        self.tone = tone
+        self.actionSpace = actionSpace
+        self.responseLanguage = responseLanguage
+        self.allowsModelInvocation = allowsModelInvocation
+    }
+
+    private static func defaultOutputCharacterBudget(
+        for kind: BASAdaptiveTraceKind,
+        gear: BASRuntimeGear,
+        allowsModelInvocation: Bool,
+        outputMode: BASOutputMode
+    ) -> Int {
+        guard allowsModelInvocation else {
+            switch kind {
+            case .quick, .reminder:
+                return 180
+            case .balance:
+                return 260
+            case .mirror:
+                return 320
+            }
+        }
+
+        let base: Int = switch (gear, kind) {
+        case (.low, .quick):
+            180
+        case (.low, .balance):
+            260
+        case (.low, .mirror):
+            320
+        case (.low, .reminder):
+            140
+        case (.balanced, .quick):
+            220
+        case (.balanced, .balance):
+            340
+        case (.balanced, .mirror):
+            440
+        case (.balanced, .reminder):
+            160
+        case (.high, .quick):
+            260
+        case (.high, .balance):
+            420
+        case (.high, .mirror):
+            560
+        case (.high, .reminder):
+            180
+        }
+
+        let schemaPenalty: Int = switch outputMode {
+        case .jsonShort, .deterministicTemplate:
+            20
+        case .guidedShort:
+            0
+        case .structuredBoard:
+            10
+        case .reflectiveStructured:
+            0
+        }
+
+        return max(120, base - schemaPenalty)
+    }
+
+    private static func defaultTimeBudgetMs(
+        for kind: BASAdaptiveTraceKind,
+        gear: BASRuntimeGear,
+        allowsModelInvocation: Bool,
+        thinkingMode: BASThinkingMode
+    ) -> Int {
+        guard allowsModelInvocation else {
+            switch kind {
+            case .quick, .reminder:
+                return 350
+            case .balance:
+                return 500
+            case .mirror:
+                return 650
+            }
+        }
+
+        let base: Int = switch (gear, kind) {
+        case (.low, .quick):
+            500
+        case (.low, .balance):
+            700
+        case (.low, .mirror):
+            900
+        case (.low, .reminder):
+            350
+        case (.balanced, .quick):
+            700
+        case (.balanced, .balance):
+            1000
+        case (.balanced, .mirror):
+            1300
+        case (.balanced, .reminder):
+            450
+        case (.high, .quick):
+            900
+        case (.high, .balance):
+            1400
+        case (.high, .mirror):
+            1800
+        case (.high, .reminder):
+            550
+        }
+
+        return thinkingMode == .gated ? base + 250 : base
+    }
+
+    private static func defaultToolCallBudget(
+        for kind: BASAdaptiveTraceKind,
+        allowsModelInvocation: Bool
+    ) -> Int {
+        guard allowsModelInvocation else { return 0 }
+        return switch kind {
+        case .quick:
+            1
+        case .balance:
+            2
+        case .mirror:
+            2
+        case .reminder:
+            1
+        }
+    }
+
+    private static func defaultRetrievalItemBudget(
+        for kind: BASAdaptiveTraceKind,
+        retrievalMode: BASRetrievalMode
+    ) -> Int {
+        switch retrievalMode {
+        case .off:
+            return 0
+        case .filtered:
+            return kind == .reminder ? 2 : 3
+        case .adaptive:
+            return kind == .mirror ? 5 : 4
+        }
+    }
+}
+
+public struct BASAdaptiveRuntimeMatrix: Codable, Equatable, Sendable {
+    public let runtimeGear: BASRuntimeGear
+    public let environmentClass: BASEnvironmentClass
+    public let deviceClass: BASDevicePerformanceClass
+    public let languageMode: BASLanguageMode
+    public let strategiesByKind: [BASAdaptiveTraceKind: BASAdaptiveTaskStrategy]
+
+    public init(
+        runtimeGear: BASRuntimeGear,
+        environmentClass: BASEnvironmentClass,
+        deviceClass: BASDevicePerformanceClass,
+        languageMode: BASLanguageMode,
+        strategiesByKind: [BASAdaptiveTraceKind: BASAdaptiveTaskStrategy]
+    ) {
+        self.runtimeGear = runtimeGear
+        self.environmentClass = environmentClass
+        self.deviceClass = deviceClass
+        self.languageMode = languageMode
+        self.strategiesByKind = strategiesByKind
+    }
+
+    public func strategy(for kind: BASAdaptiveTraceKind) -> BASAdaptiveTaskStrategy {
+        strategiesByKind[kind] ?? BASAdaptiveTaskStrategy(
+            kind: kind,
+            entropy: .medium,
+            runtimeGear: .low,
+            contextBudget: 0,
+            retrievalMode: .off,
+            thinkingMode: .off,
+            outputMode: .deterministicTemplate,
+            tone: .neutral,
+            actionSpace: [],
+            responseLanguage: .english,
+            allowsModelInvocation: false
+        )
+    }
+
+    public func executionLane(for kind: BASAdaptiveTraceKind) -> BASExecutionLane {
+        strategy(for: kind).executionLane
+    }
+}
+
+public struct BASAdaptiveRuntimeMatrixRequest: Codable, Equatable, Sendable {
+    public let runtimeGear: BASRuntimeGear
+    public let environmentClass: BASEnvironmentClass
+    public let deviceClass: BASDevicePerformanceClass
+    public let languageMode: BASLanguageMode
+    public let allowFallbacks: Bool
+    public let allowsModelInvocationByKind: [BASAdaptiveTraceKind: Bool]
+
+    public init(
+        runtimeGear: BASRuntimeGear,
+        environmentClass: BASEnvironmentClass,
+        deviceClass: BASDevicePerformanceClass,
+        languageMode: BASLanguageMode,
+        allowFallbacks: Bool,
+        allowsModelInvocationByKind: [BASAdaptiveTraceKind: Bool]
+    ) {
+        self.runtimeGear = runtimeGear
+        self.environmentClass = environmentClass
+        self.deviceClass = deviceClass
+        self.languageMode = languageMode
+        self.allowFallbacks = allowFallbacks
+        self.allowsModelInvocationByKind = allowsModelInvocationByKind
+    }
+}
+
+public enum BASAdaptiveRuntimeMatrixResolver {
+    public static func resolve(request: BASAdaptiveRuntimeMatrixRequest) -> BASAdaptiveRuntimeMatrix {
+        let strategies = Dictionary(
+            uniqueKeysWithValues: BASAdaptiveTraceKind.allCases.map { kind in
+                let allowsModelInvocation = request.allowsModelInvocationByKind[kind] ?? false
+                let taskGear = taskGear(
+                    for: kind,
+                    runtimeGear: request.runtimeGear,
+                    allowsModelInvocation: allowsModelInvocation,
+                    environmentClass: request.environmentClass,
+                    deviceClass: request.deviceClass
+                )
+
+                return (
+                    kind,
+                    BASAdaptiveTaskStrategy(
+                        kind: kind,
+                        entropy: entropy(for: kind),
+                        runtimeGear: taskGear,
+                        contextBudget: contextBudget(
+                            for: kind,
+                            gear: taskGear,
+                            allowsModelInvocation: allowsModelInvocation,
+                            environmentClass: request.environmentClass,
+                            deviceClass: request.deviceClass,
+                            languageMode: request.languageMode
+                        ),
+                        outputCharacterBudget: outputCharacterBudget(
+                            for: kind,
+                            gear: taskGear,
+                            allowsModelInvocation: allowsModelInvocation,
+                            environmentClass: request.environmentClass,
+                            deviceClass: request.deviceClass
+                        ),
+                        timeBudgetMs: timeBudgetMs(
+                            for: kind,
+                            gear: taskGear,
+                            allowsModelInvocation: allowsModelInvocation,
+                            environmentClass: request.environmentClass,
+                            deviceClass: request.deviceClass
+                        ),
+                        toolCallBudget: toolCallBudget(
+                            for: kind,
+                            allowsModelInvocation: allowsModelInvocation,
+                            environmentClass: request.environmentClass
+                        ),
+                        retrievalItemBudget: retrievalItemBudget(
+                            for: kind,
+                            allowsModelInvocation: allowsModelInvocation,
+                            environmentClass: request.environmentClass
+                        ),
+                        retrievalMode: retrievalMode(
+                            for: kind,
+                            gear: taskGear,
+                            allowsModelInvocation: allowsModelInvocation,
+                            environmentClass: request.environmentClass,
+                            deviceClass: request.deviceClass,
+                            languageMode: request.languageMode
+                        ),
+                        thinkingMode: thinkingMode(
+                            for: kind,
+                            gear: taskGear,
+                            allowsModelInvocation: allowsModelInvocation,
+                            environmentClass: request.environmentClass,
+                            deviceClass: request.deviceClass,
+                            languageMode: request.languageMode
+                        ),
+                        outputMode: outputMode(
+                            for: kind,
+                            allowsModelInvocation: allowsModelInvocation
+                        ),
+                        tone: tone(
+                            for: kind,
+                            allowsModelInvocation: allowsModelInvocation,
+                            environmentClass: request.environmentClass,
+                            languageMode: request.languageMode
+                        ),
+                        actionSpace: actionSpace(
+                            for: kind,
+                            allowFallbacks: request.allowFallbacks,
+                            environmentClass: request.environmentClass,
+                            deviceClass: request.deviceClass
+                        ),
+                        responseLanguage: responseLanguage(for: request.languageMode),
+                        allowsModelInvocation: allowsModelInvocation
+                    )
+                )
+            }
+        )
+
+        return BASAdaptiveRuntimeMatrix(
+            runtimeGear: request.runtimeGear,
+            environmentClass: request.environmentClass,
+            deviceClass: request.deviceClass,
+            languageMode: request.languageMode,
+            strategiesByKind: strategies
+        )
+    }
+
+    public static func environmentClass(for deviceProfile: BASDeviceProfile) -> BASEnvironmentClass {
+        if deviceProfile.modelName.lowercased().contains("simulator") {
+            return .simulator
+        }
+        if deviceProfile.lowPowerMode {
+            return .lowPower
+        }
+        if deviceProfile.memoryMB < 7 * 1024 {
+            return .memoryConstrained
+        }
+        return .normal
+    }
+
+    public static func deviceClass(for deviceProfile: BASDeviceProfile) -> BASDevicePerformanceClass {
+        if deviceProfile.modelName.lowercased().contains("simulator") {
+            return .simulator
+        }
+        if deviceProfile.memoryMB < 7 * 1024 {
+            return .memoryConstrainedPhone
+        }
+        if deviceProfile.memoryMB < 8 * 1024 {
+            return .balancedPhone
+        }
+        return .fullPhone
+    }
+
+    private static func taskGear(
+        for kind: BASAdaptiveTraceKind,
+        runtimeGear: BASRuntimeGear,
+        allowsModelInvocation: Bool,
+        environmentClass: BASEnvironmentClass,
+        deviceClass: BASDevicePerformanceClass
+    ) -> BASRuntimeGear {
+        guard allowsModelInvocation else { return .low }
+
+        let baseGear: BASRuntimeGear = switch kind {
+        case .quick, .reminder:
+            .low
+        case .balance:
+            runtimeGear == .low ? .low : .balanced
+        case .mirror:
+            switch runtimeGear {
+            case .low:
+                .low
+            case .balanced:
+                .balanced
+            case .high:
+                .high
+            }
+        }
+
+        if environmentClass == .simulator || environmentClass == .lowPower {
+            return .low
+        }
+
+        if deviceClass == .memoryConstrainedPhone {
+            return baseGear == .high ? .balanced : baseGear
+        }
+
+        if deviceClass == .balancedPhone && baseGear == .high {
+            return .balanced
+        }
+
+        return baseGear
+    }
+
+    private static func entropy(for kind: BASAdaptiveTraceKind) -> BASTaskEntropyClass {
+        switch kind {
+        case .quick, .reminder:
+            .low
+        case .balance:
+            .medium
+        case .mirror:
+            .high
+        }
+    }
+
+    private static func contextBudget(
+        for kind: BASAdaptiveTraceKind,
+        gear: BASRuntimeGear,
+        allowsModelInvocation: Bool,
+        environmentClass: BASEnvironmentClass,
+        deviceClass: BASDevicePerformanceClass,
+        languageMode: BASLanguageMode
+    ) -> Int {
+        let base: Int
+        if !allowsModelInvocation {
+            switch kind {
+            case .quick, .reminder: base = 160
+            case .balance: base = 220
+            case .mirror: base = 240
+            }
+        } else {
+            switch (gear, kind) {
+            case (.low, .quick): base = 220
+            case (.low, .balance): base = 280
+            case (.low, .mirror): base = 320
+            case (.low, .reminder): base = 160
+            case (.balanced, .quick): base = 320
+            case (.balanced, .balance): base = 440
+            case (.balanced, .mirror): base = 520
+            case (.balanced, .reminder): base = 200
+            case (.high, .quick): base = 360
+            case (.high, .balance): base = 520
+            case (.high, .mirror): base = 620
+            case (.high, .reminder): base = 240
+            }
+        }
+
+        let environmentPenalty: Int = switch environmentClass {
+        case .simulator: 90
+        case .lowPower: 80
+        case .memoryConstrained: 50
+        case .normal: 0
+        }
+        let devicePenalty: Int = switch deviceClass {
+        case .simulator: 30
+        case .memoryConstrainedPhone: 40
+        case .balancedPhone: 20
+        case .fullPhone: 0
+        }
+        let languagePenalty: Int = switch languageMode {
+        case .mixed: 20
+        case .unknown: 10
+        case .english, .chinese: 0
+        }
+        let minimumBudget: Int = switch kind {
+        case .quick: 160
+        case .balance: 220
+        case .mirror: 260
+        case .reminder: 140
+        }
+
+        return max(minimumBudget, base - environmentPenalty - devicePenalty - languagePenalty)
+    }
+
+    private static func outputCharacterBudget(
+        for kind: BASAdaptiveTraceKind,
+        gear: BASRuntimeGear,
+        allowsModelInvocation: Bool,
+        environmentClass: BASEnvironmentClass,
+        deviceClass: BASDevicePerformanceClass
+    ) -> Int {
+        let base = BASAdaptiveTaskStrategy(
+            kind: kind,
+            entropy: entropy(for: kind),
+            runtimeGear: gear,
+            contextBudget: 0,
+            retrievalMode: .off,
+            thinkingMode: .off,
+            outputMode: outputMode(for: kind, allowsModelInvocation: allowsModelInvocation),
+            tone: .neutral,
+            actionSpace: [],
+            allowsModelInvocation: allowsModelInvocation
+        ).outputCharacterBudget
+
+        let environmentPenalty: Int = switch environmentClass {
+        case .simulator: 30
+        case .lowPower: 50
+        case .memoryConstrained: 30
+        case .normal: 0
+        }
+        let devicePenalty: Int = switch deviceClass {
+        case .simulator: 10
+        case .memoryConstrainedPhone: 30
+        case .balancedPhone: 10
+        case .fullPhone: 0
+        }
+
+        return max(120, base - environmentPenalty - devicePenalty)
+    }
+
+    private static func timeBudgetMs(
+        for kind: BASAdaptiveTraceKind,
+        gear: BASRuntimeGear,
+        allowsModelInvocation: Bool,
+        environmentClass: BASEnvironmentClass,
+        deviceClass: BASDevicePerformanceClass
+    ) -> Int {
+        let base = BASAdaptiveTaskStrategy(
+            kind: kind,
+            entropy: entropy(for: kind),
+            runtimeGear: gear,
+            contextBudget: 0,
+            retrievalMode: .off,
+            thinkingMode: .off,
+            outputMode: outputMode(for: kind, allowsModelInvocation: allowsModelInvocation),
+            tone: .neutral,
+            actionSpace: [],
+            allowsModelInvocation: allowsModelInvocation
+        ).timeBudgetMs
+
+        let environmentPenalty: Int = switch environmentClass {
+        case .simulator: 120
+        case .lowPower: 180
+        case .memoryConstrained: 100
+        case .normal: 0
+        }
+        let devicePenalty: Int = switch deviceClass {
+        case .simulator: 60
+        case .memoryConstrainedPhone: 120
+        case .balancedPhone: 60
+        case .fullPhone: 0
+        }
+
+        return max(300, base - environmentPenalty - devicePenalty)
+    }
+
+    private static func toolCallBudget(
+        for kind: BASAdaptiveTraceKind,
+        allowsModelInvocation: Bool,
+        environmentClass: BASEnvironmentClass
+    ) -> Int {
+        guard allowsModelInvocation else { return 0 }
+        let base: Int = switch kind {
+        case .quick, .reminder:
+            1
+        case .balance, .mirror:
+            2
+        }
+        return environmentClass == .normal ? base : max(0, base - 1)
+    }
+
+    private static func retrievalItemBudget(
+        for kind: BASAdaptiveTraceKind,
+        allowsModelInvocation: Bool,
+        environmentClass: BASEnvironmentClass
+    ) -> Int {
+        guard allowsModelInvocation else { return 0 }
+        let base: Int = switch kind {
+        case .quick:
+            0
+        case .reminder:
+            2
+        case .balance:
+            3
+        case .mirror:
+            5
+        }
+
+        return environmentClass == .normal ? base : max(0, base - 1)
+    }
+
+    private static func retrievalMode(
+        for kind: BASAdaptiveTraceKind,
+        gear: BASRuntimeGear,
+        allowsModelInvocation: Bool,
+        environmentClass: BASEnvironmentClass,
+        deviceClass: BASDevicePerformanceClass,
+        languageMode: BASLanguageMode
+    ) -> BASRetrievalMode {
+        guard allowsModelInvocation else { return .off }
+        var mode: BASRetrievalMode = switch kind {
+        case .quick:
+            .off
+        case .reminder:
+            .filtered
+        case .balance:
+            gear == .high ? .adaptive : .filtered
+        case .mirror:
+            .adaptive
+        }
+
+        if environmentClass == .simulator || environmentClass == .lowPower {
+            if kind == .reminder {
+                return .off
+            }
+            if mode == .adaptive {
+                mode = .filtered
+            }
+        }
+
+        if deviceClass == .memoryConstrainedPhone || deviceClass == .simulator {
+            if mode == .adaptive {
+                mode = .filtered
+            }
+        }
+
+        if languageMode == .mixed || languageMode == .unknown {
+            if mode == .adaptive {
+                mode = .filtered
+            }
+        }
+
+        return mode
+    }
+
+    private static func thinkingMode(
+        for kind: BASAdaptiveTraceKind,
+        gear: BASRuntimeGear,
+        allowsModelInvocation: Bool,
+        environmentClass: BASEnvironmentClass,
+        deviceClass: BASDevicePerformanceClass,
+        languageMode: BASLanguageMode
+    ) -> BASThinkingMode {
+        guard allowsModelInvocation else { return .off }
+        guard kind == .balance || kind == .mirror else { return .off }
+        guard gear == .high,
+              environmentClass == .normal,
+              deviceClass == .fullPhone,
+              languageMode != .mixed else {
+            return .off
+        }
+        return .gated
+    }
+
+    private static func outputMode(
+        for kind: BASAdaptiveTraceKind,
+        allowsModelInvocation: Bool
+    ) -> BASOutputMode {
+        guard allowsModelInvocation else { return .deterministicTemplate }
+        switch kind {
+        case .quick:
+            return .guidedShort
+        case .balance:
+            return .structuredBoard
+        case .mirror:
+            return .reflectiveStructured
+        case .reminder:
+            return .jsonShort
+        }
+    }
+
+    private static func tone(
+        for kind: BASAdaptiveTraceKind,
+        allowsModelInvocation: Bool,
+        environmentClass: BASEnvironmentClass,
+        languageMode: BASLanguageMode
+    ) -> BASToneProfile {
+        guard allowsModelInvocation else { return .neutral }
+        if environmentClass == .lowPower || environmentClass == .memoryConstrained {
+            return .briefWarm
+        }
+
+        if languageMode == .mixed || languageMode == .unknown {
+            switch kind {
+            case .quick, .reminder:
+                return .briefWarm
+            case .balance, .mirror:
+                return .groundedDirect
+            }
+        }
+
+        switch kind {
+        case .quick, .reminder:
+            return .briefWarm
+        case .balance:
+            return .groundedDirect
+        case .mirror:
+            return .reflectiveClear
+        }
+    }
+
+    private static func actionSpace(
+        for kind: BASAdaptiveTraceKind,
+        allowFallbacks: Bool,
+        environmentClass: BASEnvironmentClass,
+        deviceClass: BASDevicePerformanceClass
+    ) -> [String] {
+        var actions: [String] = switch kind {
+        case .quick:
+            ["encourage", "next_step", allowFallbacks ? "fallback_to_template" : "stay_deterministic"]
+        case .balance:
+            ["name_tradeoff", "surface_priority", allowFallbacks ? "fallback_to_template" : "stay_deterministic"]
+        case .mirror:
+            ["name_pattern", "name_boundary", allowFallbacks ? "fallback_to_template" : "stay_deterministic"]
+        case .reminder:
+            ["select_reminder", allowFallbacks ? "fallback_to_ranked_leader" : "stay_ranked_only"]
+        }
+
+        if environmentClass != .normal && !actions.contains("save_state") {
+            actions.append("save_state")
+        }
+
+        if deviceClass == .memoryConstrainedPhone && !actions.contains("stay_brief") {
+            actions.append("stay_brief")
+        }
+
+        return actions
+    }
+
+    private static func responseLanguage(
+        for languageMode: BASLanguageMode
+    ) -> BASAdaptiveResponseLanguage {
+        switch languageMode {
+        case .chinese:
+            return .chinese
+        case .mixed:
+            return .mixed
+        case .english, .unknown:
+            return .english
+        }
+    }
+}

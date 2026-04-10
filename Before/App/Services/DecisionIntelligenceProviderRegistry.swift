@@ -1,4 +1,5 @@
 import Foundation
+import BASRuntimeCore
 
 enum DecisionModelCapability: String, CaseIterable, Codable, Sendable {
     case shortDialogue = "short_dialogue"
@@ -772,180 +773,205 @@ enum DecisionIntelligenceTaskRouter {
         )
 
         guard allowFallbacks, baseKinds.count > 1 else { return baseKinds }
-
-        let descriptorByKind = Dictionary(
-            uniqueKeysWithValues: registry.descriptors().map { ($0.kind, $0) }
+        let plan = BASProviderPlanner.plan(
+            task: substrateTraceKind(task),
+            preferredProviderID: preference.kind.rawValue,
+            baseOrderedProviderIDs: baseKinds.map(\.rawValue),
+            strategy: strategy.map(substrateAdaptiveStrategy),
+            descriptors: registry.descriptors().map(substrateProviderDescriptor)
         )
-        let baseIndexByKind = Dictionary(
-            uniqueKeysWithValues: baseKinds.enumerated().map { ($0.element, $0.offset) }
-        )
-        let compatibleKinds = strategy.map { strategy in
-            baseKinds.filter { kind in
-                isCompatible(
-                    with: strategy,
-                    descriptor: descriptorByKind[kind]
-                )
-            }
-        } ?? baseKinds
 
-        guard !compatibleKinds.isEmpty else { return [] }
+        return plan.orderedProviderIDs.compactMap(DecisionModelProviderKind.init(rawValue:))
+    }
 
-        return compatibleKinds.sorted { lhs, rhs in
-            let lhsScore = routingScore(
-                kind: lhs,
-                task: task,
-                preferredKind: preference.kind,
-                descriptor: descriptorByKind[lhs],
-                baseIndex: baseIndexByKind[lhs] ?? 0,
-                strategy: strategy
-            )
-            let rhsScore = routingScore(
-                kind: rhs,
-                task: task,
-                preferredKind: preference.kind,
-                descriptor: descriptorByKind[rhs],
-                baseIndex: baseIndexByKind[rhs] ?? 0,
-                strategy: strategy
-            )
-
-            if lhsScore == rhsScore {
-                return (baseIndexByKind[lhs] ?? 0) < (baseIndexByKind[rhs] ?? 0)
-            }
-
-            return lhsScore > rhsScore
+    private static func substrateTraceKind(_ task: DecisionIntelligenceTraceKind) -> BASAdaptiveTraceKind {
+        switch task {
+        case .quick:
+            .quick
+        case .balance:
+            .balance
+        case .mirror:
+            .mirror
+        case .reminder:
+            .reminder
         }
     }
 
-    private static func isCompatible(
-        with strategy: DecisionAdaptiveTaskStrategy,
-        descriptor: DecisionModelProviderDescriptor?
-    ) -> Bool {
-        guard let profile = descriptor?.capabilityProfile else { return true }
-
-        if !profile.supports(responseLanguage: strategy.responseLanguage) {
-            return false
+    private static func substrateAdaptiveStrategy(
+        _ strategy: DecisionAdaptiveTaskStrategy
+    ) -> BASAdaptiveTaskStrategy {
+        let responseLanguage: BASAdaptiveResponseLanguage
+        switch strategy.responseLanguage {
+        case .english:
+            responseLanguage = .english
+        case .chinese:
+            responseLanguage = .chinese
+        case .mixed:
+            responseLanguage = .mixed
         }
 
-        if strategy.thinkingMode == .gated, !profile.supportsThinking {
-            return false
-        }
-
-        if strategy.outputMode != .deterministicTemplate, !profile.supportsStructuredOutput {
-            return false
-        }
-
-        return true
-    }
-
-    private static func routingScore(
-        kind: DecisionModelProviderKind,
-        task: DecisionIntelligenceTraceKind,
-        preferredKind: DecisionModelProviderKind,
-        descriptor: DecisionModelProviderDescriptor?,
-        baseIndex: Int,
-        strategy: DecisionAdaptiveTaskStrategy?
-    ) -> Int {
-        let affinity = descriptor?.affinity(for: task) ?? 0
-        let preferredBias = kind == preferredKind ? 8 : 0
-        let baseBias = max(0, 24 - (baseIndex * 12))
-        let capabilityBias = strategy.map {
-            capabilityScore(for: $0, descriptor: descriptor)
-        } ?? 0
-        return (affinity * 10) + preferredBias + baseBias + capabilityBias
-    }
-
-    private static func capabilityScore(
-        for strategy: DecisionAdaptiveTaskStrategy,
-        descriptor: DecisionModelProviderDescriptor?
-    ) -> Int {
-        guard let profile = descriptor?.capabilityProfile else { return 0 }
-
-        var score = 0
-
-        if profile.bestFor.contains(strategy.kind) {
-            score += 14
-        }
-
-        if strategy.outputMode != .deterministicTemplate {
-            score += profile.supportsStructuredOutput ? 12 : -120
-        }
-
-        if strategy.thinkingMode == .gated {
-            score += profile.supportsThinking ? 18 : -120
-        }
-
-        if strategy.retrievalMode == .adaptive {
-            score += profile.supports(.retrievalGrounding) ? 10 : -8
-        }
-
+        let entropy: BASTaskEntropyClass
         switch strategy.entropy {
         case .low:
-            switch profile.latencyClass {
-            case .low: score += 10
-            case .medium: score += 4
-            case .high: score -= 6
-            }
+            entropy = .low
         case .medium:
-            score += profile.supports(.structuredOutput) ? 6 : 0
+            entropy = .medium
         case .high:
-            score += profile.supports(.deepReflection) ? 14 : -10
-            switch profile.memoryClass {
-            case .high: score += 6
-            case .medium: score += 2
-            case .low: score -= 4
-            }
+            entropy = .high
         }
 
+        let runtimeGear: BASRuntimeGear
         switch strategy.runtimeGear {
         case .low:
-            switch profile.latencyClass {
-            case .low: score += 24
-            case .medium: score += 8
-            case .high: score -= 36
-            }
-            switch profile.memoryClass {
-            case .low: score += 18
-            case .medium: score += 4
-            case .high: score -= 34
-            }
-            score += profile.supports(.lowLatency) ? 14 : -6
-            score += profile.supports(.lowMemory) ? 14 : -6
+            runtimeGear = .low
         case .balanced:
-            switch profile.latencyClass {
-            case .low: score += 6
-            case .medium: score += 8
-            case .high: break
-            }
-            switch profile.memoryClass {
-            case .low: score += 4
-            case .medium: score += 6
-            case .high: break
-            }
+            runtimeGear = .balanced
         case .high:
-            switch profile.latencyClass {
-            case .low: score += 2
-            case .medium: score += 6
-            case .high: score += 8
-            }
-            switch profile.memoryClass {
-            case .low: score -= 2
-            case .medium: score += 4
-            case .high: score += 8
-            }
-            score += profile.supports(.deepReflection) ? 12 : -6
+            runtimeGear = .high
         }
 
-        if profile.supports(responseLanguage: strategy.responseLanguage) {
-            score += 12
-        } else {
-            score -= 260
+        let retrievalMode: BASRetrievalMode
+        switch strategy.retrievalMode {
+        case .off:
+            retrievalMode = .off
+        case .filtered:
+            retrievalMode = .filtered
+        case .adaptive:
+            retrievalMode = .adaptive
         }
 
-        if strategy.actionSpace.contains("stay_brief") {
-            score += profile.supports(.lowLatency) ? 6 : 0
-            score += profile.supports(.lowMemory) ? 6 : 0
+        let thinkingMode: BASThinkingMode
+        switch strategy.thinkingMode {
+        case .off:
+            thinkingMode = .off
+        case .gated:
+            thinkingMode = .gated
         }
 
-        return score
+        let outputMode: BASOutputMode
+        switch strategy.outputMode {
+        case .deterministicTemplate:
+            outputMode = .deterministicTemplate
+        case .guidedShort:
+            outputMode = .guidedShort
+        case .structuredBoard:
+            outputMode = .structuredBoard
+        case .reflectiveStructured:
+            outputMode = .reflectiveStructured
+        case .jsonShort:
+            outputMode = .jsonShort
+        }
+
+        let tone: BASToneProfile
+        switch strategy.tone {
+        case .neutral:
+            tone = .neutral
+        case .briefWarm:
+            tone = .briefWarm
+        case .groundedDirect:
+            tone = .groundedDirect
+        case .reflectiveClear:
+            tone = .reflectiveClear
+        }
+
+        return BASAdaptiveTaskStrategy(
+            kind: substrateTraceKind(strategy.kind),
+            entropy: entropy,
+            runtimeGear: runtimeGear,
+            contextBudget: strategy.contextBudget,
+            outputCharacterBudget: strategy.outputCharacterBudget,
+            timeBudgetMs: strategy.timeBudgetMs,
+            toolCallBudget: strategy.toolCallBudget,
+            retrievalItemBudget: strategy.retrievalItemBudget,
+            retrievalMode: retrievalMode,
+            thinkingMode: thinkingMode,
+            outputMode: outputMode,
+            tone: tone,
+            actionSpace: strategy.actionSpace,
+            responseLanguage: responseLanguage,
+            allowsModelInvocation: strategy.allowsModelInvocation
+        )
+    }
+
+    private static func substrateProviderDescriptor(
+        _ descriptor: DecisionModelProviderDescriptor
+    ) -> BASProviderDescriptor {
+        BASProviderDescriptor(
+            providerID: descriptor.kind.rawValue,
+            taskAffinities: Dictionary(
+                uniqueKeysWithValues: descriptor.taskAffinities.map { entry in
+                    (substrateTraceKind(entry.key), entry.value)
+                }
+            ),
+            capabilityProfile: BASProviderCapabilityProfile(
+                strengths: descriptor.capabilityProfile.strengths.map(substrateCapability),
+                weaknesses: descriptor.capabilityProfile.weaknesses.map(substrateCapability),
+                latencyClass: substrateLatencyClass(descriptor.capabilityProfile.latencyClass),
+                memoryClass: substrateMemoryClass(descriptor.capabilityProfile.memoryClass),
+                supportedResponseLanguages: descriptor.capabilityProfile.supportedResponseLanguages.map { language in
+                    switch language {
+                    case .english:
+                        .english
+                    case .chinese:
+                        .chinese
+                    case .mixed:
+                        .mixed
+                    }
+                },
+                supportsThinking: descriptor.capabilityProfile.supportsThinking,
+                supportsStructuredOutput: descriptor.capabilityProfile.supportsStructuredOutput,
+                supportsToolUse: descriptor.capabilityProfile.supportsToolUse,
+                bestFor: descriptor.capabilityProfile.bestFor.map(substrateTraceKind)
+            )
+        )
+    }
+
+    private static func substrateCapability(
+        _ capability: DecisionModelCapability
+    ) -> BASProviderCapability {
+        switch capability {
+        case .shortDialogue:
+            .shortDialogue
+        case .structuredOutput:
+            .structuredOutput
+        case .lightToolUse:
+            .lightToolUse
+        case .deepReflection:
+            .deepReflection
+        case .retrievalGrounding:
+            .retrievalGrounding
+        case .multilingualChinese:
+            .multilingualChinese
+        case .lowLatency:
+            .lowLatency
+        case .lowMemory:
+            .lowMemory
+        }
+    }
+
+    private static func substrateLatencyClass(
+        _ latencyClass: DecisionModelLatencyClass
+    ) -> BASProviderLatencyClass {
+        switch latencyClass {
+        case .low:
+            .low
+        case .medium:
+            .medium
+        case .high:
+            .high
+        }
+    }
+
+    private static func substrateMemoryClass(
+        _ memoryClass: DecisionModelMemoryClass
+    ) -> BASProviderMemoryClass {
+        switch memoryClass {
+        case .low:
+            .low
+        case .medium:
+            .medium
+        case .high:
+            .high
+        }
     }
 }

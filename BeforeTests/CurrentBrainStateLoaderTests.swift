@@ -40,6 +40,7 @@ final class CurrentBrainStateLoaderTests: XCTestCase {
         XCTAssertEqual(current.identityProfile.role, .pauseCompanion)
         XCTAssertEqual(current.boundaryPolicy.mode, .localOnlyAdvisory)
         XCTAssertEqual(current.calibrationState.status, .stable)
+        XCTAssertTrue(current.calibrationState.alerts.isEmpty)
         XCTAssertEqual(checkpoints.count, 1)
         XCTAssertEqual(current.evolutionState.checkpointCount, 1)
         XCTAssertTrue(current.evolutionState.rollbackReady)

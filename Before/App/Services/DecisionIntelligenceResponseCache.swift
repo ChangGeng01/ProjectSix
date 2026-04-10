@@ -78,6 +78,15 @@ actor DecisionIntelligenceResponseCache {
         )
     }
 
+    func quarantineQuickResult(for key: String) {
+        quarantineValue(
+            for: key,
+            kind: .quick,
+            storage: &quickStorage,
+            order: &quickOrder
+        )
+    }
+
     func balanceResult(for key: String) -> BalanceBoardResult? {
         cachedValue(
             for: key,
@@ -96,6 +105,15 @@ actor DecisionIntelligenceResponseCache {
             storage: &balanceStorage,
             order: &balanceOrder,
             validator: DecisionIntelligenceCacheGuard.validate
+        )
+    }
+
+    func quarantineBalanceResult(for key: String) {
+        quarantineValue(
+            for: key,
+            kind: .balance,
+            storage: &balanceStorage,
+            order: &balanceOrder
         )
     }
 
@@ -120,6 +138,15 @@ actor DecisionIntelligenceResponseCache {
         )
     }
 
+    func quarantineMirrorResult(for key: String) {
+        quarantineValue(
+            for: key,
+            kind: .mirror,
+            storage: &mirrorStorage,
+            order: &mirrorOrder
+        )
+    }
+
     func reminder(for key: String) -> ReminderSelectionCandidate? {
         cachedValue(
             for: key,
@@ -138,6 +165,15 @@ actor DecisionIntelligenceResponseCache {
             storage: &reminderStorage,
             order: &reminderOrder,
             validator: DecisionIntelligenceCacheGuard.validate
+        )
+    }
+
+    func quarantineReminder(for key: String) {
+        quarantineValue(
+            for: key,
+            kind: .reminder,
+            storage: &reminderStorage,
+            order: &reminderOrder
         )
     }
 
@@ -224,5 +260,16 @@ actor DecisionIntelligenceResponseCache {
     private func touchKey(_ key: String, order: inout [String]) {
         order.removeAll { $0 == key }
         order.insert(key, at: 0)
+    }
+
+    private func quarantineValue<Value>(
+        for key: String,
+        kind: DecisionIntelligenceTraceKind,
+        storage: inout [String: Value],
+        order: inout [String]
+    ) {
+        guard storage.removeValue(forKey: key) != nil else { return }
+        order.removeAll { $0 == key }
+        quarantinedHitCountByKind[kind, default: 0] += 1
     }
 }

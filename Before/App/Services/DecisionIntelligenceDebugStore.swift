@@ -1,4 +1,5 @@
 import Foundation
+import BASPolicy
 
 enum DecisionIntelligenceTracePrivacy {
     static func allowsSensitivePayload(
@@ -74,6 +75,8 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
     let admissionDecision: DecisionIntelligenceAdmissionDecision?
     let semanticPromptFingerprint: String?
     let stablePrefixFingerprint: String?
+    let consistencyCheck: BASConsistencyCheckResult?
+    let consistencyRejected: Bool
     let prompt: String
     let outputPreview: String
     let detail: String
@@ -96,6 +99,8 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
         admissionDecision: DecisionIntelligenceAdmissionDecision? = nil,
         semanticPromptFingerprint: String? = nil,
         stablePrefixFingerprint: String? = nil,
+        consistencyCheck: BASConsistencyCheckResult? = nil,
+        consistencyRejected: Bool = false,
         prompt: String,
         outputPreview: String,
         detail: String
@@ -117,6 +122,8 @@ struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {
         self.admissionDecision = admissionDecision
         self.semanticPromptFingerprint = semanticPromptFingerprint
         self.stablePrefixFingerprint = stablePrefixFingerprint
+        self.consistencyCheck = consistencyCheck
+        self.consistencyRejected = consistencyRejected
         self.prompt = prompt
         self.outputPreview = outputPreview
         self.detail = detail

@@ -21,12 +21,15 @@ let package = Package(
     ],
     targets: [
         .target(name: "BASRuntimeCore"),
-        .target(name: "BASMemory"),
+        .target(name: "BASMemory", dependencies: ["BASRuntimeCore"]),
         .target(name: "BASPolicy", dependencies: ["BASRuntimeCore", "BASMemory"]),
         .target(name: "BASOrchestration", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy"]),
-        .target(name: "BASObservability", dependencies: ["BASRuntimeCore", "BASPolicy"]),
-        .target(name: "BASEvaluation", dependencies: ["BASObservability"]),
-        .target(name: "BASAdmin", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASEvaluation"]),
+        .target(name: "BASObservability", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy"]),
+        .target(
+            name: "BASEvaluation",
+            dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASObservability"]
+        ),
+        .target(name: "BASAdmin", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASObservability", "BASEvaluation"]),
         .target(name: "BASAppleAdapters", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy"]),
         .testTarget(name: "BehavioralAISubstrateTests", dependencies: [
             "BASRuntimeCore",

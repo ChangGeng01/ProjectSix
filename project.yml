@@ -86,6 +86,15 @@ targets:
         INFOPLIST_FILE: BeforeWidgetExtension/Info.plist
         APPLICATION_EXTENSION_API_ONLY: YES
         SKIP_INSTALL: YES
+    dependencies:
+      - package: BehavioralAISubstrate
+        product: BASRuntimeCore
+      - package: BehavioralAISubstrate
+        product: BASMemory
+      - package: BehavioralAISubstrate
+        product: BASPolicy
+      - package: BehavioralAISubstrate
+        product: BASOrchestration
 
   BeforeWatch:
     type: application
@@ -115,6 +124,8 @@ targets:
         product: BASMemory
       - package: BehavioralAISubstrate
         product: BASPolicy
+      - package: BehavioralAISubstrate
+        product: BASOrchestration
       - package: BehavioralAISubstrate
         product: BASAppleAdapters
 

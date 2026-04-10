@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import Testing
+import BASPolicy
 @testable import Before
 
 @MainActor
@@ -465,6 +466,8 @@ struct DecisionTestingInterfaceTests {
             ),
             semanticPromptFingerprint: "semantic-quick-1",
             stablePrefixFingerprint: "prefix-quick-1",
+            consistencyCheck: BASConsistencyCheckResult(violations: []),
+            consistencyRejected: false,
             prompt: "Quick prompt",
             outputPreview: "Quick output",
             detail: "Quick detail"
@@ -593,6 +596,12 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.circuitTripCount == 1)
         #expect(export.summary.circuitTripCountByProvider[.gemmaE4B] == 1)
         #expect(export.summary.circuitTripCountByReason[.repeatedProviderFailure] == 1)
+        #expect(export.summary.consistencyCheckedTraceCount == 1)
+        #expect(export.summary.consistencyRejectedTraceCount == 0)
+        #expect(export.summary.consistencyCheckCoverageRate == 1)
+        #expect(export.summary.consistencyRejectRate == 0)
+        #expect(export.summary.consistencyRejectedCountByKind[.quick] == nil)
+        #expect(export.summary.consistencyViolationCounts.isEmpty)
         #expect(export.summary.admissionSkipRate == 0)
         #expect(export.summary.providerBypassRate == 0)
         #expect(abs((export.summary.providerBypassRateByKind[.quick] ?? 0) - 0) < 0.0001)
@@ -699,10 +708,64 @@ struct DecisionTestingInterfaceTests {
         #expect(export.flightDeck.layerReports.contains(where: { $0.layer == .safety }))
         #expect(export.flightDeck.layerReports.contains(where: { $0.layer == .evaluation }))
         #expect(
+            export.flightDeck.layerReports.first(where: { $0.layer == .observability })?.signals.contains(where: {
+                $0.contains("Consistency checked")
+            }) == true
+        )
+        #expect(
             export.flightDeck.layerReports.first(where: { $0.layer == .data })?.signals.contains(where: {
                 $0.contains("Replay entries")
             }) == true
         )
+    }
+
+    @Test
+    func runtimeExportFlightDeckSurfacesConsistencyRejectionSignal() async {
+        let debugStore = DecisionIntelligenceDebugStore()
+        debugStore.record(
+            DecisionIntelligenceTrace(
+                kind: .quick,
+                preferredProvider: .gemmaE4B,
+                activeProvider: .gemmaE4B,
+                attemptedProviders: [.gemmaE4B],
+                allowFallbacks: true,
+                usedFallback: false,
+                consistencyCheck: BASConsistencyCheckResult(
+                    violations: [
+                        BASConsistencyViolation(
+                            kind: .forbiddenAction,
+                            message: "Action render_local_guidance is forbidden in the current truth state."
+                        )
+                    ]
+                ),
+                consistencyRejected: true,
+                prompt: "Prompt",
+                outputPreview: "Output",
+                detail: "Rejected by consistency harness"
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            debugStore: debugStore,
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        let safetyReport = export.flightDeck.layerReports.first(where: { $0.layer == .safety })
+        let observabilityReport = export.flightDeck.layerReports.first(where: { $0.layer == .observability })
+
+        #expect(export.summary.consistencyCheckedTraceCount == 1)
+        #expect(export.summary.consistencyRejectedTraceCount == 1)
+        #expect(export.summary.consistencyRejectRate == 1)
+        #expect(export.summary.consistencyViolationCounts[.forbiddenAction] == 1)
+        #expect(safetyReport?.signals.contains(where: { $0.contains("Consistency rejected: 1") }) == true)
+        #expect(safetyReport?.blockers.contains(where: { $0.contains("forbidden actions") }) == true)
+        #expect(observabilityReport?.signals.contains(where: { $0.contains("Consistency checked: 1") }) == true)
     }
 
     @Test

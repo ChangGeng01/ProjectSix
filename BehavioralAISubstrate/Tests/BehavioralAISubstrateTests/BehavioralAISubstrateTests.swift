@@ -51,7 +51,7 @@ struct BehavioralAISubstrateTests {
         let decision = set.decide(actionClass: .toolCall, riskLevel: .high, scope: .task, sensitivity: .medium, cloudRequested: true)
 
         #expect(decoded == doc)
-        #expect(decision.decision == .requireConfirmation)
+        #expect(decision.decision == .deny)
     }
 
     @Test("admin snapshot covers all layers")
@@ -90,5 +90,47 @@ struct BehavioralAISubstrateTests {
         #expect(summary.taskKind == .plan)
         #expect(summary.routeKind == .local)
         #expect(summary.detail.contains("route local"))
+    }
+
+    @Test("console snapshot builder materializes all eight layers")
+    func consoleSnapshotBuilderMaterializesAllEightLayers() {
+        let metrics = BASFlightDeckMetrics(
+            layerInputs: [
+                BASLayerAssessmentInput(layer: .runtime, score: 92, summary: "Runtime stable"),
+                BASLayerAssessmentInput(layer: .memory, score: 78, summary: "Memory warming", blockers: ["Pending candidates still high"])
+            ],
+            runtimeSummary: "Route local",
+            brainSummary: "Companion coach",
+            isPureLocal: true
+        )
+
+        let snapshot = BASConsoleSnapshotBuilder.build(from: metrics)
+
+        #expect(snapshot.reports.count == 8)
+        #expect(snapshot.reports.first(where: { $0.kind == .runtime })?.health == .healthy)
+        #expect(snapshot.reports.first(where: { $0.kind == .memory })?.health == .warning)
+        #expect(snapshot.blockerSummary.contains(where: { $0.contains("Pending candidates still high") }))
+    }
+
+    @Test("entry intent summary keeps orchestration semantics")
+    func entryIntentSummaryKeepsOrchestrationSemantics() {
+        let envelope = BASEntryIntentEnvelope(
+            kind: .resumeCurrentDecision,
+            surface: .notification,
+            taskKind: .plan,
+            preferredWorkflowID: "balance",
+            promptSeed: "Resume the decision about moving.",
+            riskLevel: .high,
+            triggerReason: "predictive_nudge",
+            continuityToken: "fp_123",
+            expiresAt: .now.addingTimeInterval(300)
+        )
+
+        let summary = BASEntryIntentSummarizer.summarize(envelope)
+
+        #expect(summary.requiresResume)
+        #expect(summary.headline.contains("Notification"))
+        #expect(summary.detail.contains("task plan"))
+        #expect(summary.detail.contains("risk high"))
     }
 }

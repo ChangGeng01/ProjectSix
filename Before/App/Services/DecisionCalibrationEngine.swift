@@ -1,4 +1,6 @@
 import Foundation
+import BASEvaluation
+import BASPolicy
 
 enum DecisionCalibrationEngine {
     static func evaluate(
@@ -8,59 +10,47 @@ enum DecisionCalibrationEngine {
         boundaryPolicy: DecisionBoundaryPolicyState,
         now: Date = .now
     ) -> DecisionCalibrationState {
-        var alerts: [DecisionCalibrationAlert] = []
-        var adjustments: [String] = []
-        var driftScore = 0.0
+        BASCalibrationEvaluator.evaluate(
+            brainState: brainState,
+            riskLevel: substrateRiskLevel(from: riskLevel),
+            identityProfile: identityProfile,
+            boundaryPolicy: boundaryPolicy,
+            now: now
+        )
+    }
+}
 
-        let snapshot = brainState.verificationSnapshot
-
-        if snapshot.pendingMemoryLoadRate >= 0.34 {
-            alerts.append(.highPendingInfluence)
-            adjustments.append("Lower pending-memory influence before it hardens into guidance.")
-            driftScore += 0.28
+extension DecisionCalibrationState {
+    var packageCalibrationReport: BASEvaluation.BASCalibrationReport {
+        let status: BASEvaluation.BASRegressionStatus = switch self.status {
+        case .stable:
+            .pass
+        case .watch:
+            .warn
+        case .drifting:
+            .fail
         }
 
-        if snapshot.lowTrustMemoryLoadRate >= 0.18 {
-            alerts.append(.lowTrustLoad)
-            adjustments.append("Prefer higher-trust memory slices or tighten retrieval.")
-            driftScore += 0.24
+        let alertModels = alerts.map { alert in
+            BASEvaluation.BASCalibrationAlert(
+                reason: alert.rawValue,
+                severity: status.rawValue
+            )
         }
 
-        if identityProfile.initiative == .assertive && riskLevel != .high {
-            alerts.append(.aggressiveInitiative)
-            adjustments.append("Reduce initiative outside explicitly risky moments.")
-            driftScore += 0.18
-        }
-
-        if riskLevel == .high && !boundaryPolicy.requiredConfirmations.contains("irreversible_decision") {
-            alerts.append(.underConstrainedHighRisk)
-            adjustments.append("High-risk flows should require an irreversible-decision confirmation.")
-            driftScore += 0.24
-        }
-
-        if riskLevel != .low && brainState.activeInterventionTemplateIDs.isEmpty {
-            alerts.append(.templateCoverageGap)
-            adjustments.append("Restore a reusable intervention template before deepening guidance.")
-            driftScore += 0.12
-        }
-
-        let status: DecisionCalibrationStatus = {
-            switch driftScore {
-            case ..<0.20:
-                .stable
-            case ..<0.50:
-                .watch
-            default:
-                .drifting
+        let summary: String = {
+            if suggestedAdjustments.isEmpty {
+                return "Calibration is \(self.status.rawValue) with drift score \(String(format: "%.2f", driftScore))."
             }
+
+            return suggestedAdjustments.joined(separator: " ")
         }()
 
-        return DecisionCalibrationState(
+        return BASEvaluation.BASCalibrationReport(
+            score: max(0, 1 - driftScore),
             status: status,
-            alerts: alerts,
-            suggestedAdjustments: adjustments,
-            driftScore: driftScore,
-            generatedAt: now
+            alerts: alertModels,
+            summary: summary
         )
     }
 }
