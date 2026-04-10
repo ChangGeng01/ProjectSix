@@ -87,15 +87,14 @@ enum CurrentBrainStateLoader {
         )
 
         let update = BrainStateUpdate(
-            createdAt: now,
-            source: source,
-            mode: mode,
-            dominantGoal: current.dominantGoal,
-            dominantReactionWeight: current.dominantReactionWeight,
-            fingerprint: current.verificationSnapshot.fingerprint,
-            activeConstraints: current.activeConstraints,
-            activeTemplateIDs: current.activeTemplateIDs,
-            failureGuardIDs: current.failureGuardIDs
+            storedFields: BASCurrentBrainPersistenceApplier.updateFields(
+                createdAt: now,
+                source: source.rawValue,
+                input: BASCurrentBrainPersistenceApplier.updateInput(
+                    mode: mode.rawValue,
+                    bootstrapped: execution.bootstrapped
+                )
+            )
         )
         context.insert(update)
         trimOldUpdates(in: context, now: now)
@@ -108,10 +107,11 @@ enum CurrentBrainStateLoader {
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         let updates = (try? context.fetch(descriptor)) ?? []
-        for stale in updates.dropFirst(60) {
-            context.delete(stale)
-        }
-        for stale in updates where stale.createdAt.addingTimeInterval(60 * 60 * 24 * 14) < now {
+        let retainedIDs = BASCurrentBrainPersistenceApplier.retainedUpdateIDs(
+            in: updates.map(\.storedFields),
+            now: now
+        )
+        for stale in updates where !retainedIDs.contains(stale.id) {
             context.delete(stale)
         }
     }

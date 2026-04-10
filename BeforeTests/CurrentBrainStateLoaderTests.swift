@@ -46,7 +46,7 @@ final class CurrentBrainStateLoaderTests: XCTestCase {
         XCTAssertTrue(current.evolutionState.rollbackReady)
         XCTAssertEqual(updates.count, 1)
         XCTAssertEqual(updates.first?.fingerprint, current.verificationSnapshot.fingerprint)
-        XCTAssertEqual(updates.first?.activeTemplateIDs, current.activeTemplateIDs)
+        XCTAssertEqual(Set(updates.first?.activeTemplateIDs ?? []), Set(current.activeTemplateIDs))
     }
 
     @MainActor

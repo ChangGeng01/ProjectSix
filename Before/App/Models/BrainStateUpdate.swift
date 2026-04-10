@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import BASMemory
 
 @Model
 final class BrainStateUpdate {
@@ -38,6 +39,21 @@ final class BrainStateUpdate {
         self.failureGuardIDsBlob = Self.encode(failureGuardIDs)
     }
 
+    convenience init(storedFields: BASCurrentBrainUpdateStoredFields) {
+        self.init(
+            id: storedFields.id,
+            createdAt: storedFields.createdAt,
+            source: BrainStateUpdateSource(rawValue: storedFields.source) ?? .explicitRefresh,
+            mode: DecisionMode(rawValue: storedFields.mode) ?? .quick,
+            dominantGoal: storedFields.dominantGoal,
+            dominantReactionWeight: DecisionReactionWeightKey(rawValue: storedFields.dominantReactionWeight) ?? .briefLanguage,
+            fingerprint: storedFields.fingerprint,
+            activeConstraints: storedFields.activeConstraints,
+            activeTemplateIDs: storedFields.activeTemplateIDs,
+            failureGuardIDs: storedFields.failureGuardIDs
+        )
+    }
+
     var source: BrainStateUpdateSource {
         BrainStateUpdateSource(rawValue: sourceRaw) ?? .explicitRefresh
     }
@@ -60,6 +76,21 @@ final class BrainStateUpdate {
 
     var failureGuardIDs: [String] {
         Self.decode(failureGuardIDsBlob)
+    }
+
+    var storedFields: BASCurrentBrainUpdateStoredFields {
+        BASCurrentBrainUpdateStoredFields(
+            id: id,
+            createdAt: createdAt,
+            source: sourceRaw,
+            mode: modeRaw,
+            dominantGoal: dominantGoal,
+            dominantReactionWeight: dominantReactionWeightRaw,
+            fingerprint: fingerprint,
+            activeConstraints: activeConstraints,
+            activeTemplateIDs: activeTemplateIDs,
+            failureGuardIDs: failureGuardIDs
+        )
     }
 
     static func encode(_ values: [String]) -> String {
