@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 import BASOrchestration
 import BASPolicy
@@ -52,79 +51,21 @@ enum DecisionIntelligencePromptContract {
     }
 
     enum PrefixCache {
-        static let sharedPrelude = """
-        You are the language rendering layer for a local decision app.
-        The app owns state, routing, safety, verdicts, and actions.
-        You only tighten wording or select from provided options.
-        Keep the tone calm, short, and non-shaming.
-        """
-
-        static let quick = """
-        Rewrite only the two perspective lines.
-        Keep the same meaning and do not change verdicts or actions.
-        """
-
-        static let balance = """
-        Tighten the board without inventing new facts or turning it into a verdict.
-        Preserve the same focus and next-step intent.
-        """
-
-        static let mirror = """
-        Clarify the mirror without becoming dramatic, therapeutic, or yes-no.
-        Preserve the same tension and reflective next move.
-        """
-
-        static let reminder = """
-        Pick one existing reminder that best matches the current state.
-        Do not rewrite or invent reminder text.
-        """
-
         static func instructions(for kind: TaskKind) -> String {
-            let modeInstructions: String = switch kind {
-            case .quick:
-                quick
-            case .balance:
-                balance
-            case .mirror:
-                mirror
-            case .reminder:
-                reminder
-            }
-
-            return sharedPrelude + "\n" + modeInstructions
+            BASPromptPrefixCatalog.instructions(for: semanticTaskKind(for: kind))
         }
 
         static func immutablePrefix(for kind: TaskKind) -> String {
-            sharedPrelude
+            BASPromptPrefixCatalog.immutablePrefix(for: semanticTaskKind(for: kind))
         }
 
         static func adaptivePrefix(for kind: TaskKind) -> String {
-            switch kind {
-            case .quick:
-                quick
-            case .balance:
-                balance
-            case .mirror:
-                mirror
-            case .reminder:
-                reminder
-            }
+            BASPromptPrefixCatalog.adaptivePrefix(for: semanticTaskKind(for: kind))
         }
     }
 
     static func sanitized(_ value: String, fallback: String, limit: Int) -> String {
-        let trimmed = value
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "\n", with: " ")
-
-        guard !trimmed.isEmpty else { return fallback }
-        let collapsed = trimmed.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        guard !collapsed.isEmpty else { return fallback }
-        if collapsed.count <= limit {
-            return collapsed
-        }
-
-        return String(collapsed.prefix(limit)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
+        BASPromptTextSanitizer.sanitized(value, fallback: fallback, limit: limit)
     }
 
     static func quickRefinementEnvelope(
@@ -376,22 +317,28 @@ enum DecisionIntelligencePromptContract {
         provider: DecisionModelProviderKind,
         envelope: PromptEnvelope
     ) -> String {
-        cacheFingerprint(provider: provider, semanticPrompt: envelope.runtimePrompt)
+        BASPromptFingerprinting.cacheFingerprint(
+            providerIdentifier: provider.rawValue,
+            envelope: envelope
+        )
     }
 
     static func cacheFingerprint(
         provider: DecisionModelProviderKind,
         semanticPrompt: String
     ) -> String {
-        sha256Hex("\(provider.rawValue)\n\(semanticPrompt)")
+        BASPromptFingerprinting.cacheFingerprint(
+            providerIdentifier: provider.rawValue,
+            semanticPrompt: semanticPrompt
+        )
     }
 
     static func semanticFingerprint(for envelope: PromptEnvelope) -> String {
-        sha256Hex(envelope.runtimePrompt)
+        BASPromptFingerprinting.semanticFingerprint(for: envelope)
     }
 
     static func stablePrefixFingerprint(for envelope: PromptEnvelope) -> String {
-        sha256Hex(envelope.layers.stablePrefix)
+        BASPromptFingerprinting.stablePrefixFingerprint(for: envelope)
     }
 
     private static func makeEnvelope(
@@ -486,11 +433,6 @@ enum DecisionIntelligencePromptContract {
                 reminderSurfaceMode: reminderMode.map(substrateMode(from:))
             )
         )
-    }
-
-    private static func sha256Hex(_ value: String) -> String {
-        let digest = SHA256.hash(data: Data(value.utf8))
-        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     private static func stateJSONString(_ state: [String: Any?]) -> String {
@@ -610,51 +552,10 @@ enum DecisionIntelligencePromptContract {
         for kind: TaskKind,
         strategy: DecisionAdaptiveTaskStrategy?
     ) -> Int {
-        let base: Int = switch kind {
-        case .quick:
-            5
-        case .balance:
-            4
-        case .mirror:
-            4
-        case .reminder:
-            3
-        }
-
-        guard let strategy else { return base }
-        let modeBudget: Int = switch strategy.retrievalMode {
-        case .off:
-            max(2, base - 1)
-        case .filtered:
-            base
-        case .adaptive:
-            base + 1
-        }
-
-        let retrievalBounded = if strategy.retrievalItemBudget > 0 {
-            max(2, min(modeBudget, strategy.retrievalItemBudget))
-        } else {
-            modeBudget
-        }
-
-        if strategy.runtimeGear == .low && (kind == .quick || kind == .reminder) {
-            return min(retrievalBounded, 3)
-        }
-
-        return retrievalBounded
-    }
-
-    private static func evidenceBlock(_ evidence: [String]) -> String {
-        let compactEvidence = evidence
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        guard !compactEvidence.isEmpty else { return "- None." }
-        return bulletList(compactEvidence)
-    }
-
-    private static func bulletList(_ lines: [String]) -> String {
-        lines.map { "- \($0)" }.joined(separator: "\n")
+        BASPromptRetentionAdvisor.evidenceRetentionBudget(
+            for: semanticTaskKind(for: kind),
+            strategy: strategy.map(substrateAdaptiveStrategy)
+        )
     }
 
     private static func stateValue(_ value: String, fallback: String, limit: Int) -> String {
