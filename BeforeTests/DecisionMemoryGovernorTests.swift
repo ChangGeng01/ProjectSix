@@ -211,4 +211,56 @@ final class DecisionMemoryGovernorTests: XCTestCase {
         XCTAssertNotEqual(resolvedReminder.lifecycleState, .retired)
         XCTAssertEqual(resolvedReflection.lifecycleState, .retired)
     }
+
+    @MainActor
+    func testReconcileUsesStableCanonicalOrderingForExactTies() throws {
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: DecisionMemoryRecord.self,
+            DecisionMemoryCandidateRecord.self,
+            configurations: configuration
+        )
+        let context = container.mainContext
+        let timestamp = Date(timeIntervalSince1970: 1_744_156_800)
+
+        let zRecord = DecisionMemoryRecord(
+            id: "z-id",
+            type: .support,
+            topic: "support",
+            headline: "Z support",
+            value: "Z",
+            confidence: 0.8,
+            priority: 0.8,
+            source: .history,
+            lastConfirmedAt: timestamp,
+            decayPolicy: .medium,
+            retrievalTags: ["z"],
+            evidenceCount: 1,
+            observationCount: 1,
+            provenanceSummary: "z"
+        )
+        let aRecord = DecisionMemoryRecord(
+            id: "a-id",
+            type: .support,
+            topic: "support",
+            headline: "A support",
+            value: "A",
+            confidence: 0.8,
+            priority: 0.8,
+            source: .history,
+            lastConfirmedAt: timestamp,
+            decayPolicy: .medium,
+            retrievalTags: ["a"],
+            evidenceCount: 1,
+            observationCount: 1,
+            provenanceSummary: "a"
+        )
+        context.insert(zRecord)
+        context.insert(aRecord)
+        try context.save()
+
+        let records = DecisionMemoryGovernor.reconcile(drafts: [], in: context)
+
+        XCTAssertEqual(records.map(\.id), ["a-id", "z-id"])
+    }
 }

@@ -2,6 +2,19 @@ import Foundation
 import BASMemory
 
 extension DecisionMemorySource {
+    init(_ source: BASMemorySource) {
+        switch source {
+        case .history:
+            self = .history
+        case .reflection:
+            self = .reflection
+        case .reminder:
+            self = .reminder
+        case .pattern:
+            self = .pattern
+        }
+    }
+
     var basSource: BASMemorySource {
         switch self {
         case .history:
@@ -17,6 +30,19 @@ extension DecisionMemorySource {
 }
 
 extension DecisionMemoryDecayPolicy {
+    init(_ policy: BASMemoryDecayPolicy) {
+        switch policy {
+        case .stable:
+            self = .stable
+        case .slow:
+            self = .slow
+        case .medium:
+            self = .medium
+        case .fast:
+            self = .fast
+        }
+    }
+
     var basDecayPolicy: BASMemoryDecayPolicy {
         switch self {
         case .stable:
@@ -44,6 +70,12 @@ extension DecisionMemoryGovernanceDecision {
     }
 }
 
+extension DecisionMemoryType {
+    init(basRawValue: String) {
+        self = DecisionMemoryType(rawValue: basRawValue) ?? .semantic
+    }
+}
+
 extension DecisionMemoryLifecycleState {
     init(_ state: BASMemoryLifecycleState) {
         switch state {
@@ -54,6 +86,12 @@ extension DecisionMemoryLifecycleState {
         case .retired:
             self = .retired
         }
+    }
+}
+
+extension DecisionMemoryTier {
+    init(basRawValue: String?) {
+        self = DecisionMemoryTier(rawValue: basRawValue ?? "") ?? .warm
     }
 }
 

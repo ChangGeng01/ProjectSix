@@ -44,13 +44,22 @@ enum DecisionMemoryGovernor {
             )
         }
 
-        return fetchRecords(in: context)
-            .sorted { lhs, rhs in
-                if lhs.priority == rhs.priority {
-                    return lhs.lastConfirmedAt > rhs.lastConfirmedAt
-                }
-                return lhs.priority > rhs.priority
+        let resolvedRecords = fetchRecords(in: context)
+        let ordering = Dictionary(
+            uniqueKeysWithValues: BASMemoryPersistenceApplier
+                .canonicalGovernedOrder(for: resolvedRecords.map(\.basSnapshot))
+                .enumerated()
+                .map { ($0.element, $0.offset) }
+        )
+
+        return resolvedRecords.sorted { lhs, rhs in
+            let lhsIndex = ordering[lhs.id] ?? .max
+            let rhsIndex = ordering[rhs.id] ?? .max
+            if lhsIndex == rhsIndex {
+                return lhs.id < rhs.id
             }
+            return lhsIndex < rhsIndex
+        }
     }
 
     private static func fetchRecords(in context: ModelContext) -> [DecisionMemoryRecord] {
@@ -83,10 +92,11 @@ enum DecisionMemoryGovernor {
             recordsByID[recordPlan.id] = nil
         case .add, .update, .noop:
             guard let snapshot = recordPlan.snapshot else { return }
+            let fields = BASMemoryPersistenceApplier.governedFields(from: snapshot)
             if let existing = recordsByID[recordPlan.id] {
-                apply(recordSnapshot: snapshot, to: existing)
+                apply(recordFields: fields, to: existing)
             } else {
-                let record = makeRecord(from: snapshot)
+                let record = makeRecord(from: fields)
                 context.insert(record)
                 recordsByID[record.id] = record
             }
@@ -105,10 +115,11 @@ enum DecisionMemoryGovernor {
             candidatesByID[candidatePlan.id] = nil
         case .add, .update, .noop:
             guard let snapshot = candidatePlan.snapshot else { return }
+            let fields = BASMemoryPersistenceApplier.candidateFields(from: snapshot)
             if let existing = candidatesByID[candidatePlan.id] {
-                apply(candidateSnapshot: snapshot, to: existing)
+                apply(candidateFields: fields, to: existing)
             } else {
-                let candidate = makeCandidate(from: snapshot)
+                let candidate = makeCandidate(from: fields)
                 context.insert(candidate)
                 candidatesByID[candidate.id] = candidate
             }
@@ -116,102 +127,102 @@ enum DecisionMemoryGovernor {
     }
 
     private static func makeRecord(
-        from snapshot: BASExistingGovernedMemorySnapshot
+        from fields: BASGovernedMemoryStoredFields
     ) -> DecisionMemoryRecord {
         DecisionMemoryRecord(
-            id: snapshot.id,
-            type: DecisionMemoryType(rawValue: snapshot.typeID) ?? .semantic,
-            topic: snapshot.topic,
-            headline: snapshot.headline,
-            value: snapshot.value,
-            confidence: snapshot.confidence,
-            priority: snapshot.priority,
-            source: DecisionMemorySource(rawValue: snapshot.source.rawValue) ?? .history,
-            lastConfirmedAt: snapshot.lastConfirmedAt,
-            decayPolicy: DecisionMemoryDecayPolicy(rawValue: snapshot.decayPolicy.rawValue) ?? .medium,
-            retrievalTags: snapshot.retrievalTags,
-            evidenceCount: snapshot.evidenceCount,
-            observationCount: snapshot.observationCount,
-            provenanceSummary: snapshot.provenanceSummary,
-            lifecycleState: DecisionMemoryLifecycleState(snapshot.lifecycleState),
-            lastReviewedAt: snapshot.lastReviewedAt,
-            tier: DecisionMemoryTier(rawValue: snapshot.tierID) ?? .warm
+            id: fields.id,
+            type: DecisionMemoryType(basRawValue: fields.typeID),
+            topic: fields.topic,
+            headline: fields.headline,
+            value: fields.value,
+            confidence: fields.confidence,
+            priority: fields.priority,
+            source: DecisionMemorySource(fields.source),
+            lastConfirmedAt: fields.lastConfirmedAt,
+            decayPolicy: DecisionMemoryDecayPolicy(fields.decayPolicy),
+            retrievalTags: fields.retrievalTags,
+            evidenceCount: fields.evidenceCount,
+            observationCount: fields.observationCount,
+            provenanceSummary: fields.provenanceSummary,
+            lifecycleState: DecisionMemoryLifecycleState(fields.lifecycleState),
+            lastReviewedAt: fields.lastReviewedAt,
+            tier: DecisionMemoryTier(basRawValue: fields.tierID)
         )
     }
 
     private static func apply(
-        recordSnapshot: BASExistingGovernedMemorySnapshot,
+        recordFields: BASGovernedMemoryStoredFields,
         to record: DecisionMemoryRecord
     ) {
-        record.typeRaw = recordSnapshot.typeID
-        record.topic = recordSnapshot.topic
-        record.headline = recordSnapshot.headline
-        record.value = recordSnapshot.value
-        record.confidence = recordSnapshot.confidence
-        record.priority = recordSnapshot.priority
-        record.sourceRaw = recordSnapshot.source.rawValue
-        record.lastConfirmedAt = recordSnapshot.lastConfirmedAt
-        record.decayPolicyRaw = recordSnapshot.decayPolicy.rawValue
-        record.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(recordSnapshot.retrievalTags)
-        record.evidenceCount = recordSnapshot.evidenceCount
-        record.observationCount = recordSnapshot.observationCount
-        record.provenanceSummary = recordSnapshot.provenanceSummary
-        record.lifecycleStateRaw = DecisionMemoryLifecycleState(recordSnapshot.lifecycleState).rawValue
-        record.lastReviewedAt = recordSnapshot.lastReviewedAt
-        record.tierRaw = recordSnapshot.tierID
+        record.typeRaw = recordFields.typeID
+        record.topic = recordFields.topic
+        record.headline = recordFields.headline
+        record.value = recordFields.value
+        record.confidence = recordFields.confidence
+        record.priority = recordFields.priority
+        record.sourceRaw = recordFields.source.rawValue
+        record.lastConfirmedAt = recordFields.lastConfirmedAt
+        record.decayPolicyRaw = recordFields.decayPolicy.rawValue
+        record.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(recordFields.retrievalTags)
+        record.evidenceCount = recordFields.evidenceCount
+        record.observationCount = recordFields.observationCount
+        record.provenanceSummary = recordFields.provenanceSummary
+        record.lifecycleStateRaw = DecisionMemoryLifecycleState(recordFields.lifecycleState).rawValue
+        record.lastReviewedAt = recordFields.lastReviewedAt
+        record.tierRaw = recordFields.tierID
     }
 
     private static func makeCandidate(
-        from snapshot: BASExistingCandidateMemorySnapshot
+        from fields: BASCandidateMemoryStoredFields
     ) -> DecisionMemoryCandidateRecord {
         DecisionMemoryCandidateRecord(
-            id: snapshot.id,
-            type: DecisionMemoryType(rawValue: snapshot.typeID) ?? .semantic,
-            topic: snapshot.topic,
-            headline: snapshot.headline,
-            value: snapshot.value,
-            confidence: snapshot.confidence,
-            priority: snapshot.priority,
-            source: DecisionMemorySource(rawValue: snapshot.source.rawValue) ?? .history,
-            firstObservedAt: snapshot.firstObservedAt,
-            lastObservedAt: snapshot.lastObservedAt,
-            decayPolicy: DecisionMemoryDecayPolicy(rawValue: snapshot.decayPolicy.rawValue) ?? .medium,
-            retrievalTags: snapshot.retrievalTags,
-            evidenceCount: snapshot.evidenceCount,
-            confirmationCount: snapshot.confirmationCount,
-            lastObservationFingerprint: snapshot.lastObservationFingerprint,
-            status: DecisionMemoryCandidateStatus(snapshot.status),
-            provenanceSummary: snapshot.provenanceSummary,
-            lastWriteOperation: DecisionMemoryWriteOperation(snapshot.lastWriteOperation),
-            lastGovernanceDecision: DecisionMemoryGovernanceDecision(snapshot.lastGovernanceDecision),
-            governanceReason: snapshot.governanceReason,
-            tier: DecisionMemoryTier(rawValue: snapshot.tierID) ?? .warm
+            id: fields.id,
+            type: DecisionMemoryType(basRawValue: fields.typeID),
+            topic: fields.topic,
+            headline: fields.headline,
+            value: fields.value,
+            confidence: fields.confidence,
+            priority: fields.priority,
+            source: DecisionMemorySource(fields.source),
+            firstObservedAt: fields.firstObservedAt,
+            lastObservedAt: fields.lastObservedAt,
+            decayPolicy: DecisionMemoryDecayPolicy(fields.decayPolicy),
+            retrievalTags: fields.retrievalTags,
+            evidenceCount: fields.evidenceCount,
+            confirmationCount: fields.confirmationCount,
+            lastObservationFingerprint: fields.lastObservationFingerprint,
+            status: DecisionMemoryCandidateStatus(fields.status),
+            provenanceSummary: fields.provenanceSummary,
+            lastWriteOperation: DecisionMemoryWriteOperation(fields.lastWriteOperation),
+            lastGovernanceDecision: DecisionMemoryGovernanceDecision(fields.lastGovernanceDecision),
+            governanceReason: fields.governanceReason,
+            tier: DecisionMemoryTier(basRawValue: fields.tierID)
         )
     }
 
     private static func apply(
-        candidateSnapshot: BASExistingCandidateMemorySnapshot,
+        candidateFields: BASCandidateMemoryStoredFields,
         to candidate: DecisionMemoryCandidateRecord
     ) {
-        candidate.typeRaw = candidateSnapshot.typeID
-        candidate.topic = candidateSnapshot.topic
-        candidate.headline = candidateSnapshot.headline
-        candidate.value = candidateSnapshot.value
-        candidate.confidence = candidateSnapshot.confidence
-        candidate.priority = candidateSnapshot.priority
-        candidate.sourceRaw = candidateSnapshot.source.rawValue
-        candidate.firstObservedAt = candidateSnapshot.firstObservedAt
-        candidate.lastObservedAt = candidateSnapshot.lastObservedAt
-        candidate.decayPolicyRaw = candidateSnapshot.decayPolicy.rawValue
-        candidate.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(candidateSnapshot.retrievalTags)
-        candidate.evidenceCount = candidateSnapshot.evidenceCount
-        candidate.confirmationCount = candidateSnapshot.confirmationCount
-        candidate.lastObservationFingerprint = candidateSnapshot.lastObservationFingerprint
-        candidate.statusRaw = DecisionMemoryCandidateStatus(candidateSnapshot.status).rawValue
-        candidate.provenanceSummary = candidateSnapshot.provenanceSummary
-        candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation(candidateSnapshot.lastWriteOperation).rawValue
-        candidate.lastGovernanceDecisionRaw = DecisionMemoryGovernanceDecision(candidateSnapshot.lastGovernanceDecision).rawValue
-        candidate.governanceReason = candidateSnapshot.governanceReason
-        candidate.tierRaw = candidateSnapshot.tierID
+        candidate.typeRaw = candidateFields.typeID
+        candidate.topic = candidateFields.topic
+        candidate.headline = candidateFields.headline
+        candidate.value = candidateFields.value
+        candidate.confidence = candidateFields.confidence
+        candidate.priority = candidateFields.priority
+        candidate.sourceRaw = candidateFields.source.rawValue
+        candidate.firstObservedAt = candidateFields.firstObservedAt
+        candidate.lastObservedAt = candidateFields.lastObservedAt
+        candidate.decayPolicyRaw = candidateFields.decayPolicy.rawValue
+        candidate.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(candidateFields.retrievalTags)
+        candidate.evidenceCount = candidateFields.evidenceCount
+        candidate.confirmationCount = candidateFields.confirmationCount
+        candidate.lastObservationFingerprint = candidateFields.lastObservationFingerprint
+        candidate.statusRaw = DecisionMemoryCandidateStatus(candidateFields.status).rawValue
+        candidate.provenanceSummary = candidateFields.provenanceSummary
+        candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation(candidateFields.lastWriteOperation).rawValue
+        candidate.lastGovernanceDecisionRaw = DecisionMemoryGovernanceDecision(candidateFields.lastGovernanceDecision).rawValue
+        candidate.governanceReason = candidateFields.governanceReason
+        candidate.tierRaw = candidateFields.tierID
     }
 }
