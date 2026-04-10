@@ -1,5 +1,7 @@
 import XCTest
 import SwiftData
+import BASAppleAdapters
+import BASMemory
 @testable import Before
 
 final class DecisionEvolutionEngineTests: XCTestCase {
@@ -21,26 +23,32 @@ final class DecisionEvolutionEngineTests: XCTestCase {
             loadedAt: now
         )
 
-        let first = DecisionEvolutionEngine.recordCheckpoint(
-            mode: .quick,
-            source: .launch,
-            brainState: brainState,
-            context: context,
-            now: now
-        )
-        let second = DecisionEvolutionEngine.recordCheckpoint(
-            mode: .quick,
-            source: .launch,
-            brainState: brainState,
-            context: context,
-            now: now.addingTimeInterval(60)
-        )
+        let first: BASAppleEvolutionCheckpointWriteResult<DecisionEvolutionCheckpoint> =
+            BASAppleEvolutionCheckpointWriter.record(
+                input: BASEvolutionCheckpointPlanner.checkpointInput(
+                    modeName: DecisionMode.quick.rawValue,
+                    sourceID: BrainStateUpdateSource.launch.rawValue,
+                    brainState: brainState
+                ),
+                in: context,
+                createdAt: now
+            )
+        let second: BASAppleEvolutionCheckpointWriteResult<DecisionEvolutionCheckpoint> =
+            BASAppleEvolutionCheckpointWriter.record(
+                input: BASEvolutionCheckpointPlanner.checkpointInput(
+                    modeName: DecisionMode.quick.rawValue,
+                    sourceID: BrainStateUpdateSource.launch.rawValue,
+                    brainState: brainState
+                ),
+                in: context,
+                createdAt: now.addingTimeInterval(60)
+            )
 
         let checkpoints = try context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())
         XCTAssertEqual(checkpoints.count, 1)
-        XCTAssertEqual(first.checkpointCount, 1)
-        XCTAssertEqual(second.checkpointCount, 1)
-        XCTAssertTrue(second.rollbackReady)
+        XCTAssertEqual(first.currentState.checkpointCount, 1)
+        XCTAssertEqual(second.currentState.checkpointCount, 1)
+        XCTAssertTrue(second.currentState.rollbackReady)
     }
 
     @MainActor
@@ -96,18 +104,21 @@ final class DecisionEvolutionEngineTests: XCTestCase {
             loadedAt: .now
         )
 
-        let evolutionState = DecisionEvolutionEngine.recordCheckpoint(
-            mode: .mirror,
-            source: .sceneActive,
-            brainState: brainState,
-            context: context,
-            now: .now
-        )
+        let result: BASAppleEvolutionCheckpointWriteResult<DecisionEvolutionCheckpoint> =
+            BASAppleEvolutionCheckpointWriter.record(
+                input: BASEvolutionCheckpointPlanner.checkpointInput(
+                    modeName: DecisionMode.mirror.rawValue,
+                    sourceID: BrainStateUpdateSource.sceneActive.rawValue,
+                    brainState: brainState
+                ),
+                in: context,
+                createdAt: .now
+            )
 
         let checkpoints = try context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())
         XCTAssertEqual(checkpoints.count, 1)
         XCTAssertEqual(checkpoints.first?.approvalState, .reviewSuggested)
-        XCTAssertEqual(evolutionState.pendingReviewCount, 1)
-        XCTAssertTrue(evolutionState.recentDiffSummary.contains(where: { $0.contains("first local cognition checkpoint") }))
+        XCTAssertEqual(result.currentState.pendingReviewCount, 1)
+        XCTAssertTrue(result.currentState.recentDiffSummary.contains(where: { $0.contains("first local cognition checkpoint") }))
     }
 }

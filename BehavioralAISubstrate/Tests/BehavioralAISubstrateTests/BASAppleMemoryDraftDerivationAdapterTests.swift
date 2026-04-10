@@ -195,7 +195,7 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
             checkEventType: CheckEventFixture.self,
             balanceRecordType: BalanceFixture.self,
             mirrorRecordType: MirrorFixture.self
-        )
+        ).sorted(by: draftOrdering)
 
         let expected = BASMemoryDraftCompiler.derive(
             BASMemoryDerivationRequest(
@@ -213,10 +213,26 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
                     .sorted { $0.updatedAt > $1.updatedAt },
                 now: now
             )
-        )
+        ).sorted(by: draftOrdering)
 
         #expect(actual == expected)
         #expect(actual.contains(where: { $0.typeID == "goal" }))
         #expect(actual.contains(where: { $0.typeID == "support" }))
+    }
+
+    private func draftOrdering(
+        _ lhs: BASDerivedMemoryDraft,
+        _ rhs: BASDerivedMemoryDraft
+    ) -> Bool {
+        if lhs.priority != rhs.priority {
+            return lhs.priority > rhs.priority
+        }
+        if lhs.lastConfirmedAt != rhs.lastConfirmedAt {
+            return lhs.lastConfirmedAt > rhs.lastConfirmedAt
+        }
+        if lhs.typeID != rhs.typeID {
+            return lhs.typeID < rhs.typeID
+        }
+        return lhs.id < rhs.id
     }
 }

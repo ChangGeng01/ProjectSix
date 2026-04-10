@@ -31,14 +31,32 @@ enum CurrentBrainStateLoader {
             retrievalMode: retrievalMode,
             now: now
         )
-        var brainState = artifact.bootstrapped.brainState
-        brainState.evolutionState = DecisionEvolutionEngine.recordCheckpoint(
-            mode: mode,
-            source: source,
-            brainState: brainState,
-            context: context,
-            now: now
+        let commit: BASAppleCurrentBrainCommitWriteResult<
+            BrainStateUpdate,
+            DecisionEvolutionCheckpoint
+        > = BASAppleCurrentBrainCommitter.commit(
+            modeName: mode.rawValue,
+            sourceID: source.rawValue,
+            brainState: artifact.bootstrapped.brainState,
+            persistenceInput: artifact.persistenceInput,
+            in: context,
+            createdAt: now,
+            checkpointLimit: BeforePolicy.RuntimeState.evolutionCheckpointLimit,
+            checkpointRetentionInterval: BeforePolicy.RuntimeState.evolutionCheckpointRetentionInterval,
+            onCheckpointSaveError: { error in
+                PersistenceIssueRecorder.record(
+                    error: error,
+                    operation: "recording evolution checkpoints"
+                )
+            },
+            onUpdateSaveError: { error in
+                PersistenceIssueRecorder.record(
+                    error: error,
+                    operation: "persisting current brain updates"
+                )
+            }
         )
+        let brainState = commit.brainState
 
         let current = CurrentBrainState(
             source: source,
@@ -54,21 +72,6 @@ enum CurrentBrainStateLoader {
             sourceIntentEnvelope: envelope,
             loadedAt: now
         )
-
-        _ = BASAppleCurrentBrainUpdateWriter.persist(
-            BASCurrentBrainPersistenceApplier.updateFields(
-                createdAt: now,
-                source: source.rawValue,
-                input: artifact.persistenceInput
-            ),
-            in: context,
-            onSaveError: { error in
-                PersistenceIssueRecorder.record(
-                    error: error,
-                    operation: "persisting current brain updates"
-                )
-            }
-        ) as BASAppleCurrentBrainUpdateWriteResult<BrainStateUpdate>
         return current
     }
 }
