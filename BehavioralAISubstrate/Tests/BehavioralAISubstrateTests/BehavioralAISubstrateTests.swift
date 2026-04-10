@@ -72,6 +72,23 @@ struct BehavioralAISubstrateTests {
         #expect(result.blockedReason == "candidate under baseline")
     }
 
+    @Test("evaluation coverage builder tracks regression drift and evolution signals")
+    func evaluationCoverageBuilderTracksSignals() {
+        let section = BASEvaluationCoverageBuilder.build(
+            input: BASEvaluationCoverageInput(
+                regressionHarnessPresent: true,
+                calibrationKindCount: 2,
+                calibrationAlertKindCount: 3,
+                evolutionKindCount: 1
+            )
+        )
+
+        #expect(section.items.count == 3)
+        #expect(section.items.first(where: { $0.id == "evaluation.regression" })?.status == .ready)
+        #expect(section.items.first(where: { $0.id == "evaluation.drift" })?.evidence == ["Calibration alerts 3"])
+        #expect(section.items.first(where: { $0.id == "evaluation.safe_evolution" })?.status == .ready)
+    }
+
     @Test("apple handoff summary keeps typed metadata")
     func appleHandoffSummaryKeepsTypedMetadata() {
         let envelope = BASAppleHandoffEnvelope(

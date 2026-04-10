@@ -1,5 +1,6 @@
 import Foundation
 import BASAdmin
+import BASEvaluation
 
 enum DecisionCapabilityCoverageBuilder {
     static func build(
@@ -368,31 +369,26 @@ enum DecisionCapabilityCoverageBuilder {
         hasEvolution: Bool,
         hasCalibration: Bool
     ) -> BASCapabilitySection {
-        BASCapabilitySection(
+        let section = BASEvaluationCoverageBuilder.build(
+            input: BASEvaluationCoverageInput(
+                regressionHarnessPresent: true,
+                calibrationKindCount: hasCalibration ? brain.calibrationStatusByKind.count : 0,
+                calibrationAlertKindCount: brain.calibrationAlertCountsByKind.count,
+                evolutionKindCount: hasEvolution ? brain.evolutionCheckpointCountByKind.count : 0
+            )
+        )
+
+        return BASCapabilitySection(
             domain: .evaluation,
-            items: [
+            items: section.items.map {
                 BASCapabilityItem(
-                    id: "evaluation.regression",
-                    title: "Regression harness",
-                    summary: "Keep replay, runtime, policy, and UI behavior behind quality gates and soak tests.",
-                    status: .ready,
-                    evidence: ["Gate scripts and regression suites are present in the repo."]
-                ),
-                BASCapabilityItem(
-                    id: "evaluation.drift",
-                    title: "Drift detection",
-                    summary: "Track calibration drift, route instability, and retrieval pollution over time.",
-                    status: hasCalibration ? .ready : .partial,
-                    evidence: ["Calibration alerts \(brain.calibrationAlertCountsByKind.count)"]
-                ),
-                BASCapabilityItem(
-                    id: "evaluation.safe_evolution",
-                    title: "Safe evolution checkpoints",
-                    summary: "Let the substrate evolve through checkpoints, rollback readiness, and pending review counts.",
-                    status: hasEvolution ? .ready : .partial,
-                    evidence: ["Evolution kinds \(brain.evolutionCheckpointCountByKind.count)"]
+                    id: $0.id,
+                    title: $0.title,
+                    summary: $0.summary,
+                    status: capabilityStatus(for: $0.status),
+                    evidence: $0.evidence
                 )
-            ]
+            }
         )
     }
 
@@ -431,5 +427,16 @@ enum DecisionCapabilityCoverageBuilder {
         let array = Array(values)
         guard !array.isEmpty else { return 0 }
         return array.reduce(0, +) / Double(array.count)
+    }
+
+    private static func capabilityStatus(for status: BASEvaluationCapabilityStatus) -> BASCapabilityStatus {
+        switch status {
+        case .ready:
+            .ready
+        case .partial:
+            .partial
+        case .missing:
+            .missing
+        }
     }
 }

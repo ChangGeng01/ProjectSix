@@ -48,6 +48,7 @@ struct DecisionCapabilityCoverageBuilderTests {
         #expect(report.sections.first(where: { $0.domain == .context })?.items.contains(where: { $0.id == "context.compaction" }) == true)
         #expect(report.sections.first(where: { $0.domain == .memory })?.items.contains(where: { $0.id == "memory.brain_bootstrap" }) == true)
         #expect(report.sections.first(where: { $0.domain == .orchestration })?.items.contains(where: { $0.id == "orchestration.watch_handoff" }) == true)
+        #expect(report.sections.first(where: { $0.domain == .evaluation })?.items.contains(where: { $0.id == "evaluation.safe_evolution" }) == true)
         #expect(report.sections.first(where: { $0.domain == .delivery })?.items.contains(where: { $0.id == "delivery.self_portrait" }) == true)
         #expect(report.overallScore > 0)
         #expect(bridgeSnapshot.capabilityCoverage == report)
