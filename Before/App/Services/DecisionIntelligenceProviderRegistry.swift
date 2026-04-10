@@ -1,76 +1,12 @@
 import Foundation
 import BASRuntimeCore
 
-enum DecisionModelCapability: String, CaseIterable, Codable, Sendable {
-    case shortDialogue = "short_dialogue"
-    case structuredOutput = "structured_output"
-    case lightToolUse = "light_tool_use"
-    case deepReflection = "deep_reflection"
-    case retrievalGrounding = "retrieval_grounding"
-    case multilingualChinese = "multilingual_chinese"
-    case lowLatency = "low_latency"
-    case lowMemory = "low_memory"
-}
-
-enum DecisionModelLatencyClass: String, Codable, Equatable, Sendable {
-    case low
-    case medium
-    case high
-}
-
-enum DecisionModelMemoryClass: String, Codable, Equatable, Sendable {
-    case low
-    case medium
-    case high
-}
-
-struct DecisionModelCapabilityProfile: Equatable, Sendable {
-    let modelID: String
-    let strengths: [DecisionModelCapability]
-    let weaknesses: [DecisionModelCapability]
-    let latencyClass: DecisionModelLatencyClass
-    let memoryClass: DecisionModelMemoryClass
-    let supportedResponseLanguages: [DecisionAdaptiveResponseLanguage]
-    let supportsThinking: Bool
-    let supportsStructuredOutput: Bool
-    let supportsToolUse: Bool
-    let bestFor: [DecisionIntelligenceTraceKind]
-
-    func supports(_ capability: DecisionModelCapability) -> Bool {
-        strengths.contains(capability) && !weaknesses.contains(capability)
-    }
-
-    func supports(responseLanguage: DecisionAdaptiveResponseLanguage) -> Bool {
-        if supportedResponseLanguages.contains(responseLanguage) {
-            return true
-        }
-
-        if responseLanguage == .mixed {
-            return supportedResponseLanguages.contains(.english) &&
-                supportedResponseLanguages.contains(.chinese)
-        }
-
-        return false
-    }
-
-    static func generic(
-        modelID: String,
-        bestFor: [DecisionIntelligenceTraceKind] = []
-    ) -> DecisionModelCapabilityProfile {
-        DecisionModelCapabilityProfile(
-            modelID: modelID,
-            strengths: [.structuredOutput],
-            weaknesses: [],
-            latencyClass: .medium,
-            memoryClass: .medium,
-            supportedResponseLanguages: [.english],
-            supportsThinking: false,
-            supportsStructuredOutput: true,
-            supportsToolUse: false,
-            bestFor: bestFor
-        )
-    }
-}
+typealias DecisionModelCapability = BASProviderCapability
+typealias DecisionModelLatencyClass = BASProviderLatencyClass
+typealias DecisionModelMemoryClass = BASProviderMemoryClass
+typealias DecisionModelCapabilityProfile = BASProviderCapabilityProfile
+typealias DecisionOpenModelDescriptor = BASOpenModelDescriptor
+typealias DecisionModelProviderTrack = BASProviderTrack
 
 protocol DecisionIntelligenceProviding: Sendable {
     var kind: DecisionModelProviderKind { get }
@@ -152,52 +88,22 @@ protocol DecisionOpenModelAdapting: Sendable {
     ) async -> ReminderSelectionCandidate?
 }
 
-struct DecisionOpenModelDescriptor: Equatable, Sendable {
-    let stableID: String
-    let family: String
-    let version: String
-    let title: String
-    let detail: String
-    let taskAffinities: [DecisionIntelligenceTraceKind: Int]
-    let capabilityProfile: DecisionModelCapabilityProfile
-
-    init(
-        stableID: String,
-        family: String,
-        version: String,
-        title: String,
-        detail: String,
-        taskAffinities: [DecisionIntelligenceTraceKind: Int],
-        capabilityProfile: DecisionModelCapabilityProfile? = nil
-    ) {
-        self.stableID = stableID
-        self.family = family
-        self.version = version
-        self.title = title
-        self.detail = detail
-        self.taskAffinities = taskAffinities
-        self.capabilityProfile = capabilityProfile ?? .generic(
-            modelID: stableID,
-            bestFor: Array(taskAffinities.keys)
-        )
-    }
-}
-
-enum DecisionModelProviderTrack: String, Equatable, Sendable {
-    case builtInOpenModel
-    case builtInSystem
-    case testingOnly
-    case deterministic
-}
-
 struct DecisionModelProviderDescriptor: Equatable, Sendable {
     let kind: DecisionModelProviderKind
-    let title: String
-    let detail: String
-    let track: DecisionModelProviderTrack
-    let openModel: DecisionOpenModelDescriptor?
-    let taskAffinities: [DecisionIntelligenceTraceKind: Int]
-    let capabilityProfile: DecisionModelCapabilityProfile
+    private let basDescriptor: BASProviderDescriptor
+
+    var title: String { basDescriptor.title }
+    var detail: String { basDescriptor.detail }
+    var track: DecisionModelProviderTrack { basDescriptor.track }
+    var openModel: DecisionOpenModelDescriptor? { basDescriptor.openModel }
+    var capabilityProfile: DecisionModelCapabilityProfile { basDescriptor.capabilityProfile }
+    var taskAffinities: [DecisionIntelligenceTraceKind: Int] {
+        Dictionary(
+            uniqueKeysWithValues: basDescriptor.taskAffinities.map { entry in
+                (DecisionIntelligenceTaskRouter.hostTraceKind(entry.key), entry.value)
+            }
+        )
+    }
 
     init(
         kind: DecisionModelProviderKind,
@@ -209,20 +115,34 @@ struct DecisionModelProviderDescriptor: Equatable, Sendable {
         capabilityProfile: DecisionModelCapabilityProfile? = nil
     ) {
         self.kind = kind
-        self.title = title
-        self.detail = detail
-        self.track = track
-        self.openModel = openModel
-        self.taskAffinities = taskAffinities
-        self.capabilityProfile = capabilityProfile ?? openModel?.capabilityProfile ?? .generic(
-            modelID: kind.rawValue,
-            bestFor: Array(taskAffinities.keys)
+        self.basDescriptor = BASProviderDescriptor(
+            providerID: kind.rawValue,
+            title: title,
+            detail: detail,
+            track: track,
+            openModel: openModel,
+            taskAffinities: Dictionary(
+                uniqueKeysWithValues: taskAffinities.map { entry in
+                    (DecisionIntelligenceTaskRouter.substrateTraceKind(entry.key), entry.value)
+                }
+            ),
+            capabilityProfile: capabilityProfile ?? openModel?.capabilityProfile ?? .generic(
+                modelID: kind.rawValue,
+                bestFor: taskAffinities.keys.map(DecisionIntelligenceTaskRouter.substrateTraceKind)
+            )
         )
     }
 
-    func affinity(for task: DecisionIntelligenceTraceKind) -> Int {
-        taskAffinities[task] ?? 0
+    init(kind: DecisionModelProviderKind, basDescriptor: BASProviderDescriptor) {
+        self.kind = kind
+        self.basDescriptor = basDescriptor
     }
+
+    func affinity(for task: DecisionIntelligenceTraceKind) -> Int {
+        basDescriptor.affinity(for: DecisionIntelligenceTaskRouter.substrateTraceKind(task))
+    }
+
+    var substrateDescriptor: BASProviderDescriptor { basDescriptor }
 }
 
 struct OpenModelDecisionIntelligenceProvider: DecisionIntelligenceProviding {
@@ -647,7 +567,11 @@ final class DecisionIntelligenceProviderRegistry: @unchecked Sendable {
                 detail: adapter.descriptor.detail,
                 track: .builtInOpenModel,
                 openModel: adapter.descriptor,
-                taskAffinities: adapter.descriptor.taskAffinities,
+                taskAffinities: Dictionary(
+                    uniqueKeysWithValues: adapter.descriptor.taskAffinities.map { entry in
+                        (DecisionIntelligenceTaskRouter.hostTraceKind(entry.key), entry.value)
+                    }
+                ),
                 capabilityProfile: adapter.descriptor.capabilityProfile
             )
         )
@@ -662,98 +586,20 @@ final class DecisionIntelligenceProviderRegistry: @unchecked Sendable {
     }
 
     private static func defaultDescriptorsByKind() -> [DecisionModelProviderKind: DecisionModelProviderDescriptor] {
-        let gemmaDescriptor = GemmaOpenModelAdapter().descriptor
-        let reservedOpenModelDescriptor = ReservedOpenModelAdapter().descriptor
-
-        return [
-            .gemmaE4B: DecisionModelProviderDescriptor(
-                kind: .gemmaE4B,
-                title: gemmaDescriptor.title,
-                detail: gemmaDescriptor.detail,
-                track: .builtInOpenModel,
-                openModel: gemmaDescriptor,
-                taskAffinities: gemmaDescriptor.taskAffinities,
-                capabilityProfile: gemmaDescriptor.capabilityProfile
-            ),
-            .foundationModels: DecisionModelProviderDescriptor(
-                kind: .foundationModels,
-                title: "Apple Foundation Model",
-                detail: "Built-in system-managed language provider.",
-                track: .builtInSystem,
-                openModel: nil,
-                taskAffinities: defaultTaskAffinities(for: .foundationModels),
-                capabilityProfile: DecisionModelCapabilityProfile(
-                    modelID: "apple/foundation-model-default",
-                    strengths: [
-                        .shortDialogue,
-                        .structuredOutput,
-                        .lightToolUse,
-                        .lowLatency,
-                        .lowMemory,
-                        .multilingualChinese
-                    ],
-                    weaknesses: [],
-                    latencyClass: .low,
-                    memoryClass: .low,
-                    supportedResponseLanguages: [.english, .chinese, .mixed],
-                    supportsThinking: false,
-                    supportsStructuredOutput: true,
-                    supportsToolUse: true,
-                    bestFor: [.quick, .reminder]
-                )
-            ),
-            .openModel: DecisionModelProviderDescriptor(
-                kind: .openModel,
-                title: reservedOpenModelDescriptor.title,
-                detail: reservedOpenModelDescriptor.detail,
-                track: .builtInOpenModel,
-                openModel: reservedOpenModelDescriptor,
-                taskAffinities: reservedOpenModelDescriptor.taskAffinities,
-                capabilityProfile: reservedOpenModelDescriptor.capabilityProfile
-            )
-        ]
+        BASReferenceProviderCatalog.defaultDescriptorsByID().reduce(into: [:]) { partialResult, entry in
+            guard let kind = DecisionModelProviderKind(rawValue: entry.key) else { return }
+            partialResult[kind] = DecisionModelProviderDescriptor(kind: kind, basDescriptor: entry.value)
+        }
     }
 
     private static func defaultTaskAffinities(
         for kind: DecisionModelProviderKind
     ) -> [DecisionIntelligenceTraceKind: Int] {
-        switch kind {
-        case .gemmaE4B:
-            [
-                .quick: 70,
-                .balance: 94,
-                .mirror: 100,
-                .reminder: 84
-            ]
-        case .openModel:
-            [
-                .quick: 88,
-                .balance: 90,
-                .mirror: 92,
-                .reminder: 86
-            ]
-        case .foundationModels:
-            [
-                .quick: 100,
-                .balance: 78,
-                .mirror: 72,
-                .reminder: 92
-            ]
-        case .testingStub:
-            [
-                .quick: 100,
-                .balance: 100,
-                .mirror: 100,
-                .reminder: 100
-            ]
-        case .template:
-            [
-                .quick: 0,
-                .balance: 0,
-                .mirror: 0,
-                .reminder: 0
-            ]
-        }
+        Dictionary(
+            uniqueKeysWithValues: BASReferenceProviderCatalog.defaultTaskAffinities(providerID: kind.rawValue).map { entry in
+                (DecisionIntelligenceTaskRouter.hostTraceKind(entry.key), entry.value)
+            }
+        )
     }
 }
 
@@ -892,82 +738,19 @@ enum DecisionIntelligenceTaskRouter {
     static func substrateProviderDescriptor(
         _ descriptor: DecisionModelProviderDescriptor
     ) -> BASProviderDescriptor {
-        BASProviderDescriptor(
-            providerID: descriptor.kind.rawValue,
-            taskAffinities: Dictionary(
-                uniqueKeysWithValues: descriptor.taskAffinities.map { entry in
-                    (substrateTraceKind(entry.key), entry.value)
-                }
-            ),
-            capabilityProfile: BASProviderCapabilityProfile(
-                strengths: descriptor.capabilityProfile.strengths.map(substrateCapability),
-                weaknesses: descriptor.capabilityProfile.weaknesses.map(substrateCapability),
-                latencyClass: substrateLatencyClass(descriptor.capabilityProfile.latencyClass),
-                memoryClass: substrateMemoryClass(descriptor.capabilityProfile.memoryClass),
-                supportedResponseLanguages: descriptor.capabilityProfile.supportedResponseLanguages.map { language in
-                    switch language {
-                    case .english:
-                        .english
-                    case .chinese:
-                        .chinese
-                    case .mixed:
-                        .mixed
-                    }
-                },
-                supportsThinking: descriptor.capabilityProfile.supportsThinking,
-                supportsStructuredOutput: descriptor.capabilityProfile.supportsStructuredOutput,
-                supportsToolUse: descriptor.capabilityProfile.supportsToolUse,
-                bestFor: descriptor.capabilityProfile.bestFor.map(substrateTraceKind)
-            )
-        )
+        descriptor.substrateDescriptor
     }
 
-    private static func substrateCapability(
-        _ capability: DecisionModelCapability
-    ) -> BASProviderCapability {
-        switch capability {
-        case .shortDialogue:
-            .shortDialogue
-        case .structuredOutput:
-            .structuredOutput
-        case .lightToolUse:
-            .lightToolUse
-        case .deepReflection:
-            .deepReflection
-        case .retrievalGrounding:
-            .retrievalGrounding
-        case .multilingualChinese:
-            .multilingualChinese
-        case .lowLatency:
-            .lowLatency
-        case .lowMemory:
-            .lowMemory
-        }
-    }
-
-    private static func substrateLatencyClass(
-        _ latencyClass: DecisionModelLatencyClass
-    ) -> BASProviderLatencyClass {
-        switch latencyClass {
-        case .low:
-            .low
-        case .medium:
-            .medium
-        case .high:
-            .high
-        }
-    }
-
-    private static func substrateMemoryClass(
-        _ memoryClass: DecisionModelMemoryClass
-    ) -> BASProviderMemoryClass {
-        switch memoryClass {
-        case .low:
-            .low
-        case .medium:
-            .medium
-        case .high:
-            .high
+    static func hostTraceKind(_ task: BASAdaptiveTraceKind) -> DecisionIntelligenceTraceKind {
+        switch task {
+        case .quick:
+            .quick
+        case .balance:
+            .balance
+        case .mirror:
+            .mirror
+        case .reminder:
+            .reminder
         }
     }
 }

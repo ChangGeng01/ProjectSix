@@ -24,6 +24,7 @@ public enum BASProviderMemoryClass: String, Codable, Equatable, Sendable {
 }
 
 public struct BASProviderCapabilityProfile: Codable, Equatable, Sendable {
+    public var modelID: String
     public var strengths: [BASProviderCapability]
     public var weaknesses: [BASProviderCapability]
     public var latencyClass: BASProviderLatencyClass
@@ -35,6 +36,7 @@ public struct BASProviderCapabilityProfile: Codable, Equatable, Sendable {
     public var bestFor: [BASAdaptiveTraceKind]
 
     public init(
+        modelID: String = "",
         strengths: [BASProviderCapability],
         weaknesses: [BASProviderCapability] = [],
         latencyClass: BASProviderLatencyClass,
@@ -45,6 +47,7 @@ public struct BASProviderCapabilityProfile: Codable, Equatable, Sendable {
         supportsToolUse: Bool,
         bestFor: [BASAdaptiveTraceKind]
     ) {
+        self.modelID = modelID
         self.strengths = strengths
         self.weaknesses = weaknesses
         self.latencyClass = latencyClass
@@ -72,20 +75,88 @@ public struct BASProviderCapabilityProfile: Codable, Equatable, Sendable {
 
         return false
     }
+
+    public static func generic(
+        modelID: String,
+        bestFor: [BASAdaptiveTraceKind] = []
+    ) -> BASProviderCapabilityProfile {
+        BASProviderCapabilityProfile(
+            modelID: modelID,
+            strengths: [.structuredOutput],
+            weaknesses: [],
+            latencyClass: .medium,
+            memoryClass: .medium,
+            supportedResponseLanguages: [.english],
+            supportsThinking: false,
+            supportsStructuredOutput: true,
+            supportsToolUse: false,
+            bestFor: bestFor
+        )
+    }
+}
+
+public enum BASProviderTrack: String, Codable, Equatable, Sendable {
+    case builtInOpenModel
+    case builtInSystem
+    case testingOnly
+    case deterministic
+}
+
+public struct BASOpenModelDescriptor: Codable, Equatable, Sendable {
+    public var stableID: String
+    public var family: String
+    public var version: String
+    public var title: String
+    public var detail: String
+    public var taskAffinities: [BASAdaptiveTraceKind: Int]
+    public var capabilityProfile: BASProviderCapabilityProfile
+
+    public init(
+        stableID: String,
+        family: String,
+        version: String,
+        title: String,
+        detail: String,
+        taskAffinities: [BASAdaptiveTraceKind: Int],
+        capabilityProfile: BASProviderCapabilityProfile? = nil
+    ) {
+        self.stableID = stableID
+        self.family = family
+        self.version = version
+        self.title = title
+        self.detail = detail
+        self.taskAffinities = taskAffinities
+        self.capabilityProfile = capabilityProfile ?? .generic(
+            modelID: stableID,
+            bestFor: Array(taskAffinities.keys)
+        )
+    }
 }
 
 public struct BASProviderDescriptor: Codable, Equatable, Sendable, Identifiable {
     public var id: String { providerID }
     public var providerID: String
+    public var title: String
+    public var detail: String
+    public var track: BASProviderTrack
+    public var openModel: BASOpenModelDescriptor?
     public var taskAffinities: [BASAdaptiveTraceKind: Int]
     public var capabilityProfile: BASProviderCapabilityProfile
 
     public init(
         providerID: String,
+        title: String? = nil,
+        detail: String? = nil,
+        track: BASProviderTrack = .testingOnly,
+        openModel: BASOpenModelDescriptor? = nil,
         taskAffinities: [BASAdaptiveTraceKind: Int],
         capabilityProfile: BASProviderCapabilityProfile
     ) {
         self.providerID = providerID
+        self.title = title ?? openModel?.title ?? providerID
+        self.detail = detail ?? openModel?.detail ?? ""
+        self.track = track
+        self.openModel = openModel
         self.taskAffinities = taskAffinities
         self.capabilityProfile = capabilityProfile
     }
