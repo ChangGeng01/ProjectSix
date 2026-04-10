@@ -10,6 +10,14 @@ struct BASReferencePromptModesCoreTests {
         case reminder
     }
 
+    @Test("reference prompt kind carries package-owned adaptive trace mapping")
+    func referencePromptKindCarriesAdaptiveTraceMapping() {
+        #expect(BASReferencePromptKind.quick.adaptiveTraceKind == .quick)
+        #expect(BASReferencePromptKind.balance.adaptiveTraceKind == .balance)
+        #expect(BASReferencePromptKind.mirror.adaptiveTraceKind == .mirror)
+        #expect(BASReferencePromptKind.reminder.adaptiveTraceKind == .reminder)
+    }
+
     @Test("quick envelope compiles structured state and secondary actions")
     func quickEnvelopeCompilesStructuredState() {
         let envelope = BASReferencePromptBuilder.quickEnvelope(

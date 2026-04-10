@@ -59,7 +59,7 @@ enum DecisionIntelligenceAdmissionController {
         DecisionIntelligenceAdmissionDecision(
             BASExecutionGovernance.admissionDecision(
                 for: BASAdmissionRequest(
-                    kind: envelope.kind.basTraceKind,
+                    kind: envelope.kind.adaptiveTraceKind,
                     budget: envelope.budget.promptPressureSnapshot,
                     frontstageState: envelope.frontstageState.basSummary,
                     reminderCandidateCount: reminderCandidateCount,
@@ -88,21 +88,6 @@ private extension DecisionFrontstageState {
             anchorHeadlineCount: anchorHeadlines.count,
             suppressionHintCount: suppressionHints.count
         )
-    }
-}
-
-private extension DecisionIntelligencePromptContract.TaskKind {
-    var basTraceKind: BASAdaptiveTraceKind {
-        switch self {
-        case .quick:
-            .quick
-        case .balance:
-            .balance
-        case .mirror:
-            .mirror
-        case .reminder:
-            .reminder
-        }
     }
 }
 

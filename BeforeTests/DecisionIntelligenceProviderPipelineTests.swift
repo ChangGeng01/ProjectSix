@@ -206,6 +206,46 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
     }
 
     @MainActor
+    func testTemplatePinnedQuickRefinementRecordsTemplatePinnedTelemetryAndTrace() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            preference: .template,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertNil(refined)
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertEqual(snapshot.outcomeCount[.templatePinned], 1)
+
+        guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
+            return XCTFail("Expected a template-pinned quick trace.")
+        }
+
+        XCTAssertEqual(latestTrace.kind, .quick)
+        XCTAssertEqual(latestTrace.activeProvider, nil)
+        XCTAssertEqual(latestTrace.attemptedProviders, [.template])
+        XCTAssertTrue(latestTrace.detail.contains("Template mode is pinned"))
+    }
+
+    @MainActor
     func testRefinementTraceCarriesContextLifecycleState() async {
         let base = BalanceBoardResult(
             headline: "Base headline",
@@ -329,6 +369,28 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         )
 
         XCTAssertEqual(selected?.content, "Last")
+    }
+
+    @MainActor
+    func testTemplatePinnedReminderSelectionRecordsTelemetryWithoutTrace() async {
+        let selected = await DecisionIntelligenceProviderPipeline.pickReminder(
+            from: [
+                ReminderSelectionCandidate(id: UUID(), content: "First"),
+                ReminderSelectionCandidate(id: UUID(), content: "Last")
+            ],
+            scenario: .buy,
+            prompt: "Rough day",
+            mode: .quick,
+            preference: .template,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertNil(selected)
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertEqual(snapshot.outcomeCount[.templatePinned], 1)
+        XCTAssertTrue(DecisionIntelligenceDebugStore.shared.traces.isEmpty)
     }
 
     @MainActor

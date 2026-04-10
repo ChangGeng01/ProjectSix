@@ -93,10 +93,59 @@ public struct BASProviderRequestNoResult: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASProviderRequestAttemptEvent<Provider: Sendable, Result: Sendable, Assessment: Sendable>: Sendable {
+    public var planSummary: BASProviderRequestPlanSummary
+    public var provider: Provider
+    public var result: Result
+    public var assessment: Assessment
+    public var attemptedProviderIDs: [String]
+
+    public init(
+        planSummary: BASProviderRequestPlanSummary,
+        provider: Provider,
+        result: Result,
+        assessment: Assessment,
+        attemptedProviderIDs: [String]
+    ) {
+        self.planSummary = planSummary
+        self.provider = provider
+        self.result = result
+        self.assessment = assessment
+        self.attemptedProviderIDs = attemptedProviderIDs
+    }
+}
+
+public struct BASProviderRequestMissEvent<Provider: Sendable>: Sendable {
+    public var planSummary: BASProviderRequestPlanSummary
+    public var provider: Provider
+    public var attemptedProviderIDs: [String]
+
+    public init(
+        planSummary: BASProviderRequestPlanSummary,
+        provider: Provider,
+        attemptedProviderIDs: [String]
+    ) {
+        self.planSummary = planSummary
+        self.provider = provider
+        self.attemptedProviderIDs = attemptedProviderIDs
+    }
+}
+
 public enum BASProviderRequestOutcome<Result: Sendable, Assessment: Sendable>: Sendable {
     case templatePinned
     case admissionSkipped
     case resolved(BASProviderRequestResolution<Result, Assessment>)
+    case noResult(BASProviderRequestNoResult)
+}
+
+public enum BASProviderRequestEvent<Provider: Sendable, Result: Sendable, Assessment: Sendable>: Sendable {
+    case templatePinned
+    case admissionSkipped
+    case cachedRejected(BASProviderRequestAttemptEvent<Provider, Result, Assessment>)
+    case cacheHit(BASProviderRequestAttemptEvent<Provider, Result, Assessment>)
+    case providerRejected(BASProviderRequestAttemptEvent<Provider, Result, Assessment>)
+    case providerSuccess(BASProviderRequestAttemptEvent<Provider, Result, Assessment>)
+    case providerMiss(BASProviderRequestMissEvent<Provider>)
     case noResult(BASProviderRequestNoResult)
 }
 
@@ -302,6 +351,128 @@ public enum BASProviderAttemptExecutor {
 }
 
 public enum BASProviderRequestRunner {
+    public static func executeObserved<Provider: Sendable, Result: Sendable, Assessment: Sendable>(
+        task: BASAdaptiveTraceKind,
+        preferredProviderID: String,
+        allowFallbacks: Bool,
+        deterministicProviderID: String,
+        preferenceOrderings: [BASProviderPreferenceOrdering],
+        suspendedProviderIDs: Set<String> = [],
+        strategy: BASAdaptiveTaskStrategy? = nil,
+        descriptors: [BASProviderDescriptor],
+        testingOverrideProvider: Provider? = nil,
+        providerID: (Provider) -> String,
+        providerForID: (String) -> Provider?,
+        isAvailable: (Provider) -> Bool,
+        admissionAllowed: Bool,
+        loadCachedResult: (Provider) async -> Result?,
+        assessCachedResult: (Result) -> BASProviderExecutionVerdict<Assessment>,
+        quarantineCachedResult: (Provider) async -> Void,
+        invokeProvider: (Provider) async -> Result?,
+        assessProviderResult: (Result) -> BASProviderExecutionVerdict<Assessment>,
+        observe: ((BASProviderRequestEvent<Provider, Result, Assessment>) async -> Void)? = nil
+    ) async -> BASProviderRequestOutcome<Result, Assessment> {
+        guard preferredProviderID != deterministicProviderID else {
+            await observe?(.templatePinned)
+            return .templatePinned
+        }
+
+        guard admissionAllowed else {
+            await observe?(.admissionSkipped)
+            return .admissionSkipped
+        }
+
+        let outcome = await execute(
+            task: task,
+            preferredProviderID: preferredProviderID,
+            allowFallbacks: allowFallbacks,
+            deterministicProviderID: deterministicProviderID,
+            preferenceOrderings: preferenceOrderings,
+            suspendedProviderIDs: suspendedProviderIDs,
+            strategy: strategy,
+            descriptors: descriptors,
+            testingOverrideProvider: testingOverrideProvider,
+            providerID: providerID,
+            providerForID: providerForID,
+            isAvailable: isAvailable,
+            admissionAllowed: true,
+            loadCachedResult: loadCachedResult,
+            assessCachedResult: assessCachedResult,
+            quarantineCachedResult: quarantineCachedResult,
+            invokeProvider: invokeProvider,
+            assessProviderResult: assessProviderResult,
+            onCachedRejected: { planSummary, provider, result, assessment, attemptedProviderIDs in
+                await observe?(
+                    .cachedRejected(
+                        BASProviderRequestAttemptEvent(
+                            planSummary: planSummary,
+                            provider: provider,
+                            result: result,
+                            assessment: assessment,
+                            attemptedProviderIDs: attemptedProviderIDs
+                        )
+                    )
+                )
+            },
+            onCacheHit: { planSummary, provider, result, assessment, attemptedProviderIDs in
+                await observe?(
+                    .cacheHit(
+                        BASProviderRequestAttemptEvent(
+                            planSummary: planSummary,
+                            provider: provider,
+                            result: result,
+                            assessment: assessment,
+                            attemptedProviderIDs: attemptedProviderIDs
+                        )
+                    )
+                )
+            },
+            onProviderRejected: { planSummary, provider, result, assessment, attemptedProviderIDs in
+                await observe?(
+                    .providerRejected(
+                        BASProviderRequestAttemptEvent(
+                            planSummary: planSummary,
+                            provider: provider,
+                            result: result,
+                            assessment: assessment,
+                            attemptedProviderIDs: attemptedProviderIDs
+                        )
+                    )
+                )
+            },
+            onProviderSuccess: { planSummary, provider, result, assessment, attemptedProviderIDs in
+                await observe?(
+                    .providerSuccess(
+                        BASProviderRequestAttemptEvent(
+                            planSummary: planSummary,
+                            provider: provider,
+                            result: result,
+                            assessment: assessment,
+                            attemptedProviderIDs: attemptedProviderIDs
+                        )
+                    )
+                )
+            },
+            onProviderMiss: { planSummary, provider, attemptedProviderIDs in
+                await observe?(
+                    .providerMiss(
+                        BASProviderRequestMissEvent(
+                            planSummary: planSummary,
+                            provider: provider,
+                            attemptedProviderIDs: attemptedProviderIDs
+                        )
+                    )
+                )
+            }
+        )
+
+        if case .noResult(let noResult) = outcome {
+            await observe?(.noResult(noResult))
+        }
+
+        return outcome
+    }
+
     public static func execute<Provider, Result: Sendable, Assessment: Sendable>(
         task: BASAdaptiveTraceKind,
         preferredProviderID: String,

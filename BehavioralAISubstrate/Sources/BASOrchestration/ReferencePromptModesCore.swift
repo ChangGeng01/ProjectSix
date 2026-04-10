@@ -3,6 +3,39 @@ import BASMemory
 import BASPolicy
 import BASRuntimeCore
 
+public enum BASReferencePromptKind: String, Codable, Sendable, Equatable {
+    case quick
+    case balance
+    case mirror
+    case reminder
+
+    public var adaptiveTraceKind: BASAdaptiveTraceKind {
+        switch self {
+        case .quick:
+            .quick
+        case .balance:
+            .balance
+        case .mirror:
+            .mirror
+        case .reminder:
+            .reminder
+        }
+    }
+}
+
+public struct BASReferenceReminderSelectionEnvelope<Candidate: Equatable & Sendable>: Equatable, Sendable {
+    public var prompt: BASPromptEnvelope<BASReferencePromptKind, BASFrontstageState>
+    public var candidates: [Candidate]
+
+    public init(
+        prompt: BASPromptEnvelope<BASReferencePromptKind, BASFrontstageState>,
+        candidates: [Candidate]
+    ) {
+        self.prompt = prompt
+        self.candidates = candidates
+    }
+}
+
 public enum BASReferencePromptLimits {
     public static let quickCurrentPerspective = 140
     public static let quickAfterPerspective = 160

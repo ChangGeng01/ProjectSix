@@ -7,15 +7,45 @@ import Testing
 
 @Suite("BASApple Provider Release Adapter")
 struct BASAppleProviderReleaseAdapterTests {
+    @Test("adapter owns preview formatting and referenced facts")
+    func adapterOwnsPreviewFormattingAndReferencedFacts() {
+        #expect(
+            BASAppleProviderReleaseAdapter.quickPreview(
+                currentPerspective: "Pause now.",
+                afterPerspective: "Tomorrow will feel lighter."
+            ) == "Current: Pause now.\nAfter: Tomorrow will feel lighter."
+        )
+        #expect(
+            BASAppleProviderReleaseAdapter.balancePreview(
+                headline: "Protect sleep",
+                focusDescription: "This adds one more obligation.",
+                nextAction: "Wait until tomorrow."
+            ) == "Headline: Protect sleep\nFocus: This adds one more obligation.\nNext: Wait until tomorrow."
+        )
+        #expect(
+            BASAppleProviderReleaseAdapter.mirrorPreview(
+                headline: "This is the same pattern",
+                coreTension: "Hope versus depletion",
+                nextAction: "Name the cost first."
+            ) == "Headline: This is the same pattern\nTension: Hope versus depletion\nNext: Name the cost first."
+        )
+        #expect(
+            BASAppleProviderReleaseAdapter.reminderPreview(content: "Hold this for tomorrow.") == "Hold this for tomorrow."
+        )
+        #expect(
+            BASAppleProviderReleaseAdapter.referencedFacts(from: blockedGuidanceBrainState()) == [
+                "current_goal": "Protect tomorrow's judgment."
+            ]
+        )
+    }
+
     @Test("adapter verdict keeps provider release decisions package-owned")
     func adapterVerdictKeepsReleaseDecisionPackageOwned() {
         let verdict = BASAppleProviderReleaseAdapter.verdict(
-            from: BASAppleProviderReleaseInput(
-                traceKindRawValue: "quick",
-                outputPreview: "Current: pause and let the urge settle.\nAfter: come back tomorrow.",
-                kernelSnapshot: kernelWithoutTruthState(),
-                brainState: blockedGuidanceBrainState()
-            )
+            traceKindRawValue: "quick",
+            outputPreview: "Current: pause and let the urge settle.\nAfter: come back tomorrow.",
+            kernelSnapshot: kernelWithoutTruthState(),
+            brainState: blockedGuidanceBrainState()
         )
 
         switch verdict {

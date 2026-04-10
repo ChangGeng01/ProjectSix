@@ -22,25 +22,13 @@ enum DecisionIntelligencePromptContract {
         static let evidenceSnippet = BASReferencePromptLimits.evidenceSnippet
     }
 
-    enum TaskKind: Equatable, Sendable {
-        case quick
-        case balance
-        case mirror
-        case reminder
-    }
-
     typealias ContextBudget = BASPromptBudget
     typealias PromptLayers = BASPromptLayers
     typealias PromptBlockKind = BASSemanticPromptBlockKind
     typealias PromptBlockRetention = BASSemanticPromptBlockRetention
     typealias PromptBlock = BASSemanticPromptBlock
     typealias PromptAssembly = BASSemanticContextAssembly
-    typealias PromptEnvelope = BASPromptEnvelope<TaskKind, DecisionFrontstageState>
-
-    struct ReminderSelectionEnvelope: Equatable, Sendable {
-        let prompt: PromptEnvelope
-        let candidates: [ReminderSelectionCandidate]
-    }
+    typealias PromptEnvelope = BASPromptEnvelope<BASReferencePromptKind, DecisionFrontstageState>
 
     static func sanitized(_ value: String, fallback: String, limit: Int) -> String {
         BASPromptTextSanitizer.sanitized(value, fallback: fallback, limit: limit)
@@ -54,9 +42,8 @@ enum DecisionIntelligencePromptContract {
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
     ) -> PromptEnvelope {
-        BASReferencePromptBuilder.quickEnvelope(
-            BASQuickRefinementPromptRequest(
-                kind: TaskKind.quick,
+        BASAppleReferencePromptBuilder.quickEnvelope(
+            BASAppleQuickRefinementEnvelopeRequest(
                 modeTitle: DecisionMode.quick.shortTitle,
                 scenarioTitle: input.scenario.title,
                 motivationTitle: input.motivation.title,
@@ -69,9 +56,49 @@ enum DecisionIntelligencePromptContract {
                 primaryActionTitle: base.primaryAction.title,
                 secondaryActionTitles: base.secondaryActions.map(\.title),
                 providerIdentifier: strategy?.preferredProvider.rawValue,
-                strategy: strategy.map(substrateAdaptiveStrategy),
-                contextLifecycleSnapshot: contextState.map(promptContextLifecycleSnapshot),
-                neuralSnapshot: neuralState.map(promptNeuralSnapshot),
+                strategy: strategy.map {
+                    BASAppleAdaptiveStrategyRawInput(
+                        kindRawValue: $0.kind.rawValue,
+                        entropyRawValue: $0.entropy.rawValue,
+                        runtimeGearRawValue: $0.runtimeGear.rawValue,
+                        contextBudget: $0.contextBudget,
+                        outputCharacterBudget: $0.outputCharacterBudget,
+                        timeBudgetMs: $0.timeBudgetMs,
+                        toolCallBudget: $0.toolCallBudget,
+                        retrievalItemBudget: $0.retrievalItemBudget,
+                        retrievalModeRawValue: $0.retrievalMode.rawValue,
+                        thinkingModeRawValue: $0.thinkingMode.rawValue,
+                        outputModeRawValue: $0.outputMode.rawValue,
+                        toneRawValue: $0.tone.rawValue,
+                        actionSpace: $0.actionSpace,
+                        responseLanguageRawValue: $0.responseLanguage.rawValue,
+                        allowsModelInvocation: $0.allowsModelInvocation
+                    )
+                },
+                contextLifecycleInput: contextState.map {
+                    BASApplePromptLifecycleInput(
+                        rebuiltSession: $0.rebuiltSession,
+                        generation: $0.generation,
+                        anchorFields: $0.anchorFields.map(\.rawValue),
+                        activeFields: $0.activeFields.map(\.rawValue),
+                        staleFields: $0.staleFields.map(\.rawValue),
+                        anchorTitles: $0.anchorFields.map(\.title)
+                    )
+                },
+                neuralInput: neuralState.map {
+                    BASApplePromptNeuralInput(
+                        dominantActivations: $0.dominantActivations.map {
+                            BASApplePromptActivationInput(
+                                signal: $0.signal.rawValue,
+                                displayTitle: $0.signal.title
+                            )
+                        },
+                        candidateActions: $0.candidateActions.map {
+                            BASApplePromptActionCandidateInput(route: $0.route.rawValue)
+                        },
+                        suppressedBehaviors: $0.suppressedBehaviors
+                    )
+                },
                 brainState: brainState
             )
         )
@@ -103,9 +130,8 @@ enum DecisionIntelligencePromptContract {
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
     ) -> PromptEnvelope {
-        BASReferencePromptBuilder.balanceEnvelope(
-            BASBalanceRefinementPromptRequest(
-                kind: TaskKind.balance,
+        BASAppleReferencePromptBuilder.balanceEnvelope(
+            BASAppleBalanceRefinementEnvelopeRequest(
                 modeTitle: DecisionMode.balance.shortTitle,
                 prompt: input.prompt,
                 desire: input.desire,
@@ -118,9 +144,49 @@ enum DecisionIntelligencePromptContract {
                 focusDescription: base.focusDescription,
                 nextAction: base.nextAction,
                 providerIdentifier: strategy?.preferredProvider.rawValue,
-                strategy: strategy.map(substrateAdaptiveStrategy),
-                contextLifecycleSnapshot: contextState.map(promptContextLifecycleSnapshot),
-                neuralSnapshot: neuralState.map(promptNeuralSnapshot),
+                strategy: strategy.map {
+                    BASAppleAdaptiveStrategyRawInput(
+                        kindRawValue: $0.kind.rawValue,
+                        entropyRawValue: $0.entropy.rawValue,
+                        runtimeGearRawValue: $0.runtimeGear.rawValue,
+                        contextBudget: $0.contextBudget,
+                        outputCharacterBudget: $0.outputCharacterBudget,
+                        timeBudgetMs: $0.timeBudgetMs,
+                        toolCallBudget: $0.toolCallBudget,
+                        retrievalItemBudget: $0.retrievalItemBudget,
+                        retrievalModeRawValue: $0.retrievalMode.rawValue,
+                        thinkingModeRawValue: $0.thinkingMode.rawValue,
+                        outputModeRawValue: $0.outputMode.rawValue,
+                        toneRawValue: $0.tone.rawValue,
+                        actionSpace: $0.actionSpace,
+                        responseLanguageRawValue: $0.responseLanguage.rawValue,
+                        allowsModelInvocation: $0.allowsModelInvocation
+                    )
+                },
+                contextLifecycleInput: contextState.map {
+                    BASApplePromptLifecycleInput(
+                        rebuiltSession: $0.rebuiltSession,
+                        generation: $0.generation,
+                        anchorFields: $0.anchorFields.map(\.rawValue),
+                        activeFields: $0.activeFields.map(\.rawValue),
+                        staleFields: $0.staleFields.map(\.rawValue),
+                        anchorTitles: $0.anchorFields.map(\.title)
+                    )
+                },
+                neuralInput: neuralState.map {
+                    BASApplePromptNeuralInput(
+                        dominantActivations: $0.dominantActivations.map {
+                            BASApplePromptActivationInput(
+                                signal: $0.signal.rawValue,
+                                displayTitle: $0.signal.title
+                            )
+                        },
+                        candidateActions: $0.candidateActions.map {
+                            BASApplePromptActionCandidateInput(route: $0.route.rawValue)
+                        },
+                        suppressedBehaviors: $0.suppressedBehaviors
+                    )
+                },
                 brainState: brainState
             )
         )
@@ -152,9 +218,8 @@ enum DecisionIntelligencePromptContract {
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
     ) -> PromptEnvelope {
-        BASReferencePromptBuilder.mirrorEnvelope(
-            BASMirrorRefinementPromptRequest(
-                kind: TaskKind.mirror,
+        BASAppleReferencePromptBuilder.mirrorEnvelope(
+            BASAppleMirrorRefinementEnvelopeRequest(
                 modeTitle: DecisionMode.mirror.shortTitle,
                 prompt: input.prompt,
                 emotion: input.emotion,
@@ -167,9 +232,49 @@ enum DecisionIntelligencePromptContract {
                 nextActionTitle: base.nextActionTitle,
                 nextAction: base.nextAction,
                 providerIdentifier: strategy?.preferredProvider.rawValue,
-                strategy: strategy.map(substrateAdaptiveStrategy),
-                contextLifecycleSnapshot: contextState.map(promptContextLifecycleSnapshot),
-                neuralSnapshot: neuralState.map(promptNeuralSnapshot),
+                strategy: strategy.map {
+                    BASAppleAdaptiveStrategyRawInput(
+                        kindRawValue: $0.kind.rawValue,
+                        entropyRawValue: $0.entropy.rawValue,
+                        runtimeGearRawValue: $0.runtimeGear.rawValue,
+                        contextBudget: $0.contextBudget,
+                        outputCharacterBudget: $0.outputCharacterBudget,
+                        timeBudgetMs: $0.timeBudgetMs,
+                        toolCallBudget: $0.toolCallBudget,
+                        retrievalItemBudget: $0.retrievalItemBudget,
+                        retrievalModeRawValue: $0.retrievalMode.rawValue,
+                        thinkingModeRawValue: $0.thinkingMode.rawValue,
+                        outputModeRawValue: $0.outputMode.rawValue,
+                        toneRawValue: $0.tone.rawValue,
+                        actionSpace: $0.actionSpace,
+                        responseLanguageRawValue: $0.responseLanguage.rawValue,
+                        allowsModelInvocation: $0.allowsModelInvocation
+                    )
+                },
+                contextLifecycleInput: contextState.map {
+                    BASApplePromptLifecycleInput(
+                        rebuiltSession: $0.rebuiltSession,
+                        generation: $0.generation,
+                        anchorFields: $0.anchorFields.map(\.rawValue),
+                        activeFields: $0.activeFields.map(\.rawValue),
+                        staleFields: $0.staleFields.map(\.rawValue),
+                        anchorTitles: $0.anchorFields.map(\.title)
+                    )
+                },
+                neuralInput: neuralState.map {
+                    BASApplePromptNeuralInput(
+                        dominantActivations: $0.dominantActivations.map {
+                            BASApplePromptActivationInput(
+                                signal: $0.signal.rawValue,
+                                displayTitle: $0.signal.title
+                            )
+                        },
+                        candidateActions: $0.candidateActions.map {
+                            BASApplePromptActionCandidateInput(route: $0.route.rawValue)
+                        },
+                        suppressedBehaviors: $0.suppressedBehaviors
+                    )
+                },
                 brainState: brainState
             )
         )
@@ -199,24 +304,35 @@ enum DecisionIntelligencePromptContract {
         prompt: String,
         mode: DecisionMode?,
         strategy: DecisionAdaptiveTaskStrategy? = nil
-    ) -> ReminderSelectionEnvelope {
-        let clippedCandidates = Array(candidates.prefix(BASReferencePromptLimits.reminderCandidates))
-        let modeTitle = mode?.shortTitle ?? "Not specified"
-
-        let envelope = BASReferencePromptBuilder.reminderEnvelope(
-            BASReminderSelectionPromptRequest(
-                kind: TaskKind.reminder,
-                modeTitle: modeTitle,
-                scenarioTitle: scenario.title,
-                prompt: prompt,
-                candidateTexts: clippedCandidates.map(\.content),
-                reminderSurfaceMode: mode.map(substrateMode(from:)),
-                providerIdentifier: strategy?.preferredProvider.rawValue,
-                strategy: strategy.map(substrateAdaptiveStrategy)
-            )
+    ) -> BASReferenceReminderSelectionEnvelope<ReminderSelectionCandidate> {
+        BASAppleReferencePromptBuilder.reminderEnvelope(
+            candidates: candidates,
+            candidateText: \.content,
+            modeTitle: mode?.shortTitle ?? "Not specified",
+            scenarioTitle: scenario.title,
+            prompt: prompt,
+            reminderSurfaceModeRawValue: mode?.rawValue,
+            providerIdentifier: strategy?.preferredProvider.rawValue,
+            strategy: strategy.map {
+                BASAppleAdaptiveStrategyRawInput(
+                    kindRawValue: $0.kind.rawValue,
+                    entropyRawValue: $0.entropy.rawValue,
+                    runtimeGearRawValue: $0.runtimeGear.rawValue,
+                    contextBudget: $0.contextBudget,
+                    outputCharacterBudget: $0.outputCharacterBudget,
+                    timeBudgetMs: $0.timeBudgetMs,
+                    toolCallBudget: $0.toolCallBudget,
+                    retrievalItemBudget: $0.retrievalItemBudget,
+                    retrievalModeRawValue: $0.retrievalMode.rawValue,
+                    thinkingModeRawValue: $0.thinkingMode.rawValue,
+                    outputModeRawValue: $0.outputMode.rawValue,
+                    toneRawValue: $0.tone.rawValue,
+                    actionSpace: $0.actionSpace,
+                    responseLanguageRawValue: $0.responseLanguage.rawValue,
+                    allowsModelInvocation: $0.allowsModelInvocation
+                )
+            }
         )
-
-        return ReminderSelectionEnvelope(prompt: envelope, candidates: clippedCandidates)
     }
 
     static func reminderSelectionPrompt(
@@ -263,63 +379,5 @@ enum DecisionIntelligencePromptContract {
 
     static func stablePrefixFingerprint(for envelope: PromptEnvelope) -> String {
         BASPromptFingerprinting.stablePrefixFingerprint(for: envelope)
-    }
-
-    private static func promptContextLifecycleSnapshot(
-        _ contextState: DecisionContextPreparedState
-    ) -> BASPromptContextLifecycleSnapshot {
-        BASApplePromptInputAdapter.lifecycleSnapshot(
-            from: BASApplePromptLifecycleInput(
-                rebuiltSession: contextState.rebuiltSession,
-                generation: contextState.generation,
-                anchorFields: contextState.anchorFields.map(\.rawValue),
-                activeFields: contextState.activeFields.map(\.rawValue),
-                staleFields: contextState.staleFields.map(\.rawValue),
-                anchorTitles: contextState.anchorFields.map(\.title)
-            )
-        )
-    }
-
-    private static func promptNeuralSnapshot(
-        _ neuralState: DecisionNeuralState
-    ) -> BASPromptNeuralSnapshot {
-        BASApplePromptInputAdapter.neuralSnapshot(
-            from: BASApplePromptNeuralInput(
-                dominantActivations: neuralState.dominantActivations.map {
-                    BASApplePromptActivationInput(
-                        signal: $0.signal.rawValue,
-                        displayTitle: $0.signal.title
-                    )
-                },
-                candidateActions: neuralState.candidateActions.map {
-                    BASApplePromptActionCandidateInput(route: $0.route.rawValue)
-                },
-                suppressedBehaviors: neuralState.suppressedBehaviors
-            )
-        )
-    }
-
-    private static func substrateAdaptiveStrategy(
-        _ strategy: DecisionAdaptiveTaskStrategy
-    ) -> BASAdaptiveTaskStrategy {
-        BASApplePromptInputAdapter.adaptiveStrategy(
-            from: BASAppleAdaptiveStrategyInput(
-                kind: BASAdaptiveTraceKind(rawValue: strategy.kind.rawValue) ?? .quick,
-                entropy: BASTaskEntropyClass(rawValue: strategy.entropy.rawValue) ?? .medium,
-                runtimeGear: BASRuntimeGear(rawValue: strategy.runtimeGear.rawValue) ?? .balanced,
-                contextBudget: strategy.contextBudget,
-                outputCharacterBudget: strategy.outputCharacterBudget,
-                timeBudgetMs: strategy.timeBudgetMs,
-                toolCallBudget: strategy.toolCallBudget,
-                retrievalItemBudget: strategy.retrievalItemBudget,
-                retrievalMode: BASRetrievalMode(rawValue: strategy.retrievalMode.rawValue) ?? .adaptive,
-                thinkingMode: BASThinkingMode(rawValue: strategy.thinkingMode.rawValue) ?? .gated,
-                outputMode: BASOutputMode(rawValue: strategy.outputMode.rawValue) ?? .guidedShort,
-                tone: BASToneProfile(rawValue: strategy.tone.rawValue) ?? .neutral,
-                actionSpace: strategy.actionSpace,
-                responseLanguage: BASAdaptiveResponseLanguage(rawValue: strategy.responseLanguage.rawValue) ?? .english,
-                allowsModelInvocation: strategy.allowsModelInvocation
-            )
-        )
     }
 }

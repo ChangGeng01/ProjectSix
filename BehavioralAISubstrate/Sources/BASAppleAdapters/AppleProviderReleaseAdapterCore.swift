@@ -30,6 +30,60 @@ public struct BASAppleProviderReleaseInput: Sendable, Equatable {
 }
 
 public enum BASAppleProviderReleaseAdapter {
+    public static func quickPreview(
+        currentPerspective: String,
+        afterPerspective: String
+    ) -> String {
+        "Current: \(currentPerspective)\nAfter: \(afterPerspective)"
+    }
+
+    public static func balancePreview(
+        headline: String,
+        focusDescription: String,
+        nextAction: String
+    ) -> String {
+        "Headline: \(headline)\nFocus: \(focusDescription)\nNext: \(nextAction)"
+    }
+
+    public static func mirrorPreview(
+        headline: String,
+        coreTension: String,
+        nextAction: String
+    ) -> String {
+        "Headline: \(headline)\nTension: \(coreTension)\nNext: \(nextAction)"
+    }
+
+    public static func reminderPreview(
+        content: String
+    ) -> String {
+        content
+    }
+
+    public static func referencedFacts(
+        from brainState: BASDecisionBrainState?
+    ) -> [String: String] {
+        brainState?.activeGoals.first.map { ["current_goal": $0] } ?? [:]
+    }
+
+    public static func verdict(
+        traceKindRawValue: String,
+        outputPreview: String,
+        kernelSnapshot: BASCognitionKernelSnapshot,
+        brainState: BASDecisionBrainState?,
+        reminderSurfaceModeRawValue: String? = nil
+    ) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment> {
+        verdict(
+            from: BASAppleProviderReleaseInput(
+                traceKindRawValue: traceKindRawValue,
+                outputPreview: outputPreview,
+                kernelSnapshot: kernelSnapshot,
+                brainState: brainState,
+                reminderSurfaceModeRawValue: reminderSurfaceModeRawValue,
+                referencedFacts: referencedFacts(from: brainState)
+            )
+        )
+    }
+
     public static func verdict(
         from input: BASAppleProviderReleaseInput
     ) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment> {
