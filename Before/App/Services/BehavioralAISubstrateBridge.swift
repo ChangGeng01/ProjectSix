@@ -285,65 +285,12 @@ enum BehavioralAISubstrateBridge {
                 limit: 12
             ).map { ($0.id, $0.score) }
         )
-
-        return BASBrainProjectionCompiler.compile(
-            BASBrainProjectionCompileRequest(
-                records: projection.records.map { record in
-                    BASProjectionGovernedMemoryInput(
-                        id: record.id,
-                        typeID: record.type.rawValue,
-                        headline: record.headline,
-                        confidence: record.confidence,
-                        sourceID: record.source.rawValue,
-                        lastConfirmedAt: record.lastConfirmedAt,
-                        lifecycleStateID: record.lifecycleState.rawValue,
-                        tierID: record.tier.rawValue,
-                        provenanceSummary: record.provenanceSummary
-                    )
-                },
-                candidates: projection.candidates.map { candidate in
-                    BASProjectionCandidateInput(
-                        id: candidate.id,
-                        typeID: candidate.type.rawValue,
-                        headline: candidate.headline,
-                        confidence: candidate.confidence,
-                        priority: candidate.priority,
-                        sourceID: candidate.source.rawValue,
-                        retrievalTags: candidate.retrievalTags,
-                        lastObservedAt: candidate.lastObservedAt,
-                        decayPolicyID: candidate.decayPolicy.rawValue,
-                        statusID: candidate.status.rawValue,
-                        governanceDecisionID: candidate.lastGovernanceDecision.rawValue,
-                        evidenceCount: candidate.evidenceCount,
-                        provenanceSummary: candidate.provenanceSummary
-                    )
-                },
-                events: projection.checkEvents.map { event in
-                    BASProjectionEventInput(
-                        id: event.id.uuidString,
-                        note: event.note,
-                        fallbackContent: event.scenario.title,
-                        createdAt: event.createdAt,
-                        scenarioID: event.scenario.rawValue,
-                        actionID: event.finalAction.rawValue,
-                        reflectionOutcomeID: event.reflectionOutcome?.rawValue,
-                        entrySourceID: event.entrySource.rawValue
-                    )
-                },
-                embeddingScoresByID: embeddingScores,
-                governanceSnapshot: BASProjectionGovernanceInput(
-                    totalRecordCount: projection.governanceSnapshot.totalRecordCount,
-                    totalCandidateCount: projection.governanceSnapshot.totalCandidateCount,
-                    pendingCandidateCount: projection.governanceSnapshot.pendingCandidateCount,
-                    promotedCandidateCount: projection.governanceSnapshot.promotedCandidateCount,
-                    deferredCandidateCount: projection.governanceSnapshot.deferredCandidateCount,
-                    admittedCandidateCount: projection.governanceSnapshot.admittedCandidateCount
-                ),
-                taskGraphHint: taskGraph.map(taskGraphHint(from:)),
-                activeTemplateIDs: activeTemplateIDs,
-                failureGuardIDs: failureGuardIDs
-            )
-        )
+        var compiled = projection.baseProjection
+        compiled.embeddingScoresByID = embeddingScores
+        compiled.taskGraphHint = taskGraph.map(taskGraphHint(from:))
+        compiled.activeTemplateIDs = activeTemplateIDs
+        compiled.failureGuardIDs = failureGuardIDs
+        return compiled
     }
 
     private static func taskKind(from kind: DecisionIntelligenceTraceKind?) -> BASTaskKind {

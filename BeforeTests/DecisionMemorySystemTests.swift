@@ -376,9 +376,9 @@ final class DecisionMemorySystemTests: XCTestCase {
         XCTAssertEqual(projection.governanceSnapshot.promotedCandidateCount, 18)
         XCTAssertEqual(projection.governanceSnapshot.admittedCandidateCount, 22)
         XCTAssertEqual(projection.governanceSnapshot.deferredCandidateCount, 22)
-        XCTAssertLessThanOrEqual(projection.records.count, DecisionMemorySystem.projectionRecordLimit)
-        XCTAssertLessThanOrEqual(projection.candidates.count, DecisionMemorySystem.projectionCandidateLimit)
-        XCTAssertTrue(projection.candidates.allSatisfy { $0.status == .pending })
+        XCTAssertLessThanOrEqual(projection.diagnostics.recordCount, DecisionMemorySystem.projectionRecordLimit)
+        XCTAssertLessThanOrEqual(projection.diagnostics.candidateCount, DecisionMemorySystem.projectionCandidateLimit)
+        XCTAssertTrue(projection.diagnostics.allCandidatesPending)
     }
 
     @MainActor
