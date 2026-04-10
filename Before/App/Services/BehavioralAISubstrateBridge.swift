@@ -106,10 +106,10 @@ enum BehavioralAISubstrateBridge {
             from: BASAppleConsoleSnapshotSourceInput(
                 generatedAt: export.generatedAt,
                 flightDeckCompilation: flightDeckCompilation,
-                activeProviderTitle: export.summary.activeProvider.title,
+                activeProviderTitle: export.runtimeSnapshot.runtimeStatus.active.title,
                 runtimeGearID: runtimeContext.gear.rawValue,
-                totalRequests: export.summary.totalRequests,
-                totalProviderAttempts: export.summary.totalProviderAttempts,
+                totalRequests: export.basRuntimeInspectionSummary.totalRequests,
+                totalProviderAttempts: export.basRuntimeInspectionSummary.totalProviderAttempts,
                 roleName: roleProfile?.name,
                 boundaryModeID: currentBrainState?.boundaryPolicy.mode.rawValue,
                 calibrationStatusID: currentBrainState?.calibrationState.status.rawValue,

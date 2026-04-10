@@ -21,7 +21,7 @@ enum DecisionCapabilityCoverageBuilder {
         let flightDeck = export.flightDeck
 
         return BASReferenceCapabilityCoverageInput(
-            activeProviderTitle: export.summary.activeProvider.title,
+            activeProviderTitle: export.runtimeSnapshot.runtimeStatus.active.title,
             runtimeSummary: export.basRuntimeInspectionSummary,
             brainSummary: export.basBrainSummary,
             isPureLocalClosedLoop: flightDeck.isPureLocalClosedLoop,
