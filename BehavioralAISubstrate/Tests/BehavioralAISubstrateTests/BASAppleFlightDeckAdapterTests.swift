@@ -194,11 +194,28 @@ struct BASAppleFlightDeckAdapterTests {
                 brainSummary: brainSummary
             )
         )
+        let builtCompilation = BASAppleFlightDeckBuilder.build(
+            from: BASAppleFlightDeckSourceInput(
+                generatedAt: compilation.generatedAt,
+                registeredProviderIDs: ["foundationModels", "template"],
+                activeProviderID: "foundationModels",
+                activeProviderTitle: "Foundation Models",
+                backendTitle: "Core ML",
+                activeTaskGraphTaskCount: 2,
+                hardwareAccelerationActive: true,
+                runningOnSimulator: false,
+                onDeviceIntelligenceEnabled: true,
+                fallbackTitle: "Template",
+                inspectionSummary: inspectionSummary,
+                brainSummary: brainSummary
+            )
+        )
 
         #expect(compilation.isPureLocalClosedLoop)
         #expect(compilation.overallHealthID == "strong")
         #expect(compilation.layerReports.count == 8)
         #expect(compilation.layerReports.first(where: { $0.layerID == "runtime" })?.healthID == "strong")
         #expect(compilation.layerReports.first(where: { $0.layerID == "observability" }) != nil)
+        #expect(builtCompilation == compilation)
     }
 }

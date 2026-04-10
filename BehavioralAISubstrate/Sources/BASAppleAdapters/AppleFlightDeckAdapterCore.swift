@@ -1,5 +1,50 @@
 import Foundation
 import BASAdmin
+import BASMemory
+import BASObservability
+
+public struct BASAppleFlightDeckSourceInput: Codable, Equatable, Sendable {
+    public var generatedAt: Date
+    public var registeredProviderIDs: [String]
+    public var activeProviderID: String
+    public var activeProviderTitle: String
+    public var backendTitle: String
+    public var activeTaskGraphTaskCount: Int
+    public var hardwareAccelerationActive: Bool
+    public var runningOnSimulator: Bool
+    public var onDeviceIntelligenceEnabled: Bool
+    public var fallbackTitle: String?
+    public var inspectionSummary: BASRuntimeInspectionSummary
+    public var brainSummary: BASBrainSummary
+
+    public init(
+        generatedAt: Date = .now,
+        registeredProviderIDs: [String],
+        activeProviderID: String,
+        activeProviderTitle: String,
+        backendTitle: String,
+        activeTaskGraphTaskCount: Int,
+        hardwareAccelerationActive: Bool,
+        runningOnSimulator: Bool,
+        onDeviceIntelligenceEnabled: Bool,
+        fallbackTitle: String?,
+        inspectionSummary: BASRuntimeInspectionSummary,
+        brainSummary: BASBrainSummary
+    ) {
+        self.generatedAt = generatedAt
+        self.registeredProviderIDs = registeredProviderIDs
+        self.activeProviderID = activeProviderID
+        self.activeProviderTitle = activeProviderTitle
+        self.backendTitle = backendTitle
+        self.activeTaskGraphTaskCount = activeTaskGraphTaskCount
+        self.hardwareAccelerationActive = hardwareAccelerationActive
+        self.runningOnSimulator = runningOnSimulator
+        self.onDeviceIntelligenceEnabled = onDeviceIntelligenceEnabled
+        self.fallbackTitle = fallbackTitle
+        self.inspectionSummary = inspectionSummary
+        self.brainSummary = brainSummary
+    }
+}
 
 public struct BASAppleFlightDeckLayerReport: Codable, Equatable, Sendable, Identifiable {
     public var layerID: String
@@ -50,6 +95,28 @@ public struct BASAppleFlightDeckCompilation: Codable, Equatable, Sendable {
         self.layerReports = layerReports
         self.isPureLocalClosedLoop = isPureLocalClosedLoop
         self.dominantBlockers = dominantBlockers
+    }
+}
+
+public enum BASAppleFlightDeckBuilder {
+    public static func build(
+        from input: BASAppleFlightDeckSourceInput
+    ) -> BASAppleFlightDeckCompilation {
+        BASAppleFlightDeckAdapter.compile(
+            from: BASReferenceFlightDeckAssemblyInput(
+                generatedAt: input.generatedAt,
+                isPureLocalClosedLoop: !input.registeredProviderIDs.contains("testingStub"),
+                activeProviderTitle: input.activeProviderTitle,
+                backendTitle: input.backendTitle,
+                activeTaskGraphTaskCount: input.activeTaskGraphTaskCount,
+                hardwareAccelerationActive: input.hardwareAccelerationActive || input.runningOnSimulator,
+                activeRuntimeUsingDeterministicFallback: input.activeProviderID == "template" &&
+                    input.onDeviceIntelligenceEnabled,
+                fallbackTitle: input.fallbackTitle,
+                inspectionSummary: input.inspectionSummary,
+                brainSummary: input.brainSummary
+            )
+        )
     }
 }
 

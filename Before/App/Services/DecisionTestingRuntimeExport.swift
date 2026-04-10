@@ -35,19 +35,38 @@ struct DecisionTestingRuntimeExport {
     }
 
     var basLifecycleSummary: BASLifecycleSummary {
-        BASLifecycleSummaryBuilder.build(from: lifecycleTraceInputs)
+        basRuntimeInspectionCompilation.lifecycleSummary
     }
 
     var basNeuralSummary: BASNeuralSummary {
-        BASNeuralSummaryBuilder.build(from: neuralTraceInputs)
+        basRuntimeInspectionCompilation.neuralSummary
     }
 
     var basBrainSummary: BASBrainSummary {
-        BASBrainSummaryBuilder.build(from: brainTraceInputs)
+        basRuntimeInspectionCompilation.brainSummary
     }
 
     var basRuntimeInspectionSummary: BASRuntimeInspectionSummary {
-        BASRuntimeInspectionBuilder.build(from: basRuntimeInspectionInput)
+        basRuntimeInspectionCompilation.runtimeInspectionSummary
+    }
+
+    var basFlightDeckCompilation: BASAppleFlightDeckCompilation {
+        BASAppleFlightDeckBuilder.build(
+            from: BASAppleFlightDeckSourceInput(
+                generatedAt: generatedAt,
+                registeredProviderIDs: registeredProviders.map { $0.kind.rawValue },
+                activeProviderID: runtimeSnapshot.runtimeStatus.active.rawValue,
+                activeProviderTitle: summary.activeProvider.title,
+                backendTitle: runtimeSnapshot.gemmaBackendResolution.effectiveBackend.title,
+                activeTaskGraphTaskCount: runtimeSnapshot.activeTaskGraph?.tasks.count ?? 0,
+                hardwareAccelerationActive: runtimeSnapshot.gemmaBackendResolution.isHardwareAccelerated,
+                runningOnSimulator: runtimeSnapshot.deviceCapabilities.isSimulator,
+                onDeviceIntelligenceEnabled: runtimeSnapshot.preferences.onDeviceIntelligenceMode != .off,
+                fallbackTitle: runtimeSnapshot.runtimeStatus.fallback?.title,
+                inspectionSummary: basRuntimeInspectionSummary,
+                brainSummary: basBrainSummary
+            )
+        )
     }
 
     private var lifecycleTraceInputs: [BASLifecycleTraceInput] {
@@ -127,11 +146,11 @@ struct DecisionTestingRuntimeExport {
         }
     }
 
-    private var basRuntimeInspectionInput: BASRuntimeInspectionInput {
+    private var basRuntimeInspectionCompilation: BASAppleRuntimeInspectionCompilation {
         let adaptationMatrix = runtimeSnapshot.executionProfile.adaptationMatrix
 
-        return BASAppleObservabilityAdapter.compileRuntimeInspectionInput(
-            from: BASAppleRuntimeInspectionAdapterInput(
+        return BASAppleRuntimeInspectionBuilder.build(
+            from: BASAppleRuntimeInspectionSourceInput(
                 activeProviderID: runtimeSnapshot.runtimeStatus.active.rawValue,
                 fallbackProviderID: runtimeSnapshot.runtimeStatus.fallback?.rawValue,
                 runtimeGear: BASRuntimeGear(rawValue: adaptationMatrix.runtimeGear.rawValue) ?? .balanced,
@@ -156,11 +175,11 @@ struct DecisionTestingRuntimeExport {
                 .compactMapValues { grouped in
                     grouped.first?.1
                 },
+                lifecycleTraceInputs: lifecycleTraceInputs,
+                neuralTraceInputs: neuralTraceInputs,
+                brainTraceInputs: brainTraceInputs,
                 traceInputs: runtimeInspectionTraceInputs,
                 telemetrySummary: intelligenceTelemetry.substrateSummary,
-                lifecycleSummary: basLifecycleSummary,
-                neuralSummary: basNeuralSummary,
-                brainSummary: basBrainSummary,
                 totalCacheEntries: cacheTelemetry.entryCountByKind.values.reduce(0, +),
                 totalCacheLookupCount: cacheTelemetry.totalHits + cacheTelemetry.totalMisses,
                 totalCacheRejectedStores: cacheTelemetry.totalRejectedStores,

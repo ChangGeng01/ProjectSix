@@ -60,9 +60,7 @@ struct DecisionSystemFlightDeck: Equatable, Sendable {
 
 enum DecisionSystemFlightDeckBuilder {
     static func build(from export: DecisionTestingRuntimeExport) -> DecisionSystemFlightDeck {
-        let compilation = BASAppleFlightDeckAdapter.compile(
-            from: referenceInput(from: export)
-        )
+        let compilation = export.basFlightDeckCompilation
         let reports = compilation.layerReports.map(layerReport(from:))
 
         return DecisionSystemFlightDeck(
@@ -72,26 +70,6 @@ enum DecisionSystemFlightDeckBuilder {
             layerReports: reports,
             isPureLocalClosedLoop: compilation.isPureLocalClosedLoop,
             dominantBlockers: compilation.dominantBlockers
-        )
-    }
-
-    private static func referenceInput(
-        from export: DecisionTestingRuntimeExport
-    ) -> BASReferenceFlightDeckAssemblyInput {
-        let snapshot = export.runtimeSnapshot
-        return BASReferenceFlightDeckAssemblyInput(
-            generatedAt: export.generatedAt,
-            isPureLocalClosedLoop: export.registeredProviders.allSatisfy { $0.kind != .testingStub },
-            activeProviderTitle: export.summary.activeProvider.title,
-            backendTitle: snapshot.gemmaBackendResolution.effectiveBackend.title,
-            activeTaskGraphTaskCount: snapshot.activeTaskGraph?.tasks.count ?? 0,
-            hardwareAccelerationActive: snapshot.gemmaBackendResolution.isHardwareAccelerated ||
-                snapshot.deviceCapabilities.isSimulator,
-            activeRuntimeUsingDeterministicFallback: export.summary.activeProvider == .template &&
-                snapshot.preferences.onDeviceIntelligenceMode != .off,
-            fallbackTitle: snapshot.runtimeStatus.fallback?.title,
-            inspectionSummary: export.basRuntimeInspectionSummary,
-            brainSummary: export.basBrainSummary
         )
     }
 

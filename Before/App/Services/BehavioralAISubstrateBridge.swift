@@ -97,28 +97,23 @@ enum BehavioralAISubstrateBridge {
         from export: DecisionTestingRuntimeExport,
         currentBrainState: CurrentBrainState?
     ) -> BASConsoleSnapshot {
-        let flightDeck = export.flightDeck
+        let flightDeckCompilation = export.basFlightDeckCompilation
         let runtimeContext = runtimeContext(from: export)
         let brainSnapshot = brainSnapshot(from: currentBrainState)
+        let roleProfile = roleProfile(from: currentBrainState)
 
-        return BASConsoleSnapshotBuilder.build(
-            from: BASFlightDeckMetrics(
+        return BASAppleConsoleSnapshotBuilder.build(
+            from: BASAppleConsoleSnapshotSourceInput(
                 generatedAt: export.generatedAt,
-                layerInputs: flightDeck.layerReports.map { report in
-                    BASLayerAssessmentInput(
-                        layer: map(report.layer),
-                        score: Double(report.score),
-                        summary: report.headline,
-                        blockers: report.blockers
-                    )
-                },
-                runtimeSummary: "Route \(export.summary.activeProvider.title) • gear \(runtimeContext.gear.rawValue) • requests \(export.summary.totalRequests) • attempts \(export.summary.totalProviderAttempts)",
-                brainSummary: brainSummary(
-                    currentBrainState: currentBrainState,
-                    roleProfile: roleProfile(from: currentBrainState),
-                    brainSnapshot: brainSnapshot
-                ),
-                isPureLocal: flightDeck.isPureLocalClosedLoop,
+                flightDeckCompilation: flightDeckCompilation,
+                activeProviderTitle: export.summary.activeProvider.title,
+                runtimeGearID: runtimeContext.gear.rawValue,
+                totalRequests: export.summary.totalRequests,
+                totalProviderAttempts: export.summary.totalProviderAttempts,
+                roleName: roleProfile?.name,
+                boundaryModeID: currentBrainState?.boundaryPolicy.mode.rawValue,
+                calibrationStatusID: currentBrainState?.calibrationState.status.rawValue,
+                verificationSnapshot: brainSnapshot?.verificationSnapshot,
                 capabilityCoverage: DecisionCapabilityCoverageBuilder.build(
                     from: export,
                     currentBrainState: currentBrainState

@@ -293,4 +293,178 @@ struct BASAppleObservabilityAdapterTests {
         #expect(compilation.strategyByKind["quick"]?.kind == .quick)
         #expect(compilation.preferredProviderRawValueByKind["quick"] == "gemmaE4B")
     }
+
+    @Test("runtime inspection builder compiles lifecycle neural brain and inspection summaries from raw trace inputs")
+    func runtimeInspectionBuilderCompilesFromTraceInputs() {
+        let telemetrySummary = BASTelemetrySummary(
+            input: BASTelemetrySummaryInput(
+                requestCountByKind: ["quick": 1],
+                outcomeCount: [.providerSuccess: 1],
+                outcomeCountByKind: [.providerSuccess: ["quick": 1]],
+                activeProviderCount: ["gemmaE4B": 1],
+                attemptedProviderCount: ["gemmaE4B": 1],
+                fallbackActivations: 0,
+                backendCount: [:],
+                slowRequestCountByKind: [:],
+                overTimeBudgetCountByKind: [:],
+                requestDurationTotalMsByKind: ["quick": 120],
+                firstPresentableTotalMsByKind: ["quick": 60],
+                promptAssemblyTotalMsByKind: ["quick": 20],
+                admissionEvaluationTotalMsByKind: ["quick": 10],
+                providerSelectionTotalMsByKind: ["quick": 10],
+                executionTotalMsByKind: ["quick": 20],
+                activeProviderDurationTotalMs: ["gemmaE4B": 120],
+                backendDurationTotalMs: [:],
+                admissionSkipCountByReason: [:],
+                admissionSkipCountByReasonAndKind: [:],
+                reminderSelectionNeedCount: [:],
+                promptCharactersTotalByKind: ["quick": 240],
+                prefixCharactersTotalByKind: ["quick": 120],
+                immutablePrefixCharactersTotalByKind: ["quick": 80],
+                adaptivePrefixCharactersTotalByKind: ["quick": 40],
+                suffixCharactersTotalByKind: ["quick": 120],
+                overTargetBudgetCountByKind: [:],
+                lowPressureModelCallCountByKind: [:],
+                reminderKindRawValue: "reminder",
+                reminderKnowledgeNeedRawValue: "knowledge",
+                reminderControlNeedRawValue: "control",
+                reminderRetrievalBypassReasonRawValues: [],
+                avoidableSkipReasonRawValues: []
+            )
+        )
+
+        let compilation = BASAppleRuntimeInspectionBuilder.build(
+            from: BASAppleRuntimeInspectionSourceInput(
+                activeProviderID: "gemmaE4B",
+                fallbackProviderID: "template",
+                runtimeGear: .balanced,
+                environmentClass: .normal,
+                deviceClass: .fullPhone,
+                languageMode: .english,
+                taskEntropyByKind: ["quick": .low],
+                preferredProviderRawValueByKind: ["quick": "gemmaE4B"],
+                strategyByKind: [
+                    "quick": BASAdaptiveTaskStrategy(
+                        kind: .quick,
+                        entropy: .low,
+                        runtimeGear: .balanced,
+                        contextBudget: 320,
+                        outputCharacterBudget: 180,
+                        timeBudgetMs: 900,
+                        toolCallBudget: 0,
+                        retrievalItemBudget: 2,
+                        retrievalMode: .filtered,
+                        thinkingMode: .off,
+                        outputMode: .guidedShort,
+                        tone: .briefWarm,
+                        actionSpace: ["encourage"],
+                        responseLanguage: .english,
+                        allowsModelInvocation: true
+                    )
+                ],
+                effectivePreferredProviderRawValueByKind: ["quick": "gemmaE4B"],
+                lifecycleTraceInputs: [
+                    BASLifecycleTraceInput(
+                        kind: "quick",
+                        hasContextState: true,
+                        generation: 3,
+                        rebuiltSession: true,
+                        staleFieldCount: 1,
+                        anchorFieldCount: 2,
+                        hasFrontstageState: true,
+                        retainedEvidenceCount: 2,
+                        droppedEvidenceCount: 1,
+                        droppedInjectedEvidenceCount: 1,
+                        droppedDuplicateEvidenceCount: 0,
+                        droppedBudgetEvidenceCount: 0
+                    )
+                ],
+                neuralTraceInputs: [
+                    BASNeuralTraceInput(
+                        kind: "quick",
+                        suppressedBehaviorCount: 1,
+                        dominantActionRawValue: "encourage",
+                        strongestSignalRawValue: "urgency"
+                    )
+                ],
+                brainTraceInputs: [
+                    BASBrainTraceInput(
+                        kind: "quick",
+                        dominantReactionWeight: .briefLanguage,
+                        profileCoreCount: 1,
+                        activeGoalCount: 1,
+                        relevantMemoryCount: 2,
+                        loadedPromotedMemoryCount: 2,
+                        loadedPendingMemoryCount: 1,
+                        pendingCandidateCount: 1,
+                        promotedRecordCount: 4,
+                        screenedOutMemoryCount: 0,
+                        loadedEligibilityReasonCounts: [:],
+                        screenedOutEligibilityReasonCounts: [:],
+                        snapshotFingerprint: "brain_fp",
+                        lowTrustMemoryLoadRate: 0.25,
+                        riskFlags: [.lowTrustLoad],
+                        identityRole: .pauseCompanion,
+                        boundaryMode: .localOnlyAdvisory,
+                        activeConstraints: [.lockSensitiveMemory],
+                        calibrationStatus: .stable,
+                        calibrationAlerts: [],
+                        evolutionCheckpointCount: 2,
+                        evolutionPendingReviewCount: 0,
+                        evolutionRollbackReady: true
+                    )
+                ],
+                traceInputs: [
+                    BASRuntimeInspectionTraceInput(
+                        kind: "quick",
+                        attemptedProviderIDs: ["gemmaE4B"],
+                        runtimeStrategy: BASAdaptiveTaskStrategy(
+                            kind: .quick,
+                            entropy: .low,
+                            runtimeGear: .balanced,
+                            contextBudget: 320,
+                            outputCharacterBudget: 180,
+                            timeBudgetMs: 900,
+                            toolCallBudget: 0,
+                            retrievalItemBudget: 2,
+                            retrievalMode: .filtered,
+                            thinkingMode: .off,
+                            outputMode: .guidedShort,
+                            tone: .briefWarm,
+                            actionSpace: ["encourage"],
+                            responseLanguage: .english,
+                            allowsModelInvocation: true
+                        ),
+                        semanticPromptFingerprint: "semantic_fp",
+                        stablePrefixFingerprint: "prefix_fp",
+                        consistencyChecked: true,
+                        consistencyRejected: false,
+                        consistencyViolationKinds: []
+                    )
+                ],
+                telemetrySummary: telemetrySummary,
+                totalCacheEntries: 2,
+                totalCacheLookupCount: 4,
+                totalCacheRejectedStores: 0,
+                totalCacheQuarantinedHits: 0,
+                dominantBackendID: "coreML",
+                registeredProviderCount: 3,
+                registeredOpenModelProviderCount: 1,
+                activeCircuitProviderIDs: [],
+                circuitTripCount: 0,
+                circuitTripCountByProvider: [:],
+                circuitTripCountByReason: [:],
+                traceCount: 1,
+                replayCount: 0
+            )
+        )
+
+        #expect(compilation.lifecycleSummary.contextAwareTraceCount == 1)
+        #expect(compilation.neuralSummary.neuralTraceCount == 1)
+        #expect(compilation.brainSummary.brainTraceCount == 1)
+        #expect(compilation.runtimeInspectionInput.activeProviderID == "gemmaE4B")
+        #expect(compilation.runtimeInspectionSummary.traceCount == 1)
+        #expect(compilation.runtimeInspectionSummary.brainTraceCount == 1)
+        #expect(compilation.runtimeInspectionSummary.consistencyCheckedTraceCount == 1)
+    }
 }
