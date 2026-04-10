@@ -126,6 +126,150 @@ public struct BASAppleProviderObservationContext: Codable, Sendable, Equatable {
     }
 }
 
+public struct BASAppleProviderObservationSourceInput: Codable, Sendable, Equatable {
+    public var kind: String
+    public var preferredProviderID: String
+    public var allowFallbacks: Bool
+    public var providerProfilesByID: [String: BASAppleProviderProfile]
+    public var promptBudget: BASPromptBudget?
+    public var brainState: BASDecisionBrainState?
+    public var admissionPressureID: String?
+    public var admissionSkipReasonID: String?
+    public var reminderSelectionNeedID: String?
+    public var runtimeTimeBudgetMs: Int?
+    public var admissionReason: String?
+    public var semanticPromptFingerprint: String?
+    public var stablePrefixFingerprint: String?
+    public var prompt: String
+    public var baselineOutputPreview: String
+    public var deterministicFallbackOutputPreview: String
+    public var recordsTemplatePinnedTrace: Bool
+
+    public init(
+        kind: String,
+        preferredProviderID: String,
+        allowFallbacks: Bool,
+        providerProfilesByID: [String: BASAppleProviderProfile],
+        promptBudget: BASPromptBudget? = nil,
+        brainState: BASDecisionBrainState? = nil,
+        admissionPressureID: String? = nil,
+        admissionSkipReasonID: String? = nil,
+        reminderSelectionNeedID: String? = nil,
+        runtimeTimeBudgetMs: Int? = nil,
+        admissionReason: String? = nil,
+        semanticPromptFingerprint: String? = nil,
+        stablePrefixFingerprint: String? = nil,
+        prompt: String,
+        baselineOutputPreview: String,
+        deterministicFallbackOutputPreview: String,
+        recordsTemplatePinnedTrace: Bool
+    ) {
+        self.kind = kind
+        self.preferredProviderID = preferredProviderID
+        self.allowFallbacks = allowFallbacks
+        self.providerProfilesByID = providerProfilesByID
+        self.promptBudget = promptBudget
+        self.brainState = brainState
+        self.admissionPressureID = admissionPressureID
+        self.admissionSkipReasonID = admissionSkipReasonID
+        self.reminderSelectionNeedID = reminderSelectionNeedID
+        self.runtimeTimeBudgetMs = runtimeTimeBudgetMs
+        self.admissionReason = admissionReason
+        self.semanticPromptFingerprint = semanticPromptFingerprint
+        self.stablePrefixFingerprint = stablePrefixFingerprint
+        self.prompt = prompt
+        self.baselineOutputPreview = baselineOutputPreview
+        self.deterministicFallbackOutputPreview = deterministicFallbackOutputPreview
+        self.recordsTemplatePinnedTrace = recordsTemplatePinnedTrace
+    }
+}
+
+public enum BASAppleProviderObservationContextBuilder {
+    public static func build(
+        from input: BASAppleProviderObservationSourceInput
+    ) -> BASAppleProviderObservationContext {
+        let narrative = narrativePreset(for: input.kind)
+        return BASAppleProviderObservationContext(
+            kind: input.kind,
+            preferredProviderID: input.preferredProviderID,
+            allowFallbacks: input.allowFallbacks,
+            providerProfilesByID: input.providerProfilesByID,
+            promptBudget: input.promptBudget,
+            brainState: input.brainState,
+            admissionPressureID: input.admissionPressureID,
+            admissionSkipReasonID: input.admissionSkipReasonID,
+            reminderSelectionNeedID: input.reminderSelectionNeedID,
+            runtimeTimeBudgetMs: input.runtimeTimeBudgetMs,
+            admissionReason: input.admissionReason,
+            semanticPromptFingerprint: input.semanticPromptFingerprint,
+            stablePrefixFingerprint: input.stablePrefixFingerprint,
+            prompt: input.prompt,
+            templatePinnedOutputPreview: input.baselineOutputPreview,
+            admissionSkippedOutputPreview: input.baselineOutputPreview,
+            deterministicFallbackOutputPreview: input.deterministicFallbackOutputPreview,
+            templatePinnedDetail: narrative.templatePinnedDetail,
+            admissionSkippedDetailPrefix: narrative.admissionSkippedDetailPrefix,
+            deterministicFallbackBase: narrative.deterministicFallbackBase,
+            cachedConsistencySource: narrative.cachedConsistencySource,
+            providerConsistencySource: narrative.providerConsistencySource,
+            recordsTemplatePinnedTrace: input.recordsTemplatePinnedTrace
+        )
+    }
+
+    private static func narrativePreset(
+        for kind: String
+    ) -> (
+        templatePinnedDetail: String,
+        admissionSkippedDetailPrefix: String,
+        deterministicFallbackBase: String,
+        cachedConsistencySource: String,
+        providerConsistencySource: String
+    ) {
+        switch kind {
+        case "quick":
+            (
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for quick refinement.",
+                admissionSkippedDetailPrefix: "Admission controller skipped quick refinement.",
+                deterministicFallbackBase: "No provider returned a refined quick result, so Before kept the deterministic copy.",
+                cachedConsistencySource: "cached quick refinement",
+                providerConsistencySource: "provider quick refinement"
+            )
+        case "balance":
+            (
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for balance refinement.",
+                admissionSkippedDetailPrefix: "Admission controller skipped balance refinement.",
+                deterministicFallbackBase: "No provider returned a refined balance board, so Before kept the deterministic copy.",
+                cachedConsistencySource: "cached balance refinement",
+                providerConsistencySource: "provider balance refinement"
+            )
+        case "mirror":
+            (
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for mirror refinement.",
+                admissionSkippedDetailPrefix: "Admission controller skipped mirror refinement.",
+                deterministicFallbackBase: "No provider returned a refined mirror, so Before kept the deterministic copy.",
+                cachedConsistencySource: "cached mirror refinement",
+                providerConsistencySource: "provider mirror refinement"
+            )
+        case "reminder":
+            (
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for reminder selection.",
+                admissionSkippedDetailPrefix: "Admission controller skipped reminder selection.",
+                deterministicFallbackBase: "No provider returned a reminder selection, so Before kept the deterministic reminder ordering.",
+                cachedConsistencySource: "cached reminder selection",
+                providerConsistencySource: "provider reminder selection"
+            )
+        default:
+            (
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used.",
+                admissionSkippedDetailPrefix: "Admission controller skipped provider execution.",
+                deterministicFallbackBase: "No provider returned a result, so Before kept the deterministic copy.",
+                cachedConsistencySource: "cached provider result",
+                providerConsistencySource: "provider result"
+            )
+        }
+    }
+}
+
 public enum BASAppleProviderCircuitEvent: Codable, Sendable, Equatable {
     case cacheHit(providerID: String)
     case providerFailure(providerID: String)

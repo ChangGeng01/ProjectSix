@@ -49,6 +49,41 @@ struct BASAppleProviderOutcomeObserverTests {
         #expect(rejected.contains("provider quick refinement"))
     }
 
+    @Test("observation context builder owns task-specific narrative presets")
+    func observationContextBuilderOwnsNarrativePresets() {
+        let quick = BASAppleProviderObservationContextBuilder.build(
+            from: BASAppleProviderObservationSourceInput(
+                kind: "quick",
+                preferredProviderID: "foundationModels",
+                allowFallbacks: true,
+                providerProfilesByID: [:],
+                prompt: "quick prompt",
+                baselineOutputPreview: "quick preview",
+                deterministicFallbackOutputPreview: "quick fallback",
+                recordsTemplatePinnedTrace: true
+            )
+        )
+        let reminder = BASAppleProviderObservationContextBuilder.build(
+            from: BASAppleProviderObservationSourceInput(
+                kind: "reminder",
+                preferredProviderID: "foundationModels",
+                allowFallbacks: true,
+                providerProfilesByID: [:],
+                prompt: "reminder prompt",
+                baselineOutputPreview: "keep ordering",
+                deterministicFallbackOutputPreview: "no reminder",
+                recordsTemplatePinnedTrace: false
+            )
+        )
+
+        #expect(quick.templatePinnedDetail.contains("quick refinement"))
+        #expect(quick.admissionSkippedOutputPreview == "quick preview")
+        #expect(quick.cachedConsistencySource == "cached quick refinement")
+        #expect(reminder.templatePinnedDetail.contains("reminder selection"))
+        #expect(reminder.providerConsistencySource == "provider reminder selection")
+        #expect(reminder.deterministicFallbackOutputPreview == "no reminder")
+    }
+
     @Test("observer compiles sanitized traces and telemetry observations")
     func observerCompilesTraceAndTelemetry() {
         let trace = BASAppleProviderOutcomeObserver.traceObservation(

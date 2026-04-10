@@ -104,7 +104,8 @@ enum DecisionIntelligenceProviderPipeline {
             brainState: brainState,
             promptBudget: envelope.budget,
             admissionDecision: admissionDecision,
-            substrateContext: BASAppleProviderObservationContext(
+            substrateContext: BASAppleProviderObservationContextBuilder.build(
+                from: BASAppleProviderObservationSourceInput(
                 kind: DecisionIntelligenceTraceKind.quick.rawValue,
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
@@ -119,16 +120,10 @@ enum DecisionIntelligenceProviderPipeline {
                 semanticPromptFingerprint: semanticPromptFingerprint,
                 stablePrefixFingerprint: stablePrefixFingerprint,
                 prompt: envelope.debugPrompt,
-                templatePinnedOutputPreview: quickPreview(from: base),
-                admissionSkippedOutputPreview: quickPreview(from: base),
+                baselineOutputPreview: quickPreview(from: base),
                 deterministicFallbackOutputPreview: quickPreview(from: base),
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for quick refinement.",
-                admissionSkippedDetailPrefix: "Admission controller skipped quick refinement.",
-                deterministicFallbackBase: "No provider returned a refined quick result, so Before kept the deterministic copy.",
-                cachedConsistencySource: "cached quick refinement",
-                providerConsistencySource: "provider quick refinement",
                 recordsTemplatePinnedTrace: true
-            )
+            ))
         )
         let outcome = await executeProviderRequest(
             task: .quick,
@@ -241,7 +236,8 @@ enum DecisionIntelligenceProviderPipeline {
             brainState: brainState,
             promptBudget: envelope.budget,
             admissionDecision: admissionDecision,
-            substrateContext: BASAppleProviderObservationContext(
+            substrateContext: BASAppleProviderObservationContextBuilder.build(
+                from: BASAppleProviderObservationSourceInput(
                 kind: DecisionIntelligenceTraceKind.balance.rawValue,
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
@@ -256,16 +252,10 @@ enum DecisionIntelligenceProviderPipeline {
                 semanticPromptFingerprint: semanticPromptFingerprint,
                 stablePrefixFingerprint: stablePrefixFingerprint,
                 prompt: envelope.debugPrompt,
-                templatePinnedOutputPreview: balancePreview(from: base),
-                admissionSkippedOutputPreview: balancePreview(from: base),
+                baselineOutputPreview: balancePreview(from: base),
                 deterministicFallbackOutputPreview: balancePreview(from: base),
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for balance refinement.",
-                admissionSkippedDetailPrefix: "Admission controller skipped balance refinement.",
-                deterministicFallbackBase: "No provider returned a refined balance board, so Before kept the deterministic copy.",
-                cachedConsistencySource: "cached balance refinement",
-                providerConsistencySource: "provider balance refinement",
                 recordsTemplatePinnedTrace: true
-            )
+            ))
         )
         let outcome = await executeProviderRequest(
             task: .balance,
@@ -378,7 +368,8 @@ enum DecisionIntelligenceProviderPipeline {
             brainState: brainState,
             promptBudget: envelope.budget,
             admissionDecision: admissionDecision,
-            substrateContext: BASAppleProviderObservationContext(
+            substrateContext: BASAppleProviderObservationContextBuilder.build(
+                from: BASAppleProviderObservationSourceInput(
                 kind: DecisionIntelligenceTraceKind.mirror.rawValue,
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
@@ -393,16 +384,10 @@ enum DecisionIntelligenceProviderPipeline {
                 semanticPromptFingerprint: semanticPromptFingerprint,
                 stablePrefixFingerprint: stablePrefixFingerprint,
                 prompt: envelope.debugPrompt,
-                templatePinnedOutputPreview: mirrorPreview(from: base),
-                admissionSkippedOutputPreview: mirrorPreview(from: base),
+                baselineOutputPreview: mirrorPreview(from: base),
                 deterministicFallbackOutputPreview: mirrorPreview(from: base),
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for mirror refinement.",
-                admissionSkippedDetailPrefix: "Admission controller skipped mirror refinement.",
-                deterministicFallbackBase: "No provider returned a refined mirror, so Before kept the deterministic copy.",
-                cachedConsistencySource: "cached mirror refinement",
-                providerConsistencySource: "provider mirror refinement",
                 recordsTemplatePinnedTrace: true
-            )
+            ))
         )
         let outcome = await executeProviderRequest(
             task: .mirror,
@@ -525,7 +510,8 @@ enum DecisionIntelligenceProviderPipeline {
             brainState: nil,
             promptBudget: selection.prompt.budget,
             admissionDecision: admissionDecision,
-            substrateContext: BASAppleProviderObservationContext(
+            substrateContext: BASAppleProviderObservationContextBuilder.build(
+                from: BASAppleProviderObservationSourceInput(
                 kind: DecisionIntelligenceTraceKind.reminder.rawValue,
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
@@ -540,16 +526,10 @@ enum DecisionIntelligenceProviderPipeline {
                 semanticPromptFingerprint: semanticPromptFingerprint,
                 stablePrefixFingerprint: stablePrefixFingerprint,
                 prompt: selection.prompt.debugPrompt,
-                templatePinnedOutputPreview: "Deterministic reminder ordering kept",
-                admissionSkippedOutputPreview: "Deterministic reminder ordering kept",
+                baselineOutputPreview: "Deterministic reminder ordering kept",
                 deterministicFallbackOutputPreview: "No reminder selected",
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for reminder selection.",
-                admissionSkippedDetailPrefix: "Admission controller skipped reminder selection.",
-                deterministicFallbackBase: "No provider returned a reminder selection, so Before kept the deterministic reminder ordering.",
-                cachedConsistencySource: "cached reminder selection",
-                providerConsistencySource: "provider reminder selection",
                 recordsTemplatePinnedTrace: false
-            )
+            ))
         )
         let outcome = await executeProviderRequest(
             task: .reminder,
