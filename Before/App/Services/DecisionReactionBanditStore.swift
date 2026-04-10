@@ -1,31 +1,9 @@
 import Foundation
-
-private struct DecisionBanditArmState: Codable, Equatable, Sendable {
-    var alpha: Double
-    var beta: Double
-
-    var score: Double {
-        alpha / max(1, alpha + beta)
-    }
-}
-
-private struct DecisionBanditBucketState: Codable, Equatable, Sendable {
-    var arms: [String: DecisionBanditArmState]
-}
-
-private struct DecisionBanditSnapshot: Codable, Equatable, Sendable {
-    var buckets: [String: DecisionBanditBucketState]
-}
+import BASAppleAdapters
 
 enum DecisionReactionBanditStore {
     private static let key = "before.reaction.bandit.snapshot"
     private static let storage = CodableStateStorage.protectedLocal
-    private static let arms = [
-        "brief_warm_nudge",
-        "tomorrow_box_interrupt",
-        "reflective_question",
-        "slow_delay_guard"
-    ]
 
     static func recommendedArmIDs(
         mode: DecisionMode,
@@ -33,17 +11,15 @@ enum DecisionReactionBanditStore {
         languageMode: DecisionLanguageMode,
         now: Date = .now
     ) -> [String] {
-        let bucket = bucketKey(mode: mode, riskLevel: riskLevel, languageMode: languageMode, now: now)
-        let snapshot = loadSnapshot()
-        let states = snapshot.buckets[bucket]?.arms ?? defaultArmStates()
-        return states
-            .sorted {
-                if $0.value.score == $1.value.score {
-                    return $0.key < $1.key
-                }
-                return $0.value.score > $1.value.score
-            }
-            .map(\.key)
+        BASAppleInterventionBanditAdvisor.orderedArmIDs(
+            snapshot: loadSnapshot(),
+            bucketID: bucketID(
+                mode: mode,
+                riskLevel: riskLevel,
+                languageMode: languageMode,
+                now: now
+            )
+        )
     }
 
     static func update(
@@ -54,17 +30,17 @@ enum DecisionReactionBanditStore {
         reward: Bool,
         now: Date = .now
     ) {
-        let bucket = bucketKey(mode: mode, riskLevel: riskLevel, languageMode: languageMode, now: now)
-        var snapshot = loadSnapshot()
-        var bucketState = snapshot.buckets[bucket] ?? DecisionBanditBucketState(arms: defaultArmStates())
-        var armState = bucketState.arms[chosenArmID] ?? DecisionBanditArmState(alpha: 1, beta: 1)
-        if reward {
-            armState.alpha += 1
-        } else {
-            armState.beta += 1.4
-        }
-        bucketState.arms[chosenArmID] = armState
-        snapshot.buckets[bucket] = bucketState
+        let snapshot = BASAppleInterventionBanditAdvisor.updatedSnapshot(
+            snapshot: loadSnapshot(),
+            bucketID: bucketID(
+                mode: mode,
+                riskLevel: riskLevel,
+                languageMode: languageMode,
+                now: now
+            ),
+            chosenArmID: chosenArmID,
+            reward: reward
+        )
         storage.save(snapshot, key: key)
     }
 
@@ -72,28 +48,22 @@ enum DecisionReactionBanditStore {
         storage.clear(key: key)
     }
 
-    private static func loadSnapshot() -> DecisionBanditSnapshot {
-        storage.load(DecisionBanditSnapshot.self, key: key) ?? DecisionBanditSnapshot(buckets: [:])
+    private static func loadSnapshot() -> BASAppleInterventionBanditSnapshot {
+        storage.load(BASAppleInterventionBanditSnapshot.self, key: key) ??
+            BASAppleInterventionBanditAdvisor.emptySnapshot()
     }
 
-    private static func defaultArmStates() -> [String: DecisionBanditArmState] {
-        Dictionary(uniqueKeysWithValues: arms.map { ($0, DecisionBanditArmState(alpha: 1, beta: 1)) })
-    }
-
-    private static func bucketKey(
+    private static func bucketID(
         mode: DecisionMode,
         riskLevel: InterventionRiskLevel,
         languageMode: DecisionLanguageMode,
         now: Date
     ) -> String {
-        let hour = Calendar.autoupdatingCurrent.component(.hour, from: now)
-        let daypart: String
-        switch hour {
-        case 0..<6: daypart = "late_night"
-        case 6..<12: daypart = "morning"
-        case 12..<18: daypart = "afternoon"
-        default: daypart = "night"
-        }
-        return [mode.rawValue, riskLevel.rawValue, languageMode.rawValue, daypart].joined(separator: "::")
+        BASAppleInterventionBanditAdvisor.bucketID(
+            modeID: mode.rawValue,
+            riskLevelID: riskLevel.rawValue,
+            languageModeID: languageMode.rawValue,
+            now: now
+        )
     }
 }

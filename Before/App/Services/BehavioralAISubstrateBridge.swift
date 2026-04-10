@@ -7,30 +7,6 @@ import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
 
-struct CurrentBrainBootstrapPreparation: Equatable, Sendable {
-    let sourceSurface: DecisionIntentSourceSurface
-    let riskLevel: InterventionRiskLevel
-    let languageMode: DecisionLanguageMode
-    fileprivate let substratePreparation: BASCurrentBrainBootstrapPreparation
-}
-
-struct CurrentBrainBootstrapExecution: Equatable, Sendable {
-    let preparation: CurrentBrainBootstrapPreparation
-    let bootstrapped: BASBootstrappedBrainState
-    let activeTemplateIDs: [String]
-    let failureGuardIDs: [String]
-}
-
-struct CurrentBrainBootstrapArtifact: Equatable, Sendable {
-    let sourceSurface: DecisionIntentSourceSurface
-    let riskLevel: InterventionRiskLevel
-    let languageMode: DecisionLanguageMode
-    let bootstrapped: BASBootstrappedBrainState
-    let activeTemplateIDs: [String]
-    let failureGuardIDs: [String]
-    let persistenceInput: BASCurrentBrainUpdatePersistenceInput
-}
-
 enum BehavioralAISubstrateBridge {
     @discardableResult
     static func bootstrapCurrentBrainState(
@@ -64,7 +40,7 @@ enum BehavioralAISubstrateBridge {
         > = BASAppleCurrentBrainCommitter.commit(
             modeName: mode.rawValue,
             sourceID: source.rawValue,
-            brainState: artifact.bootstrapped.brainState,
+            brainState: artifact.execution.bootstrapped.brainState,
             persistenceInput: artifact.persistenceInput,
             in: context,
             createdAt: now,
@@ -86,15 +62,15 @@ enum BehavioralAISubstrateBridge {
 
         return CurrentBrainState(
             source: source,
-            sourceSurface: artifact.sourceSurface,
+            sourceSurface: sourceSurface(from: artifact.execution.preparation.sourceSurface),
             mode: mode,
-            riskLevel: artifact.riskLevel,
+            riskLevel: interventionRiskLevel(from: artifact.execution.preparation.riskLevel),
             taskGraph: taskGraph,
             brainState: commit.brainState,
-            dominantGoal: artifact.bootstrapped.dominantGoal,
-            activeConstraints: artifact.bootstrapped.activeConstraints,
-            activeTemplateIDs: artifact.activeTemplateIDs,
-            failureGuardIDs: artifact.failureGuardIDs,
+            dominantGoal: artifact.execution.bootstrapped.dominantGoal,
+            activeConstraints: artifact.execution.bootstrapped.activeConstraints,
+            activeTemplateIDs: artifact.execution.orderedTemplateIDs,
+            failureGuardIDs: artifact.execution.orderedFailurePatternIDs,
             sourceIntentEnvelope: envelope,
             loadedAt: now
         )
@@ -231,7 +207,7 @@ enum BehavioralAISubstrateBridge {
         projection: DecisionMemorySystem.BrainStateProjection,
         retrievalMode: DecisionRetrievalMode,
         now: Date
-    ) -> CurrentBrainBootstrapArtifact {
+    ) -> BASAppleCurrentBrainBootstrapArtifact {
         let preparation = prepareCurrentBrainBootstrap(
             mode: mode,
             prompt: prompt,
@@ -239,8 +215,8 @@ enum BehavioralAISubstrateBridge {
             envelope: envelope,
             now: now
         )
-        let languageMode = preparation.languageMode
-        let riskLevel = preparation.riskLevel
+        let languageMode = decisionLanguageMode(from: preparation.languageMode)
+        let riskLevel = interventionRiskLevel(from: preparation.riskLevel)
         let recommendedArmIDs = DecisionReactionBanditStore.recommendedArmIDs(
             mode: mode,
             riskLevel: riskLevel,
@@ -254,28 +230,21 @@ enum BehavioralAISubstrateBridge {
             recommendedArmIDs: recommendedArmIDs
         )
         let failurePatterns = FailurePatternStore.selectedFailurePatterns(in: context, mode: mode)
-        let artifact = BASAppleCurrentBrainBootstrapPlanner.artifact(
-            source: BASAppleCurrentBrainBootstrapPlanningPreparedInput(
-                preparation: preparation.substratePreparation,
+        return BASAppleCurrentBrainBootstrapHostAdapter.artifact(
+            from: hostBootstrapSourceInput(
+                mode: mode,
+                prompt: prompt,
+                source: source,
+                sourceSurfaceOverride: envelope?.sourceSurface,
+                riskLevelOverride: envelope?.riskLevel,
                 projection: projection.baseProjection,
-                embeddingScores: embeddingScores(for: prompt),
-                taskGraphHint: taskGraph.map(appleTaskGraphHint(from:)),
+                taskGraph: taskGraph,
                 retrievalMode: retrievalMode.rawValue,
                 recommendedTemplateIDs: recommendedArmIDs,
-                templates: appleTemplateInputs(from: templates),
-                failurePatterns: appleFailurePatternInputs(from: failurePatterns)
+                templates: templates,
+                failurePatterns: failurePatterns,
+                now: now
             )
-        )
-        let artifactPreparation = artifact.execution.preparation
-
-        return CurrentBrainBootstrapArtifact(
-            sourceSurface: sourceSurface(from: artifactPreparation.sourceSurface),
-            riskLevel: interventionRiskLevel(from: artifactPreparation.riskLevel),
-            languageMode: decisionLanguageMode(from: artifactPreparation.languageMode),
-            bootstrapped: artifact.execution.bootstrapped,
-            activeTemplateIDs: artifact.execution.orderedTemplateIDs,
-            failureGuardIDs: artifact.execution.orderedFailurePatternIDs,
-            persistenceInput: artifact.persistenceInput
         )
     }
 
@@ -285,60 +254,44 @@ enum BehavioralAISubstrateBridge {
         source: BrainStateUpdateSource,
         envelope: DecisionIntentEnvelope?,
         now: Date
-    ) -> CurrentBrainBootstrapPreparation {
-        let preparation = BASAppleCurrentBrainBootstrapAdapter.prepare(
-            source: BASAppleCurrentBrainBootstrapSourceInput(
-                preparationRequest: BASCurrentBrainBootstrapPreparationRequest(
-                    mode: substrateMode(from: mode),
-                    prompt: prompt,
-                    trigger: currentBrainBootstrapTrigger(from: source),
-                    sourceSurfaceOverride: envelope.map { interactionSurface(from: $0.sourceSurface) },
-                    riskLevelOverride: envelope?.riskLevel.map(riskLevel(from:)),
-                    preferredLanguages: Locale.preferredLanguages,
-                    now: now
-                ),
+    ) -> BASCurrentBrainBootstrapPreparation {
+        BASAppleCurrentBrainBootstrapHostAdapter.prepare(
+            from: hostBootstrapSourceInput(
+                mode: mode,
+                prompt: prompt,
+                source: source,
+                sourceSurfaceOverride: envelope?.sourceSurface,
+                riskLevelOverride: envelope?.riskLevel,
                 projection: .init(records: [], candidates: [], recentEvents: []),
+                taskGraph: nil,
                 retrievalMode: "prepare",
+                recommendedTemplateIDs: [],
                 templates: [],
-                failurePatterns: []
+                failurePatterns: [],
+                now: now
             )
-        )
-
-        return CurrentBrainBootstrapPreparation(
-            sourceSurface: sourceSurface(from: preparation.sourceSurface),
-            riskLevel: interventionRiskLevel(from: preparation.riskLevel),
-            languageMode: decisionLanguageMode(from: preparation.languageMode),
-            substratePreparation: preparation
         )
     }
 
     static func executeCurrentBrainBootstrap(
-        preparation: CurrentBrainBootstrapPreparation,
+        preparation: BASCurrentBrainBootstrapPreparation,
         taskGraph: DecisionTaskGraphSnapshot?,
         projection: DecisionMemorySystem.BrainStateProjection,
         retrievalMode: DecisionRetrievalMode,
         recommendedTemplateIDs: [String],
         templates: [InterventionTemplateRecord],
         failurePatterns: [FailurePatternRecord]
-    ) -> CurrentBrainBootstrapExecution {
-        let execution = BASAppleCurrentBrainBootstrapPlanner.execute(
-            source: BASAppleCurrentBrainBootstrapPlanningPreparedInput(
-                preparation: preparation.substratePreparation,
+    ) -> BASCurrentBrainBootstrapExecution {
+        BASAppleCurrentBrainBootstrapHostAdapter.execute(
+            from: hostBootstrapSourceInput(
+                preparation: preparation,
                 projection: projection.baseProjection,
-                embeddingScores: embeddingScores(for: preparation.substratePreparation.prompt),
-                taskGraphHint: taskGraph.map(appleTaskGraphHint(from:)),
+                taskGraph: taskGraph,
                 retrievalMode: retrievalMode.rawValue,
                 recommendedTemplateIDs: recommendedTemplateIDs,
-                templates: appleTemplateInputs(from: templates),
-                failurePatterns: appleFailurePatternInputs(from: failurePatterns)
+                templates: templates,
+                failurePatterns: failurePatterns
             )
-        )
-
-        return CurrentBrainBootstrapExecution(
-            preparation: preparation,
-            bootstrapped: execution.bootstrapped,
-            activeTemplateIDs: execution.orderedTemplateIDs,
-            failureGuardIDs: execution.orderedFailurePatternIDs
         )
     }
 
@@ -355,41 +308,45 @@ enum BehavioralAISubstrateBridge {
         failureGuardIDs: [String],
         now: Date
     ) -> BASBootstrappedBrainState {
-        let execution = BASAppleCurrentBrainBootstrapPlanner.artifact(
-            source: BASAppleCurrentBrainBootstrapPlanningSourceInput(
-                preparationRequest: BASCurrentBrainBootstrapPreparationRequest(
-                    mode: substrateMode(from: mode),
-                    prompt: prompt,
-                    trigger: currentBrainBootstrapTrigger(from: source),
-                    sourceSurfaceOverride: interactionSurface(from: sourceSurface),
-                    riskLevelOverride: self.riskLevel(from: riskLevel),
-                    preferredLanguages: Locale.preferredLanguages,
-                    now: now
-                ),
+        let execution = BASAppleCurrentBrainBootstrapHostAdapter.artifact(
+            from: hostBootstrapSourceInput(
+                mode: mode,
+                prompt: prompt,
+                source: source,
+                sourceSurfaceOverride: sourceSurface,
+                riskLevelOverride: riskLevel,
                 projection: projection.baseProjection,
-                embeddingScores: embeddingScores(for: prompt),
-                taskGraphHint: taskGraph.map(appleTaskGraphHint(from:)),
+                taskGraph: taskGraph,
                 retrievalMode: retrievalMode.rawValue,
                 recommendedTemplateIDs: activeTemplateIDs,
                 templates: activeTemplateIDs.map {
-                    BASAppleCurrentBrainBootstrapTemplateInput(
+                    InterventionTemplateRecord(
                         id: $0,
-                        mode: substrateMode(from: mode),
-                        riskLevel: self.riskLevel(from: riskLevel),
+                        createdAt: now,
+                        updatedAt: now,
+                        title: "",
+                        summary: "",
+                        body: [],
+                        mode: mode,
+                        riskLevel: riskLevel,
                         isPinned: false,
-                        successCount: 0,
-                        updatedAt: now
+                        successCount: 0
                     )
                 },
                 failurePatterns: failureGuardIDs.map {
-                    BASAppleCurrentBrainBootstrapFailurePatternInput(
+                    FailurePatternRecord(
                         id: $0,
-                        mode: substrateMode(from: mode),
+                        createdAt: now,
+                        updatedAt: now,
+                        mode: mode,
+                        title: "",
+                        detail: "",
+                        cadenceTag: $0,
                         suppressionWeight: 1,
-                        evidenceCount: 1,
-                        updatedAt: now
+                        evidenceCount: 1
                     )
-                }
+                },
+                now: now
             )
         )
         return execution.execution.bootstrapped
@@ -487,14 +444,138 @@ enum BehavioralAISubstrateBridge {
         retrievalMode: DecisionRetrievalMode,
         now: Date
     ) -> BASBrainBootstrapRequest {
-        BASBrainBootstrapRequest(
-            mode: substrateMode(from: mode),
-            prompt: prompt,
-            source: memorySource(for: source, mode: mode),
-            sourceSurface: interactionSurface(from: sourceSurface),
-            riskLevel: substrateRiskLevel(from: riskLevel),
+        let preparation = BASAppleCurrentBrainBootstrapHostAdapter.request(
+            from: hostBootstrapSourceInput(
+                mode: mode,
+                prompt: prompt,
+                source: source,
+                sourceSurfaceOverride: sourceSurface,
+                riskLevelOverride: riskLevel,
+                projection: .init(records: [], candidates: [], recentEvents: []),
+                taskGraph: nil,
+                retrievalMode: retrievalMode.rawValue,
+                recommendedTemplateIDs: [],
+                templates: [],
+                failurePatterns: [],
+                now: now
+            )
+        ).preparation
+
+        return BASBrainBootstrapRequest(
+            mode: preparation.mode,
+            prompt: preparation.prompt,
+            source: preparation.memorySource,
+            sourceSurface: preparation.sourceSurface,
+            riskLevel: preparation.riskLevel,
             retrievalMode: retrievalMode.rawValue,
-            now: now
+            now: preparation.now
+        )
+    }
+
+    private static func hostBootstrapSourceInput(
+        mode: DecisionMode,
+        prompt: String,
+        source: BrainStateUpdateSource,
+        sourceSurfaceOverride: DecisionIntentSourceSurface?,
+        riskLevelOverride: InterventionRiskLevel?,
+        projection: BASBrainProjection,
+        taskGraph: DecisionTaskGraphSnapshot?,
+        retrievalMode: String,
+        recommendedTemplateIDs: [String],
+        templates: [InterventionTemplateRecord],
+        failurePatterns: [FailurePatternRecord],
+        now: Date
+    ) -> BASAppleCurrentBrainBootstrapHostSourceInput {
+        BASAppleCurrentBrainBootstrapHostSourceInput(
+            modeID: mode.rawValue,
+            prompt: prompt,
+            triggerID: source.rawValue,
+            sourceSurfaceOverrideID: sourceSurfaceOverride?.rawValue,
+            riskLevelOverrideID: riskLevelOverride?.rawValue,
+            preferredLanguages: Locale.preferredLanguages,
+            now: now,
+            projection: projection,
+            embeddingScores: embeddingScores(for: prompt),
+            taskGraphHint: taskGraph.map { snapshot in
+                BASAppleCurrentBrainBootstrapHostTaskGraphInput(
+                    headline: snapshot.nextActionHint,
+                    activeNodeCount: snapshot.tasks.filter { $0.status != .completed }.count,
+                    hasResumeCandidate: !snapshot.tasks.isEmpty,
+                    resumeHint: snapshot.nextActionHint
+                )
+            },
+            retrievalMode: retrievalMode,
+            recommendedTemplateIDs: recommendedTemplateIDs,
+            templates: templates.map { template in
+                BASAppleCurrentBrainBootstrapHostTemplateInput(
+                    id: template.id,
+                    modeID: template.mode.rawValue,
+                    riskLevelID: template.riskLevel.rawValue,
+                    isPinned: template.isPinned,
+                    successCount: template.successCount,
+                    updatedAt: template.updatedAt
+                )
+            },
+            failurePatterns: failurePatterns.map { pattern in
+                BASAppleCurrentBrainBootstrapHostFailurePatternInput(
+                    id: pattern.id,
+                    modeID: pattern.mode.rawValue,
+                    suppressionWeight: pattern.suppressionWeight,
+                    evidenceCount: pattern.evidenceCount,
+                    updatedAt: pattern.updatedAt
+                )
+            }
+        )
+    }
+
+    private static func hostBootstrapSourceInput(
+        preparation: BASCurrentBrainBootstrapPreparation,
+        projection: BASBrainProjection,
+        taskGraph: DecisionTaskGraphSnapshot?,
+        retrievalMode: String,
+        recommendedTemplateIDs: [String],
+        templates: [InterventionTemplateRecord],
+        failurePatterns: [FailurePatternRecord]
+    ) -> BASAppleCurrentBrainBootstrapHostSourceInput {
+        BASAppleCurrentBrainBootstrapHostSourceInput(
+            modeID: preparation.mode.rawValue,
+            prompt: preparation.prompt,
+            triggerID: preparation.trigger.rawValue,
+            sourceSurfaceOverrideID: sourceSurface(from: preparation.sourceSurface).rawValue,
+            riskLevelOverrideID: interventionRiskLevel(from: preparation.riskLevel).rawValue,
+            preferredLanguages: Locale.preferredLanguages,
+            now: preparation.now,
+            projection: projection,
+            embeddingScores: embeddingScores(for: preparation.prompt),
+            taskGraphHint: taskGraph.map { snapshot in
+                BASAppleCurrentBrainBootstrapHostTaskGraphInput(
+                    headline: snapshot.nextActionHint,
+                    activeNodeCount: snapshot.tasks.filter { $0.status != .completed }.count,
+                    hasResumeCandidate: !snapshot.tasks.isEmpty,
+                    resumeHint: snapshot.nextActionHint
+                )
+            },
+            retrievalMode: retrievalMode,
+            recommendedTemplateIDs: recommendedTemplateIDs,
+            templates: templates.map { template in
+                BASAppleCurrentBrainBootstrapHostTemplateInput(
+                    id: template.id,
+                    modeID: template.mode.rawValue,
+                    riskLevelID: template.riskLevel.rawValue,
+                    isPinned: template.isPinned,
+                    successCount: template.successCount,
+                    updatedAt: template.updatedAt
+                )
+            },
+            failurePatterns: failurePatterns.map { pattern in
+                BASAppleCurrentBrainBootstrapHostFailurePatternInput(
+                    id: pattern.id,
+                    modeID: pattern.mode.rawValue,
+                    suppressionWeight: pattern.suppressionWeight,
+                    evidenceCount: pattern.evidenceCount,
+                    updatedAt: pattern.updatedAt
+                )
+            }
         )
     }
 
@@ -722,90 +803,12 @@ enum BehavioralAISubstrateBridge {
         )
     }
 
-    private static func appleTaskGraphHint(
-        from snapshot: DecisionTaskGraphSnapshot
-    ) -> BASAppleTaskGraphHintInput {
-        BASAppleTaskGraphHintInput(
-            headline: snapshot.nextActionHint,
-            activeNodeCount: snapshot.tasks.filter { $0.status != .completed }.count,
-            hasResumeCandidate: !snapshot.tasks.isEmpty,
-            resumeHint: snapshot.nextActionHint
-        )
-    }
-
     private static func embeddingScores(for prompt: String) -> [BASAppleEmbeddingScoreInput] {
         EmbeddingMemoryStore.query(
             prompt,
             allowedTiers: [.hot, .warm],
             limit: 12
         ).map { BASAppleEmbeddingScoreInput(id: $0.id, score: $0.score) }
-    }
-
-    private static func appleTemplateInputs(
-        from templates: [InterventionTemplateRecord]
-    ) -> [BASAppleCurrentBrainBootstrapTemplateInput] {
-        templates.map { template in
-            BASAppleCurrentBrainBootstrapTemplateInput(
-                id: template.id,
-                mode: substrateMode(from: template.mode),
-                riskLevel: riskLevel(from: template.riskLevel),
-                isPinned: template.isPinned,
-                successCount: template.successCount,
-                updatedAt: template.updatedAt
-            )
-        }
-    }
-
-    private static func appleFailurePatternInputs(
-        from patterns: [FailurePatternRecord]
-    ) -> [BASAppleCurrentBrainBootstrapFailurePatternInput] {
-        patterns.map { pattern in
-            BASAppleCurrentBrainBootstrapFailurePatternInput(
-                id: pattern.id,
-                mode: substrateMode(from: pattern.mode),
-                suppressionWeight: pattern.suppressionWeight,
-                evidenceCount: pattern.evidenceCount,
-                updatedAt: pattern.updatedAt
-            )
-        }
-    }
-
-    private static func memorySource(
-        for source: BrainStateUpdateSource,
-        mode: DecisionMode
-    ) -> BASMemorySource {
-        if mode == .mirror {
-            return .reflection
-        }
-        switch source {
-        case .watchHandoff, .notification, .widget:
-            return .reminder
-        case .sessionPrime, .explicitRefresh:
-            return .pattern
-        case .launch, .sceneActive:
-            return .history
-        }
-    }
-
-    private static func currentBrainBootstrapTrigger(
-        from source: BrainStateUpdateSource
-    ) -> BASCurrentBrainBootstrapTrigger {
-        switch source {
-        case .launch:
-            .launch
-        case .sceneActive:
-            .sceneActive
-        case .watchHandoff:
-            .watchHandoff
-        case .notification:
-            .notification
-        case .widget:
-            .widget
-        case .explicitRefresh:
-            .explicitRefresh
-        case .sessionPrime:
-            .sessionPrime
-        }
     }
 
     private static func interactionSurface(from sourceSurface: DecisionIntentSourceSurface) -> BASInteractionSurface {

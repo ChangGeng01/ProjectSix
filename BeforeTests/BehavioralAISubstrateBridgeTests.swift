@@ -332,7 +332,7 @@ struct BehavioralAISubstrateBridgeTests {
                     summary: "Cooling",
                     body: ["Cooling"],
                     mode: .quick,
-                    riskLevel: preparation.riskLevel,
+                    riskLevel: .high,
                     isPinned: true,
                     successCount: 1
                 )
@@ -351,8 +351,8 @@ struct BehavioralAISubstrateBridgeTests {
             ]
         )
 
-        #expect(execution.activeTemplateIDs == ["night_message_cooling", "fallback_template"])
-        #expect(execution.failureGuardIDs == ["night_fast_path_failure"])
+        #expect(execution.orderedTemplateIDs == ["night_message_cooling", "fallback_template"])
+        #expect(execution.orderedFailurePatternIDs == ["night_fast_path_failure"])
         #expect(execution.bootstrapped.taskGraphHint?.headline == "Pause before you send.")
         #expect(execution.bootstrapped.brainState.boundaryPolicy.riskLevel == .high)
     }

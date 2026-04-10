@@ -1,21 +1,35 @@
 import Foundation
 import SwiftData
+import BASAppleAdapters
 
 enum FailurePatternStore {
     static func syncFromHistory(in context: ModelContext) {
-        let failures = recentFailurePatterns(in: context)
+        let failures = BASAppleBootstrapStrategyAdapter.synthesizedFailurePatternSeeds(
+            from: recentFailureHistoryEvents(in: context)
+        )
         let existing = (try? context.fetch(FetchDescriptor<FailurePatternRecord>())) ?? []
         var byID = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
 
         for failure in failures {
             if let record = byID[failure.id] {
-                record.updatedAt = .now
+                record.updatedAt = failure.updatedAt
                 record.detail = failure.detail
                 record.suppressionWeight = failure.suppressionWeight
                 record.evidenceCount = failure.evidenceCount
             } else {
-                context.insert(failure)
-                byID[failure.id] = failure
+                let record = FailurePatternRecord(
+                    id: failure.id,
+                    createdAt: failure.createdAt,
+                    updatedAt: failure.updatedAt,
+                    mode: DecisionMode(rawValue: failure.modeID) ?? .quick,
+                    title: failure.title,
+                    detail: failure.detail,
+                    cadenceTag: failure.cadenceTag,
+                    suppressionWeight: failure.suppressionWeight,
+                    evidenceCount: failure.evidenceCount
+                )
+                context.insert(record)
+                byID[failure.id] = record
             }
         }
 
@@ -33,9 +47,17 @@ enum FailurePatternStore {
             sortBy: [SortDescriptor(\.suppressionWeight, order: .reverse), SortDescriptor(\.updatedAt, order: .reverse)]
         )
         let patterns = (try? context.fetch(descriptor)) ?? []
-        let orderedIDs = BehavioralAISubstrateBridge.orderedFailurePatternIDs(
-            mode: mode,
-            failurePatterns: patterns
+        let orderedIDs = BASAppleBootstrapStrategyAdapter.orderedFailurePatternIDs(
+            modeID: mode.rawValue,
+            failurePatterns: patterns.map { pattern in
+                BASAppleCurrentBrainBootstrapHostFailurePatternInput(
+                    id: pattern.id,
+                    modeID: pattern.mode.rawValue,
+                    suppressionWeight: pattern.suppressionWeight,
+                    evidenceCount: pattern.evidenceCount,
+                    updatedAt: pattern.updatedAt
+                )
+            }
         )
         let priorityByID = Dictionary(uniqueKeysWithValues: orderedIDs.enumerated().map { ($0.element, $0.offset) })
         return patterns
@@ -50,51 +72,16 @@ enum FailurePatternStore {
             }
     }
 
-    private static func recentFailurePatterns(in context: ModelContext) -> [FailurePatternRecord] {
+    private static func recentFailureHistoryEvents(
+        in context: ModelContext
+    ) -> [BASAppleFailureHistoryEventInput] {
         let descriptor = FetchDescriptor<CheckEvent>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
-        let events = (try? context.fetch(descriptor)) ?? []
-        let negative = events.filter {
-            guard let outcome = $0.reflectionOutcome else { return false }
-            return outcome == .regrettedIt || outcome == .feltEmptier
-        }
-
-        guard !negative.isEmpty else { return [] }
-
-        let nightFailures = negative.filter {
-            let hour = Calendar.autoupdatingCurrent.component(.hour, from: $0.createdAt)
-            return hour >= 22 || hour < 5
-        }
-        let proceedFailures = negative.filter {
-            $0.finalAction == .goAheadAnyway || $0.finalAction == .continueMindfully
-        }
-
-        var results: [FailurePatternRecord] = []
-        if nightFailures.count >= 2 {
-            results.append(
-                FailurePatternRecord(
-                    id: "night_fast_path_failure",
-                    mode: .quick,
-                    title: "Night fast paths backfire",
-                    detail: "Fast action at night has repeatedly ended in regret or emptiness.",
-                    cadenceTag: "night_fast_path",
-                    suppressionWeight: min(1, 0.4 + Double(nightFailures.count) * 0.12),
-                    evidenceCount: nightFailures.count
-                )
+        return ((try? context.fetch(descriptor)) ?? []).map { event in
+            BASAppleFailureHistoryEventInput(
+                createdAt: event.createdAt,
+                reflectionOutcomeID: event.reflectionOutcome?.rawValue,
+                finalActionID: event.finalAction.rawValue
             )
         }
-        if proceedFailures.count >= 2 {
-            results.append(
-                FailurePatternRecord(
-                    id: "proceed_without_pause_failure",
-                    mode: .quick,
-                    title: "Proceeding too fast backfires",
-                    detail: "Going forward without a pause has repeatedly ended badly.",
-                    cadenceTag: "proceed_fast",
-                    suppressionWeight: min(1, 0.4 + Double(proceedFailures.count) * 0.1),
-                    evidenceCount: proceedFailures.count
-                )
-            )
-        }
-        return results
     }
 }

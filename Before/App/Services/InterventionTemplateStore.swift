@@ -1,12 +1,26 @@
 import Foundation
 import SwiftData
+import BASAppleAdapters
 
 enum InterventionTemplateStore {
     static func ensureDefaults(in context: ModelContext) {
         let existing = (try? context.fetch(FetchDescriptor<InterventionTemplateRecord>())) ?? []
         let byID = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
-        for template in defaultTemplates where byID[template.id] == nil {
-            context.insert(template)
+        for seed in BASAppleBootstrapStrategyAdapter.defaultTemplateSeeds() where byID[seed.id] == nil {
+            context.insert(
+                InterventionTemplateRecord(
+                    id: seed.id,
+                    createdAt: seed.createdAt,
+                    updatedAt: seed.updatedAt,
+                    title: seed.title,
+                    summary: seed.summary,
+                    body: seed.body,
+                    mode: DecisionMode(rawValue: seed.modeID) ?? .quick,
+                    riskLevel: InterventionRiskLevel(rawValue: seed.riskLevelID) ?? .low,
+                    isPinned: seed.isPinned,
+                    successCount: seed.successCount
+                )
+            )
         }
         if context.hasChanges {
             try? context.save()
@@ -24,11 +38,20 @@ enum InterventionTemplateStore {
             sortBy: [SortDescriptor(\.successCount, order: .reverse), SortDescriptor(\.updatedAt, order: .reverse)]
         )
         let templates = (try? context.fetch(descriptor)) ?? []
-        let orderedIDs = BehavioralAISubstrateBridge.orderedTemplateIDs(
-            mode: mode,
-            riskLevel: riskLevel,
+        let orderedIDs = BASAppleBootstrapStrategyAdapter.orderedTemplateIDs(
+            modeID: mode.rawValue,
+            riskLevelID: riskLevel.rawValue,
             recommendedTemplateIDs: recommendedArmIDs,
-            templates: templates
+            templates: templates.map { template in
+                BASAppleCurrentBrainBootstrapHostTemplateInput(
+                    id: template.id,
+                    modeID: template.mode.rawValue,
+                    riskLevelID: template.riskLevel.rawValue,
+                    isPinned: template.isPinned,
+                    successCount: template.successCount,
+                    updatedAt: template.updatedAt
+                )
+            }
         )
         let priorityByID = Dictionary(uniqueKeysWithValues: orderedIDs.enumerated().map { ($0.element, $0.offset) })
         return templates
@@ -41,62 +64,5 @@ enum InterventionTemplateStore {
                 }
                 return lhsPriority < rhsPriority
             }
-    }
-
-    private static var defaultTemplates: [InterventionTemplateRecord] {
-        [
-            InterventionTemplateRecord(
-                id: "tomorrow_box_interrupt",
-                title: "Night-message cooling",
-                summary: "Lower the heat, then move the message into tomorrow.",
-                body: [
-                    "Step back from the send button.",
-                    "Name what this message is trying to fix right now.",
-                    "Put it into Tomorrow Box before you reread it."
-                ],
-                mode: .quick,
-                riskLevel: .medium,
-                isPinned: true
-            ),
-            InterventionTemplateRecord(
-                id: "brief_warm_nudge",
-                title: "Impulse-buy cooling",
-                summary: "Short, warm friction before spending from blur.",
-                body: [
-                    "Pause the purchase.",
-                    "Name whether this is need, relief, or reward.",
-                    "Reopen it in daylight."
-                ],
-                mode: .quick,
-                riskLevel: .low,
-                isPinned: true
-            ),
-            InterventionTemplateRecord(
-                id: "reflective_question",
-                title: "Anxiety loop interruption",
-                summary: "Use one question and one grounded action instead of more spinning.",
-                body: [
-                    "What are you trying to make go away quickly?",
-                    "Choose one small grounded action.",
-                    "Do not solve the whole future right now."
-                ],
-                mode: .mirror,
-                riskLevel: .medium,
-                isPinned: true
-            ),
-            InterventionTemplateRecord(
-                id: "slow_delay_guard",
-                title: "Self-blame recovery",
-                summary: "Slow the cadence, keep it honest, and stop adding punishment.",
-                body: [
-                    "Name what happened without adding contempt.",
-                    "Choose one boundary step, not a life sentence.",
-                    "If needed, move the call into Tomorrow Box."
-                ],
-                mode: .mirror,
-                riskLevel: .high,
-                isPinned: true
-            )
-        ]
     }
 }

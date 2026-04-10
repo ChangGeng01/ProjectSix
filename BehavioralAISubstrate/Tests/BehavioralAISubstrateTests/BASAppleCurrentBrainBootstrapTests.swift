@@ -359,4 +359,78 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(artifact.execution.orderedTemplateIDs == ["night_message_cooling"])
         #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.rawValue)
     }
+
+    @Test("host bootstrap adapter compiles raw bridge inputs into artifact semantics")
+    func hostBootstrapAdapterCompilesRawBridgeInputsIntoArtifactSemantics() {
+        let now = Date(timeIntervalSince1970: 1_744_322_200)
+
+        let artifact = BASAppleCurrentBrainBootstrapHostAdapter.artifact(
+            from: BASAppleCurrentBrainBootstrapHostSourceInput(
+                modeID: "quick",
+                prompt: "Should I wait until morning?",
+                triggerID: "notification",
+                sourceSurfaceOverrideID: "notification",
+                riskLevelOverrideID: "high",
+                preferredLanguages: ["en-AU"],
+                now: now,
+                projection: BASBrainProjection(
+                    records: [
+                        BASGovernedMemory(
+                            kind: .goal,
+                            content: "Protect tomorrow morning energy.",
+                            scope: .user,
+                            sensitivity: .low,
+                            tier: .hot,
+                            confidence: 0.91,
+                            sourceType: "history",
+                            governanceStatus: .governed,
+                            provenanceSummary: "goal"
+                        )
+                    ],
+                    candidates: [],
+                    recentEvents: []
+                ),
+                embeddingScores: [
+                    BASAppleEmbeddingScoreInput(
+                        id: "00000000-0000-0000-0000-000000000999",
+                        score: 0.8
+                    )
+                ],
+                taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput(
+                    headline: "Pause before you send.",
+                    activeNodeCount: 1,
+                    hasResumeCandidate: true,
+                    resumeHint: "Pause before you send."
+                ),
+                retrievalMode: "filtered",
+                recommendedTemplateIDs: ["night_message_cooling"],
+                templates: [
+                    BASAppleCurrentBrainBootstrapHostTemplateInput(
+                        id: "night_message_cooling",
+                        modeID: "quick",
+                        riskLevelID: "high",
+                        isPinned: true,
+                        successCount: 3,
+                        updatedAt: now
+                    )
+                ],
+                failurePatterns: [
+                    BASAppleCurrentBrainBootstrapHostFailurePatternInput(
+                        id: "night_fast_path_failure",
+                        modeID: "quick",
+                        suppressionWeight: 0.95,
+                        evidenceCount: 2,
+                        updatedAt: now
+                    )
+                ]
+            )
+        )
+
+        #expect(artifact.execution.preparation.trigger == .notification)
+        #expect(artifact.execution.preparation.sourceSurface == .notification)
+        #expect(artifact.execution.preparation.riskLevel == .high)
+        #expect(artifact.execution.orderedTemplateIDs == ["night_message_cooling"])
+        #expect(artifact.execution.orderedFailurePatternIDs == ["night_fast_path_failure"])
+        #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.rawValue)
+    }
 }
