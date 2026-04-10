@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import BASMemory
 import BASPolicy
 import BASRuntimeCore
@@ -334,6 +335,92 @@ public enum BASAppleCurrentBrainBootstrapCoordinator {
                 templates: templates,
                 failurePatterns: failurePatterns
             )
+        )
+    }
+}
+
+public struct BASAppleCurrentBrainBootstrapCommitResult<
+    Update: BASAppleCurrentBrainUpdateEntity,
+    Checkpoint: BASAppleEvolutionCheckpointEntity
+> {
+    public var preparation: BASCurrentBrainBootstrapPreparation
+    public var brainState: BASDecisionBrainState
+    public var dominantGoal: String?
+    public var activeConstraints: [String]
+    public var orderedTemplateIDs: [String]
+    public var orderedFailurePatternIDs: [String]
+    public var commit: BASAppleCurrentBrainCommitWriteResult<Update, Checkpoint>
+
+    public init(
+        preparation: BASCurrentBrainBootstrapPreparation,
+        brainState: BASDecisionBrainState,
+        dominantGoal: String?,
+        activeConstraints: [String],
+        orderedTemplateIDs: [String],
+        orderedFailurePatternIDs: [String],
+        commit: BASAppleCurrentBrainCommitWriteResult<Update, Checkpoint>
+    ) {
+        self.preparation = preparation
+        self.brainState = brainState
+        self.dominantGoal = dominantGoal
+        self.activeConstraints = activeConstraints
+        self.orderedTemplateIDs = orderedTemplateIDs
+        self.orderedFailurePatternIDs = orderedFailurePatternIDs
+        self.commit = commit
+    }
+}
+
+public enum BASAppleCurrentBrainRuntimeCoordinator {
+    public static func bootstrapAndCommit<
+        Template,
+        FailurePattern,
+        Update: BASAppleCurrentBrainUpdateEntity,
+        Checkpoint: BASAppleEvolutionCheckpointEntity
+    >(
+        context: BASAppleCurrentBrainBootstrapHostBuildContext,
+        in modelContext: ModelContext,
+        createdAt: Date = .now,
+        checkpointLimit: Int = BASEvolutionCheckpointPlanner.defaultCheckpointLimit,
+        checkpointRetentionInterval: TimeInterval = BASEvolutionCheckpointPlanner.defaultRetentionInterval,
+        recommendTemplateIDs: (BASCurrentBrainBootstrapPreparation) -> [String],
+        selectTemplates: (BASCurrentBrainBootstrapPreparation, [String]) -> [Template],
+        selectFailurePatterns: (BASCurrentBrainBootstrapPreparation) -> [FailurePattern],
+        mapTemplate: (Template) -> BASAppleCurrentBrainBootstrapHostTemplateInput,
+        mapFailurePattern: (FailurePattern) -> BASAppleCurrentBrainBootstrapHostFailurePatternInput,
+        onCheckpointSaveError: ((Error) -> Void)? = nil,
+        onUpdateSaveError: ((Error) -> Void)? = nil
+    ) -> BASAppleCurrentBrainBootstrapCommitResult<Update, Checkpoint> {
+        let artifact = BASAppleCurrentBrainBootstrapCoordinator.artifact(
+            context: context,
+            recommendTemplateIDs: recommendTemplateIDs,
+            selectTemplates: selectTemplates,
+            selectFailurePatterns: selectFailurePatterns,
+            mapTemplate: mapTemplate,
+            mapFailurePattern: mapFailurePattern
+        )
+
+        let commit: BASAppleCurrentBrainCommitWriteResult<Update, Checkpoint> =
+            BASAppleCurrentBrainCommitter.commit(
+                modeName: context.modeID,
+                sourceID: context.triggerID,
+                brainState: artifact.execution.bootstrapped.brainState,
+                persistenceInput: artifact.persistenceInput,
+                in: modelContext,
+                createdAt: createdAt,
+                checkpointLimit: checkpointLimit,
+                checkpointRetentionInterval: checkpointRetentionInterval,
+                onCheckpointSaveError: onCheckpointSaveError,
+                onUpdateSaveError: onUpdateSaveError
+            )
+
+        return BASAppleCurrentBrainBootstrapCommitResult(
+            preparation: artifact.execution.preparation,
+            brainState: commit.brainState,
+            dominantGoal: artifact.execution.bootstrapped.dominantGoal,
+            activeConstraints: artifact.execution.bootstrapped.activeConstraints,
+            orderedTemplateIDs: artifact.execution.orderedTemplateIDs,
+            orderedFailurePatternIDs: artifact.execution.orderedFailurePatternIDs,
+            commit: commit
         )
     }
 }

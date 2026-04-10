@@ -23,29 +23,64 @@ enum BehavioralAISubstrateBridge {
         InterventionTemplateStore.ensureDefaults(in: context)
         FailurePatternStore.syncFromHistory(in: context)
 
-        let artifact = bootstrapCurrentBrainStateArtifact(
-            mode: mode,
-            prompt: prompt,
-            source: source,
-            envelope: envelope,
-            taskGraph: taskGraph,
-            context: context,
-            projection: projection,
-            retrievalMode: retrievalMode,
-            now: now
-        )
-        let commit: BASAppleCurrentBrainCommitWriteResult<
+        let committed: BASAppleCurrentBrainBootstrapCommitResult<
             BrainStateUpdate,
             DecisionEvolutionCheckpoint
-        > = BASAppleCurrentBrainCommitter.commit(
-            modeName: mode.rawValue,
-            sourceID: source.rawValue,
-            brainState: artifact.execution.bootstrapped.brainState,
-            persistenceInput: artifact.persistenceInput,
+        > = BASAppleCurrentBrainRuntimeCoordinator.bootstrapAndCommit(
+            context: hostBootstrapBuildContext(
+                mode: mode,
+                prompt: prompt,
+                source: source,
+                sourceSurfaceOverride: envelope?.sourceSurface,
+                riskLevelOverride: envelope?.riskLevel,
+                projection: projection.baseProjection,
+                taskGraph: taskGraph,
+                retrievalMode: retrievalMode.rawValue,
+                recommendedTemplateIDs: [],
+                now: now
+            ),
             in: context,
             createdAt: now,
             checkpointLimit: BeforePolicy.RuntimeState.evolutionCheckpointLimit,
             checkpointRetentionInterval: BeforePolicy.RuntimeState.evolutionCheckpointRetentionInterval,
+            recommendTemplateIDs: { preparation in
+                DecisionReactionBanditStore.recommendedArmIDs(
+                    mode: mode,
+                    riskLevel: interventionRiskLevel(from: preparation.riskLevel),
+                    languageMode: decisionLanguageMode(from: preparation.languageMode),
+                    now: preparation.now
+                )
+            },
+            selectTemplates: { preparation, recommendedTemplateIDs in
+                InterventionTemplateStore.selectTemplates(
+                    in: context,
+                    mode: mode,
+                    riskLevel: interventionRiskLevel(from: preparation.riskLevel),
+                    recommendedArmIDs: recommendedTemplateIDs
+                )
+            },
+            selectFailurePatterns: { _ in
+                FailurePatternStore.selectedFailurePatterns(in: context, mode: mode)
+            },
+            mapTemplate: { template in
+                BASAppleCurrentBrainBootstrapHostTemplateInput(
+                    id: template.id,
+                    modeID: template.mode.rawValue,
+                    riskLevelID: template.riskLevel.rawValue,
+                    isPinned: template.isPinned,
+                    successCount: template.successCount,
+                    updatedAt: template.updatedAt
+                )
+            },
+            mapFailurePattern: { pattern in
+                BASAppleCurrentBrainBootstrapHostFailurePatternInput(
+                    id: pattern.id,
+                    modeID: pattern.mode.rawValue,
+                    suppressionWeight: pattern.suppressionWeight,
+                    evidenceCount: pattern.evidenceCount,
+                    updatedAt: pattern.updatedAt
+                )
+            },
             onCheckpointSaveError: { error in
                 PersistenceIssueRecorder.record(
                     error: error,
@@ -62,15 +97,15 @@ enum BehavioralAISubstrateBridge {
 
         return CurrentBrainState(
             source: source,
-            sourceSurface: sourceSurface(from: artifact.execution.preparation.sourceSurface),
+            sourceSurface: sourceSurface(from: committed.preparation.sourceSurface),
             mode: mode,
-            riskLevel: interventionRiskLevel(from: artifact.execution.preparation.riskLevel),
+            riskLevel: interventionRiskLevel(from: committed.preparation.riskLevel),
             taskGraph: taskGraph,
-            brainState: commit.brainState,
-            dominantGoal: artifact.execution.bootstrapped.dominantGoal,
-            activeConstraints: artifact.execution.bootstrapped.activeConstraints,
-            activeTemplateIDs: artifact.execution.orderedTemplateIDs,
-            failureGuardIDs: artifact.execution.orderedFailurePatternIDs,
+            brainState: committed.brainState,
+            dominantGoal: committed.dominantGoal,
+            activeConstraints: committed.activeConstraints,
+            activeTemplateIDs: committed.orderedTemplateIDs,
+            failureGuardIDs: committed.orderedFailurePatternIDs,
             sourceIntentEnvelope: envelope,
             loadedAt: now
         )
@@ -194,71 +229,6 @@ enum BehavioralAISubstrateBridge {
                 createdAt: envelope.requestedAt
             ),
             route: nil
-        )
-    }
-
-    static func bootstrapCurrentBrainStateArtifact(
-        mode: DecisionMode,
-        prompt: String,
-        source: BrainStateUpdateSource,
-        envelope: DecisionIntentEnvelope?,
-        taskGraph: DecisionTaskGraphSnapshot?,
-        context: ModelContext,
-        projection: DecisionMemorySystem.BrainStateProjection,
-        retrievalMode: DecisionRetrievalMode,
-        now: Date
-    ) -> BASAppleCurrentBrainBootstrapArtifact {
-        BASAppleCurrentBrainBootstrapCoordinator.artifact(
-            context: hostBootstrapBuildContext(
-                mode: mode,
-                prompt: prompt,
-                source: source,
-                sourceSurfaceOverride: envelope?.sourceSurface,
-                riskLevelOverride: envelope?.riskLevel,
-                projection: projection.baseProjection,
-                taskGraph: taskGraph,
-                retrievalMode: retrievalMode.rawValue,
-                recommendedTemplateIDs: [],
-                now: now
-            ),
-            recommendTemplateIDs: { preparation in
-                DecisionReactionBanditStore.recommendedArmIDs(
-                    mode: mode,
-                    riskLevel: interventionRiskLevel(from: preparation.riskLevel),
-                    languageMode: decisionLanguageMode(from: preparation.languageMode),
-                    now: preparation.now
-                )
-            },
-            selectTemplates: { preparation, recommendedTemplateIDs in
-                InterventionTemplateStore.selectTemplates(
-                    in: context,
-                    mode: mode,
-                    riskLevel: interventionRiskLevel(from: preparation.riskLevel),
-                    recommendedArmIDs: recommendedTemplateIDs
-                )
-            },
-            selectFailurePatterns: { _ in
-                FailurePatternStore.selectedFailurePatterns(in: context, mode: mode)
-            },
-            mapTemplate: { template in
-                BASAppleCurrentBrainBootstrapHostTemplateInput(
-                    id: template.id,
-                    modeID: template.mode.rawValue,
-                    riskLevelID: template.riskLevel.rawValue,
-                    isPinned: template.isPinned,
-                    successCount: template.successCount,
-                    updatedAt: template.updatedAt
-                )
-            },
-            mapFailurePattern: { pattern in
-                BASAppleCurrentBrainBootstrapHostFailurePatternInput(
-                    id: pattern.id,
-                    modeID: pattern.mode.rawValue,
-                    suppressionWeight: pattern.suppressionWeight,
-                    evidenceCount: pattern.evidenceCount,
-                    updatedAt: pattern.updatedAt
-                )
-            }
         )
     }
 

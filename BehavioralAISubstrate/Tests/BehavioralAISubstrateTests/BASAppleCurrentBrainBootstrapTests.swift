@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import BASAppleAdapters
 @testable import BASMemory
@@ -7,6 +8,104 @@ import Testing
 
 @Suite("BASApple Current Brain Bootstrap")
 struct BASAppleCurrentBrainBootstrapTests {
+    @Model
+    final class UpdateFixture: BASAppleCurrentBrainUpdateEntity {
+        @Attribute(.unique) var id: UUID
+        var createdAt: Date
+        var source: String
+        var mode: String
+        var dominantGoal: String?
+        var dominantReactionWeight: String
+        var fingerprint: String
+        var activeConstraints: [String]
+        var activeTemplateIDs: [String]
+        var failureGuardIDs: [String]
+
+        init(fields: BASCurrentBrainUpdateStoredFields) {
+            self.id = fields.id
+            self.createdAt = fields.createdAt
+            self.source = fields.source
+            self.mode = fields.mode
+            self.dominantGoal = fields.dominantGoal
+            self.dominantReactionWeight = fields.dominantReactionWeight
+            self.fingerprint = fields.fingerprint
+            self.activeConstraints = fields.activeConstraints
+            self.activeTemplateIDs = fields.activeTemplateIDs
+            self.failureGuardIDs = fields.failureGuardIDs
+        }
+
+        static func basMake(from fields: BASCurrentBrainUpdateStoredFields) -> UpdateFixture {
+            UpdateFixture(fields: fields)
+        }
+
+        var basSnapshot: BASCurrentBrainUpdateStoredFields {
+            BASCurrentBrainUpdateStoredFields(
+                id: id,
+                createdAt: createdAt,
+                source: source,
+                mode: mode,
+                dominantGoal: dominantGoal,
+                dominantReactionWeight: dominantReactionWeight,
+                fingerprint: fingerprint,
+                activeConstraints: activeConstraints,
+                activeTemplateIDs: activeTemplateIDs,
+                failureGuardIDs: failureGuardIDs
+            )
+        }
+    }
+
+    @Model
+    final class CheckpointFixture: BASAppleEvolutionCheckpointEntity {
+        @Attribute(.unique) var id: String
+        var createdAt: Date
+        var fingerprint: String
+        var previousCheckpointID: String?
+        var modeName: String
+        var sourceID: String
+        var identityRoleRaw: String
+        var boundaryModeRaw: String
+        var calibrationStatusRaw: String
+        var diffSummary: [String]
+        var approvalStateRaw: String
+        var rollbackReady: Bool
+
+        init(fields: BASEvolutionCheckpointStoredFields) {
+            self.id = fields.id
+            self.createdAt = fields.createdAt
+            self.fingerprint = fields.fingerprint
+            self.previousCheckpointID = fields.previousCheckpointID
+            self.modeName = fields.modeName
+            self.sourceID = fields.sourceID
+            self.identityRoleRaw = fields.identityRole.rawValue
+            self.boundaryModeRaw = fields.boundaryMode.rawValue
+            self.calibrationStatusRaw = fields.calibrationStatus.rawValue
+            self.diffSummary = fields.diffSummary
+            self.approvalStateRaw = fields.approvalState.rawValue
+            self.rollbackReady = fields.rollbackReady
+        }
+
+        static func basMake(from fields: BASEvolutionCheckpointStoredFields) -> CheckpointFixture {
+            CheckpointFixture(fields: fields)
+        }
+
+        var basSnapshot: BASEvolutionCheckpointStoredFields {
+            BASEvolutionCheckpointStoredFields(
+                id: id,
+                createdAt: createdAt,
+                fingerprint: fingerprint,
+                previousCheckpointID: previousCheckpointID,
+                modeName: modeName,
+                sourceID: sourceID,
+                identityRole: BASIdentityRole(rawValue: identityRoleRaw) ?? .pauseCompanion,
+                boundaryMode: BASBoundaryPolicyMode(rawValue: boundaryModeRaw) ?? .localOnlyAdvisory,
+                calibrationStatus: BASCalibrationStatus(rawValue: calibrationStatusRaw) ?? .stable,
+                diffSummary: diffSummary,
+                approvalState: BASEvolutionApprovalState(rawValue: approvalStateRaw) ?? .automatic,
+                rollbackReady: rollbackReady
+            )
+        }
+    }
+
     @Test("host input builder centralizes host-source compilation for apple bootstrap")
     func hostInputBuilderCompilesContextAndDescriptors() {
         let now = Date(timeIntervalSince1970: 1_744_322_100)
@@ -82,6 +181,96 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(request.riskLevel == BASRiskLevel.low)
         #expect(request.retrievalMode == "filtered")
         #expect(request.now == now)
+    }
+
+    @Test("runtime coordinator bootstraps and commits current brain state in one package-owned flow")
+    func runtimeCoordinatorBootstrapsAndCommits() throws {
+        let now = Date(timeIntervalSince1970: 1_744_322_220)
+        let container = try ModelContainer(
+            for: UpdateFixture.self,
+            CheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+
+        let result: BASAppleCurrentBrainBootstrapCommitResult<UpdateFixture, CheckpointFixture> =
+            BASAppleCurrentBrainRuntimeCoordinator.bootstrapAndCommit(
+                context: BASAppleCurrentBrainBootstrapHostBuildContext(
+                    modeID: BASDecisionMode.quick.rawValue,
+                    prompt: "Should I send this tonight?",
+                    triggerID: BASCurrentBrainBootstrapTrigger.notification.rawValue,
+                    sourceSurfaceOverrideID: BASInteractionSurface.notification.rawValue,
+                    riskLevelOverrideID: BASRiskLevel.high.rawValue,
+                    preferredLanguages: ["en-AU"],
+                    now: now,
+                    projection: BASBrainProjection(
+                        records: [
+                            BASGovernedMemory(
+                                kind: .goal,
+                                content: "Protect sleep before midnight",
+                                scope: .user,
+                                sensitivity: .low,
+                                tier: .hot,
+                                confidence: 0.94,
+                                sourceType: "history",
+                                governanceStatus: .governed,
+                                provenanceSummary: "goal"
+                            )
+                        ],
+                        candidates: [],
+                        recentEvents: []
+                    ),
+                    embeddingScores: [
+                        BASAppleEmbeddingScoreInput(id: "goal-1", score: 0.9)
+                    ],
+                    taskGraphHint: BASAppleCurrentBrainBootstrapHostInputBuilder.taskGraphInput(
+                        headline: "Pause before sending.",
+                        activeNodeCount: 1,
+                        hasResumeCandidate: true,
+                        resumeHint: "Sleep on it."
+                    ),
+                    retrievalMode: "filtered"
+                ),
+                in: context,
+                createdAt: now,
+                checkpointLimit: 4,
+                checkpointRetentionInterval: 60 * 60,
+                recommendTemplateIDs: { _ in ["night_message_cooling"] },
+                selectTemplates: { _, _ in
+                    [
+                        BASAppleCurrentBrainBootstrapHostTemplateInput(
+                            id: "night_message_cooling",
+                            modeID: BASDecisionMode.quick.rawValue,
+                            riskLevelID: BASRiskLevel.high.rawValue,
+                            isPinned: true,
+                            successCount: 3,
+                            updatedAt: now
+                        )
+                    ]
+                },
+                selectFailurePatterns: { _ in
+                    [
+                        BASAppleCurrentBrainBootstrapHostFailurePatternInput(
+                            id: "night_fast_path_failure",
+                            modeID: BASDecisionMode.quick.rawValue,
+                            suppressionWeight: 0.9,
+                            evidenceCount: 2,
+                            updatedAt: now
+                        )
+                    ]
+                },
+                mapTemplate: { $0 },
+                mapFailurePattern: { $0 }
+            )
+
+        #expect(result.preparation.sourceSurface == .notification)
+        #expect(result.preparation.riskLevel == .high)
+        #expect(result.dominantGoal == "Protect sleep before midnight")
+        #expect(result.orderedTemplateIDs == ["night_message_cooling"])
+        #expect(result.orderedFailurePatternIDs == ["night_fast_path_failure"])
+        #expect(result.commit.wroteCheckpoint)
+        #expect(result.commit.orderedUpdates.count == 1)
+        #expect(result.commit.orderedCheckpoints.count == 1)
     }
 
     @Test("prepare resolves default surface, language mode, memory source, and risk overrides")
