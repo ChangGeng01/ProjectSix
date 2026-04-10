@@ -3,68 +3,6 @@ import SwiftData
 import BASAppleAdapters
 import BASMemory
 
-struct DecisionMemoryDraft: Sendable {
-    let id: String
-    let type: DecisionMemoryType
-    let topic: String
-    let headline: String
-    let value: String
-    let confidence: Double
-    let priority: Double
-    let source: DecisionMemorySource
-    let lastConfirmedAt: Date
-    let decayPolicy: DecisionMemoryDecayPolicy
-    let retrievalTags: [String]
-    let evidenceCount: Int
-    let provenanceSummary: String
-    let promotionPolicy: BASDraftPromotionPolicy
-    let tier: DecisionMemoryTier = .warm
-
-    var fingerprint: String {
-        [
-            id,
-            type.rawValue,
-            topic,
-            headline,
-            value,
-            String(format: "%.3f", confidence),
-            String(format: "%.3f", priority),
-            source.rawValue,
-            lastConfirmedAt.ISO8601Format(),
-            decayPolicy.rawValue,
-            retrievalTags.sorted().joined(separator: "|"),
-            String(evidenceCount)
-        ]
-        .joined(separator: "::")
-    }
-
-    func makeRecord(
-        observationCount: Int,
-        lifecycleState: DecisionMemoryLifecycleState = .active,
-        lastReviewedAt: Date? = nil
-    ) -> DecisionMemoryRecord {
-        DecisionMemoryRecord(
-            id: id,
-            type: type,
-            topic: topic,
-            headline: headline,
-            value: value,
-            confidence: confidence,
-            priority: priority,
-            source: source,
-            lastConfirmedAt: lastConfirmedAt,
-            decayPolicy: decayPolicy,
-            retrievalTags: retrievalTags,
-            evidenceCount: evidenceCount,
-            observationCount: observationCount,
-            provenanceSummary: provenanceSummary,
-            lifecycleState: lifecycleState,
-            lastReviewedAt: lastReviewedAt,
-            tier: tier
-        )
-    }
-}
-
 enum DecisionMemorySystem {
     static let projectionRecordLimit = 72
     static let projectionCandidateLimit = 32
@@ -386,7 +324,7 @@ enum DecisionMemorySystem {
     private static func deriveMemoryDrafts(
         in context: ModelContext,
         now: Date
-    ) -> [DecisionMemoryDraft] {
+    ) -> [BASDerivedMemoryDraft] {
         let checkEvents = (try? context.fetch(
             FetchDescriptor<CheckEvent>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
         )) ?? []
@@ -435,26 +373,6 @@ enum DecisionMemorySystem {
                 },
                 now: now
             )
-        )
-        .map(makeDraft(from:))
-    }
-
-    private static func makeDraft(from derived: BASDerivedMemoryDraft) -> DecisionMemoryDraft {
-        DecisionMemoryDraft(
-            id: derived.id,
-            type: DecisionMemoryType(rawValue: derived.typeID) ?? .semantic,
-            topic: derived.topic,
-            headline: derived.headline,
-            value: derived.value,
-            confidence: derived.confidence,
-            priority: derived.priority,
-            source: DecisionMemorySource(rawValue: derived.sourceID) ?? .history,
-            lastConfirmedAt: derived.lastConfirmedAt,
-            decayPolicy: DecisionMemoryDecayPolicy(rawValue: derived.decayPolicyID) ?? .medium,
-            retrievalTags: derived.retrievalTags,
-            evidenceCount: derived.evidenceCount,
-            provenanceSummary: derived.provenanceSummary,
-            promotionPolicy: derived.promotionPolicy
         )
     }
 }

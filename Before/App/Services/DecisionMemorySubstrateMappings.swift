@@ -121,35 +121,6 @@ extension DecisionMemoryWriteOperation {
     }
 }
 
-extension DecisionMemoryDraft {
-    var governanceDraftInput: BASMemoryGovernanceDraftInput {
-        BASMemoryGovernanceDraftInput(
-            id: id,
-            typeID: type.rawValue,
-            topic: topic,
-            headline: headline,
-            value: value,
-            confidence: confidence,
-            priority: priority,
-            source: source.basSource,
-            lastConfirmedAt: lastConfirmedAt,
-            decayPolicy: decayPolicy.basDecayPolicy,
-            retrievalTags: retrievalTags,
-            evidenceCount: evidenceCount,
-            provenanceSummary: provenanceSummary,
-            promotionPolicy: promotionPolicy,
-            tierID: tier.rawValue
-        )
-    }
-
-    var reconciliationDraftInput: BASMemoryReconciliationDraftInput {
-        BASMemoryReconciliationDraftInput(
-            draft: governanceDraftInput,
-            fingerprint: fingerprint
-        )
-    }
-}
-
 extension DecisionMemoryRecord {
     var lifecycleReviewInput: BASMemoryLifecycleReviewInput {
         BASMemoryLifecycleReviewInput(

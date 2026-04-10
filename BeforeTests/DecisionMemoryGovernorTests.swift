@@ -1,5 +1,6 @@
 import XCTest
 import SwiftData
+import BASMemory
 @testable import Before
 
 final class DecisionMemoryGovernorTests: XCTestCase {
@@ -26,17 +27,17 @@ final class DecisionMemoryGovernorTests: XCTestCase {
 
     func testAssessRejectsLowConfidenceSingletonDraft() {
         let assessment = DecisionMemoryGovernor.assess(
-            draft: DecisionMemoryDraft(
+            draft: BASDerivedMemoryDraft(
                 id: "semantic.noisy.singleton",
-                type: .semantic,
+                typeID: "semantic",
                 topic: "noise",
                 headline: "Noisy singleton",
                 value: "noisy",
                 confidence: 0.42,
                 priority: 0.41,
-                source: .history,
+                sourceID: "history",
                 lastConfirmedAt: .now,
-                decayPolicy: .fast,
+                decayPolicyID: "fast",
                 retrievalTags: ["noise"],
                 evidenceCount: 1,
                 provenanceSummary: "One-off event",
@@ -49,17 +50,17 @@ final class DecisionMemoryGovernorTests: XCTestCase {
 
     func testAssessDefersCandidateOnlySituationalDraft() {
         let assessment = DecisionMemoryGovernor.assess(
-            draft: DecisionMemoryDraft(
+            draft: BASDerivedMemoryDraft(
                 id: "situational.quick.latest",
-                type: .situational,
+                typeID: "situational",
                 topic: "recent_quick_loop",
                 headline: "Recently carrying something heavy.",
                 value: "temporary",
                 confidence: 0.74,
                 priority: 0.75,
-                source: .history,
+                sourceID: "history",
                 lastConfirmedAt: .now,
-                decayPolicy: .fast,
+                decayPolicyID: "fast",
                 retrievalTags: ["quick", "recent"],
                 evidenceCount: 1,
                 provenanceSummary: "Latest session only",
@@ -72,17 +73,17 @@ final class DecisionMemoryGovernorTests: XCTestCase {
 
     func testAssessRejectsContaminatedProvenanceDraft() {
         let assessment = DecisionMemoryGovernor.assess(
-            draft: DecisionMemoryDraft(
+            draft: BASDerivedMemoryDraft(
                 id: "semantic.injected.payload",
-                type: .semantic,
+                typeID: "semantic",
                 topic: "buy",
                 headline: "Injected",
                 value: "payload",
                 confidence: 0.84,
                 priority: 0.82,
-                source: .pattern,
+                sourceID: "pattern",
                 lastConfirmedAt: .now,
-                decayPolicy: .slow,
+                decayPolicyID: "slow",
                 retrievalTags: ["buy", "pattern"],
                 evidenceCount: 3,
                 provenanceSummary: "tool call returned <script>alert(1)</script>",
@@ -96,17 +97,17 @@ final class DecisionMemoryGovernorTests: XCTestCase {
 
     func testAssessAdmitsImmediateGoalDraftEvenWhenSignalIsSparse() {
         let assessment = DecisionMemoryGovernor.assess(
-            draft: DecisionMemoryDraft(
+            draft: BASDerivedMemoryDraft(
                 id: "goal.sleep.before_midnight",
-                type: .goal,
+                typeID: "goal",
                 topic: "active_goal_1",
                 headline: "Sleep before midnight",
                 value: "Sleep before midnight",
                 confidence: 0.52,
                 priority: 0.78,
-                source: .history,
+                sourceID: "history",
                 lastConfirmedAt: .now,
-                decayPolicy: .medium,
+                decayPolicyID: "medium",
                 retrievalTags: ["goal", "sleep"],
                 evidenceCount: 1,
                 provenanceSummary: "Promoted from repeated long-term fields in balance and mirror workspaces.",

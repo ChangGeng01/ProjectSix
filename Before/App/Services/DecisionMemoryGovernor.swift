@@ -9,7 +9,7 @@ enum DecisionMemoryGovernor {
     }
 
     static func reconcile(
-        drafts: [DecisionMemoryDraft],
+        drafts: [BASDerivedMemoryDraft],
         in context: ModelContext
     ) -> [DecisionMemoryRecord] {
         let reviewNow = drafts.map(\.lastConfirmedAt).max() ?? .now
@@ -70,7 +70,7 @@ enum DecisionMemoryGovernor {
         (try? context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())) ?? []
     }
 
-    static func assess(draft: DecisionMemoryDraft) -> GovernanceAssessment {
+    static func assess(draft: BASDerivedMemoryDraft) -> GovernanceAssessment {
         let substrateAssessment = BASMemoryGovernance.assess(
             draft: draft.governanceDraftInput
         )
