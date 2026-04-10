@@ -194,6 +194,87 @@ public struct BASAppleCurrentBrainBootstrapFailurePatternInput: Codable, Equatab
     }
 }
 
+public struct BASAppleTaskGraphHintInput: Codable, Equatable, Sendable {
+    public var headline: String?
+    public var activeNodeCount: Int
+    public var hasResumeCandidate: Bool
+    public var resumeHint: String?
+
+    public init(
+        headline: String?,
+        activeNodeCount: Int,
+        hasResumeCandidate: Bool,
+        resumeHint: String?
+    ) {
+        self.headline = headline
+        self.activeNodeCount = activeNodeCount
+        self.hasResumeCandidate = hasResumeCandidate
+        self.resumeHint = resumeHint
+    }
+}
+
+public struct BASAppleCurrentBrainBootstrapPlanningSourceInput: Codable, Equatable, Sendable {
+    public var preparationRequest: BASCurrentBrainBootstrapPreparationRequest
+    public var projection: BASBrainProjection
+    public var embeddingScores: [BASAppleEmbeddingScoreInput]
+    public var taskGraphHint: BASAppleTaskGraphHintInput?
+    public var retrievalMode: String
+    public var recommendedTemplateIDs: [String]
+    public var templates: [BASAppleCurrentBrainBootstrapTemplateInput]
+    public var failurePatterns: [BASAppleCurrentBrainBootstrapFailurePatternInput]
+
+    public init(
+        preparationRequest: BASCurrentBrainBootstrapPreparationRequest,
+        projection: BASBrainProjection,
+        embeddingScores: [BASAppleEmbeddingScoreInput] = [],
+        taskGraphHint: BASAppleTaskGraphHintInput? = nil,
+        retrievalMode: String,
+        recommendedTemplateIDs: [String] = [],
+        templates: [BASAppleCurrentBrainBootstrapTemplateInput],
+        failurePatterns: [BASAppleCurrentBrainBootstrapFailurePatternInput]
+    ) {
+        self.preparationRequest = preparationRequest
+        self.projection = projection
+        self.embeddingScores = embeddingScores
+        self.taskGraphHint = taskGraphHint
+        self.retrievalMode = retrievalMode
+        self.recommendedTemplateIDs = recommendedTemplateIDs
+        self.templates = templates
+        self.failurePatterns = failurePatterns
+    }
+}
+
+public struct BASAppleCurrentBrainBootstrapPlanningPreparedInput: Codable, Equatable, Sendable {
+    public var preparation: BASCurrentBrainBootstrapPreparation
+    public var projection: BASBrainProjection
+    public var embeddingScores: [BASAppleEmbeddingScoreInput]
+    public var taskGraphHint: BASAppleTaskGraphHintInput?
+    public var retrievalMode: String
+    public var recommendedTemplateIDs: [String]
+    public var templates: [BASAppleCurrentBrainBootstrapTemplateInput]
+    public var failurePatterns: [BASAppleCurrentBrainBootstrapFailurePatternInput]
+
+    public init(
+        preparation: BASCurrentBrainBootstrapPreparation,
+        projection: BASBrainProjection,
+        embeddingScores: [BASAppleEmbeddingScoreInput] = [],
+        taskGraphHint: BASAppleTaskGraphHintInput? = nil,
+        retrievalMode: String,
+        recommendedTemplateIDs: [String] = [],
+        templates: [BASAppleCurrentBrainBootstrapTemplateInput],
+        failurePatterns: [BASAppleCurrentBrainBootstrapFailurePatternInput]
+    ) {
+        self.preparation = preparation
+        self.projection = projection
+        self.embeddingScores = embeddingScores
+        self.taskGraphHint = taskGraphHint
+        self.retrievalMode = retrievalMode
+        self.recommendedTemplateIDs = recommendedTemplateIDs
+        self.templates = templates
+        self.failurePatterns = failurePatterns
+    }
+}
+
 public struct BASAppleCurrentBrainBootstrapRequest: Codable, Equatable, Sendable {
     public var preparation: BASCurrentBrainBootstrapPreparation
     public var baseProjection: BASBrainProjection
@@ -507,6 +588,70 @@ public enum BASAppleCurrentBrainBootstrapAdapter {
                     )
                 }
             )
+        )
+    }
+}
+
+public enum BASAppleCurrentBrainBootstrapPlanner {
+    public static func request(
+        from input: BASAppleCurrentBrainBootstrapPlanningSourceInput
+    ) -> BASAppleCurrentBrainBootstrapRequest {
+        BASAppleCurrentBrainBootstrapRequest(
+            preparation: BASCurrentBrainBootstrapCoordinator.prepare(
+                request: input.preparationRequest
+            ),
+            baseProjection: input.projection,
+            embeddingScores: input.embeddingScores,
+            taskGraphHint: taskGraphHint(from: input.taskGraphHint),
+            retrievalMode: input.retrievalMode,
+            recommendedTemplateIDs: input.recommendedTemplateIDs,
+            templates: input.templates,
+            failurePatterns: input.failurePatterns
+        )
+    }
+
+    public static func request(
+        from input: BASAppleCurrentBrainBootstrapPlanningPreparedInput
+    ) -> BASAppleCurrentBrainBootstrapRequest {
+        BASAppleCurrentBrainBootstrapRequest(
+            preparation: input.preparation,
+            baseProjection: input.projection,
+            embeddingScores: input.embeddingScores,
+            taskGraphHint: taskGraphHint(from: input.taskGraphHint),
+            retrievalMode: input.retrievalMode,
+            recommendedTemplateIDs: input.recommendedTemplateIDs,
+            templates: input.templates,
+            failurePatterns: input.failurePatterns
+        )
+    }
+
+    public static func execute(
+        source input: BASAppleCurrentBrainBootstrapPlanningPreparedInput
+    ) -> BASCurrentBrainBootstrapExecution {
+        BASAppleCurrentBrainBootstrapAdapter.bootstrap(request: request(from: input))
+    }
+
+    public static func artifact(
+        source input: BASAppleCurrentBrainBootstrapPlanningPreparedInput
+    ) -> BASAppleCurrentBrainBootstrapArtifact {
+        BASAppleCurrentBrainBootstrapAdapter.artifact(request: request(from: input))
+    }
+
+    public static func artifact(
+        source input: BASAppleCurrentBrainBootstrapPlanningSourceInput
+    ) -> BASAppleCurrentBrainBootstrapArtifact {
+        BASAppleCurrentBrainBootstrapAdapter.artifact(request: request(from: input))
+    }
+
+    private static func taskGraphHint(
+        from input: BASAppleTaskGraphHintInput?
+    ) -> BASBrainTaskGraphHint? {
+        guard let input else { return nil }
+        return BASBrainTaskGraphHint(
+            headline: input.headline ?? input.resumeHint ?? "Resume current work",
+            activeNodeCount: input.activeNodeCount,
+            hasResumeCandidate: input.hasResumeCandidate,
+            resumeHint: input.resumeHint
         )
     }
 }

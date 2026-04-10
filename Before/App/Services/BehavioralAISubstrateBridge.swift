@@ -234,26 +234,15 @@ enum BehavioralAISubstrateBridge {
         retrievalMode: DecisionRetrievalMode,
         now: Date
     ) -> CurrentBrainBootstrapArtifact {
-        let preparationRequest = BASCurrentBrainBootstrapPreparationRequest(
-            mode: substrateMode(from: mode),
+        let preparation = prepareCurrentBrainBootstrap(
+            mode: mode,
             prompt: prompt,
-            trigger: currentBrainBootstrapTrigger(from: source),
-            sourceSurfaceOverride: envelope.map { interactionSurface(from: $0.sourceSurface) },
-            riskLevelOverride: envelope?.riskLevel.map(riskLevel(from:)),
-            preferredLanguages: Locale.preferredLanguages,
+            source: source,
+            envelope: envelope,
             now: now
         )
-        let prepared = BASAppleCurrentBrainBootstrapAdapter.prepare(
-            source: BASAppleCurrentBrainBootstrapSourceInput(
-                preparationRequest: preparationRequest,
-                projection: projection.baseProjection,
-                retrievalMode: retrievalMode.rawValue,
-                templates: [],
-                failurePatterns: []
-            )
-        )
-        let languageMode = decisionLanguageMode(from: prepared.languageMode)
-        let riskLevel = interventionRiskLevel(from: prepared.riskLevel)
+        let languageMode = preparation.languageMode
+        let riskLevel = preparation.riskLevel
         let recommendedArmIDs = DecisionReactionBanditStore.recommendedArmIDs(
             mode: mode,
             riskLevel: riskLevel,
@@ -267,16 +256,16 @@ enum BehavioralAISubstrateBridge {
             recommendedArmIDs: recommendedArmIDs
         )
         let failurePatterns = FailurePatternStore.selectedFailurePatterns(in: context, mode: mode)
-        let artifact = BASAppleCurrentBrainBootstrapAdapter.artifact(
-            source: BASAppleCurrentBrainBootstrapSourceInput(
-                preparationRequest: preparationRequest,
+        let artifact = BASAppleCurrentBrainBootstrapPlanner.artifact(
+            source: BASAppleCurrentBrainBootstrapPlanningPreparedInput(
+                preparation: preparation.substratePreparation,
                 projection: projection.baseProjection,
                 embeddingScores: embeddingScores(for: prompt),
-                taskGraphHint: taskGraph.map(taskGraphHint(from:)),
+                taskGraphHint: taskGraph.map(appleTaskGraphHint(from:)),
                 retrievalMode: retrievalMode.rawValue,
                 recommendedTemplateIDs: recommendedArmIDs,
-                templates: interventionTemplateDescriptors(from: templates),
-                failurePatterns: failurePatternDescriptors(from: failurePatterns)
+                templates: appleTemplateInputs(from: templates),
+                failurePatterns: appleFailurePatternInputs(from: failurePatterns)
             )
         )
         let artifactPreparation = artifact.execution.preparation
@@ -334,16 +323,16 @@ enum BehavioralAISubstrateBridge {
         templates: [InterventionTemplateRecord],
         failurePatterns: [FailurePatternRecord]
     ) -> CurrentBrainBootstrapExecution {
-        let execution = BASAppleCurrentBrainBootstrapAdapter.execute(
-            source: BASAppleCurrentBrainBootstrapPreparedSourceInput(
+        let execution = BASAppleCurrentBrainBootstrapPlanner.execute(
+            source: BASAppleCurrentBrainBootstrapPlanningPreparedInput(
                 preparation: preparation.substratePreparation,
                 projection: projection.baseProjection,
                 embeddingScores: embeddingScores(for: preparation.substratePreparation.prompt),
-                taskGraphHint: taskGraph.map(taskGraphHint(from:)),
+                taskGraphHint: taskGraph.map(appleTaskGraphHint(from:)),
                 retrievalMode: retrievalMode.rawValue,
                 recommendedTemplateIDs: recommendedTemplateIDs,
-                templates: interventionTemplateDescriptors(from: templates),
-                failurePatterns: failurePatternDescriptors(from: failurePatterns)
+                templates: appleTemplateInputs(from: templates),
+                failurePatterns: appleFailurePatternInputs(from: failurePatterns)
             )
         )
 
@@ -368,8 +357,8 @@ enum BehavioralAISubstrateBridge {
         failureGuardIDs: [String],
         now: Date
     ) -> BASBootstrappedBrainState {
-        let execution = BASAppleCurrentBrainBootstrapAdapter.artifact(
-            source: BASAppleCurrentBrainBootstrapSourceInput(
+        let execution = BASAppleCurrentBrainBootstrapPlanner.artifact(
+            source: BASAppleCurrentBrainBootstrapPlanningSourceInput(
                 preparationRequest: BASCurrentBrainBootstrapPreparationRequest(
                     mode: substrateMode(from: mode),
                     prompt: prompt,
@@ -381,11 +370,11 @@ enum BehavioralAISubstrateBridge {
                 ),
                 projection: projection.baseProjection,
                 embeddingScores: embeddingScores(for: prompt),
-                taskGraphHint: taskGraph.map(taskGraphHint(from:)),
+                taskGraphHint: taskGraph.map(appleTaskGraphHint(from:)),
                 retrievalMode: retrievalMode.rawValue,
                 recommendedTemplateIDs: activeTemplateIDs,
                 templates: activeTemplateIDs.map {
-                    BASInterventionTemplateDescriptor(
+                    BASAppleCurrentBrainBootstrapTemplateInput(
                         id: $0,
                         mode: substrateMode(from: mode),
                         riskLevel: self.riskLevel(from: riskLevel),
@@ -395,7 +384,7 @@ enum BehavioralAISubstrateBridge {
                     )
                 },
                 failurePatterns: failureGuardIDs.map {
-                    BASFailurePatternDescriptor(
+                    BASAppleCurrentBrainBootstrapFailurePatternInput(
                         id: $0,
                         mode: substrateMode(from: mode),
                         suppressionWeight: 1,
@@ -749,6 +738,17 @@ enum BehavioralAISubstrateBridge {
         )
     }
 
+    private static func appleTaskGraphHint(
+        from snapshot: DecisionTaskGraphSnapshot
+    ) -> BASAppleTaskGraphHintInput {
+        BASAppleTaskGraphHintInput(
+            headline: snapshot.nextActionHint,
+            activeNodeCount: snapshot.tasks.filter { $0.status != .completed }.count,
+            hasResumeCandidate: !snapshot.tasks.isEmpty,
+            resumeHint: snapshot.nextActionHint
+        )
+    }
+
     private static func embeddingScores(for prompt: String) -> [BASAppleEmbeddingScoreInput] {
         EmbeddingMemoryStore.query(
             prompt,
@@ -757,11 +757,11 @@ enum BehavioralAISubstrateBridge {
         ).map { BASAppleEmbeddingScoreInput(id: $0.id, score: $0.score) }
     }
 
-    private static func interventionTemplateDescriptors(
+    private static func appleTemplateInputs(
         from templates: [InterventionTemplateRecord]
-    ) -> [BASInterventionTemplateDescriptor] {
+    ) -> [BASAppleCurrentBrainBootstrapTemplateInput] {
         templates.map { template in
-            BASInterventionTemplateDescriptor(
+            BASAppleCurrentBrainBootstrapTemplateInput(
                 id: template.id,
                 mode: substrateMode(from: template.mode),
                 riskLevel: riskLevel(from: template.riskLevel),
@@ -772,11 +772,11 @@ enum BehavioralAISubstrateBridge {
         }
     }
 
-    private static func failurePatternDescriptors(
+    private static func appleFailurePatternInputs(
         from patterns: [FailurePatternRecord]
-    ) -> [BASFailurePatternDescriptor] {
+    ) -> [BASAppleCurrentBrainBootstrapFailurePatternInput] {
         patterns.map { pattern in
-            BASFailurePatternDescriptor(
+            BASAppleCurrentBrainBootstrapFailurePatternInput(
                 id: pattern.id,
                 mode: substrateMode(from: pattern.mode),
                 suppressionWeight: pattern.suppressionWeight,
