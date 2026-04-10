@@ -33,6 +33,73 @@ public struct BASExecutableProviderPlanningResult<Provider> {
     public var usedTestingOverride: Bool { resolution.usedTestingOverride }
 }
 
+public struct BASProviderRequestPlanSummary: Codable, Equatable, Sendable {
+    public var task: BASAdaptiveTraceKind
+    public var preferredProviderID: String
+    public var orderedProviderIDs: [String]
+    public var resolvedProviderIDs: [String]
+    public var compatibleProviderIDs: [String]
+    public var incompatibleProviderIDs: [String]
+    public var suspendedProviderIDs: [String]
+    public var usedTestingOverride: Bool
+    public var providerSelectionDurationMs: Int
+
+    public init(
+        task: BASAdaptiveTraceKind,
+        preferredProviderID: String,
+        orderedProviderIDs: [String],
+        resolvedProviderIDs: [String],
+        compatibleProviderIDs: [String],
+        incompatibleProviderIDs: [String],
+        suspendedProviderIDs: [String],
+        usedTestingOverride: Bool,
+        providerSelectionDurationMs: Int
+    ) {
+        self.task = task
+        self.preferredProviderID = preferredProviderID
+        self.orderedProviderIDs = orderedProviderIDs
+        self.resolvedProviderIDs = resolvedProviderIDs
+        self.compatibleProviderIDs = compatibleProviderIDs
+        self.incompatibleProviderIDs = incompatibleProviderIDs
+        self.suspendedProviderIDs = suspendedProviderIDs
+        self.usedTestingOverride = usedTestingOverride
+        self.providerSelectionDurationMs = providerSelectionDurationMs
+    }
+}
+
+public struct BASProviderRequestResolution<Result: Sendable, Assessment: Sendable>: Sendable {
+    public var planSummary: BASProviderRequestPlanSummary
+    public var execution: BASProviderExecutionResolution<Result, Assessment>
+
+    public init(
+        planSummary: BASProviderRequestPlanSummary,
+        execution: BASProviderExecutionResolution<Result, Assessment>
+    ) {
+        self.planSummary = planSummary
+        self.execution = execution
+    }
+}
+
+public struct BASProviderRequestNoResult: Codable, Equatable, Sendable {
+    public var planSummary: BASProviderRequestPlanSummary
+    public var attemptedProviderIDs: [String]
+
+    public init(
+        planSummary: BASProviderRequestPlanSummary,
+        attemptedProviderIDs: [String]
+    ) {
+        self.planSummary = planSummary
+        self.attemptedProviderIDs = attemptedProviderIDs
+    }
+}
+
+public enum BASProviderRequestOutcome<Result: Sendable, Assessment: Sendable>: Sendable {
+    case templatePinned
+    case admissionSkipped
+    case resolved(BASProviderRequestResolution<Result, Assessment>)
+    case noResult(BASProviderRequestNoResult)
+}
+
 public enum BASProviderExecutionVerdict<Assessment: Sendable>: Sendable {
     case allow(Assessment)
     case reject(Assessment)
@@ -231,5 +298,120 @@ public enum BASProviderAttemptExecutor {
         }
 
         return .noResult(attemptedProviderIDs: attemptedProviderIDs)
+    }
+}
+
+public enum BASProviderRequestRunner {
+    public static func execute<Provider, Result: Sendable, Assessment: Sendable>(
+        task: BASAdaptiveTraceKind,
+        preferredProviderID: String,
+        allowFallbacks: Bool,
+        deterministicProviderID: String,
+        preferenceOrderings: [BASProviderPreferenceOrdering],
+        suspendedProviderIDs: Set<String> = [],
+        strategy: BASAdaptiveTaskStrategy? = nil,
+        descriptors: [BASProviderDescriptor],
+        testingOverrideProvider: Provider? = nil,
+        providerID: (Provider) -> String,
+        providerForID: (String) -> Provider?,
+        isAvailable: (Provider) -> Bool,
+        admissionAllowed: Bool,
+        loadCachedResult: (Provider) async -> Result?,
+        assessCachedResult: (Result) -> BASProviderExecutionVerdict<Assessment>,
+        quarantineCachedResult: (Provider) async -> Void,
+        invokeProvider: (Provider) async -> Result?,
+        assessProviderResult: (Result) -> BASProviderExecutionVerdict<Assessment>,
+        onCachedRejected: ((BASProviderRequestPlanSummary, Provider, Result, Assessment, [String]) async -> Void)? = nil,
+        onCacheHit: ((BASProviderRequestPlanSummary, Provider, Result, Assessment, [String]) async -> Void)? = nil,
+        onProviderRejected: ((BASProviderRequestPlanSummary, Provider, Result, Assessment, [String]) async -> Void)? = nil,
+        onProviderSuccess: ((BASProviderRequestPlanSummary, Provider, Result, Assessment, [String]) async -> Void)? = nil,
+        onProviderMiss: ((BASProviderRequestPlanSummary, Provider, [String]) async -> Void)? = nil
+    ) async -> BASProviderRequestOutcome<Result, Assessment> {
+        guard preferredProviderID != deterministicProviderID else {
+            return .templatePinned
+        }
+
+        guard admissionAllowed else {
+            return .admissionSkipped
+        }
+
+        let clock = ContinuousClock()
+        let selectionStart = clock.now
+        let planning = BASExecutableProviderPlanner.resolve(
+            task: task,
+            preferredProviderID: preferredProviderID,
+            allowFallbacks: allowFallbacks,
+            deterministicProviderID: deterministicProviderID,
+            preferenceOrderings: preferenceOrderings,
+            suspendedProviderIDs: suspendedProviderIDs,
+            strategy: strategy,
+            descriptors: descriptors,
+            testingOverrideProvider: testingOverrideProvider,
+            providerID: providerID,
+            providerForID: providerForID,
+            isAvailable: isAvailable
+        )
+        let planSummary = BASProviderRequestPlanSummary(
+            task: task,
+            preferredProviderID: preferredProviderID,
+            orderedProviderIDs: planning.plan.orderedProviderIDs,
+            resolvedProviderIDs: planning.resolvedProviderIDs,
+            compatibleProviderIDs: planning.plan.compatibleProviderIDs,
+            incompatibleProviderIDs: planning.plan.incompatibleProviderIDs,
+            suspendedProviderIDs: suspendedProviderIDs.sorted(),
+            usedTestingOverride: planning.usedTestingOverride,
+            providerSelectionDurationMs: elapsedMilliseconds(since: selectionStart, clock: clock)
+        )
+
+        let executionOutcome = await BASProviderAttemptExecutor.execute(
+            providers: planning.providers,
+            providerID: providerID,
+            loadCachedResult: loadCachedResult,
+            assessCachedResult: assessCachedResult,
+            quarantineCachedResult: quarantineCachedResult,
+            invokeProvider: invokeProvider,
+            assessProviderResult: assessProviderResult,
+            onCachedRejected: { provider, result, assessment, attemptedProviderIDs in
+                await onCachedRejected?(planSummary, provider, result, assessment, attemptedProviderIDs)
+            },
+            onCacheHit: { provider, result, assessment, attemptedProviderIDs in
+                await onCacheHit?(planSummary, provider, result, assessment, attemptedProviderIDs)
+            },
+            onProviderRejected: { provider, result, assessment, attemptedProviderIDs in
+                await onProviderRejected?(planSummary, provider, result, assessment, attemptedProviderIDs)
+            },
+            onProviderSuccess: { provider, result, assessment, attemptedProviderIDs in
+                await onProviderSuccess?(planSummary, provider, result, assessment, attemptedProviderIDs)
+            },
+            onProviderMiss: { provider, attemptedProviderIDs in
+                await onProviderMiss?(planSummary, provider, attemptedProviderIDs)
+            }
+        )
+
+        switch executionOutcome {
+        case .resolved(let execution):
+            return .resolved(
+                BASProviderRequestResolution(
+                    planSummary: planSummary,
+                    execution: execution
+                )
+            )
+        case .noResult(let attemptedProviderIDs):
+            return .noResult(
+                BASProviderRequestNoResult(
+                    planSummary: planSummary,
+                    attemptedProviderIDs: attemptedProviderIDs
+                )
+            )
+        }
+    }
+
+    private static func elapsedMilliseconds(
+        since start: ContinuousClock.Instant,
+        clock: ContinuousClock
+    ) -> Int {
+        let duration = start.duration(to: clock.now)
+        return Int(duration.components.seconds * 1_000)
+            + Int(duration.components.attoseconds / 1_000_000_000_000_000)
     }
 }

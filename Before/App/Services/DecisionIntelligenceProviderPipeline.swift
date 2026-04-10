@@ -120,99 +120,17 @@ enum DecisionIntelligenceProviderPipeline {
         let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: envelope)
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: envelope)
         let promptPreparedMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        guard preference != .template else {
-            await recordTelemetry(
-                kind: .quick,
-                outcome: .templatePinned,
-                preferredProvider: preference.kind,
-                activeProvider: nil,
-                attemptedProviders: [],
-                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                lifecycleMetrics: lifecycleMetrics(
-                    requestStart: requestStart,
-                    clock: clock,
-                    promptPreparedMs: promptPreparedMs
-                ),
-                promptBudget: envelope.budget,
-                runtimeStrategy: strategy
-            )
-            recordTrace(
-                kind: .quick,
-                preferredProvider: preference.kind,
-                activeProvider: nil,
-                attemptedProviders: [.template],
-                allowFallbacks: allowFallbacks,
-                runtimeStrategy: strategy,
-                frontstageState: envelope.frontstageState,
-                contextState: contextState,
-                neuralState: neuralState,
-                brainState: brainState,
-                promptBudget: envelope.budget,
-                semanticPromptFingerprint: semanticPromptFingerprint,
-                stablePrefixFingerprint: stablePrefixFingerprint,
-                prompt: envelope.debugPrompt,
-                outputPreview: quickPreview(from: base),
-                detail: "Template mode is pinned, so no model provider was used for quick refinement."
-            )
-            return nil
-        }
-
         let admissionDecision = testingStubProfile.map {
             _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: envelope)
         } ?? DecisionIntelligenceAdmissionController.decide(for: envelope)
         let admissionEvaluatedMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        guard admissionDecision.isAllowed else {
-            await recordTelemetry(
-                kind: .quick,
-                outcome: .admissionSkipped,
-                preferredProvider: preference.kind,
-                activeProvider: nil,
-                attemptedProviders: [],
-                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                lifecycleMetrics: lifecycleMetrics(
-                    requestStart: requestStart,
-                    clock: clock,
-                    promptPreparedMs: promptPreparedMs,
-                    admissionEvaluatedMs: admissionEvaluatedMs
-                ),
-                promptBudget: envelope.budget,
-                runtimeStrategy: strategy,
-                admissionDecision: admissionDecision
-            )
-            recordTrace(
-                kind: .quick,
-                preferredProvider: preference.kind,
-                activeProvider: nil,
-                attemptedProviders: [],
-                allowFallbacks: allowFallbacks,
-                runtimeStrategy: strategy,
-                frontstageState: envelope.frontstageState,
-                contextState: contextState,
-                neuralState: neuralState,
-                brainState: brainState,
-                promptBudget: envelope.budget,
-                admissionDecision: admissionDecision,
-                semanticPromptFingerprint: semanticPromptFingerprint,
-                stablePrefixFingerprint: stablePrefixFingerprint,
-                prompt: envelope.debugPrompt,
-                outputPreview: quickPreview(from: base),
-                detail: "Admission controller skipped quick refinement. \(admissionDecision.reason)"
-            )
-            return nil
-        }
-
-        let providers = await orderedProviders(
+        let outcome = await executeProviderRequest(
             task: .quick,
             strategy: strategy,
-            for: preference,
+            preference: preference,
             allowFallbacks: allowFallbacks,
-            testingStubProfile: testingStubProfile
-        )
-        let providerSelectionMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
-        let outcome = await BASProviderAttemptExecutor.execute(
-            providers: providers,
-            providerID: { $0.kind.rawValue },
+            testingStubProfile: testingStubProfile,
+            admissionAllowed: admissionDecision.isAllowed,
             loadCachedResult: { provider in
                 let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
                     provider: provider.kind,
@@ -253,7 +171,7 @@ enum DecisionIntelligenceProviderPipeline {
                     brainState: brainState
                 )
             },
-            onCachedRejected: { provider, _, assessment, attemptedProviderIDs in
+            onCachedRejected: { planSummary, provider, _, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 if let consistencyCheck = assessment.consistencyCheck {
                     recordTrace(
@@ -287,7 +205,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 }
             },
-            onCacheHit: { provider, _, assessment, attemptedProviderIDs in
+            onCacheHit: { planSummary, provider, _, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
@@ -305,7 +223,7 @@ enum DecisionIntelligenceProviderPipeline {
                         clock: clock,
                         promptPreparedMs: promptPreparedMs,
                         admissionEvaluatedMs: admissionEvaluatedMs,
-                        providerSelectionMs: providerSelectionMs
+                        providerSelectionMs: Double(planSummary.providerSelectionDurationMs)
                     ),
                     promptBudget: envelope.budget,
                     runtimeStrategy: strategy,
@@ -336,7 +254,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 )
             },
-            onProviderRejected: { provider, _, assessment, attemptedProviderIDs in
+            onProviderRejected: { _, provider, _, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
@@ -374,7 +292,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 }
             },
-            onProviderSuccess: { provider, refined, assessment, attemptedProviderIDs in
+            onProviderSuccess: { planSummary, provider, refined, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
                     provider: provider.kind,
@@ -400,7 +318,7 @@ enum DecisionIntelligenceProviderPipeline {
                         clock: clock,
                         promptPreparedMs: promptPreparedMs,
                         admissionEvaluatedMs: admissionEvaluatedMs,
-                        providerSelectionMs: providerSelectionMs
+                        providerSelectionMs: Double(planSummary.providerSelectionDurationMs)
                     ),
                     promptBudget: envelope.budget,
                     runtimeStrategy: strategy,
@@ -431,7 +349,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 )
             },
-            onProviderMiss: { provider, _ in
+            onProviderMiss: { _, provider, _ in
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
                     event: .providerFailure
@@ -440,11 +358,84 @@ enum DecisionIntelligenceProviderPipeline {
         )
 
         switch outcome {
+        case .templatePinned:
+            await recordTelemetry(
+                kind: .quick,
+                outcome: .templatePinned,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs
+                ),
+                promptBudget: envelope.budget,
+                runtimeStrategy: strategy
+            )
+            recordTrace(
+                kind: .quick,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [.template],
+                allowFallbacks: allowFallbacks,
+                runtimeStrategy: strategy,
+                frontstageState: envelope.frontstageState,
+                contextState: contextState,
+                neuralState: neuralState,
+                brainState: brainState,
+                promptBudget: envelope.budget,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
+                prompt: envelope.debugPrompt,
+                outputPreview: quickPreview(from: base),
+                detail: "Template mode is pinned, so no model provider was used for quick refinement."
+            )
+            return nil
+        case .admissionSkipped:
+            await recordTelemetry(
+                kind: .quick,
+                outcome: .admissionSkipped,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs,
+                    admissionEvaluatedMs: admissionEvaluatedMs
+                ),
+                promptBudget: envelope.budget,
+                runtimeStrategy: strategy,
+                admissionDecision: admissionDecision
+            )
+            recordTrace(
+                kind: .quick,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                allowFallbacks: allowFallbacks,
+                runtimeStrategy: strategy,
+                frontstageState: envelope.frontstageState,
+                contextState: contextState,
+                neuralState: neuralState,
+                brainState: brainState,
+                promptBudget: envelope.budget,
+                admissionDecision: admissionDecision,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
+                prompt: envelope.debugPrompt,
+                outputPreview: quickPreview(from: base),
+                detail: "Admission controller skipped quick refinement. \(admissionDecision.reason)"
+            )
+            return nil
         case .resolved(let resolution):
-            return resolution.result
-        case .noResult(let attemptedProviderIDs):
-            let actualAttemptedKinds = attemptedKinds(from: attemptedProviderIDs)
-
+            return resolution.execution.result
+        case .noResult(let noResult):
+            let actualAttemptedKinds = attemptedKinds(from: noResult.attemptedProviderIDs)
+            let suspendedKinds = noResult.planSummary.suspendedProviderIDs.compactMap(DecisionModelProviderKind.init(rawValue:))
             await recordTelemetry(
                 kind: .quick,
                 outcome: .deterministicFallback,
@@ -457,7 +448,7 @@ enum DecisionIntelligenceProviderPipeline {
                     clock: clock,
                     promptPreparedMs: promptPreparedMs,
                     admissionEvaluatedMs: admissionEvaluatedMs,
-                    providerSelectionMs: providerSelectionMs
+                    providerSelectionMs: Double(noResult.planSummary.providerSelectionDurationMs)
                 ),
                 promptBudget: envelope.budget,
                 runtimeStrategy: strategy,
@@ -513,99 +504,17 @@ enum DecisionIntelligenceProviderPipeline {
         let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: envelope)
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: envelope)
         let promptPreparedMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        guard preference != .template else {
-            await recordTelemetry(
-                kind: .balance,
-                outcome: .templatePinned,
-                preferredProvider: preference.kind,
-                activeProvider: nil,
-                attemptedProviders: [],
-                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                lifecycleMetrics: lifecycleMetrics(
-                    requestStart: requestStart,
-                    clock: clock,
-                    promptPreparedMs: promptPreparedMs
-                ),
-                promptBudget: envelope.budget,
-                runtimeStrategy: strategy
-            )
-            recordTrace(
-                kind: .balance,
-                preferredProvider: preference.kind,
-                activeProvider: nil,
-                attemptedProviders: [.template],
-                allowFallbacks: allowFallbacks,
-                runtimeStrategy: strategy,
-                frontstageState: envelope.frontstageState,
-                contextState: contextState,
-                neuralState: neuralState,
-                brainState: brainState,
-                promptBudget: envelope.budget,
-                semanticPromptFingerprint: semanticPromptFingerprint,
-                stablePrefixFingerprint: stablePrefixFingerprint,
-                prompt: envelope.debugPrompt,
-                outputPreview: balancePreview(from: base),
-                detail: "Template mode is pinned, so no model provider was used for balance refinement."
-            )
-            return nil
-        }
-
         let admissionDecision = testingStubProfile.map {
             _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: envelope)
         } ?? DecisionIntelligenceAdmissionController.decide(for: envelope)
         let admissionEvaluatedMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        guard admissionDecision.isAllowed else {
-            await recordTelemetry(
-                kind: .balance,
-                outcome: .admissionSkipped,
-                preferredProvider: preference.kind,
-                activeProvider: nil,
-                attemptedProviders: [],
-                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                lifecycleMetrics: lifecycleMetrics(
-                    requestStart: requestStart,
-                    clock: clock,
-                    promptPreparedMs: promptPreparedMs,
-                    admissionEvaluatedMs: admissionEvaluatedMs
-                ),
-                promptBudget: envelope.budget,
-                runtimeStrategy: strategy,
-                admissionDecision: admissionDecision
-            )
-            recordTrace(
-                kind: .balance,
-                preferredProvider: preference.kind,
-                activeProvider: nil,
-                attemptedProviders: [],
-                allowFallbacks: allowFallbacks,
-                runtimeStrategy: strategy,
-                frontstageState: envelope.frontstageState,
-                contextState: contextState,
-                neuralState: neuralState,
-                brainState: brainState,
-                promptBudget: envelope.budget,
-                admissionDecision: admissionDecision,
-                semanticPromptFingerprint: semanticPromptFingerprint,
-                stablePrefixFingerprint: stablePrefixFingerprint,
-                prompt: envelope.debugPrompt,
-                outputPreview: balancePreview(from: base),
-                detail: "Admission controller skipped balance refinement. \(admissionDecision.reason)"
-            )
-            return nil
-        }
-
-        let providers = await orderedProviders(
+        let outcome = await executeProviderRequest(
             task: .balance,
             strategy: strategy,
-            for: preference,
+            preference: preference,
             allowFallbacks: allowFallbacks,
-            testingStubProfile: testingStubProfile
-        )
-        let providerSelectionMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
-        let outcome = await BASProviderAttemptExecutor.execute(
-            providers: providers,
-            providerID: { $0.kind.rawValue },
+            testingStubProfile: testingStubProfile,
+            admissionAllowed: admissionDecision.isAllowed,
             loadCachedResult: { provider in
                 let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
                     provider: provider.kind,
@@ -646,7 +555,7 @@ enum DecisionIntelligenceProviderPipeline {
                     brainState: brainState
                 )
             },
-            onCachedRejected: { provider, _, assessment, attemptedProviderIDs in
+            onCachedRejected: { _, provider, _, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 if let consistencyCheck = assessment.consistencyCheck {
                     recordTrace(
@@ -680,7 +589,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 }
             },
-            onCacheHit: { provider, _, assessment, attemptedProviderIDs in
+            onCacheHit: { planSummary, provider, _, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
@@ -698,7 +607,7 @@ enum DecisionIntelligenceProviderPipeline {
                         clock: clock,
                         promptPreparedMs: promptPreparedMs,
                         admissionEvaluatedMs: admissionEvaluatedMs,
-                        providerSelectionMs: providerSelectionMs
+                        providerSelectionMs: Double(planSummary.providerSelectionDurationMs)
                     ),
                     promptBudget: envelope.budget,
                     runtimeStrategy: strategy,
@@ -729,7 +638,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 )
             },
-            onProviderRejected: { provider, _, assessment, attemptedProviderIDs in
+            onProviderRejected: { _, provider, _, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
@@ -767,7 +676,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 }
             },
-            onProviderSuccess: { provider, refined, assessment, attemptedProviderIDs in
+            onProviderSuccess: { planSummary, provider, refined, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
                     provider: provider.kind,
@@ -793,7 +702,7 @@ enum DecisionIntelligenceProviderPipeline {
                         clock: clock,
                         promptPreparedMs: promptPreparedMs,
                         admissionEvaluatedMs: admissionEvaluatedMs,
-                        providerSelectionMs: providerSelectionMs
+                        providerSelectionMs: Double(planSummary.providerSelectionDurationMs)
                     ),
                     promptBudget: envelope.budget,
                     runtimeStrategy: strategy,
@@ -824,7 +733,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 )
             },
-            onProviderMiss: { provider, _ in
+            onProviderMiss: { _, provider, _ in
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
                     event: .providerFailure
@@ -833,11 +742,84 @@ enum DecisionIntelligenceProviderPipeline {
         )
 
         switch outcome {
+        case .templatePinned:
+            await recordTelemetry(
+                kind: .balance,
+                outcome: .templatePinned,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs
+                ),
+                promptBudget: envelope.budget,
+                runtimeStrategy: strategy
+            )
+            recordTrace(
+                kind: .balance,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [.template],
+                allowFallbacks: allowFallbacks,
+                runtimeStrategy: strategy,
+                frontstageState: envelope.frontstageState,
+                contextState: contextState,
+                neuralState: neuralState,
+                brainState: brainState,
+                promptBudget: envelope.budget,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
+                prompt: envelope.debugPrompt,
+                outputPreview: balancePreview(from: base),
+                detail: "Template mode is pinned, so no model provider was used for balance refinement."
+            )
+            return nil
+        case .admissionSkipped:
+            await recordTelemetry(
+                kind: .balance,
+                outcome: .admissionSkipped,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs,
+                    admissionEvaluatedMs: admissionEvaluatedMs
+                ),
+                promptBudget: envelope.budget,
+                runtimeStrategy: strategy,
+                admissionDecision: admissionDecision
+            )
+            recordTrace(
+                kind: .balance,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                allowFallbacks: allowFallbacks,
+                runtimeStrategy: strategy,
+                frontstageState: envelope.frontstageState,
+                contextState: contextState,
+                neuralState: neuralState,
+                brainState: brainState,
+                promptBudget: envelope.budget,
+                admissionDecision: admissionDecision,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
+                prompt: envelope.debugPrompt,
+                outputPreview: balancePreview(from: base),
+                detail: "Admission controller skipped balance refinement. \(admissionDecision.reason)"
+            )
+            return nil
         case .resolved(let resolution):
-            return resolution.result
-        case .noResult(let attemptedProviderIDs):
-            let actualAttemptedKinds = attemptedKinds(from: attemptedProviderIDs)
-
+            return resolution.execution.result
+        case .noResult(let noResult):
+            let actualAttemptedKinds = attemptedKinds(from: noResult.attemptedProviderIDs)
+            let suspendedKinds = noResult.planSummary.suspendedProviderIDs.compactMap(DecisionModelProviderKind.init(rawValue:))
             await recordTelemetry(
                 kind: .balance,
                 outcome: .deterministicFallback,
@@ -850,7 +832,7 @@ enum DecisionIntelligenceProviderPipeline {
                     clock: clock,
                     promptPreparedMs: promptPreparedMs,
                     admissionEvaluatedMs: admissionEvaluatedMs,
-                    providerSelectionMs: providerSelectionMs
+                    providerSelectionMs: Double(noResult.planSummary.providerSelectionDurationMs)
                 ),
                 promptBudget: envelope.budget,
                 runtimeStrategy: strategy,
@@ -906,99 +888,17 @@ enum DecisionIntelligenceProviderPipeline {
         let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: envelope)
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: envelope)
         let promptPreparedMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        guard preference != .template else {
-            await recordTelemetry(
-                kind: .mirror,
-                outcome: .templatePinned,
-                preferredProvider: preference.kind,
-                activeProvider: nil,
-                attemptedProviders: [],
-                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                lifecycleMetrics: lifecycleMetrics(
-                    requestStart: requestStart,
-                    clock: clock,
-                    promptPreparedMs: promptPreparedMs
-                ),
-                promptBudget: envelope.budget,
-                runtimeStrategy: strategy
-            )
-            recordTrace(
-                kind: .mirror,
-                preferredProvider: preference.kind,
-                activeProvider: nil,
-                attemptedProviders: [.template],
-                allowFallbacks: allowFallbacks,
-                runtimeStrategy: strategy,
-                frontstageState: envelope.frontstageState,
-                contextState: contextState,
-                neuralState: neuralState,
-                brainState: brainState,
-                promptBudget: envelope.budget,
-                semanticPromptFingerprint: semanticPromptFingerprint,
-                stablePrefixFingerprint: stablePrefixFingerprint,
-                prompt: envelope.debugPrompt,
-                outputPreview: mirrorPreview(from: base),
-                detail: "Template mode is pinned, so no model provider was used for mirror refinement."
-            )
-            return nil
-        }
-
         let admissionDecision = testingStubProfile.map {
             _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: envelope)
         } ?? DecisionIntelligenceAdmissionController.decide(for: envelope)
         let admissionEvaluatedMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        guard admissionDecision.isAllowed else {
-            await recordTelemetry(
-                kind: .mirror,
-                outcome: .admissionSkipped,
-                preferredProvider: preference.kind,
-                activeProvider: nil,
-                attemptedProviders: [],
-                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                lifecycleMetrics: lifecycleMetrics(
-                    requestStart: requestStart,
-                    clock: clock,
-                    promptPreparedMs: promptPreparedMs,
-                    admissionEvaluatedMs: admissionEvaluatedMs
-                ),
-                promptBudget: envelope.budget,
-                runtimeStrategy: strategy,
-                admissionDecision: admissionDecision
-            )
-            recordTrace(
-                kind: .mirror,
-                preferredProvider: preference.kind,
-                activeProvider: nil,
-                attemptedProviders: [],
-                allowFallbacks: allowFallbacks,
-                runtimeStrategy: strategy,
-                frontstageState: envelope.frontstageState,
-                contextState: contextState,
-                neuralState: neuralState,
-                brainState: brainState,
-                promptBudget: envelope.budget,
-                admissionDecision: admissionDecision,
-                semanticPromptFingerprint: semanticPromptFingerprint,
-                stablePrefixFingerprint: stablePrefixFingerprint,
-                prompt: envelope.debugPrompt,
-                outputPreview: mirrorPreview(from: base),
-                detail: "Admission controller skipped mirror refinement. \(admissionDecision.reason)"
-            )
-            return nil
-        }
-
-        let providers = await orderedProviders(
+        let outcome = await executeProviderRequest(
             task: .mirror,
             strategy: strategy,
-            for: preference,
+            preference: preference,
             allowFallbacks: allowFallbacks,
-            testingStubProfile: testingStubProfile
-        )
-        let providerSelectionMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
-        let outcome = await BASProviderAttemptExecutor.execute(
-            providers: providers,
-            providerID: { $0.kind.rawValue },
+            testingStubProfile: testingStubProfile,
+            admissionAllowed: admissionDecision.isAllowed,
             loadCachedResult: { provider in
                 let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
                     provider: provider.kind,
@@ -1039,7 +939,7 @@ enum DecisionIntelligenceProviderPipeline {
                     brainState: brainState
                 )
             },
-            onCachedRejected: { provider, _, assessment, attemptedProviderIDs in
+            onCachedRejected: { _, provider, _, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 if let consistencyCheck = assessment.consistencyCheck {
                     recordTrace(
@@ -1073,7 +973,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 }
             },
-            onCacheHit: { provider, _, assessment, attemptedProviderIDs in
+            onCacheHit: { planSummary, provider, _, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
@@ -1091,7 +991,7 @@ enum DecisionIntelligenceProviderPipeline {
                         clock: clock,
                         promptPreparedMs: promptPreparedMs,
                         admissionEvaluatedMs: admissionEvaluatedMs,
-                        providerSelectionMs: providerSelectionMs
+                        providerSelectionMs: Double(planSummary.providerSelectionDurationMs)
                     ),
                     promptBudget: envelope.budget,
                     runtimeStrategy: strategy,
@@ -1122,7 +1022,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 )
             },
-            onProviderRejected: { provider, _, assessment, attemptedProviderIDs in
+            onProviderRejected: { _, provider, _, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
@@ -1160,7 +1060,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 }
             },
-            onProviderSuccess: { provider, refined, assessment, attemptedProviderIDs in
+            onProviderSuccess: { planSummary, provider, refined, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
                     provider: provider.kind,
@@ -1186,7 +1086,7 @@ enum DecisionIntelligenceProviderPipeline {
                         clock: clock,
                         promptPreparedMs: promptPreparedMs,
                         admissionEvaluatedMs: admissionEvaluatedMs,
-                        providerSelectionMs: providerSelectionMs
+                        providerSelectionMs: Double(planSummary.providerSelectionDurationMs)
                     ),
                     promptBudget: envelope.budget,
                     runtimeStrategy: strategy,
@@ -1217,7 +1117,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 )
             },
-            onProviderMiss: { provider, _ in
+            onProviderMiss: { _, provider, _ in
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
                     event: .providerFailure
@@ -1226,11 +1126,84 @@ enum DecisionIntelligenceProviderPipeline {
         )
 
         switch outcome {
+        case .templatePinned:
+            await recordTelemetry(
+                kind: .mirror,
+                outcome: .templatePinned,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs
+                ),
+                promptBudget: envelope.budget,
+                runtimeStrategy: strategy
+            )
+            recordTrace(
+                kind: .mirror,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [.template],
+                allowFallbacks: allowFallbacks,
+                runtimeStrategy: strategy,
+                frontstageState: envelope.frontstageState,
+                contextState: contextState,
+                neuralState: neuralState,
+                brainState: brainState,
+                promptBudget: envelope.budget,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
+                prompt: envelope.debugPrompt,
+                outputPreview: mirrorPreview(from: base),
+                detail: "Template mode is pinned, so no model provider was used for mirror refinement."
+            )
+            return nil
+        case .admissionSkipped:
+            await recordTelemetry(
+                kind: .mirror,
+                outcome: .admissionSkipped,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs,
+                    admissionEvaluatedMs: admissionEvaluatedMs
+                ),
+                promptBudget: envelope.budget,
+                runtimeStrategy: strategy,
+                admissionDecision: admissionDecision
+            )
+            recordTrace(
+                kind: .mirror,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                allowFallbacks: allowFallbacks,
+                runtimeStrategy: strategy,
+                frontstageState: envelope.frontstageState,
+                contextState: contextState,
+                neuralState: neuralState,
+                brainState: brainState,
+                promptBudget: envelope.budget,
+                admissionDecision: admissionDecision,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
+                prompt: envelope.debugPrompt,
+                outputPreview: mirrorPreview(from: base),
+                detail: "Admission controller skipped mirror refinement. \(admissionDecision.reason)"
+            )
+            return nil
         case .resolved(let resolution):
-            return resolution.result
-        case .noResult(let attemptedProviderIDs):
-            let actualAttemptedKinds = attemptedKinds(from: attemptedProviderIDs)
-
+            return resolution.execution.result
+        case .noResult(let noResult):
+            let actualAttemptedKinds = attemptedKinds(from: noResult.attemptedProviderIDs)
+            let suspendedKinds = noResult.planSummary.suspendedProviderIDs.compactMap(DecisionModelProviderKind.init(rawValue:))
             await recordTelemetry(
                 kind: .mirror,
                 outcome: .deterministicFallback,
@@ -1243,7 +1216,7 @@ enum DecisionIntelligenceProviderPipeline {
                     clock: clock,
                     promptPreparedMs: promptPreparedMs,
                     admissionEvaluatedMs: admissionEvaluatedMs,
-                    providerSelectionMs: providerSelectionMs
+                    providerSelectionMs: Double(noResult.planSummary.providerSelectionDurationMs)
                 ),
                 promptBudget: envelope.budget,
                 runtimeStrategy: strategy,
@@ -1305,24 +1278,6 @@ enum DecisionIntelligenceProviderPipeline {
             mode: mode
         )
         guard !clippedCandidates.isEmpty else { return nil }
-        guard preference != .template else {
-            await recordTelemetry(
-                kind: .reminder,
-                outcome: .templatePinned,
-                preferredProvider: preference.kind,
-                activeProvider: nil,
-                attemptedProviders: [],
-                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                lifecycleMetrics: lifecycleMetrics(
-                    requestStart: requestStart,
-                    clock: clock,
-                    promptPreparedMs: promptPreparedMs
-                ),
-                promptBudget: selection.prompt.budget,
-                runtimeStrategy: strategy
-            )
-            return nil
-        }
         let admissionDecision = testingStubProfile.map {
             _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: selection.prompt)
         } ?? DecisionIntelligenceAdmissionController.decide(
@@ -1331,54 +1286,13 @@ enum DecisionIntelligenceProviderPipeline {
             reminderSelectionAssessment: reminderSelectionAssessment
         )
         let admissionEvaluatedMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        guard admissionDecision.isAllowed else {
-            await recordTelemetry(
-                kind: .reminder,
-                outcome: .admissionSkipped,
-                preferredProvider: preference.kind,
-                activeProvider: nil,
-                attemptedProviders: [],
-                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                lifecycleMetrics: lifecycleMetrics(
-                    requestStart: requestStart,
-                    clock: clock,
-                    promptPreparedMs: promptPreparedMs,
-                    admissionEvaluatedMs: admissionEvaluatedMs
-                ),
-                promptBudget: selection.prompt.budget,
-                runtimeStrategy: strategy,
-                admissionDecision: admissionDecision
-            )
-            recordTrace(
-                kind: .reminder,
-                preferredProvider: preference.kind,
-                activeProvider: nil,
-                attemptedProviders: [],
-                allowFallbacks: allowFallbacks,
-                runtimeStrategy: strategy,
-                frontstageState: selection.prompt.frontstageState,
-                promptBudget: selection.prompt.budget,
-                admissionDecision: admissionDecision,
-                semanticPromptFingerprint: semanticPromptFingerprint,
-                stablePrefixFingerprint: stablePrefixFingerprint,
-                prompt: selection.prompt.debugPrompt,
-                outputPreview: "Deterministic reminder ordering kept",
-                detail: "Admission controller skipped reminder selection. \(admissionDecision.reason)"
-            )
-            return nil
-        }
-        let providers = await orderedProviders(
+        let outcome = await executeProviderRequest(
             task: .reminder,
             strategy: strategy,
-            for: preference,
+            preference: preference,
             allowFallbacks: allowFallbacks,
-            testingStubProfile: testingStubProfile
-        )
-        let providerSelectionMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        let suspendedKinds = await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders
-        let outcome = await BASProviderAttemptExecutor.execute(
-            providers: providers,
-            providerID: { $0.kind.rawValue },
+            testingStubProfile: testingStubProfile,
+            admissionAllowed: admissionDecision.isAllowed,
             loadCachedResult: { provider in
                 let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
                     provider: provider.kind,
@@ -1425,7 +1339,7 @@ enum DecisionIntelligenceProviderPipeline {
                     reminderMode: mode
                 )
             },
-            onCachedRejected: { provider, _, assessment, attemptedProviderIDs in
+            onCachedRejected: { _, provider, _, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 if let consistencyCheck = assessment.consistencyCheck {
                     recordTrace(
@@ -1456,7 +1370,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 }
             },
-            onCacheHit: { provider, _, assessment, attemptedProviderIDs in
+            onCacheHit: { planSummary, provider, _, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
@@ -1474,7 +1388,7 @@ enum DecisionIntelligenceProviderPipeline {
                         clock: clock,
                         promptPreparedMs: promptPreparedMs,
                         admissionEvaluatedMs: admissionEvaluatedMs,
-                        providerSelectionMs: providerSelectionMs
+                        providerSelectionMs: Double(planSummary.providerSelectionDurationMs)
                     ),
                     promptBudget: selection.prompt.budget,
                     runtimeStrategy: strategy,
@@ -1502,7 +1416,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 )
             },
-            onProviderRejected: { provider, _, assessment, attemptedProviderIDs in
+            onProviderRejected: { _, provider, _, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
@@ -1537,7 +1451,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 }
             },
-            onProviderSuccess: { provider, selected, assessment, attemptedProviderIDs in
+            onProviderSuccess: { planSummary, provider, selected, assessment, attemptedProviderIDs in
                 let attemptedKinds = attemptedKinds(from: attemptedProviderIDs)
                 let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
                     provider: provider.kind,
@@ -1563,7 +1477,7 @@ enum DecisionIntelligenceProviderPipeline {
                         clock: clock,
                         promptPreparedMs: promptPreparedMs,
                         admissionEvaluatedMs: admissionEvaluatedMs,
-                        providerSelectionMs: providerSelectionMs
+                        providerSelectionMs: Double(planSummary.providerSelectionDurationMs)
                     ),
                     promptBudget: selection.prompt.budget,
                     runtimeStrategy: strategy,
@@ -1591,7 +1505,7 @@ enum DecisionIntelligenceProviderPipeline {
                     )
                 )
             },
-            onProviderMiss: { provider, _ in
+            onProviderMiss: { _, provider, _ in
                 await DecisionIntelligenceCircuitBreaker.shared.record(
                     provider: provider.kind,
                     event: .providerFailure
@@ -1600,11 +1514,63 @@ enum DecisionIntelligenceProviderPipeline {
         )
 
         switch outcome {
+        case .templatePinned:
+            await recordTelemetry(
+                kind: .reminder,
+                outcome: .templatePinned,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs
+                ),
+                promptBudget: selection.prompt.budget,
+                runtimeStrategy: strategy
+            )
+            return nil
+        case .admissionSkipped:
+            await recordTelemetry(
+                kind: .reminder,
+                outcome: .admissionSkipped,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
+                lifecycleMetrics: lifecycleMetrics(
+                    requestStart: requestStart,
+                    clock: clock,
+                    promptPreparedMs: promptPreparedMs,
+                    admissionEvaluatedMs: admissionEvaluatedMs
+                ),
+                promptBudget: selection.prompt.budget,
+                runtimeStrategy: strategy,
+                admissionDecision: admissionDecision
+            )
+            recordTrace(
+                kind: .reminder,
+                preferredProvider: preference.kind,
+                activeProvider: nil,
+                attemptedProviders: [],
+                allowFallbacks: allowFallbacks,
+                runtimeStrategy: strategy,
+                frontstageState: selection.prompt.frontstageState,
+                promptBudget: selection.prompt.budget,
+                admissionDecision: admissionDecision,
+                semanticPromptFingerprint: semanticPromptFingerprint,
+                stablePrefixFingerprint: stablePrefixFingerprint,
+                prompt: selection.prompt.debugPrompt,
+                outputPreview: "Deterministic reminder ordering kept",
+                detail: "Admission controller skipped reminder selection. \(admissionDecision.reason)"
+            )
+            return nil
         case .resolved(let resolution):
-            return resolution.result
-        case .noResult(let attemptedProviderIDs):
-            let actualAttemptedKinds = attemptedKinds(from: attemptedProviderIDs)
-
+            return resolution.execution.result
+        case .noResult(let noResult):
+            let actualAttemptedKinds = attemptedKinds(from: noResult.attemptedProviderIDs)
+            let suspendedKinds = noResult.planSummary.suspendedProviderIDs.compactMap(DecisionModelProviderKind.init(rawValue:))
             await recordTelemetry(
                 kind: .reminder,
                 outcome: .deterministicFallback,
@@ -1617,7 +1583,7 @@ enum DecisionIntelligenceProviderPipeline {
                     clock: clock,
                     promptPreparedMs: promptPreparedMs,
                     admissionEvaluatedMs: admissionEvaluatedMs,
-                    providerSelectionMs: providerSelectionMs
+                    providerSelectionMs: Double(noResult.planSummary.providerSelectionDurationMs)
                 ),
                 promptBudget: selection.prompt.budget,
                 runtimeStrategy: strategy,
@@ -1650,33 +1616,67 @@ enum DecisionIntelligenceProviderPipeline {
         registry.statusesByKind()
     }
 
-    private static func orderedProviders(
+    private static func executeProviderRequest<Result: Sendable>(
         task: DecisionIntelligenceTraceKind,
         strategy: DecisionAdaptiveTaskStrategy?,
-        for preference: DecisionModelProviderPreference,
+        preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
-        testingStubProfile: DecisionTestingStubProfile?
-    ) async -> [any DecisionIntelligenceProviding] {
-        let suspendedKinds = Set(await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders)
-        let testingOverrideProvider: (any DecisionIntelligenceProviding)? = testingStubProfile.flatMap { profile in
-            preference != .template ? TestingDecisionIntelligenceProvider(profile: profile) : nil
-        }
-        return BASExecutableProviderPlanner.resolve(
+        testingStubProfile: DecisionTestingStubProfile?,
+        admissionAllowed: Bool,
+        loadCachedResult: @escaping ((any DecisionIntelligenceProviding)) async -> Result?,
+        assessCachedResult: @escaping (Result) -> BASProviderExecutionVerdict<ProviderAttemptAssessment>,
+        quarantineCachedResult: @escaping ((any DecisionIntelligenceProviding)) async -> Void,
+        invokeProvider: @escaping ((any DecisionIntelligenceProviding)) async -> Result?,
+        assessProviderResult: @escaping (Result) -> BASProviderExecutionVerdict<ProviderAttemptAssessment>,
+        onCachedRejected: (((BASProviderRequestPlanSummary), (any DecisionIntelligenceProviding), Result, ProviderAttemptAssessment, [String]) async -> Void)? = nil,
+        onCacheHit: (((BASProviderRequestPlanSummary), (any DecisionIntelligenceProviding), Result, ProviderAttemptAssessment, [String]) async -> Void)? = nil,
+        onProviderRejected: (((BASProviderRequestPlanSummary), (any DecisionIntelligenceProviding), Result, ProviderAttemptAssessment, [String]) async -> Void)? = nil,
+        onProviderSuccess: (((BASProviderRequestPlanSummary), (any DecisionIntelligenceProviding), Result, ProviderAttemptAssessment, [String]) async -> Void)? = nil,
+        onProviderMiss: (((BASProviderRequestPlanSummary), (any DecisionIntelligenceProviding), [String]) async -> Void)? = nil
+    ) async -> BASProviderRequestOutcome<Result, ProviderAttemptAssessment> {
+        let suspendedProviderIDs = Set(
+            await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders.map(\.rawValue)
+        )
+
+        return await BASProviderRequestRunner.execute(
             task: DecisionIntelligenceTaskRouter.substrateTraceKind(task),
             preferredProviderID: preference.kind.rawValue,
             allowFallbacks: allowFallbacks,
             deterministicProviderID: DecisionModelProviderKind.template.rawValue,
             preferenceOrderings: preferenceOrderings,
-            suspendedProviderIDs: Set(suspendedKinds.map(\.rawValue)),
+            suspendedProviderIDs: suspendedProviderIDs,
             strategy: strategy.map(DecisionIntelligenceTaskRouter.substrateAdaptiveStrategy),
             descriptors: registry.descriptors().map(DecisionIntelligenceTaskRouter.substrateProviderDescriptor),
-            testingOverrideProvider: testingOverrideProvider,
+            testingOverrideProvider: testingOverrideProvider(
+                for: preference,
+                testingStubProfile: testingStubProfile
+            ),
             providerID: { $0.kind.rawValue },
             providerForID: { providerID in
                 DecisionModelProviderKind(rawValue: providerID).flatMap(registry.provider(for:))
             },
-            isAvailable: { $0.availabilityStatus.isAvailable }
-        ).providers
+            isAvailable: { $0.availabilityStatus.isAvailable },
+            admissionAllowed: admissionAllowed,
+            loadCachedResult: loadCachedResult,
+            assessCachedResult: assessCachedResult,
+            quarantineCachedResult: quarantineCachedResult,
+            invokeProvider: invokeProvider,
+            assessProviderResult: assessProviderResult,
+            onCachedRejected: onCachedRejected,
+            onCacheHit: onCacheHit,
+            onProviderRejected: onProviderRejected,
+            onProviderSuccess: onProviderSuccess,
+            onProviderMiss: onProviderMiss
+        )
+    }
+
+    private static func testingOverrideProvider(
+        for preference: DecisionModelProviderPreference,
+        testingStubProfile: DecisionTestingStubProfile?
+    ) -> (any DecisionIntelligenceProviding)? {
+        testingStubProfile.flatMap { profile in
+            preference != .template ? TestingDecisionIntelligenceProvider(profile: profile) : nil
+        }
     }
 
     private static func deterministicFallbackDetail(

@@ -323,6 +323,162 @@ struct BASRuntimeCoreTests {
         #expect(!planning.usedTestingOverride)
     }
 
+    @Test("provider request runner short-circuits template pin and admission skip")
+    func providerRequestRunnerShortCircuitsTemplateAndAdmission() async {
+        struct FakeProvider: Equatable {
+            let id: String
+            let available: Bool
+        }
+
+        let providers = [
+            "local-fast": FakeProvider(id: "local-fast", available: true)
+        ]
+
+        let templatePinned = await BASProviderRequestRunner.execute(
+            task: .quick,
+            preferredProviderID: "template",
+            allowFallbacks: true,
+            deterministicProviderID: "template",
+            preferenceOrderings: [],
+            descriptors: [],
+            providerID: \.id,
+            providerForID: { providers[$0] },
+            isAvailable: \.available,
+            admissionAllowed: true,
+            loadCachedResult: { _ in nil as String? },
+            assessCachedResult: { _ in .allow("unused") },
+            quarantineCachedResult: { _ in },
+            invokeProvider: { _ in nil as String? },
+            assessProviderResult: { _ in .allow("unused") }
+        )
+
+        switch templatePinned {
+        case .templatePinned:
+            break
+        default:
+            Issue.record("Expected template pin to short-circuit the request runner.")
+        }
+
+        let admissionSkipped = await BASProviderRequestRunner.execute(
+            task: .quick,
+            preferredProviderID: "local-fast",
+            allowFallbacks: true,
+            deterministicProviderID: "template",
+            preferenceOrderings: [
+                BASProviderPreferenceOrdering(
+                    preferredProviderID: "local-fast",
+                    orderedProviderIDs: ["local-fast"]
+                )
+            ],
+            descriptors: [],
+            providerID: \.id,
+            providerForID: { providers[$0] },
+            isAvailable: \.available,
+            admissionAllowed: false,
+            loadCachedResult: { _ in nil as String? },
+            assessCachedResult: { _ in .allow("unused") },
+            quarantineCachedResult: { _ in },
+            invokeProvider: { _ in nil as String? },
+            assessProviderResult: { _ in .allow("unused") }
+        )
+
+        switch admissionSkipped {
+        case .admissionSkipped:
+            break
+        default:
+            Issue.record("Expected admission denial to short-circuit the request runner.")
+        }
+    }
+
+    @Test("provider request runner composes planning summary and resolved execution")
+    func providerRequestRunnerComposesPlanningSummaryAndExecution() async {
+        struct FakeProvider: Equatable {
+            let id: String
+            let available: Bool
+        }
+
+        let providers = [
+            "local-fast": FakeProvider(id: "local-fast", available: true),
+            "reflective-large": FakeProvider(id: "reflective-large", available: true)
+        ]
+
+        let outcome = await BASProviderRequestRunner.execute(
+            task: .mirror,
+            preferredProviderID: "local-fast",
+            allowFallbacks: true,
+            deterministicProviderID: "template",
+            preferenceOrderings: [
+                BASProviderPreferenceOrdering(
+                    preferredProviderID: "local-fast",
+                    orderedProviderIDs: ["local-fast", "reflective-large"]
+                )
+            ],
+            strategy: BASAdaptiveTaskStrategy(
+                kind: .mirror,
+                entropy: .high,
+                runtimeGear: .high,
+                contextBudget: 1800,
+                retrievalMode: .adaptive,
+                thinkingMode: .gated,
+                outputMode: .reflectiveStructured,
+                tone: .reflectiveClear,
+                actionSpace: ["reflect", "stay_brief"],
+                responseLanguage: .english,
+                allowsModelInvocation: true
+            ),
+            descriptors: [
+                providerDescriptor(
+                    id: "local-fast",
+                    bestFor: [.quick],
+                    strengths: [.structuredOutput, .lowLatency, .lowMemory],
+                    latencyClass: .low,
+                    memoryClass: .low,
+                    languages: [.english],
+                    supportsThinking: false
+                ),
+                providerDescriptor(
+                    id: "reflective-large",
+                    bestFor: [.mirror],
+                    strengths: [.structuredOutput, .deepReflection, .retrievalGrounding],
+                    latencyClass: .high,
+                    memoryClass: .high,
+                    languages: [.english],
+                    supportsThinking: true
+                )
+            ],
+            providerID: \.id,
+            providerForID: { providers[$0] },
+            isAvailable: \.available,
+            admissionAllowed: true,
+            loadCachedResult: { _ in nil as String? },
+            assessCachedResult: { _ in .allow("unused") },
+            quarantineCachedResult: { _ in },
+            invokeProvider: { provider in
+                provider.id == "reflective-large" ? "refined" : nil
+            },
+            assessProviderResult: { value in
+                .allow("allow-\(value)")
+            }
+        )
+
+        switch outcome {
+        case .resolved(let resolution):
+            #expect(resolution.planSummary.task == .mirror)
+            #expect(resolution.planSummary.preferredProviderID == "local-fast")
+            #expect(resolution.planSummary.orderedProviderIDs.first == "reflective-large")
+            #expect(resolution.planSummary.resolvedProviderIDs == ["reflective-large"])
+            #expect(resolution.planSummary.compatibleProviderIDs == ["reflective-large"])
+            #expect(resolution.planSummary.incompatibleProviderIDs == ["local-fast"])
+            #expect(resolution.planSummary.providerSelectionDurationMs >= 0)
+            #expect(resolution.execution.source == .providerSuccess)
+            #expect(resolution.execution.providerID == "reflective-large")
+            #expect(resolution.execution.result == "refined")
+            #expect(resolution.execution.assessment == "allow-refined")
+        default:
+            Issue.record("Expected provider request runner to produce a resolved execution.")
+        }
+    }
+
     @Test("local only routing stays on device and keeps deterministic fallbacks")
     func localOnlyRoutingStaysOnDevice() {
         let registry = BASCapabilityRegistry(descriptors: [
