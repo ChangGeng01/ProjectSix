@@ -89,12 +89,15 @@ enum DecisionMemoryGovernor {
             context.delete(existing)
             recordsByID[recordMutation.id] = nil
         case .add, .update, .noop:
-            guard let fields = recordMutation.fields else { return }
-            if let existing = recordsByID[recordMutation.id] {
-                apply(recordFields: fields, to: existing)
-            } else {
-                let record = makeRecord(from: fields)
-                context.insert(record)
+            let record = BASAppleMemoryMutationWriter.apply(
+                recordMutation,
+                existing: recordsByID[recordMutation.id],
+                make: makeRecord(from:)
+            )
+            if let record {
+                if recordsByID[recordMutation.id] == nil {
+                    context.insert(record)
+                }
                 recordsByID[record.id] = record
             }
         }
@@ -111,12 +114,15 @@ enum DecisionMemoryGovernor {
             context.delete(existing)
             candidatesByID[candidateMutation.id] = nil
         case .add, .update, .noop:
-            guard let fields = candidateMutation.fields else { return }
-            if let existing = candidatesByID[candidateMutation.id] {
-                apply(candidateFields: fields, to: existing)
-            } else {
-                let candidate = makeCandidate(from: fields)
-                context.insert(candidate)
+            let candidate = BASAppleMemoryMutationWriter.apply(
+                candidateMutation,
+                existing: candidatesByID[candidateMutation.id],
+                make: makeCandidate(from:)
+            )
+            if let candidate {
+                if candidatesByID[candidateMutation.id] == nil {
+                    context.insert(candidate)
+                }
                 candidatesByID[candidate.id] = candidate
             }
         }
@@ -144,28 +150,6 @@ enum DecisionMemoryGovernor {
             lastReviewedAt: fields.lastReviewedAt,
             tier: DecisionMemoryTier(basRawValue: fields.tierID)
         )
-    }
-
-    private static func apply(
-        recordFields: BASGovernedMemoryStoredFields,
-        to record: DecisionMemoryRecord
-    ) {
-        record.typeRaw = recordFields.typeID
-        record.topic = recordFields.topic
-        record.headline = recordFields.headline
-        record.value = recordFields.value
-        record.confidence = recordFields.confidence
-        record.priority = recordFields.priority
-        record.sourceRaw = recordFields.source.rawValue
-        record.lastConfirmedAt = recordFields.lastConfirmedAt
-        record.decayPolicyRaw = recordFields.decayPolicy.rawValue
-        record.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(recordFields.retrievalTags)
-        record.evidenceCount = recordFields.evidenceCount
-        record.observationCount = recordFields.observationCount
-        record.provenanceSummary = recordFields.provenanceSummary
-        record.lifecycleStateRaw = DecisionMemoryLifecycleState(recordFields.lifecycleState).rawValue
-        record.lastReviewedAt = recordFields.lastReviewedAt
-        record.tierRaw = recordFields.tierID
     }
 
     private static func makeCandidate(
@@ -196,29 +180,4 @@ enum DecisionMemoryGovernor {
         )
     }
 
-    private static func apply(
-        candidateFields: BASCandidateMemoryStoredFields,
-        to candidate: DecisionMemoryCandidateRecord
-    ) {
-        candidate.typeRaw = candidateFields.typeID
-        candidate.topic = candidateFields.topic
-        candidate.headline = candidateFields.headline
-        candidate.value = candidateFields.value
-        candidate.confidence = candidateFields.confidence
-        candidate.priority = candidateFields.priority
-        candidate.sourceRaw = candidateFields.source.rawValue
-        candidate.firstObservedAt = candidateFields.firstObservedAt
-        candidate.lastObservedAt = candidateFields.lastObservedAt
-        candidate.decayPolicyRaw = candidateFields.decayPolicy.rawValue
-        candidate.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(candidateFields.retrievalTags)
-        candidate.evidenceCount = candidateFields.evidenceCount
-        candidate.confirmationCount = candidateFields.confirmationCount
-        candidate.lastObservationFingerprint = candidateFields.lastObservationFingerprint
-        candidate.statusRaw = DecisionMemoryCandidateStatus(candidateFields.status).rawValue
-        candidate.provenanceSummary = candidateFields.provenanceSummary
-        candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation(candidateFields.lastWriteOperation).rawValue
-        candidate.lastGovernanceDecisionRaw = DecisionMemoryGovernanceDecision(candidateFields.lastGovernanceDecision).rawValue
-        candidate.governanceReason = candidateFields.governanceReason
-        candidate.tierRaw = candidateFields.tierID
-    }
 }

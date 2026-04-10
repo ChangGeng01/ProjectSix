@@ -1,5 +1,7 @@
 import Foundation
 import SwiftData
+import BASAppleAdapters
+import BASMemory
 
 enum DecisionMemoryType: String, Codable, Sendable {
     case identity
@@ -263,5 +265,157 @@ extension DecisionMemoryCandidateRecord {
 
     var tier: DecisionMemoryTier {
         DecisionMemoryTier(rawValue: tierRaw ?? "") ?? .warm
+    }
+}
+
+extension DecisionMemoryRecord: BASAppleGovernedMemoryMutable {
+    var basID: String { id }
+    var basTypeID: String {
+        get { typeRaw }
+        set { typeRaw = newValue }
+    }
+    var basTopic: String {
+        get { topic }
+        set { topic = newValue }
+    }
+    var basHeadline: String {
+        get { headline }
+        set { headline = newValue }
+    }
+    var basValue: String {
+        get { value }
+        set { value = newValue }
+    }
+    var basConfidence: Double {
+        get { confidence }
+        set { confidence = newValue }
+    }
+    var basPriority: Double {
+        get { priority }
+        set { priority = newValue }
+    }
+    var basSource: BASMemorySource {
+        get { source.basSource }
+        set { sourceRaw = DecisionMemorySource(newValue).rawValue }
+    }
+    var basLastConfirmedAt: Date {
+        get { lastConfirmedAt }
+        set { lastConfirmedAt = newValue }
+    }
+    var basDecayPolicy: BASMemoryDecayPolicy {
+        get { decayPolicy.basDecayPolicy }
+        set { decayPolicyRaw = DecisionMemoryDecayPolicy(newValue).rawValue }
+    }
+    var basRetrievalTags: [String] {
+        get { retrievalTags }
+        set { retrievalTagsBlob = Self.encodeTags(newValue) }
+    }
+    var basEvidenceCount: Int {
+        get { evidenceCount }
+        set { evidenceCount = newValue }
+    }
+    var basObservationCount: Int {
+        get { observationCount }
+        set { observationCount = newValue }
+    }
+    var basProvenanceSummary: String {
+        get { provenanceSummary }
+        set { provenanceSummary = newValue }
+    }
+    var basLifecycleState: BASMemoryLifecycleState {
+        get { BASMemoryLifecycleState(rawValue: lifecycleState.rawValue) ?? .active }
+        set { lifecycleStateRaw = DecisionMemoryLifecycleState(newValue).rawValue }
+    }
+    var basLastReviewedAt: Date {
+        get { reviewedAt }
+        set { lastReviewedAt = newValue }
+    }
+    var basTierID: String {
+        get { tier.rawValue }
+        set { tierRaw = newValue }
+    }
+}
+
+extension DecisionMemoryCandidateRecord: BASAppleCandidateMemoryMutable {
+    var basID: String { id }
+    var basTypeID: String {
+        get { typeRaw }
+        set { typeRaw = newValue }
+    }
+    var basTopic: String {
+        get { topic }
+        set { topic = newValue }
+    }
+    var basHeadline: String {
+        get { headline }
+        set { headline = newValue }
+    }
+    var basValue: String {
+        get { value }
+        set { value = newValue }
+    }
+    var basConfidence: Double {
+        get { confidence }
+        set { confidence = newValue }
+    }
+    var basPriority: Double {
+        get { priority }
+        set { priority = newValue }
+    }
+    var basSource: BASMemorySource {
+        get { source.basSource }
+        set { sourceRaw = DecisionMemorySource(newValue).rawValue }
+    }
+    var basFirstObservedAt: Date {
+        get { firstObservedAt }
+        set { firstObservedAt = newValue }
+    }
+    var basLastObservedAt: Date {
+        get { lastObservedAt }
+        set { lastObservedAt = newValue }
+    }
+    var basDecayPolicy: BASMemoryDecayPolicy {
+        get { decayPolicy.basDecayPolicy }
+        set { decayPolicyRaw = DecisionMemoryDecayPolicy(newValue).rawValue }
+    }
+    var basRetrievalTags: [String] {
+        get { retrievalTags }
+        set { retrievalTagsBlob = DecisionMemoryRecord.encodeTags(newValue) }
+    }
+    var basEvidenceCount: Int {
+        get { evidenceCount }
+        set { evidenceCount = newValue }
+    }
+    var basConfirmationCount: Int {
+        get { confirmationCount }
+        set { confirmationCount = newValue }
+    }
+    var basLastObservationFingerprint: String {
+        get { lastObservationFingerprint }
+        set { lastObservationFingerprint = newValue }
+    }
+    var basStatus: BASMemoryCandidateStatus {
+        get { BASMemoryCandidateStatus(rawValue: status.rawValue) ?? .pending }
+        set { statusRaw = DecisionMemoryCandidateStatus(newValue).rawValue }
+    }
+    var basProvenanceSummary: String {
+        get { provenanceSummary }
+        set { provenanceSummary = newValue }
+    }
+    var basLastWriteOperation: BASMemoryWriteOperation {
+        get { BASMemoryWriteOperation(rawValue: lastWriteOperation.rawValue) ?? .noop }
+        set { lastWriteOperationRaw = DecisionMemoryWriteOperation(newValue).rawValue }
+    }
+    var basLastGovernanceDecision: BASMemoryGovernanceDecision {
+        get { BASMemoryGovernanceDecision(rawValue: lastGovernanceDecision.rawValue) ?? .deferred }
+        set { lastGovernanceDecisionRaw = DecisionMemoryGovernanceDecision(newValue).rawValue }
+    }
+    var basGovernanceReason: String {
+        get { governanceReason }
+        set { governanceReason = newValue }
+    }
+    var basTierID: String {
+        get { tier.rawValue }
+        set { tierRaw = newValue }
     }
 }
