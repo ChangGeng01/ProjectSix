@@ -115,6 +115,30 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(publishedNotice, "refresh notice")
     }
 
+    func testResolveProjectionRefreshUsesResolverAndCommitsState() {
+        let runtime = BASHostRuntime()
+        var committedProjection: String?
+        var dirtyFlag = true
+        var publishedNotice: String?
+
+        runtime.resolveProjectionRefresh(
+            using: {
+                BASAppleProjectionRefreshResult(
+                    projection: "resolved-projection",
+                    refreshed: true,
+                    notice: "resolved notice"
+                )
+            },
+            commitProjection: { committedProjection = $0 },
+            setProjectionDirty: { dirtyFlag = $0 },
+            publishNotice: { publishedNotice = $0 }
+        )
+
+        XCTAssertEqual(committedProjection, "resolved-projection")
+        XCTAssertFalse(dirtyFlag)
+        XCTAssertEqual(publishedNotice, "resolved notice")
+    }
+
     func testActivateSessionCommitsProjectionBrainAndSession() {
         let runtime = BASHostRuntime()
         var loadedSession: [String] = []
@@ -148,5 +172,213 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(publishedNotice, "activation notice")
         XCTAssertEqual(committedBrain, "brain")
         XCTAssertEqual(committedSession, "session")
+    }
+
+    func testResolveCurrentBrainProjectionUsesResolverAndCommitsBrain() {
+        let runtime = BASHostRuntime()
+        var committedProjection: String?
+        var dirtyFlag = true
+        var publishedNotice: String?
+        var committedBrain: String?
+
+        runtime.resolveCurrentBrainProjection(
+            using: {
+                BASAppleCurrentBrainProjectionRuntimeResult(
+                    currentBrain: "resolved-brain",
+                    projection: "resolved-projection",
+                    refreshedProjection: true,
+                    notice: "resolved current brain"
+                )
+            },
+            commitProjection: { committedProjection = $0 },
+            setProjectionDirty: { dirtyFlag = $0 },
+            publishNotice: { publishedNotice = $0 },
+            commitCurrentBrain: { committedBrain = $0 }
+        )
+
+        XCTAssertEqual(committedProjection, "resolved-projection")
+        XCTAssertFalse(dirtyFlag)
+        XCTAssertEqual(publishedNotice, "resolved current brain")
+        XCTAssertEqual(committedBrain, "resolved-brain")
+    }
+
+    func testResolveAndActivateSessionUsesResolverAndCommitsSession() {
+        let runtime = BASHostRuntime()
+        var loadedSession: [String] = []
+        var committedProjection: String?
+        var dirtyFlag = true
+        var publishedNotice: String?
+        var committedBrain: String?
+        var committedSession: String?
+
+        runtime.resolveAndActivateSession(
+            session: "session",
+            using: {
+                BASAppleCurrentBrainProjectionRuntimeResult(
+                    currentBrain: "brain",
+                    projection: "projection",
+                    refreshedProjection: true,
+                    notice: "resolved activation"
+                )
+            },
+            loadBrainState: { session, currentBrain in
+                loadedSession = [session, currentBrain]
+            },
+            commitProjection: { committedProjection = $0 },
+            setProjectionDirty: { dirtyFlag = $0 },
+            publishNotice: { publishedNotice = $0 },
+            commitCurrentBrain: { committedBrain = $0 },
+            commitSession: { committedSession = $0 }
+        )
+
+        XCTAssertEqual(loadedSession, ["session", "brain"])
+        XCTAssertEqual(committedProjection, "projection")
+        XCTAssertFalse(dirtyFlag)
+        XCTAssertEqual(publishedNotice, "resolved activation")
+        XCTAssertEqual(committedBrain, "brain")
+        XCTAssertEqual(committedSession, "session")
+    }
+
+    func testReopenHeldItemAppliesFollowUpSuggestion() {
+        let runtime = BASHostRuntime()
+        var actions: [String] = []
+        var suggestion: BASAppleReopenInterventionSuggestion?
+
+        runtime.reopenHeldItem(
+            modeID: BASDecisionMode.balance.rawValue,
+            promptSeed: "Slow this choice down.",
+            hasDraft: false,
+            title: "Reopen carefully",
+            detail: "High-risk reopen",
+            riskLevelID: BASRiskLevel.high.rawValue,
+            reopenHint: "Use more structure",
+            templateHint: "Cooling template",
+            interventionHistorySummary: "Past nighttime choices went worse.",
+            clearActiveDecisionFlows: { actions.append("clear") },
+            activateQuickFromDraft: { actions.append("draft-quick") },
+            activateBalanceFromDraft: { actions.append("draft-balance") },
+            activateMirrorFromDraft: { actions.append("draft-mirror") },
+            startQuick: { _ in actions.append("start-quick") },
+            startBalance: { _ in actions.append("start-balance") },
+            startMirror: { _ in actions.append("start-mirror") },
+            removeItem: { actions.append("remove") },
+            applyInterventionSuggestion: { suggestion = $0; actions.append("suggest") },
+            refreshPredictedIntervention: { actions.append("refresh") },
+            selectHomeTab: { actions.append("home") },
+            persistActiveWorkspaceState: { actions.append("persist") },
+            now: .distantPast
+        )
+
+        XCTAssertEqual(actions, ["clear", "start-balance", "remove", "suggest", "home", "persist"])
+        XCTAssertEqual(suggestion?.title, "Use more structure")
+        XCTAssertEqual(suggestion?.suggestedModeID, BASDecisionMode.balance.rawValue)
+    }
+
+    func testRestoreActiveWorkspaceIfNeededRestoresMatchingMode() {
+        let runtime = BASHostRuntime()
+        var actions: [String] = []
+
+        runtime.restoreActiveWorkspaceIfNeeded(
+            restoreEnabled: true,
+            hasActiveQuickSession: false,
+            hasActiveBalanceSession: false,
+            hasActiveMirrorSession: false,
+            hasReflectionContext: false,
+            loadState: { "mirror" },
+            modeID: { $0 },
+            restoreQuick: { _ in actions.append("quick") },
+            restoreBalance: { _ in actions.append("balance") },
+            restoreMirror: { _ in actions.append("mirror") },
+            selectHomeTab: { actions.append("home") },
+            afterRestore: { actions.append("after") }
+        )
+
+        XCTAssertEqual(actions, ["mirror", "home", "after"])
+    }
+
+    func testRefreshActiveTaskGraphChoosesFirstAvailableSnapshot() {
+        let runtime = BASHostRuntime()
+        var savedSnapshot: String?
+        var cleared = false
+
+        let snapshot = runtime.refreshActiveTaskGraph(
+            quickSnapshot: { nil as String? },
+            balanceSnapshot: { "balance-snapshot" },
+            mirrorSnapshot: { "mirror-snapshot" },
+            saveSnapshot: { savedSnapshot = $0 },
+            clearSnapshot: { cleared = true }
+        )
+
+        XCTAssertEqual(snapshot, "balance-snapshot")
+        XCTAssertEqual(savedSnapshot, "balance-snapshot")
+        XCTAssertFalse(cleared)
+    }
+
+    func testReconcilePredictiveInterventionKeepsExistingPresentationStable() {
+        let runtime = BASHostRuntime()
+        let existing = BASApplePredictiveInterventionCandidateSummary(
+            id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+            riskLevelID: BASRiskLevel.medium.rawValue,
+            title: "Pause",
+            detail: "Slow down",
+            evidenceSignalCount: 2,
+            preferredModeID: BASDecisionMode.mirror.rawValue,
+            reason: "Recent signals say pause.",
+            createdAt: .distantPast,
+            expiresAt: .distantFuture
+        )
+        let next = BASApplePredictiveInterventionCandidateSummary(
+            id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
+            riskLevelID: BASRiskLevel.medium.rawValue,
+            title: "Pause",
+            detail: "Slow down",
+            evidenceSignalCount: 2,
+            preferredModeID: BASDecisionMode.mirror.rawValue,
+            reason: "Recent signals say pause.",
+            createdAt: .now,
+            expiresAt: .distantFuture
+        )
+
+        let reconciled = runtime.reconcilePredictiveIntervention(
+            existing: existing,
+            next: next
+        )
+
+        XCTAssertEqual(reconciled?.id, existing.id)
+    }
+
+    func testExecutePredictiveInterventionDeliverySchedulesAllowedCandidate() {
+        let runtime = BASHostRuntime()
+        let candidate = BASApplePredictiveInterventionCandidateSummary(
+            id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+            riskLevelID: BASRiskLevel.high.rawValue,
+            title: "Pause",
+            detail: "Slow down",
+            evidenceSignalCount: 3,
+            preferredModeID: BASDecisionMode.mirror.rawValue,
+            reason: "High-risk context",
+            createdAt: .now,
+            expiresAt: .distantFuture
+        )
+        var upserts: [(UUID, Bool)] = []
+        var cancelled: [UUID] = []
+        var scheduled: [UUID] = []
+
+        runtime.executePredictiveInterventionDelivery(
+            candidate: candidate,
+            predictiveInterventionsEnabled: true,
+            policyAllowed: true,
+            upsertTrigger: { summary, wasDelivered in
+                upserts.append((summary.id, wasDelivered))
+            },
+            cancelNotification: { cancelled.append($0) },
+            scheduleNotification: { scheduled.append($0.id) }
+        )
+
+        XCTAssertEqual(upserts.count, 1)
+        XCTAssertEqual(upserts.first?.0, candidate.id)
+        XCTAssertEqual(upserts.first?.1, true)
+        XCTAssertTrue(cancelled.isEmpty)
+        XCTAssertEqual(scheduled, [candidate.id])
     }
 }

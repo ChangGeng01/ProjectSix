@@ -396,17 +396,28 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func reopenTomorrowBoxItem(_ item: TomorrowBoxItem) {
-        BehavioralAISubstrateBridge.reopenTomorrowBoxItem(
-            item,
+        hostRuntime.reopenHeldItem(
+            modeID: item.mode.rawValue,
+            promptSeed: item.prompt,
+            hasDraft: item.draft != nil,
+            title: item.title,
+            detail: item.detail,
+            riskLevelID: item.riskLevel?.rawValue,
+            reopenHint: item.reopenHint,
+            templateHint: item.templateHint,
+            interventionHistorySummary: item.interventionHistorySummary,
             clearActiveDecisionFlows: { clearActiveDecisionFlows() },
-            activateQuick: { session in
-                activateQuickSession(session)
+            activateQuickFromDraft: {
+                guard let draft = item.draft else { return }
+                activateQuickSession(draft.restoreQuickSession(entrySource: .app))
             },
-            activateBalance: { session in
-                activateBalanceSession(session)
+            activateBalanceFromDraft: {
+                guard let draft = item.draft else { return }
+                activateBalanceSession(draft.restoreBalanceSession(entrySource: .app))
             },
-            activateMirror: { session in
-                activateMirrorSession(session)
+            activateMirrorFromDraft: {
+                guard let draft = item.draft else { return }
+                activateMirrorSession(draft.restoreMirrorSession(entrySource: .app))
             },
             startQuick: { prompt in
                 startQuickCheck(entrySource: .app, prompt: prompt)
@@ -417,11 +428,11 @@ final class BeforeAppModel: ObservableObject {
             startMirror: { prompt in
                 startMirrorWorkspace(entrySource: .app, prompt: prompt)
             },
-            removeTomorrowBoxItem: {
+            removeItem: {
                 removeTomorrowBoxItem(item)
             },
-            setInterventionCandidate: { candidate in
-                interventionCandidate = candidate
+            applyInterventionSuggestion: { suggestion in
+                interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
             },
             refreshPredictedIntervention: { refreshPredictedIntervention() },
             selectHomeTab: {
@@ -447,11 +458,10 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func reopenCheckEvent(_ event: CheckEvent) {
-        BehavioralAISubstrateBridge.reopenCheckEvent(
-            event,
+        hostRuntime.reopenSimpleItem(
             clearActiveDecisionFlows: { clearActiveDecisionFlows() },
-            activateQuick: { session in
-                activateQuickSession(session)
+            reopen: {
+                activateQuickSession(event.restoredSession())
             },
             selectHomeTab: {
                 selectedTab = .home
@@ -461,11 +471,10 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func reopenBalanceRecord(_ record: BalanceDecisionRecord) {
-        BehavioralAISubstrateBridge.reopenBalanceRecord(
-            record,
+        hostRuntime.reopenSimpleItem(
             clearActiveDecisionFlows: { clearActiveDecisionFlows() },
-            activateBalance: { session in
-                activateBalanceSession(session)
+            reopen: {
+                activateBalanceSession(record.restoredSession())
             },
             selectHomeTab: {
                 selectedTab = .home
@@ -475,11 +484,10 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func reopenMirrorRecord(_ record: MirrorDecisionRecord) {
-        BehavioralAISubstrateBridge.reopenMirrorRecord(
-            record,
+        hostRuntime.reopenSimpleItem(
             clearActiveDecisionFlows: { clearActiveDecisionFlows() },
-            activateMirror: { session in
-                activateMirrorSession(session)
+            reopen: {
+                activateMirrorSession(record.restoredSession())
             },
             selectHomeTab: {
                 selectedTab = .home
@@ -972,26 +980,28 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func reopenSupportRequest(_ request: SupportRequest) {
-        BehavioralAISubstrateBridge.reopenSupportRequest(
-            request,
+        guard let mode = request.mode, let draft = request.draft else { return }
+
+        guard hostRuntime.reopenDraftedItem(
+            modeID: mode.rawValue,
             clearActiveDecisionFlows: { clearActiveDecisionFlows() },
-            activateQuick: { session in
-                activateQuickSession(session)
+            activateQuick: {
+                activateQuickSession(draft.restoreQuickSession(entrySource: .app))
             },
-            activateBalance: { session in
-                activateBalanceSession(session)
+            activateBalance: {
+                activateBalanceSession(draft.restoreBalanceSession(entrySource: .app))
             },
-            activateMirror: { session in
-                activateMirrorSession(session)
+            activateMirror: {
+                activateMirrorSession(draft.restoreMirrorSession(entrySource: .app))
             },
-            markHeard: {
+            afterSuccessfulReopen: {
                 supportInbox.markHeard(request.id)
-            },
-            selectHomeTab: {
                 selectedTab = .home
-            },
-            persistActiveWorkspaceState: { persistActiveWorkspaceState() }
-        )
+                persistActiveWorkspaceState()
+            }
+        ) else {
+            return
+        }
     }
 
     func moveSupportRequestToTomorrow(_ request: SupportRequest) {
@@ -1035,26 +1045,28 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func reopenSharedLifeItem(_ item: SharedLifeBoxItem) {
-        BehavioralAISubstrateBridge.reopenSharedLifeItem(
-            item,
+        guard let mode = item.mode, let draft = item.draft else { return }
+
+        guard hostRuntime.reopenDraftedItem(
+            modeID: mode.rawValue,
             clearActiveDecisionFlows: { clearActiveDecisionFlows() },
-            activateQuick: { session in
-                activateQuickSession(session)
+            activateQuick: {
+                activateQuickSession(draft.restoreQuickSession(entrySource: .app))
             },
-            activateBalance: { session in
-                activateBalanceSession(session)
+            activateBalance: {
+                activateBalanceSession(draft.restoreBalanceSession(entrySource: .app))
             },
-            activateMirror: { session in
-                activateMirrorSession(session)
+            activateMirror: {
+                activateMirrorSession(draft.restoreMirrorSession(entrySource: .app))
             },
-            markReviewing: {
+            afterSuccessfulReopen: {
                 sharedLifeStore.markReviewing(item.id)
-            },
-            selectHomeTab: {
                 selectedTab = .home
-            },
-            persistActiveWorkspaceState: { persistActiveWorkspaceState() }
-        )
+                persistActiveWorkspaceState()
+            }
+        ) else {
+            return
+        }
     }
 
     func moveSharedLifeItemToTomorrow(_ item: SharedLifeBoxItem) {
@@ -1157,13 +1169,14 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func restoreActiveWorkspaceIfNeeded() {
-        BehavioralAISubstrateBridge.restoreActiveWorkspaceIfNeeded(
-            preferences: preferences,
+        hostRuntime.restoreActiveWorkspaceIfNeeded(
+            restoreEnabled: preferences.restoreInProgressWorkspaces,
             hasActiveQuickSession: activeQuickSession != nil,
             hasActiveBalanceSession: activeBalanceSession != nil,
             hasActiveMirrorSession: activeMirrorSession != nil,
             hasReflectionContext: reflectionContext != nil,
             loadState: { ActiveDecisionWorkspaceStore.load() },
+            modeID: { $0.modeRaw },
             restoreQuick: { state in
                 activateQuickSession(state.restoreQuickSession())
             },
@@ -1246,13 +1259,15 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func refreshDecisionMemoryStore(force: Bool = false) {
-        hostRuntime.commitProjectionRefresh(
-            outcome: BehavioralAISubstrateBridge.resolveMemoryProjection(
-                force: force,
-                cachedProjection: memoryProjection,
-                isDirty: isMemoryProjectionDirty,
-                context: modelContainer.mainContext
-            ),
+        hostRuntime.resolveProjectionRefresh(
+            using: {
+                BehavioralAISubstrateBridge.resolveMemoryProjection(
+                    force: force,
+                    cachedProjection: memoryProjection,
+                    isDirty: isMemoryProjectionDirty,
+                    context: modelContainer.mainContext
+                )
+            },
             commitProjection: { memoryProjection = $0 },
             setProjectionDirty: { isMemoryProjectionDirty = $0 },
             publishNotice: publishStartupNotice
@@ -1260,17 +1275,18 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func activateQuickSession(_ session: QuickCheckSession) {
-        let outcome = BehavioralAISubstrateBridge.activateQuickSession(
-            session,
-            preferences: preferences,
-            context: modelContainer.mainContext,
-            cachedProjection: memoryProjection,
-            isProjectionDirty: isMemoryProjectionDirty,
-            now: .now
-        )
-        hostRuntime.activateSession(
+        hostRuntime.resolveAndActivateSession(
             session: session,
-            outcome: outcome,
+            using: {
+                BehavioralAISubstrateBridge.activateQuickSession(
+                    session,
+                    preferences: preferences,
+                    context: modelContainer.mainContext,
+                    cachedProjection: memoryProjection,
+                    isProjectionDirty: isMemoryProjectionDirty,
+                    now: .now
+                )
+            },
             loadBrainState: { session, currentBrain in
                 session.loadBrainState(currentBrain.brainState)
             },
@@ -1283,17 +1299,18 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func activateBalanceSession(_ session: BalanceBoardSession) {
-        let outcome = BehavioralAISubstrateBridge.activateBalanceSession(
-            session,
-            preferences: preferences,
-            context: modelContainer.mainContext,
-            cachedProjection: memoryProjection,
-            isProjectionDirty: isMemoryProjectionDirty,
-            now: .now
-        )
-        hostRuntime.activateSession(
+        hostRuntime.resolveAndActivateSession(
             session: session,
-            outcome: outcome,
+            using: {
+                BehavioralAISubstrateBridge.activateBalanceSession(
+                    session,
+                    preferences: preferences,
+                    context: modelContainer.mainContext,
+                    cachedProjection: memoryProjection,
+                    isProjectionDirty: isMemoryProjectionDirty,
+                    now: .now
+                )
+            },
             loadBrainState: { session, currentBrain in
                 session.loadBrainState(currentBrain.brainState)
             },
@@ -1306,17 +1323,18 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func activateMirrorSession(_ session: MirrorWorkspaceSession) {
-        let outcome = BehavioralAISubstrateBridge.activateMirrorSession(
-            session,
-            preferences: preferences,
-            context: modelContainer.mainContext,
-            cachedProjection: memoryProjection,
-            isProjectionDirty: isMemoryProjectionDirty,
-            now: .now
-        )
-        hostRuntime.activateSession(
+        hostRuntime.resolveAndActivateSession(
             session: session,
-            outcome: outcome,
+            using: {
+                BehavioralAISubstrateBridge.activateMirrorSession(
+                    session,
+                    preferences: preferences,
+                    context: modelContainer.mainContext,
+                    cachedProjection: memoryProjection,
+                    isProjectionDirty: isMemoryProjectionDirty,
+                    now: .now
+                )
+            },
             loadBrainState: { session, currentBrain in
                 session.loadBrainState(currentBrain.brainState)
             },
@@ -1339,18 +1357,20 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func refreshGlobalBrainState(source: BrainStateUpdateSource) {
-        hostRuntime.commitCurrentBrainProjection(
-            outcome: BehavioralAISubstrateBridge.refreshCurrentBrainState(
-                activeQuickSession: activeQuickSession,
-                activeBalanceSession: activeBalanceSession,
-                activeMirrorSession: activeMirrorSession,
-                taskGraph: activeTaskGraph,
-                preferences: preferences,
-                context: modelContainer.mainContext,
-                cachedProjection: memoryProjection,
-                isProjectionDirty: isMemoryProjectionDirty,
-                source: source
-            ),
+        hostRuntime.resolveCurrentBrainProjection(
+            using: {
+                BehavioralAISubstrateBridge.refreshCurrentBrainState(
+                    activeQuickSession: activeQuickSession,
+                    activeBalanceSession: activeBalanceSession,
+                    activeMirrorSession: activeMirrorSession,
+                    taskGraph: activeTaskGraph,
+                    preferences: preferences,
+                    context: modelContainer.mainContext,
+                    cachedProjection: memoryProjection,
+                    isProjectionDirty: isMemoryProjectionDirty,
+                    source: source
+                )
+            },
             commitProjection: { memoryProjection = $0 },
             setProjectionDirty: { isMemoryProjectionDirty = $0 },
             publishNotice: publishStartupNotice,
@@ -1359,25 +1379,53 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func refreshPredictedIntervention() {
-        interventionCandidate = BehavioralAISubstrateBridge.refreshPredictedIntervention(
-            existing: interventionCandidate,
+        let next = InterventionPredictionEngine.predictCandidate(
             currentBrainState: currentBrainState,
             context: modelContainer.mainContext,
-            preferences: preferences
+            preferences: preferences,
+            now: .now
         )
+        let reconciled = hostRuntime.reconcilePredictiveIntervention(
+            existing: interventionCandidate.map(predictiveInterventionSummary(from:)),
+            next: next.map(predictiveInterventionSummary(from:))
+        )
+        interventionCandidate = reconciled.map(makeInterventionCandidate(from:))
     }
 
     private func schedulePredictiveInterventionIfNeeded() {
-        BehavioralAISubstrateBridge.schedulePredictiveInterventionIfNeeded(
-            candidate: interventionCandidate,
-            preferences: preferences,
-            currentBrainState: currentBrainState,
-            context: modelContainer.mainContext,
-            upsertTrigger: upsertInterventionTrigger,
+        let summary = interventionCandidate.map(predictiveInterventionSummary(from:))
+        let policyAllowed: Bool
+        if BASApplePredictiveInterventionDeliveryPlanner.shouldEvaluatePolicy(
+            candidate: summary,
+            predictiveInterventionsEnabled: preferences.predictiveInterventionsEnabled
+        ), let candidate = interventionCandidate {
+            policyAllowed = InterventionNotificationPolicyEngine.decide(
+                candidate: candidate,
+                preferences: preferences,
+                currentBrainState: currentBrainState,
+                context: modelContainer.mainContext,
+                now: .now,
+                calendar: .autoupdatingCurrent
+            ).isAllowed
+        } else {
+            policyAllowed = false
+        }
+
+        hostRuntime.executePredictiveInterventionDelivery(
+            candidate: summary,
+            predictiveInterventionsEnabled: preferences.predictiveInterventionsEnabled,
+            policyAllowed: policyAllowed,
+            upsertTrigger: { summary, wasDelivered in
+                upsertInterventionTrigger(
+                    makeInterventionCandidate(from: summary),
+                    wasDelivered: wasDelivered
+                )
+            },
             cancelNotification: { candidateID in
                 NotificationService.shared.cancelPredictiveInterventionNotification(candidateID: candidateID)
             },
-            scheduleNotification: { candidate in
+            scheduleNotification: { summary in
+                let candidate = makeInterventionCandidate(from: summary)
                 Task {
                     await NotificationService.shared.schedulePredictiveInterventionNotification(candidate)
                 }
@@ -1386,10 +1434,10 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func refreshActiveTaskGraphSnapshot() {
-        activeTaskGraph = BehavioralAISubstrateBridge.refreshActiveTaskGraphSnapshot(
-            activeQuickSession: activeQuickSession,
-            activeBalanceSession: activeBalanceSession,
-            activeMirrorSession: activeMirrorSession,
+        activeTaskGraph = hostRuntime.refreshActiveTaskGraph(
+            quickSnapshot: { activeQuickSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
+            balanceSnapshot: { activeBalanceSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
+            mirrorSnapshot: { activeMirrorSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
             saveSnapshot: { snapshot in
                 DecisionTaskGraphStore.save(snapshot)
             },
@@ -1437,6 +1485,52 @@ final class BeforeAppModel: ObservableObject {
             suggestedMode: suggestion.preferredModeID.flatMap(DecisionMode.init(rawValue:)),
             reason: suggestion.reason,
             expiresAt: suggestion.expiresAt
+        )
+    }
+
+    private func makeInterventionCandidate(
+        from suggestion: BASAppleReopenInterventionSuggestion
+    ) -> InterventionPredictionCandidate {
+        InterventionPredictionCandidate(
+            riskLevel: InterventionRiskLevel(rawValue: suggestion.riskLevelID) ?? .medium,
+            title: suggestion.title,
+            detail: suggestion.detail ?? "",
+            evidenceSignalCount: suggestion.evidenceSignalCount,
+            suggestedMode: suggestion.suggestedModeID.flatMap(DecisionMode.init(rawValue:)),
+            reason: suggestion.reason,
+            expiresAt: suggestion.expiresAt
+        )
+    }
+
+    private func makeInterventionCandidate(
+        from summary: BASApplePredictiveInterventionCandidateSummary
+    ) -> InterventionPredictionCandidate {
+        InterventionPredictionCandidate(
+            id: summary.id,
+            riskLevel: InterventionRiskLevel(rawValue: summary.riskLevelID) ?? .medium,
+            title: summary.title,
+            detail: summary.detail,
+            evidenceSignalCount: summary.evidenceSignalCount,
+            suggestedMode: summary.preferredModeID.flatMap(DecisionMode.init(rawValue:)),
+            reason: summary.reason,
+            createdAt: summary.createdAt,
+            expiresAt: summary.expiresAt
+        )
+    }
+
+    private func predictiveInterventionSummary(
+        from candidate: InterventionPredictionCandidate
+    ) -> BASApplePredictiveInterventionCandidateSummary {
+        BASApplePredictiveInterventionCandidateSummary(
+            id: candidate.id,
+            riskLevelID: candidate.riskLevel.rawValue,
+            title: candidate.title,
+            detail: candidate.detail,
+            evidenceSignalCount: candidate.evidenceSignalCount,
+            preferredModeID: candidate.suggestedModeRaw,
+            reason: candidate.reason,
+            createdAt: candidate.createdAt,
+            expiresAt: candidate.expiresAt
         )
     }
 

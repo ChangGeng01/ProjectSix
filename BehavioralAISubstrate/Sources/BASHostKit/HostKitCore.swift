@@ -275,6 +275,20 @@ public struct BASHostRuntime: Sendable {
         )
     }
 
+    public func resolveProjectionRefresh<Projection>(
+        using resolver: () -> BASAppleProjectionRefreshResult<Projection>,
+        commitProjection: (Projection) -> Void,
+        setProjectionDirty: (Bool) -> Void,
+        publishNotice: (String) -> Void
+    ) {
+        commitProjectionRefresh(
+            outcome: resolver(),
+            commitProjection: commitProjection,
+            setProjectionDirty: setProjectionDirty,
+            publishNotice: publishNotice
+        )
+    }
+
     public func commitCurrentBrainProjection<CurrentBrain, Projection>(
         outcome: BASAppleCurrentBrainProjectionRuntimeResult<CurrentBrain, Projection>,
         commitProjection: (Projection) -> Void,
@@ -284,6 +298,22 @@ public struct BASHostRuntime: Sendable {
     ) {
         BASAppleCurrentBrainHostStateExecutor.commitCurrentBrainProjection(
             outcome: outcome,
+            commitProjection: commitProjection,
+            setProjectionDirty: setProjectionDirty,
+            publishNotice: publishNotice,
+            commitCurrentBrain: commitCurrentBrain
+        )
+    }
+
+    public func resolveCurrentBrainProjection<CurrentBrain, Projection>(
+        using resolver: () -> BASAppleCurrentBrainProjectionRuntimeResult<CurrentBrain, Projection>,
+        commitProjection: (Projection) -> Void,
+        setProjectionDirty: (Bool) -> Void,
+        publishNotice: (String) -> Void,
+        commitCurrentBrain: (CurrentBrain) -> Void
+    ) {
+        commitCurrentBrainProjection(
+            outcome: resolver(),
             commitProjection: commitProjection,
             setProjectionDirty: setProjectionDirty,
             publishNotice: publishNotice,
@@ -310,6 +340,197 @@ public struct BASHostRuntime: Sendable {
             publishNotice: publishNotice,
             commitCurrentBrain: commitCurrentBrain,
             commitSession: commitSession
+        )
+    }
+
+    public func resolveAndActivateSession<Session, CurrentBrain, Projection>(
+        session: Session,
+        using resolver: () -> BASAppleCurrentBrainProjectionRuntimeResult<CurrentBrain, Projection>,
+        loadBrainState: (Session, CurrentBrain) -> Void,
+        commitProjection: (Projection) -> Void,
+        setProjectionDirty: (Bool) -> Void,
+        publishNotice: (String) -> Void,
+        commitCurrentBrain: (CurrentBrain) -> Void,
+        commitSession: (Session) -> Void
+    ) {
+        activateSession(
+            session: session,
+            outcome: resolver(),
+            loadBrainState: loadBrainState,
+            commitProjection: commitProjection,
+            setProjectionDirty: setProjectionDirty,
+            publishNotice: publishNotice,
+            commitCurrentBrain: commitCurrentBrain,
+            commitSession: commitSession
+        )
+    }
+
+    public func reopenHeldItem(
+        modeID: String?,
+        promptSeed: String,
+        hasDraft: Bool,
+        title: String,
+        detail: String?,
+        riskLevelID: String?,
+        reopenHint: String?,
+        templateHint: String?,
+        interventionHistorySummary: String?,
+        clearActiveDecisionFlows: () -> Void,
+        activateQuickFromDraft: () -> Void,
+        activateBalanceFromDraft: () -> Void,
+        activateMirrorFromDraft: () -> Void,
+        startQuick: (String) -> Void,
+        startBalance: (String) -> Void,
+        startMirror: (String) -> Void,
+        removeItem: () -> Void,
+        applyInterventionSuggestion: (BASAppleReopenInterventionSuggestion?) -> Void,
+        refreshPredictedIntervention: () -> Void,
+        selectHomeTab: () -> Void,
+        persistActiveWorkspaceState: () -> Void,
+        now: Date = .now
+    ) {
+        let followUp = BASAppleTomorrowBoxReopenFollowUpBuilder.build(
+            riskLevelID: riskLevelID,
+            title: title,
+            detail: detail,
+            modeID: modeID,
+            reopenHint: reopenHint,
+            templateHint: templateHint,
+            interventionHistorySummary: interventionHistorySummary,
+            now: now
+        )
+
+        BASAppleTomorrowBoxReopenExecutor.execute(
+            modeID: modeID,
+            promptSeed: promptSeed,
+            hasDraft: hasDraft,
+            clearActiveDecisionFlows: clearActiveDecisionFlows,
+            activateQuickFromDraft: activateQuickFromDraft,
+            activateBalanceFromDraft: activateBalanceFromDraft,
+            activateMirrorFromDraft: activateMirrorFromDraft,
+            startQuick: startQuick,
+            startBalance: startBalance,
+            startMirror: startMirror,
+            removeTomorrowBoxItem: removeItem,
+            followUp: followUp,
+            setInterventionSuggestion: applyInterventionSuggestion,
+            refreshPredictedIntervention: refreshPredictedIntervention,
+            selectHomeTab: selectHomeTab,
+            persistActiveWorkspaceState: persistActiveWorkspaceState
+        )
+    }
+
+    public func reopenSimpleItem(
+        clearActiveDecisionFlows: () -> Void,
+        reopen: () -> Void,
+        selectHomeTab: () -> Void,
+        persistActiveWorkspaceState: () -> Void
+    ) {
+        BASAppleSimpleReopenExecutor.execute(
+            clearActiveDecisionFlows: clearActiveDecisionFlows,
+            reopen: reopen,
+            afterSuccessfulReopen: {
+                selectHomeTab()
+                persistActiveWorkspaceState()
+            }
+        )
+    }
+
+    @discardableResult
+    public func reopenDraftedItem(
+        modeID: String?,
+        clearActiveDecisionFlows: () -> Void,
+        activateQuick: () -> Void,
+        activateBalance: () -> Void,
+        activateMirror: () -> Void,
+        afterSuccessfulReopen: () -> Void
+    ) -> Bool {
+        BASAppleDraftedModeReopenExecutor.execute(
+            modeID: modeID,
+            clearActiveDecisionFlows: clearActiveDecisionFlows,
+            activateQuick: activateQuick,
+            activateBalance: activateBalance,
+            activateMirror: activateMirror,
+            afterSuccessfulReopen: afterSuccessfulReopen
+        )
+    }
+
+    public func restoreActiveWorkspaceIfNeeded<State>(
+        restoreEnabled: Bool,
+        hasActiveQuickSession: Bool,
+        hasActiveBalanceSession: Bool,
+        hasActiveMirrorSession: Bool,
+        hasReflectionContext: Bool,
+        loadState: () -> State?,
+        modeID: (State) -> String?,
+        restoreQuick: (State) -> Void,
+        restoreBalance: (State) -> Void,
+        restoreMirror: (State) -> Void,
+        selectHomeTab: () -> Void,
+        afterRestore: () -> Void
+    ) {
+        BASAppleWorkspaceRestoreExecutor.execute(
+            eligibility: BASAppleWorkspaceRestoreEligibilityInput(
+                restoreEnabled: restoreEnabled,
+                hasActiveQuickSession: hasActiveQuickSession,
+                hasActiveBalanceSession: hasActiveBalanceSession,
+                hasActiveMirrorSession: hasActiveMirrorSession,
+                hasReflectionContext: hasReflectionContext
+            ),
+            loadState: loadState,
+            modeID: modeID,
+            restoreQuick: restoreQuick,
+            restoreBalance: restoreBalance,
+            restoreMirror: restoreMirror,
+            selectHomeTab: selectHomeTab,
+            afterRestore: afterRestore
+        )
+    }
+
+    public func refreshActiveTaskGraph<Snapshot>(
+        quickSnapshot: () -> Snapshot?,
+        balanceSnapshot: () -> Snapshot?,
+        mirrorSnapshot: () -> Snapshot?,
+        saveSnapshot: (Snapshot) -> Void,
+        clearSnapshot: () -> Void
+    ) -> Snapshot? {
+        BASAppleTaskGraphLifecycleExecutor.refresh(
+            quickSnapshot: quickSnapshot,
+            balanceSnapshot: balanceSnapshot,
+            mirrorSnapshot: mirrorSnapshot,
+            saveSnapshot: saveSnapshot,
+            clearSnapshot: clearSnapshot
+        )
+    }
+
+    public func reconcilePredictiveIntervention(
+        existing: BASApplePredictiveInterventionCandidateSummary?,
+        next: BASApplePredictiveInterventionCandidateSummary?
+    ) -> BASApplePredictiveInterventionCandidateSummary? {
+        BASApplePredictiveInterventionReconciler.reconcile(
+            existing: existing,
+            next: next
+        )
+    }
+
+    public func executePredictiveInterventionDelivery(
+        candidate: BASApplePredictiveInterventionCandidateSummary?,
+        predictiveInterventionsEnabled: Bool,
+        policyAllowed: Bool,
+        upsertTrigger: (BASApplePredictiveInterventionCandidateSummary, Bool) -> Void,
+        cancelNotification: (UUID) -> Void,
+        scheduleNotification: (BASApplePredictiveInterventionCandidateSummary) -> Void
+    ) {
+        let plan = BASApplePredictiveInterventionDeliveryPlanner.plan(
+            candidate: candidate,
+            predictiveInterventionsEnabled: predictiveInterventionsEnabled,
+            policyAllowed: policyAllowed
+        )
+        BASApplePredictiveInterventionDeliveryExecutor.execute(
+            plan: plan,
+            upsertTrigger: upsertTrigger,
+            cancelNotification: cancelNotification,
+            scheduleNotification: scheduleNotification
         )
     }
 
