@@ -445,4 +445,117 @@ struct BASAppleProviderOutcomeObserverTests {
             "success:gemmaE4B:quick:640"
         ])
     }
+
+    @Test("host observation executor owns success storage plus circuit telemetry and trace fan-out")
+    func hostObservationExecutorOwnsSuccessStoragePlusFanOut() async {
+        actor Recorder {
+            var stored: [String] = []
+            var circuits: [String] = []
+            var telemetryProviders: [String] = []
+            var traceDetails: [String] = []
+
+            func appendStored(_ value: String) { stored.append(value) }
+            func appendCircuit(_ value: String) { circuits.append(value) }
+            func appendTelemetry(_ value: String) { telemetryProviders.append(value) }
+            func appendTrace(_ value: String) { traceDetails.append(value) }
+            func snapshot() -> ([String], [String], [String], [String]) {
+                (stored, circuits, telemetryProviders, traceDetails)
+            }
+        }
+
+        let context: BASAppleHostProviderObservationContext<
+            MockTraceKind,
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            String
+        > = BASAppleHostProviderObservationBridge.context(
+            kind: MockTraceKind.quick,
+            frontstageState: "frontstage",
+            contextState: "scoped",
+            neuralState: "neural",
+            brainState: "brain",
+            runtimeStrategy: "runtime",
+            promptBudget: "budget",
+            admissionDecision: "admission",
+            sourceInput: BASAppleProviderObservationSourceInput(
+                kind: "quick",
+                preferredProviderID: "foundationModels",
+                allowFallbacks: true,
+                providerProfilesByID: [
+                    "foundationModels": BASAppleProviderProfile(
+                        providerID: "foundationModels",
+                        title: "Foundation"
+                    ),
+                    "gemmaE4B": BASAppleProviderProfile(
+                        providerID: "gemmaE4B",
+                        title: "Gemma",
+                        activeResolutionDetail: "Core ML: on-device",
+                        activeBackendID: "coreML"
+                    )
+                ],
+                prompt: "live prompt",
+                baselineOutputPreview: "baseline preview",
+                deterministicFallbackOutputPreview: "fallback preview",
+                recordsTemplatePinnedTrace: true
+            )
+        )
+
+        let event = BASProviderRequestEvent.providerSuccess(
+            BASProviderRequestAttemptEvent(
+                planSummary: BASProviderRequestPlanSummary(
+                    task: .quick,
+                    preferredProviderID: "foundationModels",
+                    orderedProviderIDs: ["foundationModels", "gemmaE4B"],
+                    resolvedProviderIDs: ["foundationModels", "gemmaE4B"],
+                    compatibleProviderIDs: ["foundationModels", "gemmaE4B"],
+                    incompatibleProviderIDs: [],
+                    suspendedProviderIDs: [],
+                    usedTestingOverride: false,
+                    providerSelectionDurationMs: 12
+                ),
+                provider: MockProvider(id: "gemmaE4B"),
+                result: "stored-result",
+                assessment: BASProviderReleaseAssessment(
+                    outputPreview: "provider output",
+                    consistencyCheck: nil
+                ),
+                attemptedProviderIDs: ["foundationModels", "gemmaE4B"]
+            )
+        )
+
+        let recorder = Recorder()
+
+        await BASAppleHostProviderObservationExecutor.handleEvent(
+            event,
+            context: context,
+            durationMs: 640,
+            promptPreparedMs: 30,
+            admissionEvaluatedMs: 50,
+            providerID: { $0.id },
+            storeResolvedResult: { _, result in
+                await recorder.appendStored(result)
+            },
+            applyCircuitEvent: { event in
+                await recorder.appendCircuit(String(describing: event))
+            },
+            recordTelemetry: { observation in
+                await recorder.appendTelemetry(observation.input.activeProviderID ?? "none")
+            },
+            recordTrace: { traceRecord in
+                await recorder.appendTrace(traceRecord.detail)
+            }
+        )
+
+        let (stored, circuits, telemetryProviders, traceDetails) = await recorder.snapshot()
+
+        #expect(stored == ["stored-result"])
+        #expect(circuits == ["providerSuccess(providerID: \"gemmaE4B\", kind: \"quick\", durationMs: 640.0)"])
+        #expect(telemetryProviders == ["gemmaE4B"])
+        #expect(traceDetails.count == 1)
+        #expect(traceDetails.first?.contains("Gemma") == true)
+    }
 }

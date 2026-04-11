@@ -118,7 +118,7 @@ enum DecisionIntelligenceProviderPipeline {
                 kind: DecisionIntelligenceTraceKind.quick.rawValue,
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
-                providerProfilesByID: providerProfiles(),
+                providerProfilesByID: BehavioralAISubstrateBridge.providerProfiles(),
                 promptBudget: envelope.budget,
                 brainState: brainState,
                 admissionPressureID: admissionDecision.pressure.rawValue,
@@ -182,11 +182,10 @@ enum DecisionIntelligenceProviderPipeline {
                 )
             },
             observeEvent: { event in
-                await observeProviderRequestEvent(
+                await BehavioralAISubstrateBridge.observeProviderRequestEvent(
                     event,
                     context: observationContext,
-                    requestStart: requestStart,
-                    clock: clock,
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                     promptPreparedMs: promptPreparedMs,
                     admissionEvaluatedMs: admissionEvaluatedMs,
                     storeResolvedResult: { provider, refined in
@@ -249,7 +248,7 @@ enum DecisionIntelligenceProviderPipeline {
                 kind: DecisionIntelligenceTraceKind.balance.rawValue,
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
-                providerProfilesByID: providerProfiles(),
+                providerProfilesByID: BehavioralAISubstrateBridge.providerProfiles(),
                 promptBudget: envelope.budget,
                 brainState: brainState,
                 admissionPressureID: admissionDecision.pressure.rawValue,
@@ -313,11 +312,10 @@ enum DecisionIntelligenceProviderPipeline {
                 )
             },
             observeEvent: { event in
-                await observeProviderRequestEvent(
+                await BehavioralAISubstrateBridge.observeProviderRequestEvent(
                     event,
                     context: observationContext,
-                    requestStart: requestStart,
-                    clock: clock,
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                     promptPreparedMs: promptPreparedMs,
                     admissionEvaluatedMs: admissionEvaluatedMs,
                     storeResolvedResult: { provider, refined in
@@ -380,7 +378,7 @@ enum DecisionIntelligenceProviderPipeline {
                 kind: DecisionIntelligenceTraceKind.mirror.rawValue,
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
-                providerProfilesByID: providerProfiles(),
+                providerProfilesByID: BehavioralAISubstrateBridge.providerProfiles(),
                 promptBudget: envelope.budget,
                 brainState: brainState,
                 admissionPressureID: admissionDecision.pressure.rawValue,
@@ -444,11 +442,10 @@ enum DecisionIntelligenceProviderPipeline {
                 )
             },
             observeEvent: { event in
-                await observeProviderRequestEvent(
+                await BehavioralAISubstrateBridge.observeProviderRequestEvent(
                     event,
                     context: observationContext,
-                    requestStart: requestStart,
-                    clock: clock,
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                     promptPreparedMs: promptPreparedMs,
                     admissionEvaluatedMs: admissionEvaluatedMs,
                     storeResolvedResult: { provider, refined in
@@ -521,7 +518,7 @@ enum DecisionIntelligenceProviderPipeline {
                 kind: DecisionIntelligenceTraceKind.reminder.rawValue,
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
-                providerProfilesByID: providerProfiles(),
+                providerProfilesByID: BehavioralAISubstrateBridge.providerProfiles(),
                 promptBudget: selection.prompt.budget,
                 brainState: nil,
                 admissionPressureID: admissionDecision.pressure.rawValue,
@@ -591,11 +588,10 @@ enum DecisionIntelligenceProviderPipeline {
                 )
             },
             observeEvent: { event in
-                await observeProviderRequestEvent(
+                await BehavioralAISubstrateBridge.observeProviderRequestEvent(
                     event,
                     context: observationContext,
-                    requestStart: requestStart,
-                    clock: clock,
+                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
                     promptPreparedMs: promptPreparedMs,
                     admissionEvaluatedMs: admissionEvaluatedMs,
                     storeResolvedResult: { provider, selected in
@@ -619,47 +615,6 @@ enum DecisionIntelligenceProviderPipeline {
 
     static func defaultStatusesByKind() -> [DecisionModelProviderKind: DecisionModelProviderStatus] {
         registry.statusesByKind()
-    }
-
-    private static func observeProviderRequestEvent<Result: Sendable>(
-        _ event: BASProviderRequestEvent<any DecisionIntelligenceProviding, Result, BASProviderReleaseAssessment>,
-        context: ProviderRequestObservationContext,
-        requestStart: ContinuousClock.Instant,
-        clock: ContinuousClock,
-        promptPreparedMs: Double,
-        admissionEvaluatedMs: Double? = nil,
-        storeResolvedResult: (((any DecisionIntelligenceProviding), Result) async -> Void)? = nil
-    ) async {
-        if case .providerSuccess(let attempt) = event {
-            await storeResolvedResult?(attempt.provider, attempt.result)
-        }
-
-        let durationMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        let observation = BASAppleProviderOutcomeObserver.observeEvent(
-            event,
-            context: context.substrateContext,
-            durationMs: durationMs,
-            promptPreparedMs: promptPreparedMs,
-            admissionEvaluatedMs: admissionEvaluatedMs,
-            providerID: { $0.kind.rawValue }
-        )
-
-        for circuitEvent in observation.circuitEvents {
-            await recordCircuitEvent(circuitEvent)
-        }
-
-        if let telemetryObservation = observation.telemetryObservation {
-            await DecisionIntelligenceTelemetryStore.shared.record(
-                observation: telemetryObservation
-            )
-        }
-
-        if let trace = observation.trace {
-            recordTrace(
-                context: context,
-                observedTrace: trace
-            )
-        }
     }
 
     private static func executeProviderRequest<Result: Sendable>(
@@ -717,49 +672,6 @@ enum DecisionIntelligenceProviderPipeline {
         }
     }
 
-    private static func recordTrace(
-        context: ProviderRequestObservationContext,
-        observedTrace: BASAppleObservedProviderTrace
-    ) {
-        let traceRecord = BASAppleHostProviderObservationBridge.traceRecord(
-            context: context,
-            observedTrace: observedTrace
-        )
-        let preferredProvider = DecisionModelProviderKind(
-            rawValue: traceRecord.preferredProviderID
-        ) ?? .template
-        let activeProvider = traceRecord.activeProviderID.flatMap(DecisionModelProviderKind.init(rawValue:))
-        let attemptedProviders = traceRecord.attemptedProviderIDs.compactMap(DecisionModelProviderKind.init(rawValue:))
-
-        let trace = DecisionIntelligenceTrace(
-            kind: traceRecord.kind,
-            preferredProvider: preferredProvider,
-            activeProvider: activeProvider,
-            attemptedProviders: attemptedProviders,
-            allowFallbacks: traceRecord.allowFallbacks,
-            usedFallback: traceRecord.usedFallback,
-            frontstageState: traceRecord.frontstageState,
-            contextState: traceRecord.contextState,
-            neuralState: traceRecord.neuralState,
-            brainState: traceRecord.brainState,
-            runtimeStrategy: traceRecord.runtimeStrategy,
-            promptBudget: traceRecord.promptBudget,
-            admissionDecision: traceRecord.admissionDecision,
-            semanticPromptFingerprint: traceRecord.semanticPromptFingerprint,
-            stablePrefixFingerprint: traceRecord.stablePrefixFingerprint,
-            consistencyCheck: traceRecord.consistencyCheck,
-            consistencyRejected: traceRecord.consistencyRejected,
-            substrateTrace: traceRecord.substrateTrace,
-            prompt: traceRecord.prompt,
-            outputPreview: traceRecord.outputPreview,
-            detail: traceRecord.detail
-        )
-
-        Task { @MainActor in
-            DecisionIntelligenceDebugStore.shared.record(trace)
-        }
-    }
-
     private static func quickPreview(from result: QuickCheckResult) -> String {
         BASAppleProviderReleaseAdapter.quickPreview(
             currentPerspective: result.currentPerspective,
@@ -814,55 +726,4 @@ enum DecisionIntelligenceProviderPipeline {
         return (seconds + attoseconds) * 1_000
     }
 
-    private static func providerProfiles() -> [String: BASAppleProviderProfile] {
-        BASAppleHostProviderObservationBridge.providerProfiles(
-            descriptors: registry.descriptors(),
-            providerID: { $0.kind.rawValue },
-            title: { $0.kind.title },
-            activeResolutionDetail: { descriptor in
-                guard descriptor.kind == .gemmaE4B else { return nil }
-                let resolution = GemmaE4BIntelligenceService.backendResolution(
-                    policy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
-                )
-                return "\(resolution.title): \(resolution.detail)"
-            },
-            activeBackendID: { descriptor in
-                guard descriptor.kind == .gemmaE4B else { return nil }
-                return GemmaE4BIntelligenceService.backendResolution(
-                    policy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
-                ).effectiveBackend.rawValue
-            }
-        )
-    }
-
-    private static func recordCircuitEvent(
-        _ event: BASAppleProviderCircuitEvent
-    ) async {
-        await BASAppleHostProviderObservationBridge.applyCircuitEvent(
-            event,
-            providerForID: DecisionModelProviderKind.init(rawValue:),
-            kindForID: DecisionIntelligenceTraceKind.init(rawValue:),
-            onCacheHit: { provider in
-                await DecisionIntelligenceCircuitBreaker.shared.record(
-                    provider: provider,
-                    event: .cacheHit
-                )
-            },
-            onProviderFailure: { provider in
-                await DecisionIntelligenceCircuitBreaker.shared.record(
-                    provider: provider,
-                    event: .providerFailure
-                )
-            },
-            onProviderSuccess: { provider, kind, durationMs in
-                await DecisionIntelligenceCircuitBreaker.shared.record(
-                    provider: provider,
-                    event: .providerSuccess(
-                        kind: kind,
-                        durationMs: durationMs
-                    )
-                )
-            }
-        )
-    }
 }

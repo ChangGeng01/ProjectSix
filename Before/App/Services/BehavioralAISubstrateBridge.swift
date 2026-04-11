@@ -8,6 +8,23 @@ import BASPolicy
 import BASRuntimeCore
 
 enum BehavioralAISubstrateBridge {
+    typealias ProviderObservationContext = BASAppleHostProviderObservationContext<
+        DecisionIntelligenceTraceKind,
+        DecisionFrontstageState,
+        DecisionContextPreparedState,
+        DecisionNeuralState,
+        DecisionBrainState,
+        DecisionAdaptiveTaskStrategy,
+        DecisionIntelligencePromptContract.ContextBudget,
+        DecisionIntelligenceAdmissionDecision
+    >
+
+    struct MemoryProjectionRefreshOutcome {
+        let projection: DecisionMemorySystem.BrainStateProjection
+        let refreshed: Bool
+        let notice: String?
+    }
+
     @discardableResult
     static func bootstrapCurrentBrainState(
         mode: DecisionMode,
@@ -74,6 +91,72 @@ enum BehavioralAISubstrateBridge {
         )
     }
 
+    @MainActor
+    @discardableResult
+    static func primeQuickSession(
+        _ session: QuickCheckSession,
+        preferences: BeforePreferences,
+        context: ModelContext,
+        projection: DecisionMemorySystem.BrainStateProjection,
+        now: Date = .now
+    ) -> CurrentBrainState {
+        primeCurrentBrainState(
+            mode: .quick,
+            promptFragments: quickPromptFragments(for: session),
+            context: context,
+            projection: projection,
+            retrievalMode: currentBrainRuntimeRetrievalMode(
+                for: .quick,
+                preferences: preferences
+            ),
+            now: now
+        )
+    }
+
+    @MainActor
+    @discardableResult
+    static func primeBalanceSession(
+        _ session: BalanceBoardSession,
+        preferences: BeforePreferences,
+        context: ModelContext,
+        projection: DecisionMemorySystem.BrainStateProjection,
+        now: Date = .now
+    ) -> CurrentBrainState {
+        primeCurrentBrainState(
+            mode: .balance,
+            promptFragments: balancePromptFragments(for: session),
+            context: context,
+            projection: projection,
+            retrievalMode: currentBrainRuntimeRetrievalMode(
+                for: .balance,
+                preferences: preferences
+            ),
+            now: now
+        )
+    }
+
+    @MainActor
+    @discardableResult
+    static func primeMirrorSession(
+        _ session: MirrorWorkspaceSession,
+        preferences: BeforePreferences,
+        context: ModelContext,
+        projection: DecisionMemorySystem.BrainStateProjection,
+        now: Date = .now
+    ) -> CurrentBrainState {
+        primeCurrentBrainState(
+            mode: .mirror,
+            promptFragments: mirrorPromptFragments(for: session),
+            context: context,
+            projection: projection,
+            retrievalMode: currentBrainRuntimeRetrievalMode(
+                for: .mirror,
+                preferences: preferences
+            ),
+            now: now
+        )
+    }
+
     @discardableResult
     static func refreshCurrentBrainState(
         quickPromptFragments: [String]?,
@@ -109,6 +192,34 @@ enum BehavioralAISubstrateBridge {
                     context: context
                 )
             }
+        )
+    }
+
+    @MainActor
+    @discardableResult
+    static func refreshCurrentBrainState(
+        activeQuickSession: QuickCheckSession?,
+        activeBalanceSession: BalanceBoardSession?,
+        activeMirrorSession: MirrorWorkspaceSession?,
+        taskGraph: DecisionTaskGraphSnapshot?,
+        preferences: BeforePreferences,
+        context: ModelContext,
+        projection: DecisionMemorySystem.BrainStateProjection,
+        source: BrainStateUpdateSource,
+        now: Date = .now
+    ) -> CurrentBrainState {
+        refreshCurrentBrainState(
+            quickPromptFragments: activeQuickSession.map(quickPromptFragments(for:)),
+            balancePromptFragments: activeBalanceSession.map(balancePromptFragments(for:)),
+            mirrorPromptFragments: activeMirrorSession.map(mirrorPromptFragments(for:)),
+            taskGraph: taskGraph,
+            context: context,
+            projection: projection,
+            retrievalModesByModeID: currentBrainRuntimeRetrievalModesByModeID(
+                preferences: preferences
+            ),
+            source: source,
+            now: now
         )
     }
 
@@ -198,6 +309,112 @@ enum BehavioralAISubstrateBridge {
             failureGuardIDs: committed.failureGuardIDs,
             sourceIntentEnvelope: envelope,
             loadedAt: input.now
+        )
+    }
+
+    static func providerProfiles() -> [String: BASAppleProviderProfile] {
+        BASAppleHostProviderObservationBridge.providerProfiles(
+            descriptors: DecisionIntelligenceProviderRegistry.shared.descriptors(),
+            providerID: { $0.kind.rawValue },
+            title: { $0.kind.title },
+            activeResolutionDetail: { descriptor in
+                guard descriptor.kind == .gemmaE4B else { return nil }
+                let resolution = GemmaE4BIntelligenceService.backendResolution(
+                    policy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
+                )
+                return "\(resolution.title): \(resolution.detail)"
+            },
+            activeBackendID: { descriptor in
+                guard descriptor.kind == .gemmaE4B else { return nil }
+                return GemmaE4BIntelligenceService.backendResolution(
+                    policy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
+                ).effectiveBackend.rawValue
+            }
+        )
+    }
+
+    static func observeProviderRequestEvent<Result: Sendable>(
+        _ event: BASProviderRequestEvent<any DecisionIntelligenceProviding, Result, BASProviderReleaseAssessment>,
+        context: ProviderObservationContext,
+        durationMs: Double,
+        promptPreparedMs: Double,
+        admissionEvaluatedMs: Double? = nil,
+        storeResolvedResult: (((any DecisionIntelligenceProviding), Result) async -> Void)? = nil
+    ) async {
+        await BASAppleHostProviderObservationExecutor.handleEvent(
+            event,
+            context: context,
+            durationMs: durationMs,
+            promptPreparedMs: promptPreparedMs,
+            admissionEvaluatedMs: admissionEvaluatedMs,
+            providerID: { $0.kind.rawValue },
+            storeResolvedResult: storeResolvedResult,
+            applyCircuitEvent: { event in
+                await BASAppleHostProviderObservationBridge.applyCircuitEvent(
+                    event,
+                    providerForID: DecisionModelProviderKind.init(rawValue:),
+                    kindForID: DecisionIntelligenceTraceKind.init(rawValue:),
+                    onCacheHit: { provider in
+                        await DecisionIntelligenceCircuitBreaker.shared.record(
+                            provider: provider,
+                            event: .cacheHit
+                        )
+                    },
+                    onProviderFailure: { provider in
+                        await DecisionIntelligenceCircuitBreaker.shared.record(
+                            provider: provider,
+                            event: .providerFailure
+                        )
+                    },
+                    onProviderSuccess: { provider, kind, durationMs in
+                        await DecisionIntelligenceCircuitBreaker.shared.record(
+                            provider: provider,
+                            event: .providerSuccess(
+                                kind: kind,
+                                durationMs: durationMs
+                            )
+                        )
+                    }
+                )
+            },
+            recordTelemetry: { observation in
+                await DecisionIntelligenceTelemetryStore.shared.record(
+                    observation: observation
+                )
+            },
+            recordTrace: { traceRecord in
+                let preferredProvider = DecisionModelProviderKind(
+                    rawValue: traceRecord.preferredProviderID
+                ) ?? .template
+                let activeProvider = traceRecord.activeProviderID.flatMap(DecisionModelProviderKind.init(rawValue:))
+                let attemptedProviders = traceRecord.attemptedProviderIDs.compactMap(DecisionModelProviderKind.init(rawValue:))
+
+                let trace = DecisionIntelligenceTrace(
+                    kind: traceRecord.kind,
+                    preferredProvider: preferredProvider,
+                    activeProvider: activeProvider,
+                    attemptedProviders: attemptedProviders,
+                    allowFallbacks: traceRecord.allowFallbacks,
+                    usedFallback: traceRecord.usedFallback,
+                    frontstageState: traceRecord.frontstageState,
+                    contextState: traceRecord.contextState,
+                    neuralState: traceRecord.neuralState,
+                    brainState: traceRecord.brainState,
+                    runtimeStrategy: traceRecord.runtimeStrategy,
+                    promptBudget: traceRecord.promptBudget,
+                    admissionDecision: traceRecord.admissionDecision,
+                    semanticPromptFingerprint: traceRecord.semanticPromptFingerprint,
+                    stablePrefixFingerprint: traceRecord.stablePrefixFingerprint,
+                    consistencyCheck: traceRecord.consistencyCheck,
+                    consistencyRejected: traceRecord.consistencyRejected,
+                    substrateTrace: traceRecord.substrateTrace,
+                    prompt: traceRecord.prompt,
+                    outputPreview: traceRecord.outputPreview,
+                    detail: traceRecord.detail
+                )
+
+                DecisionIntelligenceDebugStore.shared.record(trace)
+            }
         )
     }
 
@@ -325,6 +542,253 @@ enum BehavioralAISubstrateBridge {
         )
     }
 
+    @MainActor
+    static func consumePendingLaunchRequest(
+        consumeHandoff: () -> DecisionIntentEnvelope?,
+        handleHandoff: (DecisionIntentEnvelope) -> Void,
+        consumePendingRequest: () -> PendingLaunchRequest?,
+        performQuickCapture: (EntrySource, ScenarioType?, String) -> Void,
+        performOpenMode: (DecisionMode, EntrySource, String) -> Void,
+        performRoutedPrompt: (String, EntrySource) -> Void
+    ) {
+        if let envelope = consumeHandoff() {
+            handleHandoff(envelope)
+            return
+        }
+
+        guard let request = consumePendingRequest() else { return }
+        let plan = BASApplePendingLaunchOutcomeBuilder.resolve(
+            preferredModeID: request.preferredModeRaw,
+            scenarioID: request.scenarioRaw,
+            promptSeed: request.prompt
+        )
+
+        BASApplePendingLaunchOutcomeExecutor.execute(
+            plan: plan,
+            performQuickCapture: { plan in
+                performQuickCapture(
+                    request.entrySource,
+                    plan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
+                    plan.promptSeed
+                )
+            },
+            performOpenMode: { plan in
+                performOpenMode(
+                    plan.preferredModeID.flatMap(DecisionMode.init(rawValue:)) ?? .quick,
+                    request.entrySource,
+                    plan.promptSeed
+                )
+            },
+            performRoutedPrompt: { plan in
+                performRoutedPrompt(plan.promptSeed, request.entrySource)
+            }
+        )
+    }
+
+    @MainActor
+    static func consumeDecisionIntentEnvelope(
+        _ envelope: DecisionIntentEnvelope,
+        performQuickCapture: (DecisionIntentEnvelope, ScenarioType?, String) -> Void,
+        performOpenMode: (DecisionIntentEnvelope, DecisionMode, Bool, String) -> Void,
+        performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
+        performRestoreWorkspace: () -> Void,
+        refreshCurrentBrain: (BrainStateUpdateSource) -> Void
+    ) {
+        let resolution = BASAppleEntryIntentOutcomeBuilder.resolve(
+            kindID: envelope.kind.rawValue,
+            surfaceID: envelope.sourceSurface.rawValue,
+            preferredModeID: envelope.preferredMode?.rawValue,
+            scenarioID: envelope.scenario?.rawValue,
+            promptSeed: envelope.promptSeed,
+            riskLevelID: envelope.riskLevel?.rawValue,
+            triggerReason: envelope.triggerReason,
+            expiresAt: envelope.expiresAt
+        )
+
+        BASAppleEntryIntentOutcomeExecutor.execute(
+            resolution: resolution,
+            performQuickCapture: { actionPlan in
+                performQuickCapture(
+                    envelope,
+                    actionPlan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
+                    actionPlan.promptSeed
+                )
+            },
+            performOpenMode: { actionPlan in
+                performOpenMode(
+                    envelope,
+                    actionPlan.preferredModeID.flatMap(DecisionMode.init(rawValue:)) ?? .quick,
+                    actionPlan.shouldSelectBoxTab,
+                    actionPlan.promptSeed
+                )
+            },
+            performPredictiveIntervention: performPredictiveIntervention,
+            performRestoreWorkspace: performRestoreWorkspace,
+            refreshCurrentBrain: { triggerID in
+                refreshCurrentBrain(
+                    BrainStateUpdateSource(rawValue: triggerID) ?? .explicitRefresh
+                )
+            }
+        )
+    }
+
+    @MainActor
+    static func restoreActiveWorkspaceIfNeeded(
+        preferences: BeforePreferences,
+        hasActiveQuickSession: Bool,
+        hasActiveBalanceSession: Bool,
+        hasActiveMirrorSession: Bool,
+        hasReflectionContext: Bool,
+        loadState: () -> ActiveDecisionWorkspaceState?,
+        restoreQuick: (ActiveDecisionWorkspaceState) -> Void,
+        restoreBalance: (ActiveDecisionWorkspaceState) -> Void,
+        restoreMirror: (ActiveDecisionWorkspaceState) -> Void,
+        selectHomeTab: () -> Void,
+        afterRestore: () -> Void
+    ) {
+        BASAppleWorkspaceRestoreExecutor.execute(
+            eligibility: BASAppleWorkspaceRestoreEligibilityInput(
+                restoreEnabled: preferences.restoreInProgressWorkspaces,
+                hasActiveQuickSession: hasActiveQuickSession,
+                hasActiveBalanceSession: hasActiveBalanceSession,
+                hasActiveMirrorSession: hasActiveMirrorSession,
+                hasReflectionContext: hasReflectionContext
+            ),
+            loadState: loadState,
+            modeID: { $0.modeRaw },
+            restoreQuick: restoreQuick,
+            restoreBalance: restoreBalance,
+            restoreMirror: restoreMirror,
+            selectHomeTab: selectHomeTab,
+            afterRestore: afterRestore
+        )
+    }
+
+    static func resolveMemoryProjection(
+        force: Bool,
+        cachedProjection: DecisionMemorySystem.BrainStateProjection?,
+        isDirty: Bool,
+        context: ModelContext,
+        now: Date = .now
+    ) -> MemoryProjectionRefreshOutcome {
+        BASAppleMemoryProjectionRefreshExecutor.resolve(
+            force: force,
+            cacheState: BASAppleMemoryProjectionRefreshCacheState(
+                hasCachedProjection: cachedProjection != nil,
+                isDirty: isDirty
+            ),
+            cached: {
+                cachedProjection.map {
+                    MemoryProjectionRefreshOutcome(
+                        projection: $0,
+                        refreshed: false,
+                        notice: nil
+                    )
+                }
+            },
+            refresh: {
+                InterventionTemplateStore.ensureDefaults(in: context)
+                FailurePatternStore.syncFromHistory(in: context)
+                let projection = DecisionMemorySystem.refreshProjection(in: context, now: now)
+                return MemoryProjectionRefreshOutcome(
+                    projection: projection,
+                    refreshed: true,
+                    notice: PersistenceIssueRecorder.latestNotice() ?? StateStorageIssueRecorder.latestNotice()
+                )
+            }
+        )
+    }
+
+    static func refreshPredictedIntervention(
+        existing: InterventionPredictionCandidate?,
+        currentBrainState: CurrentBrainState?,
+        context: ModelContext,
+        preferences: BeforePreferences,
+        now: Date = .now
+    ) -> InterventionPredictionCandidate? {
+        let next = InterventionPredictionEngine.predictCandidate(
+            currentBrainState: currentBrainState,
+            context: context,
+            preferences: preferences,
+            now: now
+        )
+
+        return BASApplePredictiveInterventionReconciler.reconcile(
+            existing: existing.map(predictiveInterventionSummary(from:)),
+            next: next.map(predictiveInterventionSummary(from:))
+        )
+        .map(interventionCandidate(from:))
+    }
+
+    @MainActor
+    static func schedulePredictiveInterventionIfNeeded(
+        candidate: InterventionPredictionCandidate?,
+        preferences: BeforePreferences,
+        currentBrainState: CurrentBrainState?,
+        context: ModelContext,
+        now: Date = .now,
+        calendar: Calendar = .autoupdatingCurrent,
+        upsertTrigger: (InterventionPredictionCandidate, Bool) -> Void,
+        cancelNotification: (UUID) -> Void,
+        scheduleNotification: (InterventionPredictionCandidate) -> Void
+    ) {
+        let summary = candidate.map(predictiveInterventionSummary(from:))
+        guard BASApplePredictiveInterventionDeliveryPlanner.shouldEvaluatePolicy(
+            candidate: summary,
+            predictiveInterventionsEnabled: preferences.predictiveInterventionsEnabled
+        ), let candidate else {
+            return
+        }
+
+        let policyDecision = InterventionNotificationPolicyEngine.decide(
+            candidate: candidate,
+            preferences: preferences,
+            currentBrainState: currentBrainState,
+            context: context,
+            now: now,
+            calendar: calendar
+        )
+
+        let plan = BASApplePredictiveInterventionDeliveryPlanner.plan(
+            candidate: summary,
+            predictiveInterventionsEnabled: preferences.predictiveInterventionsEnabled,
+            policyAllowed: policyDecision.isAllowed
+        )
+
+        BASApplePredictiveInterventionDeliveryExecutor.execute(
+            plan: plan,
+            upsertTrigger: { summary, wasDelivered in
+                upsertTrigger(
+                    interventionCandidate(from: summary),
+                    wasDelivered
+                )
+            },
+            cancelNotification: cancelNotification,
+            scheduleNotification: { summary in
+                scheduleNotification(
+                    interventionCandidate(from: summary)
+                )
+            }
+        )
+    }
+
+    @MainActor
+    static func refreshActiveTaskGraphSnapshot(
+        activeQuickSession: QuickCheckSession?,
+        activeBalanceSession: BalanceBoardSession?,
+        activeMirrorSession: MirrorWorkspaceSession?,
+        saveSnapshot: (DecisionTaskGraphSnapshot) -> Void,
+        clearSnapshot: () -> Void
+    ) -> DecisionTaskGraphSnapshot? {
+        BASAppleTaskGraphLifecycleExecutor.refresh(
+            quickSnapshot: { activeQuickSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
+            balanceSnapshot: { activeBalanceSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
+            mirrorSnapshot: { activeMirrorSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
+            saveSnapshot: saveSnapshot,
+            clearSnapshot: clearSnapshot
+        )
+    }
+
     static func enrichBrainState(
         brainState: DecisionBrainState,
         mode: DecisionMode,
@@ -362,6 +826,38 @@ enum BehavioralAISubstrateBridge {
             return .medium
         }
         return .low
+    }
+
+    private static func predictiveInterventionSummary(
+        from candidate: InterventionPredictionCandidate
+    ) -> BASApplePredictiveInterventionCandidateSummary {
+        BASApplePredictiveInterventionCandidateSummary(
+            id: candidate.id,
+            riskLevelID: candidate.riskLevel.rawValue,
+            title: candidate.title,
+            detail: candidate.detail,
+            evidenceSignalCount: candidate.evidenceSignalCount,
+            preferredModeID: candidate.suggestedModeRaw,
+            reason: candidate.reason,
+            createdAt: candidate.createdAt,
+            expiresAt: candidate.expiresAt
+        )
+    }
+
+    private static func interventionCandidate(
+        from summary: BASApplePredictiveInterventionCandidateSummary
+    ) -> InterventionPredictionCandidate {
+        InterventionPredictionCandidate(
+            id: summary.id,
+            riskLevel: InterventionRiskLevel(rawValue: summary.riskLevelID) ?? .medium,
+            title: summary.title,
+            detail: summary.detail,
+            evidenceSignalCount: summary.evidenceSignalCount,
+            suggestedMode: summary.preferredModeID.flatMap(DecisionMode.init(rawValue:)),
+            reason: summary.reason,
+            createdAt: summary.createdAt,
+            expiresAt: summary.expiresAt
+        )
     }
 
     private static func map(_ layer: DecisionSystemLayer) -> BASLayerKind {
@@ -441,6 +937,77 @@ enum BehavioralAISubstrateBridge {
         case .notification:
             .notification
         }
+    }
+
+    private static func currentBrainRuntimeRetrievalMode(
+        for mode: DecisionMode,
+        preferences: BeforePreferences
+    ) -> DecisionRetrievalMode {
+        let traceKind = DecisionIntelligenceTraceKind(rawValue: mode.rawValue) ?? .quick
+        return DecisionIntelligenceCoordinator
+            .executionProfile(preferences: preferences)
+            .strategy(for: traceKind)
+            .retrievalMode
+    }
+
+    private static func currentBrainRuntimeRetrievalModesByModeID(
+        preferences: BeforePreferences
+    ) -> [String: String] {
+        [
+            DecisionMode.quick.rawValue: currentBrainRuntimeRetrievalMode(
+                for: .quick,
+                preferences: preferences
+            ).rawValue,
+            DecisionMode.balance.rawValue: currentBrainRuntimeRetrievalMode(
+                for: .balance,
+                preferences: preferences
+            ).rawValue,
+            DecisionMode.mirror.rawValue: currentBrainRuntimeRetrievalMode(
+                for: .mirror,
+                preferences: preferences
+            ).rawValue
+        ]
+    }
+
+    @MainActor
+    private static func quickPromptFragments(for session: QuickCheckSession) -> [String] {
+        [
+            session.scenario.title,
+            session.note,
+            session.motivation?.title ?? "",
+            session.expectedOutcome?.title ?? "",
+            session.controlLevel?.title ?? ""
+        ]
+        .map(trimmed)
+    }
+
+    @MainActor
+    private static func balancePromptFragments(for session: BalanceBoardSession) -> [String] {
+        [
+            session.prompt,
+            session.desire,
+            session.concern,
+            session.constraint,
+            session.longTerm
+        ]
+        .map(trimmed)
+    }
+
+    @MainActor
+    private static func mirrorPromptFragments(for session: MirrorWorkspaceSession) -> [String] {
+        [
+            session.prompt,
+            session.emotion,
+            session.relationship,
+            session.reality,
+            session.longTerm,
+            session.selfLens
+        ]
+        .map(trimmed)
+    }
+
+    private static func trimmed(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func resolvedInteractionSurface(

@@ -323,6 +323,82 @@ public enum BASAppleHostProviderObservationBridge {
     }
 }
 
+public enum BASAppleHostProviderObservationExecutor {
+    public static func handleEvent<
+        Provider: Sendable,
+        Result: Sendable,
+        Kind: Equatable & Sendable,
+        FrontstageState: Equatable & Sendable,
+        ContextState: Equatable & Sendable,
+        NeuralState: Equatable & Sendable,
+        BrainState: Equatable & Sendable,
+        RuntimeStrategy: Equatable & Sendable,
+        PromptBudget: Equatable & Sendable,
+        AdmissionDecision: Equatable & Sendable
+    >(
+        _ event: BASProviderRequestEvent<Provider, Result, BASProviderReleaseAssessment>,
+        context: BASAppleHostProviderObservationContext<
+            Kind,
+            FrontstageState,
+            ContextState,
+            NeuralState,
+            BrainState,
+            RuntimeStrategy,
+            PromptBudget,
+            AdmissionDecision
+        >,
+        durationMs: Double,
+        promptPreparedMs: Double,
+        admissionEvaluatedMs: Double? = nil,
+        providerID: (Provider) -> String,
+        storeResolvedResult: ((Provider, Result) async -> Void)? = nil,
+        applyCircuitEvent: @escaping (BASAppleProviderCircuitEvent) async -> Void,
+        recordTelemetry: @escaping (BASAppleProviderTelemetryObservation) async -> Void,
+        recordTrace: @escaping @MainActor (
+            BASAppleHostProviderTraceRecord<
+                Kind,
+                FrontstageState,
+                ContextState,
+                NeuralState,
+                BrainState,
+                RuntimeStrategy,
+                PromptBudget,
+                AdmissionDecision
+            >
+        ) async -> Void
+    ) async {
+        if case .providerSuccess(let attempt) = event {
+            await storeResolvedResult?(attempt.provider, attempt.result)
+        }
+
+        let observation = BASAppleProviderOutcomeObserver.observeEvent(
+            event,
+            context: context.substrateContext,
+            durationMs: durationMs,
+            promptPreparedMs: promptPreparedMs,
+            admissionEvaluatedMs: admissionEvaluatedMs,
+            providerID: providerID
+        )
+
+        for event in observation.circuitEvents {
+            await applyCircuitEvent(event)
+        }
+
+        if let telemetryObservation = observation.telemetryObservation {
+            await recordTelemetry(telemetryObservation)
+        }
+
+        if let trace = observation.trace {
+            await recordTrace(
+                BASAppleHostProviderObservationBridge.traceRecord(
+                    context: context,
+                    observedTrace: trace
+                )
+            )
+        }
+    }
+}
+
 public struct BASAppleProviderObservationContext: Codable, Sendable, Equatable {
     public var kind: String
     public var preferredProviderID: String

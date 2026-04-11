@@ -176,23 +176,30 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func consumePendingLaunchRequestIfNeeded() {
-        if let envelope = WatchHandoffCoordinator.consume() {
-            consumeDecisionIntentEnvelope(envelope)
-            return
-        }
-        guard let request = PendingLaunchRequestStore.consume() else { return }
-        switch LaunchRequestResolver.resolve(request) {
-        case let .quick(scenario, prompt):
-            startQuickCheck(
-                entrySource: request.entrySource,
-                scenario: scenario,
-                prompt: prompt
-            )
-        case let .mode(mode, prompt):
-            startDecisionMode(mode, entrySource: request.entrySource, prompt: prompt)
-        case let .routedPrompt(prompt):
-            _ = routeDecision(prompt: prompt, entrySource: request.entrySource)
-        }
+        BehavioralAISubstrateBridge.consumePendingLaunchRequest(
+            consumeHandoff: { WatchHandoffCoordinator.consume() },
+            handleHandoff: { envelope in
+                consumeDecisionIntentEnvelope(envelope)
+            },
+            consumePendingRequest: { PendingLaunchRequestStore.consume() },
+            performQuickCapture: { entrySource, scenario, prompt in
+                startQuickCheck(
+                    entrySource: entrySource,
+                    scenario: scenario,
+                    prompt: prompt
+                )
+            },
+            performOpenMode: { mode, entrySource, prompt in
+                startDecisionMode(
+                    mode,
+                    entrySource: entrySource,
+                    prompt: prompt
+                )
+            },
+            performRoutedPrompt: { prompt, entrySource in
+                _ = routeDecision(prompt: prompt, entrySource: entrySource)
+            }
+        )
     }
 
     func handleScenePhase(_ phase: ScenePhase) {
@@ -1116,39 +1123,36 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func restoreActiveWorkspaceIfNeeded() {
-        guard
-            preferences.restoreInProgressWorkspaces,
-            activeQuickSession == nil,
-            activeBalanceSession == nil,
-            activeMirrorSession == nil,
-            reflectionContext == nil,
-            let state = ActiveDecisionWorkspaceStore.load(),
-            let mode = state.mode
-        else {
-            return
-        }
-
-        switch mode {
-        case .quick:
-            let session = state.restoreQuickSession()
-            refreshDecisionMemoryStore()
-            primeQuickSession(session)
-            activeQuickSession = session
-        case .balance:
-            let session = state.restoreBalanceSession()
-            refreshDecisionMemoryStore()
-            primeBalanceSession(session)
-            activeBalanceSession = session
-        case .mirror:
-            let session = state.restoreMirrorSession()
-            refreshDecisionMemoryStore()
-            primeMirrorSession(session)
-            activeMirrorSession = session
-        }
-
-        selectedTab = .home
-        refreshActiveTaskGraphSnapshot()
-        refreshPredictedIntervention()
+        BehavioralAISubstrateBridge.restoreActiveWorkspaceIfNeeded(
+            preferences: preferences,
+            hasActiveQuickSession: activeQuickSession != nil,
+            hasActiveBalanceSession: activeBalanceSession != nil,
+            hasActiveMirrorSession: activeMirrorSession != nil,
+            hasReflectionContext: reflectionContext != nil,
+            loadState: { ActiveDecisionWorkspaceStore.load() },
+            restoreQuick: { state in
+                let session = state.restoreQuickSession()
+                primeQuickSession(session)
+                activeQuickSession = session
+            },
+            restoreBalance: { state in
+                let session = state.restoreBalanceSession()
+                primeBalanceSession(session)
+                activeBalanceSession = session
+            },
+            restoreMirror: { state in
+                let session = state.restoreMirrorSession()
+                primeMirrorSession(session)
+                activeMirrorSession = session
+            },
+            selectHomeTab: {
+                selectedTab = .home
+            },
+            afterRestore: {
+                refreshActiveTaskGraphSnapshot()
+                refreshPredictedIntervention()
+            }
+        )
     }
 
     private func persistActiveWorkspaceState() {
@@ -1214,13 +1218,16 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func refreshDecisionMemoryStore(force: Bool = false) {
-        guard force || isMemoryProjectionDirty || memoryProjection == nil else { return }
-        let context = modelContainer.mainContext
-        InterventionTemplateStore.ensureDefaults(in: context)
-        FailurePatternStore.syncFromHistory(in: context)
-        memoryProjection = DecisionMemorySystem.refreshProjection(in: context)
+        let outcome = BehavioralAISubstrateBridge.resolveMemoryProjection(
+            force: force,
+            cachedProjection: memoryProjection,
+            isDirty: isMemoryProjectionDirty,
+            context: modelContainer.mainContext
+        )
+        guard outcome.refreshed else { return }
+        memoryProjection = outcome.projection
         isMemoryProjectionDirty = false
-        if let notice = PersistenceIssueRecorder.latestNotice() ?? StateStorageIssueRecorder.latestNotice() {
+        if let notice = outcome.notice {
             publishStartupNotice(notice)
         }
     }
@@ -1236,120 +1243,72 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func primeQuickSession(_ session: QuickCheckSession) {
-        refreshDecisionMemoryStore()
-        let currentBrain = BehavioralAISubstrateBridge.primeCurrentBrainState(
-            mode: .quick,
-            promptFragments: quickPromptFragments(for: session),
+        let currentBrain = BehavioralAISubstrateBridge.primeQuickSession(
+            session,
+            preferences: preferences,
             context: modelContainer.mainContext,
             projection: currentMemoryProjection(),
-            retrievalMode: currentBrainRuntimeRetrievalMode(for: .quick)
+            now: .now
         )
         session.loadBrainState(currentBrain.brainState)
         currentBrainState = currentBrain
     }
 
     private func primeBalanceSession(_ session: BalanceBoardSession) {
-        refreshDecisionMemoryStore()
-        let currentBrain = BehavioralAISubstrateBridge.primeCurrentBrainState(
-            mode: .balance,
-            promptFragments: balancePromptFragments(for: session),
+        let currentBrain = BehavioralAISubstrateBridge.primeBalanceSession(
+            session,
+            preferences: preferences,
             context: modelContainer.mainContext,
             projection: currentMemoryProjection(),
-            retrievalMode: currentBrainRuntimeRetrievalMode(for: .balance)
+            now: .now
         )
         session.loadBrainState(currentBrain.brainState)
         currentBrainState = currentBrain
     }
 
     private func primeMirrorSession(_ session: MirrorWorkspaceSession) {
-        refreshDecisionMemoryStore()
-        let currentBrain = BehavioralAISubstrateBridge.primeCurrentBrainState(
-            mode: .mirror,
-            promptFragments: mirrorPromptFragments(for: session),
+        let currentBrain = BehavioralAISubstrateBridge.primeMirrorSession(
+            session,
+            preferences: preferences,
             context: modelContainer.mainContext,
             projection: currentMemoryProjection(),
-            retrievalMode: currentBrainRuntimeRetrievalMode(for: .mirror)
+            now: .now
         )
         session.loadBrainState(currentBrain.brainState)
         currentBrainState = currentBrain
     }
 
-    private func quickPromptFragments(for session: QuickCheckSession) -> [String] {
-        [
-            session.scenario.title,
-            session.note,
-            session.motivation?.title ?? "",
-            session.expectedOutcome?.title ?? "",
-            session.controlLevel?.title ?? ""
-        ]
-        .map(trimmed)
-    }
-
-    private func balancePromptFragments(for session: BalanceBoardSession) -> [String] {
-        [
-            session.prompt,
-            session.desire,
-            session.concern,
-            session.constraint,
-            session.longTerm
-        ]
-        .map(trimmed)
-    }
-
-    private func mirrorPromptFragments(for session: MirrorWorkspaceSession) -> [String] {
-        [
-            session.prompt,
-            session.emotion,
-            session.relationship,
-            session.reality,
-            session.longTerm,
-            session.selfLens
-        ]
-        .map(trimmed)
-    }
-
     private func refreshGlobalBrainState(source: BrainStateUpdateSource) {
-        refreshDecisionMemoryStore()
         currentBrainState = BehavioralAISubstrateBridge.refreshCurrentBrainState(
-            quickPromptFragments: activeQuickSession.map(quickPromptFragments(for:)),
-            balancePromptFragments: activeBalanceSession.map(balancePromptFragments(for:)),
-            mirrorPromptFragments: activeMirrorSession.map(mirrorPromptFragments(for:)),
+            activeQuickSession: activeQuickSession,
+            activeBalanceSession: activeBalanceSession,
+            activeMirrorSession: activeMirrorSession,
             taskGraph: activeTaskGraph,
+            preferences: preferences,
             context: modelContainer.mainContext,
             projection: currentMemoryProjection(),
-            retrievalModesByModeID: currentBrainRuntimeRetrievalModesByModeID(),
             source: source
         )
     }
 
     private func consumeDecisionIntentEnvelope(_ envelope: DecisionIntentEnvelope) {
-        let resolution = BASAppleEntryIntentOutcomeBuilder.resolve(
-            kindID: envelope.kind.rawValue,
-            surfaceID: envelope.sourceSurface.rawValue,
-            preferredModeID: envelope.preferredMode?.rawValue,
-            scenarioID: envelope.scenario?.rawValue,
-            promptSeed: envelope.promptSeed,
-            riskLevelID: envelope.riskLevel?.rawValue,
-            triggerReason: envelope.triggerReason,
-            expiresAt: envelope.expiresAt
-        )
-        BASAppleEntryIntentOutcomeExecutor.execute(
-            resolution: resolution,
-            performQuickCapture: { actionPlan in
+        BehavioralAISubstrateBridge.consumeDecisionIntentEnvelope(
+            envelope,
+            performQuickCapture: { envelope, scenario, prompt in
                 startQuickCheck(
                     entrySource: envelope.entrySource,
-                    scenario: actionPlan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
-                    prompt: actionPlan.promptSeed
+                    scenario: scenario,
+                    prompt: prompt
                 )
             },
-            performOpenMode: { actionPlan in
-                if actionPlan.shouldSelectBoxTab {
+            performOpenMode: { envelope, mode, shouldSelectBoxTab, prompt in
+                if shouldSelectBoxTab {
                     selectedTab = .box
                 }
                 startDecisionMode(
-                    actionPlan.preferredModeID.flatMap(DecisionMode.init(rawValue:)) ?? .quick,
+                    mode,
                     entrySource: envelope.entrySource,
-                    prompt: actionPlan.promptSeed
+                    prompt: prompt
                 )
             },
             performPredictiveIntervention: { suggestion in
@@ -1358,82 +1317,51 @@ final class BeforeAppModel: ObservableObject {
             performRestoreWorkspace: {
                 restoreActiveWorkspaceIfNeeded()
             },
-            refreshCurrentBrain: { triggerID in
-                refreshGlobalBrainState(
-                    source: BrainStateUpdateSource(rawValue: triggerID) ?? .explicitRefresh
-                )
+            refreshCurrentBrain: { source in
+                refreshGlobalBrainState(source: source)
             }
         )
     }
 
     private func refreshPredictedIntervention() {
-        let next = InterventionPredictionEngine.predictCandidate(
+        interventionCandidate = BehavioralAISubstrateBridge.refreshPredictedIntervention(
+            existing: interventionCandidate,
             currentBrainState: currentBrainState,
             context: modelContainer.mainContext,
             preferences: preferences
         )
-        if let existing = interventionCandidate, let next,
-           existing.riskLevel == next.riskLevel,
-           existing.title == next.title,
-           existing.detail == next.detail,
-           existing.evidenceSignalCount == next.evidenceSignalCount,
-           existing.reason == next.reason,
-           existing.suggestedMode == next.suggestedMode {
-            interventionCandidate = existing
-        } else {
-            interventionCandidate = next
-        }
     }
 
     private func schedulePredictiveInterventionIfNeeded() {
-        guard preferences.predictiveInterventionsEnabled,
-              let interventionCandidate,
-              interventionCandidate.riskLevel != .low else {
-            return
-        }
-
-        let context = modelContainer.mainContext
-        let policyDecision = InterventionNotificationPolicyEngine.decide(
+        BehavioralAISubstrateBridge.schedulePredictiveInterventionIfNeeded(
             candidate: interventionCandidate,
             preferences: preferences,
             currentBrainState: currentBrainState,
-            context: context
+            context: modelContainer.mainContext,
+            upsertTrigger: upsertInterventionTrigger,
+            cancelNotification: { candidateID in
+                NotificationService.shared.cancelPredictiveInterventionNotification(candidateID: candidateID)
+            },
+            scheduleNotification: { candidate in
+                Task {
+                    await NotificationService.shared.schedulePredictiveInterventionNotification(candidate)
+                }
+            }
         )
-        upsertInterventionTrigger(
-            interventionCandidate,
-            wasDelivered: policyDecision.isAllowed
-        )
-
-        guard policyDecision.isAllowed else {
-            NotificationService.shared.cancelPredictiveInterventionNotification(candidateID: interventionCandidate.id)
-            return
-        }
-
-        Task {
-            await NotificationService.shared.schedulePredictiveInterventionNotification(interventionCandidate)
-        }
     }
 
     private func refreshActiveTaskGraphSnapshot() {
-        let snapshot: DecisionTaskGraphSnapshot?
-
-        if let session = activeQuickSession {
-            snapshot = DecisionTaskGraphSnapshot.capture(from: session)
-        } else if let session = activeBalanceSession {
-            snapshot = DecisionTaskGraphSnapshot.capture(from: session)
-        } else if let session = activeMirrorSession {
-            snapshot = DecisionTaskGraphSnapshot.capture(from: session)
-        } else {
-            snapshot = nil
-        }
-
-        activeTaskGraph = snapshot
-
-        if let snapshot {
-            DecisionTaskGraphStore.save(snapshot)
-        } else {
-            DecisionTaskGraphStore.clear()
-        }
+        activeTaskGraph = BehavioralAISubstrateBridge.refreshActiveTaskGraphSnapshot(
+            activeQuickSession: activeQuickSession,
+            activeBalanceSession: activeBalanceSession,
+            activeMirrorSession: activeMirrorSession,
+            saveSnapshot: { snapshot in
+                DecisionTaskGraphStore.save(snapshot)
+            },
+            clearSnapshot: {
+                DecisionTaskGraphStore.clear()
+            }
+        )
     }
 
     private func runLifecycleBootstrapPlan(_ phase: BASAppleLifecycleBootstrapPhase) {
@@ -1453,28 +1381,19 @@ final class BeforeAppModel: ObservableObject {
         )
     }
 
-    private func currentBrainRuntimeRetrievalMode(for mode: DecisionMode) -> DecisionRetrievalMode {
-        let traceKind = DecisionIntelligenceTraceKind(rawValue: mode.rawValue) ?? .quick
-        return DecisionIntelligenceCoordinator
-            .executionProfile(preferences: preferences)
-            .strategy(for: traceKind)
-            .retrievalMode
-    }
-
-    private func currentBrainRuntimeRetrievalModesByModeID() -> [String: String] {
-        [
-            DecisionMode.quick.rawValue: currentBrainRuntimeRetrievalMode(for: .quick).rawValue,
-            DecisionMode.balance.rawValue: currentBrainRuntimeRetrievalMode(for: .balance).rawValue,
-            DecisionMode.mirror.rawValue: currentBrainRuntimeRetrievalMode(for: .mirror).rawValue
-        ]
-    }
-
     private func currentMemoryProjection() -> DecisionMemorySystem.BrainStateProjection {
-        if let memoryProjection {
-            return memoryProjection
+        let outcome = BehavioralAISubstrateBridge.resolveMemoryProjection(
+            force: false,
+            cachedProjection: memoryProjection,
+            isDirty: isMemoryProjectionDirty,
+            context: modelContainer.mainContext
+        )
+        memoryProjection = outcome.projection
+        isMemoryProjectionDirty = false
+        if let notice = outcome.notice {
+            publishStartupNotice(notice)
         }
-        refreshDecisionMemoryStore(force: true)
-        return memoryProjection ?? DecisionMemorySystem.refreshProjection(in: modelContainer.mainContext)
+        return outcome.projection
     }
 
     private func persistContext(
