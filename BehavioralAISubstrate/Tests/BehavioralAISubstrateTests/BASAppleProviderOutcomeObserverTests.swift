@@ -11,6 +11,22 @@ struct BASAppleProviderOutcomeObserverTests {
         let id: String
     }
 
+    private struct MockDescriptor: Sendable {
+        let id: String
+        let title: String
+        let detail: String?
+        let backendID: String?
+    }
+
+    private enum MockTraceKind: String, Sendable {
+        case quick
+    }
+
+    private enum MockProviderKind: String, Sendable {
+        case foundationModels
+        case gemmaE4B
+    }
+
     @Test("observer owns provider narrative variants and consistency rejection details")
     func observerBuildsNarratives() {
         let live = BASAppleProviderOutcomeObserver.providerDetail(
@@ -233,6 +249,170 @@ struct BASAppleProviderOutcomeObserverTests {
                 kind: "quick",
                 durationMs: 640
             )
+        ])
+    }
+
+    @Test("host observation bridge owns provider profile catalogs and trace record compilation")
+    func hostObservationBridgeCompilesProfilesAndTraceRecords() {
+        let profiles = BASAppleHostProviderObservationBridge.providerProfiles(
+            descriptors: [
+                MockDescriptor(
+                    id: "foundationModels",
+                    title: "Foundation",
+                    detail: nil,
+                    backendID: nil
+                ),
+                MockDescriptor(
+                    id: "gemmaE4B",
+                    title: "Gemma",
+                    detail: "Core ML: on-device",
+                    backendID: "coreML"
+                )
+            ],
+            providerID: \.id,
+            title: \.title,
+            activeResolutionDetail: \.detail,
+            activeBackendID: \.backendID
+        )
+        let substrateContext = BASAppleProviderObservationContextBuilder.build(
+            from: BASAppleProviderObservationSourceInput(
+                kind: "quick",
+                preferredProviderID: "foundationModels",
+                allowFallbacks: true,
+                providerProfilesByID: profiles,
+                promptBudget: BASPromptBudget(
+                    targetCharacters: 220,
+                    prefixCharacters: 80,
+                    suffixCharacters: 60
+                ),
+                prompt: "live prompt",
+                baselineOutputPreview: "preview",
+                deterministicFallbackOutputPreview: "fallback",
+                recordsTemplatePinnedTrace: true
+            )
+        )
+        let traceRecord = BASAppleHostProviderObservationBridge.traceRecord(
+            context: BASAppleHostProviderObservationContext(
+                kind: MockTraceKind.quick,
+                frontstageState: "frontstage",
+                contextState: "context",
+                neuralState: "neural",
+                brainState: "brain",
+                runtimeStrategy: "strategy",
+                promptBudget: BASPromptBudget(
+                    targetCharacters: 220,
+                    prefixCharacters: 80,
+                    suffixCharacters: 60
+                ),
+                admissionDecision: "allowed",
+                substrateContext: substrateContext
+            ),
+            observedTrace: BASAppleObservedProviderTrace(
+                activeProviderID: "gemmaE4B",
+                attemptedProviderIDs: ["foundationModels", "gemmaE4B"],
+                consistencyCheck: BASConsistencyCheckResult(
+                    violations: [
+                        BASConsistencyViolation(
+                            kind: .modeMismatch,
+                            message: "Drifted away from quick mode."
+                        )
+                    ]
+                ),
+                consistencyRejected: true,
+                observation: BASAppleProviderTraceObservation(
+                    detail: "Gemma handled quick refinement.",
+                    compilation: BASAppleProviderTraceCompilation(
+                        allowsSensitivePayload: false,
+                        storedPrompt: "[REDACTED LIVE PROMPT]\nsemantic-1",
+                        storedOutputPreview: "[REDACTED LIVE OUTPUT]",
+                        executionTrace: BASExecutionTrace(
+                            inputSummary: "quick prompt",
+                            selectedRoute: .local(
+                                "gemmaE4B",
+                                fallbackModelIDs: ["foundationModels"]
+                            ),
+                            memoriesRecalled: ["memory"],
+                            toolsCalled: [],
+                            latency: BASTraceLatencyBreakdown(
+                                routeSelectionMs: 12,
+                                retrievalMs: 0,
+                                generationMs: 640,
+                                toolMs: 0
+                            ),
+                            outputSummary: "provider output"
+                        )
+                    )
+                )
+            )
+        )
+
+        #expect(profiles["gemmaE4B"]?.activeBackendID == "coreML")
+        #expect(traceRecord.kind == MockTraceKind.quick)
+        #expect(traceRecord.preferredProviderID == "foundationModels")
+        #expect(traceRecord.activeProviderID == "gemmaE4B")
+        #expect(traceRecord.usedFallback)
+        #expect(traceRecord.frontstageState == "frontstage")
+        #expect(traceRecord.consistencyRejected)
+        #expect(traceRecord.detail.contains("Gemma"))
+    }
+
+    @Test("host observation bridge applies circuit events through host closures")
+    func hostObservationBridgeAppliesCircuitEvents() async {
+        final class Recorder: @unchecked Sendable {
+            var values: [String] = []
+        }
+
+        let recorder = Recorder()
+
+        await BASAppleHostProviderObservationBridge.applyCircuitEvent(
+            .cacheHit(providerID: "foundationModels"),
+            providerForID: MockProviderKind.init(rawValue:),
+            kindForID: MockTraceKind.init(rawValue:),
+            onCacheHit: { provider in
+                recorder.values.append("cache:\(provider.rawValue)")
+            },
+            onProviderFailure: { provider in
+                recorder.values.append("failure:\(provider.rawValue)")
+            },
+            onProviderSuccess: { provider, kind, durationMs in
+                recorder.values.append("success:\(provider.rawValue):\(kind.rawValue):\(Int(durationMs))")
+            }
+        )
+
+        await BASAppleHostProviderObservationBridge.applyCircuitEvent(
+            .providerFailure(providerID: "gemmaE4B"),
+            providerForID: MockProviderKind.init(rawValue:),
+            kindForID: MockTraceKind.init(rawValue:),
+            onCacheHit: { provider in
+                recorder.values.append("cache:\(provider.rawValue)")
+            },
+            onProviderFailure: { provider in
+                recorder.values.append("failure:\(provider.rawValue)")
+            },
+            onProviderSuccess: { provider, kind, durationMs in
+                recorder.values.append("success:\(provider.rawValue):\(kind.rawValue):\(Int(durationMs))")
+            }
+        )
+
+        await BASAppleHostProviderObservationBridge.applyCircuitEvent(
+            .providerSuccess(providerID: "gemmaE4B", kind: "quick", durationMs: 640),
+            providerForID: MockProviderKind.init(rawValue:),
+            kindForID: MockTraceKind.init(rawValue:),
+            onCacheHit: { provider in
+                recorder.values.append("cache:\(provider.rawValue)")
+            },
+            onProviderFailure: { provider in
+                recorder.values.append("failure:\(provider.rawValue)")
+            },
+            onProviderSuccess: { provider, kind, durationMs in
+                recorder.values.append("success:\(provider.rawValue):\(kind.rawValue):\(Int(durationMs))")
+            }
+        )
+
+        #expect(recorder.values == [
+            "cache:foundationModels",
+            "failure:gemmaE4B",
+            "success:gemmaE4B:quick:640"
         ])
     }
 }

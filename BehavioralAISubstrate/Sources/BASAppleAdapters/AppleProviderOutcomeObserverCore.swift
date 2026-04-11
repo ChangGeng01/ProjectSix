@@ -50,6 +50,235 @@ public struct BASAppleProviderProfile: Codable, Sendable, Equatable {
     }
 }
 
+public struct BASAppleHostProviderObservationContext<
+    Kind: Equatable & Sendable,
+    FrontstageState: Equatable & Sendable,
+    ContextState: Equatable & Sendable,
+    NeuralState: Equatable & Sendable,
+    BrainState: Equatable & Sendable,
+    RuntimeStrategy: Equatable & Sendable,
+    PromptBudget: Equatable & Sendable,
+    AdmissionDecision: Equatable & Sendable
+>: Equatable, Sendable {
+    public var kind: Kind
+    public var frontstageState: FrontstageState?
+    public var contextState: ContextState?
+    public var neuralState: NeuralState?
+    public var brainState: BrainState?
+    public var runtimeStrategy: RuntimeStrategy?
+    public var promptBudget: PromptBudget?
+    public var admissionDecision: AdmissionDecision?
+    public var substrateContext: BASAppleProviderObservationContext
+
+    public init(
+        kind: Kind,
+        frontstageState: FrontstageState? = nil,
+        contextState: ContextState? = nil,
+        neuralState: NeuralState? = nil,
+        brainState: BrainState? = nil,
+        runtimeStrategy: RuntimeStrategy? = nil,
+        promptBudget: PromptBudget? = nil,
+        admissionDecision: AdmissionDecision? = nil,
+        substrateContext: BASAppleProviderObservationContext
+    ) {
+        self.kind = kind
+        self.frontstageState = frontstageState
+        self.contextState = contextState
+        self.neuralState = neuralState
+        self.brainState = brainState
+        self.runtimeStrategy = runtimeStrategy
+        self.promptBudget = promptBudget
+        self.admissionDecision = admissionDecision
+        self.substrateContext = substrateContext
+    }
+}
+
+public struct BASAppleHostProviderTraceRecord<
+    Kind: Equatable & Sendable,
+    FrontstageState: Equatable & Sendable,
+    ContextState: Equatable & Sendable,
+    NeuralState: Equatable & Sendable,
+    BrainState: Equatable & Sendable,
+    RuntimeStrategy: Equatable & Sendable,
+    PromptBudget: Equatable & Sendable,
+    AdmissionDecision: Equatable & Sendable
+>: Equatable, Sendable {
+    public var kind: Kind
+    public var preferredProviderID: String
+    public var activeProviderID: String?
+    public var attemptedProviderIDs: [String]
+    public var allowFallbacks: Bool
+    public var usedFallback: Bool
+    public var frontstageState: FrontstageState?
+    public var contextState: ContextState?
+    public var neuralState: NeuralState?
+    public var brainState: BrainState?
+    public var runtimeStrategy: RuntimeStrategy?
+    public var promptBudget: PromptBudget?
+    public var admissionDecision: AdmissionDecision?
+    public var semanticPromptFingerprint: String?
+    public var stablePrefixFingerprint: String?
+    public var consistencyCheck: BASConsistencyCheckResult?
+    public var consistencyRejected: Bool
+    public var substrateTrace: BASExecutionTrace?
+    public var prompt: String
+    public var outputPreview: String
+    public var detail: String
+
+    public init(
+        kind: Kind,
+        preferredProviderID: String,
+        activeProviderID: String?,
+        attemptedProviderIDs: [String],
+        allowFallbacks: Bool,
+        usedFallback: Bool,
+        frontstageState: FrontstageState? = nil,
+        contextState: ContextState? = nil,
+        neuralState: NeuralState? = nil,
+        brainState: BrainState? = nil,
+        runtimeStrategy: RuntimeStrategy? = nil,
+        promptBudget: PromptBudget? = nil,
+        admissionDecision: AdmissionDecision? = nil,
+        semanticPromptFingerprint: String? = nil,
+        stablePrefixFingerprint: String? = nil,
+        consistencyCheck: BASConsistencyCheckResult? = nil,
+        consistencyRejected: Bool = false,
+        substrateTrace: BASExecutionTrace? = nil,
+        prompt: String,
+        outputPreview: String,
+        detail: String
+    ) {
+        self.kind = kind
+        self.preferredProviderID = preferredProviderID
+        self.activeProviderID = activeProviderID
+        self.attemptedProviderIDs = attemptedProviderIDs
+        self.allowFallbacks = allowFallbacks
+        self.usedFallback = usedFallback
+        self.frontstageState = frontstageState
+        self.contextState = contextState
+        self.neuralState = neuralState
+        self.brainState = brainState
+        self.runtimeStrategy = runtimeStrategy
+        self.promptBudget = promptBudget
+        self.admissionDecision = admissionDecision
+        self.semanticPromptFingerprint = semanticPromptFingerprint
+        self.stablePrefixFingerprint = stablePrefixFingerprint
+        self.consistencyCheck = consistencyCheck
+        self.consistencyRejected = consistencyRejected
+        self.substrateTrace = substrateTrace
+        self.prompt = prompt
+        self.outputPreview = outputPreview
+        self.detail = detail
+    }
+}
+
+public enum BASAppleHostProviderObservationBridge {
+    public static func providerProfiles<Descriptor>(
+        descriptors: [Descriptor],
+        providerID: (Descriptor) -> String,
+        title: (Descriptor) -> String,
+        activeResolutionDetail: (Descriptor) -> String?,
+        activeBackendID: (Descriptor) -> String?
+    ) -> [String: BASAppleProviderProfile] {
+        Dictionary(
+            uniqueKeysWithValues: descriptors.map { descriptor in
+                let id = providerID(descriptor)
+                return (
+                    id,
+                    BASAppleProviderProfile(
+                        providerID: id,
+                        title: title(descriptor),
+                        activeResolutionDetail: activeResolutionDetail(descriptor),
+                        activeBackendID: activeBackendID(descriptor)
+                    )
+                )
+            }
+        )
+    }
+
+    public static func traceRecord<
+        Kind: Equatable & Sendable,
+        FrontstageState: Equatable & Sendable,
+        ContextState: Equatable & Sendable,
+        NeuralState: Equatable & Sendable,
+        BrainState: Equatable & Sendable,
+        RuntimeStrategy: Equatable & Sendable,
+        PromptBudget: Equatable & Sendable,
+        AdmissionDecision: Equatable & Sendable
+    >(
+        context: BASAppleHostProviderObservationContext<
+            Kind,
+            FrontstageState,
+            ContextState,
+            NeuralState,
+            BrainState,
+            RuntimeStrategy,
+            PromptBudget,
+            AdmissionDecision
+        >,
+        observedTrace: BASAppleObservedProviderTrace
+    ) -> BASAppleHostProviderTraceRecord<
+        Kind,
+        FrontstageState,
+        ContextState,
+        NeuralState,
+        BrainState,
+        RuntimeStrategy,
+        PromptBudget,
+        AdmissionDecision
+    > {
+        BASAppleHostProviderTraceRecord(
+            kind: context.kind,
+            preferredProviderID: context.substrateContext.preferredProviderID,
+            activeProviderID: observedTrace.activeProviderID,
+            attemptedProviderIDs: observedTrace.attemptedProviderIDs,
+            allowFallbacks: context.substrateContext.allowFallbacks,
+            usedFallback: observedTrace.activeProviderID != nil
+                && observedTrace.activeProviderID != context.substrateContext.preferredProviderID,
+            frontstageState: context.frontstageState,
+            contextState: context.contextState,
+            neuralState: context.neuralState,
+            brainState: context.brainState,
+            runtimeStrategy: context.runtimeStrategy,
+            promptBudget: context.promptBudget,
+            admissionDecision: context.admissionDecision,
+            semanticPromptFingerprint: context.substrateContext.semanticPromptFingerprint,
+            stablePrefixFingerprint: context.substrateContext.stablePrefixFingerprint,
+            consistencyCheck: observedTrace.consistencyCheck,
+            consistencyRejected: observedTrace.consistencyRejected,
+            substrateTrace: observedTrace.observation.compilation.executionTrace,
+            prompt: observedTrace.observation.compilation.storedPrompt,
+            outputPreview: observedTrace.observation.compilation.storedOutputPreview,
+            detail: observedTrace.observation.detail
+        )
+    }
+
+    public static func applyCircuitEvent<ProviderID, Kind>(
+        _ event: BASAppleProviderCircuitEvent,
+        providerForID: (String) -> ProviderID?,
+        kindForID: (String) -> Kind?,
+        onCacheHit: (ProviderID) async -> Void,
+        onProviderFailure: (ProviderID) async -> Void,
+        onProviderSuccess: (ProviderID, Kind, Double) async -> Void
+    ) async {
+        switch event {
+        case .cacheHit(let providerID):
+            guard let provider = providerForID(providerID) else { return }
+            await onCacheHit(provider)
+        case .providerFailure(let providerID):
+            guard let provider = providerForID(providerID) else { return }
+            await onProviderFailure(provider)
+        case .providerSuccess(let providerID, let kindID, let durationMs):
+            guard let provider = providerForID(providerID),
+                  let kind = kindForID(kindID)
+            else {
+                return
+            }
+            await onProviderSuccess(provider, kind, durationMs)
+        }
+    }
+}
+
 public struct BASAppleProviderObservationContext: Codable, Sendable, Equatable {
     public var kind: String
     public var preferredProviderID: String
