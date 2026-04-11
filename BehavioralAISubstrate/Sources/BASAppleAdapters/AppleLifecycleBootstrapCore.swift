@@ -83,6 +83,40 @@ public enum BASAppleLifecycleBootstrapPlanner {
     }
 }
 
+public enum BASAppleLifecycleBootstrapExecutor {
+    public static func execute(
+        phase: BASAppleLifecycleBootstrapPhase,
+        refreshMemoryProjection: () -> Void,
+        refreshCurrentBrain: (String) -> Void,
+        presentPendingReflection: () -> Void,
+        consumePendingLaunchRequest: () -> Void,
+        restoreActiveWorkspace: () -> Void,
+        refreshPredictedIntervention: () -> Void,
+        syncWidgetSnapshot: () -> Void = {}
+    ) {
+        for action in BASAppleLifecycleBootstrapPlanner.actions(for: phase) {
+            switch action.kind {
+            case .refreshMemoryProjection:
+                refreshMemoryProjection()
+            case .refreshCurrentBrain:
+                refreshCurrentBrain(
+                    action.currentBrainTriggerID ?? BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue
+                )
+            case .presentPendingReflection:
+                presentPendingReflection()
+            case .consumePendingLaunchRequest:
+                consumePendingLaunchRequest()
+            case .restoreActiveWorkspace:
+                restoreActiveWorkspace()
+            case .refreshPredictedIntervention:
+                refreshPredictedIntervention()
+            case .syncWidgetSnapshot:
+                syncWidgetSnapshot()
+            }
+        }
+    }
+}
+
 public enum BASAppleCurrentBrainRuntimePlanner {
     public static func sessionPrimePlan(
         modeID: String,
@@ -125,6 +159,53 @@ public enum BASAppleCurrentBrainRuntimePlanner {
                 ?? retrievalModesByModeID[defaultModeID]
                 ?? defaultRetrievalMode,
             triggerID: triggerID
+        )
+    }
+}
+
+public enum BASAppleCurrentBrainRuntimeExecutor {
+    public static func primeSession<CurrentBrain>(
+        modeID: String,
+        promptFragments: [String],
+        retrievalMode: String,
+        refreshMemoryProjection: () -> Void,
+        bootstrapCurrentBrain: (BASAppleCurrentBrainRuntimePlan) -> CurrentBrain,
+        afterBootstrap: (CurrentBrain) -> Void
+    ) -> CurrentBrain {
+        refreshMemoryProjection()
+        let currentBrain = bootstrapCurrentBrain(
+            BASAppleCurrentBrainRuntimePlanner.sessionPrimePlan(
+                modeID: modeID,
+                promptFragments: promptFragments,
+                retrievalMode: retrievalMode
+            )
+        )
+        afterBootstrap(currentBrain)
+        return currentBrain
+    }
+
+    public static func refreshActiveBrain<CurrentBrain>(
+        quickPromptFragments: [String]?,
+        balancePromptFragments: [String]?,
+        mirrorPromptFragments: [String]?,
+        taskGraphModeID: String?,
+        taskGraphPromptSeed: String?,
+        retrievalModesByModeID: [String: String],
+        triggerID: String = BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue,
+        refreshMemoryProjection: () -> Void,
+        bootstrapCurrentBrain: (BASAppleCurrentBrainRuntimePlan) -> CurrentBrain
+    ) -> CurrentBrain {
+        refreshMemoryProjection()
+        return bootstrapCurrentBrain(
+            BASAppleCurrentBrainRuntimePlanner.activeRefreshPlan(
+                quickPromptFragments: quickPromptFragments,
+                balancePromptFragments: balancePromptFragments,
+                mirrorPromptFragments: mirrorPromptFragments,
+                taskGraphModeID: taskGraphModeID,
+                taskGraphPromptSeed: taskGraphPromptSeed,
+                retrievalModesByModeID: retrievalModesByModeID,
+                triggerID: triggerID
+            )
         )
     }
 }

@@ -1236,39 +1236,48 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func primeQuickSession(_ session: QuickCheckSession) {
-        refreshDecisionMemoryStore()
-        currentBrainState = bootstrapCurrentBrainState(
-            using: BASAppleCurrentBrainRuntimePlanner.sessionPrimePlan(
-                modeID: DecisionMode.quick.rawValue,
-                promptFragments: quickPromptFragments(for: session),
-                retrievalMode: currentBrainRuntimeRetrievalMode(for: .quick).rawValue
-            )
+        currentBrainState = BASAppleCurrentBrainRuntimeExecutor.primeSession(
+            modeID: DecisionMode.quick.rawValue,
+            promptFragments: quickPromptFragments(for: session),
+            retrievalMode: currentBrainRuntimeRetrievalMode(for: .quick).rawValue,
+            refreshMemoryProjection: { refreshDecisionMemoryStore() },
+            bootstrapCurrentBrain: { plan in
+                bootstrapCurrentBrainState(using: plan)
+            },
+            afterBootstrap: { currentBrain in
+                session.loadBrainState(currentBrain.brainState)
+            }
         )
-        session.loadBrainState(currentBrainState?.brainState)
     }
 
     private func primeBalanceSession(_ session: BalanceBoardSession) {
-        refreshDecisionMemoryStore()
-        currentBrainState = bootstrapCurrentBrainState(
-            using: BASAppleCurrentBrainRuntimePlanner.sessionPrimePlan(
-                modeID: DecisionMode.balance.rawValue,
-                promptFragments: balancePromptFragments(for: session),
-                retrievalMode: currentBrainRuntimeRetrievalMode(for: .balance).rawValue
-            )
+        currentBrainState = BASAppleCurrentBrainRuntimeExecutor.primeSession(
+            modeID: DecisionMode.balance.rawValue,
+            promptFragments: balancePromptFragments(for: session),
+            retrievalMode: currentBrainRuntimeRetrievalMode(for: .balance).rawValue,
+            refreshMemoryProjection: { refreshDecisionMemoryStore() },
+            bootstrapCurrentBrain: { plan in
+                bootstrapCurrentBrainState(using: plan)
+            },
+            afterBootstrap: { currentBrain in
+                session.loadBrainState(currentBrain.brainState)
+            }
         )
-        session.loadBrainState(currentBrainState?.brainState)
     }
 
     private func primeMirrorSession(_ session: MirrorWorkspaceSession) {
-        refreshDecisionMemoryStore()
-        currentBrainState = bootstrapCurrentBrainState(
-            using: BASAppleCurrentBrainRuntimePlanner.sessionPrimePlan(
-                modeID: DecisionMode.mirror.rawValue,
-                promptFragments: mirrorPromptFragments(for: session),
-                retrievalMode: currentBrainRuntimeRetrievalMode(for: .mirror).rawValue
-            )
+        currentBrainState = BASAppleCurrentBrainRuntimeExecutor.primeSession(
+            modeID: DecisionMode.mirror.rawValue,
+            promptFragments: mirrorPromptFragments(for: session),
+            retrievalMode: currentBrainRuntimeRetrievalMode(for: .mirror).rawValue,
+            refreshMemoryProjection: { refreshDecisionMemoryStore() },
+            bootstrapCurrentBrain: { plan in
+                bootstrapCurrentBrainState(using: plan)
+            },
+            afterBootstrap: { currentBrain in
+                session.loadBrainState(currentBrain.brainState)
+            }
         )
-        session.loadBrainState(currentBrainState?.brainState)
     }
 
     private func quickPromptFragments(for session: QuickCheckSession) -> [String] {
@@ -1306,63 +1315,62 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func refreshGlobalBrainState(source: BrainStateUpdateSource) {
-        refreshDecisionMemoryStore()
-        currentBrainState = bootstrapCurrentBrainState(
-            using: BASAppleCurrentBrainRuntimePlanner.activeRefreshPlan(
-                quickPromptFragments: activeQuickSession.map(quickPromptFragments(for:)),
-                balancePromptFragments: activeBalanceSession.map(balancePromptFragments(for:)),
-                mirrorPromptFragments: activeMirrorSession.map(mirrorPromptFragments(for:)),
-                taskGraphModeID: activeTaskGraph?.mode?.rawValue,
-                taskGraphPromptSeed: activeTaskGraph?.promptSeed,
-                retrievalModesByModeID: currentBrainRuntimeRetrievalModesByModeID(),
-                triggerID: source.rawValue
-            )
+        currentBrainState = BASAppleCurrentBrainRuntimeExecutor.refreshActiveBrain(
+            quickPromptFragments: activeQuickSession.map(quickPromptFragments(for:)),
+            balancePromptFragments: activeBalanceSession.map(balancePromptFragments(for:)),
+            mirrorPromptFragments: activeMirrorSession.map(mirrorPromptFragments(for:)),
+            taskGraphModeID: activeTaskGraph?.mode?.rawValue,
+            taskGraphPromptSeed: activeTaskGraph?.promptSeed,
+            retrievalModesByModeID: currentBrainRuntimeRetrievalModesByModeID(),
+            triggerID: source.rawValue,
+            refreshMemoryProjection: { refreshDecisionMemoryStore() },
+            bootstrapCurrentBrain: { plan in
+                bootstrapCurrentBrainState(using: plan)
+            }
         )
     }
 
     private func consumeDecisionIntentEnvelope(_ envelope: DecisionIntentEnvelope) {
-        let actionPlan = BASAppleEntryIntentPlanBuilder.plan(
+        let resolution = BASAppleEntryIntentOutcomeBuilder.resolve(
             kindID: envelope.kind.rawValue,
             surfaceID: envelope.sourceSurface.rawValue,
             preferredModeID: envelope.preferredMode?.rawValue,
             scenarioID: envelope.scenario?.rawValue,
             promptSeed: envelope.promptSeed,
             riskLevelID: envelope.riskLevel?.rawValue,
-            triggerReason: envelope.triggerReason
+            triggerReason: envelope.triggerReason,
+            expiresAt: envelope.expiresAt
         )
-
-        switch actionPlan.actionKind {
-        case .quickCapture:
-            startQuickCheck(
-                entrySource: envelope.entrySource,
-                scenario: actionPlan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
-                prompt: actionPlan.promptSeed
-            )
-        case .openMode:
-            if actionPlan.shouldSelectBoxTab {
-                selectedTab = .box
+        BASAppleEntryIntentOutcomeExecutor.execute(
+            resolution: resolution,
+            performQuickCapture: { actionPlan in
+                startQuickCheck(
+                    entrySource: envelope.entrySource,
+                    scenario: actionPlan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
+                    prompt: actionPlan.promptSeed
+                )
+            },
+            performOpenMode: { actionPlan in
+                if actionPlan.shouldSelectBoxTab {
+                    selectedTab = .box
+                }
+                startDecisionMode(
+                    actionPlan.preferredModeID.flatMap(DecisionMode.init(rawValue:)) ?? .quick,
+                    entrySource: envelope.entrySource,
+                    prompt: actionPlan.promptSeed
+                )
+            },
+            performPredictiveIntervention: { suggestion in
+                interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
+            },
+            performRestoreWorkspace: {
+                restoreActiveWorkspaceIfNeeded()
+            },
+            refreshCurrentBrain: { triggerID in
+                refreshGlobalBrainState(
+                    source: BrainStateUpdateSource(rawValue: triggerID) ?? .explicitRefresh
+                )
             }
-            startDecisionMode(
-                actionPlan.preferredModeID.flatMap(DecisionMode.init(rawValue:)) ?? .quick,
-                entrySource: envelope.entrySource,
-                prompt: actionPlan.promptSeed
-            )
-        case .predictiveIntervention:
-            interventionCandidate = InterventionPredictionCandidate(
-                riskLevel: actionPlan.riskLevelID.flatMap(InterventionRiskLevel.init(rawValue:)) ?? .medium,
-                title: actionPlan.promptSeed.isEmpty ? "Pause before you decide." : actionPlan.promptSeed,
-                detail: "A predicted pattern says a slower move is safer here.",
-                evidenceSignalCount: actionPlan.triggerReason == nil ? 1 : 2,
-                suggestedMode: actionPlan.preferredModeID.flatMap(DecisionMode.init(rawValue:)),
-                reason: actionPlan.triggerReason ?? "A recent pattern suggests more friction before acting.",
-                expiresAt: envelope.expiresAt
-            )
-        case .restoreWorkspace:
-            restoreActiveWorkspaceIfNeeded()
-        }
-
-        refreshGlobalBrainState(
-            source: actionPlan.refreshTriggerKind == .watchHandoff ? .watchHandoff : .explicitRefresh
         )
     }
 
@@ -1437,26 +1445,20 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func runLifecycleBootstrapPlan(_ phase: BASAppleLifecycleBootstrapPhase) {
-        for action in BASAppleLifecycleBootstrapPlanner.actions(for: phase) {
-            switch action.kind {
-            case .refreshMemoryProjection:
-                refreshDecisionMemoryStore()
-            case .refreshCurrentBrain:
-                let source = action.currentBrainTriggerID.flatMap(BrainStateUpdateSource.init(rawValue:))
-                    ?? .explicitRefresh
-                refreshGlobalBrainState(source: source)
-            case .presentPendingReflection:
-                presentPendingReflectionIfNeeded()
-            case .consumePendingLaunchRequest:
-                consumePendingLaunchRequestIfNeeded()
-            case .restoreActiveWorkspace:
-                restoreActiveWorkspaceIfNeeded()
-            case .refreshPredictedIntervention:
-                refreshPredictedIntervention()
-            case .syncWidgetSnapshot:
-                syncWidgetSnapshot()
-            }
-        }
+        BASAppleLifecycleBootstrapExecutor.execute(
+            phase: phase,
+            refreshMemoryProjection: { refreshDecisionMemoryStore() },
+            refreshCurrentBrain: { triggerID in
+                refreshGlobalBrainState(
+                    source: BrainStateUpdateSource(rawValue: triggerID) ?? .explicitRefresh
+                )
+            },
+            presentPendingReflection: { presentPendingReflectionIfNeeded() },
+            consumePendingLaunchRequest: { consumePendingLaunchRequestIfNeeded() },
+            restoreActiveWorkspace: { restoreActiveWorkspaceIfNeeded() },
+            refreshPredictedIntervention: { refreshPredictedIntervention() },
+            syncWidgetSnapshot: { syncWidgetSnapshot() }
+        )
     }
 
     private func bootstrapCurrentBrainState(
@@ -1522,6 +1524,20 @@ final class BeforeAppModel: ObservableObject {
             return
         }
         startupNotice = notice
+    }
+
+    private func makeInterventionCandidate(
+        from suggestion: BASApplePredictiveInterventionSuggestion
+    ) -> InterventionPredictionCandidate {
+        InterventionPredictionCandidate(
+            riskLevel: InterventionRiskLevel(rawValue: suggestion.riskLevelID) ?? .medium,
+            title: suggestion.title,
+            detail: suggestion.detail,
+            evidenceSignalCount: suggestion.evidenceSignalCount,
+            suggestedMode: suggestion.preferredModeID.flatMap(DecisionMode.init(rawValue:)),
+            reason: suggestion.reason,
+            expiresAt: suggestion.expiresAt
+        )
     }
 
     private func upsertInterventionTrigger(
