@@ -343,52 +343,15 @@ enum BehavioralAISubstrateBridge {
             checkpointLimit: BeforePolicy.RuntimeState.evolutionCheckpointLimit,
             checkpointRetentionInterval: BeforePolicy.RuntimeState.evolutionCheckpointRetentionInterval
         )
+        let support: BASAppleCurrentBrainHostSupportDescriptor<
+            InterventionTemplateRecord,
+            FailurePatternRecord
+        > = currentBrainHostSupport(mode: mode, context: context)
 
-        return BASAppleCurrentBrainHostLifecycleRuntimeExecutor.bootstrapAndBuildCurrentBrain(
+        return BASAppleCurrentBrainHostSupportRuntimeExecutor.bootstrapAndBuildCurrentBrain(
             input: runtimeInput,
             in: context,
-            prepareLifecycleState: {
-                InterventionTemplateStore.ensureDefaults(in: context)
-                FailurePatternStore.syncFromHistory(in: context)
-            },
-            recommendTemplateIDs: { preparation in
-                DecisionReactionBanditStore.recommendedArmIDs(
-                    mode: mode,
-                    riskLevel: InterventionRiskLevel(rawValue: preparation.riskLevel.rawValue) ?? .low,
-                    languageMode: DecisionLanguageMode(rawValue: preparation.languageMode.rawValue) ?? .unknown,
-                    now: preparation.now
-                )
-            },
-            selectTemplates: { preparation, recommendedTemplateIDs in
-                InterventionTemplateStore.selectTemplates(
-                    in: context,
-                    mode: mode,
-                    riskLevel: InterventionRiskLevel(rawValue: preparation.riskLevel.rawValue) ?? .low,
-                    recommendedArmIDs: recommendedTemplateIDs
-                )
-            },
-            selectFailurePatterns: { _ in
-                FailurePatternStore.selectedFailurePatterns(in: context, mode: mode)
-            },
-            mapTemplate: { template in
-                BASAppleCurrentBrainBootstrapHostTemplateInput(
-                    id: template.id,
-                    modeID: template.mode.rawValue,
-                    riskLevelID: template.riskLevel.rawValue,
-                    isPinned: template.isPinned,
-                    successCount: template.successCount,
-                    updatedAt: template.updatedAt
-                )
-            },
-            mapFailurePattern: { pattern in
-                BASAppleCurrentBrainBootstrapHostFailurePatternInput(
-                    id: pattern.id,
-                    modeID: pattern.mode.rawValue,
-                    suppressionWeight: pattern.suppressionWeight,
-                    evidenceCount: pattern.evidenceCount,
-                    updatedAt: pattern.updatedAt
-                )
-            },
+            support: support,
             onCheckpointSaveError: { error in
                 PersistenceIssueRecorder.record(
                     error: error,
@@ -423,6 +386,55 @@ enum BehavioralAISubstrateBridge {
         )
     }
 
+    private static func currentBrainHostSupport(
+        mode: DecisionMode,
+        context: ModelContext
+    ) -> BASAppleCurrentBrainHostSupportDescriptor<
+        InterventionTemplateRecord,
+        FailurePatternRecord
+    > {
+        BASAppleCurrentBrainHostSupportDescriptor(
+            prepareLifecycleState: {
+                InterventionTemplateStore.ensureDefaults(in: context)
+                FailurePatternStore.syncFromHistory(in: context)
+            },
+            recommendTemplateIDs: { preparation in
+                DecisionReactionBanditStore.recommendedArmIDs(
+                    mode: mode,
+                    riskLevel: InterventionRiskLevel(rawValue: preparation.riskLevel.rawValue) ?? .low,
+                    languageMode: DecisionLanguageMode(rawValue: preparation.languageMode.rawValue) ?? .unknown,
+                    now: preparation.now
+                )
+            },
+            selectTemplates: { preparation, recommendedTemplateIDs in
+                InterventionTemplateStore.selectTemplates(
+                    in: context,
+                    mode: mode,
+                    riskLevel: InterventionRiskLevel(rawValue: preparation.riskLevel.rawValue) ?? .low,
+                    recommendedArmIDs: recommendedTemplateIDs
+                )
+            },
+            selectFailurePatterns: { _ in
+                FailurePatternStore.selectedFailurePatterns(in: context, mode: mode)
+            },
+            templateMapper: BASAppleCurrentBrainHostTemplateMapper(
+                id: \.id,
+                modeID: { $0.mode.rawValue },
+                riskLevelID: { $0.riskLevel.rawValue },
+                isPinned: \.isPinned,
+                successCount: \.successCount,
+                updatedAt: \.updatedAt
+            ),
+            failurePatternMapper: BASAppleCurrentBrainHostFailurePatternMapper(
+                id: \.id,
+                modeID: { $0.mode.rawValue },
+                suppressionWeight: \.suppressionWeight,
+                evidenceCount: \.evidenceCount,
+                updatedAt: \.updatedAt
+            )
+        )
+    }
+
     static func providerProfiles() -> [String: BASAppleProviderProfile] {
         BASAppleHostProviderObservationBridge.providerProfiles(
             descriptors: DecisionIntelligenceProviderRegistry.shared.descriptors(),
@@ -444,22 +456,27 @@ enum BehavioralAISubstrateBridge {
         )
     }
 
-    static func executeProviderRequest<Result: Sendable>(
+    static func executeObservedProviderRequest<Result: Sendable>(
         task: DecisionIntelligenceTraceKind,
         strategy: DecisionAdaptiveTaskStrategy?,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile?,
         admissionAllowed: Bool,
+        observationContext: ProviderObservationContext,
+        requestStart: ContinuousClock.Instant,
+        clock: ContinuousClock,
+        promptPreparedMs: Double,
+        admissionEvaluatedMs: Double? = nil,
         loadCachedResult: @escaping ((any DecisionIntelligenceProviding)) async -> Result?,
         assessCachedResult: @escaping (Result) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment>,
         quarantineCachedResult: @escaping ((any DecisionIntelligenceProviding)) async -> Void,
         invokeProvider: @escaping ((any DecisionIntelligenceProviding)) async -> Result?,
         assessProviderResult: @escaping (Result) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment>,
-        observeEvent: ((BASProviderRequestEvent<any DecisionIntelligenceProviding, Result, BASProviderReleaseAssessment>) async -> Void)? = nil
+        storeResolvedResult: (((any DecisionIntelligenceProviding), Result) async -> Void)? = nil
     ) async -> BASProviderRequestOutcome<Result, BASProviderReleaseAssessment> {
         let registry = DecisionIntelligenceProviderRegistry.shared
-        let input: BASAppleProviderRequestRuntimeInput<any DecisionIntelligenceProviding> = BASAppleProviderRequestRuntimeInput(
+        let runtimeInput: BASAppleProviderRequestRuntimeInput<any DecisionIntelligenceProviding> = BASAppleProviderRequestRuntimeInput(
             task: DecisionIntelligenceTaskRouter.substrateTraceKind(task),
             preferredProviderID: preference.kind.rawValue,
             allowFallbacks: allowFallbacks,
@@ -475,8 +492,13 @@ enum BehavioralAISubstrateBridge {
             admissionAllowed: admissionAllowed
         )
 
-        return await BASAppleProviderRequestRuntimeExecutor.executeObserved(
-            input: input,
+        return await BASAppleObservedProviderRequestExecutor.execute(
+            runtimeInput: runtimeInput,
+            observationContext: observationContext,
+            requestStart: requestStart,
+            clock: clock,
+            promptPreparedMs: promptPreparedMs,
+            admissionEvaluatedMs: admissionEvaluatedMs,
             providerID: { $0.kind.rawValue },
             providerForID: { providerID in
                 DecisionModelProviderKind(rawValue: providerID).flatMap(registry.provider(for:))
@@ -487,25 +509,6 @@ enum BehavioralAISubstrateBridge {
             quarantineCachedResult: quarantineCachedResult,
             invokeProvider: invokeProvider,
             assessProviderResult: assessProviderResult,
-            observe: observeEvent
-        )
-    }
-
-    static func observeProviderRequestEvent<Result: Sendable>(
-        _ event: BASProviderRequestEvent<any DecisionIntelligenceProviding, Result, BASProviderReleaseAssessment>,
-        context: ProviderObservationContext,
-        durationMs: Double,
-        promptPreparedMs: Double,
-        admissionEvaluatedMs: Double? = nil,
-        storeResolvedResult: (((any DecisionIntelligenceProviding), Result) async -> Void)? = nil
-    ) async {
-        await BASAppleHostProviderObservationExecutor.handleEvent(
-            event,
-            context: context,
-            durationMs: durationMs,
-            promptPreparedMs: promptPreparedMs,
-            admissionEvaluatedMs: admissionEvaluatedMs,
-            providerID: { $0.kind.rawValue },
             storeResolvedResult: storeResolvedResult,
             applyCircuitEvent: { event in
                 await BASAppleHostProviderObservationBridge.applyCircuitEvent(

@@ -134,13 +134,18 @@ enum DecisionIntelligenceProviderPipeline {
                 recordsTemplatePinnedTrace: true
             )
         )
-        let outcome = await BehavioralAISubstrateBridge.executeProviderRequest(
+        let outcome = await BehavioralAISubstrateBridge.executeObservedProviderRequest(
             task: .quick,
             strategy: strategy,
             preference: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile,
             admissionAllowed: admissionDecision.isAllowed,
+            observationContext: observationContext,
+            requestStart: requestStart,
+            clock: clock,
+            promptPreparedMs: promptPreparedMs,
+            admissionEvaluatedMs: admissionEvaluatedMs,
             loadCachedResult: { provider in
                 let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
                     provider: provider.kind,
@@ -181,21 +186,12 @@ enum DecisionIntelligenceProviderPipeline {
                     brainState: brainState
                 )
             },
-            observeEvent: { event in
-                await BehavioralAISubstrateBridge.observeProviderRequestEvent(
-                    event,
-                    context: observationContext,
-                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                    promptPreparedMs: promptPreparedMs,
-                    admissionEvaluatedMs: admissionEvaluatedMs,
-                    storeResolvedResult: { provider, refined in
-                        let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
-                            provider: provider.kind,
-                            envelope: envelope
-                        )
-                        await responseCache.storeQuickResult(refined, for: cacheKey)
-                    }
+            storeResolvedResult: { provider, refined in
+                let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+                    provider: provider.kind,
+                    envelope: envelope
                 )
+                await responseCache.storeQuickResult(refined, for: cacheKey)
             }
         )
 
@@ -264,13 +260,18 @@ enum DecisionIntelligenceProviderPipeline {
                 recordsTemplatePinnedTrace: true
             )
         )
-        let outcome = await BehavioralAISubstrateBridge.executeProviderRequest(
+        let outcome = await BehavioralAISubstrateBridge.executeObservedProviderRequest(
             task: .balance,
             strategy: strategy,
             preference: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile,
             admissionAllowed: admissionDecision.isAllowed,
+            observationContext: observationContext,
+            requestStart: requestStart,
+            clock: clock,
+            promptPreparedMs: promptPreparedMs,
+            admissionEvaluatedMs: admissionEvaluatedMs,
             loadCachedResult: { provider in
                 let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
                     provider: provider.kind,
@@ -311,21 +312,12 @@ enum DecisionIntelligenceProviderPipeline {
                     brainState: brainState
                 )
             },
-            observeEvent: { event in
-                await BehavioralAISubstrateBridge.observeProviderRequestEvent(
-                    event,
-                    context: observationContext,
-                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                    promptPreparedMs: promptPreparedMs,
-                    admissionEvaluatedMs: admissionEvaluatedMs,
-                    storeResolvedResult: { provider, refined in
-                        let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
-                            provider: provider.kind,
-                            envelope: envelope
-                        )
-                        await responseCache.storeBalanceResult(refined, for: cacheKey)
-                    }
+            storeResolvedResult: { provider, refined in
+                let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+                    provider: provider.kind,
+                    envelope: envelope
                 )
+                await responseCache.storeBalanceResult(refined, for: cacheKey)
             }
         )
 
@@ -394,13 +386,18 @@ enum DecisionIntelligenceProviderPipeline {
                 recordsTemplatePinnedTrace: true
             )
         )
-        let outcome = await BehavioralAISubstrateBridge.executeProviderRequest(
+        let outcome = await BehavioralAISubstrateBridge.executeObservedProviderRequest(
             task: .mirror,
             strategy: strategy,
             preference: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile,
             admissionAllowed: admissionDecision.isAllowed,
+            observationContext: observationContext,
+            requestStart: requestStart,
+            clock: clock,
+            promptPreparedMs: promptPreparedMs,
+            admissionEvaluatedMs: admissionEvaluatedMs,
             loadCachedResult: { provider in
                 let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
                     provider: provider.kind,
@@ -441,21 +438,12 @@ enum DecisionIntelligenceProviderPipeline {
                     brainState: brainState
                 )
             },
-            observeEvent: { event in
-                await BehavioralAISubstrateBridge.observeProviderRequestEvent(
-                    event,
-                    context: observationContext,
-                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                    promptPreparedMs: promptPreparedMs,
-                    admissionEvaluatedMs: admissionEvaluatedMs,
-                    storeResolvedResult: { provider, refined in
-                        let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
-                            provider: provider.kind,
-                            envelope: envelope
-                        )
-                        await responseCache.storeMirrorResult(refined, for: cacheKey)
-                    }
+            storeResolvedResult: { provider, refined in
+                let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+                    provider: provider.kind,
+                    envelope: envelope
                 )
+                await responseCache.storeMirrorResult(refined, for: cacheKey)
             }
         )
 
@@ -534,13 +522,18 @@ enum DecisionIntelligenceProviderPipeline {
                 recordsTemplatePinnedTrace: false
             )
         )
-        let outcome = await BehavioralAISubstrateBridge.executeProviderRequest(
+        let outcome = await BehavioralAISubstrateBridge.executeObservedProviderRequest(
             task: .reminder,
             strategy: strategy,
             preference: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile,
             admissionAllowed: admissionDecision.isAllowed,
+            observationContext: observationContext,
+            requestStart: requestStart,
+            clock: clock,
+            promptPreparedMs: promptPreparedMs,
+            admissionEvaluatedMs: admissionEvaluatedMs,
             loadCachedResult: { provider in
                 let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
                     provider: provider.kind,
@@ -587,21 +580,12 @@ enum DecisionIntelligenceProviderPipeline {
                     reminderMode: mode
                 )
             },
-            observeEvent: { event in
-                await BehavioralAISubstrateBridge.observeProviderRequestEvent(
-                    event,
-                    context: observationContext,
-                    durationMs: elapsedMilliseconds(since: requestStart, clock: clock),
-                    promptPreparedMs: promptPreparedMs,
-                    admissionEvaluatedMs: admissionEvaluatedMs,
-                    storeResolvedResult: { provider, selected in
-                        let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
-                            provider: provider.kind,
-                            envelope: selection.prompt
-                        )
-                        await responseCache.storeReminder(selected, for: cacheKey)
-                    }
+            storeResolvedResult: { provider, selected in
+                let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+                    provider: provider.kind,
+                    envelope: selection.prompt
                 )
+                await responseCache.storeReminder(selected, for: cacheKey)
             }
         )
 

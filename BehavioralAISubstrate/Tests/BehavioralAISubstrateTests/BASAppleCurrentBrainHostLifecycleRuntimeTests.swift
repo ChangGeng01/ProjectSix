@@ -211,4 +211,130 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
         #expect(built.6 == 1)
         #expect(built.7 == 1)
     }
+
+    @Test("host support runtime centralizes template and failure mapping")
+    func hostSupportRuntimeUsesDescriptorOwnedSupportWiring() throws {
+        let now = Date(timeIntervalSince1970: 1_744_322_640)
+        let container = try ModelContainer(
+            for: UpdateFixture.self,
+            CheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        var preparedLifecycleState = false
+
+        struct TemplateFixture {
+            var id: String
+            var modeID: String
+            var riskLevelID: String
+            var isPinned: Bool
+            var successCount: Int
+            var updatedAt: Date
+        }
+
+        struct FailurePatternFixture {
+            var id: String
+            var modeID: String
+            var suppressionWeight: Double
+            var evidenceCount: Int
+            var updatedAt: Date
+        }
+
+        let built: (String, [String], [String], Int, Int) =
+            BASAppleCurrentBrainHostSupportRuntimeExecutor.bootstrapAndBuildCurrentBrain(
+                input: BASAppleCurrentBrainHostLifecycleRuntimeInput(
+                    bootstrapInput: BASAppleCurrentBrainBootstrapBridgeInput(
+                        modeID: BASDecisionMode.quick.rawValue,
+                        prompt: "Should I sleep on this?",
+                        triggerID: BASCurrentBrainBootstrapTrigger.sceneActive.rawValue,
+                        sourceSurfaceOverrideID: BASInteractionSurface.app.rawValue,
+                        riskLevelOverrideID: BASRiskLevel.medium.rawValue,
+                        preferredLanguages: ["en-AU"],
+                        now: now,
+                        projection: BASBrainProjection(
+                            records: [
+                                BASGovernedMemory(
+                                    kind: .goal,
+                                    content: "Protect sleep before midnight",
+                                    scope: .user,
+                                    sensitivity: .low,
+                                    tier: .hot,
+                                    confidence: 0.9,
+                                    sourceType: "history",
+                                    governanceStatus: .governed,
+                                    provenanceSummary: "goal"
+                                )
+                            ],
+                            candidates: [],
+                            recentEvents: []
+                        ),
+                        embeddingScores: [],
+                        retrievalMode: "filtered"
+                    )
+                ),
+                in: context,
+                support: BASAppleCurrentBrainHostSupportDescriptor(
+                    prepareLifecycleState: {
+                        preparedLifecycleState = true
+                    },
+                    recommendTemplateIDs: { _ in ["night_message_cooling"] },
+                    selectTemplates: { _, _ in
+                        [
+                            TemplateFixture(
+                                id: "night_message_cooling",
+                                modeID: BASDecisionMode.quick.rawValue,
+                                riskLevelID: BASRiskLevel.medium.rawValue,
+                                isPinned: true,
+                                successCount: 4,
+                                updatedAt: now
+                            )
+                        ]
+                    },
+                    selectFailurePatterns: { _ in
+                        [
+                            FailurePatternFixture(
+                                id: "long_explanation_backfires",
+                                modeID: BASDecisionMode.quick.rawValue,
+                                suppressionWeight: 0.7,
+                                evidenceCount: 2,
+                                updatedAt: now
+                            )
+                        ]
+                    },
+                    templateMapper: BASAppleCurrentBrainHostTemplateMapper(
+                        id: \.id,
+                        modeID: \.modeID,
+                        riskLevelID: \.riskLevelID,
+                        isPinned: \.isPinned,
+                        successCount: \.successCount,
+                        updatedAt: \.updatedAt
+                    ),
+                    failurePatternMapper: BASAppleCurrentBrainHostFailurePatternMapper(
+                        id: \.id,
+                        modeID: \.modeID,
+                        suppressionWeight: \.suppressionWeight,
+                        evidenceCount: \.evidenceCount,
+                        updatedAt: \.updatedAt
+                    )
+                ),
+                buildCurrentBrain: { (
+                    result: BASAppleCurrentBrainLifecycleResult<UpdateFixture, CheckpointFixture>
+                ) in
+                    (
+                        result.riskLevelID,
+                        result.activeTemplateIDs,
+                        result.failureGuardIDs,
+                        result.commit.orderedUpdates.count,
+                        result.commit.orderedCheckpoints.count
+                    )
+                }
+            )
+
+        #expect(preparedLifecycleState)
+        #expect(built.0 == BASRiskLevel.medium.rawValue)
+        #expect(built.1 == ["night_message_cooling"])
+        #expect(built.2 == ["long_explanation_backfires"])
+        #expect(built.3 == 1)
+        #expect(built.4 == 1)
+    }
 }
