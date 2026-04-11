@@ -127,12 +127,12 @@ enum BehavioralAISubstrateBridge {
         let strategy = adaptationMatrix.strategy(for: primaryKind)
 
         return BASAppleInspectionBridgeBuilder.runtimeContext(
-            from: BASAppleRuntimeContextSourceInput(
-                primaryTraceKind: export.recentTraces.first?.kind.rawValue,
-                runtimeGear: runtimeGear(from: adaptationMatrix.runtimeGear),
-                environmentClass: environmentClass(from: adaptationMatrix.environmentClass),
-                deviceClass: devicePerformanceClass(from: adaptationMatrix.deviceClass),
-                riskLevel: riskLevel(from: currentRiskBand(in: export)),
+            from: BASAppleRawRuntimeContextSourceInput(
+                primaryTraceKindID: export.recentTraces.first?.kind.rawValue,
+                runtimeGearID: adaptationMatrix.runtimeGear.rawValue,
+                environmentClassID: adaptationMatrix.environmentClass.rawValue,
+                deviceClassID: adaptationMatrix.deviceClass.rawValue,
+                riskLevelID: currentRiskBand(in: export).rawValue,
                 budget: BASAdaptiveRuntimeBudget(
                     contextBudget: strategy.contextBudget,
                     outputCharacterBudget: strategy.outputCharacterBudget,
@@ -145,39 +145,35 @@ enum BehavioralAISubstrateBridge {
     }
 
     static func roleProfile(from currentBrainState: CurrentBrainState?) -> BASRoleProfile? {
-        BASAppleInspectionBridgeBuilder.roleProfile(
-            from: currentBrainState.map { currentBrainState in
-                BASAppleRoleProfileSourceInput(
-                    name: currentBrainState.identityProfile.role.title,
-                    postureID: currentBrainState.identityProfile.posture.rawValue,
-                    initiativeID: currentBrainState.identityProfile.initiative.rawValue,
-                    confidenceCeiling: currentBrainState.identityProfile.confidenceCeiling,
-                    roleBoundaryPreset: currentBrainState.identityProfile.relationshipBoundary
-                )
-            }
-        )
+        currentBrainState.flatMap { currentBrainState in
+            BASAppleInspectionBridgeBuilder.roleProfile(
+                name: currentBrainState.identityProfile.role.title,
+                postureID: currentBrainState.identityProfile.posture.rawValue,
+                initiativeID: currentBrainState.identityProfile.initiative.rawValue,
+                confidenceCeiling: currentBrainState.identityProfile.confidenceCeiling,
+                roleBoundaryPreset: currentBrainState.identityProfile.relationshipBoundary
+            )
+        }
     }
 
     static func brainSnapshot(
         from currentBrainState: CurrentBrainState?
     ) -> BASCurrentBrainState? {
-        BASAppleInspectionBridgeBuilder.brainSnapshot(
-            from: currentBrainState.map { currentBrainState in
-                BASAppleBrainSnapshotSourceInput(
-                    mode: currentBrainState.mode.rawValue,
-                    dominantGoals: currentBrainState.dominantGoal.map { [$0] } ?? [],
-                    activeConstraints: currentBrainState.activeConstraints,
-                    warmth: currentBrainState.brainState.reactionWeights.warmDirectTone,
-                    directness: currentBrainState.brainState.reactionWeights.tradeoffClarityBias,
-                    brevity: currentBrainState.brainState.reactionWeights.briefLanguage,
-                    actionBias: currentBrainState.brainState.reactionWeights.interruptiveActionBias,
-                    activeTemplateIDs: currentBrainState.activeTemplateIDs,
-                    recentFailurePatternIDs: currentBrainState.failureGuardIDs,
-                    retrievalTags: currentBrainState.brainState.retrievalTags,
-                    verificationSnapshot: currentBrainState.verificationSnapshot.fingerprint
-                )
-            }
-        )
+        currentBrainState.flatMap { currentBrainState in
+            BASAppleInspectionBridgeBuilder.brainSnapshot(
+                modeID: currentBrainState.mode.rawValue,
+                dominantGoals: currentBrainState.dominantGoal.map { [$0] } ?? [],
+                activeConstraints: currentBrainState.activeConstraints,
+                warmth: currentBrainState.brainState.reactionWeights.warmDirectTone,
+                directness: currentBrainState.brainState.reactionWeights.tradeoffClarityBias,
+                brevity: currentBrainState.brainState.reactionWeights.briefLanguage,
+                actionBias: currentBrainState.brainState.reactionWeights.interruptiveActionBias,
+                activeTemplateIDs: currentBrainState.activeTemplateIDs,
+                recentFailurePatternIDs: currentBrainState.failureGuardIDs,
+                retrievalTags: currentBrainState.brainState.retrievalTags,
+                verificationSnapshot: currentBrainState.verificationSnapshot.fingerprint
+            )
+        }
     }
 
     static func consoleSnapshot(
@@ -210,13 +206,12 @@ enum BehavioralAISubstrateBridge {
     }
 
     static func entryIntentEnvelope(from envelope: DecisionIntentEnvelope) -> BASEntryIntentEnvelope {
-        BASEntryIntentEnvelope(
-            kind: intentKind(from: envelope.kind),
-            surface: intentSurface(from: envelope.sourceSurface),
-            taskKind: taskKind(from: traceKind(for: envelope.preferredMode)),
+        BASEntryIntentBridgeBuilder.envelope(
+            kindID: envelope.kind.rawValue,
+            surfaceID: envelope.sourceSurface.rawValue,
             preferredWorkflowID: envelope.preferredMode?.rawValue,
             promptSeed: envelope.promptSeed,
-            riskLevel: envelope.riskLevel.map(riskLevel(from:)),
+            riskLevelID: envelope.riskLevel?.rawValue,
             triggerReason: envelope.triggerReason,
             continuityToken: envelope.brainFingerprint,
             requestedAt: envelope.requestedAt,
@@ -225,19 +220,27 @@ enum BehavioralAISubstrateBridge {
     }
 
     static func entryIntentSummary(from envelope: DecisionIntentEnvelope) -> BASEntryIntentSummary {
-        BASEntryIntentSummarizer.summarize(entryIntentEnvelope(from: envelope))
+        BASEntryIntentBridgeBuilder.summary(
+            kindID: envelope.kind.rawValue,
+            surfaceID: envelope.sourceSurface.rawValue,
+            preferredWorkflowID: envelope.preferredMode?.rawValue,
+            promptSeed: envelope.promptSeed,
+            riskLevelID: envelope.riskLevel?.rawValue,
+            triggerReason: envelope.triggerReason,
+            continuityToken: envelope.brainFingerprint,
+            requestedAt: envelope.requestedAt,
+            expiresAt: envelope.expiresAt
+        )
     }
 
     static func handoffSummary(from envelope: DecisionIntentEnvelope) -> BASAppleHandoffSummary {
-        BASDefaultAppleHandoffSummarizer().summarize(
-            BASAppleHandoffEnvelope(
-                id: envelope.id,
-                surface: appleSurface(from: envelope.sourceSurface),
-                taskKind: taskKind(from: traceKind(for: envelope.preferredMode)),
-                riskLevel: envelope.riskLevel.map(riskLevel(from:)) ?? .low,
-                payloadSummary: envelope.promptSeed ?? envelope.triggerReason ?? envelope.kind.rawValue,
-                createdAt: envelope.requestedAt
-            ),
+        BASAppleHandoffBridgeBuilder.summary(
+            id: envelope.id,
+            surfaceID: envelope.sourceSurface.rawValue,
+            preferredWorkflowID: envelope.preferredMode?.rawValue,
+            riskLevelID: envelope.riskLevel?.rawValue,
+            payloadSummary: envelope.promptSeed ?? envelope.triggerReason ?? envelope.kind.rawValue,
+            createdAt: envelope.requestedAt,
             route: nil
         )
     }
@@ -268,71 +271,6 @@ enum BehavioralAISubstrateBridge {
             failureGuardIDs: failureGuardIDs,
             now: now
         )
-    }
-
-    private static func runtimeGear(from gear: DecisionRuntimeGear) -> BASRuntimeGear {
-        switch gear {
-        case .low:
-            .low
-        case .balanced:
-            .balanced
-        case .high:
-            .high
-        }
-    }
-
-    private static func taskKind(from kind: DecisionIntelligenceTraceKind?) -> BASTaskKind {
-        switch kind {
-        case .quick, .reminder:
-            .chat
-        case .balance:
-            .plan
-        case .mirror:
-            .retrieve
-        case nil:
-            .chat
-        }
-    }
-
-    private static func devicePerformanceClass(
-        from deviceClass: DecisionDevicePerformanceClass
-    ) -> BASDevicePerformanceClass {
-        switch deviceClass {
-        case .simulator:
-            .simulator
-        case .memoryConstrainedPhone:
-            .memoryConstrainedPhone
-        case .balancedPhone:
-            .balancedPhone
-        case .fullPhone:
-            .fullPhone
-        }
-    }
-
-    private static func environmentClass(
-        from environmentClass: DecisionEnvironmentClass
-    ) -> BASEnvironmentClass {
-        switch environmentClass {
-        case .simulator:
-            .simulator
-        case .lowPower:
-            .lowPower
-        case .memoryConstrained:
-            .memoryConstrained
-        case .normal:
-            .normal
-        }
-    }
-
-    private static func riskLevel(from riskLevel: InterventionRiskLevel) -> BASRiskLevel {
-        switch riskLevel {
-        case .low:
-            .low
-        case .medium:
-            .medium
-        case .high:
-            .high
-        }
     }
 
     private static func interventionRiskLevel(
@@ -422,66 +360,6 @@ enum BehavioralAISubstrateBridge {
             .warning
         case .critical:
             .blocker
-        }
-    }
-
-    private static func intentKind(from kind: DecisionIntentKind) -> BASEntryIntentKind {
-        switch kind {
-        case .quickCapture:
-            .quickCapture
-        case .openMode:
-            .openMode
-        case .reopenTomorrowItem:
-            .reopenTomorrowItem
-        case .predictiveIntervention:
-            .predictiveIntervention
-        case .resumeCurrentDecision:
-            .resumeCurrentDecision
-        }
-    }
-
-    private static func intentSurface(from surface: DecisionIntentSourceSurface) -> BASEntryIntentSurface {
-        switch surface {
-        case .app:
-            .app
-        case .watch:
-            .watch
-        case .widget:
-            .widget
-        case .shortcut:
-            .shortcut
-        case .siri:
-            .siri
-        case .notification:
-            .notification
-        }
-    }
-
-    private static func appleSurface(from surface: DecisionIntentSourceSurface) -> BASAppleSurface {
-        switch surface {
-        case .app:
-            .app
-        case .watch:
-            .watch
-        case .widget:
-            .widget
-        case .shortcut, .siri:
-            .shortcut
-        case .notification:
-            .notification
-        }
-    }
-
-    private static func traceKind(for mode: DecisionMode?) -> DecisionIntelligenceTraceKind? {
-        switch mode {
-        case .quick:
-            .quick
-        case .balance:
-            .balance
-        case .mirror:
-            .mirror
-        case nil:
-            nil
         }
     }
 

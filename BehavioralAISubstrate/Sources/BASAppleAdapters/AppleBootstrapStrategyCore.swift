@@ -89,7 +89,59 @@ public struct BASAppleFailurePatternSeed: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASAppleActiveSessionSeed: Codable, Equatable, Sendable {
+    public var modeID: String
+    public var promptSeed: String
+
+    public init(modeID: String, promptSeed: String) {
+        self.modeID = modeID
+        self.promptSeed = promptSeed
+    }
+}
+
 public enum BASAppleBootstrapStrategyAdapter {
+    public static func promptSeed(fragments: [String]) -> String {
+        fragments
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
+    public static func resolveActiveSessionSeed(
+        quickPromptFragments: [String]?,
+        balancePromptFragments: [String]?,
+        mirrorPromptFragments: [String]?,
+        taskGraphModeID: String?,
+        taskGraphPromptSeed: String?,
+        defaultModeID: String = BASDecisionMode.quick.rawValue
+    ) -> BASAppleActiveSessionSeed {
+        if let quickPromptFragments {
+            return BASAppleActiveSessionSeed(
+                modeID: BASDecisionMode.quick.rawValue,
+                promptSeed: promptSeed(fragments: quickPromptFragments)
+            )
+        }
+        if let balancePromptFragments {
+            return BASAppleActiveSessionSeed(
+                modeID: BASDecisionMode.balance.rawValue,
+                promptSeed: promptSeed(fragments: balancePromptFragments)
+            )
+        }
+        if let mirrorPromptFragments {
+            return BASAppleActiveSessionSeed(
+                modeID: BASDecisionMode.mirror.rawValue,
+                promptSeed: promptSeed(fragments: mirrorPromptFragments)
+            )
+        }
+        if let taskGraphModeID {
+            return BASAppleActiveSessionSeed(
+                modeID: taskGraphModeID,
+                promptSeed: taskGraphPromptSeed ?? ""
+            )
+        }
+        return BASAppleActiveSessionSeed(modeID: defaultModeID, promptSeed: "")
+    }
+
     public static func defaultTemplateSeeds(now: Date = .now) -> [BASAppleInterventionTemplateSeed] {
         [
             BASAppleInterventionTemplateSeed(

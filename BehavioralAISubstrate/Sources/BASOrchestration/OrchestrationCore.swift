@@ -299,6 +299,78 @@ public enum BASEntryIntentSummarizer {
     }
 }
 
+public enum BASEntryIntentBridgeBuilder {
+    public static func envelope(
+        kindID: String,
+        surfaceID: String,
+        preferredWorkflowID: String?,
+        promptSeed: String?,
+        riskLevelID: String?,
+        triggerReason: String?,
+        continuityToken: String?,
+        requestedAt: Date,
+        expiresAt: Date
+    ) -> BASEntryIntentEnvelope {
+        BASEntryIntentEnvelope(
+            kind: kind(from: kindID),
+            surface: surface(from: surfaceID),
+            taskKind: taskKind(from: preferredWorkflowID),
+            preferredWorkflowID: preferredWorkflowID,
+            promptSeed: promptSeed,
+            riskLevel: riskLevelID.flatMap(BASRiskLevel.init(rawValue:)),
+            triggerReason: triggerReason,
+            continuityToken: continuityToken,
+            requestedAt: requestedAt,
+            expiresAt: expiresAt
+        )
+    }
+
+    public static func summary(
+        kindID: String,
+        surfaceID: String,
+        preferredWorkflowID: String?,
+        promptSeed: String?,
+        riskLevelID: String?,
+        triggerReason: String?,
+        continuityToken: String?,
+        requestedAt: Date,
+        expiresAt: Date
+    ) -> BASEntryIntentSummary {
+        BASEntryIntentSummarizer.summarize(
+            envelope(
+                kindID: kindID,
+                surfaceID: surfaceID,
+                preferredWorkflowID: preferredWorkflowID,
+                promptSeed: promptSeed,
+                riskLevelID: riskLevelID,
+                triggerReason: triggerReason,
+                continuityToken: continuityToken,
+                requestedAt: requestedAt,
+                expiresAt: expiresAt
+            )
+        )
+    }
+
+    private static func kind(from rawValue: String) -> BASEntryIntentKind {
+        BASEntryIntentKind(rawValue: rawValue) ?? .quickCapture
+    }
+
+    private static func surface(from rawValue: String) -> BASEntryIntentSurface {
+        BASEntryIntentSurface(rawValue: rawValue) ?? .app
+    }
+
+    private static func taskKind(from preferredWorkflowID: String?) -> BASTaskKind {
+        switch preferredWorkflowID {
+        case "balance":
+            .plan
+        case "mirror":
+            .retrieve
+        default:
+            .chat
+        }
+    }
+}
+
 public struct BASWorkflowState: Codable, Sendable, Equatable {
     public var id: UUID
     public var status: BASWorkflowStatus

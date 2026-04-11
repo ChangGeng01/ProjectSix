@@ -30,6 +30,31 @@ public struct BASAppleRuntimeContextSourceInput: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASAppleRawRuntimeContextSourceInput: Codable, Equatable, Sendable {
+    public var primaryTraceKindID: String?
+    public var runtimeGearID: String
+    public var environmentClassID: String
+    public var deviceClassID: String
+    public var riskLevelID: String
+    public var budget: BASAdaptiveRuntimeBudget
+
+    public init(
+        primaryTraceKindID: String?,
+        runtimeGearID: String,
+        environmentClassID: String,
+        deviceClassID: String,
+        riskLevelID: String,
+        budget: BASAdaptiveRuntimeBudget
+    ) {
+        self.primaryTraceKindID = primaryTraceKindID
+        self.runtimeGearID = runtimeGearID
+        self.environmentClassID = environmentClassID
+        self.deviceClassID = deviceClassID
+        self.riskLevelID = riskLevelID
+        self.budget = budget
+    }
+}
+
 public struct BASAppleRoleProfileSourceInput: Codable, Equatable, Sendable {
     public var name: String
     public var postureID: String
@@ -137,6 +162,21 @@ public struct BASAppleConsoleBridgeSourceInput: Codable, Equatable, Sendable {
 
 public enum BASAppleInspectionBridgeBuilder {
     public static func runtimeContext(
+        from rawInput: BASAppleRawRuntimeContextSourceInput
+    ) -> BASRuntimeContext {
+        runtimeContext(
+            from: BASAppleRuntimeContextSourceInput(
+                primaryTraceKind: rawInput.primaryTraceKindID,
+                runtimeGear: BASRuntimeGear(rawValue: rawInput.runtimeGearID) ?? .balanced,
+                environmentClass: BASEnvironmentClass(rawValue: rawInput.environmentClassID) ?? .normal,
+                deviceClass: BASDevicePerformanceClass(rawValue: rawInput.deviceClassID) ?? .balancedPhone,
+                riskLevel: BASRiskLevel(rawValue: rawInput.riskLevelID) ?? .low,
+                budget: rawInput.budget
+            )
+        )
+    }
+
+    public static func runtimeContext(
         from input: BASAppleRuntimeContextSourceInput
     ) -> BASRuntimeContext {
         BASRuntimeContext(
@@ -163,6 +203,24 @@ public enum BASAppleInspectionBridgeBuilder {
     }
 
     public static func roleProfile(
+        name: String,
+        postureID: String,
+        initiativeID: String,
+        confidenceCeiling: Double,
+        roleBoundaryPreset: String
+    ) -> BASRoleProfile? {
+        roleProfile(
+            from: BASAppleRoleProfileSourceInput(
+                name: name,
+                postureID: postureID,
+                initiativeID: initiativeID,
+                confidenceCeiling: confidenceCeiling,
+                roleBoundaryPreset: roleBoundaryPreset
+            )
+        )
+    }
+
+    public static func roleProfile(
         from input: BASAppleRoleProfileSourceInput?
     ) -> BASRoleProfile? {
         guard let input else { return nil }
@@ -172,6 +230,36 @@ public enum BASAppleInspectionBridgeBuilder {
             initiative: initiative(from: input.initiativeID),
             confidenceCeiling: input.confidenceCeiling,
             roleBoundaryPreset: input.roleBoundaryPreset
+        )
+    }
+
+    public static func brainSnapshot(
+        modeID: String,
+        dominantGoals: [String],
+        activeConstraints: [String],
+        warmth: Double,
+        directness: Double,
+        brevity: Double,
+        actionBias: Double,
+        activeTemplateIDs: [String],
+        recentFailurePatternIDs: [String],
+        retrievalTags: [String],
+        verificationSnapshot: String
+    ) -> BASCurrentBrainState? {
+        brainSnapshot(
+            from: BASAppleBrainSnapshotSourceInput(
+                mode: modeID,
+                dominantGoals: dominantGoals,
+                activeConstraints: activeConstraints,
+                warmth: warmth,
+                directness: directness,
+                brevity: brevity,
+                actionBias: actionBias,
+                activeTemplateIDs: activeTemplateIDs,
+                recentFailurePatternIDs: recentFailurePatternIDs,
+                retrievalTags: retrievalTags,
+                verificationSnapshot: verificationSnapshot
+            )
         )
     }
 

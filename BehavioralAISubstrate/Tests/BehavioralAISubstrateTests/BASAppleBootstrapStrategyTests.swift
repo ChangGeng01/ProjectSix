@@ -126,4 +126,23 @@ struct BASAppleBootstrapStrategyTests {
 
         #expect(ordered == ["proceed_without_pause_failure", "night_fast_path_failure"])
     }
+
+    @Test("session seed builder trims fragments and resolves the active priming mode")
+    func sessionSeedBuilderTrimsAndResolvesActiveMode() {
+        let seed = BASAppleBootstrapStrategyAdapter.resolveActiveSessionSeed(
+            quickPromptFragments: nil,
+            balancePromptFragments: ["  Should I move?  ", "", " protect savings "],
+            mirrorPromptFragments: ["This would be ignored"],
+            taskGraphModeID: "mirror",
+            taskGraphPromptSeed: "task graph fallback"
+        )
+
+        #expect(seed.modeID == "balance")
+        #expect(seed.promptSeed == "Should I move? protect savings")
+        #expect(
+            BASAppleBootstrapStrategyAdapter.promptSeed(
+                fragments: ["  one  ", "", "two", "   "]
+            ) == "one two"
+        )
+    }
 }

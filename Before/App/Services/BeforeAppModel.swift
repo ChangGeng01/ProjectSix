@@ -1253,7 +1253,9 @@ final class BeforeAppModel: ObservableObject {
             .strategy(for: .quick)
         currentBrainState = CurrentBrainStateLoader.bootstrapCurrentBrainState(
             mode: .quick,
-            prompt: quickPromptSeed(for: session),
+            prompt: BASAppleBootstrapStrategyAdapter.promptSeed(
+                fragments: quickPromptFragments(for: session)
+            ),
             source: .sessionPrime,
             taskGraph: activeTaskGraph,
             context: modelContainer.mainContext,
@@ -1270,7 +1272,9 @@ final class BeforeAppModel: ObservableObject {
             .strategy(for: .balance)
         currentBrainState = CurrentBrainStateLoader.bootstrapCurrentBrainState(
             mode: .balance,
-            prompt: balancePromptSeed(for: session),
+            prompt: BASAppleBootstrapStrategyAdapter.promptSeed(
+                fragments: balancePromptFragments(for: session)
+            ),
             source: .sessionPrime,
             taskGraph: activeTaskGraph,
             context: modelContainer.mainContext,
@@ -1287,7 +1291,9 @@ final class BeforeAppModel: ObservableObject {
             .strategy(for: .mirror)
         currentBrainState = CurrentBrainStateLoader.bootstrapCurrentBrainState(
             mode: .mirror,
-            prompt: mirrorPromptSeed(for: session),
+            prompt: BASAppleBootstrapStrategyAdapter.promptSeed(
+                fragments: mirrorPromptFragments(for: session)
+            ),
             source: .sessionPrime,
             taskGraph: activeTaskGraph,
             context: modelContainer.mainContext,
@@ -1297,7 +1303,7 @@ final class BeforeAppModel: ObservableObject {
         session.loadBrainState(currentBrainState?.brainState)
     }
 
-    private func quickPromptSeed(for session: QuickCheckSession) -> String {
+    private func quickPromptFragments(for session: QuickCheckSession) -> [String] {
         [
             session.scenario.title,
             session.note,
@@ -1306,11 +1312,9 @@ final class BeforeAppModel: ObservableObject {
             session.controlLevel?.title ?? ""
         ]
         .map(trimmed)
-        .filter { !$0.isEmpty }
-        .joined(separator: " ")
     }
 
-    private func balancePromptSeed(for session: BalanceBoardSession) -> String {
+    private func balancePromptFragments(for session: BalanceBoardSession) -> [String] {
         [
             session.prompt,
             session.desire,
@@ -1319,11 +1323,9 @@ final class BeforeAppModel: ObservableObject {
             session.longTerm
         ]
         .map(trimmed)
-        .filter { !$0.isEmpty }
-        .joined(separator: " ")
     }
 
-    private func mirrorPromptSeed(for session: MirrorWorkspaceSession) -> String {
+    private func mirrorPromptFragments(for session: MirrorWorkspaceSession) -> [String] {
         [
             session.prompt,
             session.emotion,
@@ -1333,42 +1335,20 @@ final class BeforeAppModel: ObservableObject {
             session.selfLens
         ]
         .map(trimmed)
-        .filter { !$0.isEmpty }
-        .joined(separator: " ")
     }
 
     private func refreshGlobalBrainState(source: BrainStateUpdateSource) {
         refreshDecisionMemoryStore()
-
-        let mode: DecisionMode
-        let promptSeed: String
-
-        if let activeQuickSession {
-            mode = .quick
-            promptSeed = quickPromptSeed(for: activeQuickSession)
-        } else if let activeBalanceSession {
-            mode = .balance
-            promptSeed = balancePromptSeed(for: activeBalanceSession)
-        } else if let activeMirrorSession {
-            mode = .mirror
-            promptSeed = mirrorPromptSeed(for: activeMirrorSession)
-        } else if let activeTaskGraph, let taskMode = activeTaskGraph.mode {
-            mode = taskMode
-            promptSeed = activeTaskGraph.promptSeed
-        } else {
-            mode = .quick
-            promptSeed = ""
-        }
-
-        let traceKind: DecisionIntelligenceTraceKind
-        switch mode {
-        case .quick:
-            traceKind = .quick
-        case .balance:
-            traceKind = .balance
-        case .mirror:
-            traceKind = .mirror
-        }
+        let activeSeed = BASAppleBootstrapStrategyAdapter.resolveActiveSessionSeed(
+            quickPromptFragments: activeQuickSession.map(quickPromptFragments(for:)),
+            balancePromptFragments: activeBalanceSession.map(balancePromptFragments(for:)),
+            mirrorPromptFragments: activeMirrorSession.map(mirrorPromptFragments(for:)),
+            taskGraphModeID: activeTaskGraph?.mode?.rawValue,
+            taskGraphPromptSeed: activeTaskGraph?.promptSeed
+        )
+        let mode = DecisionMode(rawValue: activeSeed.modeID) ?? .quick
+        let promptSeed = activeSeed.promptSeed
+        let traceKind = DecisionIntelligenceTraceKind(rawValue: activeSeed.modeID) ?? .quick
 
         let strategy = DecisionIntelligenceCoordinator
             .executionProfile(preferences: preferences)

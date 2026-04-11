@@ -3,6 +3,7 @@ import Testing
 @testable import BASAdmin
 @testable import BASAppleAdapters
 @testable import BASMemory
+@testable import BASOrchestration
 @testable import BASRuntimeCore
 
 @Suite("BASAppleInspectionBridge")
@@ -33,6 +34,56 @@ struct BASAppleInspectionBridgeTests {
         #expect(context.privacyMode == .localOnly)
         #expect(context.riskLevel == .high)
         #expect(context.budget.contextTokens == 420)
+    }
+
+    @Test("raw runtime, intent, and handoff builders normalize host raw values")
+    func rawBuildersNormalizeHostValues() {
+        let context = BASAppleInspectionBridgeBuilder.runtimeContext(
+            from: BASAppleRawRuntimeContextSourceInput(
+                primaryTraceKindID: "mirror",
+                runtimeGearID: "low",
+                environmentClassID: "memoryConstrained",
+                deviceClassID: "memoryConstrainedPhone",
+                riskLevelID: "medium",
+                budget: BASAdaptiveRuntimeBudget(
+                    contextBudget: 180,
+                    outputCharacterBudget: 90,
+                    timeBudgetMs: 2400,
+                    toolCallBudget: 0,
+                    retrievalItemBudget: 1
+                )
+            )
+        )
+        let intent = BASEntryIntentBridgeBuilder.envelope(
+            kindID: "resumeCurrentDecision",
+            surfaceID: "notification",
+            preferredWorkflowID: "balance",
+            promptSeed: "Resume the decision.",
+            riskLevelID: "high",
+            triggerReason: "prediction",
+            continuityToken: "fp-1",
+            requestedAt: Date(timeIntervalSince1970: 1_800_000_000),
+            expiresAt: Date(timeIntervalSince1970: 1_800_003_600)
+        )
+        let handoff = BASAppleHandoffBridgeBuilder.summary(
+            id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+            surfaceID: "siri",
+            preferredWorkflowID: "mirror",
+            riskLevelID: "medium",
+            payloadSummary: "Hold this until tomorrow morning.",
+            createdAt: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+
+        #expect(context.taskKind == .retrieve)
+        #expect(context.gear == .low)
+        #expect(context.deviceProfile.memoryMB == 4096)
+        #expect(intent.kind == .resumeCurrentDecision)
+        #expect(intent.surface == .notification)
+        #expect(intent.taskKind == .plan)
+        #expect(intent.riskLevel == .high)
+        #expect(handoff.surface == .shortcut)
+        #expect(handoff.taskKind == .retrieve)
+        #expect(handoff.riskLevel == .medium)
     }
 
     @Test("role profile and brain snapshot builders normalize host raw values")

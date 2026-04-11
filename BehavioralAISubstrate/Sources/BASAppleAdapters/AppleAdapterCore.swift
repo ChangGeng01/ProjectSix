@@ -143,3 +143,73 @@ public struct BASDefaultAppleHandoffSummarizer: BASAppleHandoffSummarizing {
         )
     }
 }
+
+public enum BASAppleHandoffBridgeBuilder {
+    public static func envelope(
+        id: UUID,
+        surfaceID: String,
+        preferredWorkflowID: String?,
+        riskLevelID: String?,
+        payloadSummary: String,
+        createdAt: Date
+    ) -> BASAppleHandoffEnvelope {
+        BASAppleHandoffEnvelope(
+            id: id,
+            surface: surface(from: surfaceID),
+            taskKind: taskKind(from: preferredWorkflowID),
+            riskLevel: BASRiskLevel(rawValue: riskLevelID ?? "") ?? .low,
+            payloadSummary: payloadSummary,
+            createdAt: createdAt
+        )
+    }
+
+    public static func summary(
+        id: UUID,
+        surfaceID: String,
+        preferredWorkflowID: String?,
+        riskLevelID: String?,
+        payloadSummary: String,
+        createdAt: Date,
+        route: BASModelRoute? = nil
+    ) -> BASAppleHandoffSummary {
+        BASDefaultAppleHandoffSummarizer().summarize(
+            envelope(
+                id: id,
+                surfaceID: surfaceID,
+                preferredWorkflowID: preferredWorkflowID,
+                riskLevelID: riskLevelID,
+                payloadSummary: payloadSummary,
+                createdAt: createdAt
+            ),
+            route: route
+        )
+    }
+
+    private static func surface(from rawValue: String) -> BASAppleSurface {
+        switch rawValue {
+        case BASAppleSurface.app.rawValue:
+            .app
+        case BASAppleSurface.watch.rawValue:
+            .watch
+        case BASAppleSurface.widget.rawValue:
+            .widget
+        case BASAppleSurface.notification.rawValue:
+            .notification
+        case "siri", BASAppleSurface.shortcut.rawValue:
+            .shortcut
+        default:
+            .app
+        }
+    }
+
+    private static func taskKind(from preferredWorkflowID: String?) -> BASTaskKind {
+        switch preferredWorkflowID {
+        case "balance":
+            .plan
+        case "mirror":
+            .retrieve
+        default:
+            .chat
+        }
+    }
+}
