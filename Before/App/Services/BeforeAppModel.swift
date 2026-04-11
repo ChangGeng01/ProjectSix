@@ -1366,41 +1366,49 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func consumeDecisionIntentEnvelope(_ envelope: DecisionIntentEnvelope) {
-        switch envelope.kind {
+        let actionPlan = BASAppleEntryIntentPlanBuilder.plan(
+            kindID: envelope.kind.rawValue,
+            surfaceID: envelope.sourceSurface.rawValue,
+            preferredModeID: envelope.preferredMode?.rawValue,
+            scenarioID: envelope.scenario?.rawValue,
+            promptSeed: envelope.promptSeed,
+            riskLevelID: envelope.riskLevel?.rawValue,
+            triggerReason: envelope.triggerReason
+        )
+
+        switch actionPlan.actionKind {
         case .quickCapture:
             startQuickCheck(
                 entrySource: envelope.entrySource,
-                scenario: envelope.scenario,
-                prompt: envelope.promptSeed ?? ""
+                scenario: actionPlan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
+                prompt: actionPlan.promptSeed
             )
         case .openMode:
+            if actionPlan.shouldSelectBoxTab {
+                selectedTab = .box
+            }
             startDecisionMode(
-                envelope.preferredMode ?? .quick,
+                actionPlan.preferredModeID.flatMap(DecisionMode.init(rawValue:)) ?? .quick,
                 entrySource: envelope.entrySource,
-                prompt: envelope.promptSeed ?? ""
-            )
-        case .reopenTomorrowItem:
-            selectedTab = .box
-            startDecisionMode(
-                envelope.preferredMode ?? .quick,
-                entrySource: envelope.entrySource,
-                prompt: envelope.promptSeed ?? ""
+                prompt: actionPlan.promptSeed
             )
         case .predictiveIntervention:
             interventionCandidate = InterventionPredictionCandidate(
-                riskLevel: envelope.riskLevel ?? .medium,
-                title: envelope.promptSeed ?? "Pause before you decide.",
+                riskLevel: actionPlan.riskLevelID.flatMap(InterventionRiskLevel.init(rawValue:)) ?? .medium,
+                title: actionPlan.promptSeed.isEmpty ? "Pause before you decide." : actionPlan.promptSeed,
                 detail: "A predicted pattern says a slower move is safer here.",
-                evidenceSignalCount: envelope.triggerReason == nil ? 1 : 2,
-                suggestedMode: envelope.preferredMode,
-                reason: envelope.triggerReason ?? "A recent pattern suggests more friction before acting.",
+                evidenceSignalCount: actionPlan.triggerReason == nil ? 1 : 2,
+                suggestedMode: actionPlan.preferredModeID.flatMap(DecisionMode.init(rawValue:)),
+                reason: actionPlan.triggerReason ?? "A recent pattern suggests more friction before acting.",
                 expiresAt: envelope.expiresAt
             )
-        case .resumeCurrentDecision:
+        case .restoreWorkspace:
             restoreActiveWorkspaceIfNeeded()
         }
 
-        refreshGlobalBrainState(source: envelope.sourceSurface == .watch ? .watchHandoff : .explicitRefresh)
+        refreshGlobalBrainState(
+            source: actionPlan.refreshTriggerKind == .watchHandoff ? .watchHandoff : .explicitRefresh
+        )
     }
 
     private func refreshPredictedIntervention() {

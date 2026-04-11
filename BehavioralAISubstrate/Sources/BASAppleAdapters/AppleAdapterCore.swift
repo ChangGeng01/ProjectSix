@@ -108,6 +108,108 @@ public struct BASAppleDeviceProfileSnapshot: Codable, Sendable, Equatable {
     }
 }
 
+public enum BASAppleEntryIntentActionKind: String, Codable, Sendable {
+    case quickCapture
+    case openMode
+    case predictiveIntervention
+    case restoreWorkspace
+}
+
+public enum BASAppleBrainRefreshTriggerKind: String, Codable, Sendable {
+    case explicitRefresh
+    case watchHandoff
+}
+
+public struct BASAppleEntryIntentActionPlan: Codable, Sendable, Equatable {
+    public var actionKind: BASAppleEntryIntentActionKind
+    public var preferredModeID: String?
+    public var promptSeed: String
+    public var scenarioID: String?
+    public var riskLevelID: String?
+    public var triggerReason: String?
+    public var sourceSurface: BASAppleSurface
+    public var shouldSelectBoxTab: Bool
+    public var refreshTriggerKind: BASAppleBrainRefreshTriggerKind
+
+    public init(
+        actionKind: BASAppleEntryIntentActionKind,
+        preferredModeID: String?,
+        promptSeed: String,
+        scenarioID: String?,
+        riskLevelID: String?,
+        triggerReason: String?,
+        sourceSurface: BASAppleSurface,
+        shouldSelectBoxTab: Bool,
+        refreshTriggerKind: BASAppleBrainRefreshTriggerKind
+    ) {
+        self.actionKind = actionKind
+        self.preferredModeID = preferredModeID
+        self.promptSeed = promptSeed
+        self.scenarioID = scenarioID
+        self.riskLevelID = riskLevelID
+        self.triggerReason = triggerReason
+        self.sourceSurface = sourceSurface
+        self.shouldSelectBoxTab = shouldSelectBoxTab
+        self.refreshTriggerKind = refreshTriggerKind
+    }
+}
+
+public enum BASAppleEntryIntentPlanBuilder {
+    public static func plan(
+        kindID: String,
+        surfaceID: String,
+        preferredModeID: String?,
+        scenarioID: String?,
+        promptSeed: String?,
+        riskLevelID: String?,
+        triggerReason: String?
+    ) -> BASAppleEntryIntentActionPlan {
+        let surface = surface(from: surfaceID)
+        let kind = actionKind(from: kindID)
+        return BASAppleEntryIntentActionPlan(
+            actionKind: kind,
+            preferredModeID: preferredModeID,
+            promptSeed: promptSeed ?? "",
+            scenarioID: scenarioID,
+            riskLevelID: riskLevelID,
+            triggerReason: triggerReason,
+            sourceSurface: surface,
+            shouldSelectBoxTab: kindID == "reopenTomorrowItem",
+            refreshTriggerKind: surface == .watch ? .watchHandoff : .explicitRefresh
+        )
+    }
+
+    private static func actionKind(from rawValue: String) -> BASAppleEntryIntentActionKind {
+        switch rawValue {
+        case "quickCapture":
+            .quickCapture
+        case "predictiveIntervention":
+            .predictiveIntervention
+        case "resumeCurrentDecision":
+            .restoreWorkspace
+        case "openMode", "reopenTomorrowItem":
+            .openMode
+        default:
+            .openMode
+        }
+    }
+
+    private static func surface(from rawValue: String) -> BASAppleSurface {
+        switch rawValue {
+        case BASAppleSurface.watch.rawValue:
+            .watch
+        case BASAppleSurface.widget.rawValue:
+            .widget
+        case BASAppleSurface.notification.rawValue:
+            .notification
+        case "siri", BASAppleSurface.shortcut.rawValue:
+            .shortcut
+        default:
+            .app
+        }
+    }
+}
+
 public protocol BASAppleProtectedStateAdapter: Sendable {
     func save(data: Data, key: String) throws
     func load(key: String) throws -> Data?
