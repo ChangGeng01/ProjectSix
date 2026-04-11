@@ -77,7 +77,7 @@ struct BASAppleInspectionBridgeTests {
         #expect(context.taskKind == .retrieve)
         #expect(context.gear == .low)
         #expect(context.deviceProfile.memoryMB == 4096)
-        #expect(intent.kind == .resumeCurrentDecision)
+        #expect(intent.kind == .resume)
         #expect(intent.surface == .notification)
         #expect(intent.taskKind == .plan)
         #expect(intent.riskLevel == .high)
@@ -90,7 +90,7 @@ struct BASAppleInspectionBridgeTests {
     func roleAndBrainBuildersNormalizeHostState() {
         let role = BASAppleInspectionBridgeBuilder.roleProfile(
             from: BASAppleRoleProfileSourceInput(
-                name: "Predictive Sentinel",
+                name: "Risk Sentinel",
                 postureID: "protective",
                 initiativeID: "guided",
                 confidenceCeiling: 0.72,

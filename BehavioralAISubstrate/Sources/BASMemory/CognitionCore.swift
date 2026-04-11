@@ -7,14 +7,38 @@ public enum BASDecisionMode: String, Codable, Sendable, CaseIterable {
     case balance
     case mirror
 
+    public var identifier: String {
+        switch self {
+        case .quick:
+            "primary"
+        case .balance:
+            "comparative"
+        case .mirror:
+            "reflective"
+        }
+    }
+
+    public init?(identifier: String) {
+        switch identifier {
+        case "primary", "quick":
+            self = .quick
+        case "comparative", "balance":
+            self = .balance
+        case "reflective", "mirror":
+            self = .mirror
+        default:
+            return nil
+        }
+    }
+
     public var title: String {
         switch self {
         case .quick:
-            "Quick"
+            "Primary"
         case .balance:
-            "Balance"
+            "Comparative"
         case .mirror:
-            "Mirror"
+            "Reflective"
         }
     }
 }

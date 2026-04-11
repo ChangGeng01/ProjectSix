@@ -16,7 +16,7 @@ struct BASAppleEntryIntentPlanBuilderTests {
             triggerReason: "watch_capture"
         )
 
-        #expect(plan.actionKind == .quickCapture)
+        #expect(plan.actionKind == .capture)
         #expect(plan.sourceSurface == .watch)
         #expect(plan.refreshTriggerKind == .watchHandoff)
         #expect(plan.promptSeed == "Hold this.")
@@ -35,7 +35,7 @@ struct BASAppleEntryIntentPlanBuilderTests {
             triggerReason: nil
         )
 
-        #expect(plan.actionKind == .openMode)
+        #expect(plan.actionKind == .present)
         #expect(plan.shouldSelectBoxTab)
         #expect(plan.refreshTriggerKind == .explicitRefresh)
         #expect(plan.preferredModeID == "mirror")
@@ -53,7 +53,7 @@ struct BASAppleEntryIntentPlanBuilderTests {
             triggerReason: nil
         )
 
-        #expect(plan.actionKind == .restoreWorkspace)
+        #expect(plan.actionKind == .restore)
         #expect(plan.promptSeed.isEmpty)
         #expect(plan.shouldSelectBoxTab == false)
     }

@@ -6,14 +6,78 @@ final class SampleHostModel: ObservableObject {
     @Published private(set) var result: BASHostSessionResult
 
     private let runtime: BASHostRuntime
+    private static let workflowBehavior = BASHostWorkflowBehaviorConfiguration(
+        templateIDsByProfileID: [
+            BASHostWorkflowProfile.rapid.rawValue: ["samplehost.template.rapid-lens"],
+            BASHostWorkflowProfile.deliberate.rawValue: ["samplehost.template.compare-lens"],
+            BASHostWorkflowProfile.reflective.rawValue: ["samplehost.template.reflective-lens"]
+        ],
+        memorySourceIDsByProfileID: [
+            BASHostWorkflowProfile.rapid.rawValue: BASMemorySource.pattern.rawValue,
+            BASHostWorkflowProfile.deliberate.rawValue: BASMemorySource.history.rawValue,
+            BASHostWorkflowProfile.reflective.rawValue: BASMemorySource.reflection.rawValue
+        ],
+        interactiveRetrievalModeByProfileID: [
+            BASHostWorkflowProfile.rapid.rawValue: "compact",
+            BASHostWorkflowProfile.deliberate.rawValue: "balanced",
+            BASHostWorkflowProfile.reflective.rawValue: "full"
+        ],
+        hostNamespace: "samplehost"
+    )
+    private static let sampleHostPresentation = BASHostPresentationConfiguration(
+        workflowTitles: BASHostWorkflowTitles(
+            rapid: "Rapid Lens",
+            deliberate: "Compare Lens",
+            reflective: "Reflective Lens"
+        ),
+        sessionTitles: BASHostSessionTitles(
+            rapid: "Rapid Lens",
+            deliberate: "Compare Lens",
+            reflective: "Reflective Lens",
+            initialAppearance: "SampleHost Bootstrap",
+            sceneActive: "SampleHost Refresh"
+        ),
+        followUpActions: BASHostFollowUpActions(
+            rapid: ["Spot the impulse", "Name one next move"],
+            deliberate: ["Frame the competing pulls", "Choose one bounded comparison"],
+            reflective: ["Name the deeper signal", "Choose one grounded reflection"],
+            highRiskEscalation: ["Add one more confirmation step"]
+        ),
+        lifecycle: BASHostLifecyclePresentation(
+            initialAppearancePromptFallback: "Load the substrate before the host asks it to speak.",
+            sceneActivePromptFallback: "Refresh the current brain and restore the shell."
+        ),
+        notices: BASHostNoticeTemplates(
+            enteredWorkflow: "{surface} entered the {workflow} lane in SampleHost.",
+            runtimeProfile: "SampleHost runtime profile {runtimeProfile} is active.",
+            reopenFollowUpAction: "Reopen with the {workflow} lane",
+            emptyPromptGoalFallback: "Keep the host steady before acting."
+        ),
+        predictiveIntervention: BASHostPredictiveInterventionPresentation(
+            mediumRiskTitle: "Pause for one slower pass.",
+            mediumRiskDetail: "SampleHost wants one more deliberate step here.",
+            highRiskTitle: "Add one more checkpoint.",
+            highRiskDetail: "SampleHost sees elevated risk and wants stronger confirmation.",
+            reopenRiskDetail: "This reopen path needs a little more structure in SampleHost.",
+            fallbackReopenSuggestionDetail: "A prior hold suggests restoring friction first.",
+            defaultReason: "SampleHost prefers a slower lane here."
+        )
+    )
 
-    init(runtime: BASHostRuntime = BASHostRuntime()) {
+    init(
+        runtime: BASHostRuntime = BASHostRuntime(
+            configuration: BASHostConfiguration(
+                workflowBehavior: SampleHostModel.workflowBehavior,
+                presentation: SampleHostModel.sampleHostPresentation
+            )
+        )
+    ) {
         self.runtime = runtime
         self.result = runtime.bootstrap(
             BASHostLifecycleRequest(
                 phase: .initialAppearance,
-                preferredMode: .quick,
-                sourceSurface: .app,
+                preferredProfile: .rapid,
+                sourceSurface: .application,
                 promptSeed: "Load the substrate before the host asks it to speak."
             )
         )
@@ -23,27 +87,27 @@ final class SampleHostModel: ObservableObject {
         result = runtime.bootstrap(
             BASHostLifecycleRequest(
                 phase: .sceneActive,
-                preferredMode: .quick,
-                sourceSurface: .app,
+                preferredProfile: .rapid,
+                sourceSurface: .application,
                 promptSeed: "Refresh the current brain and restore the shell."
             )
         )
     }
 
-    func start(_ mode: BASDecisionMode) {
-        let prompts: [BASDecisionMode: String] = [
-            .quick: "Should I do this right now?",
-            .balance: "What tradeoff am I refusing to name?",
-            .mirror: "What is the honest story here?"
+    func start(_ profile: BASHostWorkflowProfile) {
+        let prompts: [BASHostWorkflowProfile: String] = [
+            .rapid: "Should I do this right now?",
+            .deliberate: "What tradeoff am I refusing to name?",
+            .reflective: "What is the honest story here?"
         ]
         result = runtime.startSession(
             BASHostSessionRequest(
-                kind: mode == .quick ? .quick : mode == .balance ? .balance : .mirror,
-                mode: mode,
-                surface: .app,
-                prompt: prompts[mode] ?? "Hold this decision for one more beat.",
-                title: "\(mode.title) from SampleHost",
-                riskLevel: mode == .mirror ? .medium : .low
+                kind: .interactive,
+                workflowProfile: profile,
+                surface: .application,
+                prompt: prompts[profile] ?? "Hold this decision for one more beat.",
+                title: "\(profile.title) from SampleHost",
+                riskLevel: profile == .reflective ? .medium : .low
             )
         )
     }
@@ -51,7 +115,7 @@ final class SampleHostModel: ObservableObject {
     func reopen() {
         result = runtime.reopen(
             BASHostReopenRequest(
-                mode: .balance,
+                workflowProfile: .deliberate,
                 title: "Reopen this held decision",
                 detail: "SampleHost is proving the reopen path through BASHostKit.",
                 promptSeed: "Take one slower pass before committing.",

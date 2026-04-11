@@ -30,27 +30,12 @@ public struct BASAppleProviderReleaseInput: Sendable, Equatable {
 }
 
 public enum BASAppleProviderReleaseAdapter {
-    public static func quickPreview(
-        currentPerspective: String,
-        afterPerspective: String
+    public static func keyedPreview(
+        fields: [(label: String, value: String)]
     ) -> String {
-        "Current: \(currentPerspective)\nAfter: \(afterPerspective)"
-    }
-
-    public static func balancePreview(
-        headline: String,
-        focusDescription: String,
-        nextAction: String
-    ) -> String {
-        "Headline: \(headline)\nFocus: \(focusDescription)\nNext: \(nextAction)"
-    }
-
-    public static func mirrorPreview(
-        headline: String,
-        coreTension: String,
-        nextAction: String
-    ) -> String {
-        "Headline: \(headline)\nTension: \(coreTension)\nNext: \(nextAction)"
+        fields
+            .map { "\($0.label): \($0.value)" }
+            .joined(separator: "\n")
     }
 
     public static func reminderPreview(

@@ -39,9 +39,8 @@ public struct BASAppleCurrentBrainSessionBridgeInput: Codable, Equatable, Sendab
 }
 
 public struct BASAppleCurrentBrainActiveRefreshBridgeInput: Codable, Equatable, Sendable {
-    public var quickPromptFragments: [String]?
-    public var balancePromptFragments: [String]?
-    public var mirrorPromptFragments: [String]?
+    public var promptFragmentsByModeID: [String: [String]]
+    public var modePriority: [String]
     public var taskGraphModeID: String?
     public var taskGraphPromptSeed: String?
     public var sourceSurfaceOverrideID: String?
@@ -54,9 +53,12 @@ public struct BASAppleCurrentBrainActiveRefreshBridgeInput: Codable, Equatable, 
     public var triggerID: String
 
     public init(
-        quickPromptFragments: [String]? = nil,
-        balancePromptFragments: [String]? = nil,
-        mirrorPromptFragments: [String]? = nil,
+        promptFragmentsByModeID: [String: [String]] = [:],
+        modePriority: [String] = [
+            BASDecisionMode.quick.identifier,
+            BASDecisionMode.balance.identifier,
+            BASDecisionMode.mirror.identifier
+        ],
         taskGraphModeID: String? = nil,
         taskGraphPromptSeed: String? = nil,
         sourceSurfaceOverrideID: String? = nil,
@@ -68,9 +70,8 @@ public struct BASAppleCurrentBrainActiveRefreshBridgeInput: Codable, Equatable, 
         retrievalModesByModeID: [String: String],
         triggerID: String = BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue
     ) {
-        self.quickPromptFragments = quickPromptFragments
-        self.balancePromptFragments = balancePromptFragments
-        self.mirrorPromptFragments = mirrorPromptFragments
+        self.promptFragmentsByModeID = promptFragmentsByModeID
+        self.modePriority = modePriority
         self.taskGraphModeID = taskGraphModeID
         self.taskGraphPromptSeed = taskGraphPromptSeed
         self.sourceSurfaceOverrideID = sourceSurfaceOverrideID
@@ -112,9 +113,8 @@ public enum BASAppleCurrentBrainRuntimeBridgeBuilder {
         from input: BASAppleCurrentBrainActiveRefreshBridgeInput
     ) -> BASAppleCurrentBrainBootstrapBridgeInput {
         let runtimePlan = BASAppleCurrentBrainRuntimePlanner.activeRefreshPlan(
-            quickPromptFragments: input.quickPromptFragments,
-            balancePromptFragments: input.balancePromptFragments,
-            mirrorPromptFragments: input.mirrorPromptFragments,
+            promptFragmentsByModeID: input.promptFragmentsByModeID,
+            modePriority: input.modePriority,
             taskGraphModeID: input.taskGraphModeID,
             taskGraphPromptSeed: input.taskGraphPromptSeed,
             retrievalModesByModeID: input.retrievalModesByModeID,

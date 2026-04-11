@@ -577,33 +577,33 @@ public enum BASAppleProviderObservationContextBuilder {
         switch kind {
         case "quick":
             (
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for quick refinement.",
-                admissionSkippedDetailPrefix: "Admission controller skipped quick refinement.",
-                deterministicFallbackBase: "No provider returned a refined quick result, so Before kept the deterministic copy.",
-                cachedConsistencySource: "cached quick refinement",
-                providerConsistencySource: "provider quick refinement"
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for primary refinement.",
+                admissionSkippedDetailPrefix: "Admission controller skipped primary refinement.",
+                deterministicFallbackBase: "No provider returned a refined primary-path result, so the host app kept the deterministic copy.",
+                cachedConsistencySource: "cached primary refinement",
+                providerConsistencySource: "provider primary refinement"
             )
         case "balance":
             (
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for balance refinement.",
-                admissionSkippedDetailPrefix: "Admission controller skipped balance refinement.",
-                deterministicFallbackBase: "No provider returned a refined balance board, so Before kept the deterministic copy.",
-                cachedConsistencySource: "cached balance refinement",
-                providerConsistencySource: "provider balance refinement"
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for comparative refinement.",
+                admissionSkippedDetailPrefix: "Admission controller skipped comparative refinement.",
+                deterministicFallbackBase: "No provider returned a refined comparative analysis, so the host app kept the deterministic copy.",
+                cachedConsistencySource: "cached comparative refinement",
+                providerConsistencySource: "provider comparative refinement"
             )
         case "mirror":
             (
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for mirror refinement.",
-                admissionSkippedDetailPrefix: "Admission controller skipped mirror refinement.",
-                deterministicFallbackBase: "No provider returned a refined mirror, so Before kept the deterministic copy.",
-                cachedConsistencySource: "cached mirror refinement",
-                providerConsistencySource: "provider mirror refinement"
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for reflective refinement.",
+                admissionSkippedDetailPrefix: "Admission controller skipped reflective refinement.",
+                deterministicFallbackBase: "No provider returned a refined reflective analysis, so the host app kept the deterministic copy.",
+                cachedConsistencySource: "cached reflective refinement",
+                providerConsistencySource: "provider reflective refinement"
             )
         case "reminder":
             (
                 templatePinnedDetail: "Template mode is pinned, so no model provider was used for reminder selection.",
                 admissionSkippedDetailPrefix: "Admission controller skipped reminder selection.",
-                deterministicFallbackBase: "No provider returned a reminder selection, so Before kept the deterministic reminder ordering.",
+                deterministicFallbackBase: "No provider returned a reminder selection, so the host app kept the deterministic reminder ordering.",
                 cachedConsistencySource: "cached reminder selection",
                 providerConsistencySource: "provider reminder selection"
             )
@@ -611,7 +611,7 @@ public enum BASAppleProviderObservationContextBuilder {
             (
                 templatePinnedDetail: "Template mode is pinned, so no model provider was used.",
                 admissionSkippedDetailPrefix: "Admission controller skipped provider execution.",
-                deterministicFallbackBase: "No provider returned a result, so Before kept the deterministic copy.",
+                deterministicFallbackBase: "No provider returned a result, so the host app kept the deterministic copy.",
                 cachedConsistencySource: "cached provider result",
                 providerConsistencySource: "provider result"
             )

@@ -204,7 +204,7 @@ struct BehavioralAISubstrateTests {
     @Test("entry intent summary keeps orchestration semantics")
     func entryIntentSummaryKeepsOrchestrationSemantics() {
         let envelope = BASEntryIntentEnvelope(
-            kind: .resumeCurrentDecision,
+            kind: .resume,
             surface: .notification,
             taskKind: .plan,
             preferredWorkflowID: "balance",

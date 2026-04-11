@@ -133,20 +133,18 @@ public enum BASAppleCurrentBrainRuntimePlanner {
     }
 
     public static func activeRefreshPlan(
-        quickPromptFragments: [String]?,
-        balancePromptFragments: [String]?,
-        mirrorPromptFragments: [String]?,
+        promptFragmentsByModeID: [String: [String]],
+        modePriority: [String],
         taskGraphModeID: String?,
         taskGraphPromptSeed: String?,
         retrievalModesByModeID: [String: String],
         triggerID: String = BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue,
-        defaultModeID: String = BASDecisionMode.quick.rawValue,
+        defaultModeID: String = BASDecisionMode.quick.identifier,
         defaultRetrievalMode: String = BASRetrievalMode.adaptive.rawValue
     ) -> BASAppleCurrentBrainRuntimePlan {
         let seed = BASAppleBootstrapStrategyAdapter.resolveActiveSessionSeed(
-            quickPromptFragments: quickPromptFragments,
-            balancePromptFragments: balancePromptFragments,
-            mirrorPromptFragments: mirrorPromptFragments,
+            promptFragmentsByModeID: promptFragmentsByModeID,
+            modePriority: modePriority,
             taskGraphModeID: taskGraphModeID,
             taskGraphPromptSeed: taskGraphPromptSeed,
             defaultModeID: defaultModeID
@@ -185,9 +183,8 @@ public enum BASAppleCurrentBrainRuntimeExecutor {
     }
 
     public static func refreshActiveBrain<CurrentBrain>(
-        quickPromptFragments: [String]?,
-        balancePromptFragments: [String]?,
-        mirrorPromptFragments: [String]?,
+        promptFragmentsByModeID: [String: [String]],
+        modePriority: [String],
         taskGraphModeID: String?,
         taskGraphPromptSeed: String?,
         retrievalModesByModeID: [String: String],
@@ -198,9 +195,8 @@ public enum BASAppleCurrentBrainRuntimeExecutor {
         refreshMemoryProjection()
         return bootstrapCurrentBrain(
             BASAppleCurrentBrainRuntimePlanner.activeRefreshPlan(
-                quickPromptFragments: quickPromptFragments,
-                balancePromptFragments: balancePromptFragments,
-                mirrorPromptFragments: mirrorPromptFragments,
+                promptFragmentsByModeID: promptFragmentsByModeID,
+                modePriority: modePriority,
                 taskGraphModeID: taskGraphModeID,
                 taskGraphPromptSeed: taskGraphPromptSeed,
                 retrievalModesByModeID: retrievalModesByModeID,

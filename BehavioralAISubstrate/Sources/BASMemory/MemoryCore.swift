@@ -85,8 +85,8 @@ public struct BASReactionWeights: Codable, Sendable, Equatable {
     }
 
     public static func defaults(for modeName: String) -> BASReactionWeights {
-        switch modeName {
-        case "quick":
+        switch BASDecisionMode(identifier: modeName) {
+        case .quick:
             BASReactionWeights(
                 briefLanguage: 0.62,
                 warmDirectTone: 0.58,
@@ -95,7 +95,7 @@ public struct BASReactionWeights: Codable, Sendable, Equatable {
                 boundaryNamingBias: 0.34,
                 tradeoffClarityBias: 0.38
             )
-        case "balance":
+        case .balance:
             BASReactionWeights(
                 briefLanguage: 0.48,
                 warmDirectTone: 0.56,
@@ -104,7 +104,7 @@ public struct BASReactionWeights: Codable, Sendable, Equatable {
                 boundaryNamingBias: 0.44,
                 tradeoffClarityBias: 0.76
             )
-        case "mirror":
+        case .mirror:
             BASReactionWeights(
                 briefLanguage: 0.44,
                 warmDirectTone: 0.62,
@@ -319,13 +319,13 @@ public enum BASIdentityRole: String, CaseIterable, Codable, Sendable {
     public var title: String {
         switch self {
         case .pauseCompanion:
-            "Pause Companion"
+            "Stability Guide"
         case .tradeoffGuide:
-            "Trade-off Guide"
+            "Comparative Guide"
         case .mirrorWitness:
-            "Mirror Witness"
+            "Reflective Witness"
         case .predictiveSentinel:
-            "Predictive Sentinel"
+            "Risk Sentinel"
         }
     }
 }
@@ -383,7 +383,7 @@ public struct BASIdentityProfile: Codable, Equatable, Sendable {
                 canAdvise: true,
                 canExecuteActions: false,
                 canEscalateToCloud: false,
-                relationshipBoundary: "Interrupt speed, do not impersonate certainty."
+                relationshipBoundary: "Interrupt velocity without pretending certainty."
             )
         case "balance":
             BASIdentityProfile(
@@ -394,7 +394,7 @@ public struct BASIdentityProfile: Codable, Equatable, Sendable {
                 canAdvise: true,
                 canExecuteActions: false,
                 canEscalateToCloud: false,
-                relationshipBoundary: "Clarify trade-offs without taking control of the decision."
+                relationshipBoundary: "Clarify competing pressures without taking ownership of the decision."
             )
         case "mirror":
             BASIdentityProfile(
@@ -405,7 +405,7 @@ public struct BASIdentityProfile: Codable, Equatable, Sendable {
                 canAdvise: true,
                 canExecuteActions: false,
                 canEscalateToCloud: false,
-                relationshipBoundary: "Reflect the pattern without becoming the protagonist."
+                relationshipBoundary: "Reflect the pattern without becoming the center of the story."
             )
         default:
             BASIdentityProfile(
@@ -823,7 +823,7 @@ public struct BASDecisionBrainState: Codable, Equatable, Sendable {
         memoryGovernance: BASMemoryGovernanceState = .empty,
         loadedAt: Date = .now
     ) {
-        let resolvedIdentity = identityProfile ?? BASIdentityProfile.default(modeName: "quick")
+        let resolvedIdentity = identityProfile ?? BASIdentityProfile.default(modeName: BASDecisionMode.quick.identifier)
         let resolvedBoundary = boundaryPolicy ?? BASBoundaryPolicyState.default(riskLevel: .low)
         self.init(
             memorySlices: Self.legacyMemorySlices(

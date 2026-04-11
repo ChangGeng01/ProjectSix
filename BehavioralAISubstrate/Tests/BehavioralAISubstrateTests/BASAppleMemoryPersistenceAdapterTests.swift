@@ -24,7 +24,7 @@ struct BASAppleMemoryPersistenceAdapterTests {
                         decayPolicyID: "medium",
                         retrievalTags: ["Goal", "sleep", "goal"],
                         evidenceCount: 1,
-                        provenanceSummary: "Promoted from repeated long-term fields in balance and mirror workspaces.",
+                        provenanceSummary: "Promoted from repeated long-term fields in comparative and reflective workspaces.",
                         promotionPolicy: .immediate
                     )
                 ],

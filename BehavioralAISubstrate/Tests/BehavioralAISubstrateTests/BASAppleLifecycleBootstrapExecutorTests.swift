@@ -79,12 +79,11 @@ struct BASAppleLifecycleBootstrapExecutorTests {
         var calls: [String] = []
 
         let currentBrain = BASAppleCurrentBrainRuntimeExecutor.refreshActiveBrain(
-            quickPromptFragments: nil,
-            balancePromptFragments: nil,
-            mirrorPromptFragments: nil,
-            taskGraphModeID: "mirror",
+            promptFragmentsByModeID: [:],
+            modePriority: ["primary", "comparative", "reflective"],
+            taskGraphModeID: "reflective",
             taskGraphPromptSeed: "resume this",
-            retrievalModesByModeID: ["mirror": "filtered"],
+            retrievalModesByModeID: ["reflective": "filtered"],
             triggerID: "sceneActive",
             refreshMemoryProjection: {
                 calls.append("refresh")
@@ -98,7 +97,7 @@ struct BASAppleLifecycleBootstrapExecutorTests {
         #expect(currentBrain == "current")
         #expect(calls == [
             "refresh",
-            "bootstrap:mirror:resume this:filtered:sceneActive"
+            "bootstrap:reflective:resume this:filtered:sceneActive"
         ])
     }
 }

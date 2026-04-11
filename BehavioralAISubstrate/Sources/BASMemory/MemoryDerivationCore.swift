@@ -211,7 +211,7 @@ public enum BASMemoryDraftCompiler {
                         decayPolicyID: "slow",
                         retrievalTags: ["style", "communication", "concise", "direct"],
                         evidenceCount: allLengths.count,
-                        provenanceSummary: "Derived from repeated short reminders and recent quick-check note length.",
+                        provenanceSummary: "Derived from repeated short reminders and recent primary-loop note length.",
                         promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
                     )
                 )
@@ -261,7 +261,7 @@ public enum BASMemoryDraftCompiler {
                     decayPolicyID: "medium",
                     retrievalTags: tags(from: goal) + ["goal", "long_term"],
                     evidenceCount: items.count,
-                    provenanceSummary: "Promoted from repeated long-term fields in balance and mirror workspaces.",
+                    provenanceSummary: "Promoted from repeated long-term fields in comparative and reflective workspaces.",
                     promotionPolicy: .immediate
                 )
             }
@@ -294,7 +294,7 @@ public enum BASMemoryDraftCompiler {
                     decayPolicyID: "fast",
                     retrievalTags: [event.scenarioID, "quick", "recent"] + tags(from: note),
                     evidenceCount: 1,
-                    provenanceSummary: "Candidate memory staged from the latest quick-check loop.",
+                    provenanceSummary: "Candidate memory staged from the latest primary decision loop.",
                     promotionPolicy: .candidateOnly
                 )
             )
@@ -317,7 +317,7 @@ public enum BASMemoryDraftCompiler {
                         decayPolicyID: "fast",
                         retrievalTags: ["balance", "recent"] + tags(from: prompt),
                         evidenceCount: 1,
-                        provenanceSummary: "Candidate memory staged from the latest balance board.",
+                        provenanceSummary: "Candidate memory staged from the latest comparative workspace.",
                         promotionPolicy: .candidateOnly
                     )
                 )
@@ -341,7 +341,7 @@ public enum BASMemoryDraftCompiler {
                         decayPolicyID: "fast",
                         retrievalTags: ["mirror", "recent"] + tags(from: prompt),
                         evidenceCount: 1,
-                        provenanceSummary: "Candidate memory staged from the latest mirror workspace.",
+                        provenanceSummary: "Candidate memory staged from the latest reflective workspace.",
                         promotionPolicy: .candidateOnly
                     )
                 )
@@ -376,7 +376,7 @@ public enum BASMemoryDraftCompiler {
                     decayPolicyID: "slow",
                     retrievalTags: [dominantScenario.key, "pattern", "repeat"],
                     evidenceCount: dominantScenario.value.count,
-                    provenanceSummary: "Derived from repeated quick-check events in the same scenario.",
+                    provenanceSummary: "Derived from repeated primary-loop events in the same scenario.",
                     promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 2)
                 )
             )
@@ -401,7 +401,7 @@ public enum BASMemoryDraftCompiler {
                     decayPolicyID: "slow",
                     retrievalTags: ["night", "late", "fatigue", "support"],
                     evidenceCount: lateNightEvents.count,
-                    provenanceSummary: "Derived from repeated late-night quick-check history.",
+                    provenanceSummary: "Derived from repeated late-night primary-loop history.",
                     promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
                 )
             )
@@ -424,8 +424,8 @@ public enum BASMemoryDraftCompiler {
                 let (headline, tags): (String, [String])
                 switch actionID {
                 case "decideTomorrow":
-                    headline = "Putting it into Tomorrow Box often breaks the loop."
-                    tags = ["support", "tomorrow", "delay", "loop_break"]
+                    headline = "Holding the decision often breaks the loop."
+                    tags = ["support", "hold", "delay", "loop_break"]
                 case "leaveStimulus":
                     headline = "Stepping away from the trigger usually helps faster."
                     tags = ["support", "stimulus", "step_away", "interrupt"]
@@ -453,7 +453,7 @@ public enum BASMemoryDraftCompiler {
                     decayPolicyID: "medium",
                     retrievalTags: tags + ["quick", actionID],
                     evidenceCount: events.count,
-                    provenanceSummary: "Derived from repeated successful quick-check final actions.",
+                    provenanceSummary: "Derived from repeated successful primary-loop final actions.",
                     promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 2)
                 )
             }

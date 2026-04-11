@@ -4,7 +4,7 @@ import BASHostKit
 
 enum FailurePatternStore {
     static func syncFromHistory(in context: ModelContext) {
-        let failures = BASAppleBootstrapStrategyAdapter.synthesizedFailurePatternSeeds(
+        let failures = BeforeProductBootstrapSemantics.synthesizedFailurePatternSeeds(
             from: recentFailureHistoryEvents(in: context)
         )
         let existing = (try? context.fetch(FetchDescriptor<FailurePatternRecord>())) ?? []
@@ -21,7 +21,7 @@ enum FailurePatternStore {
                     id: failure.id,
                     createdAt: failure.createdAt,
                     updatedAt: failure.updatedAt,
-                    mode: DecisionMode(rawValue: failure.modeID) ?? .quick,
+                    mode: DecisionMode.fromSubstrateModeID(failure.modeID) ?? .quick,
                     title: failure.title,
                     detail: failure.detail,
                     cadenceTag: failure.cadenceTag,
@@ -48,11 +48,11 @@ enum FailurePatternStore {
         )
         let patterns = (try? context.fetch(descriptor)) ?? []
         let orderedIDs = BASAppleBootstrapStrategyAdapter.orderedFailurePatternIDs(
-            modeID: mode.rawValue,
+            modeID: mode.substrateModeID,
             failurePatterns: patterns.map { pattern in
                 BASAppleCurrentBrainBootstrapHostFailurePatternInput(
                     id: pattern.id,
-                    modeID: pattern.mode.rawValue,
+                    modeID: pattern.mode.substrateModeID,
                     suppressionWeight: pattern.suppressionWeight,
                     evidenceCount: pattern.evidenceCount,
                     updatedAt: pattern.updatedAt
@@ -74,14 +74,8 @@ enum FailurePatternStore {
 
     private static func recentFailureHistoryEvents(
         in context: ModelContext
-    ) -> [BASAppleFailureHistoryEventInput] {
+    ) -> [CheckEvent] {
         let descriptor = FetchDescriptor<CheckEvent>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
-        return ((try? context.fetch(descriptor)) ?? []).map { event in
-            BASAppleFailureHistoryEventInput(
-                createdAt: event.createdAt,
-                reflectionOutcomeID: event.reflectionOutcome?.rawValue,
-                finalActionID: event.finalAction.rawValue
-            )
-        }
+        return (try? context.fetch(descriptor)) ?? []
     }
 }

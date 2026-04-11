@@ -7,17 +7,19 @@ final class BASHostKitTests: XCTestCase {
 
         let result = runtime.startSession(
             BASHostSessionRequest(
-                kind: .mirror,
-                mode: .mirror,
-                surface: .app,
+                kind: .interactive,
+                workflowProfile: .reflective,
+                surface: .application,
                 prompt: "I need to slow down before I send this message.",
-                title: "Mirror this decision",
+                title: "Reflect on this decision",
                 riskLevel: .medium
             )
         )
 
-        XCTAssertEqual(result.requestKind, .mirror)
-        XCTAssertEqual(result.currentBrain.mode, BASDecisionMode.mirror.rawValue)
+        XCTAssertEqual(result.requestKind, .interactive)
+        XCTAssertEqual(result.workflowProfile, .reflective)
+        XCTAssertEqual(result.currentBrain.workflowProfile, .reflective)
+        XCTAssertEqual(result.currentBrain.workflowTitle, "Reflective")
         XCTAssertFalse(result.currentBrain.dominantGoals.isEmpty)
         XCTAssertFalse(result.consoleSnapshot.reports.isEmpty)
         XCTAssertEqual(result.consoleSnapshot.reports.count, BASLayerKind.allCases.count)
@@ -30,7 +32,7 @@ final class BASHostKitTests: XCTestCase {
         let result = runtime.bootstrap(
             BASHostLifecycleRequest(
                 phase: .initialAppearance,
-                preferredMode: .quick,
+                preferredProfile: .rapid,
                 promptSeed: "Load the substrate before the UI asks for help."
             )
         )
@@ -45,7 +47,7 @@ final class BASHostKitTests: XCTestCase {
 
         let result = runtime.reopen(
             BASHostReopenRequest(
-                mode: .balance,
+                workflowProfile: .deliberate,
                 title: "Reopen this choice",
                 detail: "There is enough risk here that we want more structure.",
                 promptSeed: "Look at the cost of acting tonight.",
@@ -56,9 +58,173 @@ final class BASHostKitTests: XCTestCase {
         )
 
         XCTAssertEqual(result.requestKind, .reopen)
-        XCTAssertEqual(result.currentBrain.mode, BASDecisionMode.balance.rawValue)
+        XCTAssertEqual(result.workflowProfile, .deliberate)
+        XCTAssertEqual(result.currentBrain.workflowProfile, .deliberate)
+        XCTAssertGreaterThan(result.currentBrain.failureGuardCount, 0)
         XCTAssertNotNil(result.interventionSuggestion)
         XCTAssertTrue(result.followUpActions.contains("Require stronger confirmation"))
+    }
+
+    func testCustomPresentationLetsHostOwnWorkflowLanguage() {
+        let runtime = BASHostRuntime(
+            configuration: BASHostConfiguration(
+                presentation: BASHostPresentationConfiguration(
+                    workflowTitles: BASHostWorkflowTitles(
+                        rapid: "Quick Judgment",
+                        deliberate: "Balance Board",
+                        reflective: "Mirror"
+                    ),
+                    surfaceTitles: BASHostSurfaceTitles(
+                        application: "App",
+                        wearable: "Watch",
+                        widget: "Widget",
+                        shortcut: "Shortcut",
+                        voiceAssistant: "Siri",
+                        notification: "Notification",
+                        system: "System"
+                    ),
+                    sessionTitles: BASHostSessionTitles(
+                        rapid: "Quick Judgment",
+                        deliberate: "Balance Board",
+                        reflective: "Mirror",
+                        initialAppearance: "Before Bootstrap",
+                        sceneActive: "Before Refresh"
+                    ),
+                    followUpActions: BASHostFollowUpActions(
+                        rapid: ["Name the urge", "Choose one clean next move"],
+                        deliberate: ["Surface the real trade-off", "Name one cost and one benefit"],
+                        reflective: ["Slow the story", "Name one grounded truth"],
+                        highRiskEscalation: ["Require stronger confirmation"]
+                    ),
+                    lifecycle: BASHostLifecyclePresentation(
+                        refreshMemoryProjectionNotice: "Refresh Before memory projection",
+                        refreshCurrentBrainNotice: "Refresh Before brain state",
+                        presentPendingReflectionNotice: "Present the pending reflection",
+                        consumePendingLaunchRequestNotice: "Consume the pending launch request",
+                        restoreActiveWorkspaceNotice: "Restore the structured workspace",
+                        refreshPredictedInterventionNotice: "Refresh the guarded intervention state",
+                        syncWidgetSnapshotNotice: "Sync the Before widget snapshot",
+                        loadCurrentBrainFollowUp: "Load the current brain before rendering Before",
+                        resumeStructuredWorkspaceFollowUp: "Resume the last structured Before workspace",
+                        recomputeGuardedInterventionFollowUp: "Recompute the guarded intervention state"
+                    ),
+                    notices: BASHostNoticeTemplates(
+                        enteredWorkflow: "{surface} entered {workflow} through Before.",
+                        runtimeProfile: "Before runtime profile {runtimeProfile} is active.",
+                        reopenFollowUpAction: "Reopen with {workflow} structure",
+                        emptyPromptGoalFallback: "Stay clear before acting."
+                    ),
+                    predictiveIntervention: BASHostPredictiveInterventionPresentation(
+                        mediumRiskTitle: "Pause before you decide.",
+                        mediumRiskDetail: "Before sees a context that benefits from one slower step.",
+                        highRiskTitle: "Add more friction before acting.",
+                        highRiskDetail: "Before sees elevated risk and wants stronger confirmation before the next move.",
+                        reopenRiskDetail: "This reopen path is carrying risk, so Before is asking for more structure.",
+                        fallbackReopenSuggestionDetail: "A prior hold suggests slowing this down.",
+                        defaultReason: "Before prefers a slower path here."
+                    )
+                )
+            )
+        )
+
+        let session = runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .rapid,
+                surface: .application,
+                prompt: "I want to move fast.",
+                riskLevel: .low
+            )
+        )
+        let bootstrap = runtime.bootstrap(
+            BASHostLifecycleRequest(
+                phase: .initialAppearance,
+                preferredProfile: .rapid,
+                promptSeed: "Load the current brain before speaking."
+            )
+        )
+
+        XCTAssertEqual(session.activeSessionTitle, "Quick Judgment")
+        XCTAssertTrue(session.notices.contains("App entered quick judgment through Before."))
+        XCTAssertTrue(session.notices.contains("Before runtime profile apple.local-first is active."))
+        XCTAssertEqual(session.followUpActions, ["Name the urge", "Choose one clean next move"])
+        XCTAssertEqual(bootstrap.activeSessionTitle, "Before Bootstrap")
+        XCTAssertTrue(bootstrap.notices.contains("Refresh Before memory projection"))
+        XCTAssertTrue(bootstrap.followUpActions.contains("Load the current brain before rendering Before"))
+    }
+
+    func testCustomPredictiveInterventionCopyBelongsToHost() {
+        let runtime = BASHostRuntime(
+            configuration: BASHostConfiguration(
+                presentation: BASHostPresentationConfiguration(
+                    predictiveIntervention: BASHostPredictiveInterventionPresentation(
+                        mediumRiskTitle: "Host says pause.",
+                        mediumRiskDetail: "Host wants one slower pass.",
+                        highRiskTitle: "Host wants another checkpoint.",
+                        highRiskDetail: "Host sees elevated risk and wants stronger confirmation.",
+                        reopenRiskDetail: "Host sees risk in this reopen path and wants structure.",
+                        fallbackReopenSuggestionDetail: "Host says slow this reopen down.",
+                        defaultReason: "Host policy prefers a slower lane."
+                    )
+                )
+            )
+        )
+
+        let session = runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .deliberate,
+                surface: .application,
+                prompt: "I need to compare these options carefully.",
+                riskLevel: .medium
+            )
+        )
+        let reopen = runtime.reopen(
+            BASHostReopenRequest(
+                workflowProfile: .deliberate,
+                title: "Reopen this choice",
+                promptSeed: "Look at the cost of acting tonight.",
+                riskLevel: .high,
+                templateHint: "Use the cooling template."
+            )
+        )
+
+        XCTAssertEqual(session.interventionSuggestion?.title, "Host says pause.")
+        XCTAssertEqual(session.interventionSuggestion?.detail, "Host wants one slower pass.")
+        XCTAssertEqual(session.interventionSuggestion?.reason, "Host policy prefers a slower lane.")
+        XCTAssertEqual(reopen.interventionSuggestion?.detail, "Host says slow this reopen down.")
+    }
+
+    func testCustomWorkflowBehaviorBelongsToHost() {
+        let runtime = BASHostRuntime(
+            configuration: BASHostConfiguration(
+                workflowBehavior: BASHostWorkflowBehaviorConfiguration(
+                    templateIDsByProfileID: [
+                        BASHostWorkflowProfile.rapid.rawValue: ["before.template.quick-judgment"]
+                    ],
+                    memorySourceIDsByProfileID: [
+                        BASHostWorkflowProfile.rapid.rawValue: BASMemorySource.history.rawValue
+                    ],
+                    interactiveRetrievalModeByProfileID: [
+                        BASHostWorkflowProfile.rapid.rawValue: "balanced"
+                    ],
+                    hostNamespace: "before-sdk"
+                )
+            )
+        )
+
+        let result = runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .rapid,
+                surface: .application,
+                prompt: "I need one cleaner pass before I act.",
+                riskLevel: .low
+            )
+        )
+
+        XCTAssertEqual(result.projection.activeTemplateIDs, ["before.template.quick-judgment"])
+        XCTAssertEqual(result.currentBrain.verificationSummary.split(separator: "/").first, "before-sdk")
     }
 
     func testExecuteLifecyclePhaseDelegatesEntryConsumptionAndRefreshOrder() {
@@ -255,12 +421,12 @@ final class BASHostKitTests: XCTestCase {
             templateHint: "Cooling template",
             interventionHistorySummary: "Past nighttime choices went worse.",
             clearActiveDecisionFlows: { actions.append("clear") },
-            activateQuickFromDraft: { actions.append("draft-quick") },
-            activateBalanceFromDraft: { actions.append("draft-balance") },
-            activateMirrorFromDraft: { actions.append("draft-mirror") },
-            startQuick: { _ in actions.append("start-quick") },
-            startBalance: { _ in actions.append("start-balance") },
-            startMirror: { _ in actions.append("start-mirror") },
+            activatePrimaryFromDraft: { actions.append("draft-quick") },
+            activateComparativeFromDraft: { actions.append("draft-balance") },
+            activateReflectiveFromDraft: { actions.append("draft-mirror") },
+            startPrimary: { _ in actions.append("start-quick") },
+            startComparative: { _ in actions.append("start-balance") },
+            startReflective: { _ in actions.append("start-mirror") },
             removeItem: { actions.append("remove") },
             applyInterventionSuggestion: { suggestion = $0; actions.append("suggest") },
             refreshPredictedIntervention: { actions.append("refresh") },
@@ -280,15 +446,15 @@ final class BASHostKitTests: XCTestCase {
 
         runtime.restoreActiveWorkspaceIfNeeded(
             restoreEnabled: true,
-            hasActiveQuickSession: false,
-            hasActiveBalanceSession: false,
-            hasActiveMirrorSession: false,
+            hasActivePrimaryWorkflow: false,
+            hasActiveComparativeWorkflow: false,
+            hasActiveReflectiveWorkflow: false,
             hasReflectionContext: false,
             loadState: { "mirror" },
             modeID: { $0 },
-            restoreQuick: { _ in actions.append("quick") },
-            restoreBalance: { _ in actions.append("balance") },
-            restoreMirror: { _ in actions.append("mirror") },
+            restorePrimary: { _ in actions.append("quick") },
+            restoreComparative: { _ in actions.append("balance") },
+            restoreReflective: { _ in actions.append("mirror") },
             selectHomeTab: { actions.append("home") },
             afterRestore: { actions.append("after") }
         )
@@ -300,11 +466,14 @@ final class BASHostKitTests: XCTestCase {
         let runtime = BASHostRuntime()
         var savedSnapshot: String?
         var cleared = false
+        let snapshotLoaders: [() -> String?] = [
+            { nil },
+            { "balance-snapshot" },
+            { "mirror-snapshot" }
+        ]
 
         let snapshot = runtime.refreshActiveTaskGraph(
-            quickSnapshot: { nil as String? },
-            balanceSnapshot: { "balance-snapshot" },
-            mirrorSnapshot: { "mirror-snapshot" },
+            snapshotsInPriorityOrder: snapshotLoaders,
             saveSnapshot: { savedSnapshot = $0 },
             clearSnapshot: { cleared = true }
         )

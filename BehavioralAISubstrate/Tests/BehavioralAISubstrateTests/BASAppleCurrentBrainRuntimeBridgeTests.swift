@@ -8,7 +8,7 @@ struct BASAppleCurrentBrainRuntimeBridgeTests {
     @Test("session bridge compiles prompt fragments into a bootstrap input")
     func sessionBridgeCompilesPromptFragmentsIntoBootstrapInput() {
         let input = BASAppleCurrentBrainSessionBridgeInput(
-            modeID: "quick",
+            modeID: "primary",
             promptFragments: ["  should ", "I", "wait?  "],
             preferredLanguages: ["en-AU"],
             now: Date(timeIntervalSince1970: 1_765_000_000),
@@ -24,7 +24,7 @@ struct BASAppleCurrentBrainRuntimeBridgeTests {
             from: input
         )
 
-        #expect(bootstrapInput.modeID == "quick")
+        #expect(bootstrapInput.modeID == "primary")
         #expect(bootstrapInput.prompt == "should I wait?")
         #expect(bootstrapInput.triggerID == BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue)
         #expect(bootstrapInput.retrievalMode == "filtered")
@@ -34,10 +34,9 @@ struct BASAppleCurrentBrainRuntimeBridgeTests {
     @Test("active bridge falls back to task graph seed and carries task graph hint")
     func activeBridgeFallsBackToTaskGraphSeedAndCarriesTaskGraphHint() {
         let input = BASAppleCurrentBrainActiveRefreshBridgeInput(
-            quickPromptFragments: nil,
-            balancePromptFragments: nil,
-            mirrorPromptFragments: nil,
-            taskGraphModeID: "mirror",
+            promptFragmentsByModeID: [:],
+            modePriority: ["primary", "comparative", "reflective"],
+            taskGraphModeID: "reflective",
             taskGraphPromptSeed: "resume this tomorrow",
             preferredLanguages: ["en-AU"],
             now: Date(timeIntervalSince1970: 1_765_000_000),
@@ -52,7 +51,7 @@ struct BASAppleCurrentBrainRuntimeBridgeTests {
                 hasResumeCandidate: true,
                 resumeHint: "Resume the unresolved self-check"
             ),
-            retrievalModesByModeID: ["mirror": "filtered"],
+            retrievalModesByModeID: ["reflective": "filtered"],
             triggerID: BASCurrentBrainBootstrapTrigger.sceneActive.rawValue
         )
 
@@ -60,7 +59,7 @@ struct BASAppleCurrentBrainRuntimeBridgeTests {
             from: input
         )
 
-        #expect(bootstrapInput.modeID == "mirror")
+        #expect(bootstrapInput.modeID == "reflective")
         #expect(bootstrapInput.prompt == "resume this tomorrow")
         #expect(bootstrapInput.retrievalMode == "filtered")
         #expect(bootstrapInput.taskGraphHeadline == "Return to the mirror lane")

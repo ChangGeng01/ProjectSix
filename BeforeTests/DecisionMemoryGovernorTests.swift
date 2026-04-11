@@ -111,7 +111,7 @@ final class DecisionMemoryGovernorTests: XCTestCase {
                 decayPolicyID: "medium",
                 retrievalTags: ["goal", "sleep"],
                 evidenceCount: 1,
-                provenanceSummary: "Promoted from repeated long-term fields in balance and mirror workspaces.",
+                provenanceSummary: "Promoted from repeated long-term fields in comparative and reflective workspaces.",
                 promotionPolicy: .immediate
             )
         )
@@ -144,7 +144,7 @@ final class DecisionMemoryGovernorTests: XCTestCase {
             retrievalTags: ["buy", "pattern"],
             evidenceCount: 3,
             observationCount: 3,
-            provenanceSummary: "Derived from repeated quick-check events."
+            provenanceSummary: "Derived from repeated primary-loop events."
         )
         context.insert(record)
         try context.save()

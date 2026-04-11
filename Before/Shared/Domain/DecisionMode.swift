@@ -1,4 +1,5 @@
 import AppIntents
+import BASHostKit
 import Foundation
 
 enum DecisionMode: String, CaseIterable, Codable, Identifiable, Sendable {
@@ -57,4 +58,36 @@ extension DecisionMode: AppEnum {
         .balance: "Balance Board",
         .mirror: "Mirror"
     ]
+}
+
+extension DecisionMode {
+    var substrateMode: BASDecisionMode {
+        switch self {
+        case .quick:
+            BASDecisionMode.quick
+        case .balance:
+            BASDecisionMode.balance
+        case .mirror:
+            BASDecisionMode.mirror
+        }
+    }
+
+    var substrateModeID: String {
+        substrateMode.identifier
+    }
+
+    static func fromSubstrateModeID(_ modeID: String?) -> DecisionMode? {
+        guard let modeID, let substrateMode = BASDecisionMode(identifier: modeID) else {
+            return nil
+        }
+
+        switch substrateMode {
+        case .quick:
+            return DecisionMode.quick
+        case .balance:
+            return DecisionMode.balance
+        case .mirror:
+            return DecisionMode.mirror
+        }
+    }
 }

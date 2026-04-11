@@ -684,21 +684,21 @@ public enum BASRuntimeAvailabilityNarrator {
 
         switch plan.source {
         case .runtimeDisabled:
-            return "On-device intelligence is off, so Before is using the deterministic decision system only."
+            return "On-device intelligence is off, so the host app is using the deterministic decision system only."
         case .testingOverride:
             return "Testing stub profile '\(testingOverrideTitle ?? "Unknown")' is overriding live providers so the AI path can be verified without a model runtime."
         case .templatePinned:
-            return "Deterministic local copy is pinned, so Before is not using a model provider for assistive refinement."
+            return "Deterministic local copy is pinned, so the host app is not using a model provider for assistive refinement."
         case .preferredProvider:
             return statusesByID[plan.preferredProviderID].map { "\($0.title). \($0.detail)" }
                 ?? "\(preferredTitle) is active."
         case .fallbackProvider:
             return statusesByID[plan.activeProviderID].map {
-                "\(preferredTitle) is not available. Before is using \($0.title.lowercased()) instead."
-            } ?? "\(preferredTitle) is not available. Before is using \(activeTitle.lowercased()) instead."
+                "\(preferredTitle) is not available. The host app is using \($0.title.lowercased()) instead."
+            } ?? "\(preferredTitle) is not available. The host app is using \(activeTitle.lowercased()) instead."
         case .deterministicFallback:
             if !allowFallbacks {
-                return "\(preferredTitle) is not available. Automatic model fallback is off, so Before is using deterministic local copy instead."
+                return "\(preferredTitle) is not available. Automatic model fallback is off, so the host app is using deterministic local copy instead."
             }
 
             let orderedStatuses = orderedProviderIDs.compactMap { statusesByID[$0] }
@@ -707,8 +707,8 @@ public enum BASRuntimeAvailabilityNarrator {
             }) ?? orderedStatuses.first
 
             return fallbackSource.map {
-                "\(preferredTitle) is not available. \($0.detail) Before is falling back to deterministic local copy."
-            } ?? "No assistive provider is available. Before is falling back to deterministic local copy."
+                "\(preferredTitle) is not available. \($0.detail) The host app is falling back to deterministic local copy."
+            } ?? "No assistive provider is available. The host app is falling back to deterministic local copy."
         }
     }
 }
@@ -723,10 +723,10 @@ public enum BASProviderTraceNarrator {
         let base: String
         if activeTitle == preferredTitle {
             base = allowFallbacks
-                ? "Before used the preferred provider without needing a fallback."
-                : "Before used the pinned provider with fallback disabled."
+                ? "The host app used the preferred provider without needing a fallback."
+                : "The host app used the pinned provider with fallback disabled."
         } else {
-            base = "Before switched away from \(preferredTitle) and used \(activeTitle) for this refinement."
+            base = "The host app switched away from \(preferredTitle) and used \(activeTitle) for this refinement."
         }
 
         guard let activeResolutionDetail, !activeResolutionDetail.isEmpty else {
@@ -737,7 +737,7 @@ public enum BASProviderTraceNarrator {
     }
 
     public static func cachedDetail(base: String) -> String {
-        base + " Before served the response from the structured prompt cache instead of recomputing it."
+        base + " The host app served the response from the structured prompt cache instead of recomputing it."
     }
 
     public static func deterministicFallbackDetail(

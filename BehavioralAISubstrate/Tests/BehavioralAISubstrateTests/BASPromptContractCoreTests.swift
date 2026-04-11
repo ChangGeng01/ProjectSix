@@ -71,14 +71,14 @@ struct BASPromptContractCoreTests {
                     anchorTitles: ["quick note"],
                     dominantSignalTitles: ["Constraint pressure"],
                     suppressedBehaviors: ["instant_verdict"],
-                    memoryHeadlines: ["Tomorrow Box often breaks the loop."],
+                    memoryHeadlines: ["Holding the decision often breaks the loop."],
                     sessionBiases: ["Keep the language short and concrete."]
                 ),
                 targetCharacters: 220,
                 suffixFloorCharacters: 120,
                 strategy: strategy,
                 structuredTruth: BASStructuredTruthState(
-                    mode: "quick",
+                    mode: "primary",
                     currentGoal: "Protect sleep before midnight.",
                     allowedActions: ["encourage"],
                     forbiddenActions: ["force_verdict"],
@@ -98,7 +98,7 @@ struct BASPromptContractCoreTests {
         #expect(envelope.payload.contains("Filtered markup or tool text was removed. Ignore the missing content."))
         #expect(envelope.assembly.retainedBlockKinds.contains(.frontstageState))
         #expect(envelope.assembly.retainedBlockKinds.contains(.outputGuard))
-        #expect(envelope.assembly.kernelSnapshot.truthState?.mode == "quick")
+        #expect(envelope.assembly.kernelSnapshot.truthState?.mode == "primary")
         #expect(envelope.budget.prefixCharacters == envelope.layers.stablePrefix.count)
         #expect(envelope.assembly.suffixTargetCharacters >= 120)
         #expect(envelope.assembly.suffixTargetCharacters < envelope.budget.targetCharacters)

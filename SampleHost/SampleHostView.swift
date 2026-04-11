@@ -18,9 +18,9 @@ struct SampleHostView: View {
 
                     HStack(spacing: 12) {
                         Button("Bootstrap") { model.bootstrap() }
-                        Button("Quick") { model.start(.quick) }
-                        Button("Balance") { model.start(.balance) }
-                        Button("Mirror") { model.start(.mirror) }
+                        Button("Rapid") { model.start(.rapid) }
+                        Button("Deliberate") { model.start(.deliberate) }
+                        Button("Reflective") { model.start(.reflective) }
                         Button("Reopen") { model.reopen() }
                     }
                     .buttonStyle(.borderedProminent)
@@ -28,7 +28,7 @@ struct SampleHostView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(model.result.activeSessionTitle)
                             .font(.headline)
-                        Text("Mode: \(model.result.currentBrain.mode)")
+                        Text("Workflow: \(model.result.currentBrain.workflowTitle)")
                             .font(.subheadline.weight(.medium))
                         if !model.result.currentBrain.dominantGoals.isEmpty {
                             Text(model.result.currentBrain.dominantGoals.joined(separator: " • "))
@@ -46,7 +46,7 @@ struct SampleHostView: View {
                         }
                     }
 
-                    BASConsoleView(snapshot: model.result.consoleSnapshot)
+                    BASHostConsoleView(snapshot: model.result.consoleSnapshot)
                 }
                 .padding(24)
             }

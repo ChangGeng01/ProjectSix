@@ -37,7 +37,7 @@ enum BehavioralAISubstrateBridge {
         let taskGraphInput = taskGraphInput(from: taskGraph)
         return bootstrapCurrentBrainState(
             input: BASAppleCurrentBrainBootstrapBridgeInputBuilder.build(
-                modeID: mode.rawValue,
+                modeID: mode.substrateModeID,
                 prompt: prompt,
                 triggerID: source.rawValue,
                 sourceSurfaceOverrideID: envelope?.sourceSurface.rawValue,
@@ -66,7 +66,7 @@ enum BehavioralAISubstrateBridge {
     ) -> CurrentBrainState {
         BASAppleCurrentBrainRuntimeBridgeExecutor.primeSession(
             input: BASAppleCurrentBrainSessionBridgeInput(
-                modeID: mode.rawValue,
+                modeID: mode.substrateModeID,
                 promptFragments: promptFragments,
                 preferredLanguages: Locale.preferredLanguages,
                 now: now,
@@ -330,9 +330,8 @@ enum BehavioralAISubstrateBridge {
 
     @discardableResult
     static func refreshCurrentBrainState(
-        quickPromptFragments: [String]?,
-        balancePromptFragments: [String]?,
-        mirrorPromptFragments: [String]?,
+        promptFragmentsByModeID: [String: [String]],
+        modePriority: [String],
         taskGraph: DecisionTaskGraphSnapshot?,
         context: ModelContext,
         projection: DecisionMemorySystem.BrainStateProjection,
@@ -342,10 +341,9 @@ enum BehavioralAISubstrateBridge {
     ) -> CurrentBrainState {
         BASAppleCurrentBrainRuntimeBridgeExecutor.refreshActiveBrain(
             input: BASAppleCurrentBrainActiveRefreshBridgeInput(
-                quickPromptFragments: quickPromptFragments,
-                balancePromptFragments: balancePromptFragments,
-                mirrorPromptFragments: mirrorPromptFragments,
-                taskGraphModeID: taskGraph?.mode?.rawValue,
+                promptFragmentsByModeID: promptFragmentsByModeID,
+                modePriority: modePriority,
+                taskGraphModeID: taskGraph?.mode?.substrateModeID,
                 taskGraphPromptSeed: taskGraph?.promptSeed,
                 preferredLanguages: Locale.preferredLanguages,
                 now: now,
@@ -380,9 +378,12 @@ enum BehavioralAISubstrateBridge {
         now: Date = .now
     ) -> CurrentBrainState {
         refreshCurrentBrainState(
-            quickPromptFragments: activeQuickSession.map(quickPromptFragments(for:)),
-            balancePromptFragments: activeBalanceSession.map(balancePromptFragments(for:)),
-            mirrorPromptFragments: activeMirrorSession.map(mirrorPromptFragments(for:)),
+            promptFragmentsByModeID: promptFragmentsByModeID(
+                activeQuickSession: activeQuickSession,
+                activeBalanceSession: activeBalanceSession,
+                activeMirrorSession: activeMirrorSession
+            ),
+            modePriority: activeModePriority,
             taskGraph: taskGraph,
             context: context,
             projection: projection,
@@ -471,7 +472,7 @@ enum BehavioralAISubstrateBridge {
         taskGraph: DecisionTaskGraphSnapshot? = nil,
         context: ModelContext
     ) -> CurrentBrainState {
-        let mode = DecisionMode(rawValue: input.modeID) ?? .quick
+        let mode = DecisionMode.fromSubstrateModeID(input.modeID) ?? .quick
         let runtimeInput = BASAppleCurrentBrainHostLifecycleRuntimeInput(
             bootstrapInput: input,
             checkpointLimit: BeforePolicy.RuntimeState.evolutionCheckpointLimit,
@@ -505,7 +506,7 @@ enum BehavioralAISubstrateBridge {
                 CurrentBrainState(
                     source: BrainStateUpdateSource(rawValue: committed.triggerID) ?? .explicitRefresh,
                     sourceSurface: DecisionIntentSourceSurface(rawValue: committed.sourceSurfaceID) ?? .app,
-                    mode: DecisionMode(rawValue: committed.modeID) ?? .quick,
+                    mode: DecisionMode.fromSubstrateModeID(committed.modeID) ?? .quick,
                     riskLevel: InterventionRiskLevel(rawValue: committed.riskLevelID) ?? .low,
                     taskGraph: taskGraph,
                     brainState: committed.brainState,
@@ -553,7 +554,7 @@ enum BehavioralAISubstrateBridge {
             },
             templateMapper: BASAppleCurrentBrainHostTemplateMapper(
                 id: \.id,
-                modeID: { $0.mode.rawValue },
+                modeID: { $0.mode.substrateModeID },
                 riskLevelID: { $0.riskLevel.rawValue },
                 isPinned: \.isPinned,
                 successCount: \.successCount,
@@ -561,7 +562,7 @@ enum BehavioralAISubstrateBridge {
             ),
             failurePatternMapper: BASAppleCurrentBrainHostFailurePatternMapper(
                 id: \.id,
-                modeID: { $0.mode.rawValue },
+                modeID: { $0.mode.substrateModeID },
                 suppressionWeight: \.suppressionWeight,
                 evidenceCount: \.evidenceCount,
                 updatedAt: \.updatedAt
@@ -753,7 +754,7 @@ enum BehavioralAISubstrateBridge {
     ) -> BASCurrentBrainState? {
         currentBrainState.flatMap { currentBrainState in
             BASAppleInspectionBridgeBuilder.brainSnapshot(
-                modeID: currentBrainState.mode.rawValue,
+                modeID: currentBrainState.mode.substrateModeID,
                 dominantGoals: currentBrainState.dominantGoal.map { [$0] } ?? [],
                 activeConstraints: currentBrainState.activeConstraints,
                 warmth: currentBrainState.brainState.reactionWeights.warmDirectTone,
@@ -801,7 +802,7 @@ enum BehavioralAISubstrateBridge {
         BASEntryIntentBridgeBuilder.envelope(
             kindID: envelope.kind.rawValue,
             surfaceID: envelope.sourceSurface.rawValue,
-            preferredWorkflowID: envelope.preferredMode?.rawValue,
+            preferredWorkflowID: envelope.preferredMode?.substrateModeID,
             promptSeed: envelope.promptSeed,
             riskLevelID: envelope.riskLevel?.rawValue,
             triggerReason: envelope.triggerReason,
@@ -815,7 +816,7 @@ enum BehavioralAISubstrateBridge {
         BASEntryIntentBridgeBuilder.summary(
             kindID: envelope.kind.rawValue,
             surfaceID: envelope.sourceSurface.rawValue,
-            preferredWorkflowID: envelope.preferredMode?.rawValue,
+            preferredWorkflowID: envelope.preferredMode?.substrateModeID,
             promptSeed: envelope.promptSeed,
             riskLevelID: envelope.riskLevel?.rawValue,
             triggerReason: envelope.triggerReason,
@@ -829,7 +830,7 @@ enum BehavioralAISubstrateBridge {
         BASAppleHandoffBridgeBuilder.summary(
             id: envelope.id,
             surfaceID: envelope.sourceSurface.rawValue,
-            preferredWorkflowID: envelope.preferredMode?.rawValue,
+            preferredWorkflowID: envelope.preferredMode?.substrateModeID,
             riskLevelID: envelope.riskLevel?.rawValue,
             payloadSummary: envelope.promptSeed ?? envelope.triggerReason ?? envelope.kind.rawValue,
             createdAt: envelope.requestedAt,
@@ -841,12 +842,12 @@ enum BehavioralAISubstrateBridge {
     static func consumeLifecycleEntrySourcesIfNeeded(
         consumeHandoff: () -> DecisionIntentEnvelope?,
         consumePendingRequest: () -> PendingLaunchRequest?,
-        performQuickCapture: (EntrySource, ScenarioType?, String) -> Void,
-        performOpenMode: (DecisionMode, EntrySource, String) -> Void,
-        performRoutedPrompt: (String, EntrySource) -> Void,
+        performCapture: (EntrySource, ScenarioType?, String) -> Void,
+        performPresent: (DecisionMode, EntrySource, String) -> Void,
+        performRoutedInput: (String, EntrySource) -> Void,
         selectBoxTab: () -> Void,
         performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
-        performRestoreWorkspace: () -> Void,
+        performRestore: () -> Void,
         refreshCurrentBrain: (BrainStateUpdateSource) -> Void
     ) {
         BASAppleAppLifecycleOrchestrationExecutor.consumeEntriesIfNeeded(
@@ -854,17 +855,17 @@ enum BehavioralAISubstrateBridge {
             handleHandoff: { envelope in
                 consumeDecisionIntentEnvelope(
                     envelope,
-                    performQuickCapture: { envelope, scenario, prompt in
-                        performQuickCapture(envelope.entrySource, scenario, prompt)
+                    performCapture: { envelope, scenario, prompt in
+                        performCapture(envelope.entrySource, scenario, prompt)
                     },
-                    performOpenMode: { envelope, mode, shouldSelectBoxTab, prompt in
+                    performPresent: { envelope, mode, shouldSelectBoxTab, prompt in
                         if shouldSelectBoxTab {
                             selectBoxTab()
                         }
-                        performOpenMode(mode, envelope.entrySource, prompt)
+                        performPresent(mode, envelope.entrySource, prompt)
                     },
                     performPredictiveIntervention: performPredictiveIntervention,
-                    performRestoreWorkspace: performRestoreWorkspace,
+                    performRestore: performRestore,
                     refreshCurrentBrain: refreshCurrentBrain
                 )
             },
@@ -872,26 +873,26 @@ enum BehavioralAISubstrateBridge {
             handlePendingRequest: { request in
                 BASApplePendingLaunchRuntimeExecutor.execute(
                     input: BASApplePendingLaunchRuntimeInput(
-                        preferredModeID: request.preferredModeRaw,
+                        preferredModeID: DecisionMode.fromSubstrateModeID(request.preferredModeRaw)?.substrateModeID ?? request.preferredModeRaw,
                         scenarioID: request.scenarioRaw,
                         promptSeed: request.prompt
                     ),
-                    performQuickCapture: { plan in
-                        performQuickCapture(
+                    performCapture: { plan in
+                        performCapture(
                             request.entrySource,
                             plan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
                             plan.promptSeed
                         )
                     },
-                    performOpenMode: { plan in
-                        performOpenMode(
-                            plan.preferredModeID.flatMap(DecisionMode.init(rawValue:)) ?? .quick,
+                    performPresent: { plan in
+                        performPresent(
+                            DecisionMode.fromSubstrateModeID(plan.preferredModeID) ?? .quick,
                             request.entrySource,
                             plan.promptSeed
                         )
                     },
-                    performRoutedPrompt: { plan in
-                        performRoutedPrompt(plan.promptSeed, request.entrySource)
+                    performRoutedInput: { plan in
+                        performRoutedInput(plan.promptSeed, request.entrySource)
                     }
                 )
             }
@@ -906,12 +907,12 @@ enum BehavioralAISubstrateBridge {
         presentPendingReflection: () -> Void,
         consumeHandoff: () -> DecisionIntentEnvelope?,
         consumePendingRequest: () -> PendingLaunchRequest?,
-        performQuickCapture: (EntrySource, ScenarioType?, String) -> Void,
-        performOpenMode: (DecisionMode, EntrySource, String) -> Void,
-        performRoutedPrompt: (String, EntrySource) -> Void,
+        performCapture: (EntrySource, ScenarioType?, String) -> Void,
+        performPresent: (DecisionMode, EntrySource, String) -> Void,
+        performRoutedInput: (String, EntrySource) -> Void,
         selectBoxTab: () -> Void,
         performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
-        performRestoreWorkspace: () -> Void,
+        performRestore: () -> Void,
         refreshPredictedIntervention: () -> Void,
         syncWidgetSnapshot: () -> Void = {}
     ) {
@@ -928,17 +929,17 @@ enum BehavioralAISubstrateBridge {
             handleHandoff: { envelope in
                 consumeDecisionIntentEnvelope(
                     envelope,
-                    performQuickCapture: { envelope, scenario, prompt in
-                        performQuickCapture(envelope.entrySource, scenario, prompt)
+                    performCapture: { envelope, scenario, prompt in
+                        performCapture(envelope.entrySource, scenario, prompt)
                     },
-                    performOpenMode: { envelope, mode, shouldSelectBoxTab, prompt in
+                    performPresent: { envelope, mode, shouldSelectBoxTab, prompt in
                         if shouldSelectBoxTab {
                             selectBoxTab()
                         }
-                        performOpenMode(mode, envelope.entrySource, prompt)
+                        performPresent(mode, envelope.entrySource, prompt)
                     },
                     performPredictiveIntervention: performPredictiveIntervention,
-                    performRestoreWorkspace: performRestoreWorkspace,
+                    performRestore: performRestore,
                     refreshCurrentBrain: refreshCurrentBrain
                 )
             },
@@ -946,30 +947,30 @@ enum BehavioralAISubstrateBridge {
             handlePendingRequest: { request in
                 BASApplePendingLaunchRuntimeExecutor.execute(
                     input: BASApplePendingLaunchRuntimeInput(
-                        preferredModeID: request.preferredModeRaw,
+                        preferredModeID: DecisionMode.fromSubstrateModeID(request.preferredModeRaw)?.substrateModeID ?? request.preferredModeRaw,
                         scenarioID: request.scenarioRaw,
                         promptSeed: request.prompt
                     ),
-                    performQuickCapture: { plan in
-                        performQuickCapture(
+                    performCapture: { plan in
+                        performCapture(
                             request.entrySource,
                             plan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
                             plan.promptSeed
                         )
                     },
-                    performOpenMode: { plan in
-                        performOpenMode(
-                            plan.preferredModeID.flatMap(DecisionMode.init(rawValue:)) ?? .quick,
+                    performPresent: { plan in
+                        performPresent(
+                            DecisionMode.fromSubstrateModeID(plan.preferredModeID) ?? .quick,
                             request.entrySource,
                             plan.promptSeed
                         )
                     },
-                    performRoutedPrompt: { plan in
-                        performRoutedPrompt(plan.promptSeed, request.entrySource)
+                    performRoutedInput: { plan in
+                        performRoutedInput(plan.promptSeed, request.entrySource)
                     }
                 )
             },
-            restoreActiveWorkspace: performRestoreWorkspace,
+            restoreActiveWorkspace: performRestore,
             refreshPredictedIntervention: refreshPredictedIntervention,
             syncWidgetSnapshot: syncWidgetSnapshot
         )
@@ -978,40 +979,45 @@ enum BehavioralAISubstrateBridge {
     @MainActor
     static func consumeDecisionIntentEnvelope(
         _ envelope: DecisionIntentEnvelope,
-        performQuickCapture: (DecisionIntentEnvelope, ScenarioType?, String) -> Void,
-        performOpenMode: (DecisionIntentEnvelope, DecisionMode, Bool, String) -> Void,
+        performCapture: (DecisionIntentEnvelope, ScenarioType?, String) -> Void,
+        performPresent: (DecisionIntentEnvelope, DecisionMode, Bool, String) -> Void,
         performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
-        performRestoreWorkspace: () -> Void,
+        performRestore: () -> Void,
         refreshCurrentBrain: (BrainStateUpdateSource) -> Void
     ) {
         BASAppleEntryIntentRuntimeExecutor.execute(
             input: BASAppleEntryIntentRuntimeInput(
                 kindID: envelope.kind.rawValue,
                 surfaceID: envelope.sourceSurface.rawValue,
-                preferredModeID: envelope.preferredMode?.rawValue,
+                preferredModeID: envelope.preferredMode?.substrateModeID,
                 scenarioID: envelope.scenario?.rawValue,
                 promptSeed: envelope.promptSeed,
                 riskLevelID: envelope.riskLevel?.rawValue,
                 triggerReason: envelope.triggerReason,
+                predictiveInterventionPresentation: BASAppleEntryIntentSuggestionPresentation(
+                    fallbackTitle: BeforeProductLanguage.hostPresentation.predictiveIntervention.mediumRiskTitle,
+                    fallbackDetail: BeforeProductLanguage.hostPresentation.predictiveIntervention.mediumRiskDetail,
+                    fallbackReason: BeforeProductLanguage.hostPresentation.predictiveIntervention.defaultReason
+                ),
                 expiresAt: envelope.expiresAt
             ),
-            performQuickCapture: { actionPlan in
-                performQuickCapture(
+            performCapture: { actionPlan in
+                performCapture(
                     envelope,
                     actionPlan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
                     actionPlan.promptSeed
                 )
             },
-            performOpenMode: { actionPlan in
-                performOpenMode(
+            performPresent: { actionPlan in
+                performPresent(
                     envelope,
-                    actionPlan.preferredModeID.flatMap(DecisionMode.init(rawValue:)) ?? .quick,
+                    DecisionMode.fromSubstrateModeID(actionPlan.preferredModeID) ?? .quick,
                     actionPlan.shouldSelectBoxTab,
                     actionPlan.promptSeed
                 )
             },
             performPredictiveIntervention: performPredictiveIntervention,
-            performRestoreWorkspace: performRestoreWorkspace,
+            performRestore: performRestore,
             refreshCurrentBrain: { triggerID in
                 refreshCurrentBrain(
                     BrainStateUpdateSource(rawValue: triggerID) ?? .explicitRefresh
@@ -1037,37 +1043,37 @@ enum BehavioralAISubstrateBridge {
         persistActiveWorkspaceState: () -> Void
     ) {
         let draft = item.draft
-        let followUp = BASAppleTomorrowBoxReopenFollowUpBuilder.build(
+        let followUp = BASAppleDeferredReopenFollowUpBuilder.build(
             riskLevelID: item.riskLevel?.rawValue,
             title: item.title,
             detail: item.detail,
-            modeID: item.mode.rawValue,
+            modeID: item.mode.substrateModeID,
             reopenHint: item.reopenHint,
             templateHint: item.templateHint,
             interventionHistorySummary: item.interventionHistorySummary
         )
 
-        BASAppleTomorrowBoxReopenExecutor.execute(
-            modeID: item.mode.rawValue,
+        BASAppleDeferredReopenExecutor.execute(
+            modeID: item.mode.substrateModeID,
             promptSeed: item.prompt,
             hasDraft: draft != nil,
             clearActiveDecisionFlows: clearActiveDecisionFlows,
-            activateQuickFromDraft: {
+            activatePrimaryFromDraft: {
                 guard let draft else { return }
                 activateQuick(draft.restoreQuickSession(entrySource: .app))
             },
-            activateBalanceFromDraft: {
+            activateComparativeFromDraft: {
                 guard let draft else { return }
                 activateBalance(draft.restoreBalanceSession(entrySource: .app))
             },
-            activateMirrorFromDraft: {
+            activateReflectiveFromDraft: {
                 guard let draft else { return }
                 activateMirror(draft.restoreMirrorSession(entrySource: .app))
             },
-            startQuick: startQuick,
-            startBalance: startBalance,
-            startMirror: startMirror,
-            removeTomorrowBoxItem: removeTomorrowBoxItem,
+            startPrimary: startQuick,
+            startComparative: startBalance,
+            startReflective: startMirror,
+            removeDeferredItem: removeTomorrowBoxItem,
             followUp: followUp,
             setInterventionSuggestion: { suggestion in
                 setInterventionCandidate(suggestion.flatMap(interventionCandidate(from:)))
@@ -1145,16 +1151,16 @@ enum BehavioralAISubstrateBridge {
     ) {
         guard let mode = request.mode, let draft = request.draft else { return }
 
-        guard BASAppleDraftedModeReopenExecutor.execute(
-            modeID: mode.rawValue,
+        guard BASAppleDraftedWorkflowReopenExecutor.execute(
+            modeID: mode.substrateModeID,
             clearActiveDecisionFlows: clearActiveDecisionFlows,
-            activateQuick: {
+            activatePrimary: {
                 activateQuick(draft.restoreQuickSession(entrySource: .app))
             },
-            activateBalance: {
+            activateComparative: {
                 activateBalance(draft.restoreBalanceSession(entrySource: .app))
             },
-            activateMirror: {
+            activateReflective: {
                 activateMirror(draft.restoreMirrorSession(entrySource: .app))
             },
             afterSuccessfulReopen: {
@@ -1180,16 +1186,16 @@ enum BehavioralAISubstrateBridge {
     ) {
         guard let mode = item.mode, let draft = item.draft else { return }
 
-        guard BASAppleDraftedModeReopenExecutor.execute(
-            modeID: mode.rawValue,
+        guard BASAppleDraftedWorkflowReopenExecutor.execute(
+            modeID: mode.substrateModeID,
             clearActiveDecisionFlows: clearActiveDecisionFlows,
-            activateQuick: {
+            activatePrimary: {
                 activateQuick(draft.restoreQuickSession(entrySource: .app))
             },
-            activateBalance: {
+            activateComparative: {
                 activateBalance(draft.restoreBalanceSession(entrySource: .app))
             },
-            activateMirror: {
+            activateReflective: {
                 activateMirror(draft.restoreMirrorSession(entrySource: .app))
             },
             afterSuccessfulReopen: {
@@ -1205,30 +1211,30 @@ enum BehavioralAISubstrateBridge {
     @MainActor
     static func restoreActiveWorkspaceIfNeeded(
         preferences: BeforePreferences,
-        hasActiveQuickSession: Bool,
-        hasActiveBalanceSession: Bool,
-        hasActiveMirrorSession: Bool,
+        hasActivePrimaryWorkflow: Bool,
+        hasActiveComparativeWorkflow: Bool,
+        hasActiveReflectiveWorkflow: Bool,
         hasReflectionContext: Bool,
         loadState: () -> ActiveDecisionWorkspaceState?,
-        restoreQuick: (ActiveDecisionWorkspaceState) -> Void,
-        restoreBalance: (ActiveDecisionWorkspaceState) -> Void,
-        restoreMirror: (ActiveDecisionWorkspaceState) -> Void,
+        restorePrimary: (ActiveDecisionWorkspaceState) -> Void,
+        restoreComparative: (ActiveDecisionWorkspaceState) -> Void,
+        restoreReflective: (ActiveDecisionWorkspaceState) -> Void,
         selectHomeTab: () -> Void,
         afterRestore: () -> Void
     ) {
         BASAppleWorkspaceRestoreExecutor.execute(
             eligibility: BASAppleWorkspaceRestoreEligibilityInput(
                 restoreEnabled: preferences.restoreInProgressWorkspaces,
-                hasActiveQuickSession: hasActiveQuickSession,
-                hasActiveBalanceSession: hasActiveBalanceSession,
-                hasActiveMirrorSession: hasActiveMirrorSession,
+                hasActivePrimaryWorkflow: hasActivePrimaryWorkflow,
+                hasActiveComparativeWorkflow: hasActiveComparativeWorkflow,
+                hasActiveReflectiveWorkflow: hasActiveReflectiveWorkflow,
                 hasReflectionContext: hasReflectionContext
             ),
             loadState: loadState,
             modeID: { $0.modeRaw },
-            restoreQuick: restoreQuick,
-            restoreBalance: restoreBalance,
-            restoreMirror: restoreMirror,
+            restorePrimary: restorePrimary,
+            restoreComparative: restoreComparative,
+            restoreReflective: restoreReflective,
             selectHomeTab: selectHomeTab,
             afterRestore: afterRestore
         )
@@ -1411,9 +1417,11 @@ enum BehavioralAISubstrateBridge {
         clearSnapshot: () -> Void
     ) -> DecisionTaskGraphSnapshot? {
         BASAppleTaskGraphLifecycleExecutor.refresh(
-            quickSnapshot: { activeQuickSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
-            balanceSnapshot: { activeBalanceSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
-            mirrorSnapshot: { activeMirrorSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
+            snapshotsInPriorityOrder: [
+                { activeQuickSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
+                { activeBalanceSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
+                { activeMirrorSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) }
+            ],
             saveSnapshot: saveSnapshot,
             clearSnapshot: clearSnapshot
         )
@@ -1467,7 +1475,7 @@ enum BehavioralAISubstrateBridge {
             title: candidate.title,
             detail: candidate.detail,
             evidenceSignalCount: candidate.evidenceSignalCount,
-            preferredModeID: candidate.suggestedModeRaw,
+            preferredModeID: candidate.suggestedMode?.substrateModeID,
             reason: candidate.reason,
             createdAt: candidate.createdAt,
             expiresAt: candidate.expiresAt
@@ -1482,7 +1490,7 @@ enum BehavioralAISubstrateBridge {
             title: suggestion.title,
             detail: suggestion.detail ?? "",
             evidenceSignalCount: suggestion.evidenceSignalCount,
-            suggestedMode: suggestion.suggestedModeID.flatMap(DecisionMode.init(rawValue:)),
+            suggestedMode: DecisionMode.fromSubstrateModeID(suggestion.suggestedModeID),
             reason: suggestion.reason,
             expiresAt: suggestion.expiresAt
         )
@@ -1497,7 +1505,7 @@ enum BehavioralAISubstrateBridge {
             title: summary.title,
             detail: summary.detail,
             evidenceSignalCount: summary.evidenceSignalCount,
-            suggestedMode: summary.preferredModeID.flatMap(DecisionMode.init(rawValue:)),
+            suggestedMode: DecisionMode.fromSubstrateModeID(summary.preferredModeID),
             reason: summary.reason,
             createdAt: summary.createdAt,
             expiresAt: summary.expiresAt
@@ -1598,19 +1606,46 @@ enum BehavioralAISubstrateBridge {
         preferences: BeforePreferences
     ) -> [String: String] {
         [
-            DecisionMode.quick.rawValue: currentBrainRuntimeRetrievalMode(
+            DecisionMode.quick.substrateModeID: currentBrainRuntimeRetrievalMode(
                 for: .quick,
                 preferences: preferences
             ).rawValue,
-            DecisionMode.balance.rawValue: currentBrainRuntimeRetrievalMode(
+            DecisionMode.balance.substrateModeID: currentBrainRuntimeRetrievalMode(
                 for: .balance,
                 preferences: preferences
             ).rawValue,
-            DecisionMode.mirror.rawValue: currentBrainRuntimeRetrievalMode(
+            DecisionMode.mirror.substrateModeID: currentBrainRuntimeRetrievalMode(
                 for: .mirror,
                 preferences: preferences
             ).rawValue
         ]
+    }
+
+    private static var activeModePriority: [String] {
+        [
+            DecisionMode.quick.substrateModeID,
+            DecisionMode.balance.substrateModeID,
+            DecisionMode.mirror.substrateModeID
+        ]
+    }
+
+    @MainActor
+    private static func promptFragmentsByModeID(
+        activeQuickSession: QuickCheckSession?,
+        activeBalanceSession: BalanceBoardSession?,
+        activeMirrorSession: MirrorWorkspaceSession?
+    ) -> [String: [String]] {
+        var fragmentsByModeID: [String: [String]] = [:]
+        if let activeQuickSession {
+            fragmentsByModeID[DecisionMode.quick.substrateModeID] = quickPromptFragments(for: activeQuickSession)
+        }
+        if let activeBalanceSession {
+            fragmentsByModeID[DecisionMode.balance.substrateModeID] = balancePromptFragments(for: activeBalanceSession)
+        }
+        if let activeMirrorSession {
+            fragmentsByModeID[DecisionMode.mirror.substrateModeID] = mirrorPromptFragments(for: activeMirrorSession)
+        }
+        return fragmentsByModeID
     }
 
     @MainActor

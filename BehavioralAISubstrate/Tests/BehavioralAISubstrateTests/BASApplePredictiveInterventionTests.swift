@@ -26,7 +26,7 @@ final class BASApplePredictiveInterventionTests: XCTestCase {
         )
 
         XCTAssertEqual(candidate?.riskLevelID, "high")
-        XCTAssertEqual(candidate?.preferredModeID, "mirror")
+        XCTAssertEqual(candidate?.preferredModeID, "reflective")
         XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("regret") == true)
         XCTAssertEqual(candidate?.evidenceSignalCount, 2)
     }
@@ -35,7 +35,7 @@ final class BASApplePredictiveInterventionTests: XCTestCase {
         let candidate = BASApplePredictiveInterventionPredictor.predictCandidate(
             input: BASApplePredictiveInterventionInput(
                 predictiveInterventionsEnabled: true,
-                currentModeID: "quick",
+                currentModeID: "primary",
                 negativeRecentCount: 0,
                 failureGuardIDs: ["night_fast_path_failure"],
                 now: date("2026-04-10T23:10:00Z")
@@ -59,7 +59,7 @@ final class BASApplePredictiveInterventionTests: XCTestCase {
 
         XCTAssertEqual(candidate?.riskLevelID, "medium")
         XCTAssertNotEqual(candidate?.riskLevelID, "high")
-        XCTAssertEqual(candidate?.preferredModeID, "mirror")
+        XCTAssertEqual(candidate?.preferredModeID, "reflective")
     }
 
     func testPredictCandidateDefaultsToLowRiskQuickPathWithoutSignals() {
@@ -73,7 +73,7 @@ final class BASApplePredictiveInterventionTests: XCTestCase {
         )
 
         XCTAssertEqual(candidate?.riskLevelID, "low")
-        XCTAssertEqual(candidate?.preferredModeID, "quick")
+        XCTAssertEqual(candidate?.preferredModeID, "primary")
         XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("low-friction pause") == true)
         XCTAssertEqual(candidate?.evidenceSignalCount, 0)
     }

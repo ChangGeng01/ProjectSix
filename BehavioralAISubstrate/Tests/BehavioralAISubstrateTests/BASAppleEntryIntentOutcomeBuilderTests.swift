@@ -21,7 +21,7 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
         #expect(resolution.actionPlan.actionKind == .predictiveIntervention)
         #expect(resolution.refreshTriggerID == BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue)
         #expect(resolution.predictiveIntervention?.riskLevelID == "high")
-        #expect(resolution.predictiveIntervention?.title == "Pause before you decide.")
+        #expect(resolution.predictiveIntervention?.title == "Take one slower pass.")
         #expect(resolution.predictiveIntervention?.evidenceSignalCount == 2)
         #expect(resolution.predictiveIntervention?.reason == "night_pattern")
         #expect(resolution.predictiveIntervention?.expiresAt == expiresAt)
@@ -40,7 +40,7 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
             expiresAt: .distantFuture
         )
 
-        #expect(resolution.actionPlan.actionKind == .quickCapture)
+        #expect(resolution.actionPlan.actionKind == .capture)
         #expect(resolution.refreshTriggerID == BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue)
         #expect(resolution.predictiveIntervention == nil)
     }
@@ -61,14 +61,14 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
 
         BASAppleEntryIntentOutcomeExecutor.execute(
             resolution: resolution,
-            performQuickCapture: { _ in calls.append("quick") },
-            performOpenMode: { plan in
+            performCapture: { _ in calls.append("quick") },
+            performPresent: { plan in
                 calls.append("open:\(plan.preferredModeID ?? "nil"):\(plan.shouldSelectBoxTab)")
             },
             performPredictiveIntervention: { suggestion in
                 calls.append("predict:\(suggestion?.title ?? "nil")")
             },
-            performRestoreWorkspace: {
+            performRestore: {
                 calls.append("restore")
             },
             refreshCurrentBrain: { triggerID in
@@ -97,16 +97,16 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
                 triggerReason: "night_pattern",
                 expiresAt: Date(timeIntervalSince1970: 200)
             ),
-            performQuickCapture: { _ in
+            performCapture: { _ in
                 calls.append("quick")
             },
-            performOpenMode: { _ in
+            performPresent: { _ in
                 calls.append("open")
             },
             performPredictiveIntervention: { suggestion in
                 calls.append("predict:\(suggestion?.preferredModeID ?? "nil")")
             },
-            performRestoreWorkspace: {
+            performRestore: {
                 calls.append("restore")
             },
             refreshCurrentBrain: { triggerID in

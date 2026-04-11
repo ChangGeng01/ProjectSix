@@ -58,7 +58,7 @@ struct BASAppleReferencePromptBuilderTests {
                 brainState: BASDecisionBrainState(
                     profileCore: ["Short language lands better."],
                     activeGoals: ["Protect sleep."],
-                    relevantMemories: ["Tomorrow Box often works."],
+                    relevantMemories: ["Holding the decision often works."],
                     sessionBiases: ["Keep it short."],
                     retrievalTags: ["buy", "night"],
                     reactionWeights: BASReactionWeights(
@@ -96,7 +96,7 @@ struct BASAppleReferencePromptBuilderTests {
         let envelope = BASAppleReferencePromptBuilder.reminderEnvelope(
             candidates: [
                 Candidate(id: 1, text: "Hold it until tomorrow morning."),
-                Candidate(id: 2, text: "Put it in Tomorrow Box and sleep on it."),
+                Candidate(id: 2, text: "Put it in the holding lane and sleep on it."),
                 Candidate(id: 3, text: "Wait for the weekend before deciding."),
                 Candidate(id: 4, text: "This fourth candidate should be clipped.")
             ],
@@ -111,6 +111,6 @@ struct BASAppleReferencePromptBuilderTests {
         #expect(envelope.candidates.map(\.id) == [1, 2, 3])
         #expect(envelope.prompt.payload.contains("\"candidate_count\":3"))
         #expect(!envelope.prompt.payload.contains("This fourth candidate should be clipped."))
-        #expect(envelope.prompt.assembly.kernelSnapshot.truthState?.sessionFacts["surface_mode"] == "quick")
+        #expect(envelope.prompt.assembly.kernelSnapshot.truthState?.sessionFacts["surface_mode"] == "primary")
     }
 }

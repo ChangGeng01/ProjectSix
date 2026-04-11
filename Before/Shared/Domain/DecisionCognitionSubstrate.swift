@@ -32,12 +32,12 @@ extension DecisionBoundaryPolicyState {
 
 @inline(__always)
 func substrateModeName(from mode: DecisionMode) -> String {
-    mode.rawValue
+    mode.substrateMode.identifier
 }
 
 @inline(__always)
 func substrateMode(from mode: DecisionMode) -> BASDecisionMode {
-    BASDecisionMode(rawValue: mode.rawValue) ?? .quick
+    mode.substrateMode
 }
 
 @inline(__always)

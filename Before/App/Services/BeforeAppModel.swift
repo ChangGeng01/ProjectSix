@@ -29,7 +29,12 @@ final class BeforeAppModel: ObservableObject {
     let modelContainer: ModelContainer
     let supportInbox: SupportInboxStore
     let sharedLifeStore: SharedLifeStore
-    private let hostRuntime = BASHostRuntime()
+    private let hostRuntime = BASHostRuntime(
+        configuration: BASHostConfiguration(
+            workflowBehavior: BeforeProductLanguage.workflowBehavior,
+            presentation: BeforeProductLanguage.hostPresentation
+        )
+    )
     private var memoryProjection: DecisionMemorySystem.BrainStateProjection?
     private var isMemoryProjectionDirty = true
     private var shouldPromptReflectionAfterBackground = false
@@ -188,11 +193,11 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func executeLifecyclePhase(
-        _ phase: BASAppleLifecycleBootstrapPhase,
+        _ phase: BASHostLifecyclePhase,
         syncWidgetSnapshot shouldSyncWidgetSnapshot: Bool = false
     ) {
         hostRuntime.executeLifecyclePhase(
-            phase == .initialAppearance ? .initialAppearance : .sceneActive,
+            phase,
             refreshMemoryProjection: { refreshDecisionMemoryStore() },
             refreshCurrentBrain: { triggerID in
                 refreshGlobalBrainState(
@@ -204,14 +209,14 @@ final class BeforeAppModel: ObservableObject {
             handleHandoff: { envelope in
                 BehavioralAISubstrateBridge.consumeDecisionIntentEnvelope(
                     envelope,
-                    performQuickCapture: { envelope, scenario, prompt in
+                    performCapture: { envelope, scenario, prompt in
                         startQuickCheck(
                             entrySource: envelope.entrySource,
                             scenario: scenario,
                             prompt: prompt
                         )
                     },
-                    performOpenMode: { envelope, mode, shouldSelectBoxTab, prompt in
+                    performPresent: { envelope, mode, shouldSelectBoxTab, prompt in
                         if shouldSelectBoxTab {
                             selectedTab = .box
                         }
@@ -224,7 +229,7 @@ final class BeforeAppModel: ObservableObject {
                     performPredictiveIntervention: { suggestion in
                         interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
                     },
-                    performRestoreWorkspace: { restoreActiveWorkspaceIfNeeded() },
+                    performRestore: { restoreActiveWorkspaceIfNeeded() },
                     refreshCurrentBrain: { source in
                         refreshGlobalBrainState(source: source)
                     }
@@ -234,25 +239,25 @@ final class BeforeAppModel: ObservableObject {
             handlePendingRequest: { request in
                 BASApplePendingLaunchRuntimeExecutor.execute(
                     input: BASApplePendingLaunchRuntimeInput(
-                        preferredModeID: request.preferredModeRaw,
+                        preferredModeID: DecisionMode.fromSubstrateModeID(request.preferredModeRaw)?.substrateModeID ?? request.preferredModeRaw,
                         scenarioID: request.scenarioRaw,
                         promptSeed: request.prompt
                     ),
-                    performQuickCapture: { plan in
+                    performCapture: { plan in
                         startQuickCheck(
                             entrySource: request.entrySource,
                             scenario: plan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
                             prompt: plan.promptSeed
                         )
                     },
-                    performOpenMode: { plan in
+                    performPresent: { plan in
                         startDecisionMode(
-                            plan.preferredModeID.flatMap(DecisionMode.init(rawValue:)) ?? .quick,
+                            DecisionMode.fromSubstrateModeID(plan.preferredModeID) ?? .quick,
                             entrySource: request.entrySource,
                             prompt: plan.promptSeed
                         )
                     },
-                    performRoutedPrompt: { plan in
+                    performRoutedInput: { plan in
                         _ = routeDecision(prompt: plan.promptSeed, entrySource: request.entrySource)
                     }
                 )
@@ -397,7 +402,7 @@ final class BeforeAppModel: ObservableObject {
 
     func reopenTomorrowBoxItem(_ item: TomorrowBoxItem) {
         hostRuntime.reopenHeldItem(
-            modeID: item.mode.rawValue,
+            modeID: item.mode.substrateModeID,
             promptSeed: item.prompt,
             hasDraft: item.draft != nil,
             title: item.title,
@@ -407,25 +412,25 @@ final class BeforeAppModel: ObservableObject {
             templateHint: item.templateHint,
             interventionHistorySummary: item.interventionHistorySummary,
             clearActiveDecisionFlows: { clearActiveDecisionFlows() },
-            activateQuickFromDraft: {
+            activatePrimaryFromDraft: {
                 guard let draft = item.draft else { return }
                 activateQuickSession(draft.restoreQuickSession(entrySource: .app))
             },
-            activateBalanceFromDraft: {
+            activateComparativeFromDraft: {
                 guard let draft = item.draft else { return }
                 activateBalanceSession(draft.restoreBalanceSession(entrySource: .app))
             },
-            activateMirrorFromDraft: {
+            activateReflectiveFromDraft: {
                 guard let draft = item.draft else { return }
                 activateMirrorSession(draft.restoreMirrorSession(entrySource: .app))
             },
-            startQuick: { prompt in
+            startPrimary: { prompt in
                 startQuickCheck(entrySource: .app, prompt: prompt)
             },
-            startBalance: { prompt in
+            startComparative: { prompt in
                 startBalanceBoard(entrySource: .app, prompt: prompt)
             },
-            startMirror: { prompt in
+            startReflective: { prompt in
                 startMirrorWorkspace(entrySource: .app, prompt: prompt)
             },
             removeItem: {
@@ -888,7 +893,7 @@ final class BeforeAppModel: ObservableObject {
         return export.flightDeck
     }
 
-    func substrateConsoleSnapshot() async -> BASConsoleSnapshot {
+    func substrateConsoleSnapshot() async -> BASHostConsoleSnapshot {
         let export = await decisionRuntimeExport()
         return BehavioralAISubstrateBridge.consoleSnapshot(
             from: export,
@@ -983,15 +988,15 @@ final class BeforeAppModel: ObservableObject {
         guard let mode = request.mode, let draft = request.draft else { return }
 
         guard hostRuntime.reopenDraftedItem(
-            modeID: mode.rawValue,
+            modeID: mode.substrateModeID,
             clearActiveDecisionFlows: { clearActiveDecisionFlows() },
-            activateQuick: {
+            activatePrimary: {
                 activateQuickSession(draft.restoreQuickSession(entrySource: .app))
             },
-            activateBalance: {
+            activateComparative: {
                 activateBalanceSession(draft.restoreBalanceSession(entrySource: .app))
             },
-            activateMirror: {
+            activateReflective: {
                 activateMirrorSession(draft.restoreMirrorSession(entrySource: .app))
             },
             afterSuccessfulReopen: {
@@ -1048,15 +1053,15 @@ final class BeforeAppModel: ObservableObject {
         guard let mode = item.mode, let draft = item.draft else { return }
 
         guard hostRuntime.reopenDraftedItem(
-            modeID: mode.rawValue,
+            modeID: mode.substrateModeID,
             clearActiveDecisionFlows: { clearActiveDecisionFlows() },
-            activateQuick: {
+            activatePrimary: {
                 activateQuickSession(draft.restoreQuickSession(entrySource: .app))
             },
-            activateBalance: {
+            activateComparative: {
                 activateBalanceSession(draft.restoreBalanceSession(entrySource: .app))
             },
-            activateMirror: {
+            activateReflective: {
                 activateMirrorSession(draft.restoreMirrorSession(entrySource: .app))
             },
             afterSuccessfulReopen: {
@@ -1171,19 +1176,19 @@ final class BeforeAppModel: ObservableObject {
     private func restoreActiveWorkspaceIfNeeded() {
         hostRuntime.restoreActiveWorkspaceIfNeeded(
             restoreEnabled: preferences.restoreInProgressWorkspaces,
-            hasActiveQuickSession: activeQuickSession != nil,
-            hasActiveBalanceSession: activeBalanceSession != nil,
-            hasActiveMirrorSession: activeMirrorSession != nil,
+            hasActivePrimaryWorkflow: activeQuickSession != nil,
+            hasActiveComparativeWorkflow: activeBalanceSession != nil,
+            hasActiveReflectiveWorkflow: activeMirrorSession != nil,
             hasReflectionContext: reflectionContext != nil,
             loadState: { ActiveDecisionWorkspaceStore.load() },
             modeID: { $0.modeRaw },
-            restoreQuick: { state in
+            restorePrimary: { state in
                 activateQuickSession(state.restoreQuickSession())
             },
-            restoreBalance: { state in
+            restoreComparative: { state in
                 activateBalanceSession(state.restoreBalanceSession())
             },
-            restoreMirror: { state in
+            restoreReflective: { state in
                 activateMirrorSession(state.restoreMirrorSession())
             },
             selectHomeTab: {
@@ -1435,9 +1440,11 @@ final class BeforeAppModel: ObservableObject {
 
     private func refreshActiveTaskGraphSnapshot() {
         activeTaskGraph = hostRuntime.refreshActiveTaskGraph(
-            quickSnapshot: { activeQuickSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
-            balanceSnapshot: { activeBalanceSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
-            mirrorSnapshot: { activeMirrorSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
+            snapshotsInPriorityOrder: [
+                { [self] in activeQuickSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
+                { [self] in activeBalanceSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) },
+                { [self] in activeMirrorSession.flatMap(DecisionTaskGraphSnapshot.capture(from:)) }
+            ],
             saveSnapshot: { snapshot in
                 DecisionTaskGraphStore.save(snapshot)
             },
@@ -1482,7 +1489,7 @@ final class BeforeAppModel: ObservableObject {
             title: suggestion.title,
             detail: suggestion.detail,
             evidenceSignalCount: suggestion.evidenceSignalCount,
-            suggestedMode: suggestion.preferredModeID.flatMap(DecisionMode.init(rawValue:)),
+            suggestedMode: DecisionMode.fromSubstrateModeID(suggestion.preferredModeID),
             reason: suggestion.reason,
             expiresAt: suggestion.expiresAt
         )
@@ -1496,7 +1503,7 @@ final class BeforeAppModel: ObservableObject {
             title: suggestion.title,
             detail: suggestion.detail ?? "",
             evidenceSignalCount: suggestion.evidenceSignalCount,
-            suggestedMode: suggestion.suggestedModeID.flatMap(DecisionMode.init(rawValue:)),
+            suggestedMode: DecisionMode.fromSubstrateModeID(suggestion.suggestedModeID),
             reason: suggestion.reason,
             expiresAt: suggestion.expiresAt
         )
@@ -1511,7 +1518,7 @@ final class BeforeAppModel: ObservableObject {
             title: summary.title,
             detail: summary.detail,
             evidenceSignalCount: summary.evidenceSignalCount,
-            suggestedMode: summary.preferredModeID.flatMap(DecisionMode.init(rawValue:)),
+            suggestedMode: DecisionMode.fromSubstrateModeID(summary.preferredModeID),
             reason: summary.reason,
             createdAt: summary.createdAt,
             expiresAt: summary.expiresAt
@@ -1527,7 +1534,7 @@ final class BeforeAppModel: ObservableObject {
             title: candidate.title,
             detail: candidate.detail,
             evidenceSignalCount: candidate.evidenceSignalCount,
-            preferredModeID: candidate.suggestedModeRaw,
+            preferredModeID: candidate.suggestedMode?.substrateModeID,
             reason: candidate.reason,
             createdAt: candidate.createdAt,
             expiresAt: candidate.expiresAt

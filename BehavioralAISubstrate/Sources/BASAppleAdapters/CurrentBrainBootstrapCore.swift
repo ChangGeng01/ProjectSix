@@ -499,7 +499,7 @@ public enum BASAppleCurrentBrainBootstrapAdapter {
         return BASAppleCurrentBrainBootstrapArtifact(
             execution: execution,
             persistenceInput: BASCurrentBrainPersistenceApplier.updateInput(
-                mode: input.preparation.mode.rawValue,
+                mode: input.preparation.mode.identifier,
                 bootstrapped: execution.bootstrapped
             )
         )

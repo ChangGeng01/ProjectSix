@@ -309,7 +309,7 @@ public enum BASSubstrateArchitectureBuilder {
                 anchors: [
                     "Watch / widget / shortcut envelopes",
                     "Predictive intervention gates",
-                    "Tomorrow Box and reopen bias"
+                    "Hold-and-reopen bias"
                 ]
             ),
             BASControlLoop(

@@ -4,7 +4,7 @@ import BASHostKit
 struct SelfPortraitView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @State private var systemFlightDeck: DecisionSystemFlightDeck?
-    @State private var substrateConsoleSnapshot: BASConsoleSnapshot?
+    @State private var substrateConsoleSnapshot: BASHostConsoleSnapshot?
     @State private var isLoadingSystemFlightDeck = false
 
     var body: some View {
@@ -139,11 +139,11 @@ struct SelfPortraitView: View {
 
     @ViewBuilder
     private func substrateConsoleCard(
-        _ snapshot: BASConsoleSnapshot?
+        _ snapshot: BASHostConsoleSnapshot?
     ) -> some View {
         if let snapshot {
             PanelCard {
-                BASConsoleView(snapshot: snapshot)
+                BASHostConsoleView(snapshot: snapshot)
             }
         }
     }

@@ -11,7 +11,7 @@ struct BASStructuredTruthCoreTests {
         let brainState = BASDecisionBrainState(
             profileCore: ["Short, direct language lands better."],
             activeGoals: ["Protect sleep before midnight."],
-            relevantMemories: ["Tomorrow Box often breaks the loop."],
+            relevantMemories: ["Holding the decision often breaks the loop."],
             sessionBiases: ["Keep the language short and concrete."],
             retrievalTags: ["night", "sleep"],
             reactionWeights: BASReactionWeights(
@@ -32,7 +32,7 @@ struct BASStructuredTruthCoreTests {
             )
         )
 
-        #expect(truthState?.mode == "quick")
+        #expect(truthState?.mode == "primary")
         #expect(truthState?.currentGoal == "Protect sleep before midnight.")
         #expect(truthState?.allowedActions == Array(brainState.boundaryPolicy.allowedActionClasses.prefix(3)))
         #expect(truthState?.forbiddenActions == Array(brainState.boundaryPolicy.blockedActionClasses.prefix(2)))
@@ -54,7 +54,7 @@ struct BASStructuredTruthCoreTests {
 
         #expect(truthState?.mode == "reminder")
         #expect(truthState?.currentGoal == nil)
-        #expect(truthState?.sessionFacts["surface_mode"] == "balance")
+        #expect(truthState?.sessionFacts["surface_mode"] == "comparative")
         #expect(truthState?.sessionFacts["boundary_mode"] == nil)
         #expect(truthState?.personaRules.contains("Choose from retained reminders only and do not invent new reminders.") == true)
         #expect(truthState?.allowedActions == ["render_local_guidance", "load_governed_memory"])

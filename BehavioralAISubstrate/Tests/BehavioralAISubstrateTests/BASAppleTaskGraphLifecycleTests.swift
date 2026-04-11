@@ -7,9 +7,11 @@ struct BASAppleTaskGraphLifecycleTests {
         var saved: [String] = []
 
         let snapshot = BASAppleTaskGraphLifecycleExecutor.refresh(
-            quickSnapshot: { "quick" },
-            balanceSnapshot: { "balance" },
-            mirrorSnapshot: { "mirror" },
+            snapshotsInPriorityOrder: [
+                { "quick" },
+                { "balance" },
+                { "mirror" }
+            ],
             saveSnapshot: { saved.append($0) },
             clearSnapshot: { saved.append("clear") }
         )
@@ -23,9 +25,11 @@ struct BASAppleTaskGraphLifecycleTests {
         var calls: [String] = []
 
         let snapshot = BASAppleTaskGraphLifecycleExecutor.refresh(
-            quickSnapshot: { Optional<String>.none },
-            balanceSnapshot: { Optional<String>.none },
-            mirrorSnapshot: { Optional<String>.none },
+            snapshotsInPriorityOrder: [
+                { Optional<String>.none },
+                { Optional<String>.none },
+                { Optional<String>.none }
+            ],
             saveSnapshot: { calls.append($0) },
             clearSnapshot: { calls.append("clear") }
         )

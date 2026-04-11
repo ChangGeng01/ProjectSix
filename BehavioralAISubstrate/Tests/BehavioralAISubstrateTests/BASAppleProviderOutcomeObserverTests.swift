@@ -50,11 +50,11 @@ struct BASAppleProviderOutcomeObserverTests {
                 violations: [
                     BASConsistencyViolation(
                         kind: .modeMismatch,
-                        message: "Response drifted away from quick mode."
+                        message: "Response drifted away from primary mode."
                     )
                 ]
             ),
-            source: "provider quick refinement"
+            source: "provider primary refinement"
         )
 
         #expect(live.contains("Foundation"))
@@ -62,7 +62,7 @@ struct BASAppleProviderOutcomeObserverTests {
         #expect(live.contains("Core ML"))
         #expect(cached.contains("structured prompt cache"))
         #expect(fallback.contains("Foundation"))
-        #expect(rejected.contains("provider quick refinement"))
+        #expect(rejected.contains("provider primary refinement"))
     }
 
     @Test("observation context builder owns task-specific narrative presets")
@@ -92,9 +92,9 @@ struct BASAppleProviderOutcomeObserverTests {
             )
         )
 
-        #expect(quick.templatePinnedDetail.contains("quick refinement"))
+        #expect(quick.templatePinnedDetail.contains("primary refinement"))
         #expect(quick.admissionSkippedOutputPreview == "quick preview")
-        #expect(quick.cachedConsistencySource == "cached quick refinement")
+        #expect(quick.cachedConsistencySource == "cached primary refinement")
         #expect(reminder.templatePinnedDetail.contains("reminder selection"))
         #expect(reminder.providerConsistencySource == "provider reminder selection")
         #expect(reminder.deterministicFallbackOutputPreview == "no reminder")
@@ -126,8 +126,8 @@ struct BASAppleProviderOutcomeObserverTests {
         #expect(context.kind == .quick)
         #expect(context.frontstageState == "frontstage")
         #expect(context.brainState == "brain")
-        #expect(context.substrateContext.templatePinnedDetail.contains("quick refinement"))
-        #expect(context.substrateContext.cachedConsistencySource == "cached quick refinement")
+        #expect(context.substrateContext.templatePinnedDetail.contains("primary refinement"))
+        #expect(context.substrateContext.cachedConsistencySource == "cached primary refinement")
     }
 
     @Test("observer compiles sanitized traces and telemetry observations")
@@ -145,7 +145,7 @@ struct BASAppleProviderOutcomeObserverTests {
                 allowFallbacks: true,
                 prompt: "live prompt",
                 outputPreview: "live output",
-                detail: "Gemma handled quick refinement.",
+                detail: "Gemma handled primary refinement.",
                 semanticPromptFingerprint: "semantic-1",
                 stablePrefixFingerprint: "prefix-1",
                 promptBudget: BASPromptBudget(
@@ -232,8 +232,8 @@ struct BASAppleProviderOutcomeObserverTests {
             templatePinnedDetail: "Template pinned.",
             admissionSkippedDetailPrefix: "Admission skipped.",
             deterministicFallbackBase: "No provider returned a result.",
-            cachedConsistencySource: "cached quick refinement",
-            providerConsistencySource: "provider quick refinement",
+            cachedConsistencySource: "cached primary refinement",
+            providerConsistencySource: "provider primary refinement",
             recordsTemplatePinnedTrace: true
         )
         let event = BASProviderRequestEvent.providerSuccess(
@@ -344,13 +344,13 @@ struct BASAppleProviderOutcomeObserverTests {
                     violations: [
                         BASConsistencyViolation(
                             kind: .modeMismatch,
-                            message: "Drifted away from quick mode."
+                            message: "Drifted away from primary mode."
                         )
                     ]
                 ),
                 consistencyRejected: true,
                 observation: BASAppleProviderTraceObservation(
-                    detail: "Gemma handled quick refinement.",
+                    detail: "Gemma handled primary refinement.",
                     compilation: BASAppleProviderTraceCompilation(
                         allowsSensitivePayload: false,
                         storedPrompt: "[REDACTED LIVE PROMPT]\nsemantic-1",

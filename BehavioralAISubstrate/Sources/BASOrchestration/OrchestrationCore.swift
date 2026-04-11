@@ -4,11 +4,11 @@ import BASPolicy
 import BASRuntimeCore
 
 public enum BASEntryIntentKind: String, Codable, Sendable {
-    case quickCapture
-    case openMode
-    case reopenTomorrowItem
+    case capture
+    case present
+    case reopen
     case predictiveIntervention
-    case resumeCurrentDecision
+    case resume
 }
 
 public enum BASEntryIntentSurface: String, Codable, Sendable {
@@ -290,7 +290,7 @@ public enum BASEntryIntentSummarizer {
         let headline = "\(envelope.surface.rawValue.capitalized) \(envelope.kind.rawValue)"
         let prompt = envelope.promptSeed.map { String($0.prefix(80)) } ?? "No prompt seed"
         let detail = "\(prompt) • task \(envelope.taskKind.rawValue) • risk \(envelope.riskLevel?.rawValue ?? "unknown")"
-        let requiresResume = envelope.kind == .resumeCurrentDecision || envelope.taskKind == .plan || envelope.riskLevel == .high
+        let requiresResume = envelope.kind == .resume || envelope.taskKind == .plan || envelope.riskLevel == .high
         return BASEntryIntentSummary(
             headline: headline,
             detail: detail,
@@ -352,7 +352,20 @@ public enum BASEntryIntentBridgeBuilder {
     }
 
     private static func kind(from rawValue: String) -> BASEntryIntentKind {
-        BASEntryIntentKind(rawValue: rawValue) ?? .quickCapture
+        switch rawValue {
+        case "quickCapture", "capture":
+            .capture
+        case "openMode", "present":
+            .present
+        case "reopenTomorrowItem", "reopen":
+            .reopen
+        case "resumeCurrentDecision", "resume":
+            .resume
+        case BASEntryIntentKind.predictiveIntervention.rawValue:
+            .predictiveIntervention
+        default:
+            .capture
+        }
     }
 
     private static func surface(from rawValue: String) -> BASEntryIntentSurface {

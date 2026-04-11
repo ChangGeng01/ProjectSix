@@ -1,6 +1,22 @@
 import Foundation
 import BASRuntimeCore
 
+public struct BASAppleEntryIntentSuggestionPresentation: Codable, Equatable, Sendable {
+    public var fallbackTitle: String
+    public var fallbackDetail: String
+    public var fallbackReason: String
+
+    public init(
+        fallbackTitle: String = "Take one slower pass.",
+        fallbackDetail: String = "A predicted pattern suggests using a slower path here.",
+        fallbackReason: String = "A recent pattern suggests adding more friction before acting."
+    ) {
+        self.fallbackTitle = fallbackTitle
+        self.fallbackDetail = fallbackDetail
+        self.fallbackReason = fallbackReason
+    }
+}
+
 public struct BASApplePredictiveInterventionSuggestion: Codable, Equatable, Sendable {
     public var riskLevelID: String
     public var title: String
@@ -53,6 +69,7 @@ public struct BASAppleEntryIntentRuntimeInput: Codable, Equatable, Sendable {
     public var promptSeed: String?
     public var riskLevelID: String?
     public var triggerReason: String?
+    public var predictiveInterventionPresentation: BASAppleEntryIntentSuggestionPresentation
     public var expiresAt: Date
 
     public init(
@@ -63,6 +80,7 @@ public struct BASAppleEntryIntentRuntimeInput: Codable, Equatable, Sendable {
         promptSeed: String? = nil,
         riskLevelID: String? = nil,
         triggerReason: String? = nil,
+        predictiveInterventionPresentation: BASAppleEntryIntentSuggestionPresentation = BASAppleEntryIntentSuggestionPresentation(),
         expiresAt: Date
     ) {
         self.kindID = kindID
@@ -72,6 +90,7 @@ public struct BASAppleEntryIntentRuntimeInput: Codable, Equatable, Sendable {
         self.promptSeed = promptSeed
         self.riskLevelID = riskLevelID
         self.triggerReason = triggerReason
+        self.predictiveInterventionPresentation = predictiveInterventionPresentation
         self.expiresAt = expiresAt
     }
 }
@@ -85,6 +104,7 @@ public enum BASAppleEntryIntentOutcomeBuilder {
         promptSeed: String?,
         riskLevelID: String?,
         triggerReason: String?,
+        predictiveInterventionPresentation: BASAppleEntryIntentSuggestionPresentation = BASAppleEntryIntentSuggestionPresentation(),
         expiresAt: Date
     ) -> BASAppleEntryIntentResolution {
         resolve(
@@ -97,18 +117,24 @@ public enum BASAppleEntryIntentOutcomeBuilder {
                 riskLevelID: riskLevelID,
                 triggerReason: triggerReason
             ),
+            predictiveInterventionPresentation: predictiveInterventionPresentation,
             expiresAt: expiresAt
         )
     }
 
     public static func resolve(
         plan: BASAppleEntryIntentActionPlan,
+        predictiveInterventionPresentation: BASAppleEntryIntentSuggestionPresentation = BASAppleEntryIntentSuggestionPresentation(),
         expiresAt: Date
     ) -> BASAppleEntryIntentResolution {
         BASAppleEntryIntentResolution(
             actionPlan: plan,
             refreshTriggerID: refreshTriggerID(for: plan),
-            predictiveIntervention: predictiveIntervention(for: plan, expiresAt: expiresAt)
+            predictiveIntervention: predictiveIntervention(
+                for: plan,
+                predictiveInterventionPresentation: predictiveInterventionPresentation,
+                expiresAt: expiresAt
+            )
         )
     }
 
@@ -125,17 +151,18 @@ public enum BASAppleEntryIntentOutcomeBuilder {
 
     private static func predictiveIntervention(
         for plan: BASAppleEntryIntentActionPlan,
+        predictiveInterventionPresentation: BASAppleEntryIntentSuggestionPresentation,
         expiresAt: Date
     ) -> BASApplePredictiveInterventionSuggestion? {
         guard plan.actionKind == .predictiveIntervention else { return nil }
 
         return BASApplePredictiveInterventionSuggestion(
             riskLevelID: plan.riskLevelID ?? BASRiskLevel.medium.rawValue,
-            title: plan.promptSeed.isEmpty ? "Pause before you decide." : plan.promptSeed,
-            detail: "A predicted pattern says a slower move is safer here.",
+            title: plan.promptSeed.isEmpty ? predictiveInterventionPresentation.fallbackTitle : plan.promptSeed,
+            detail: predictiveInterventionPresentation.fallbackDetail,
             evidenceSignalCount: plan.triggerReason == nil ? 1 : 2,
             preferredModeID: plan.preferredModeID,
-            reason: plan.triggerReason ?? "A recent pattern suggests more friction before acting.",
+            reason: plan.triggerReason ?? predictiveInterventionPresentation.fallbackReason,
             expiresAt: expiresAt
         )
     }
@@ -144,10 +171,10 @@ public enum BASAppleEntryIntentOutcomeBuilder {
 public enum BASAppleEntryIntentRuntimeExecutor {
     public static func execute(
         input: BASAppleEntryIntentRuntimeInput,
-        performQuickCapture: (BASAppleEntryIntentActionPlan) -> Void,
-        performOpenMode: (BASAppleEntryIntentActionPlan) -> Void,
+        performCapture: (BASAppleEntryIntentActionPlan) -> Void,
+        performPresent: (BASAppleEntryIntentActionPlan) -> Void,
         performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
-        performRestoreWorkspace: () -> Void,
+        performRestore: () -> Void,
         refreshCurrentBrain: (String) -> Void
     ) {
         BASAppleEntryIntentOutcomeExecutor.execute(
@@ -159,12 +186,13 @@ public enum BASAppleEntryIntentRuntimeExecutor {
                 promptSeed: input.promptSeed,
                 riskLevelID: input.riskLevelID,
                 triggerReason: input.triggerReason,
+                predictiveInterventionPresentation: input.predictiveInterventionPresentation,
                 expiresAt: input.expiresAt
             ),
-            performQuickCapture: performQuickCapture,
-            performOpenMode: performOpenMode,
+            performCapture: performCapture,
+            performPresent: performPresent,
             performPredictiveIntervention: performPredictiveIntervention,
-            performRestoreWorkspace: performRestoreWorkspace,
+            performRestore: performRestore,
             refreshCurrentBrain: refreshCurrentBrain
         )
     }
@@ -173,23 +201,23 @@ public enum BASAppleEntryIntentRuntimeExecutor {
 public enum BASAppleEntryIntentOutcomeExecutor {
     public static func execute(
         resolution: BASAppleEntryIntentResolution,
-        performQuickCapture: (BASAppleEntryIntentActionPlan) -> Void,
-        performOpenMode: (BASAppleEntryIntentActionPlan) -> Void,
+        performCapture: (BASAppleEntryIntentActionPlan) -> Void,
+        performPresent: (BASAppleEntryIntentActionPlan) -> Void,
         performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
-        performRestoreWorkspace: () -> Void,
+        performRestore: () -> Void,
         refreshCurrentBrain: (String) -> Void
     ) {
         let actionPlan = resolution.actionPlan
 
         switch actionPlan.actionKind {
-        case .quickCapture:
-            performQuickCapture(actionPlan)
-        case .openMode:
-            performOpenMode(actionPlan)
+        case .capture:
+            performCapture(actionPlan)
+        case .present:
+            performPresent(actionPlan)
         case .predictiveIntervention:
             performPredictiveIntervention(resolution.predictiveIntervention)
-        case .restoreWorkspace:
-            performRestoreWorkspace()
+        case .restore:
+            performRestore()
         }
 
         refreshCurrentBrain(resolution.refreshTriggerID)

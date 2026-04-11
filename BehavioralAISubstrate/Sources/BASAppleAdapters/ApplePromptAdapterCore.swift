@@ -541,7 +541,7 @@ public enum BASAppleReferencePromptBuilder {
                 scenarioTitle: scenarioTitle,
                 prompt: prompt,
                 candidateTexts: clippedCandidates.map(candidateText),
-                reminderSurfaceMode: reminderSurfaceModeRawValue.flatMap(BASDecisionMode.init(rawValue:)),
+                reminderSurfaceMode: reminderSurfaceModeRawValue.flatMap(BASDecisionMode.init(identifier:)),
                 providerIdentifier: providerIdentifier,
                 strategy: strategy.map(BASApplePromptInputAdapter.adaptiveStrategy)
             )

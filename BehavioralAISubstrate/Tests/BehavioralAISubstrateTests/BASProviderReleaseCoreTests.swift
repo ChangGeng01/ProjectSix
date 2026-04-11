@@ -61,11 +61,11 @@ struct BASProviderReleaseCoreTests {
         let detail = BASProviderReleaseGate.rejectedConsistencyDetail(
             base: "Base detail.",
             result: result,
-            source: "cached quick refinement"
+            source: "cached primary refinement"
         )
 
         #expect(detail.contains("Base detail."))
-        #expect(detail.contains("cached quick refinement"))
+        #expect(detail.contains("cached primary refinement"))
         #expect(detail.contains("First."))
         #expect(detail.contains("Second."))
         #expect(detail.contains("Third."))

@@ -585,25 +585,20 @@ enum DecisionIntelligenceProviderPipeline {
     }
 
     private static func quickPreview(from result: QuickCheckResult) -> String {
-        BASAppleProviderReleaseAdapter.quickPreview(
-            currentPerspective: result.currentPerspective,
-            afterPerspective: result.afterPerspective
+        BASAppleProviderReleaseAdapter.keyedPreview(
+            fields: BeforeProductLanguage.Preview.primaryFields(from: result)
         )
     }
 
     private static func balancePreview(from result: BalanceBoardResult) -> String {
-        BASAppleProviderReleaseAdapter.balancePreview(
-            headline: result.headline,
-            focusDescription: result.focusDescription,
-            nextAction: result.nextAction
+        BASAppleProviderReleaseAdapter.keyedPreview(
+            fields: BeforeProductLanguage.Preview.comparativeFields(from: result)
         )
     }
 
     private static func mirrorPreview(from result: MirrorResult) -> String {
-        BASAppleProviderReleaseAdapter.mirrorPreview(
-            headline: result.headline,
-            coreTension: result.coreTension,
-            nextAction: result.nextAction
+        BASAppleProviderReleaseAdapter.keyedPreview(
+            fields: BeforeProductLanguage.Preview.reflectiveFields(from: result)
         )
     }
 

@@ -24,7 +24,7 @@ struct BASProjectionCoreTests {
                 BASProjectionCandidateInput(
                     id: "candidate.tomorrow",
                     typeID: "support",
-                    headline: "Tomorrow Box usually breaks the late-night loop",
+                    headline: "Holding the decision usually breaks the late-night loop",
                     confidence: 0.84,
                     priority: 0.81,
                     sourceID: "pattern",

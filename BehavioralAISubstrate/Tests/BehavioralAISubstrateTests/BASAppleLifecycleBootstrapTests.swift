@@ -36,12 +36,12 @@ struct BASAppleLifecycleBootstrapTests {
     @Test("session prime plan compacts prompt fragments and preserves retrieval mode")
     func sessionPrimePlanCompactsPromptFragmentsAndPreservesRetrievalMode() {
         let plan = BASAppleCurrentBrainRuntimePlanner.sessionPrimePlan(
-            modeID: "mirror",
+            modeID: "reflective",
             promptFragments: ["  first  ", "", "second"],
             retrievalMode: "filtered"
         )
 
-        #expect(plan.modeID == "mirror")
+        #expect(plan.modeID == "reflective")
         #expect(plan.promptSeed == "first second")
         #expect(plan.retrievalMode == "filtered")
         #expect(plan.triggerID == "sessionPrime")
@@ -50,19 +50,20 @@ struct BASAppleLifecycleBootstrapTests {
     @Test("active refresh plan resolves active seed and retrieval mode by mode id")
     func activeRefreshPlanResolvesActiveSeedAndRetrievalModeByModeID() {
         let plan = BASAppleCurrentBrainRuntimePlanner.activeRefreshPlan(
-            quickPromptFragments: nil,
-            balancePromptFragments: ["should", "win"],
-            mirrorPromptFragments: nil,
-            taskGraphModeID: "mirror",
+            promptFragmentsByModeID: [
+                "comparative": ["should", "win"]
+            ],
+            modePriority: ["primary", "comparative", "reflective"],
+            taskGraphModeID: "reflective",
             taskGraphPromptSeed: "ignored",
             retrievalModesByModeID: [
-                "quick": "off",
-                "balance": "adaptive",
-                "mirror": "filtered"
+                "primary": "off",
+                "comparative": "adaptive",
+                "reflective": "filtered"
             ]
         )
 
-        #expect(plan.modeID == "balance")
+        #expect(plan.modeID == "comparative")
         #expect(plan.promptSeed == "should win")
         #expect(plan.retrievalMode == "adaptive")
         #expect(plan.triggerID == "explicitRefresh")
@@ -71,15 +72,14 @@ struct BASAppleLifecycleBootstrapTests {
     @Test("active refresh plan falls back to task graph and default retrieval mode")
     func activeRefreshPlanFallsBackToTaskGraphAndDefaultRetrievalMode() {
         let plan = BASAppleCurrentBrainRuntimePlanner.activeRefreshPlan(
-            quickPromptFragments: nil,
-            balancePromptFragments: nil,
-            mirrorPromptFragments: nil,
-            taskGraphModeID: "mirror",
+            promptFragmentsByModeID: [:],
+            modePriority: ["primary", "comparative", "reflective"],
+            taskGraphModeID: "reflective",
             taskGraphPromptSeed: "resume this",
             retrievalModesByModeID: [:]
         )
 
-        #expect(plan.modeID == "mirror")
+        #expect(plan.modeID == "reflective")
         #expect(plan.promptSeed == "resume this")
         #expect(plan.retrievalMode == "adaptive")
     }

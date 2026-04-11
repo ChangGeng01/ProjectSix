@@ -278,7 +278,7 @@ public enum BASAppleCurrentBrainBootstrapHostAdapter {
     ) -> BASAppleCurrentBrainBootstrapPlanningSourceInput {
         BASAppleCurrentBrainBootstrapPlanningSourceInput(
             preparationRequest: BASCurrentBrainBootstrapPreparationRequest(
-                mode: BASDecisionMode(rawValue: input.modeID) ?? .quick,
+                mode: BASDecisionMode(identifier: input.modeID) ?? .quick,
                 prompt: input.prompt,
                 trigger: BASCurrentBrainBootstrapTrigger(rawValue: input.triggerID) ?? .sessionPrime,
                 sourceSurfaceOverride: input.sourceSurfaceOverrideID.flatMap(BASInteractionSurface.init(rawValue:)),
@@ -301,7 +301,7 @@ public enum BASAppleCurrentBrainBootstrapHostAdapter {
             templates: input.templates.map { template in
                 BASAppleCurrentBrainBootstrapTemplateInput(
                     id: template.id,
-                    mode: BASDecisionMode(rawValue: template.modeID) ?? .quick,
+                    mode: BASDecisionMode(identifier: template.modeID) ?? .quick,
                     riskLevel: BASRiskLevel(rawValue: template.riskLevelID) ?? .low,
                     isPinned: template.isPinned,
                     successCount: template.successCount,
@@ -311,7 +311,7 @@ public enum BASAppleCurrentBrainBootstrapHostAdapter {
             failurePatterns: input.failurePatterns.map { pattern in
                 BASAppleCurrentBrainBootstrapFailurePatternInput(
                     id: pattern.id,
-                    mode: BASDecisionMode(rawValue: pattern.modeID) ?? .quick,
+                    mode: BASDecisionMode(identifier: pattern.modeID) ?? .quick,
                     suppressionWeight: pattern.suppressionWeight,
                     evidenceCount: pattern.evidenceCount,
                     updatedAt: pattern.updatedAt

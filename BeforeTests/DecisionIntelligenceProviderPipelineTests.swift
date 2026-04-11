@@ -515,7 +515,7 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
 
         XCTAssertEqual(latestTrace.kind, .quick)
         XCTAssertEqual(latestTrace.admissionDecision?.skipReason, .templateAlreadySufficient)
-        XCTAssertTrue(latestTrace.detail.contains("Admission controller skipped quick refinement"))
+        XCTAssertTrue(latestTrace.detail.contains("Admission controller skipped primary refinement"))
     }
 
     @MainActor
@@ -807,7 +807,7 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         XCTAssertEqual(cacheSnapshot.totalQuarantinedHits, 1)
         XCTAssertTrue(
             DecisionIntelligenceDebugStore.shared.traces.contains {
-                $0.consistencyRejected && $0.detail.contains("cached quick refinement")
+                $0.consistencyRejected && $0.detail.contains("cached primary refinement")
             }
         )
     }

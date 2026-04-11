@@ -1,4 +1,5 @@
 import Foundation
+import BASMemory
 import BASPolicy
 import BASRuntimeCore
 
@@ -223,7 +224,7 @@ public enum BASExecutionGovernance {
                 return BASAdmissionDecision(
                     isAllowed: false,
                     pressure: pressure,
-                    reason: "Quick refinement stayed deterministic because this turn is already fully covered by the structured quick-check template and there is no extra user signal to justify a model pass.",
+                    reason: "Primary refinement stayed deterministic because this turn is already fully covered by the structured primary template and there is no extra user signal to justify a model pass.",
                     skipReason: .templateAlreadySufficient
                 )
             }
@@ -232,7 +233,7 @@ public enum BASExecutionGovernance {
                 return BASAdmissionDecision(
                     isAllowed: false,
                     pressure: pressure,
-                    reason: "Quick refinement stayed deterministic because the prompt is already over budget and first-token latency matters more than extra wording polish here.",
+                    reason: "Primary refinement stayed deterministic because the prompt is already over budget and first-token latency matters more than extra wording polish here.",
                     skipReason: .budgetExceeded
                 )
             }
@@ -326,7 +327,16 @@ public enum BASExecutionGovernance {
     public static func responseMode(
         for kind: BASAdaptiveTraceKind
     ) -> String {
-        kind.rawValue
+        switch kind {
+        case .quick:
+            BASDecisionMode.quick.identifier
+        case .balance:
+            BASDecisionMode.balance.identifier
+        case .mirror:
+            BASDecisionMode.mirror.identifier
+        case .reminder:
+            kind.rawValue
+        }
     }
 
     public static func proposedActions(

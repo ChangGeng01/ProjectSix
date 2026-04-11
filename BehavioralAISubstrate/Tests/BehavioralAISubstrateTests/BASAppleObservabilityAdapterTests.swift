@@ -41,7 +41,7 @@ struct BASAppleObservabilityAdapterTests {
                 brainState: BASDecisionBrainState(
                     profileCore: ["Gentle tone"],
                     activeGoals: ["Protect sleep"],
-                    relevantMemories: ["Tomorrow Box helped before"],
+                    relevantMemories: ["Holding the decision helped before"],
                     sessionBiases: [],
                     retrievalTags: [],
                     reactionWeights: .defaults(for: "quick"),
@@ -58,7 +58,7 @@ struct BASAppleObservabilityAdapterTests {
         #expect(compilation.storedOutputPreview.contains("[REDACTED LIVE OUTPUT PREVIEW]"))
         #expect(compilation.executionTrace.selectedRoute.preferredModelID == "foundationModels")
         #expect(compilation.executionTrace.selectedRoute.fallbackModelIDs == ["foundationModels"])
-        #expect(compilation.executionTrace.memoriesRecalled == ["Protect sleep", "Tomorrow Box helped before"])
+        #expect(compilation.executionTrace.memoriesRecalled == ["Protect sleep", "Holding the decision helped before"])
         #expect(compilation.executionTrace.latency.routeSelectionMs == 30)
         #expect(compilation.executionTrace.latency.retrievalMs == 60)
         #expect(compilation.executionTrace.latency.generationMs == 90)
@@ -189,10 +189,10 @@ struct BASAppleObservabilityAdapterTests {
                     BASConsistencyViolation(kind: .forbiddenAction, message: "Action drifted outside the allowed space.")
                 ]
             ),
-            source: "provider quick refinement"
+            source: "provider primary refinement"
         )
 
-        #expect(detail.contains("provider quick refinement"))
+        #expect(detail.contains("provider primary refinement"))
         #expect(detail.contains("Action drifted outside the allowed space."))
     }
 

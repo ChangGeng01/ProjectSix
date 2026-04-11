@@ -78,7 +78,7 @@ public enum BASStructuredTruthCompiler {
 
         var sessionFacts: [String: String] = [:]
         if let surfaceMode {
-            sessionFacts["surface_mode"] = surfaceMode.rawValue
+            sessionFacts["surface_mode"] = surfaceMode.identifier
         }
         if let brainState {
             sessionFacts["boundary_mode"] = brainState.boundaryPolicy.mode.rawValue
@@ -99,11 +99,11 @@ public enum BASStructuredTruthCompiler {
     ) -> String {
         switch kind {
         case .quick:
-            "quick"
+            BASDecisionMode.quick.identifier
         case .balance:
-            "balance"
+            BASDecisionMode.balance.identifier
         case .mirror:
-            "mirror"
+            BASDecisionMode.mirror.identifier
         case .reminder:
             "reminder"
         }

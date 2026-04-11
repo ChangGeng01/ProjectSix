@@ -11,7 +11,7 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
 
         XCTAssertNotNil(openModelDescriptor)
         XCTAssertEqual(openModelDescriptor?.track, .builtInOpenModel)
-        XCTAssertEqual(openModelDescriptor?.openModel?.stableID, "before/open-model-slot")
+        XCTAssertEqual(openModelDescriptor?.openModel?.stableID, "substrate/open-model-slot")
         XCTAssertEqual(gemmaDescriptor?.affinity(for: .mirror), 100)
         XCTAssertEqual(foundationDescriptor?.affinity(for: .quick), 100)
         XCTAssertEqual(gemmaDescriptor?.capabilityProfile.modelID, "google/gemma-4-e4b-it")

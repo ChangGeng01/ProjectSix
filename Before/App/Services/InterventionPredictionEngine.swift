@@ -20,7 +20,7 @@ enum InterventionPredictionEngine {
         let candidate = BASApplePredictiveInterventionPredictor.predictCandidate(
             input: BASApplePredictiveInterventionInput(
                 predictiveInterventionsEnabled: preferences.predictiveInterventionsEnabled,
-                currentModeID: currentBrainState?.mode.rawValue,
+                currentModeID: currentBrainState?.mode.substrateModeID,
                 negativeRecentCount: negativeRecentCount,
                 failureGuardIDs: currentBrainState?.failureGuardIDs ?? [],
                 now: now
@@ -33,7 +33,7 @@ enum InterventionPredictionEngine {
                 title: $0.title,
                 detail: $0.detail,
                 evidenceSignalCount: $0.evidenceSignalCount,
-                suggestedMode: $0.preferredModeID.flatMap(DecisionMode.init(rawValue:)),
+                suggestedMode: DecisionMode.fromSubstrateModeID($0.preferredModeID),
                 reason: $0.reason,
                 expiresAt: $0.expiresAt
             )

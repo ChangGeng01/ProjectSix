@@ -54,7 +54,7 @@ struct BASReferencePromptModesCoreTests {
                 prompt: "I want to buy this tonight.",
                 candidateTexts: [
                     "Hold it until tomorrow morning.",
-                    "Put it in Tomorrow Box and sleep on it.",
+                    "Put it in the holding lane and sleep on it.",
                     "Wait for the weekend before deciding.",
                     "This fourth candidate should be clipped."
                 ],

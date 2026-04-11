@@ -618,7 +618,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                 ),
                 BASGovernedMemory(
                     kind: .support,
-                    content: "Tomorrow Box usually breaks the late-night loop.",
+                    content: "Holding the decision usually breaks the late-night loop.",
                     scope: .user,
                     sensitivity: .medium,
                     tier: .warm,
@@ -837,7 +837,7 @@ struct BASAppleCurrentBrainBootstrapTests {
         )
 
         #expect(artifact.execution.orderedTemplateIDs == ["night_message_cooling"])
-        #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.rawValue)
+        #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.identifier)
         #expect(artifact.persistenceInput.fingerprint == artifact.execution.bootstrapped.brainState.verificationSnapshot.fingerprint)
         #expect(Set(artifact.persistenceInput.activeTemplateIDs) == Set(artifact.execution.orderedTemplateIDs))
         #expect(Set(artifact.persistenceInput.failureGuardIDs) == Set(artifact.execution.orderedFailurePatternIDs))
@@ -912,7 +912,7 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(artifact.execution.preparation.languageMode == .chinese)
         #expect(artifact.execution.preparation.riskLevel == .high)
         #expect(artifact.execution.orderedTemplateIDs == ["night_message_cooling"])
-        #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.rawValue)
+        #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.identifier)
     }
 
     @Test("host bootstrap adapter compiles raw bridge inputs into artifact semantics")
@@ -986,7 +986,7 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(artifact.execution.preparation.riskLevel == .high)
         #expect(artifact.execution.orderedTemplateIDs == ["night_message_cooling"])
         #expect(artifact.execution.orderedFailurePatternIDs == ["night_fast_path_failure"])
-        #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.rawValue)
+        #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.identifier)
     }
 
     @Test("bridge input builder compiles task graph hint into raw bridge payload")

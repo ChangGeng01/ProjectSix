@@ -42,7 +42,7 @@ struct BASFrontstageAndScopedContextTests {
                 anchorTitles: ["quick note"],
                 dominantSignalTitles: ["Constraint pressure", "Concern weight"],
                 suppressedBehaviors: ["instant_verdict"],
-                memoryHeadlines: ["Tomorrow Box often breaks the loop."],
+                memoryHeadlines: ["Holding the decision often breaks the loop."],
                 sessionBiases: ["Keep the language short and concrete."]
             )
         )
@@ -62,7 +62,7 @@ struct BASFrontstageAndScopedContextTests {
         let brainState = BASDecisionBrainState(
             profileCore: ["Short, direct language lands better.", "Long copy causes drift."],
             activeGoals: ["Protect sleep before midnight.", "Avoid stress shopping."],
-            relevantMemories: ["Tomorrow Box often breaks the loop.", "Late sessions need lighter guidance."],
+            relevantMemories: ["Holding the decision often breaks the loop.", "Late sessions need lighter guidance."],
             sessionBiases: ["Keep the language short and concrete.", "Avoid sounding judgmental."],
             retrievalTags: ["night", "buy"],
             reactionWeights: BASReactionWeights(
@@ -103,7 +103,7 @@ struct BASFrontstageAndScopedContextTests {
         #expect(compact?.userProfile == ["Short, direct language lands better."])
         #expect(compact?.activeGoals == ["Protect sleep before midnight."])
         #expect(compact?.localBiases == ["Keep the language short and concrete."])
-        #expect(compact?.autoMemory == ["Tomorrow Box often breaks the loop."])
+        #expect(compact?.autoMemory == ["Holding the decision often breaks the loop."])
         #expect(compact?.boundaryMode == brainState.boundaryPolicy.mode.rawValue)
         #expect(full?.userProfile.count == 2)
         #expect(full?.activeGoals.count == 2)

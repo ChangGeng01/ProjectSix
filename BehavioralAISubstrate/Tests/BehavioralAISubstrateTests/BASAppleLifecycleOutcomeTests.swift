@@ -12,7 +12,7 @@ struct BASAppleLifecycleOutcomeTests {
             promptSeed: "  hold this  "
         )
 
-        #expect(plan.actionKind == .quickCapture)
+        #expect(plan.actionKind == .capture)
         #expect(plan.scenarioID == "buy")
         #expect(plan.preferredModeID == nil)
         #expect(plan.promptSeed == "hold this")
@@ -29,11 +29,11 @@ struct BASAppleLifecycleOutcomeTests {
 
         BASApplePendingLaunchOutcomeExecutor.execute(
             plan: plan,
-            performQuickCapture: { _ in calls.append("quick") },
-            performOpenMode: { action in
+            performCapture: { _ in calls.append("quick") },
+            performPresent: { action in
                 calls.append("open:\(action.preferredModeID ?? "nil"):\(action.promptSeed)")
             },
-            performRoutedPrompt: { _ in calls.append("route") }
+            performRoutedInput: { _ in calls.append("route") }
         )
 
         #expect(calls == ["open:balance:reopen this"])
@@ -49,13 +49,13 @@ struct BASAppleLifecycleOutcomeTests {
                 scenarioID: "buy",
                 promptSeed: " hold this "
             ),
-            performQuickCapture: { plan in
+            performCapture: { plan in
                 calls.append("quick:\(plan.scenarioID ?? "nil"):\(plan.promptSeed)")
             },
-            performOpenMode: { _ in
+            performPresent: { _ in
                 calls.append("open")
             },
-            performRoutedPrompt: { _ in
+            performRoutedInput: { _ in
                 calls.append("route")
             }
         )
@@ -84,16 +84,16 @@ struct BASAppleLifecycleOutcomeTests {
         BASAppleWorkspaceRestoreExecutor.execute(
             eligibility: BASAppleWorkspaceRestoreEligibilityInput(
                 restoreEnabled: false,
-                hasActiveQuickSession: false,
-                hasActiveBalanceSession: false,
-                hasActiveMirrorSession: false,
+                hasActivePrimaryWorkflow: false,
+                hasActiveComparativeWorkflow: false,
+                hasActiveReflectiveWorkflow: false,
                 hasReflectionContext: false
             ),
             loadState: { "quick" },
             modeID: { $0 },
-            restoreQuick: { _ in calls.append("quick") },
-            restoreBalance: { _ in calls.append("balance") },
-            restoreMirror: { _ in calls.append("mirror") },
+            restorePrimary: { _ in calls.append("quick") },
+            restoreComparative: { _ in calls.append("balance") },
+            restoreReflective: { _ in calls.append("mirror") },
             selectHomeTab: { calls.append("home") },
             afterRestore: { calls.append("after") }
         )
@@ -108,16 +108,16 @@ struct BASAppleLifecycleOutcomeTests {
         BASAppleWorkspaceRestoreExecutor.execute(
             eligibility: BASAppleWorkspaceRestoreEligibilityInput(
                 restoreEnabled: true,
-                hasActiveQuickSession: false,
-                hasActiveBalanceSession: false,
-                hasActiveMirrorSession: false,
+                hasActivePrimaryWorkflow: false,
+                hasActiveComparativeWorkflow: false,
+                hasActiveReflectiveWorkflow: false,
                 hasReflectionContext: false
             ),
             loadState: { "mirror" },
             modeID: { $0 },
-            restoreQuick: { _ in calls.append("quick") },
-            restoreBalance: { _ in calls.append("balance") },
-            restoreMirror: { _ in calls.append("mirror") },
+            restorePrimary: { _ in calls.append("quick") },
+            restoreComparative: { _ in calls.append("balance") },
+            restoreReflective: { _ in calls.append("mirror") },
             selectHomeTab: { calls.append("home") },
             afterRestore: { calls.append("after") }
         )

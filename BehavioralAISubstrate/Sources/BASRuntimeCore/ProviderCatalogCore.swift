@@ -28,14 +28,14 @@ public enum BASReferenceProviderCatalog {
     )
 
     public static let reservedOpenModelDescriptor = BASOpenModelDescriptor(
-        stableID: "before/open-model-slot",
+        stableID: "substrate/open-model-slot",
         family: "Open model runtime",
         version: "reserved",
         title: "Open model runtime",
         detail: "Reserved integration slot for future bundled or open-source local models. Replace this adapter to add a new model without rewriting the intelligence pipeline.",
         taskAffinities: defaultTaskAffinities(providerID: BASReferenceProviderRuntime.openModelProviderID),
         capabilityProfile: BASProviderCapabilityProfile(
-            modelID: "before/open-model-slot",
+            modelID: "substrate/open-model-slot",
             strengths: [
                 .shortDialogue,
                 .structuredOutput,

@@ -10,23 +10,29 @@ struct BASAppleProviderReleaseAdapterTests {
     @Test("adapter owns preview formatting and referenced facts")
     func adapterOwnsPreviewFormattingAndReferencedFacts() {
         #expect(
-            BASAppleProviderReleaseAdapter.quickPreview(
-                currentPerspective: "Pause now.",
-                afterPerspective: "Tomorrow will feel lighter."
+            BASAppleProviderReleaseAdapter.keyedPreview(
+                fields: [
+                    ("Current", "Pause now."),
+                    ("After", "Tomorrow will feel lighter.")
+                ]
             ) == "Current: Pause now.\nAfter: Tomorrow will feel lighter."
         )
         #expect(
-            BASAppleProviderReleaseAdapter.balancePreview(
-                headline: "Protect sleep",
-                focusDescription: "This adds one more obligation.",
-                nextAction: "Wait until tomorrow."
+            BASAppleProviderReleaseAdapter.keyedPreview(
+                fields: [
+                    ("Headline", "Protect sleep"),
+                    ("Focus", "This adds one more obligation."),
+                    ("Next", "Wait until tomorrow.")
+                ]
             ) == "Headline: Protect sleep\nFocus: This adds one more obligation.\nNext: Wait until tomorrow."
         )
         #expect(
-            BASAppleProviderReleaseAdapter.mirrorPreview(
-                headline: "This is the same pattern",
-                coreTension: "Hope versus depletion",
-                nextAction: "Name the cost first."
+            BASAppleProviderReleaseAdapter.keyedPreview(
+                fields: [
+                    ("Headline", "This is the same pattern"),
+                    ("Tension", "Hope versus depletion"),
+                    ("Next", "Name the cost first.")
+                ]
             ) == "Headline: This is the same pattern\nTension: Hope versus depletion\nNext: Name the cost first."
         )
         #expect(
@@ -65,10 +71,10 @@ struct BASAppleProviderReleaseAdapterTests {
                     BASConsistencyViolation(kind: .forbiddenAction, message: "Action drifted outside the allowed space.")
                 ]
             ),
-            source: "cached mirror refinement"
+            source: "cached reflective refinement"
         )
 
-        #expect(detail.contains("cached mirror refinement"))
+        #expect(detail.contains("cached reflective refinement"))
         #expect(detail.contains("Action drifted outside the allowed space."))
     }
 

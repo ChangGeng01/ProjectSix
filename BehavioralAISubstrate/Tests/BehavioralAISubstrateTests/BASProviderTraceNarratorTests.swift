@@ -19,7 +19,7 @@ struct BASProviderTraceNarratorTests {
     @Test("cached detail appends structured cache explanation")
     func cachedDetailAppendsCacheExplanation() {
         let detail = BASProviderTraceNarrator.cachedDetail(
-            base: "Before used the preferred provider without needing a fallback."
+            base: "The host app used the preferred provider without needing a fallback."
         )
 
         #expect(detail.contains("structured prompt cache"))
@@ -28,7 +28,7 @@ struct BASProviderTraceNarratorTests {
     @Test("deterministic fallback detail lists suspended providers when present")
     func deterministicFallbackDetailListsCooldownProviders() {
         let detail = BASProviderTraceNarrator.deterministicFallbackDetail(
-            base: "No provider returned a reminder selection, so Before kept the deterministic reminder ordering.",
+            base: "No provider returned a reminder selection, so the host app kept the deterministic reminder ordering.",
             suspendedProviderTitles: ["Gemma", "Foundation Models"]
         )
 

@@ -188,7 +188,7 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         XCTAssertFalse(envelope.payload.contains("After perspective: It may feel louder tomorrow."))
         XCTAssertTrue(envelope.payload.contains("\"auto_memory\":[\"Putting it into Tomorrow Box often breaks the loop.\"]"))
         XCTAssertFalse(envelope.payload.contains("Late sessions need lighter, shorter guidance."))
-        XCTAssertEqual(envelope.assembly.kernelSnapshot.truthState?.mode, "quick")
+        XCTAssertEqual(envelope.assembly.kernelSnapshot.truthState?.mode, "primary")
         XCTAssertEqual(
             envelope.assembly.kernelSnapshot.truthState?.currentGoal,
             "Protect sleep before midnight."
@@ -282,7 +282,7 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
         )
         XCTAssertTrue(envelope.payload.contains("\"user_profile\":[\"Short, direct language lands better.\"]"))
         XCTAssertTrue(envelope.payload.contains("STRUCTURED_TRUTH_JSON:"))
-        XCTAssertTrue(envelope.payload.contains("\"mode\":\"balance\""))
+        XCTAssertTrue(envelope.payload.contains("\"mode\":\"comparative\""))
         XCTAssertTrue(envelope.payload.contains("\"currentGoal\":\"Protect sleep and energy.\""))
         XCTAssertTrue(envelope.payload.contains("\"local_biases\":[\"Keep the language short and concrete.\"]"))
         XCTAssertTrue(envelope.payload.contains("\"auto_memory\":[\"Late sessions need lighter, shorter guidance.\"]"))
@@ -324,7 +324,7 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
             )
         )
         XCTAssertEqual(envelope.prompt.assembly.kernelSnapshot.truthState?.mode, "reminder")
-        XCTAssertEqual(envelope.prompt.assembly.kernelSnapshot.truthState?.sessionFacts["surface_mode"], "quick")
+        XCTAssertEqual(envelope.prompt.assembly.kernelSnapshot.truthState?.sessionFacts["surface_mode"], "primary")
         XCTAssertTrue(envelope.prompt.budget.isWithinTarget)
     }
 

@@ -41,7 +41,7 @@ struct BASAppleConsoleSnapshotBuilderTests {
                 runtimeGearID: "balanced",
                 totalRequests: 12,
                 totalProviderAttempts: 14,
-                roleName: "Pause Companion",
+                roleName: "Stability Guide",
                 boundaryModeID: "localOnlyAdvisory",
                 calibrationStatusID: "stable",
                 verificationSnapshot: "brain_fp"
@@ -50,7 +50,7 @@ struct BASAppleConsoleSnapshotBuilderTests {
 
         #expect(snapshot.isPureLocal)
         #expect(snapshot.runtimeSummary == "Route Foundation Models • gear balanced • requests 12 • attempts 14")
-        #expect(snapshot.brainSummary == "Pause Companion • localOnlyAdvisory • stable • fingerprint brain_fp")
+        #expect(snapshot.brainSummary == "Stability Guide • localOnlyAdvisory • stable • fingerprint brain_fp")
         #expect(snapshot.reports.first(where: { $0.kind == .runtime })?.summary == "Runtime layer is stable.")
         #expect(snapshot.reports.first(where: { $0.kind == .memory })?.blockers == ["Cold archive is not fully compacted."])
     }

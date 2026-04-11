@@ -7,11 +7,11 @@ struct BASAppleReopenWorkflowTests {
     func decisionModeExecutorRoutesBalanceModeDeterministically() {
         var routed: String?
 
-        let handled = BASAppleDecisionModeExecutor.execute(
+        let handled = BASAppleWorkflowModeExecutor.execute(
             modeID: "balance",
-            performQuick: { routed = "quick" },
-            performBalance: { routed = "balance" },
-            performMirror: { routed = "mirror" }
+            performPrimary: { routed = "quick" },
+            performComparative: { routed = "balance" },
+            performReflective: { routed = "mirror" }
         )
 
         #expect(handled)
@@ -20,7 +20,7 @@ struct BASAppleReopenWorkflowTests {
 
     @Test("tomorrow box follow-up builder suppresses low risk and creates high-risk suggestion")
     func tomorrowBoxFollowUpBuilderSuppressesLowRiskAndCreatesHighRiskSuggestion() {
-        let low = BASAppleTomorrowBoxReopenFollowUpBuilder.build(
+        let low = BASAppleDeferredReopenFollowUpBuilder.build(
             riskLevelID: "low",
             title: "Pause",
             detail: "Low risk",
@@ -29,7 +29,7 @@ struct BASAppleReopenWorkflowTests {
             templateHint: nil,
             interventionHistorySummary: nil
         )
-        let high = BASAppleTomorrowBoxReopenFollowUpBuilder.build(
+        let high = BASAppleDeferredReopenFollowUpBuilder.build(
             riskLevelID: "high",
             title: "Pause",
             detail: "High risk",
@@ -58,19 +58,19 @@ struct BASAppleReopenWorkflowTests {
         var selectedHome = false
         var persisted = false
 
-        BASAppleTomorrowBoxReopenExecutor.execute(
+        BASAppleDeferredReopenExecutor.execute(
             modeID: "mirror",
             promptSeed: "Ignored because draft exists",
             hasDraft: true,
             clearActiveDecisionFlows: { cleared = true },
-            activateQuickFromDraft: { activated = "quick" },
-            activateBalanceFromDraft: { activated = "balance" },
-            activateMirrorFromDraft: { activated = "mirror" },
-            startQuick: { _ in Issue.record("Unexpected quick start") },
-            startBalance: { _ in Issue.record("Unexpected balance start") },
-            startMirror: { _ in Issue.record("Unexpected mirror start") },
-            removeTomorrowBoxItem: { removed = true },
-            followUp: BASAppleTomorrowBoxReopenFollowUp(
+            activatePrimaryFromDraft: { activated = "quick" },
+            activateComparativeFromDraft: { activated = "balance" },
+            activateReflectiveFromDraft: { activated = "mirror" },
+            startPrimary: { _ in Issue.record("Unexpected quick start") },
+            startComparative: { _ in Issue.record("Unexpected balance start") },
+            startReflective: { _ in Issue.record("Unexpected mirror start") },
+            removeDeferredItem: { removed = true },
+            followUp: BASAppleDeferredReopenFollowUp(
                 interventionSuggestion: BASAppleReopenInterventionSuggestion(
                     riskLevelID: "high",
                     title: "Re-open slowly",
@@ -100,12 +100,12 @@ struct BASAppleReopenWorkflowTests {
     func draftedModeReopenExecutorOnlyFinalizesForSupportedModes() {
         var finalized = false
 
-        let handled = BASAppleDraftedModeReopenExecutor.execute(
+        let handled = BASAppleDraftedWorkflowReopenExecutor.execute(
             modeID: "unsupported",
             clearActiveDecisionFlows: {},
-            activateQuick: {},
-            activateBalance: {},
-            activateMirror: {},
+            activatePrimary: {},
+            activateComparative: {},
+            activateReflective: {},
             afterSuccessfulReopen: { finalized = true }
         )
 

@@ -1,6 +1,6 @@
 # BehavioralAISubstrate
 
-`BehavioralAISubstrate` is the private Apple-only substrate that powers `Before` and can now be integrated by other host apps inside this monorepo.
+`BehavioralAISubstrate` is a private Apple-only substrate for behavior-aware host apps. `Before` is the first reference host, not the shape of the substrate itself.
 
 ## Products
 
@@ -18,19 +18,24 @@
 
 Default hosts should import `BASHostKit`.
 
+Product language stays in the host. The substrate exposes generic workflow and lifecycle vocabulary, while hosts translate their own mode names, tabs, and branded flows at the edge.
+
 ```swift
 import BASHostKit
 
 let runtime = BASHostRuntime(
-    configuration: BASHostConfiguration(),
+    configuration: BASHostConfiguration(
+        workflowBehavior: BASHostWorkflowBehaviorConfiguration(hostNamespace: "host"),
+        presentation: BASHostPresentationConfiguration()
+    ),
     dependencies: BASHostDependencySet()
 )
 
 let result = runtime.startSession(
     BASHostSessionRequest(
-        kind: .quick,
-        mode: .quick,
-        surface: .app,
+        kind: .interactive,
+        workflowProfile: .rapid,
+        surface: .application,
         prompt: "Should I do this right now?"
     )
 )
@@ -43,6 +48,21 @@ The façade returns:
 - `BASHostSessionResult.consoleSnapshot`
 - `BASHostSessionResult.notices`
 - `BASHostSessionResult.followUpActions`
+
+Hosts can also inject their own:
+
+- workflow titles
+- workflow template IDs
+- workflow memory source mapping
+- workflow retrieval defaults
+- host namespace for verification and projection provenance
+- lifecycle titles
+- lifecycle notices
+- follow-up action phrasing
+- predictive intervention copy
+- reopen wording
+
+through `BASHostConfiguration.presentation`, so the substrate keeps generic behavior while each host keeps its own product DNA.
 
 ## Reference Hosts
 

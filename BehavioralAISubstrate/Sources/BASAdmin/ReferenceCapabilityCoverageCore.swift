@@ -444,10 +444,10 @@ public enum BASReferenceCapabilityCoverageBuilder {
                 ),
                 BASCapabilityItem(
                     id: "delivery.cooling_container",
-                    title: "Tomorrow Box cooling container",
+                    title: "Unified cooling container",
                     summary: "Route impulsive decisions into a unified hold, delay, and reopen container.",
                     status: .ready,
-                    evidence: ["Tomorrow Box models and reopen hints are integrated."]
+                    evidence: ["Hold, delay, and reopen flows are integrated."]
                 ),
                 BASCapabilityItem(
                     id: "delivery.safe_shared_surfaces",

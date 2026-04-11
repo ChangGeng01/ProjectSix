@@ -80,7 +80,7 @@ struct BehavioralAISubstrateBridgeTests {
                 triggerReason: "watch_capture"
             )
         )
-        #expect(intentEnvelope.kind == .quickCapture)
+        #expect(intentEnvelope.kind == .capture)
         #expect(intentEnvelope.surface == .watch)
         #expect(intentEnvelope.taskKind == BASTaskKind.chat)
         #expect(intentEnvelope.riskLevel == .medium)
@@ -191,7 +191,7 @@ struct BehavioralAISubstrateBridgeTests {
         let hostResult = runtime.startSession(
             BASHostSessionRequest(
                 kind: .notification,
-                mode: .quick,
+                workflowProfile: .rapid,
                 surface: .notification,
                 prompt: "Should I send this tonight?",
                 title: "Should I send this tonight?",
@@ -204,13 +204,23 @@ struct BehavioralAISubstrateBridgeTests {
         let bridgeSnapshot = try #require(
             BehavioralAISubstrateBridge.brainSnapshot(from: bridgeCurrent)
         )
+        let expectedProfile = BASDecisionMode(identifier: bridgeSnapshot.mode).map { mode in
+            switch mode {
+            case .quick:
+                BASHostWorkflowProfile.rapid
+            case .balance:
+                BASHostWorkflowProfile.deliberate
+            case .mirror:
+                BASHostWorkflowProfile.reflective
+            }
+        }
 
-        #expect(hostResult.currentBrain.mode == bridgeSnapshot.mode)
-        #expect(hostResult.currentBrain.activeTemplateIDs.isEmpty == false)
-        #expect(hostResult.currentBrain.recentFailurePatternIDs.isEmpty == false)
+        #expect(hostResult.currentBrain.workflowProfile == expectedProfile)
+        #expect(hostResult.currentBrain.activeTemplateCount > 0)
+        #expect(hostResult.currentBrain.failureGuardCount > 0)
         #expect(hostResult.currentBrain.activeConstraints.contains("high-risk-confirmation"))
-        #expect(hostResult.interventionSuggestion?.preferredModeID == bridgeSnapshot.mode)
-        #expect(hostResult.interventionSuggestion?.riskLevelID == bridgeCurrent.riskLevel.rawValue)
+        #expect(hostResult.interventionSuggestion?.preferredWorkflowProfile == expectedProfile)
+        #expect(hostResult.interventionSuggestion?.riskLevel.rawValue == bridgeCurrent.riskLevel.rawValue)
     }
 
     @Test
@@ -297,13 +307,16 @@ struct BehavioralAISubstrateBridgeTests {
         )
 
         let current = BehavioralAISubstrateBridge.refreshCurrentBrainState(
-            quickPromptFragments: nil,
-            balancePromptFragments: nil,
-            mirrorPromptFragments: nil,
+            promptFragmentsByModeID: [:],
+            modePriority: [
+                DecisionMode.quick.substrateModeID,
+                DecisionMode.balance.substrateModeID,
+                DecisionMode.mirror.substrateModeID
+            ],
             taskGraph: taskGraph,
             context: context,
             projection: projection,
-            retrievalModesByModeID: [DecisionMode.mirror.rawValue: DecisionRetrievalMode.filtered.rawValue],
+            retrievalModesByModeID: [DecisionMode.mirror.substrateModeID: DecisionRetrievalMode.filtered.rawValue],
             source: .sceneActive,
             now: now
         )
@@ -412,10 +425,10 @@ struct BehavioralAISubstrateBridgeTests {
 
         BehavioralAISubstrateBridge.consumeDecisionIntentEnvelope(
             envelope,
-            performQuickCapture: { _, _, _ in
+            performCapture: { _, _, _ in
                 Issue.record("Expected open-mode path, not quick capture")
             },
-            performOpenMode: { _, mode, shouldSelectBoxTab, prompt in
+            performPresent: { _, mode, shouldSelectBoxTab, prompt in
                 openedMode = mode
                 selectedBoxTab = shouldSelectBoxTab
                 #expect(prompt == "Resume with more space.")
@@ -423,7 +436,7 @@ struct BehavioralAISubstrateBridgeTests {
             performPredictiveIntervention: { _ in
                 Issue.record("Expected open-mode path, not predictive intervention")
             },
-            performRestoreWorkspace: {
+            performRestore: {
                 Issue.record("Expected open-mode path, not workspace restore")
             },
             refreshCurrentBrain: { source in
@@ -455,21 +468,21 @@ struct BehavioralAISubstrateBridgeTests {
         BehavioralAISubstrateBridge.consumeLifecycleEntrySourcesIfNeeded(
             consumeHandoff: { envelope },
             consumePendingRequest: { nil },
-            performQuickCapture: { _, _, _ in
+            performCapture: { _, _, _ in
                 Issue.record("Expected open-mode handoff path")
             },
-            performOpenMode: { mode, _, prompt in
+            performPresent: { mode, _, prompt in
                 openedMode = mode
                 #expect(prompt == "Resume with more space.")
             },
-            performRoutedPrompt: { _, _ in
+            performRoutedInput: { _, _ in
                 Issue.record("Expected handoff path, not routed launch")
             },
             selectBoxTab: { selectedBoxTab = true },
             performPredictiveIntervention: { _ in
                 Issue.record("Expected open-mode handoff path")
             },
-            performRestoreWorkspace: {
+            performRestore: {
                 Issue.record("Expected open-mode handoff path")
             },
             refreshCurrentBrain: { source in
@@ -495,12 +508,12 @@ struct BehavioralAISubstrateBridgeTests {
             presentPendingReflection: { actions.append("reflection") },
             consumeHandoff: { nil },
             consumePendingRequest: { nil },
-            performQuickCapture: { _, _, _ in actions.append("quick") },
-            performOpenMode: { _, _, _ in actions.append("open") },
-            performRoutedPrompt: { _, _ in actions.append("route") },
+            performCapture: { _, _, _ in actions.append("quick") },
+            performPresent: { _, _, _ in actions.append("open") },
+            performRoutedInput: { _, _ in actions.append("route") },
             selectBoxTab: { actions.append("box") },
             performPredictiveIntervention: { _ in actions.append("prediction") },
-            performRestoreWorkspace: { actions.append("restore") },
+            performRestore: { actions.append("restore") },
             refreshPredictedIntervention: { actions.append("refresh_prediction") },
             syncWidgetSnapshot: { actions.append("widget") }
         )

@@ -58,7 +58,7 @@ public enum BASApplePredictiveInterventionPredictor {
     ) -> BASApplePredictiveInterventionCandidate? {
         guard input.predictiveInterventionsEnabled else { return nil }
 
-        let mode = BASDecisionMode(rawValue: input.currentModeID ?? "") ?? .quick
+        let mode = BASDecisionMode(identifier: input.currentModeID ?? "") ?? .quick
         let isNight = nightWindow(at: input.now)
         let riskLevel = resolvedRiskLevel(
             isNight: isNight,
@@ -111,20 +111,20 @@ public enum BASApplePredictiveInterventionPredictor {
         case .low:
             return (
                 title: "Put this out of the fast lane.",
-                detail: "A short delay may be enough. Tomorrow Box can hold it without pretending it disappeared.",
-                preferredModeID: BASDecisionMode.quick.rawValue
+                detail: "A short delay may be enough. Put it into a holding lane instead of forcing a decision right now.",
+                preferredModeID: BASDecisionMode.quick.identifier
             )
         case .medium:
             return (
-                title: "You may need one cleaner mirror before acting.",
+                title: "You may need one cleaner reflective pass before acting.",
                 detail: "Recent patterns suggest a pause plus one honest question will help more than a fast answer.",
-                preferredModeID: BASDecisionMode.mirror.rawValue
+                preferredModeID: BASDecisionMode.mirror.identifier
             )
         case .high:
             return (
                 title: "Do not decide from this level of blur.",
                 detail: "Night pressure and recent regret patterns suggest slowing this down before you move.",
-                preferredModeID: BASDecisionMode.mirror.rawValue
+                preferredModeID: BASDecisionMode.mirror.identifier
             )
         }
     }
@@ -139,7 +139,7 @@ public enum BASApplePredictiveInterventionPredictor {
             reasons.append("It is late enough that fast decisions are less trustworthy.")
         }
         if negativeRecentCount > 0 {
-            reasons.append("Recent quick calls have ended in regret or emptiness.")
+            reasons.append("Recent fast-path decisions have ended in regret or emptiness.")
         }
         if failureGuardIDs.contains("night_fast_path_failure") {
             reasons.append("Your current brain state is already suppressing night fast paths.")

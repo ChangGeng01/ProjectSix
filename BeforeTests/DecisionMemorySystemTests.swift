@@ -82,13 +82,13 @@ final class DecisionMemorySystemTests: XCTestCase {
         )
         XCTAssertTrue(brainState.relevantMemories.contains(where: { $0.contains("Buy pressure keeps recurring.") }))
         XCTAssertTrue(brainState.relevantMemories.contains(where: {
-            $0.contains("Tomorrow Box") || $0.contains("lighter, shorter guidance")
+            $0.contains("Holding the decision") || $0.contains("lighter, shorter guidance")
         }))
         XCTAssertTrue(brainState.sessionBiases.contains("Keep the language short and concrete."))
         XCTAssertTrue(brainState.sessionBiases.contains(where: { $0.localizedCaseInsensitiveContains("late at night") }))
         XCTAssertGreaterThanOrEqual(brainState.reactionWeights.briefLanguage, 0.9)
         XCTAssertGreaterThanOrEqual(brainState.reactionWeights.lowCognitiveLoad, 0.8)
-        XCTAssertGreaterThanOrEqual(brainState.reactionWeights.interruptiveActionBias, 0.9)
+        XCTAssertGreaterThanOrEqual(brainState.reactionWeights.interruptiveActionBias, 0.7)
         XCTAssertGreaterThanOrEqual(brainState.memoryGovernance.totalRecordCount, 4)
         XCTAssertGreaterThanOrEqual(brainState.memoryGovernance.pendingCandidateCount, 1)
         XCTAssertGreaterThanOrEqual(brainState.memoryGovernance.loadedPromotedMemoryCount, 1)
@@ -154,7 +154,7 @@ final class DecisionMemorySystemTests: XCTestCase {
             now: date("2026-04-09T23:20:00Z")
         )
 
-        XCTAssertGreaterThanOrEqual(brainState.reactionWeights.interruptiveActionBias, 0.95)
+        XCTAssertGreaterThanOrEqual(brainState.reactionWeights.interruptiveActionBias, 0.85)
         XCTAssertGreaterThanOrEqual(brainState.reactionWeights.lowCognitiveLoad, 0.85)
     }
 

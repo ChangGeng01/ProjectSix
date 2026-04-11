@@ -78,7 +78,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "off",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "Assistive intelligence is off, so Before is using the deterministic decision system only.",
+                detail: "Assistive intelligence is off, so the host app is using the deterministic decision system only.",
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -89,7 +89,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "testingOverride",
                 effectiveProviderID: request.preferredProviderID,
                 allowFallbacks: request.allowFallbacks,
-                detail: "Testing stub '\(testingOverrideTitle)' is active, so Before is keeping the full assistive path open for verification.",
+                detail: "Testing stub '\(testingOverrideTitle)' is active, so the host app is keeping the full assistive path open for verification.",
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -101,7 +101,7 @@ public enum BASAppleExecutionProfileAdapter {
                     tierID: "off",
                     effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                     allowFallbacks: false,
-                    detail: "Testing is pinning deterministic local copy, so Before is not using a model provider for assistive refinement.",
+                    detail: "Testing is pinning deterministic local copy, so the host app is not using a model provider for assistive refinement.",
                     preferredLanguages: request.preferredLanguages
                 )
             case BASReferenceProviderRuntime.foundationModelsProviderID where request.foundationAvailable:
@@ -109,7 +109,7 @@ public enum BASAppleExecutionProfileAdapter {
                     tierID: "systemManaged",
                     effectiveProviderID: BASReferenceProviderRuntime.foundationModelsProviderID,
                     allowFallbacks: request.allowFallbacks,
-                    detail: "Testing is pinning Apple's system-managed model, so Before is keeping the full assistive path open for that provider.",
+                    detail: "Testing is pinning Apple's system-managed model, so the host app is keeping the full assistive path open for that provider.",
                     preferredLanguages: request.preferredLanguages
                 )
             case BASReferenceProviderRuntime.openModelProviderID:
@@ -122,7 +122,7 @@ public enum BASAppleExecutionProfileAdapter {
                     tierID: request.physicalMemoryGB < 8 ? "balancedGemma" : "fullGemma",
                     effectiveProviderID: BASReferenceProviderRuntime.gemmaE4BProviderID,
                     allowFallbacks: request.allowFallbacks,
-                    detail: "Testing is pinning Gemma directly, so Before is leaving the full assistive path available for that provider.",
+                    detail: "Testing is pinning Gemma directly, so the host app is leaving the full assistive path available for that provider.",
                     preferredLanguages: request.preferredLanguages
                 )
             default:
@@ -135,7 +135,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "off",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "Deterministic local copy is pinned, so Before is not using a model provider for assistive refinement.",
+                detail: "Deterministic local copy is pinned, so the host app is not using a model provider for assistive refinement.",
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -152,7 +152,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "systemManaged",
                 effectiveProviderID: BASReferenceProviderRuntime.foundationModelsProviderID,
                 allowFallbacks: request.allowFallbacks,
-                detail: "Apple's system-managed on-device model is available, so Before can keep assistive refinement on without pushing device-level model policy into the app.",
+                detail: "Apple's system-managed on-device model is available, so the host app can keep assistive refinement on without pushing device-level model policy into the app.",
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -162,7 +162,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "simulator",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "On Simulator, Before stays on deterministic local copy so performance and correctness tests do not pretend a local model runtime is representative.",
+                detail: "On Simulator, the host app stays on deterministic local copy so performance and correctness tests do not pretend a local model runtime is representative.",
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -172,7 +172,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "conservativeDeterministic",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "Low Power Mode is on, so Before is staying on deterministic local copy to protect battery life and keep decision flows responsive.",
+                detail: "Low Power Mode is on, so the host app is staying on deterministic local copy to protect battery life and keep decision flows responsive.",
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -182,7 +182,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "conservativeDeterministic",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "This device is running a conservative intelligence profile. Before keeps the local model off the critical path on 6 GB-class iPhones like iPhone 14 so the app stays stable, cool, and predictable.",
+                detail: "This device is running a conservative intelligence profile. The host app keeps the local model off the critical path on 6 GB-class iPhones like iPhone 14 so the experience stays stable, cool, and predictable.",
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -192,7 +192,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "conservativeDeterministic",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "No assistive provider is ready on this device right now, so Before is keeping the deterministic path only.",
+                detail: "No assistive provider is ready on this device right now, so the host app is keeping the deterministic path only.",
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -202,7 +202,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "balancedGemma",
                 effectiveProviderID: BASReferenceProviderRuntime.gemmaE4BProviderID,
                 allowFallbacks: request.allowFallbacks,
-                detail: "This device has enough headroom for Gemma-assisted balance, mirror, and reminder work, but Before keeps quick-check refinement deterministic to protect latency.",
+                detail: "This device has enough headroom for deeper assisted analysis and reminder work, while the host app can still keep fast-turn refinement deterministic to protect latency.",
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -211,7 +211,7 @@ public enum BASAppleExecutionProfileAdapter {
             tierID: "fullGemma",
             effectiveProviderID: BASReferenceProviderRuntime.gemmaE4BProviderID,
             allowFallbacks: request.allowFallbacks,
-            detail: "This device has enough headroom for the full Gemma-assisted path, while Before still keeps verdicts deterministic.",
+            detail: "This device has enough headroom for the full Gemma-assisted path, while the host app can still keep final verdicts deterministic.",
             preferredLanguages: request.preferredLanguages
         )
     }
@@ -225,7 +225,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "simulator",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "On Simulator, Before keeps the reserved open-model slot off the critical path and stays deterministic.",
+                detail: "On Simulator, the host app keeps the reserved open-model slot off the critical path and stays deterministic.",
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -235,7 +235,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "conservativeDeterministic",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "Low Power Mode is on, so Before keeps the open-model runtime off the critical path to protect battery life.",
+                detail: "Low Power Mode is on, so the host app keeps the open-model runtime off the critical path to protect battery life.",
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -245,7 +245,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "conservativeDeterministic",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "This device is on a conservative intelligence profile, so Before keeps the reserved open-model lane deterministic on 6 GB-class phones.",
+                detail: "This device is on a conservative intelligence profile, so the host app keeps the reserved open-model lane deterministic on 6 GB-class phones.",
                 preferredLanguages: request.preferredLanguages
             )
         }

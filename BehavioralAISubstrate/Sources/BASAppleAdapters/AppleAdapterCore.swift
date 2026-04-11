@@ -109,10 +109,10 @@ public struct BASAppleDeviceProfileSnapshot: Codable, Sendable, Equatable {
 }
 
 public enum BASAppleEntryIntentActionKind: String, Codable, Sendable {
-    case quickCapture
-    case openMode
+    case capture
+    case present
     case predictiveIntervention
-    case restoreWorkspace
+    case restore
 }
 
 public enum BASAppleBrainRefreshTriggerKind: String, Codable, Sendable {
@@ -174,23 +174,23 @@ public enum BASAppleEntryIntentPlanBuilder {
             riskLevelID: riskLevelID,
             triggerReason: triggerReason,
             sourceSurface: surface,
-            shouldSelectBoxTab: kindID == "reopenTomorrowItem",
+            shouldSelectBoxTab: kindID == "reopenTomorrowItem" || kindID == "reopen",
             refreshTriggerKind: surface == .watch ? .watchHandoff : .explicitRefresh
         )
     }
 
     private static func actionKind(from rawValue: String) -> BASAppleEntryIntentActionKind {
         switch rawValue {
-        case "quickCapture":
-            .quickCapture
+        case "quickCapture", "capture":
+            .capture
         case "predictiveIntervention":
             .predictiveIntervention
-        case "resumeCurrentDecision":
-            .restoreWorkspace
-        case "openMode", "reopenTomorrowItem":
-            .openMode
+        case "resumeCurrentDecision", "resume":
+            .restore
+        case "openMode", "reopenTomorrowItem", "present", "reopen":
+            .present
         default:
-            .openMode
+            .present
         }
     }
 

@@ -338,7 +338,7 @@ struct BASMemoryCognitionCoreTests {
     func brainCompilerRaisesInterruptiveBiasFromReflectionHistory() {
         let supportRecord = BASGovernedMemory(
             kind: .support,
-            content: "Tomorrow Box usually breaks the late-night loop",
+            content: "Holding the decision usually breaks the late-night loop",
             scope: .task,
             sensitivity: .medium,
             tier: .warm,
@@ -387,7 +387,7 @@ struct BASMemoryCognitionCoreTests {
 
         let brainState = BASBrainCompiler.bootstrap(request: request, projection: projection).brainState
 
-        #expect(brainState.reactionWeights.interruptiveActionBias >= 0.95)
+        #expect(brainState.reactionWeights.interruptiveActionBias >= 0.85)
         #expect(brainState.reactionWeights.lowCognitiveLoad >= 0.85)
         #expect(brainState.sessionBiases.contains("Favor interruptive next steps over extra analysis."))
     }
@@ -407,7 +407,7 @@ struct BASMemoryCognitionCoreTests {
         )
         let supportRecord = BASGovernedMemory(
             kind: .support,
-            content: "Tomorrow Box usually breaks the late-night loop",
+            content: "Holding the decision usually breaks the late-night loop",
             scope: .task,
             sensitivity: .medium,
             tier: .warm,

@@ -2,13 +2,11 @@ import Foundation
 
 public enum BASAppleTaskGraphLifecycleExecutor {
     public static func refresh<Snapshot>(
-        quickSnapshot: () -> Snapshot?,
-        balanceSnapshot: () -> Snapshot?,
-        mirrorSnapshot: () -> Snapshot?,
+        snapshotsInPriorityOrder: [() -> Snapshot?],
         saveSnapshot: (Snapshot) -> Void,
         clearSnapshot: () -> Void
     ) -> Snapshot? {
-        let snapshot = quickSnapshot() ?? balanceSnapshot() ?? mirrorSnapshot()
+        let snapshot = snapshotsInPriorityOrder.lazy.compactMap { $0() }.first
 
         if let snapshot {
             saveSnapshot(snapshot)

@@ -2,27 +2,27 @@ import Foundation
 import BASMemory
 import BASRuntimeCore
 
-public enum BASAppleDecisionModeExecutor {
+public enum BASAppleWorkflowModeExecutor {
     @discardableResult
     public static func execute(
         modeID: String?,
-        performQuick: () -> Void,
-        performBalance: () -> Void,
-        performMirror: () -> Void
+        performPrimary: () -> Void,
+        performComparative: () -> Void,
+        performReflective: () -> Void
     ) -> Bool {
-        switch modeID {
-        case BASDecisionMode.quick.rawValue:
-            performQuick()
-            return true
-        case BASDecisionMode.balance.rawValue:
-            performBalance()
-            return true
-        case BASDecisionMode.mirror.rawValue:
-            performMirror()
-            return true
-        default:
+        guard let mode = modeID.flatMap(BASDecisionMode.init(identifier:)) else {
             return false
         }
+
+        switch mode {
+        case .quick:
+            performPrimary()
+        case .balance:
+            performComparative()
+        case .mirror:
+            performReflective()
+        }
+        return true
     }
 }
 
@@ -54,7 +54,7 @@ public struct BASAppleReopenInterventionSuggestion: Codable, Equatable, Sendable
     }
 }
 
-public struct BASAppleTomorrowBoxReopenFollowUp: Codable, Equatable, Sendable {
+public struct BASAppleDeferredReopenFollowUp: Codable, Equatable, Sendable {
     public var interventionSuggestion: BASAppleReopenInterventionSuggestion?
 
     public init(interventionSuggestion: BASAppleReopenInterventionSuggestion?) {
@@ -66,7 +66,7 @@ public struct BASAppleTomorrowBoxReopenFollowUp: Codable, Equatable, Sendable {
     }
 }
 
-public enum BASAppleTomorrowBoxReopenFollowUpBuilder {
+public enum BASAppleDeferredReopenFollowUpBuilder {
     public static func build(
         riskLevelID: String?,
         title: String,
@@ -76,16 +76,16 @@ public enum BASAppleTomorrowBoxReopenFollowUpBuilder {
         templateHint: String?,
         interventionHistorySummary: String?,
         now: Date = .now
-    ) -> BASAppleTomorrowBoxReopenFollowUp {
+    ) -> BASAppleDeferredReopenFollowUp {
         guard
             let riskLevelID,
             let riskLevel = BASRiskLevel(rawValue: riskLevelID),
             riskLevel > .low
         else {
-            return BASAppleTomorrowBoxReopenFollowUp(interventionSuggestion: nil)
+            return BASAppleDeferredReopenFollowUp(interventionSuggestion: nil)
         }
 
-        return BASAppleTomorrowBoxReopenFollowUp(
+        return BASAppleDeferredReopenFollowUp(
             interventionSuggestion: BASAppleReopenInterventionSuggestion(
                 riskLevelID: riskLevelID,
                 title: reopenHint ?? title,
@@ -99,20 +99,20 @@ public enum BASAppleTomorrowBoxReopenFollowUpBuilder {
     }
 }
 
-public enum BASAppleTomorrowBoxReopenExecutor {
+public enum BASAppleDeferredReopenExecutor {
     public static func execute(
         modeID: String?,
         promptSeed: String,
         hasDraft: Bool,
         clearActiveDecisionFlows: () -> Void,
-        activateQuickFromDraft: () -> Void,
-        activateBalanceFromDraft: () -> Void,
-        activateMirrorFromDraft: () -> Void,
-        startQuick: (String) -> Void,
-        startBalance: (String) -> Void,
-        startMirror: (String) -> Void,
-        removeTomorrowBoxItem: () -> Void,
-        followUp: BASAppleTomorrowBoxReopenFollowUp,
+        activatePrimaryFromDraft: () -> Void,
+        activateComparativeFromDraft: () -> Void,
+        activateReflectiveFromDraft: () -> Void,
+        startPrimary: (String) -> Void,
+        startComparative: (String) -> Void,
+        startReflective: (String) -> Void,
+        removeDeferredItem: () -> Void,
+        followUp: BASAppleDeferredReopenFollowUp,
         setInterventionSuggestion: (BASAppleReopenInterventionSuggestion?) -> Void,
         refreshPredictedIntervention: () -> Void,
         selectHomeTab: () -> Void,
@@ -120,32 +120,32 @@ public enum BASAppleTomorrowBoxReopenExecutor {
     ) {
         clearActiveDecisionFlows()
 
-        _ = BASAppleDecisionModeExecutor.execute(
+        _ = BASAppleWorkflowModeExecutor.execute(
             modeID: modeID,
-            performQuick: {
+            performPrimary: {
                 if hasDraft {
-                    activateQuickFromDraft()
+                    activatePrimaryFromDraft()
                 } else {
-                    startQuick(promptSeed)
+                    startPrimary(promptSeed)
                 }
             },
-            performBalance: {
+            performComparative: {
                 if hasDraft {
-                    activateBalanceFromDraft()
+                    activateComparativeFromDraft()
                 } else {
-                    startBalance(promptSeed)
+                    startComparative(promptSeed)
                 }
             },
-            performMirror: {
+            performReflective: {
                 if hasDraft {
-                    activateMirrorFromDraft()
+                    activateReflectiveFromDraft()
                 } else {
-                    startMirror(promptSeed)
+                    startReflective(promptSeed)
                 }
             }
         )
 
-        removeTomorrowBoxItem()
+        removeDeferredItem()
         if followUp.shouldRefreshPredictedIntervention {
             refreshPredictedIntervention()
         } else {
@@ -156,22 +156,22 @@ public enum BASAppleTomorrowBoxReopenExecutor {
     }
 }
 
-public enum BASAppleDraftedModeReopenExecutor {
+public enum BASAppleDraftedWorkflowReopenExecutor {
     @discardableResult
     public static func execute(
         modeID: String?,
         clearActiveDecisionFlows: () -> Void,
-        activateQuick: () -> Void,
-        activateBalance: () -> Void,
-        activateMirror: () -> Void,
+        activatePrimary: () -> Void,
+        activateComparative: () -> Void,
+        activateReflective: () -> Void,
         afterSuccessfulReopen: () -> Void
     ) -> Bool {
         clearActiveDecisionFlows()
-        guard BASAppleDecisionModeExecutor.execute(
+        guard BASAppleWorkflowModeExecutor.execute(
             modeID: modeID,
-            performQuick: activateQuick,
-            performBalance: activateBalance,
-            performMirror: activateMirror
+            performPrimary: activatePrimary,
+            performComparative: activateComparative,
+            performReflective: activateReflective
         ) else {
             return false
         }

@@ -39,22 +39,6 @@ public struct BASAppleInterventionTemplateSeed: Codable, Equatable, Sendable {
     }
 }
 
-public struct BASAppleFailureHistoryEventInput: Codable, Equatable, Sendable {
-    public var createdAt: Date
-    public var reflectionOutcomeID: String?
-    public var finalActionID: String
-
-    public init(
-        createdAt: Date,
-        reflectionOutcomeID: String?,
-        finalActionID: String
-    ) {
-        self.createdAt = createdAt
-        self.reflectionOutcomeID = reflectionOutcomeID
-        self.finalActionID = finalActionID
-    }
-}
-
 public struct BASAppleFailurePatternSeed: Codable, Equatable, Sendable {
     public var id: String
     public var createdAt: Date
@@ -108,29 +92,17 @@ public enum BASAppleBootstrapStrategyAdapter {
     }
 
     public static func resolveActiveSessionSeed(
-        quickPromptFragments: [String]?,
-        balancePromptFragments: [String]?,
-        mirrorPromptFragments: [String]?,
+        promptFragmentsByModeID: [String: [String]],
+        modePriority: [String],
         taskGraphModeID: String?,
         taskGraphPromptSeed: String?,
-        defaultModeID: String = BASDecisionMode.quick.rawValue
+        defaultModeID: String = BASDecisionMode.quick.identifier
     ) -> BASAppleActiveSessionSeed {
-        if let quickPromptFragments {
+        for modeID in modePriority {
+            guard let fragments = promptFragmentsByModeID[modeID] else { continue }
             return BASAppleActiveSessionSeed(
-                modeID: BASDecisionMode.quick.rawValue,
-                promptSeed: promptSeed(fragments: quickPromptFragments)
-            )
-        }
-        if let balancePromptFragments {
-            return BASAppleActiveSessionSeed(
-                modeID: BASDecisionMode.balance.rawValue,
-                promptSeed: promptSeed(fragments: balancePromptFragments)
-            )
-        }
-        if let mirrorPromptFragments {
-            return BASAppleActiveSessionSeed(
-                modeID: BASDecisionMode.mirror.rawValue,
-                promptSeed: promptSeed(fragments: mirrorPromptFragments)
+                modeID: modeID,
+                promptSeed: promptSeed(fragments: fragments)
             )
         }
         if let taskGraphModeID {
@@ -142,75 +114,6 @@ public enum BASAppleBootstrapStrategyAdapter {
         return BASAppleActiveSessionSeed(modeID: defaultModeID, promptSeed: "")
     }
 
-    public static func defaultTemplateSeeds(now: Date = .now) -> [BASAppleInterventionTemplateSeed] {
-        [
-            BASAppleInterventionTemplateSeed(
-                id: "tomorrow_box_interrupt",
-                createdAt: now,
-                updatedAt: now,
-                title: "Night-message cooling",
-                summary: "Lower the heat, then move the message into tomorrow.",
-                body: [
-                    "Step back from the send button.",
-                    "Name what this message is trying to fix right now.",
-                    "Put it into Tomorrow Box before you reread it."
-                ],
-                modeID: BASDecisionMode.quick.rawValue,
-                riskLevelID: BASRiskLevel.medium.rawValue,
-                isPinned: true,
-                successCount: 0
-            ),
-            BASAppleInterventionTemplateSeed(
-                id: "brief_warm_nudge",
-                createdAt: now,
-                updatedAt: now,
-                title: "Impulse-buy cooling",
-                summary: "Short, warm friction before spending from blur.",
-                body: [
-                    "Pause the purchase.",
-                    "Name whether this is need, relief, or reward.",
-                    "Reopen it in daylight."
-                ],
-                modeID: BASDecisionMode.quick.rawValue,
-                riskLevelID: BASRiskLevel.low.rawValue,
-                isPinned: true,
-                successCount: 0
-            ),
-            BASAppleInterventionTemplateSeed(
-                id: "reflective_question",
-                createdAt: now,
-                updatedAt: now,
-                title: "Anxiety loop interruption",
-                summary: "Use one question and one grounded action instead of more spinning.",
-                body: [
-                    "What are you trying to make go away quickly?",
-                    "Choose one small grounded action.",
-                    "Do not solve the whole future right now."
-                ],
-                modeID: BASDecisionMode.mirror.rawValue,
-                riskLevelID: BASRiskLevel.medium.rawValue,
-                isPinned: true,
-                successCount: 0
-            ),
-            BASAppleInterventionTemplateSeed(
-                id: "slow_delay_guard",
-                createdAt: now,
-                updatedAt: now,
-                title: "Self-blame recovery",
-                summary: "Slow the cadence, keep it honest, and stop adding punishment.",
-                body: [
-                    "Name what happened without adding contempt.",
-                    "Choose one boundary step, not a life sentence.",
-                    "If needed, move the call into Tomorrow Box."
-                ],
-                modeID: BASDecisionMode.mirror.rawValue,
-                riskLevelID: BASRiskLevel.high.rawValue,
-                isPinned: true,
-                successCount: 0
-            )
-        ]
-    }
-
     public static func orderedTemplateIDs(
         modeID: String,
         riskLevelID: String,
@@ -218,13 +121,13 @@ public enum BASAppleBootstrapStrategyAdapter {
         templates: [BASAppleCurrentBrainBootstrapHostTemplateInput]
     ) -> [String] {
         BASBrainBootstrapAdvisor.orderedTemplateIDs(
-            mode: BASDecisionMode(rawValue: modeID) ?? .quick,
+            mode: BASDecisionMode(identifier: modeID) ?? .quick,
             riskLevel: BASRiskLevel(rawValue: riskLevelID) ?? .low,
             recommendedTemplateIDs: recommendedTemplateIDs,
             templates: templates.map { template in
                 BASInterventionTemplateDescriptor(
                     id: template.id,
-                    mode: BASDecisionMode(rawValue: template.modeID) ?? .quick,
+                    mode: BASDecisionMode(identifier: template.modeID) ?? .quick,
                     riskLevel: BASRiskLevel(rawValue: template.riskLevelID) ?? .low,
                     isPinned: template.isPinned,
                     successCount: template.successCount,
@@ -234,71 +137,16 @@ public enum BASAppleBootstrapStrategyAdapter {
         )
     }
 
-    public static func synthesizedFailurePatternSeeds(
-        from events: [BASAppleFailureHistoryEventInput],
-        now: Date = .now
-    ) -> [BASAppleFailurePatternSeed] {
-        let negativeEvents = events.filter {
-            guard let outcomeID = $0.reflectionOutcomeID else { return false }
-            return outcomeID == "regrettedIt" || outcomeID == "feltEmptier"
-        }
-
-        guard !negativeEvents.isEmpty else {
-            return []
-        }
-
-        let nightFailures = negativeEvents.filter {
-            let hour = Calendar.autoupdatingCurrent.component(.hour, from: $0.createdAt)
-            return hour >= 22 || hour < 5
-        }
-        let proceedFailures = negativeEvents.filter {
-            $0.finalActionID == "goAheadAnyway" || $0.finalActionID == "continueMindfully"
-        }
-
-        var seeds: [BASAppleFailurePatternSeed] = []
-        if nightFailures.count >= 2 {
-            seeds.append(
-                BASAppleFailurePatternSeed(
-                    id: "night_fast_path_failure",
-                    createdAt: now,
-                    updatedAt: now,
-                    modeID: BASDecisionMode.quick.rawValue,
-                    title: "Night fast paths backfire",
-                    detail: "Fast action at night has repeatedly ended in regret or emptiness.",
-                    cadenceTag: "night_fast_path",
-                    suppressionWeight: min(1, 0.4 + Double(nightFailures.count) * 0.12),
-                    evidenceCount: nightFailures.count
-                )
-            )
-        }
-        if proceedFailures.count >= 2 {
-            seeds.append(
-                BASAppleFailurePatternSeed(
-                    id: "proceed_without_pause_failure",
-                    createdAt: now,
-                    updatedAt: now,
-                    modeID: BASDecisionMode.quick.rawValue,
-                    title: "Proceeding too fast backfires",
-                    detail: "Going forward without a pause has repeatedly ended badly.",
-                    cadenceTag: "proceed_fast",
-                    suppressionWeight: min(1, 0.4 + Double(proceedFailures.count) * 0.1),
-                    evidenceCount: proceedFailures.count
-                )
-            )
-        }
-        return seeds
-    }
-
     public static func orderedFailurePatternIDs(
         modeID: String,
         failurePatterns: [BASAppleCurrentBrainBootstrapHostFailurePatternInput]
     ) -> [String] {
         BASBrainBootstrapAdvisor.orderedFailurePatternIDs(
-            mode: BASDecisionMode(rawValue: modeID) ?? .quick,
+            mode: BASDecisionMode(identifier: modeID) ?? .quick,
             failurePatterns: failurePatterns.map { pattern in
                 BASFailurePatternDescriptor(
                     id: pattern.id,
-                    mode: BASDecisionMode(rawValue: pattern.modeID) ?? .quick,
+                    mode: BASDecisionMode(identifier: pattern.modeID) ?? .quick,
                     suppressionWeight: pattern.suppressionWeight,
                     evidenceCount: pattern.evidenceCount,
                     updatedAt: pattern.updatedAt

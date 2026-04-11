@@ -56,7 +56,7 @@ struct BASAppleMemoryMutationWriterTests {
                     id: existing.basID,
                     typeID: "support",
                     topic: "action_support",
-                    headline: "Putting it into Tomorrow Box often breaks the loop.",
+                    headline: "Holding the decision often breaks the loop.",
                     value: "Decide Tomorrow",
                     confidence: 0.72,
                     priority: 0.79,
@@ -66,7 +66,7 @@ struct BASAppleMemoryMutationWriterTests {
                     retrievalTags: ["decidetomorrow", "delay", "support", "tomorrow"],
                     evidenceCount: 3,
                     observationCount: 2,
-                    provenanceSummary: "Derived from repeated successful quick-check final actions.",
+                    provenanceSummary: "Derived from repeated successful primary-loop final actions.",
                     lifecycleState: .active,
                     lastReviewedAt: Date(timeIntervalSince1970: 1_744_156_800),
                     tierID: "warm"
@@ -77,7 +77,7 @@ struct BASAppleMemoryMutationWriterTests {
         )
 
         #expect(updated === existing)
-        #expect(existing.basHeadline == "Putting it into Tomorrow Box often breaks the loop.")
+        #expect(existing.basHeadline == "Holding the decision often breaks the loop.")
         #expect(existing.basRetrievalTags == ["decidetomorrow", "delay", "support", "tomorrow"])
         #expect(existing.basLifecycleState == .active)
         #expect(existing.basTierID == "warm")

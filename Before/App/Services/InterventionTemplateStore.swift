@@ -6,7 +6,7 @@ enum InterventionTemplateStore {
     static func ensureDefaults(in context: ModelContext) {
         let existing = (try? context.fetch(FetchDescriptor<InterventionTemplateRecord>())) ?? []
         let byID = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
-        for seed in BASAppleBootstrapStrategyAdapter.defaultTemplateSeeds() where byID[seed.id] == nil {
+        for seed in BeforeProductBootstrapSemantics.defaultTemplateSeeds() where byID[seed.id] == nil {
             context.insert(
                 InterventionTemplateRecord(
                     id: seed.id,
@@ -15,7 +15,7 @@ enum InterventionTemplateStore {
                     title: seed.title,
                     summary: seed.summary,
                     body: seed.body,
-                    mode: DecisionMode(rawValue: seed.modeID) ?? .quick,
+                    mode: DecisionMode.fromSubstrateModeID(seed.modeID) ?? .quick,
                     riskLevel: InterventionRiskLevel(rawValue: seed.riskLevelID) ?? .low,
                     isPinned: seed.isPinned,
                     successCount: seed.successCount
@@ -39,13 +39,13 @@ enum InterventionTemplateStore {
         )
         let templates = (try? context.fetch(descriptor)) ?? []
         let orderedIDs = BASAppleBootstrapStrategyAdapter.orderedTemplateIDs(
-            modeID: mode.rawValue,
+            modeID: mode.substrateModeID,
             riskLevelID: riskLevel.rawValue,
             recommendedTemplateIDs: recommendedArmIDs,
             templates: templates.map { template in
                 BASAppleCurrentBrainBootstrapHostTemplateInput(
                     id: template.id,
-                    modeID: template.mode.rawValue,
+                    modeID: template.mode.substrateModeID,
                     riskLevelID: template.riskLevel.rawValue,
                     isPinned: template.isPinned,
                     successCount: template.successCount,
