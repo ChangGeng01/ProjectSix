@@ -1246,11 +1246,13 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func refreshDecisionMemoryStore(force: Bool = false) {
-        BehavioralAISubstrateBridge.refreshMemoryProjectionHostState(
-            force: force,
-            cachedProjection: memoryProjection,
-            isProjectionDirty: isMemoryProjectionDirty,
-            context: modelContainer.mainContext,
+        hostRuntime.commitProjectionRefresh(
+            outcome: BehavioralAISubstrateBridge.resolveMemoryProjection(
+                force: force,
+                cachedProjection: memoryProjection,
+                isDirty: isMemoryProjectionDirty,
+                context: modelContainer.mainContext
+            ),
             commitProjection: { memoryProjection = $0 },
             setProjectionDirty: { isMemoryProjectionDirty = $0 },
             publishNotice: publishStartupNotice
@@ -1258,12 +1260,17 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func activateQuickSession(_ session: QuickCheckSession) {
-        BehavioralAISubstrateBridge.activateQuickSessionHost(
+        let outcome = BehavioralAISubstrateBridge.activateQuickSession(
             session,
             preferences: preferences,
             context: modelContainer.mainContext,
             cachedProjection: memoryProjection,
             isProjectionDirty: isMemoryProjectionDirty,
+            now: .now
+        )
+        hostRuntime.activateSession(
+            session: session,
+            outcome: outcome,
             loadBrainState: { session, currentBrain in
                 session.loadBrainState(currentBrain.brainState)
             },
@@ -1271,18 +1278,22 @@ final class BeforeAppModel: ObservableObject {
             setProjectionDirty: { isMemoryProjectionDirty = $0 },
             publishNotice: publishStartupNotice,
             commitCurrentBrain: { currentBrainState = $0 },
-            commitSession: { activeQuickSession = $0 },
-            now: .now
+            commitSession: { activeQuickSession = $0 }
         )
     }
 
     private func activateBalanceSession(_ session: BalanceBoardSession) {
-        BehavioralAISubstrateBridge.activateBalanceSessionHost(
+        let outcome = BehavioralAISubstrateBridge.activateBalanceSession(
             session,
             preferences: preferences,
             context: modelContainer.mainContext,
             cachedProjection: memoryProjection,
             isProjectionDirty: isMemoryProjectionDirty,
+            now: .now
+        )
+        hostRuntime.activateSession(
+            session: session,
+            outcome: outcome,
             loadBrainState: { session, currentBrain in
                 session.loadBrainState(currentBrain.brainState)
             },
@@ -1290,18 +1301,22 @@ final class BeforeAppModel: ObservableObject {
             setProjectionDirty: { isMemoryProjectionDirty = $0 },
             publishNotice: publishStartupNotice,
             commitCurrentBrain: { currentBrainState = $0 },
-            commitSession: { activeBalanceSession = $0 },
-            now: .now
+            commitSession: { activeBalanceSession = $0 }
         )
     }
 
     private func activateMirrorSession(_ session: MirrorWorkspaceSession) {
-        BehavioralAISubstrateBridge.activateMirrorSessionHost(
+        let outcome = BehavioralAISubstrateBridge.activateMirrorSession(
             session,
             preferences: preferences,
             context: modelContainer.mainContext,
             cachedProjection: memoryProjection,
             isProjectionDirty: isMemoryProjectionDirty,
+            now: .now
+        )
+        hostRuntime.activateSession(
+            session: session,
+            outcome: outcome,
             loadBrainState: { session, currentBrain in
                 session.loadBrainState(currentBrain.brainState)
             },
@@ -1309,8 +1324,7 @@ final class BeforeAppModel: ObservableObject {
             setProjectionDirty: { isMemoryProjectionDirty = $0 },
             publishNotice: publishStartupNotice,
             commitCurrentBrain: { currentBrainState = $0 },
-            commitSession: { activeMirrorSession = $0 },
-            now: .now
+            commitSession: { activeMirrorSession = $0 }
         )
     }
 
@@ -1325,16 +1339,18 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func refreshGlobalBrainState(source: BrainStateUpdateSource) {
-        BehavioralAISubstrateBridge.refreshCurrentBrainHostState(
-            activeQuickSession: activeQuickSession,
-            activeBalanceSession: activeBalanceSession,
-            activeMirrorSession: activeMirrorSession,
-            taskGraph: activeTaskGraph,
-            preferences: preferences,
-            context: modelContainer.mainContext,
-            cachedProjection: memoryProjection,
-            isProjectionDirty: isMemoryProjectionDirty,
-            source: source,
+        hostRuntime.commitCurrentBrainProjection(
+            outcome: BehavioralAISubstrateBridge.refreshCurrentBrainState(
+                activeQuickSession: activeQuickSession,
+                activeBalanceSession: activeBalanceSession,
+                activeMirrorSession: activeMirrorSession,
+                taskGraph: activeTaskGraph,
+                preferences: preferences,
+                context: modelContainer.mainContext,
+                cachedProjection: memoryProjection,
+                isProjectionDirty: isMemoryProjectionDirty,
+                source: source
+            ),
             commitProjection: { memoryProjection = $0 },
             setProjectionDirty: { isMemoryProjectionDirty = $0 },
             publishNotice: publishStartupNotice,

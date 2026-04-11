@@ -261,6 +261,58 @@ public struct BASHostRuntime: Sendable {
         )
     }
 
+    public func commitProjectionRefresh<Projection>(
+        outcome: BASAppleProjectionRefreshResult<Projection>,
+        commitProjection: (Projection) -> Void,
+        setProjectionDirty: (Bool) -> Void,
+        publishNotice: (String) -> Void
+    ) {
+        BASAppleCurrentBrainHostStateExecutor.commitProjectionRefresh(
+            outcome: outcome,
+            commitProjection: commitProjection,
+            setProjectionDirty: setProjectionDirty,
+            publishNotice: publishNotice
+        )
+    }
+
+    public func commitCurrentBrainProjection<CurrentBrain, Projection>(
+        outcome: BASAppleCurrentBrainProjectionRuntimeResult<CurrentBrain, Projection>,
+        commitProjection: (Projection) -> Void,
+        setProjectionDirty: (Bool) -> Void,
+        publishNotice: (String) -> Void,
+        commitCurrentBrain: (CurrentBrain) -> Void
+    ) {
+        BASAppleCurrentBrainHostStateExecutor.commitCurrentBrainProjection(
+            outcome: outcome,
+            commitProjection: commitProjection,
+            setProjectionDirty: setProjectionDirty,
+            publishNotice: publishNotice,
+            commitCurrentBrain: commitCurrentBrain
+        )
+    }
+
+    public func activateSession<Session, CurrentBrain, Projection>(
+        session: Session,
+        outcome: BASAppleCurrentBrainProjectionRuntimeResult<CurrentBrain, Projection>,
+        loadBrainState: (Session, CurrentBrain) -> Void,
+        commitProjection: (Projection) -> Void,
+        setProjectionDirty: (Bool) -> Void,
+        publishNotice: (String) -> Void,
+        commitCurrentBrain: (CurrentBrain) -> Void,
+        commitSession: (Session) -> Void
+    ) {
+        BASAppleCurrentBrainHostStateExecutor.activateSession(
+            session: session,
+            outcome: outcome,
+            loadBrainState: loadBrainState,
+            commitProjection: commitProjection,
+            setProjectionDirty: setProjectionDirty,
+            publishNotice: publishNotice,
+            commitCurrentBrain: commitCurrentBrain,
+            commitSession: commitSession
+        )
+    }
+
     public func bootstrap(
         _ request: BASHostLifecycleRequest,
         now: Date = .now

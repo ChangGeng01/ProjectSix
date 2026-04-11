@@ -92,4 +92,61 @@ final class BASHostKitTests: XCTestCase {
             ]
         )
     }
+
+    func testCommitProjectionRefreshPublishesProjectionAndNotice() {
+        let runtime = BASHostRuntime()
+        var committedProjection: String?
+        var dirtyFlag = true
+        var publishedNotice: String?
+
+        runtime.commitProjectionRefresh(
+            outcome: BASAppleProjectionRefreshResult(
+                projection: "projection",
+                refreshed: true,
+                notice: "refresh notice"
+            ),
+            commitProjection: { committedProjection = $0 },
+            setProjectionDirty: { dirtyFlag = $0 },
+            publishNotice: { publishedNotice = $0 }
+        )
+
+        XCTAssertEqual(committedProjection, "projection")
+        XCTAssertFalse(dirtyFlag)
+        XCTAssertEqual(publishedNotice, "refresh notice")
+    }
+
+    func testActivateSessionCommitsProjectionBrainAndSession() {
+        let runtime = BASHostRuntime()
+        var loadedSession: [String] = []
+        var committedProjection: String?
+        var dirtyFlag = true
+        var publishedNotice: String?
+        var committedBrain: String?
+        var committedSession: String?
+
+        runtime.activateSession(
+            session: "session",
+            outcome: BASAppleCurrentBrainProjectionRuntimeResult(
+                currentBrain: "brain",
+                projection: "projection",
+                refreshedProjection: true,
+                notice: "activation notice"
+            ),
+            loadBrainState: { session, currentBrain in
+                loadedSession = [session, currentBrain]
+            },
+            commitProjection: { committedProjection = $0 },
+            setProjectionDirty: { dirtyFlag = $0 },
+            publishNotice: { publishedNotice = $0 },
+            commitCurrentBrain: { committedBrain = $0 },
+            commitSession: { committedSession = $0 }
+        )
+
+        XCTAssertEqual(loadedSession, ["session", "brain"])
+        XCTAssertEqual(committedProjection, "projection")
+        XCTAssertFalse(dirtyFlag)
+        XCTAssertEqual(publishedNotice, "activation notice")
+        XCTAssertEqual(committedBrain, "brain")
+        XCTAssertEqual(committedSession, "session")
+    }
 }
