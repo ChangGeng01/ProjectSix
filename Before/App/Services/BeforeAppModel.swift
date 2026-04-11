@@ -1236,48 +1236,42 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func primeQuickSession(_ session: QuickCheckSession) {
-        currentBrainState = BASAppleCurrentBrainRuntimeExecutor.primeSession(
-            modeID: DecisionMode.quick.rawValue,
+        refreshDecisionMemoryStore()
+        let currentBrain = BehavioralAISubstrateBridge.primeCurrentBrainState(
+            mode: .quick,
             promptFragments: quickPromptFragments(for: session),
-            retrievalMode: currentBrainRuntimeRetrievalMode(for: .quick).rawValue,
-            refreshMemoryProjection: { refreshDecisionMemoryStore() },
-            bootstrapCurrentBrain: { plan in
-                bootstrapCurrentBrainState(using: plan)
-            },
-            afterBootstrap: { currentBrain in
-                session.loadBrainState(currentBrain.brainState)
-            }
+            context: modelContainer.mainContext,
+            projection: currentMemoryProjection(),
+            retrievalMode: currentBrainRuntimeRetrievalMode(for: .quick)
         )
+        session.loadBrainState(currentBrain.brainState)
+        currentBrainState = currentBrain
     }
 
     private func primeBalanceSession(_ session: BalanceBoardSession) {
-        currentBrainState = BASAppleCurrentBrainRuntimeExecutor.primeSession(
-            modeID: DecisionMode.balance.rawValue,
+        refreshDecisionMemoryStore()
+        let currentBrain = BehavioralAISubstrateBridge.primeCurrentBrainState(
+            mode: .balance,
             promptFragments: balancePromptFragments(for: session),
-            retrievalMode: currentBrainRuntimeRetrievalMode(for: .balance).rawValue,
-            refreshMemoryProjection: { refreshDecisionMemoryStore() },
-            bootstrapCurrentBrain: { plan in
-                bootstrapCurrentBrainState(using: plan)
-            },
-            afterBootstrap: { currentBrain in
-                session.loadBrainState(currentBrain.brainState)
-            }
+            context: modelContainer.mainContext,
+            projection: currentMemoryProjection(),
+            retrievalMode: currentBrainRuntimeRetrievalMode(for: .balance)
         )
+        session.loadBrainState(currentBrain.brainState)
+        currentBrainState = currentBrain
     }
 
     private func primeMirrorSession(_ session: MirrorWorkspaceSession) {
-        currentBrainState = BASAppleCurrentBrainRuntimeExecutor.primeSession(
-            modeID: DecisionMode.mirror.rawValue,
+        refreshDecisionMemoryStore()
+        let currentBrain = BehavioralAISubstrateBridge.primeCurrentBrainState(
+            mode: .mirror,
             promptFragments: mirrorPromptFragments(for: session),
-            retrievalMode: currentBrainRuntimeRetrievalMode(for: .mirror).rawValue,
-            refreshMemoryProjection: { refreshDecisionMemoryStore() },
-            bootstrapCurrentBrain: { plan in
-                bootstrapCurrentBrainState(using: plan)
-            },
-            afterBootstrap: { currentBrain in
-                session.loadBrainState(currentBrain.brainState)
-            }
+            context: modelContainer.mainContext,
+            projection: currentMemoryProjection(),
+            retrievalMode: currentBrainRuntimeRetrievalMode(for: .mirror)
         )
+        session.loadBrainState(currentBrain.brainState)
+        currentBrainState = currentBrain
     }
 
     private func quickPromptFragments(for session: QuickCheckSession) -> [String] {
@@ -1315,18 +1309,16 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func refreshGlobalBrainState(source: BrainStateUpdateSource) {
-        currentBrainState = BASAppleCurrentBrainRuntimeExecutor.refreshActiveBrain(
+        refreshDecisionMemoryStore()
+        currentBrainState = BehavioralAISubstrateBridge.refreshCurrentBrainState(
             quickPromptFragments: activeQuickSession.map(quickPromptFragments(for:)),
             balancePromptFragments: activeBalanceSession.map(balancePromptFragments(for:)),
             mirrorPromptFragments: activeMirrorSession.map(mirrorPromptFragments(for:)),
-            taskGraphModeID: activeTaskGraph?.mode?.rawValue,
-            taskGraphPromptSeed: activeTaskGraph?.promptSeed,
+            taskGraph: activeTaskGraph,
+            context: modelContainer.mainContext,
+            projection: currentMemoryProjection(),
             retrievalModesByModeID: currentBrainRuntimeRetrievalModesByModeID(),
-            triggerID: source.rawValue,
-            refreshMemoryProjection: { refreshDecisionMemoryStore() },
-            bootstrapCurrentBrain: { plan in
-                bootstrapCurrentBrainState(using: plan)
-            }
+            source: source
         )
     }
 
@@ -1458,20 +1450,6 @@ final class BeforeAppModel: ObservableObject {
             restoreActiveWorkspace: { restoreActiveWorkspaceIfNeeded() },
             refreshPredictedIntervention: { refreshPredictedIntervention() },
             syncWidgetSnapshot: { syncWidgetSnapshot() }
-        )
-    }
-
-    private func bootstrapCurrentBrainState(
-        using plan: BASAppleCurrentBrainRuntimePlan
-    ) -> CurrentBrainState {
-        CurrentBrainStateLoader.bootstrapCurrentBrainState(
-            mode: DecisionMode(rawValue: plan.modeID) ?? .quick,
-            prompt: plan.promptSeed,
-            source: BrainStateUpdateSource(rawValue: plan.triggerID) ?? .explicitRefresh,
-            taskGraph: activeTaskGraph,
-            context: modelContainer.mainContext,
-            projection: currentMemoryProjection(),
-            retrievalMode: DecisionRetrievalMode(rawValue: plan.retrievalMode) ?? .adaptive
         )
     }
 

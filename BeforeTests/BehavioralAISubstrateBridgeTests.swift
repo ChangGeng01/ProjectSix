@@ -157,6 +157,77 @@ struct BehavioralAISubstrateBridgeTests {
         #expect(current.boundaryPolicy.riskLevel == .high)
     }
 
+    @Test
+    func bridgePrimeCurrentBrainStateCompactsSessionFragmentsIntoCommittedBrain() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        seedHistory(into: context)
+        try context.save()
+
+        let now = date("2026-04-10T22:00:00Z")
+        let projection = DecisionMemorySystem.refreshProjection(in: context, now: now)
+
+        let current = BehavioralAISubstrateBridge.primeCurrentBrainState(
+            mode: .quick,
+            promptFragments: ["  should ", "I", "wait until morning?  "],
+            context: context,
+            projection: projection,
+            retrievalMode: .filtered,
+            now: now
+        )
+
+        let updates = try context.fetch(FetchDescriptor<BrainStateUpdate>())
+
+        #expect(current.source == .sessionPrime)
+        #expect(current.mode == .quick)
+        #expect(current.sourceSurface == .app)
+        #expect(current.activeTemplateIDs.isEmpty == false)
+        #expect(updates.last?.source == .sessionPrime)
+    }
+
+    @Test
+    func bridgeRefreshCurrentBrainStateUsesTaskGraphFallbackWhenSessionsAreEmpty() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        seedHistory(into: context)
+        try context.save()
+
+        let now = date("2026-04-10T22:30:00Z")
+        let projection = DecisionMemorySystem.refreshProjection(in: context, now: now)
+        let taskGraph = DecisionTaskGraphSnapshot(
+            mode: .mirror,
+            promptSeed: "resume the hard reflection",
+            nextActionHint: "Return to the unresolved reflection",
+            continuityFingerprint: "mirror|resume",
+            tasks: [
+                DecisionTaskNode(
+                    kind: .evaluate,
+                    title: "Re-open the reflection",
+                    detail: "Return to the unresolved reflection with a slower lens.",
+                    status: .inProgress
+                )
+            ],
+            updatedAt: now
+        )
+
+        let current = BehavioralAISubstrateBridge.refreshCurrentBrainState(
+            quickPromptFragments: nil,
+            balancePromptFragments: nil,
+            mirrorPromptFragments: nil,
+            taskGraph: taskGraph,
+            context: context,
+            projection: projection,
+            retrievalModesByModeID: [DecisionMode.mirror.rawValue: DecisionRetrievalMode.filtered.rawValue],
+            source: .sceneActive,
+            now: now
+        )
+
+        #expect(current.source == .sceneActive)
+        #expect(current.mode == .mirror)
+        #expect(current.taskGraph?.promptSeed == "resume the hard reflection")
+        #expect(current.verificationSnapshot.fingerprint.isEmpty == false)
+    }
+
     @MainActor
     private func makeContainer() throws -> ModelContainer {
         try ModelContainer(

@@ -20,13 +20,8 @@ enum BehavioralAISubstrateBridge {
         retrievalMode: DecisionRetrievalMode,
         now: Date = .now
     ) -> CurrentBrainState {
-        InterventionTemplateStore.ensureDefaults(in: context)
-        FailurePatternStore.syncFromHistory(in: context)
-
-        let committed: BASAppleCurrentBrainBootstrapBridgeResult<
-            BrainStateUpdate,
-            DecisionEvolutionCheckpoint
-        > = BASAppleCurrentBrainBootstrapBridgeBuilder.bootstrapAndCommit(
+        let taskGraphInput = taskGraphInput(from: taskGraph)
+        return bootstrapCurrentBrainState(
             input: BASAppleCurrentBrainBootstrapBridgeInput(
                 modeID: mode.rawValue,
                 prompt: prompt,
@@ -37,14 +32,105 @@ enum BehavioralAISubstrateBridge {
                 now: now,
                 projection: projection.baseProjection,
                 embeddingScores: embeddingScores(for: prompt),
-                taskGraphHeadline: taskGraph?.nextActionHint,
-                taskGraphActiveNodeCount: taskGraph?.tasks.filter { $0.status != .completed }.count,
-                taskGraphHasResumeCandidate: taskGraph.map { !$0.tasks.isEmpty },
-                taskGraphResumeHint: taskGraph?.nextActionHint,
+                taskGraphHeadline: taskGraphInput?.headline,
+                taskGraphActiveNodeCount: taskGraphInput?.activeNodeCount,
+                taskGraphHasResumeCandidate: taskGraphInput?.hasResumeCandidate,
+                taskGraphResumeHint: taskGraphInput?.resumeHint,
                 retrievalMode: retrievalMode.rawValue
             ),
+            envelope: envelope,
+            taskGraph: taskGraph,
+            context: context
+        )
+    }
+
+    @discardableResult
+    static func primeCurrentBrainState(
+        mode: DecisionMode,
+        promptFragments: [String],
+        context: ModelContext,
+        projection: DecisionMemorySystem.BrainStateProjection,
+        retrievalMode: DecisionRetrievalMode,
+        now: Date = .now
+    ) -> CurrentBrainState {
+        BASAppleCurrentBrainRuntimeBridgeExecutor.primeSession(
+            input: BASAppleCurrentBrainSessionBridgeInput(
+                modeID: mode.rawValue,
+                promptFragments: promptFragments,
+                preferredLanguages: Locale.preferredLanguages,
+                now: now,
+                projection: projection.baseProjection,
+                retrievalMode: retrievalMode.rawValue
+            ),
+            bootstrapCurrentBrain: { bootstrapInput in
+                var bootstrapInput = bootstrapInput
+                bootstrapInput.embeddingScores = embeddingScores(for: bootstrapInput.prompt)
+                return bootstrapCurrentBrainState(
+                    input: bootstrapInput,
+                    context: context
+                )
+            },
+            afterBootstrap: { _ in }
+        )
+    }
+
+    @discardableResult
+    static func refreshCurrentBrainState(
+        quickPromptFragments: [String]?,
+        balancePromptFragments: [String]?,
+        mirrorPromptFragments: [String]?,
+        taskGraph: DecisionTaskGraphSnapshot?,
+        context: ModelContext,
+        projection: DecisionMemorySystem.BrainStateProjection,
+        retrievalModesByModeID: [String: String],
+        source: BrainStateUpdateSource,
+        now: Date = .now
+    ) -> CurrentBrainState {
+        BASAppleCurrentBrainRuntimeBridgeExecutor.refreshActiveBrain(
+            input: BASAppleCurrentBrainActiveRefreshBridgeInput(
+                quickPromptFragments: quickPromptFragments,
+                balancePromptFragments: balancePromptFragments,
+                mirrorPromptFragments: mirrorPromptFragments,
+                taskGraphModeID: taskGraph?.mode?.rawValue,
+                taskGraphPromptSeed: taskGraph?.promptSeed,
+                preferredLanguages: Locale.preferredLanguages,
+                now: now,
+                projection: projection.baseProjection,
+                taskGraphHint: taskGraphInput(from: taskGraph),
+                retrievalModesByModeID: retrievalModesByModeID,
+                triggerID: source.rawValue
+            ),
+            bootstrapCurrentBrain: { bootstrapInput in
+                var bootstrapInput = bootstrapInput
+                bootstrapInput.embeddingScores = embeddingScores(for: bootstrapInput.prompt)
+                return bootstrapCurrentBrainState(
+                    input: bootstrapInput,
+                    taskGraph: taskGraph,
+                    context: context
+                )
+            }
+        )
+    }
+
+    @discardableResult
+    private static func bootstrapCurrentBrainState(
+        input: BASAppleCurrentBrainBootstrapBridgeInput,
+        envelope: DecisionIntentEnvelope? = nil,
+        taskGraph: DecisionTaskGraphSnapshot? = nil,
+        context: ModelContext
+    ) -> CurrentBrainState {
+        InterventionTemplateStore.ensureDefaults(in: context)
+        FailurePatternStore.syncFromHistory(in: context)
+        let mode = DecisionMode(rawValue: input.modeID) ?? .quick
+        let source = BrainStateUpdateSource(rawValue: input.triggerID) ?? .explicitRefresh
+
+        let committed: BASAppleCurrentBrainBootstrapBridgeResult<
+            BrainStateUpdate,
+            DecisionEvolutionCheckpoint
+        > = BASAppleCurrentBrainBootstrapBridgeBuilder.bootstrapAndCommit(
+            input: input,
             in: context,
-            createdAt: now,
+            createdAt: input.now,
             checkpointLimit: BeforePolicy.RuntimeState.evolutionCheckpointLimit,
             checkpointRetentionInterval: BeforePolicy.RuntimeState.evolutionCheckpointRetentionInterval,
             recommendTemplateIDs: { preparation in
@@ -111,7 +197,7 @@ enum BehavioralAISubstrateBridge {
             activeTemplateIDs: committed.activeTemplateIDs,
             failureGuardIDs: committed.failureGuardIDs,
             sourceIntentEnvelope: envelope,
-            loadedAt: now
+            loadedAt: input.now
         )
     }
 
@@ -317,6 +403,19 @@ enum BehavioralAISubstrateBridge {
             hasResumeCandidate: !snapshot.tasks.isEmpty,
             resumeHint: snapshot.nextActionHint
         )
+    }
+
+    private static func taskGraphInput(
+        from snapshot: DecisionTaskGraphSnapshot?
+    ) -> BASAppleCurrentBrainBootstrapHostTaskGraphInput? {
+        snapshot.map { snapshot in
+            BASAppleCurrentBrainBootstrapHostTaskGraphInput(
+                headline: snapshot.nextActionHint,
+                activeNodeCount: snapshot.tasks.filter { $0.status != .completed }.count,
+                hasResumeCandidate: !snapshot.tasks.isEmpty,
+                resumeHint: snapshot.nextActionHint
+            )
+        }
     }
 
     private static func embeddingScores(for prompt: String) -> [BASAppleEmbeddingScoreInput] {
