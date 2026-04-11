@@ -163,6 +163,47 @@ public struct BASAppleCurrentBrainBootstrapHostBuildContext: Codable, Equatable,
 }
 
 public enum BASAppleCurrentBrainBootstrapHostInputBuilder {
+    public static func context<TaskGraph>(
+        modeID: String,
+        prompt: String,
+        triggerID: String,
+        sourceSurfaceOverrideID: String? = nil,
+        riskLevelOverrideID: String? = nil,
+        preferredLanguages: [String] = [],
+        now: Date = .now,
+        projection: BASBrainProjection,
+        embeddingScores: [BASAppleEmbeddingScoreInput] = [],
+        taskGraph: TaskGraph? = nil,
+        headline: (TaskGraph) -> String?,
+        activeNodeCount: (TaskGraph) -> Int,
+        hasResumeCandidate: (TaskGraph) -> Bool,
+        resumeHint: (TaskGraph) -> String?,
+        retrievalMode: String,
+        recommendedTemplateIDs: [String] = []
+    ) -> BASAppleCurrentBrainBootstrapHostBuildContext {
+        BASAppleCurrentBrainBootstrapHostBuildContext(
+            modeID: modeID,
+            prompt: prompt,
+            triggerID: triggerID,
+            sourceSurfaceOverrideID: sourceSurfaceOverrideID,
+            riskLevelOverrideID: riskLevelOverrideID,
+            preferredLanguages: preferredLanguages,
+            now: now,
+            projection: projection,
+            embeddingScores: embeddingScores,
+            taskGraphHint: taskGraph.map { graph in
+                taskGraphInput(
+                    headline: headline(graph),
+                    activeNodeCount: activeNodeCount(graph),
+                    hasResumeCandidate: hasResumeCandidate(graph),
+                    resumeHint: resumeHint(graph)
+                )
+            },
+            retrievalMode: retrievalMode,
+            recommendedTemplateIDs: recommendedTemplateIDs
+        )
+    }
+
     public static func taskGraphInput(
         headline: String?,
         activeNodeCount: Int,

@@ -27,17 +27,27 @@ enum BehavioralAISubstrateBridge {
             BrainStateUpdate,
             DecisionEvolutionCheckpoint
         > = BASAppleCurrentBrainRuntimeCoordinator.bootstrapAndCommit(
-            context: hostBootstrapBuildContext(
-                mode: mode,
+            context: BASAppleCurrentBrainBootstrapHostInputBuilder.context(
+                modeID: mode.rawValue,
                 prompt: prompt,
-                source: source,
-                sourceSurfaceOverride: envelope?.sourceSurface,
-                riskLevelOverride: envelope?.riskLevel,
+                triggerID: source.rawValue,
+                sourceSurfaceOverrideID: envelope?.sourceSurface.rawValue,
+                riskLevelOverrideID: envelope?.riskLevel?.rawValue,
+                preferredLanguages: Locale.preferredLanguages,
+                now: now,
                 projection: projection.baseProjection,
+                embeddingScores: embeddingScores(for: prompt),
                 taskGraph: taskGraph,
+                headline: \.nextActionHint,
+                activeNodeCount: { snapshot in
+                    snapshot.tasks.filter { $0.status != .completed }.count
+                },
+                hasResumeCandidate: { snapshot in
+                    !snapshot.tasks.isEmpty
+                },
+                resumeHint: \.nextActionHint,
                 retrievalMode: retrievalMode.rawValue,
-                recommendedTemplateIDs: [],
-                now: now
+                recommendedTemplateIDs: []
             ),
             in: context,
             createdAt: now,
@@ -257,45 +267,6 @@ enum BehavioralAISubstrateBridge {
             activeTemplateIDs: activeTemplateIDs,
             failureGuardIDs: failureGuardIDs,
             now: now
-        )
-    }
-
-    private static func hostBootstrapBuildContext(
-        mode: DecisionMode,
-        prompt: String,
-        source: BrainStateUpdateSource,
-        sourceSurfaceOverride: DecisionIntentSourceSurface?,
-        riskLevelOverride: InterventionRiskLevel?,
-        projection: BASBrainProjection,
-        taskGraph: DecisionTaskGraphSnapshot?,
-        retrievalMode: String,
-        recommendedTemplateIDs: [String],
-        now: Date
-    ) -> BASAppleCurrentBrainBootstrapHostBuildContext {
-        BASAppleCurrentBrainBootstrapHostBuildContext(
-            modeID: mode.rawValue,
-            prompt: prompt,
-            triggerID: source.rawValue,
-            sourceSurfaceOverrideID: sourceSurfaceOverride?.rawValue,
-            riskLevelOverrideID: riskLevelOverride?.rawValue,
-            preferredLanguages: Locale.preferredLanguages,
-            now: now,
-            projection: projection,
-            embeddingScores: embeddingScores(for: prompt),
-            taskGraphHint: taskGraph.map(hostTaskGraphInput(from:)),
-            retrievalMode: retrievalMode,
-            recommendedTemplateIDs: recommendedTemplateIDs
-        )
-    }
-
-    private static func hostTaskGraphInput(
-        from snapshot: DecisionTaskGraphSnapshot
-    ) -> BASAppleCurrentBrainBootstrapHostTaskGraphInput {
-        BASAppleCurrentBrainBootstrapHostInputBuilder.taskGraphInput(
-            headline: snapshot.nextActionHint,
-            activeNodeCount: snapshot.tasks.filter { $0.status != .completed }.count,
-            hasResumeCandidate: !snapshot.tasks.isEmpty,
-            resumeHint: snapshot.nextActionHint
         )
     }
 

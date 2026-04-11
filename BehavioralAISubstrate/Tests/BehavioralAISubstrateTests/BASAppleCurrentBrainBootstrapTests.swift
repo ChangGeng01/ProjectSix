@@ -161,6 +161,46 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(input.failurePatterns.map { $0.id } == ["night_fast_path_failure"])
     }
 
+    @Test("host input builder can compile context directly from task graph carriers")
+    func hostInputBuilderBuildsContextFromTaskGraphCarrier() {
+        struct MockTaskGraph: Equatable {
+            let headline: String?
+            let activeNodeCount: Int
+            let hasResumeCandidate: Bool
+            let resumeHint: String?
+        }
+
+        let context = BASAppleCurrentBrainBootstrapHostInputBuilder.context(
+            modeID: BASDecisionMode.quick.rawValue,
+            prompt: "Should I sleep on this?",
+            triggerID: BASCurrentBrainBootstrapTrigger.notification.rawValue,
+            sourceSurfaceOverrideID: BASInteractionSurface.notification.rawValue,
+            riskLevelOverrideID: BASRiskLevel.high.rawValue,
+            preferredLanguages: ["en-AU"],
+            now: Date(timeIntervalSince1970: 1_744_322_180),
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+            embeddingScores: [BASAppleEmbeddingScoreInput(id: "memory-1", score: 0.88)],
+            taskGraph: MockTaskGraph(
+                headline: "Pause before replying.",
+                activeNodeCount: 2,
+                hasResumeCandidate: true,
+                resumeHint: "Reopen tomorrow."
+            ),
+            headline: \.headline,
+            activeNodeCount: \.activeNodeCount,
+            hasResumeCandidate: \.hasResumeCandidate,
+            resumeHint: \.resumeHint,
+            retrievalMode: "filtered",
+            recommendedTemplateIDs: ["night_message_cooling"]
+        )
+
+        #expect(context.prompt == "Should I sleep on this?")
+        #expect(context.embeddingScores.map(\.id) == ["memory-1"])
+        #expect(context.taskGraphHint?.headline == "Pause before replying.")
+        #expect(context.taskGraphHint?.activeNodeCount == 2)
+        #expect(context.recommendedTemplateIDs == ["night_message_cooling"])
+    }
+
     @Test("brain bootstrap request adapter compiles minimal local request without host bridge")
     func brainBootstrapRequestAdapterBuildsRequest() {
         let now = Date(timeIntervalSince1970: 1_744_322_120)
