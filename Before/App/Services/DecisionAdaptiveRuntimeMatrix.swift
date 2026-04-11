@@ -1,6 +1,5 @@
 import Foundation
-import BASAppleAdapters
-import BASRuntimeCore
+import BASHostKit
 
 enum DecisionRuntimeGear: String, Equatable, Sendable {
     case low

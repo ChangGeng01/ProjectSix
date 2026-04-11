@@ -1,5 +1,5 @@
 import Foundation
-import BASAppleAdapters
+import BASHostKit
 
 enum DecisionIntelligenceExecutionTier: String, Equatable, Sendable {
     case testingOverride

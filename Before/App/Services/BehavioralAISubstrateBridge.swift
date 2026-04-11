@@ -1,11 +1,6 @@
 import Foundation
 import SwiftData
-import BASAdmin
-import BASAppleAdapters
-import BASMemory
-import BASOrchestration
-import BASPolicy
-import BASRuntimeCore
+import BASHostKit
 
 enum BehavioralAISubstrateBridge {
     typealias ProviderObservationContext = BASAppleHostProviderObservationContext<

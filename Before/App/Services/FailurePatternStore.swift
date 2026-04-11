@@ -1,6 +1,6 @@
 import Foundation
 import SwiftData
-import BASAppleAdapters
+import BASHostKit
 
 enum FailurePatternStore {
     static func syncFromHistory(in context: ModelContext) {

@@ -1,9 +1,5 @@
 import Foundation
-import BASAppleAdapters
-import BASOrchestration
-import BASObservability
-import BASPolicy
-import BASRuntimeCore
+import BASHostKit
 
 enum DecisionIntelligenceProviderPipeline {
     private static let registry = DecisionIntelligenceProviderRegistry.shared

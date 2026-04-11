@@ -1,6 +1,5 @@
 import Foundation
-import BASMemory
-import BASPolicy
+import BASHostKit
 
 enum DecisionIdentityRoleSystem {
     static func resolve(

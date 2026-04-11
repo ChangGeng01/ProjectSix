@@ -1,5 +1,5 @@
 import Foundation
-import BASMemory
+import BASHostKit
 
 typealias DecisionReactionWeightKey = BASReactionWeightKey
 typealias DecisionReactionWeights = BASReactionWeights

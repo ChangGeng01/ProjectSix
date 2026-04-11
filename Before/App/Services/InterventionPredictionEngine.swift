@@ -1,6 +1,6 @@
 import Foundation
 import SwiftData
-import BASAppleAdapters
+import BASHostKit
 
 enum InterventionPredictionEngine {
     static func predictCandidate(

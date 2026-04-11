@@ -1,6 +1,6 @@
 import Foundation
 import SwiftData
-import BASPolicy
+import BASHostKit
 
 enum InterventionNotificationPolicyBlockReason: String, Equatable, Sendable {
     case featureDisabled

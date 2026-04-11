@@ -1,5 +1,5 @@
 import Foundation
-import BASAppleAdapters
+import BASHostKit
 
 enum DecisionReactionBanditStore {
     private static let key = "before.reaction.bandit.snapshot"

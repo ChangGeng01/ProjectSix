@@ -1,6 +1,5 @@
 import Foundation
-import BASAppleAdapters
-import BASObservability
+import BASHostKit
 
 typealias DecisionIntelligenceRequestOutcome = BASRequestOutcome
 typealias DecisionRequestLifecycleMetrics = BASRequestLifecycleMetrics

@@ -10,6 +10,7 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
+        .library(name: "BASHostKit", targets: ["BASHostKit"]),
         .library(name: "BASRuntimeCore", targets: ["BASRuntimeCore"]),
         .library(name: "BASMemory", targets: ["BASMemory"]),
         .library(name: "BASPolicy", targets: ["BASPolicy"]),
@@ -34,7 +35,21 @@ let package = Package(
             name: "BASAppleAdapters",
             dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASOrchestration", "BASObservability", "BASAdmin"]
         ),
+        .target(
+            name: "BASHostKit",
+            dependencies: [
+                "BASRuntimeCore",
+                "BASMemory",
+                "BASPolicy",
+                "BASOrchestration",
+                "BASObservability",
+                "BASEvaluation",
+                "BASAdmin",
+                "BASAppleAdapters"
+            ]
+        ),
         .testTarget(name: "BehavioralAISubstrateTests", dependencies: [
+            "BASHostKit",
             "BASRuntimeCore",
             "BASMemory",
             "BASPolicy",

@@ -1,6 +1,5 @@
 import Foundation
-import BASMemory
-import BASRuntimeCore
+import BASHostKit
 
 typealias DecisionIdentityRole = BASIdentityRole
 typealias DecisionIdentityPosture = BASIdentityPosture
@@ -11,9 +10,9 @@ typealias DecisionBoundaryPolicyMode = BASBoundaryPolicyMode
 typealias DecisionBoundaryConstraint = BASBoundaryConstraint
 typealias DecisionBoundaryPolicyState = BASBoundaryPolicyState
 
-typealias DecisionCalibrationStatus = BASCalibrationStatus
-typealias DecisionCalibrationAlert = BASCalibrationAlert
-typealias DecisionCalibrationState = BASCalibrationState
+typealias DecisionCalibrationStatus = BASMemory.BASCalibrationStatus
+typealias DecisionCalibrationAlert = BASMemory.BASCalibrationAlert
+typealias DecisionCalibrationState = BASMemory.BASCalibrationState
 
 typealias DecisionEvolutionApprovalState = BASEvolutionApprovalState
 typealias DecisionEvolutionCheckpointSummary = BASEvolutionCheckpointSummary

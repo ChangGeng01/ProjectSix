@@ -1,5 +1,5 @@
 import Foundation
-import BASRuntimeCore
+import BASHostKit
 
 typealias DecisionModelCapability = BASProviderCapability
 typealias DecisionModelLatencyClass = BASProviderLatencyClass

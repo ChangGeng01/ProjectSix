@@ -1,7 +1,5 @@
 import Foundation
-import BASAppleAdapters
-import BASObservability
-import BASPolicy
+import BASHostKit
 
 enum DecisionIntelligenceTracePrivacy {
     static func allowsSensitivePayload(

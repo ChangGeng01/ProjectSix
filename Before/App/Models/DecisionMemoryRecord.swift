@@ -1,7 +1,6 @@
 import Foundation
 import SwiftData
-import BASAppleAdapters
-import BASMemory
+import BASHostKit
 
 enum DecisionMemoryType: String, Codable, Sendable {
     case identity

@@ -1,7 +1,6 @@
 import Foundation
 import SwiftData
-import BASAppleAdapters
-import BASMemory
+import BASHostKit
 
 enum DecisionMemorySystem {
     static let projectionRecordLimit = BASAppleMemoryProjectionRefreshLimits.default.recordLimit

@@ -48,21 +48,7 @@ targets:
       - target: BeforeWidgetExtension
         embed: true
       - package: BehavioralAISubstrate
-        product: BASRuntimeCore
-      - package: BehavioralAISubstrate
-        product: BASMemory
-      - package: BehavioralAISubstrate
-        product: BASPolicy
-      - package: BehavioralAISubstrate
-        product: BASOrchestration
-      - package: BehavioralAISubstrate
-        product: BASObservability
-      - package: BehavioralAISubstrate
-        product: BASEvaluation
-      - package: BehavioralAISubstrate
-        product: BASAdmin
-      - package: BehavioralAISubstrate
-        product: BASAppleAdapters
+        product: BASHostKit
 
   BeforeWidgetExtension:
     type: app-extension
@@ -88,13 +74,7 @@ targets:
         SKIP_INSTALL: YES
     dependencies:
       - package: BehavioralAISubstrate
-        product: BASRuntimeCore
-      - package: BehavioralAISubstrate
-        product: BASMemory
-      - package: BehavioralAISubstrate
-        product: BASPolicy
-      - package: BehavioralAISubstrate
-        product: BASOrchestration
+        product: BASHostKit
 
   BeforeWatch:
     type: application
@@ -119,15 +99,42 @@ targets:
         TARGETED_DEVICE_FAMILY: "4"
     dependencies:
       - package: BehavioralAISubstrate
-        product: BASRuntimeCore
+        product: BASHostKit
+
+  SampleHost:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: SampleHost
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.changgeng.samplehost
+        PRODUCT_NAME: SampleHost
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        INFOPLIST_KEY_CFBundleDisplayName: SampleHost
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    dependencies:
       - package: BehavioralAISubstrate
-        product: BASMemory
+        product: BASHostKit
+
+  SampleHostTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: SampleHostTests
+    dependencies:
+      - target: SampleHost
       - package: BehavioralAISubstrate
-        product: BASPolicy
-      - package: BehavioralAISubstrate
-        product: BASOrchestration
-      - package: BehavioralAISubstrate
-        product: BASAppleAdapters
+        product: BASHostKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.changgeng.samplehost.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SampleHost.app/SampleHost"
+        BUNDLE_LOADER: "$(TEST_HOST)"
 
   BeforeTests:
     type: bundle.unit-test
@@ -194,3 +201,11 @@ schemes:
     build:
       targets:
         BeforeWatch: all
+  SampleHost:
+    build:
+      targets:
+        SampleHost: all
+        SampleHostTests: [test]
+    test:
+      targets:
+        - name: SampleHostTests

@@ -1,5 +1,5 @@
 import SwiftUI
-import BASPolicy
+import BASHostKit
 
 struct DecisionTraceDetailView: View {
     let trace: DecisionIntelligenceTrace

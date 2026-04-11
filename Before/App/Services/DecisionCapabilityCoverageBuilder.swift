@@ -1,5 +1,5 @@
 import Foundation
-import BASAdmin
+import BASHostKit
 
 enum DecisionCapabilityCoverageBuilder {
     static func build(

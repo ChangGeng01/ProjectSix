@@ -1,6 +1,5 @@
 import Foundation
-import BASAppleAdapters
-import BASMemory
+import BASHostKit
 
 extension DecisionMemorySource {
     init(_ source: BASMemorySource) {

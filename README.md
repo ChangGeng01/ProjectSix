@@ -29,7 +29,9 @@ It is not a streak app, not a blocker, and not a shame machine. The current buil
 ## Project Structure
 
 - `project.yml`: XcodeGen spec
+- `BehavioralAISubstrate/`: private substrate Swift Package
 - `Before/`: main iOS app
+- `SampleHost/`: minimal façade-only host example
 - `BeforeWidgetExtension/`: widget target
 - `BeforeTests/`: unit tests for the rules and reminder templates
 - `docs/`: model packaging and testing-interface notes
@@ -59,6 +61,8 @@ xcodebuild -project Before.xcodeproj -scheme Before -destination 'platform=iOS S
 - The widget extension uses an app group placeholder: `group.com.changgeng.before`.
 - Widget surfaces only use safe generic copy and never show raw user-written reminders.
 - Personal data stays local in this build.
+- `BASHostKit` is now the preferred host-facing integration surface for the private substrate SDK.
+- `Before` remains the full reference host, while `SampleHost` proves the minimal façade integration path.
 - The quick verdict engine remains rule-based and intentionally lightweight.
 - Apple Foundation Models can refine local copy on supported devices.
 - Gemma 4 E4B is prepared as a bundled `.litertlm` asset under `Before/Resources/Models`, with runtime fallback to Apple or deterministic copy when unavailable.

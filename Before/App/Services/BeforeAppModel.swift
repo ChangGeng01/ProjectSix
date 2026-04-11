@@ -2,8 +2,7 @@ import Foundation
 import SwiftData
 import SwiftUI
 import WidgetKit
-import BASAdmin
-import BASAppleAdapters
+import BASHostKit
 
 struct DecisionSignal {
     let eyebrow: String

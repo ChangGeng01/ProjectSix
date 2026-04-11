@@ -1,5 +1,5 @@
 import Foundation
-import BASAppleAdapters
+import BASHostKit
 
 enum DecisionIntelligenceCoordinator {
     private static let adapter: any LocalModelAdapting = TemplateLocalModelAdapter()

@@ -1,8 +1,5 @@
 import Foundation
-import BASAppleAdapters
-import BASOrchestration
-import BASPolicy
-import BASRuntimeCore
+import BASHostKit
 
 enum DecisionIntelligencePromptContract {
     enum Limit {

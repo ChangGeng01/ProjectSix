@@ -3,6 +3,7 @@ import SwiftData
 import Testing
 import BASAdmin
 import BASAppleAdapters
+import BASHostKit
 import BASMemory
 import BASOrchestration
 import BASRuntimeCore
@@ -155,6 +156,61 @@ struct BehavioralAISubstrateBridgeTests {
         #expect(updates.first?.fingerprint == current.verificationSnapshot.fingerprint)
         #expect(current.identityProfile.role == .predictiveSentinel)
         #expect(current.boundaryPolicy.riskLevel == .high)
+    }
+
+    @Test
+    func hostKitFacadePreservesHighRiskNotificationSessionSemantics() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        seedHistory(into: context)
+        try context.save()
+
+        let now = date("2026-04-10T21:55:00Z")
+        let projection = DecisionMemorySystem.refreshProjection(in: context, now: now)
+        let bridgeCurrent = BehavioralAISubstrateBridge.bootstrapCurrentBrainState(
+            mode: .quick,
+            prompt: "Should I send this tonight?",
+            source: .notification,
+            envelope: DecisionIntentEnvelope(
+                kind: .resumeCurrentDecision,
+                sourceSurface: .notification,
+                entrySource: .app,
+                preferredMode: .quick,
+                promptSeed: "Should I send this tonight?",
+                riskLevel: .high,
+                triggerReason: "prediction"
+            ),
+            taskGraph: nil,
+            context: context,
+            projection: projection,
+            retrievalMode: .filtered,
+            now: now
+        )
+
+        let runtime = BASHostRuntime()
+        let hostResult = runtime.startSession(
+            BASHostSessionRequest(
+                kind: .notification,
+                mode: .quick,
+                surface: .notification,
+                prompt: "Should I send this tonight?",
+                title: "Should I send this tonight?",
+                riskLevel: .high,
+                triggerReason: "prediction"
+            ),
+            now: now
+        )
+
+        let bridgeSnapshot = try #require(
+            BehavioralAISubstrateBridge.brainSnapshot(from: bridgeCurrent)
+        )
+
+        #expect(hostResult.currentBrain.mode == bridgeSnapshot.mode)
+        #expect(hostResult.currentBrain.activeTemplateIDs.isEmpty == false)
+        #expect(hostResult.currentBrain.recentFailurePatternIDs.isEmpty == false)
+        #expect(hostResult.currentBrain.activeConstraints.contains("high-risk-confirmation"))
+        #expect(hostResult.interventionSuggestion?.preferredModeID == bridgeSnapshot.mode)
+        #expect(hostResult.interventionSuggestion?.riskLevelID == bridgeCurrent.riskLevel.rawValue)
     }
 
     @Test

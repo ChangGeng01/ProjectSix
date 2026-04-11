@@ -1,5 +1,5 @@
 import SwiftUI
-import BASAdmin
+import BASHostKit
 
 struct SelfPortraitView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
