@@ -16,6 +16,6 @@ typealias DecisionBrainState = BASDecisionBrainState
 
 extension DecisionReactionWeights {
     static func defaults(for mode: DecisionMode) -> DecisionReactionWeights {
-        BASReactionWeights.defaults(forModeName: substrateModeName(from: mode))
+        BeforeProductLanguage.reactionWeights(for: mode)
     }
 }

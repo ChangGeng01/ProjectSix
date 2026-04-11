@@ -17,6 +17,7 @@ public enum BASAppleMemoryGovernanceAdapter {
         checkEventType: Event.Type,
         balanceRecordType: Balance.Type,
         mirrorRecordType: Mirror.Type,
+        behavior: BASMemoryDerivationBehavior = .generic,
         onSaveError: ((Error) -> Void)? = nil
     ) -> BASAppleMemoryReconciliationWriteResult<Governed, Candidate> {
         let drafts = BASAppleMemoryDraftDerivationAdapter.deriveDrafts(
@@ -25,7 +26,8 @@ public enum BASAppleMemoryGovernanceAdapter {
             reminderType: reminderType,
             checkEventType: checkEventType,
             balanceRecordType: balanceRecordType,
-            mirrorRecordType: mirrorRecordType
+            mirrorRecordType: mirrorRecordType,
+            behavior: behavior
         )
         .sorted { lhs, rhs in
             if lhs.priority == rhs.priority {

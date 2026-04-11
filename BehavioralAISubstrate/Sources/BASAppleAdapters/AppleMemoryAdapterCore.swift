@@ -153,7 +153,8 @@ public enum BASAppleMemoryDraftDerivationAdapter {
         checkEvents: [Event],
         balanceRecords: [Balance],
         mirrorRecords: [Mirror],
-        now: Date
+        now: Date,
+        behavior: BASMemoryDerivationBehavior = .generic
     ) -> [BASDerivedMemoryDraft] {
         deriveDrafts(
             BASMemoryDerivationRequest(
@@ -169,7 +170,8 @@ public enum BASAppleMemoryDraftDerivationAdapter {
                 mirrorRecords: mirrorRecords
                     .map(\.basMirrorMemoryInput)
                     .sorted { $0.updatedAt > $1.updatedAt },
-                now: now
+                now: now,
+                behavior: behavior
             )
         )
     }
@@ -185,7 +187,8 @@ public enum BASAppleMemoryDraftDerivationAdapter {
         reminderType: Reminder.Type,
         checkEventType: Event.Type,
         balanceRecordType: Balance.Type,
-        mirrorRecordType: Mirror.Type
+        mirrorRecordType: Mirror.Type,
+        behavior: BASMemoryDerivationBehavior = .generic
     ) -> [BASDerivedMemoryDraft] {
         let reminders = (try? context.fetch(FetchDescriptor<Reminder>())) ?? []
         let checkEvents = (try? context.fetch(FetchDescriptor<Event>())) ?? []
@@ -197,7 +200,8 @@ public enum BASAppleMemoryDraftDerivationAdapter {
             checkEvents: checkEvents,
             balanceRecords: balanceRecords,
             mirrorRecords: mirrorRecords,
-            now: now
+            now: now,
+            behavior: behavior
         )
     }
 }

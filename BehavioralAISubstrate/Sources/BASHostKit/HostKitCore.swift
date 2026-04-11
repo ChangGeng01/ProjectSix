@@ -485,6 +485,95 @@ public struct BASHostWorkflowBehaviorConfiguration: Codable, Equatable, Sendable
     }
 }
 
+public struct BASHostCognitionBehaviorConfiguration: Codable, Equatable, Sendable {
+    public var reactionWeightsByProfileID: [String: BASReactionWeights]
+    public var identityProfilesByProfileID: [String: BASIdentityProfile]
+
+    public init(
+        reactionWeightsByProfileID: [String: BASReactionWeights]? = nil,
+        identityProfilesByProfileID: [String: BASIdentityProfile]? = nil
+    ) {
+        self.reactionWeightsByProfileID = reactionWeightsByProfileID
+            ?? BASHostCognitionBehaviorConfiguration.genericReactionWeightsByProfileID()
+        self.identityProfilesByProfileID = identityProfilesByProfileID
+            ?? BASHostCognitionBehaviorConfiguration.genericIdentityProfilesByProfileID()
+    }
+
+    public func reactionWeights(for profile: BASHostWorkflowProfile) -> BASReactionWeights {
+        reactionWeightsByProfileID[profile.rawValue]
+            ?? BASHostCognitionBehaviorConfiguration.neutralReactionWeights(for: profile)
+    }
+
+    public func identityProfile(for profile: BASHostWorkflowProfile) -> BASIdentityProfile {
+        identityProfilesByProfileID[profile.rawValue]
+            ?? BASHostCognitionBehaviorConfiguration.neutralIdentityProfile(for: profile)
+    }
+
+    private static func genericReactionWeightsByProfileID() -> [String: BASReactionWeights] {
+        var mapping: [String: BASReactionWeights] = [:]
+        for profile in BASHostWorkflowProfile.allCases {
+            mapping[profile.rawValue] = neutralReactionWeights(for: profile)
+        }
+        return mapping
+    }
+
+    private static func genericIdentityProfilesByProfileID() -> [String: BASIdentityProfile] {
+        var mapping: [String: BASIdentityProfile] = [:]
+        for profile in BASHostWorkflowProfile.allCases {
+            mapping[profile.rawValue] = neutralIdentityProfile(for: profile)
+        }
+        return mapping
+    }
+
+    private static func neutralReactionWeights(for profile: BASHostWorkflowProfile) -> BASReactionWeights {
+        switch profile {
+        case .rapid:
+            BASReactionWeights(
+                briefLanguage: 0.56,
+                warmDirectTone: 0.52,
+                lowCognitiveLoad: 0.58,
+                interruptiveActionBias: 0.48,
+                boundaryNamingBias: 0.42,
+                tradeoffClarityBias: 0.44
+            )
+        case .deliberate:
+            BASReactionWeights(
+                briefLanguage: 0.48,
+                warmDirectTone: 0.52,
+                lowCognitiveLoad: 0.46,
+                interruptiveActionBias: 0.36,
+                boundaryNamingBias: 0.46,
+                tradeoffClarityBias: 0.58
+            )
+        case .reflective:
+            BASReactionWeights(
+                briefLanguage: 0.50,
+                warmDirectTone: 0.56,
+                lowCognitiveLoad: 0.50,
+                interruptiveActionBias: 0.28,
+                boundaryNamingBias: 0.58,
+                tradeoffClarityBias: 0.46
+            )
+        }
+    }
+
+    private static func neutralIdentityProfile(for profile: BASHostWorkflowProfile) -> BASIdentityProfile {
+        let posture: BASIdentityPosture = profile == .rapid ? .coaching : .reflective
+        let initiative: BASIdentityInitiative = profile == .reflective ? .passive : .guided
+
+        return BASIdentityProfile(
+            role: .boundedGuide,
+            posture: posture,
+            initiative: initiative,
+            confidenceCeiling: profile == .deliberate ? 0.72 : 0.68,
+            canAdvise: true,
+            canExecuteActions: false,
+            canEscalateToCloud: false,
+            relationshipBoundary: "Stay bounded, local, and explicit about uncertainty."
+        )
+    }
+}
+
 public struct BASHostPresentationConfiguration: Codable, Equatable, Sendable {
     public var workflowTitles: BASHostWorkflowTitles
     public var surfaceTitles: BASHostSurfaceTitles
@@ -519,6 +608,7 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
     public var prefersPureLocal: Bool
     public var console: BASHostConsoleConfiguration
     public var workflowBehavior: BASHostWorkflowBehaviorConfiguration
+    public var cognitionBehavior: BASHostCognitionBehaviorConfiguration
     public var presentation: BASHostPresentationConfiguration
 
     public init(
@@ -527,6 +617,7 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
         prefersPureLocal: Bool = true,
         console: BASHostConsoleConfiguration = BASHostConsoleConfiguration(),
         workflowBehavior: BASHostWorkflowBehaviorConfiguration = BASHostWorkflowBehaviorConfiguration(),
+        cognitionBehavior: BASHostCognitionBehaviorConfiguration = BASHostCognitionBehaviorConfiguration(),
         presentation: BASHostPresentationConfiguration = BASHostPresentationConfiguration()
     ) {
         self.runtimeProfileID = runtimeProfileID
@@ -534,6 +625,7 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
         self.prefersPureLocal = prefersPureLocal
         self.console = console
         self.workflowBehavior = workflowBehavior
+        self.cognitionBehavior = cognitionBehavior
         self.presentation = presentation
     }
 }
@@ -1172,6 +1264,8 @@ public struct BASHostRuntime: Sendable {
                 sourceSurface: request.surface.substrateSurface,
                 riskLevel: request.riskLevel.substrateRiskLevel,
                 retrievalMode: retrievalMode(for: request),
+                reactionWeightSeed: configuration.cognitionBehavior.reactionWeights(for: request.workflowProfile),
+                identityProfileOverride: configuration.cognitionBehavior.identityProfile(for: request.workflowProfile),
                 goalHints: goalHints(for: request),
                 constraintHints: constraintHints(for: request),
                 now: now

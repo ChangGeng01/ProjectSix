@@ -121,25 +121,136 @@ public struct BASMirrorMemoryInput: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASSituationalDraftBehavior: Codable, Equatable, Sendable {
+    public var draftID: String
+    public var topic: String
+    public var primaryHeadlinePrefix: String
+    public var fallbackHeadlinePrefix: String?
+    public var provenanceSummary: String
+    public var baseTags: [String]
+
+    public init(
+        draftID: String,
+        topic: String,
+        primaryHeadlinePrefix: String,
+        fallbackHeadlinePrefix: String? = nil,
+        provenanceSummary: String,
+        baseTags: [String]
+    ) {
+        self.draftID = draftID
+        self.topic = topic
+        self.primaryHeadlinePrefix = primaryHeadlinePrefix
+        self.fallbackHeadlinePrefix = fallbackHeadlinePrefix
+        self.provenanceSummary = provenanceSummary
+        self.baseTags = baseTags
+    }
+}
+
+public struct BASSupportActionDraftBehavior: Codable, Equatable, Sendable {
+    public var headline: String
+    public var tags: [String]
+    public var provenanceSummary: String?
+
+    public init(
+        headline: String,
+        tags: [String],
+        provenanceSummary: String? = nil
+    ) {
+        self.headline = headline
+        self.tags = tags
+        self.provenanceSummary = provenanceSummary
+    }
+}
+
+public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
+    public static let generic = BASMemoryDerivationBehavior()
+
+    public var primarySituational: BASSituationalDraftBehavior
+    public var comparativeSituational: BASSituationalDraftBehavior
+    public var reflectiveSituational: BASSituationalDraftBehavior
+    public var supportActionsByID: [String: BASSupportActionDraftBehavior]
+    public var fallbackSupportTags: [String]
+    public var fallbackSupportProvenanceSummary: String
+
+    public init(
+        primarySituational: BASSituationalDraftBehavior = BASSituationalDraftBehavior(
+            draftID: "situational.primary.latest",
+            topic: "recent_primary_loop",
+            primaryHeadlinePrefix: "Recently carrying",
+            fallbackHeadlinePrefix: "Recently revisiting",
+            provenanceSummary: "Candidate memory staged from the latest primary interaction.",
+            baseTags: ["primary", "recent"]
+        ),
+        comparativeSituational: BASSituationalDraftBehavior = BASSituationalDraftBehavior(
+            draftID: "situational.comparative.latest",
+            topic: "recent_comparative_deliberation",
+            primaryHeadlinePrefix: "Recently weighing",
+            provenanceSummary: "Candidate memory staged from the latest comparative workspace.",
+            baseTags: ["comparative", "recent"]
+        ),
+        reflectiveSituational: BASSituationalDraftBehavior = BASSituationalDraftBehavior(
+            draftID: "situational.reflective.latest",
+            topic: "recent_reflective_question",
+            primaryHeadlinePrefix: "Recently reflecting on",
+            provenanceSummary: "Candidate memory staged from the latest reflective workspace.",
+            baseTags: ["reflective", "recent"]
+        ),
+        supportActionsByID: [String: BASSupportActionDraftBehavior] = [
+            "decideTomorrow": BASSupportActionDraftBehavior(
+                headline: "Deferring the decision often reduces loop intensity.",
+                tags: ["support", "delay", "stabilize"]
+            ),
+            "leaveStimulus": BASSupportActionDraftBehavior(
+                headline: "Stepping away from the trigger often helps faster.",
+                tags: ["support", "distance", "interrupt"]
+            ),
+            "wait90s": BASSupportActionDraftBehavior(
+                headline: "A short pause often creates enough space to reset.",
+                tags: ["support", "pause", "interrupt"]
+            ),
+            "goAheadAnyway": BASSupportActionDraftBehavior(
+                headline: "When it is aligned, clean action can beat over-processing.",
+                tags: ["support", "aligned", "action"]
+            ),
+            "continueMindfully": BASSupportActionDraftBehavior(
+                headline: "When it is aligned, clean action can beat over-processing.",
+                tags: ["support", "aligned", "action"]
+            )
+        ],
+        fallbackSupportTags: [String] = ["support", "action_pattern"],
+        fallbackSupportProvenanceSummary: String = "Derived from repeated successful action outcomes."
+    ) {
+        self.primarySituational = primarySituational
+        self.comparativeSituational = comparativeSituational
+        self.reflectiveSituational = reflectiveSituational
+        self.supportActionsByID = supportActionsByID
+        self.fallbackSupportTags = fallbackSupportTags
+        self.fallbackSupportProvenanceSummary = fallbackSupportProvenanceSummary
+    }
+}
+
 public struct BASMemoryDerivationRequest: Codable, Equatable, Sendable {
     public var reminders: [BASSelfReminderMemoryInput]
     public var checkEvents: [BASCheckEventMemoryInput]
     public var balanceRecords: [BASBalanceMemoryInput]
     public var mirrorRecords: [BASMirrorMemoryInput]
     public var now: Date
+    public var behavior: BASMemoryDerivationBehavior
 
     public init(
         reminders: [BASSelfReminderMemoryInput],
         checkEvents: [BASCheckEventMemoryInput],
         balanceRecords: [BASBalanceMemoryInput],
         mirrorRecords: [BASMirrorMemoryInput],
-        now: Date
+        now: Date,
+        behavior: BASMemoryDerivationBehavior = .generic
     ) {
         self.reminders = reminders
         self.checkEvents = checkEvents
         self.balanceRecords = balanceRecords
         self.mirrorRecords = mirrorRecords
         self.now = now
+        self.behavior = behavior
     }
 }
 
@@ -158,13 +269,17 @@ public enum BASMemoryDraftCompiler {
         drafts += situationalDrafts(
             checkEvents: request.checkEvents,
             balanceRecords: request.balanceRecords,
-            mirrorRecords: request.mirrorRecords
+            mirrorRecords: request.mirrorRecords,
+            behavior: request.behavior
         )
         drafts += semanticDrafts(
             checkEvents: request.checkEvents,
             now: request.now
         )
-        drafts += supportDrafts(checkEvents: request.checkEvents)
+        drafts += supportDrafts(
+            checkEvents: request.checkEvents,
+            behavior: request.behavior
+        )
 
         var unique: [String: BASDerivedMemoryDraft] = [:]
         for draft in drafts {
@@ -270,21 +385,25 @@ public enum BASMemoryDraftCompiler {
     private static func situationalDrafts(
         checkEvents: [BASCheckEventMemoryInput],
         balanceRecords: [BASBalanceMemoryInput],
-        mirrorRecords: [BASMirrorMemoryInput]
+        mirrorRecords: [BASMirrorMemoryInput],
+        behavior: BASMemoryDerivationBehavior
     ) -> [BASDerivedMemoryDraft] {
         var drafts: [BASDerivedMemoryDraft] = []
 
         if let event = checkEvents.first {
             let note = normalized(event.note)
-            let headline = note.isEmpty
-                ? "Recently revisiting \(event.scenarioTitle.lowercased()) pressure."
-                : "Recently carrying: \(clipped(note, limit: 96))"
+            let headline: String
+            if note.isEmpty, let fallbackPrefix = behavior.primarySituational.fallbackHeadlinePrefix {
+                headline = "\(fallbackPrefix) \(event.scenarioTitle.lowercased()) pressure."
+            } else {
+                headline = "\(behavior.primarySituational.primaryHeadlinePrefix): \(clipped(note.isEmpty ? event.scenarioTitle : note, limit: 96))"
+            }
 
             drafts.append(
                 BASDerivedMemoryDraft(
-                    id: "situational.quick.latest",
+                    id: behavior.primarySituational.draftID,
                     typeID: "situational",
-                    topic: "recent_quick_loop",
+                    topic: behavior.primarySituational.topic,
                     headline: headline,
                     value: note.isEmpty ? event.scenarioTitle : note,
                     confidence: 0.7,
@@ -292,9 +411,9 @@ public enum BASMemoryDraftCompiler {
                     sourceID: "history",
                     lastConfirmedAt: event.createdAt,
                     decayPolicyID: "fast",
-                    retrievalTags: [event.scenarioID, "quick", "recent"] + tags(from: note),
+                    retrievalTags: [event.scenarioID] + behavior.primarySituational.baseTags + tags(from: note),
                     evidenceCount: 1,
-                    provenanceSummary: "Candidate memory staged from the latest primary decision loop.",
+                    provenanceSummary: behavior.primarySituational.provenanceSummary,
                     promotionPolicy: .candidateOnly
                 )
             )
@@ -305,19 +424,19 @@ public enum BASMemoryDraftCompiler {
             if !prompt.isEmpty {
                 drafts.append(
                     BASDerivedMemoryDraft(
-                        id: "situational.balance.latest",
+                        id: behavior.comparativeSituational.draftID,
                         typeID: "situational",
-                        topic: "recent_balance_board",
-                        headline: "Recently weighing: \(clipped(prompt, limit: 96))",
+                        topic: behavior.comparativeSituational.topic,
+                        headline: "\(behavior.comparativeSituational.primaryHeadlinePrefix): \(clipped(prompt, limit: 96))",
                         value: prompt,
                         confidence: 0.74,
                         priority: 0.76,
                         sourceID: "history",
                         lastConfirmedAt: record.updatedAt,
                         decayPolicyID: "fast",
-                        retrievalTags: ["balance", "recent"] + tags(from: prompt),
+                        retrievalTags: behavior.comparativeSituational.baseTags + tags(from: prompt),
                         evidenceCount: 1,
-                        provenanceSummary: "Candidate memory staged from the latest comparative workspace.",
+                        provenanceSummary: behavior.comparativeSituational.provenanceSummary,
                         promotionPolicy: .candidateOnly
                     )
                 )
@@ -329,19 +448,19 @@ public enum BASMemoryDraftCompiler {
             if !prompt.isEmpty {
                 drafts.append(
                     BASDerivedMemoryDraft(
-                        id: "situational.mirror.latest",
+                        id: behavior.reflectiveSituational.draftID,
                         typeID: "situational",
-                        topic: "recent_mirror_question",
-                        headline: "Recently reflecting on: \(clipped(prompt, limit: 96))",
+                        topic: behavior.reflectiveSituational.topic,
+                        headline: "\(behavior.reflectiveSituational.primaryHeadlinePrefix): \(clipped(prompt, limit: 96))",
                         value: prompt,
                         confidence: 0.78,
                         priority: 0.82,
                         sourceID: "history",
                         lastConfirmedAt: record.updatedAt,
                         decayPolicyID: "fast",
-                        retrievalTags: ["mirror", "recent"] + tags(from: prompt),
+                        retrievalTags: behavior.reflectiveSituational.baseTags + tags(from: prompt),
                         evidenceCount: 1,
-                        provenanceSummary: "Candidate memory staged from the latest reflective workspace.",
+                        provenanceSummary: behavior.reflectiveSituational.provenanceSummary,
                         promotionPolicy: .candidateOnly
                     )
                 )
@@ -411,7 +530,8 @@ public enum BASMemoryDraftCompiler {
     }
 
     private static func supportDrafts(
-        checkEvents: [BASCheckEventMemoryInput]
+        checkEvents: [BASCheckEventMemoryInput],
+        behavior: BASMemoryDerivationBehavior
     ) -> [BASDerivedMemoryDraft] {
         let actionGroups = Dictionary(grouping: checkEvents, by: \.actionID)
 
@@ -421,24 +541,10 @@ public enum BASMemoryDraftCompiler {
             .prefix(2)
             .compactMap { actionID, events in
                 guard let first = events.first else { return nil }
-                let (headline, tags): (String, [String])
-                switch actionID {
-                case "decideTomorrow":
-                    headline = "Holding the decision often breaks the loop."
-                    tags = ["support", "hold", "delay", "loop_break"]
-                case "leaveStimulus":
-                    headline = "Stepping away from the trigger usually helps faster."
-                    tags = ["support", "stimulus", "step_away", "interrupt"]
-                case "wait90s":
-                    headline = "A short pause usually creates enough space to reset."
-                    tags = ["support", "pause", "wait", "interrupt"]
-                case "goAheadAnyway", "continueMindfully":
-                    headline = "When it is genuinely aligned, acting cleanly beats over-processing."
-                    tags = ["support", "aligned", "action", "clarity"]
-                default:
-                    headline = "\(first.actionTitle) tends to help in repeated loops."
-                    tags = ["support", actionID]
-                }
+                let configured = behavior.supportActionsByID[actionID]
+                let headline = configured?.headline ?? "\(first.actionTitle) tends to help in repeated loops."
+                let tags = configured?.tags ?? (behavior.fallbackSupportTags + [actionID])
+                let provenanceSummary = configured?.provenanceSummary ?? behavior.fallbackSupportProvenanceSummary
 
                 return BASDerivedMemoryDraft(
                     id: "support.action.\(actionID)",
@@ -451,9 +557,9 @@ public enum BASMemoryDraftCompiler {
                     sourceID: "history",
                     lastConfirmedAt: events.map(\.createdAt).max() ?? .now,
                     decayPolicyID: "medium",
-                    retrievalTags: tags + ["quick", actionID],
+                    retrievalTags: tags + [actionID],
                     evidenceCount: events.count,
-                    provenanceSummary: "Derived from repeated successful primary-loop final actions.",
+                    provenanceSummary: provenanceSummary,
                     promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 2)
                 )
             }

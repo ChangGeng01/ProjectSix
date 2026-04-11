@@ -47,7 +47,9 @@ enum BehavioralAISubstrateBridge {
                 projection: projection.baseProjection,
                 embeddingScores: embeddingScores(for: prompt),
                 taskGraphHint: taskGraphInput,
-                retrievalMode: retrievalMode.rawValue
+                retrievalMode: retrievalMode.rawValue,
+                reactionWeightSeed: BeforeProductLanguage.reactionWeights(for: mode),
+                identityProfileOverride: BeforeProductLanguage.identityProfile(for: mode)
             ),
             envelope: envelope,
             taskGraph: taskGraph,
@@ -76,6 +78,8 @@ enum BehavioralAISubstrateBridge {
             bootstrapCurrentBrain: { bootstrapInput in
                 var bootstrapInput = bootstrapInput
                 bootstrapInput.embeddingScores = embeddingScores(for: bootstrapInput.prompt)
+                bootstrapInput.reactionWeightSeed = BeforeProductLanguage.reactionWeights(for: mode)
+                bootstrapInput.identityProfileOverride = BeforeProductLanguage.identityProfile(for: mode)
                 return bootstrapCurrentBrainState(
                     input: bootstrapInput,
                     context: context
@@ -355,6 +359,10 @@ enum BehavioralAISubstrateBridge {
             bootstrapCurrentBrain: { bootstrapInput in
                 var bootstrapInput = bootstrapInput
                 bootstrapInput.embeddingScores = embeddingScores(for: bootstrapInput.prompt)
+                if let mode = DecisionMode.fromSubstrateModeID(bootstrapInput.modeID) {
+                    bootstrapInput.reactionWeightSeed = BeforeProductLanguage.reactionWeights(for: mode)
+                    bootstrapInput.identityProfileOverride = BeforeProductLanguage.identityProfile(for: mode)
+                }
                 return bootstrapCurrentBrainState(
                     input: bootstrapInput,
                     taskGraph: taskGraph,

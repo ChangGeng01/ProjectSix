@@ -431,6 +431,8 @@ public struct BASBrainBootstrapRequest: Codable, Equatable, Sendable {
     public var sourceSurface: BASInteractionSurface
     public var riskLevel: BASRiskLevel
     public var retrievalMode: String
+    public var reactionWeightSeed: BASReactionWeights?
+    public var identityProfileOverride: BASIdentityProfile?
     public var goalHints: [String]
     public var constraintHints: [String]
     public var now: Date
@@ -442,6 +444,8 @@ public struct BASBrainBootstrapRequest: Codable, Equatable, Sendable {
         sourceSurface: BASInteractionSurface,
         riskLevel: BASRiskLevel,
         retrievalMode: String,
+        reactionWeightSeed: BASReactionWeights? = nil,
+        identityProfileOverride: BASIdentityProfile? = nil,
         goalHints: [String] = [],
         constraintHints: [String] = [],
         now: Date = .now
@@ -452,6 +456,8 @@ public struct BASBrainBootstrapRequest: Codable, Equatable, Sendable {
         self.sourceSurface = sourceSurface
         self.riskLevel = riskLevel
         self.retrievalMode = retrievalMode
+        self.reactionWeightSeed = reactionWeightSeed
+        self.identityProfileOverride = identityProfileOverride
         self.goalHints = goalHints
         self.constraintHints = constraintHints
         self.now = now
@@ -758,6 +764,7 @@ public enum BASDecisionBrainCompiler {
         )
         let reactionWeights = reactionWeights(
             for: request.mode,
+            seed: request.reactionWeightSeed ?? BASReactionWeights.defaults(forModeName: request.mode.rawValue),
             queryTags: queryTags,
             memorySlices: memorySlices,
             recentEvents: projection.recentEvents
@@ -769,7 +776,7 @@ public enum BASDecisionBrainCompiler {
             recentEvents: projection.recentEvents,
             reactionWeights: reactionWeights
         )
-        let identityProfile = BASIdentityProfile.default(modeName: request.mode.rawValue)
+        let identityProfile = request.identityProfileOverride ?? BASIdentityProfile.default(modeName: request.mode.rawValue)
         let boundaryPolicy = BASBoundaryPolicyState.default(riskLevel: request.riskLevel)
         let memoryGovernance = mergeGovernanceState(
             seed: projection.governanceSnapshot,
@@ -1051,11 +1058,12 @@ public enum BASDecisionBrainCompiler {
 
     private static func reactionWeights(
         for mode: BASDecisionMode,
+        seed: BASReactionWeights,
         queryTags: Set<String>,
         memorySlices: [BASGovernedMemorySlice],
         recentEvents: [BASEventRecord]
     ) -> BASReactionWeights {
-        var weights = BASReactionWeights.defaults(forModeName: mode.rawValue)
+        var weights = seed
         let memoryText = normalizedMemoryText(from: memorySlices)
         let hasNightSignal = hasNightSignal(queryTags: queryTags, memoryText: memoryText, recentEvents: recentEvents, now: nil)
 

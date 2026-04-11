@@ -20,7 +20,7 @@ typealias DecisionEvolutionState = BASEvolutionState
 
 extension DecisionIdentityProfile {
     static func `default`(for mode: DecisionMode) -> DecisionIdentityProfile {
-        BASIdentityProfile.default(modeName: substrateModeName(from: mode))
+        BeforeProductLanguage.identityProfile(for: mode)
     }
 }
 

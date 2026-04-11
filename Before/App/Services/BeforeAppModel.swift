@@ -32,6 +32,7 @@ final class BeforeAppModel: ObservableObject {
     private let hostRuntime = BASHostRuntime(
         configuration: BASHostConfiguration(
             workflowBehavior: BeforeProductLanguage.workflowBehavior,
+            cognitionBehavior: BeforeProductLanguage.hostCognition,
             presentation: BeforeProductLanguage.hostPresentation
         )
     )

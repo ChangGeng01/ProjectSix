@@ -79,6 +79,7 @@ public enum BASAppleMemoryProjectionRefreshAdapter {
         checkEventType: Event.Type,
         balanceRecordType: Balance.Type,
         mirrorRecordType: Mirror.Type,
+        behavior: BASMemoryDerivationBehavior = .generic,
         fetchRecords: (ModelContext, Int) -> [Governed],
         fetchCandidates: (ModelContext, Int) -> [Candidate],
         fetchCheckEvents: (ModelContext, Int) -> [Event],
@@ -109,6 +110,7 @@ public enum BASAppleMemoryProjectionRefreshAdapter {
                     checkEventType: checkEventType,
                     balanceRecordType: balanceRecordType,
                     mirrorRecordType: mirrorRecordType,
+                    behavior: behavior,
                     onSaveError: onSaveError
                 )
             resolvedRecords = Array(refreshed.orderedRecords.prefix(limits.recordLimit))
@@ -171,6 +173,7 @@ public enum BASAppleMemoryProjectionRuntime {
         checkEventType: Event.Type,
         balanceRecordType: Balance.Type,
         mirrorRecordType: Mirror.Type,
+        behavior: BASMemoryDerivationBehavior = .generic,
         rebuildEmbeddings: (
             _ records: [Governed],
             _ candidates: [Candidate],
@@ -190,6 +193,7 @@ public enum BASAppleMemoryProjectionRuntime {
             checkEventType: checkEventType,
             balanceRecordType: balanceRecordType,
             mirrorRecordType: mirrorRecordType,
+            behavior: behavior,
             fetchRecords: {
                 BASAppleMemoryProjectionSelectionAdapter.fetchProjectionRecords(
                     in: $0,
@@ -247,6 +251,7 @@ public enum BASAppleMemoryProjectionRuntime {
         checkEventType: Event.Type,
         balanceRecordType: Balance.Type,
         mirrorRecordType: Mirror.Type,
+        behavior: BASMemoryDerivationBehavior = .generic,
         fetchRecords: (ModelContext, Int) -> [Governed],
         fetchCandidates: (ModelContext, Int) -> [Candidate],
         fetchCheckEvents: (ModelContext, Int) -> [Event],
@@ -282,6 +287,7 @@ public enum BASAppleMemoryProjectionRuntime {
             checkEventType: checkEventType,
             balanceRecordType: balanceRecordType,
             mirrorRecordType: mirrorRecordType,
+            behavior: behavior,
             fetchRecords: fetchRecords,
             fetchCandidates: fetchCandidates,
             fetchCheckEvents: fetchCheckEvents,

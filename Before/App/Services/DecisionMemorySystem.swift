@@ -23,6 +23,7 @@ enum DecisionMemorySystem {
             checkEventType: CheckEvent.self,
             balanceRecordType: BalanceDecisionRecord.self,
             mirrorRecordType: MirrorDecisionRecord.self,
+            behavior: BeforeProductLanguage.memoryDerivationBehavior,
             onSaveError: { error in
                 PersistenceIssueRecorder.record(
                     error: error,
@@ -46,6 +47,7 @@ enum DecisionMemorySystem {
             checkEventType: CheckEvent.self,
             balanceRecordType: BalanceDecisionRecord.self,
             mirrorRecordType: MirrorDecisionRecord.self,
+            behavior: BeforeProductLanguage.memoryDerivationBehavior,
             rebuildEmbeddings: { records, candidates, checkEvents, balanceRecords, mirrorRecords in
                 EmbeddingMemoryStore.rebuildIndex(
                     records: records,
@@ -92,6 +94,8 @@ enum DecisionMemorySystem {
             prompt: prompt,
             projection: projection.baseProjection,
             retrievalMode: retrievalMode.rawValue,
+            reactionWeightSeed: BeforeProductLanguage.reactionWeights(for: mode),
+            identityProfileOverride: BeforeProductLanguage.identityProfile(for: mode),
             preferredLanguages: Locale.preferredLanguages,
             now: now
         )

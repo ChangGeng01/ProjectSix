@@ -90,13 +90,84 @@ struct BASMemoryDerivationCoreTests {
         )
 
         let drafts = BASMemoryDraftCompiler.derive(request)
-        let situational = try #require(drafts.first(where: { $0.id == "situational.quick.latest" }))
+        let situational = try #require(drafts.first(where: { $0.id == "situational.primary.latest" }))
 
         #expect(situational.promotionPolicy == .candidateOnly)
         #expect(situational.typeID == "situational")
         #expect(situational.retrievalTags.contains("lang:chinese"))
         #expect(situational.retrievalTags.contains("script:han"))
         #expect(situational.retrievalTags.contains(where: { $0.contains("今晚") || $0.contains("想买") }))
+    }
+
+    @Test("draft compiler accepts host supplied derivation behavior")
+    func derivesDraftsUsingHostBehavior() throws {
+        let request = BASMemoryDerivationRequest(
+            reminders: [],
+            checkEvents: [
+                BASCheckEventMemoryInput(
+                    id: "host-1",
+                    scenarioID: "message",
+                    scenarioTitle: "Message",
+                    actionID: "decideTomorrow",
+                    actionTitle: "Tomorrow Box",
+                    note: "Hold this until morning.",
+                    createdAt: date("2026-04-10T08:00:00Z")
+                ),
+                BASCheckEventMemoryInput(
+                    id: "host-2",
+                    scenarioID: "message",
+                    scenarioTitle: "Message",
+                    actionID: "decideTomorrow",
+                    actionTitle: "Tomorrow Box",
+                    note: "Hold this until morning.",
+                    createdAt: date("2026-04-09T08:00:00Z")
+                )
+            ],
+            balanceRecords: [],
+            mirrorRecords: [],
+            now: date("2026-04-10T08:30:00Z"),
+            behavior: BASMemoryDerivationBehavior(
+                primarySituational: BASSituationalDraftBehavior(
+                    draftID: "situational.quick.latest",
+                    topic: "recent_quick_loop",
+                    primaryHeadlinePrefix: "Recently carrying",
+                    fallbackHeadlinePrefix: "Recently revisiting",
+                    provenanceSummary: "Host quick memory.",
+                    baseTags: ["quick", "recent"]
+                ),
+                comparativeSituational: .init(
+                    draftID: "situational.compare.latest",
+                    topic: "recent_compare",
+                    primaryHeadlinePrefix: "Recently comparing",
+                    provenanceSummary: "Host compare memory.",
+                    baseTags: ["compare", "recent"]
+                ),
+                reflectiveSituational: .init(
+                    draftID: "situational.reflect.latest",
+                    topic: "recent_reflect",
+                    primaryHeadlinePrefix: "Recently reflecting",
+                    provenanceSummary: "Host reflect memory.",
+                    baseTags: ["reflect", "recent"]
+                ),
+                supportActionsByID: [
+                    "decideTomorrow": BASSupportActionDraftBehavior(
+                        headline: "Holding the decision often breaks the loop.",
+                        tags: ["support", "hold", "delay", "loop_break"]
+                    )
+                ],
+                fallbackSupportTags: ["support", "custom"],
+                fallbackSupportProvenanceSummary: "Host support memory."
+            )
+        )
+
+        let drafts = BASMemoryDraftCompiler.derive(request)
+        let situational = try #require(drafts.first(where: { $0.id == "situational.quick.latest" }))
+        let support = try #require(drafts.first(where: { $0.id == "support.action.decideTomorrow" }))
+
+        #expect(situational.topic == "recent_quick_loop")
+        #expect(situational.retrievalTags.contains("quick"))
+        #expect(support.headline == "Holding the decision often breaks the loop.")
+        #expect(support.retrievalTags.contains("loop_break"))
     }
 
     private func date(_ value: String) -> Date {

@@ -24,6 +24,66 @@ final class SampleHostModel: ObservableObject {
         ],
         hostNamespace: "samplehost"
     )
+    private static let cognitionBehavior = BASHostCognitionBehaviorConfiguration(
+        reactionWeightsByProfileID: [
+            BASHostWorkflowProfile.rapid.rawValue: BASReactionWeights(
+                briefLanguage: 0.60,
+                warmDirectTone: 0.50,
+                lowCognitiveLoad: 0.56,
+                interruptiveActionBias: 0.58,
+                boundaryNamingBias: 0.32,
+                tradeoffClarityBias: 0.40
+            ),
+            BASHostWorkflowProfile.deliberate.rawValue: BASReactionWeights(
+                briefLanguage: 0.46,
+                warmDirectTone: 0.52,
+                lowCognitiveLoad: 0.44,
+                interruptiveActionBias: 0.34,
+                boundaryNamingBias: 0.48,
+                tradeoffClarityBias: 0.72
+            ),
+            BASHostWorkflowProfile.reflective.rawValue: BASReactionWeights(
+                briefLanguage: 0.48,
+                warmDirectTone: 0.64,
+                lowCognitiveLoad: 0.52,
+                interruptiveActionBias: 0.22,
+                boundaryNamingBias: 0.68,
+                tradeoffClarityBias: 0.40
+            )
+        ],
+        identityProfilesByProfileID: [
+            BASHostWorkflowProfile.rapid.rawValue: BASIdentityProfile(
+                role: .boundedGuide,
+                posture: .coaching,
+                initiative: .guided,
+                confidenceCeiling: 0.68,
+                canAdvise: true,
+                canExecuteActions: false,
+                canEscalateToCloud: false,
+                relationshipBoundary: "SampleHost keeps the lane narrow and practical."
+            ),
+            BASHostWorkflowProfile.deliberate.rawValue: BASIdentityProfile(
+                role: .tradeoffGuide,
+                posture: .reflective,
+                initiative: .guided,
+                confidenceCeiling: 0.72,
+                canAdvise: true,
+                canExecuteActions: false,
+                canEscalateToCloud: false,
+                relationshipBoundary: "SampleHost compares pressures without deciding for you."
+            ),
+            BASHostWorkflowProfile.reflective.rawValue: BASIdentityProfile(
+                role: .mirrorWitness,
+                posture: .reflective,
+                initiative: .passive,
+                confidenceCeiling: 0.66,
+                canAdvise: true,
+                canExecuteActions: false,
+                canEscalateToCloud: false,
+                relationshipBoundary: "SampleHost reflects the pattern without taking center stage."
+            )
+        ]
+    )
     private static let sampleHostPresentation = BASHostPresentationConfiguration(
         workflowTitles: BASHostWorkflowTitles(
             rapid: "Rapid Lens",
@@ -68,6 +128,7 @@ final class SampleHostModel: ObservableObject {
         runtime: BASHostRuntime = BASHostRuntime(
             configuration: BASHostConfiguration(
                 workflowBehavior: SampleHostModel.workflowBehavior,
+                cognitionBehavior: SampleHostModel.cognitionBehavior,
                 presentation: SampleHostModel.sampleHostPresentation
             )
         )

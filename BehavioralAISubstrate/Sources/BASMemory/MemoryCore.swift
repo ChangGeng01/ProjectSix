@@ -85,44 +85,15 @@ public struct BASReactionWeights: Codable, Sendable, Equatable {
     }
 
     public static func defaults(for modeName: String) -> BASReactionWeights {
-        switch BASDecisionMode(identifier: modeName) {
-        case .quick:
-            BASReactionWeights(
-                briefLanguage: 0.62,
-                warmDirectTone: 0.58,
-                lowCognitiveLoad: 0.54,
-                interruptiveActionBias: 0.72,
-                boundaryNamingBias: 0.34,
-                tradeoffClarityBias: 0.38
-            )
-        case .balance:
-            BASReactionWeights(
-                briefLanguage: 0.48,
-                warmDirectTone: 0.56,
-                lowCognitiveLoad: 0.40,
-                interruptiveActionBias: 0.36,
-                boundaryNamingBias: 0.44,
-                tradeoffClarityBias: 0.76
-            )
-        case .mirror:
-            BASReactionWeights(
-                briefLanguage: 0.44,
-                warmDirectTone: 0.62,
-                lowCognitiveLoad: 0.46,
-                interruptiveActionBias: 0.28,
-                boundaryNamingBias: 0.78,
-                tradeoffClarityBias: 0.42
-            )
-        default:
-            BASReactionWeights(
-                briefLanguage: 0.50,
-                warmDirectTone: 0.56,
-                lowCognitiveLoad: 0.48,
-                interruptiveActionBias: 0.40,
-                boundaryNamingBias: 0.46,
-                tradeoffClarityBias: 0.50
-            )
-        }
+        _ = modeName
+        return BASReactionWeights(
+            briefLanguage: 0.50,
+            warmDirectTone: 0.54,
+            lowCognitiveLoad: 0.50,
+            interruptiveActionBias: 0.44,
+            boundaryNamingBias: 0.46,
+            tradeoffClarityBias: 0.50
+        )
     }
 
     public static func defaults(forModeName modeName: String) -> BASReactionWeights {
@@ -311,6 +282,7 @@ public struct BASBrainStateSnapshot: Codable, Equatable, Sendable {
 }
 
 public enum BASIdentityRole: String, CaseIterable, Codable, Sendable {
+    case boundedGuide = "bounded_guide"
     case pauseCompanion = "pause_companion"
     case tradeoffGuide = "tradeoff_guide"
     case mirrorWitness = "mirror_witness"
@@ -318,6 +290,8 @@ public enum BASIdentityRole: String, CaseIterable, Codable, Sendable {
 
     public var title: String {
         switch self {
+        case .boundedGuide:
+            "Bounded Guide"
         case .pauseCompanion:
             "Stability Guide"
         case .tradeoffGuide:
@@ -373,52 +347,17 @@ public struct BASIdentityProfile: Codable, Equatable, Sendable {
     }
 
     public static func `default`(modeName: String) -> BASIdentityProfile {
-        switch modeName {
-        case "quick":
-            BASIdentityProfile(
-                role: .pauseCompanion,
-                posture: .coaching,
-                initiative: .guided,
-                confidenceCeiling: 0.72,
-                canAdvise: true,
-                canExecuteActions: false,
-                canEscalateToCloud: false,
-                relationshipBoundary: "Interrupt velocity without pretending certainty."
-            )
-        case "balance":
-            BASIdentityProfile(
-                role: .tradeoffGuide,
-                posture: .reflective,
-                initiative: .guided,
-                confidenceCeiling: 0.76,
-                canAdvise: true,
-                canExecuteActions: false,
-                canEscalateToCloud: false,
-                relationshipBoundary: "Clarify competing pressures without taking ownership of the decision."
-            )
-        case "mirror":
-            BASIdentityProfile(
-                role: .mirrorWitness,
-                posture: .reflective,
-                initiative: .passive,
-                confidenceCeiling: 0.68,
-                canAdvise: true,
-                canExecuteActions: false,
-                canEscalateToCloud: false,
-                relationshipBoundary: "Reflect the pattern without becoming the center of the story."
-            )
-        default:
-            BASIdentityProfile(
-                role: .pauseCompanion,
-                posture: .coaching,
-                initiative: .guided,
-                confidenceCeiling: 0.70,
-                canAdvise: true,
-                canExecuteActions: false,
-                canEscalateToCloud: false,
-                relationshipBoundary: "Stay bounded, local, and supportive."
-            )
-        }
+        _ = modeName
+        return BASIdentityProfile(
+            role: .boundedGuide,
+            posture: .reflective,
+            initiative: .guided,
+            confidenceCeiling: 0.70,
+            canAdvise: true,
+            canExecuteActions: false,
+            canEscalateToCloud: false,
+            relationshipBoundary: "Stay bounded, local, and explicit about uncertainty."
+        )
     }
 }
 
@@ -823,7 +762,7 @@ public struct BASDecisionBrainState: Codable, Equatable, Sendable {
         memoryGovernance: BASMemoryGovernanceState = .empty,
         loadedAt: Date = .now
     ) {
-        let resolvedIdentity = identityProfile ?? BASIdentityProfile.default(modeName: BASDecisionMode.quick.identifier)
+        let resolvedIdentity = identityProfile ?? BASIdentityProfile.default(modeName: "generic")
         let resolvedBoundary = boundaryPolicy ?? BASBoundaryPolicyState.default(riskLevel: .low)
         self.init(
             memorySlices: Self.legacyMemorySlices(

@@ -115,4 +115,141 @@ enum BeforeProductLanguage {
         ],
         hostNamespace: "before"
     )
+
+    static let hostCognition = BASHostCognitionBehaviorConfiguration(
+        reactionWeightsByProfileID: [
+            BASHostWorkflowProfile.rapid.rawValue: reactionWeights(for: .quick),
+            BASHostWorkflowProfile.deliberate.rawValue: reactionWeights(for: .balance),
+            BASHostWorkflowProfile.reflective.rawValue: reactionWeights(for: .mirror)
+        ],
+        identityProfilesByProfileID: [
+            BASHostWorkflowProfile.rapid.rawValue: identityProfile(for: .quick),
+            BASHostWorkflowProfile.deliberate.rawValue: identityProfile(for: .balance),
+            BASHostWorkflowProfile.reflective.rawValue: identityProfile(for: .mirror)
+        ]
+    )
+
+    static let memoryDerivationBehavior = BASMemoryDerivationBehavior(
+        primarySituational: BASSituationalDraftBehavior(
+            draftID: "situational.quick.latest",
+            topic: "recent_quick_loop",
+            primaryHeadlinePrefix: "Recently carrying",
+            fallbackHeadlinePrefix: "Recently revisiting",
+            provenanceSummary: "Candidate memory staged from the latest primary decision loop.",
+            baseTags: ["quick", "recent"]
+        ),
+        comparativeSituational: BASSituationalDraftBehavior(
+            draftID: "situational.balance.latest",
+            topic: "recent_balance_board",
+            primaryHeadlinePrefix: "Recently weighing",
+            provenanceSummary: "Candidate memory staged from the latest comparative workspace.",
+            baseTags: ["balance", "recent"]
+        ),
+        reflectiveSituational: BASSituationalDraftBehavior(
+            draftID: "situational.mirror.latest",
+            topic: "recent_mirror_question",
+            primaryHeadlinePrefix: "Recently reflecting on",
+            provenanceSummary: "Candidate memory staged from the latest reflective workspace.",
+            baseTags: ["mirror", "recent"]
+        ),
+        supportActionsByID: [
+            "decideTomorrow": BASSupportActionDraftBehavior(
+                headline: "Holding the decision often breaks the loop.",
+                tags: ["support", "hold", "delay", "loop_break"],
+                provenanceSummary: "Derived from repeated successful primary-loop final actions."
+            ),
+            "leaveStimulus": BASSupportActionDraftBehavior(
+                headline: "Stepping away from the trigger usually helps faster.",
+                tags: ["support", "stimulus", "step_away", "interrupt"],
+                provenanceSummary: "Derived from repeated successful primary-loop final actions."
+            ),
+            "wait90s": BASSupportActionDraftBehavior(
+                headline: "A short pause usually creates enough space to reset.",
+                tags: ["support", "pause", "wait", "interrupt"],
+                provenanceSummary: "Derived from repeated successful primary-loop final actions."
+            ),
+            "goAheadAnyway": BASSupportActionDraftBehavior(
+                headline: "When it is genuinely aligned, acting cleanly beats over-processing.",
+                tags: ["support", "aligned", "action", "clarity"],
+                provenanceSummary: "Derived from repeated successful primary-loop final actions."
+            ),
+            "continueMindfully": BASSupportActionDraftBehavior(
+                headline: "When it is genuinely aligned, acting cleanly beats over-processing.",
+                tags: ["support", "aligned", "action", "clarity"],
+                provenanceSummary: "Derived from repeated successful primary-loop final actions."
+            )
+        ],
+        fallbackSupportTags: ["support", "before", "action_pattern"],
+        fallbackSupportProvenanceSummary: "Derived from repeated successful primary-loop final actions."
+    )
+
+    static func reactionWeights(for mode: DecisionMode) -> BASReactionWeights {
+        switch mode {
+        case .quick:
+            BASReactionWeights(
+                briefLanguage: 0.62,
+                warmDirectTone: 0.58,
+                lowCognitiveLoad: 0.54,
+                interruptiveActionBias: 0.72,
+                boundaryNamingBias: 0.34,
+                tradeoffClarityBias: 0.38
+            )
+        case .balance:
+            BASReactionWeights(
+                briefLanguage: 0.48,
+                warmDirectTone: 0.56,
+                lowCognitiveLoad: 0.40,
+                interruptiveActionBias: 0.36,
+                boundaryNamingBias: 0.44,
+                tradeoffClarityBias: 0.76
+            )
+        case .mirror:
+            BASReactionWeights(
+                briefLanguage: 0.44,
+                warmDirectTone: 0.62,
+                lowCognitiveLoad: 0.46,
+                interruptiveActionBias: 0.28,
+                boundaryNamingBias: 0.78,
+                tradeoffClarityBias: 0.42
+            )
+        }
+    }
+
+    static func identityProfile(for mode: DecisionMode) -> BASIdentityProfile {
+        switch mode {
+        case .quick:
+            BASIdentityProfile(
+                role: .pauseCompanion,
+                posture: .coaching,
+                initiative: .guided,
+                confidenceCeiling: 0.72,
+                canAdvise: true,
+                canExecuteActions: false,
+                canEscalateToCloud: false,
+                relationshipBoundary: "Interrupt velocity without pretending certainty."
+            )
+        case .balance:
+            BASIdentityProfile(
+                role: .tradeoffGuide,
+                posture: .reflective,
+                initiative: .guided,
+                confidenceCeiling: 0.76,
+                canAdvise: true,
+                canExecuteActions: false,
+                canEscalateToCloud: false,
+                relationshipBoundary: "Clarify competing pressures without taking ownership of the decision."
+            )
+        case .mirror:
+            BASIdentityProfile(
+                role: .mirrorWitness,
+                posture: .reflective,
+                initiative: .passive,
+                confidenceCeiling: 0.68,
+                canAdvise: true,
+                canExecuteActions: false,
+                canEscalateToCloud: false,
+                relationshipBoundary: "Reflect the pattern without becoming the center of the story."
+            )
+        }
+    }
 }

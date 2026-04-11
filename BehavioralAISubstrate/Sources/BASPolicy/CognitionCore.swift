@@ -47,7 +47,8 @@ public enum BASCognitionBootstrapper {
         let identityProfile = BASIdentityRoleResolver.resolve(
             mode: mode,
             sourceSurface: sourceSurface,
-            riskLevel: riskLevel
+            riskLevel: riskLevel,
+            baseProfile: enrichedBrainState.identityProfile
         )
         let boundaryPolicy = BASBoundaryPolicyEvaluator.evaluate(
             mode: mode,
@@ -102,9 +103,10 @@ public enum BASIdentityRoleResolver {
     public static func resolve(
         mode: BASDecisionMode,
         sourceSurface: BASInteractionSurface,
-        riskLevel: BASRiskLevel
+        riskLevel: BASRiskLevel,
+        baseProfile: BASIdentityProfile? = nil
     ) -> BASIdentityProfile {
-        var profile = BASIdentityProfile.default(modeName: mode.rawValue)
+        var profile = baseProfile ?? BASIdentityProfile.default(modeName: mode.rawValue)
 
         if sourceSurface == .notification {
             profile = BASIdentityProfile(

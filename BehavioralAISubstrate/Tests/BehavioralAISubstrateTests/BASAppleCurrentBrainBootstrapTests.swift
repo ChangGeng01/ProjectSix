@@ -772,6 +772,54 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(execution.bootstrapped.brainState.memorySlices.contains(where: { $0.headline.contains("Protect sleep") }))
     }
 
+    @Test("apple bootstrap request path preserves host cognition seeds")
+    func appleBootstrapRequestPathPreservesHostCognitionSeeds() {
+        let now = Date(timeIntervalSince1970: 1_744_321_950)
+        let seed = BASReactionWeights(
+            briefLanguage: 0.91,
+            warmDirectTone: 0.33,
+            lowCognitiveLoad: 0.22,
+            interruptiveActionBias: 0.11,
+            boundaryNamingBias: 0.44,
+            tradeoffClarityBias: 0.55
+        )
+        let identity = BASIdentityProfile(
+            role: .pauseCompanion,
+            posture: .coaching,
+            initiative: .guided,
+            confidenceCeiling: 0.72,
+            canAdvise: true,
+            canExecuteActions: false,
+            canEscalateToCloud: false,
+            relationshipBoundary: "Host-owned coaching boundary."
+        )
+
+        let execution = BASAppleCurrentBrainBootstrapAdapter.bootstrap(
+            request: BASAppleCurrentBrainBootstrapRequest(
+                preparation: BASCurrentBrainBootstrapPreparation(
+                    mode: .quick,
+                    prompt: "Should I wait until tomorrow?",
+                    trigger: .launch,
+                    sourceSurface: .app,
+                    riskLevel: .low,
+                    languageMode: .english,
+                    memorySource: .history,
+                    now: now
+                ),
+                baseProjection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+                retrievalMode: "filtered",
+                reactionWeightSeed: seed,
+                identityProfileOverride: identity,
+                templates: [],
+                failurePatterns: []
+            )
+        )
+
+        #expect(execution.bootstrapped.brainState.reactionWeights == seed)
+        #expect(execution.bootstrapped.brainState.identityProfile == identity)
+        #expect(execution.bootstrapped.brainState.boundaryPolicy.mode == .localOnlyAdvisory)
+    }
+
     @Test("apple bootstrap artifact also owns persistence input shaping")
     func appleBootstrapArtifactOwnsPersistenceInputShaping() {
         let now = Date(timeIntervalSince1970: 1_744_322_000)
@@ -846,6 +894,24 @@ struct BASAppleCurrentBrainBootstrapTests {
     @Test("source input artifact owns preparation plus execution assembly")
     func sourceInputArtifactOwnsPreparationAndExecutionAssembly() {
         let now = Date(timeIntervalSince1970: 1_744_322_100)
+        let seed = BASReactionWeights(
+            briefLanguage: 0.18,
+            warmDirectTone: 0.22,
+            lowCognitiveLoad: 0.31,
+            interruptiveActionBias: 0.84,
+            boundaryNamingBias: 0.27,
+            tradeoffClarityBias: 0.16
+        )
+        let identity = BASIdentityProfile(
+            role: .pauseCompanion,
+            posture: .coaching,
+            initiative: .guided,
+            confidenceCeiling: 0.68,
+            canAdvise: true,
+            canExecuteActions: false,
+            canEscalateToCloud: false,
+            relationshipBoundary: "Host-owned pause boundary."
+        )
         let artifact = BASAppleCurrentBrainBootstrapAdapter.artifact(
             source: BASAppleCurrentBrainBootstrapSourceInput(
                 preparationRequest: BASCurrentBrainBootstrapPreparationRequest(
@@ -886,6 +952,8 @@ struct BASAppleCurrentBrainBootstrapTests {
                     resumeHint: "Resume after sleep."
                 ),
                 retrievalMode: "filtered",
+                reactionWeightSeed: seed,
+                identityProfileOverride: identity,
                 recommendedTemplateIDs: ["night_message_cooling"],
                 templates: [
                     BASInterventionTemplateDescriptor(
@@ -913,6 +981,54 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(artifact.execution.preparation.riskLevel == .high)
         #expect(artifact.execution.orderedTemplateIDs == ["night_message_cooling"])
         #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.identifier)
+        #expect(artifact.execution.bootstrapped.brainState.reactionWeights.dominantKey == .interruptiveActionBias)
+    }
+
+    @Test("source input artifact preserves host cognition seeds on neutral app surfaces")
+    func sourceInputArtifactPreservesHostCognitionSeedsOnNeutralAppSurfaces() {
+        let now = Date(timeIntervalSince1970: 1_744_322_101)
+        let seed = BASReactionWeights(
+            briefLanguage: 0.87,
+            warmDirectTone: 0.24,
+            lowCognitiveLoad: 0.31,
+            interruptiveActionBias: 0.18,
+            boundaryNamingBias: 0.29,
+            tradeoffClarityBias: 0.12
+        )
+        let identity = BASIdentityProfile(
+            role: .pauseCompanion,
+            posture: .coaching,
+            initiative: .guided,
+            confidenceCeiling: 0.69,
+            canAdvise: true,
+            canExecuteActions: false,
+            canEscalateToCloud: false,
+            relationshipBoundary: "Host-owned neutral app boundary."
+        )
+
+        let artifact = BASAppleCurrentBrainBootstrapAdapter.artifact(
+            source: BASAppleCurrentBrainBootstrapSourceInput(
+                preparationRequest: BASCurrentBrainBootstrapPreparationRequest(
+                    mode: .quick,
+                    prompt: "Should I wait?",
+                    trigger: .launch,
+                    sourceSurfaceOverride: .app,
+                    riskLevelOverride: .low,
+                    preferredLanguages: ["en-AU"],
+                    now: now
+                ),
+                projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+                retrievalMode: "filtered",
+                reactionWeightSeed: seed,
+                identityProfileOverride: identity,
+                templates: [],
+                failurePatterns: []
+            )
+        )
+
+        #expect(artifact.execution.bootstrapped.brainState.reactionWeights == seed)
+        #expect(artifact.execution.bootstrapped.brainState.identityProfile == identity)
+        #expect(artifact.execution.bootstrapped.brainState.boundaryPolicy.mode == .localOnlyAdvisory)
     }
 
     @Test("host bootstrap adapter compiles raw bridge inputs into artifact semantics")

@@ -295,6 +295,24 @@ struct BASMemoryCognitionCoreTests {
             sourceSurface: .notification,
             riskLevel: .high,
             retrievalMode: "governed",
+            reactionWeightSeed: BASReactionWeights(
+                briefLanguage: 0.44,
+                warmDirectTone: 0.62,
+                lowCognitiveLoad: 0.46,
+                interruptiveActionBias: 0.28,
+                boundaryNamingBias: 0.82,
+                tradeoffClarityBias: 0.42
+            ),
+            identityProfileOverride: BASIdentityProfile(
+                role: .mirrorWitness,
+                posture: .reflective,
+                initiative: .passive,
+                confidenceCeiling: 0.68,
+                canAdvise: true,
+                canExecuteActions: false,
+                canEscalateToCloud: false,
+                relationshipBoundary: "Reflect the pattern without becoming the center of the story."
+            ),
             now: Date(timeIntervalSince1970: 1_700_060_000)
         )
 
@@ -382,6 +400,24 @@ struct BASMemoryCognitionCoreTests {
             sourceSurface: .app,
             riskLevel: .low,
             retrievalMode: "filtered",
+            reactionWeightSeed: BASReactionWeights(
+                briefLanguage: 0.62,
+                warmDirectTone: 0.58,
+                lowCognitiveLoad: 0.60,
+                interruptiveActionBias: 0.72,
+                boundaryNamingBias: 0.34,
+                tradeoffClarityBias: 0.38
+            ),
+            identityProfileOverride: BASIdentityProfile(
+                role: .boundedGuide,
+                posture: .coaching,
+                initiative: .guided,
+                confidenceCeiling: 0.70,
+                canAdvise: true,
+                canExecuteActions: false,
+                canEscalateToCloud: false,
+                relationshipBoundary: "Stabilize the moment without overstating certainty."
+            ),
             now: Date(timeIntervalSince1970: 1_700_064_000)
         )
 
