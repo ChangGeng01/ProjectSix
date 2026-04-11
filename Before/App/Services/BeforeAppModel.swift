@@ -74,13 +74,7 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func handleInitialAppearance() {
-        refreshDecisionMemoryStore()
-        refreshGlobalBrainState(source: .launch)
-        presentPendingReflectionIfNeeded()
-        consumePendingLaunchRequestIfNeeded()
-        restoreActiveWorkspaceIfNeeded()
-        refreshPredictedIntervention()
-        syncWidgetSnapshot()
+        runLifecycleBootstrapPlan(.initialAppearance)
     }
 
     func dismissStartupNotice() {
@@ -204,12 +198,7 @@ final class BeforeAppModel: ObservableObject {
     func handleScenePhase(_ phase: ScenePhase) {
         switch phase {
         case .active:
-            refreshDecisionMemoryStore()
-            refreshGlobalBrainState(source: .sceneActive)
-            presentPendingReflectionIfNeeded()
-            consumePendingLaunchRequestIfNeeded()
-            restoreActiveWorkspaceIfNeeded()
-            refreshPredictedIntervention()
+            runLifecycleBootstrapPlan(.sceneActive)
         case .background:
             if pendingReflectionContext != nil {
                 shouldPromptReflectionAfterBackground = true
@@ -1248,57 +1237,36 @@ final class BeforeAppModel: ObservableObject {
 
     private func primeQuickSession(_ session: QuickCheckSession) {
         refreshDecisionMemoryStore()
-        let strategy = DecisionIntelligenceCoordinator
-            .executionProfile(preferences: preferences)
-            .strategy(for: .quick)
-        currentBrainState = CurrentBrainStateLoader.bootstrapCurrentBrainState(
-            mode: .quick,
-            prompt: BASAppleBootstrapStrategyAdapter.promptSeed(
-                fragments: quickPromptFragments(for: session)
-            ),
-            source: .sessionPrime,
-            taskGraph: activeTaskGraph,
-            context: modelContainer.mainContext,
-            projection: currentMemoryProjection(),
-            retrievalMode: strategy.retrievalMode
+        currentBrainState = bootstrapCurrentBrainState(
+            using: BASAppleCurrentBrainRuntimePlanner.sessionPrimePlan(
+                modeID: DecisionMode.quick.rawValue,
+                promptFragments: quickPromptFragments(for: session),
+                retrievalMode: currentBrainRuntimeRetrievalMode(for: .quick).rawValue
+            )
         )
         session.loadBrainState(currentBrainState?.brainState)
     }
 
     private func primeBalanceSession(_ session: BalanceBoardSession) {
         refreshDecisionMemoryStore()
-        let strategy = DecisionIntelligenceCoordinator
-            .executionProfile(preferences: preferences)
-            .strategy(for: .balance)
-        currentBrainState = CurrentBrainStateLoader.bootstrapCurrentBrainState(
-            mode: .balance,
-            prompt: BASAppleBootstrapStrategyAdapter.promptSeed(
-                fragments: balancePromptFragments(for: session)
-            ),
-            source: .sessionPrime,
-            taskGraph: activeTaskGraph,
-            context: modelContainer.mainContext,
-            projection: currentMemoryProjection(),
-            retrievalMode: strategy.retrievalMode
+        currentBrainState = bootstrapCurrentBrainState(
+            using: BASAppleCurrentBrainRuntimePlanner.sessionPrimePlan(
+                modeID: DecisionMode.balance.rawValue,
+                promptFragments: balancePromptFragments(for: session),
+                retrievalMode: currentBrainRuntimeRetrievalMode(for: .balance).rawValue
+            )
         )
         session.loadBrainState(currentBrainState?.brainState)
     }
 
     private func primeMirrorSession(_ session: MirrorWorkspaceSession) {
         refreshDecisionMemoryStore()
-        let strategy = DecisionIntelligenceCoordinator
-            .executionProfile(preferences: preferences)
-            .strategy(for: .mirror)
-        currentBrainState = CurrentBrainStateLoader.bootstrapCurrentBrainState(
-            mode: .mirror,
-            prompt: BASAppleBootstrapStrategyAdapter.promptSeed(
-                fragments: mirrorPromptFragments(for: session)
-            ),
-            source: .sessionPrime,
-            taskGraph: activeTaskGraph,
-            context: modelContainer.mainContext,
-            projection: currentMemoryProjection(),
-            retrievalMode: strategy.retrievalMode
+        currentBrainState = bootstrapCurrentBrainState(
+            using: BASAppleCurrentBrainRuntimePlanner.sessionPrimePlan(
+                modeID: DecisionMode.mirror.rawValue,
+                promptFragments: mirrorPromptFragments(for: session),
+                retrievalMode: currentBrainRuntimeRetrievalMode(for: .mirror).rawValue
+            )
         )
         session.loadBrainState(currentBrainState?.brainState)
     }
@@ -1339,29 +1307,16 @@ final class BeforeAppModel: ObservableObject {
 
     private func refreshGlobalBrainState(source: BrainStateUpdateSource) {
         refreshDecisionMemoryStore()
-        let activeSeed = BASAppleBootstrapStrategyAdapter.resolveActiveSessionSeed(
-            quickPromptFragments: activeQuickSession.map(quickPromptFragments(for:)),
-            balancePromptFragments: activeBalanceSession.map(balancePromptFragments(for:)),
-            mirrorPromptFragments: activeMirrorSession.map(mirrorPromptFragments(for:)),
-            taskGraphModeID: activeTaskGraph?.mode?.rawValue,
-            taskGraphPromptSeed: activeTaskGraph?.promptSeed
-        )
-        let mode = DecisionMode(rawValue: activeSeed.modeID) ?? .quick
-        let promptSeed = activeSeed.promptSeed
-        let traceKind = DecisionIntelligenceTraceKind(rawValue: activeSeed.modeID) ?? .quick
-
-        let strategy = DecisionIntelligenceCoordinator
-            .executionProfile(preferences: preferences)
-            .strategy(for: traceKind)
-
-        currentBrainState = CurrentBrainStateLoader.bootstrapCurrentBrainState(
-            mode: mode,
-            prompt: promptSeed,
-            source: source,
-            taskGraph: activeTaskGraph,
-            context: modelContainer.mainContext,
-            projection: currentMemoryProjection(),
-            retrievalMode: strategy.retrievalMode
+        currentBrainState = bootstrapCurrentBrainState(
+            using: BASAppleCurrentBrainRuntimePlanner.activeRefreshPlan(
+                quickPromptFragments: activeQuickSession.map(quickPromptFragments(for:)),
+                balancePromptFragments: activeBalanceSession.map(balancePromptFragments(for:)),
+                mirrorPromptFragments: activeMirrorSession.map(mirrorPromptFragments(for:)),
+                taskGraphModeID: activeTaskGraph?.mode?.rawValue,
+                taskGraphPromptSeed: activeTaskGraph?.promptSeed,
+                retrievalModesByModeID: currentBrainRuntimeRetrievalModesByModeID(),
+                triggerID: source.rawValue
+            )
         )
     }
 
@@ -1479,6 +1434,59 @@ final class BeforeAppModel: ObservableObject {
         } else {
             DecisionTaskGraphStore.clear()
         }
+    }
+
+    private func runLifecycleBootstrapPlan(_ phase: BASAppleLifecycleBootstrapPhase) {
+        for action in BASAppleLifecycleBootstrapPlanner.actions(for: phase) {
+            switch action.kind {
+            case .refreshMemoryProjection:
+                refreshDecisionMemoryStore()
+            case .refreshCurrentBrain:
+                let source = action.currentBrainTriggerID.flatMap(BrainStateUpdateSource.init(rawValue:))
+                    ?? .explicitRefresh
+                refreshGlobalBrainState(source: source)
+            case .presentPendingReflection:
+                presentPendingReflectionIfNeeded()
+            case .consumePendingLaunchRequest:
+                consumePendingLaunchRequestIfNeeded()
+            case .restoreActiveWorkspace:
+                restoreActiveWorkspaceIfNeeded()
+            case .refreshPredictedIntervention:
+                refreshPredictedIntervention()
+            case .syncWidgetSnapshot:
+                syncWidgetSnapshot()
+            }
+        }
+    }
+
+    private func bootstrapCurrentBrainState(
+        using plan: BASAppleCurrentBrainRuntimePlan
+    ) -> CurrentBrainState {
+        CurrentBrainStateLoader.bootstrapCurrentBrainState(
+            mode: DecisionMode(rawValue: plan.modeID) ?? .quick,
+            prompt: plan.promptSeed,
+            source: BrainStateUpdateSource(rawValue: plan.triggerID) ?? .explicitRefresh,
+            taskGraph: activeTaskGraph,
+            context: modelContainer.mainContext,
+            projection: currentMemoryProjection(),
+            retrievalMode: DecisionRetrievalMode(rawValue: plan.retrievalMode) ?? .adaptive
+        )
+    }
+
+    private func currentBrainRuntimeRetrievalMode(for mode: DecisionMode) -> DecisionRetrievalMode {
+        let traceKind = DecisionIntelligenceTraceKind(rawValue: mode.rawValue) ?? .quick
+        return DecisionIntelligenceCoordinator
+            .executionProfile(preferences: preferences)
+            .strategy(for: traceKind)
+            .retrievalMode
+    }
+
+    private func currentBrainRuntimeRetrievalModesByModeID() -> [String: String] {
+        [
+            DecisionMode.quick.rawValue: currentBrainRuntimeRetrievalMode(for: .quick).rawValue,
+            DecisionMode.balance.rawValue: currentBrainRuntimeRetrievalMode(for: .balance).rawValue,
+            DecisionMode.mirror.rawValue: currentBrainRuntimeRetrievalMode(for: .mirror).rawValue
+        ]
     }
 
     private func currentMemoryProjection() -> DecisionMemorySystem.BrainStateProjection {
