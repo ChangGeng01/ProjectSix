@@ -19,18 +19,13 @@ enum BehavioralAISubstrateBridge {
         DecisionIntelligenceAdmissionDecision
     >
 
-    struct MemoryProjectionRefreshOutcome {
-        let projection: DecisionMemorySystem.BrainStateProjection
-        let refreshed: Bool
-        let notice: String?
-    }
-
-    struct CurrentBrainProjectionOutcome {
-        let currentBrain: CurrentBrainState
-        let projection: DecisionMemorySystem.BrainStateProjection
-        let refreshedProjection: Bool
-        let notice: String?
-    }
+    typealias MemoryProjectionRefreshOutcome =
+        BASAppleProjectionRefreshResult<DecisionMemorySystem.BrainStateProjection>
+    typealias CurrentBrainProjectionOutcome =
+        BASAppleCurrentBrainProjectionRuntimeResult<
+            CurrentBrainState,
+            DecisionMemorySystem.BrainStateProjection
+        >
 
     @discardableResult
     static func bootstrapCurrentBrainState(
@@ -343,15 +338,15 @@ enum BehavioralAISubstrateBridge {
         context: ModelContext
     ) -> CurrentBrainState {
         let mode = DecisionMode(rawValue: input.modeID) ?? .quick
-        let committed: BASAppleCurrentBrainLifecycleResult<
-            BrainStateUpdate,
-            DecisionEvolutionCheckpoint
-        > = BASAppleCurrentBrainLifecycleExecutor.bootstrapAndCommit(
-            input: input,
-            in: context,
-            createdAt: input.now,
+        let runtimeInput = BASAppleCurrentBrainHostLifecycleRuntimeInput(
+            bootstrapInput: input,
             checkpointLimit: BeforePolicy.RuntimeState.evolutionCheckpointLimit,
-            checkpointRetentionInterval: BeforePolicy.RuntimeState.evolutionCheckpointRetentionInterval,
+            checkpointRetentionInterval: BeforePolicy.RuntimeState.evolutionCheckpointRetentionInterval
+        )
+
+        return BASAppleCurrentBrainHostLifecycleRuntimeExecutor.bootstrapAndBuildCurrentBrain(
+            input: runtimeInput,
+            in: context,
             prepareLifecycleState: {
                 InterventionTemplateStore.ensureDefaults(in: context)
                 FailurePatternStore.syncFromHistory(in: context)
@@ -405,22 +400,26 @@ enum BehavioralAISubstrateBridge {
                     error: error,
                     operation: "persisting current brain updates"
                 )
+            },
+            buildCurrentBrain: { (committed: BASAppleCurrentBrainLifecycleResult<
+                BrainStateUpdate,
+                DecisionEvolutionCheckpoint
+            >) in
+                CurrentBrainState(
+                    source: BrainStateUpdateSource(rawValue: committed.triggerID) ?? .explicitRefresh,
+                    sourceSurface: DecisionIntentSourceSurface(rawValue: committed.sourceSurfaceID) ?? .app,
+                    mode: DecisionMode(rawValue: committed.modeID) ?? .quick,
+                    riskLevel: InterventionRiskLevel(rawValue: committed.riskLevelID) ?? .low,
+                    taskGraph: taskGraph,
+                    brainState: committed.brainState,
+                    dominantGoal: committed.dominantGoal,
+                    activeConstraints: committed.activeConstraints,
+                    activeTemplateIDs: committed.activeTemplateIDs,
+                    failureGuardIDs: committed.failureGuardIDs,
+                    sourceIntentEnvelope: envelope,
+                    loadedAt: committed.loadedAt
+                )
             }
-        )
-
-        return CurrentBrainState(
-            source: BrainStateUpdateSource(rawValue: committed.triggerID) ?? .explicitRefresh,
-            sourceSurface: DecisionIntentSourceSurface(rawValue: committed.sourceSurfaceID) ?? .app,
-            mode: DecisionMode(rawValue: committed.modeID) ?? .quick,
-            riskLevel: InterventionRiskLevel(rawValue: committed.riskLevelID) ?? .low,
-            taskGraph: taskGraph,
-            brainState: committed.brainState,
-            dominantGoal: committed.dominantGoal,
-            activeConstraints: committed.activeConstraints,
-            activeTemplateIDs: committed.activeTemplateIDs,
-            failureGuardIDs: committed.failureGuardIDs,
-            sourceIntentEnvelope: envelope,
-            loadedAt: committed.loadedAt
         )
     }
 
@@ -442,6 +441,53 @@ enum BehavioralAISubstrateBridge {
                     policy: DecisionTestingInterface.effectiveInferenceBackendPolicy()
                 ).effectiveBackend.rawValue
             }
+        )
+    }
+
+    static func executeProviderRequest<Result: Sendable>(
+        task: DecisionIntelligenceTraceKind,
+        strategy: DecisionAdaptiveTaskStrategy?,
+        preference: DecisionModelProviderPreference,
+        allowFallbacks: Bool,
+        testingStubProfile: DecisionTestingStubProfile?,
+        admissionAllowed: Bool,
+        loadCachedResult: @escaping ((any DecisionIntelligenceProviding)) async -> Result?,
+        assessCachedResult: @escaping (Result) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment>,
+        quarantineCachedResult: @escaping ((any DecisionIntelligenceProviding)) async -> Void,
+        invokeProvider: @escaping ((any DecisionIntelligenceProviding)) async -> Result?,
+        assessProviderResult: @escaping (Result) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment>,
+        observeEvent: ((BASProviderRequestEvent<any DecisionIntelligenceProviding, Result, BASProviderReleaseAssessment>) async -> Void)? = nil
+    ) async -> BASProviderRequestOutcome<Result, BASProviderReleaseAssessment> {
+        let registry = DecisionIntelligenceProviderRegistry.shared
+        let input: BASAppleProviderRequestRuntimeInput<any DecisionIntelligenceProviding> = BASAppleProviderRequestRuntimeInput(
+            task: DecisionIntelligenceTaskRouter.substrateTraceKind(task),
+            preferredProviderID: preference.kind.rawValue,
+            allowFallbacks: allowFallbacks,
+            suspendedProviderIDs: Set(
+                await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders.map(\.rawValue)
+            ),
+            strategy: strategy.map(DecisionIntelligenceTaskRouter.substrateAdaptiveStrategy),
+            descriptors: registry.descriptors().map(DecisionIntelligenceTaskRouter.substrateProviderDescriptor),
+            testingOverrideProvider: testingStubProfile.flatMap { profile in
+                guard preference != .template else { return nil }
+                return TestingDecisionIntelligenceProvider(profile: profile) as (any DecisionIntelligenceProviding)
+            },
+            admissionAllowed: admissionAllowed
+        )
+
+        return await BASAppleProviderRequestRuntimeExecutor.executeObserved(
+            input: input,
+            providerID: { $0.kind.rawValue },
+            providerForID: { providerID in
+                DecisionModelProviderKind(rawValue: providerID).flatMap(registry.provider(for:))
+            },
+            isAvailable: { $0.availabilityStatus.isAvailable },
+            loadCachedResult: loadCachedResult,
+            assessCachedResult: assessCachedResult,
+            quarantineCachedResult: quarantineCachedResult,
+            invokeProvider: invokeProvider,
+            assessProviderResult: assessProviderResult,
+            observe: observeEvent
         )
     }
 
@@ -1067,7 +1113,7 @@ enum BehavioralAISubstrateBridge {
         context: ModelContext,
         now: Date = .now
     ) -> MemoryProjectionRefreshOutcome {
-        BASAppleMemoryProjectionRefreshExecutor.resolve(
+        BASAppleCurrentBrainProjectionRuntimeExecutor.resolveProjection(
             force: force,
             cacheState: BASAppleMemoryProjectionRefreshCacheState(
                 hasCachedProjection: cachedProjection != nil,
@@ -1103,19 +1149,31 @@ enum BehavioralAISubstrateBridge {
         now: Date,
         execute: (DecisionMemorySystem.BrainStateProjection) -> CurrentBrainState
     ) -> CurrentBrainProjectionOutcome {
-        let projectionOutcome = resolveMemoryProjection(
-            force: forceProjectionRefresh,
-            cachedProjection: cachedProjection,
-            isDirty: isProjectionDirty,
-            context: context,
-            now: now
-        )
-
-        return CurrentBrainProjectionOutcome(
-            currentBrain: execute(projectionOutcome.projection),
-            projection: projectionOutcome.projection,
-            refreshedProjection: projectionOutcome.refreshed,
-            notice: projectionOutcome.notice
+        BASAppleCurrentBrainProjectionRuntimeExecutor.execute(
+            forceProjectionRefresh: forceProjectionRefresh,
+            cacheState: BASAppleMemoryProjectionRefreshCacheState(
+                hasCachedProjection: cachedProjection != nil,
+                isDirty: isProjectionDirty
+            ),
+            cached: {
+                cachedProjection.map {
+                    MemoryProjectionRefreshOutcome(
+                        projection: $0,
+                        refreshed: false,
+                        notice: nil
+                    )
+                }
+            },
+            refresh: {
+                resolveMemoryProjection(
+                    force: true,
+                    cachedProjection: cachedProjection,
+                    isDirty: isProjectionDirty,
+                    context: context,
+                    now: now
+                )
+            },
+            execute: execute
         )
     }
 

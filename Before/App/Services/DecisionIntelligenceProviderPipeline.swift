@@ -134,7 +134,7 @@ enum DecisionIntelligenceProviderPipeline {
                 recordsTemplatePinnedTrace: true
             )
         )
-        let outcome = await executeProviderRequest(
+        let outcome = await BehavioralAISubstrateBridge.executeProviderRequest(
             task: .quick,
             strategy: strategy,
             preference: preference,
@@ -264,7 +264,7 @@ enum DecisionIntelligenceProviderPipeline {
                 recordsTemplatePinnedTrace: true
             )
         )
-        let outcome = await executeProviderRequest(
+        let outcome = await BehavioralAISubstrateBridge.executeProviderRequest(
             task: .balance,
             strategy: strategy,
             preference: preference,
@@ -394,7 +394,7 @@ enum DecisionIntelligenceProviderPipeline {
                 recordsTemplatePinnedTrace: true
             )
         )
-        let outcome = await executeProviderRequest(
+        let outcome = await BehavioralAISubstrateBridge.executeProviderRequest(
             task: .mirror,
             strategy: strategy,
             preference: preference,
@@ -534,7 +534,7 @@ enum DecisionIntelligenceProviderPipeline {
                 recordsTemplatePinnedTrace: false
             )
         )
-        let outcome = await executeProviderRequest(
+        let outcome = await BehavioralAISubstrateBridge.executeProviderRequest(
             task: .reminder,
             strategy: strategy,
             preference: preference,
@@ -615,61 +615,6 @@ enum DecisionIntelligenceProviderPipeline {
 
     static func defaultStatusesByKind() -> [DecisionModelProviderKind: DecisionModelProviderStatus] {
         registry.statusesByKind()
-    }
-
-    private static func executeProviderRequest<Result: Sendable>(
-        task: DecisionIntelligenceTraceKind,
-        strategy: DecisionAdaptiveTaskStrategy?,
-        preference: DecisionModelProviderPreference,
-        allowFallbacks: Bool,
-        testingStubProfile: DecisionTestingStubProfile?,
-        admissionAllowed: Bool,
-        loadCachedResult: @escaping ((any DecisionIntelligenceProviding)) async -> Result?,
-        assessCachedResult: @escaping (Result) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment>,
-        quarantineCachedResult: @escaping ((any DecisionIntelligenceProviding)) async -> Void,
-        invokeProvider: @escaping ((any DecisionIntelligenceProviding)) async -> Result?,
-        assessProviderResult: @escaping (Result) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment>,
-        observeEvent: ((BASProviderRequestEvent<any DecisionIntelligenceProviding, Result, BASProviderReleaseAssessment>) async -> Void)? = nil
-    ) async -> BASProviderRequestOutcome<Result, BASProviderReleaseAssessment> {
-        let suspendedProviderIDs = Set(
-            await DecisionIntelligenceCircuitBreaker.shared.snapshot().activeProviders.map(\.rawValue)
-        )
-
-        return await BASProviderRequestRunner.executeObserved(
-            task: DecisionIntelligenceTaskRouter.substrateTraceKind(task),
-            preferredProviderID: preference.kind.rawValue,
-            allowFallbacks: allowFallbacks,
-            deterministicProviderID: BASReferenceProviderRuntime.templateProviderID,
-            preferenceOrderings: BASReferenceProviderRuntime.preferenceOrderings,
-            suspendedProviderIDs: suspendedProviderIDs,
-            strategy: strategy.map(DecisionIntelligenceTaskRouter.substrateAdaptiveStrategy),
-            descriptors: registry.descriptors().map(DecisionIntelligenceTaskRouter.substrateProviderDescriptor),
-            testingOverrideProvider: testingOverrideProvider(
-                for: preference,
-                testingStubProfile: testingStubProfile
-            ),
-            providerID: { $0.kind.rawValue },
-            providerForID: { providerID in
-                DecisionModelProviderKind(rawValue: providerID).flatMap(registry.provider(for:))
-            },
-            isAvailable: { $0.availabilityStatus.isAvailable },
-            admissionAllowed: admissionAllowed,
-            loadCachedResult: loadCachedResult,
-            assessCachedResult: assessCachedResult,
-            quarantineCachedResult: quarantineCachedResult,
-            invokeProvider: invokeProvider,
-            assessProviderResult: assessProviderResult,
-            observe: observeEvent
-        )
-    }
-
-    private static func testingOverrideProvider(
-        for preference: DecisionModelProviderPreference,
-        testingStubProfile: DecisionTestingStubProfile?
-    ) -> (any DecisionIntelligenceProviding)? {
-        testingStubProfile.flatMap { profile in
-            preference != .template ? TestingDecisionIntelligenceProvider(profile: profile) : nil
-        }
     }
 
     private static func quickPreview(from result: QuickCheckResult) -> String {
