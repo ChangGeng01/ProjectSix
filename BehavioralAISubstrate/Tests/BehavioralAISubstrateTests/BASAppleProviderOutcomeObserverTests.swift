@@ -100,6 +100,36 @@ struct BASAppleProviderOutcomeObserverTests {
         #expect(reminder.deterministicFallbackOutputPreview == "no reminder")
     }
 
+    @Test("host observation bridge builds host context while keeping substrate narrative compilation package-owned")
+    func hostObservationBridgeBuildsHostContext() {
+        let context = BASAppleHostProviderObservationBridge.context(
+            kind: MockTraceKind.quick,
+            frontstageState: "frontstage",
+            contextState: "scoped",
+            neuralState: "neural",
+            brainState: "brain",
+            runtimeStrategy: "runtime",
+            promptBudget: "budget",
+            admissionDecision: "admission",
+            sourceInput: BASAppleProviderObservationSourceInput(
+                kind: "quick",
+                preferredProviderID: "foundationModels",
+                allowFallbacks: true,
+                providerProfilesByID: [:],
+                prompt: "quick prompt",
+                baselineOutputPreview: "quick preview",
+                deterministicFallbackOutputPreview: "fallback preview",
+                recordsTemplatePinnedTrace: true
+            )
+        )
+
+        #expect(context.kind == .quick)
+        #expect(context.frontstageState == "frontstage")
+        #expect(context.brainState == "brain")
+        #expect(context.substrateContext.templatePinnedDetail.contains("quick refinement"))
+        #expect(context.substrateContext.cachedConsistencySource == "cached quick refinement")
+    }
+
     @Test("observer compiles sanitized traces and telemetry observations")
     func observerCompilesTraceAndTelemetry() {
         let trace = BASAppleProviderOutcomeObserver.traceObservation(

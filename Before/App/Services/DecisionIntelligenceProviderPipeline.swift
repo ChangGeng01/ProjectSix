@@ -105,7 +105,7 @@ enum DecisionIntelligenceProviderPipeline {
             _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: envelope)
         } ?? DecisionIntelligenceAdmissionController.decide(for: envelope)
         let admissionEvaluatedMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        let observationContext = ProviderRequestObservationContext(
+        let observationContext: ProviderRequestObservationContext = BASAppleHostProviderObservationBridge.context(
             kind: .quick,
             frontstageState: envelope.frontstageState,
             contextState: contextState,
@@ -114,8 +114,7 @@ enum DecisionIntelligenceProviderPipeline {
             runtimeStrategy: strategy,
             promptBudget: envelope.budget,
             admissionDecision: admissionDecision,
-            substrateContext: BASAppleProviderObservationContextBuilder.build(
-                from: BASAppleProviderObservationSourceInput(
+            sourceInput: BASAppleProviderObservationSourceInput(
                 kind: DecisionIntelligenceTraceKind.quick.rawValue,
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
@@ -133,7 +132,7 @@ enum DecisionIntelligenceProviderPipeline {
                 baselineOutputPreview: quickPreview(from: base),
                 deterministicFallbackOutputPreview: quickPreview(from: base),
                 recordsTemplatePinnedTrace: true
-            ))
+            )
         )
         let outcome = await executeProviderRequest(
             task: .quick,
@@ -237,7 +236,7 @@ enum DecisionIntelligenceProviderPipeline {
             _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: envelope)
         } ?? DecisionIntelligenceAdmissionController.decide(for: envelope)
         let admissionEvaluatedMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        let observationContext = ProviderRequestObservationContext(
+        let observationContext: ProviderRequestObservationContext = BASAppleHostProviderObservationBridge.context(
             kind: .balance,
             frontstageState: envelope.frontstageState,
             contextState: contextState,
@@ -246,8 +245,7 @@ enum DecisionIntelligenceProviderPipeline {
             runtimeStrategy: strategy,
             promptBudget: envelope.budget,
             admissionDecision: admissionDecision,
-            substrateContext: BASAppleProviderObservationContextBuilder.build(
-                from: BASAppleProviderObservationSourceInput(
+            sourceInput: BASAppleProviderObservationSourceInput(
                 kind: DecisionIntelligenceTraceKind.balance.rawValue,
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
@@ -265,7 +263,7 @@ enum DecisionIntelligenceProviderPipeline {
                 baselineOutputPreview: balancePreview(from: base),
                 deterministicFallbackOutputPreview: balancePreview(from: base),
                 recordsTemplatePinnedTrace: true
-            ))
+            )
         )
         let outcome = await executeProviderRequest(
             task: .balance,
@@ -369,7 +367,7 @@ enum DecisionIntelligenceProviderPipeline {
             _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: envelope)
         } ?? DecisionIntelligenceAdmissionController.decide(for: envelope)
         let admissionEvaluatedMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        let observationContext = ProviderRequestObservationContext(
+        let observationContext: ProviderRequestObservationContext = BASAppleHostProviderObservationBridge.context(
             kind: .mirror,
             frontstageState: envelope.frontstageState,
             contextState: contextState,
@@ -378,8 +376,7 @@ enum DecisionIntelligenceProviderPipeline {
             runtimeStrategy: strategy,
             promptBudget: envelope.budget,
             admissionDecision: admissionDecision,
-            substrateContext: BASAppleProviderObservationContextBuilder.build(
-                from: BASAppleProviderObservationSourceInput(
+            sourceInput: BASAppleProviderObservationSourceInput(
                 kind: DecisionIntelligenceTraceKind.mirror.rawValue,
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
@@ -397,7 +394,7 @@ enum DecisionIntelligenceProviderPipeline {
                 baselineOutputPreview: mirrorPreview(from: base),
                 deterministicFallbackOutputPreview: mirrorPreview(from: base),
                 recordsTemplatePinnedTrace: true
-            ))
+            )
         )
         let outcome = await executeProviderRequest(
             task: .mirror,
@@ -511,7 +508,7 @@ enum DecisionIntelligenceProviderPipeline {
             reminderSelectionAssessment: reminderSelectionAssessment
         )
         let admissionEvaluatedMs = elapsedMilliseconds(since: requestStart, clock: clock)
-        let observationContext = ProviderRequestObservationContext(
+        let observationContext: ProviderRequestObservationContext = BASAppleHostProviderObservationBridge.context(
             kind: .reminder,
             frontstageState: selection.prompt.frontstageState,
             contextState: nil,
@@ -520,8 +517,7 @@ enum DecisionIntelligenceProviderPipeline {
             runtimeStrategy: strategy,
             promptBudget: selection.prompt.budget,
             admissionDecision: admissionDecision,
-            substrateContext: BASAppleProviderObservationContextBuilder.build(
-                from: BASAppleProviderObservationSourceInput(
+            sourceInput: BASAppleProviderObservationSourceInput(
                 kind: DecisionIntelligenceTraceKind.reminder.rawValue,
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
@@ -539,7 +535,7 @@ enum DecisionIntelligenceProviderPipeline {
                 baselineOutputPreview: "Deterministic reminder ordering kept",
                 deterministicFallbackOutputPreview: "No reminder selected",
                 recordsTemplatePinnedTrace: false
-            ))
+            )
         )
         let outcome = await executeProviderRequest(
             task: .reminder,

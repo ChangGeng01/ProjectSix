@@ -173,6 +173,50 @@ public struct BASAppleHostProviderTraceRecord<
 }
 
 public enum BASAppleHostProviderObservationBridge {
+    public static func context<
+        Kind: Equatable & Sendable,
+        FrontstageState: Equatable & Sendable,
+        ContextState: Equatable & Sendable,
+        NeuralState: Equatable & Sendable,
+        BrainState: Equatable & Sendable,
+        RuntimeStrategy: Equatable & Sendable,
+        PromptBudget: Equatable & Sendable,
+        AdmissionDecision: Equatable & Sendable
+    >(
+        kind: Kind,
+        frontstageState: FrontstageState? = nil,
+        contextState: ContextState? = nil,
+        neuralState: NeuralState? = nil,
+        brainState: BrainState? = nil,
+        runtimeStrategy: RuntimeStrategy? = nil,
+        promptBudget: PromptBudget? = nil,
+        admissionDecision: AdmissionDecision? = nil,
+        sourceInput: BASAppleProviderObservationSourceInput
+    ) -> BASAppleHostProviderObservationContext<
+        Kind,
+        FrontstageState,
+        ContextState,
+        NeuralState,
+        BrainState,
+        RuntimeStrategy,
+        PromptBudget,
+        AdmissionDecision
+    > {
+        BASAppleHostProviderObservationContext(
+            kind: kind,
+            frontstageState: frontstageState,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState,
+            runtimeStrategy: runtimeStrategy,
+            promptBudget: promptBudget,
+            admissionDecision: admissionDecision,
+            substrateContext: BASAppleProviderObservationContextBuilder.build(
+                from: sourceInput
+            )
+        )
+    }
+
     public static func providerProfiles<Descriptor>(
         descriptors: [Descriptor],
         providerID: (Descriptor) -> String,
