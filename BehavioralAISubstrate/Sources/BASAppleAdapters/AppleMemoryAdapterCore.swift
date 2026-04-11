@@ -24,12 +24,32 @@ public protocol BASAppleCheckEventMemoryEntity: PersistentModel {
     var basCheckEventMemoryInput: BASCheckEventMemoryInput { get }
 }
 
-public protocol BASAppleBalanceMemoryEntity: PersistentModel {
+public protocol BASAppleWorkspaceMemoryEntity: PersistentModel {
+    var basWorkspaceMemoryInput: BASWorkspaceMemoryInput { get }
+}
+
+public protocol BASAppleComparativeMemoryEntity: PersistentModel {
+    var basComparativeMemoryInput: BASComparativeMemoryInput { get }
+}
+
+public protocol BASAppleBalanceMemoryEntity: BASAppleComparativeMemoryEntity {
     var basBalanceMemoryInput: BASBalanceMemoryInput { get }
 }
 
-public protocol BASAppleMirrorMemoryEntity: PersistentModel {
+public extension BASAppleBalanceMemoryEntity {
+    var basComparativeMemoryInput: BASComparativeMemoryInput { basBalanceMemoryInput }
+}
+
+public protocol BASAppleReflectiveMemoryEntity: PersistentModel {
+    var basReflectiveMemoryInput: BASReflectiveMemoryInput { get }
+}
+
+public protocol BASAppleMirrorMemoryEntity: BASAppleReflectiveMemoryEntity {
     var basMirrorMemoryInput: BASMirrorMemoryInput { get }
+}
+
+public extension BASAppleMirrorMemoryEntity {
+    var basReflectiveMemoryInput: BASReflectiveMemoryInput { basMirrorMemoryInput }
 }
 
 public struct BASAppleProjectionGovernanceSnapshot: Codable, Equatable, Sendable {
@@ -146,13 +166,11 @@ public enum BASAppleMemoryDraftDerivationAdapter {
     public static func deriveDrafts<
         Reminder: BASAppleReminderMemoryEntity,
         Event: BASAppleCheckEventMemoryEntity,
-        Balance: BASAppleBalanceMemoryEntity,
-        Mirror: BASAppleMirrorMemoryEntity
+        Workspace: BASAppleWorkspaceMemoryEntity
     >(
         reminders: [Reminder],
         checkEvents: [Event],
-        balanceRecords: [Balance],
-        mirrorRecords: [Mirror],
+        workspaceRecords: [Workspace],
         now: Date,
         behavior: BASMemoryDerivationBehavior = .generic
     ) -> [BASDerivedMemoryDraft] {
@@ -164,15 +182,96 @@ public enum BASAppleMemoryDraftDerivationAdapter {
                 checkEvents: checkEvents
                     .map(\.basCheckEventMemoryInput)
                     .sorted { $0.createdAt > $1.createdAt },
-                balanceRecords: balanceRecords
-                    .map(\.basBalanceMemoryInput)
-                    .sorted { $0.updatedAt > $1.updatedAt },
-                mirrorRecords: mirrorRecords
-                    .map(\.basMirrorMemoryInput)
+                workspaceRecords: workspaceRecords
+                    .map(\.basWorkspaceMemoryInput)
                     .sorted { $0.updatedAt > $1.updatedAt },
                 now: now,
                 behavior: behavior
             )
+        )
+    }
+
+    public static func deriveDrafts<
+        Reminder: BASAppleReminderMemoryEntity,
+        Event: BASAppleCheckEventMemoryEntity,
+        Comparative: BASAppleComparativeMemoryEntity,
+        Reflective: BASAppleReflectiveMemoryEntity
+    >(
+        reminders: [Reminder],
+        checkEvents: [Event],
+        comparativeRecords: [Comparative],
+        reflectiveRecords: [Reflective],
+        now: Date,
+        behavior: BASMemoryDerivationBehavior = .generic
+    ) -> [BASDerivedMemoryDraft] {
+        deriveDrafts(
+            BASMemoryDerivationRequest(
+                reminders: reminders
+                    .map(\.basReminderMemoryInput)
+                    .sorted { $0.lastUsedAt > $1.lastUsedAt },
+                checkEvents: checkEvents
+                    .map(\.basCheckEventMemoryInput)
+                    .sorted { $0.createdAt > $1.createdAt },
+                workspaceRecords: (
+                    comparativeRecords.map(\.basComparativeMemoryInput.workspaceInput) +
+                    reflectiveRecords.map(\.basReflectiveMemoryInput.workspaceInput)
+                )
+                .sorted { $0.updatedAt > $1.updatedAt },
+                now: now,
+                behavior: behavior
+            )
+        )
+    }
+
+    public static func deriveDrafts<
+        Reminder: BASAppleReminderMemoryEntity,
+        Event: BASAppleCheckEventMemoryEntity,
+        Comparative: BASAppleComparativeMemoryEntity,
+        Reflective: BASAppleReflectiveMemoryEntity
+    >(
+        in context: ModelContext,
+        now: Date,
+        reminderType: Reminder.Type,
+        checkEventType: Event.Type,
+        comparativeRecordType: Comparative.Type,
+        reflectiveRecordType: Reflective.Type,
+        behavior: BASMemoryDerivationBehavior = .generic
+    ) -> [BASDerivedMemoryDraft] {
+        let reminders = (try? context.fetch(FetchDescriptor<Reminder>())) ?? []
+        let checkEvents = (try? context.fetch(FetchDescriptor<Event>())) ?? []
+        let comparativeRecords = (try? context.fetch(FetchDescriptor<Comparative>())) ?? []
+        let reflectiveRecords = (try? context.fetch(FetchDescriptor<Reflective>())) ?? []
+
+        return deriveDrafts(
+            reminders: reminders,
+            checkEvents: checkEvents,
+            comparativeRecords: comparativeRecords,
+            reflectiveRecords: reflectiveRecords,
+            now: now,
+            behavior: behavior
+        )
+    }
+
+    public static func deriveDrafts<
+        Reminder: BASAppleReminderMemoryEntity,
+        Event: BASAppleCheckEventMemoryEntity,
+        Balance: BASAppleBalanceMemoryEntity,
+        Mirror: BASAppleMirrorMemoryEntity
+    >(
+        reminders: [Reminder],
+        checkEvents: [Event],
+        balanceRecords: [Balance],
+        mirrorRecords: [Mirror],
+        now: Date,
+        behavior: BASMemoryDerivationBehavior = .generic
+    ) -> [BASDerivedMemoryDraft] {
+        deriveDrafts(
+            reminders: reminders,
+            checkEvents: checkEvents,
+            comparativeRecords: balanceRecords,
+            reflectiveRecords: mirrorRecords,
+            now: now,
+            behavior: behavior
         )
     }
 
@@ -190,17 +289,13 @@ public enum BASAppleMemoryDraftDerivationAdapter {
         mirrorRecordType: Mirror.Type,
         behavior: BASMemoryDerivationBehavior = .generic
     ) -> [BASDerivedMemoryDraft] {
-        let reminders = (try? context.fetch(FetchDescriptor<Reminder>())) ?? []
-        let checkEvents = (try? context.fetch(FetchDescriptor<Event>())) ?? []
-        let balanceRecords = (try? context.fetch(FetchDescriptor<Balance>())) ?? []
-        let mirrorRecords = (try? context.fetch(FetchDescriptor<Mirror>())) ?? []
-
-        return deriveDrafts(
-            reminders: reminders,
-            checkEvents: checkEvents,
-            balanceRecords: balanceRecords,
-            mirrorRecords: mirrorRecords,
+        deriveDrafts(
+            in: context,
             now: now,
+            reminderType: reminderType,
+            checkEventType: checkEventType,
+            comparativeRecordType: balanceRecordType,
+            reflectiveRecordType: mirrorRecordType,
             behavior: behavior
         )
     }

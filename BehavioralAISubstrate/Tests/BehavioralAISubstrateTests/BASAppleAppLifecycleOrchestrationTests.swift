@@ -2,8 +2,8 @@ import Testing
 @testable import BASAppleAdapters
 
 struct BASAppleAppLifecycleOrchestrationTests {
-    @Test("app lifecycle orchestration prefers handoff over pending request during bootstrap")
-    func appLifecycleOrchestrationPrefersHandoffOverPendingRequestDuringBootstrap() {
+    @Test("app lifecycle orchestration prefers handoff over pending request during generic bootstrap")
+    func appLifecycleOrchestrationPrefersHandoffOverPendingRequestDuringGenericBootstrap() {
         var actions: [String] = []
 
         BASAppleAppLifecycleOrchestrationExecutor.execute(
@@ -28,11 +28,7 @@ struct BASAppleAppLifecycleOrchestrationTests {
             actions == [
                 "projection",
                 "brain:launch",
-                "reflection",
-                "handoff:handoff",
-                "restore",
-                "prediction",
-                "widget"
+                "handoff:handoff"
             ]
         )
     }

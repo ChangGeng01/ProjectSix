@@ -193,8 +193,8 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
             now: now,
             reminderType: ReminderFixture.self,
             checkEventType: CheckEventFixture.self,
-            balanceRecordType: BalanceFixture.self,
-            mirrorRecordType: MirrorFixture.self
+            comparativeRecordType: BalanceFixture.self,
+            reflectiveRecordType: MirrorFixture.self
         ).sorted(by: draftOrdering)
 
         let expected = BASMemoryDraftCompiler.derive(
@@ -205,11 +205,11 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
                 checkEvents: checkEvents
                     .map(\.basCheckEventMemoryInput)
                     .sorted { $0.createdAt > $1.createdAt },
-                balanceRecords: balanceRecords
-                    .map(\.basBalanceMemoryInput)
+                comparativeRecords: balanceRecords
+                    .map(\.basComparativeMemoryInput)
                     .sorted { $0.updatedAt > $1.updatedAt },
-                mirrorRecords: mirrorRecords
-                    .map(\.basMirrorMemoryInput)
+                reflectiveRecords: mirrorRecords
+                    .map(\.basReflectiveMemoryInput)
                     .sorted { $0.updatedAt > $1.updatedAt },
                 now: now
             )

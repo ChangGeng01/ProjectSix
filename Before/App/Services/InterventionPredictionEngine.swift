@@ -23,7 +23,8 @@ enum InterventionPredictionEngine {
                 currentModeID: currentBrainState?.mode.substrateModeID,
                 negativeRecentCount: negativeRecentCount,
                 failureGuardIDs: currentBrainState?.failureGuardIDs ?? [],
-                now: now
+                now: now,
+                behavior: BeforeProductLanguage.predictiveInterventionBehavior
             )
         )
 

@@ -17,6 +17,7 @@ public enum BASAppleAppLifecycleOrchestrationExecutor {
 
     public static func execute<Envelope, PendingRequest>(
         phase: BASAppleLifecycleBootstrapPhase,
+        behavior: BASAppleLifecycleBootstrapBehavior = .generic,
         refreshMemoryProjection: () -> Void,
         refreshCurrentBrain: (String) -> Void,
         presentPendingReflection: () -> Void,
@@ -30,6 +31,7 @@ public enum BASAppleAppLifecycleOrchestrationExecutor {
     ) {
         BASAppleLifecycleBootstrapExecutor.execute(
             phase: phase,
+            behavior: behavior,
             refreshMemoryProjection: refreshMemoryProjection,
             refreshCurrentBrain: refreshCurrentBrain,
             presentPendingReflection: presentPendingReflection,

@@ -31,6 +31,9 @@ final class BeforeAppModel: ObservableObject {
     let sharedLifeStore: SharedLifeStore
     private let hostRuntime = BASHostRuntime(
         configuration: BASHostConfiguration(
+            runtimeProfileID: "before.local-cognition",
+            policyProfileID: "before.product-policy",
+            lifecycleBehavior: BeforeProductLanguage.hostLifecycleBehavior,
             workflowBehavior: BeforeProductLanguage.workflowBehavior,
             cognitionBehavior: BeforeProductLanguage.hostCognition,
             presentation: BeforeProductLanguage.hostPresentation

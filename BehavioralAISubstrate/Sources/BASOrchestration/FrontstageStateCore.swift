@@ -1,6 +1,84 @@
 import Foundation
 import BASRuntimeCore
 
+public struct BASFrontstagePresentationBehavior: Codable, Sendable, Equatable {
+    public var focusGoalsByKindID: [String: String]
+    public var baseEvidenceCountByKindID: [String: Int]
+    public var lowGearEvidenceClampByKindID: [String: Int]
+    public var contextRebuiltSignal: String
+    public var staleFieldsSignal: String
+    public var filteredEvidenceSignal: String
+    public var trimmedEvidenceSignal: String
+
+    public init(
+        focusGoalsByKindID: [String: String] = [
+            BASAdaptiveTraceKind.quick.rawValue: "Clarify the immediate state before momentum hardens.",
+            BASAdaptiveTraceKind.balance.rawValue: "Clarify the active trade-off before committing.",
+            BASAdaptiveTraceKind.mirror.rawValue: "Clarify the underlying pattern without forcing closure.",
+            BASAdaptiveTraceKind.reminder.rawValue: "Select the stored candidate that best fits the current state."
+        ],
+        baseEvidenceCountByKindID: [String: Int] = [
+            BASAdaptiveTraceKind.quick.rawValue: 2,
+            BASAdaptiveTraceKind.balance.rawValue: 1,
+            BASAdaptiveTraceKind.mirror.rawValue: 1,
+            BASAdaptiveTraceKind.reminder.rawValue: 0
+        ],
+        lowGearEvidenceClampByKindID: [String: Int] = [
+            BASAdaptiveTraceKind.quick.rawValue: 1
+        ],
+        contextRebuiltSignal: String = "Session rebuild",
+        staleFieldsSignal: String = "Stale fields dropped",
+        filteredEvidenceSignal: String = "Evidence filtered",
+        trimmedEvidenceSignal: String = "Frontstage trimmed"
+    ) {
+        self.focusGoalsByKindID = focusGoalsByKindID
+        self.baseEvidenceCountByKindID = baseEvidenceCountByKindID
+        self.lowGearEvidenceClampByKindID = lowGearEvidenceClampByKindID
+        self.contextRebuiltSignal = contextRebuiltSignal
+        self.staleFieldsSignal = staleFieldsSignal
+        self.filteredEvidenceSignal = filteredEvidenceSignal
+        self.trimmedEvidenceSignal = trimmedEvidenceSignal
+    }
+
+    public static let generic = BASFrontstagePresentationBehavior()
+
+    public func focusGoal(for kind: BASAdaptiveTraceKind) -> String {
+        focusGoalsByKindID[kind.rawValue, default: BASFrontstagePresentationBehavior.generic.fallbackFocusGoal(for: kind)]
+    }
+
+    public func baseEvidenceCount(for kind: BASAdaptiveTraceKind) -> Int {
+        baseEvidenceCountByKindID[kind.rawValue, default: BASFrontstagePresentationBehavior.generic.fallbackBaseEvidenceCount(for: kind)]
+    }
+
+    public func lowGearEvidenceClamp(for kind: BASAdaptiveTraceKind) -> Int? {
+        lowGearEvidenceClampByKindID[kind.rawValue]
+    }
+
+    private func fallbackFocusGoal(for kind: BASAdaptiveTraceKind) -> String {
+        switch kind {
+        case .quick:
+            "Clarify the immediate state before momentum hardens."
+        case .balance:
+            "Clarify the active trade-off before committing."
+        case .mirror:
+            "Clarify the underlying pattern without forcing closure."
+        case .reminder:
+            "Select the stored candidate that best fits the current state."
+        }
+    }
+
+    private func fallbackBaseEvidenceCount(for kind: BASAdaptiveTraceKind) -> Int {
+        switch kind {
+        case .quick:
+            2
+        case .balance, .mirror:
+            1
+        case .reminder:
+            0
+        }
+    }
+}
+
 public struct BASFrontstageCompilationRequest: Codable, Sendable, Equatable {
     public var kind: BASAdaptiveTraceKind
     public var activeStateSignalCount: Int
@@ -19,6 +97,7 @@ public struct BASFrontstageCompilationRequest: Codable, Sendable, Equatable {
     public var suppressedBehaviors: [String]
     public var memoryHeadlines: [String]
     public var sessionBiases: [String]
+    public var presentationBehavior: BASFrontstagePresentationBehavior
 
     public init(
         kind: BASAdaptiveTraceKind,
@@ -37,7 +116,8 @@ public struct BASFrontstageCompilationRequest: Codable, Sendable, Equatable {
         dominantSignalTitles: [String] = [],
         suppressedBehaviors: [String] = [],
         memoryHeadlines: [String] = [],
-        sessionBiases: [String] = []
+        sessionBiases: [String] = [],
+        presentationBehavior: BASFrontstagePresentationBehavior = .generic
     ) {
         self.kind = kind
         self.activeStateSignalCount = activeStateSignalCount
@@ -56,6 +136,7 @@ public struct BASFrontstageCompilationRequest: Codable, Sendable, Equatable {
         self.suppressedBehaviors = suppressedBehaviors
         self.memoryHeadlines = memoryHeadlines
         self.sessionBiases = sessionBiases
+        self.presentationBehavior = presentationBehavior
     }
 }
 
@@ -68,21 +149,27 @@ public enum BASFrontstageStateCompiler {
             .map { compact($0, fallback: $0, limit: Constants.frontstageSignalLimit) }
 
         if request.contextWasRebuilt {
-            dangerSignals.append("Session rebuild")
+            dangerSignals.append(request.presentationBehavior.contextRebuiltSignal)
         }
         if request.staleFieldCount > 0 {
-            dangerSignals.append("Stale fields dropped")
+            dangerSignals.append(request.presentationBehavior.staleFieldsSignal)
         }
         if request.droppedInjectedEvidenceCount > 0 {
-            dangerSignals.append("Evidence filtered")
+            dangerSignals.append(request.presentationBehavior.filteredEvidenceSignal)
         }
         if request.droppedBudgetEvidenceCount > 0 {
-            dangerSignals.append("Frontstage trimmed")
+            dangerSignals.append(request.presentationBehavior.trimmedEvidenceSignal)
         }
         dangerSignals = Array(dangerSignals.prefix(Constants.frontstageSignalCount))
 
         let evidenceHeadlines = request.retainedEvidence
-            .prefix(frontstageEvidenceCount(for: request.kind, strategy: request.strategy))
+            .prefix(
+                frontstageEvidenceCount(
+                    for: request.kind,
+                    strategy: request.strategy,
+                    behavior: request.presentationBehavior
+                )
+            )
             .map { compact($0, fallback: $0, limit: Constants.frontstageEvidenceLimit) }
 
         let anchorHeadlines = Array(
@@ -110,7 +197,7 @@ public enum BASFrontstageStateCompiler {
         )
 
         return BASFrontstageState(
-            focusGoal: focusGoal(for: request.kind),
+            focusGoal: request.presentationBehavior.focusGoal(for: request.kind),
             activeStateSignalCount: request.activeStateSignalCount,
             openTextSignalCount: request.openTextSignalCount,
             dangerSignals: dangerSignals,
@@ -135,33 +222,12 @@ public enum BASFrontstageStateCompiler {
         static let sessionBiasLimit = 72
     }
 
-    private static func focusGoal(
-        for kind: BASAdaptiveTraceKind
-    ) -> String {
-        switch kind {
-        case .quick:
-            "Interrupt the automatic reaction before it locks in."
-        case .balance:
-            "Surface the real trade-off before choosing a side."
-        case .mirror:
-            "Name the core tension without forcing a yes-no answer."
-        case .reminder:
-            "Pick the one reminder that best fits the current state."
-        }
-    }
-
     private static func frontstageEvidenceCount(
         for kind: BASAdaptiveTraceKind,
-        strategy: BASAdaptiveTaskStrategy?
+        strategy: BASAdaptiveTaskStrategy?,
+        behavior: BASFrontstagePresentationBehavior
     ) -> Int {
-        let base: Int = switch kind {
-        case .quick:
-            2
-        case .balance, .mirror:
-            1
-        case .reminder:
-            0
-        }
+        let base = behavior.baseEvidenceCount(for: kind)
 
         guard let strategy else { return base }
         let retrievalAdjusted: Int = switch strategy.retrievalMode {
@@ -173,8 +239,9 @@ public enum BASFrontstageStateCompiler {
             base + 1
         }
 
-        if strategy.runtimeGear == .low && kind == .quick {
-            return min(1, retrievalAdjusted)
+        if strategy.runtimeGear == .low,
+           let clamp = behavior.lowGearEvidenceClamp(for: kind) {
+            return min(clamp, retrievalAdjusted)
         }
 
         return retrievalAdjusted

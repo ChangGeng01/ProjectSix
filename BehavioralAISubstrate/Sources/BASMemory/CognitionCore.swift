@@ -7,24 +7,39 @@ public enum BASDecisionMode: String, Codable, Sendable, CaseIterable {
     case balance
     case mirror
 
+    public static let primaryID = "primary"
+    public static let comparativeID = "comparative"
+    public static let reflectiveID = "reflective"
+    public static let genericPriorityIDs = [
+        primaryID,
+        comparativeID,
+        reflectiveID
+    ]
+
+    public static var primary: Self { .quick }
+    public static var comparative: Self { .balance }
+    public static var reflective: Self { .mirror }
+
     public var identifier: String {
         switch self {
         case .quick:
-            "primary"
+            Self.primaryID
         case .balance:
-            "comparative"
+            Self.comparativeID
         case .mirror:
-            "reflective"
+            Self.reflectiveID
         }
     }
 
+    public var legacyIdentifier: String { rawValue }
+
     public init?(identifier: String) {
         switch identifier {
-        case "primary", "quick":
+        case Self.primaryID, "quick":
             self = .quick
-        case "comparative", "balance":
+        case Self.comparativeID, "balance":
             self = .balance
-        case "reflective", "mirror":
+        case Self.reflectiveID, "mirror":
             self = .mirror
         default:
             return nil
@@ -337,14 +352,16 @@ public enum BASMemoryEligibilityJudge {
         candidate: BASMemoryEligibilityCandidate,
         mode: BASDecisionMode,
         queryTags: Set<String>,
-        now: Date
+        now: Date,
+        behavior: BASBrainCompilationBehavior = BASBrainCompilationBehavior()
     ) -> BASMemoryEligibilityDecision {
         if candidate.kind == .goal {
             return .allowed(.goalOverride)
         }
 
-        let meaningfulItemTags = relevantTags(candidate.retrievalTags)
-        let meaningfulQueryTags = relevantTags(Array(queryTags))
+        let ignoredTags = behavior.ignoredRetrievalTagSet()
+        let meaningfulItemTags = relevantTags(candidate.retrievalTags, ignoredTags: ignoredTags)
+        let meaningfulQueryTags = relevantTags(Array(queryTags), ignoredTags: ignoredTags)
         let hasTagOverlap = !meaningfulItemTags.intersection(meaningfulQueryTags).isEmpty
         let ageHours = max(0, now.timeIntervalSince(candidate.lastConfirmedAt) / 3_600)
 
@@ -376,7 +393,7 @@ public enum BASMemoryEligibilityJudge {
         }
 
         if candidate.role == .relevant {
-            let baseline = mode == .mirror ? 0.58 : 0.64
+            let baseline = behavior.relevantPriorityBaseline(for: mode)
             if candidate.priority < baseline, !hasTagOverlap {
                 return .screenedOut(candidate.kind == .template ? .supportPriorityNoOverlap : .semanticPriorityNoOverlap)
             }
@@ -385,20 +402,12 @@ public enum BASMemoryEligibilityJudge {
         return .allowed(.defaultAllowed)
     }
 
-    private static func relevantTags(_ tags: [String]) -> Set<String> {
-        let ignored = Set([
-            "quick",
-            "balance",
-            "mirror",
-            "recent",
-            "goal",
-            "long_term",
-            "pattern",
-            "repeat"
-        ])
-
+    private static func relevantTags(
+        _ tags: [String],
+        ignoredTags: Set<String>
+    ) -> Set<String> {
         return Set(tags.map { $0.lowercased() })
-            .subtracting(ignored)
+            .subtracting(ignoredTags)
             .filter { tag in
                 !tag.hasPrefix("lang:") && !tag.hasPrefix("script:")
             }
@@ -433,6 +442,7 @@ public struct BASBrainBootstrapRequest: Codable, Equatable, Sendable {
     public var retrievalMode: String
     public var reactionWeightSeed: BASReactionWeights?
     public var identityProfileOverride: BASIdentityProfile?
+    public var cognitionBehavior: BASCognitionBehavior
     public var goalHints: [String]
     public var constraintHints: [String]
     public var now: Date
@@ -446,6 +456,7 @@ public struct BASBrainBootstrapRequest: Codable, Equatable, Sendable {
         retrievalMode: String,
         reactionWeightSeed: BASReactionWeights? = nil,
         identityProfileOverride: BASIdentityProfile? = nil,
+        cognitionBehavior: BASCognitionBehavior = .generic,
         goalHints: [String] = [],
         constraintHints: [String] = [],
         now: Date = .now
@@ -458,6 +469,7 @@ public struct BASBrainBootstrapRequest: Codable, Equatable, Sendable {
         self.retrievalMode = retrievalMode
         self.reactionWeightSeed = reactionWeightSeed
         self.identityProfileOverride = identityProfileOverride
+        self.cognitionBehavior = cognitionBehavior
         self.goalHints = goalHints
         self.constraintHints = constraintHints
         self.now = now
@@ -690,7 +702,12 @@ public enum BASDecisionBrainCompiler {
         projection: BASBrainProjection
     ) -> BASBootstrappedBrainState {
         let queryTags = buildQueryTags(for: request, projection: projection)
-        let retrievalPlan = retrievalPlan(for: request.mode, retrievalMode: request.retrievalMode)
+        let brainCompilation = request.cognitionBehavior.brainCompilation
+        let retrievalPlan = retrievalPlan(
+            for: request.mode,
+            retrievalMode: request.retrievalMode,
+            behavior: brainCompilation
+        )
         let compilerItems = BASMemoryTierFilter.frontstageEligibleMemories(projection.records)
             .map(CompilerItem.init(memory:))
             .sorted(by: memorySort)
@@ -704,13 +721,15 @@ public enum BASDecisionBrainCompiler {
                     mode: request.mode,
                     queryTags: queryTags,
                     embeddingScores: projection.embeddingScoresByID,
-                    now: request.now
+                    now: request.now,
+                    behavior: brainCompilation
                 ) > score(
                     rhs,
                     mode: request.mode,
                     queryTags: queryTags,
                     embeddingScores: projection.embeddingScoresByID,
-                    now: request.now
+                    now: request.now,
+                    behavior: brainCompilation
                 )
             }
         let retrievalPool = orderedItems.filter {
@@ -720,7 +739,8 @@ public enum BASDecisionBrainCompiler {
             from: retrievalPool,
             mode: request.mode,
             queryTags: queryTags,
-            now: request.now
+            now: request.now,
+            behavior: brainCompilation
         )
         let retrievalQualified = Array(judged.allowedItems.prefix(retrievalPlan.candidateLimit))
         let profileItems = selectItems(
@@ -767,7 +787,8 @@ public enum BASDecisionBrainCompiler {
             seed: request.reactionWeightSeed ?? BASReactionWeights.defaults(forModeName: request.mode.rawValue),
             queryTags: queryTags,
             memorySlices: memorySlices,
-            recentEvents: projection.recentEvents
+            recentEvents: projection.recentEvents,
+            cognitionBehavior: request.cognitionBehavior
         )
         let sessionBiases = sessionBiases(
             for: request,
@@ -891,14 +912,15 @@ public enum BASDecisionBrainCompiler {
 
     private static func retrievalPlan(
         for mode: BASDecisionMode,
-        retrievalMode: String
+        retrievalMode: String,
+        behavior: BASBrainCompilationBehavior
     ) -> RetrievalPlan {
         switch retrievalMode {
         case "off":
             return RetrievalPlan(
-                candidateLimit: mode == .quick ? 4 : 5,
+                candidateLimit: behavior.candidateLimitWhenRetrievalOff(for: mode),
                 profileLimit: 1,
-                goalLimit: mode == .quick ? 1 : 2,
+                goalLimit: behavior.goalLimitWhenRetrievalOff(for: mode),
                 relevantLimit: 1,
                 includesPendingCandidates: false
             )
@@ -907,7 +929,7 @@ public enum BASDecisionBrainCompiler {
                 candidateLimit: 12,
                 profileLimit: 2,
                 goalLimit: 2,
-                relevantLimit: mode == .mirror ? 4 : 3,
+                relevantLimit: behavior.relevantLimitWhenAdaptive(for: mode),
                 includesPendingCandidates: true
             )
         default:
@@ -997,40 +1019,39 @@ public enum BASDecisionBrainCompiler {
     ) -> [String] {
         let memoryText = normalizedMemoryText(from: memorySlices)
         let hasNightSignal = hasNightSignal(queryTags: queryTags, memoryText: memoryText, recentEvents: recentEvents, now: request.now)
-        var biases = defaultSessionBiases(for: request.mode)
+        let behavior = request.cognitionBehavior.sessionBias
+        let brainCompilation = request.cognitionBehavior.brainCompilation
+        var biases = behavior.defaultBiases(for: request.mode)
 
         if reactionWeights.briefLanguage >= 0.7 ||
-            memoryText.contains("short") ||
-            memoryText.contains("direct") {
+            containsSignal(in: memoryText, signals: behavior.briefLanguageSignals) {
             biases.append("Keep the language short and concrete.")
         }
 
         if hasNightSignal {
-            biases.append("Avoid heavy, high-friction guidance late at night.")
+            biases.append(behavior.nightBias)
         }
 
         if hasNightSignal &&
-            (memoryText.contains("lighter, shorter guidance") ||
-             memoryText.contains("late sessions need lighter") ||
+            (containsSignal(in: memoryText, signals: behavior.lowCognitiveLoadSignals) ||
              reactionWeights.lowCognitiveLoad >= 0.72) {
-            biases.append("Keep the cognitive load light right now.")
+            biases.append(behavior.nightLowLoadBias)
         }
 
-        if request.mode == .quick,
+        if brainCompilation.isInterruptiveMode(request.mode),
            (reactionWeights.interruptiveActionBias >= 0.74 ||
-            memoryText.contains("tomorrow box") ||
-            memoryText.contains("pause") ||
-            memoryText.contains("trigger") ||
-            memoryText.contains("step away")) {
-            biases.append("Favor interruptive next steps over extra analysis.")
+            containsSignal(in: memoryText, signals: behavior.interruptiveActionSignals)) {
+            biases.append(behavior.interruptiveActionBias)
         }
 
-        if request.mode == .mirror, reactionWeights.boundaryNamingBias >= 0.8 {
-            biases.append("Name the real boundary before softening it.")
+        if brainCompilation.isBoundaryNamingMode(request.mode),
+           reactionWeights.boundaryNamingBias >= 0.8 {
+            biases.append(behavior.boundaryNamingBias)
         }
 
-        if request.mode == .balance, reactionWeights.tradeoffClarityBias >= 0.8 {
-            biases.append("Keep the trade-off explicit before polishing the language.")
+        if brainCompilation.isTradeoffClarityMode(request.mode),
+           reactionWeights.tradeoffClarityBias >= 0.8 {
+            biases.append(behavior.tradeoffClarityBias)
         }
 
         let contextMarkers = [
@@ -1045,29 +1066,21 @@ public enum BASDecisionBrainCompiler {
         return uniqueOrdered(biases + contextMarkers)
     }
 
-    private static func defaultSessionBiases(for mode: BASDecisionMode) -> [String] {
-        switch mode {
-        case .quick:
-            ["Interrupt the loop before explaining too much."]
-        case .balance:
-            ["Keep the trade-off explicit and bounded."]
-        case .mirror:
-            ["Name the tension before suggesting anything."]
-        }
-    }
-
     private static func reactionWeights(
         for mode: BASDecisionMode,
         seed: BASReactionWeights,
         queryTags: Set<String>,
         memorySlices: [BASGovernedMemorySlice],
-        recentEvents: [BASEventRecord]
+        recentEvents: [BASEventRecord],
+        cognitionBehavior: BASCognitionBehavior
     ) -> BASReactionWeights {
         var weights = seed
         let memoryText = normalizedMemoryText(from: memorySlices)
         let hasNightSignal = hasNightSignal(queryTags: queryTags, memoryText: memoryText, recentEvents: recentEvents, now: nil)
+        let behavior = cognitionBehavior.sessionBias
+        let brainCompilation = cognitionBehavior.brainCompilation
 
-        if memoryText.contains("short") || memoryText.contains("direct") {
+        if containsSignal(in: memoryText, signals: behavior.briefLanguageSignals) {
             weights.briefLanguage += 0.24
             weights.warmDirectTone += 0.08
         }
@@ -1078,11 +1091,8 @@ public enum BASDecisionBrainCompiler {
             weights.warmDirectTone += 0.06
         }
 
-        if mode == .quick &&
-            (memoryText.contains("tomorrow box") ||
-             memoryText.contains("pause") ||
-             memoryText.contains("trigger") ||
-             memoryText.contains("step away")) {
+        if brainCompilation.isInterruptiveMode(mode) &&
+            containsSignal(in: memoryText, signals: behavior.interruptiveActionSignals) {
             weights.interruptiveActionBias += 0.24
         }
 
@@ -1090,21 +1100,24 @@ public enum BASDecisionBrainCompiler {
             guard let actionID = event.actionID, let reflectionOutcomeID = event.reflectionOutcomeID else {
                 return false
             }
-            return interruptiveActionIDs.contains(actionID) && positiveReflectionOutcomeIDs.contains(reflectionOutcomeID)
+            return brainCompilation.interruptiveActionIDs.contains(actionID) &&
+                brainCompilation.positiveReflectionOutcomeIDs.contains(reflectionOutcomeID)
         }.count
 
         let negativeProceedReflections = recentEvents.filter { event in
             guard let actionID = event.actionID, let reflectionOutcomeID = event.reflectionOutcomeID else {
                 return false
             }
-            return proceedActionIDs.contains(actionID) && negativeReflectionOutcomeIDs.contains(reflectionOutcomeID)
+            return brainCompilation.proceedActionIDs.contains(actionID) &&
+                brainCompilation.negativeReflectionOutcomeIDs.contains(reflectionOutcomeID)
         }.count
 
         let positiveProceedReflections = recentEvents.filter { event in
             guard let actionID = event.actionID, let reflectionOutcomeID = event.reflectionOutcomeID else {
                 return false
             }
-            return proceedActionIDs.contains(actionID) && positiveReflectionOutcomeIDs.contains(reflectionOutcomeID)
+            return brainCompilation.proceedActionIDs.contains(actionID) &&
+                brainCompilation.positiveReflectionOutcomeIDs.contains(reflectionOutcomeID)
         }.count
 
         if positiveInterruptiveReflections > 0 || negativeProceedReflections > 0 {
@@ -1119,25 +1132,39 @@ public enum BASDecisionBrainCompiler {
             weights.warmDirectTone += min(0.1, Double(positiveProceedReflections) * 0.03)
         }
 
-        if mode == .mirror ||
-            memoryText.contains("shrinking") ||
-            memoryText.contains("boundary") ||
-            memoryText.contains("cost") ||
-            memoryText.contains("relationship") {
+        if brainCompilation.isBoundaryNamingMode(mode) ||
+            containsSignal(in: memoryText, signals: behavior.boundaryNamingSignals) {
             weights.boundaryNamingBias += 0.18
             weights.warmDirectTone += 0.06
         }
 
-        if mode == .balance ||
-            queryTags.contains("tradeoff") ||
-            queryTags.contains("constraint") ||
-            memoryText.contains("trade-off") ||
-            memoryText.contains("cash versus") ||
-            memoryText.contains("protect sleep") {
+        if brainCompilation.isTradeoffClarityMode(mode) ||
+            containsSignal(in: memoryText, signals: behavior.tradeoffClaritySignals) ||
+            containsSignal(in: queryTags, signals: behavior.tradeoffClaritySignals) {
             weights.tradeoffClarityBias += 0.22
         }
 
         return rounded(clamped(weights))
+    }
+
+    private static func containsSignal(
+        in text: String,
+        signals: [String]
+    ) -> Bool {
+        let normalizedText = text.lowercased()
+        return signals.contains { signal in
+            normalizedText.contains(signal.lowercased())
+        }
+    }
+
+    private static func containsSignal(
+        in tags: Set<String>,
+        signals: [String]
+    ) -> Bool {
+        let normalizedTags = Set(tags.map { $0.lowercased() })
+        return signals.contains { signal in
+            normalizedTags.contains(signal.lowercased())
+        }
     }
 
     private static func role(for memory: BASGovernedMemory) -> BASBrainMemoryRole {
@@ -1278,28 +1305,6 @@ public enum BASDecisionBrainCompiler {
         return hour >= 21 || hour < 6
     }
 
-    private static let interruptiveActionIDs: Set<String> = [
-        "wait90s",
-        "leaveStimulus",
-        "decideTomorrow"
-    ]
-
-    private static let proceedActionIDs: Set<String> = [
-        "goAheadAnyway",
-        "continueMindfully"
-    ]
-
-    private static let positiveReflectionOutcomeIDs: Set<String> = [
-        "betterThanExpected",
-        "okay",
-        "notNeeded"
-    ]
-
-    private static let negativeReflectionOutcomeIDs: Set<String> = [
-        "regrettedIt",
-        "feltEmptier"
-    ]
-
     private static func clamped(_ weights: BASReactionWeights) -> BASReactionWeights {
         BASReactionWeights(
             briefLanguage: max(0, min(1, weights.briefLanguage)),
@@ -1368,29 +1373,15 @@ public enum BASDecisionBrainCompiler {
         mode: BASDecisionMode,
         queryTags: Set<String>,
         embeddingScores: [String: Double],
-        now: Date
+        now: Date,
+        behavior: BASBrainCompilationBehavior
     ) -> Double {
         let overlap = Double(
             Set(relevantRetrievalTags(item.retrievalTags))
                 .intersection(relevantRetrievalTags(Array(queryTags)))
                 .count
         )
-        let typeBoost: Double = switch (mode, item.kind) {
-        case (.quick, .support):
-            3.4
-        case (.quick, .semantic):
-            2.8
-        case (.quick, .situational):
-            2.4
-        case (.balance, .goal), (.balance, .semantic):
-            3.0
-        case (.mirror, .situational), (.mirror, .semantic), (.mirror, .goal):
-            3.4
-        case (_, .profile):
-            1.8
-        default:
-            1.0
-        }
+        let typeBoost = behavior.typeBoost(for: mode, kind: item.kind)
 
         let ageInDays = max(0, now.timeIntervalSince(item.lastConfirmedAt) / 86_400)
         let fastWindow = 45 * item.decayGraceMultiplier
@@ -1433,7 +1424,8 @@ public enum BASDecisionBrainCompiler {
         from orderedItems: [CompilerItem],
         mode: BASDecisionMode,
         queryTags: Set<String>,
-        now: Date
+        now: Date,
+        behavior: BASBrainCompilationBehavior
     ) -> (allowedItems: [EvaluatedItem], screenedOutItems: [EvaluatedItem]) {
         var allowed: [EvaluatedItem] = []
         var screenedOut: [EvaluatedItem] = []
@@ -1443,7 +1435,8 @@ public enum BASDecisionBrainCompiler {
                 candidate: item.eligibilityCandidate,
                 mode: mode,
                 queryTags: queryTags,
-                now: now
+                now: now,
+                behavior: behavior
             )
             let evaluated = EvaluatedItem(item: item, eligibility: eligibility)
             if eligibility.isAllowed {

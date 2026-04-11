@@ -3,9 +3,10 @@ import SwiftData
 import BASHostKit
 
 enum DecisionMemorySystem {
-    static let projectionRecordLimit = BASAppleMemoryProjectionRefreshLimits.default.recordLimit
-    static let projectionCandidateLimit = BASAppleMemoryProjectionRefreshLimits.default.candidateLimit
-    static let projectionCheckEventLimit = BASAppleMemoryProjectionRefreshLimits.default.checkEventLimit
+    static let projectionRefreshLimits = BeforeProductLanguage.hostLifecycleBehavior.projectionRefreshLimits
+    static let projectionRecordLimit = projectionRefreshLimits.recordLimit
+    static let projectionCandidateLimit = projectionRefreshLimits.candidateLimit
+    static let projectionCheckEventLimit = projectionRefreshLimits.checkEventLimit
 
     typealias BrainStateProjection = BASAppleMemoryProjectionRefreshResult
 
@@ -21,8 +22,8 @@ enum DecisionMemorySystem {
             now: now,
             reminderType: SelfReminder.self,
             checkEventType: CheckEvent.self,
-            balanceRecordType: BalanceDecisionRecord.self,
-            mirrorRecordType: MirrorDecisionRecord.self,
+            comparativeRecordType: BalanceDecisionRecord.self,
+            reflectiveRecordType: MirrorDecisionRecord.self,
             behavior: BeforeProductLanguage.memoryDerivationBehavior,
             onSaveError: { error in
                 PersistenceIssueRecorder.record(
@@ -41,20 +42,21 @@ enum DecisionMemorySystem {
         BASAppleMemoryProjectionRuntime.refresh(
             in: context,
             now: now,
+            limits: projectionRefreshLimits,
             recordType: DecisionMemoryRecord.self,
             candidateType: DecisionMemoryCandidateRecord.self,
             reminderType: SelfReminder.self,
             checkEventType: CheckEvent.self,
-            balanceRecordType: BalanceDecisionRecord.self,
-            mirrorRecordType: MirrorDecisionRecord.self,
+            comparativeRecordType: BalanceDecisionRecord.self,
+            reflectiveRecordType: MirrorDecisionRecord.self,
             behavior: BeforeProductLanguage.memoryDerivationBehavior,
-            rebuildEmbeddings: { records, candidates, checkEvents, balanceRecords, mirrorRecords in
+            rebuildEmbeddings: { records, candidates, checkEvents, comparativeRecords, reflectiveRecords in
                 EmbeddingMemoryStore.rebuildIndex(
                     records: records,
                     candidates: candidates,
                     checkEvents: checkEvents,
-                    balance: balanceRecords,
-                    mirror: mirrorRecords
+                    balance: comparativeRecords,
+                    mirror: reflectiveRecords
                 )
             },
             onSaveError: { error in
@@ -96,6 +98,7 @@ enum DecisionMemorySystem {
             retrievalMode: retrievalMode.rawValue,
             reactionWeightSeed: BeforeProductLanguage.reactionWeights(for: mode),
             identityProfileOverride: BeforeProductLanguage.identityProfile(for: mode),
+            cognitionBehavior: BeforeProductLanguage.hostCognition.substrateBehavior,
             preferredLanguages: Locale.preferredLanguages,
             now: now
         )
@@ -136,22 +139,22 @@ enum DecisionMemorySystem {
 
     static func fetchBalanceRecords(
         in context: ModelContext,
-        limit: Int = BASAppleMemoryProjectionRefreshLimits.default.balanceRecordLimit
+        limit: Int = projectionRefreshLimits.comparativeRecordLimit
     ) -> [BalanceDecisionRecord] {
-        BASAppleMemoryProjectionSelectionAdapter.fetchProjectionBalanceRecords(
+        BASAppleMemoryProjectionSelectionAdapter.fetchProjectionComparativeRecords(
             in: context,
-            balanceType: BalanceDecisionRecord.self,
+            comparativeType: BalanceDecisionRecord.self,
             limit: limit
         )
     }
 
     static func fetchMirrorRecords(
         in context: ModelContext,
-        limit: Int = BASAppleMemoryProjectionRefreshLimits.default.mirrorRecordLimit
+        limit: Int = projectionRefreshLimits.reflectiveRecordLimit
     ) -> [MirrorDecisionRecord] {
-        BASAppleMemoryProjectionSelectionAdapter.fetchProjectionMirrorRecords(
+        BASAppleMemoryProjectionSelectionAdapter.fetchProjectionReflectiveRecords(
             in: context,
-            mirrorType: MirrorDecisionRecord.self,
+            reflectiveType: MirrorDecisionRecord.self,
             limit: limit
         )
     }

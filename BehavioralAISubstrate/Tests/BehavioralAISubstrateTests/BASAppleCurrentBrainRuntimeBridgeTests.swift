@@ -17,7 +17,12 @@ struct BASAppleCurrentBrainRuntimeBridgeTests {
                 candidates: [],
                 recentEvents: []
             ),
-            retrievalMode: "filtered"
+            retrievalMode: "filtered",
+            bootstrapBehavior: BASCurrentBrainBootstrapBehavior(
+                sourceSurfaceOverridesByTriggerID: [
+                    BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue: BASInteractionSurface.shortcut.rawValue
+                ]
+            )
         )
 
         let bootstrapInput = BASAppleCurrentBrainRuntimeBridgeBuilder.sessionBootstrapInput(
@@ -29,6 +34,9 @@ struct BASAppleCurrentBrainRuntimeBridgeTests {
         #expect(bootstrapInput.triggerID == BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue)
         #expect(bootstrapInput.retrievalMode == "filtered")
         #expect(bootstrapInput.preferredLanguages == ["en-AU"])
+        #expect(bootstrapInput.bootstrapBehavior.sourceSurfaceOverridesByTriggerID[
+            BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue
+        ] == BASInteractionSurface.shortcut.rawValue)
     }
 
     @Test("active bridge falls back to task graph seed and carries task graph hint")

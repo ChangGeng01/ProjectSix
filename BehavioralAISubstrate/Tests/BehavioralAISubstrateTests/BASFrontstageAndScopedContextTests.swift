@@ -47,7 +47,7 @@ struct BASFrontstageAndScopedContextTests {
             )
         )
 
-        #expect(state.focusGoal == "Interrupt the automatic reaction before it locks in.")
+        #expect(state.focusGoal == "Clarify the immediate state before momentum hardens.")
         #expect(state.evidenceHeadlines.count == 1)
         #expect(state.dangerSignals.count == 3)
         #expect(state.dangerSignals.contains("Constraint pressure"))
@@ -55,6 +55,47 @@ struct BASFrontstageAndScopedContextTests {
         #expect(state.dangerSignals.contains("Session rebuild"))
         #expect(!state.dangerSignals.contains("Evidence filtered"))
         #expect(!state.dangerSignals.contains("Frontstage trimmed"))
+    }
+
+    @Test("frontstage compiler honors host presentation behavior")
+    func frontstageCompilerHonorsHostPresentationBehavior() {
+        let state = BASFrontstageStateCompiler.compile(
+            BASFrontstageCompilationRequest(
+                kind: .mirror,
+                activeStateSignalCount: 2,
+                openTextSignalCount: 1,
+                retainedEvidence: [
+                    "Core tension: You want closeness and distance at the same time.",
+                    "Next action: Name one grounded truth."
+                ],
+                retainedEvidenceCount: 2,
+                droppedEvidenceCount: 2,
+                droppedInjectedEvidenceCount: 1,
+                droppedDuplicateEvidenceCount: 0,
+                droppedBudgetEvidenceCount: 1,
+                contextWasRebuilt: true,
+                staleFieldCount: 1,
+                presentationBehavior: BASFrontstagePresentationBehavior(
+                    focusGoalsByKindID: [
+                        BASAdaptiveTraceKind.mirror.rawValue: "Hold the reflective lane without forcing closure."
+                    ],
+                    baseEvidenceCountByKindID: [
+                        BASAdaptiveTraceKind.mirror.rawValue: 2
+                    ],
+                    lowGearEvidenceClampByKindID: [:],
+                    contextRebuiltSignal: "Host rebuild",
+                    staleFieldsSignal: "Host dropped stale fields",
+                    filteredEvidenceSignal: "Host filtered evidence",
+                    trimmedEvidenceSignal: "Host trimmed evidence"
+                )
+            )
+        )
+
+        #expect(state.focusGoal == "Hold the reflective lane without forcing closure.")
+        #expect(state.evidenceHeadlines.count == 2)
+        #expect(state.dangerSignals.contains("Host rebuild"))
+        #expect(state.dangerSignals.contains("Host dropped stale fields"))
+        #expect(state.dangerSignals.contains("Host filtered evidence"))
     }
 
     @Test("scoped context compiler compacts low-gear quick and preserves richer balance context")

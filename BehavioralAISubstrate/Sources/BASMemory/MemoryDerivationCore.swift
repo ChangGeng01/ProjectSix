@@ -97,7 +97,7 @@ public struct BASCheckEventMemoryInput: Codable, Equatable, Sendable {
     }
 }
 
-public struct BASBalanceMemoryInput: Codable, Equatable, Sendable {
+public struct BASComparativeMemoryInput: Codable, Equatable, Sendable {
     public var prompt: String
     public var longTerm: String
     public var updatedAt: Date
@@ -107,14 +107,66 @@ public struct BASBalanceMemoryInput: Codable, Equatable, Sendable {
         self.longTerm = longTerm
         self.updatedAt = updatedAt
     }
+
+    public init(workspace: BASWorkspaceMemoryInput) {
+        self.prompt = workspace.prompt
+        self.longTerm = workspace.longTerm
+        self.updatedAt = workspace.updatedAt
+    }
+
+    public var workspaceInput: BASWorkspaceMemoryInput {
+        BASWorkspaceMemoryInput(
+            workflowID: "comparative",
+            prompt: prompt,
+            longTerm: longTerm,
+            updatedAt: updatedAt
+        )
+    }
 }
 
-public struct BASMirrorMemoryInput: Codable, Equatable, Sendable {
+public struct BASReflectiveMemoryInput: Codable, Equatable, Sendable {
     public var prompt: String
     public var longTerm: String
     public var updatedAt: Date
 
     public init(prompt: String, longTerm: String, updatedAt: Date) {
+        self.prompt = prompt
+        self.longTerm = longTerm
+        self.updatedAt = updatedAt
+    }
+
+    public init(workspace: BASWorkspaceMemoryInput) {
+        self.prompt = workspace.prompt
+        self.longTerm = workspace.longTerm
+        self.updatedAt = workspace.updatedAt
+    }
+
+    public var workspaceInput: BASWorkspaceMemoryInput {
+        BASWorkspaceMemoryInput(
+            workflowID: "reflective",
+            prompt: prompt,
+            longTerm: longTerm,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+public typealias BASBalanceMemoryInput = BASComparativeMemoryInput
+public typealias BASMirrorMemoryInput = BASReflectiveMemoryInput
+
+public struct BASWorkspaceMemoryInput: Codable, Equatable, Sendable {
+    public var workflowID: String
+    public var prompt: String
+    public var longTerm: String
+    public var updatedAt: Date
+
+    public init(
+        workflowID: String,
+        prompt: String,
+        longTerm: String,
+        updatedAt: Date
+    ) {
+        self.workflowID = workflowID
         self.prompt = prompt
         self.longTerm = longTerm
         self.updatedAt = updatedAt
@@ -168,6 +220,8 @@ public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
     public var primarySituational: BASSituationalDraftBehavior
     public var comparativeSituational: BASSituationalDraftBehavior
     public var reflectiveSituational: BASSituationalDraftBehavior
+    public var comparativeWorkspaceIDs: [String]
+    public var reflectiveWorkspaceIDs: [String]
     public var supportActionsByID: [String: BASSupportActionDraftBehavior]
     public var fallbackSupportTags: [String]
     public var fallbackSupportProvenanceSummary: String
@@ -175,54 +229,37 @@ public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
     public init(
         primarySituational: BASSituationalDraftBehavior = BASSituationalDraftBehavior(
             draftID: "situational.primary.latest",
-            topic: "recent_primary_loop",
+            topic: "recent_primary_workflow",
             primaryHeadlinePrefix: "Recently carrying",
             fallbackHeadlinePrefix: "Recently revisiting",
-            provenanceSummary: "Candidate memory staged from the latest primary interaction.",
+            provenanceSummary: "Candidate memory staged from the latest primary workflow.",
             baseTags: ["primary", "recent"]
         ),
         comparativeSituational: BASSituationalDraftBehavior = BASSituationalDraftBehavior(
             draftID: "situational.comparative.latest",
-            topic: "recent_comparative_deliberation",
+            topic: "recent_comparative_workflow",
             primaryHeadlinePrefix: "Recently weighing",
-            provenanceSummary: "Candidate memory staged from the latest comparative workspace.",
+            provenanceSummary: "Candidate memory staged from the latest comparative workflow.",
             baseTags: ["comparative", "recent"]
         ),
         reflectiveSituational: BASSituationalDraftBehavior = BASSituationalDraftBehavior(
             draftID: "situational.reflective.latest",
-            topic: "recent_reflective_question",
-            primaryHeadlinePrefix: "Recently reflecting on",
-            provenanceSummary: "Candidate memory staged from the latest reflective workspace.",
+            topic: "recent_reflective_workflow",
+            primaryHeadlinePrefix: "Recently noticing",
+            provenanceSummary: "Candidate memory staged from the latest reflective workflow.",
             baseTags: ["reflective", "recent"]
         ),
-        supportActionsByID: [String: BASSupportActionDraftBehavior] = [
-            "decideTomorrow": BASSupportActionDraftBehavior(
-                headline: "Deferring the decision often reduces loop intensity.",
-                tags: ["support", "delay", "stabilize"]
-            ),
-            "leaveStimulus": BASSupportActionDraftBehavior(
-                headline: "Stepping away from the trigger often helps faster.",
-                tags: ["support", "distance", "interrupt"]
-            ),
-            "wait90s": BASSupportActionDraftBehavior(
-                headline: "A short pause often creates enough space to reset.",
-                tags: ["support", "pause", "interrupt"]
-            ),
-            "goAheadAnyway": BASSupportActionDraftBehavior(
-                headline: "When it is aligned, clean action can beat over-processing.",
-                tags: ["support", "aligned", "action"]
-            ),
-            "continueMindfully": BASSupportActionDraftBehavior(
-                headline: "When it is aligned, clean action can beat over-processing.",
-                tags: ["support", "aligned", "action"]
-            )
-        ],
-        fallbackSupportTags: [String] = ["support", "action_pattern"],
-        fallbackSupportProvenanceSummary: String = "Derived from repeated successful action outcomes."
+        comparativeWorkspaceIDs: [String] = ["comparative"],
+        reflectiveWorkspaceIDs: [String] = ["reflective"],
+        supportActionsByID: [String: BASSupportActionDraftBehavior] = [:],
+        fallbackSupportTags: [String] = ["action_support", "stabilizing_action"],
+        fallbackSupportProvenanceSummary: String = "Derived from repeated stabilizing actions in the host workflow."
     ) {
         self.primarySituational = primarySituational
         self.comparativeSituational = comparativeSituational
         self.reflectiveSituational = reflectiveSituational
+        self.comparativeWorkspaceIDs = comparativeWorkspaceIDs
+        self.reflectiveWorkspaceIDs = reflectiveWorkspaceIDs
         self.supportActionsByID = supportActionsByID
         self.fallbackSupportTags = fallbackSupportTags
         self.fallbackSupportProvenanceSummary = fallbackSupportProvenanceSummary
@@ -232,10 +269,73 @@ public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
 public struct BASMemoryDerivationRequest: Codable, Equatable, Sendable {
     public var reminders: [BASSelfReminderMemoryInput]
     public var checkEvents: [BASCheckEventMemoryInput]
-    public var balanceRecords: [BASBalanceMemoryInput]
-    public var mirrorRecords: [BASMirrorMemoryInput]
+    public var workspaceRecords: [BASWorkspaceMemoryInput]
+    public var comparativeRecords: [BASComparativeMemoryInput]
+    public var reflectiveRecords: [BASReflectiveMemoryInput]
     public var now: Date
     public var behavior: BASMemoryDerivationBehavior
+
+    public var balanceRecords: [BASComparativeMemoryInput] {
+        get { comparativeRecords }
+        set { comparativeRecords = newValue }
+    }
+
+    public var mirrorRecords: [BASReflectiveMemoryInput] {
+        get { reflectiveRecords }
+        set { reflectiveRecords = newValue }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case reminders
+        case checkEvents
+        case workspaceRecords
+        case comparativeRecords
+        case reflectiveRecords
+        case balanceRecords
+        case mirrorRecords
+        case now
+        case behavior
+    }
+
+    public init(
+        reminders: [BASSelfReminderMemoryInput],
+        checkEvents: [BASCheckEventMemoryInput],
+        workspaceRecords: [BASWorkspaceMemoryInput],
+        now: Date,
+        behavior: BASMemoryDerivationBehavior = .generic
+    ) {
+        self.reminders = reminders
+        self.checkEvents = checkEvents
+        self.workspaceRecords = workspaceRecords
+        self.comparativeRecords = workspaceRecords
+            .filter { behavior.comparativeWorkspaceIDs.contains($0.workflowID) }
+            .map(BASComparativeMemoryInput.init(workspace:))
+        self.reflectiveRecords = workspaceRecords
+            .filter { behavior.reflectiveWorkspaceIDs.contains($0.workflowID) }
+            .map(BASReflectiveMemoryInput.init(workspace:))
+        self.now = now
+        self.behavior = behavior
+    }
+
+    public init(
+        reminders: [BASSelfReminderMemoryInput],
+        checkEvents: [BASCheckEventMemoryInput],
+        comparativeRecords: [BASComparativeMemoryInput],
+        reflectiveRecords: [BASReflectiveMemoryInput],
+        now: Date,
+        behavior: BASMemoryDerivationBehavior = .generic
+    ) {
+        self.reminders = reminders
+        self.checkEvents = checkEvents
+        self.workspaceRecords = (
+            comparativeRecords.map(\.workspaceInput) +
+            reflectiveRecords.map(\.workspaceInput)
+        )
+        self.comparativeRecords = comparativeRecords
+        self.reflectiveRecords = reflectiveRecords
+        self.now = now
+        self.behavior = behavior
+    }
 
     public init(
         reminders: [BASSelfReminderMemoryInput],
@@ -245,12 +345,43 @@ public struct BASMemoryDerivationRequest: Codable, Equatable, Sendable {
         now: Date,
         behavior: BASMemoryDerivationBehavior = .generic
     ) {
-        self.reminders = reminders
-        self.checkEvents = checkEvents
-        self.balanceRecords = balanceRecords
-        self.mirrorRecords = mirrorRecords
-        self.now = now
-        self.behavior = behavior
+        self.init(
+            reminders: reminders,
+            checkEvents: checkEvents,
+            comparativeRecords: balanceRecords,
+            reflectiveRecords: mirrorRecords,
+            now: now,
+            behavior: behavior
+        )
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        reminders = try container.decode([BASSelfReminderMemoryInput].self, forKey: .reminders)
+        checkEvents = try container.decode([BASCheckEventMemoryInput].self, forKey: .checkEvents)
+        let decodedComparative = try container.decodeIfPresent([BASComparativeMemoryInput].self, forKey: .comparativeRecords) ??
+            container.decodeIfPresent([BASBalanceMemoryInput].self, forKey: .balanceRecords) ??
+            []
+        let decodedReflective = try container.decodeIfPresent([BASReflectiveMemoryInput].self, forKey: .reflectiveRecords) ??
+            container.decodeIfPresent([BASMirrorMemoryInput].self, forKey: .mirrorRecords) ??
+            []
+        comparativeRecords = decodedComparative
+        reflectiveRecords = decodedReflective
+        workspaceRecords = try container.decodeIfPresent([BASWorkspaceMemoryInput].self, forKey: .workspaceRecords) ??
+            (decodedComparative.map(\.workspaceInput) + decodedReflective.map(\.workspaceInput))
+        now = try container.decode(Date.self, forKey: .now)
+        behavior = try container.decodeIfPresent(BASMemoryDerivationBehavior.self, forKey: .behavior) ?? .generic
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(reminders, forKey: .reminders)
+        try container.encode(checkEvents, forKey: .checkEvents)
+        try container.encode(workspaceRecords, forKey: .workspaceRecords)
+        try container.encode(comparativeRecords, forKey: .comparativeRecords)
+        try container.encode(reflectiveRecords, forKey: .reflectiveRecords)
+        try container.encode(now, forKey: .now)
+        try container.encode(behavior, forKey: .behavior)
     }
 }
 
@@ -263,13 +394,11 @@ public enum BASMemoryDraftCompiler {
             now: request.now
         )
         drafts += goalDrafts(
-            balanceRecords: request.balanceRecords,
-            mirrorRecords: request.mirrorRecords
+            workspaceRecords: request.workspaceRecords
         )
         drafts += situationalDrafts(
             checkEvents: request.checkEvents,
-            balanceRecords: request.balanceRecords,
-            mirrorRecords: request.mirrorRecords,
+            workspaceRecords: request.workspaceRecords,
             behavior: request.behavior
         )
         drafts += semanticDrafts(
@@ -326,7 +455,7 @@ public enum BASMemoryDraftCompiler {
                         decayPolicyID: "slow",
                         retrievalTags: ["style", "communication", "concise", "direct"],
                         evidenceCount: allLengths.count,
-                        provenanceSummary: "Derived from repeated short reminders and recent primary-loop note length.",
+                        provenanceSummary: "Derived from repeated short reminders and recent structured interaction note length.",
                         promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
                     )
                 )
@@ -337,19 +466,14 @@ public enum BASMemoryDraftCompiler {
     }
 
     private static func goalDrafts(
-        balanceRecords: [BASBalanceMemoryInput],
-        mirrorRecords: [BASMirrorMemoryInput]
+        workspaceRecords: [BASWorkspaceMemoryInput]
     ) -> [BASDerivedMemoryDraft] {
-        let balanceGoals = balanceRecords.compactMap { record -> (String, Date)? in
-            let value = normalized(record.longTerm)
-            return value.isEmpty ? nil : (value, record.updatedAt)
-        }
-        let mirrorGoals = mirrorRecords.compactMap { record -> (String, Date)? in
+        let workspaceGoals = workspaceRecords.compactMap { record -> (String, Date)? in
             let value = normalized(record.longTerm)
             return value.isEmpty ? nil : (value, record.updatedAt)
         }
 
-        let grouped = Dictionary(grouping: balanceGoals + mirrorGoals, by: \.0)
+        let grouped = Dictionary(grouping: workspaceGoals, by: \.0)
         return grouped
             .sorted { lhs, rhs in
                 let lhsDate = lhs.value.map(\.1).max() ?? .distantPast
@@ -376,7 +500,7 @@ public enum BASMemoryDraftCompiler {
                     decayPolicyID: "medium",
                     retrievalTags: tags(from: goal) + ["goal", "long_term"],
                     evidenceCount: items.count,
-                    provenanceSummary: "Promoted from repeated long-term fields in comparative and reflective workspaces.",
+                    provenanceSummary: "Promoted from repeated long-term fields across structured workspaces.",
                     promotionPolicy: .immediate
                 )
             }
@@ -384,8 +508,7 @@ public enum BASMemoryDraftCompiler {
 
     private static func situationalDrafts(
         checkEvents: [BASCheckEventMemoryInput],
-        balanceRecords: [BASBalanceMemoryInput],
-        mirrorRecords: [BASMirrorMemoryInput],
+        workspaceRecords: [BASWorkspaceMemoryInput],
         behavior: BASMemoryDerivationBehavior
     ) -> [BASDerivedMemoryDraft] {
         var drafts: [BASDerivedMemoryDraft] = []
@@ -419,7 +542,10 @@ public enum BASMemoryDraftCompiler {
             )
         }
 
-        if let record = balanceRecords.first {
+        if let record = firstWorkspace(
+            in: workspaceRecords,
+            matching: behavior.comparativeWorkspaceIDs
+        ) {
             let prompt = normalized(record.prompt)
             if !prompt.isEmpty {
                 drafts.append(
@@ -443,7 +569,10 @@ public enum BASMemoryDraftCompiler {
             }
         }
 
-        if let record = mirrorRecords.first {
+        if let record = firstWorkspace(
+            in: workspaceRecords,
+            matching: behavior.reflectiveWorkspaceIDs
+        ) {
             let prompt = normalized(record.prompt)
             if !prompt.isEmpty {
                 drafts.append(
@@ -495,7 +624,7 @@ public enum BASMemoryDraftCompiler {
                     decayPolicyID: "slow",
                     retrievalTags: [dominantScenario.key, "pattern", "repeat"],
                     evidenceCount: dominantScenario.value.count,
-                    provenanceSummary: "Derived from repeated primary-loop events in the same scenario.",
+                    provenanceSummary: "Derived from repeated structured events in the same scenario.",
                     promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 2)
                 )
             )
@@ -520,7 +649,7 @@ public enum BASMemoryDraftCompiler {
                     decayPolicyID: "slow",
                     retrievalTags: ["night", "late", "fatigue", "support"],
                     evidenceCount: lateNightEvents.count,
-                    provenanceSummary: "Derived from repeated late-night primary-loop history.",
+                    provenanceSummary: "Derived from repeated late-night structured interaction history.",
                     promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
                 )
             )
@@ -542,7 +671,7 @@ public enum BASMemoryDraftCompiler {
             .compactMap { actionID, events in
                 guard let first = events.first else { return nil }
                 let configured = behavior.supportActionsByID[actionID]
-                let headline = configured?.headline ?? "\(first.actionTitle) tends to help in repeated loops."
+                let headline = configured?.headline ?? "\(first.actionTitle) has repeatedly helped stabilize this situation."
                 let tags = configured?.tags ?? (behavior.fallbackSupportTags + [actionID])
                 let provenanceSummary = configured?.provenanceSummary ?? behavior.fallbackSupportProvenanceSummary
 
@@ -562,6 +691,20 @@ public enum BASMemoryDraftCompiler {
                     provenanceSummary: provenanceSummary,
                     promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 2)
                 )
+            }
+    }
+
+    private static func firstWorkspace(
+        in records: [BASWorkspaceMemoryInput],
+        matching workflowIDs: [String]
+    ) -> BASWorkspaceMemoryInput? {
+        records
+            .filter { workflowIDs.contains($0.workflowID) }
+            .max { lhs, rhs in
+                if lhs.updatedAt == rhs.updatedAt {
+                    return lhs.workflowID < rhs.workflowID
+                }
+                return lhs.updatedAt < rhs.updatedAt
             }
     }
 

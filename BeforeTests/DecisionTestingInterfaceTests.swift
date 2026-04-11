@@ -432,6 +432,7 @@ struct DecisionTestingInterfaceTests {
                     boundaryNamingBias: 0.28,
                     tradeoffClarityBias: 0.33
                 ),
+                identityProfile: BeforeProductLanguage.identityProfile(for: .quick),
                 memoryGovernance: DecisionMemoryGovernanceState(
                     totalRecordCount: 6,
                     totalCandidateCount: 3,

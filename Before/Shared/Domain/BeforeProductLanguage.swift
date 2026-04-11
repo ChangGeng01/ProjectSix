@@ -97,7 +97,84 @@ enum BeforeProductLanguage {
         )
     )
 
+    static let referencePromptBehavior = BASReferencePromptBehavior(
+        presentationBehavior: BASPromptPresentationBehavior(
+            sharedPrelude: """
+            You are the language rendering layer for Before.
+            Before owns state, routing, safety, verdicts, and actions.
+            You only tighten wording or select from provided options.
+            Keep the tone calm, short, and non-shaming.
+            """,
+            adaptivePrefixByKindID: [
+                BASSemanticTaskKind.quick.rawValue: """
+                Rewrite only the two perspective lines.
+                Keep the same meaning and do not change verdicts or actions.
+                """,
+                BASSemanticTaskKind.balance.rawValue: """
+                Tighten the board without inventing new facts or turning it into a verdict.
+                Preserve the same focus and next-step intent.
+                """,
+                BASSemanticTaskKind.mirror.rawValue: """
+                Clarify the reflective pass without becoming dramatic, therapeutic, or yes-no.
+                Preserve the same tension and reflective next move.
+                """,
+                BASSemanticTaskKind.reminder.rawValue: """
+                Pick one existing reminder that best matches the current state.
+                Do not rewrite or invent reminder text.
+                """
+            ]
+        ),
+        frontstageBehavior: BASFrontstagePresentationBehavior(
+            focusGoalsByKindID: [
+                BASAdaptiveTraceKind.quick.rawValue: "Interrupt the automatic reaction before it locks in.",
+                BASAdaptiveTraceKind.balance.rawValue: "Surface the real trade-off before choosing a side.",
+                BASAdaptiveTraceKind.mirror.rawValue: "Name the core tension without forcing a yes-no answer.",
+                BASAdaptiveTraceKind.reminder.rawValue: "Pick the one reminder that best fits the current state."
+            ],
+            baseEvidenceCountByKindID: [
+                BASAdaptiveTraceKind.quick.rawValue: 2,
+                BASAdaptiveTraceKind.balance.rawValue: 1,
+                BASAdaptiveTraceKind.mirror.rawValue: 1,
+                BASAdaptiveTraceKind.reminder.rawValue: 0
+            ],
+            lowGearEvidenceClampByKindID: [
+                BASAdaptiveTraceKind.quick.rawValue: 1
+            ],
+            contextRebuiltSignal: "Session rebuild",
+            staleFieldsSignal: "Stale fields dropped",
+            filteredEvidenceSignal: "Evidence filtered",
+            trimmedEvidenceSignal: "Frontstage trimmed"
+        ),
+        outputGuardsByKindID: [
+            BASSemanticTaskKind.quick.rawValue: [
+                "Rewrite only the current and after perspective lines.",
+                "Keep the same meaning and emotional direction.",
+                "Do not change the verdict, actions, or scenario."
+            ],
+            BASSemanticTaskKind.balance.rawValue: [
+                "Keep the same focus and next step.",
+                "Do not invent facts or force a verdict.",
+                "Tighten language only."
+            ],
+            BASSemanticTaskKind.mirror.rawValue: [
+                "Clarify the mirror without giving a yes-no answer.",
+                "Keep the tone restrained, reflective, and non-therapeutic.",
+                "Preserve the same core tension and next reflective move."
+            ],
+            BASSemanticTaskKind.reminder.rawValue: [
+                "Choose exactly one candidate index from the provided evidence.",
+                "Do not rewrite, combine, or invent reminder text.",
+                "Prefer the reminder that most directly matches the current state."
+            ]
+        ]
+    )
+
     static let workflowBehavior = BASHostWorkflowBehaviorConfiguration(
+        modeIDsByProfileID: [
+            BASHostWorkflowProfile.rapid.rawValue: DecisionMode.quick.substrateModeID,
+            BASHostWorkflowProfile.deliberate.rawValue: DecisionMode.balance.substrateModeID,
+            BASHostWorkflowProfile.reflective.rawValue: DecisionMode.mirror.substrateModeID
+        ],
         templateIDsByProfileID: [
             BASHostWorkflowProfile.rapid.rawValue: ["before.template.quick-judgment"],
             BASHostWorkflowProfile.deliberate.rawValue: ["before.template.balance-board"],
@@ -113,6 +190,22 @@ enum BeforeProductLanguage {
             BASHostWorkflowProfile.deliberate.rawValue: "full",
             BASHostWorkflowProfile.reflective.rawValue: "full"
         ],
+        memorySourceIDsBySessionKindID: [
+            BASHostSessionKind.ambient.rawValue: BASMemorySource.reminder.rawValue,
+            BASHostSessionKind.reopen.rawValue: BASMemorySource.reminder.rawValue,
+            BASHostSessionKind.notification.rawValue: BASMemorySource.reminder.rawValue
+        ],
+        retrievalModeIDsBySessionKindID: [
+            BASHostSessionKind.ambient.rawValue: "guarded",
+            BASHostSessionKind.reopen.rawValue: "full",
+            BASHostSessionKind.handoff.rawValue: "compact",
+            BASHostSessionKind.widget.rawValue: "compact",
+            BASHostSessionKind.notification.rawValue: "guarded"
+        ],
+        failureGuardIDsByRiskLevelID: [
+            BASHostRiskLevel.medium.rawValue: ["before.guard/slow-pass"],
+            BASHostRiskLevel.high.rawValue: ["before.guard/high-risk-delay"]
+        ],
         hostNamespace: "before"
     )
 
@@ -126,7 +219,218 @@ enum BeforeProductLanguage {
             BASHostWorkflowProfile.rapid.rawValue: identityProfile(for: .quick),
             BASHostWorkflowProfile.deliberate.rawValue: identityProfile(for: .balance),
             BASHostWorkflowProfile.reflective.rawValue: identityProfile(for: .mirror)
-        ]
+        ],
+        substrateBehavior: BASCognitionBehavior(
+            surfaceIdentityOverlaysBySurfaceID: [
+                BASInteractionSurface.notification.rawValue: BASIdentityProfileOverlay(
+                    role: .predictiveSentinel,
+                    posture: .coaching,
+                    initiative: .guided,
+                    confidenceCeiling: 0.58,
+                    canAdvise: true,
+                    canExecuteActions: false,
+                    canEscalateToCloud: false,
+                    relationshipBoundary: "Interrupt momentum, but do not overtake the user's agency."
+                ),
+                BASInteractionSurface.watch.rawValue: BASIdentityProfileOverlay(
+                    role: .pauseCompanion,
+                    initiative: .guided,
+                    confidenceCeiling: 0.64,
+                    canAdvise: true,
+                    canExecuteActions: false,
+                    canEscalateToCloud: false,
+                    relationshipBoundary: "Keep the watch surface lightweight, interruptive, and local."
+                )
+            ],
+            highRiskIdentityOverlay: BASIdentityProfileOverlay(
+                posture: .protective,
+                confidenceCeiling: 0.66,
+                canAdvise: true,
+                canExecuteActions: false,
+                canEscalateToCloud: false,
+                relationshipBoundary: "Slow the decision down before offering any stronger interpretation."
+            ),
+            highRiskInitiativeByRoleID: [
+                BASIdentityRole.mirrorWitness.rawValue: .guided
+            ],
+            boundary: BASBoundaryEvaluationBehavior(
+                defaultAllowedActionClasses: ["render_local_guidance", "load_governed_memory"],
+                defaultBlockedActionClasses: ["cloud_escalation", "autonomous_external_action"],
+                defaultConstraints: [
+                    .noCloudEscalation,
+                    .noAutonomousExternalAction,
+                    .lockSensitiveMemory,
+                    .roleLimitedAdvice
+                ],
+                allowedActionClassesBySurfaceID: [
+                    BASInteractionSurface.watch.rawValue: ["quick_capture"]
+                ],
+                blockedActionClassesBySurfaceID: [
+                    BASInteractionSurface.watch.rawValue: ["deep_editor_surface"],
+                    BASInteractionSurface.notification.rawValue: ["high_frequency_nudge"]
+                ],
+                constraintsBySurfaceID: [
+                    BASInteractionSurface.watch.rawValue: [.watchSurfaceLightweight],
+                    BASInteractionSurface.notification.rawValue: [.notificationRequiresEvidence]
+                ],
+                highRiskRequiredConfirmations: ["irreversible_decision"],
+                highRiskBlockedActionClasses: ["fast_commit_action"],
+                reflectiveModeIDs: [DecisionMode.balance.substrateModeID],
+                advisoryHeadline: "Guide locally with bounded advice and no autonomous moves.",
+                reflectiveHeadline: "Reflect locally and avoid pushing the decision over the line.",
+                protectiveHeadline: "Stay local, add friction, and require confirmation before irreversible movement."
+            ),
+            sessionBias: BASSessionBiasBehavior(
+                defaultBiasesByModeID: [
+                    DecisionMode.quick.substrateModeID: ["Interrupt the loop before explaining too much."],
+                    DecisionMode.balance.substrateModeID: ["Keep the trade-off explicit and bounded."],
+                    DecisionMode.mirror.substrateModeID: ["Name the tension before suggesting anything."]
+                ],
+                briefLanguageSignals: ["short", "direct"],
+                nightBias: "Avoid heavy, high-friction guidance late at night.",
+                nightLowLoadBias: "Keep the cognitive load light right now.",
+                lowCognitiveLoadSignals: [
+                    "lighter, shorter guidance",
+                    "late sessions need lighter"
+                ],
+                interruptiveActionSignals: [
+                    "tomorrow box",
+                    "pause",
+                    "trigger",
+                    "step away"
+                ],
+                interruptiveActionBias: "Favor interruptive next steps over extra analysis.",
+                boundaryNamingSignals: [
+                    "shrinking",
+                    "boundary",
+                    "cost",
+                    "relationship"
+                ],
+                boundaryNamingBias: "Name the real boundary before softening it.",
+                tradeoffClaritySignals: [
+                    "tradeoff",
+                    "constraint",
+                    "trade-off",
+                    "cash versus",
+                    "protect sleep"
+                ],
+                tradeoffClarityBias: "Keep the trade-off explicit before polishing the language."
+            ),
+            brainCompilation: BASBrainCompilationBehavior(
+                ignoredRetrievalTags: [
+                    BASDecisionMode.primaryID,
+                    BASDecisionMode.comparativeID,
+                    BASDecisionMode.reflectiveID,
+                    "quick",
+                    "balance",
+                    "mirror",
+                    "recent",
+                    "goal",
+                    "long_term",
+                    "pattern",
+                    "repeat"
+                ],
+                interruptiveActionIDs: [
+                    "wait90s",
+                    "leaveStimulus",
+                    "decideTomorrow"
+                ],
+                proceedActionIDs: [
+                    "goAheadAnyway",
+                    "continueMindfully"
+                ],
+                positiveReflectionOutcomeIDs: [
+                    "betterThanExpected",
+                    "okay",
+                    "notNeeded"
+                ],
+                negativeReflectionOutcomeIDs: [
+                    "regrettedIt",
+                    "feltEmptier"
+                ]
+            )
+        )
+    )
+
+    static let hostLifecycleBehavior = BASHostLifecycleBehaviorConfiguration(
+        bootstrapBehavior: BASAppleLifecycleBootstrapBehavior(
+            actionsByPhaseID: [
+                BASAppleLifecycleBootstrapPhase.initialAppearance.rawValue: [
+                    BASAppleLifecycleBootstrapAction(kind: .refreshMemoryProjection),
+                    BASAppleLifecycleBootstrapAction(
+                        kind: .refreshCurrentBrain,
+                        bootstrapTriggerID: BASCurrentBrainBootstrapTrigger.launch.rawValue
+                    ),
+                    BASAppleLifecycleBootstrapAction(kind: .presentPendingReflection),
+                    BASAppleLifecycleBootstrapAction(kind: .consumePendingLaunchRequest),
+                    BASAppleLifecycleBootstrapAction(kind: .restoreActiveWorkspace),
+                    BASAppleLifecycleBootstrapAction(kind: .refreshPredictedIntervention),
+                    BASAppleLifecycleBootstrapAction(kind: .syncWidgetSnapshot)
+                ],
+                BASAppleLifecycleBootstrapPhase.sceneActive.rawValue: [
+                    BASAppleLifecycleBootstrapAction(kind: .refreshMemoryProjection),
+                    BASAppleLifecycleBootstrapAction(
+                        kind: .refreshCurrentBrain,
+                        bootstrapTriggerID: BASCurrentBrainBootstrapTrigger.sceneActive.rawValue
+                    ),
+                    BASAppleLifecycleBootstrapAction(kind: .presentPendingReflection),
+                    BASAppleLifecycleBootstrapAction(kind: .consumePendingLaunchRequest),
+                    BASAppleLifecycleBootstrapAction(kind: .restoreActiveWorkspace),
+                    BASAppleLifecycleBootstrapAction(kind: .refreshPredictedIntervention)
+                ]
+            ],
+            activeRefreshDefaultModeID: DecisionMode.quick.substrateModeID,
+            activeRefreshDefaultRetrievalModeID: BASRetrievalMode.adaptive.rawValue
+        ),
+        currentBrainBootstrapBehavior: BASCurrentBrainBootstrapBehavior(
+            defaultSourceSurfaceID: BASInteractionSurface.app.rawValue,
+            sourceSurfaceOverridesByTriggerID: [
+                BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue: BASInteractionSurface.watch.rawValue,
+                BASCurrentBrainBootstrapTrigger.notification.rawValue: BASInteractionSurface.notification.rawValue,
+                BASCurrentBrainBootstrapTrigger.widget.rawValue: BASInteractionSurface.widget.rawValue
+            ],
+            enforcedSourceSurfaceByTriggerID: [
+                BASCurrentBrainBootstrapTrigger.notification.rawValue: BASInteractionSurface.notification.rawValue
+            ],
+            defaultMemorySourceID: BASMemorySource.history.rawValue,
+            memorySourceOverridesByTriggerID: [
+                BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue: BASMemorySource.reminder.rawValue,
+                BASCurrentBrainBootstrapTrigger.notification.rawValue: BASMemorySource.reminder.rawValue,
+                BASCurrentBrainBootstrapTrigger.widget.rawValue: BASMemorySource.reminder.rawValue,
+                BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue: BASMemorySource.pattern.rawValue,
+                BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue: BASMemorySource.pattern.rawValue
+            ],
+            memorySourceOverridesByModeID: [
+                DecisionMode.mirror.substrateModeID: BASMemorySource.reflection.rawValue,
+                "mirror": BASMemorySource.reflection.rawValue
+            ],
+            bootstrapAdvisorBehavior: BASBrainBootstrapAdvisorBehavior(
+                highRiskSignalGroups: [
+                    ["message", "reply", "text", "send", "dm"],
+                    ["buy", "purchase", "spend", "checkout", "cart"]
+                ],
+                nightFallbackRiskLevelByModeID: [
+                    DecisionMode.quick.substrateModeID: BASRiskLevel.medium.rawValue,
+                    DecisionMode.balance.substrateModeID: BASRiskLevel.high.rawValue,
+                    DecisionMode.mirror.substrateModeID: BASRiskLevel.high.rawValue,
+                    "quick": BASRiskLevel.medium.rawValue,
+                    "balance": BASRiskLevel.high.rawValue,
+                    "mirror": BASRiskLevel.high.rawValue
+                ],
+                defaultRiskLevelByModeID: [
+                    DecisionMode.mirror.substrateModeID: BASRiskLevel.medium.rawValue,
+                    "mirror": BASRiskLevel.medium.rawValue
+                ]
+            )
+        ),
+        predictiveInterventionBehavior: predictiveInterventionBehavior,
+        projectionRefreshLimits: BASAppleMemoryProjectionRefreshLimits(
+            recordLimit: 72,
+            candidateLimit: 32,
+            checkEventLimit: 96,
+            comparativeRecordLimit: 36,
+            reflectiveRecordLimit: 36
+        )
     )
 
     static let memoryDerivationBehavior = BASMemoryDerivationBehavior(
@@ -152,6 +456,14 @@ enum BeforeProductLanguage {
             provenanceSummary: "Candidate memory staged from the latest reflective workspace.",
             baseTags: ["mirror", "recent"]
         ),
+        comparativeWorkspaceIDs: [
+            DecisionMode.balance.substrateModeID,
+            "balance"
+        ],
+        reflectiveWorkspaceIDs: [
+            DecisionMode.mirror.substrateModeID,
+            "mirror"
+        ],
         supportActionsByID: [
             "decideTomorrow": BASSupportActionDraftBehavior(
                 headline: "Holding the decision often breaks the loop.",
@@ -181,6 +493,35 @@ enum BeforeProductLanguage {
         ],
         fallbackSupportTags: ["support", "before", "action_pattern"],
         fallbackSupportProvenanceSummary: "Derived from repeated successful primary-loop final actions."
+    )
+
+    static let predictiveInterventionBehavior = BASApplePredictiveInterventionBehavior(
+        lowRisk: BASApplePredictiveInterventionRiskBehavior(
+            title: "Put this out of the fast lane.",
+            detail: "A short delay may be enough. Put it into a holding lane instead of forcing a decision right now.",
+            preferredModeID: DecisionMode.quick.substrateModeID
+        ),
+        mediumRisk: BASApplePredictiveInterventionRiskBehavior(
+            title: "You may need one cleaner reflective pass before acting.",
+            detail: "Recent patterns suggest a pause plus one honest question will help more than a fast answer.",
+            preferredModeID: DecisionMode.mirror.substrateModeID
+        ),
+        highRisk: BASApplePredictiveInterventionRiskBehavior(
+            title: "Do not decide from this level of blur.",
+            detail: "Night pressure and recent regret patterns suggest slowing this down before you move.",
+            preferredModeID: DecisionMode.mirror.substrateModeID
+        ),
+        preferredModeIDsByCurrentModeID: [
+            DecisionMode.mirror.substrateModeID: DecisionMode.mirror.substrateModeID
+        ],
+        mediumRiskNegativeRecentThreshold: 1,
+        highRiskNegativeRecentThreshold: 2,
+        nightWindowReason: "It is late enough that fast decisions are less trustworthy.",
+        negativeRecentReason: "Recent fast-path decisions have ended in regret or emptiness.",
+        failureGuardReasonsByID: [
+            "night_fast_path_failure": "Your current brain state is already suppressing night fast paths."
+        ],
+        defaultReason: "A low-friction pause is still the cleanest move."
     )
 
     static func reactionWeights(for mode: DecisionMode) -> BASReactionWeights {

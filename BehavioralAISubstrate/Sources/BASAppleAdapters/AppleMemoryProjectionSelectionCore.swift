@@ -72,20 +72,62 @@ public enum BASAppleMemoryProjectionSelectionAdapter {
         return Array(candidates.prefix(limit))
     }
 
+    public static func fetchProjectionTemporalEntries<Entry: PersistentModel>(
+        in context: ModelContext,
+        entryType: Entry.Type,
+        limit: Int? = nil,
+        timestamp: (Entry) -> Date,
+        stableID: (Entry) -> String = { String(describing: $0.persistentModelID) }
+    ) -> [Entry] {
+        let entries = ((try? context.fetch(FetchDescriptor<Entry>())) ?? [])
+            .sorted { lhs, rhs in
+                if timestamp(lhs) == timestamp(rhs) {
+                    return stableID(lhs) < stableID(rhs)
+                }
+                return timestamp(lhs) > timestamp(rhs)
+            }
+        guard let limit else { return entries }
+        return Array(entries.prefix(limit))
+    }
+
     public static func fetchProjectionCheckEvents<Event: BASAppleCheckEventMemoryEntity>(
         in context: ModelContext,
         eventType: Event.Type,
         limit: Int? = nil
     ) -> [Event] {
-        let events = ((try? context.fetch(FetchDescriptor<Event>())) ?? [])
-            .sorted { lhs, rhs in
-                if lhs.basCheckEventMemoryInput.createdAt == rhs.basCheckEventMemoryInput.createdAt {
-                    return lhs.persistentModelID.hashValue < rhs.persistentModelID.hashValue
-                }
-                return lhs.basCheckEventMemoryInput.createdAt > rhs.basCheckEventMemoryInput.createdAt
-            }
-        guard let limit else { return events }
-        return Array(events.prefix(limit))
+        fetchProjectionTemporalEntries(
+            in: context,
+            entryType: eventType,
+            limit: limit,
+            timestamp: { $0.basCheckEventMemoryInput.createdAt },
+            stableID: { $0.basCheckEventMemoryInput.id }
+        )
+    }
+
+    public static func fetchProjectionComparativeRecords<Comparative: BASAppleComparativeMemoryEntity>(
+        in context: ModelContext,
+        comparativeType: Comparative.Type,
+        limit: Int? = nil
+    ) -> [Comparative] {
+        fetchProjectionTemporalEntries(
+            in: context,
+            entryType: comparativeType,
+            limit: limit,
+            timestamp: { $0.basComparativeMemoryInput.updatedAt }
+        )
+    }
+
+    public static func fetchProjectionReflectiveRecords<Reflective: BASAppleReflectiveMemoryEntity>(
+        in context: ModelContext,
+        reflectiveType: Reflective.Type,
+        limit: Int? = nil
+    ) -> [Reflective] {
+        fetchProjectionTemporalEntries(
+            in: context,
+            entryType: reflectiveType,
+            limit: limit,
+            timestamp: { $0.basReflectiveMemoryInput.updatedAt }
+        )
     }
 
     public static func fetchProjectionBalanceRecords<Balance: BASAppleBalanceMemoryEntity>(
@@ -93,15 +135,11 @@ public enum BASAppleMemoryProjectionSelectionAdapter {
         balanceType: Balance.Type,
         limit: Int? = nil
     ) -> [Balance] {
-        let records = ((try? context.fetch(FetchDescriptor<Balance>())) ?? [])
-            .sorted { lhs, rhs in
-                if lhs.basBalanceMemoryInput.updatedAt == rhs.basBalanceMemoryInput.updatedAt {
-                    return lhs.persistentModelID.hashValue < rhs.persistentModelID.hashValue
-                }
-                return lhs.basBalanceMemoryInput.updatedAt > rhs.basBalanceMemoryInput.updatedAt
-            }
-        guard let limit else { return records }
-        return Array(records.prefix(limit))
+        fetchProjectionComparativeRecords(
+            in: context,
+            comparativeType: balanceType,
+            limit: limit
+        )
     }
 
     public static func fetchProjectionMirrorRecords<Mirror: BASAppleMirrorMemoryEntity>(
@@ -109,14 +147,10 @@ public enum BASAppleMemoryProjectionSelectionAdapter {
         mirrorType: Mirror.Type,
         limit: Int? = nil
     ) -> [Mirror] {
-        let records = ((try? context.fetch(FetchDescriptor<Mirror>())) ?? [])
-            .sorted { lhs, rhs in
-                if lhs.basMirrorMemoryInput.updatedAt == rhs.basMirrorMemoryInput.updatedAt {
-                    return lhs.persistentModelID.hashValue < rhs.persistentModelID.hashValue
-                }
-                return lhs.basMirrorMemoryInput.updatedAt > rhs.basMirrorMemoryInput.updatedAt
-            }
-        guard let limit else { return records }
-        return Array(records.prefix(limit))
+        fetchProjectionReflectiveRecords(
+            in: context,
+            reflectiveType: mirrorType,
+            limit: limit
+        )
     }
 }

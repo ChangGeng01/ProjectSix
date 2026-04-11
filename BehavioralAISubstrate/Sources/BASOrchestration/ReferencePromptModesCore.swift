@@ -53,6 +53,111 @@ public enum BASReferencePromptLimits {
     public static let evidenceSnippet = 180
 }
 
+public struct BASReferencePromptBehavior: Codable, Equatable, Sendable {
+    public var presentationBehavior: BASPromptPresentationBehavior
+    public var frontstageBehavior: BASFrontstagePresentationBehavior
+    public var outputGuardsByKindID: [String: [String]]
+    public var targetCharactersByKindID: [String: Int]
+
+    public init(
+        presentationBehavior: BASPromptPresentationBehavior = .generic,
+        frontstageBehavior: BASFrontstagePresentationBehavior = .generic,
+        outputGuardsByKindID: [String: [String]] = [
+            BASSemanticTaskKind.quick.rawValue: [
+                "Refine only the supplied paired perspective fields.",
+                "Keep the same decision frame, actions, and emotional direction.",
+                "Do not add new facts or emotional escalation."
+            ],
+            BASSemanticTaskKind.balance.rawValue: [
+                "Keep the same comparison frame, focus, and next step.",
+                "Do not invent facts or force a verdict.",
+                "Tighten language only."
+            ],
+            BASSemanticTaskKind.mirror.rawValue: [
+                "Clarify the supplied reflective fields without turning them into a verdict.",
+                "Keep the tone restrained and non-clinical.",
+                "Preserve the same tension and next reflective move."
+            ],
+            BASSemanticTaskKind.reminder.rawValue: [
+                "Choose exactly one candidate index from the supplied evidence.",
+                "Do not rewrite, combine, or invent candidate text.",
+                "Prefer the candidate that most directly matches the current state."
+            ]
+        ],
+        targetCharactersByKindID: [String: Int] = [
+            BASSemanticTaskKind.quick.rawValue: 1_500,
+            BASSemanticTaskKind.balance.rawValue: 2_150,
+            BASSemanticTaskKind.mirror.rawValue: 1_700,
+            BASSemanticTaskKind.reminder.rawValue: 1_250
+        ]
+    ) {
+        self.presentationBehavior = presentationBehavior
+        self.frontstageBehavior = frontstageBehavior
+        self.outputGuardsByKindID = outputGuardsByKindID
+        self.targetCharactersByKindID = targetCharactersByKindID
+    }
+
+    public static let generic = BASReferencePromptBehavior()
+
+    public func outputGuard(
+        for kind: BASSemanticTaskKind
+    ) -> [String] {
+        outputGuardsByKindID[kind.rawValue, default: fallbackOutputGuard(for: kind)]
+    }
+
+    public func targetCharacters(
+        for kind: BASSemanticTaskKind
+    ) -> Int {
+        targetCharactersByKindID[kind.rawValue, default: fallbackTargetCharacters(for: kind)]
+    }
+
+    private func fallbackOutputGuard(
+        for kind: BASSemanticTaskKind
+    ) -> [String] {
+        switch kind {
+        case .quick:
+            [
+                "Refine only the supplied paired perspective fields.",
+                "Keep the same decision frame, actions, and emotional direction.",
+                "Do not add new facts or emotional escalation."
+            ]
+        case .balance:
+            [
+                "Keep the same comparison frame, focus, and next step.",
+                "Do not invent facts or force a verdict.",
+                "Tighten language only."
+            ]
+        case .mirror:
+            [
+                "Clarify the supplied reflective fields without turning them into a verdict.",
+                "Keep the tone restrained and non-clinical.",
+                "Preserve the same tension and next reflective move."
+            ]
+        case .reminder:
+            [
+                "Choose exactly one candidate index from the supplied evidence.",
+                "Do not rewrite, combine, or invent candidate text.",
+                "Prefer the candidate that most directly matches the current state."
+            ]
+        }
+    }
+
+    private func fallbackTargetCharacters(
+        for kind: BASSemanticTaskKind
+    ) -> Int {
+        switch kind {
+        case .quick:
+            1_500
+        case .balance:
+            2_150
+        case .mirror:
+            1_700
+        case .reminder:
+            1_250
+        }
+    }
+}
+
 public struct BASQuickRefinementPromptRequest<Kind: Equatable & Sendable>: Sendable, Equatable {
     public var kind: Kind
     public var modeTitle: String
@@ -260,7 +365,8 @@ public struct BASReminderSelectionPromptRequest<Kind: Equatable & Sendable>: Sen
 
 public enum BASReferencePromptBuilder {
     public static func quickEnvelope<Kind: Equatable & Sendable>(
-        _ request: BASQuickRefinementPromptRequest<Kind>
+        _ request: BASQuickRefinementPromptRequest<Kind>,
+        behavior: BASReferencePromptBehavior = .generic
     ) -> BASPromptEnvelope<Kind, BASFrontstageState> {
         compile(
             kind: request.kind,
@@ -281,23 +387,22 @@ public enum BASReferencePromptBuilder {
                 "Primary action: \(request.primaryActionTitle)",
                 secondaryActionEvidence(request.secondaryActionTitles)
             ],
-            outputGuard: [
-                "Rewrite only the current and after perspective lines.",
-                "Keep the same meaning and emotional direction.",
-                "Do not change the verdict, actions, or scenario."
-            ],
+            outputGuard: behavior.outputGuard(for: .quick),
             openTextSignalCount: nonEmptySignalCount([request.note]),
-            targetCharacters: 1_500,
+            targetCharacters: behavior.targetCharacters(for: .quick),
             providerIdentifier: request.providerIdentifier,
             strategy: request.strategy,
             contextLifecycleSnapshot: request.contextLifecycleSnapshot,
             neuralSnapshot: request.neuralSnapshot,
-            brainState: request.brainState
+            brainState: request.brainState,
+            presentationBehavior: behavior.presentationBehavior,
+            frontstageBehavior: behavior.frontstageBehavior
         )
     }
 
     public static func balanceEnvelope<Kind: Equatable & Sendable>(
-        _ request: BASBalanceRefinementPromptRequest<Kind>
+        _ request: BASBalanceRefinementPromptRequest<Kind>,
+        behavior: BASReferencePromptBehavior = .generic
     ) -> BASPromptEnvelope<Kind, BASFrontstageState> {
         compile(
             kind: request.kind,
@@ -318,11 +423,7 @@ public enum BASReferencePromptBuilder {
                 "Focus description: \(evidenceValue(request.focusDescription, limit: BASReferencePromptLimits.evidenceSnippet))",
                 "Next action: \(evidenceValue(request.nextAction, limit: BASReferencePromptLimits.evidenceSnippet))"
             ],
-            outputGuard: [
-                "Keep the same focus and next step.",
-                "Do not invent facts or force a verdict.",
-                "Tighten language only."
-            ],
+            outputGuard: behavior.outputGuard(for: .balance),
             openTextSignalCount: nonEmptySignalCount([
                 request.prompt,
                 request.desire,
@@ -330,17 +431,20 @@ public enum BASReferencePromptBuilder {
                 request.constraint,
                 request.longTerm
             ]),
-            targetCharacters: 2_050,
+            targetCharacters: behavior.targetCharacters(for: .balance),
             providerIdentifier: request.providerIdentifier,
             strategy: request.strategy,
             contextLifecycleSnapshot: request.contextLifecycleSnapshot,
             neuralSnapshot: request.neuralSnapshot,
-            brainState: request.brainState
+            brainState: request.brainState,
+            presentationBehavior: behavior.presentationBehavior,
+            frontstageBehavior: behavior.frontstageBehavior
         )
     }
 
     public static func mirrorEnvelope<Kind: Equatable & Sendable>(
-        _ request: BASMirrorRefinementPromptRequest<Kind>
+        _ request: BASMirrorRefinementPromptRequest<Kind>,
+        behavior: BASReferencePromptBehavior = .generic
     ) -> BASPromptEnvelope<Kind, BASFrontstageState> {
         compile(
             kind: request.kind,
@@ -361,11 +465,7 @@ public enum BASReferencePromptBuilder {
                 "Next action title: \(evidenceValue(request.nextActionTitle, limit: BASReferencePromptLimits.evidenceSnippet))",
                 "Next action: \(evidenceValue(request.nextAction, limit: BASReferencePromptLimits.evidenceSnippet))"
             ],
-            outputGuard: [
-                "Clarify the mirror without giving a yes-no answer.",
-                "Keep the tone restrained, reflective, and non-therapeutic.",
-                "Preserve the same core tension and next reflective move."
-            ],
+            outputGuard: behavior.outputGuard(for: .mirror),
             openTextSignalCount: nonEmptySignalCount([
                 request.prompt,
                 request.emotion,
@@ -374,17 +474,20 @@ public enum BASReferencePromptBuilder {
                 request.longTerm,
                 request.selfLens
             ]),
-            targetCharacters: 1_700,
+            targetCharacters: behavior.targetCharacters(for: .mirror),
             providerIdentifier: request.providerIdentifier,
             strategy: request.strategy,
             contextLifecycleSnapshot: request.contextLifecycleSnapshot,
             neuralSnapshot: request.neuralSnapshot,
-            brainState: request.brainState
+            brainState: request.brainState,
+            presentationBehavior: behavior.presentationBehavior,
+            frontstageBehavior: behavior.frontstageBehavior
         )
     }
 
     public static func reminderEnvelope<Kind: Equatable & Sendable>(
-        _ request: BASReminderSelectionPromptRequest<Kind>
+        _ request: BASReminderSelectionPromptRequest<Kind>,
+        behavior: BASReferencePromptBehavior = .generic
     ) -> BASPromptEnvelope<Kind, BASFrontstageState> {
         let clippedCandidateTexts = Array(request.candidateTexts.prefix(BASReferencePromptLimits.reminderCandidates))
         return compile(
@@ -400,13 +503,9 @@ public enum BASReferencePromptBuilder {
             evidence: clippedCandidateTexts.enumerated().map { index, candidate in
                 "\(index): \(BASPromptTextSanitizer.sanitized(candidate, fallback: candidate, limit: BASReferencePromptLimits.reminderCandidateLength))"
             },
-            outputGuard: [
-                "Choose exactly one candidate index from the provided evidence.",
-                "Do not rewrite, combine, or invent reminder text.",
-                "Prefer the reminder that most directly matches the current state."
-            ],
+            outputGuard: behavior.outputGuard(for: .reminder),
             openTextSignalCount: nonEmptySignalCount([request.prompt]),
-            targetCharacters: 1_250,
+            targetCharacters: behavior.targetCharacters(for: .reminder),
             providerIdentifier: request.providerIdentifier,
             strategy: request.strategy,
             structuredTruthOverride: BASStructuredTruthCompiler.truthState(
@@ -416,7 +515,9 @@ public enum BASReferencePromptBuilder {
                     reminderSurfaceMode: request.reminderSurfaceMode
                 )
             ),
-            includeStructuredTruthBlock: false
+            includeStructuredTruthBlock: false,
+            presentationBehavior: behavior.presentationBehavior,
+            frontstageBehavior: behavior.frontstageBehavior
         )
     }
 
@@ -435,13 +536,17 @@ public enum BASReferencePromptBuilder {
         neuralSnapshot: BASPromptNeuralSnapshot? = nil,
         brainState: BASDecisionBrainState? = nil,
         structuredTruthOverride: BASStructuredTruthState? = nil,
-        includeStructuredTruthBlock: Bool = true
+        includeStructuredTruthBlock: Bool = true,
+        presentationBehavior: BASPromptPresentationBehavior = .generic,
+        frontstageBehavior: BASFrontstagePresentationBehavior = .generic
     ) -> BASPromptEnvelope<Kind, BASFrontstageState> {
         BASPromptPreparationCompiler.compile(
             BASPromptPreparationRequest(
                 kind: kind,
                 semanticKind: semanticKind,
                 adaptiveKind: adaptiveKind,
+                presentationBehavior: presentationBehavior,
+                frontstageBehavior: frontstageBehavior,
                 taskState: state,
                 evidenceSnippets: evidence,
                 outputGuard: outputGuard,

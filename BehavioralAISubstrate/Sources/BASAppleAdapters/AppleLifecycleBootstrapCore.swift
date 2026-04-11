@@ -19,14 +19,39 @@ public enum BASAppleLifecycleBootstrapActionKind: String, Codable, Equatable, Se
 
 public struct BASAppleLifecycleBootstrapAction: Codable, Equatable, Sendable {
     public var kind: BASAppleLifecycleBootstrapActionKind
-    public var currentBrainTriggerID: String?
+    public var bootstrapTriggerID: String?
 
     public init(
         kind: BASAppleLifecycleBootstrapActionKind,
+        bootstrapTriggerID: String? = nil,
         currentBrainTriggerID: String? = nil
     ) {
         self.kind = kind
-        self.currentBrainTriggerID = currentBrainTriggerID
+        self.bootstrapTriggerID = bootstrapTriggerID ?? currentBrainTriggerID
+    }
+
+    public var currentBrainTriggerID: String? {
+        bootstrapTriggerID
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case kind
+        case bootstrapTriggerID
+        case currentBrainTriggerID
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try container.decode(BASAppleLifecycleBootstrapActionKind.self, forKey: .kind)
+        bootstrapTriggerID =
+            try container.decodeIfPresent(String.self, forKey: .bootstrapTriggerID) ??
+            container.decodeIfPresent(String.self, forKey: .currentBrainTriggerID)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(kind, forKey: .kind)
+        try container.encodeIfPresent(bootstrapTriggerID, forKey: .bootstrapTriggerID)
     }
 }
 
@@ -49,43 +74,58 @@ public struct BASAppleCurrentBrainRuntimePlan: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASAppleLifecycleBootstrapBehavior: Codable, Equatable, Sendable {
+    public static let generic = BASAppleLifecycleBootstrapBehavior()
+
+    public var actionsByPhaseID: [String: [BASAppleLifecycleBootstrapAction]]
+    public var activeRefreshDefaultModeID: String
+    public var activeRefreshDefaultRetrievalModeID: String
+
+    public init(
+        actionsByPhaseID: [String: [BASAppleLifecycleBootstrapAction]] = [
+            BASAppleLifecycleBootstrapPhase.initialAppearance.rawValue: [
+                BASAppleLifecycleBootstrapAction(kind: .refreshMemoryProjection),
+                BASAppleLifecycleBootstrapAction(
+                    kind: .refreshCurrentBrain,
+                    bootstrapTriggerID: BASCurrentBrainBootstrapTrigger.launch.rawValue
+                ),
+                BASAppleLifecycleBootstrapAction(kind: .consumePendingLaunchRequest)
+            ],
+            BASAppleLifecycleBootstrapPhase.sceneActive.rawValue: [
+                BASAppleLifecycleBootstrapAction(kind: .refreshMemoryProjection),
+                BASAppleLifecycleBootstrapAction(
+                    kind: .refreshCurrentBrain,
+                    bootstrapTriggerID: BASCurrentBrainBootstrapTrigger.sceneActive.rawValue
+                ),
+                BASAppleLifecycleBootstrapAction(kind: .consumePendingLaunchRequest)
+            ]
+        ],
+        activeRefreshDefaultModeID: String = BASDecisionMode.primaryID,
+        activeRefreshDefaultRetrievalModeID: String = BASRetrievalMode.adaptive.rawValue
+    ) {
+        self.actionsByPhaseID = actionsByPhaseID
+        self.activeRefreshDefaultModeID = activeRefreshDefaultModeID
+        self.activeRefreshDefaultRetrievalModeID = activeRefreshDefaultRetrievalModeID
+    }
+
+    public func actions(for phase: BASAppleLifecycleBootstrapPhase) -> [BASAppleLifecycleBootstrapAction] {
+        actionsByPhaseID[phase.rawValue, default: BASAppleLifecycleBootstrapBehavior.generic.actionsByPhaseID[phase.rawValue] ?? []]
+    }
+}
+
 public enum BASAppleLifecycleBootstrapPlanner {
     public static func actions(
-        for phase: BASAppleLifecycleBootstrapPhase
+        for phase: BASAppleLifecycleBootstrapPhase,
+        behavior: BASAppleLifecycleBootstrapBehavior = .generic
     ) -> [BASAppleLifecycleBootstrapAction] {
-        switch phase {
-        case .initialAppearance:
-            [
-                BASAppleLifecycleBootstrapAction(kind: .refreshMemoryProjection),
-                BASAppleLifecycleBootstrapAction(
-                    kind: .refreshCurrentBrain,
-                    currentBrainTriggerID: BASCurrentBrainBootstrapTrigger.launch.rawValue
-                ),
-                BASAppleLifecycleBootstrapAction(kind: .presentPendingReflection),
-                BASAppleLifecycleBootstrapAction(kind: .consumePendingLaunchRequest),
-                BASAppleLifecycleBootstrapAction(kind: .restoreActiveWorkspace),
-                BASAppleLifecycleBootstrapAction(kind: .refreshPredictedIntervention),
-                BASAppleLifecycleBootstrapAction(kind: .syncWidgetSnapshot)
-            ]
-        case .sceneActive:
-            [
-                BASAppleLifecycleBootstrapAction(kind: .refreshMemoryProjection),
-                BASAppleLifecycleBootstrapAction(
-                    kind: .refreshCurrentBrain,
-                    currentBrainTriggerID: BASCurrentBrainBootstrapTrigger.sceneActive.rawValue
-                ),
-                BASAppleLifecycleBootstrapAction(kind: .presentPendingReflection),
-                BASAppleLifecycleBootstrapAction(kind: .consumePendingLaunchRequest),
-                BASAppleLifecycleBootstrapAction(kind: .restoreActiveWorkspace),
-                BASAppleLifecycleBootstrapAction(kind: .refreshPredictedIntervention)
-            ]
-        }
+        behavior.actions(for: phase)
     }
 }
 
 public enum BASAppleLifecycleBootstrapExecutor {
     public static func execute(
         phase: BASAppleLifecycleBootstrapPhase,
+        behavior: BASAppleLifecycleBootstrapBehavior = .generic,
         refreshMemoryProjection: () -> Void,
         refreshCurrentBrain: (String) -> Void,
         presentPendingReflection: () -> Void,
@@ -94,13 +134,13 @@ public enum BASAppleLifecycleBootstrapExecutor {
         refreshPredictedIntervention: () -> Void,
         syncWidgetSnapshot: () -> Void = {}
     ) {
-        for action in BASAppleLifecycleBootstrapPlanner.actions(for: phase) {
+        for action in BASAppleLifecycleBootstrapPlanner.actions(for: phase, behavior: behavior) {
             switch action.kind {
             case .refreshMemoryProjection:
                 refreshMemoryProjection()
             case .refreshCurrentBrain:
                 refreshCurrentBrain(
-                    action.currentBrainTriggerID ?? BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue
+                    action.bootstrapTriggerID ?? BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue
                 )
             case .presentPendingReflection:
                 presentPendingReflection()
@@ -139,23 +179,22 @@ public enum BASAppleCurrentBrainRuntimePlanner {
         taskGraphPromptSeed: String?,
         retrievalModesByModeID: [String: String],
         triggerID: String = BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue,
-        defaultModeID: String = BASDecisionMode.quick.identifier,
-        defaultRetrievalMode: String = BASRetrievalMode.adaptive.rawValue
+        behavior: BASAppleLifecycleBootstrapBehavior = .generic
     ) -> BASAppleCurrentBrainRuntimePlan {
         let seed = BASAppleBootstrapStrategyAdapter.resolveActiveSessionSeed(
             promptFragmentsByModeID: promptFragmentsByModeID,
             modePriority: modePriority,
             taskGraphModeID: taskGraphModeID,
             taskGraphPromptSeed: taskGraphPromptSeed,
-            defaultModeID: defaultModeID
+            defaultModeID: behavior.activeRefreshDefaultModeID
         )
 
         return BASAppleCurrentBrainRuntimePlan(
             modeID: seed.modeID,
             promptSeed: seed.promptSeed,
             retrievalMode: retrievalModesByModeID[seed.modeID]
-                ?? retrievalModesByModeID[defaultModeID]
-                ?? defaultRetrievalMode,
+                ?? retrievalModesByModeID[behavior.activeRefreshDefaultModeID]
+                ?? behavior.activeRefreshDefaultRetrievalModeID,
             triggerID: triggerID
         )
     }
@@ -189,6 +228,7 @@ public enum BASAppleCurrentBrainRuntimeExecutor {
         taskGraphPromptSeed: String?,
         retrievalModesByModeID: [String: String],
         triggerID: String = BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue,
+        behavior: BASAppleLifecycleBootstrapBehavior = .generic,
         refreshMemoryProjection: () -> Void,
         bootstrapCurrentBrain: (BASAppleCurrentBrainRuntimePlan) -> CurrentBrain
     ) -> CurrentBrain {
@@ -200,7 +240,8 @@ public enum BASAppleCurrentBrainRuntimeExecutor {
                 taskGraphModeID: taskGraphModeID,
                 taskGraphPromptSeed: taskGraphPromptSeed,
                 retrievalModesByModeID: retrievalModesByModeID,
-                triggerID: triggerID
+                triggerID: triggerID,
+                behavior: behavior
             )
         )
     }

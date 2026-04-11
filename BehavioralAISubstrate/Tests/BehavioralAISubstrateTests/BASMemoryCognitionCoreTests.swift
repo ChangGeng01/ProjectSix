@@ -5,6 +5,28 @@ import BASRuntimeCore
 
 @Suite("BASMemory Cognition Core")
 struct BASMemoryCognitionCoreTests {
+    @Test("decision modes keep generic identifiers while tolerating legacy aliases")
+    func decisionModesExposeGenericAliases() {
+        #expect(BASDecisionMode.primary == .quick)
+        #expect(BASDecisionMode.comparative == .balance)
+        #expect(BASDecisionMode.reflective == .mirror)
+        #expect(BASDecisionMode.primary.identifier == BASDecisionMode.primaryID)
+        #expect(BASDecisionMode.primary.legacyIdentifier == "quick")
+        #expect(BASDecisionMode(identifier: BASDecisionMode.primaryID) == .primary)
+        #expect(BASDecisionMode(identifier: "balance") == .comparative)
+        #expect(BASDecisionMode(identifier: "mirror") == .reflective)
+    }
+
+    @Test("identity roles expose generic identifiers while accepting legacy aliases")
+    func identityRolesExposeGenericIdentifiers() {
+        #expect(BASIdentityRole.reflectiveWitness == .mirrorWitness)
+        #expect(BASIdentityRole.reflectiveWitness.identifier == "reflective_witness")
+        #expect(BASIdentityRole.pauseCompanion.identifier == "stability_guide")
+        #expect(BASIdentityRole(identifier: "reflective_witness") == .mirrorWitness)
+        #expect(BASIdentityRole(identifier: "mirror_witness") == .mirrorWitness)
+        #expect(BASIdentityRole(identifier: "comparative_guide") == .tradeoffGuide)
+    }
+
     @Test("brain bootstrap advisor infers higher risk for late-night impulse prompts")
     func brainBootstrapAdvisorInfersRiskLevel() {
         var components = DateComponents()
@@ -40,6 +62,50 @@ struct BASMemoryCognitionCoreTests {
         #expect(nightMessageRisk == .high)
         #expect(dayQuickRisk == .low)
         #expect(mirrorRisk == .medium)
+    }
+
+    @Test("brain bootstrap advisor lets hosts override risk heuristics")
+    func brainBootstrapAdvisorSupportsHostSpecificHeuristics() {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.timeZone = TimeZone.autoupdatingCurrent
+        components.year = 2026
+        components.month = 4
+        components.day = 10
+        components.hour = 23
+        components.minute = 30
+        let lateNight = components.date ?? .distantPast
+
+        let sampleHostBehavior = BASBrainBootstrapAdvisorBehavior(
+            highRiskSignalGroups: [
+                ["publish", "post"],
+                ["subscribe", "upgrade"]
+            ],
+            nightFallbackRiskLevelByModeID: [
+                BASDecisionMode.primaryID: BASRiskLevel.medium.rawValue,
+                BASDecisionMode.comparativeID: BASRiskLevel.medium.rawValue,
+                BASDecisionMode.reflectiveID: BASRiskLevel.high.rawValue
+            ],
+            defaultRiskLevelByModeID: [
+                BASDecisionMode.reflectiveID: BASRiskLevel.medium.rawValue
+            ]
+        )
+
+        let publishRisk = BASBrainBootstrapAdvisor.inferRiskLevel(
+            mode: .primary,
+            prompt: "I want to publish this right now.",
+            now: lateNight,
+            behavior: sampleHostBehavior
+        )
+        let deliberateNightRisk = BASBrainBootstrapAdvisor.inferRiskLevel(
+            mode: .comparative,
+            prompt: "Should I sit with this until morning?",
+            now: lateNight,
+            behavior: sampleHostBehavior
+        )
+
+        #expect(publishRisk == .high)
+        #expect(deliberateNightRisk == .medium)
     }
 
     @Test("brain bootstrap advisor orders templates and failure patterns deterministically")
@@ -348,8 +414,8 @@ struct BASMemoryCognitionCoreTests {
         #expect(brainState.memorySlices.contains(where: { $0.id == pendingTaggedCandidate.id }))
         #expect(!brainState.memorySlices.contains(where: { $0.id == screenedCandidate.id }))
         #expect(bootstrapped.dominantGoal == "prefer concise answers")
-        #expect(brainState.sessionBiases.contains("Name the real boundary before softening it."))
-        #expect(brainState.sessionBiases.contains(where: { $0.localizedCaseInsensitiveContains("late at night") }))
+        #expect(brainState.sessionBiases.contains("Name the active limit before reframing it."))
+        #expect(brainState.sessionBiases.contains(where: { $0.localizedCaseInsensitiveContains("lower-trust conditions") }))
     }
 
     @Test("brain compiler raises interruptive bias when pause paths are rewarded and proceed paths backfire")
@@ -418,6 +484,28 @@ struct BASMemoryCognitionCoreTests {
                 canEscalateToCloud: false,
                 relationshipBoundary: "Stabilize the moment without overstating certainty."
             ),
+            cognitionBehavior: BASCognitionBehavior(
+                brainCompilation: BASBrainCompilationBehavior(
+                    interruptiveActionIDs: [
+                        "wait90s",
+                        "leaveStimulus",
+                        "decideTomorrow"
+                    ],
+                    proceedActionIDs: [
+                        "goAheadAnyway",
+                        "continueMindfully"
+                    ],
+                    positiveReflectionOutcomeIDs: [
+                        "betterThanExpected",
+                        "okay",
+                        "notNeeded"
+                    ],
+                    negativeReflectionOutcomeIDs: [
+                        "regrettedIt",
+                        "feltEmptier"
+                    ]
+                )
+            ),
             now: Date(timeIntervalSince1970: 1_700_064_000)
         )
 
@@ -425,7 +513,7 @@ struct BASMemoryCognitionCoreTests {
 
         #expect(brainState.reactionWeights.interruptiveActionBias >= 0.85)
         #expect(brainState.reactionWeights.lowCognitiveLoad >= 0.85)
-        #expect(brainState.sessionBiases.contains("Favor interruptive next steps over extra analysis."))
+        #expect(brainState.sessionBiases.contains("Prefer a regulating next step before deeper elaboration."))
     }
 
     @Test("brain compiler preserves goal and support memory taxonomy")
@@ -486,5 +574,59 @@ struct BASMemoryCognitionCoreTests {
         #expect(bootstrapped.brainState.memorySlices.contains(where: {
             $0.role == .relevant && $0.type == BASMemoryKind.support.rawValue
         }))
+    }
+
+    @Test("brain compiler honors host-injected session bias behavior")
+    func brainCompilerHonorsInjectedSessionBiasBehavior() {
+        let projection = BASBrainProjection(
+            records: [
+                BASGovernedMemory(
+                    kind: .support,
+                    content: "Tomorrow box usually helps me stop the spiral.",
+                    scope: .task,
+                    sensitivity: .medium,
+                    tier: .warm,
+                    confidence: 0.86,
+                    sourceType: "history",
+                    governanceStatus: .governed,
+                    provenanceSummary: "support"
+                )
+            ],
+            candidates: [],
+            recentEvents: []
+        )
+
+        let request = BASBrainBootstrapRequest(
+            mode: .quick,
+            prompt: "I want to send this late tonight.",
+            source: .history,
+            sourceSurface: .app,
+            riskLevel: .medium,
+            retrievalMode: "filtered",
+            cognitionBehavior: BASCognitionBehavior(
+                sessionBias: BASSessionBiasBehavior(
+                    defaultBiasesByModeID: [
+                        BASDecisionMode.quick.identifier: ["Host says slow the impulse before analysis."]
+                    ],
+                    briefLanguageSignals: ["concise"],
+                    nightBias: "Host says night pressure lowers reliability.",
+                    nightLowLoadBias: "Host says keep the load light.",
+                    lowCognitiveLoadSignals: [],
+                    interruptiveActionSignals: ["tomorrow box"],
+                    interruptiveActionBias: "Host says route this through a holding lane.",
+                    boundaryNamingSignals: ["boundary"],
+                    boundaryNamingBias: "Host says name the edge clearly.",
+                    tradeoffClaritySignals: ["tradeoff"],
+                    tradeoffClarityBias: "Host says keep the trade-off visible."
+                )
+            ),
+            now: Date(timeIntervalSince1970: 1_700_064_000)
+        )
+
+        let brainState = BASBrainCompiler.bootstrap(request: request, projection: projection).brainState
+
+        #expect(brainState.sessionBiases.contains("Host says slow the impulse before analysis."))
+        #expect(brainState.sessionBiases.contains("Host says route this through a holding lane."))
+        #expect(!brainState.sessionBiases.contains("Prefer a regulating next step before deeper elaboration."))
     }
 }

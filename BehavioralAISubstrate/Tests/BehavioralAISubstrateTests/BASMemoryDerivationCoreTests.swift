@@ -40,15 +40,15 @@ struct BASMemoryDerivationCoreTests {
                     createdAt: date("2026-04-06T23:05:00+10:00")
                 )
             ],
-            balanceRecords: [
-                BASBalanceMemoryInput(
+            comparativeRecords: [
+                BASComparativeMemoryInput(
                     prompt: "Should I keep taking late freelance work?",
                     longTerm: "Sleep before midnight",
                     updatedAt: date("2026-04-08T09:05:00Z")
                 )
             ],
-            mirrorRecords: [
-                BASMirrorMemoryInput(
+            reflectiveRecords: [
+                BASReflectiveMemoryInput(
                     prompt: "Should I stay in this relationship?",
                     longTerm: "Sleep before midnight",
                     updatedAt: date("2026-04-09T08:05:00Z")
@@ -84,8 +84,8 @@ struct BASMemoryDerivationCoreTests {
                     createdAt: date("2026-04-09T23:10:00Z")
                 )
             ],
-            balanceRecords: [],
-            mirrorRecords: [],
+            comparativeRecords: [],
+            reflectiveRecords: [],
             now: date("2026-04-09T23:10:00Z")
         )
 
@@ -123,8 +123,8 @@ struct BASMemoryDerivationCoreTests {
                     createdAt: date("2026-04-09T08:00:00Z")
                 )
             ],
-            balanceRecords: [],
-            mirrorRecords: [],
+            comparativeRecords: [],
+            reflectiveRecords: [],
             now: date("2026-04-10T08:30:00Z"),
             behavior: BASMemoryDerivationBehavior(
                 primarySituational: BASSituationalDraftBehavior(
@@ -168,6 +168,132 @@ struct BASMemoryDerivationCoreTests {
         #expect(situational.retrievalTags.contains("quick"))
         #expect(support.headline == "Holding the decision often breaks the loop.")
         #expect(support.retrievalTags.contains("loop_break"))
+    }
+
+    @Test("draft compiler accepts generic workspace inputs with host taxonomy")
+    func derivesDraftsFromGenericWorkspaceInputs() throws {
+        let request = BASMemoryDerivationRequest(
+            reminders: [],
+            checkEvents: [
+                BASCheckEventMemoryInput(
+                    id: "workspace-1",
+                    scenarioID: "message",
+                    scenarioTitle: "Message",
+                    actionID: "archiveAndReopen",
+                    actionTitle: "Archive and reopen",
+                    note: "Pause this and revisit with distance.",
+                    createdAt: date("2026-04-10T08:00:00Z")
+                )
+            ],
+            workspaceRecords: [
+                BASWorkspaceMemoryInput(
+                    workflowID: "journal-compare",
+                    prompt: "Should I take on this extra commitment?",
+                    longTerm: "Protect weekends",
+                    updatedAt: date("2026-04-10T06:00:00Z")
+                ),
+                BASWorkspaceMemoryInput(
+                    workflowID: "journal-reflect",
+                    prompt: "Why do I keep saying yes when I mean no?",
+                    longTerm: "Protect weekends",
+                    updatedAt: date("2026-04-10T07:00:00Z")
+                )
+            ],
+            now: date("2026-04-10T08:30:00Z"),
+            behavior: BASMemoryDerivationBehavior(
+                comparativeSituational: .init(
+                    draftID: "situational.compare.latest",
+                    topic: "recent_compare_lane",
+                    primaryHeadlinePrefix: "Recently comparing",
+                    provenanceSummary: "Host compare memory.",
+                    baseTags: ["compare", "recent"]
+                ),
+                reflectiveSituational: .init(
+                    draftID: "situational.reflect.latest",
+                    topic: "recent_reflect_lane",
+                    primaryHeadlinePrefix: "Recently reflecting",
+                    provenanceSummary: "Host reflect memory.",
+                    baseTags: ["reflect", "recent"]
+                ),
+                comparativeWorkspaceIDs: ["journal-compare"],
+                reflectiveWorkspaceIDs: ["journal-reflect"]
+            )
+        )
+
+        let drafts = BASMemoryDraftCompiler.derive(request)
+        let compare = try #require(drafts.first(where: { $0.id == "situational.compare.latest" }))
+        let reflect = try #require(drafts.first(where: { $0.id == "situational.reflect.latest" }))
+        let goal = try #require(drafts.first(where: { $0.typeID == "goal" && $0.value == "Protect weekends" }))
+
+        #expect(compare.retrievalTags.contains("compare"))
+        #expect(reflect.retrievalTags.contains("reflect"))
+        #expect(goal.provenanceSummary == "Promoted from repeated long-term fields across structured workspaces.")
+    }
+
+    @Test("generic derivation falls back without a host action lexicon")
+    func genericDerivationFallsBackWithoutHostActionLexicon() throws {
+        let request = BASMemoryDerivationRequest(
+            reminders: [],
+            checkEvents: [
+                BASCheckEventMemoryInput(
+                    id: "generic-1",
+                    scenarioID: "workflow",
+                    scenarioTitle: "Workflow",
+                    actionID: "archiveAndReopen",
+                    actionTitle: "Archive and reopen",
+                    note: "Pause this and come back with distance.",
+                    createdAt: date("2026-04-10T08:00:00Z")
+                ),
+                BASCheckEventMemoryInput(
+                    id: "generic-2",
+                    scenarioID: "workflow",
+                    scenarioTitle: "Workflow",
+                    actionID: "archiveAndReopen",
+                    actionTitle: "Archive and reopen",
+                    note: "Pause this and come back with distance.",
+                    createdAt: date("2026-04-09T08:00:00Z")
+                )
+            ],
+            comparativeRecords: [],
+            reflectiveRecords: [],
+            now: date("2026-04-10T08:30:00Z")
+        )
+
+        let drafts = BASMemoryDraftCompiler.derive(request)
+        let support = try #require(drafts.first(where: { $0.id == "support.action.archiveAndReopen" }))
+
+        #expect(support.headline == "Archive and reopen has repeatedly helped stabilize this situation.")
+        #expect(support.retrievalTags.contains("action_support"))
+        #expect(support.retrievalTags.contains("stabilizing_action"))
+        #expect(support.provenanceSummary == "Derived from repeated stabilizing actions in the host workflow.")
+    }
+
+    @Test("generic derivation prefers the freshest matching workspace instead of first match order")
+    func genericDerivationPrefersFreshestMatchingWorkspace() throws {
+        let request = BASMemoryDerivationRequest(
+            reminders: [],
+            checkEvents: [],
+            workspaceRecords: [
+                BASWorkspaceMemoryInput(
+                    workflowID: "comparative",
+                    prompt: "Older comparative prompt",
+                    longTerm: "Older long term",
+                    updatedAt: date("2026-04-09T06:00:00Z")
+                ),
+                BASWorkspaceMemoryInput(
+                    workflowID: "comparative",
+                    prompt: "Newer comparative prompt",
+                    longTerm: "Newer long term",
+                    updatedAt: date("2026-04-10T06:00:00Z")
+                )
+            ],
+            now: date("2026-04-10T08:30:00Z")
+        )
+
+        let drafts = BASMemoryDraftCompiler.derive(request)
+        let compare = try #require(drafts.first(where: { $0.id == "situational.comparative.latest" }))
+
+        #expect(compare.headline.contains("Newer comparative prompt"))
     }
 
     private func date(_ value: String) -> Date {

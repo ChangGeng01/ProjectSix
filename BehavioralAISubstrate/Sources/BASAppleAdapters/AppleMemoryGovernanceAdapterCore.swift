@@ -8,15 +8,15 @@ public enum BASAppleMemoryGovernanceAdapter {
         Candidate: BASAppleCandidateMemoryEntity,
         Reminder: BASAppleReminderMemoryEntity,
         Event: BASAppleCheckEventMemoryEntity,
-        Balance: BASAppleBalanceMemoryEntity,
-        Mirror: BASAppleMirrorMemoryEntity
+        Comparative: BASAppleComparativeMemoryEntity,
+        Reflective: BASAppleReflectiveMemoryEntity
     >(
         in context: ModelContext,
         now: Date = .now,
         reminderType: Reminder.Type,
         checkEventType: Event.Type,
-        balanceRecordType: Balance.Type,
-        mirrorRecordType: Mirror.Type,
+        comparativeRecordType: Comparative.Type,
+        reflectiveRecordType: Reflective.Type,
         behavior: BASMemoryDerivationBehavior = .generic,
         onSaveError: ((Error) -> Void)? = nil
     ) -> BASAppleMemoryReconciliationWriteResult<Governed, Candidate> {
@@ -25,8 +25,8 @@ public enum BASAppleMemoryGovernanceAdapter {
             now: now,
             reminderType: reminderType,
             checkEventType: checkEventType,
-            balanceRecordType: balanceRecordType,
-            mirrorRecordType: mirrorRecordType,
+            comparativeRecordType: comparativeRecordType,
+            reflectiveRecordType: reflectiveRecordType,
             behavior: behavior
         )
         .sorted { lhs, rhs in
@@ -45,6 +45,35 @@ public enum BASAppleMemoryGovernanceAdapter {
                 reviewNow: reviewNow
             ),
             in: context,
+            onSaveError: onSaveError
+        )
+    }
+
+    public static func refreshStoredMemories<
+        Governed: BASAppleGovernedMemoryEntity,
+        Candidate: BASAppleCandidateMemoryEntity,
+        Reminder: BASAppleReminderMemoryEntity,
+        Event: BASAppleCheckEventMemoryEntity,
+        Balance: BASAppleBalanceMemoryEntity,
+        Mirror: BASAppleMirrorMemoryEntity
+    >(
+        in context: ModelContext,
+        now: Date = .now,
+        reminderType: Reminder.Type,
+        checkEventType: Event.Type,
+        balanceRecordType: Balance.Type,
+        mirrorRecordType: Mirror.Type,
+        behavior: BASMemoryDerivationBehavior = .generic,
+        onSaveError: ((Error) -> Void)? = nil
+    ) -> BASAppleMemoryReconciliationWriteResult<Governed, Candidate> {
+        refreshStoredMemories(
+            in: context,
+            now: now,
+            reminderType: reminderType,
+            checkEventType: checkEventType,
+            comparativeRecordType: balanceRecordType,
+            reflectiveRecordType: mirrorRecordType,
+            behavior: behavior,
             onSaveError: onSaveError
         )
     }

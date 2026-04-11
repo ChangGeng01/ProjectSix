@@ -288,6 +288,40 @@ public enum BASIdentityRole: String, CaseIterable, Codable, Sendable {
     case mirrorWitness = "mirror_witness"
     case predictiveSentinel = "predictive_sentinel"
 
+    public static var reflectiveWitness: Self { .mirrorWitness }
+
+    public var identifier: String {
+        switch self {
+        case .boundedGuide:
+            "bounded_guide"
+        case .pauseCompanion:
+            "stability_guide"
+        case .tradeoffGuide:
+            "comparative_guide"
+        case .mirrorWitness:
+            "reflective_witness"
+        case .predictiveSentinel:
+            "risk_sentinel"
+        }
+    }
+
+    public init?(identifier: String) {
+        switch identifier {
+        case Self.boundedGuide.identifier, Self.boundedGuide.rawValue:
+            self = .boundedGuide
+        case Self.pauseCompanion.identifier, Self.pauseCompanion.rawValue:
+            self = .pauseCompanion
+        case Self.tradeoffGuide.identifier, Self.tradeoffGuide.rawValue:
+            self = .tradeoffGuide
+        case Self.reflectiveWitness.identifier, Self.mirrorWitness.rawValue:
+            self = .mirrorWitness
+        case Self.predictiveSentinel.identifier, Self.predictiveSentinel.rawValue:
+            self = .predictiveSentinel
+        default:
+            return nil
+        }
+    }
+
     public var title: String {
         switch self {
         case .boundedGuide:
@@ -361,6 +395,53 @@ public struct BASIdentityProfile: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASIdentityProfileOverlay: Codable, Equatable, Sendable {
+    public var role: BASIdentityRole?
+    public var posture: BASIdentityPosture?
+    public var initiative: BASIdentityInitiative?
+    public var confidenceCeiling: Double?
+    public var canAdvise: Bool?
+    public var canExecuteActions: Bool?
+    public var canEscalateToCloud: Bool?
+    public var relationshipBoundary: String?
+
+    public init(
+        role: BASIdentityRole? = nil,
+        posture: BASIdentityPosture? = nil,
+        initiative: BASIdentityInitiative? = nil,
+        confidenceCeiling: Double? = nil,
+        canAdvise: Bool? = nil,
+        canExecuteActions: Bool? = nil,
+        canEscalateToCloud: Bool? = nil,
+        relationshipBoundary: String? = nil
+    ) {
+        self.role = role
+        self.posture = posture
+        self.initiative = initiative
+        self.confidenceCeiling = confidenceCeiling
+        self.canAdvise = canAdvise
+        self.canExecuteActions = canExecuteActions
+        self.canEscalateToCloud = canEscalateToCloud
+        self.relationshipBoundary = relationshipBoundary
+    }
+
+    public func applying(
+        to profile: BASIdentityProfile,
+        initiativeOverride: BASIdentityInitiative? = nil
+    ) -> BASIdentityProfile {
+        BASIdentityProfile(
+            role: role ?? profile.role,
+            posture: posture ?? profile.posture,
+            initiative: initiativeOverride ?? initiative ?? profile.initiative,
+            confidenceCeiling: confidenceCeiling ?? profile.confidenceCeiling,
+            canAdvise: canAdvise ?? profile.canAdvise,
+            canExecuteActions: canExecuteActions ?? profile.canExecuteActions,
+            canEscalateToCloud: canEscalateToCloud ?? profile.canEscalateToCloud,
+            relationshipBoundary: relationshipBoundary ?? profile.relationshipBoundary
+        )
+    }
+}
+
 public enum BASBoundaryPolicyMode: String, CaseIterable, Codable, Sendable {
     case localOnlyReflective = "local_only_reflective"
     case localOnlyAdvisory = "local_only_advisory"
@@ -420,6 +501,336 @@ public struct BASBoundaryPolicyState: Codable, Equatable, Sendable {
             activeConstraints: [.noCloudEscalation, .noAutonomousExternalAction, .lockSensitiveMemory],
             auditHeadline: "Stay local, stay bounded, and avoid irreversible momentum."
         )
+    }
+}
+
+public struct BASBoundaryEvaluationBehavior: Codable, Equatable, Sendable {
+    public var defaultAllowedActionClasses: [String]
+    public var defaultBlockedActionClasses: [String]
+    public var defaultConstraints: [BASBoundaryConstraint]
+    public var allowedActionClassesBySurfaceID: [String: [String]]
+    public var blockedActionClassesBySurfaceID: [String: [String]]
+    public var constraintsBySurfaceID: [String: [BASBoundaryConstraint]]
+    public var highRiskRequiredConfirmations: [String]
+    public var highRiskBlockedActionClasses: [String]
+    public var reflectiveModeIDs: [String]
+    public var advisoryHeadline: String
+    public var reflectiveHeadline: String
+    public var protectiveHeadline: String
+
+    public init(
+        defaultAllowedActionClasses: [String] = ["render_local_guidance", "load_governed_memory"],
+        defaultBlockedActionClasses: [String] = ["cloud_escalation", "autonomous_external_action"],
+        defaultConstraints: [BASBoundaryConstraint] = [
+            .noCloudEscalation,
+            .noAutonomousExternalAction,
+            .lockSensitiveMemory,
+            .roleLimitedAdvice
+        ],
+        allowedActionClassesBySurfaceID: [String: [String]] = [
+            BASInteractionSurface.watch.rawValue: ["lightweight_capture"]
+        ],
+        blockedActionClassesBySurfaceID: [String: [String]] = [
+            BASInteractionSurface.watch.rawValue: ["deep_editor_surface"],
+            BASInteractionSurface.notification.rawValue: ["high_frequency_nudge"]
+        ],
+        constraintsBySurfaceID: [String: [BASBoundaryConstraint]] = [
+            BASInteractionSurface.watch.rawValue: [.watchSurfaceLightweight],
+            BASInteractionSurface.notification.rawValue: [.notificationRequiresEvidence]
+        ],
+        highRiskRequiredConfirmations: [String] = ["irreversible_decision"],
+        highRiskBlockedActionClasses: [String] = ["fast_commit_action"],
+        reflectiveModeIDs: [String] = [BASDecisionMode.reflectiveID],
+        advisoryHeadline: String = "Guide locally with bounded advice and no autonomous moves.",
+        reflectiveHeadline: String = "Reflect locally and avoid pushing the decision over the line.",
+        protectiveHeadline: String = "Stay local, add friction, and require confirmation before irreversible movement."
+    ) {
+        self.defaultAllowedActionClasses = defaultAllowedActionClasses
+        self.defaultBlockedActionClasses = defaultBlockedActionClasses
+        self.defaultConstraints = defaultConstraints
+        self.allowedActionClassesBySurfaceID = allowedActionClassesBySurfaceID
+        self.blockedActionClassesBySurfaceID = blockedActionClassesBySurfaceID
+        self.constraintsBySurfaceID = constraintsBySurfaceID
+        self.highRiskRequiredConfirmations = highRiskRequiredConfirmations
+        self.highRiskBlockedActionClasses = highRiskBlockedActionClasses
+        self.reflectiveModeIDs = reflectiveModeIDs
+        self.advisoryHeadline = advisoryHeadline
+        self.reflectiveHeadline = reflectiveHeadline
+        self.protectiveHeadline = protectiveHeadline
+    }
+}
+
+public struct BASBrainCompilationBehavior: Codable, Equatable, Sendable {
+    public var retrievalOffCandidateLimitByModeID: [String: Int]
+    public var retrievalOffGoalLimitByModeID: [String: Int]
+    public var adaptiveRelevantLimitByModeID: [String: Int]
+    public var relevantPriorityBaselinesByModeID: [String: Double]
+    public var ignoredRetrievalTags: [String]
+    public var interruptiveModeIDs: [String]
+    public var boundaryNamingModeIDs: [String]
+    public var tradeoffClarityModeIDs: [String]
+    public var typeBoostsByModeID: [String: [String: Double]]
+    public var interruptiveActionIDs: [String]
+    public var proceedActionIDs: [String]
+    public var positiveReflectionOutcomeIDs: [String]
+    public var negativeReflectionOutcomeIDs: [String]
+
+    public init(
+        retrievalOffCandidateLimitByModeID: [String: Int] = [
+            BASDecisionMode.primaryID: 4,
+            BASDecisionMode.comparativeID: 5,
+            BASDecisionMode.reflectiveID: 5
+        ],
+        retrievalOffGoalLimitByModeID: [String: Int] = [
+            BASDecisionMode.primaryID: 1,
+            BASDecisionMode.comparativeID: 2,
+            BASDecisionMode.reflectiveID: 2
+        ],
+        adaptiveRelevantLimitByModeID: [String: Int] = [
+            BASDecisionMode.primaryID: 3,
+            BASDecisionMode.comparativeID: 3,
+            BASDecisionMode.reflectiveID: 4
+        ],
+        relevantPriorityBaselinesByModeID: [String: Double] = [
+            BASDecisionMode.primaryID: 0.64,
+            BASDecisionMode.comparativeID: 0.64,
+            BASDecisionMode.reflectiveID: 0.58
+        ],
+        ignoredRetrievalTags: [String] = [
+            BASDecisionMode.primaryID,
+            BASDecisionMode.comparativeID,
+            BASDecisionMode.reflectiveID,
+            "recent",
+            "goal",
+            "long_term",
+            "pattern",
+            "repeat"
+        ],
+        interruptiveModeIDs: [String] = [BASDecisionMode.primaryID],
+        boundaryNamingModeIDs: [String] = [BASDecisionMode.reflectiveID],
+        tradeoffClarityModeIDs: [String] = [BASDecisionMode.comparativeID],
+        typeBoostsByModeID: [String: [String: Double]] = [
+            BASDecisionMode.primaryID: [
+                BASMemoryKind.support.rawValue: 3.4,
+                BASMemoryKind.semantic.rawValue: 2.8,
+                BASMemoryKind.situational.rawValue: 2.4
+            ],
+            BASDecisionMode.comparativeID: [
+                BASMemoryKind.goal.rawValue: 3.0,
+                BASMemoryKind.semantic.rawValue: 3.0
+            ],
+            BASDecisionMode.reflectiveID: [
+                BASMemoryKind.situational.rawValue: 3.4,
+                BASMemoryKind.semantic.rawValue: 3.4,
+                BASMemoryKind.goal.rawValue: 3.4
+            ]
+        ],
+        interruptiveActionIDs: [String] = ["pause", "step_back", "defer"],
+        proceedActionIDs: [String] = ["proceed", "continue"],
+        positiveReflectionOutcomeIDs: [String] = ["stabilized", "okay", "not_needed"],
+        negativeReflectionOutcomeIDs: [String] = ["regretted", "felt_worse"]
+    ) {
+        self.retrievalOffCandidateLimitByModeID = retrievalOffCandidateLimitByModeID
+        self.retrievalOffGoalLimitByModeID = retrievalOffGoalLimitByModeID
+        self.adaptiveRelevantLimitByModeID = adaptiveRelevantLimitByModeID
+        self.relevantPriorityBaselinesByModeID = relevantPriorityBaselinesByModeID
+        self.ignoredRetrievalTags = ignoredRetrievalTags
+        self.interruptiveModeIDs = interruptiveModeIDs
+        self.boundaryNamingModeIDs = boundaryNamingModeIDs
+        self.tradeoffClarityModeIDs = tradeoffClarityModeIDs
+        self.typeBoostsByModeID = typeBoostsByModeID
+        self.interruptiveActionIDs = interruptiveActionIDs
+        self.proceedActionIDs = proceedActionIDs
+        self.positiveReflectionOutcomeIDs = positiveReflectionOutcomeIDs
+        self.negativeReflectionOutcomeIDs = negativeReflectionOutcomeIDs
+    }
+
+    public func candidateLimitWhenRetrievalOff(for mode: BASDecisionMode) -> Int {
+        resolvedInt(from: retrievalOffCandidateLimitByModeID, for: mode) ?? 5
+    }
+
+    public func goalLimitWhenRetrievalOff(for mode: BASDecisionMode) -> Int {
+        resolvedInt(from: retrievalOffGoalLimitByModeID, for: mode) ?? 2
+    }
+
+    public func relevantLimitWhenAdaptive(for mode: BASDecisionMode) -> Int {
+        resolvedInt(from: adaptiveRelevantLimitByModeID, for: mode) ?? 3
+    }
+
+    public func relevantPriorityBaseline(for mode: BASDecisionMode) -> Double {
+        resolvedDouble(from: relevantPriorityBaselinesByModeID, for: mode) ?? 0.64
+    }
+
+    public func ignoredRetrievalTagSet() -> Set<String> {
+        Set(ignoredRetrievalTags.map { $0.lowercased() })
+    }
+
+    public func typeBoost(for mode: BASDecisionMode, kind: BASMemoryKind) -> Double {
+        for key in modeKeys(for: mode) {
+            if let mapping = typeBoostsByModeID[key], let boost = mapping[kind.rawValue] {
+                return boost
+            }
+        }
+        if kind == .profile {
+            return 1.8
+        }
+        return 1.0
+    }
+
+    public func isInterruptiveMode(_ mode: BASDecisionMode) -> Bool {
+        matches(mode: mode, configuredIDs: interruptiveModeIDs)
+    }
+
+    public func isBoundaryNamingMode(_ mode: BASDecisionMode) -> Bool {
+        matches(mode: mode, configuredIDs: boundaryNamingModeIDs)
+    }
+
+    public func isTradeoffClarityMode(_ mode: BASDecisionMode) -> Bool {
+        matches(mode: mode, configuredIDs: tradeoffClarityModeIDs)
+    }
+
+    private func modeKeys(for mode: BASDecisionMode) -> [String] {
+        [mode.identifier, mode.rawValue]
+    }
+
+    private func resolvedInt(from mapping: [String: Int], for mode: BASDecisionMode) -> Int? {
+        for key in modeKeys(for: mode) {
+            if let value = mapping[key] {
+                return value
+            }
+        }
+        return nil
+    }
+
+    private func resolvedDouble(from mapping: [String: Double], for mode: BASDecisionMode) -> Double? {
+        for key in modeKeys(for: mode) {
+            if let value = mapping[key] {
+                return value
+            }
+        }
+        return nil
+    }
+
+    private func matches(mode: BASDecisionMode, configuredIDs: [String]) -> Bool {
+        let keys = Set(modeKeys(for: mode))
+        return configuredIDs.contains { keys.contains($0) }
+    }
+}
+
+public struct BASCognitionBehavior: Codable, Equatable, Sendable {
+    public var surfaceIdentityOverlaysBySurfaceID: [String: BASIdentityProfileOverlay]
+    public var highRiskIdentityOverlay: BASIdentityProfileOverlay
+    public var highRiskInitiativeByRoleID: [String: BASIdentityInitiative]
+    public var boundary: BASBoundaryEvaluationBehavior
+    public var sessionBias: BASSessionBiasBehavior
+    public var brainCompilation: BASBrainCompilationBehavior
+
+    public init(
+        surfaceIdentityOverlaysBySurfaceID: [String: BASIdentityProfileOverlay] = [
+            BASInteractionSurface.notification.rawValue: BASIdentityProfileOverlay(
+                role: .predictiveSentinel,
+                posture: .coaching,
+                initiative: .guided,
+                confidenceCeiling: 0.58,
+                canAdvise: true,
+                canExecuteActions: false,
+                canEscalateToCloud: false,
+                relationshipBoundary: "Use brief local nudges without taking over the user's agency."
+            ),
+            BASInteractionSurface.watch.rawValue: BASIdentityProfileOverlay(
+                role: .pauseCompanion,
+                initiative: .guided,
+                confidenceCeiling: 0.64,
+                canExecuteActions: false,
+                canEscalateToCloud: false,
+                relationshipBoundary: "Keep the wearable surface lightweight, local, and interruptive."
+            )
+        ],
+        highRiskIdentityOverlay: BASIdentityProfileOverlay = BASIdentityProfileOverlay(
+            posture: .protective,
+            confidenceCeiling: 0.66,
+            canAdvise: true,
+            canExecuteActions: false,
+            canEscalateToCloud: false,
+            relationshipBoundary: "Slow the decision down before offering stronger interpretation."
+        ),
+        highRiskInitiativeByRoleID: [String: BASIdentityInitiative] = [
+            BASIdentityRole.reflectiveWitness.identifier: .guided
+        ],
+        boundary: BASBoundaryEvaluationBehavior = BASBoundaryEvaluationBehavior(),
+        sessionBias: BASSessionBiasBehavior = BASSessionBiasBehavior(),
+        brainCompilation: BASBrainCompilationBehavior = BASBrainCompilationBehavior()
+    ) {
+        self.surfaceIdentityOverlaysBySurfaceID = surfaceIdentityOverlaysBySurfaceID
+        self.highRiskIdentityOverlay = highRiskIdentityOverlay
+        self.highRiskInitiativeByRoleID = highRiskInitiativeByRoleID
+        self.boundary = boundary
+        self.sessionBias = sessionBias
+        self.brainCompilation = brainCompilation
+    }
+
+    public static let generic = BASCognitionBehavior()
+}
+
+public struct BASSessionBiasBehavior: Codable, Equatable, Sendable {
+    public var defaultBiasesByModeID: [String: [String]]
+    public var briefLanguageSignals: [String]
+    public var nightBias: String
+    public var nightLowLoadBias: String
+    public var lowCognitiveLoadSignals: [String]
+    public var interruptiveActionSignals: [String]
+    public var interruptiveActionBias: String
+    public var boundaryNamingSignals: [String]
+    public var boundaryNamingBias: String
+    public var tradeoffClaritySignals: [String]
+    public var tradeoffClarityBias: String
+
+    public init(
+        defaultBiasesByModeID: [String: [String]] = [
+            BASDecisionMode.primaryID: ["Stabilize the immediate state before expanding."],
+            BASDecisionMode.comparativeID: ["Keep the active pressures visible without forcing a conclusion."],
+            BASDecisionMode.reflectiveID: ["Reflect the pattern before steering it."]
+        ],
+        briefLanguageSignals: [String] = ["short", "direct", "concise"],
+        nightBias: String = "Lower-trust conditions call for more friction.",
+        nightLowLoadBias: String = "Prefer a lighter cognitive load in lower-trust conditions.",
+        lowCognitiveLoadSignals: [String] = ["lighter guidance", "lighter", "shorter guidance", "low load", "fatigued", "overloaded"],
+        interruptiveActionSignals: [String] = ["hold", "pause", "interrupt", "step away", "slow down"],
+        interruptiveActionBias: String = "Prefer a regulating next step before deeper elaboration.",
+        boundaryNamingSignals: [String] = ["boundary", "pattern", "relationship", "limit", "edge"],
+        boundaryNamingBias: String = "Name the active limit before reframing it.",
+        tradeoffClaritySignals: [String] = ["trade-off", "tradeoff", "constraint", "benefit", "cost"],
+        tradeoffClarityBias: String = "Keep the active trade-off visible before polishing the language."
+    ) {
+        self.defaultBiasesByModeID = defaultBiasesByModeID
+        self.briefLanguageSignals = briefLanguageSignals
+        self.nightBias = nightBias
+        self.nightLowLoadBias = nightLowLoadBias
+        self.lowCognitiveLoadSignals = lowCognitiveLoadSignals
+        self.interruptiveActionSignals = interruptiveActionSignals
+        self.interruptiveActionBias = interruptiveActionBias
+        self.boundaryNamingSignals = boundaryNamingSignals
+        self.boundaryNamingBias = boundaryNamingBias
+        self.tradeoffClaritySignals = tradeoffClaritySignals
+        self.tradeoffClarityBias = tradeoffClarityBias
+    }
+
+    public func defaultBiases(for mode: BASDecisionMode) -> [String] {
+        if let configured = defaultBiasesByModeID[mode.identifier], !configured.isEmpty {
+            return configured
+        }
+        if let configured = defaultBiasesByModeID[mode.rawValue], !configured.isEmpty {
+            return configured
+        }
+
+        switch mode {
+        case .quick:
+            return ["Stabilize the immediate state before expanding."]
+        case .balance:
+            return ["Keep the active pressures visible without forcing a conclusion."]
+        case .mirror:
+            return ["Reflect the pattern before steering it."]
+        }
     }
 }
 
@@ -1151,7 +1562,7 @@ public struct BASCurrentBrainBootstrap: Sendable {
         from memories: [BASGovernedMemory],
         goalHints: [String] = [],
         constraintHints: [String] = [],
-        mode: String = "balanced",
+        mode: String = BASDecisionMode.primaryID,
         verificationSnapshot: String = "bootstrap"
     ) -> BASCurrentBrainState {
         let frontstage = BASMemoryTierFilter.frontstageEligibleMemories(memories)

@@ -102,6 +102,8 @@ public struct BASPromptPreparationRequest<Kind: Equatable & Sendable>: Sendable,
     public var kind: Kind
     public var semanticKind: BASSemanticTaskKind
     public var adaptiveKind: BASAdaptiveTraceKind
+    public var presentationBehavior: BASPromptPresentationBehavior
+    public var frontstageBehavior: BASFrontstagePresentationBehavior
     public var taskState: [String: BASPromptStateValue?]
     public var evidenceSnippets: [String]
     public var outputGuard: [String]
@@ -119,6 +121,8 @@ public struct BASPromptPreparationRequest<Kind: Equatable & Sendable>: Sendable,
         kind: Kind,
         semanticKind: BASSemanticTaskKind,
         adaptiveKind: BASAdaptiveTraceKind,
+        presentationBehavior: BASPromptPresentationBehavior = .generic,
+        frontstageBehavior: BASFrontstagePresentationBehavior = .generic,
         taskState: [String: BASPromptStateValue?],
         evidenceSnippets: [String],
         outputGuard: [String],
@@ -135,6 +139,8 @@ public struct BASPromptPreparationRequest<Kind: Equatable & Sendable>: Sendable,
         self.kind = kind
         self.semanticKind = semanticKind
         self.adaptiveKind = adaptiveKind
+        self.presentationBehavior = presentationBehavior
+        self.frontstageBehavior = frontstageBehavior
         self.taskState = taskState
         self.evidenceSnippets = evidenceSnippets
         self.outputGuard = outputGuard
@@ -178,7 +184,8 @@ public enum BASPromptPreparationCompiler {
             dominantSignalTitles: request.neuralSnapshot?.dominantActivations.map { $0.displayTitle ?? $0.signal } ?? [],
             suppressedBehaviors: request.neuralSnapshot?.suppressedBehaviors ?? [],
             memoryHeadlines: request.brainState?.relevantMemories ?? [],
-            sessionBiases: request.brainState?.sessionBiases ?? []
+            sessionBiases: request.brainState?.sessionBiases ?? [],
+            presentationBehavior: request.frontstageBehavior
         )
 
         return BASPromptContractCompiler.compile(
@@ -186,13 +193,20 @@ public enum BASPromptPreparationCompiler {
                 kind: request.kind,
                 semanticKind: request.semanticKind,
                 adaptiveKind: request.adaptiveKind,
-                immutablePrefix: BASPromptPrefixCatalog.immutablePrefix(for: request.semanticKind),
-                adaptivePrefix: BASPromptPrefixCatalog.adaptivePrefix(for: request.semanticKind),
+                immutablePrefix: BASPromptPrefixCatalog.immutablePrefix(
+                    for: request.semanticKind,
+                    behavior: request.presentationBehavior
+                ),
+                adaptivePrefix: BASPromptPrefixCatalog.adaptivePrefix(
+                    for: request.semanticKind,
+                    behavior: request.presentationBehavior
+                ),
                 taskStateJSON: taskStateJSONString(request.taskState),
                 evidenceSnippets: request.evidenceSnippets,
                 evidenceRetentionBudget: BASPromptRetentionAdvisor.evidenceRetentionBudget(
                     for: request.semanticKind,
-                    strategy: request.strategy
+                    strategy: request.strategy,
+                    behavior: request.presentationBehavior
                 ),
                 outputGuard: request.outputGuard,
                 frontstageInput: frontstageInput,

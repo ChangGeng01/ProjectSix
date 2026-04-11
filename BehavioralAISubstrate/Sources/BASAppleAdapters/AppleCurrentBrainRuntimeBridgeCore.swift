@@ -12,6 +12,8 @@ public struct BASAppleCurrentBrainSessionBridgeInput: Codable, Equatable, Sendab
     public var taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput?
     public var retrievalMode: String
     public var triggerID: String
+    public var bootstrapBehavior: BASCurrentBrainBootstrapBehavior
+    public var cognitionBehavior: BASCognitionBehavior
 
     public init(
         modeID: String,
@@ -23,7 +25,9 @@ public struct BASAppleCurrentBrainSessionBridgeInput: Codable, Equatable, Sendab
         projection: BASBrainProjection,
         taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput? = nil,
         retrievalMode: String,
-        triggerID: String = BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue
+        triggerID: String = BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue,
+        bootstrapBehavior: BASCurrentBrainBootstrapBehavior = .generic,
+        cognitionBehavior: BASCognitionBehavior = .generic
     ) {
         self.modeID = modeID
         self.promptFragments = promptFragments
@@ -35,6 +39,8 @@ public struct BASAppleCurrentBrainSessionBridgeInput: Codable, Equatable, Sendab
         self.taskGraphHint = taskGraphHint
         self.retrievalMode = retrievalMode
         self.triggerID = triggerID
+        self.bootstrapBehavior = bootstrapBehavior
+        self.cognitionBehavior = cognitionBehavior
     }
 }
 
@@ -51,14 +57,13 @@ public struct BASAppleCurrentBrainActiveRefreshBridgeInput: Codable, Equatable, 
     public var taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput?
     public var retrievalModesByModeID: [String: String]
     public var triggerID: String
+    public var lifecycleBehavior: BASAppleLifecycleBootstrapBehavior
+    public var bootstrapBehavior: BASCurrentBrainBootstrapBehavior
+    public var cognitionBehavior: BASCognitionBehavior
 
     public init(
         promptFragmentsByModeID: [String: [String]] = [:],
-        modePriority: [String] = [
-            BASDecisionMode.quick.identifier,
-            BASDecisionMode.balance.identifier,
-            BASDecisionMode.mirror.identifier
-        ],
+        modePriority: [String] = BASDecisionMode.genericPriorityIDs,
         taskGraphModeID: String? = nil,
         taskGraphPromptSeed: String? = nil,
         sourceSurfaceOverrideID: String? = nil,
@@ -68,7 +73,10 @@ public struct BASAppleCurrentBrainActiveRefreshBridgeInput: Codable, Equatable, 
         projection: BASBrainProjection,
         taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput? = nil,
         retrievalModesByModeID: [String: String],
-        triggerID: String = BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue
+        triggerID: String = BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue,
+        lifecycleBehavior: BASAppleLifecycleBootstrapBehavior = .generic,
+        bootstrapBehavior: BASCurrentBrainBootstrapBehavior = .generic,
+        cognitionBehavior: BASCognitionBehavior = .generic
     ) {
         self.promptFragmentsByModeID = promptFragmentsByModeID
         self.modePriority = modePriority
@@ -82,6 +90,9 @@ public struct BASAppleCurrentBrainActiveRefreshBridgeInput: Codable, Equatable, 
         self.taskGraphHint = taskGraphHint
         self.retrievalModesByModeID = retrievalModesByModeID
         self.triggerID = triggerID
+        self.lifecycleBehavior = lifecycleBehavior
+        self.bootstrapBehavior = bootstrapBehavior
+        self.cognitionBehavior = cognitionBehavior
     }
 }
 
@@ -105,7 +116,9 @@ public enum BASAppleCurrentBrainRuntimeBridgeBuilder {
             now: input.now,
             projection: input.projection,
             taskGraphHint: input.taskGraphHint,
-            retrievalMode: runtimePlan.retrievalMode
+            retrievalMode: runtimePlan.retrievalMode,
+            bootstrapBehavior: input.bootstrapBehavior,
+            cognitionBehavior: input.cognitionBehavior
         )
     }
 
@@ -118,7 +131,8 @@ public enum BASAppleCurrentBrainRuntimeBridgeBuilder {
             taskGraphModeID: input.taskGraphModeID,
             taskGraphPromptSeed: input.taskGraphPromptSeed,
             retrievalModesByModeID: input.retrievalModesByModeID,
-            triggerID: input.triggerID
+            triggerID: input.triggerID,
+            behavior: input.lifecycleBehavior
         )
         return bootstrapInput(
             modeID: runtimePlan.modeID,
@@ -130,7 +144,9 @@ public enum BASAppleCurrentBrainRuntimeBridgeBuilder {
             now: input.now,
             projection: input.projection,
             taskGraphHint: input.taskGraphHint,
-            retrievalMode: runtimePlan.retrievalMode
+            retrievalMode: runtimePlan.retrievalMode,
+            bootstrapBehavior: input.bootstrapBehavior,
+            cognitionBehavior: input.cognitionBehavior
         )
     }
 
@@ -144,7 +160,9 @@ public enum BASAppleCurrentBrainRuntimeBridgeBuilder {
         now: Date,
         projection: BASBrainProjection,
         taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput?,
-        retrievalMode: String
+        retrievalMode: String,
+        bootstrapBehavior: BASCurrentBrainBootstrapBehavior,
+        cognitionBehavior: BASCognitionBehavior
     ) -> BASAppleCurrentBrainBootstrapBridgeInput {
         BASAppleCurrentBrainBootstrapBridgeInputBuilder.build(
             modeID: modeID,
@@ -157,7 +175,9 @@ public enum BASAppleCurrentBrainRuntimeBridgeBuilder {
             projection: projection,
             embeddingScores: [],
             taskGraphHint: taskGraphHint,
-            retrievalMode: retrievalMode
+            retrievalMode: retrievalMode,
+            bootstrapBehavior: bootstrapBehavior,
+            cognitionBehavior: cognitionBehavior
         )
     }
 }

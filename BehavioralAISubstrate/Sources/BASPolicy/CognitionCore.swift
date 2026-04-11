@@ -20,6 +20,7 @@ public enum BASCognitionBootstrapper {
             activeConstraints: compiled.activeConstraints,
             activeTemplateIDs: compiled.activeTemplateIDs,
             failureGuardIDs: compiled.failureGuardIDs,
+            cognitionBehavior: request.cognitionBehavior,
             now: request.now
         )
     }
@@ -34,6 +35,7 @@ public enum BASCognitionBootstrapper {
         activeConstraints seedConstraints: [String] = [],
         activeTemplateIDs: [String]? = nil,
         failureGuardIDs: [String]? = nil,
+        cognitionBehavior: BASCognitionBehavior = .generic,
         now: Date = .now
     ) -> BASBootstrappedBrainState {
         var enrichedBrainState = brainState
@@ -48,7 +50,8 @@ public enum BASCognitionBootstrapper {
             mode: mode,
             sourceSurface: sourceSurface,
             riskLevel: riskLevel,
-            baseProfile: enrichedBrainState.identityProfile
+            baseProfile: enrichedBrainState.identityProfile,
+            behavior: cognitionBehavior
         )
         let boundaryPolicy = BASBoundaryPolicyEvaluator.evaluate(
             mode: mode,
@@ -56,7 +59,8 @@ public enum BASCognitionBootstrapper {
             riskLevel: riskLevel,
             identityProfile: identityProfile,
             brainState: enrichedBrainState,
-            taskGraphHint: taskGraphHint
+            taskGraphHint: taskGraphHint,
+            behavior: cognitionBehavior
         )
         let calibrationState = BASCalibrationEvaluator.evaluate(
             brainState: enrichedBrainState,
@@ -104,46 +108,22 @@ public enum BASIdentityRoleResolver {
         mode: BASDecisionMode,
         sourceSurface: BASInteractionSurface,
         riskLevel: BASRiskLevel,
-        baseProfile: BASIdentityProfile? = nil
+        baseProfile: BASIdentityProfile? = nil,
+        behavior: BASCognitionBehavior = .generic
     ) -> BASIdentityProfile {
         var profile = baseProfile ?? BASIdentityProfile.default(modeName: mode.rawValue)
 
-        if sourceSurface == .notification {
-            profile = BASIdentityProfile(
-                role: .predictiveSentinel,
-                posture: riskLevel == .high ? .protective : .coaching,
-                initiative: riskLevel == .high ? .assertive : .guided,
-                confidenceCeiling: riskLevel == .high ? 0.62 : 0.58,
-                canAdvise: true,
-                canExecuteActions: false,
-                canEscalateToCloud: false,
-                relationshipBoundary: "Interrupt momentum, but do not overtake the user's agency."
-            )
-        }
-
-        if sourceSurface == .watch {
-            return BASIdentityProfile(
-                role: .pauseCompanion,
-                posture: riskLevel == .high ? .protective : profile.posture,
-                initiative: .guided,
-                confidenceCeiling: min(profile.confidenceCeiling, 0.64),
-                canAdvise: profile.canAdvise,
-                canExecuteActions: false,
-                canEscalateToCloud: false,
-                relationshipBoundary: "Keep the watch surface lightweight, interruptive, and local."
-            )
+        if let surfaceOverlay = behavior.surfaceIdentityOverlaysBySurfaceID[sourceSurface.rawValue] {
+            profile = surfaceOverlay.applying(to: profile)
         }
 
         if riskLevel == .high {
-            return BASIdentityProfile(
-                role: profile.role,
-                posture: .protective,
-                initiative: profile.role == .mirrorWitness ? .guided : .assertive,
-                confidenceCeiling: min(profile.confidenceCeiling, 0.66),
-                canAdvise: true,
-                canExecuteActions: false,
-                canEscalateToCloud: false,
-                relationshipBoundary: "Slow the decision down before offering any stronger interpretation."
+            let initiativeOverride =
+                behavior.highRiskInitiativeByRoleID[profile.role.identifier] ??
+                behavior.highRiskInitiativeByRoleID[profile.role.rawValue]
+            return behavior.highRiskIdentityOverlay.applying(
+                to: profile,
+                initiativeOverride: initiativeOverride
             )
         }
 
@@ -158,32 +138,21 @@ public enum BASBoundaryPolicyEvaluator {
         riskLevel: BASRiskLevel,
         identityProfile: BASIdentityProfile,
         brainState: BASDecisionBrainState,
-        taskGraphHint: BASTaskGraphHint? = nil
+        taskGraphHint: BASTaskGraphHint? = nil,
+        behavior: BASCognitionBehavior = .generic
     ) -> BASBoundaryPolicyState {
-        var constraints: [BASBoundaryConstraint] = [
-            .noCloudEscalation,
-            .noAutonomousExternalAction,
-            .lockSensitiveMemory,
-            .roleLimitedAdvice
-        ]
+        var constraints = behavior.boundary.defaultConstraints
         var requiredConfirmations: [String] = []
-        var blocked = ["cloud_escalation", "autonomous_external_action"]
-        var allowed = ["render_local_guidance", "load_governed_memory", "resume_checkpoint"]
+        var blocked = behavior.boundary.defaultBlockedActionClasses
+        var allowed = behavior.boundary.defaultAllowedActionClasses
 
-        if sourceSurface == .watch {
-            constraints.append(.watchSurfaceLightweight)
-            blocked.append("deep_editor_surface")
-            allowed.append("quick_capture")
-        }
-
-        if sourceSurface == .notification {
-            constraints.append(.notificationRequiresEvidence)
-            blocked.append("high_frequency_nudge")
-        }
+        allowed.append(contentsOf: behavior.boundary.allowedActionClassesBySurfaceID[sourceSurface.rawValue] ?? [])
+        blocked.append(contentsOf: behavior.boundary.blockedActionClassesBySurfaceID[sourceSurface.rawValue] ?? [])
+        constraints.append(contentsOf: behavior.boundary.constraintsBySurfaceID[sourceSurface.rawValue] ?? [])
 
         if riskLevel == .high {
-            requiredConfirmations.append("irreversible_decision")
-            blocked.append("fast_commit_action")
+            requiredConfirmations.append(contentsOf: behavior.boundary.highRiskRequiredConfirmations)
+            blocked.append(contentsOf: behavior.boundary.highRiskBlockedActionClasses)
         }
 
         if taskGraphHint?.hasResumeCandidate == true || !brainState.failureGuardIDs.isEmpty {
@@ -192,18 +161,21 @@ public enum BASBoundaryPolicyEvaluator {
 
         let modeValue: BASBoundaryPolicyMode = {
             if riskLevel == .high { return .localOnlyProtective }
-            if identityProfile.posture == .reflective || mode == .balance { return .localOnlyReflective }
+            if identityProfile.posture == .reflective ||
+                behavior.boundary.reflectiveModeIDs.contains(mode.identifier) {
+                return .localOnlyReflective
+            }
             return .localOnlyAdvisory
         }()
 
         let headline: String = {
             switch modeValue {
             case .localOnlyReflective:
-                "Reflect locally and avoid pushing the decision over the line."
+                behavior.boundary.reflectiveHeadline
             case .localOnlyAdvisory:
-                "Guide locally with bounded advice and no autonomous moves."
+                behavior.boundary.advisoryHeadline
             case .localOnlyProtective:
-                "Stay local, add friction, and require confirmation before irreversible movement."
+                behavior.boundary.protectiveHeadline
             }
         }()
 

@@ -181,6 +181,7 @@ public struct BASPromptContractFrontstageInput: Codable, Sendable, Equatable {
     public var suppressedBehaviors: [String]
     public var memoryHeadlines: [String]
     public var sessionBiases: [String]
+    public var presentationBehavior: BASFrontstagePresentationBehavior
 
     public init(
         kind: BASAdaptiveTraceKind,
@@ -192,7 +193,8 @@ public struct BASPromptContractFrontstageInput: Codable, Sendable, Equatable {
         dominantSignalTitles: [String] = [],
         suppressedBehaviors: [String] = [],
         memoryHeadlines: [String] = [],
-        sessionBiases: [String] = []
+        sessionBiases: [String] = [],
+        presentationBehavior: BASFrontstagePresentationBehavior = .generic
     ) {
         self.kind = kind
         self.activeStateSignalCount = activeStateSignalCount
@@ -204,6 +206,7 @@ public struct BASPromptContractFrontstageInput: Codable, Sendable, Equatable {
         self.suppressedBehaviors = suppressedBehaviors
         self.memoryHeadlines = memoryHeadlines
         self.sessionBiases = sessionBiases
+        self.presentationBehavior = presentationBehavior
     }
 }
 
@@ -300,7 +303,8 @@ public enum BASPromptContractCompiler {
                 dominantSignalTitles: request.frontstageInput.dominantSignalTitles,
                 suppressedBehaviors: request.frontstageInput.suppressedBehaviors,
                 memoryHeadlines: request.frontstageInput.memoryHeadlines,
-                sessionBiases: request.frontstageInput.sessionBiases
+                sessionBiases: request.frontstageInput.sessionBiases,
+                presentationBehavior: request.frontstageInput.presentationBehavior
             )
         )
         let includeStructuredTruthBlock = request.includeStructuredTruthBlock && request.structuredTruth != nil

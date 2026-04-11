@@ -69,4 +69,53 @@ struct BASReferencePromptModesCoreTests {
         #expect(!envelope.payload.contains("STRUCTURED_TRUTH_JSON:"))
         #expect(envelope.assembly.kernelSnapshot.truthState?.mode == "reminder")
     }
+
+    @Test("reference prompt builder honors injected host presentation behavior")
+    func referencePromptBuilderHonorsInjectedBehavior() {
+        let behavior = BASReferencePromptBehavior(
+            presentationBehavior: BASPromptPresentationBehavior(
+                sharedPrelude: "Host immutable prefix.",
+                adaptivePrefixByKindID: [
+                    BASSemanticTaskKind.quick.rawValue: "Host quick adaptive prefix."
+                ]
+            ),
+            frontstageBehavior: BASFrontstagePresentationBehavior(
+                focusGoalsByKindID: [
+                    BASAdaptiveTraceKind.quick.rawValue: "Host quick focus goal."
+                ]
+            ),
+            outputGuardsByKindID: [
+                BASSemanticTaskKind.quick.rawValue: [
+                    "Keep the host-specific viewpoint framing."
+                ]
+            ],
+            targetCharactersByKindID: [
+                BASSemanticTaskKind.quick.rawValue: 900
+            ]
+        )
+
+        let envelope = BASReferencePromptBuilder.quickEnvelope(
+            BASQuickRefinementPromptRequest(
+                kind: TestKind.quick,
+                modeTitle: "Quick",
+                scenarioTitle: "Buy",
+                motivationTitle: "Reward",
+                expectedOutcomeTitle: "Temporary relief",
+                controlLevelTitle: "Maybe",
+                note: "",
+                currentPerspective: "You want a little relief.",
+                afterPerspective: "It may not feel worth it tomorrow.",
+                verdictTitle: "Pause",
+                primaryActionTitle: "Wait 90s",
+                secondaryActionTitles: ["Decide tomorrow"]
+            ),
+            behavior: behavior
+        )
+
+        #expect(envelope.layers.immutablePrefix == "Host immutable prefix.")
+        #expect(envelope.layers.adaptivePrefix == "Host quick adaptive prefix.")
+        #expect(envelope.payload.contains("Keep the host-specific viewpoint framing."))
+        #expect(envelope.budget.targetCharacters == 900)
+        #expect(envelope.frontstageState.focusGoal == "Host quick focus goal.")
+    }
 }

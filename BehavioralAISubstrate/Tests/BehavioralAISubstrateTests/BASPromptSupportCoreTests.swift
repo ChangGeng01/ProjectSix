@@ -10,9 +10,50 @@ struct BASPromptSupportCoreTests {
         let adaptive = BASPromptPrefixCatalog.adaptivePrefix(for: .quick)
         let instructions = BASPromptPrefixCatalog.instructions(for: .quick)
 
-        #expect(immutable.contains("language rendering layer"))
-        #expect(adaptive.contains("Rewrite only the two perspective lines."))
+        #expect(immutable.contains("host-owned cognition system"))
+        #expect(adaptive.contains("Refine only the supplied paired perspective fields."))
         #expect(instructions == immutable + "\n" + adaptive)
+    }
+
+    @Test("prompt presentation behavior lets hosts override prefixes and retention policy")
+    func promptPresentationBehaviorHonorsHostOverrides() {
+        let behavior = BASPromptPresentationBehavior(
+            sharedPrelude: "Host immutable shell.",
+            adaptivePrefixByKindID: [
+                BASSemanticTaskKind.quick.rawValue: "Host quick framing."
+            ],
+            baseEvidenceRetentionBudgetByKindID: [
+                BASSemanticTaskKind.quick.rawValue: 6
+            ],
+            lowGearClampKindIDs: [
+                BASSemanticTaskKind.quick.rawValue
+            ],
+            lowGearClampMaximumBudget: 4
+        )
+        let strategy = BASAdaptiveTaskStrategy(
+            kind: .quick,
+            entropy: .low,
+            runtimeGear: .low,
+            contextBudget: 220,
+            retrievalItemBudget: 7,
+            retrievalMode: .adaptive,
+            thinkingMode: .off,
+            outputMode: .guidedShort,
+            tone: .briefWarm,
+            actionSpace: ["encourage"],
+            responseLanguage: .english,
+            allowsModelInvocation: true
+        )
+
+        #expect(BASPromptPrefixCatalog.immutablePrefix(for: .quick, behavior: behavior) == "Host immutable shell.")
+        #expect(BASPromptPrefixCatalog.adaptivePrefix(for: .quick, behavior: behavior) == "Host quick framing.")
+        #expect(
+            BASPromptRetentionAdvisor.evidenceRetentionBudget(
+                for: .quick,
+                strategy: strategy,
+                behavior: behavior
+            ) == 4
+        )
     }
 
     @Test("text sanitizer collapses whitespace and clips deterministically")

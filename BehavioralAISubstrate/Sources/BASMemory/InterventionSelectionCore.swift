@@ -48,36 +48,108 @@ public struct BASFailurePatternDescriptor: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASBrainBootstrapAdvisorBehavior: Codable, Equatable, Sendable {
+    public static let generic = BASBrainBootstrapAdvisorBehavior()
+
+    public var nightWindowStartHour: Int
+    public var nightWindowEndHour: Int
+    public var highRiskSignalGroups: [[String]]
+    public var nightFallbackRiskLevelByModeID: [String: String]
+    public var defaultRiskLevelByModeID: [String: String]
+    public var defaultNightFallbackRiskLevelID: String
+    public var defaultDayRiskLevelID: String
+
+    public init(
+        nightWindowStartHour: Int = 22,
+        nightWindowEndHour: Int = 5,
+        highRiskSignalGroups: [[String]] = [
+            ["message", "reply", "text", "send", "dm"],
+            ["buy", "purchase", "spend", "checkout", "cart"]
+        ],
+        nightFallbackRiskLevelByModeID: [String: String] = [
+            BASDecisionMode.primaryID: BASRiskLevel.medium.rawValue,
+            BASDecisionMode.comparativeID: BASRiskLevel.high.rawValue,
+            BASDecisionMode.reflectiveID: BASRiskLevel.high.rawValue
+        ],
+        defaultRiskLevelByModeID: [String: String] = [
+            BASDecisionMode.reflectiveID: BASRiskLevel.medium.rawValue
+        ],
+        defaultNightFallbackRiskLevelID: String = BASRiskLevel.high.rawValue,
+        defaultDayRiskLevelID: String = BASRiskLevel.low.rawValue
+    ) {
+        self.nightWindowStartHour = nightWindowStartHour
+        self.nightWindowEndHour = nightWindowEndHour
+        self.highRiskSignalGroups = highRiskSignalGroups
+        self.nightFallbackRiskLevelByModeID = nightFallbackRiskLevelByModeID
+        self.defaultRiskLevelByModeID = defaultRiskLevelByModeID
+        self.defaultNightFallbackRiskLevelID = defaultNightFallbackRiskLevelID
+        self.defaultDayRiskLevelID = defaultDayRiskLevelID
+    }
+
+    public func isNightWindow(hour: Int) -> Bool {
+        if nightWindowStartHour == nightWindowEndHour {
+            return true
+        }
+        if nightWindowStartHour < nightWindowEndHour {
+            return (nightWindowStartHour..<nightWindowEndHour).contains(hour)
+        }
+        return hour >= nightWindowStartHour || hour < nightWindowEndHour
+    }
+
+    public func containsHighRiskSignal(in text: String) -> Bool {
+        highRiskSignalGroups.contains { group in
+            group.contains { text.contains($0) }
+        }
+    }
+
+    public func nightFallbackRiskLevel(for mode: BASDecisionMode) -> BASRiskLevel {
+        resolveRiskLevel(
+            in: nightFallbackRiskLevelByModeID,
+            mode: mode,
+            fallback: defaultNightFallbackRiskLevelID
+        )
+    }
+
+    public func defaultRiskLevel(for mode: BASDecisionMode) -> BASRiskLevel {
+        resolveRiskLevel(
+            in: defaultRiskLevelByModeID,
+            mode: mode,
+            fallback: defaultDayRiskLevelID
+        )
+    }
+
+    private func resolveRiskLevel(
+        in mapping: [String: String],
+        mode: BASDecisionMode,
+        fallback: String
+    ) -> BASRiskLevel {
+        let aliases = [mode.identifier, mode.rawValue]
+        for alias in aliases {
+            if let riskLevel = mapping[alias].flatMap(BASRiskLevel.init(rawValue:)) {
+                return riskLevel
+            }
+        }
+        return BASRiskLevel(rawValue: fallback) ?? .low
+    }
+}
+
 public enum BASBrainBootstrapAdvisor {
     public static func inferRiskLevel(
         mode: BASDecisionMode,
         prompt: String,
-        now: Date
+        now: Date,
+        behavior: BASBrainBootstrapAdvisorBehavior = .generic
     ) -> BASRiskLevel {
         let lowercased = prompt.lowercased()
         let hour = Calendar.autoupdatingCurrent.component(.hour, from: now)
-        let isNightWindow = hour >= 22 || hour < 5
-        let containsMessagingImpulse = containsAny(
-            in: lowercased,
-            tokens: ["message", "reply", "text", "send", "dm"]
-        )
-        let containsSpendingImpulse = containsAny(
-            in: lowercased,
-            tokens: ["buy", "purchase", "spend", "checkout", "cart"]
-        )
-
-        if isNightWindow {
-            if containsMessagingImpulse || containsSpendingImpulse {
+        if behavior.isNightWindow(hour: hour) {
+            if behavior.containsHighRiskSignal(in: lowercased) {
                 return .high
             }
-            return mode == .quick ? .medium : .high
+            return behavior.nightFallbackRiskLevel(for: mode)
         }
 
-        if mode == .mirror {
-            return .medium
-        }
-
-        return .low
+        return behavior.defaultRiskLevel(for: mode)
     }
 
     public static func orderedTemplateIDs(

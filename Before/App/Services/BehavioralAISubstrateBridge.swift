@@ -48,8 +48,10 @@ enum BehavioralAISubstrateBridge {
                 embeddingScores: embeddingScores(for: prompt),
                 taskGraphHint: taskGraphInput,
                 retrievalMode: retrievalMode.rawValue,
+                bootstrapBehavior: BeforeProductLanguage.hostLifecycleBehavior.currentBrainBootstrapBehavior,
                 reactionWeightSeed: BeforeProductLanguage.reactionWeights(for: mode),
-                identityProfileOverride: BeforeProductLanguage.identityProfile(for: mode)
+                identityProfileOverride: BeforeProductLanguage.identityProfile(for: mode),
+                cognitionBehavior: BeforeProductLanguage.hostCognition.substrateBehavior
             ),
             envelope: envelope,
             taskGraph: taskGraph,
@@ -73,7 +75,9 @@ enum BehavioralAISubstrateBridge {
                 preferredLanguages: Locale.preferredLanguages,
                 now: now,
                 projection: projection.baseProjection,
-                retrievalMode: retrievalMode.rawValue
+                retrievalMode: retrievalMode.rawValue,
+                bootstrapBehavior: BeforeProductLanguage.hostLifecycleBehavior.currentBrainBootstrapBehavior,
+                cognitionBehavior: BeforeProductLanguage.hostCognition.substrateBehavior
             ),
             bootstrapCurrentBrain: { bootstrapInput in
                 var bootstrapInput = bootstrapInput
@@ -354,7 +358,10 @@ enum BehavioralAISubstrateBridge {
                 projection: projection.baseProjection,
                 taskGraphHint: taskGraphInput(from: taskGraph),
                 retrievalModesByModeID: retrievalModesByModeID,
-                triggerID: source.rawValue
+                triggerID: source.rawValue,
+                lifecycleBehavior: BeforeProductLanguage.hostLifecycleBehavior.bootstrapBehavior,
+                bootstrapBehavior: BeforeProductLanguage.hostLifecycleBehavior.currentBrainBootstrapBehavior,
+                cognitionBehavior: BeforeProductLanguage.hostCognition.substrateBehavior
             ),
             bootstrapCurrentBrain: { bootstrapInput in
                 var bootstrapInput = bootstrapInput

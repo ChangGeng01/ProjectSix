@@ -1,5 +1,6 @@
 import XCTest
 @testable import BASAppleAdapters
+@testable import BASMemory
 
 final class BASApplePredictiveInterventionTests: XCTestCase {
     func testPredictCandidateReturnsNilWhenPredictiveInterventionsAreDisabled() {
@@ -26,8 +27,8 @@ final class BASApplePredictiveInterventionTests: XCTestCase {
         )
 
         XCTAssertEqual(candidate?.riskLevelID, "high")
-        XCTAssertEqual(candidate?.preferredModeID, "reflective")
-        XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("regret") == true)
+        XCTAssertNil(candidate?.preferredModeID)
+        XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("ended poorly") == true)
         XCTAssertEqual(candidate?.evidenceSignalCount, 2)
     }
 
@@ -38,12 +39,17 @@ final class BASApplePredictiveInterventionTests: XCTestCase {
                 currentModeID: "primary",
                 negativeRecentCount: 0,
                 failureGuardIDs: ["night_fast_path_failure"],
-                now: date("2026-04-10T23:10:00Z")
+                now: date("2026-04-10T23:10:00Z"),
+                behavior: BASApplePredictiveInterventionBehavior(
+                    failureGuardReasonsByID: [
+                        "night_fast_path_failure": "Host-owned guard warning."
+                    ]
+                )
             )
         )
 
         XCTAssertNotNil(candidate)
-        XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("suppressing night fast paths") == true)
+        XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("host-owned guard warning") == true)
         XCTAssertEqual(candidate?.evidenceSignalCount, 1)
     }
 
@@ -59,7 +65,7 @@ final class BASApplePredictiveInterventionTests: XCTestCase {
 
         XCTAssertEqual(candidate?.riskLevelID, "medium")
         XCTAssertNotEqual(candidate?.riskLevelID, "high")
-        XCTAssertEqual(candidate?.preferredModeID, "reflective")
+        XCTAssertNil(candidate?.preferredModeID)
     }
 
     func testPredictCandidateDefaultsToLowRiskQuickPathWithoutSignals() {
@@ -73,9 +79,115 @@ final class BASApplePredictiveInterventionTests: XCTestCase {
         )
 
         XCTAssertEqual(candidate?.riskLevelID, "low")
-        XCTAssertEqual(candidate?.preferredModeID, "primary")
-        XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("low-friction pause") == true)
+        XCTAssertNil(candidate?.preferredModeID)
+        XCTAssertEqual(candidate?.title, "A lighter pass may be enough.")
+        XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("steadier next step") == true)
         XCTAssertEqual(candidate?.evidenceSignalCount, 0)
+    }
+
+    func testPredictCandidateGenericDefaultsDoNotEscalateByModeAlone() {
+        let candidate = BASApplePredictiveInterventionPredictor.predictCandidate(
+            input: BASApplePredictiveInterventionInput(
+                predictiveInterventionsEnabled: true,
+                currentModeID: BASDecisionMode.mirror.identifier,
+                negativeRecentCount: 0,
+                now: localDate(year: 2026, month: 4, day: 10, hour: 11, minute: 0)
+            )
+        )
+
+        XCTAssertEqual(candidate?.riskLevelID, "low")
+        XCTAssertNil(candidate?.preferredModeID)
+    }
+
+    func testPredictCandidateUsesHostInjectedBehaviorInsteadOfGenericCopy() {
+        let candidate = BASApplePredictiveInterventionPredictor.predictCandidate(
+            input: BASApplePredictiveInterventionInput(
+                predictiveInterventionsEnabled: true,
+                currentModeID: nil,
+                negativeRecentCount: 0,
+                now: localDate(year: 2026, month: 4, day: 10, hour: 11, minute: 0),
+                behavior: BASApplePredictiveInterventionBehavior(
+                    lowRisk: BASApplePredictiveInterventionRiskBehavior(
+                        title: "Host-owned pause.",
+                        detail: "The host wants to slow this down in its own language.",
+                        preferredModeID: BASDecisionMode.quick.identifier
+                    ),
+                    mediumRisk: BASApplePredictiveInterventionRiskBehavior(
+                        title: "Host-owned reflect.",
+                        detail: "The host wants a reflective pass here.",
+                        preferredModeID: BASDecisionMode.mirror.identifier
+                    ),
+                    highRisk: BASApplePredictiveInterventionRiskBehavior(
+                        title: "Host-owned friction.",
+                        detail: "The host wants stronger friction before action.",
+                        preferredModeID: BASDecisionMode.mirror.identifier
+                    ),
+                    nightWindowReason: "Host-owned time warning.",
+                    negativeRecentReason: "Host-owned recent-history warning.",
+                    failureGuardReasonsByID: [
+                        "night_fast_path_failure": "Host-owned guard warning."
+                    ],
+                    defaultReason: "Host-owned fallback."
+                )
+            )
+        )
+
+        XCTAssertEqual(candidate?.title, "Host-owned pause.")
+        XCTAssertEqual(candidate?.detail, "The host wants to slow this down in its own language.")
+        XCTAssertEqual(candidate?.reason, "Host-owned fallback.")
+    }
+
+    func testPredictCandidateUsesHostInjectedRiskResolutionInsteadOfBuiltInModeBias() {
+        let candidate = BASApplePredictiveInterventionPredictor.predictCandidate(
+            input: BASApplePredictiveInterventionInput(
+                predictiveInterventionsEnabled: true,
+                currentModeID: BASDecisionMode.mirror.identifier,
+                negativeRecentCount: 0,
+                now: localDate(year: 2026, month: 4, day: 10, hour: 11, minute: 0),
+                behavior: BASApplePredictiveInterventionBehavior(
+                    preferredModeIDsByCurrentModeID: [:]
+                )
+            )
+        )
+
+        XCTAssertEqual(candidate?.riskLevelID, "low")
+        XCTAssertNil(candidate?.preferredModeID)
+    }
+
+    func testPredictCandidateDoesNotAssumeRapidModeWhenCurrentModeIsUnknown() {
+        let candidate = BASApplePredictiveInterventionPredictor.predictCandidate(
+            input: BASApplePredictiveInterventionInput(
+                predictiveInterventionsEnabled: true,
+                currentModeID: nil,
+                negativeRecentCount: 0,
+                now: localDate(year: 2026, month: 4, day: 10, hour: 11, minute: 0),
+                behavior: BASApplePredictiveInterventionBehavior(
+                    preferredModeIDsByCurrentModeID: [BASDecisionMode.quick.identifier: BASDecisionMode.quick.identifier]
+                )
+            )
+        )
+
+        XCTAssertEqual(candidate?.riskLevelID, "low")
+        XCTAssertNil(candidate?.preferredModeID)
+    }
+
+    func testPredictCandidateCanRecommendHostModeWithoutElevatingRisk() {
+        let candidate = BASApplePredictiveInterventionPredictor.predictCandidate(
+            input: BASApplePredictiveInterventionInput(
+                predictiveInterventionsEnabled: true,
+                currentModeID: BASDecisionMode.mirror.identifier,
+                negativeRecentCount: 0,
+                now: localDate(year: 2026, month: 4, day: 10, hour: 11, minute: 0),
+                behavior: BASApplePredictiveInterventionBehavior(
+                    preferredModeIDsByCurrentModeID: [
+                        BASDecisionMode.mirror.identifier: BASDecisionMode.comparative.identifier
+                    ]
+                )
+            )
+        )
+
+        XCTAssertEqual(candidate?.riskLevelID, "low")
+        XCTAssertEqual(candidate?.preferredModeID, BASDecisionMode.comparative.identifier)
     }
 
     private func date(_ value: String) -> Date {

@@ -222,7 +222,7 @@ extension CheckEvent: BASAppleProjectionEventSource {
     }
 }
 
-extension BalanceDecisionRecord: BASAppleBalanceMemoryEntity {
+extension BalanceDecisionRecord: BASAppleBalanceMemoryEntity, BASAppleWorkspaceMemoryEntity {
     var basBalanceMemoryInput: BASBalanceMemoryInput {
         BASBalanceMemoryInput(
             prompt: prompt,
@@ -230,11 +230,29 @@ extension BalanceDecisionRecord: BASAppleBalanceMemoryEntity {
             updatedAt: updatedAt
         )
     }
+
+    var basWorkspaceMemoryInput: BASWorkspaceMemoryInput {
+        BASWorkspaceMemoryInput(
+            workflowID: DecisionMode.balance.substrateModeID,
+            prompt: prompt,
+            longTerm: longTerm,
+            updatedAt: updatedAt
+        )
+    }
 }
 
-extension MirrorDecisionRecord: BASAppleMirrorMemoryEntity {
+extension MirrorDecisionRecord: BASAppleMirrorMemoryEntity, BASAppleWorkspaceMemoryEntity {
     var basMirrorMemoryInput: BASMirrorMemoryInput {
         BASMirrorMemoryInput(
+            prompt: prompt,
+            longTerm: longTerm,
+            updatedAt: updatedAt
+        )
+    }
+
+    var basWorkspaceMemoryInput: BASWorkspaceMemoryInput {
+        BASWorkspaceMemoryInput(
+            workflowID: DecisionMode.mirror.substrateModeID,
             prompt: prompt,
             longTerm: longTerm,
             updatedAt: updatedAt

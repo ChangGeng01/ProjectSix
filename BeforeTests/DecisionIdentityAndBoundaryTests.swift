@@ -13,7 +13,7 @@ final class DecisionIdentityAndBoundaryTests: XCTestCase {
 
         XCTAssertEqual(substrateProfile.role, .predictiveSentinel)
         XCTAssertEqual(substrateProfile.posture, .protective)
-        XCTAssertEqual(substrateProfile.initiative, .assertive)
+        XCTAssertEqual(substrateProfile.initiative, .guided)
 
         let profile = DecisionIdentityRoleSystem.resolve(
             mode: .quick,
@@ -24,7 +24,7 @@ final class DecisionIdentityAndBoundaryTests: XCTestCase {
 
         XCTAssertEqual(profile.role, .predictiveSentinel)
         XCTAssertEqual(profile.posture, .protective)
-        XCTAssertEqual(profile.initiative, .assertive)
+        XCTAssertEqual(profile.initiative, .guided)
         XCTAssertFalse(profile.canExecuteActions)
         XCTAssertFalse(profile.canEscalateToCloud)
     }

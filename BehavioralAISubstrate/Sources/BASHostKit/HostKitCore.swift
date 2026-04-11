@@ -131,17 +131,6 @@ public enum BASHostWorkflowProfile: String, Codable, Sendable, CaseIterable {
             "Reflective"
         }
     }
-
-    var substrateMode: BASDecisionMode {
-        switch self {
-        case .rapid:
-            .quick
-        case .deliberate:
-            .balance
-        case .reflective:
-            .mirror
-        }
-    }
 }
 
 public enum BASHostLifecyclePhase: String, Codable, Sendable, CaseIterable {
@@ -180,9 +169,9 @@ public struct BASHostWorkflowTitles: Codable, Equatable, Sendable {
     public var reflective: String
 
     public init(
-        rapid: String = "Rapid",
-        deliberate: String = "Deliberate",
-        reflective: String = "Reflective"
+        rapid: String = "Rapid Workflow",
+        deliberate: String = "Deliberate Workflow",
+        reflective: String = "Reflective Workflow"
     ) {
         self.rapid = rapid
         self.deliberate = deliberate
@@ -256,11 +245,11 @@ public struct BASHostSessionTitles: Codable, Equatable, Sendable {
     public var sceneActive: String
 
     public init(
-        rapid: String = "Rapid session",
-        deliberate: String = "Deliberate session",
-        reflective: String = "Reflective session",
-        initialAppearance: String = "Lifecycle Bootstrap",
-        sceneActive: String = "Scene Activation"
+        rapid: String = "Rapid Workflow",
+        deliberate: String = "Deliberate Workflow",
+        reflective: String = "Reflective Workflow",
+        initialAppearance: String = "Host Bootstrap",
+        sceneActive: String = "Host Refresh"
     ) {
         self.rapid = rapid
         self.deliberate = deliberate
@@ -297,9 +286,9 @@ public struct BASHostFollowUpActions: Codable, Equatable, Sendable {
     public var highRiskEscalation: [String]
 
     public init(
-        rapid: [String] = ["Pause once", "Name the next move"],
-        deliberate: [String] = ["Compare tradeoffs", "State one cost and one benefit"],
-        reflective: [String] = ["Slow the narrative", "Pull one grounded reflection"],
+        rapid: [String] = ["Capture the immediate context", "Choose one bounded next move"],
+        deliberate: [String] = ["Compare the active pressures", "State one constraint and one opportunity"],
+        reflective: [String] = ["Clarify the deeper pattern", "Keep one grounded anchor visible"],
         highRiskEscalation: [String] = ["Require stronger confirmation"]
     ) {
         self.rapid = rapid
@@ -335,17 +324,17 @@ public struct BASHostLifecyclePresentation: Codable, Equatable, Sendable {
     public var recomputeGuardedInterventionFollowUp: String
 
     public init(
-        initialAppearancePromptFallback: String = "Load the current brain before the host speaks.",
-        sceneActivePromptFallback: String = "Refresh the current brain and restore the host shell.",
-        refreshMemoryProjectionNotice: String = "Refresh memory projection",
-        refreshCurrentBrainNotice: String = "Refresh current brain",
-        presentPendingReflectionNotice: String = "Present pending reflection",
-        consumePendingLaunchRequestNotice: String = "Consume pending launch request",
+        initialAppearancePromptFallback: String = "Hydrate substrate state before the host renders.",
+        sceneActivePromptFallback: String = "Refresh substrate state and resume the host shell.",
+        refreshMemoryProjectionNotice: String = "Refresh substrate projection",
+        refreshCurrentBrainNotice: String = "Refresh substrate state",
+        presentPendingReflectionNotice: String = "Present deferred follow-up",
+        consumePendingLaunchRequestNotice: String = "Consume deferred entry request",
         restoreActiveWorkspaceNotice: String = "Restore active workspace",
         refreshPredictedInterventionNotice: String = "Refresh predictive intervention",
-        syncWidgetSnapshotNotice: String = "Sync widget snapshot",
-        loadCurrentBrainFollowUp: String = "Load the current brain before rendering",
-        resumeStructuredWorkspaceFollowUp: String = "Resume the last structured workspace",
+        syncWidgetSnapshotNotice: String = "Sync shared snapshot",
+        loadCurrentBrainFollowUp: String = "Hydrate substrate state before rendering",
+        resumeStructuredWorkspaceFollowUp: String = "Resume the active workspace",
         recomputeGuardedInterventionFollowUp: String = "Recompute the guarded intervention state"
     ) {
         self.initialAppearancePromptFallback = initialAppearancePromptFallback
@@ -370,10 +359,10 @@ public struct BASHostNoticeTemplates: Codable, Equatable, Sendable {
     public var emptyPromptGoalFallback: String
 
     public init(
-        enteredWorkflow: String = "{surface} entered the {workflow} workflow through the substrate host kit.",
-        runtimeProfile: String = "Runtime profile {runtimeProfile} is active.",
-        reopenFollowUpAction: String = "Reopen with {workflow} structure",
-        emptyPromptGoalFallback: String = "Stay clear before acting."
+        enteredWorkflow: String = "{surface} entered {workflow} through the host runtime.",
+        runtimeProfile: String = "Runtime profile {runtimeProfile} is active for this host.",
+        reopenFollowUpAction: String = "Reopen with {workflow}",
+        emptyPromptGoalFallback: String = "Keep the host state bounded before acting."
     ) {
         self.enteredWorkflow = enteredWorkflow
         self.runtimeProfile = runtimeProfile
@@ -392,13 +381,13 @@ public struct BASHostPredictiveInterventionPresentation: Codable, Equatable, Sen
     public var defaultReason: String
 
     public init(
-        mediumRiskTitle: String = "Take one slower pass.",
-        mediumRiskDetail: String = "The substrate detected a context that benefits from one more deliberate step.",
-        highRiskTitle: String = "Add more friction before acting.",
-        highRiskDetail: String = "The substrate detected elevated risk and prefers more confirmation before the next move.",
-        reopenRiskDetail: String = "This reopen path is carrying risk, so the substrate is asking for more structure.",
-        fallbackReopenSuggestionDetail: String = "A prior hold suggests restoring friction before you act.",
-        defaultReason: String = "Risk-aware policy prefers a slower path here."
+        mediumRiskTitle: String = "A steadier pass may help here.",
+        mediumRiskDetail: String = "Current signals suggest another structured pass before proceeding.",
+        highRiskTitle: String = "This may need more confirmation.",
+        highRiskDetail: String = "Current signals suggest restoring more structure before the next move.",
+        reopenRiskDetail: String = "This reopen path is carrying extra risk, so the substrate is restoring more structure first.",
+        fallbackReopenSuggestionDetail: String = "A prior hold suggests reopening with more structure before proceeding.",
+        defaultReason: String = "Risk-aware policy prefers a steadier next step here."
     ) {
         self.mediumRiskTitle = mediumRiskTitle
         self.mediumRiskDetail = mediumRiskDetail
@@ -410,93 +399,164 @@ public struct BASHostPredictiveInterventionPresentation: Codable, Equatable, Sen
     }
 }
 
+public struct BASHostLifecycleBehaviorConfiguration: Codable, Equatable, Sendable {
+    public var bootstrapBehavior: BASAppleLifecycleBootstrapBehavior
+    public var currentBrainBootstrapBehavior: BASCurrentBrainBootstrapBehavior
+    public var predictiveInterventionBehavior: BASApplePredictiveInterventionBehavior
+    public var projectionRefreshLimits: BASAppleMemoryProjectionRefreshLimits
+
+    public init(
+        bootstrapBehavior: BASAppleLifecycleBootstrapBehavior = BASAppleLifecycleBootstrapBehavior(),
+        currentBrainBootstrapBehavior: BASCurrentBrainBootstrapBehavior = BASCurrentBrainBootstrapBehavior(),
+        predictiveInterventionBehavior: BASApplePredictiveInterventionBehavior = BASApplePredictiveInterventionBehavior(),
+        projectionRefreshLimits: BASAppleMemoryProjectionRefreshLimits = BASAppleMemoryProjectionRefreshLimits()
+    ) {
+        self.bootstrapBehavior = bootstrapBehavior
+        self.currentBrainBootstrapBehavior = currentBrainBootstrapBehavior
+        self.predictiveInterventionBehavior = predictiveInterventionBehavior
+        self.projectionRefreshLimits = projectionRefreshLimits
+    }
+}
+
 public struct BASHostWorkflowBehaviorConfiguration: Codable, Equatable, Sendable {
+    public var modeIDsByProfileID: [String: String]
     public var templateIDsByProfileID: [String: [String]]
     public var memorySourceIDsByProfileID: [String: String]
     public var interactiveRetrievalModeByProfileID: [String: String]
+    public var memorySourceIDsBySessionKindID: [String: String]
+    public var retrievalModeIDsBySessionKindID: [String: String]
+    public var defaultMemorySourceIDsBySessionKindID: [String: String]
+    public var defaultRetrievalModeIDsBySessionKindID: [String: String]
+    public var failureGuardIDsByRiskLevelID: [String: [String]]
     public var hostNamespace: String
 
     public init(
-        templateIDsByProfileID: [String: [String]] = [
-            BASHostWorkflowProfile.rapid.rawValue: ["template/rapid-stabilization"],
-            BASHostWorkflowProfile.deliberate.rawValue: ["template/tradeoff-deliberation"],
-            BASHostWorkflowProfile.reflective.rawValue: ["template/reflection-reset"]
+        modeIDsByProfileID: [String: String] = [
+            BASHostWorkflowProfile.rapid.rawValue: BASDecisionMode.primaryID,
+            BASHostWorkflowProfile.deliberate.rawValue: BASDecisionMode.comparativeID,
+            BASHostWorkflowProfile.reflective.rawValue: BASDecisionMode.reflectiveID
         ],
-        memorySourceIDsByProfileID: [String: String] = [
-            BASHostWorkflowProfile.rapid.rawValue: BASMemorySource.pattern.rawValue,
-            BASHostWorkflowProfile.deliberate.rawValue: BASMemorySource.history.rawValue,
-            BASHostWorkflowProfile.reflective.rawValue: BASMemorySource.reflection.rawValue
+        templateIDsByProfileID: [String: [String]] = [:],
+        memorySourceIDsByProfileID: [String: String] = [:],
+        interactiveRetrievalModeByProfileID: [String: String] = [:],
+        memorySourceIDsBySessionKindID: [String: String] = [:],
+        retrievalModeIDsBySessionKindID: [String: String] = [:],
+        defaultMemorySourceIDsBySessionKindID: [String: String] = [:],
+        defaultRetrievalModeIDsBySessionKindID: [String: String] = [:],
+        failureGuardIDsByRiskLevelID: [String: [String]] = [
+            BASHostRiskLevel.high.rawValue: ["substrate.guard/elevated-risk"]
         ],
-        interactiveRetrievalModeByProfileID: [String: String] = [
-            BASHostWorkflowProfile.rapid.rawValue: "compact",
-            BASHostWorkflowProfile.deliberate.rawValue: "full",
-            BASHostWorkflowProfile.reflective.rawValue: "full"
-        ],
-        hostNamespace: String = "hostkit"
+        hostNamespace: String = "substrate"
     ) {
+        self.modeIDsByProfileID = modeIDsByProfileID
         self.templateIDsByProfileID = templateIDsByProfileID
         self.memorySourceIDsByProfileID = memorySourceIDsByProfileID
         self.interactiveRetrievalModeByProfileID = interactiveRetrievalModeByProfileID
+        self.memorySourceIDsBySessionKindID = memorySourceIDsBySessionKindID
+        self.retrievalModeIDsBySessionKindID = retrievalModeIDsBySessionKindID
+        self.defaultMemorySourceIDsBySessionKindID = defaultMemorySourceIDsBySessionKindID
+        self.defaultRetrievalModeIDsBySessionKindID = defaultRetrievalModeIDsBySessionKindID
+        self.failureGuardIDsByRiskLevelID = failureGuardIDsByRiskLevelID
         self.hostNamespace = hostNamespace
     }
 
+    public func modeID(for profile: BASHostWorkflowProfile) -> String {
+        modeIDsByProfileID[profile.rawValue, default: defaultModeID(for: profile)]
+    }
+
+    public func mode(for profile: BASHostWorkflowProfile) -> BASDecisionMode {
+        BASDecisionMode(identifier: modeID(for: profile)) ?? .primary
+    }
+
+    public func workflowProfile(forModeID requestedModeID: String) -> BASHostWorkflowProfile? {
+        let requestedAliases = Self.modeAliases(for: requestedModeID)
+
+        for profile in BASHostWorkflowProfile.allCases {
+            let configuredAliases = Self.modeAliases(for: modeID(for: profile))
+            if !requestedAliases.isDisjoint(with: configuredAliases) {
+                return profile
+            }
+        }
+
+        return nil
+    }
+
     public func templateIDs(for profile: BASHostWorkflowProfile) -> [String] {
-        templateIDsByProfileID[profile.rawValue, default: legacyTemplateIDs(for: profile)]
+        templateIDsByProfileID[profile.rawValue, default: []]
     }
 
     public func memorySource(for profile: BASHostWorkflowProfile) -> BASMemorySource {
         memorySourceIDsByProfileID[profile.rawValue]
             .flatMap(BASMemorySource.init(rawValue:))
-            ?? legacyMemorySource(for: profile)
+            ?? .history
     }
 
     public func interactiveRetrievalMode(for profile: BASHostWorkflowProfile) -> String {
-        interactiveRetrievalModeByProfileID[profile.rawValue, default: legacyInteractiveRetrievalMode(for: profile)]
+        interactiveRetrievalModeByProfileID[profile.rawValue, default: BASRetrievalMode.adaptive.rawValue]
+    }
+
+    public func memorySource(for kind: BASHostSessionKind) -> BASMemorySource? {
+        memorySourceIDsBySessionKindID[kind.rawValue]
+            .flatMap(BASMemorySource.init(rawValue:))
+    }
+
+    public func retrievalMode(for kind: BASHostSessionKind) -> String? {
+        retrievalModeIDsBySessionKindID[kind.rawValue]
+    }
+
+    public func defaultMemorySource(for kind: BASHostSessionKind) -> BASMemorySource? {
+        defaultMemorySourceIDsBySessionKindID[kind.rawValue]
+            .flatMap(BASMemorySource.init(rawValue:))
+    }
+
+    public func defaultRetrievalMode(for kind: BASHostSessionKind) -> String? {
+        defaultRetrievalModeIDsBySessionKindID[kind.rawValue]
+    }
+
+    public func failureGuardIDs(for riskLevel: BASHostRiskLevel) -> [String] {
+        failureGuardIDsByRiskLevelID[riskLevel.rawValue, default: []]
     }
 
     public var sessionProvenanceSummary: String {
-        "\(hostNamespace) session request"
+        "Session request from \(hostNamespace)"
     }
 
-    private func legacyTemplateIDs(for profile: BASHostWorkflowProfile) -> [String] {
+    private static func modeAliases(for modeID: String) -> Set<String> {
+        var aliases = Set([modeID])
+        if let mode = BASDecisionMode(identifier: modeID) {
+            aliases.insert(mode.identifier)
+            aliases.insert(mode.rawValue)
+        }
+        return aliases
+    }
+
+    private func defaultModeID(for profile: BASHostWorkflowProfile) -> String {
         switch profile {
         case .rapid:
-            ["template/rapid-stabilization"]
+            BASDecisionMode.primaryID
         case .deliberate:
-            ["template/tradeoff-deliberation"]
+            BASDecisionMode.comparativeID
         case .reflective:
-            ["template/reflection-reset"]
+            BASDecisionMode.reflectiveID
         }
-    }
-
-    private func legacyMemorySource(for profile: BASHostWorkflowProfile) -> BASMemorySource {
-        switch profile {
-        case .rapid:
-            .pattern
-        case .deliberate:
-            .history
-        case .reflective:
-            .reflection
-        }
-    }
-
-    private func legacyInteractiveRetrievalMode(for profile: BASHostWorkflowProfile) -> String {
-        profile == .rapid ? "compact" : "full"
     }
 }
 
 public struct BASHostCognitionBehaviorConfiguration: Codable, Equatable, Sendable {
     public var reactionWeightsByProfileID: [String: BASReactionWeights]
     public var identityProfilesByProfileID: [String: BASIdentityProfile]
+    public var substrateBehavior: BASCognitionBehavior
 
     public init(
         reactionWeightsByProfileID: [String: BASReactionWeights]? = nil,
-        identityProfilesByProfileID: [String: BASIdentityProfile]? = nil
+        identityProfilesByProfileID: [String: BASIdentityProfile]? = nil,
+        substrateBehavior: BASCognitionBehavior = .generic
     ) {
         self.reactionWeightsByProfileID = reactionWeightsByProfileID
             ?? BASHostCognitionBehaviorConfiguration.genericReactionWeightsByProfileID()
         self.identityProfilesByProfileID = identityProfilesByProfileID
             ?? BASHostCognitionBehaviorConfiguration.genericIdentityProfilesByProfileID()
+        self.substrateBehavior = substrateBehavior
     }
 
     public func reactionWeights(for profile: BASHostWorkflowProfile) -> BASReactionWeights {
@@ -526,51 +586,13 @@ public struct BASHostCognitionBehaviorConfiguration: Codable, Equatable, Sendabl
     }
 
     private static func neutralReactionWeights(for profile: BASHostWorkflowProfile) -> BASReactionWeights {
-        switch profile {
-        case .rapid:
-            BASReactionWeights(
-                briefLanguage: 0.56,
-                warmDirectTone: 0.52,
-                lowCognitiveLoad: 0.58,
-                interruptiveActionBias: 0.48,
-                boundaryNamingBias: 0.42,
-                tradeoffClarityBias: 0.44
-            )
-        case .deliberate:
-            BASReactionWeights(
-                briefLanguage: 0.48,
-                warmDirectTone: 0.52,
-                lowCognitiveLoad: 0.46,
-                interruptiveActionBias: 0.36,
-                boundaryNamingBias: 0.46,
-                tradeoffClarityBias: 0.58
-            )
-        case .reflective:
-            BASReactionWeights(
-                briefLanguage: 0.50,
-                warmDirectTone: 0.56,
-                lowCognitiveLoad: 0.50,
-                interruptiveActionBias: 0.28,
-                boundaryNamingBias: 0.58,
-                tradeoffClarityBias: 0.46
-            )
-        }
+        _ = profile
+        return BASReactionWeights.defaults(for: "substrate")
     }
 
     private static func neutralIdentityProfile(for profile: BASHostWorkflowProfile) -> BASIdentityProfile {
-        let posture: BASIdentityPosture = profile == .rapid ? .coaching : .reflective
-        let initiative: BASIdentityInitiative = profile == .reflective ? .passive : .guided
-
-        return BASIdentityProfile(
-            role: .boundedGuide,
-            posture: posture,
-            initiative: initiative,
-            confidenceCeiling: profile == .deliberate ? 0.72 : 0.68,
-            canAdvise: true,
-            canExecuteActions: false,
-            canEscalateToCloud: false,
-            relationshipBoundary: "Stay bounded, local, and explicit about uncertainty."
-        )
+        _ = profile
+        return BASIdentityProfile.default(modeName: "substrate")
     }
 }
 
@@ -607,15 +629,17 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
     public var policyProfileID: String
     public var prefersPureLocal: Bool
     public var console: BASHostConsoleConfiguration
+    public var lifecycleBehavior: BASHostLifecycleBehaviorConfiguration
     public var workflowBehavior: BASHostWorkflowBehaviorConfiguration
     public var cognitionBehavior: BASHostCognitionBehaviorConfiguration
     public var presentation: BASHostPresentationConfiguration
 
     public init(
-        runtimeProfileID: String = "apple.local-first",
-        policyProfileID: String = "private-sdk.fast-evolving",
+        runtimeProfileID: String = "substrate.default-runtime",
+        policyProfileID: String = "substrate.default-policy",
         prefersPureLocal: Bool = true,
         console: BASHostConsoleConfiguration = BASHostConsoleConfiguration(),
+        lifecycleBehavior: BASHostLifecycleBehaviorConfiguration = BASHostLifecycleBehaviorConfiguration(),
         workflowBehavior: BASHostWorkflowBehaviorConfiguration = BASHostWorkflowBehaviorConfiguration(),
         cognitionBehavior: BASHostCognitionBehaviorConfiguration = BASHostCognitionBehaviorConfiguration(),
         presentation: BASHostPresentationConfiguration = BASHostPresentationConfiguration()
@@ -624,6 +648,7 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
         self.policyProfileID = policyProfileID
         self.prefersPureLocal = prefersPureLocal
         self.console = console
+        self.lifecycleBehavior = lifecycleBehavior
         self.workflowBehavior = workflowBehavior
         self.cognitionBehavior = cognitionBehavior
         self.presentation = presentation
@@ -638,11 +663,11 @@ public struct BASHostDependencySet: Codable, Equatable, Sendable {
     public var persistenceProviderID: String
 
     public init(
-        protectedStorageProviderID: String = "apple.protected-storage",
-        handoffProviderID: String = "apple.handoff",
-        notificationProviderID: String = "apple.notifications",
-        modelRegistryID: String = "behavioral-substrate.registry",
-        persistenceProviderID: String = "swiftdata+protected-sidecar"
+        protectedStorageProviderID: String = "substrate.protected-storage",
+        handoffProviderID: String = "substrate.handoff",
+        notificationProviderID: String = "substrate.notifications",
+        modelRegistryID: String = "substrate.model-registry",
+        persistenceProviderID: String = "substrate.persistence"
     ) {
         self.protectedStorageProviderID = protectedStorageProviderID
         self.handoffProviderID = handoffProviderID
@@ -789,6 +814,9 @@ public struct BASHostProjectionSummary: Codable, Equatable, Sendable {
 public struct BASHostCurrentBrain: Codable, Equatable, Sendable {
     public var workflowProfile: BASHostWorkflowProfile
     public var workflowTitle: String
+    public var roleID: String
+    public var relationshipBoundary: String
+    public var boundaryHeadline: String
     public var dominantGoals: [String]
     public var activeConstraints: [String]
     public var retrievalTags: [String]
@@ -799,6 +827,9 @@ public struct BASHostCurrentBrain: Codable, Equatable, Sendable {
     public init(
         workflowProfile: BASHostWorkflowProfile,
         workflowTitle: String,
+        roleID: String,
+        relationshipBoundary: String,
+        boundaryHeadline: String,
         dominantGoals: [String],
         activeConstraints: [String],
         retrievalTags: [String],
@@ -808,6 +839,9 @@ public struct BASHostCurrentBrain: Codable, Equatable, Sendable {
     ) {
         self.workflowProfile = workflowProfile
         self.workflowTitle = workflowTitle
+        self.roleID = roleID
+        self.relationshipBoundary = relationshipBoundary
+        self.boundaryHeadline = boundaryHeadline
         self.dominantGoals = dominantGoals
         self.activeConstraints = activeConstraints
         self.retrievalTags = retrievalTags
@@ -909,6 +943,7 @@ public struct BASHostRuntime: Sendable {
     ) {
         BASAppleAppLifecycleOrchestrationExecutor.execute(
             phase: phase.bootstrapPhase,
+            behavior: configuration.lifecycleBehavior.bootstrapBehavior,
             refreshMemoryProjection: refreshMemoryProjection,
             refreshCurrentBrain: refreshCurrentBrain,
             presentPendingReflection: presentPendingReflection,
@@ -1209,7 +1244,10 @@ public struct BASHostRuntime: Sendable {
         _ request: BASHostLifecycleRequest,
         now: Date = .now
     ) -> BASHostSessionResult {
-        let bootstrapActions = BASAppleLifecycleBootstrapPlanner.actions(for: request.phase.bootstrapPhase)
+        let bootstrapActions = BASAppleLifecycleBootstrapPlanner.actions(
+            for: request.phase.bootstrapPhase,
+            behavior: configuration.lifecycleBehavior.bootstrapBehavior
+        )
         let lifecyclePresentation = configuration.presentation.lifecycle
         let baseRequest = BASHostSessionRequest(
             kind: .interactive,
@@ -1255,8 +1293,8 @@ public struct BASHostRuntime: Sendable {
             riskLevel: request.riskLevel,
             now: now
         )
-        let mode = request.workflowProfile.substrateMode
-        let bootstrapped = BASBrainCompiler.bootstrap(
+        let mode = configuration.workflowBehavior.mode(for: request.workflowProfile)
+        let bootstrapped = BASCognitionBootstrapper.bootstrap(
             request: BASBrainBootstrapRequest(
                 mode: mode,
                 prompt: request.prompt,
@@ -1266,6 +1304,7 @@ public struct BASHostRuntime: Sendable {
                 retrievalMode: retrievalMode(for: request),
                 reactionWeightSeed: configuration.cognitionBehavior.reactionWeights(for: request.workflowProfile),
                 identityProfileOverride: configuration.cognitionBehavior.identityProfile(for: request.workflowProfile),
+                cognitionBehavior: configuration.cognitionBehavior.substrateBehavior,
                 goalHints: goalHints(for: request),
                 constraintHints: constraintHints(for: request),
                 now: now
@@ -1288,7 +1327,9 @@ public struct BASHostRuntime: Sendable {
         )
         let currentBrain = makeHostCurrentBrain(
             from: substrateCurrentBrain,
-            workflowProfile: request.workflowProfile
+            workflowProfile: request.workflowProfile,
+            identityProfile: bootstrapped.brainState.identityProfile,
+            boundaryHeadline: bootstrapped.brainState.boundaryPolicy.auditHeadline
         )
         let notices = baseNotices(for: request)
         let followUpActions = baseFollowUpActions(for: request)
@@ -1319,7 +1360,7 @@ public struct BASHostRuntime: Sendable {
             riskLevelID: request.riskLevel.rawValue,
             title: request.title,
             detail: request.detail,
-            modeID: request.workflowProfile.substrateMode.identifier,
+            modeID: configuration.workflowBehavior.modeID(for: request.workflowProfile),
             reopenHint: request.reopenHint,
             templateHint: request.templateHint,
             interventionHistorySummary: request.interventionHistorySummary,
@@ -1345,8 +1386,7 @@ public struct BASHostRuntime: Sendable {
                 detail: suggestion.detail ?? configuration.presentation.predictiveIntervention.fallbackReopenSuggestionDetail,
                 evidenceSignalCount: suggestion.evidenceSignalCount,
                 preferredWorkflowProfile: suggestion.suggestedModeID
-                    .flatMap(BASDecisionMode.init(identifier:))
-                    .map(Self.workflowProfile(for:)),
+                    .flatMap { configuration.workflowBehavior.workflowProfile(forModeID: $0) },
                 reason: suggestion.reason,
                 expiresAt: suggestion.expiresAt
             )
@@ -1381,22 +1421,32 @@ public struct BASHostRuntime: Sendable {
         now: Date = .now
     ) -> BASHostInterventionSuggestion? {
         guard request.riskLevel >= .medium else { return nil }
+        let predictiveBehavior = configuration.lifecycleBehavior.predictiveInterventionBehavior
+        let riskBehavior: BASApplePredictiveInterventionRiskBehavior = {
+            switch request.riskLevel {
+            case .low:
+                predictiveBehavior.lowRisk
+            case .medium:
+                predictiveBehavior.mediumRisk
+            case .high:
+                predictiveBehavior.highRisk
+            }
+        }()
+
         let predictivePresentation = configuration.presentation.predictiveIntervention
-        let title = request.riskLevel == .high
-            ? predictivePresentation.highRiskTitle
-            : predictivePresentation.mediumRiskTitle
         let detail = request.kind == .reopen
             ? predictivePresentation.reopenRiskDetail
-            : (request.riskLevel == .high
-                ? predictivePresentation.highRiskDetail
-                : predictivePresentation.mediumRiskDetail)
+            : riskBehavior.detail
+
         return BASHostInterventionSuggestion(
             riskLevel: request.riskLevel,
-            title: title,
+            title: riskBehavior.title,
             detail: detail,
             evidenceSignalCount: request.triggerReason == nil ? 1 : 2,
-            preferredWorkflowProfile: request.workflowProfile,
-            reason: request.triggerReason ?? predictivePresentation.defaultReason,
+            preferredWorkflowProfile: riskBehavior.preferredModeID
+                .flatMap { configuration.workflowBehavior.workflowProfile(forModeID: $0) }
+                ?? request.workflowProfile,
+            reason: request.triggerReason ?? predictiveBehavior.defaultReason,
             expiresAt: now.addingTimeInterval(30 * 60)
         )
     }
@@ -1486,11 +1536,16 @@ public struct BASHostRuntime: Sendable {
 
     private func makeHostCurrentBrain(
         from currentBrain: BASCurrentBrainState,
-        workflowProfile: BASHostWorkflowProfile
+        workflowProfile: BASHostWorkflowProfile,
+        identityProfile: BASIdentityProfile,
+        boundaryHeadline: String
     ) -> BASHostCurrentBrain {
         BASHostCurrentBrain(
             workflowProfile: workflowProfile,
             workflowTitle: workflowTitle(for: workflowProfile),
+            roleID: identityProfile.role.identifier,
+            relationshipBoundary: identityProfile.relationshipBoundary,
+            boundaryHeadline: boundaryHeadline,
             dominantGoals: currentBrain.dominantGoals,
             activeConstraints: currentBrain.activeConstraints,
             retrievalTags: currentBrain.retrievalTags,
@@ -1577,45 +1632,33 @@ public struct BASHostRuntime: Sendable {
     }
 
     private func failureGuardIDs(for riskLevel: BASHostRiskLevel) -> [String] {
-        guard riskLevel >= .medium else { return [] }
-        return ["guard/high-risk-delay"]
+        configuration.workflowBehavior.failureGuardIDs(for: riskLevel)
     }
 
     private func retrievalMode(for request: BASHostSessionRequest) -> String {
-        switch request.kind {
-        case .interactive:
-            configuration.workflowBehavior.interactiveRetrievalMode(for: request.workflowProfile)
-        case .ambient, .notification:
-            "guarded"
-        case .reopen:
-            "full"
-        case .handoff, .widget:
-            "compact"
+        if let configured = configuration.workflowBehavior.retrievalMode(for: request.kind) {
+            return configured
         }
+        if request.kind == .interactive {
+            return configuration.workflowBehavior.interactiveRetrievalMode(for: request.workflowProfile)
+        }
+        return configuration.workflowBehavior.defaultRetrievalMode(for: request.kind)
+            ?? BASRetrievalMode.adaptive.rawValue
     }
 
     private func source(for request: BASHostSessionRequest) -> BASMemorySource {
-        switch request.kind {
-        case .interactive, .handoff, .widget:
-            source(for: request.workflowProfile)
-        case .ambient, .reopen, .notification:
-            .reminder
+        if let configured = configuration.workflowBehavior.memorySource(for: request.kind) {
+            return configured
         }
+        if request.kind == .interactive {
+            return source(for: request.workflowProfile)
+        }
+        return configuration.workflowBehavior.defaultMemorySource(for: request.kind)
+            ?? source(for: request.workflowProfile)
     }
 
     private func source(for profile: BASHostWorkflowProfile) -> BASMemorySource {
         configuration.workflowBehavior.memorySource(for: profile)
-    }
-
-    private static func workflowProfile(for mode: BASDecisionMode) -> BASHostWorkflowProfile {
-        switch mode {
-        case .quick:
-            .rapid
-        case .balance:
-            .deliberate
-        case .mirror:
-            .reflective
-        }
     }
 
     private func compactGoals(primary: String?, prompt: String) -> [String] {

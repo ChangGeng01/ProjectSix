@@ -72,7 +72,7 @@ struct BASCognitionCoreTests {
 
         #expect(profile.role == .predictiveSentinel)
         #expect(profile.posture == .protective)
-        #expect(profile.initiative == .assertive)
+        #expect(profile.initiative == .guided)
         #expect(profile.canExecuteActions == false)
         #expect(profile.canEscalateToCloud == false)
     }
@@ -113,7 +113,7 @@ struct BASCognitionCoreTests {
         #expect(policy.activeConstraints.contains(.noCloudEscalation))
         #expect(policy.activeConstraints.contains(.watchSurfaceLightweight))
         #expect(policy.requiredConfirmations.contains("irreversible_decision"))
-        #expect(policy.allowedActionClasses.contains("quick_capture"))
+        #expect(policy.allowedActionClasses.contains("lightweight_capture"))
         #expect(policy.allowedActionClasses.contains("checkpoint_reopen"))
         #expect(policy.blockedActionClasses.contains("deep_editor_surface"))
     }

@@ -7,9 +7,9 @@ public struct BASAppleEntryIntentSuggestionPresentation: Codable, Equatable, Sen
     public var fallbackReason: String
 
     public init(
-        fallbackTitle: String = "Take one slower pass.",
-        fallbackDetail: String = "A predicted pattern suggests using a slower path here.",
-        fallbackReason: String = "A recent pattern suggests adding more friction before acting."
+        fallbackTitle: String = "A steadier pass may help here.",
+        fallbackDetail: String = "A predicted pattern suggests restoring more structure here.",
+        fallbackReason: String = "A recent pattern suggests slowing this down before acting."
     ) {
         self.fallbackTitle = fallbackTitle
         self.fallbackDetail = fallbackDetail

@@ -216,7 +216,7 @@ struct BASAppleCurrentBrainBootstrapTests {
         )
 
         #expect(request.mode == BASDecisionMode.quick)
-        #expect(request.source == BASMemorySource.pattern)
+        #expect(request.source == BASMemorySource.history)
         #expect(request.sourceSurface == BASInteractionSurface.app)
         #expect(request.riskLevel == BASRiskLevel.low)
         #expect(request.retrievalMode == "filtered")
@@ -586,8 +586,36 @@ struct BASAppleCurrentBrainBootstrapTests {
 
         #expect(preparation.sourceSurface == .watch)
         #expect(preparation.languageMode == .chinese)
-        #expect(preparation.memorySource == .reminder)
+        #expect(preparation.memorySource == .history)
         #expect(preparation.riskLevel == .high)
+    }
+
+    @Test("prepare honors host-injected bootstrap behavior for surface and memory source")
+    func prepareHonorsHostInjectedBootstrapBehavior() {
+        let preparation = BASCurrentBrainBootstrapCoordinator.prepare(
+            request: BASCurrentBrainBootstrapPreparationRequest(
+                mode: .balance,
+                prompt: "Compare these two options with more structure.",
+                trigger: .watchHandoff,
+                preferredLanguages: ["en-AU"],
+                behavior: BASCurrentBrainBootstrapBehavior(
+                    sourceSurfaceOverridesByTriggerID: [
+                        BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue: BASInteractionSurface.shortcut.rawValue
+                    ],
+                    enforcedSourceSurfaceByTriggerID: [:],
+                    memorySourceOverridesByTriggerID: [
+                        BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue: BASMemorySource.history.rawValue
+                    ],
+                    memorySourceOverridesByModeID: [
+                        BASDecisionMode.balance.identifier: BASMemorySource.pattern.rawValue
+                    ]
+                ),
+                now: Date(timeIntervalSince1970: 1_744_322_320)
+            )
+        )
+
+        #expect(preparation.sourceSurface == .shortcut)
+        #expect(preparation.memorySource == .pattern)
     }
 
     @Test("bootstrap orders interventions and enriches the projection before cognition bootstrap")

@@ -26,7 +26,8 @@ enum DecisionBoundaryPolicyEngine {
             riskLevel: substrateRiskLevel(from: riskLevel),
             identityProfile: identityProfile,
             brainState: brainState,
-            taskGraphHint: taskGraphHint
+            taskGraphHint: taskGraphHint,
+            behavior: BeforeProductLanguage.hostCognition.substrateBehavior
         )
     }
 

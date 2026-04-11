@@ -8,21 +8,65 @@ public struct BASAppleMemoryProjectionRefreshLimits: Codable, Equatable, Sendabl
     public var recordLimit: Int
     public var candidateLimit: Int
     public var checkEventLimit: Int
-    public var balanceRecordLimit: Int
-    public var mirrorRecordLimit: Int
+    public var comparativeRecordLimit: Int
+    public var reflectiveRecordLimit: Int
+
+    public var balanceRecordLimit: Int {
+        get { comparativeRecordLimit }
+        set { comparativeRecordLimit = newValue }
+    }
+
+    public var mirrorRecordLimit: Int {
+        get { reflectiveRecordLimit }
+        set { reflectiveRecordLimit = newValue }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case recordLimit
+        case candidateLimit
+        case checkEventLimit
+        case comparativeRecordLimit
+        case reflectiveRecordLimit
+        case balanceRecordLimit
+        case mirrorRecordLimit
+    }
 
     public init(
         recordLimit: Int = 72,
         candidateLimit: Int = 32,
         checkEventLimit: Int = 96,
-        balanceRecordLimit: Int = 36,
-        mirrorRecordLimit: Int = 36
+        comparativeRecordLimit: Int = 36,
+        reflectiveRecordLimit: Int = 36,
+        balanceRecordLimit: Int? = nil,
+        mirrorRecordLimit: Int? = nil
     ) {
         self.recordLimit = recordLimit
         self.candidateLimit = candidateLimit
         self.checkEventLimit = checkEventLimit
-        self.balanceRecordLimit = balanceRecordLimit
-        self.mirrorRecordLimit = mirrorRecordLimit
+        self.comparativeRecordLimit = balanceRecordLimit ?? comparativeRecordLimit
+        self.reflectiveRecordLimit = mirrorRecordLimit ?? reflectiveRecordLimit
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        recordLimit = try container.decodeIfPresent(Int.self, forKey: .recordLimit) ?? 72
+        candidateLimit = try container.decodeIfPresent(Int.self, forKey: .candidateLimit) ?? 32
+        checkEventLimit = try container.decodeIfPresent(Int.self, forKey: .checkEventLimit) ?? 96
+        comparativeRecordLimit = try container.decodeIfPresent(Int.self, forKey: .comparativeRecordLimit) ??
+            container.decodeIfPresent(Int.self, forKey: .balanceRecordLimit) ??
+            36
+        reflectiveRecordLimit = try container.decodeIfPresent(Int.self, forKey: .reflectiveRecordLimit) ??
+            container.decodeIfPresent(Int.self, forKey: .mirrorRecordLimit) ??
+            36
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(recordLimit, forKey: .recordLimit)
+        try container.encode(candidateLimit, forKey: .candidateLimit)
+        try container.encode(checkEventLimit, forKey: .checkEventLimit)
+        try container.encode(comparativeRecordLimit, forKey: .comparativeRecordLimit)
+        try container.encode(reflectiveRecordLimit, forKey: .reflectiveRecordLimit)
     }
 }
 
@@ -67,6 +111,98 @@ public enum BASAppleMemoryProjectionRefreshAdapter {
         Candidate: BASAppleCandidateMemoryEntity,
         Reminder: BASAppleReminderMemoryEntity,
         Event: BASAppleCheckEventMemoryEntity & BASAppleProjectionEventSource,
+        Comparative: BASAppleComparativeMemoryEntity,
+        Reflective: BASAppleReflectiveMemoryEntity
+    >(
+        in context: ModelContext,
+        now: Date,
+        governanceSnapshot: BASAppleProjectionGovernanceSnapshot,
+        refreshGovernanceSnapshot: (ModelContext) -> BASAppleProjectionGovernanceSnapshot,
+        limits: BASAppleMemoryProjectionRefreshLimits = .default,
+        reminderType: Reminder.Type,
+        checkEventType: Event.Type,
+        comparativeRecordType: Comparative.Type,
+        reflectiveRecordType: Reflective.Type,
+        behavior: BASMemoryDerivationBehavior = .generic,
+        fetchRecords: (ModelContext, Int) -> [Governed],
+        fetchCandidates: (ModelContext, Int) -> [Candidate],
+        fetchCheckEvents: (ModelContext, Int) -> [Event],
+        fetchComparativeRecords: (ModelContext, Int) -> [Comparative],
+        fetchReflectiveRecords: (ModelContext, Int) -> [Reflective],
+        rebuildEmbeddings: (
+            _ records: [Governed],
+            _ candidates: [Candidate],
+            _ checkEvents: [Event],
+            _ comparativeRecords: [Comparative],
+            _ reflectiveRecords: [Reflective]
+        ) -> Void,
+        onSaveError: ((Error) -> Void)? = nil
+    ) -> BASAppleMemoryProjectionRefreshResult {
+        var resolvedGovernanceSnapshot = governanceSnapshot
+        let records = fetchRecords(context, limits.recordLimit)
+        let candidates = fetchCandidates(context, limits.candidateLimit)
+        let resolvedRecords: [Governed]
+        let resolvedCandidates: [Candidate]
+
+        if resolvedGovernanceSnapshot.totalRecordCount == 0 &&
+            resolvedGovernanceSnapshot.totalCandidateCount == 0 {
+            let refreshed: BASAppleMemoryReconciliationWriteResult<Governed, Candidate> =
+                BASAppleMemoryGovernanceAdapter.refreshStoredMemories(
+                    in: context,
+                    now: now,
+                    reminderType: reminderType,
+                    checkEventType: checkEventType,
+                    comparativeRecordType: comparativeRecordType,
+                    reflectiveRecordType: reflectiveRecordType,
+                    behavior: behavior,
+                    onSaveError: onSaveError
+                )
+            resolvedRecords = Array(refreshed.orderedRecords.prefix(limits.recordLimit))
+            resolvedGovernanceSnapshot = refreshGovernanceSnapshot(context)
+            resolvedCandidates = fetchCandidates(context, limits.candidateLimit)
+        } else {
+            resolvedRecords = records
+            resolvedCandidates = candidates
+        }
+
+        let checkEvents = fetchCheckEvents(context, limits.checkEventLimit)
+        let comparativeRecords = fetchComparativeRecords(context, limits.comparativeRecordLimit)
+        let reflectiveRecords = fetchReflectiveRecords(context, limits.reflectiveRecordLimit)
+
+        rebuildEmbeddings(
+            resolvedRecords,
+            resolvedCandidates,
+            checkEvents,
+            comparativeRecords,
+            reflectiveRecords
+        )
+
+        let projection = BASAppleMemoryProjectionAdapter.compileProjection(
+            records: resolvedRecords,
+            candidates: resolvedCandidates,
+            events: checkEvents,
+            governanceSnapshot: resolvedGovernanceSnapshot
+        )
+
+        return BASAppleMemoryProjectionRefreshResult(
+            baseProjection: projection,
+            governanceSnapshot: resolvedGovernanceSnapshot,
+            diagnostics: BASAppleMemoryProjectionDiagnostics(
+                recordCount: resolvedRecords.count,
+                candidateCount: resolvedCandidates.count,
+                allCandidatesPending: resolvedCandidates.allSatisfy {
+                    $0.basSnapshot.status == .pending
+                }
+            ),
+            refreshedAt: now
+        )
+    }
+
+    public static func refreshProjection<
+        Governed: BASAppleGovernedMemoryEntity,
+        Candidate: BASAppleCandidateMemoryEntity,
+        Reminder: BASAppleReminderMemoryEntity,
+        Event: BASAppleCheckEventMemoryEntity & BASAppleProjectionEventSource,
         Balance: BASAppleBalanceMemoryEntity,
         Mirror: BASAppleMirrorMemoryEntity
     >(
@@ -94,68 +230,173 @@ public enum BASAppleMemoryProjectionRefreshAdapter {
         ) -> Void,
         onSaveError: ((Error) -> Void)? = nil
     ) -> BASAppleMemoryProjectionRefreshResult {
-        var resolvedGovernanceSnapshot = governanceSnapshot
-        let records = fetchRecords(context, limits.recordLimit)
-        let candidates = fetchCandidates(context, limits.candidateLimit)
-        let resolvedRecords: [Governed]
-        let resolvedCandidates: [Candidate]
-
-        if resolvedGovernanceSnapshot.totalRecordCount == 0 &&
-            resolvedGovernanceSnapshot.totalCandidateCount == 0 {
-            let refreshed: BASAppleMemoryReconciliationWriteResult<Governed, Candidate> =
-                BASAppleMemoryGovernanceAdapter.refreshStoredMemories(
-                    in: context,
-                    now: now,
-                    reminderType: reminderType,
-                    checkEventType: checkEventType,
-                    balanceRecordType: balanceRecordType,
-                    mirrorRecordType: mirrorRecordType,
-                    behavior: behavior,
-                    onSaveError: onSaveError
-                )
-            resolvedRecords = Array(refreshed.orderedRecords.prefix(limits.recordLimit))
-            resolvedGovernanceSnapshot = refreshGovernanceSnapshot(context)
-            resolvedCandidates = fetchCandidates(context, limits.candidateLimit)
-        } else {
-            resolvedRecords = records
-            resolvedCandidates = candidates
-        }
-
-        let checkEvents = fetchCheckEvents(context, limits.checkEventLimit)
-        let balanceRecords = fetchBalanceRecords(context, limits.balanceRecordLimit)
-        let mirrorRecords = fetchMirrorRecords(context, limits.mirrorRecordLimit)
-
-        rebuildEmbeddings(
-            resolvedRecords,
-            resolvedCandidates,
-            checkEvents,
-            balanceRecords,
-            mirrorRecords
-        )
-
-        let projection = BASAppleMemoryProjectionAdapter.compileProjection(
-            records: resolvedRecords,
-            candidates: resolvedCandidates,
-            events: checkEvents,
-            governanceSnapshot: resolvedGovernanceSnapshot
-        )
-
-        return BASAppleMemoryProjectionRefreshResult(
-            baseProjection: projection,
-            governanceSnapshot: resolvedGovernanceSnapshot,
-            diagnostics: BASAppleMemoryProjectionDiagnostics(
-                recordCount: resolvedRecords.count,
-                candidateCount: resolvedCandidates.count,
-                allCandidatesPending: resolvedCandidates.allSatisfy {
-                    $0.basSnapshot.status == .pending
-                }
-            ),
-            refreshedAt: now
+        refreshProjection(
+            in: context,
+            now: now,
+            governanceSnapshot: governanceSnapshot,
+            refreshGovernanceSnapshot: refreshGovernanceSnapshot,
+            limits: limits,
+            reminderType: reminderType,
+            checkEventType: checkEventType,
+            comparativeRecordType: balanceRecordType,
+            reflectiveRecordType: mirrorRecordType,
+            behavior: behavior,
+            fetchRecords: fetchRecords,
+            fetchCandidates: fetchCandidates,
+            fetchCheckEvents: fetchCheckEvents,
+            fetchComparativeRecords: fetchBalanceRecords,
+            fetchReflectiveRecords: fetchMirrorRecords,
+            rebuildEmbeddings: rebuildEmbeddings,
+            onSaveError: onSaveError
         )
     }
 }
 
 public enum BASAppleMemoryProjectionRuntime {
+    public static func refresh<
+        Governed: BASAppleGovernedMemoryEntity,
+        Candidate: BASAppleCandidateMemoryEntity,
+        Reminder: BASAppleReminderMemoryEntity,
+        Event: BASAppleCheckEventMemoryEntity & BASAppleProjectionEventSource,
+        Comparative: BASAppleComparativeMemoryEntity,
+        Reflective: BASAppleReflectiveMemoryEntity
+    >(
+        in context: ModelContext,
+        now: Date,
+        limits: BASAppleMemoryProjectionRefreshLimits = .default,
+        recordType: Governed.Type,
+        candidateType: Candidate.Type,
+        reminderType: Reminder.Type,
+        checkEventType: Event.Type,
+        comparativeRecordType: Comparative.Type,
+        reflectiveRecordType: Reflective.Type,
+        behavior: BASMemoryDerivationBehavior = .generic,
+        rebuildEmbeddings: (
+            _ records: [Governed],
+            _ candidates: [Candidate],
+            _ checkEvents: [Event],
+            _ comparativeRecords: [Comparative],
+            _ reflectiveRecords: [Reflective]
+        ) -> Void,
+        onSaveError: ((Error) -> Void)? = nil
+    ) -> BASAppleMemoryProjectionRefreshResult {
+        refresh(
+            in: context,
+            now: now,
+            limits: limits,
+            recordType: recordType,
+            candidateType: candidateType,
+            reminderType: reminderType,
+            checkEventType: checkEventType,
+            comparativeRecordType: comparativeRecordType,
+            reflectiveRecordType: reflectiveRecordType,
+            behavior: behavior,
+            fetchRecords: {
+                BASAppleMemoryProjectionSelectionAdapter.fetchProjectionRecords(
+                    in: $0,
+                    recordType: recordType,
+                    limit: $1
+                )
+            },
+            fetchCandidates: {
+                BASAppleMemoryProjectionSelectionAdapter.fetchPendingProjectionCandidates(
+                    in: $0,
+                    candidateType: candidateType,
+                    limit: $1
+                )
+            },
+            fetchCheckEvents: {
+                BASAppleMemoryProjectionSelectionAdapter.fetchProjectionTemporalEntries(
+                    in: $0,
+                    entryType: checkEventType,
+                    limit: $1,
+                    timestamp: { $0.basCheckEventMemoryInput.createdAt },
+                    stableID: { $0.basCheckEventMemoryInput.id }
+                )
+            },
+            fetchComparativeRecords: {
+                BASAppleMemoryProjectionSelectionAdapter.fetchProjectionComparativeRecords(
+                    in: $0,
+                    comparativeType: comparativeRecordType,
+                    limit: $1
+                )
+            },
+            fetchReflectiveRecords: {
+                BASAppleMemoryProjectionSelectionAdapter.fetchProjectionReflectiveRecords(
+                    in: $0,
+                    reflectiveType: reflectiveRecordType,
+                    limit: $1
+                )
+            },
+            rebuildEmbeddings: rebuildEmbeddings,
+            onSaveError: onSaveError
+        )
+    }
+
+    public static func refresh<
+        Governed: BASAppleGovernedMemoryEntity,
+        Candidate: BASAppleCandidateMemoryEntity,
+        Reminder: BASAppleReminderMemoryEntity,
+        Event: BASAppleCheckEventMemoryEntity & BASAppleProjectionEventSource,
+        Comparative: BASAppleComparativeMemoryEntity,
+        Reflective: BASAppleReflectiveMemoryEntity
+    >(
+        in context: ModelContext,
+        now: Date,
+        limits: BASAppleMemoryProjectionRefreshLimits = .default,
+        recordType: Governed.Type,
+        candidateType: Candidate.Type,
+        reminderType: Reminder.Type,
+        checkEventType: Event.Type,
+        comparativeRecordType: Comparative.Type,
+        reflectiveRecordType: Reflective.Type,
+        behavior: BASMemoryDerivationBehavior = .generic,
+        fetchRecords: (ModelContext, Int) -> [Governed],
+        fetchCandidates: (ModelContext, Int) -> [Candidate],
+        fetchCheckEvents: (ModelContext, Int) -> [Event],
+        fetchComparativeRecords: (ModelContext, Int) -> [Comparative],
+        fetchReflectiveRecords: (ModelContext, Int) -> [Reflective],
+        rebuildEmbeddings: (
+            _ records: [Governed],
+            _ candidates: [Candidate],
+            _ checkEvents: [Event],
+            _ comparativeRecords: [Comparative],
+            _ reflectiveRecords: [Reflective]
+        ) -> Void,
+        onSaveError: ((Error) -> Void)? = nil
+    ) -> BASAppleMemoryProjectionRefreshResult {
+        let governanceSnapshot = BASAppleMemoryProjectionSelectionAdapter.governanceSnapshot(
+            in: context,
+            recordType: recordType,
+            candidateType: candidateType
+        )
+        return BASAppleMemoryProjectionRefreshAdapter.refreshProjection(
+            in: context,
+            now: now,
+            governanceSnapshot: governanceSnapshot,
+            refreshGovernanceSnapshot: {
+                BASAppleMemoryProjectionSelectionAdapter.governanceSnapshot(
+                    in: $0,
+                    recordType: recordType,
+                    candidateType: candidateType
+                )
+            },
+            limits: limits,
+            reminderType: reminderType,
+            checkEventType: checkEventType,
+            comparativeRecordType: comparativeRecordType,
+            reflectiveRecordType: reflectiveRecordType,
+            behavior: behavior,
+            fetchRecords: fetchRecords,
+            fetchCandidates: fetchCandidates,
+            fetchCheckEvents: fetchCheckEvents,
+            fetchComparativeRecords: fetchComparativeRecords,
+            fetchReflectiveRecords: fetchReflectiveRecords,
+            rebuildEmbeddings: rebuildEmbeddings,
+            onSaveError: onSaveError
+        )
+    }
+
     public static func refresh<
         Governed: BASAppleGovernedMemoryEntity,
         Candidate: BASAppleCandidateMemoryEntity,
@@ -191,44 +432,9 @@ public enum BASAppleMemoryProjectionRuntime {
             candidateType: candidateType,
             reminderType: reminderType,
             checkEventType: checkEventType,
-            balanceRecordType: balanceRecordType,
-            mirrorRecordType: mirrorRecordType,
+            comparativeRecordType: balanceRecordType,
+            reflectiveRecordType: mirrorRecordType,
             behavior: behavior,
-            fetchRecords: {
-                BASAppleMemoryProjectionSelectionAdapter.fetchProjectionRecords(
-                    in: $0,
-                    recordType: recordType,
-                    limit: $1
-                )
-            },
-            fetchCandidates: {
-                BASAppleMemoryProjectionSelectionAdapter.fetchPendingProjectionCandidates(
-                    in: $0,
-                    candidateType: candidateType,
-                    limit: $1
-                )
-            },
-            fetchCheckEvents: {
-                BASAppleMemoryProjectionSelectionAdapter.fetchProjectionCheckEvents(
-                    in: $0,
-                    eventType: checkEventType,
-                    limit: $1
-                )
-            },
-            fetchBalanceRecords: {
-                BASAppleMemoryProjectionSelectionAdapter.fetchProjectionBalanceRecords(
-                    in: $0,
-                    balanceType: balanceRecordType,
-                    limit: $1
-                )
-            },
-            fetchMirrorRecords: {
-                BASAppleMemoryProjectionSelectionAdapter.fetchProjectionMirrorRecords(
-                    in: $0,
-                    mirrorType: mirrorRecordType,
-                    limit: $1
-                )
-            },
             rebuildEmbeddings: rebuildEmbeddings,
             onSaveError: onSaveError
         )
@@ -266,33 +472,22 @@ public enum BASAppleMemoryProjectionRuntime {
         ) -> Void,
         onSaveError: ((Error) -> Void)? = nil
     ) -> BASAppleMemoryProjectionRefreshResult {
-        let governanceSnapshot = BASAppleMemoryProjectionSelectionAdapter.governanceSnapshot(
-            in: context,
-            recordType: recordType,
-            candidateType: candidateType
-        )
-        return BASAppleMemoryProjectionRefreshAdapter.refreshProjection(
+        refresh(
             in: context,
             now: now,
-            governanceSnapshot: governanceSnapshot,
-            refreshGovernanceSnapshot: {
-                BASAppleMemoryProjectionSelectionAdapter.governanceSnapshot(
-                    in: $0,
-                    recordType: recordType,
-                    candidateType: candidateType
-                )
-            },
             limits: limits,
+            recordType: recordType,
+            candidateType: candidateType,
             reminderType: reminderType,
             checkEventType: checkEventType,
-            balanceRecordType: balanceRecordType,
-            mirrorRecordType: mirrorRecordType,
+            comparativeRecordType: balanceRecordType,
+            reflectiveRecordType: mirrorRecordType,
             behavior: behavior,
             fetchRecords: fetchRecords,
             fetchCandidates: fetchCandidates,
             fetchCheckEvents: fetchCheckEvents,
-            fetchBalanceRecords: fetchBalanceRecords,
-            fetchMirrorRecords: fetchMirrorRecords,
+            fetchComparativeRecords: fetchBalanceRecords,
+            fetchReflectiveRecords: fetchMirrorRecords,
             rebuildEmbeddings: rebuildEmbeddings,
             onSaveError: onSaveError
         )

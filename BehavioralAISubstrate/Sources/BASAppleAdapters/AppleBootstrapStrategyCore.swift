@@ -96,7 +96,7 @@ public enum BASAppleBootstrapStrategyAdapter {
         modePriority: [String],
         taskGraphModeID: String?,
         taskGraphPromptSeed: String?,
-        defaultModeID: String = BASDecisionMode.quick.identifier
+        defaultModeID: String = BASDecisionMode.primaryID
     ) -> BASAppleActiveSessionSeed {
         for modeID in modePriority {
             guard let fragments = promptFragmentsByModeID[modeID] else { continue }
@@ -121,13 +121,13 @@ public enum BASAppleBootstrapStrategyAdapter {
         templates: [BASAppleCurrentBrainBootstrapHostTemplateInput]
     ) -> [String] {
         BASBrainBootstrapAdvisor.orderedTemplateIDs(
-            mode: BASDecisionMode(identifier: modeID) ?? .quick,
+            mode: BASDecisionMode(identifier: modeID) ?? .primary,
             riskLevel: BASRiskLevel(rawValue: riskLevelID) ?? .low,
             recommendedTemplateIDs: recommendedTemplateIDs,
             templates: templates.map { template in
                 BASInterventionTemplateDescriptor(
                     id: template.id,
-                    mode: BASDecisionMode(identifier: template.modeID) ?? .quick,
+                    mode: BASDecisionMode(identifier: template.modeID) ?? .primary,
                     riskLevel: BASRiskLevel(rawValue: template.riskLevelID) ?? .low,
                     isPinned: template.isPinned,
                     successCount: template.successCount,
@@ -142,11 +142,11 @@ public enum BASAppleBootstrapStrategyAdapter {
         failurePatterns: [BASAppleCurrentBrainBootstrapHostFailurePatternInput]
     ) -> [String] {
         BASBrainBootstrapAdvisor.orderedFailurePatternIDs(
-            mode: BASDecisionMode(identifier: modeID) ?? .quick,
+            mode: BASDecisionMode(identifier: modeID) ?? .primary,
             failurePatterns: failurePatterns.map { pattern in
                 BASFailurePatternDescriptor(
                     id: pattern.id,
-                    mode: BASDecisionMode(identifier: pattern.modeID) ?? .quick,
+                    mode: BASDecisionMode(identifier: pattern.modeID) ?? .primary,
                     suppressionWeight: pattern.suppressionWeight,
                     evidenceCount: pattern.evidenceCount,
                     updatedAt: pattern.updatedAt

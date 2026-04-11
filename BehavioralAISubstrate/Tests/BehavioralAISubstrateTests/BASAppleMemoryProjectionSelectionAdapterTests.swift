@@ -325,7 +325,7 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
         #expect(candidates.map(\.basID) == ["candidate-a", "candidate-b"])
     }
 
-    @Test("event and workspace fetch adapters keep newest-first canonical ordering")
+    @Test("generic temporal fetch keeps newest-first canonical ordering across host-defined sources")
     func eventAndWorkspaceFetchAdaptersPreserveOrdering() throws {
         let now = Date(timeIntervalSinceReferenceDate: 1_000)
         let context = try makeContext()
@@ -341,18 +341,37 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
             in: context,
             eventType: SelectionCheckEventFixture.self
         )
-        let balances = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionBalanceRecords(
+        let balances = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionComparativeRecords(
             in: context,
-            balanceType: SelectionBalanceFixture.self
+            comparativeType: SelectionBalanceFixture.self
         )
-        let mirrors = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionMirrorRecords(
+        let mirrors = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionReflectiveRecords(
             in: context,
-            mirrorType: SelectionMirrorFixture.self
+            reflectiveType: SelectionMirrorFixture.self
+        )
+        let genericChecks = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionTemporalEntries(
+            in: context,
+            entryType: SelectionCheckEventFixture.self,
+            timestamp: { $0.basCheckEventMemoryInput.createdAt },
+            stableID: { $0.basCheckEventMemoryInput.id }
+        )
+        let genericBalances = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionTemporalEntries(
+            in: context,
+            entryType: SelectionBalanceFixture.self,
+            timestamp: { $0.basBalanceMemoryInput.updatedAt }
+        )
+        let genericMirrors = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionTemporalEntries(
+            in: context,
+            entryType: SelectionMirrorFixture.self,
+            timestamp: { $0.basMirrorMemoryInput.updatedAt }
         )
 
         #expect(checks.map(\.id) == ["check-a", "check-b"])
         #expect(balances.map(\.prompt) == ["balance-a", "balance-b"])
         #expect(mirrors.map(\.prompt) == ["mirror-a", "mirror-b"])
+        #expect(genericChecks.map(\.id) == ["check-a", "check-b"])
+        #expect(genericBalances.map(\.prompt) == ["balance-a", "balance-b"])
+        #expect(genericMirrors.map(\.prompt) == ["mirror-a", "mirror-b"])
     }
 
     private func makeContext() throws -> ModelContext {

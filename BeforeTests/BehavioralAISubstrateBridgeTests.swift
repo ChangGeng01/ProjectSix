@@ -216,7 +216,7 @@ struct BehavioralAISubstrateBridgeTests {
         }
 
         #expect(hostResult.currentBrain.workflowProfile == expectedProfile)
-        #expect(hostResult.currentBrain.activeTemplateCount > 0)
+        #expect(hostResult.currentBrain.activeTemplateCount == 0)
         #expect(hostResult.currentBrain.failureGuardCount > 0)
         #expect(hostResult.currentBrain.activeConstraints.contains("high-risk-confirmation"))
         #expect(hostResult.interventionSuggestion?.preferredWorkflowProfile == expectedProfile)
@@ -521,11 +521,7 @@ struct BehavioralAISubstrateBridgeTests {
         #expect(
             actions == [
                 "projection",
-                "brain:launch",
-                "reflection",
-                "restore",
-                "refresh_prediction",
-                "widget"
+                "brain:launch"
             ]
         )
     }

@@ -9,7 +9,7 @@ final class SampleHostTests: XCTestCase {
         XCTAssertFalse(model.result.currentBrain.dominantGoals.isEmpty)
         XCTAssertFalse(model.result.consoleSnapshot.reports.isEmpty)
         XCTAssertEqual(model.result.activeSessionTitle, "SampleHost Bootstrap")
-        XCTAssertTrue(model.result.notices.contains("Refresh memory projection"))
+        XCTAssertTrue(model.result.notices.contains("Refresh substrate projection"))
     }
 
     func testReflectiveSessionUpdatesMode() {
@@ -21,8 +21,10 @@ final class SampleHostTests: XCTestCase {
         XCTAssertEqual(model.result.currentBrain.workflowTitle, "Reflective Lens")
         XCTAssertEqual(model.result.requestKind.rawValue, "interactive")
         XCTAssertEqual(model.result.workflowProfile.rawValue, "reflective")
-        XCTAssertEqual(model.result.activeSessionTitle, "Reflective from SampleHost")
+        XCTAssertEqual(model.result.activeSessionTitle, "Reflective Lens from SampleHost")
         XCTAssertTrue(model.result.notices.contains("Application entered the reflective lens lane in SampleHost."))
+        XCTAssertEqual(model.result.interventionSuggestion?.title, "Run this through Compare Lens first.")
+        XCTAssertEqual(model.result.interventionSuggestion?.preferredWorkflowProfile, .deliberate)
         XCTAssertEqual(model.result.projection.activeTemplateIDs, ["samplehost.template.reflective-lens"])
         XCTAssertTrue(model.result.currentBrain.verificationSummary.hasPrefix("samplehost/"))
     }

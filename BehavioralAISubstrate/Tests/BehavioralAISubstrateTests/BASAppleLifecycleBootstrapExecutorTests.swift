@@ -3,8 +3,8 @@ import Testing
 
 @Suite("BASApple Lifecycle Bootstrap Executor")
 struct BASAppleLifecycleBootstrapExecutorTests {
-    @Test("executor preserves initial appearance action order")
-    func executorPreservesInitialAppearanceActionOrder() {
+    @Test("executor preserves generic initial appearance action order")
+    func executorPreservesGenericInitialAppearanceActionOrder() {
         var calls: [String] = []
 
         BASAppleLifecycleBootstrapExecutor.execute(
@@ -21,11 +21,7 @@ struct BASAppleLifecycleBootstrapExecutorTests {
         #expect(calls == [
             "refreshMemoryProjection",
             "refreshCurrentBrain:launch",
-            "presentPendingReflection",
-            "consumePendingLaunchRequest",
-            "restoreActiveWorkspace",
-            "refreshPredictedIntervention",
-            "syncWidgetSnapshot"
+            "consumePendingLaunchRequest"
         ])
     }
 

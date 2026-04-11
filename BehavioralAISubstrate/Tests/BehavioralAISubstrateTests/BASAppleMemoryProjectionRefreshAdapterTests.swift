@@ -411,20 +411,20 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
             refreshGovernanceSnapshot: { governanceSnapshot(in: $0) },
             reminderType: ReminderFixture.self,
             checkEventType: CheckEventFixture.self,
-            balanceRecordType: BalanceFixture.self,
-            mirrorRecordType: MirrorFixture.self,
+            comparativeRecordType: BalanceFixture.self,
+            reflectiveRecordType: MirrorFixture.self,
             fetchRecords: { fetchRecords(in: $0, limit: $1) },
             fetchCandidates: { fetchCandidates(in: $0, limit: $1) },
             fetchCheckEvents: { fetchCheckEvents(in: $0, limit: $1) },
-            fetchBalanceRecords: { fetchBalanceRecords(in: $0, limit: $1) },
-            fetchMirrorRecords: { fetchMirrorRecords(in: $0, limit: $1) },
-            rebuildEmbeddings: { records, candidates, checkEvents, balanceRecords, mirrorRecords in
+            fetchComparativeRecords: { fetchBalanceRecords(in: $0, limit: $1) },
+            fetchReflectiveRecords: { fetchMirrorRecords(in: $0, limit: $1) },
+            rebuildEmbeddings: { records, candidates, checkEvents, comparativeRecords, reflectiveRecords in
                 rebuildCall = (
                     records.count,
                     candidates.count,
                     checkEvents.count,
-                    balanceRecords.count,
-                    mirrorRecords.count
+                    comparativeRecords.count,
+                    reflectiveRecords.count
                 )
             }
         )
@@ -481,13 +481,13 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
             refreshGovernanceSnapshot: { governanceSnapshot(in: $0) },
             reminderType: ReminderFixture.self,
             checkEventType: CheckEventFixture.self,
-            balanceRecordType: BalanceFixture.self,
-            mirrorRecordType: MirrorFixture.self,
+            comparativeRecordType: BalanceFixture.self,
+            reflectiveRecordType: MirrorFixture.self,
             fetchRecords: { fetchRecords(in: $0, limit: $1) },
             fetchCandidates: { fetchCandidates(in: $0, limit: $1) },
             fetchCheckEvents: { fetchCheckEvents(in: $0, limit: $1) },
-            fetchBalanceRecords: { fetchBalanceRecords(in: $0, limit: $1) },
-            fetchMirrorRecords: { fetchMirrorRecords(in: $0, limit: $1) },
+            fetchComparativeRecords: { fetchBalanceRecords(in: $0, limit: $1) },
+            fetchReflectiveRecords: { fetchMirrorRecords(in: $0, limit: $1) },
             rebuildEmbeddings: { _, _, _, _, _ in }
         )
 

@@ -11,33 +11,111 @@ public enum BASCurrentBrainBootstrapTrigger: String, Codable, Equatable, Sendabl
     case widget
     case explicitRefresh
     case sessionPrime
+}
 
-    public var defaultSourceSurface: BASInteractionSurface {
-        switch self {
-        case .watchHandoff:
-            .watch
-        case .notification:
-            .notification
-        case .widget:
-            .widget
-        case .launch, .sceneActive, .explicitRefresh, .sessionPrime:
-            .app
-        }
+public struct BASCurrentBrainBootstrapBehavior: Codable, Equatable, Sendable {
+    public static let generic = BASCurrentBrainBootstrapBehavior()
+
+    public var defaultSourceSurfaceID: String
+    public var sourceSurfaceOverridesByTriggerID: [String: String]
+    public var enforcedSourceSurfaceByTriggerID: [String: String]
+    public var defaultMemorySourceID: String
+    public var memorySourceOverridesByTriggerID: [String: String]
+    public var memorySourceOverridesByModeID: [String: String]
+    public var memorySourceOverridesByTriggerAndModeID: [String: [String: String]]
+    public var bootstrapAdvisorBehavior: BASBrainBootstrapAdvisorBehavior
+
+    public init(
+        defaultSourceSurfaceID: String = BASInteractionSurface.app.rawValue,
+        sourceSurfaceOverridesByTriggerID: [String: String] = [
+            BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue: BASInteractionSurface.watch.rawValue,
+            BASCurrentBrainBootstrapTrigger.notification.rawValue: BASInteractionSurface.notification.rawValue,
+            BASCurrentBrainBootstrapTrigger.widget.rawValue: BASInteractionSurface.widget.rawValue
+        ],
+        enforcedSourceSurfaceByTriggerID: [String: String] = [
+            BASCurrentBrainBootstrapTrigger.notification.rawValue: BASInteractionSurface.notification.rawValue
+        ],
+        defaultMemorySourceID: String = BASMemorySource.history.rawValue,
+        memorySourceOverridesByTriggerID: [String: String] = [:],
+        memorySourceOverridesByModeID: [String: String] = [:],
+        memorySourceOverridesByTriggerAndModeID: [String: [String: String]] = [:],
+        bootstrapAdvisorBehavior: BASBrainBootstrapAdvisorBehavior = .generic
+    ) {
+        self.defaultSourceSurfaceID = defaultSourceSurfaceID
+        self.sourceSurfaceOverridesByTriggerID = sourceSurfaceOverridesByTriggerID
+        self.enforcedSourceSurfaceByTriggerID = enforcedSourceSurfaceByTriggerID
+        self.defaultMemorySourceID = defaultMemorySourceID
+        self.memorySourceOverridesByTriggerID = memorySourceOverridesByTriggerID
+        self.memorySourceOverridesByModeID = memorySourceOverridesByModeID
+        self.memorySourceOverridesByTriggerAndModeID = memorySourceOverridesByTriggerAndModeID
+        self.bootstrapAdvisorBehavior = bootstrapAdvisorBehavior
     }
 
-    public func memorySource(for mode: BASDecisionMode) -> BASMemorySource {
-        if mode == .mirror {
-            return .reflection
+    public func resolvedSourceSurface(
+        for trigger: BASCurrentBrainBootstrapTrigger,
+        override: BASInteractionSurface?
+    ) -> BASInteractionSurface {
+        if let enforced = surface(
+            in: enforcedSourceSurfaceByTriggerID,
+            for: trigger.rawValue
+        ) {
+            return enforced
         }
+        if let override {
+            return override
+        }
+        if let overridden = surface(
+            in: sourceSurfaceOverridesByTriggerID,
+            for: trigger.rawValue
+        ) {
+            return overridden
+        }
+        return BASInteractionSurface(rawValue: defaultSourceSurfaceID) ?? .app
+    }
 
-        switch self {
-        case .watchHandoff, .notification, .widget:
-            return .reminder
-        case .explicitRefresh, .sessionPrime:
-            return .pattern
-        case .launch, .sceneActive:
-            return .history
+    public func memorySource(
+        for trigger: BASCurrentBrainBootstrapTrigger,
+        mode: BASDecisionMode
+    ) -> BASMemorySource {
+        if let modeMapping = memorySourceOverridesByTriggerAndModeID[trigger.rawValue],
+           let source = memorySource(
+               in: modeMapping,
+               candidates: [mode.identifier, mode.rawValue]
+           ) {
+            return source
         }
+        if let source = memorySource(
+            in: memorySourceOverridesByModeID,
+            candidates: [mode.identifier, mode.rawValue]
+        ) {
+            return source
+        }
+        if let source = memorySource(
+            in: memorySourceOverridesByTriggerID,
+            candidates: [trigger.rawValue]
+        ) {
+            return source
+        }
+        return BASMemorySource(rawValue: defaultMemorySourceID) ?? .history
+    }
+
+    private func surface(
+        in mapping: [String: String],
+        for key: String
+    ) -> BASInteractionSurface? {
+        mapping[key].flatMap(BASInteractionSurface.init(rawValue:))
+    }
+
+    private func memorySource(
+        in mapping: [String: String],
+        candidates: [String]
+    ) -> BASMemorySource? {
+        for candidate in candidates {
+            if let source = mapping[candidate].flatMap(BASMemorySource.init(rawValue:)) {
+                return source
+            }
+        }
+        return nil
     }
 }
 
@@ -48,6 +126,7 @@ public struct BASCurrentBrainBootstrapPreparationRequest: Codable, Equatable, Se
     public var sourceSurfaceOverride: BASInteractionSurface?
     public var riskLevelOverride: BASRiskLevel?
     public var preferredLanguages: [String]
+    public var behavior: BASCurrentBrainBootstrapBehavior
     public var now: Date
 
     public init(
@@ -57,6 +136,7 @@ public struct BASCurrentBrainBootstrapPreparationRequest: Codable, Equatable, Se
         sourceSurfaceOverride: BASInteractionSurface? = nil,
         riskLevelOverride: BASRiskLevel? = nil,
         preferredLanguages: [String] = [],
+        behavior: BASCurrentBrainBootstrapBehavior = .generic,
         now: Date = .now
     ) {
         self.mode = mode
@@ -65,6 +145,7 @@ public struct BASCurrentBrainBootstrapPreparationRequest: Codable, Equatable, Se
         self.sourceSurfaceOverride = sourceSurfaceOverride
         self.riskLevelOverride = riskLevelOverride
         self.preferredLanguages = preferredLanguages
+        self.behavior = behavior
         self.now = now
     }
 }
@@ -107,6 +188,7 @@ public struct BASCurrentBrainBootstrapExecutionRequest: Codable, Equatable, Send
     public var retrievalMode: String
     public var reactionWeightSeed: BASReactionWeights?
     public var identityProfileOverride: BASIdentityProfile?
+    public var cognitionBehavior: BASCognitionBehavior
     public var recommendedTemplateIDs: [String]
     public var templates: [BASInterventionTemplateDescriptor]
     public var failurePatterns: [BASFailurePatternDescriptor]
@@ -118,6 +200,7 @@ public struct BASCurrentBrainBootstrapExecutionRequest: Codable, Equatable, Send
         retrievalMode: String,
         reactionWeightSeed: BASReactionWeights? = nil,
         identityProfileOverride: BASIdentityProfile? = nil,
+        cognitionBehavior: BASCognitionBehavior = .generic,
         recommendedTemplateIDs: [String] = [],
         templates: [BASInterventionTemplateDescriptor],
         failurePatterns: [BASFailurePatternDescriptor]
@@ -128,6 +211,7 @@ public struct BASCurrentBrainBootstrapExecutionRequest: Codable, Equatable, Send
         self.retrievalMode = retrievalMode
         self.reactionWeightSeed = reactionWeightSeed
         self.identityProfileOverride = identityProfileOverride
+        self.cognitionBehavior = cognitionBehavior
         self.recommendedTemplateIDs = recommendedTemplateIDs
         self.templates = templates
         self.failurePatterns = failurePatterns
@@ -227,6 +311,7 @@ public struct BASAppleCurrentBrainBootstrapPlanningSourceInput: Codable, Equatab
     public var retrievalMode: String
     public var reactionWeightSeed: BASReactionWeights?
     public var identityProfileOverride: BASIdentityProfile?
+    public var cognitionBehavior: BASCognitionBehavior
     public var recommendedTemplateIDs: [String]
     public var templates: [BASAppleCurrentBrainBootstrapTemplateInput]
     public var failurePatterns: [BASAppleCurrentBrainBootstrapFailurePatternInput]
@@ -239,6 +324,7 @@ public struct BASAppleCurrentBrainBootstrapPlanningSourceInput: Codable, Equatab
         retrievalMode: String,
         reactionWeightSeed: BASReactionWeights? = nil,
         identityProfileOverride: BASIdentityProfile? = nil,
+        cognitionBehavior: BASCognitionBehavior = .generic,
         recommendedTemplateIDs: [String] = [],
         templates: [BASAppleCurrentBrainBootstrapTemplateInput],
         failurePatterns: [BASAppleCurrentBrainBootstrapFailurePatternInput]
@@ -250,6 +336,7 @@ public struct BASAppleCurrentBrainBootstrapPlanningSourceInput: Codable, Equatab
         self.retrievalMode = retrievalMode
         self.reactionWeightSeed = reactionWeightSeed
         self.identityProfileOverride = identityProfileOverride
+        self.cognitionBehavior = cognitionBehavior
         self.recommendedTemplateIDs = recommendedTemplateIDs
         self.templates = templates
         self.failurePatterns = failurePatterns
@@ -264,6 +351,7 @@ public struct BASAppleCurrentBrainBootstrapPlanningPreparedInput: Codable, Equat
     public var retrievalMode: String
     public var reactionWeightSeed: BASReactionWeights?
     public var identityProfileOverride: BASIdentityProfile?
+    public var cognitionBehavior: BASCognitionBehavior
     public var recommendedTemplateIDs: [String]
     public var templates: [BASAppleCurrentBrainBootstrapTemplateInput]
     public var failurePatterns: [BASAppleCurrentBrainBootstrapFailurePatternInput]
@@ -276,6 +364,7 @@ public struct BASAppleCurrentBrainBootstrapPlanningPreparedInput: Codable, Equat
         retrievalMode: String,
         reactionWeightSeed: BASReactionWeights? = nil,
         identityProfileOverride: BASIdentityProfile? = nil,
+        cognitionBehavior: BASCognitionBehavior = .generic,
         recommendedTemplateIDs: [String] = [],
         templates: [BASAppleCurrentBrainBootstrapTemplateInput],
         failurePatterns: [BASAppleCurrentBrainBootstrapFailurePatternInput]
@@ -287,6 +376,7 @@ public struct BASAppleCurrentBrainBootstrapPlanningPreparedInput: Codable, Equat
         self.retrievalMode = retrievalMode
         self.reactionWeightSeed = reactionWeightSeed
         self.identityProfileOverride = identityProfileOverride
+        self.cognitionBehavior = cognitionBehavior
         self.recommendedTemplateIDs = recommendedTemplateIDs
         self.templates = templates
         self.failurePatterns = failurePatterns
@@ -301,6 +391,7 @@ public struct BASAppleCurrentBrainBootstrapRequest: Codable, Equatable, Sendable
     public var retrievalMode: String
     public var reactionWeightSeed: BASReactionWeights?
     public var identityProfileOverride: BASIdentityProfile?
+    public var cognitionBehavior: BASCognitionBehavior
     public var recommendedTemplateIDs: [String]
     public var templates: [BASAppleCurrentBrainBootstrapTemplateInput]
     public var failurePatterns: [BASAppleCurrentBrainBootstrapFailurePatternInput]
@@ -313,6 +404,7 @@ public struct BASAppleCurrentBrainBootstrapRequest: Codable, Equatable, Sendable
         retrievalMode: String,
         reactionWeightSeed: BASReactionWeights? = nil,
         identityProfileOverride: BASIdentityProfile? = nil,
+        cognitionBehavior: BASCognitionBehavior = .generic,
         recommendedTemplateIDs: [String] = [],
         templates: [BASAppleCurrentBrainBootstrapTemplateInput],
         failurePatterns: [BASAppleCurrentBrainBootstrapFailurePatternInput]
@@ -324,6 +416,7 @@ public struct BASAppleCurrentBrainBootstrapRequest: Codable, Equatable, Sendable
         self.retrievalMode = retrievalMode
         self.reactionWeightSeed = reactionWeightSeed
         self.identityProfileOverride = identityProfileOverride
+        self.cognitionBehavior = cognitionBehavior
         self.recommendedTemplateIDs = recommendedTemplateIDs
         self.templates = templates
         self.failurePatterns = failurePatterns
@@ -351,6 +444,7 @@ public struct BASAppleCurrentBrainBootstrapSourceInput: Codable, Equatable, Send
     public var retrievalMode: String
     public var reactionWeightSeed: BASReactionWeights?
     public var identityProfileOverride: BASIdentityProfile?
+    public var cognitionBehavior: BASCognitionBehavior
     public var recommendedTemplateIDs: [String]
     public var templates: [BASInterventionTemplateDescriptor]
     public var failurePatterns: [BASFailurePatternDescriptor]
@@ -363,6 +457,7 @@ public struct BASAppleCurrentBrainBootstrapSourceInput: Codable, Equatable, Send
         retrievalMode: String,
         reactionWeightSeed: BASReactionWeights? = nil,
         identityProfileOverride: BASIdentityProfile? = nil,
+        cognitionBehavior: BASCognitionBehavior = .generic,
         recommendedTemplateIDs: [String] = [],
         templates: [BASInterventionTemplateDescriptor],
         failurePatterns: [BASFailurePatternDescriptor]
@@ -374,6 +469,7 @@ public struct BASAppleCurrentBrainBootstrapSourceInput: Codable, Equatable, Send
         self.retrievalMode = retrievalMode
         self.reactionWeightSeed = reactionWeightSeed
         self.identityProfileOverride = identityProfileOverride
+        self.cognitionBehavior = cognitionBehavior
         self.recommendedTemplateIDs = recommendedTemplateIDs
         self.templates = templates
         self.failurePatterns = failurePatterns
@@ -388,6 +484,7 @@ public struct BASAppleCurrentBrainBootstrapPreparedSourceInput: Codable, Equatab
     public var retrievalMode: String
     public var reactionWeightSeed: BASReactionWeights?
     public var identityProfileOverride: BASIdentityProfile?
+    public var cognitionBehavior: BASCognitionBehavior
     public var recommendedTemplateIDs: [String]
     public var templates: [BASInterventionTemplateDescriptor]
     public var failurePatterns: [BASFailurePatternDescriptor]
@@ -400,6 +497,7 @@ public struct BASAppleCurrentBrainBootstrapPreparedSourceInput: Codable, Equatab
         retrievalMode: String,
         reactionWeightSeed: BASReactionWeights? = nil,
         identityProfileOverride: BASIdentityProfile? = nil,
+        cognitionBehavior: BASCognitionBehavior = .generic,
         recommendedTemplateIDs: [String] = [],
         templates: [BASInterventionTemplateDescriptor],
         failurePatterns: [BASFailurePatternDescriptor]
@@ -411,6 +509,7 @@ public struct BASAppleCurrentBrainBootstrapPreparedSourceInput: Codable, Equatab
         self.retrievalMode = retrievalMode
         self.reactionWeightSeed = reactionWeightSeed
         self.identityProfileOverride = identityProfileOverride
+        self.cognitionBehavior = cognitionBehavior
         self.recommendedTemplateIDs = recommendedTemplateIDs
         self.templates = templates
         self.failurePatterns = failurePatterns
@@ -421,7 +520,10 @@ public enum BASCurrentBrainBootstrapCoordinator {
     public static func prepare(
         request: BASCurrentBrainBootstrapPreparationRequest
     ) -> BASCurrentBrainBootstrapPreparation {
-        let sourceSurface = request.sourceSurfaceOverride ?? request.trigger.defaultSourceSurface
+        let sourceSurface = request.behavior.resolvedSourceSurface(
+            for: request.trigger,
+            override: request.sourceSurfaceOverride
+        )
         let languageMode = BASLanguageMode.detect(
             preferredLanguages: request.preferredLanguages,
             sampleTexts: [request.prompt]
@@ -429,7 +531,8 @@ public enum BASCurrentBrainBootstrapCoordinator {
         let riskLevel = request.riskLevelOverride ?? BASBrainBootstrapAdvisor.inferRiskLevel(
             mode: request.mode,
             prompt: request.prompt,
-            now: request.now
+            now: request.now,
+            behavior: request.behavior.bootstrapAdvisorBehavior
         )
 
         return BASCurrentBrainBootstrapPreparation(
@@ -439,7 +542,10 @@ public enum BASCurrentBrainBootstrapCoordinator {
             sourceSurface: sourceSurface,
             riskLevel: riskLevel,
             languageMode: languageMode,
-            memorySource: request.trigger.memorySource(for: request.mode),
+            memorySource: request.behavior.memorySource(
+                for: request.trigger,
+                mode: request.mode
+            ),
             now: request.now
         )
     }
@@ -468,14 +574,12 @@ public enum BASCurrentBrainBootstrapCoordinator {
                 mode: request.preparation.mode,
                 prompt: request.preparation.prompt,
                 source: request.preparation.memorySource,
-                sourceSurface: resolvedSourceSurface(
-                    trigger: request.preparation.trigger,
-                    sourceSurface: request.preparation.sourceSurface
-                ),
+                sourceSurface: request.preparation.sourceSurface,
                 riskLevel: request.preparation.riskLevel,
                 retrievalMode: request.retrievalMode,
                 reactionWeightSeed: request.reactionWeightSeed,
                 identityProfileOverride: request.identityProfileOverride,
+                cognitionBehavior: request.cognitionBehavior,
                 now: request.preparation.now
             ),
             projection: projection
@@ -487,18 +591,6 @@ public enum BASCurrentBrainBootstrapCoordinator {
             orderedTemplateIDs: orderedTemplateIDs,
             orderedFailurePatternIDs: orderedFailurePatternIDs
         )
-    }
-
-    private static func resolvedSourceSurface(
-        trigger: BASCurrentBrainBootstrapTrigger,
-        sourceSurface: BASInteractionSurface
-    ) -> BASInteractionSurface {
-        switch trigger {
-        case .notification:
-            .notification
-        default:
-            sourceSurface
-        }
     }
 }
 
@@ -525,6 +617,7 @@ public enum BASAppleCurrentBrainBootstrapAdapter {
                 retrievalMode: input.retrievalMode,
                 reactionWeightSeed: input.reactionWeightSeed,
                 identityProfileOverride: input.identityProfileOverride,
+                cognitionBehavior: input.cognitionBehavior,
                 recommendedTemplateIDs: input.recommendedTemplateIDs,
                 templates: input.templates,
                 failurePatterns: input.failurePatterns
@@ -558,6 +651,7 @@ public enum BASAppleCurrentBrainBootstrapAdapter {
                 retrievalMode: input.retrievalMode,
                 reactionWeightSeed: input.reactionWeightSeed,
                 identityProfileOverride: input.identityProfileOverride,
+                cognitionBehavior: input.cognitionBehavior,
                 recommendedTemplateIDs: input.recommendedTemplateIDs,
                 templates: input.templates,
                 failurePatterns: input.failurePatterns
@@ -577,6 +671,7 @@ public enum BASAppleCurrentBrainBootstrapAdapter {
                 retrievalMode: request.retrievalMode,
                 reactionWeightSeed: request.reactionWeightSeed,
                 identityProfileOverride: request.identityProfileOverride,
+                cognitionBehavior: request.cognitionBehavior,
                 recommendedTemplateIDs: request.recommendedTemplateIDs,
                 templates: request.templates.map { template in
                     BASInterventionTemplateDescriptor(
@@ -613,6 +708,7 @@ public enum BASAppleCurrentBrainBootstrapAdapter {
                 retrievalMode: request.retrievalMode,
                 reactionWeightSeed: request.reactionWeightSeed,
                 identityProfileOverride: request.identityProfileOverride,
+                cognitionBehavior: request.cognitionBehavior,
                 recommendedTemplateIDs: request.recommendedTemplateIDs,
                 templates: request.templates.map { template in
                     BASInterventionTemplateDescriptor(
@@ -658,6 +754,33 @@ public enum BASAppleBrainBootstrapRuntime {
 }
 
 public enum BASAppleCurrentBrainStateCompiler {
+    public static func sessionPrimeBrainState(
+        modeID: String,
+        prompt: String,
+        projection: BASBrainProjection,
+        retrievalMode: String,
+        reactionWeightSeed: BASReactionWeights? = nil,
+        identityProfileOverride: BASIdentityProfile? = nil,
+        cognitionBehavior: BASCognitionBehavior = .generic,
+        preferredLanguages: [String] = [],
+        now: Date = .now
+    ) -> BASDecisionBrainState {
+        brainState(
+            modeID: modeID,
+            prompt: prompt,
+            projection: projection,
+            retrievalMode: retrievalMode,
+            triggerID: BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue,
+            sourceSurfaceOverrideID: BASInteractionSurface.app.rawValue,
+            riskLevelOverrideID: BASRiskLevel.low.rawValue,
+            reactionWeightSeed: reactionWeightSeed,
+            identityProfileOverride: identityProfileOverride,
+            cognitionBehavior: cognitionBehavior,
+            preferredLanguages: preferredLanguages,
+            now: now
+        )
+    }
+
     public static func brainState(
         modeID: String,
         prompt: String,
@@ -668,6 +791,7 @@ public enum BASAppleCurrentBrainStateCompiler {
         riskLevelOverrideID: String? = BASRiskLevel.low.rawValue,
         reactionWeightSeed: BASReactionWeights? = nil,
         identityProfileOverride: BASIdentityProfile? = nil,
+        cognitionBehavior: BASCognitionBehavior = .generic,
         preferredLanguages: [String] = [],
         now: Date = .now
     ) -> BASDecisionBrainState {
@@ -679,6 +803,7 @@ public enum BASAppleCurrentBrainStateCompiler {
             riskLevelOverrideID: riskLevelOverrideID,
             reactionWeightSeed: reactionWeightSeed,
             identityProfileOverride: identityProfileOverride,
+            cognitionBehavior: cognitionBehavior,
             preferredLanguages: preferredLanguages,
             now: now,
             retrievalMode: retrievalMode
@@ -698,19 +823,18 @@ public enum BASAppleCurrentBrainProjectionStateCompiler {
         retrievalMode: String,
         reactionWeightSeed: BASReactionWeights? = nil,
         identityProfileOverride: BASIdentityProfile? = nil,
+        cognitionBehavior: BASCognitionBehavior = .generic,
         preferredLanguages: [String] = [],
         now: Date = .now
     ) -> BASDecisionBrainState {
-        BASAppleCurrentBrainStateCompiler.brainState(
+        BASAppleCurrentBrainStateCompiler.sessionPrimeBrainState(
             modeID: modeID,
             prompt: prompt,
             projection: projection,
             retrievalMode: retrievalMode,
-            triggerID: BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue,
-            sourceSurfaceOverrideID: BASInteractionSurface.app.rawValue,
-            riskLevelOverrideID: BASRiskLevel.low.rawValue,
             reactionWeightSeed: reactionWeightSeed,
             identityProfileOverride: identityProfileOverride,
+            cognitionBehavior: cognitionBehavior,
             preferredLanguages: preferredLanguages,
             now: now
         )
@@ -731,6 +855,7 @@ public enum BASAppleCurrentBrainBootstrapPlanner {
             retrievalMode: input.retrievalMode,
             reactionWeightSeed: input.reactionWeightSeed,
             identityProfileOverride: input.identityProfileOverride,
+            cognitionBehavior: input.cognitionBehavior,
             recommendedTemplateIDs: input.recommendedTemplateIDs,
             templates: input.templates,
             failurePatterns: input.failurePatterns
@@ -748,6 +873,7 @@ public enum BASAppleCurrentBrainBootstrapPlanner {
             retrievalMode: input.retrievalMode,
             reactionWeightSeed: input.reactionWeightSeed,
             identityProfileOverride: input.identityProfileOverride,
+            cognitionBehavior: input.cognitionBehavior,
             recommendedTemplateIDs: input.recommendedTemplateIDs,
             templates: input.templates,
             failurePatterns: input.failurePatterns

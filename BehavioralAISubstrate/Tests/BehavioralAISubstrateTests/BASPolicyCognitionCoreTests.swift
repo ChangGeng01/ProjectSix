@@ -21,7 +21,7 @@ struct BASPolicyCognitionCoreTests {
 
         #expect(notificationIdentity.role == .predictiveSentinel)
         #expect(notificationIdentity.posture == .protective)
-        #expect(notificationIdentity.initiative == .assertive)
+        #expect(notificationIdentity.initiative == .guided)
         #expect(watchIdentity.role == .pauseCompanion)
         #expect(watchIdentity.initiative == .guided)
         #expect(watchIdentity.relationshipBoundary.contains("lightweight"))
@@ -54,6 +54,84 @@ struct BASPolicyCognitionCoreTests {
         #expect(boundary.requiredConfirmations.contains("irreversible_decision"))
         #expect(boundary.allowedActionClasses.contains("checkpoint_reopen"))
         #expect(boundary.auditHeadline.contains("Stay local"))
+    }
+
+    @Test("host-injected cognition behavior overrides substrate defaults")
+    func hostInjectedCognitionBehaviorOverridesDefaults() {
+        let behavior = BASCognitionBehavior(
+            surfaceIdentityOverlaysBySurfaceID: [
+                BASInteractionSurface.notification.rawValue: BASIdentityProfileOverlay(
+                    role: .boundedGuide,
+                    posture: .reflective,
+                    initiative: .passive,
+                    confidenceCeiling: 0.49,
+                    relationshipBoundary: "Host owns the notification relationship."
+                )
+            ],
+            highRiskIdentityOverlay: BASIdentityProfileOverlay(
+                posture: .protective,
+                initiative: .guided,
+                confidenceCeiling: 0.51,
+                relationshipBoundary: "Host wants high risk to stay highly bounded."
+            ),
+            highRiskInitiativeByRoleID: [:],
+            boundary: BASBoundaryEvaluationBehavior(
+                defaultAllowedActionClasses: ["host_render"],
+                defaultBlockedActionClasses: ["host_cloud"],
+                defaultConstraints: [.lockSensitiveMemory],
+                allowedActionClassesBySurfaceID: [
+                    BASInteractionSurface.notification.rawValue: ["host_notification_lane"]
+                ],
+                blockedActionClassesBySurfaceID: [
+                    BASInteractionSurface.notification.rawValue: ["host_high_frequency_nudge"]
+                ],
+                constraintsBySurfaceID: [
+                    BASInteractionSurface.notification.rawValue: [.notificationRequiresEvidence]
+                ],
+                highRiskRequiredConfirmations: ["host_irreversible_confirmation"],
+                highRiskBlockedActionClasses: ["host_fast_commit"],
+                reflectiveModeIDs: [],
+                advisoryHeadline: "Host advisory boundary.",
+                reflectiveHeadline: "Host reflective boundary.",
+                protectiveHeadline: "Host protective boundary."
+            )
+        )
+
+        let identity = BASIdentityRoleResolver.resolve(
+            mode: .mirror,
+            sourceSurface: .notification,
+            riskLevel: .high,
+            baseProfile: BASIdentityProfile(
+                role: .mirrorWitness,
+                posture: .reflective,
+                initiative: .guided,
+                confidenceCeiling: 0.72,
+                canAdvise: true,
+                canExecuteActions: false,
+                canEscalateToCloud: false,
+                relationshipBoundary: "Default"
+            ),
+            behavior: behavior
+        )
+        let boundary = BASBoundaryPolicyEvaluator.evaluate(
+            mode: .mirror,
+            sourceSurface: .notification,
+            riskLevel: .high,
+            identityProfile: identity,
+            brainState: makeBrainState(),
+            taskGraphHint: nil,
+            behavior: behavior
+        )
+
+        #expect(identity.role == .boundedGuide)
+        #expect(identity.initiative == .guided)
+        #expect(identity.relationshipBoundary == "Host wants high risk to stay highly bounded.")
+        #expect(boundary.allowedActionClasses.contains("host_render"))
+        #expect(boundary.allowedActionClasses.contains("host_notification_lane"))
+        #expect(boundary.blockedActionClasses.contains("host_cloud"))
+        #expect(boundary.blockedActionClasses.contains("host_fast_commit"))
+        #expect(boundary.requiredConfirmations == ["host_irreversible_confirmation"])
+        #expect(boundary.auditHeadline == "Host protective boundary.")
     }
 
     @Test("calibration evaluator detects drift from pending load and missing templates")

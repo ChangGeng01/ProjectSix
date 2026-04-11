@@ -97,7 +97,8 @@ enum DecisionIntelligencePromptContract {
                     )
                 },
                 brainState: brainState
-            )
+            ),
+            behavior: BeforeProductLanguage.referencePromptBehavior
         )
     }
 
@@ -185,7 +186,8 @@ enum DecisionIntelligencePromptContract {
                     )
                 },
                 brainState: brainState
-            )
+            ),
+            behavior: BeforeProductLanguage.referencePromptBehavior
         )
     }
 
@@ -273,7 +275,8 @@ enum DecisionIntelligencePromptContract {
                     )
                 },
                 brainState: brainState
-            )
+            ),
+            behavior: BeforeProductLanguage.referencePromptBehavior
         )
     }
 
@@ -328,7 +331,8 @@ enum DecisionIntelligencePromptContract {
                     responseLanguageRawValue: $0.responseLanguage.rawValue,
                     allowsModelInvocation: $0.allowsModelInvocation
                 )
-            }
+            },
+            behavior: BeforeProductLanguage.referencePromptBehavior
         )
     }
 

@@ -19,7 +19,10 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(result.requestKind, .interactive)
         XCTAssertEqual(result.workflowProfile, .reflective)
         XCTAssertEqual(result.currentBrain.workflowProfile, .reflective)
-        XCTAssertEqual(result.currentBrain.workflowTitle, "Reflective")
+        XCTAssertEqual(result.currentBrain.workflowTitle, "Reflective Workflow")
+        XCTAssertFalse(result.currentBrain.roleID.isEmpty)
+        XCTAssertFalse(result.currentBrain.relationshipBoundary.isEmpty)
+        XCTAssertFalse(result.currentBrain.boundaryHeadline.isEmpty)
         XCTAssertFalse(result.currentBrain.dominantGoals.isEmpty)
         XCTAssertFalse(result.consoleSnapshot.reports.isEmpty)
         XCTAssertEqual(result.consoleSnapshot.reports.count, BASLayerKind.allCases.count)
@@ -37,9 +40,45 @@ final class BASHostKitTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(result.activeSessionTitle, "Lifecycle Bootstrap")
-        XCTAssertTrue(result.notices.contains("Refresh memory projection"))
-        XCTAssertTrue(result.followUpActions.contains("Load the current brain before rendering"))
+        XCTAssertEqual(result.activeSessionTitle, "Host Bootstrap")
+        XCTAssertTrue(result.notices.contains("Refresh substrate projection"))
+        XCTAssertTrue(result.followUpActions.contains("Hydrate substrate state before rendering"))
+    }
+
+    func testCustomLifecycleBehaviorBelongsToHost() {
+        let runtime = BASHostRuntime(
+            configuration: BASHostConfiguration(
+                lifecycleBehavior: BASHostLifecycleBehaviorConfiguration(
+                    bootstrapBehavior: BASAppleLifecycleBootstrapBehavior(
+                        actionsByPhaseID: [
+                            BASAppleLifecycleBootstrapPhase.initialAppearance.rawValue: [
+                                BASAppleLifecycleBootstrapAction(kind: .refreshCurrentBrain, bootstrapTriggerID: "hostLaunch"),
+                                BASAppleLifecycleBootstrapAction(kind: .restoreActiveWorkspace)
+                            ]
+                        ]
+                    )
+                ),
+                presentation: BASHostPresentationConfiguration(
+                    lifecycle: BASHostLifecyclePresentation(
+                        refreshCurrentBrainNotice: "Host refresh brain",
+                        restoreActiveWorkspaceNotice: "Host restore workspace",
+                        loadCurrentBrainFollowUp: "Host loads first",
+                        resumeStructuredWorkspaceFollowUp: "Host resumes workspace"
+                    )
+                )
+            )
+        )
+
+        let result = runtime.bootstrap(
+            BASHostLifecycleRequest(
+                phase: .initialAppearance,
+                preferredProfile: .rapid,
+                promptSeed: "Host bootstrap"
+            )
+        )
+
+        XCTAssertEqual(result.notices, ["Host refresh brain", "Host restore workspace"])
+        XCTAssertEqual(result.followUpActions, ["Host loads first", "Host resumes workspace"])
     }
 
     func testReopenHighRiskProducesFollowUpSuggestion() {
@@ -68,6 +107,7 @@ final class BASHostKitTests: XCTestCase {
     func testCustomPresentationLetsHostOwnWorkflowLanguage() {
         let runtime = BASHostRuntime(
             configuration: BASHostConfiguration(
+                runtimeProfileID: "before.local-cognition",
                 presentation: BASHostPresentationConfiguration(
                     workflowTitles: BASHostWorkflowTitles(
                         rapid: "Quick Judgment",
@@ -146,7 +186,7 @@ final class BASHostKitTests: XCTestCase {
 
         XCTAssertEqual(session.activeSessionTitle, "Quick Judgment")
         XCTAssertTrue(session.notices.contains("App entered quick judgment through Before."))
-        XCTAssertTrue(session.notices.contains("Before runtime profile apple.local-first is active."))
+        XCTAssertTrue(session.notices.contains("Before runtime profile before.local-cognition is active."))
         XCTAssertEqual(session.followUpActions, ["Name the urge", "Choose one clean next move"])
         XCTAssertEqual(bootstrap.activeSessionTitle, "Before Bootstrap")
         XCTAssertTrue(bootstrap.notices.contains("Refresh Before memory projection"))
@@ -156,15 +196,30 @@ final class BASHostKitTests: XCTestCase {
     func testCustomPredictiveInterventionCopyBelongsToHost() {
         let runtime = BASHostRuntime(
             configuration: BASHostConfiguration(
+                lifecycleBehavior: BASHostLifecycleBehaviorConfiguration(
+                    predictiveInterventionBehavior: BASApplePredictiveInterventionBehavior(
+                        lowRisk: BASApplePredictiveInterventionRiskBehavior(
+                            title: "Host says soften it.",
+                            detail: "Host wants a lighter pass.",
+                            preferredModeID: BASDecisionMode.quick.identifier
+                        ),
+                        mediumRisk: BASApplePredictiveInterventionRiskBehavior(
+                            title: "Host says pause.",
+                            detail: "Host wants one slower pass.",
+                            preferredModeID: BASDecisionMode.balance.identifier
+                        ),
+                        highRisk: BASApplePredictiveInterventionRiskBehavior(
+                            title: "Host wants another checkpoint.",
+                            detail: "Host sees elevated risk and wants stronger confirmation.",
+                            preferredModeID: BASDecisionMode.mirror.identifier
+                        ),
+                        defaultReason: "Host policy prefers a slower workflow."
+                    )
+                ),
                 presentation: BASHostPresentationConfiguration(
                     predictiveIntervention: BASHostPredictiveInterventionPresentation(
-                        mediumRiskTitle: "Host says pause.",
-                        mediumRiskDetail: "Host wants one slower pass.",
-                        highRiskTitle: "Host wants another checkpoint.",
-                        highRiskDetail: "Host sees elevated risk and wants stronger confirmation.",
                         reopenRiskDetail: "Host sees risk in this reopen path and wants structure.",
-                        fallbackReopenSuggestionDetail: "Host says slow this reopen down.",
-                        defaultReason: "Host policy prefers a slower lane."
+                        fallbackReopenSuggestionDetail: "Host says slow this reopen down."
                     )
                 )
             )
@@ -191,8 +246,97 @@ final class BASHostKitTests: XCTestCase {
 
         XCTAssertEqual(session.interventionSuggestion?.title, "Host says pause.")
         XCTAssertEqual(session.interventionSuggestion?.detail, "Host wants one slower pass.")
-        XCTAssertEqual(session.interventionSuggestion?.reason, "Host policy prefers a slower lane.")
+        XCTAssertEqual(session.interventionSuggestion?.reason, "Host policy prefers a slower workflow.")
+        XCTAssertEqual(session.interventionSuggestion?.preferredWorkflowProfile, .deliberate)
         XCTAssertEqual(reopen.interventionSuggestion?.detail, "Host says slow this reopen down.")
+    }
+
+    func testPreferredPredictiveWorkflowUsesHostModeMapping() {
+        let runtime = BASHostRuntime(
+            configuration: BASHostConfiguration(
+                lifecycleBehavior: BASHostLifecycleBehaviorConfiguration(
+                    predictiveInterventionBehavior: BASApplePredictiveInterventionBehavior(
+                        mediumRisk: BASApplePredictiveInterventionRiskBehavior(
+                            title: "Use more structure",
+                            detail: "The host wants the comparative workflow next.",
+                            preferredModeID: BASDecisionMode.comparativeID
+                        )
+                    )
+                ),
+                workflowBehavior: BASHostWorkflowBehaviorConfiguration(
+                    modeIDsByProfileID: [
+                        BASHostWorkflowProfile.rapid.rawValue: BASDecisionMode.reflectiveID,
+                        BASHostWorkflowProfile.deliberate.rawValue: BASDecisionMode.primaryID,
+                        BASHostWorkflowProfile.reflective.rawValue: BASDecisionMode.comparativeID
+                    ]
+                )
+            )
+        )
+
+        let session = runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .rapid,
+                surface: .application,
+                prompt: "Slow this down for one more pass.",
+                riskLevel: .medium
+            )
+        )
+
+        XCTAssertEqual(session.interventionSuggestion?.preferredWorkflowProfile, .reflective)
+    }
+
+    func testLifecycleBehaviorCarriesHostOwnedProjectionLimits() {
+        let configuration = BASHostConfiguration(
+            lifecycleBehavior: BASHostLifecycleBehaviorConfiguration(
+                projectionRefreshLimits: BASAppleMemoryProjectionRefreshLimits(
+                    recordLimit: 48,
+                    candidateLimit: 20,
+                    checkEventLimit: 64,
+                    comparativeRecordLimit: 20,
+                    reflectiveRecordLimit: 20
+                )
+            )
+        )
+
+        XCTAssertEqual(configuration.lifecycleBehavior.projectionRefreshLimits.recordLimit, 48)
+        XCTAssertEqual(configuration.lifecycleBehavior.projectionRefreshLimits.candidateLimit, 20)
+        XCTAssertEqual(configuration.lifecycleBehavior.projectionRefreshLimits.checkEventLimit, 64)
+        XCTAssertEqual(configuration.lifecycleBehavior.projectionRefreshLimits.comparativeRecordLimit, 20)
+        XCTAssertEqual(configuration.lifecycleBehavior.projectionRefreshLimits.reflectiveRecordLimit, 20)
+    }
+
+    func testWorkflowBehaviorCanOwnSessionKindDefaults() {
+        let configuration = BASHostWorkflowBehaviorConfiguration(
+            memorySourceIDsBySessionKindID: [
+                BASHostSessionKind.notification.rawValue: BASMemorySource.reflection.rawValue
+            ],
+            retrievalModeIDsBySessionKindID: [
+                BASHostSessionKind.widget.rawValue: "host-widget-compact"
+            ]
+        )
+
+        XCTAssertEqual(configuration.memorySource(for: .notification), .reflection)
+        XCTAssertNil(configuration.memorySource(for: .interactive))
+        XCTAssertEqual(configuration.retrievalMode(for: .widget), "host-widget-compact")
+        XCTAssertNil(configuration.retrievalMode(for: .interactive))
+    }
+
+    func testWorkflowBehaviorOwnsModeMappingAndNeutralFallbacks() {
+        let configuration = BASHostWorkflowBehaviorConfiguration(
+            modeIDsByProfileID: [
+                BASHostWorkflowProfile.rapid.rawValue: BASDecisionMode.reflectiveID,
+                BASHostWorkflowProfile.deliberate.rawValue: BASDecisionMode.primaryID,
+                BASHostWorkflowProfile.reflective.rawValue: BASDecisionMode.comparativeID
+            ]
+        )
+
+        XCTAssertEqual(configuration.mode(for: .rapid), .reflective)
+        XCTAssertEqual(configuration.mode(for: .deliberate), .primary)
+        XCTAssertEqual(configuration.workflowProfile(forModeID: BASDecisionMode.comparativeID), .reflective)
+        XCTAssertEqual(configuration.interactiveRetrievalMode(for: .rapid), BASRetrievalMode.adaptive.rawValue)
+        XCTAssertNil(configuration.defaultMemorySource(for: .reopen))
+        XCTAssertNil(configuration.defaultRetrievalMode(for: .reopen))
     }
 
     func testCustomWorkflowBehaviorBelongsToHost() {
@@ -227,6 +371,51 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(result.currentBrain.verificationSummary.split(separator: "/").first, "before-sdk")
     }
 
+    func testGenericWorkflowDefaultsStayNeutralUntilHostInjectsProductSemantics() {
+        let runtime = BASHostRuntime()
+
+        let result = runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .rapid,
+                surface: .application,
+                prompt: "Hold the state steady for one more pass.",
+                riskLevel: .low
+            )
+        )
+
+        XCTAssertTrue(result.projection.activeTemplateIDs.isEmpty)
+        XCTAssertEqual(result.currentBrain.activeTemplateCount, 0)
+        XCTAssertTrue(result.currentBrain.verificationSummary.hasPrefix("substrate/"))
+        XCTAssertEqual(result.currentBrain.workflowTitle, "Rapid Workflow")
+        XCTAssertEqual(result.activeSessionTitle, "Rapid Workflow")
+    }
+
+    func testWorkflowBehaviorLetsHostOwnFailureGuardIdentifiers() {
+        let runtime = BASHostRuntime(
+            configuration: BASHostConfiguration(
+                workflowBehavior: BASHostWorkflowBehaviorConfiguration(
+                    failureGuardIDsByRiskLevelID: [
+                        BASHostRiskLevel.high.rawValue: ["samplehost.guard/elevated-risk"]
+                    ],
+                    hostNamespace: "samplehost"
+                )
+            )
+        )
+
+        let result = runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .deliberate,
+                surface: .application,
+                prompt: "This needs another checkpoint before I commit.",
+                riskLevel: .high
+            )
+        )
+
+        XCTAssertEqual(result.currentBrain.failureGuardCount, 1)
+    }
+
     func testExecuteLifecyclePhaseDelegatesEntryConsumptionAndRefreshOrder() {
         let runtime = BASHostRuntime()
         var actions: [String] = []
@@ -250,11 +439,7 @@ final class BASHostKitTests: XCTestCase {
             [
                 "projection",
                 "brain:launch",
-                "reflection",
-                "handoff:handoff",
-                "restore",
-                "prediction",
-                "widget"
+                "handoff:handoff"
             ]
         )
     }
@@ -549,5 +734,90 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(upserts.first?.1, true)
         XCTAssertTrue(cancelled.isEmpty)
         XCTAssertEqual(scheduled, [candidate.id])
+    }
+
+    func testCustomCognitionBehaviorBelongsToHost() {
+        let runtime = BASHostRuntime(
+            configuration: BASHostConfiguration(
+                cognitionBehavior: BASHostCognitionBehaviorConfiguration(
+                    reactionWeightsByProfileID: [
+                        BASHostWorkflowProfile.rapid.rawValue: BASReactionWeights(
+                            briefLanguage: 0.71,
+                            warmDirectTone: 0.41,
+                            lowCognitiveLoad: 0.68,
+                            interruptiveActionBias: 0.63,
+                            boundaryNamingBias: 0.22,
+                            tradeoffClarityBias: 0.31
+                        )
+                    ],
+                    identityProfilesByProfileID: [
+                        BASHostWorkflowProfile.rapid.rawValue: BASIdentityProfile(
+                            role: .tradeoffGuide,
+                            posture: .coaching,
+                            initiative: .guided,
+                            confidenceCeiling: 0.67,
+                            canAdvise: true,
+                            canExecuteActions: false,
+                            canEscalateToCloud: false,
+                            relationshipBoundary: "Host rapid role."
+                        )
+                    ],
+                    substrateBehavior: BASCognitionBehavior(
+                        surfaceIdentityOverlaysBySurfaceID: [
+                            BASInteractionSurface.notification.rawValue: BASIdentityProfileOverlay(
+                                role: .boundedGuide,
+                                posture: .coaching,
+                                initiative: .passive,
+                                confidenceCeiling: 0.5,
+                                relationshipBoundary: "Host notification relationship."
+                            )
+                        ],
+                        highRiskIdentityOverlay: BASIdentityProfileOverlay(
+                            posture: .protective,
+                            initiative: .guided,
+                            confidenceCeiling: 0.52,
+                            relationshipBoundary: "Host high-risk relationship."
+                        ),
+                        highRiskInitiativeByRoleID: [:],
+                        boundary: BASBoundaryEvaluationBehavior(
+                            defaultAllowedActionClasses: ["host_render"],
+                            defaultBlockedActionClasses: ["host_cloud"],
+                            defaultConstraints: [.lockSensitiveMemory],
+                            allowedActionClassesBySurfaceID: [
+                                BASInteractionSurface.notification.rawValue: ["host_notification_lane"]
+                            ],
+                            blockedActionClassesBySurfaceID: [
+                                BASInteractionSurface.notification.rawValue: ["host_notification_spam"]
+                            ],
+                            constraintsBySurfaceID: [
+                                BASInteractionSurface.notification.rawValue: [.notificationRequiresEvidence]
+                            ],
+                            highRiskRequiredConfirmations: ["host_confirm"],
+                            highRiskBlockedActionClasses: ["host_fast_commit"],
+                            reflectiveModeIDs: [],
+                            advisoryHeadline: "Host advisory.",
+                            reflectiveHeadline: "Host reflective.",
+                            protectiveHeadline: "Host protective."
+                        )
+                    )
+                )
+            )
+        )
+
+        let result = runtime.startSession(
+            BASHostSessionRequest(
+                kind: .notification,
+                workflowProfile: .rapid,
+                surface: .notification,
+                prompt: "Host wants a slower notification path.",
+                riskLevel: .high
+            )
+        )
+
+        XCTAssertEqual(result.currentBrain.workflowProfile, .rapid)
+        XCTAssertEqual(result.currentBrain.roleID, BASIdentityRole.boundedGuide.rawValue)
+        XCTAssertEqual(result.currentBrain.relationshipBoundary, "Host high-risk relationship.")
+        XCTAssertEqual(result.currentBrain.boundaryHeadline, "Host protective.")
+        XCTAssertNotNil(result.interventionSuggestion)
     }
 }
