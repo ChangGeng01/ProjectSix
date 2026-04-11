@@ -485,6 +485,180 @@ struct BehavioralAISubstrateBridgeTests {
     }
 
     @MainActor
+    @Test
+    func bridgeReopenTomorrowBoxItemRestoresDraftAndBuildsReopenCandidate() {
+        let item = TomorrowBoxItem(
+            dueAt: date("2026-04-11T10:00:00Z"),
+            mode: .balance,
+            title: "Pause before deciding",
+            detail: "Carry this into a slower balance pass.",
+            prompt: "Should I do this tonight?",
+            entrySource: .app,
+            draft: TomorrowBoxDraft(
+                prompt: "Should I do this tonight?",
+                scenarioRaw: nil,
+                motivationRaw: nil,
+                expectedOutcomeRaw: nil,
+                controlLevelRaw: nil,
+                note: nil,
+                desire: "Immediate relief",
+                concern: "Likely regret",
+                constraint: "It is late",
+                longTerm: "Sleep on it",
+                emotion: nil,
+                relationship: nil,
+                reality: nil,
+                selfLens: nil
+            ),
+            riskLevel: .high,
+            reopenHint: "Re-open slowly",
+            templateHint: "Use the night cooling template",
+            interventionHistorySummary: "Past late-night calls improved when delayed."
+        )
+
+        var cleared = false
+        var activatedBalancePrompt: String?
+        var startedPrompt: String?
+        var removed = false
+        var candidate: InterventionPredictionCandidate?
+        var refreshedPrediction = false
+        var selectedHome = false
+        var persisted = false
+
+        BehavioralAISubstrateBridge.reopenTomorrowBoxItem(
+            item,
+            clearActiveDecisionFlows: { cleared = true },
+            activateQuick: { _ in Issue.record("Unexpected quick activation") },
+            activateBalance: { session in
+                activatedBalancePrompt = session.prompt
+            },
+            activateMirror: { _ in Issue.record("Unexpected mirror activation") },
+            startQuick: { prompt in startedPrompt = prompt },
+            startBalance: { prompt in startedPrompt = prompt },
+            startMirror: { prompt in startedPrompt = prompt },
+            removeTomorrowBoxItem: { removed = true },
+            setInterventionCandidate: { candidate = $0 },
+            refreshPredictedIntervention: { refreshedPrediction = true },
+            selectHomeTab: { selectedHome = true },
+            persistActiveWorkspaceState: { persisted = true }
+        )
+
+        #expect(cleared)
+        #expect(activatedBalancePrompt == "Should I do this tonight?")
+        #expect(startedPrompt == nil)
+        #expect(removed)
+        #expect(candidate?.riskLevel == .high)
+        #expect(candidate?.suggestedMode == .balance)
+        #expect(candidate?.reason == "Use the night cooling template")
+        #expect(refreshedPrediction == false)
+        #expect(selectedHome)
+        #expect(persisted)
+    }
+
+    @MainActor
+    @Test
+    func bridgeReopenSupportRequestRoutesDraftedModeAndFinalizesHostState() {
+        let request = SupportRequest(
+            kind: .helpMeJudgeThis,
+            message: "Help me slow this down.",
+            mode: .mirror,
+            draft: TomorrowBoxDraft(
+                prompt: "Should I send this message?",
+                scenarioRaw: nil,
+                motivationRaw: nil,
+                expectedOutcomeRaw: nil,
+                controlLevelRaw: nil,
+                note: nil,
+                desire: nil,
+                concern: nil,
+                constraint: nil,
+                longTerm: "Protect the relationship",
+                emotion: "hurt",
+                relationship: "close friend",
+                reality: "It is late",
+                selfLens: "Defensive"
+            )
+        )
+
+        var cleared = false
+        var activatedMirrorPrompt: String?
+        var markedHeard = false
+        var selectedHome = false
+        var persisted = false
+
+        BehavioralAISubstrateBridge.reopenSupportRequest(
+            request,
+            clearActiveDecisionFlows: { cleared = true },
+            activateQuick: { _ in Issue.record("Unexpected quick activation") },
+            activateBalance: { _ in Issue.record("Unexpected balance activation") },
+            activateMirror: { session in
+                activatedMirrorPrompt = session.prompt
+            },
+            markHeard: { markedHeard = true },
+            selectHomeTab: { selectedHome = true },
+            persistActiveWorkspaceState: { persisted = true }
+        )
+
+        #expect(cleared)
+        #expect(activatedMirrorPrompt == "Should I send this message?")
+        #expect(markedHeard)
+        #expect(selectedHome)
+        #expect(persisted)
+    }
+
+    @MainActor
+    @Test
+    func bridgeReopenSharedLifeItemRoutesDraftedModeAndMarksReviewing() {
+        let item = SharedLifeBoxItem(
+            title: "Shared decision",
+            detail: "Revisit with more structure.",
+            mode: .quick,
+            prompt: "Should we commit now?",
+            draft: TomorrowBoxDraft(
+                prompt: "Should we commit now?",
+                scenarioRaw: ScenarioType.other.rawValue,
+                motivationRaw: MotivationChoice.genuineNeed.rawValue,
+                expectedOutcomeRaw: OutcomeChoice.satisfied.rawValue,
+                controlLevelRaw: ControlChoice.maybe.rawValue,
+                note: "Need a cooler head first.",
+                desire: nil,
+                concern: nil,
+                constraint: nil,
+                longTerm: nil,
+                emotion: nil,
+                relationship: nil,
+                reality: nil,
+                selfLens: nil
+            )
+        )
+
+        var cleared = false
+        var activatedQuickNote: String?
+        var markedReviewing = false
+        var selectedHome = false
+        var persisted = false
+
+        BehavioralAISubstrateBridge.reopenSharedLifeItem(
+            item,
+            clearActiveDecisionFlows: { cleared = true },
+            activateQuick: { session in
+                activatedQuickNote = session.note
+            },
+            activateBalance: { _ in Issue.record("Unexpected balance activation") },
+            activateMirror: { _ in Issue.record("Unexpected mirror activation") },
+            markReviewing: { markedReviewing = true },
+            selectHomeTab: { selectedHome = true },
+            persistActiveWorkspaceState: { persisted = true }
+        )
+
+        #expect(cleared)
+        #expect(activatedQuickNote == "Need a cooler head first.")
+        #expect(markedReviewing)
+        #expect(selectedHome)
+        #expect(persisted)
+    }
+
+    @MainActor
     private func makeContainer() throws -> ModelContainer {
         try ModelContainer(
             for: CheckEvent.self,

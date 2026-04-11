@@ -181,9 +181,7 @@ final class BeforeAppModel: ObservableObject {
         if let scenario {
             session.scenario = scenario
         }
-        refreshDecisionMemoryStore()
-        primeQuickSession(session)
-        activeQuickSession = session
+        activateQuickSession(session)
         selectedTab = .home
         persistActiveWorkspaceState()
     }
@@ -191,9 +189,7 @@ final class BeforeAppModel: ObservableObject {
     func startBalanceBoard(entrySource: EntrySource, prompt: String = "") {
         clearActiveDecisionFlows()
         let session = BalanceBoardSession(entrySource: entrySource, prompt: prompt)
-        refreshDecisionMemoryStore()
-        primeBalanceSession(session)
-        activeBalanceSession = session
+        activateBalanceSession(session)
         selectedTab = .home
         persistActiveWorkspaceState()
     }
@@ -201,9 +197,7 @@ final class BeforeAppModel: ObservableObject {
     func startMirrorWorkspace(entrySource: EntrySource, prompt: String = "") {
         clearActiveDecisionFlows()
         let session = MirrorWorkspaceSession(entrySource: entrySource, prompt: prompt)
-        refreshDecisionMemoryStore()
-        primeMirrorSession(session)
-        activeMirrorSession = session
+        activateMirrorSession(session)
         selectedTab = .home
         persistActiveWorkspaceState()
     }
@@ -388,100 +382,96 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func reopenTomorrowBoxItem(_ item: TomorrowBoxItem) {
-        clearActiveDecisionFlows()
-        refreshDecisionMemoryStore()
-
-        switch item.mode {
-        case .quick:
-            if let draft = item.draft {
-                let session = draft.restoreQuickSession(entrySource: .app)
-                primeQuickSession(session)
-                activeQuickSession = session
-            } else {
-                startQuickCheck(entrySource: .app, prompt: item.prompt)
-            }
-        case .balance:
-            if let draft = item.draft {
-                let session = draft.restoreBalanceSession(entrySource: .app)
-                primeBalanceSession(session)
-                activeBalanceSession = session
-            } else {
-                startBalanceBoard(entrySource: .app, prompt: item.prompt)
-            }
-        case .mirror:
-            if let draft = item.draft {
-                let session = draft.restoreMirrorSession(entrySource: .app)
-                primeMirrorSession(session)
-                activeMirrorSession = session
-            } else {
-                startMirrorWorkspace(entrySource: .app, prompt: item.prompt)
-            }
-        }
-
-        removeTomorrowBoxItem(item)
-        if let riskLevel = item.riskLevel, riskLevel != .low {
-            interventionCandidate = InterventionPredictionCandidate(
-                riskLevel: riskLevel,
-                title: item.reopenHint ?? item.title,
-                detail: item.interventionHistorySummary ?? item.detail,
-                evidenceSignalCount: item.interventionHistorySummary == nil ? 1 : 2,
-                suggestedMode: item.mode,
-                reason: item.templateHint ?? "A previous hold suggests reopening this with more structure.",
-                expiresAt: .now.addingTimeInterval(60 * 30)
-            )
-        } else {
-            refreshPredictedIntervention()
-        }
-        selectedTab = .home
-        persistActiveWorkspaceState()
+        BehavioralAISubstrateBridge.reopenTomorrowBoxItem(
+            item,
+            clearActiveDecisionFlows: { clearActiveDecisionFlows() },
+            activateQuick: { session in
+                activateQuickSession(session)
+            },
+            activateBalance: { session in
+                activateBalanceSession(session)
+            },
+            activateMirror: { session in
+                activateMirrorSession(session)
+            },
+            startQuick: { prompt in
+                startQuickCheck(entrySource: .app, prompt: prompt)
+            },
+            startBalance: { prompt in
+                startBalanceBoard(entrySource: .app, prompt: prompt)
+            },
+            startMirror: { prompt in
+                startMirrorWorkspace(entrySource: .app, prompt: prompt)
+            },
+            removeTomorrowBoxItem: {
+                removeTomorrowBoxItem(item)
+            },
+            setInterventionCandidate: { candidate in
+                interventionCandidate = candidate
+            },
+            refreshPredictedIntervention: { refreshPredictedIntervention() },
+            selectHomeTab: {
+                selectedTab = .home
+            },
+            persistActiveWorkspaceState: { persistActiveWorkspaceState() }
+        )
     }
 
     func refreshQuickBrainState(_ session: QuickCheckSession) {
-        refreshDecisionMemoryStore()
-        primeQuickSession(session)
+        activateQuickSession(session)
         refreshActiveTaskGraphSnapshot()
     }
 
     func refreshBalanceBrainState(_ session: BalanceBoardSession) {
-        refreshDecisionMemoryStore()
-        primeBalanceSession(session)
+        activateBalanceSession(session)
         refreshActiveTaskGraphSnapshot()
     }
 
     func refreshMirrorBrainState(_ session: MirrorWorkspaceSession) {
-        refreshDecisionMemoryStore()
-        primeMirrorSession(session)
+        activateMirrorSession(session)
         refreshActiveTaskGraphSnapshot()
     }
 
     func reopenCheckEvent(_ event: CheckEvent) {
-        clearActiveDecisionFlows()
-        let session = event.restoredSession()
-        refreshDecisionMemoryStore()
-        primeQuickSession(session)
-        activeQuickSession = session
-        selectedTab = .home
-        persistActiveWorkspaceState()
+        BehavioralAISubstrateBridge.reopenCheckEvent(
+            event,
+            clearActiveDecisionFlows: { clearActiveDecisionFlows() },
+            activateQuick: { session in
+                activateQuickSession(session)
+            },
+            selectHomeTab: {
+                selectedTab = .home
+            },
+            persistActiveWorkspaceState: { persistActiveWorkspaceState() }
+        )
     }
 
     func reopenBalanceRecord(_ record: BalanceDecisionRecord) {
-        clearActiveDecisionFlows()
-        let session = record.restoredSession()
-        refreshDecisionMemoryStore()
-        primeBalanceSession(session)
-        activeBalanceSession = session
-        selectedTab = .home
-        persistActiveWorkspaceState()
+        BehavioralAISubstrateBridge.reopenBalanceRecord(
+            record,
+            clearActiveDecisionFlows: { clearActiveDecisionFlows() },
+            activateBalance: { session in
+                activateBalanceSession(session)
+            },
+            selectHomeTab: {
+                selectedTab = .home
+            },
+            persistActiveWorkspaceState: { persistActiveWorkspaceState() }
+        )
     }
 
     func reopenMirrorRecord(_ record: MirrorDecisionRecord) {
-        clearActiveDecisionFlows()
-        let session = record.restoredSession()
-        refreshDecisionMemoryStore()
-        primeMirrorSession(session)
-        activeMirrorSession = session
-        selectedTab = .home
-        persistActiveWorkspaceState()
+        BehavioralAISubstrateBridge.reopenMirrorRecord(
+            record,
+            clearActiveDecisionFlows: { clearActiveDecisionFlows() },
+            activateMirror: { session in
+                activateMirrorSession(session)
+            },
+            selectHomeTab: {
+                selectedTab = .home
+            },
+            persistActiveWorkspaceState: { persistActiveWorkspaceState() }
+        )
     }
 
     func moveCheckEventToTomorrow(_ event: CheckEvent) {
@@ -968,30 +958,26 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func reopenSupportRequest(_ request: SupportRequest) {
-        guard let mode = request.mode, let draft = request.draft else { return }
-
-        clearActiveDecisionFlows()
-        switch mode {
-        case .quick:
-            let session = draft.restoreQuickSession(entrySource: .app)
-            refreshDecisionMemoryStore()
-            primeQuickSession(session)
-            activeQuickSession = session
-        case .balance:
-            let session = draft.restoreBalanceSession(entrySource: .app)
-            refreshDecisionMemoryStore()
-            primeBalanceSession(session)
-            activeBalanceSession = session
-        case .mirror:
-            let session = draft.restoreMirrorSession(entrySource: .app)
-            refreshDecisionMemoryStore()
-            primeMirrorSession(session)
-            activeMirrorSession = session
-        }
-
-        supportInbox.markHeard(request.id)
-        selectedTab = .home
-        persistActiveWorkspaceState()
+        BehavioralAISubstrateBridge.reopenSupportRequest(
+            request,
+            clearActiveDecisionFlows: { clearActiveDecisionFlows() },
+            activateQuick: { session in
+                activateQuickSession(session)
+            },
+            activateBalance: { session in
+                activateBalanceSession(session)
+            },
+            activateMirror: { session in
+                activateMirrorSession(session)
+            },
+            markHeard: {
+                supportInbox.markHeard(request.id)
+            },
+            selectHomeTab: {
+                selectedTab = .home
+            },
+            persistActiveWorkspaceState: { persistActiveWorkspaceState() }
+        )
     }
 
     func moveSupportRequestToTomorrow(_ request: SupportRequest) {
@@ -1035,30 +1021,26 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func reopenSharedLifeItem(_ item: SharedLifeBoxItem) {
-        guard let mode = item.mode, let draft = item.draft else { return }
-
-        clearActiveDecisionFlows()
-        switch mode {
-        case .quick:
-            let session = draft.restoreQuickSession(entrySource: .app)
-            refreshDecisionMemoryStore()
-            primeQuickSession(session)
-            activeQuickSession = session
-        case .balance:
-            let session = draft.restoreBalanceSession(entrySource: .app)
-            refreshDecisionMemoryStore()
-            primeBalanceSession(session)
-            activeBalanceSession = session
-        case .mirror:
-            let session = draft.restoreMirrorSession(entrySource: .app)
-            refreshDecisionMemoryStore()
-            primeMirrorSession(session)
-            activeMirrorSession = session
-        }
-
-        sharedLifeStore.markReviewing(item.id)
-        selectedTab = .home
-        persistActiveWorkspaceState()
+        BehavioralAISubstrateBridge.reopenSharedLifeItem(
+            item,
+            clearActiveDecisionFlows: { clearActiveDecisionFlows() },
+            activateQuick: { session in
+                activateQuickSession(session)
+            },
+            activateBalance: { session in
+                activateBalanceSession(session)
+            },
+            activateMirror: { session in
+                activateMirrorSession(session)
+            },
+            markReviewing: {
+                sharedLifeStore.markReviewing(item.id)
+            },
+            selectHomeTab: {
+                selectedTab = .home
+            },
+            persistActiveWorkspaceState: { persistActiveWorkspaceState() }
+        )
     }
 
     func moveSharedLifeItemToTomorrow(_ item: SharedLifeBoxItem) {
@@ -1169,19 +1151,13 @@ final class BeforeAppModel: ObservableObject {
             hasReflectionContext: reflectionContext != nil,
             loadState: { ActiveDecisionWorkspaceStore.load() },
             restoreQuick: { state in
-                let session = state.restoreQuickSession()
-                primeQuickSession(session)
-                activeQuickSession = session
+                activateQuickSession(state.restoreQuickSession())
             },
             restoreBalance: { state in
-                let session = state.restoreBalanceSession()
-                primeBalanceSession(session)
-                activeBalanceSession = session
+                activateBalanceSession(state.restoreBalanceSession())
             },
             restoreMirror: { state in
-                let session = state.restoreMirrorSession()
-                primeMirrorSession(session)
-                activeMirrorSession = session
+                activateMirrorSession(state.restoreMirrorSession())
             },
             selectHomeTab: {
                 selectedTab = .home
@@ -1268,6 +1244,24 @@ final class BeforeAppModel: ObservableObject {
         if let notice = outcome.notice {
             publishStartupNotice(notice)
         }
+    }
+
+    private func activateQuickSession(_ session: QuickCheckSession) {
+        refreshDecisionMemoryStore()
+        primeQuickSession(session)
+        activeQuickSession = session
+    }
+
+    private func activateBalanceSession(_ session: BalanceBoardSession) {
+        refreshDecisionMemoryStore()
+        primeBalanceSession(session)
+        activeBalanceSession = session
+    }
+
+    private func activateMirrorSession(_ session: MirrorWorkspaceSession) {
+        refreshDecisionMemoryStore()
+        primeMirrorSession(session)
+        activeMirrorSession = session
     }
 
     private func decisionRuntimeExport() async -> DecisionTestingRuntimeExport {

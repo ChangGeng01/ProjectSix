@@ -738,6 +738,210 @@ enum BehavioralAISubstrateBridge {
         )
     }
 
+    @discardableResult
+    private static func executeDecisionMode(
+        modeID: String?,
+        performQuick: () -> Void,
+        performBalance: () -> Void,
+        performMirror: () -> Void
+    ) -> Bool {
+        switch modeID {
+        case DecisionMode.quick.rawValue:
+            performQuick()
+            return true
+        case DecisionMode.balance.rawValue:
+            performBalance()
+            return true
+        case DecisionMode.mirror.rawValue:
+            performMirror()
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static func reopenInterventionCandidate(
+        from item: TomorrowBoxItem,
+        now: Date = .now
+    ) -> InterventionPredictionCandidate? {
+        guard let riskLevel = item.riskLevel, riskLevel != .low else { return nil }
+        return InterventionPredictionCandidate(
+            riskLevel: riskLevel,
+            title: item.reopenHint ?? item.title,
+            detail: item.interventionHistorySummary ?? item.detail,
+            evidenceSignalCount: item.interventionHistorySummary == nil ? 1 : 2,
+            suggestedMode: item.mode,
+            reason: item.templateHint ?? "A previous hold suggests reopening this with more structure.",
+            expiresAt: now.addingTimeInterval(60 * 30)
+        )
+    }
+
+    @MainActor
+    static func reopenTomorrowBoxItem(
+        _ item: TomorrowBoxItem,
+        clearActiveDecisionFlows: () -> Void,
+        activateQuick: (QuickCheckSession) -> Void,
+        activateBalance: (BalanceBoardSession) -> Void,
+        activateMirror: (MirrorWorkspaceSession) -> Void,
+        startQuick: (String) -> Void,
+        startBalance: (String) -> Void,
+        startMirror: (String) -> Void,
+        removeTomorrowBoxItem: () -> Void,
+        setInterventionCandidate: (InterventionPredictionCandidate?) -> Void,
+        refreshPredictedIntervention: () -> Void,
+        selectHomeTab: () -> Void,
+        persistActiveWorkspaceState: () -> Void
+    ) {
+        clearActiveDecisionFlows()
+
+        if let draft = item.draft {
+            _ = executeDecisionMode(
+                modeID: item.mode.rawValue,
+                performQuick: {
+                    activateQuick(draft.restoreQuickSession(entrySource: .app))
+                },
+                performBalance: {
+                    activateBalance(draft.restoreBalanceSession(entrySource: .app))
+                },
+                performMirror: {
+                    activateMirror(draft.restoreMirrorSession(entrySource: .app))
+                }
+            )
+        } else {
+            _ = executeDecisionMode(
+                modeID: item.mode.rawValue,
+                performQuick: {
+                    startQuick(item.prompt)
+                },
+                performBalance: {
+                    startBalance(item.prompt)
+                },
+                performMirror: {
+                    startMirror(item.prompt)
+                }
+            )
+        }
+
+        removeTomorrowBoxItem()
+        if let candidate = reopenInterventionCandidate(from: item) {
+            setInterventionCandidate(candidate)
+        } else {
+            refreshPredictedIntervention()
+        }
+        selectHomeTab()
+        persistActiveWorkspaceState()
+    }
+
+    @MainActor
+    static func reopenCheckEvent(
+        _ event: CheckEvent,
+        clearActiveDecisionFlows: () -> Void,
+        activateQuick: (QuickCheckSession) -> Void,
+        selectHomeTab: () -> Void,
+        persistActiveWorkspaceState: () -> Void
+    ) {
+        clearActiveDecisionFlows()
+        activateQuick(event.restoredSession())
+        selectHomeTab()
+        persistActiveWorkspaceState()
+    }
+
+    @MainActor
+    static func reopenBalanceRecord(
+        _ record: BalanceDecisionRecord,
+        clearActiveDecisionFlows: () -> Void,
+        activateBalance: (BalanceBoardSession) -> Void,
+        selectHomeTab: () -> Void,
+        persistActiveWorkspaceState: () -> Void
+    ) {
+        clearActiveDecisionFlows()
+        activateBalance(record.restoredSession())
+        selectHomeTab()
+        persistActiveWorkspaceState()
+    }
+
+    @MainActor
+    static func reopenMirrorRecord(
+        _ record: MirrorDecisionRecord,
+        clearActiveDecisionFlows: () -> Void,
+        activateMirror: (MirrorWorkspaceSession) -> Void,
+        selectHomeTab: () -> Void,
+        persistActiveWorkspaceState: () -> Void
+    ) {
+        clearActiveDecisionFlows()
+        activateMirror(record.restoredSession())
+        selectHomeTab()
+        persistActiveWorkspaceState()
+    }
+
+    @MainActor
+    static func reopenSupportRequest(
+        _ request: SupportRequest,
+        clearActiveDecisionFlows: () -> Void,
+        activateQuick: (QuickCheckSession) -> Void,
+        activateBalance: (BalanceBoardSession) -> Void,
+        activateMirror: (MirrorWorkspaceSession) -> Void,
+        markHeard: () -> Void,
+        selectHomeTab: () -> Void,
+        persistActiveWorkspaceState: () -> Void
+    ) {
+        guard let mode = request.mode, let draft = request.draft else { return }
+
+        clearActiveDecisionFlows()
+        guard executeDecisionMode(
+            modeID: mode.rawValue,
+            performQuick: {
+                activateQuick(draft.restoreQuickSession(entrySource: .app))
+            },
+            performBalance: {
+                activateBalance(draft.restoreBalanceSession(entrySource: .app))
+            },
+            performMirror: {
+                activateMirror(draft.restoreMirrorSession(entrySource: .app))
+            }
+        ) else {
+            return
+        }
+
+        markHeard()
+        selectHomeTab()
+        persistActiveWorkspaceState()
+    }
+
+    @MainActor
+    static func reopenSharedLifeItem(
+        _ item: SharedLifeBoxItem,
+        clearActiveDecisionFlows: () -> Void,
+        activateQuick: (QuickCheckSession) -> Void,
+        activateBalance: (BalanceBoardSession) -> Void,
+        activateMirror: (MirrorWorkspaceSession) -> Void,
+        markReviewing: () -> Void,
+        selectHomeTab: () -> Void,
+        persistActiveWorkspaceState: () -> Void
+    ) {
+        guard let mode = item.mode, let draft = item.draft else { return }
+
+        clearActiveDecisionFlows()
+        guard executeDecisionMode(
+            modeID: mode.rawValue,
+            performQuick: {
+                activateQuick(draft.restoreQuickSession(entrySource: .app))
+            },
+            performBalance: {
+                activateBalance(draft.restoreBalanceSession(entrySource: .app))
+            },
+            performMirror: {
+                activateMirror(draft.restoreMirrorSession(entrySource: .app))
+            }
+        ) else {
+            return
+        }
+
+        markReviewing()
+        selectHomeTab()
+        persistActiveWorkspaceState()
+    }
+
     @MainActor
     static func restoreActiveWorkspaceIfNeeded(
         preferences: BeforePreferences,
