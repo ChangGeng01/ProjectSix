@@ -212,6 +212,38 @@ struct BASMemoryCognitionCoreTests {
         #expect(BASMemoryTrustEngine.effectiveConfidence(rawConfidence: 0.9, trustProfile: profile) < 0.7)
     }
 
+    @Test("trust engine lets hosts override which memory sources count as stronger evidence")
+    func trustEngineSupportsHostSpecificSourcePriors() {
+        let genericProfile = BASMemoryTrustEngine.profile(
+            source: .history,
+            evidenceCount: 1,
+            decayPolicy: .medium,
+            governanceStatus: .pending,
+            isPending: false,
+            provenanceSummary: "clean history"
+        )
+        let hostProfile = BASMemoryTrustEngine.profile(
+            source: .history,
+            evidenceCount: 1,
+            decayPolicy: .medium,
+            governanceStatus: .pending,
+            isPending: false,
+            provenanceSummary: "clean history",
+            behavior: BASMemoryTrustBehavior(
+                baseScoresBySourceID: [
+                    BASMemorySource.reminder.rawValue: 0.55,
+                    BASMemorySource.pattern.rawValue: 0.62,
+                    BASMemorySource.reflection.rawValue: 0.7,
+                    BASMemorySource.history.rawValue: 0.92
+                ]
+            )
+        )
+
+        #expect(genericProfile.tier == .low)
+        #expect(hostProfile.score > genericProfile.score)
+        #expect(hostProfile.tier != .low)
+    }
+
     @Test("eligibility judge screens low trust pending candidates without overlap")
     func eligibilityJudgeScreensLowTrustPendingCandidates() {
         let candidate = BASMemoryEligibilityCandidate(
@@ -437,7 +469,7 @@ struct BASMemoryCognitionCoreTests {
         #expect(!brainState.memorySlices.contains(where: { $0.id == screenedCandidate.id }))
         #expect(bootstrapped.dominantGoal == "prefer concise answers")
         #expect(brainState.sessionBiases.contains("Name the active limit before reframing."))
-        #expect(brainState.sessionBiases.contains(where: { $0.localizedCaseInsensitiveContains("lower-trust conditions") }))
+        #expect(brainState.sessionBiases.contains(where: { $0.localizedCaseInsensitiveContains("lower-fidelity conditions") }))
     }
 
     @Test("brain compiler raises interruptive bias when pause paths are rewarded and proceed paths backfire")
@@ -535,7 +567,7 @@ struct BASMemoryCognitionCoreTests {
 
         #expect(brainState.reactionWeights.interruptiveActionBias >= 0.85)
         #expect(brainState.reactionWeights.lowCognitiveLoad >= 0.85)
-        #expect(brainState.sessionBiases.contains("Prefer a stabilizing next step before adding more detail."))
+        #expect(brainState.sessionBiases.contains("Prefer a stabilizing next step before adding more complexity."))
     }
 
     @Test("brain compiler preserves goal and support memory taxonomy")
@@ -650,5 +682,88 @@ struct BASMemoryCognitionCoreTests {
         #expect(brainState.sessionBiases.contains("Host says slow the impulse before analysis."))
         #expect(brainState.sessionBiases.contains("Host says route this through a holding lane."))
         #expect(!brainState.sessionBiases.contains("Prefer a stabilizing next step before adding more detail."))
+    }
+
+    @Test("brain compiler respects host filtered retrieval windows")
+    func brainCompilerRespectsHostFilteredRetrievalWindows() {
+        let records = [
+            BASGovernedMemory(
+                kind: .semantic,
+                content: "Pattern memory A",
+                scope: .task,
+                sensitivity: .medium,
+                tier: .warm,
+                confidence: 0.91,
+                sourceType: "pattern",
+                governanceStatus: .governed,
+                provenanceSummary: "pattern"
+            ),
+            BASGovernedMemory(
+                kind: .semantic,
+                content: "Pattern memory B",
+                scope: .task,
+                sensitivity: .medium,
+                tier: .warm,
+                confidence: 0.89,
+                sourceType: "pattern",
+                governanceStatus: .governed,
+                provenanceSummary: "pattern"
+            ),
+            BASGovernedMemory(
+                kind: .support,
+                content: "Support memory C",
+                scope: .task,
+                sensitivity: .medium,
+                tier: .warm,
+                confidence: 0.86,
+                sourceType: "history",
+                governanceStatus: .governed,
+                provenanceSummary: "support"
+            ),
+            BASGovernedMemory(
+                kind: .support,
+                content: "Support memory D",
+                scope: .task,
+                sensitivity: .medium,
+                tier: .warm,
+                confidence: 0.84,
+                sourceType: "history",
+                governanceStatus: .governed,
+                provenanceSummary: "support"
+            )
+        ]
+
+        let projection = BASBrainProjection(records: records, candidates: [], recentEvents: [])
+        let defaultRequest = BASBrainBootstrapRequest(
+            mode: .quick,
+            prompt: "I am back in the same loop again.",
+            source: .history,
+            sourceSurface: .app,
+            riskLevel: .medium,
+            retrievalMode: "filtered",
+            now: Date(timeIntervalSince1970: 1_700_070_000)
+        )
+        let hostRequest = BASBrainBootstrapRequest(
+            mode: .quick,
+            prompt: "I am back in the same loop again.",
+            source: .history,
+            sourceSurface: .app,
+            riskLevel: .medium,
+            retrievalMode: "filtered",
+            cognitionBehavior: BASCognitionBehavior(
+                brainCompilation: BASBrainCompilationBehavior(
+                    filteredCandidateLimitByModeID: [BASDecisionMode.primaryID: 6],
+                    filteredRelevantLimitByModeID: [BASDecisionMode.primaryID: 4]
+                )
+            ),
+            now: Date(timeIntervalSince1970: 1_700_070_000)
+        )
+
+        let defaultBrain = BASBrainCompiler.bootstrap(request: defaultRequest, projection: projection).brainState
+        let hostBrain = BASBrainCompiler.bootstrap(request: hostRequest, projection: projection).brainState
+
+        #expect(defaultBrain.relevantMemories.count == 3)
+        #expect(hostBrain.relevantMemories.count == 4)
+        #expect(hostBrain.relevantMemories.contains("Support memory D"))
     }
 }

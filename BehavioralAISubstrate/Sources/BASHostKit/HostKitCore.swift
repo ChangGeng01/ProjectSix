@@ -423,6 +423,7 @@ public struct BASHostWorkflowBehaviorConfiguration: Codable, Equatable, Sendable
     public var templateIDsByProfileID: [String: [String]]
     public var memorySourceIDsByProfileID: [String: String]
     public var interactiveRetrievalModeByProfileID: [String: String]
+    public var providerObservationNarrativesByKindID: [String: BASAppleProviderObservationNarrative]
     public var memorySourceIDsBySessionKindID: [String: String]
     public var retrievalModeIDsBySessionKindID: [String: String]
     public var defaultMemorySourceIDsBySessionKindID: [String: String]
@@ -439,6 +440,7 @@ public struct BASHostWorkflowBehaviorConfiguration: Codable, Equatable, Sendable
         templateIDsByProfileID: [String: [String]] = [:],
         memorySourceIDsByProfileID: [String: String] = [:],
         interactiveRetrievalModeByProfileID: [String: String] = [:],
+        providerObservationNarrativesByKindID: [String: BASAppleProviderObservationNarrative] = [:],
         memorySourceIDsBySessionKindID: [String: String] = [:],
         retrievalModeIDsBySessionKindID: [String: String] = [:],
         defaultMemorySourceIDsBySessionKindID: [String: String] = [:],
@@ -450,6 +452,7 @@ public struct BASHostWorkflowBehaviorConfiguration: Codable, Equatable, Sendable
         self.templateIDsByProfileID = templateIDsByProfileID
         self.memorySourceIDsByProfileID = memorySourceIDsByProfileID
         self.interactiveRetrievalModeByProfileID = interactiveRetrievalModeByProfileID
+        self.providerObservationNarrativesByKindID = providerObservationNarrativesByKindID
         self.memorySourceIDsBySessionKindID = memorySourceIDsBySessionKindID
         self.retrievalModeIDsBySessionKindID = retrievalModeIDsBySessionKindID
         self.defaultMemorySourceIDsBySessionKindID = defaultMemorySourceIDsBySessionKindID
@@ -491,6 +494,15 @@ public struct BASHostWorkflowBehaviorConfiguration: Codable, Equatable, Sendable
 
     public func interactiveRetrievalMode(for profile: BASHostWorkflowProfile) -> String {
         interactiveRetrievalModeByProfileID[profile.rawValue, default: BASRetrievalMode.adaptive.rawValue]
+    }
+
+    public func providerObservationNarrative(forKindID kindID: String) -> BASAppleProviderObservationNarrative? {
+        for alias in providerObservationAliases(for: kindID) {
+            if let configured = providerObservationNarrativesByKindID[alias] {
+                return configured
+            }
+        }
+        return nil
     }
 
     public func memorySource(for kind: BASHostSessionKind) -> BASMemorySource? {
@@ -540,6 +552,19 @@ public struct BASHostWorkflowBehaviorConfiguration: Codable, Equatable, Sendable
             BASDecisionMode.comparativeID
         case .reflective:
             BASDecisionMode.reflectiveID
+        }
+    }
+
+    private func providerObservationAliases(for kindID: String) -> [String] {
+        switch kindID {
+        case "quick", BASDecisionMode.primaryID:
+            [kindID, BASDecisionMode.primaryID, "quick"]
+        case "balance", BASDecisionMode.comparativeID:
+            [kindID, BASDecisionMode.comparativeID, "balance"]
+        case "mirror", BASDecisionMode.reflectiveID:
+            [kindID, BASDecisionMode.reflectiveID, "mirror"]
+        default:
+            [kindID]
         }
     }
 }

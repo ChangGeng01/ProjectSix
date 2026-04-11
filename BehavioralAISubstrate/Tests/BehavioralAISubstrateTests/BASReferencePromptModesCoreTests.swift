@@ -16,11 +16,21 @@ struct BASReferencePromptModesCoreTests {
         #expect(BASReferencePromptKind.balance.adaptiveTraceKind == .balance)
         #expect(BASReferencePromptKind.mirror.adaptiveTraceKind == .mirror)
         #expect(BASReferencePromptKind.reminder.adaptiveTraceKind == .reminder)
+        #expect(BASReferencePromptKind.primary == .quick)
+        #expect(BASReferencePromptKind.comparative == .balance)
+        #expect(BASReferencePromptKind.reflective == .mirror)
+        #expect(BASReferencePromptKind.selection == .reminder)
+        #expect(BASReferencePromptKind.quick.identifier == BASAdaptiveTraceKind.primaryID)
+        #expect(BASReferencePromptKind.mirror.legacyIdentifier == "mirror")
+        #expect(BASReferencePromptKind(identifier: "primary") == .quick)
+        #expect(BASReferencePromptKind(identifier: "comparative") == .balance)
+        #expect(BASReferencePromptKind(identifier: "reflective") == .mirror)
+        #expect(BASReferencePromptKind(identifier: "selection") == .reminder)
     }
 
     @Test("quick envelope compiles structured state and secondary actions")
     func quickEnvelopeCompilesStructuredState() {
-        let envelope = BASReferencePromptBuilder.quickEnvelope(
+        let envelope = BASReferencePromptBuilder.primaryEnvelope(
             BASQuickRefinementPromptRequest(
                 kind: TestKind.quick,
                 modeTitle: "Quick",
@@ -42,6 +52,26 @@ struct BASReferencePromptModesCoreTests {
         #expect(envelope.payload.contains("Current perspective: You want a little relief."))
         #expect(envelope.payload.contains("Secondary actions: Decide tomorrow"))
         #expect(envelope.assembly.kernelSnapshot.truthState == nil)
+    }
+
+    @Test("selection envelope remains available through the generic facade")
+    func selectionEnvelopeUsesGenericFacade() {
+        let envelope = BASReferencePromptBuilder.selectionEnvelope(
+            BASReminderSelectionPromptRequest(
+                kind: TestKind.reminder,
+                modeTitle: "Primary",
+                scenarioTitle: "Buy",
+                prompt: "I want to buy this tonight.",
+                candidateTexts: [
+                    "Hold it until tomorrow morning.",
+                    "Put it in the holding lane and sleep on it."
+                ],
+                reminderSurfaceMode: .primary
+            )
+        )
+
+        #expect(envelope.kind == .reminder)
+        #expect(envelope.assembly.kernelSnapshot.truthState?.sessionFacts["surface_mode"] == "primary")
     }
 
     @Test("reminder envelope clips candidates and suppresses structured truth block")
@@ -76,29 +106,29 @@ struct BASReferencePromptModesCoreTests {
             presentationBehavior: BASPromptPresentationBehavior(
                 sharedPrelude: "Host immutable prefix.",
                 adaptivePrefixByKindID: [
-                    BASSemanticTaskKind.quick.rawValue: "Host quick adaptive prefix."
+                    BASSemanticTaskKind.primaryID: "Host quick adaptive prefix."
                 ]
             ),
             frontstageBehavior: BASFrontstagePresentationBehavior(
                 focusGoalsByKindID: [
-                    BASAdaptiveTraceKind.quick.rawValue: "Host quick focus goal."
+                    BASAdaptiveTraceKind.primaryID: "Host quick focus goal."
                 ]
             ),
             structuredTruthBehavior: BASStructuredTruthBehavior(
                 modeNamesByKindID: [
-                    BASAdaptiveTraceKind.quick.rawValue: "before.quick"
+                    BASAdaptiveTraceKind.primaryID: "before.quick"
                 ],
                 kernelPersonaRulesByKindID: [
-                    BASAdaptiveTraceKind.quick.rawValue: "Keep the interruption short, calm, and non-shaming."
+                    BASAdaptiveTraceKind.primaryID: "Keep the interruption short, calm, and non-shaming."
                 ]
             ),
             outputGuardsByKindID: [
-                BASSemanticTaskKind.quick.rawValue: [
+                BASSemanticTaskKind.primaryID: [
                     "Keep the host-specific viewpoint framing."
                 ]
             ],
             targetCharactersByKindID: [
-                BASSemanticTaskKind.quick.rawValue: 900
+                BASSemanticTaskKind.primaryID: 900
             ]
         )
 

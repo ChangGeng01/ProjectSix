@@ -80,10 +80,16 @@ final class DecisionMemorySystemTests: XCTestCase {
             brainState.activeGoals.contains(where: { $0.contains("Sleep before midnight") }),
             "Expected sleep goal in \(brainState.activeGoals)"
         )
-        XCTAssertTrue(brainState.relevantMemories.contains(where: { $0.contains("Buy pressure keeps recurring.") }))
+        XCTAssertTrue(
+            brainState.relevantMemories.contains(where: { $0.contains("Buy pressure keeps recurring.") }),
+            "Expected repeated buy pattern in \(brainState.relevantMemories)"
+        )
         XCTAssertTrue(brainState.relevantMemories.contains(where: {
-            $0.contains("Holding the decision") || $0.contains("lighter, shorter guidance")
-        }))
+            $0.contains("Holding the decision") ||
+                $0.contains("lighter, shorter guidance") ||
+                $0.contains("Recently carrying") ||
+                $0.contains("Recently weighing")
+        }), "Expected stabilizing or context-carrying memory in \(brainState.relevantMemories)")
         XCTAssertTrue(brainState.sessionBiases.contains("Keep the language short and concrete."))
         XCTAssertTrue(brainState.sessionBiases.contains(where: { $0.localizedCaseInsensitiveContains("late at night") }))
         XCTAssertGreaterThanOrEqual(brainState.reactionWeights.briefLanguage, 0.9)

@@ -92,7 +92,8 @@ public enum BASAppleMemoryProjectionAdapter {
         records: [Governed],
         candidates: [Candidate],
         events: [Event],
-        governanceSnapshot: BASAppleProjectionGovernanceSnapshot? = nil
+        governanceSnapshot: BASAppleProjectionGovernanceSnapshot? = nil,
+        memoryTrustBehavior: BASMemoryTrustBehavior = .generic
     ) -> BASBrainProjection {
         compile(
             BASBrainProjectionCompileRequest(
@@ -138,7 +139,8 @@ public enum BASAppleMemoryProjectionAdapter {
                         deferredCandidateCount: $0.deferredCandidateCount,
                         admittedCandidateCount: $0.admittedCandidateCount
                     )
-                }
+                },
+                memoryTrustBehavior: memoryTrustBehavior
             )
         )
     }

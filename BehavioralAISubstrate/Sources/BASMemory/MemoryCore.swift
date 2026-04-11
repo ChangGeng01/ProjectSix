@@ -541,9 +541,9 @@ public struct BASBoundaryEvaluationBehavior: Codable, Equatable, Sendable {
         highRiskRequiredConfirmations: [String] = ["irreversible_decision"],
         highRiskBlockedActionClasses: [String] = ["fast_commit_action"],
         reflectiveModeIDs: [String] = [BASDecisionMode.reflectiveID],
-        advisoryHeadline: String = "Keep guidance local, bounded, and non-autonomous.",
-        reflectiveHeadline: String = "Keep the interpretation local and avoid forcing resolution.",
-        protectiveHeadline: String = "Keep execution local, add friction, and require confirmation before irreversible change."
+        advisoryHeadline: String = "Keep output local, bounded, and reversible.",
+        reflectiveHeadline: String = "Keep interpretation local and avoid premature closure.",
+        protectiveHeadline: String = "Keep execution local, increase confirmation, and slow irreversible change."
     ) {
         self.defaultAllowedActionClasses = defaultAllowedActionClasses
         self.defaultBlockedActionClasses = defaultBlockedActionClasses
@@ -561,8 +561,10 @@ public struct BASBoundaryEvaluationBehavior: Codable, Equatable, Sendable {
 }
 
 public struct BASBrainCompilationBehavior: Codable, Equatable, Sendable {
+    public var filteredCandidateLimitByModeID: [String: Int]
     public var retrievalOffCandidateLimitByModeID: [String: Int]
     public var retrievalOffGoalLimitByModeID: [String: Int]
+    public var filteredRelevantLimitByModeID: [String: Int]
     public var adaptiveRelevantLimitByModeID: [String: Int]
     public var relevantPriorityBaselinesByModeID: [String: Double]
     public var ignoredRetrievalTags: [String]
@@ -576,6 +578,11 @@ public struct BASBrainCompilationBehavior: Codable, Equatable, Sendable {
     public var negativeReflectionOutcomeIDs: [String]
 
     public init(
+        filteredCandidateLimitByModeID: [String: Int] = [
+            BASDecisionMode.primaryID: 8,
+            BASDecisionMode.comparativeID: 8,
+            BASDecisionMode.reflectiveID: 8
+        ],
         retrievalOffCandidateLimitByModeID: [String: Int] = [
             BASDecisionMode.primaryID: 4,
             BASDecisionMode.comparativeID: 5,
@@ -585,6 +592,11 @@ public struct BASBrainCompilationBehavior: Codable, Equatable, Sendable {
             BASDecisionMode.primaryID: 1,
             BASDecisionMode.comparativeID: 2,
             BASDecisionMode.reflectiveID: 2
+        ],
+        filteredRelevantLimitByModeID: [String: Int] = [
+            BASDecisionMode.primaryID: 3,
+            BASDecisionMode.comparativeID: 3,
+            BASDecisionMode.reflectiveID: 3
         ],
         adaptiveRelevantLimitByModeID: [String: Int] = [
             BASDecisionMode.primaryID: 3,
@@ -630,8 +642,10 @@ public struct BASBrainCompilationBehavior: Codable, Equatable, Sendable {
         positiveReflectionOutcomeIDs: [String] = ["stabilized", "okay", "not_needed"],
         negativeReflectionOutcomeIDs: [String] = ["regretted", "felt_worse"]
     ) {
+        self.filteredCandidateLimitByModeID = filteredCandidateLimitByModeID
         self.retrievalOffCandidateLimitByModeID = retrievalOffCandidateLimitByModeID
         self.retrievalOffGoalLimitByModeID = retrievalOffGoalLimitByModeID
+        self.filteredRelevantLimitByModeID = filteredRelevantLimitByModeID
         self.adaptiveRelevantLimitByModeID = adaptiveRelevantLimitByModeID
         self.relevantPriorityBaselinesByModeID = relevantPriorityBaselinesByModeID
         self.ignoredRetrievalTags = ignoredRetrievalTags
@@ -645,12 +659,20 @@ public struct BASBrainCompilationBehavior: Codable, Equatable, Sendable {
         self.negativeReflectionOutcomeIDs = negativeReflectionOutcomeIDs
     }
 
+    public func candidateLimitWhenFiltered(for mode: BASDecisionMode) -> Int {
+        resolvedInt(from: filteredCandidateLimitByModeID, for: mode) ?? 8
+    }
+
     public func candidateLimitWhenRetrievalOff(for mode: BASDecisionMode) -> Int {
         resolvedInt(from: retrievalOffCandidateLimitByModeID, for: mode) ?? 5
     }
 
     public func goalLimitWhenRetrievalOff(for mode: BASDecisionMode) -> Int {
         resolvedInt(from: retrievalOffGoalLimitByModeID, for: mode) ?? 2
+    }
+
+    public func relevantLimitWhenFiltered(for mode: BASDecisionMode) -> Int {
+        resolvedInt(from: filteredRelevantLimitByModeID, for: mode) ?? 3
     }
 
     public func relevantLimitWhenAdaptive(for mode: BASDecisionMode) -> Int {
@@ -724,6 +746,7 @@ public struct BASCognitionBehavior: Codable, Equatable, Sendable {
     public var boundary: BASBoundaryEvaluationBehavior
     public var sessionBias: BASSessionBiasBehavior
     public var brainCompilation: BASBrainCompilationBehavior
+    public var memoryTrust: BASMemoryTrustBehavior
 
     public init(
         surfaceIdentityOverlaysBySurfaceID: [String: BASIdentityProfileOverlay] = [
@@ -752,14 +775,15 @@ public struct BASCognitionBehavior: Codable, Equatable, Sendable {
             canAdvise: true,
             canExecuteActions: false,
             canEscalateToCloud: false,
-            relationshipBoundary: "Slow the decision down before offering stronger interpretation."
+            relationshipBoundary: "Slow execution down and preserve reversibility before offering stronger interpretation."
         ),
         highRiskInitiativeByRoleID: [String: BASIdentityInitiative] = [
             BASIdentityRole.reflectiveWitness.identifier: .guided
         ],
         boundary: BASBoundaryEvaluationBehavior = BASBoundaryEvaluationBehavior(),
         sessionBias: BASSessionBiasBehavior = BASSessionBiasBehavior(),
-        brainCompilation: BASBrainCompilationBehavior = BASBrainCompilationBehavior()
+        brainCompilation: BASBrainCompilationBehavior = BASBrainCompilationBehavior(),
+        memoryTrust: BASMemoryTrustBehavior = .generic
     ) {
         self.surfaceIdentityOverlaysBySurfaceID = surfaceIdentityOverlaysBySurfaceID
         self.highRiskIdentityOverlay = highRiskIdentityOverlay
@@ -767,6 +791,7 @@ public struct BASCognitionBehavior: Codable, Equatable, Sendable {
         self.boundary = boundary
         self.sessionBias = sessionBias
         self.brainCompilation = brainCompilation
+        self.memoryTrust = memoryTrust
     }
 
     public static let generic = BASCognitionBehavior()
@@ -787,16 +812,16 @@ public struct BASSessionBiasBehavior: Codable, Equatable, Sendable {
 
     public init(
         defaultBiasesByModeID: [String: [String]] = [
-            BASDecisionMode.primaryID: ["Keep the immediate state bounded before expanding."],
-            BASDecisionMode.comparativeID: ["Keep the active considerations visible without forcing resolution."],
-            BASDecisionMode.reflectiveID: ["Describe the underlying pattern before steering it."]
+            BASDecisionMode.primaryID: ["Stabilize the active state before expanding it."],
+            BASDecisionMode.comparativeID: ["Keep the active pressures visible without collapsing them."],
+            BASDecisionMode.reflectiveID: ["Describe the underlying signal before steering it."]
         ],
         briefLanguageSignals: [String] = ["short", "direct", "concise"],
-        nightBias: String = "Lower-trust conditions call for more pacing.",
-        nightLowLoadBias: String = "Prefer a lighter cognitive load in lower-trust conditions.",
+        nightBias: String = "Lower-fidelity conditions call for more pacing.",
+        nightLowLoadBias: String = "Prefer a lighter cognitive load when signal quality drops.",
         lowCognitiveLoadSignals: [String] = ["lighter guidance", "lighter", "shorter guidance", "low load", "fatigued", "overloaded"],
         interruptiveActionSignals: [String] = ["hold", "pause", "interrupt", "step away", "slow down"],
-        interruptiveActionBias: String = "Prefer a stabilizing next step before adding more detail.",
+        interruptiveActionBias: String = "Prefer a stabilizing next step before adding more complexity.",
         boundaryNamingSignals: [String] = ["boundary", "pattern", "relationship", "limit", "edge"],
         boundaryNamingBias: String = "Name the active limit before reframing.",
         tradeoffClaritySignals: [String] = ["trade-off", "tradeoff", "constraint", "benefit", "cost"],

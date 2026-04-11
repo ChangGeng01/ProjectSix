@@ -146,6 +146,7 @@ public struct BASBrainProjectionCompileRequest: Codable, Equatable, Sendable {
     public var taskGraphHint: BASBrainTaskGraphHint?
     public var activeTemplateIDs: [String]
     public var failureGuardIDs: [String]
+    public var memoryTrustBehavior: BASMemoryTrustBehavior
 
     public init(
         records: [BASProjectionGovernedMemoryInput],
@@ -155,7 +156,8 @@ public struct BASBrainProjectionCompileRequest: Codable, Equatable, Sendable {
         governanceSnapshot: BASProjectionGovernanceInput? = nil,
         taskGraphHint: BASBrainTaskGraphHint? = nil,
         activeTemplateIDs: [String] = [],
-        failureGuardIDs: [String] = []
+        failureGuardIDs: [String] = [],
+        memoryTrustBehavior: BASMemoryTrustBehavior = .generic
     ) {
         self.records = records
         self.candidates = candidates
@@ -165,6 +167,7 @@ public struct BASBrainProjectionCompileRequest: Codable, Equatable, Sendable {
         self.taskGraphHint = taskGraphHint
         self.activeTemplateIDs = activeTemplateIDs
         self.failureGuardIDs = failureGuardIDs
+        self.memoryTrustBehavior = memoryTrustBehavior
     }
 }
 
@@ -172,7 +175,7 @@ public enum BASBrainProjectionCompiler {
     public static func compile(_ request: BASBrainProjectionCompileRequest) -> BASBrainProjection {
         BASBrainProjection(
             records: request.records.map(governedMemory(from:)),
-            candidates: request.candidates.map(candidate(from:)),
+            candidates: request.candidates.map { candidate(from: $0, behavior: request.memoryTrustBehavior) },
             recentEvents: request.events.map(event(from:)),
             embeddingScoresByID: request.embeddingScoresByID,
             governanceSnapshot: request.governanceSnapshot.map(governanceState(from:)),
@@ -199,7 +202,10 @@ public enum BASBrainProjectionCompiler {
         )
     }
 
-    private static func candidate(from input: BASProjectionCandidateInput) -> BASMemoryEligibilityCandidate {
+    private static func candidate(
+        from input: BASProjectionCandidateInput,
+        behavior: BASMemoryTrustBehavior
+    ) -> BASMemoryEligibilityCandidate {
         let source = memorySource(from: input.sourceID)
         let governanceStatus = memoryLoadStatus(
             statusID: input.statusID,
@@ -213,7 +219,8 @@ public enum BASBrainProjectionCompiler {
             decayPolicy: decayPolicy,
             governanceStatus: governanceStatus,
             isPending: isPending,
-            provenanceSummary: input.provenanceSummary
+            provenanceSummary: input.provenanceSummary,
+            behavior: behavior
         )
 
         return BASMemoryEligibilityCandidate(

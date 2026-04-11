@@ -198,6 +198,25 @@ public struct BASSituationalDraftBehavior: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASWorkspaceSituationalDraftBehavior: Codable, Equatable, Sendable {
+    public var workflowIDs: [String]
+    public var draft: BASSituationalDraftBehavior
+    public var confidence: Double
+    public var priority: Double
+
+    public init(
+        workflowIDs: [String],
+        draft: BASSituationalDraftBehavior,
+        confidence: Double,
+        priority: Double
+    ) {
+        self.workflowIDs = workflowIDs
+        self.draft = draft
+        self.confidence = confidence
+        self.priority = priority
+    }
+}
+
 public struct BASSupportActionDraftBehavior: Codable, Equatable, Sendable {
     public var headline: String
     public var tags: [String]
@@ -222,9 +241,22 @@ public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
     public var reflectiveSituational: BASSituationalDraftBehavior
     public var comparativeWorkspaceIDs: [String]
     public var reflectiveWorkspaceIDs: [String]
+    public var workspaceSituationalBehaviors: [BASWorkspaceSituationalDraftBehavior]
     public var supportActionsByID: [String: BASSupportActionDraftBehavior]
     public var fallbackSupportTags: [String]
     public var fallbackSupportProvenanceSummary: String
+
+    private enum CodingKeys: String, CodingKey {
+        case primarySituational
+        case comparativeSituational
+        case reflectiveSituational
+        case comparativeWorkspaceIDs
+        case reflectiveWorkspaceIDs
+        case workspaceSituationalBehaviors
+        case supportActionsByID
+        case fallbackSupportTags
+        case fallbackSupportProvenanceSummary
+    }
 
     public init(
         primarySituational: BASSituationalDraftBehavior = BASSituationalDraftBehavior(
@@ -251,6 +283,7 @@ public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
         ),
         comparativeWorkspaceIDs: [String] = ["comparative"],
         reflectiveWorkspaceIDs: [String] = ["reflective"],
+        workspaceSituationalBehaviors: [BASWorkspaceSituationalDraftBehavior] = [],
         supportActionsByID: [String: BASSupportActionDraftBehavior] = [:],
         fallbackSupportTags: [String] = ["action_support", "stabilizing_action"],
         fallbackSupportProvenanceSummary: String = "Derived from repeated stabilizing actions in the host runtime."
@@ -260,9 +293,67 @@ public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
         self.reflectiveSituational = reflectiveSituational
         self.comparativeWorkspaceIDs = comparativeWorkspaceIDs
         self.reflectiveWorkspaceIDs = reflectiveWorkspaceIDs
+        self.workspaceSituationalBehaviors = workspaceSituationalBehaviors
         self.supportActionsByID = supportActionsByID
         self.fallbackSupportTags = fallbackSupportTags
         self.fallbackSupportProvenanceSummary = fallbackSupportProvenanceSummary
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let fallback = BASMemoryDerivationBehavior.generic
+        primarySituational = try container.decodeIfPresent(BASSituationalDraftBehavior.self, forKey: .primarySituational)
+            ?? fallback.primarySituational
+        comparativeSituational = try container.decodeIfPresent(BASSituationalDraftBehavior.self, forKey: .comparativeSituational)
+            ?? fallback.comparativeSituational
+        reflectiveSituational = try container.decodeIfPresent(BASSituationalDraftBehavior.self, forKey: .reflectiveSituational)
+            ?? fallback.reflectiveSituational
+        comparativeWorkspaceIDs = try container.decodeIfPresent([String].self, forKey: .comparativeWorkspaceIDs)
+            ?? fallback.comparativeWorkspaceIDs
+        reflectiveWorkspaceIDs = try container.decodeIfPresent([String].self, forKey: .reflectiveWorkspaceIDs)
+            ?? fallback.reflectiveWorkspaceIDs
+        workspaceSituationalBehaviors = try container.decodeIfPresent([BASWorkspaceSituationalDraftBehavior].self, forKey: .workspaceSituationalBehaviors)
+            ?? []
+        supportActionsByID = try container.decodeIfPresent([String: BASSupportActionDraftBehavior].self, forKey: .supportActionsByID)
+            ?? fallback.supportActionsByID
+        fallbackSupportTags = try container.decodeIfPresent([String].self, forKey: .fallbackSupportTags)
+            ?? fallback.fallbackSupportTags
+        fallbackSupportProvenanceSummary = try container.decodeIfPresent(String.self, forKey: .fallbackSupportProvenanceSummary)
+            ?? fallback.fallbackSupportProvenanceSummary
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(primarySituational, forKey: .primarySituational)
+        try container.encode(comparativeSituational, forKey: .comparativeSituational)
+        try container.encode(reflectiveSituational, forKey: .reflectiveSituational)
+        try container.encode(comparativeWorkspaceIDs, forKey: .comparativeWorkspaceIDs)
+        try container.encode(reflectiveWorkspaceIDs, forKey: .reflectiveWorkspaceIDs)
+        try container.encode(workspaceSituationalBehaviors, forKey: .workspaceSituationalBehaviors)
+        try container.encode(supportActionsByID, forKey: .supportActionsByID)
+        try container.encode(fallbackSupportTags, forKey: .fallbackSupportTags)
+        try container.encode(fallbackSupportProvenanceSummary, forKey: .fallbackSupportProvenanceSummary)
+    }
+
+    public var resolvedWorkspaceSituationalBehaviors: [BASWorkspaceSituationalDraftBehavior] {
+        if workspaceSituationalBehaviors.isEmpty == false {
+            return workspaceSituationalBehaviors
+        }
+
+        return [
+            BASWorkspaceSituationalDraftBehavior(
+                workflowIDs: comparativeWorkspaceIDs,
+                draft: comparativeSituational,
+                confidence: 0.74,
+                priority: 0.76
+            ),
+            BASWorkspaceSituationalDraftBehavior(
+                workflowIDs: reflectiveWorkspaceIDs,
+                draft: reflectiveSituational,
+                confidence: 0.78,
+                priority: 0.82
+            )
+        ].filter { $0.workflowIDs.isEmpty == false }
     }
 }
 
@@ -542,58 +633,34 @@ public enum BASMemoryDraftCompiler {
             )
         }
 
-        if let record = firstWorkspace(
-            in: workspaceRecords,
-            matching: behavior.comparativeWorkspaceIDs
-        ) {
-            let prompt = normalized(record.prompt)
-            if !prompt.isEmpty {
-                drafts.append(
-                    BASDerivedMemoryDraft(
-                        id: behavior.comparativeSituational.draftID,
-                        typeID: "situational",
-                        topic: behavior.comparativeSituational.topic,
-                        headline: "\(behavior.comparativeSituational.primaryHeadlinePrefix): \(clipped(prompt, limit: 96))",
-                        value: prompt,
-                        confidence: 0.74,
-                        priority: 0.76,
-                        sourceID: "history",
-                        lastConfirmedAt: record.updatedAt,
-                        decayPolicyID: "fast",
-                        retrievalTags: behavior.comparativeSituational.baseTags + tags(from: prompt),
-                        evidenceCount: 1,
-                        provenanceSummary: behavior.comparativeSituational.provenanceSummary,
-                        promotionPolicy: .candidateOnly
-                    )
-                )
+        for workspaceBehavior in behavior.resolvedWorkspaceSituationalBehaviors {
+            guard let record = firstWorkspace(
+                in: workspaceRecords,
+                matching: workspaceBehavior.workflowIDs
+            ) else {
+                continue
             }
-        }
+            let prompt = normalized(record.prompt)
+            guard !prompt.isEmpty else { continue }
 
-        if let record = firstWorkspace(
-            in: workspaceRecords,
-            matching: behavior.reflectiveWorkspaceIDs
-        ) {
-            let prompt = normalized(record.prompt)
-            if !prompt.isEmpty {
-                drafts.append(
-                    BASDerivedMemoryDraft(
-                        id: behavior.reflectiveSituational.draftID,
-                        typeID: "situational",
-                        topic: behavior.reflectiveSituational.topic,
-                        headline: "\(behavior.reflectiveSituational.primaryHeadlinePrefix): \(clipped(prompt, limit: 96))",
-                        value: prompt,
-                        confidence: 0.78,
-                        priority: 0.82,
-                        sourceID: "history",
-                        lastConfirmedAt: record.updatedAt,
-                        decayPolicyID: "fast",
-                        retrievalTags: behavior.reflectiveSituational.baseTags + tags(from: prompt),
-                        evidenceCount: 1,
-                        provenanceSummary: behavior.reflectiveSituational.provenanceSummary,
-                        promotionPolicy: .candidateOnly
-                    )
+            drafts.append(
+                BASDerivedMemoryDraft(
+                    id: workspaceBehavior.draft.draftID,
+                    typeID: "situational",
+                    topic: workspaceBehavior.draft.topic,
+                    headline: "\(workspaceBehavior.draft.primaryHeadlinePrefix): \(clipped(prompt, limit: 96))",
+                    value: prompt,
+                    confidence: workspaceBehavior.confidence,
+                    priority: workspaceBehavior.priority,
+                    sourceID: "history",
+                    lastConfirmedAt: record.updatedAt,
+                    decayPolicyID: "fast",
+                    retrievalTags: workspaceBehavior.draft.baseTags + tags(from: prompt),
+                    evidenceCount: 1,
+                    provenanceSummary: workspaceBehavior.draft.provenanceSummary,
+                    promotionPolicy: .candidateOnly
                 )
-            }
+            )
         }
 
         return drafts

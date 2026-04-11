@@ -15,6 +15,12 @@ enum DecisionIntelligenceProviderPipeline {
         DecisionIntelligenceAdmissionDecision
     >
 
+    private static func providerObservationNarrative(
+        for kind: DecisionIntelligenceTraceKind
+    ) -> BASAppleProviderObservationNarrative? {
+        BeforeProductLanguage.workflowBehavior.providerObservationNarrative(forKindID: kind.rawValue)
+    }
+
     static func orderedKinds(
         for preference: DecisionModelProviderPreference,
         allowFallbacks: Bool = true,
@@ -111,6 +117,7 @@ enum DecisionIntelligenceProviderPipeline {
                 admissionReason: admissionDecision.reason,
                 semanticPromptFingerprint: semanticPromptFingerprint,
                 stablePrefixFingerprint: stablePrefixFingerprint,
+                narrativeOverride: providerObservationNarrative(for: .quick),
                 prompt: envelope.debugPrompt,
                 baselineOutputPreview: quickPreview(from: base),
                 deterministicFallbackOutputPreview: quickPreview(from: base),
@@ -237,6 +244,7 @@ enum DecisionIntelligenceProviderPipeline {
                 admissionReason: admissionDecision.reason,
                 semanticPromptFingerprint: semanticPromptFingerprint,
                 stablePrefixFingerprint: stablePrefixFingerprint,
+                narrativeOverride: providerObservationNarrative(for: .balance),
                 prompt: envelope.debugPrompt,
                 baselineOutputPreview: balancePreview(from: base),
                 deterministicFallbackOutputPreview: balancePreview(from: base),
@@ -363,6 +371,7 @@ enum DecisionIntelligenceProviderPipeline {
                 admissionReason: admissionDecision.reason,
                 semanticPromptFingerprint: semanticPromptFingerprint,
                 stablePrefixFingerprint: stablePrefixFingerprint,
+                narrativeOverride: providerObservationNarrative(for: .mirror),
                 prompt: envelope.debugPrompt,
                 baselineOutputPreview: mirrorPreview(from: base),
                 deterministicFallbackOutputPreview: mirrorPreview(from: base),
@@ -499,6 +508,7 @@ enum DecisionIntelligenceProviderPipeline {
                 admissionReason: admissionDecision.reason,
                 semanticPromptFingerprint: semanticPromptFingerprint,
                 stablePrefixFingerprint: stablePrefixFingerprint,
+                narrativeOverride: providerObservationNarrative(for: .reminder),
                 prompt: selection.prompt.debugPrompt,
                 baselineOutputPreview: "Deterministic reminder ordering kept",
                 deterministicFallbackOutputPreview: "No reminder selected",

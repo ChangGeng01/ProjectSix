@@ -75,11 +75,11 @@ struct BASProviderReleaseCoreTests {
     @Test("raw value evaluator bridges host trace kinds without host-owned mapping")
     func rawValueEvaluatorBridgesTraceKinds() {
         let verdict = BASProviderReleaseEvaluator.verdict(
-            traceKindRawValue: "reminder",
+            traceKindRawValue: BASAdaptiveTraceKind.reminderID,
             outputPreview: "Wait and reuse the reminder you trust.",
             kernelSnapshot: kernelWithoutTruthState(),
             brainState: reminderBrainState(),
-            reminderSurfaceModeRawValue: "quick",
+            reminderSurfaceModeRawValue: BASDecisionMode.primaryID,
             referencedFacts: ["current_goal": "Protect sleep"]
         )
 

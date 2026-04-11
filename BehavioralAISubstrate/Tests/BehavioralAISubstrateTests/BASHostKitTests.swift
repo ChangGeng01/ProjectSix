@@ -81,6 +81,29 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(result.followUpActions, ["Host loads first", "Host resumes workspace"])
     }
 
+    func testWorkflowBehaviorLetsHostOwnProviderObservationNarratives() {
+        let workflowBehavior = BASHostWorkflowBehaviorConfiguration(
+            providerObservationNarrativesByKindID: [
+                BASDecisionMode.primaryID: BASAppleProviderObservationNarrative(
+                    templatePinnedDetail: "Host owns the rapid pass copy.",
+                    admissionSkippedDetailPrefix: "Host skipped the rapid pass.",
+                    deterministicFallbackBase: "Host kept the rapid draft.",
+                    cachedConsistencySource: "cached rapid pass",
+                    providerConsistencySource: "provider rapid pass"
+                )
+            ]
+        )
+
+        XCTAssertEqual(
+            workflowBehavior.providerObservationNarrative(forKindID: "quick")?.providerConsistencySource,
+            "provider rapid pass"
+        )
+        XCTAssertEqual(
+            workflowBehavior.providerObservationNarrative(forKindID: BASDecisionMode.primaryID)?.cachedConsistencySource,
+            "cached rapid pass"
+        )
+    }
+
     func testReopenHighRiskProducesFollowUpSuggestion() {
         let runtime = BASHostRuntime()
 

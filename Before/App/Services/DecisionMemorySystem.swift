@@ -25,6 +25,7 @@ enum DecisionMemorySystem {
             comparativeRecordType: BalanceDecisionRecord.self,
             reflectiveRecordType: MirrorDecisionRecord.self,
             behavior: BeforeProductLanguage.memoryDerivationBehavior,
+            memoryTrustBehavior: BeforeProductLanguage.hostCognition.substrateBehavior.memoryTrust,
             onSaveError: { error in
                 PersistenceIssueRecorder.record(
                     error: error,
@@ -50,6 +51,7 @@ enum DecisionMemorySystem {
             comparativeRecordType: BalanceDecisionRecord.self,
             reflectiveRecordType: MirrorDecisionRecord.self,
             behavior: BeforeProductLanguage.memoryDerivationBehavior,
+            memoryTrustBehavior: BeforeProductLanguage.hostCognition.substrateBehavior.memoryTrust,
             rebuildEmbeddings: { records, candidates, checkEvents, comparativeRecords, reflectiveRecords in
                 EmbeddingMemoryStore.rebuildIndex(
                     records: records,

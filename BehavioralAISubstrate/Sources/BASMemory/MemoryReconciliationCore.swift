@@ -190,17 +190,20 @@ public struct BASMemoryReconciliationRequest: Codable, Equatable, Sendable {
     public var existingRecords: [BASExistingGovernedMemorySnapshot]
     public var existingCandidates: [BASExistingCandidateMemorySnapshot]
     public var reviewNow: Date
+    public var memoryTrustBehavior: BASMemoryTrustBehavior
 
     public init(
         drafts: [BASMemoryReconciliationDraftInput],
         existingRecords: [BASExistingGovernedMemorySnapshot],
         existingCandidates: [BASExistingCandidateMemorySnapshot],
-        reviewNow: Date
+        reviewNow: Date,
+        memoryTrustBehavior: BASMemoryTrustBehavior = .generic
     ) {
         self.drafts = drafts
         self.existingRecords = existingRecords
         self.existingCandidates = existingCandidates
         self.reviewNow = reviewNow
+        self.memoryTrustBehavior = memoryTrustBehavior
     }
 }
 
@@ -231,7 +234,10 @@ public enum BASMemoryReconciler {
             let draft = input.draft
             seenDraftIDs.insert(draft.id)
 
-            let assessment = BASMemoryGovernance.assess(draft: draft)
+            let assessment = BASMemoryGovernance.assess(
+                draft: draft,
+                behavior: request.memoryTrustBehavior
+            )
 
             if assessment.decision == .reject {
                 if recordsByID[draft.id] != nil {
@@ -346,7 +352,8 @@ public enum BASMemoryReconciler {
                     provenanceSummary: record.provenanceSummary,
                     lastConfirmedAt: record.lastConfirmedAt,
                     reviewNow: request.reviewNow
-                )
+                ),
+                behavior: request.memoryTrustBehavior
             )
             let updatedRecord = transitionRecord(
                 record,

@@ -135,4 +135,66 @@ struct BASProjectionCoreTests {
         #expect(projection.records.first?.decayScore == 0)
         #expect(projection.recentEvents.first?.content == "Fallback event content")
     }
+
+    @Test("projection compiler respects host memory trust behavior")
+    func projectionCompilerRespectsHostMemoryTrustBehavior() {
+        let genericProjection = BASBrainProjectionCompiler.compile(
+            BASBrainProjectionCompileRequest(
+                records: [],
+                candidates: [
+                    BASProjectionCandidateInput(
+                        id: "candidate.history",
+                        typeID: "semantic",
+                        headline: "Long-lived editorial pattern",
+                        confidence: 0.8,
+                        priority: 0.72,
+                        sourceID: BASMemorySource.history.rawValue,
+                        retrievalTags: ["publish", "cadence"],
+                        lastObservedAt: Date(timeIntervalSince1970: 1_700_010_000),
+                        decayPolicyID: BASMemoryDecayPolicy.medium.rawValue,
+                        statusID: BASMemoryLoadStatus.pending.rawValue,
+                        governanceDecisionID: BASMemoryGovernanceDecision.admit.rawValue,
+                        evidenceCount: 1,
+                        provenanceSummary: "clean history"
+                    )
+                ],
+                events: []
+            )
+        )
+
+        let hostProjection = BASBrainProjectionCompiler.compile(
+            BASBrainProjectionCompileRequest(
+                records: [],
+                candidates: [
+                    BASProjectionCandidateInput(
+                        id: "candidate.history",
+                        typeID: "semantic",
+                        headline: "Long-lived editorial pattern",
+                        confidence: 0.8,
+                        priority: 0.72,
+                        sourceID: BASMemorySource.history.rawValue,
+                        retrievalTags: ["publish", "cadence"],
+                        lastObservedAt: Date(timeIntervalSince1970: 1_700_010_000),
+                        decayPolicyID: BASMemoryDecayPolicy.medium.rawValue,
+                        statusID: BASMemoryLoadStatus.pending.rawValue,
+                        governanceDecisionID: BASMemoryGovernanceDecision.admit.rawValue,
+                        evidenceCount: 1,
+                        provenanceSummary: "clean history"
+                    )
+                ],
+                events: [],
+                memoryTrustBehavior: BASMemoryTrustBehavior(
+                    baseScoresBySourceID: [
+                        BASMemorySource.reminder.rawValue: 0.55,
+                        BASMemorySource.pattern.rawValue: 0.62,
+                        BASMemorySource.reflection.rawValue: 0.7,
+                        BASMemorySource.history.rawValue: 0.92
+                    ]
+                )
+            )
+        )
+
+        #expect((hostProjection.candidates.first?.sourceTrustScore ?? 0) > (genericProjection.candidates.first?.sourceTrustScore ?? 0))
+        #expect((hostProjection.candidates.first?.sourceTrustScore ?? 0) > 0.75)
+    }
 }

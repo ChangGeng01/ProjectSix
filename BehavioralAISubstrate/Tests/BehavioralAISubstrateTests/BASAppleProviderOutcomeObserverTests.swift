@@ -92,12 +92,39 @@ struct BASAppleProviderOutcomeObserverTests {
             )
         )
 
-        #expect(quick.templatePinnedDetail.contains("primary refinement"))
+        #expect(quick.templatePinnedDetail.contains("primary pass"))
         #expect(quick.admissionSkippedOutputPreview == "quick preview")
-        #expect(quick.cachedConsistencySource == "cached primary refinement")
+        #expect(quick.cachedConsistencySource == "cached primary pass")
         #expect(reminder.templatePinnedDetail.contains("reminder selection"))
         #expect(reminder.providerConsistencySource == "provider reminder selection")
         #expect(reminder.deterministicFallbackOutputPreview == "no reminder")
+    }
+
+    @Test("observation context builder lets hosts override provider narratives")
+    func observationContextBuilderSupportsHostNarratives() {
+        let context = BASAppleProviderObservationContextBuilder.build(
+            from: BASAppleProviderObservationSourceInput(
+                kind: "quick",
+                preferredProviderID: "foundationModels",
+                allowFallbacks: true,
+                providerProfilesByID: [:],
+                narrativeOverride: BASAppleProviderObservationNarrative(
+                    templatePinnedDetail: "Host kept Rapid Lens deterministic.",
+                    admissionSkippedDetailPrefix: "Host skipped Rapid Lens execution.",
+                    deterministicFallbackBase: "Host kept the Rapid Lens draft.",
+                    cachedConsistencySource: "cached Rapid Lens pass",
+                    providerConsistencySource: "provider Rapid Lens pass"
+                ),
+                prompt: "rapid prompt",
+                baselineOutputPreview: "rapid preview",
+                deterministicFallbackOutputPreview: "rapid fallback",
+                recordsTemplatePinnedTrace: true
+            )
+        )
+
+        #expect(context.templatePinnedDetail == "Host kept Rapid Lens deterministic.")
+        #expect(context.cachedConsistencySource == "cached Rapid Lens pass")
+        #expect(context.providerConsistencySource == "provider Rapid Lens pass")
     }
 
     @Test("host observation bridge builds host context while keeping substrate narrative compilation package-owned")
@@ -126,8 +153,8 @@ struct BASAppleProviderOutcomeObserverTests {
         #expect(context.kind == .quick)
         #expect(context.frontstageState == "frontstage")
         #expect(context.brainState == "brain")
-        #expect(context.substrateContext.templatePinnedDetail.contains("primary refinement"))
-        #expect(context.substrateContext.cachedConsistencySource == "cached primary refinement")
+        #expect(context.substrateContext.templatePinnedDetail.contains("primary pass"))
+        #expect(context.substrateContext.cachedConsistencySource == "cached primary pass")
     }
 
     @Test("observer compiles sanitized traces and telemetry observations")

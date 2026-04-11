@@ -124,6 +124,7 @@ public enum BASAppleMemoryProjectionRefreshAdapter {
         comparativeRecordType: Comparative.Type,
         reflectiveRecordType: Reflective.Type,
         behavior: BASMemoryDerivationBehavior = .generic,
+        memoryTrustBehavior: BASMemoryTrustBehavior = .generic,
         fetchRecords: (ModelContext, Int) -> [Governed],
         fetchCandidates: (ModelContext, Int) -> [Candidate],
         fetchCheckEvents: (ModelContext, Int) -> [Event],
@@ -155,6 +156,7 @@ public enum BASAppleMemoryProjectionRefreshAdapter {
                     comparativeRecordType: comparativeRecordType,
                     reflectiveRecordType: reflectiveRecordType,
                     behavior: behavior,
+                    memoryTrustBehavior: memoryTrustBehavior,
                     onSaveError: onSaveError
                 )
             resolvedRecords = Array(refreshed.orderedRecords.prefix(limits.recordLimit))
@@ -181,7 +183,8 @@ public enum BASAppleMemoryProjectionRefreshAdapter {
             records: resolvedRecords,
             candidates: resolvedCandidates,
             events: checkEvents,
-            governanceSnapshot: resolvedGovernanceSnapshot
+            governanceSnapshot: resolvedGovernanceSnapshot,
+            memoryTrustBehavior: memoryTrustBehavior
         )
 
         return BASAppleMemoryProjectionRefreshResult(
@@ -271,6 +274,7 @@ public enum BASAppleMemoryProjectionRuntime {
         comparativeRecordType: Comparative.Type,
         reflectiveRecordType: Reflective.Type,
         behavior: BASMemoryDerivationBehavior = .generic,
+        memoryTrustBehavior: BASMemoryTrustBehavior = .generic,
         rebuildEmbeddings: (
             _ records: [Governed],
             _ candidates: [Candidate],
@@ -291,6 +295,7 @@ public enum BASAppleMemoryProjectionRuntime {
             comparativeRecordType: comparativeRecordType,
             reflectiveRecordType: reflectiveRecordType,
             behavior: behavior,
+            memoryTrustBehavior: memoryTrustBehavior,
             fetchRecords: {
                 BASAppleMemoryProjectionSelectionAdapter.fetchProjectionRecords(
                     in: $0,
@@ -351,6 +356,7 @@ public enum BASAppleMemoryProjectionRuntime {
         comparativeRecordType: Comparative.Type,
         reflectiveRecordType: Reflective.Type,
         behavior: BASMemoryDerivationBehavior = .generic,
+        memoryTrustBehavior: BASMemoryTrustBehavior = .generic,
         fetchRecords: (ModelContext, Int) -> [Governed],
         fetchCandidates: (ModelContext, Int) -> [Candidate],
         fetchCheckEvents: (ModelContext, Int) -> [Event],
@@ -387,6 +393,7 @@ public enum BASAppleMemoryProjectionRuntime {
             comparativeRecordType: comparativeRecordType,
             reflectiveRecordType: reflectiveRecordType,
             behavior: behavior,
+            memoryTrustBehavior: memoryTrustBehavior,
             fetchRecords: fetchRecords,
             fetchCandidates: fetchCandidates,
             fetchCheckEvents: fetchCheckEvents,
@@ -415,6 +422,7 @@ public enum BASAppleMemoryProjectionRuntime {
         balanceRecordType: Balance.Type,
         mirrorRecordType: Mirror.Type,
         behavior: BASMemoryDerivationBehavior = .generic,
+        memoryTrustBehavior: BASMemoryTrustBehavior = .generic,
         rebuildEmbeddings: (
             _ records: [Governed],
             _ candidates: [Candidate],
@@ -435,6 +443,7 @@ public enum BASAppleMemoryProjectionRuntime {
             comparativeRecordType: balanceRecordType,
             reflectiveRecordType: mirrorRecordType,
             behavior: behavior,
+            memoryTrustBehavior: memoryTrustBehavior,
             rebuildEmbeddings: rebuildEmbeddings,
             onSaveError: onSaveError
         )
@@ -458,6 +467,7 @@ public enum BASAppleMemoryProjectionRuntime {
         balanceRecordType: Balance.Type,
         mirrorRecordType: Mirror.Type,
         behavior: BASMemoryDerivationBehavior = .generic,
+        memoryTrustBehavior: BASMemoryTrustBehavior = .generic,
         fetchRecords: (ModelContext, Int) -> [Governed],
         fetchCandidates: (ModelContext, Int) -> [Candidate],
         fetchCheckEvents: (ModelContext, Int) -> [Event],
@@ -483,6 +493,7 @@ public enum BASAppleMemoryProjectionRuntime {
             comparativeRecordType: balanceRecordType,
             reflectiveRecordType: mirrorRecordType,
             behavior: behavior,
+            memoryTrustBehavior: memoryTrustBehavior,
             fetchRecords: fetchRecords,
             fetchCandidates: fetchCandidates,
             fetchCheckEvents: fetchCheckEvents,

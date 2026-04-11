@@ -117,7 +117,8 @@ public extension BASDraftPromotionPolicy {
 
 public extension BASMemoryGovernance {
     static func assess(
-        draft: BASMemoryGovernanceDraftInput
+        draft: BASMemoryGovernanceDraftInput,
+        behavior: BASMemoryTrustBehavior = .generic
     ) -> BASMemoryGovernanceAssessment {
         let continuityProtected =
             draft.typeID == "goal" ||
@@ -130,7 +131,8 @@ public extension BASMemoryGovernance {
             decayPolicy: draft.decayPolicy,
             governanceStatus: .pending,
             isPending: draft.promotionPolicy.isCandidateOnly || draft.typeID == "situational",
-            provenanceSummary: draft.provenanceSummary
+            provenanceSummary: draft.provenanceSummary,
+            behavior: behavior
         )
 
         if trustProfile.provenanceRisk {
@@ -216,7 +218,8 @@ public extension BASMemoryGovernance {
     }
 
     static func nextLifecycleState(
-        for review: BASMemoryLifecycleReviewInput
+        for review: BASMemoryLifecycleReviewInput,
+        behavior: BASMemoryTrustBehavior = .generic
     ) -> BASMemoryLifecycleState {
         let ageInDays = max(0, review.reviewNow.timeIntervalSince(review.lastConfirmedAt) / 86_400)
         let trustProfile = BASMemoryTrustEngine.profile(
@@ -225,7 +228,8 @@ public extension BASMemoryGovernance {
             decayPolicy: review.decayPolicy,
             governanceStatus: .admitted,
             isPending: false,
-            provenanceSummary: review.provenanceSummary
+            provenanceSummary: review.provenanceSummary,
+            behavior: behavior
         )
         let stableDays = 365 * trustProfile.decayGraceMultiplier
         let slowAgingDays = 45 * trustProfile.decayGraceMultiplier

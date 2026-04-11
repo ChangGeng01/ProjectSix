@@ -7,7 +7,7 @@ import Testing
 struct BASAppleReferencePromptBuilderTests {
     @Test("quick envelope builds package-owned reference kind and prompt snapshots")
     func quickEnvelopeBuildsReferencePrompt() {
-        let envelope = BASAppleReferencePromptBuilder.quickEnvelope(
+        let envelope = BASAppleReferencePromptBuilder.primaryEnvelope(
             BASAppleQuickRefinementEnvelopeRequest(
                 modeTitle: "Quick",
                 scenarioTitle: "Buy",
@@ -93,7 +93,7 @@ struct BASAppleReferencePromptBuilderTests {
             let text: String
         }
 
-        let envelope = BASAppleReferencePromptBuilder.reminderEnvelope(
+        let envelope = BASAppleReferencePromptBuilder.selectionEnvelope(
             candidates: [
                 Candidate(id: 1, text: "Hold it until tomorrow morning."),
                 Candidate(id: 2, text: "Put it in the holding lane and sleep on it."),
@@ -104,7 +104,7 @@ struct BASAppleReferencePromptBuilderTests {
             modeTitle: "Quick",
             scenarioTitle: "Buy",
             prompt: "I want to buy this tonight.",
-            reminderSurfaceModeRawValue: "quick"
+            surfaceModeRawValue: "primary"
         )
 
         #expect(envelope.prompt.kind == .reminder)

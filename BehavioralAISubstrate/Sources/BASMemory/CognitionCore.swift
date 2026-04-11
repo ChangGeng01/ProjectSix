@@ -128,6 +128,91 @@ public struct BASMemoryTrustProfile: Equatable, Sendable {
     public let decayGraceMultiplier: Double
 }
 
+public struct BASMemoryTrustBehavior: Codable, Equatable, Sendable {
+    public static let generic = BASMemoryTrustBehavior()
+
+    public var baseScoresBySourceID: [String: Double]
+    public var governanceAdjustmentsByStatusID: [String: Double]
+    public var decayAdjustmentsByPolicyID: [String: Double]
+    public var sourceDecayMultipliersBySourceID: [String: Double]
+    public var governanceDecayMultipliersByStatusID: [String: Double]
+    public var evidenceBoostPerExtraObservation: Double
+    public var evidenceBoostCap: Double
+    public var evidenceDecayBoostPerExtraObservation: Double
+    public var evidenceDecayBoostCap: Double
+    public var pendingPenalty: Double
+    public var contaminationPenalty: Double
+    public var pendingDecayPenalty: Double
+    public var provenanceDecayPenalty: Double
+    public var contaminationSignals: [String]
+
+    public init(
+        baseScoresBySourceID: [String: Double] = [
+            BASMemorySource.reminder.rawValue: 0.94,
+            BASMemorySource.pattern.rawValue: 0.82,
+            BASMemorySource.reflection.rawValue: 0.74,
+            BASMemorySource.history.rawValue: 0.66
+        ],
+        governanceAdjustmentsByStatusID: [String: Double] = [
+            BASMemoryLoadStatus.admitted.rawValue: 0.04,
+            BASMemoryLoadStatus.deferred.rawValue: -0.08,
+            BASMemoryLoadStatus.pending.rawValue: -0.12
+        ],
+        decayAdjustmentsByPolicyID: [String: Double] = [
+            BASMemoryDecayPolicy.stable.rawValue: 0.04,
+            BASMemoryDecayPolicy.slow.rawValue: 0.02,
+            BASMemoryDecayPolicy.medium.rawValue: 0,
+            BASMemoryDecayPolicy.fast.rawValue: -0.06
+        ],
+        sourceDecayMultipliersBySourceID: [String: Double] = [
+            BASMemorySource.reminder.rawValue: 1.32,
+            BASMemorySource.pattern.rawValue: 1.12,
+            BASMemorySource.history.rawValue: 0.96,
+            BASMemorySource.reflection.rawValue: 0.78
+        ],
+        governanceDecayMultipliersByStatusID: [String: Double] = [
+            BASMemoryLoadStatus.admitted.rawValue: 1.08,
+            BASMemoryLoadStatus.deferred.rawValue: 0.92,
+            BASMemoryLoadStatus.pending.rawValue: 0.82
+        ],
+        evidenceBoostPerExtraObservation: Double = 0.03,
+        evidenceBoostCap: Double = 0.12,
+        evidenceDecayBoostPerExtraObservation: Double = 0.04,
+        evidenceDecayBoostCap: Double = 0.18,
+        pendingPenalty: Double = 0.06,
+        contaminationPenalty: Double = 0.24,
+        pendingDecayPenalty: Double = 0.82,
+        provenanceDecayPenalty: Double = 0.55,
+        contaminationSignals: [String] = [
+            "<script",
+            "</",
+            "```",
+            "http://",
+            "https://",
+            "assistant:",
+            "tool call",
+            "function(",
+            "\"role\":",
+            "{json"
+        ]
+    ) {
+        self.baseScoresBySourceID = baseScoresBySourceID
+        self.governanceAdjustmentsByStatusID = governanceAdjustmentsByStatusID
+        self.decayAdjustmentsByPolicyID = decayAdjustmentsByPolicyID
+        self.sourceDecayMultipliersBySourceID = sourceDecayMultipliersBySourceID
+        self.governanceDecayMultipliersByStatusID = governanceDecayMultipliersByStatusID
+        self.evidenceBoostPerExtraObservation = evidenceBoostPerExtraObservation
+        self.evidenceBoostCap = evidenceBoostCap
+        self.evidenceDecayBoostPerExtraObservation = evidenceDecayBoostPerExtraObservation
+        self.evidenceDecayBoostCap = evidenceDecayBoostCap
+        self.pendingPenalty = pendingPenalty
+        self.contaminationPenalty = contaminationPenalty
+        self.pendingDecayPenalty = pendingDecayPenalty
+        self.provenanceDecayPenalty = provenanceDecayPenalty
+        self.contaminationSignals = contaminationSignals
+    }
+}
+
 public enum BASMemoryTrustEngine {
     public static func profile(
         source: BASMemorySource,
@@ -135,41 +220,31 @@ public enum BASMemoryTrustEngine {
         decayPolicy: BASMemoryDecayPolicy,
         governanceStatus: BASMemoryLoadStatus,
         isPending: Bool,
-        provenanceSummary: String
+        provenanceSummary: String,
+        behavior: BASMemoryTrustBehavior = .generic
     ) -> BASMemoryTrustProfile {
-        let baseScore: Double = switch source {
-        case .reminder:
-            0.94
-        case .pattern:
-            0.82
-        case .reflection:
-            0.74
-        case .history:
-            0.66
-        }
-
-        let evidenceBoost = min(0.12, Double(max(0, evidenceCount - 1)) * 0.03)
-        let governanceAdjustment: Double = switch governanceStatus {
-        case .admitted:
-            0.04
-        case .deferred:
-            -0.08
-        case .pending:
-            -0.12
-        }
-        let decayAdjustment: Double = switch decayPolicy {
-        case .stable:
-            0.04
-        case .slow:
-            0.02
-        case .medium:
-            0
-        case .fast:
-            -0.06
-        }
-        let pendingPenalty = isPending ? 0.06 : 0
-        let provenanceRisk = isContaminated(provenanceSummary)
-        let contaminationPenalty = provenanceRisk ? 0.24 : 0
+        let baseScore = resolvedDouble(
+            behavior.baseScoresBySourceID,
+            key: source.rawValue,
+            fallback: 0.7
+        )
+        let evidenceBoost = min(
+            behavior.evidenceBoostCap,
+            Double(max(0, evidenceCount - 1)) * behavior.evidenceBoostPerExtraObservation
+        )
+        let governanceAdjustment = resolvedDouble(
+            behavior.governanceAdjustmentsByStatusID,
+            key: governanceStatus.rawValue,
+            fallback: 0
+        )
+        let decayAdjustment = resolvedDouble(
+            behavior.decayAdjustmentsByPolicyID,
+            key: decayPolicy.rawValue,
+            fallback: 0
+        )
+        let pendingPenalty = isPending ? behavior.pendingPenalty : 0
+        let provenanceRisk = isContaminated(provenanceSummary, behavior: behavior)
+        let contaminationPenalty = provenanceRisk ? behavior.contaminationPenalty : 0
 
         let score = clamp(
             baseScore +
@@ -201,27 +276,22 @@ public enum BASMemoryTrustEngine {
         case .low:
             0.78
         }
-        let sourceDecayMultiplier: Double = switch source {
-        case .reminder:
-            1.32
-        case .pattern:
-            1.12
-        case .history:
-            0.96
-        case .reflection:
-            0.78
-        }
-        let governanceDecayMultiplier: Double = switch governanceStatus {
-        case .admitted:
-            1.08
-        case .deferred:
-            0.92
-        case .pending:
-            0.82
-        }
-        let evidenceDecayMultiplier = 1 + min(0.18, Double(max(0, evidenceCount - 1)) * 0.04)
-        let pendingDecayPenalty = isPending ? 0.82 : 1.0
-        let provenanceDecayPenalty = provenanceRisk ? 0.55 : 1.0
+        let sourceDecayMultiplier = resolvedDouble(
+            behavior.sourceDecayMultipliersBySourceID,
+            key: source.rawValue,
+            fallback: 1.0
+        )
+        let governanceDecayMultiplier = resolvedDouble(
+            behavior.governanceDecayMultipliersByStatusID,
+            key: governanceStatus.rawValue,
+            fallback: 1.0
+        )
+        let evidenceDecayMultiplier = 1 + min(
+            behavior.evidenceDecayBoostCap,
+            Double(max(0, evidenceCount - 1)) * behavior.evidenceDecayBoostPerExtraObservation
+        )
+        let pendingDecayPenalty = isPending ? behavior.pendingDecayPenalty : 1.0
+        let provenanceDecayPenalty = provenanceRisk ? behavior.provenanceDecayPenalty : 1.0
         let decayGraceMultiplier = clamp(
             tierDecayMultiplier *
                 sourceDecayMultiplier *
@@ -253,22 +323,20 @@ public enum BASMemoryTrustEngine {
         )
     }
 
-    private static func isContaminated(_ provenanceSummary: String) -> Bool {
+    private static func isContaminated(
+        _ provenanceSummary: String,
+        behavior: BASMemoryTrustBehavior
+    ) -> Bool {
         let normalized = provenanceSummary.lowercased()
-        let suspiciousTokens = [
-            "<script",
-            "</",
-            "```",
-            "http://",
-            "https://",
-            "assistant:",
-            "tool call",
-            "function(",
-            "\"role\":",
-            "{json"
-        ]
+        return behavior.contaminationSignals.contains { normalized.contains($0) }
+    }
 
-        return suspiciousTokens.contains { normalized.contains($0) }
+    private static func resolvedDouble(
+        _ mapping: [String: Double],
+        key: String,
+        fallback: Double
+    ) -> Double {
+        mapping[key] ?? fallback
     }
 
     private static func clamp(
@@ -568,7 +636,7 @@ public enum BASDecisionBrainCompiler {
         let decayGraceMultiplier: Double
         let isCandidate: Bool
 
-        init(memory: BASGovernedMemory) {
+        init(memory: BASGovernedMemory, trustBehavior: BASMemoryTrustBehavior = .generic) {
             let resolvedSource = BASDecisionBrainCompiler.source(for: memory.sourceType)
             let resolvedDecay = BASDecisionBrainCompiler.decay(for: memory)
             let trustProfile = BASMemoryTrustEngine.profile(
@@ -577,7 +645,8 @@ public enum BASDecisionBrainCompiler {
                 decayPolicy: resolvedDecay,
                 governanceStatus: .admitted,
                 isPending: false,
-                provenanceSummary: memory.provenanceSummary
+                provenanceSummary: memory.provenanceSummary,
+                behavior: trustBehavior
             )
 
             id = memory.id.uuidString
@@ -610,7 +679,7 @@ public enum BASDecisionBrainCompiler {
             isCandidate = false
         }
 
-        init(candidate: BASMemoryEligibilityCandidate) {
+        init(candidate: BASMemoryEligibilityCandidate, trustBehavior: BASMemoryTrustBehavior = .generic) {
             id = candidate.id
             role = candidate.role
             kind = candidate.kind
@@ -640,7 +709,8 @@ public enum BASDecisionBrainCompiler {
                 decayPolicy: candidate.decayPolicy,
                 governanceStatus: candidate.governanceStatus,
                 isPending: candidate.isPending,
-                provenanceSummary: candidate.provenanceSummary
+                provenanceSummary: candidate.provenanceSummary,
+                behavior: trustBehavior
             )
             decayGraceMultiplier = trustProfile.decayGraceMultiplier
             isCandidate = true
@@ -703,16 +773,17 @@ public enum BASDecisionBrainCompiler {
     ) -> BASBootstrappedBrainState {
         let queryTags = buildQueryTags(for: request, projection: projection)
         let brainCompilation = request.cognitionBehavior.brainCompilation
+        let memoryTrust = request.cognitionBehavior.memoryTrust
         let retrievalPlan = retrievalPlan(
             for: request.mode,
             retrievalMode: request.retrievalMode,
             behavior: brainCompilation
         )
         let compilerItems = BASMemoryTierFilter.frontstageEligibleMemories(projection.records)
-            .map(CompilerItem.init(memory:))
+            .map { CompilerItem(memory: $0, trustBehavior: memoryTrust) }
             .sorted(by: memorySort)
         let compilerCandidates = projection.candidates
-            .map(CompilerItem.init(candidate:))
+            .map { CompilerItem(candidate: $0, trustBehavior: memoryTrust) }
             .sorted(by: memorySort)
         let orderedItems = (compilerItems + compilerCandidates)
             .sorted { lhs, rhs in
@@ -934,10 +1005,10 @@ public enum BASDecisionBrainCompiler {
             )
         default:
             return RetrievalPlan(
-                candidateLimit: 8,
+                candidateLimit: behavior.candidateLimitWhenFiltered(for: mode),
                 profileLimit: 2,
                 goalLimit: 2,
-                relevantLimit: 3,
+                relevantLimit: behavior.relevantLimitWhenFiltered(for: mode),
                 includesPendingCandidates: true
             )
         }

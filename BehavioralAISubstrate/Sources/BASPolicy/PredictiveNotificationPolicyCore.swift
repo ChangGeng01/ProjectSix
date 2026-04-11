@@ -112,7 +112,7 @@ public enum BASPredictiveNotificationPolicyEngine {
         guard input.predictiveInterventionsEnabled else {
             return block(
                 .featureDisabled,
-                detail: "Predictive interventions are disabled in preferences."
+                detail: "Predictive notifications are disabled by host policy."
             )
         }
 
@@ -120,7 +120,7 @@ public enum BASPredictiveNotificationPolicyEngine {
         guard riskLevel != "low" else {
             return block(
                 .lowRisk,
-                detail: "Low-risk candidates stay in-app and do not escalate into notifications."
+                detail: "Lower-risk candidates stay local and do not escalate into notifications."
             )
         }
 
@@ -134,7 +134,7 @@ public enum BASPredictiveNotificationPolicyEngine {
         if input.evidenceSignalCount < minimumEvidenceSignalCount(for: riskLevel) {
             return block(
                 .insufficientEvidence,
-                detail: "Notification delivery stayed local-only because the evidence signal count is still too thin."
+                detail: "Notification delivery stayed local because the evidence signal count is still too thin."
             )
         }
 
@@ -150,7 +150,7 @@ public enum BASPredictiveNotificationPolicyEngine {
         if isQuietHours(input: input, calendar: calendar), riskLevel != "high" {
             return block(
                 .quietHours,
-                detail: "Medium-risk nudges stay quiet during overnight hours."
+                detail: "Medium-risk nudges stay quiet during low-attention hours."
             )
         }
 
@@ -185,7 +185,7 @@ public enum BASPredictiveNotificationPolicyEngine {
 
         return BASPredictiveNotificationPolicyDecision(
             isAllowed: true,
-            reason: "Notification delivery is allowed because evidence is strong enough and no cooldown or quiet-hours rule blocked it.",
+            reason: "Notification delivery is allowed because evidence is strong enough and no scheduling rule blocked it.",
             blockReason: nil,
             consistencyCheck: consistencyCheck
         )

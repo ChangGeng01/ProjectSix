@@ -102,11 +102,11 @@ public enum BASProviderReleaseEvaluator {
     ) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment> {
         BASProviderReleaseGate.verdict(
             for: BASProviderReleaseEvaluationRequest(
-                kind: BASAdaptiveTraceKind(rawValue: traceKindRawValue) ?? .quick,
+                kind: BASAdaptiveTraceKind(identifier: traceKindRawValue) ?? .primary,
                 outputPreview: outputPreview,
                 kernelSnapshot: kernelSnapshot,
                 brainState: brainState,
-                reminderSurfaceMode: reminderSurfaceModeRawValue.flatMap(BASDecisionMode.init(rawValue:)),
+                reminderSurfaceMode: reminderSurfaceModeRawValue.flatMap(BASDecisionMode.init(identifier:)),
                 structuredTruthBehavior: structuredTruthBehavior,
                 referencedFacts: referencedFacts
             )

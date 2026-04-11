@@ -6,17 +6,20 @@ public struct BASAppleMemoryPersistenceRequest: Codable, Equatable, Sendable {
     public var existingRecords: [BASExistingGovernedMemorySnapshot]
     public var existingCandidates: [BASExistingCandidateMemorySnapshot]
     public var reviewNow: Date
+    public var memoryTrustBehavior: BASMemoryTrustBehavior
 
     public init(
         drafts: [BASDerivedMemoryDraft],
         existingRecords: [BASExistingGovernedMemorySnapshot],
         existingCandidates: [BASExistingCandidateMemorySnapshot],
-        reviewNow: Date
+        reviewNow: Date,
+        memoryTrustBehavior: BASMemoryTrustBehavior = .generic
     ) {
         self.drafts = drafts
         self.existingRecords = existingRecords
         self.existingCandidates = existingCandidates
         self.reviewNow = reviewNow
+        self.memoryTrustBehavior = memoryTrustBehavior
     }
 }
 
@@ -80,7 +83,8 @@ public enum BASAppleMemoryPersistenceAdapter {
                 drafts: request.drafts.map(\.reconciliationDraftInput),
                 existingRecords: request.existingRecords,
                 existingCandidates: request.existingCandidates,
-                reviewNow: request.reviewNow
+                reviewNow: request.reviewNow,
+                memoryTrustBehavior: request.memoryTrustBehavior
             )
         )
 

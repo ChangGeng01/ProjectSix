@@ -50,6 +50,100 @@ public struct BASAppleProviderProfile: Codable, Sendable, Equatable {
     }
 }
 
+public struct BASAppleProviderObservationNarrative: Codable, Sendable, Equatable {
+    public var templatePinnedDetail: String
+    public var admissionSkippedDetailPrefix: String
+    public var deterministicFallbackBase: String
+    public var cachedConsistencySource: String
+    public var providerConsistencySource: String
+
+    public init(
+        templatePinnedDetail: String,
+        admissionSkippedDetailPrefix: String,
+        deterministicFallbackBase: String,
+        cachedConsistencySource: String,
+        providerConsistencySource: String
+    ) {
+        self.templatePinnedDetail = templatePinnedDetail
+        self.admissionSkippedDetailPrefix = admissionSkippedDetailPrefix
+        self.deterministicFallbackBase = deterministicFallbackBase
+        self.cachedConsistencySource = cachedConsistencySource
+        self.providerConsistencySource = providerConsistencySource
+    }
+}
+
+public struct BASAppleProviderObservationNarrativeBehavior: Codable, Sendable, Equatable {
+    public static let generic = BASAppleProviderObservationNarrativeBehavior()
+
+    public var narrativesByKindID: [String: BASAppleProviderObservationNarrative]
+    public var fallbackNarrative: BASAppleProviderObservationNarrative
+
+    public init(
+        narrativesByKindID: [String: BASAppleProviderObservationNarrative] = [
+            BASDecisionMode.primaryID: BASAppleProviderObservationNarrative(
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the primary pass.",
+                admissionSkippedDetailPrefix: "Admission controller skipped the primary pass.",
+                deterministicFallbackBase: "No provider returned a primary-pass result, so the host kept the deterministic copy.",
+                cachedConsistencySource: "cached primary pass",
+                providerConsistencySource: "provider primary pass"
+            ),
+            BASDecisionMode.comparativeID: BASAppleProviderObservationNarrative(
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the comparative pass.",
+                admissionSkippedDetailPrefix: "Admission controller skipped the comparative pass.",
+                deterministicFallbackBase: "No provider returned a comparative-pass result, so the host kept the deterministic copy.",
+                cachedConsistencySource: "cached comparative pass",
+                providerConsistencySource: "provider comparative pass"
+            ),
+            BASDecisionMode.reflectiveID: BASAppleProviderObservationNarrative(
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the reflective pass.",
+                admissionSkippedDetailPrefix: "Admission controller skipped the reflective pass.",
+                deterministicFallbackBase: "No provider returned a reflective-pass result, so the host kept the deterministic copy.",
+                cachedConsistencySource: "cached reflective pass",
+                providerConsistencySource: "provider reflective pass"
+            ),
+            "reminder": BASAppleProviderObservationNarrative(
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for reminder selection.",
+                admissionSkippedDetailPrefix: "Admission controller skipped reminder selection.",
+                deterministicFallbackBase: "No provider returned a reminder selection, so the host kept the deterministic reminder ordering.",
+                cachedConsistencySource: "cached reminder selection",
+                providerConsistencySource: "provider reminder selection"
+            )
+        ],
+        fallbackNarrative: BASAppleProviderObservationNarrative = BASAppleProviderObservationNarrative(
+            templatePinnedDetail: "Template mode is pinned, so no model provider was used.",
+            admissionSkippedDetailPrefix: "Admission controller skipped provider execution.",
+            deterministicFallbackBase: "No provider returned a result, so the host kept the deterministic copy.",
+            cachedConsistencySource: "cached provider result",
+            providerConsistencySource: "provider result"
+        )
+    ) {
+        self.narrativesByKindID = narrativesByKindID
+        self.fallbackNarrative = fallbackNarrative
+    }
+
+    public func narrative(for kindID: String) -> BASAppleProviderObservationNarrative {
+        for alias in Self.kindAliases(for: kindID) {
+            if let configured = narrativesByKindID[alias] {
+                return configured
+            }
+        }
+        return fallbackNarrative
+    }
+
+    private static func kindAliases(for kindID: String) -> [String] {
+        switch kindID {
+        case "quick", BASDecisionMode.primaryID:
+            [kindID, BASDecisionMode.primaryID, "quick"]
+        case "balance", BASDecisionMode.comparativeID:
+            [kindID, BASDecisionMode.comparativeID, "balance"]
+        case "mirror", BASDecisionMode.reflectiveID:
+            [kindID, BASDecisionMode.reflectiveID, "mirror"]
+        default:
+            [kindID]
+        }
+    }
+}
+
 public struct BASAppleHostProviderObservationContext<
     Kind: Equatable & Sendable,
     FrontstageState: Equatable & Sendable,
@@ -489,6 +583,7 @@ public struct BASAppleProviderObservationSourceInput: Codable, Sendable, Equatab
     public var admissionReason: String?
     public var semanticPromptFingerprint: String?
     public var stablePrefixFingerprint: String?
+    public var narrativeOverride: BASAppleProviderObservationNarrative?
     public var prompt: String
     public var baselineOutputPreview: String
     public var deterministicFallbackOutputPreview: String
@@ -508,6 +603,7 @@ public struct BASAppleProviderObservationSourceInput: Codable, Sendable, Equatab
         admissionReason: String? = nil,
         semanticPromptFingerprint: String? = nil,
         stablePrefixFingerprint: String? = nil,
+        narrativeOverride: BASAppleProviderObservationNarrative? = nil,
         prompt: String,
         baselineOutputPreview: String,
         deterministicFallbackOutputPreview: String,
@@ -526,6 +622,7 @@ public struct BASAppleProviderObservationSourceInput: Codable, Sendable, Equatab
         self.admissionReason = admissionReason
         self.semanticPromptFingerprint = semanticPromptFingerprint
         self.stablePrefixFingerprint = stablePrefixFingerprint
+        self.narrativeOverride = narrativeOverride
         self.prompt = prompt
         self.baselineOutputPreview = baselineOutputPreview
         self.deterministicFallbackOutputPreview = deterministicFallbackOutputPreview
@@ -537,7 +634,7 @@ public enum BASAppleProviderObservationContextBuilder {
     public static func build(
         from input: BASAppleProviderObservationSourceInput
     ) -> BASAppleProviderObservationContext {
-        let narrative = narrativePreset(for: input.kind)
+        let narrative = input.narrativeOverride ?? BASAppleProviderObservationNarrativeBehavior.generic.narrative(for: input.kind)
         return BASAppleProviderObservationContext(
             kind: input.kind,
             preferredProviderID: input.preferredProviderID,
@@ -563,59 +660,6 @@ public enum BASAppleProviderObservationContextBuilder {
             providerConsistencySource: narrative.providerConsistencySource,
             recordsTemplatePinnedTrace: input.recordsTemplatePinnedTrace
         )
-    }
-
-    private static func narrativePreset(
-        for kind: String
-    ) -> (
-        templatePinnedDetail: String,
-        admissionSkippedDetailPrefix: String,
-        deterministicFallbackBase: String,
-        cachedConsistencySource: String,
-        providerConsistencySource: String
-    ) {
-        switch kind {
-        case "quick":
-            (
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for primary refinement.",
-                admissionSkippedDetailPrefix: "Admission controller skipped primary refinement.",
-                deterministicFallbackBase: "No provider returned a refined primary-path result, so the host app kept the deterministic copy.",
-                cachedConsistencySource: "cached primary refinement",
-                providerConsistencySource: "provider primary refinement"
-            )
-        case "balance":
-            (
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for comparative refinement.",
-                admissionSkippedDetailPrefix: "Admission controller skipped comparative refinement.",
-                deterministicFallbackBase: "No provider returned a refined comparative analysis, so the host app kept the deterministic copy.",
-                cachedConsistencySource: "cached comparative refinement",
-                providerConsistencySource: "provider comparative refinement"
-            )
-        case "mirror":
-            (
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for reflective refinement.",
-                admissionSkippedDetailPrefix: "Admission controller skipped reflective refinement.",
-                deterministicFallbackBase: "No provider returned a refined reflective analysis, so the host app kept the deterministic copy.",
-                cachedConsistencySource: "cached reflective refinement",
-                providerConsistencySource: "provider reflective refinement"
-            )
-        case "reminder":
-            (
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for reminder selection.",
-                admissionSkippedDetailPrefix: "Admission controller skipped reminder selection.",
-                deterministicFallbackBase: "No provider returned a reminder selection, so the host app kept the deterministic reminder ordering.",
-                cachedConsistencySource: "cached reminder selection",
-                providerConsistencySource: "provider reminder selection"
-            )
-        default:
-            (
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used.",
-                admissionSkippedDetailPrefix: "Admission controller skipped provider execution.",
-                deterministicFallbackBase: "No provider returned a result, so the host app kept the deterministic copy.",
-                cachedConsistencySource: "cached provider result",
-                providerConsistencySource: "provider result"
-            )
-        }
     }
 }
 

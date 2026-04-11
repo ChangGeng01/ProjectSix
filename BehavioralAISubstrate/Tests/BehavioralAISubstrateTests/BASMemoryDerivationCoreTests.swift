@@ -201,22 +201,32 @@ struct BASMemoryDerivationCoreTests {
             ],
             now: date("2026-04-10T08:30:00Z"),
             behavior: BASMemoryDerivationBehavior(
-                comparativeSituational: .init(
-                    draftID: "situational.compare.latest",
-                    topic: "recent_compare_lane",
-                    primaryHeadlinePrefix: "Recently comparing",
-                    provenanceSummary: "Host compare memory.",
-                    baseTags: ["compare", "recent"]
-                ),
-                reflectiveSituational: .init(
-                    draftID: "situational.reflect.latest",
-                    topic: "recent_reflect_lane",
-                    primaryHeadlinePrefix: "Recently reflecting",
-                    provenanceSummary: "Host reflect memory.",
-                    baseTags: ["reflect", "recent"]
-                ),
-                comparativeWorkspaceIDs: ["journal-compare"],
-                reflectiveWorkspaceIDs: ["journal-reflect"]
+                workspaceSituationalBehaviors: [
+                    BASWorkspaceSituationalDraftBehavior(
+                        workflowIDs: ["journal-compare"],
+                        draft: .init(
+                            draftID: "situational.compare.latest",
+                            topic: "recent_compare_lane",
+                            primaryHeadlinePrefix: "Recently comparing",
+                            provenanceSummary: "Host compare memory.",
+                            baseTags: ["compare", "recent"]
+                        ),
+                        confidence: 0.74,
+                        priority: 0.76
+                    ),
+                    BASWorkspaceSituationalDraftBehavior(
+                        workflowIDs: ["journal-reflect"],
+                        draft: .init(
+                            draftID: "situational.reflect.latest",
+                            topic: "recent_reflect_lane",
+                            primaryHeadlinePrefix: "Recently reflecting",
+                            provenanceSummary: "Host reflect memory.",
+                            baseTags: ["reflect", "recent"]
+                        ),
+                        confidence: 0.78,
+                        priority: 0.82
+                    )
+                ]
             )
         )
 
@@ -228,6 +238,50 @@ struct BASMemoryDerivationCoreTests {
         #expect(compare.retrievalTags.contains("compare"))
         #expect(reflect.retrievalTags.contains("reflect"))
         #expect(goal.provenanceSummary == "Promoted from repeated long-term fields across structured workspaces.")
+    }
+
+    @Test("derivation behavior decode preserves legacy payloads without the new workspace lane field")
+    func derivationBehaviorDecodePreservesLegacyPayloads() throws {
+        let legacyJSON = """
+        {
+          "primarySituational": {
+            "draftID": "situational.primary.latest",
+            "topic": "recent_primary_workflow",
+            "primaryHeadlinePrefix": "Recently holding",
+            "fallbackHeadlinePrefix": "Recently revisiting",
+            "provenanceSummary": "Legacy primary.",
+            "baseTags": ["primary", "recent"]
+          },
+          "comparativeSituational": {
+            "draftID": "situational.compare.latest",
+            "topic": "recent_compare_lane",
+            "primaryHeadlinePrefix": "Recently comparing",
+            "provenanceSummary": "Legacy compare.",
+            "baseTags": ["compare", "recent"]
+          },
+          "reflectiveSituational": {
+            "draftID": "situational.reflect.latest",
+            "topic": "recent_reflect_lane",
+            "primaryHeadlinePrefix": "Recently reflecting",
+            "provenanceSummary": "Legacy reflect.",
+            "baseTags": ["reflect", "recent"]
+          },
+          "comparativeWorkspaceIDs": ["journal-compare"],
+          "reflectiveWorkspaceIDs": ["journal-reflect"],
+          "supportActionsByID": {},
+          "fallbackSupportTags": ["support", "legacy"],
+          "fallbackSupportProvenanceSummary": "Legacy support."
+        }
+        """
+
+        let behavior = try JSONDecoder().decode(
+            BASMemoryDerivationBehavior.self,
+            from: Data(legacyJSON.utf8)
+        )
+
+        #expect(behavior.workspaceSituationalBehaviors.isEmpty)
+        #expect(behavior.resolvedWorkspaceSituationalBehaviors.map(\.workflowIDs) == [["journal-compare"], ["journal-reflect"]])
+        #expect(behavior.fallbackSupportTags == ["support", "legacy"])
     }
 
     @Test("generic derivation falls back without a host action lexicon")

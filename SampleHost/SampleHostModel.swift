@@ -27,6 +27,36 @@ final class SampleHostModel: ObservableObject {
             BASHostWorkflowProfile.deliberate.rawValue: "balanced",
             BASHostWorkflowProfile.reflective.rawValue: "full"
         ],
+        providerObservationNarrativesByKindID: [
+            BASDecisionMode.primaryID: BASAppleProviderObservationNarrative(
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the Rapid Lens pass.",
+                admissionSkippedDetailPrefix: "Admission controller skipped the Rapid Lens pass.",
+                deterministicFallbackBase: "No provider returned a Rapid Lens result, so SampleHost kept the deterministic draft.",
+                cachedConsistencySource: "cached Rapid Lens pass",
+                providerConsistencySource: "provider Rapid Lens pass"
+            ),
+            BASDecisionMode.comparativeID: BASAppleProviderObservationNarrative(
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the Compare Lens pass.",
+                admissionSkippedDetailPrefix: "Admission controller skipped the Compare Lens pass.",
+                deterministicFallbackBase: "No provider returned a Compare Lens result, so SampleHost kept the deterministic draft.",
+                cachedConsistencySource: "cached Compare Lens pass",
+                providerConsistencySource: "provider Compare Lens pass"
+            ),
+            BASDecisionMode.reflectiveID: BASAppleProviderObservationNarrative(
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the Reflective Lens pass.",
+                admissionSkippedDetailPrefix: "Admission controller skipped the Reflective Lens pass.",
+                deterministicFallbackBase: "No provider returned a Reflective Lens result, so SampleHost kept the deterministic draft.",
+                cachedConsistencySource: "cached Reflective Lens pass",
+                providerConsistencySource: "provider Reflective Lens pass"
+            ),
+            "reminder": BASAppleProviderObservationNarrative(
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the reminder shortlist.",
+                admissionSkippedDetailPrefix: "Admission controller skipped the reminder shortlist.",
+                deterministicFallbackBase: "No provider returned a reminder shortlist, so SampleHost kept the deterministic ordering.",
+                cachedConsistencySource: "cached reminder shortlist",
+                providerConsistencySource: "provider reminder shortlist"
+            )
+        ],
         memorySourceIDsBySessionKindID: [
             BASHostSessionKind.ambient.rawValue: BASMemorySource.reminder.rawValue,
             BASHostSessionKind.reopen.rawValue: BASMemorySource.history.rawValue,
@@ -217,6 +247,20 @@ final class SampleHostModel: ObservableObject {
                 boundaryNamingBias: "SampleHost names the limit before it reframes it.",
                 tradeoffClaritySignals: ["tradeoff", "constraint", "cost", "benefit"],
                 tradeoffClarityBias: "SampleHost keeps the trade-off explicit before polishing language."
+            ),
+            memoryTrust: BASMemoryTrustBehavior(
+                baseScoresBySourceID: [
+                    BASMemorySource.reminder.rawValue: 0.72,
+                    BASMemorySource.pattern.rawValue: 0.78,
+                    BASMemorySource.reflection.rawValue: 0.84,
+                    BASMemorySource.history.rawValue: 0.88
+                ],
+                sourceDecayMultipliersBySourceID: [
+                    BASMemorySource.reminder.rawValue: 1.08,
+                    BASMemorySource.pattern.rawValue: 1.04,
+                    BASMemorySource.reflection.rawValue: 0.94,
+                    BASMemorySource.history.rawValue: 1.12
+                ]
             )
         )
     )

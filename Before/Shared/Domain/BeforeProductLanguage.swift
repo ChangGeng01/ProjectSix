@@ -204,6 +204,36 @@ enum BeforeProductLanguage {
             BASHostWorkflowProfile.deliberate.rawValue: "full",
             BASHostWorkflowProfile.reflective.rawValue: "full"
         ],
+        providerObservationNarrativesByKindID: [
+            "quick": BASAppleProviderObservationNarrative(
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for primary refinement.",
+                admissionSkippedDetailPrefix: "Admission controller skipped primary refinement.",
+                deterministicFallbackBase: "No provider returned a refined primary-path result, so Before kept the deterministic copy.",
+                cachedConsistencySource: "cached primary refinement",
+                providerConsistencySource: "provider primary refinement"
+            ),
+            "balance": BASAppleProviderObservationNarrative(
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for comparative refinement.",
+                admissionSkippedDetailPrefix: "Admission controller skipped comparative refinement.",
+                deterministicFallbackBase: "No provider returned a refined comparative analysis, so Before kept the deterministic copy.",
+                cachedConsistencySource: "cached comparative refinement",
+                providerConsistencySource: "provider comparative refinement"
+            ),
+            "mirror": BASAppleProviderObservationNarrative(
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for reflective refinement.",
+                admissionSkippedDetailPrefix: "Admission controller skipped reflective refinement.",
+                deterministicFallbackBase: "No provider returned a refined reflective analysis, so Before kept the deterministic copy.",
+                cachedConsistencySource: "cached reflective refinement",
+                providerConsistencySource: "provider reflective refinement"
+            ),
+            "reminder": BASAppleProviderObservationNarrative(
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for reminder selection.",
+                admissionSkippedDetailPrefix: "Admission controller skipped reminder selection.",
+                deterministicFallbackBase: "No provider returned a reminder selection, so Before kept the deterministic reminder ordering.",
+                cachedConsistencySource: "cached reminder selection",
+                providerConsistencySource: "provider reminder selection"
+            )
+        ],
         memorySourceIDsBySessionKindID: [
             BASHostSessionKind.ambient.rawValue: BASMemorySource.reminder.rawValue,
             BASHostSessionKind.reopen.rawValue: BASMemorySource.reminder.rawValue,
@@ -331,6 +361,21 @@ enum BeforeProductLanguage {
                 tradeoffClarityBias: "Keep the trade-off explicit before polishing the language."
             ),
             brainCompilation: BASBrainCompilationBehavior(
+                filteredCandidateLimitByModeID: [
+                    BASDecisionMode.primaryID: 16,
+                    BASDecisionMode.comparativeID: 8,
+                    BASDecisionMode.reflectiveID: 9
+                ],
+                filteredRelevantLimitByModeID: [
+                    BASDecisionMode.primaryID: 4,
+                    BASDecisionMode.comparativeID: 3,
+                    BASDecisionMode.reflectiveID: 4
+                ],
+                relevantPriorityBaselinesByModeID: [
+                    BASDecisionMode.primaryID: 0.58,
+                    BASDecisionMode.comparativeID: 0.64,
+                    BASDecisionMode.reflectiveID: 0.56
+                ],
                 ignoredRetrievalTags: [
                     BASDecisionMode.primaryID,
                     BASDecisionMode.comparativeID,
@@ -343,6 +388,22 @@ enum BeforeProductLanguage {
                     "long_term",
                     "pattern",
                     "repeat"
+                ],
+                typeBoostsByModeID: [
+                    BASDecisionMode.primaryID: [
+                        BASMemoryKind.support.rawValue: 4.8,
+                        BASMemoryKind.semantic.rawValue: 3.1,
+                        BASMemoryKind.situational.rawValue: 1.8
+                    ],
+                    BASDecisionMode.comparativeID: [
+                        BASMemoryKind.goal.rawValue: 3.4,
+                        BASMemoryKind.semantic.rawValue: 3.1
+                    ],
+                    BASDecisionMode.reflectiveID: [
+                        BASMemoryKind.situational.rawValue: 3.2,
+                        BASMemoryKind.semantic.rawValue: 3.5,
+                        BASMemoryKind.goal.rawValue: 3.4
+                    ]
                 ],
                 interruptiveActionIDs: [
                     "wait90s",
@@ -361,6 +422,20 @@ enum BeforeProductLanguage {
                 negativeReflectionOutcomeIDs: [
                     "regrettedIt",
                     "feltEmptier"
+                ]
+            ),
+            memoryTrust: BASMemoryTrustBehavior(
+                baseScoresBySourceID: [
+                    BASMemorySource.reminder.rawValue: 0.95,
+                    BASMemorySource.pattern.rawValue: 0.88,
+                    BASMemorySource.reflection.rawValue: 0.72,
+                    BASMemorySource.history.rawValue: 0.62
+                ],
+                sourceDecayMultipliersBySourceID: [
+                    BASMemorySource.reminder.rawValue: 1.36,
+                    BASMemorySource.pattern.rawValue: 1.18,
+                    BASMemorySource.reflection.rawValue: 0.8,
+                    BASMemorySource.history.rawValue: 0.92
                 ]
             )
         )

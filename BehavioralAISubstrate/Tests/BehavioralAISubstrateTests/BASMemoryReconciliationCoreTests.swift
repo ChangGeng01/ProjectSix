@@ -241,4 +241,57 @@ struct BASMemoryReconciliationCoreTests {
         #expect(plan.candidatePlans.first?.snapshot?.lastWriteOperation == .noop)
         #expect(plan.recordPlans.first?.operation == .noop)
     }
+
+    @Test("reconciler uses host memory trust behavior instead of substrate-only source priors")
+    func reconcilerUsesHostMemoryTrustBehavior() {
+        let draft = BASMemoryReconciliationDraftInput(
+            draft: BASMemoryGovernanceDraftInput(
+                id: "semantic.history.publish",
+                typeID: "semantic",
+                topic: "publish_pattern",
+                headline: "Publishing cadence matters here.",
+                value: "publish cadence",
+                confidence: 0.74,
+                priority: 0.8,
+                source: .history,
+                lastConfirmedAt: Date(timeIntervalSince1970: 1_744_156_800),
+                decayPolicy: .medium,
+                retrievalTags: ["publish", "cadence"],
+                evidenceCount: 1,
+                provenanceSummary: "Structured host history confirms this pattern.",
+                promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 2),
+                tierID: "warm"
+            ),
+            fingerprint: "semantic.history.publish::v1"
+        )
+
+        let genericPlan = BASMemoryReconciler.plan(
+            BASMemoryReconciliationRequest(
+                drafts: [draft],
+                existingRecords: [],
+                existingCandidates: [],
+                reviewNow: Date(timeIntervalSince1970: 1_744_156_800)
+            )
+        )
+        let hostPlan = BASMemoryReconciler.plan(
+            BASMemoryReconciliationRequest(
+                drafts: [draft],
+                existingRecords: [],
+                existingCandidates: [],
+                reviewNow: Date(timeIntervalSince1970: 1_744_156_800),
+                memoryTrustBehavior: BASMemoryTrustBehavior(
+                    baseScoresBySourceID: [
+                        BASMemorySource.reminder.rawValue: 0.55,
+                        BASMemorySource.pattern.rawValue: 0.62,
+                        BASMemorySource.reflection.rawValue: 0.7,
+                        BASMemorySource.history.rawValue: 0.92
+                    ]
+                )
+            )
+        )
+
+        #expect(genericPlan.candidatePlans.isEmpty)
+        #expect(hostPlan.candidatePlans.first?.snapshot?.lastGovernanceDecision == .admit)
+        #expect(hostPlan.candidatePlans.first?.snapshot?.status == .pending)
+    }
 }
