@@ -230,20 +230,20 @@ enum BehavioralAISubstrateBridge {
         taskGraph: DecisionTaskGraphSnapshot? = nil,
         context: ModelContext
     ) -> CurrentBrainState {
-        InterventionTemplateStore.ensureDefaults(in: context)
-        FailurePatternStore.syncFromHistory(in: context)
         let mode = DecisionMode(rawValue: input.modeID) ?? .quick
-        let source = BrainStateUpdateSource(rawValue: input.triggerID) ?? .explicitRefresh
-
-        let committed: BASAppleCurrentBrainBootstrapBridgeResult<
+        let committed: BASAppleCurrentBrainLifecycleResult<
             BrainStateUpdate,
             DecisionEvolutionCheckpoint
-        > = BASAppleCurrentBrainBootstrapBridgeBuilder.bootstrapAndCommit(
+        > = BASAppleCurrentBrainLifecycleExecutor.bootstrapAndCommit(
             input: input,
             in: context,
             createdAt: input.now,
             checkpointLimit: BeforePolicy.RuntimeState.evolutionCheckpointLimit,
             checkpointRetentionInterval: BeforePolicy.RuntimeState.evolutionCheckpointRetentionInterval,
+            prepareLifecycleState: {
+                InterventionTemplateStore.ensureDefaults(in: context)
+                FailurePatternStore.syncFromHistory(in: context)
+            },
             recommendTemplateIDs: { preparation in
                 DecisionReactionBanditStore.recommendedArmIDs(
                     mode: mode,
@@ -297,9 +297,9 @@ enum BehavioralAISubstrateBridge {
         )
 
         return CurrentBrainState(
-            source: source,
+            source: BrainStateUpdateSource(rawValue: committed.triggerID) ?? .explicitRefresh,
             sourceSurface: DecisionIntentSourceSurface(rawValue: committed.sourceSurfaceID) ?? .app,
-            mode: mode,
+            mode: DecisionMode(rawValue: committed.modeID) ?? .quick,
             riskLevel: InterventionRiskLevel(rawValue: committed.riskLevelID) ?? .low,
             taskGraph: taskGraph,
             brainState: committed.brainState,
@@ -308,7 +308,7 @@ enum BehavioralAISubstrateBridge {
             activeTemplateIDs: committed.activeTemplateIDs,
             failureGuardIDs: committed.failureGuardIDs,
             sourceIntentEnvelope: envelope,
-            loadedAt: input.now
+            loadedAt: committed.loadedAt
         )
     }
 
