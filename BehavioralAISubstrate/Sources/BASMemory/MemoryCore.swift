@@ -541,9 +541,9 @@ public struct BASBoundaryEvaluationBehavior: Codable, Equatable, Sendable {
         highRiskRequiredConfirmations: [String] = ["irreversible_decision"],
         highRiskBlockedActionClasses: [String] = ["fast_commit_action"],
         reflectiveModeIDs: [String] = [BASDecisionMode.reflectiveID],
-        advisoryHeadline: String = "Guide locally with bounded advice and no autonomous moves.",
-        reflectiveHeadline: String = "Reflect locally and avoid pushing the decision over the line.",
-        protectiveHeadline: String = "Stay local, add friction, and require confirmation before irreversible movement."
+        advisoryHeadline: String = "Keep guidance local, bounded, and non-autonomous.",
+        reflectiveHeadline: String = "Keep the interpretation local and avoid forcing resolution.",
+        protectiveHeadline: String = "Keep execution local, add friction, and require confirmation before irreversible change."
     ) {
         self.defaultAllowedActionClasses = defaultAllowedActionClasses
         self.defaultBlockedActionClasses = defaultBlockedActionClasses
@@ -787,20 +787,20 @@ public struct BASSessionBiasBehavior: Codable, Equatable, Sendable {
 
     public init(
         defaultBiasesByModeID: [String: [String]] = [
-            BASDecisionMode.primaryID: ["Stabilize the immediate state before expanding."],
-            BASDecisionMode.comparativeID: ["Keep the active pressures visible without forcing a conclusion."],
-            BASDecisionMode.reflectiveID: ["Reflect the pattern before steering it."]
+            BASDecisionMode.primaryID: ["Keep the immediate state bounded before expanding."],
+            BASDecisionMode.comparativeID: ["Keep the active considerations visible without forcing resolution."],
+            BASDecisionMode.reflectiveID: ["Describe the underlying pattern before steering it."]
         ],
         briefLanguageSignals: [String] = ["short", "direct", "concise"],
-        nightBias: String = "Lower-trust conditions call for more friction.",
+        nightBias: String = "Lower-trust conditions call for more pacing.",
         nightLowLoadBias: String = "Prefer a lighter cognitive load in lower-trust conditions.",
         lowCognitiveLoadSignals: [String] = ["lighter guidance", "lighter", "shorter guidance", "low load", "fatigued", "overloaded"],
         interruptiveActionSignals: [String] = ["hold", "pause", "interrupt", "step away", "slow down"],
-        interruptiveActionBias: String = "Prefer a regulating next step before deeper elaboration.",
+        interruptiveActionBias: String = "Prefer a stabilizing next step before adding more detail.",
         boundaryNamingSignals: [String] = ["boundary", "pattern", "relationship", "limit", "edge"],
-        boundaryNamingBias: String = "Name the active limit before reframing it.",
+        boundaryNamingBias: String = "Name the active limit before reframing.",
         tradeoffClaritySignals: [String] = ["trade-off", "tradeoff", "constraint", "benefit", "cost"],
-        tradeoffClarityBias: String = "Keep the active trade-off visible before polishing the language."
+        tradeoffClarityBias: String = "Keep the active trade-off visible before polishing language."
     ) {
         self.defaultBiasesByModeID = defaultBiasesByModeID
         self.briefLanguageSignals = briefLanguageSignals
@@ -825,11 +825,11 @@ public struct BASSessionBiasBehavior: Codable, Equatable, Sendable {
 
         switch mode {
         case .quick:
-            return ["Stabilize the immediate state before expanding."]
+            return ["Keep the immediate state bounded before expanding."]
         case .balance:
-            return ["Keep the active pressures visible without forcing a conclusion."]
+            return ["Keep the active considerations visible without forcing resolution."]
         case .mirror:
-            return ["Reflect the pattern before steering it."]
+            return ["Describe the underlying pattern before steering it."]
         }
     }
 }

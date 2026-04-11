@@ -10,6 +10,7 @@ public struct BASAppleProviderReleaseInput: Sendable, Equatable {
     public var kernelSnapshot: BASCognitionKernelSnapshot
     public var brainState: BASDecisionBrainState?
     public var reminderSurfaceModeRawValue: String?
+    public var structuredTruthBehavior: BASStructuredTruthBehavior
     public var referencedFacts: [String: String]
 
     public init(
@@ -18,6 +19,7 @@ public struct BASAppleProviderReleaseInput: Sendable, Equatable {
         kernelSnapshot: BASCognitionKernelSnapshot,
         brainState: BASDecisionBrainState?,
         reminderSurfaceModeRawValue: String? = nil,
+        structuredTruthBehavior: BASStructuredTruthBehavior = .generic,
         referencedFacts: [String: String] = [:]
     ) {
         self.traceKindRawValue = traceKindRawValue
@@ -25,6 +27,7 @@ public struct BASAppleProviderReleaseInput: Sendable, Equatable {
         self.kernelSnapshot = kernelSnapshot
         self.brainState = brainState
         self.reminderSurfaceModeRawValue = reminderSurfaceModeRawValue
+        self.structuredTruthBehavior = structuredTruthBehavior
         self.referencedFacts = referencedFacts
     }
 }
@@ -47,7 +50,11 @@ public enum BASAppleProviderReleaseAdapter {
     public static func referencedFacts(
         from brainState: BASDecisionBrainState?
     ) -> [String: String] {
-        brainState?.activeGoals.first.map { ["current_goal": $0] } ?? [:]
+        guard let currentGoal = brainState?.activeGoals.first else { return [:] }
+        return [
+            "current_goal": currentGoal,
+            "primary_context_goal": currentGoal
+        ]
     }
 
     public static func verdict(
@@ -55,7 +62,8 @@ public enum BASAppleProviderReleaseAdapter {
         outputPreview: String,
         kernelSnapshot: BASCognitionKernelSnapshot,
         brainState: BASDecisionBrainState?,
-        reminderSurfaceModeRawValue: String? = nil
+        reminderSurfaceModeRawValue: String? = nil,
+        structuredTruthBehavior: BASStructuredTruthBehavior = .generic
     ) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment> {
         verdict(
             from: BASAppleProviderReleaseInput(
@@ -64,6 +72,7 @@ public enum BASAppleProviderReleaseAdapter {
                 kernelSnapshot: kernelSnapshot,
                 brainState: brainState,
                 reminderSurfaceModeRawValue: reminderSurfaceModeRawValue,
+                structuredTruthBehavior: structuredTruthBehavior,
                 referencedFacts: referencedFacts(from: brainState)
             )
         )
@@ -78,6 +87,7 @@ public enum BASAppleProviderReleaseAdapter {
             kernelSnapshot: input.kernelSnapshot,
             brainState: input.brainState,
             reminderSurfaceModeRawValue: input.reminderSurfaceModeRawValue,
+            structuredTruthBehavior: input.structuredTruthBehavior,
             referencedFacts: input.referencedFacts
         )
     }

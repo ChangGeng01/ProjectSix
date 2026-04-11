@@ -91,6 +91,33 @@ struct BASProviderReleaseCoreTests {
         }
     }
 
+    @Test("release gate honors host-specific structured truth behavior")
+    func releaseGateHonorsHostSpecificStructuredTruthBehavior() {
+        let verdict = BASProviderReleaseGate.verdict(
+            for: BASProviderReleaseEvaluationRequest(
+                kind: .quick,
+                outputPreview: "Current: pause now.\nAfter: revisit this tomorrow.",
+                kernelSnapshot: kernelWithoutTruthState(),
+                brainState: blockedGuidanceBrainState(),
+                structuredTruthBehavior: BASStructuredTruthBehavior(
+                    modeNamesByKindID: [
+                        BASAdaptiveTraceKind.quick.rawValue: "before.quick"
+                    ],
+                    kernelPersonaRulesByKindID: [
+                        BASAdaptiveTraceKind.quick.rawValue: "Keep the interruption short, calm, and non-shaming."
+                    ]
+                )
+            )
+        )
+
+        switch verdict {
+        case .allow:
+            Issue.record("Expected the release gate to keep honoring blocked guidance even with host-specific truth behavior.")
+        case let .reject(assessment):
+            #expect(assessment.consistencyCheck?.violations.contains(where: { $0.kind == .forbiddenAction }) == true)
+        }
+    }
+
     private func kernelWithoutTruthState() -> BASCognitionKernelSnapshot {
         BASCognitionKernel.compile(
             BASCognitionKernelRequest(

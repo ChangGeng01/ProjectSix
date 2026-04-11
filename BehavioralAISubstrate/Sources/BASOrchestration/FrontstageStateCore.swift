@@ -12,19 +12,19 @@ public struct BASFrontstagePresentationBehavior: Codable, Sendable, Equatable {
 
     public init(
         focusGoalsByKindID: [String: String] = [
-            BASAdaptiveTraceKind.quick.rawValue: "Clarify the immediate state before momentum hardens.",
-            BASAdaptiveTraceKind.balance.rawValue: "Clarify the active trade-off before committing.",
-            BASAdaptiveTraceKind.mirror.rawValue: "Clarify the underlying pattern without forcing closure.",
-            BASAdaptiveTraceKind.reminder.rawValue: "Select the stored candidate that best fits the current state."
+            BASAdaptiveTraceKind.primaryID: "Clarify the active state before momentum hardens.",
+            BASAdaptiveTraceKind.comparativeID: "Clarify the active trade-off before committing.",
+            BASAdaptiveTraceKind.reflectiveID: "Clarify the underlying pattern without forcing closure.",
+            BASAdaptiveTraceKind.reminderID: "Select the retained candidate that best fits the current state."
         ],
         baseEvidenceCountByKindID: [String: Int] = [
-            BASAdaptiveTraceKind.quick.rawValue: 2,
-            BASAdaptiveTraceKind.balance.rawValue: 1,
-            BASAdaptiveTraceKind.mirror.rawValue: 1,
-            BASAdaptiveTraceKind.reminder.rawValue: 0
+            BASAdaptiveTraceKind.primaryID: 2,
+            BASAdaptiveTraceKind.comparativeID: 1,
+            BASAdaptiveTraceKind.reflectiveID: 1,
+            BASAdaptiveTraceKind.reminderID: 0
         ],
         lowGearEvidenceClampByKindID: [String: Int] = [
-            BASAdaptiveTraceKind.quick.rawValue: 1
+            BASAdaptiveTraceKind.primaryID: 1
         ],
         contextRebuiltSignal: String = "Session rebuild",
         staleFieldsSignal: String = "Stale fields dropped",
@@ -43,27 +43,29 @@ public struct BASFrontstagePresentationBehavior: Codable, Sendable, Equatable {
     public static let generic = BASFrontstagePresentationBehavior()
 
     public func focusGoal(for kind: BASAdaptiveTraceKind) -> String {
-        focusGoalsByKindID[kind.rawValue, default: BASFrontstagePresentationBehavior.generic.fallbackFocusGoal(for: kind)]
+        value(in: focusGoalsByKindID, for: kind)
+            ?? BASFrontstagePresentationBehavior.generic.fallbackFocusGoal(for: kind)
     }
 
     public func baseEvidenceCount(for kind: BASAdaptiveTraceKind) -> Int {
-        baseEvidenceCountByKindID[kind.rawValue, default: BASFrontstagePresentationBehavior.generic.fallbackBaseEvidenceCount(for: kind)]
+        value(in: baseEvidenceCountByKindID, for: kind)
+            ?? BASFrontstagePresentationBehavior.generic.fallbackBaseEvidenceCount(for: kind)
     }
 
     public func lowGearEvidenceClamp(for kind: BASAdaptiveTraceKind) -> Int? {
-        lowGearEvidenceClampByKindID[kind.rawValue]
+        value(in: lowGearEvidenceClampByKindID, for: kind)
     }
 
     private func fallbackFocusGoal(for kind: BASAdaptiveTraceKind) -> String {
         switch kind {
         case .quick:
-            "Clarify the immediate state before momentum hardens."
+            "Clarify the active state before momentum hardens."
         case .balance:
             "Clarify the active trade-off before committing."
         case .mirror:
             "Clarify the underlying pattern without forcing closure."
         case .reminder:
-            "Select the stored candidate that best fits the current state."
+            "Select the retained candidate that best fits the current state."
         }
     }
 
@@ -76,6 +78,18 @@ public struct BASFrontstagePresentationBehavior: Codable, Sendable, Equatable {
         case .reminder:
             0
         }
+    }
+
+    private func value<T>(
+        in mapping: [String: T],
+        for kind: BASAdaptiveTraceKind
+    ) -> T? {
+        for candidate in [kind.identifier, kind.rawValue] {
+            if let value = mapping[candidate] {
+                return value
+            }
+        }
+        return nil
     }
 }
 

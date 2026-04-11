@@ -84,6 +84,14 @@ struct BASReferencePromptModesCoreTests {
                     BASAdaptiveTraceKind.quick.rawValue: "Host quick focus goal."
                 ]
             ),
+            structuredTruthBehavior: BASStructuredTruthBehavior(
+                modeNamesByKindID: [
+                    BASAdaptiveTraceKind.quick.rawValue: "before.quick"
+                ],
+                kernelPersonaRulesByKindID: [
+                    BASAdaptiveTraceKind.quick.rawValue: "Keep the interruption short, calm, and non-shaming."
+                ]
+            ),
             outputGuardsByKindID: [
                 BASSemanticTaskKind.quick.rawValue: [
                     "Keep the host-specific viewpoint framing."
@@ -107,7 +115,8 @@ struct BASReferencePromptModesCoreTests {
                 afterPerspective: "It may not feel worth it tomorrow.",
                 verdictTitle: "Pause",
                 primaryActionTitle: "Wait 90s",
-                secondaryActionTitles: ["Decide tomorrow"]
+                secondaryActionTitles: ["Decide tomorrow"],
+                brainState: hostBrainState()
             ),
             behavior: behavior
         )
@@ -117,5 +126,19 @@ struct BASReferencePromptModesCoreTests {
         #expect(envelope.payload.contains("Keep the host-specific viewpoint framing."))
         #expect(envelope.budget.targetCharacters == 900)
         #expect(envelope.frontstageState.focusGoal == "Host quick focus goal.")
+        #expect(envelope.assembly.kernelSnapshot.truthState?.mode == "before.quick")
+        #expect(envelope.assembly.kernelSnapshot.truthState?.personaRules.contains("Keep the interruption short, calm, and non-shaming.") == true)
+    }
+
+    private func hostBrainState() -> BASDecisionBrainState {
+        BASDecisionBrainState(
+            profileCore: ["Keep the language steady."],
+            activeGoals: ["Protect tomorrow's clarity."],
+            relevantMemories: ["Similar loops softened after a pause."],
+            sessionBiases: ["Keep it short."],
+            retrievalTags: ["pause"],
+            reactionWeights: BASReactionWeights.defaults(forModeName: BASDecisionMode.quick.rawValue),
+            loadedAt: .now
+        )
     }
 }

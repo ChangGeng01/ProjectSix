@@ -618,7 +618,8 @@ enum DecisionIntelligenceProviderPipeline {
             outputPreview: outputPreview,
             kernelSnapshot: kernelSnapshot,
             brainState: brainState,
-            reminderSurfaceModeRawValue: reminderMode?.rawValue
+            reminderSurfaceModeRawValue: reminderMode?.rawValue,
+            structuredTruthBehavior: BeforeProductLanguage.referencePromptBehavior.structuredTruthBehavior
         )
     }
 

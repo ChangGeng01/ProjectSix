@@ -17,32 +17,32 @@ public struct BASPromptPresentationBehavior: Codable, Equatable, Sendable {
         Keep the tone grounded, calm, and concise.
         """,
         adaptivePrefixByKindID: [String: String] = [
-            BASSemanticTaskKind.quick.rawValue: """
-            Refine only the supplied paired perspective fields.
+            BASSemanticTaskKind.primaryID: """
+            Refine only the supplied primary guidance fields.
             Preserve the decision frame, actions, and intended emotional direction.
             """,
-            BASSemanticTaskKind.balance.rawValue: """
-            Tighten the supplied comparison fields without inventing facts or collapsing them into a verdict.
+            BASSemanticTaskKind.comparativeID: """
+            Tighten the supplied comparative fields without inventing facts or collapsing them into a verdict.
             Preserve the same focus and next-step intent.
             """,
-            BASSemanticTaskKind.mirror.rawValue: """
+            BASSemanticTaskKind.reflectiveID: """
             Clarify the supplied reflective fields without becoming dramatic, clinical, or binary.
             Preserve the same tension and next reflective move.
             """,
-            BASSemanticTaskKind.reminder.rawValue: """
-            Select one supplied candidate that best matches the current state.
+            BASSemanticTaskKind.reminderID: """
+            Select one retained candidate that best matches the current state.
             Do not rewrite or invent candidate text.
             """
         ],
         baseEvidenceRetentionBudgetByKindID: [String: Int] = [
-            BASSemanticTaskKind.quick.rawValue: 5,
-            BASSemanticTaskKind.balance.rawValue: 4,
-            BASSemanticTaskKind.mirror.rawValue: 4,
-            BASSemanticTaskKind.reminder.rawValue: 3
+            BASSemanticTaskKind.primaryID: 5,
+            BASSemanticTaskKind.comparativeID: 4,
+            BASSemanticTaskKind.reflectiveID: 4,
+            BASSemanticTaskKind.reminderID: 3
         ],
         lowGearClampKindIDs: [String] = [
-            BASSemanticTaskKind.quick.rawValue,
-            BASSemanticTaskKind.reminder.rawValue
+            BASSemanticTaskKind.primaryID,
+            BASSemanticTaskKind.reminderID
         ],
         lowGearClampMaximumBudget: Int = 3
     ) {
@@ -65,14 +65,16 @@ public struct BASPromptPresentationBehavior: Codable, Equatable, Sendable {
     public func adaptivePrefix(
         for kind: BASSemanticTaskKind
     ) -> String {
-        adaptivePrefixByKindID[kind.rawValue, default: fallbackAdaptivePrefix(for: kind)]
+        value(in: adaptivePrefixByKindID, for: kind)
+            ?? fallbackAdaptivePrefix(for: kind)
     }
 
     public func evidenceRetentionBudget(
         for kind: BASSemanticTaskKind,
         strategy: BASAdaptiveTaskStrategy?
     ) -> Int {
-        let base = baseEvidenceRetentionBudgetByKindID[kind.rawValue, default: fallbackBaseEvidenceRetentionBudget(for: kind)]
+        let base = value(in: baseEvidenceRetentionBudgetByKindID, for: kind)
+            ?? fallbackBaseEvidenceRetentionBudget(for: kind)
 
         guard let strategy else { return base }
 
@@ -93,7 +95,7 @@ public struct BASPromptPresentationBehavior: Codable, Equatable, Sendable {
             retrievalBounded = modeBudget
         }
 
-        if strategy.runtimeGear == .low && lowGearClampKindIDs.contains(kind.rawValue) {
+        if strategy.runtimeGear == .low && containsLowGearClamp(kind: kind) {
             return min(retrievalBounded, lowGearClampMaximumBudget)
         }
 
@@ -105,13 +107,13 @@ public struct BASPromptPresentationBehavior: Codable, Equatable, Sendable {
     ) -> String {
         switch kind {
         case .quick:
-            "Refine only the supplied paired perspective fields."
+            "Refine only the supplied primary guidance fields."
         case .balance:
-            "Tighten the supplied comparison fields without inventing facts."
+            "Tighten the supplied comparative fields without inventing facts."
         case .mirror:
             "Clarify the supplied reflective fields without changing their meaning."
         case .reminder:
-            "Select one supplied candidate without rewriting it."
+            "Select one retained candidate without rewriting it."
         }
     }
 
@@ -129,6 +131,25 @@ public struct BASPromptPresentationBehavior: Codable, Equatable, Sendable {
             3
         }
     }
+
+    private func value<T>(
+        in mapping: [String: T],
+        for kind: BASSemanticTaskKind
+    ) -> T? {
+        for candidate in [kind.identifier, kind.rawValue] {
+            if let value = mapping[candidate] {
+                return value
+            }
+        }
+        return nil
+    }
+
+    private func containsLowGearClamp(
+        kind: BASSemanticTaskKind
+    ) -> Bool {
+        let aliases = [kind.identifier, kind.rawValue]
+        return lowGearClampKindIDs.contains { aliases.contains($0) }
+    }
 }
 
 public enum BASPromptPrefixCatalog {
@@ -142,12 +163,12 @@ public enum BASPromptPrefixCatalog {
     """
 
     public static let quick = """
-    Rewrite only the supplied paired perspective fields.
+    Rewrite only the supplied primary guidance fields.
     Keep the same meaning and do not change verdicts or actions.
     """
 
     public static let balance = """
-    Tighten the supplied comparison fields without inventing new facts or turning them into a verdict.
+    Tighten the supplied comparative fields without inventing new facts or turning them into a verdict.
     Preserve the same focus and next-step intent.
     """
 
@@ -157,7 +178,7 @@ public enum BASPromptPrefixCatalog {
     """
 
     public static let reminder = """
-    Pick one supplied candidate that best matches the current state.
+    Pick one retained candidate that best matches the current state.
     Do not rewrite or invent candidate text.
     """
 

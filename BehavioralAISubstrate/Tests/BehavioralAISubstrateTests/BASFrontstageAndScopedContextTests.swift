@@ -47,7 +47,7 @@ struct BASFrontstageAndScopedContextTests {
             )
         )
 
-        #expect(state.focusGoal == "Clarify the immediate state before momentum hardens.")
+        #expect(state.focusGoal == "Clarify the active state before momentum hardens.")
         #expect(state.evidenceHeadlines.count == 1)
         #expect(state.dangerSignals.count == 3)
         #expect(state.dangerSignals.contains("Constraint pressure"))

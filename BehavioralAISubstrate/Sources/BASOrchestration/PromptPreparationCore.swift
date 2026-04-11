@@ -114,6 +114,7 @@ public struct BASPromptPreparationRequest<Kind: Equatable & Sendable>: Sendable,
     public var neuralSnapshot: BASPromptNeuralSnapshot?
     public var brainState: BASDecisionBrainState?
     public var structuredTruthOverride: BASStructuredTruthState?
+    public var structuredTruthBehavior: BASStructuredTruthBehavior
     public var includeStructuredTruthBlock: Bool
     public var providerIdentifier: String?
 
@@ -133,6 +134,7 @@ public struct BASPromptPreparationRequest<Kind: Equatable & Sendable>: Sendable,
         neuralSnapshot: BASPromptNeuralSnapshot? = nil,
         brainState: BASDecisionBrainState? = nil,
         structuredTruthOverride: BASStructuredTruthState? = nil,
+        structuredTruthBehavior: BASStructuredTruthBehavior = .generic,
         includeStructuredTruthBlock: Bool = true,
         providerIdentifier: String? = nil
     ) {
@@ -151,6 +153,7 @@ public struct BASPromptPreparationRequest<Kind: Equatable & Sendable>: Sendable,
         self.neuralSnapshot = neuralSnapshot
         self.brainState = brainState
         self.structuredTruthOverride = structuredTruthOverride
+        self.structuredTruthBehavior = structuredTruthBehavior
         self.includeStructuredTruthBlock = includeStructuredTruthBlock
         self.providerIdentifier = providerIdentifier
     }
@@ -163,7 +166,8 @@ public enum BASPromptPreparationCompiler {
         let structuredTruth = request.structuredTruthOverride ?? BASStructuredTruthCompiler.truthState(
             for: BASStructuredTruthRequest(
                 kind: request.adaptiveKind,
-                brainState: request.brainState
+                brainState: request.brainState,
+                behavior: request.structuredTruthBehavior
             )
         )
         let includeStructuredTruthBlock = request.includeStructuredTruthBlock && structuredTruth != nil

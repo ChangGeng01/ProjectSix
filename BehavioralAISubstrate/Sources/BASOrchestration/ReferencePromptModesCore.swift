@@ -56,20 +56,22 @@ public enum BASReferencePromptLimits {
 public struct BASReferencePromptBehavior: Codable, Equatable, Sendable {
     public var presentationBehavior: BASPromptPresentationBehavior
     public var frontstageBehavior: BASFrontstagePresentationBehavior
+    public var structuredTruthBehavior: BASStructuredTruthBehavior
     public var outputGuardsByKindID: [String: [String]]
     public var targetCharactersByKindID: [String: Int]
 
     public init(
         presentationBehavior: BASPromptPresentationBehavior = .generic,
         frontstageBehavior: BASFrontstagePresentationBehavior = .generic,
+        structuredTruthBehavior: BASStructuredTruthBehavior = .generic,
         outputGuardsByKindID: [String: [String]] = [
             BASSemanticTaskKind.quick.rawValue: [
-                "Refine only the supplied paired perspective fields.",
+                "Refine only the supplied first-pass perspective fields.",
                 "Keep the same decision frame, actions, and emotional direction.",
                 "Do not add new facts or emotional escalation."
             ],
             BASSemanticTaskKind.balance.rawValue: [
-                "Keep the same comparison frame, focus, and next step.",
+                "Keep the same comparative frame, focus, and next step.",
                 "Do not invent facts or force a verdict.",
                 "Tighten language only."
             ],
@@ -79,9 +81,9 @@ public struct BASReferencePromptBehavior: Codable, Equatable, Sendable {
                 "Preserve the same tension and next reflective move."
             ],
             BASSemanticTaskKind.reminder.rawValue: [
-                "Choose exactly one candidate index from the supplied evidence.",
+                "Choose exactly one retained candidate index from the supplied evidence.",
                 "Do not rewrite, combine, or invent candidate text.",
-                "Prefer the candidate that most directly matches the current state."
+                "Prefer the retained candidate that most directly matches the current state."
             ]
         ],
         targetCharactersByKindID: [String: Int] = [
@@ -93,6 +95,7 @@ public struct BASReferencePromptBehavior: Codable, Equatable, Sendable {
     ) {
         self.presentationBehavior = presentationBehavior
         self.frontstageBehavior = frontstageBehavior
+        self.structuredTruthBehavior = structuredTruthBehavior
         self.outputGuardsByKindID = outputGuardsByKindID
         self.targetCharactersByKindID = targetCharactersByKindID
     }
@@ -117,13 +120,13 @@ public struct BASReferencePromptBehavior: Codable, Equatable, Sendable {
         switch kind {
         case .quick:
             [
-                "Refine only the supplied paired perspective fields.",
+                "Refine only the supplied first-pass perspective fields.",
                 "Keep the same decision frame, actions, and emotional direction.",
                 "Do not add new facts or emotional escalation."
             ]
         case .balance:
             [
-                "Keep the same comparison frame, focus, and next step.",
+                "Keep the same comparative frame, focus, and next step.",
                 "Do not invent facts or force a verdict.",
                 "Tighten language only."
             ]
@@ -135,9 +138,9 @@ public struct BASReferencePromptBehavior: Codable, Equatable, Sendable {
             ]
         case .reminder:
             [
-                "Choose exactly one candidate index from the supplied evidence.",
+                "Choose exactly one retained candidate index from the supplied evidence.",
                 "Do not rewrite, combine, or invent candidate text.",
-                "Prefer the candidate that most directly matches the current state."
+                "Prefer the retained candidate that most directly matches the current state."
             ]
         }
     }
@@ -396,7 +399,8 @@ public enum BASReferencePromptBuilder {
             neuralSnapshot: request.neuralSnapshot,
             brainState: request.brainState,
             presentationBehavior: behavior.presentationBehavior,
-            frontstageBehavior: behavior.frontstageBehavior
+            frontstageBehavior: behavior.frontstageBehavior,
+            structuredTruthBehavior: behavior.structuredTruthBehavior
         )
     }
 
@@ -438,7 +442,8 @@ public enum BASReferencePromptBuilder {
             neuralSnapshot: request.neuralSnapshot,
             brainState: request.brainState,
             presentationBehavior: behavior.presentationBehavior,
-            frontstageBehavior: behavior.frontstageBehavior
+            frontstageBehavior: behavior.frontstageBehavior,
+            structuredTruthBehavior: behavior.structuredTruthBehavior
         )
     }
 
@@ -481,7 +486,8 @@ public enum BASReferencePromptBuilder {
             neuralSnapshot: request.neuralSnapshot,
             brainState: request.brainState,
             presentationBehavior: behavior.presentationBehavior,
-            frontstageBehavior: behavior.frontstageBehavior
+            frontstageBehavior: behavior.frontstageBehavior,
+            structuredTruthBehavior: behavior.structuredTruthBehavior
         )
     }
 
@@ -512,12 +518,14 @@ public enum BASReferencePromptBuilder {
                 for: BASStructuredTruthRequest(
                     kind: .reminder,
                     brainState: nil,
-                    reminderSurfaceMode: request.reminderSurfaceMode
+                    reminderSurfaceMode: request.reminderSurfaceMode,
+                    behavior: behavior.structuredTruthBehavior
                 )
             ),
             includeStructuredTruthBlock: false,
             presentationBehavior: behavior.presentationBehavior,
-            frontstageBehavior: behavior.frontstageBehavior
+            frontstageBehavior: behavior.frontstageBehavior,
+            structuredTruthBehavior: behavior.structuredTruthBehavior
         )
     }
 
@@ -538,7 +546,8 @@ public enum BASReferencePromptBuilder {
         structuredTruthOverride: BASStructuredTruthState? = nil,
         includeStructuredTruthBlock: Bool = true,
         presentationBehavior: BASPromptPresentationBehavior = .generic,
-        frontstageBehavior: BASFrontstagePresentationBehavior = .generic
+        frontstageBehavior: BASFrontstagePresentationBehavior = .generic,
+        structuredTruthBehavior: BASStructuredTruthBehavior = .generic
     ) -> BASPromptEnvelope<Kind, BASFrontstageState> {
         BASPromptPreparationCompiler.compile(
             BASPromptPreparationRequest(
@@ -557,6 +566,7 @@ public enum BASReferencePromptBuilder {
                 neuralSnapshot: neuralSnapshot,
                 brainState: brainState,
                 structuredTruthOverride: structuredTruthOverride,
+                structuredTruthBehavior: structuredTruthBehavior,
                 includeStructuredTruthBlock: includeStructuredTruthBlock,
                 providerIdentifier: providerIdentifier
             )

@@ -145,6 +145,20 @@ enum BeforeProductLanguage {
             filteredEvidenceSignal: "Evidence filtered",
             trimmedEvidenceSignal: "Frontstage trimmed"
         ),
+        structuredTruthBehavior: BASStructuredTruthBehavior(
+            modeNamesByKindID: [
+                BASAdaptiveTraceKind.quick.rawValue: DecisionMode.quick.substrateModeID,
+                BASAdaptiveTraceKind.balance.rawValue: DecisionMode.balance.substrateModeID,
+                BASAdaptiveTraceKind.mirror.rawValue: DecisionMode.mirror.substrateModeID,
+                BASAdaptiveTraceKind.reminder.rawValue: "reminder"
+            ],
+            kernelPersonaRulesByKindID: [
+                BASAdaptiveTraceKind.quick.rawValue: "Keep the interruption short, calm, and non-shaming.",
+                BASAdaptiveTraceKind.balance.rawValue: "Clarify trade-offs without turning the board into a verdict.",
+                BASAdaptiveTraceKind.mirror.rawValue: "Reflect the pattern without becoming dramatic or therapeutic.",
+                BASAdaptiveTraceKind.reminder.rawValue: "Choose from retained reminders only and do not invent new reminders."
+            ]
+        ),
         outputGuardsByKindID: [
             BASSemanticTaskKind.quick.rawValue: [
                 "Rewrite only the current and after perspective lines.",

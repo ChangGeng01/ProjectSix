@@ -80,8 +80,8 @@ final class BASApplePredictiveInterventionTests: XCTestCase {
 
         XCTAssertEqual(candidate?.riskLevelID, "low")
         XCTAssertNil(candidate?.preferredModeID)
-        XCTAssertEqual(candidate?.title, "A lighter pass may be enough.")
-        XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("steadier next step") == true)
+        XCTAssertEqual(candidate?.title, "A lighter next step may be enough.")
+        XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("deliberate next step") == true)
         XCTAssertEqual(candidate?.evidenceSignalCount, 0)
     }
 

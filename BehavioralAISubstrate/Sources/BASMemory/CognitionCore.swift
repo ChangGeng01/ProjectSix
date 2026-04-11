@@ -784,7 +784,7 @@ public enum BASDecisionBrainCompiler {
         )
         let reactionWeights = reactionWeights(
             for: request.mode,
-            seed: request.reactionWeightSeed ?? BASReactionWeights.defaults(forModeName: request.mode.rawValue),
+            seed: request.reactionWeightSeed ?? BASReactionWeights.defaults(forModeName: request.mode.identifier),
             queryTags: queryTags,
             memorySlices: memorySlices,
             recentEvents: projection.recentEvents,
@@ -797,7 +797,7 @@ public enum BASDecisionBrainCompiler {
             recentEvents: projection.recentEvents,
             reactionWeights: reactionWeights
         )
-        let identityProfile = request.identityProfileOverride ?? BASIdentityProfile.default(modeName: request.mode.rawValue)
+        let identityProfile = request.identityProfileOverride ?? BASIdentityProfile.default(modeName: request.mode.identifier)
         let boundaryPolicy = BASBoundaryPolicyState.default(riskLevel: request.riskLevel)
         let memoryGovernance = mergeGovernanceState(
             seed: projection.governanceSnapshot,

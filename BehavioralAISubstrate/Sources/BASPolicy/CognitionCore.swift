@@ -111,7 +111,7 @@ public enum BASIdentityRoleResolver {
         baseProfile: BASIdentityProfile? = nil,
         behavior: BASCognitionBehavior = .generic
     ) -> BASIdentityProfile {
-        var profile = baseProfile ?? BASIdentityProfile.default(modeName: mode.rawValue)
+        var profile = baseProfile ?? BASIdentityProfile.default(modeName: mode.identifier)
 
         if let surfaceOverlay = behavior.surfaceIdentityOverlaysBySurfaceID[sourceSurface.rawValue] {
             profile = surfaceOverlay.applying(to: profile)

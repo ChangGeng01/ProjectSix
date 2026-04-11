@@ -63,8 +63,9 @@ public struct BASBrainBootstrapAdvisorBehavior: Codable, Equatable, Sendable {
         nightWindowStartHour: Int = 22,
         nightWindowEndHour: Int = 5,
         highRiskSignalGroups: [[String]] = [
-            ["message", "reply", "text", "send", "dm"],
-            ["buy", "purchase", "spend", "checkout", "cart"]
+            ["publish", "post", "submit", "share", "send"],
+            ["buy", "purchase", "pay", "checkout", "upgrade", "subscribe"],
+            ["delete", "remove", "erase", "cancel", "quit"]
         ],
         nightFallbackRiskLevelByModeID: [String: String] = [
             BASDecisionMode.primaryID: BASRiskLevel.medium.rawValue,

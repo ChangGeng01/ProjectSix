@@ -130,7 +130,7 @@ struct BASMemoryDerivationCoreTests {
                 primarySituational: BASSituationalDraftBehavior(
                     draftID: "situational.quick.latest",
                     topic: "recent_quick_loop",
-                    primaryHeadlinePrefix: "Recently carrying",
+                    primaryHeadlinePrefix: "Recently holding",
                     fallbackHeadlinePrefix: "Recently revisiting",
                     provenanceSummary: "Host quick memory.",
                     baseTags: ["quick", "recent"]
@@ -265,7 +265,7 @@ struct BASMemoryDerivationCoreTests {
         #expect(support.headline == "Archive and reopen has repeatedly helped stabilize this situation.")
         #expect(support.retrievalTags.contains("action_support"))
         #expect(support.retrievalTags.contains("stabilizing_action"))
-        #expect(support.provenanceSummary == "Derived from repeated stabilizing actions in the host workflow.")
+        #expect(support.provenanceSummary == "Derived from repeated stabilizing actions in the host runtime.")
     }
 
     @Test("generic derivation prefers the freshest matching workspace instead of first match order")

@@ -155,7 +155,7 @@ public struct BASHostConsoleConfiguration: Codable, Equatable, Sendable {
     public init(
         isEnabled: Bool = true,
         productionEnabled: Bool = false,
-        debugEntryPointTitle: String = "Substrate Console"
+        debugEntryPointTitle: String = "Host Console"
     ) {
         self.isEnabled = isEnabled
         self.productionEnabled = productionEnabled
@@ -169,9 +169,9 @@ public struct BASHostWorkflowTitles: Codable, Equatable, Sendable {
     public var reflective: String
 
     public init(
-        rapid: String = "Rapid Workflow",
-        deliberate: String = "Deliberate Workflow",
-        reflective: String = "Reflective Workflow"
+        rapid: String = "Primary Lane",
+        deliberate: String = "Comparative Lane",
+        reflective: String = "Reflective Lane"
     ) {
         self.rapid = rapid
         self.deliberate = deliberate
@@ -245,9 +245,9 @@ public struct BASHostSessionTitles: Codable, Equatable, Sendable {
     public var sceneActive: String
 
     public init(
-        rapid: String = "Rapid Workflow",
-        deliberate: String = "Deliberate Workflow",
-        reflective: String = "Reflective Workflow",
+        rapid: String = "Primary Lane",
+        deliberate: String = "Comparative Lane",
+        reflective: String = "Reflective Lane",
         initialAppearance: String = "Host Bootstrap",
         sceneActive: String = "Host Refresh"
     ) {
@@ -287,8 +287,8 @@ public struct BASHostFollowUpActions: Codable, Equatable, Sendable {
 
     public init(
         rapid: [String] = ["Capture the immediate context", "Choose one bounded next move"],
-        deliberate: [String] = ["Compare the active pressures", "State one constraint and one opportunity"],
-        reflective: [String] = ["Clarify the deeper pattern", "Keep one grounded anchor visible"],
+        deliberate: [String] = ["Compare the active pressures", "State one constraint and one opening"],
+        reflective: [String] = ["Describe the underlying pattern", "Keep one grounded anchor visible"],
         highRiskEscalation: [String] = ["Require stronger confirmation"]
     ) {
         self.rapid = rapid
@@ -324,8 +324,8 @@ public struct BASHostLifecyclePresentation: Codable, Equatable, Sendable {
     public var recomputeGuardedInterventionFollowUp: String
 
     public init(
-        initialAppearancePromptFallback: String = "Hydrate substrate state before the host renders.",
-        sceneActivePromptFallback: String = "Refresh substrate state and resume the host shell.",
+        initialAppearancePromptFallback: String = "Prepare substrate state before the first host presentation.",
+        sceneActivePromptFallback: String = "Refresh substrate state and resume the active host session.",
         refreshMemoryProjectionNotice: String = "Refresh substrate projection",
         refreshCurrentBrainNotice: String = "Refresh substrate state",
         presentPendingReflectionNotice: String = "Present deferred follow-up",
@@ -333,8 +333,8 @@ public struct BASHostLifecyclePresentation: Codable, Equatable, Sendable {
         restoreActiveWorkspaceNotice: String = "Restore active workspace",
         refreshPredictedInterventionNotice: String = "Refresh predictive intervention",
         syncWidgetSnapshotNotice: String = "Sync shared snapshot",
-        loadCurrentBrainFollowUp: String = "Hydrate substrate state before rendering",
-        resumeStructuredWorkspaceFollowUp: String = "Resume the active workspace",
+        loadCurrentBrainFollowUp: String = "Prepare current substrate state before presentation",
+        resumeStructuredWorkspaceFollowUp: String = "Resume the active structured session",
         recomputeGuardedInterventionFollowUp: String = "Recompute the guarded intervention state"
     ) {
         self.initialAppearancePromptFallback = initialAppearancePromptFallback
@@ -360,7 +360,7 @@ public struct BASHostNoticeTemplates: Codable, Equatable, Sendable {
 
     public init(
         enteredWorkflow: String = "{surface} entered {workflow} through the host runtime.",
-        runtimeProfile: String = "Runtime profile {runtimeProfile} is active for this host.",
+        runtimeProfile: String = "Runtime profile {runtimeProfile} is active for the host shell.",
         reopenFollowUpAction: String = "Reopen with {workflow}",
         emptyPromptGoalFallback: String = "Keep the host state bounded before acting."
     ) {
@@ -381,13 +381,13 @@ public struct BASHostPredictiveInterventionPresentation: Codable, Equatable, Sen
     public var defaultReason: String
 
     public init(
-        mediumRiskTitle: String = "A steadier pass may help here.",
-        mediumRiskDetail: String = "Current signals suggest another structured pass before proceeding.",
-        highRiskTitle: String = "This may need more confirmation.",
-        highRiskDetail: String = "Current signals suggest restoring more structure before the next move.",
-        reopenRiskDetail: String = "This reopen path is carrying extra risk, so the substrate is restoring more structure first.",
+        mediumRiskTitle: String = "A more deliberate next step may help here.",
+        mediumRiskDetail: String = "Current signals suggest adding more structure before proceeding.",
+        highRiskTitle: String = "This state may need stronger confirmation.",
+        highRiskDetail: String = "Current signals suggest increasing confirmation and tightening execution boundaries before the next move.",
+        reopenRiskDetail: String = "This reopen path is carrying extra risk, so the substrate is adding more structure first.",
         fallbackReopenSuggestionDetail: String = "A prior hold suggests reopening with more structure before proceeding.",
-        defaultReason: String = "Risk-aware policy prefers a steadier next step here."
+        defaultReason: String = "Risk-aware policy prefers a more deliberate next step here."
     ) {
         self.mediumRiskTitle = mediumRiskTitle
         self.mediumRiskDetail = mediumRiskDetail
@@ -443,10 +443,8 @@ public struct BASHostWorkflowBehaviorConfiguration: Codable, Equatable, Sendable
         retrievalModeIDsBySessionKindID: [String: String] = [:],
         defaultMemorySourceIDsBySessionKindID: [String: String] = [:],
         defaultRetrievalModeIDsBySessionKindID: [String: String] = [:],
-        failureGuardIDsByRiskLevelID: [String: [String]] = [
-            BASHostRiskLevel.high.rawValue: ["substrate.guard/elevated-risk"]
-        ],
-        hostNamespace: String = "substrate"
+        failureGuardIDsByRiskLevelID: [String: [String]] = [:],
+        hostNamespace: String = "host"
     ) {
         self.modeIDsByProfileID = modeIDsByProfileID
         self.templateIDsByProfileID = templateIDsByProfileID
@@ -514,11 +512,15 @@ public struct BASHostWorkflowBehaviorConfiguration: Codable, Equatable, Sendable
     }
 
     public func failureGuardIDs(for riskLevel: BASHostRiskLevel) -> [String] {
-        failureGuardIDsByRiskLevelID[riskLevel.rawValue, default: []]
+        if let configured = failureGuardIDsByRiskLevelID[riskLevel.rawValue], !configured.isEmpty {
+            return configured
+        }
+        guard riskLevel == .high else { return [] }
+        return ["\(hostNamespace).guard/elevated-risk"]
     }
 
     public var sessionProvenanceSummary: String {
-        "Session request from \(hostNamespace)"
+        "Session request from the \(hostNamespace) runtime."
     }
 
     private static func modeAliases(for modeID: String) -> Set<String> {
@@ -545,17 +547,23 @@ public struct BASHostWorkflowBehaviorConfiguration: Codable, Equatable, Sendable
 public struct BASHostCognitionBehaviorConfiguration: Codable, Equatable, Sendable {
     public var reactionWeightsByProfileID: [String: BASReactionWeights]
     public var identityProfilesByProfileID: [String: BASIdentityProfile]
+    public var modeNamesByProfileID: [String: String]
     public var substrateBehavior: BASCognitionBehavior
 
     public init(
         reactionWeightsByProfileID: [String: BASReactionWeights]? = nil,
         identityProfilesByProfileID: [String: BASIdentityProfile]? = nil,
+        modeNamesByProfileID: [String: String]? = nil,
         substrateBehavior: BASCognitionBehavior = .generic
     ) {
         self.reactionWeightsByProfileID = reactionWeightsByProfileID
             ?? BASHostCognitionBehaviorConfiguration.genericReactionWeightsByProfileID()
+        self.modeNamesByProfileID = modeNamesByProfileID
+            ?? BASHostCognitionBehaviorConfiguration.genericModeNamesByProfileID()
         self.identityProfilesByProfileID = identityProfilesByProfileID
-            ?? BASHostCognitionBehaviorConfiguration.genericIdentityProfilesByProfileID()
+            ?? BASHostCognitionBehaviorConfiguration.genericIdentityProfilesByProfileID(
+                modeNamesByProfileID: self.modeNamesByProfileID
+            )
         self.substrateBehavior = substrateBehavior
     }
 
@@ -566,7 +574,10 @@ public struct BASHostCognitionBehaviorConfiguration: Codable, Equatable, Sendabl
 
     public func identityProfile(for profile: BASHostWorkflowProfile) -> BASIdentityProfile {
         identityProfilesByProfileID[profile.rawValue]
-            ?? BASHostCognitionBehaviorConfiguration.neutralIdentityProfile(for: profile)
+            ?? BASHostCognitionBehaviorConfiguration.neutralIdentityProfile(
+                for: profile,
+                modeName: modeNamesByProfileID[profile.rawValue]
+            )
     }
 
     private static func genericReactionWeightsByProfileID() -> [String: BASReactionWeights] {
@@ -577,22 +588,38 @@ public struct BASHostCognitionBehaviorConfiguration: Codable, Equatable, Sendabl
         return mapping
     }
 
-    private static func genericIdentityProfilesByProfileID() -> [String: BASIdentityProfile] {
+    private static func genericModeNamesByProfileID() -> [String: String] {
+        [
+            BASHostWorkflowProfile.rapid.rawValue: "primary",
+            BASHostWorkflowProfile.deliberate.rawValue: "comparative",
+            BASHostWorkflowProfile.reflective.rawValue: "reflective"
+        ]
+    }
+
+    private static func genericIdentityProfilesByProfileID(
+        modeNamesByProfileID: [String: String]
+    ) -> [String: BASIdentityProfile] {
         var mapping: [String: BASIdentityProfile] = [:]
         for profile in BASHostWorkflowProfile.allCases {
-            mapping[profile.rawValue] = neutralIdentityProfile(for: profile)
+            mapping[profile.rawValue] = neutralIdentityProfile(
+                for: profile,
+                modeName: modeNamesByProfileID[profile.rawValue]
+            )
         }
         return mapping
     }
 
     private static func neutralReactionWeights(for profile: BASHostWorkflowProfile) -> BASReactionWeights {
-        _ = profile
-        return BASReactionWeights.defaults(for: "substrate")
+        let modeName = genericModeNamesByProfileID()[profile.rawValue] ?? "host"
+        return BASReactionWeights.defaults(for: modeName)
     }
 
-    private static func neutralIdentityProfile(for profile: BASHostWorkflowProfile) -> BASIdentityProfile {
+    private static func neutralIdentityProfile(
+        for profile: BASHostWorkflowProfile,
+        modeName: String? = nil
+    ) -> BASIdentityProfile {
         _ = profile
-        return BASIdentityProfile.default(modeName: "substrate")
+        return BASIdentityProfile.default(modeName: modeName ?? "host")
     }
 }
 
@@ -635,8 +662,8 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
     public var presentation: BASHostPresentationConfiguration
 
     public init(
-        runtimeProfileID: String = "substrate.default-runtime",
-        policyProfileID: String = "substrate.default-policy",
+        runtimeProfileID: String = "host.default-runtime",
+        policyProfileID: String = "host.default-policy",
         prefersPureLocal: Bool = true,
         console: BASHostConsoleConfiguration = BASHostConsoleConfiguration(),
         lifecycleBehavior: BASHostLifecycleBehaviorConfiguration = BASHostLifecycleBehaviorConfiguration(),
@@ -663,11 +690,11 @@ public struct BASHostDependencySet: Codable, Equatable, Sendable {
     public var persistenceProviderID: String
 
     public init(
-        protectedStorageProviderID: String = "substrate.protected-storage",
-        handoffProviderID: String = "substrate.handoff",
-        notificationProviderID: String = "substrate.notifications",
-        modelRegistryID: String = "substrate.model-registry",
-        persistenceProviderID: String = "substrate.persistence"
+        protectedStorageProviderID: String = "host.protected-storage",
+        handoffProviderID: String = "host.handoff",
+        notificationProviderID: String = "host.notifications",
+        modelRegistryID: String = "host.model-registry",
+        persistenceProviderID: String = "host.persistence"
     ) {
         self.protectedStorageProviderID = protectedStorageProviderID
         self.handoffProviderID = handoffProviderID

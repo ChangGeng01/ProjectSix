@@ -53,7 +53,7 @@ struct BASPolicyCognitionCoreTests {
         #expect(boundary.activeConstraints.contains(.watchSurfaceLightweight))
         #expect(boundary.requiredConfirmations.contains("irreversible_decision"))
         #expect(boundary.allowedActionClasses.contains("checkpoint_reopen"))
-        #expect(boundary.auditHeadline.contains("Stay local"))
+        #expect(boundary.auditHeadline.contains("Keep execution local"))
     }
 
     @Test("host-injected cognition behavior overrides substrate defaults")

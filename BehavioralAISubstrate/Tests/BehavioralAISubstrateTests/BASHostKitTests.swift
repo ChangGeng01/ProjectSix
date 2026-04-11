@@ -19,7 +19,7 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(result.requestKind, .interactive)
         XCTAssertEqual(result.workflowProfile, .reflective)
         XCTAssertEqual(result.currentBrain.workflowProfile, .reflective)
-        XCTAssertEqual(result.currentBrain.workflowTitle, "Reflective Workflow")
+        XCTAssertEqual(result.currentBrain.workflowTitle, "Reflective Lane")
         XCTAssertFalse(result.currentBrain.roleID.isEmpty)
         XCTAssertFalse(result.currentBrain.relationshipBoundary.isEmpty)
         XCTAssertFalse(result.currentBrain.boundaryHeadline.isEmpty)
@@ -42,7 +42,7 @@ final class BASHostKitTests: XCTestCase {
 
         XCTAssertEqual(result.activeSessionTitle, "Host Bootstrap")
         XCTAssertTrue(result.notices.contains("Refresh substrate projection"))
-        XCTAssertTrue(result.followUpActions.contains("Hydrate substrate state before rendering"))
+        XCTAssertTrue(result.followUpActions.contains("Prepare current substrate state before presentation"))
     }
 
     func testCustomLifecycleBehaviorBelongsToHost() {
@@ -386,9 +386,9 @@ final class BASHostKitTests: XCTestCase {
 
         XCTAssertTrue(result.projection.activeTemplateIDs.isEmpty)
         XCTAssertEqual(result.currentBrain.activeTemplateCount, 0)
-        XCTAssertTrue(result.currentBrain.verificationSummary.hasPrefix("substrate/"))
-        XCTAssertEqual(result.currentBrain.workflowTitle, "Rapid Workflow")
-        XCTAssertEqual(result.activeSessionTitle, "Rapid Workflow")
+        XCTAssertTrue(result.currentBrain.verificationSummary.hasPrefix("host/"))
+        XCTAssertEqual(result.currentBrain.workflowTitle, "Primary Lane")
+        XCTAssertEqual(result.activeSessionTitle, "Primary Lane")
     }
 
     func testWorkflowBehaviorLetsHostOwnFailureGuardIdentifiers() {
@@ -414,6 +414,23 @@ final class BASHostKitTests: XCTestCase {
         )
 
         XCTAssertEqual(result.currentBrain.failureGuardCount, 1)
+    }
+
+    func testDefaultHighRiskGuardFallsBackToHostNamespace() {
+        let runtime = BASHostRuntime()
+
+        let result = runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .deliberate,
+                surface: .application,
+                prompt: "This needs another checkpoint before I commit.",
+                riskLevel: .high
+            )
+        )
+
+        XCTAssertEqual(result.currentBrain.failureGuardCount, 1)
+        XCTAssertTrue(result.currentBrain.verificationSummary.hasPrefix("host/"))
     }
 
     func testExecuteLifecyclePhaseDelegatesEntryConsumptionAndRefreshOrder() {

@@ -21,7 +21,7 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
         #expect(resolution.actionPlan.actionKind == .predictiveIntervention)
         #expect(resolution.refreshTriggerID == BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue)
         #expect(resolution.predictiveIntervention?.riskLevelID == "high")
-        #expect(resolution.predictiveIntervention?.title == "A steadier pass may help here.")
+        #expect(resolution.predictiveIntervention?.title == "A more deliberate next step may help here.")
         #expect(resolution.predictiveIntervention?.evidenceSignalCount == 2)
         #expect(resolution.predictiveIntervention?.reason == "night_pattern")
         #expect(resolution.predictiveIntervention?.expiresAt == expiresAt)

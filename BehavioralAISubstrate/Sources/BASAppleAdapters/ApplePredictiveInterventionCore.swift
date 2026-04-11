@@ -34,18 +34,18 @@ public struct BASApplePredictiveInterventionBehavior: Codable, Equatable, Sendab
 
     public init(
         lowRisk: BASApplePredictiveInterventionRiskBehavior = BASApplePredictiveInterventionRiskBehavior(
-            title: "A lighter pass may be enough.",
-            detail: "Current signals suggest a short hold or lower-pressure pass before proceeding.",
+            title: "A lighter next step may be enough.",
+            detail: "Current signals suggest a short hold or lower-pressure next step before proceeding.",
             preferredModeID: nil
         ),
         mediumRisk: BASApplePredictiveInterventionRiskBehavior = BASApplePredictiveInterventionRiskBehavior(
-            title: "A steadier pass may help here.",
-            detail: "Current signals suggest another structured pass before proceeding.",
+            title: "A more deliberate next step may help here.",
+            detail: "Current signals suggest adding more structure before proceeding.",
             preferredModeID: nil
         ),
         highRisk: BASApplePredictiveInterventionRiskBehavior = BASApplePredictiveInterventionRiskBehavior(
-            title: "This may need more confirmation.",
-            detail: "Current signals suggest raising confirmation and restoring more structure before proceeding.",
+            title: "This state may need stronger confirmation.",
+            detail: "Current signals suggest raising confirmation and tightening execution boundaries before proceeding.",
             preferredModeID: nil
         ),
         preferredModeIDsByCurrentModeID: [String: String] = [:],
@@ -54,7 +54,7 @@ public struct BASApplePredictiveInterventionBehavior: Codable, Equatable, Sendab
         nightWindowReason: String = "The current time window lowers decision reliability.",
         negativeRecentReason: String = "Recent low-structure passes in comparable conditions ended poorly.",
         failureGuardReasonsByID: [String: String] = [:],
-        defaultReason: String = "Current signals suggest a steadier next step."
+        defaultReason: String = "Current signals suggest a more deliberate next step."
     ) {
         self.lowRisk = lowRisk
         self.mediumRisk = mediumRisk

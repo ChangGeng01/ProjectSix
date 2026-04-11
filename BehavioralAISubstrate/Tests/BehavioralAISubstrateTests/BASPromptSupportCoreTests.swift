@@ -11,7 +11,7 @@ struct BASPromptSupportCoreTests {
         let instructions = BASPromptPrefixCatalog.instructions(for: .quick)
 
         #expect(immutable.contains("host-owned cognition system"))
-        #expect(adaptive.contains("Refine only the supplied paired perspective fields."))
+        #expect(adaptive.contains("Refine only the supplied primary guidance fields."))
         #expect(instructions == immutable + "\n" + adaptive)
     }
 

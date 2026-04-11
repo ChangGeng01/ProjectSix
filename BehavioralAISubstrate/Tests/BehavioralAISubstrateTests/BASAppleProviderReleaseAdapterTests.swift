@@ -4,6 +4,7 @@ import Testing
 @testable import BASMemory
 @testable import BASOrchestration
 @testable import BASPolicy
+@testable import BASRuntimeCore
 
 @Suite("BASApple Provider Release Adapter")
 struct BASAppleProviderReleaseAdapterTests {
@@ -40,7 +41,8 @@ struct BASAppleProviderReleaseAdapterTests {
         )
         #expect(
             BASAppleProviderReleaseAdapter.referencedFacts(from: blockedGuidanceBrainState()) == [
-                "current_goal": "Protect tomorrow's judgment."
+                "current_goal": "Protect tomorrow's judgment.",
+                "primary_context_goal": "Protect tomorrow's judgment."
             ]
         )
     }
@@ -59,6 +61,31 @@ struct BASAppleProviderReleaseAdapterTests {
             Issue.record("Expected provider release adapter to reject blocked guidance.")
         case let .reject(assessment):
             #expect(assessment.consistencyCheck?.violations.contains(where: { $0.kind == .forbiddenAction }) == true)
+        }
+    }
+
+    @Test("adapter can pass host-specific structured truth behavior through release evaluation")
+    func adapterVerdictPassesHostSpecificStructuredTruthBehavior() {
+        let verdict = BASAppleProviderReleaseAdapter.verdict(
+            traceKindRawValue: "quick",
+            outputPreview: "Current: pause and let the urge settle.\nAfter: come back tomorrow.",
+            kernelSnapshot: kernelWithoutTruthState(),
+            brainState: blockedGuidanceBrainState(),
+            structuredTruthBehavior: BASStructuredTruthBehavior(
+                modeNamesByKindID: [
+                    BASAdaptiveTraceKind.quick.rawValue: "before.quick"
+                ],
+                kernelPersonaRulesByKindID: [
+                    BASAdaptiveTraceKind.quick.rawValue: "Keep the interruption short, calm, and non-shaming."
+                ]
+            )
+        )
+
+        switch verdict {
+        case .allow:
+            Issue.record("Expected provider release adapter to preserve blocked guidance under host-specific truth behavior.")
+        case let .reject(assessment):
+            #expect(assessment.consistencyCheck?.violations.contains(where: { $0.kind == BASConsistencyViolationKind.forbiddenAction }) == true)
         }
     }
 

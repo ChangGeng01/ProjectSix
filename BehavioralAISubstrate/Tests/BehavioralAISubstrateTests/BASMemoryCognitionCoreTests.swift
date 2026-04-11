@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import BASMemory
+@testable import BASOrchestration
 import BASRuntimeCore
 
 @Suite("BASMemory Cognition Core")
@@ -17,6 +18,27 @@ struct BASMemoryCognitionCoreTests {
         #expect(BASDecisionMode(identifier: "mirror") == .reflective)
     }
 
+    @Test("adaptive trace kinds and semantic task kinds expose generic identifiers while tolerating legacy aliases")
+    func taskKindsExposeGenericAliases() {
+        #expect(BASAdaptiveTraceKind.primary == .quick)
+        #expect(BASAdaptiveTraceKind.comparative == .balance)
+        #expect(BASAdaptiveTraceKind.reflective == .mirror)
+        #expect(BASAdaptiveTraceKind.primary.identifier == BASAdaptiveTraceKind.primaryID)
+        #expect(BASAdaptiveTraceKind.primary.legacyIdentifier == "quick")
+        #expect(BASAdaptiveTraceKind(identifier: BASAdaptiveTraceKind.comparativeID) == .balance)
+        #expect(BASAdaptiveTraceKind(identifier: "mirror") == .reflective)
+        #expect(BASAdaptiveTraceKind.reflective.title == "Reflective")
+
+        #expect(BASSemanticTaskKind.primary == .quick)
+        #expect(BASSemanticTaskKind.comparative == .balance)
+        #expect(BASSemanticTaskKind.reflective == .mirror)
+        #expect(BASSemanticTaskKind.primary.identifier == BASSemanticTaskKind.primaryID)
+        #expect(BASSemanticTaskKind.primary.legacyIdentifier == "quick")
+        #expect(BASSemanticTaskKind(identifier: BASSemanticTaskKind.reflectiveID) == .mirror)
+        #expect(BASSemanticTaskKind(identifier: "balance") == .comparative)
+        #expect(BASSemanticTaskKind.comparative.title == "Comparative")
+    }
+
     @Test("identity roles expose generic identifiers while accepting legacy aliases")
     func identityRolesExposeGenericIdentifiers() {
         #expect(BASIdentityRole.reflectiveWitness == .mirrorWitness)
@@ -27,7 +49,7 @@ struct BASMemoryCognitionCoreTests {
         #expect(BASIdentityRole(identifier: "comparative_guide") == .tradeoffGuide)
     }
 
-    @Test("brain bootstrap advisor infers higher risk for late-night impulse prompts")
+    @Test("brain bootstrap advisor infers higher risk for late-night externalizing prompts")
     func brainBootstrapAdvisorInfersRiskLevel() {
         var components = DateComponents()
         components.calendar = Calendar(identifier: .gregorian)
@@ -45,12 +67,12 @@ struct BASMemoryCognitionCoreTests {
 
         let nightMessageRisk = BASBrainBootstrapAdvisor.inferRiskLevel(
             mode: .quick,
-            prompt: "I want to send this message right now.",
+            prompt: "I want to publish this right now.",
             now: lateNight
         )
         let dayQuickRisk = BASBrainBootstrapAdvisor.inferRiskLevel(
             mode: .quick,
-            prompt: "Should I text them tonight?",
+            prompt: "Should I submit this tonight?",
             now: daytime
         )
         let mirrorRisk = BASBrainBootstrapAdvisor.inferRiskLevel(
@@ -414,7 +436,7 @@ struct BASMemoryCognitionCoreTests {
         #expect(brainState.memorySlices.contains(where: { $0.id == pendingTaggedCandidate.id }))
         #expect(!brainState.memorySlices.contains(where: { $0.id == screenedCandidate.id }))
         #expect(bootstrapped.dominantGoal == "prefer concise answers")
-        #expect(brainState.sessionBiases.contains("Name the active limit before reframing it."))
+        #expect(brainState.sessionBiases.contains("Name the active limit before reframing."))
         #expect(brainState.sessionBiases.contains(where: { $0.localizedCaseInsensitiveContains("lower-trust conditions") }))
     }
 
@@ -513,7 +535,7 @@ struct BASMemoryCognitionCoreTests {
 
         #expect(brainState.reactionWeights.interruptiveActionBias >= 0.85)
         #expect(brainState.reactionWeights.lowCognitiveLoad >= 0.85)
-        #expect(brainState.sessionBiases.contains("Prefer a regulating next step before deeper elaboration."))
+        #expect(brainState.sessionBiases.contains("Prefer a stabilizing next step before adding more detail."))
     }
 
     @Test("brain compiler preserves goal and support memory taxonomy")
@@ -627,6 +649,6 @@ struct BASMemoryCognitionCoreTests {
 
         #expect(brainState.sessionBiases.contains("Host says slow the impulse before analysis."))
         #expect(brainState.sessionBiases.contains("Host says route this through a holding lane."))
-        #expect(!brainState.sessionBiases.contains("Prefer a regulating next step before deeper elaboration."))
+        #expect(!brainState.sessionBiases.contains("Prefer a stabilizing next step before adding more detail."))
     }
 }

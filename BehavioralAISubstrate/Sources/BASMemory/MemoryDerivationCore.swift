@@ -230,7 +230,7 @@ public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
         primarySituational: BASSituationalDraftBehavior = BASSituationalDraftBehavior(
             draftID: "situational.primary.latest",
             topic: "recent_primary_workflow",
-            primaryHeadlinePrefix: "Recently carrying",
+            primaryHeadlinePrefix: "Recently holding",
             fallbackHeadlinePrefix: "Recently revisiting",
             provenanceSummary: "Candidate memory staged from the latest primary workflow.",
             baseTags: ["primary", "recent"]
@@ -238,14 +238,14 @@ public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
         comparativeSituational: BASSituationalDraftBehavior = BASSituationalDraftBehavior(
             draftID: "situational.comparative.latest",
             topic: "recent_comparative_workflow",
-            primaryHeadlinePrefix: "Recently weighing",
+            primaryHeadlinePrefix: "Recently comparing",
             provenanceSummary: "Candidate memory staged from the latest comparative workflow.",
             baseTags: ["comparative", "recent"]
         ),
         reflectiveSituational: BASSituationalDraftBehavior = BASSituationalDraftBehavior(
             draftID: "situational.reflective.latest",
             topic: "recent_reflective_workflow",
-            primaryHeadlinePrefix: "Recently noticing",
+            primaryHeadlinePrefix: "Recently reflecting on",
             provenanceSummary: "Candidate memory staged from the latest reflective workflow.",
             baseTags: ["reflective", "recent"]
         ),
@@ -253,7 +253,7 @@ public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
         reflectiveWorkspaceIDs: [String] = ["reflective"],
         supportActionsByID: [String: BASSupportActionDraftBehavior] = [:],
         fallbackSupportTags: [String] = ["action_support", "stabilizing_action"],
-        fallbackSupportProvenanceSummary: String = "Derived from repeated stabilizing actions in the host workflow."
+        fallbackSupportProvenanceSummary: String = "Derived from repeated stabilizing actions in the host runtime."
     ) {
         self.primarySituational = primarySituational
         self.comparativeSituational = comparativeSituational

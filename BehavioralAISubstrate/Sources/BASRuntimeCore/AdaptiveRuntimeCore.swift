@@ -6,8 +6,56 @@ public enum BASAdaptiveTraceKind: String, CaseIterable, Codable, Sendable {
     case mirror
     case reminder
 
+    public static let primaryID = "primary"
+    public static let comparativeID = "comparative"
+    public static let reflectiveID = "reflective"
+    public static let reminderID = "reminder"
+
+    public static var primary: Self { .quick }
+    public static var comparative: Self { .balance }
+    public static var reflective: Self { .mirror }
+
+    public var identifier: String {
+        switch self {
+        case .quick:
+            Self.primaryID
+        case .balance:
+            Self.comparativeID
+        case .mirror:
+            Self.reflectiveID
+        case .reminder:
+            Self.reminderID
+        }
+    }
+
+    public var legacyIdentifier: String { rawValue }
+
+    public init?(identifier: String) {
+        switch identifier {
+        case Self.primaryID, "quick":
+            self = .quick
+        case Self.comparativeID, "balance":
+            self = .balance
+        case Self.reflectiveID, "mirror":
+            self = .mirror
+        case Self.reminderID, "reminder":
+            self = .reminder
+        default:
+            return nil
+        }
+    }
+
     public var title: String {
-        rawValue.capitalized
+        switch self {
+        case .quick:
+            "Primary"
+        case .balance:
+            "Comparative"
+        case .mirror:
+            "Reflective"
+        case .reminder:
+            "Reminder"
+        }
     }
 }
 
