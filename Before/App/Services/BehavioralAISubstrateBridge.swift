@@ -138,6 +138,40 @@ enum BehavioralAISubstrateBridge {
     }
 
     @MainActor
+    static func activateQuickSessionHost(
+        _ session: QuickCheckSession,
+        preferences: BeforePreferences,
+        context: ModelContext,
+        cachedProjection: DecisionMemorySystem.BrainStateProjection?,
+        isProjectionDirty: Bool,
+        loadBrainState: (QuickCheckSession, CurrentBrainState) -> Void,
+        commitProjection: (DecisionMemorySystem.BrainStateProjection) -> Void,
+        setProjectionDirty: (Bool) -> Void,
+        publishNotice: (String) -> Void,
+        commitCurrentBrain: (CurrentBrainState) -> Void,
+        commitSession: (QuickCheckSession) -> Void,
+        now: Date = .now
+    ) {
+        BASAppleCurrentBrainHostStateExecutor.activateSession(
+            session: session,
+            outcome: activateQuickSession(
+                session,
+                preferences: preferences,
+                context: context,
+                cachedProjection: cachedProjection,
+                isProjectionDirty: isProjectionDirty,
+                now: now
+            ),
+            loadBrainState: loadBrainState,
+            commitProjection: commitProjection,
+            setProjectionDirty: setProjectionDirty,
+            publishNotice: publishNotice,
+            commitCurrentBrain: commitCurrentBrain,
+            commitSession: commitSession
+        )
+    }
+
+    @MainActor
     @discardableResult
     static func primeBalanceSession(
         _ session: BalanceBoardSession,
@@ -185,6 +219,40 @@ enum BehavioralAISubstrateBridge {
     }
 
     @MainActor
+    static func activateBalanceSessionHost(
+        _ session: BalanceBoardSession,
+        preferences: BeforePreferences,
+        context: ModelContext,
+        cachedProjection: DecisionMemorySystem.BrainStateProjection?,
+        isProjectionDirty: Bool,
+        loadBrainState: (BalanceBoardSession, CurrentBrainState) -> Void,
+        commitProjection: (DecisionMemorySystem.BrainStateProjection) -> Void,
+        setProjectionDirty: (Bool) -> Void,
+        publishNotice: (String) -> Void,
+        commitCurrentBrain: (CurrentBrainState) -> Void,
+        commitSession: (BalanceBoardSession) -> Void,
+        now: Date = .now
+    ) {
+        BASAppleCurrentBrainHostStateExecutor.activateSession(
+            session: session,
+            outcome: activateBalanceSession(
+                session,
+                preferences: preferences,
+                context: context,
+                cachedProjection: cachedProjection,
+                isProjectionDirty: isProjectionDirty,
+                now: now
+            ),
+            loadBrainState: loadBrainState,
+            commitProjection: commitProjection,
+            setProjectionDirty: setProjectionDirty,
+            publishNotice: publishNotice,
+            commitCurrentBrain: commitCurrentBrain,
+            commitSession: commitSession
+        )
+    }
+
+    @MainActor
     @discardableResult
     static func primeMirrorSession(
         _ session: MirrorWorkspaceSession,
@@ -229,6 +297,40 @@ enum BehavioralAISubstrateBridge {
                 now: now
             )
         }
+    }
+
+    @MainActor
+    static func activateMirrorSessionHost(
+        _ session: MirrorWorkspaceSession,
+        preferences: BeforePreferences,
+        context: ModelContext,
+        cachedProjection: DecisionMemorySystem.BrainStateProjection?,
+        isProjectionDirty: Bool,
+        loadBrainState: (MirrorWorkspaceSession, CurrentBrainState) -> Void,
+        commitProjection: (DecisionMemorySystem.BrainStateProjection) -> Void,
+        setProjectionDirty: (Bool) -> Void,
+        publishNotice: (String) -> Void,
+        commitCurrentBrain: (CurrentBrainState) -> Void,
+        commitSession: (MirrorWorkspaceSession) -> Void,
+        now: Date = .now
+    ) {
+        BASAppleCurrentBrainHostStateExecutor.activateSession(
+            session: session,
+            outcome: activateMirrorSession(
+                session,
+                preferences: preferences,
+                context: context,
+                cachedProjection: cachedProjection,
+                isProjectionDirty: isProjectionDirty,
+                now: now
+            ),
+            loadBrainState: loadBrainState,
+            commitProjection: commitProjection,
+            setProjectionDirty: setProjectionDirty,
+            publishNotice: publishNotice,
+            commitCurrentBrain: commitCurrentBrain,
+            commitSession: commitSession
+        )
     }
 
     @discardableResult
@@ -328,6 +430,43 @@ enum BehavioralAISubstrateBridge {
                 now: now
             )
         }
+    }
+
+    @MainActor
+    static func refreshCurrentBrainHostState(
+        activeQuickSession: QuickCheckSession?,
+        activeBalanceSession: BalanceBoardSession?,
+        activeMirrorSession: MirrorWorkspaceSession?,
+        taskGraph: DecisionTaskGraphSnapshot?,
+        preferences: BeforePreferences,
+        context: ModelContext,
+        cachedProjection: DecisionMemorySystem.BrainStateProjection?,
+        isProjectionDirty: Bool,
+        source: BrainStateUpdateSource,
+        commitProjection: (DecisionMemorySystem.BrainStateProjection) -> Void,
+        setProjectionDirty: (Bool) -> Void,
+        publishNotice: (String) -> Void,
+        commitCurrentBrain: (CurrentBrainState) -> Void,
+        now: Date = .now
+    ) {
+        BASAppleCurrentBrainHostStateExecutor.commitCurrentBrainProjection(
+            outcome: refreshCurrentBrainState(
+                activeQuickSession: activeQuickSession,
+                activeBalanceSession: activeBalanceSession,
+                activeMirrorSession: activeMirrorSession,
+                taskGraph: taskGraph,
+                preferences: preferences,
+                context: context,
+                cachedProjection: cachedProjection,
+                isProjectionDirty: isProjectionDirty,
+                source: source,
+                now: now
+            ),
+            commitProjection: commitProjection,
+            setProjectionDirty: setProjectionDirty,
+            publishNotice: publishNotice,
+            commitCurrentBrain: commitCurrentBrain
+        )
     }
 
     @discardableResult
@@ -1132,6 +1271,30 @@ enum BehavioralAISubstrateBridge {
                     notice: PersistenceIssueRecorder.latestNotice() ?? StateStorageIssueRecorder.latestNotice()
                 )
             }
+        )
+    }
+
+    static func refreshMemoryProjectionHostState(
+        force: Bool,
+        cachedProjection: DecisionMemorySystem.BrainStateProjection?,
+        isProjectionDirty: Bool,
+        context: ModelContext,
+        commitProjection: (DecisionMemorySystem.BrainStateProjection) -> Void,
+        setProjectionDirty: (Bool) -> Void,
+        publishNotice: (String) -> Void,
+        now: Date = .now
+    ) {
+        BASAppleCurrentBrainHostStateExecutor.commitProjectionRefresh(
+            outcome: resolveMemoryProjection(
+                force: force,
+                cachedProjection: cachedProjection,
+                isDirty: isProjectionDirty,
+                context: context,
+                now: now
+            ),
+            commitProjection: commitProjection,
+            setProjectionDirty: setProjectionDirty,
+            publishNotice: publishNotice
         )
     }
 
