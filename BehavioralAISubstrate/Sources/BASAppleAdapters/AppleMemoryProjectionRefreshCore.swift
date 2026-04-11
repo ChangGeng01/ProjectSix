@@ -171,6 +171,82 @@ public enum BASAppleMemoryProjectionRuntime {
         checkEventType: Event.Type,
         balanceRecordType: Balance.Type,
         mirrorRecordType: Mirror.Type,
+        rebuildEmbeddings: (
+            _ records: [Governed],
+            _ candidates: [Candidate],
+            _ checkEvents: [Event],
+            _ balanceRecords: [Balance],
+            _ mirrorRecords: [Mirror]
+        ) -> Void,
+        onSaveError: ((Error) -> Void)? = nil
+    ) -> BASAppleMemoryProjectionRefreshResult {
+        refresh(
+            in: context,
+            now: now,
+            limits: limits,
+            recordType: recordType,
+            candidateType: candidateType,
+            reminderType: reminderType,
+            checkEventType: checkEventType,
+            balanceRecordType: balanceRecordType,
+            mirrorRecordType: mirrorRecordType,
+            fetchRecords: {
+                BASAppleMemoryProjectionSelectionAdapter.fetchProjectionRecords(
+                    in: $0,
+                    recordType: recordType,
+                    limit: $1
+                )
+            },
+            fetchCandidates: {
+                BASAppleMemoryProjectionSelectionAdapter.fetchPendingProjectionCandidates(
+                    in: $0,
+                    candidateType: candidateType,
+                    limit: $1
+                )
+            },
+            fetchCheckEvents: {
+                BASAppleMemoryProjectionSelectionAdapter.fetchProjectionCheckEvents(
+                    in: $0,
+                    eventType: checkEventType,
+                    limit: $1
+                )
+            },
+            fetchBalanceRecords: {
+                BASAppleMemoryProjectionSelectionAdapter.fetchProjectionBalanceRecords(
+                    in: $0,
+                    balanceType: balanceRecordType,
+                    limit: $1
+                )
+            },
+            fetchMirrorRecords: {
+                BASAppleMemoryProjectionSelectionAdapter.fetchProjectionMirrorRecords(
+                    in: $0,
+                    mirrorType: mirrorRecordType,
+                    limit: $1
+                )
+            },
+            rebuildEmbeddings: rebuildEmbeddings,
+            onSaveError: onSaveError
+        )
+    }
+
+    public static func refresh<
+        Governed: BASAppleGovernedMemoryEntity,
+        Candidate: BASAppleCandidateMemoryEntity,
+        Reminder: BASAppleReminderMemoryEntity,
+        Event: BASAppleCheckEventMemoryEntity & BASAppleProjectionEventSource,
+        Balance: BASAppleBalanceMemoryEntity,
+        Mirror: BASAppleMirrorMemoryEntity
+    >(
+        in context: ModelContext,
+        now: Date,
+        limits: BASAppleMemoryProjectionRefreshLimits = .default,
+        recordType: Governed.Type,
+        candidateType: Candidate.Type,
+        reminderType: Reminder.Type,
+        checkEventType: Event.Type,
+        balanceRecordType: Balance.Type,
+        mirrorRecordType: Mirror.Type,
         fetchRecords: (ModelContext, Int) -> [Governed],
         fetchCandidates: (ModelContext, Int) -> [Candidate],
         fetchCheckEvents: (ModelContext, Int) -> [Event],

@@ -223,6 +223,37 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(request.now == now)
     }
 
+    @Test("brain state compiler keeps request defaults package-owned")
+    func currentBrainStateCompilerBuildsBrainStateFromProjection() {
+        let brainState = BASAppleCurrentBrainStateCompiler.brainState(
+            modeID: BASDecisionMode.quick.rawValue,
+            prompt: "Should I sleep on this?",
+            projection: BASBrainProjection(
+                records: [
+                    BASGovernedMemory(
+                        kind: .goal,
+                        content: "Protect sleep before midnight",
+                        scope: .user,
+                        sensitivity: .low,
+                        tier: .hot,
+                        confidence: 0.93,
+                        sourceType: "history",
+                        governanceStatus: .governed,
+                        provenanceSummary: "goal"
+                    )
+                ],
+                candidates: [],
+                recentEvents: []
+            ),
+            retrievalMode: "filtered",
+            preferredLanguages: ["en-AU"],
+            now: Date(timeIntervalSince1970: 1_744_322_120)
+        )
+
+        #expect(brainState.activeGoals.contains { $0.contains("Protect sleep before midnight") })
+        #expect(brainState.retrievalTags.contains("lang:english"))
+    }
+
     @Test("runtime coordinator bootstraps and commits current brain state in one package-owned flow")
     func runtimeCoordinatorBootstrapsAndCommits() throws {
         let now = Date(timeIntervalSince1970: 1_744_322_220)

@@ -204,6 +204,77 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
         }
     }
 
+    @Model
+    final class SelectionCheckEventFixture: BASAppleCheckEventMemoryEntity {
+        @Attribute(.unique) var modelID: UUID
+        var createdAt: Date
+        var id: String
+
+        init(id: String, createdAt: Date) {
+            modelID = UUID()
+            self.id = id
+            self.createdAt = createdAt
+        }
+
+        var basCheckEventMemoryInput: BASCheckEventMemoryInput {
+            BASCheckEventMemoryInput(
+                id: id,
+                scenarioID: "buy",
+                scenarioTitle: "Impulse buy",
+                actionID: "wait90s",
+                actionTitle: "Wait 90 Seconds",
+                note: id,
+                createdAt: createdAt
+            )
+        }
+    }
+
+    @Model
+    final class SelectionBalanceFixture: BASAppleBalanceMemoryEntity {
+        @Attribute(.unique) var id: UUID
+        var updatedAt: Date
+        var prompt: String
+        var longTerm: String
+
+        init(prompt: String, updatedAt: Date) {
+            id = UUID()
+            self.prompt = prompt
+            longTerm = ""
+            self.updatedAt = updatedAt
+        }
+
+        var basBalanceMemoryInput: BASBalanceMemoryInput {
+            BASBalanceMemoryInput(
+                prompt: prompt,
+                longTerm: longTerm,
+                updatedAt: updatedAt
+            )
+        }
+    }
+
+    @Model
+    final class SelectionMirrorFixture: BASAppleMirrorMemoryEntity {
+        @Attribute(.unique) var id: UUID
+        var updatedAt: Date
+        var prompt: String
+        var longTerm: String
+
+        init(prompt: String, updatedAt: Date) {
+            id = UUID()
+            self.prompt = prompt
+            longTerm = ""
+            self.updatedAt = updatedAt
+        }
+
+        var basMirrorMemoryInput: BASMirrorMemoryInput {
+            BASMirrorMemoryInput(
+                prompt: prompt,
+                longTerm: longTerm,
+                updatedAt: updatedAt
+            )
+        }
+    }
+
     @Test("governance snapshot counts candidate status and governance categories")
     func governanceSnapshotCountsStatuses() throws {
         let context = try makeContext()
@@ -254,10 +325,43 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
         #expect(candidates.map(\.basID) == ["candidate-a", "candidate-b"])
     }
 
+    @Test("event and workspace fetch adapters keep newest-first canonical ordering")
+    func eventAndWorkspaceFetchAdaptersPreserveOrdering() throws {
+        let now = Date(timeIntervalSinceReferenceDate: 1_000)
+        let context = try makeContext()
+        context.insert(SelectionCheckEventFixture(id: "check-b", createdAt: now.addingTimeInterval(-10)))
+        context.insert(SelectionCheckEventFixture(id: "check-a", createdAt: now))
+        context.insert(SelectionBalanceFixture(prompt: "balance-b", updatedAt: now.addingTimeInterval(-10)))
+        context.insert(SelectionBalanceFixture(prompt: "balance-a", updatedAt: now))
+        context.insert(SelectionMirrorFixture(prompt: "mirror-b", updatedAt: now.addingTimeInterval(-10)))
+        context.insert(SelectionMirrorFixture(prompt: "mirror-a", updatedAt: now))
+        try context.save()
+
+        let checks = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionCheckEvents(
+            in: context,
+            eventType: SelectionCheckEventFixture.self
+        )
+        let balances = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionBalanceRecords(
+            in: context,
+            balanceType: SelectionBalanceFixture.self
+        )
+        let mirrors = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionMirrorRecords(
+            in: context,
+            mirrorType: SelectionMirrorFixture.self
+        )
+
+        #expect(checks.map(\.id) == ["check-a", "check-b"])
+        #expect(balances.map(\.prompt) == ["balance-a", "balance-b"])
+        #expect(mirrors.map(\.prompt) == ["mirror-a", "mirror-b"])
+    }
+
     private func makeContext() throws -> ModelContext {
         let schema = Schema([
             GovernedFixture.self,
-            CandidateFixture.self
+            CandidateFixture.self,
+            SelectionCheckEventFixture.self,
+            SelectionBalanceFixture.self,
+            SelectionMirrorFixture.self
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: configuration)

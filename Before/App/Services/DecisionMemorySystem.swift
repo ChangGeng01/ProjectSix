@@ -47,23 +47,6 @@ enum DecisionMemorySystem {
             checkEventType: CheckEvent.self,
             balanceRecordType: BalanceDecisionRecord.self,
             mirrorRecordType: MirrorDecisionRecord.self,
-            fetchRecords: {
-                BASAppleMemoryProjectionSelectionAdapter.fetchProjectionRecords(
-                    in: $0,
-                    recordType: DecisionMemoryRecord.self,
-                    limit: $1
-                )
-            },
-            fetchCandidates: {
-                BASAppleMemoryProjectionSelectionAdapter.fetchPendingProjectionCandidates(
-                    in: $0,
-                    candidateType: DecisionMemoryCandidateRecord.self,
-                    limit: $1
-                )
-            },
-            fetchCheckEvents: { fetchCheckEvents(in: $0, limit: $1) },
-            fetchBalanceRecords: { fetchBalanceRecords(in: $0, limit: $1) },
-            fetchMirrorRecords: { fetchMirrorRecords(in: $0, limit: $1) },
             rebuildEmbeddings: { records, candidates, checkEvents, balanceRecords, mirrorRecords in
                 EmbeddingMemoryStore.rebuildIndex(
                     records: records,
@@ -105,20 +88,17 @@ enum DecisionMemorySystem {
         retrievalMode: DecisionRetrievalMode = .filtered,
         now: Date = .now
     ) -> DecisionBrainState {
-        let request = BASAppleBrainBootstrapRequestAdapter.request(
+        BASAppleCurrentBrainStateCompiler.brainState(
             modeID: mode.rawValue,
             prompt: prompt,
+            projection: projection.baseProjection,
+            retrievalMode: retrievalMode.rawValue,
             triggerID: BrainStateUpdateSource.sessionPrime.rawValue,
             sourceSurfaceOverrideID: DecisionIntentSourceSurface.app.rawValue,
             riskLevelOverrideID: InterventionRiskLevel.low.rawValue,
             preferredLanguages: Locale.preferredLanguages,
-            now: now,
-            retrievalMode: retrievalMode.rawValue
+            now: now
         )
-        return BASAppleBrainBootstrapRuntime.bootstrap(
-            request: request,
-            projection: projection.baseProjection
-        ).brainState
     }
 
     static func fetchMemoryRecords(
@@ -147,33 +127,33 @@ enum DecisionMemorySystem {
         in context: ModelContext,
         limit: Int = projectionCheckEventLimit
     ) -> [CheckEvent] {
-        var descriptor = FetchDescriptor<CheckEvent>(
-            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        BASAppleMemoryProjectionSelectionAdapter.fetchProjectionCheckEvents(
+            in: context,
+            eventType: CheckEvent.self,
+            limit: limit
         )
-        descriptor.fetchLimit = limit
-        return (try? context.fetch(descriptor)) ?? []
     }
 
     static func fetchBalanceRecords(
         in context: ModelContext,
         limit: Int = BASAppleMemoryProjectionRefreshLimits.default.balanceRecordLimit
     ) -> [BalanceDecisionRecord] {
-        var descriptor = FetchDescriptor<BalanceDecisionRecord>(
-            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+        BASAppleMemoryProjectionSelectionAdapter.fetchProjectionBalanceRecords(
+            in: context,
+            balanceType: BalanceDecisionRecord.self,
+            limit: limit
         )
-        descriptor.fetchLimit = limit
-        return (try? context.fetch(descriptor)) ?? []
     }
 
     static func fetchMirrorRecords(
         in context: ModelContext,
         limit: Int = BASAppleMemoryProjectionRefreshLimits.default.mirrorRecordLimit
     ) -> [MirrorDecisionRecord] {
-        var descriptor = FetchDescriptor<MirrorDecisionRecord>(
-            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+        BASAppleMemoryProjectionSelectionAdapter.fetchProjectionMirrorRecords(
+            in: context,
+            mirrorType: MirrorDecisionRecord.self,
+            limit: limit
         )
-        descriptor.fetchLimit = limit
-        return (try? context.fetch(descriptor)) ?? []
     }
 
 }

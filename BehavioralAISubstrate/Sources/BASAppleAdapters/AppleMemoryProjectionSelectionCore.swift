@@ -71,4 +71,52 @@ public enum BASAppleMemoryProjectionSelectionAdapter {
         guard let limit else { return candidates }
         return Array(candidates.prefix(limit))
     }
+
+    public static func fetchProjectionCheckEvents<Event: BASAppleCheckEventMemoryEntity>(
+        in context: ModelContext,
+        eventType: Event.Type,
+        limit: Int? = nil
+    ) -> [Event] {
+        let events = ((try? context.fetch(FetchDescriptor<Event>())) ?? [])
+            .sorted { lhs, rhs in
+                if lhs.basCheckEventMemoryInput.createdAt == rhs.basCheckEventMemoryInput.createdAt {
+                    return lhs.persistentModelID.hashValue < rhs.persistentModelID.hashValue
+                }
+                return lhs.basCheckEventMemoryInput.createdAt > rhs.basCheckEventMemoryInput.createdAt
+            }
+        guard let limit else { return events }
+        return Array(events.prefix(limit))
+    }
+
+    public static func fetchProjectionBalanceRecords<Balance: BASAppleBalanceMemoryEntity>(
+        in context: ModelContext,
+        balanceType: Balance.Type,
+        limit: Int? = nil
+    ) -> [Balance] {
+        let records = ((try? context.fetch(FetchDescriptor<Balance>())) ?? [])
+            .sorted { lhs, rhs in
+                if lhs.basBalanceMemoryInput.updatedAt == rhs.basBalanceMemoryInput.updatedAt {
+                    return lhs.persistentModelID.hashValue < rhs.persistentModelID.hashValue
+                }
+                return lhs.basBalanceMemoryInput.updatedAt > rhs.basBalanceMemoryInput.updatedAt
+            }
+        guard let limit else { return records }
+        return Array(records.prefix(limit))
+    }
+
+    public static func fetchProjectionMirrorRecords<Mirror: BASAppleMirrorMemoryEntity>(
+        in context: ModelContext,
+        mirrorType: Mirror.Type,
+        limit: Int? = nil
+    ) -> [Mirror] {
+        let records = ((try? context.fetch(FetchDescriptor<Mirror>())) ?? [])
+            .sorted { lhs, rhs in
+                if lhs.basMirrorMemoryInput.updatedAt == rhs.basMirrorMemoryInput.updatedAt {
+                    return lhs.persistentModelID.hashValue < rhs.persistentModelID.hashValue
+                }
+                return lhs.basMirrorMemoryInput.updatedAt > rhs.basMirrorMemoryInput.updatedAt
+            }
+        guard let limit else { return records }
+        return Array(records.prefix(limit))
+    }
 }

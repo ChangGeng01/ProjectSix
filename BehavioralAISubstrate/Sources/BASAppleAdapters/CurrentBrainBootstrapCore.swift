@@ -611,6 +611,35 @@ public enum BASAppleBrainBootstrapRuntime {
     }
 }
 
+public enum BASAppleCurrentBrainStateCompiler {
+    public static func brainState(
+        modeID: String,
+        prompt: String,
+        projection: BASBrainProjection,
+        retrievalMode: String,
+        triggerID: String = BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue,
+        sourceSurfaceOverrideID: String? = BASInteractionSurface.app.rawValue,
+        riskLevelOverrideID: String? = BASRiskLevel.low.rawValue,
+        preferredLanguages: [String] = [],
+        now: Date = .now
+    ) -> BASDecisionBrainState {
+        let request = BASAppleBrainBootstrapRequestAdapter.request(
+            modeID: modeID,
+            prompt: prompt,
+            triggerID: triggerID,
+            sourceSurfaceOverrideID: sourceSurfaceOverrideID,
+            riskLevelOverrideID: riskLevelOverrideID,
+            preferredLanguages: preferredLanguages,
+            now: now,
+            retrievalMode: retrievalMode
+        )
+        return BASAppleBrainBootstrapRuntime.bootstrap(
+            request: request,
+            projection: projection
+        ).brainState
+    }
+}
+
 public enum BASAppleCurrentBrainBootstrapPlanner {
     public static func request(
         from input: BASAppleCurrentBrainBootstrapPlanningSourceInput
