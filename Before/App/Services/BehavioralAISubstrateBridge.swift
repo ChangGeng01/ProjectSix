@@ -23,11 +23,11 @@ enum BehavioralAISubstrateBridge {
         InterventionTemplateStore.ensureDefaults(in: context)
         FailurePatternStore.syncFromHistory(in: context)
 
-        let committed: BASAppleCurrentBrainBootstrapCommitResult<
+        let committed: BASAppleCurrentBrainBootstrapBridgeResult<
             BrainStateUpdate,
             DecisionEvolutionCheckpoint
-        > = BASAppleCurrentBrainRuntimeCoordinator.bootstrapAndCommit(
-            context: BASAppleCurrentBrainBootstrapHostInputBuilder.context(
+        > = BASAppleCurrentBrainBootstrapBridgeBuilder.bootstrapAndCommit(
+            input: BASAppleCurrentBrainBootstrapBridgeInput(
                 modeID: mode.rawValue,
                 prompt: prompt,
                 triggerID: source.rawValue,
@@ -37,17 +37,11 @@ enum BehavioralAISubstrateBridge {
                 now: now,
                 projection: projection.baseProjection,
                 embeddingScores: embeddingScores(for: prompt),
-                taskGraph: taskGraph,
-                headline: \.nextActionHint,
-                activeNodeCount: { snapshot in
-                    snapshot.tasks.filter { $0.status != .completed }.count
-                },
-                hasResumeCandidate: { snapshot in
-                    !snapshot.tasks.isEmpty
-                },
-                resumeHint: \.nextActionHint,
-                retrievalMode: retrievalMode.rawValue,
-                recommendedTemplateIDs: []
+                taskGraphHeadline: taskGraph?.nextActionHint,
+                taskGraphActiveNodeCount: taskGraph?.tasks.filter { $0.status != .completed }.count,
+                taskGraphHasResumeCandidate: taskGraph.map { !$0.tasks.isEmpty },
+                taskGraphResumeHint: taskGraph?.nextActionHint,
+                retrievalMode: retrievalMode.rawValue
             ),
             in: context,
             createdAt: now,
@@ -56,8 +50,8 @@ enum BehavioralAISubstrateBridge {
             recommendTemplateIDs: { preparation in
                 DecisionReactionBanditStore.recommendedArmIDs(
                     mode: mode,
-                    riskLevel: interventionRiskLevel(from: preparation.riskLevel),
-                    languageMode: decisionLanguageMode(from: preparation.languageMode),
+                    riskLevel: InterventionRiskLevel(rawValue: preparation.riskLevel.rawValue) ?? .low,
+                    languageMode: DecisionLanguageMode(rawValue: preparation.languageMode.rawValue) ?? .unknown,
                     now: preparation.now
                 )
             },
@@ -65,7 +59,7 @@ enum BehavioralAISubstrateBridge {
                 InterventionTemplateStore.selectTemplates(
                     in: context,
                     mode: mode,
-                    riskLevel: interventionRiskLevel(from: preparation.riskLevel),
+                    riskLevel: InterventionRiskLevel(rawValue: preparation.riskLevel.rawValue) ?? .low,
                     recommendedArmIDs: recommendedTemplateIDs
                 )
             },
@@ -107,15 +101,15 @@ enum BehavioralAISubstrateBridge {
 
         return CurrentBrainState(
             source: source,
-            sourceSurface: sourceSurface(from: committed.preparation.sourceSurface),
+            sourceSurface: DecisionIntentSourceSurface(rawValue: committed.sourceSurfaceID) ?? .app,
             mode: mode,
-            riskLevel: interventionRiskLevel(from: committed.preparation.riskLevel),
+            riskLevel: InterventionRiskLevel(rawValue: committed.riskLevelID) ?? .low,
             taskGraph: taskGraph,
             brainState: committed.brainState,
             dominantGoal: committed.dominantGoal,
             activeConstraints: committed.activeConstraints,
-            activeTemplateIDs: committed.orderedTemplateIDs,
-            failureGuardIDs: committed.orderedFailurePatternIDs,
+            activeTemplateIDs: committed.activeTemplateIDs,
+            failureGuardIDs: committed.failureGuardIDs,
             sourceIntentEnvelope: envelope,
             loadedAt: now
         )
@@ -271,53 +265,6 @@ enum BehavioralAISubstrateBridge {
             failureGuardIDs: failureGuardIDs,
             now: now
         )
-    }
-
-    private static func interventionRiskLevel(
-        from riskLevel: BASRiskLevel
-    ) -> InterventionRiskLevel {
-        switch riskLevel {
-        case .low:
-            .low
-        case .medium:
-            .medium
-        case .high:
-            .high
-        }
-    }
-
-    private static func sourceSurface(
-        from sourceSurface: BASInteractionSurface
-    ) -> DecisionIntentSourceSurface {
-        switch sourceSurface {
-        case .app, .system:
-            .app
-        case .watch:
-            .watch
-        case .widget:
-            .widget
-        case .shortcut:
-            .shortcut
-        case .siri:
-            .siri
-        case .notification:
-            .notification
-        }
-    }
-
-    private static func decisionLanguageMode(
-        from languageMode: BASLanguageMode
-    ) -> DecisionLanguageMode {
-        switch languageMode {
-        case .english:
-            .english
-        case .chinese:
-            .chinese
-        case .mixed:
-            .mixed
-        case .unknown:
-            .unknown
-        }
     }
 
     private static func currentRiskBand(in export: DecisionTestingRuntimeExport) -> InterventionRiskLevel {

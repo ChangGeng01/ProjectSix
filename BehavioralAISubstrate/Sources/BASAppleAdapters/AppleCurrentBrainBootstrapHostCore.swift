@@ -411,6 +411,171 @@ public struct BASAppleCurrentBrainBootstrapCommitResult<
     }
 }
 
+public struct BASAppleCurrentBrainBootstrapBridgeInput: Codable, Equatable, Sendable {
+    public var modeID: String
+    public var prompt: String
+    public var triggerID: String
+    public var sourceSurfaceOverrideID: String?
+    public var riskLevelOverrideID: String?
+    public var preferredLanguages: [String]
+    public var now: Date
+    public var projection: BASBrainProjection
+    public var embeddingScores: [BASAppleEmbeddingScoreInput]
+    public var taskGraphHeadline: String?
+    public var taskGraphActiveNodeCount: Int?
+    public var taskGraphHasResumeCandidate: Bool?
+    public var taskGraphResumeHint: String?
+    public var retrievalMode: String
+
+    public init(
+        modeID: String,
+        prompt: String,
+        triggerID: String,
+        sourceSurfaceOverrideID: String? = nil,
+        riskLevelOverrideID: String? = nil,
+        preferredLanguages: [String] = [],
+        now: Date = .now,
+        projection: BASBrainProjection,
+        embeddingScores: [BASAppleEmbeddingScoreInput] = [],
+        taskGraphHeadline: String? = nil,
+        taskGraphActiveNodeCount: Int? = nil,
+        taskGraphHasResumeCandidate: Bool? = nil,
+        taskGraphResumeHint: String? = nil,
+        retrievalMode: String
+    ) {
+        self.modeID = modeID
+        self.prompt = prompt
+        self.triggerID = triggerID
+        self.sourceSurfaceOverrideID = sourceSurfaceOverrideID
+        self.riskLevelOverrideID = riskLevelOverrideID
+        self.preferredLanguages = preferredLanguages
+        self.now = now
+        self.projection = projection
+        self.embeddingScores = embeddingScores
+        self.taskGraphHeadline = taskGraphHeadline
+        self.taskGraphActiveNodeCount = taskGraphActiveNodeCount
+        self.taskGraphHasResumeCandidate = taskGraphHasResumeCandidate
+        self.taskGraphResumeHint = taskGraphResumeHint
+        self.retrievalMode = retrievalMode
+    }
+}
+
+public struct BASAppleCurrentBrainBootstrapBridgeResult<
+    Update: BASAppleCurrentBrainUpdateEntity,
+    Checkpoint: BASAppleEvolutionCheckpointEntity
+> {
+    public var sourceSurfaceID: String
+    public var riskLevelID: String
+    public var brainState: BASDecisionBrainState
+    public var dominantGoal: String?
+    public var activeConstraints: [String]
+    public var activeTemplateIDs: [String]
+    public var failureGuardIDs: [String]
+    public var commit: BASAppleCurrentBrainCommitWriteResult<Update, Checkpoint>
+
+    public init(
+        sourceSurfaceID: String,
+        riskLevelID: String,
+        brainState: BASDecisionBrainState,
+        dominantGoal: String?,
+        activeConstraints: [String],
+        activeTemplateIDs: [String],
+        failureGuardIDs: [String],
+        commit: BASAppleCurrentBrainCommitWriteResult<Update, Checkpoint>
+    ) {
+        self.sourceSurfaceID = sourceSurfaceID
+        self.riskLevelID = riskLevelID
+        self.brainState = brainState
+        self.dominantGoal = dominantGoal
+        self.activeConstraints = activeConstraints
+        self.activeTemplateIDs = activeTemplateIDs
+        self.failureGuardIDs = failureGuardIDs
+        self.commit = commit
+    }
+}
+
+public enum BASAppleCurrentBrainBootstrapBridgeBuilder {
+    public static func bootstrapAndCommit<
+        Template,
+        FailurePattern,
+        Update: BASAppleCurrentBrainUpdateEntity,
+        Checkpoint: BASAppleEvolutionCheckpointEntity
+    >(
+        input: BASAppleCurrentBrainBootstrapBridgeInput,
+        in modelContext: ModelContext,
+        createdAt: Date = .now,
+        checkpointLimit: Int = BASEvolutionCheckpointPlanner.defaultCheckpointLimit,
+        checkpointRetentionInterval: TimeInterval = BASEvolutionCheckpointPlanner.defaultRetentionInterval,
+        recommendTemplateIDs: (BASCurrentBrainBootstrapPreparation) -> [String],
+        selectTemplates: (BASCurrentBrainBootstrapPreparation, [String]) -> [Template],
+        selectFailurePatterns: (BASCurrentBrainBootstrapPreparation) -> [FailurePattern],
+        mapTemplate: (Template) -> BASAppleCurrentBrainBootstrapHostTemplateInput,
+        mapFailurePattern: (FailurePattern) -> BASAppleCurrentBrainBootstrapHostFailurePatternInput,
+        onCheckpointSaveError: ((Error) -> Void)? = nil,
+        onUpdateSaveError: ((Error) -> Void)? = nil
+    ) -> BASAppleCurrentBrainBootstrapBridgeResult<Update, Checkpoint> {
+        let context = BASAppleCurrentBrainBootstrapHostBuildContext(
+            modeID: input.modeID,
+            prompt: input.prompt,
+            triggerID: input.triggerID,
+            sourceSurfaceOverrideID: input.sourceSurfaceOverrideID,
+            riskLevelOverrideID: input.riskLevelOverrideID,
+            preferredLanguages: input.preferredLanguages,
+            now: input.now,
+            projection: input.projection,
+            embeddingScores: input.embeddingScores,
+            taskGraphHint: taskGraphHint(from: input),
+            retrievalMode: input.retrievalMode
+        )
+
+        let committed: BASAppleCurrentBrainBootstrapCommitResult<Update, Checkpoint> =
+            BASAppleCurrentBrainRuntimeCoordinator.bootstrapAndCommit(
+                context: context,
+                in: modelContext,
+                createdAt: createdAt,
+                checkpointLimit: checkpointLimit,
+                checkpointRetentionInterval: checkpointRetentionInterval,
+                recommendTemplateIDs: recommendTemplateIDs,
+                selectTemplates: selectTemplates,
+                selectFailurePatterns: selectFailurePatterns,
+                mapTemplate: mapTemplate,
+                mapFailurePattern: mapFailurePattern,
+                onCheckpointSaveError: onCheckpointSaveError,
+                onUpdateSaveError: onUpdateSaveError
+            )
+
+        return BASAppleCurrentBrainBootstrapBridgeResult(
+            sourceSurfaceID: committed.preparation.sourceSurface.rawValue,
+            riskLevelID: committed.preparation.riskLevel.rawValue,
+            brainState: committed.brainState,
+            dominantGoal: committed.dominantGoal,
+            activeConstraints: committed.activeConstraints,
+            activeTemplateIDs: committed.orderedTemplateIDs,
+            failureGuardIDs: committed.orderedFailurePatternIDs,
+            commit: committed.commit
+        )
+    }
+
+    private static func taskGraphHint(
+        from input: BASAppleCurrentBrainBootstrapBridgeInput
+    ) -> BASAppleCurrentBrainBootstrapHostTaskGraphInput? {
+        guard input.taskGraphHeadline != nil ||
+                input.taskGraphActiveNodeCount != nil ||
+                input.taskGraphHasResumeCandidate != nil ||
+                input.taskGraphResumeHint != nil
+        else {
+            return nil
+        }
+
+        return BASAppleCurrentBrainBootstrapHostInputBuilder.taskGraphInput(
+            headline: input.taskGraphHeadline,
+            activeNodeCount: input.taskGraphActiveNodeCount ?? 0,
+            hasResumeCandidate: input.taskGraphHasResumeCandidate ?? false,
+            resumeHint: input.taskGraphResumeHint
+        )
+    }
+}
+
 public enum BASAppleCurrentBrainRuntimeCoordinator {
     public static func bootstrapAndCommit<
         Template,

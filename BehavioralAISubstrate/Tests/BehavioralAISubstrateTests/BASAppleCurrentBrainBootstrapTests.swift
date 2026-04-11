@@ -344,6 +344,94 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(result.commit.orderedCheckpoints.count == 1)
     }
 
+    @Test("bridge builder compacts host bootstrap orchestration into raw package output")
+    func bridgeBuilderBootstrapsAndCommitsRawHostOutput() throws {
+        let now = Date(timeIntervalSince1970: 1_744_322_260)
+        let container = try ModelContainer(
+            for: UpdateFixture.self,
+            CheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+
+        let result: BASAppleCurrentBrainBootstrapBridgeResult<UpdateFixture, CheckpointFixture> =
+            BASAppleCurrentBrainBootstrapBridgeBuilder.bootstrapAndCommit(
+                input: BASAppleCurrentBrainBootstrapBridgeInput(
+                    modeID: BASDecisionMode.quick.rawValue,
+                    prompt: "Should I send this tonight?",
+                    triggerID: BASCurrentBrainBootstrapTrigger.notification.rawValue,
+                    sourceSurfaceOverrideID: BASInteractionSurface.notification.rawValue,
+                    riskLevelOverrideID: BASRiskLevel.high.rawValue,
+                    preferredLanguages: ["en-AU"],
+                    now: now,
+                    projection: BASBrainProjection(
+                        records: [
+                            BASGovernedMemory(
+                                kind: .goal,
+                                content: "Protect sleep before midnight",
+                                scope: .user,
+                                sensitivity: .low,
+                                tier: .hot,
+                                confidence: 0.94,
+                                sourceType: "history",
+                                governanceStatus: .governed,
+                                provenanceSummary: "goal"
+                            )
+                        ],
+                        candidates: [],
+                        recentEvents: []
+                    ),
+                    embeddingScores: [
+                        BASAppleEmbeddingScoreInput(id: "goal-1", score: 0.9)
+                    ],
+                    taskGraphHeadline: "Pause before sending.",
+                    taskGraphActiveNodeCount: 1,
+                    taskGraphHasResumeCandidate: true,
+                    taskGraphResumeHint: "Sleep on it.",
+                    retrievalMode: "filtered"
+                ),
+                in: context,
+                createdAt: now,
+                checkpointLimit: 4,
+                checkpointRetentionInterval: 60 * 60,
+                recommendTemplateIDs: { _ in ["night_message_cooling"] },
+                selectTemplates: { _, _ in
+                    [
+                        BASAppleCurrentBrainBootstrapHostTemplateInput(
+                            id: "night_message_cooling",
+                            modeID: BASDecisionMode.quick.rawValue,
+                            riskLevelID: BASRiskLevel.high.rawValue,
+                            isPinned: true,
+                            successCount: 3,
+                            updatedAt: now
+                        )
+                    ]
+                },
+                selectFailurePatterns: { _ in
+                    [
+                        BASAppleCurrentBrainBootstrapHostFailurePatternInput(
+                            id: "night_fast_path_failure",
+                            modeID: BASDecisionMode.quick.rawValue,
+                            suppressionWeight: 0.9,
+                            evidenceCount: 2,
+                            updatedAt: now
+                        )
+                    ]
+                },
+                mapTemplate: { $0 },
+                mapFailurePattern: { $0 }
+            )
+
+        #expect(result.sourceSurfaceID == BASInteractionSurface.notification.rawValue)
+        #expect(result.riskLevelID == BASRiskLevel.high.rawValue)
+        #expect(result.dominantGoal == "Protect sleep before midnight")
+        #expect(result.activeTemplateIDs == ["night_message_cooling"])
+        #expect(result.failureGuardIDs == ["night_fast_path_failure"])
+        #expect(result.commit.wroteCheckpoint)
+        #expect(result.commit.orderedUpdates.count == 1)
+        #expect(result.commit.orderedCheckpoints.count == 1)
+    }
+
     @Test("prepare resolves default surface, language mode, memory source, and risk overrides")
     func prepareResolvesBootstrapInputs() {
         var components = DateComponents()
