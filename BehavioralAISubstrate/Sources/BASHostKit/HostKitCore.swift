@@ -219,6 +219,48 @@ public struct BASHostRuntime: Sendable {
         self.dependencies = dependencies
     }
 
+    public func executeLifecyclePhase<Envelope, PendingRequest>(
+        _ phase: BASHostLifecyclePhase,
+        refreshMemoryProjection: () -> Void,
+        refreshCurrentBrain: (String) -> Void,
+        presentPendingReflection: () -> Void,
+        consumeHandoff: () -> Envelope?,
+        handleHandoff: (Envelope) -> Void,
+        consumePendingRequest: () -> PendingRequest?,
+        handlePendingRequest: (PendingRequest) -> Void,
+        restoreActiveWorkspace: () -> Void,
+        refreshPredictedIntervention: () -> Void,
+        syncWidgetSnapshot: () -> Void = {}
+    ) {
+        BASAppleAppLifecycleOrchestrationExecutor.execute(
+            phase: phase.bootstrapPhase,
+            refreshMemoryProjection: refreshMemoryProjection,
+            refreshCurrentBrain: refreshCurrentBrain,
+            presentPendingReflection: presentPendingReflection,
+            consumeHandoff: consumeHandoff,
+            handleHandoff: handleHandoff,
+            consumePendingRequest: consumePendingRequest,
+            handlePendingRequest: handlePendingRequest,
+            restoreActiveWorkspace: restoreActiveWorkspace,
+            refreshPredictedIntervention: refreshPredictedIntervention,
+            syncWidgetSnapshot: syncWidgetSnapshot
+        )
+    }
+
+    public func consumeLifecycleEntriesIfNeeded<Envelope, PendingRequest>(
+        consumeHandoff: () -> Envelope?,
+        handleHandoff: (Envelope) -> Void,
+        consumePendingRequest: () -> PendingRequest?,
+        handlePendingRequest: (PendingRequest) -> Void
+    ) {
+        BASAppleAppLifecycleOrchestrationExecutor.consumeEntriesIfNeeded(
+            consumeHandoff: consumeHandoff,
+            handleHandoff: handleHandoff,
+            consumePendingRequest: consumePendingRequest,
+            handlePendingRequest: handlePendingRequest
+        )
+    }
+
     public func bootstrap(
         _ request: BASHostLifecycleRequest,
         now: Date = .now

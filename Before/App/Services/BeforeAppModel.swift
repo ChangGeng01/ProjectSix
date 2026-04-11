@@ -29,6 +29,7 @@ final class BeforeAppModel: ObservableObject {
     let modelContainer: ModelContainer
     let supportInbox: SupportInboxStore
     let sharedLifeStore: SharedLifeStore
+    private let hostRuntime = BASHostRuntime()
     private var memoryProjection: DecisionMemorySystem.BrainStateProjection?
     private var isMemoryProjectionDirty = true
     private var shouldPromptReflectionAfterBackground = false
@@ -190,37 +191,73 @@ final class BeforeAppModel: ObservableObject {
         _ phase: BASAppleLifecycleBootstrapPhase,
         syncWidgetSnapshot shouldSyncWidgetSnapshot: Bool = false
     ) {
-        BehavioralAISubstrateBridge.executeAppLifecyclePhase(
-            phase,
+        hostRuntime.executeLifecyclePhase(
+            phase == .initialAppearance ? .initialAppearance : .sceneActive,
             refreshMemoryProjection: { refreshDecisionMemoryStore() },
-            refreshCurrentBrain: { source in
-                refreshGlobalBrainState(source: source)
+            refreshCurrentBrain: { triggerID in
+                refreshGlobalBrainState(
+                    source: BrainStateUpdateSource(rawValue: triggerID) ?? .explicitRefresh
+                )
             },
             presentPendingReflection: { presentPendingReflectionIfNeeded() },
             consumeHandoff: { WatchHandoffCoordinator.consume() },
+            handleHandoff: { envelope in
+                BehavioralAISubstrateBridge.consumeDecisionIntentEnvelope(
+                    envelope,
+                    performQuickCapture: { envelope, scenario, prompt in
+                        startQuickCheck(
+                            entrySource: envelope.entrySource,
+                            scenario: scenario,
+                            prompt: prompt
+                        )
+                    },
+                    performOpenMode: { envelope, mode, shouldSelectBoxTab, prompt in
+                        if shouldSelectBoxTab {
+                            selectedTab = .box
+                        }
+                        startDecisionMode(
+                            mode,
+                            entrySource: envelope.entrySource,
+                            prompt: prompt
+                        )
+                    },
+                    performPredictiveIntervention: { suggestion in
+                        interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
+                    },
+                    performRestoreWorkspace: { restoreActiveWorkspaceIfNeeded() },
+                    refreshCurrentBrain: { source in
+                        refreshGlobalBrainState(source: source)
+                    }
+                )
+            },
             consumePendingRequest: { PendingLaunchRequestStore.consume() },
-            performQuickCapture: { entrySource, scenario, prompt in
-                startQuickCheck(
-                    entrySource: entrySource,
-                    scenario: scenario,
-                    prompt: prompt
+            handlePendingRequest: { request in
+                BASApplePendingLaunchRuntimeExecutor.execute(
+                    input: BASApplePendingLaunchRuntimeInput(
+                        preferredModeID: request.preferredModeRaw,
+                        scenarioID: request.scenarioRaw,
+                        promptSeed: request.prompt
+                    ),
+                    performQuickCapture: { plan in
+                        startQuickCheck(
+                            entrySource: request.entrySource,
+                            scenario: plan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
+                            prompt: plan.promptSeed
+                        )
+                    },
+                    performOpenMode: { plan in
+                        startDecisionMode(
+                            plan.preferredModeID.flatMap(DecisionMode.init(rawValue:)) ?? .quick,
+                            entrySource: request.entrySource,
+                            prompt: plan.promptSeed
+                        )
+                    },
+                    performRoutedPrompt: { plan in
+                        _ = routeDecision(prompt: plan.promptSeed, entrySource: request.entrySource)
+                    }
                 )
             },
-            performOpenMode: { mode, entrySource, prompt in
-                startDecisionMode(
-                    mode,
-                    entrySource: entrySource,
-                    prompt: prompt
-                )
-            },
-            performRoutedPrompt: { prompt, entrySource in
-                _ = routeDecision(prompt: prompt, entrySource: entrySource)
-            },
-            selectBoxTab: { selectedTab = .box },
-            performPredictiveIntervention: { suggestion in
-                interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
-            },
-            performRestoreWorkspace: { restoreActiveWorkspaceIfNeeded() },
+            restoreActiveWorkspace: { restoreActiveWorkspaceIfNeeded() },
             refreshPredictedIntervention: { refreshPredictedIntervention() },
             syncWidgetSnapshot: {
                 guard shouldSyncWidgetSnapshot else { return }

@@ -60,4 +60,36 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertNotNil(result.interventionSuggestion)
         XCTAssertTrue(result.followUpActions.contains("Require stronger confirmation"))
     }
+
+    func testExecuteLifecyclePhaseDelegatesEntryConsumptionAndRefreshOrder() {
+        let runtime = BASHostRuntime()
+        var actions: [String] = []
+
+        runtime.executeLifecyclePhase(
+            .initialAppearance,
+            refreshMemoryProjection: { actions.append("projection") },
+            refreshCurrentBrain: { actions.append("brain:\($0)") },
+            presentPendingReflection: { actions.append("reflection") },
+            consumeHandoff: { "handoff" },
+            handleHandoff: { envelope in actions.append("handoff:\(envelope)") },
+            consumePendingRequest: { nil as String? },
+            handlePendingRequest: { request in actions.append("pending:\(request)") },
+            restoreActiveWorkspace: { actions.append("restore") },
+            refreshPredictedIntervention: { actions.append("prediction") },
+            syncWidgetSnapshot: { actions.append("widget") }
+        )
+
+        XCTAssertEqual(
+            actions,
+            [
+                "projection",
+                "brain:launch",
+                "reflection",
+                "handoff:handoff",
+                "restore",
+                "prediction",
+                "widget"
+            ]
+        )
+    }
 }
