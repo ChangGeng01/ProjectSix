@@ -25,6 +25,13 @@ enum BehavioralAISubstrateBridge {
         let notice: String?
     }
 
+    struct CurrentBrainProjectionOutcome {
+        let currentBrain: CurrentBrainState
+        let projection: DecisionMemorySystem.BrainStateProjection
+        let refreshedProjection: Bool
+        let notice: String?
+    }
+
     @discardableResult
     static func bootstrapCurrentBrainState(
         mode: DecisionMode,
@@ -114,6 +121,31 @@ enum BehavioralAISubstrateBridge {
     }
 
     @MainActor
+    static func activateQuickSession(
+        _ session: QuickCheckSession,
+        preferences: BeforePreferences,
+        context: ModelContext,
+        cachedProjection: DecisionMemorySystem.BrainStateProjection?,
+        isProjectionDirty: Bool,
+        now: Date = .now
+    ) -> CurrentBrainProjectionOutcome {
+        executeCurrentBrainProjection(
+            cachedProjection: cachedProjection,
+            isProjectionDirty: isProjectionDirty,
+            context: context,
+            now: now
+        ) { projection in
+            primeQuickSession(
+                session,
+                preferences: preferences,
+                context: context,
+                projection: projection,
+                now: now
+            )
+        }
+    }
+
+    @MainActor
     @discardableResult
     static func primeBalanceSession(
         _ session: BalanceBoardSession,
@@ -136,6 +168,31 @@ enum BehavioralAISubstrateBridge {
     }
 
     @MainActor
+    static func activateBalanceSession(
+        _ session: BalanceBoardSession,
+        preferences: BeforePreferences,
+        context: ModelContext,
+        cachedProjection: DecisionMemorySystem.BrainStateProjection?,
+        isProjectionDirty: Bool,
+        now: Date = .now
+    ) -> CurrentBrainProjectionOutcome {
+        executeCurrentBrainProjection(
+            cachedProjection: cachedProjection,
+            isProjectionDirty: isProjectionDirty,
+            context: context,
+            now: now
+        ) { projection in
+            primeBalanceSession(
+                session,
+                preferences: preferences,
+                context: context,
+                projection: projection,
+                now: now
+            )
+        }
+    }
+
+    @MainActor
     @discardableResult
     static func primeMirrorSession(
         _ session: MirrorWorkspaceSession,
@@ -155,6 +212,31 @@ enum BehavioralAISubstrateBridge {
             ),
             now: now
         )
+    }
+
+    @MainActor
+    static func activateMirrorSession(
+        _ session: MirrorWorkspaceSession,
+        preferences: BeforePreferences,
+        context: ModelContext,
+        cachedProjection: DecisionMemorySystem.BrainStateProjection?,
+        isProjectionDirty: Bool,
+        now: Date = .now
+    ) -> CurrentBrainProjectionOutcome {
+        executeCurrentBrainProjection(
+            cachedProjection: cachedProjection,
+            isProjectionDirty: isProjectionDirty,
+            context: context,
+            now: now
+        ) { projection in
+            primeMirrorSession(
+                session,
+                preferences: preferences,
+                context: context,
+                projection: projection,
+                now: now
+            )
+        }
     }
 
     @discardableResult
@@ -221,6 +303,39 @@ enum BehavioralAISubstrateBridge {
             source: source,
             now: now
         )
+    }
+
+    @MainActor
+    static func refreshCurrentBrainState(
+        activeQuickSession: QuickCheckSession?,
+        activeBalanceSession: BalanceBoardSession?,
+        activeMirrorSession: MirrorWorkspaceSession?,
+        taskGraph: DecisionTaskGraphSnapshot?,
+        preferences: BeforePreferences,
+        context: ModelContext,
+        cachedProjection: DecisionMemorySystem.BrainStateProjection?,
+        isProjectionDirty: Bool,
+        source: BrainStateUpdateSource,
+        now: Date = .now
+    ) -> CurrentBrainProjectionOutcome {
+        executeCurrentBrainProjection(
+            cachedProjection: cachedProjection,
+            isProjectionDirty: isProjectionDirty,
+            context: context,
+            now: now
+        ) { projection in
+            refreshCurrentBrainState(
+                activeQuickSession: activeQuickSession,
+                activeBalanceSession: activeBalanceSession,
+                activeMirrorSession: activeMirrorSession,
+                taskGraph: taskGraph,
+                preferences: preferences,
+                context: context,
+                projection: projection,
+                source: source,
+                now: now
+            )
+        }
     }
 
     @discardableResult
@@ -1006,6 +1121,30 @@ enum BehavioralAISubstrateBridge {
                     notice: PersistenceIssueRecorder.latestNotice() ?? StateStorageIssueRecorder.latestNotice()
                 )
             }
+        )
+    }
+
+    private static func executeCurrentBrainProjection(
+        forceProjectionRefresh: Bool = false,
+        cachedProjection: DecisionMemorySystem.BrainStateProjection?,
+        isProjectionDirty: Bool,
+        context: ModelContext,
+        now: Date,
+        execute: (DecisionMemorySystem.BrainStateProjection) -> CurrentBrainState
+    ) -> CurrentBrainProjectionOutcome {
+        let projectionOutcome = resolveMemoryProjection(
+            force: forceProjectionRefresh,
+            cachedProjection: cachedProjection,
+            isDirty: isProjectionDirty,
+            context: context,
+            now: now
+        )
+
+        return CurrentBrainProjectionOutcome(
+            currentBrain: execute(projectionOutcome.projection),
+            projection: projectionOutcome.projection,
+            refreshedProjection: projectionOutcome.refreshed,
+            notice: projectionOutcome.notice
         )
     }
 

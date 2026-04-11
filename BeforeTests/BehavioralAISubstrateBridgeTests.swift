@@ -186,6 +186,36 @@ struct BehavioralAISubstrateBridgeTests {
     }
 
     @Test
+    func bridgeActivateQuickSessionResolvesProjectionAndReturnsCommittedBrain() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        seedHistory(into: context)
+        try context.save()
+
+        let now = date("2026-04-10T22:10:00Z")
+        let session = QuickCheckSession(
+            entrySource: .app,
+            initialNote: "Wait until tomorrow."
+        )
+        session.scenario = .other
+
+        let outcome = BehavioralAISubstrateBridge.activateQuickSession(
+            session,
+            preferences: .default,
+            context: context,
+            cachedProjection: nil,
+            isProjectionDirty: true,
+            now: now
+        )
+
+        #expect(outcome.refreshedProjection)
+        #expect(outcome.currentBrain.source == .sessionPrime)
+        #expect(outcome.currentBrain.mode == .quick)
+        #expect(outcome.currentBrain.activeTemplateIDs.isEmpty == false)
+        #expect(outcome.currentBrain.verificationSnapshot.fingerprint.isEmpty == false)
+    }
+
+    @Test
     func bridgeRefreshCurrentBrainStateUsesTaskGraphFallbackWhenSessionsAreEmpty() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -226,6 +256,39 @@ struct BehavioralAISubstrateBridgeTests {
         #expect(current.mode == .mirror)
         #expect(current.taskGraph?.promptSeed == "resume the hard reflection")
         #expect(current.verificationSnapshot.fingerprint.isEmpty == false)
+    }
+
+    @Test
+    func bridgeRefreshCurrentBrainStateResolvesProjectionCacheAndCommitsBrain() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        seedHistory(into: context)
+        try context.save()
+
+        let now = date("2026-04-10T22:35:00Z")
+        let session = QuickCheckSession(
+            entrySource: .app,
+            initialNote: "Pause before sending."
+        )
+        session.scenario = .other
+
+        let outcome = BehavioralAISubstrateBridge.refreshCurrentBrainState(
+            activeQuickSession: session,
+            activeBalanceSession: nil,
+            activeMirrorSession: nil,
+            taskGraph: nil,
+            preferences: .default,
+            context: context,
+            cachedProjection: nil,
+            isProjectionDirty: true,
+            source: .explicitRefresh,
+            now: now
+        )
+
+        #expect(outcome.refreshedProjection)
+        #expect(outcome.currentBrain.source == .explicitRefresh)
+        #expect(outcome.currentBrain.mode == .quick)
+        #expect(outcome.currentBrain.brainState.boundaryPolicy.mode.isPureLocal)
     }
 
     @Test

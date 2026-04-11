@@ -1247,20 +1247,44 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func activateQuickSession(_ session: QuickCheckSession) {
-        refreshDecisionMemoryStore()
-        primeQuickSession(session)
+        let outcome = BehavioralAISubstrateBridge.activateQuickSession(
+            session,
+            preferences: preferences,
+            context: modelContainer.mainContext,
+            cachedProjection: memoryProjection,
+            isProjectionDirty: isMemoryProjectionDirty,
+            now: .now
+        )
+        session.loadBrainState(outcome.currentBrain.brainState)
+        applyCurrentBrainProjectionOutcome(outcome)
         activeQuickSession = session
     }
 
     private func activateBalanceSession(_ session: BalanceBoardSession) {
-        refreshDecisionMemoryStore()
-        primeBalanceSession(session)
+        let outcome = BehavioralAISubstrateBridge.activateBalanceSession(
+            session,
+            preferences: preferences,
+            context: modelContainer.mainContext,
+            cachedProjection: memoryProjection,
+            isProjectionDirty: isMemoryProjectionDirty,
+            now: .now
+        )
+        session.loadBrainState(outcome.currentBrain.brainState)
+        applyCurrentBrainProjectionOutcome(outcome)
         activeBalanceSession = session
     }
 
     private func activateMirrorSession(_ session: MirrorWorkspaceSession) {
-        refreshDecisionMemoryStore()
-        primeMirrorSession(session)
+        let outcome = BehavioralAISubstrateBridge.activateMirrorSession(
+            session,
+            preferences: preferences,
+            context: modelContainer.mainContext,
+            cachedProjection: memoryProjection,
+            isProjectionDirty: isMemoryProjectionDirty,
+            now: .now
+        )
+        session.loadBrainState(outcome.currentBrain.brainState)
+        applyCurrentBrainProjectionOutcome(outcome)
         activeMirrorSession = session
     }
 
@@ -1274,53 +1298,19 @@ final class BeforeAppModel: ObservableObject {
         )
     }
 
-    private func primeQuickSession(_ session: QuickCheckSession) {
-        let currentBrain = BehavioralAISubstrateBridge.primeQuickSession(
-            session,
-            preferences: preferences,
-            context: modelContainer.mainContext,
-            projection: currentMemoryProjection(),
-            now: .now
-        )
-        session.loadBrainState(currentBrain.brainState)
-        currentBrainState = currentBrain
-    }
-
-    private func primeBalanceSession(_ session: BalanceBoardSession) {
-        let currentBrain = BehavioralAISubstrateBridge.primeBalanceSession(
-            session,
-            preferences: preferences,
-            context: modelContainer.mainContext,
-            projection: currentMemoryProjection(),
-            now: .now
-        )
-        session.loadBrainState(currentBrain.brainState)
-        currentBrainState = currentBrain
-    }
-
-    private func primeMirrorSession(_ session: MirrorWorkspaceSession) {
-        let currentBrain = BehavioralAISubstrateBridge.primeMirrorSession(
-            session,
-            preferences: preferences,
-            context: modelContainer.mainContext,
-            projection: currentMemoryProjection(),
-            now: .now
-        )
-        session.loadBrainState(currentBrain.brainState)
-        currentBrainState = currentBrain
-    }
-
     private func refreshGlobalBrainState(source: BrainStateUpdateSource) {
-        currentBrainState = BehavioralAISubstrateBridge.refreshCurrentBrainState(
+        let outcome = BehavioralAISubstrateBridge.refreshCurrentBrainState(
             activeQuickSession: activeQuickSession,
             activeBalanceSession: activeBalanceSession,
             activeMirrorSession: activeMirrorSession,
             taskGraph: activeTaskGraph,
             preferences: preferences,
             context: modelContainer.mainContext,
-            projection: currentMemoryProjection(),
+            cachedProjection: memoryProjection,
+            isProjectionDirty: isMemoryProjectionDirty,
             source: source
         )
+        applyCurrentBrainProjectionOutcome(outcome)
     }
 
     private func refreshPredictedIntervention() {
@@ -1364,19 +1354,15 @@ final class BeforeAppModel: ObservableObject {
         )
     }
 
-    private func currentMemoryProjection() -> DecisionMemorySystem.BrainStateProjection {
-        let outcome = BehavioralAISubstrateBridge.resolveMemoryProjection(
-            force: false,
-            cachedProjection: memoryProjection,
-            isDirty: isMemoryProjectionDirty,
-            context: modelContainer.mainContext
-        )
+    private func applyCurrentBrainProjectionOutcome(
+        _ outcome: BehavioralAISubstrateBridge.CurrentBrainProjectionOutcome
+    ) {
         memoryProjection = outcome.projection
         isMemoryProjectionDirty = false
         if let notice = outcome.notice {
             publishStartupNotice(notice)
         }
-        return outcome.projection
+        currentBrainState = outcome.currentBrain
     }
 
     private func persistContext(
