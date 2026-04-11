@@ -74,40 +74,7 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func handleInitialAppearance() {
-        BehavioralAISubstrateBridge.executeAppLifecyclePhase(
-            .initialAppearance,
-            refreshMemoryProjection: { refreshDecisionMemoryStore() },
-            refreshCurrentBrain: { source in
-                refreshGlobalBrainState(source: source)
-            },
-            presentPendingReflection: { presentPendingReflectionIfNeeded() },
-            consumeHandoff: { WatchHandoffCoordinator.consume() },
-            consumePendingRequest: { PendingLaunchRequestStore.consume() },
-            performQuickCapture: { entrySource, scenario, prompt in
-                startQuickCheck(
-                    entrySource: entrySource,
-                    scenario: scenario,
-                    prompt: prompt
-                )
-            },
-            performOpenMode: { mode, entrySource, prompt in
-                startDecisionMode(
-                    mode,
-                    entrySource: entrySource,
-                    prompt: prompt
-                )
-            },
-            performRoutedPrompt: { prompt, entrySource in
-                _ = routeDecision(prompt: prompt, entrySource: entrySource)
-            },
-            selectBoxTab: { selectedTab = .box },
-            performPredictiveIntervention: { suggestion in
-                interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
-            },
-            performRestoreWorkspace: { restoreActiveWorkspaceIfNeeded() },
-            refreshPredictedIntervention: { refreshPredictedIntervention() },
-            syncWidgetSnapshot: { syncWidgetSnapshot() }
-        )
+        executeLifecyclePhase(.initialAppearance, syncWidgetSnapshot: true)
     }
 
     func dismissStartupNotice() {
@@ -205,39 +172,7 @@ final class BeforeAppModel: ObservableObject {
     func handleScenePhase(_ phase: ScenePhase) {
         switch phase {
         case .active:
-            BehavioralAISubstrateBridge.executeAppLifecyclePhase(
-                .sceneActive,
-                refreshMemoryProjection: { refreshDecisionMemoryStore() },
-                refreshCurrentBrain: { source in
-                    refreshGlobalBrainState(source: source)
-                },
-                presentPendingReflection: { presentPendingReflectionIfNeeded() },
-                consumeHandoff: { WatchHandoffCoordinator.consume() },
-                consumePendingRequest: { PendingLaunchRequestStore.consume() },
-                performQuickCapture: { entrySource, scenario, prompt in
-                    startQuickCheck(
-                        entrySource: entrySource,
-                        scenario: scenario,
-                        prompt: prompt
-                    )
-                },
-                performOpenMode: { mode, entrySource, prompt in
-                    startDecisionMode(
-                        mode,
-                        entrySource: entrySource,
-                        prompt: prompt
-                    )
-                },
-                performRoutedPrompt: { prompt, entrySource in
-                    _ = routeDecision(prompt: prompt, entrySource: entrySource)
-                },
-                selectBoxTab: { selectedTab = .box },
-                performPredictiveIntervention: { suggestion in
-                    interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
-                },
-                performRestoreWorkspace: { restoreActiveWorkspaceIfNeeded() },
-                refreshPredictedIntervention: { refreshPredictedIntervention() }
-            )
+            executeLifecyclePhase(.sceneActive)
         case .background:
             if pendingReflectionContext != nil {
                 shouldPromptReflectionAfterBackground = true
@@ -250,6 +185,49 @@ final class BeforeAppModel: ObservableObject {
         default:
             break
         }
+    }
+
+    private func executeLifecyclePhase(
+        _ phase: BASAppleLifecycleBootstrapPhase,
+        syncWidgetSnapshot shouldSyncWidgetSnapshot: Bool = false
+    ) {
+        BehavioralAISubstrateBridge.executeAppLifecyclePhase(
+            phase,
+            refreshMemoryProjection: { refreshDecisionMemoryStore() },
+            refreshCurrentBrain: { source in
+                refreshGlobalBrainState(source: source)
+            },
+            presentPendingReflection: { presentPendingReflectionIfNeeded() },
+            consumeHandoff: { WatchHandoffCoordinator.consume() },
+            consumePendingRequest: { PendingLaunchRequestStore.consume() },
+            performQuickCapture: { entrySource, scenario, prompt in
+                startQuickCheck(
+                    entrySource: entrySource,
+                    scenario: scenario,
+                    prompt: prompt
+                )
+            },
+            performOpenMode: { mode, entrySource, prompt in
+                startDecisionMode(
+                    mode,
+                    entrySource: entrySource,
+                    prompt: prompt
+                )
+            },
+            performRoutedPrompt: { prompt, entrySource in
+                _ = routeDecision(prompt: prompt, entrySource: entrySource)
+            },
+            selectBoxTab: { selectedTab = .box },
+            performPredictiveIntervention: { suggestion in
+                interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
+            },
+            performRestoreWorkspace: { restoreActiveWorkspaceIfNeeded() },
+            refreshPredictedIntervention: { refreshPredictedIntervention() },
+            syncWidgetSnapshot: {
+                guard shouldSyncWidgetSnapshot else { return }
+                syncWidgetSnapshot()
+            }
+        )
     }
 
     func completeCheck(using session: QuickCheckSession, action: CheckAction) async {

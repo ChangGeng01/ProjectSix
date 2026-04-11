@@ -46,19 +46,26 @@ enum DecisionIntelligenceCoordinator {
             device: device,
             openModelStatus: openModelStatus,
             gemmaStatus: gemmaStatus,
-                foundationStatus: foundationStatus
+            foundationStatus: foundationStatus
         )
+        let statusesByKind: [DecisionModelProviderKind: DecisionModelProviderStatus] = [
+            .openModel: openModelStatus,
+            .gemmaE4B: gemmaStatus,
+            .foundationModels: foundationStatus
+        ]
         let summary = BASAppleProviderRuntimeStatusAdapter.hostVisibleRuntimeStatus(
             from: BASAppleHostVisibleRuntimeStatusInput(
                 requestedProviderID: preferences.preferredIntelligenceProvider.kind.rawValue,
                 effectiveProviderID: profile.effectiveProviderPreference.kind.rawValue,
                 allowFallbacks: profile.allowFallbacks,
                 runtimeEnabled: preferences.onDeviceIntelligenceMode.isEnabled,
-                statusesByID: DecisionIntelligenceProviderPipeline.substrateStatuses([
-                    .openModel: openModelStatus,
-                    .gemmaE4B: gemmaStatus,
-                    .foundationModels: foundationStatus
-                ]),
+                statusesByID: BASAppleProviderHostBridge.statusRecords(
+                    statusesByKind,
+                    keyID: \.rawValue,
+                    isAvailable: \.isAvailable,
+                    title: \.title,
+                    detail: \.detail
+                ),
                 testingOverrideEnabled: testingStubProfile != nil,
                 testingOverrideTitle: testingStubProfile?.title,
                 profileDetail: profile.detail

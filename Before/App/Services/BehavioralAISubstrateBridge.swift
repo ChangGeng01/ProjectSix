@@ -704,47 +704,6 @@ enum BehavioralAISubstrateBridge {
     }
 
     @MainActor
-    static func consumePendingLaunchRequest(
-        consumeHandoff: () -> DecisionIntentEnvelope?,
-        handleHandoff: (DecisionIntentEnvelope) -> Void,
-        consumePendingRequest: () -> PendingLaunchRequest?,
-        performQuickCapture: (EntrySource, ScenarioType?, String) -> Void,
-        performOpenMode: (DecisionMode, EntrySource, String) -> Void,
-        performRoutedPrompt: (String, EntrySource) -> Void
-    ) {
-        BASAppleLifecycleEntrySourceExecutor.execute(
-            consumeHandoff: consumeHandoff,
-            handleHandoff: handleHandoff,
-            consumePendingRequest: consumePendingRequest
-        ) { request in
-            BASApplePendingLaunchRuntimeExecutor.execute(
-                input: BASApplePendingLaunchRuntimeInput(
-                    preferredModeID: request.preferredModeRaw,
-                    scenarioID: request.scenarioRaw,
-                    promptSeed: request.prompt
-                ),
-                performQuickCapture: { plan in
-                    performQuickCapture(
-                        request.entrySource,
-                        plan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
-                        plan.promptSeed
-                    )
-                },
-                performOpenMode: { plan in
-                    performOpenMode(
-                        plan.preferredModeID.flatMap(DecisionMode.init(rawValue:)) ?? .quick,
-                        request.entrySource,
-                        plan.promptSeed
-                    )
-                },
-                performRoutedPrompt: { plan in
-                    performRoutedPrompt(plan.promptSeed, request.entrySource)
-                }
-            )
-        }
-    }
-
-    @MainActor
     static func consumeLifecycleEntrySourcesIfNeeded(
         consumeHandoff: () -> DecisionIntentEnvelope?,
         consumePendingRequest: () -> PendingLaunchRequest?,
@@ -756,7 +715,7 @@ enum BehavioralAISubstrateBridge {
         performRestoreWorkspace: () -> Void,
         refreshCurrentBrain: (BrainStateUpdateSource) -> Void
     ) {
-        consumePendingLaunchRequest(
+        BASAppleAppLifecycleOrchestrationExecutor.consumeEntriesIfNeeded(
             consumeHandoff: consumeHandoff,
             handleHandoff: { envelope in
                 consumeDecisionIntentEnvelope(
@@ -776,9 +735,32 @@ enum BehavioralAISubstrateBridge {
                 )
             },
             consumePendingRequest: consumePendingRequest,
-            performQuickCapture: performQuickCapture,
-            performOpenMode: performOpenMode,
-            performRoutedPrompt: performRoutedPrompt
+            handlePendingRequest: { request in
+                BASApplePendingLaunchRuntimeExecutor.execute(
+                    input: BASApplePendingLaunchRuntimeInput(
+                        preferredModeID: request.preferredModeRaw,
+                        scenarioID: request.scenarioRaw,
+                        promptSeed: request.prompt
+                    ),
+                    performQuickCapture: { plan in
+                        performQuickCapture(
+                            request.entrySource,
+                            plan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
+                            plan.promptSeed
+                        )
+                    },
+                    performOpenMode: { plan in
+                        performOpenMode(
+                            plan.preferredModeID.flatMap(DecisionMode.init(rawValue:)) ?? .quick,
+                            request.entrySource,
+                            plan.promptSeed
+                        )
+                    },
+                    performRoutedPrompt: { plan in
+                        performRoutedPrompt(plan.promptSeed, request.entrySource)
+                    }
+                )
+            }
         )
     }
 
@@ -799,22 +781,58 @@ enum BehavioralAISubstrateBridge {
         refreshPredictedIntervention: () -> Void,
         syncWidgetSnapshot: () -> Void = {}
     ) {
-        executeLifecycleBootstrapPhase(
-            phase,
+        BASAppleAppLifecycleOrchestrationExecutor.execute(
+            phase: phase,
             refreshMemoryProjection: refreshMemoryProjection,
-            refreshCurrentBrain: refreshCurrentBrain,
+            refreshCurrentBrain: { source in
+                refreshCurrentBrain(
+                    BrainStateUpdateSource(rawValue: source) ?? .explicitRefresh
+                )
+            },
             presentPendingReflection: presentPendingReflection,
-            consumeLifecycleEntries: {
-                consumeLifecycleEntrySourcesIfNeeded(
-                    consumeHandoff: consumeHandoff,
-                    consumePendingRequest: consumePendingRequest,
-                    performQuickCapture: performQuickCapture,
-                    performOpenMode: performOpenMode,
-                    performRoutedPrompt: performRoutedPrompt,
-                    selectBoxTab: selectBoxTab,
+            consumeHandoff: consumeHandoff,
+            handleHandoff: { envelope in
+                consumeDecisionIntentEnvelope(
+                    envelope,
+                    performQuickCapture: { envelope, scenario, prompt in
+                        performQuickCapture(envelope.entrySource, scenario, prompt)
+                    },
+                    performOpenMode: { envelope, mode, shouldSelectBoxTab, prompt in
+                        if shouldSelectBoxTab {
+                            selectBoxTab()
+                        }
+                        performOpenMode(mode, envelope.entrySource, prompt)
+                    },
                     performPredictiveIntervention: performPredictiveIntervention,
                     performRestoreWorkspace: performRestoreWorkspace,
                     refreshCurrentBrain: refreshCurrentBrain
+                )
+            },
+            consumePendingRequest: consumePendingRequest,
+            handlePendingRequest: { request in
+                BASApplePendingLaunchRuntimeExecutor.execute(
+                    input: BASApplePendingLaunchRuntimeInput(
+                        preferredModeID: request.preferredModeRaw,
+                        scenarioID: request.scenarioRaw,
+                        promptSeed: request.prompt
+                    ),
+                    performQuickCapture: { plan in
+                        performQuickCapture(
+                            request.entrySource,
+                            plan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
+                            plan.promptSeed
+                        )
+                    },
+                    performOpenMode: { plan in
+                        performOpenMode(
+                            plan.preferredModeID.flatMap(DecisionMode.init(rawValue:)) ?? .quick,
+                            request.entrySource,
+                            plan.promptSeed
+                        )
+                    },
+                    performRoutedPrompt: { plan in
+                        performRoutedPrompt(plan.promptSeed, request.entrySource)
+                    }
                 )
             },
             restoreActiveWorkspace: performRestoreWorkspace,
@@ -865,33 +883,6 @@ enum BehavioralAISubstrateBridge {
                     BrainStateUpdateSource(rawValue: triggerID) ?? .explicitRefresh
                 )
             }
-        )
-    }
-
-    @MainActor
-    static func executeLifecycleBootstrapPhase(
-        _ phase: BASAppleLifecycleBootstrapPhase,
-        refreshMemoryProjection: () -> Void,
-        refreshCurrentBrain: (BrainStateUpdateSource) -> Void,
-        presentPendingReflection: () -> Void,
-        consumeLifecycleEntries: () -> Void,
-        restoreActiveWorkspace: () -> Void,
-        refreshPredictedIntervention: () -> Void,
-        syncWidgetSnapshot: () -> Void = {}
-    ) {
-        BASAppleLifecycleBootstrapExecutor.execute(
-            phase: phase,
-            refreshMemoryProjection: refreshMemoryProjection,
-            refreshCurrentBrain: { triggerID in
-                refreshCurrentBrain(
-                    BrainStateUpdateSource(rawValue: triggerID) ?? .explicitRefresh
-                )
-            },
-            presentPendingReflection: presentPendingReflection,
-            consumePendingLaunchRequest: consumeLifecycleEntries,
-            restoreActiveWorkspace: restoreActiveWorkspace,
-            refreshPredictedIntervention: refreshPredictedIntervention,
-            syncWidgetSnapshot: syncWidgetSnapshot
         )
     }
 

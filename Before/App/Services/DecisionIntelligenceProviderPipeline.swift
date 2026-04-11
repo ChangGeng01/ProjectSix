@@ -24,10 +24,10 @@ enum DecisionIntelligenceProviderPipeline {
         allowFallbacks: Bool = true,
         excluding suspendedKinds: Set<DecisionModelProviderKind> = []
     ) -> [DecisionModelProviderKind] {
-        BASReferenceProviderRuntime.orderedProviderIDs(
+        BASAppleProviderHostBridge.orderedProviderIDs(
             preferredProviderID: preference.kind.rawValue,
             allowFallbacks: allowFallbacks,
-            suspendedProviderIDs: Set(suspendedKinds.map(\.rawValue))
+            excluding: Set(suspendedKinds.map(\.rawValue))
         )
         .compactMap(DecisionModelProviderKind.init(rawValue:))
     }
@@ -43,7 +43,13 @@ enum DecisionIntelligenceProviderPipeline {
                 preferredProviderID: preferred.rawValue,
                 allowFallbacks: preferences.allowModelFallbacks,
                 runtimeEnabled: preferences.onDeviceIntelligenceMode.isEnabled,
-                statusesByID: substrateStatuses(statusesByKind),
+                statusesByID: BASAppleProviderHostBridge.statusRecords(
+                    statusesByKind,
+                    keyID: \.rawValue,
+                    isAvailable: \.isAvailable,
+                    title: \.title,
+                    detail: \.detail
+                ),
                 testingOverrideEnabled: testingStubProfile != nil,
                 testingOverrideTitle: testingStubProfile?.title
             )
@@ -58,25 +64,6 @@ enum DecisionIntelligenceProviderPipeline {
             detail: summary.detail
         )
     }
-
-    static func substrateStatuses(
-        _ statusesByKind: [DecisionModelProviderKind: DecisionModelProviderStatus]
-    ) -> [String: BASProviderStatusRecord] {
-        Dictionary(
-            uniqueKeysWithValues: statusesByKind.map { entry in
-                (
-                    entry.key.rawValue,
-                    BASProviderStatusRecord(
-                        providerID: entry.key.rawValue,
-                        isAvailable: entry.value.isAvailable,
-                        title: entry.value.title,
-                        detail: entry.value.detail
-                    )
-                )
-            }
-        )
-    }
-
     static func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
