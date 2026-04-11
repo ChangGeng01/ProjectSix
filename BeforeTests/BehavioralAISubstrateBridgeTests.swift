@@ -318,6 +318,87 @@ struct BehavioralAISubstrateBridgeTests {
     }
 
     @Test
+    func bridgeConsumeLifecycleEntrySourcesPrefersHandoffAndRefreshesBrain() {
+        let envelope = DecisionIntentEnvelope(
+            kind: .reopenTomorrowItem,
+            sourceSurface: .notification,
+            entrySource: .app,
+            preferredMode: .balance,
+            promptSeed: "Resume with more space.",
+            riskLevel: .medium,
+            triggerReason: "prediction"
+        )
+
+        var openedMode: DecisionMode?
+        var selectedBoxTab = false
+        var refreshedSource: BrainStateUpdateSource?
+
+        BehavioralAISubstrateBridge.consumeLifecycleEntrySourcesIfNeeded(
+            consumeHandoff: { envelope },
+            consumePendingRequest: { nil },
+            performQuickCapture: { _, _, _ in
+                Issue.record("Expected open-mode handoff path")
+            },
+            performOpenMode: { mode, _, prompt in
+                openedMode = mode
+                #expect(prompt == "Resume with more space.")
+            },
+            performRoutedPrompt: { _, _ in
+                Issue.record("Expected handoff path, not routed launch")
+            },
+            selectBoxTab: { selectedBoxTab = true },
+            performPredictiveIntervention: { _ in
+                Issue.record("Expected open-mode handoff path")
+            },
+            performRestoreWorkspace: {
+                Issue.record("Expected open-mode handoff path")
+            },
+            refreshCurrentBrain: { source in
+                refreshedSource = source
+            }
+        )
+
+        #expect(openedMode == .balance)
+        #expect(selectedBoxTab)
+        #expect(refreshedSource == .explicitRefresh)
+    }
+
+    @Test
+    func bridgeExecuteAppLifecyclePhaseRunsBootstrapPlanWithMappedBrainTriggers() {
+        var actions: [String] = []
+
+        BehavioralAISubstrateBridge.executeAppLifecyclePhase(
+            .initialAppearance,
+            refreshMemoryProjection: { actions.append("projection") },
+            refreshCurrentBrain: { source in
+                actions.append("brain:\(source.rawValue)")
+            },
+            presentPendingReflection: { actions.append("reflection") },
+            consumeHandoff: { nil },
+            consumePendingRequest: { nil },
+            performQuickCapture: { _, _, _ in actions.append("quick") },
+            performOpenMode: { _, _, _ in actions.append("open") },
+            performRoutedPrompt: { _, _ in actions.append("route") },
+            selectBoxTab: { actions.append("box") },
+            performPredictiveIntervention: { _ in actions.append("prediction") },
+            performRestoreWorkspace: { actions.append("restore") },
+            refreshPredictedIntervention: { actions.append("refresh_prediction") },
+            syncWidgetSnapshot: { actions.append("widget") }
+        )
+
+        #expect(
+            actions == [
+                "projection",
+                "brain:launch",
+                "reflection",
+                "restore",
+                "refresh_prediction",
+                "widget"
+            ]
+        )
+    }
+
+    @Test
     func bridgeResolveMemoryProjectionUsesCachedProjectionWhenClean() throws {
         let container = try makeContainer()
         let context = container.mainContext

@@ -74,7 +74,40 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func handleInitialAppearance() {
-        runLifecycleBootstrapPlan(.initialAppearance)
+        BehavioralAISubstrateBridge.executeAppLifecyclePhase(
+            .initialAppearance,
+            refreshMemoryProjection: { refreshDecisionMemoryStore() },
+            refreshCurrentBrain: { source in
+                refreshGlobalBrainState(source: source)
+            },
+            presentPendingReflection: { presentPendingReflectionIfNeeded() },
+            consumeHandoff: { WatchHandoffCoordinator.consume() },
+            consumePendingRequest: { PendingLaunchRequestStore.consume() },
+            performQuickCapture: { entrySource, scenario, prompt in
+                startQuickCheck(
+                    entrySource: entrySource,
+                    scenario: scenario,
+                    prompt: prompt
+                )
+            },
+            performOpenMode: { mode, entrySource, prompt in
+                startDecisionMode(
+                    mode,
+                    entrySource: entrySource,
+                    prompt: prompt
+                )
+            },
+            performRoutedPrompt: { prompt, entrySource in
+                _ = routeDecision(prompt: prompt, entrySource: entrySource)
+            },
+            selectBoxTab: { selectedTab = .box },
+            performPredictiveIntervention: { suggestion in
+                interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
+            },
+            performRestoreWorkspace: { restoreActiveWorkspaceIfNeeded() },
+            refreshPredictedIntervention: { refreshPredictedIntervention() },
+            syncWidgetSnapshot: { syncWidgetSnapshot() }
+        )
     }
 
     func dismissStartupNotice() {
@@ -175,37 +208,42 @@ final class BeforeAppModel: ObservableObject {
         persistActiveWorkspaceState()
     }
 
-    func consumePendingLaunchRequestIfNeeded() {
-        BehavioralAISubstrateBridge.consumePendingLaunchRequest(
-            consumeHandoff: { WatchHandoffCoordinator.consume() },
-            handleHandoff: { envelope in
-                consumeDecisionIntentEnvelope(envelope)
-            },
-            consumePendingRequest: { PendingLaunchRequestStore.consume() },
-            performQuickCapture: { entrySource, scenario, prompt in
-                startQuickCheck(
-                    entrySource: entrySource,
-                    scenario: scenario,
-                    prompt: prompt
-                )
-            },
-            performOpenMode: { mode, entrySource, prompt in
-                startDecisionMode(
-                    mode,
-                    entrySource: entrySource,
-                    prompt: prompt
-                )
-            },
-            performRoutedPrompt: { prompt, entrySource in
-                _ = routeDecision(prompt: prompt, entrySource: entrySource)
-            }
-        )
-    }
-
     func handleScenePhase(_ phase: ScenePhase) {
         switch phase {
         case .active:
-            runLifecycleBootstrapPlan(.sceneActive)
+            BehavioralAISubstrateBridge.executeAppLifecyclePhase(
+                .sceneActive,
+                refreshMemoryProjection: { refreshDecisionMemoryStore() },
+                refreshCurrentBrain: { source in
+                    refreshGlobalBrainState(source: source)
+                },
+                presentPendingReflection: { presentPendingReflectionIfNeeded() },
+                consumeHandoff: { WatchHandoffCoordinator.consume() },
+                consumePendingRequest: { PendingLaunchRequestStore.consume() },
+                performQuickCapture: { entrySource, scenario, prompt in
+                    startQuickCheck(
+                        entrySource: entrySource,
+                        scenario: scenario,
+                        prompt: prompt
+                    )
+                },
+                performOpenMode: { mode, entrySource, prompt in
+                    startDecisionMode(
+                        mode,
+                        entrySource: entrySource,
+                        prompt: prompt
+                    )
+                },
+                performRoutedPrompt: { prompt, entrySource in
+                    _ = routeDecision(prompt: prompt, entrySource: entrySource)
+                },
+                selectBoxTab: { selectedTab = .box },
+                performPredictiveIntervention: { suggestion in
+                    interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
+                },
+                performRestoreWorkspace: { restoreActiveWorkspaceIfNeeded() },
+                refreshPredictedIntervention: { refreshPredictedIntervention() }
+            )
         case .background:
             if pendingReflectionContext != nil {
                 shouldPromptReflectionAfterBackground = true
@@ -1291,38 +1329,6 @@ final class BeforeAppModel: ObservableObject {
         )
     }
 
-    private func consumeDecisionIntentEnvelope(_ envelope: DecisionIntentEnvelope) {
-        BehavioralAISubstrateBridge.consumeDecisionIntentEnvelope(
-            envelope,
-            performQuickCapture: { envelope, scenario, prompt in
-                startQuickCheck(
-                    entrySource: envelope.entrySource,
-                    scenario: scenario,
-                    prompt: prompt
-                )
-            },
-            performOpenMode: { envelope, mode, shouldSelectBoxTab, prompt in
-                if shouldSelectBoxTab {
-                    selectedTab = .box
-                }
-                startDecisionMode(
-                    mode,
-                    entrySource: envelope.entrySource,
-                    prompt: prompt
-                )
-            },
-            performPredictiveIntervention: { suggestion in
-                interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
-            },
-            performRestoreWorkspace: {
-                restoreActiveWorkspaceIfNeeded()
-            },
-            refreshCurrentBrain: { source in
-                refreshGlobalBrainState(source: source)
-            }
-        )
-    }
-
     private func refreshPredictedIntervention() {
         interventionCandidate = BehavioralAISubstrateBridge.refreshPredictedIntervention(
             existing: interventionCandidate,
@@ -1361,23 +1367,6 @@ final class BeforeAppModel: ObservableObject {
             clearSnapshot: {
                 DecisionTaskGraphStore.clear()
             }
-        )
-    }
-
-    private func runLifecycleBootstrapPlan(_ phase: BASAppleLifecycleBootstrapPhase) {
-        BASAppleLifecycleBootstrapExecutor.execute(
-            phase: phase,
-            refreshMemoryProjection: { refreshDecisionMemoryStore() },
-            refreshCurrentBrain: { triggerID in
-                refreshGlobalBrainState(
-                    source: BrainStateUpdateSource(rawValue: triggerID) ?? .explicitRefresh
-                )
-            },
-            presentPendingReflection: { presentPendingReflectionIfNeeded() },
-            consumePendingLaunchRequest: { consumePendingLaunchRequestIfNeeded() },
-            restoreActiveWorkspace: { restoreActiveWorkspaceIfNeeded() },
-            refreshPredictedIntervention: { refreshPredictedIntervention() },
-            syncWidgetSnapshot: { syncWidgetSnapshot() }
         )
     }
 
