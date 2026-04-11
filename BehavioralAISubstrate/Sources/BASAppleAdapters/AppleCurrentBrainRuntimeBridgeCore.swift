@@ -146,7 +146,7 @@ public enum BASAppleCurrentBrainRuntimeBridgeBuilder {
         taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput?,
         retrievalMode: String
     ) -> BASAppleCurrentBrainBootstrapBridgeInput {
-        BASAppleCurrentBrainBootstrapBridgeInput(
+        BASAppleCurrentBrainBootstrapBridgeInputBuilder.build(
             modeID: modeID,
             prompt: prompt,
             triggerID: triggerID,
@@ -156,10 +156,7 @@ public enum BASAppleCurrentBrainRuntimeBridgeBuilder {
             now: now,
             projection: projection,
             embeddingScores: [],
-            taskGraphHeadline: taskGraphHint?.headline,
-            taskGraphActiveNodeCount: taskGraphHint?.activeNodeCount,
-            taskGraphHasResumeCandidate: taskGraphHint?.hasResumeCandidate,
-            taskGraphResumeHint: taskGraphHint?.resumeHint,
+            taskGraphHint: taskGraphHint,
             retrievalMode: retrievalMode
         )
     }

@@ -39,6 +39,44 @@ struct BASAppleLifecycleOutcomeTests {
         #expect(calls == ["open:balance:reopen this"])
     }
 
+    @Test("pending launch runtime executor resolves and routes in one package-owned step")
+    func pendingLaunchRuntimeExecutorResolvesAndRoutes() {
+        var calls: [String] = []
+
+        BASApplePendingLaunchRuntimeExecutor.execute(
+            input: BASApplePendingLaunchRuntimeInput(
+                preferredModeID: nil,
+                scenarioID: "buy",
+                promptSeed: " hold this "
+            ),
+            performQuickCapture: { plan in
+                calls.append("quick:\(plan.scenarioID ?? "nil"):\(plan.promptSeed)")
+            },
+            performOpenMode: { _ in
+                calls.append("open")
+            },
+            performRoutedPrompt: { _ in
+                calls.append("route")
+            }
+        )
+
+        #expect(calls == ["quick:buy:hold this"])
+    }
+
+    @Test("lifecycle entry source executor prefers handoff over pending launch")
+    func lifecycleEntrySourceExecutorPrefersHandoffOverPendingLaunch() {
+        var calls: [String] = []
+
+        BASAppleLifecycleEntrySourceExecutor.execute(
+            consumeHandoff: { "handoff" },
+            handleHandoff: { calls.append($0) },
+            consumePendingRequest: { "pending" },
+            handlePendingRequest: { calls.append($0) }
+        )
+
+        #expect(calls == ["handoff"])
+    }
+
     @Test("workspace restore executor skips when restore is not eligible")
     func workspaceRestoreExecutorSkipsWhenIneligible() {
         var calls: [String] = []

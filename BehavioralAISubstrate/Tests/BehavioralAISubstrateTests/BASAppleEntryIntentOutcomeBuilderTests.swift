@@ -81,4 +81,42 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
             "refresh:explicitRefresh"
         ])
     }
+
+    @Test("entry intent runtime executor resolves and executes in one package-owned step")
+    func entryIntentRuntimeExecutorResolvesAndExecutes() {
+        var calls: [String] = []
+
+        BASAppleEntryIntentRuntimeExecutor.execute(
+            input: BASAppleEntryIntentRuntimeInput(
+                kindID: "predictiveIntervention",
+                surfaceID: "watch",
+                preferredModeID: "mirror",
+                scenarioID: nil,
+                promptSeed: "Pause.",
+                riskLevelID: "high",
+                triggerReason: "night_pattern",
+                expiresAt: Date(timeIntervalSince1970: 200)
+            ),
+            performQuickCapture: { _ in
+                calls.append("quick")
+            },
+            performOpenMode: { _ in
+                calls.append("open")
+            },
+            performPredictiveIntervention: { suggestion in
+                calls.append("predict:\(suggestion?.preferredModeID ?? "nil")")
+            },
+            performRestoreWorkspace: {
+                calls.append("restore")
+            },
+            refreshCurrentBrain: { triggerID in
+                calls.append("refresh:\(triggerID)")
+            }
+        )
+
+        #expect(calls == [
+            "predict:mirror",
+            "refresh:watchHandoff"
+        ])
+    }
 }

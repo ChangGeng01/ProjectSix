@@ -254,6 +254,40 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(brainState.retrievalTags.contains("lang:english"))
     }
 
+    @Test("projection brain state compiler owns app-session defaults")
+    func projectionBrainStateCompilerBuildsAppSessionDefaults() {
+        let now = Date(timeIntervalSince1970: 1_744_322_180)
+        let brainState = BASAppleCurrentBrainProjectionStateCompiler.appSessionBrainState(
+            modeID: BASDecisionMode.quick.rawValue,
+            prompt: "Should I buy this tonight?",
+            projection: BASBrainProjection(
+                records: [
+                    BASGovernedMemory(
+                        kind: .goal,
+                        content: "Protect sleep before midnight",
+                        scope: .user,
+                        sensitivity: .low,
+                        tier: .hot,
+                        confidence: 0.92,
+                        sourceType: "history",
+                        governanceStatus: .governed,
+                        provenanceSummary: "goal"
+                    )
+                ],
+                candidates: [],
+                recentEvents: []
+            ),
+            retrievalMode: "filtered",
+            preferredLanguages: ["en-AU"],
+            now: now
+        )
+
+        #expect(brainState.retrievalTags.contains("quick"))
+        #expect(brainState.retrievalTags.contains("lang:english"))
+        #expect(brainState.memoryGovernance.totalRecordCount == 1)
+        #expect(brainState.activeGoals.contains { $0.contains("Protect sleep before midnight") })
+    }
+
     @Test("runtime coordinator bootstraps and commits current brain state in one package-owned flow")
     func runtimeCoordinatorBootstrapsAndCommits() throws {
         let now = Date(timeIntervalSince1970: 1_744_322_220)
@@ -953,6 +987,35 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(artifact.execution.orderedTemplateIDs == ["night_message_cooling"])
         #expect(artifact.execution.orderedFailurePatternIDs == ["night_fast_path_failure"])
         #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.rawValue)
+    }
+
+    @Test("bridge input builder compiles task graph hint into raw bridge payload")
+    func bridgeInputBuilderCompilesTaskGraphHint() {
+        let now = Date(timeIntervalSince1970: 1_744_322_205)
+        let input = BASAppleCurrentBrainBootstrapBridgeInputBuilder.build(
+            modeID: BASDecisionMode.quick.rawValue,
+            prompt: "Should I wait until morning?",
+            triggerID: BASCurrentBrainBootstrapTrigger.notification.rawValue,
+            sourceSurfaceOverrideID: BASInteractionSurface.notification.rawValue,
+            riskLevelOverrideID: BASRiskLevel.high.rawValue,
+            preferredLanguages: ["en-AU"],
+            now: now,
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+            embeddingScores: [BASAppleEmbeddingScoreInput(id: "goal-1", score: 0.8)],
+            taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput(
+                headline: "Pause before you send.",
+                activeNodeCount: 1,
+                hasResumeCandidate: true,
+                resumeHint: "Sleep on it."
+            ),
+            retrievalMode: "filtered"
+        )
+
+        #expect(input.taskGraphHeadline == "Pause before you send.")
+        #expect(input.taskGraphActiveNodeCount == 1)
+        #expect(input.taskGraphHasResumeCandidate == true)
+        #expect(input.taskGraphResumeHint == "Sleep on it.")
+        #expect(input.embeddingScores.map(\.id) == ["goal-1"])
     }
 
     @Test("bootstrap coordinator sequences recommendation and selection before compiling artifact")

@@ -460,6 +460,39 @@ public struct BASAppleCurrentBrainBootstrapBridgeInput: Codable, Equatable, Send
     }
 }
 
+public enum BASAppleCurrentBrainBootstrapBridgeInputBuilder {
+    public static func build(
+        modeID: String,
+        prompt: String,
+        triggerID: String,
+        sourceSurfaceOverrideID: String? = nil,
+        riskLevelOverrideID: String? = nil,
+        preferredLanguages: [String] = [],
+        now: Date = .now,
+        projection: BASBrainProjection,
+        embeddingScores: [BASAppleEmbeddingScoreInput] = [],
+        taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput? = nil,
+        retrievalMode: String
+    ) -> BASAppleCurrentBrainBootstrapBridgeInput {
+        BASAppleCurrentBrainBootstrapBridgeInput(
+            modeID: modeID,
+            prompt: prompt,
+            triggerID: triggerID,
+            sourceSurfaceOverrideID: sourceSurfaceOverrideID,
+            riskLevelOverrideID: riskLevelOverrideID,
+            preferredLanguages: preferredLanguages,
+            now: now,
+            projection: projection,
+            embeddingScores: embeddingScores,
+            taskGraphHeadline: taskGraphHint?.headline,
+            taskGraphActiveNodeCount: taskGraphHint?.activeNodeCount,
+            taskGraphHasResumeCandidate: taskGraphHint?.hasResumeCandidate,
+            taskGraphResumeHint: taskGraphHint?.resumeHint,
+            retrievalMode: retrievalMode
+        )
+    }
+}
+
 public struct BASAppleCurrentBrainBootstrapBridgeResult<
     Update: BASAppleCurrentBrainUpdateEntity,
     Checkpoint: BASAppleEvolutionCheckpointEntity

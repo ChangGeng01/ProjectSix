@@ -88,14 +88,11 @@ enum DecisionMemorySystem {
         retrievalMode: DecisionRetrievalMode = .filtered,
         now: Date = .now
     ) -> DecisionBrainState {
-        BASAppleCurrentBrainStateCompiler.brainState(
+        BASAppleCurrentBrainProjectionStateCompiler.appSessionBrainState(
             modeID: mode.rawValue,
             prompt: prompt,
             projection: projection.baseProjection,
             retrievalMode: retrievalMode.rawValue,
-            triggerID: BrainStateUpdateSource.sessionPrime.rawValue,
-            sourceSurfaceOverrideID: DecisionIntentSourceSurface.app.rawValue,
-            riskLevelOverrideID: InterventionRiskLevel.low.rawValue,
             preferredLanguages: Locale.preferredLanguages,
             now: now
         )

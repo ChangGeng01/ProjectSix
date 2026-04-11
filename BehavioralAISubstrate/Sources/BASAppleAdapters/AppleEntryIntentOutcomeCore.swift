@@ -45,6 +45,37 @@ public struct BASAppleEntryIntentResolution: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASAppleEntryIntentRuntimeInput: Codable, Equatable, Sendable {
+    public var kindID: String
+    public var surfaceID: String
+    public var preferredModeID: String?
+    public var scenarioID: String?
+    public var promptSeed: String?
+    public var riskLevelID: String?
+    public var triggerReason: String?
+    public var expiresAt: Date
+
+    public init(
+        kindID: String,
+        surfaceID: String,
+        preferredModeID: String? = nil,
+        scenarioID: String? = nil,
+        promptSeed: String? = nil,
+        riskLevelID: String? = nil,
+        triggerReason: String? = nil,
+        expiresAt: Date
+    ) {
+        self.kindID = kindID
+        self.surfaceID = surfaceID
+        self.preferredModeID = preferredModeID
+        self.scenarioID = scenarioID
+        self.promptSeed = promptSeed
+        self.riskLevelID = riskLevelID
+        self.triggerReason = triggerReason
+        self.expiresAt = expiresAt
+    }
+}
+
 public enum BASAppleEntryIntentOutcomeBuilder {
     public static func resolve(
         kindID: String,
@@ -106,6 +137,35 @@ public enum BASAppleEntryIntentOutcomeBuilder {
             preferredModeID: plan.preferredModeID,
             reason: plan.triggerReason ?? "A recent pattern suggests more friction before acting.",
             expiresAt: expiresAt
+        )
+    }
+}
+
+public enum BASAppleEntryIntentRuntimeExecutor {
+    public static func execute(
+        input: BASAppleEntryIntentRuntimeInput,
+        performQuickCapture: (BASAppleEntryIntentActionPlan) -> Void,
+        performOpenMode: (BASAppleEntryIntentActionPlan) -> Void,
+        performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
+        performRestoreWorkspace: () -> Void,
+        refreshCurrentBrain: (String) -> Void
+    ) {
+        BASAppleEntryIntentOutcomeExecutor.execute(
+            resolution: BASAppleEntryIntentOutcomeBuilder.resolve(
+                kindID: input.kindID,
+                surfaceID: input.surfaceID,
+                preferredModeID: input.preferredModeID,
+                scenarioID: input.scenarioID,
+                promptSeed: input.promptSeed,
+                riskLevelID: input.riskLevelID,
+                triggerReason: input.triggerReason,
+                expiresAt: input.expiresAt
+            ),
+            performQuickCapture: performQuickCapture,
+            performOpenMode: performOpenMode,
+            performPredictiveIntervention: performPredictiveIntervention,
+            performRestoreWorkspace: performRestoreWorkspace,
+            refreshCurrentBrain: refreshCurrentBrain
         )
     }
 }
