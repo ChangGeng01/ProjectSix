@@ -31,42 +31,43 @@ struct BASReferencePromptModesCoreTests {
     @Test("quick envelope compiles structured state and secondary actions")
     func quickEnvelopeCompilesStructuredState() {
         let envelope = BASReferencePromptBuilder.primaryEnvelope(
-            BASQuickRefinementPromptRequest(
+            BASPrimaryRefinementPromptRequest(
                 kind: TestKind.quick,
                 modeTitle: "Quick",
-                scenarioTitle: "Buy",
-                motivationTitle: "Reward",
-                expectedOutcomeTitle: "Temporary relief",
-                controlLevelTitle: "Maybe",
-                note: "",
-                currentPerspective: "You want a little relief.",
-                afterPerspective: "It may not feel worth it tomorrow.",
-                verdictTitle: "Pause",
-                primaryActionTitle: "Wait 90s",
-                secondaryActionTitles: ["Decide tomorrow"]
+                entryContext: "Buy",
+                currentDrive: "Reward",
+                anticipatedShift: "Temporary relief",
+                controlEstimate: "Maybe",
+                hostNote: "",
+                presentView: "You want a little relief.",
+                laterView: "It may not feel worth it tomorrow.",
+                currentVerdict: "Pause",
+                preferredAction: "Wait 90s",
+                alternateActions: ["Decide tomorrow"]
             )
         )
 
         #expect(envelope.payload.contains("\"mode\":\"Quick\""))
-        #expect(envelope.payload.contains("\"note\":\"Not provided.\""))
-        #expect(envelope.payload.contains("Current perspective: You want a little relief."))
-        #expect(envelope.payload.contains("Secondary actions: Decide tomorrow"))
+        #expect(envelope.payload.contains("\"entry_context\":\"Buy\""))
+        #expect(envelope.payload.contains("\"host_note\":\"Not provided.\""))
+        #expect(envelope.payload.contains("Present view: You want a little relief."))
+        #expect(envelope.payload.contains("Alternate actions: Decide tomorrow"))
         #expect(envelope.assembly.kernelSnapshot.truthState == nil)
     }
 
     @Test("selection envelope remains available through the generic facade")
     func selectionEnvelopeUsesGenericFacade() {
         let envelope = BASReferencePromptBuilder.selectionEnvelope(
-            BASReminderSelectionPromptRequest(
+            BASSelectionPromptRequest(
                 kind: TestKind.reminder,
                 modeTitle: "Primary",
-                scenarioTitle: "Buy",
-                prompt: "I want to buy this tonight.",
+                entryContext: "Buy",
+                activePrompt: "I want to buy this tonight.",
                 candidateTexts: [
                     "Hold it until tomorrow morning.",
                     "Put it in the holding lane and sleep on it."
                 ],
-                reminderSurfaceMode: .primary
+                selectionSurfaceMode: .primary
             )
         )
 
@@ -122,6 +123,25 @@ struct BASReferencePromptModesCoreTests {
                     BASAdaptiveTraceKind.primaryID: "Keep the interruption short, calm, and non-shaming."
                 ]
             ),
+            slotVocabularyByKindID: [
+                BASSemanticTaskKind.primaryID: BASReferencePromptSlotVocabulary(
+                    stateKeysBySlotID: [
+                        "mode": "mode",
+                        "scenario": "scenario",
+                        "motivation": "motivation",
+                        "expected_outcome": "expected_outcome",
+                        "control_level": "control_level",
+                        "note": "note"
+                    ],
+                    evidenceLabelsBySlotID: [
+                        "current_perspective": "Current perspective",
+                        "after_perspective": "After perspective",
+                        "verdict": "Verdict",
+                        "primary_action": "Primary action",
+                        "secondary_actions": "Secondary actions"
+                    ]
+                )
+            ],
             outputGuardsByKindID: [
                 BASSemanticTaskKind.primaryID: [
                     "Keep the host-specific viewpoint framing."
@@ -153,6 +173,10 @@ struct BASReferencePromptModesCoreTests {
 
         #expect(envelope.layers.immutablePrefix == "Host immutable prefix.")
         #expect(envelope.layers.adaptivePrefix == "Host quick adaptive prefix.")
+        #expect(envelope.payload.contains("\"scenario\":\"Buy\""))
+        #expect(envelope.payload.contains("\"note\":\"Not provided.\""))
+        #expect(envelope.payload.contains("Current perspective: You want a little relief."))
+        #expect(envelope.payload.contains("Secondary actions: Decide tomorrow"))
         #expect(envelope.payload.contains("Keep the host-specific viewpoint framing."))
         #expect(envelope.budget.targetCharacters == 900)
         #expect(envelope.frontstageState.focusGoal == "Host quick focus goal.")

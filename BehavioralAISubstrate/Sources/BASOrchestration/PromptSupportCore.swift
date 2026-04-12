@@ -162,25 +162,30 @@ public enum BASPromptPrefixCatalog {
     Keep the tone calm, short, and non-shaming.
     """
 
-    public static let quick = """
+    public static let primary = """
     Rewrite only the supplied primary guidance fields.
     Keep the same meaning and do not change verdicts or actions.
     """
 
-    public static let balance = """
+    public static let comparative = """
     Tighten the supplied comparative fields without inventing new facts or turning them into a verdict.
     Preserve the same focus and next-step intent.
     """
 
-    public static let mirror = """
+    public static let reflective = """
     Clarify the supplied reflective fields without becoming dramatic, therapeutic, or binary.
     Preserve the same tension and reflective next move.
     """
 
-    public static let reminder = """
+    public static let selection = """
     Pick one retained candidate that best matches the current state.
     Do not rewrite or invent candidate text.
     """
+
+    public static let quick = primary
+    public static let balance = comparative
+    public static let mirror = reflective
+    public static let reminder = selection
 
     public static func instructions(
         for kind: BASSemanticTaskKind,

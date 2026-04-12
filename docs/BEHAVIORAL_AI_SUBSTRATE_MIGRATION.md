@@ -142,6 +142,84 @@ let runtime = BASHostRuntime(
 
 This keeps substrate execution generic while moving workflow strategy DNA back into the host.
 
+## Reference Prompt Vocabulary Migration
+
+Reference prompt slot vocabulary is now host-owned.
+
+Substrate defaults now prefer neutral prompt schema keys and labels such as:
+
+- state keys:
+  - `entry_context`
+  - `current_drive`
+  - `anticipated_shift`
+  - `pull`
+  - `counterforce`
+  - `durable_priority`
+- evidence labels:
+  - `Present view`
+  - `Later view`
+  - `Current verdict`
+  - `Priority label`
+  - `Recurring tension`
+
+If a host previously depended on substrate defaults for branded prompt keys or evidence labels, move them into a host-owned `BASReferencePromptBehavior.slotVocabularyByKindID` override.
+
+Typical host-owned vocabulary concerns:
+
+- prompt field keys like `scenario`, `motivation`, `want`, `concern`, `self_lens`
+- evidence labels like `Current perspective`, `After perspective`, `Focus title`, `Core tension`, `Next action`
+- reminder prompt field names like `current_prompt`
+
+Example pattern:
+
+```swift
+let behavior = BASReferencePromptBehavior(
+    slotVocabularyByKindID: [
+        BASSemanticTaskKind.quick.rawValue: BASReferencePromptSlotVocabulary(
+            stateKeysBySlotID: [
+                "scenario": "scenario"
+            ],
+            evidenceLabelsBySlotID: [
+                "current_perspective": "Current perspective"
+            ]
+        )
+    ]
+)
+```
+
+This keeps substrate prompt compilation generic while letting each host keep its own vocabulary, copy, and product worldview.
+
+## Reference Prompt Request Surface Migration
+
+Reference prompt request and builder APIs now prefer substrate-generic names.
+
+Preferred substrate-facing types:
+
+- `BASPrimaryRefinementPromptRequest`
+- `BASComparativeRefinementPromptRequest`
+- `BASReflectiveRefinementPromptRequest`
+- `BASSelectionPromptRequest`
+
+Preferred substrate-facing builders:
+
+- `primaryEnvelope(...)`
+- `comparativeEnvelope(...)`
+- `reflectiveEnvelope(...)`
+- `selectionEnvelope(...)`
+
+Legacy request types and helpers still work as compatibility aliases:
+
+- `BASQuickRefinementPromptRequest`
+- `BASBalanceRefinementPromptRequest`
+- `BASMirrorRefinementPromptRequest`
+- `BASReminderSelectionPromptRequest`
+- `quickEnvelope(...)`
+- `balanceEnvelope(...)`
+- `mirrorEnvelope(...)`
+- `reminderEnvelope(...)`
+
+Hosts should prefer the generic surface for any new integration work, and keep branded wording in host-owned slot vocabulary plus presentation behavior.
+
 ## Reference Hosts
 
 - [`Before`](/Users/changgeng/Project/Project06/Project06/Before) remains the full reference host.

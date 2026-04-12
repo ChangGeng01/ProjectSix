@@ -159,6 +159,67 @@ enum BeforeProductLanguage {
                 BASAdaptiveTraceKind.reminder.rawValue: "Choose from retained reminders only and do not invent new reminders."
             ]
         ),
+        slotVocabularyByKindID: [
+            BASSemanticTaskKind.quick.rawValue: BASReferencePromptSlotVocabulary(
+                stateKeysBySlotID: [
+                    "mode": "mode",
+                    "scenario": "scenario",
+                    "motivation": "motivation",
+                    "expected_outcome": "expected_outcome",
+                    "control_level": "control_level",
+                    "note": "note"
+                ],
+                evidenceLabelsBySlotID: [
+                    "current_perspective": "Current perspective",
+                    "after_perspective": "After perspective",
+                    "verdict": "Verdict",
+                    "primary_action": "Primary action",
+                    "secondary_actions": "Secondary actions"
+                ]
+            ),
+            BASSemanticTaskKind.balance.rawValue: BASReferencePromptSlotVocabulary(
+                stateKeysBySlotID: [
+                    "mode": "mode",
+                    "prompt": "prompt",
+                    "want": "want",
+                    "concern": "concern",
+                    "reality": "reality",
+                    "long_term": "long_term"
+                ],
+                evidenceLabelsBySlotID: [
+                    "headline": "Current headline",
+                    "summary": "Current summary",
+                    "focus_title": "Focus title",
+                    "focus_description": "Focus description",
+                    "next_action": "Next action"
+                ]
+            ),
+            BASSemanticTaskKind.mirror.rawValue: BASReferencePromptSlotVocabulary(
+                stateKeysBySlotID: [
+                    "mode": "mode",
+                    "prompt": "prompt",
+                    "emotion": "emotion",
+                    "relationship": "relationship",
+                    "reality": "reality",
+                    "long_term": "long_term",
+                    "self_lens": "self_lens"
+                ],
+                evidenceLabelsBySlotID: [
+                    "headline": "Current headline",
+                    "core_tension": "Core tension",
+                    "next_action_title": "Next action title",
+                    "next_action": "Next action"
+                ]
+            ),
+            BASSemanticTaskKind.reminder.rawValue: BASReferencePromptSlotVocabulary(
+                stateKeysBySlotID: [
+                    "mode": "mode",
+                    "scenario": "scenario",
+                    "current_prompt": "current_prompt",
+                    "candidate_count": "candidate_count"
+                ]
+            )
+        ],
         outputGuardsByKindID: [
             BASSemanticTaskKind.quick.rawValue: [
                 "Rewrite only the current and after perspective lines.",

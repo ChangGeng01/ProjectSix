@@ -28,6 +28,10 @@
 - `Before` now also injects its own workflow behavior namespace and template IDs through `BASHostConfiguration.workflowBehavior`, while `SampleHost` proves a second host can carry a different namespace and workflow template set without forking SDK logic.
 - `SampleHost` now proves that a second host can inject a totally different presentation profile (`Rapid Lens / Compare Lens / Reflective Lens`) without forking substrate logic.
 - Identity role titles in the substrate default profile are now more generic (`Stability Guide`, `Comparative Guide`, `Reflective Witness`, `Risk Sentinel`) so persona flavor can be layered back in the host instead of leaking from the SDK core.
+- Reference prompt slot vocabulary is now substrate-generic by default. Package-owned prompt builders now emit neutral state keys and evidence labels such as `entry_context`, `current_drive`, `Present view`, and `Priority label` unless a host injects its own slot vocabulary.
+- `Before` now explicitly injects its legacy prompt slot vocabulary (`scenario`, `motivation`, `Current perspective`, `Focus title`, `Core tension`, and related labels) back through host configuration instead of relying on substrate defaults.
+- Reference prompt request/builder façade now prefers substrate-generic types and names such as `BASPrimaryRefinementPromptRequest`, `BASComparativeRefinementPromptRequest`, `BASReflectiveRefinementPromptRequest`, `BASSelectionPromptRequest`, `primaryEnvelope`, `comparativeEnvelope`, `reflectiveEnvelope`, and `selectionEnvelope`.
+- Legacy request/builder names (`BASQuickRefinementPromptRequest`, `BASBalanceRefinementPromptRequest`, `BASMirrorRefinementPromptRequest`, `BASReminderSelectionPromptRequest`, and related helpers) remain available as compatibility aliases while hosts migrate.
 
 ### Notes
 
