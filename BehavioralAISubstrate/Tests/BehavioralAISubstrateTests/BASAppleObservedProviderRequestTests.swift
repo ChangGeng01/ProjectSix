@@ -48,7 +48,7 @@ struct BASAppleObservedProviderRequestTests {
         let descriptors = [
             BASProviderDescriptor(
                 providerID: provider.id,
-                taskAffinities: [.quick: 100],
+                taskAffinities: [.primary: 100],
                 capabilityProfile: BASProviderCapabilityProfile(
                     strengths: [.structuredOutput, .lowLatency],
                     latencyClass: .low,
@@ -57,14 +57,14 @@ struct BASAppleObservedProviderRequestTests {
                     supportsThinking: false,
                     supportsStructuredOutput: true,
                     supportsToolUse: false,
-                    bestFor: [.quick]
+                    bestFor: [.primary]
                 )
             )
         ]
         let recorder = Recorder()
 
         let runtimeInput: BASAppleProviderRequestRuntimeInput<MockProvider> = BASAppleProviderRequestRuntimeInput(
-            task: .quick,
+            task: .primary,
             preferredProviderID: provider.id,
             allowFallbacks: true,
             descriptors: descriptors,
@@ -72,7 +72,7 @@ struct BASAppleObservedProviderRequestTests {
         )
         let substrateContext = BASAppleProviderObservationContextBuilder.build(
             from: BASAppleProviderObservationSourceInput(
-                kind: "quick",
+                kind: "primary",
                 preferredProviderID: provider.id,
                 allowFallbacks: true,
                 providerProfilesByID: [
@@ -81,7 +81,7 @@ struct BASAppleObservedProviderRequestTests {
                         title: "Gemma"
                     )
                 ],
-                prompt: "quick prompt",
+                prompt: "primary prompt",
                 baselineOutputPreview: "baseline preview",
                 deterministicFallbackOutputPreview: "fallback preview",
                 recordsTemplatePinnedTrace: true
@@ -97,7 +97,7 @@ struct BASAppleObservedProviderRequestTests {
             String,
             String
         > = BASAppleHostProviderObservationContext(
-            kind: "quick",
+            kind: "primary",
             substrateContext: substrateContext
         )
 
@@ -123,7 +123,7 @@ struct BASAppleObservedProviderRequestTests {
             },
             quarantineCachedResult: { _ in },
             invokeProvider: { candidate in
-                candidate.id == provider.id ? "refined quick" : nil
+                candidate.id == provider.id ? "refined primary" : nil
             },
             assessProviderResult: { value in
                 .allow(
@@ -150,19 +150,19 @@ struct BASAppleObservedProviderRequestTests {
 
         switch outcome {
         case .resolved(let resolution):
-            #expect(resolution.execution.result == "refined quick")
+            #expect(resolution.execution.result == "refined primary")
             #expect(resolution.execution.providerID == provider.id)
         default:
             Issue.record("Expected observed executor to resolve the provider request.")
         }
 
-        #expect(snapshot.storedResults == ["refined quick"])
-        #expect(snapshot.telemetryKinds == ["quick"])
+        #expect(snapshot.storedResults == ["refined primary"])
+        #expect(snapshot.telemetryKinds == ["primary"])
         #expect(snapshot.traceDetails.count == 1)
         #expect(
             snapshot.circuitEvents.contains {
                 if case let .providerSuccess(providerID, kind, _) = $0 {
-                    return providerID == provider.id && kind == "quick"
+                    return providerID == provider.id && kind == "primary"
                 }
                 return false
             }

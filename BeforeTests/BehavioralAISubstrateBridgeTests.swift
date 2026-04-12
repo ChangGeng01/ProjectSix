@@ -1,12 +1,7 @@
 import Foundation
 import SwiftData
 import Testing
-import BASAdmin
-import BASAppleAdapters
 import BASHostKit
-import BASMemory
-import BASOrchestration
-import BASRuntimeCore
 @testable import Before
 
 @MainActor
@@ -187,11 +182,11 @@ struct BehavioralAISubstrateBridgeTests {
             now: now
         )
 
-        let runtime = BASHostRuntime()
-        let hostResult = runtime.startSession(
+        let runtime = BeforeProductCompatibility.makeHostRuntime()
+        let hostResult = try runtime.startSession(
             BASHostSessionRequest(
                 kind: .notification,
-                workflowProfile: .rapid,
+                workflowProfile: .primary,
                 surface: .notification,
                 prompt: "Should I send this tonight?",
                 title: "Should I send this tonight?",
@@ -206,20 +201,32 @@ struct BehavioralAISubstrateBridgeTests {
         )
         let expectedProfile = BASDecisionMode(identifier: bridgeSnapshot.mode).map { mode in
             switch mode {
-            case .quick:
-                BASHostWorkflowProfile.rapid
-            case .balance:
-                BASHostWorkflowProfile.deliberate
-            case .mirror:
+            case .primary:
+                BASHostWorkflowProfile.primary
+            case .comparative:
+                BASHostWorkflowProfile.comparative
+            case .reflective:
                 BASHostWorkflowProfile.reflective
             }
         }
+        let expectedTemplateCount = BeforeProductCompatibility.hostConfiguration
+            .workflowBehavior
+            .templateIDs(for: .primary)
+            .count
+        let expectedInterventionProfile = BeforeProductCompatibility.hostConfiguration
+            .lifecycleBehavior
+            .predictiveInterventionBehavior
+            .highRisk
+            .preferredModeID
+            .flatMap {
+                BeforeProductCompatibility.hostConfiguration.workflowBehavior.workflowProfile(forModeID: $0)
+            }
 
         #expect(hostResult.currentBrain.workflowProfile == expectedProfile)
-        #expect(hostResult.currentBrain.activeTemplateCount == 0)
+        #expect(hostResult.currentBrain.activeTemplateCount == expectedTemplateCount)
         #expect(hostResult.currentBrain.failureGuardCount > 0)
         #expect(hostResult.currentBrain.activeConstraints.contains("high-risk-confirmation"))
-        #expect(hostResult.interventionSuggestion?.preferredWorkflowProfile == expectedProfile)
+        #expect(hostResult.interventionSuggestion?.preferredWorkflowProfile == expectedInterventionProfile)
         #expect(hostResult.interventionSuggestion?.riskLevel.rawValue == bridgeCurrent.riskLevel.rawValue)
     }
 
@@ -244,11 +251,11 @@ struct BehavioralAISubstrateBridgeTests {
 
         let updates = try context.fetch(FetchDescriptor<BrainStateUpdate>())
 
-        #expect(current.source == .sessionPrime)
+        #expect(current.source == .sessionBootstrap)
         #expect(current.mode == .quick)
         #expect(current.sourceSurface == .app)
         #expect(current.activeTemplateIDs.isEmpty == false)
-        #expect(updates.last?.source == .sessionPrime)
+        #expect(updates.last?.source == .sessionBootstrap)
     }
 
     @Test
@@ -275,7 +282,7 @@ struct BehavioralAISubstrateBridgeTests {
         )
 
         #expect(outcome.refreshedProjection)
-        #expect(outcome.currentBrain.source == .sessionPrime)
+        #expect(outcome.currentBrain.source == .sessionBootstrap)
         #expect(outcome.currentBrain.mode == .quick)
         #expect(outcome.currentBrain.activeTemplateIDs.isEmpty == false)
         #expect(outcome.currentBrain.verificationSnapshot.fingerprint.isEmpty == false)

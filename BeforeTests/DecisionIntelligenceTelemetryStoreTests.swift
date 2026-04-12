@@ -128,7 +128,7 @@ final class DecisionIntelligenceTelemetryStoreTests: XCTestCase {
         XCTAssertEqual(snapshot.admissionSkipCountByReasonAndKind[.templateAlreadySufficient]?[.quick], 1)
     }
 
-    func testSnapshotTracksReminderKnowledgeAndControlNeed() async {
+    func testSnapshotTracksSelectionKnowledgeAndControlNeed() async {
         let store = DecisionIntelligenceTelemetryStore()
 
         await store.record(
@@ -143,7 +143,7 @@ final class DecisionIntelligenceTelemetryStoreTests: XCTestCase {
                 pressure: .low,
                 reason: "Deterministic leader is already clear.",
                 skipReason: .retrievalNotNeeded,
-                reminderSelectionNeed: .control
+                selectionNeed: .control
             )
         )
         await store.record(
@@ -158,17 +158,17 @@ final class DecisionIntelligenceTelemetryStoreTests: XCTestCase {
                 pressure: .elevated,
                 reason: "Prompt creates real candidate conflict.",
                 skipReason: nil,
-                reminderSelectionNeed: .knowledge
+                selectionNeed: .knowledge
             )
         )
 
         let snapshot = await store.snapshot()
 
-        XCTAssertEqual(snapshot.reminderSelectionNeedCount[.control], 1)
-        XCTAssertEqual(snapshot.reminderSelectionNeedCount[.knowledge], 1)
-        XCTAssertEqual(snapshot.reminderKnowledgeNeedRate, 0.5, accuracy: 0.0001)
-        XCTAssertEqual(snapshot.reminderControlOnlyRate, 0.5, accuracy: 0.0001)
-        XCTAssertEqual(snapshot.reminderRetrievalBypassRate, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.selectionNeedCount[.control], 1)
+        XCTAssertEqual(snapshot.selectionNeedCount[.knowledge], 1)
+        XCTAssertEqual(snapshot.selectionKnowledgeNeedRate, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.selectionControlOnlyRate, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.selectionRetrievalBypassRate, 0.5, accuracy: 0.0001)
     }
 
     func testSnapshotTracksLifecycleStageMetrics() async {

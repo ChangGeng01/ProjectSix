@@ -1,50 +1,51 @@
 import Foundation
 import Testing
 @testable import BASAppleAdapters
+@testable import BASMemory
 
 @Suite("BASApple Entry Intent Plan Builder")
 struct BASAppleEntryIntentPlanBuilderTests {
-    @Test("watch quick capture stays quick and uses watch handoff refresh")
-    func watchQuickCapturePlan() {
+    @Test("watch capture keeps generic primary mode and uses watch handoff refresh")
+    func watchCapturePlan() {
         let plan = BASAppleEntryIntentPlanBuilder.plan(
-            kindID: "quickCapture",
+            kindID: "capture",
             surfaceID: "watch",
-            preferredModeID: "quick",
+            preferredModeID: BASDecisionMode.primaryID,
             scenarioID: "buy",
             promptSeed: "Hold this.",
             riskLevelID: "medium",
             triggerReason: "watch_capture"
         )
 
-        #expect(plan.actionKind == .capture)
-        #expect(plan.sourceSurface == .watch)
-        #expect(plan.refreshTriggerKind == .watchHandoff)
+        #expect(plan.actionKind == BASAppleEntryIntentActionKind.capture)
+        #expect(plan.sourceSurface == BASAppleSurface.watch)
+        #expect(plan.refreshTriggerKind == BASAppleBrainRefreshTriggerKind.watchHandoff)
         #expect(plan.promptSeed == "Hold this.")
         #expect(plan.scenarioID == "buy")
     }
 
-    @Test("reopen tomorrow routes as open mode and selects box tab")
-    func reopenTomorrowPlan() {
+    @Test("generic reopen routes as present and selects box tab")
+    func reopenPlan() {
         let plan = BASAppleEntryIntentPlanBuilder.plan(
-            kindID: "reopenTomorrowItem",
+            kindID: "reopen",
             surfaceID: "notification",
-            preferredModeID: "mirror",
+            preferredModeID: BASDecisionMode.reflectiveID,
             scenarioID: nil,
             promptSeed: "Reopen this tomorrow item.",
             riskLevelID: "high",
             triggerReason: nil
         )
 
-        #expect(plan.actionKind == .present)
+        #expect(plan.actionKind == BASAppleEntryIntentActionKind.present)
         #expect(plan.shouldSelectBoxTab)
-        #expect(plan.refreshTriggerKind == .explicitRefresh)
-        #expect(plan.preferredModeID == "mirror")
+        #expect(plan.refreshTriggerKind == BASAppleBrainRefreshTriggerKind.explicitRefresh)
+        #expect(plan.preferredModeID == BASDecisionMode.reflectiveID)
     }
 
-    @Test("resume current decision becomes restore workspace")
+    @Test("generic resume becomes restore workspace")
     func resumePlan() {
         let plan = BASAppleEntryIntentPlanBuilder.plan(
-            kindID: "resumeCurrentDecision",
+            kindID: "resume",
             surfaceID: "app",
             preferredModeID: nil,
             scenarioID: nil,
@@ -53,7 +54,7 @@ struct BASAppleEntryIntentPlanBuilderTests {
             triggerReason: nil
         )
 
-        #expect(plan.actionKind == .restore)
+        #expect(plan.actionKind == BASAppleEntryIntentActionKind.restore)
         #expect(plan.promptSeed.isEmpty)
         #expect(plan.shouldSelectBoxTab == false)
     }

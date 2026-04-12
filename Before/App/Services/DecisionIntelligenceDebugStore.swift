@@ -51,6 +51,34 @@ enum DecisionIntelligenceTraceKind: String, CaseIterable, Identifiable, Sendable
         case .reminder: "Reminder selection"
         }
     }
+
+    var substrateKindID: String {
+        switch self {
+        case .quick:
+            BASAdaptiveTraceKind.primary.identifier
+        case .balance:
+            BASAdaptiveTraceKind.comparative.identifier
+        case .mirror:
+            BASAdaptiveTraceKind.reflective.identifier
+        case .reminder:
+            BASAdaptiveTraceKind.selection.identifier
+        }
+    }
+
+    init?(substrateKindID: String) {
+        switch substrateKindID {
+        case BASAdaptiveTraceKind.primary.identifier, "quick":
+            self = .quick
+        case BASAdaptiveTraceKind.comparative.identifier, "balance":
+            self = .balance
+        case BASAdaptiveTraceKind.reflective.identifier, "mirror":
+            self = .mirror
+        case BASAdaptiveTraceKind.selection.identifier, "selection", "reminder":
+            self = .reminder
+        default:
+            return nil
+        }
+    }
 }
 
 struct DecisionIntelligenceTrace: Identifiable, Equatable, Sendable {

@@ -12,44 +12,44 @@ struct BASAppleFlightDeckAdapterTests {
     func flightDeckAdapterCompilesHostFacingReports() {
         let telemetrySummary = BASTelemetrySummary(
             input: BASTelemetrySummaryInput(
-                requestCountByKind: ["quick": 2, "mirror": 2],
+                requestCountByKind: ["primary": 2, "reflective": 2],
                 outcomeCount: [.providerSuccess: 4],
-                outcomeCountByKind: [.providerSuccess: ["quick": 2, "mirror": 2]],
+                outcomeCountByKind: [.providerSuccess: ["primary": 2, "reflective": 2]],
                 activeProviderCount: ["foundationModels": 4],
                 attemptedProviderCount: ["foundationModels": 4],
                 fallbackActivations: 0,
                 backendCount: ["coreML": 4],
                 slowRequestCountByKind: [:],
                 overTimeBudgetCountByKind: [:],
-                requestDurationTotalMsByKind: ["quick": 240, "mirror": 480],
-                firstPresentableTotalMsByKind: ["quick": 100, "mirror": 180],
-                promptAssemblyTotalMsByKind: ["quick": 40, "mirror": 80],
-                admissionEvaluationTotalMsByKind: ["quick": 20, "mirror": 40],
-                providerSelectionTotalMsByKind: ["quick": 20, "mirror": 40],
-                executionTotalMsByKind: ["quick": 160, "mirror": 320],
+                requestDurationTotalMsByKind: ["primary": 240, "reflective": 480],
+                firstPresentableTotalMsByKind: ["primary": 100, "reflective": 180],
+                promptAssemblyTotalMsByKind: ["primary": 40, "reflective": 80],
+                admissionEvaluationTotalMsByKind: ["primary": 20, "reflective": 40],
+                providerSelectionTotalMsByKind: ["primary": 20, "reflective": 40],
+                executionTotalMsByKind: ["primary": 160, "reflective": 320],
                 activeProviderDurationTotalMs: ["foundationModels": 720],
                 backendDurationTotalMs: ["coreML": 720],
                 admissionSkipCountByReason: [:],
                 admissionSkipCountByReasonAndKind: [:],
-                reminderSelectionNeedCount: [:],
-                promptCharactersTotalByKind: ["quick": 480, "mirror": 720],
-                prefixCharactersTotalByKind: ["quick": 220, "mirror": 320],
-                immutablePrefixCharactersTotalByKind: ["quick": 140, "mirror": 220],
-                adaptivePrefixCharactersTotalByKind: ["quick": 80, "mirror": 100],
-                suffixCharactersTotalByKind: ["quick": 260, "mirror": 400],
+                selectionNeedCount: [:],
+                promptCharactersTotalByKind: ["primary": 480, "reflective": 720],
+                prefixCharactersTotalByKind: ["primary": 220, "reflective": 320],
+                immutablePrefixCharactersTotalByKind: ["primary": 140, "reflective": 220],
+                adaptivePrefixCharactersTotalByKind: ["primary": 80, "reflective": 100],
+                suffixCharactersTotalByKind: ["primary": 260, "reflective": 400],
                 overTargetBudgetCountByKind: [:],
                 lowPressureModelCallCountByKind: [:],
-                reminderKindRawValue: "reminder",
-                reminderKnowledgeNeedRawValue: "knowledge",
-                reminderControlNeedRawValue: "control",
-                reminderRetrievalBypassReasonRawValues: [],
+                selectionKindRawValue: "selection",
+                selectionKnowledgeNeedRawValue: "knowledge",
+                selectionControlNeedRawValue: "control",
+                selectionRetrievalBypassReasonRawValues: [],
                 avoidableSkipReasonRawValues: []
             )
         )
         let lifecycleSummary = BASLifecycleSummaryBuilder.build(
             from: [
                 BASLifecycleTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     hasContextState: true,
                     generation: 2,
                     rebuiltSession: true,
@@ -67,7 +67,7 @@ struct BASAppleFlightDeckAdapterTests {
         let neuralSummary = BASNeuralSummaryBuilder.build(
             from: [
                 BASNeuralTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     suppressedBehaviorCount: 0,
                     dominantActionRawValue: "encourage",
                     strongestSignalRawValue: "urgency"
@@ -77,7 +77,7 @@ struct BASAppleFlightDeckAdapterTests {
         let brainSummary = BASBrainSummaryBuilder.build(
             from: [
                 BASBrainTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     dominantReactionWeight: .briefLanguage,
                     profileCoreCount: 1,
                     activeGoalCount: 1,
@@ -111,11 +111,11 @@ struct BASAppleFlightDeckAdapterTests {
                 environmentClass: .normal,
                 deviceClass: .fullPhone,
                 languageMode: .english,
-                taskEntropyByKind: ["quick": .low],
-                preferredProviderRawValueByKind: ["quick": "foundationModels"],
+                taskEntropyByKind: ["primary": .low],
+                preferredProviderRawValueByKind: ["primary": "foundationModels"],
                 strategyByKind: [
-                    "quick": BASAdaptiveTaskStrategy(
-                        kind: .quick,
+                    "primary": BASAdaptiveTaskStrategy(
+                        kind: .primary,
                         entropy: .low,
                         runtimeGear: .balanced,
                         contextBudget: 320,
@@ -132,13 +132,13 @@ struct BASAppleFlightDeckAdapterTests {
                         allowsModelInvocation: true
                     )
                 ],
-                effectivePreferredProviderRawValueByKind: ["quick": "foundationModels"],
+                effectivePreferredProviderRawValueByKind: ["primary": "foundationModels"],
                 traceInputs: [
                     BASRuntimeInspectionTraceInput(
-                        kind: "quick",
+                        kind: "primary",
                         attemptedProviderIDs: ["foundationModels", "template"],
                         runtimeStrategy: BASAdaptiveTaskStrategy(
-                            kind: .quick,
+                            kind: .primary,
                             entropy: .low,
                             runtimeGear: .balanced,
                             contextBudget: 320,

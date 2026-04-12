@@ -320,7 +320,7 @@ public enum BASAppleRuntimeExportBuilder {
         from input: BASAppleRuntimeInspectionAdaptiveStrategySourceInput
     ) -> BASAdaptiveTaskStrategy {
         BASAdaptiveTaskStrategy(
-            kind: BASAdaptiveTraceKind(rawValue: input.kindID) ?? .quick,
+            kind: BASAdaptiveTraceKind(identifier: input.kindID) ?? .primary,
             entropy: BASTaskEntropyClass(rawValue: input.entropyID) ?? .medium,
             runtimeGear: BASRuntimeGear(rawValue: input.runtimeGearID) ?? .balanced,
             contextBudget: input.contextBudget,

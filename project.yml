@@ -145,19 +145,7 @@ targets:
     dependencies:
       - target: Before
       - package: BehavioralAISubstrate
-        product: BASRuntimeCore
-      - package: BehavioralAISubstrate
-        product: BASMemory
-      - package: BehavioralAISubstrate
-        product: BASPolicy
-      - package: BehavioralAISubstrate
-        product: BASOrchestration
-      - package: BehavioralAISubstrate
-        product: BASObservability
-      - package: BehavioralAISubstrate
-        product: BASEvaluation
-      - package: BehavioralAISubstrate
-        product: BASAdmin
+        product: BASHostKit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.changgeng.before.tests

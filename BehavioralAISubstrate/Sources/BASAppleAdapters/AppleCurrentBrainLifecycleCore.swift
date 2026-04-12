@@ -65,11 +65,11 @@ public enum BASAppleCurrentBrainLifecycleExecutor {
         mapFailurePattern: (FailurePattern) -> BASAppleCurrentBrainBootstrapHostFailurePatternInput,
         onCheckpointSaveError: ((Error) -> Void)? = nil,
         onUpdateSaveError: ((Error) -> Void)? = nil
-    ) -> BASAppleCurrentBrainLifecycleResult<Update, Checkpoint> {
+    ) throws -> BASAppleCurrentBrainLifecycleResult<Update, Checkpoint> {
         prepareLifecycleState()
 
         let committed: BASAppleCurrentBrainBootstrapBridgeResult<Update, Checkpoint> =
-            BASAppleCurrentBrainBootstrapBridgeBuilder.bootstrapAndCommit(
+            try BASAppleCurrentBrainBootstrapBridgeBuilder.bootstrapAndCommit(
                 input: input,
                 in: modelContext,
                 createdAt: createdAt,

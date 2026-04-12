@@ -29,10 +29,10 @@ struct BASPromptContractCoreTests {
         #expect(result.droppedBudgetCount == 1)
     }
 
-    @Test("prompt contract compiler builds compact low-gear quick envelope with guarded output")
+    @Test("prompt contract compiler builds compact low-gear primary envelope with guarded output")
     func promptContractCompilerBuildsCompactQuickEnvelope() {
         let strategy = BASAdaptiveTaskStrategy(
-            kind: .quick,
+            kind: .primary,
             entropy: .low,
             runtimeGear: .low,
             contextBudget: 220,
@@ -47,12 +47,12 @@ struct BASPromptContractCoreTests {
 
         let envelope = BASPromptContractCompiler.compile(
             BASPromptContractRequest(
-                kind: "quick",
-                semanticKind: .quick,
-                adaptiveKind: .quick,
+                kind: "primary",
+                semanticKind: .primary,
+                adaptiveKind: .primary,
                 immutablePrefix: "Kernel identity.",
-                adaptivePrefix: "Quick lane rules.",
-                taskStateJSON: #"{"mode":"Quick","note":"Not provided."}"#,
+                adaptivePrefix: "Primary lane rules.",
+                taskStateJSON: #"{"mode":"Primary","note":"Not provided."}"#,
                 evidenceSnippets: [
                     "Current perspective: You want a little relief tonight.",
                     "After perspective: It may feel louder tomorrow.",
@@ -63,12 +63,12 @@ struct BASPromptContractCoreTests {
                     "Rewrite only the perspective lines."
                 ],
                 frontstageInput: BASPromptContractFrontstageInput(
-                    kind: .quick,
+                    kind: .primary,
                     activeStateSignalCount: 3,
                     openTextSignalCount: 1,
                     contextWasRebuilt: true,
                     staleFieldCount: 1,
-                    anchorTitles: ["quick note"],
+                    anchorTitles: ["primary note"],
                     dominantSignalTitles: ["Constraint pressure"],
                     suppressedBehaviors: ["instant_verdict"],
                     memoryHeadlines: ["Holding the decision often breaks the loop."],

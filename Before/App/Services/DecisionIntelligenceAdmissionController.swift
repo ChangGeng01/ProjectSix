@@ -11,7 +11,7 @@ enum DecisionIntelligencePromptPressure: String, CaseIterable, Sendable {
 enum DecisionIntelligenceAdmissionSkipReason: String, CaseIterable, Sendable {
     case budgetExceeded
     case prefillPressureTooHigh
-    case insufficientReminderChoice
+    case insufficientChoiceSpread
     case retrievalNotNeeded
     case templateAlreadySufficient
     case insufficientSourceMaterial
@@ -22,20 +22,20 @@ struct DecisionIntelligenceAdmissionDecision: Equatable, Sendable {
     let pressure: DecisionIntelligencePromptPressure
     let reason: String
     let skipReason: DecisionIntelligenceAdmissionSkipReason?
-    let reminderSelectionNeed: ReminderSelectionNeed?
+    let selectionNeed: ReminderSelectionNeed?
 
     init(
         isAllowed: Bool,
         pressure: DecisionIntelligencePromptPressure,
         reason: String,
         skipReason: DecisionIntelligenceAdmissionSkipReason?,
-        reminderSelectionNeed: ReminderSelectionNeed? = nil
+        selectionNeed: ReminderSelectionNeed? = nil
     ) {
         self.isAllowed = isAllowed
         self.pressure = pressure
         self.reason = reason
         self.skipReason = skipReason
-        self.reminderSelectionNeed = reminderSelectionNeed
+        self.selectionNeed = selectionNeed
     }
 }
 
@@ -52,8 +52,8 @@ enum DecisionIntelligenceAdmissionController {
 
     static func decide(
         for envelope: DecisionIntelligencePromptContract.PromptEnvelope,
-        reminderCandidateCount: Int? = nil,
-        reminderSelectionAssessment: ReminderSelectionAssessment? = nil
+        selectionCandidateCount: Int? = nil,
+        selectionAssessment: ReminderSelectionAssessment? = nil
     ) -> DecisionIntelligenceAdmissionDecision {
         DecisionIntelligenceAdmissionDecision(
             BASExecutionGovernance.admissionDecision(
@@ -61,8 +61,8 @@ enum DecisionIntelligenceAdmissionController {
                     kind: envelope.kind.adaptiveTraceKind,
                     budget: envelope.budget.promptPressureSnapshot,
                     frontstageState: envelope.frontstageState.basSummary,
-                    reminderCandidateCount: reminderCandidateCount,
-                    reminderSelectionAssessment: reminderSelectionAssessment?.basAssessment
+                    selectionCandidateCount: selectionCandidateCount,
+                    selectionAssessment: selectionAssessment?.basAssessment
                 )
             )
         )
@@ -91,8 +91,8 @@ private extension DecisionFrontstageState {
 }
 
 private extension ReminderSelectionAssessment {
-    var basAssessment: BASReminderSelectionAssessment {
-        BASReminderSelectionAssessment(
+    var basAssessment: BASSelectionAssessment {
+        BASSelectionAssessment(
             need: need.basNeed,
             reason: reason,
             promptTokenCount: promptTokenCount,
@@ -104,7 +104,7 @@ private extension ReminderSelectionAssessment {
 }
 
 private extension ReminderSelectionNeed {
-    var basNeed: BASReminderSelectionNeed {
+    var basNeed: BASSelectionNeed {
         switch self {
         case .control:
             .control
@@ -113,7 +113,7 @@ private extension ReminderSelectionNeed {
         }
     }
 
-    init(_ basNeed: BASReminderSelectionNeed) {
+    init(_ basNeed: BASSelectionNeed) {
         switch basNeed {
         case .control:
             self = .control
@@ -145,8 +145,8 @@ private extension DecisionIntelligenceAdmissionSkipReason {
             self = .budgetExceeded
         case .prefillPressureTooHigh:
             self = .prefillPressureTooHigh
-        case .insufficientReminderChoice:
-            self = .insufficientReminderChoice
+        case .insufficientChoiceSpread:
+            self = .insufficientChoiceSpread
         case .retrievalNotNeeded:
             self = .retrievalNotNeeded
         case .templateAlreadySufficient:
@@ -164,7 +164,7 @@ private extension DecisionIntelligenceAdmissionDecision {
             pressure: DecisionIntelligencePromptPressure(decision.pressure),
             reason: decision.reason,
             skipReason: decision.skipReason.map(DecisionIntelligenceAdmissionSkipReason.init),
-            reminderSelectionNeed: decision.reminderSelectionNeed.map(ReminderSelectionNeed.init)
+            selectionNeed: decision.selectionNeed.map(ReminderSelectionNeed.init)
         )
     }
 }

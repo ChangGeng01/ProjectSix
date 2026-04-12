@@ -191,7 +191,7 @@ public extension BASMemoryGovernance {
         if draft.typeID == "support", draft.evidenceCount < 2 {
             return BASMemoryGovernanceAssessment(
                 decision: .deferred,
-                reason: "Support patterns need to repeat before they count as policy."
+                reason: "Support patterns need repeated evidence before admission."
             )
         }
 

@@ -111,7 +111,7 @@ struct BASAppleCurrentBrainBootstrapTests {
         let now = Date(timeIntervalSince1970: 1_744_322_100)
         let input = BASAppleCurrentBrainBootstrapHostInputBuilder.build(
             context: BASAppleCurrentBrainBootstrapHostBuildContext(
-                modeID: BASDecisionMode.quick.rawValue,
+                modeID: BASDecisionMode.primary.rawValue,
                 prompt: "Should I wait until tomorrow?",
                 triggerID: BASCurrentBrainBootstrapTrigger.notification.rawValue,
                 sourceSurfaceOverrideID: BASInteractionSurface.notification.rawValue,
@@ -129,12 +129,14 @@ struct BASAppleCurrentBrainBootstrapTests {
                     resumeHint: "Resume tomorrow."
                 ),
                 retrievalMode: "filtered",
+                bootstrapBehavior: .generic,
+                cognitionBehavior: .generic,
                 recommendedTemplateIDs: ["night_message_cooling"]
             ),
             templates: [
                 BASAppleCurrentBrainBootstrapHostTemplateInput(
                     id: "night_message_cooling",
-                    modeID: BASDecisionMode.quick.rawValue,
+                    modeID: BASDecisionMode.primary.rawValue,
                     riskLevelID: BASRiskLevel.high.rawValue,
                     isPinned: true,
                     successCount: 3,
@@ -144,7 +146,7 @@ struct BASAppleCurrentBrainBootstrapTests {
             failurePatterns: [
                 BASAppleCurrentBrainBootstrapHostFailurePatternInput(
                     id: "night_fast_path_failure",
-                    modeID: BASDecisionMode.quick.rawValue,
+                    modeID: BASDecisionMode.primary.rawValue,
                     suppressionWeight: 0.9,
                     evidenceCount: 2,
                     updatedAt: now
@@ -154,7 +156,7 @@ struct BASAppleCurrentBrainBootstrapTests {
             mapFailurePattern: { $0 }
         )
 
-        #expect(input.modeID == BASDecisionMode.quick.rawValue)
+        #expect(input.modeID == BASDecisionMode.primary.rawValue)
         #expect(input.embeddingScores.map { $0.id } == ["memory-1"])
         #expect(input.taskGraphHint?.headline == "Pause before sending.")
         #expect(input.templates.map { $0.id } == ["night_message_cooling"])
@@ -171,7 +173,7 @@ struct BASAppleCurrentBrainBootstrapTests {
         }
 
         let context = BASAppleCurrentBrainBootstrapHostInputBuilder.context(
-            modeID: BASDecisionMode.quick.rawValue,
+            modeID: BASDecisionMode.primary.rawValue,
             prompt: "Should I sleep on this?",
             triggerID: BASCurrentBrainBootstrapTrigger.notification.rawValue,
             sourceSurfaceOverrideID: BASInteractionSurface.notification.rawValue,
@@ -191,32 +193,36 @@ struct BASAppleCurrentBrainBootstrapTests {
             hasResumeCandidate: \.hasResumeCandidate,
             resumeHint: \.resumeHint,
             retrievalMode: "filtered",
+            bootstrapBehavior: .generic,
+            cognitionBehavior: .generic,
             recommendedTemplateIDs: ["night_message_cooling"]
         )
 
         #expect(context.prompt == "Should I sleep on this?")
-        #expect(context.embeddingScores.map(\.id) == ["memory-1"])
+        #expect(context.embeddingScores.map { $0.id } == ["memory-1"])
         #expect(context.taskGraphHint?.headline == "Pause before replying.")
         #expect(context.taskGraphHint?.activeNodeCount == 2)
         #expect(context.recommendedTemplateIDs == ["night_message_cooling"])
     }
 
-    @Test("brain bootstrap request adapter compiles minimal local request without host bridge")
-    func brainBootstrapRequestAdapterBuildsRequest() {
+    @Test("brain bootstrap request adapter compiles minimal local request with neutral package defaults")
+    func brainBootstrapRequestAdapterBuildsRequest() throws {
         let now = Date(timeIntervalSince1970: 1_744_322_120)
-        let request = BASAppleBrainBootstrapRequestAdapter.request(
-            modeID: BASDecisionMode.quick.rawValue,
+        let request = try BASAppleBrainBootstrapRequestAdapter.request(
+            modeID: BASDecisionMode.primary.rawValue,
             prompt: "Should I send this tonight?",
-            triggerID: BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue,
+            triggerID: BASCurrentBrainBootstrapTrigger.sessionBootstrapID,
             sourceSurfaceOverrideID: BASInteractionSurface.app.rawValue,
             riskLevelOverrideID: BASRiskLevel.low.rawValue,
+            bootstrapBehavior: .generic,
+            cognitionBehavior: .generic,
             preferredLanguages: ["en-AU"],
             now: now,
             retrievalMode: "filtered"
         )
 
-        #expect(request.mode == BASDecisionMode.quick)
-        #expect(request.source == BASMemorySource.history)
+        #expect(request.mode == BASDecisionMode.primary)
+        #expect(request.source == BASMemorySource.pattern)
         #expect(request.sourceSurface == BASInteractionSurface.app)
         #expect(request.riskLevel == BASRiskLevel.low)
         #expect(request.retrievalMode == "filtered")
@@ -224,9 +230,9 @@ struct BASAppleCurrentBrainBootstrapTests {
     }
 
     @Test("brain state compiler keeps request defaults package-owned")
-    func currentBrainStateCompilerBuildsBrainStateFromProjection() {
-        let brainState = BASAppleCurrentBrainStateCompiler.brainState(
-            modeID: BASDecisionMode.quick.rawValue,
+    func currentBrainStateCompilerBuildsBrainStateFromProjection() throws {
+        let brainState = try BASAppleCurrentBrainStateCompiler.brainState(
+            modeID: BASDecisionMode.primary.rawValue,
             prompt: "Should I sleep on this?",
             projection: BASBrainProjection(
                 records: [
@@ -237,7 +243,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                         sensitivity: .low,
                         tier: .hot,
                         confidence: 0.93,
-                        sourceType: "history",
+                        sourceType: "archive",
                         governanceStatus: .governed,
                         provenanceSummary: "goal"
                     )
@@ -255,10 +261,10 @@ struct BASAppleCurrentBrainBootstrapTests {
     }
 
     @Test("projection brain state compiler owns app-session defaults")
-    func projectionBrainStateCompilerBuildsAppSessionDefaults() {
+    func projectionBrainStateCompilerBuildsAppSessionDefaults() throws {
         let now = Date(timeIntervalSince1970: 1_744_322_180)
-        let brainState = BASAppleCurrentBrainProjectionStateCompiler.appSessionBrainState(
-            modeID: BASDecisionMode.quick.rawValue,
+        let brainState = try BASAppleCurrentBrainProjectionStateCompiler.appSessionBrainState(
+            modeID: BASDecisionMode.primary.rawValue,
             prompt: "Should I buy this tonight?",
             projection: BASBrainProjection(
                 records: [
@@ -269,7 +275,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                         sensitivity: .low,
                         tier: .hot,
                         confidence: 0.92,
-                        sourceType: "history",
+                        sourceType: "archive",
                         governanceStatus: .governed,
                         provenanceSummary: "goal"
                     )
@@ -282,7 +288,7 @@ struct BASAppleCurrentBrainBootstrapTests {
             now: now
         )
 
-        #expect(brainState.retrievalTags.contains("quick"))
+        #expect(brainState.retrievalTags.contains(BASDecisionMode.primaryID))
         #expect(brainState.retrievalTags.contains("lang:english"))
         #expect(brainState.memoryGovernance.totalRecordCount == 1)
         #expect(brainState.activeGoals.contains { $0.contains("Protect sleep before midnight") })
@@ -299,9 +305,9 @@ struct BASAppleCurrentBrainBootstrapTests {
         let context = ModelContext(container)
 
         let result: BASAppleCurrentBrainBootstrapCommitResult<UpdateFixture, CheckpointFixture> =
-            BASAppleCurrentBrainRuntimeCoordinator.bootstrapAndCommit(
+            try BASAppleCurrentBrainRuntimeCoordinator.bootstrapAndCommit(
                 context: BASAppleCurrentBrainBootstrapHostBuildContext(
-                    modeID: BASDecisionMode.quick.rawValue,
+                    modeID: BASDecisionMode.primary.rawValue,
                     prompt: "Should I send this tonight?",
                     triggerID: BASCurrentBrainBootstrapTrigger.notification.rawValue,
                     sourceSurfaceOverrideID: BASInteractionSurface.notification.rawValue,
@@ -317,7 +323,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                                 sensitivity: .low,
                                 tier: .hot,
                                 confidence: 0.94,
-                                sourceType: "history",
+                                sourceType: "archive",
                                 governanceStatus: .governed,
                                 provenanceSummary: "goal"
                             )
@@ -335,6 +341,9 @@ struct BASAppleCurrentBrainBootstrapTests {
                         resumeHint: "Sleep on it."
                     ),
                     retrievalMode: "filtered"
+                    ,
+                    bootstrapBehavior: .generic,
+                    cognitionBehavior: .generic
                 ),
                 in: context,
                 createdAt: now,
@@ -345,7 +354,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                     [
                         BASAppleCurrentBrainBootstrapHostTemplateInput(
                             id: "night_message_cooling",
-                            modeID: BASDecisionMode.quick.rawValue,
+                            modeID: BASDecisionMode.primary.rawValue,
                             riskLevelID: BASRiskLevel.high.rawValue,
                             isPinned: true,
                             successCount: 3,
@@ -357,7 +366,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                     [
                         BASAppleCurrentBrainBootstrapHostFailurePatternInput(
                             id: "night_fast_path_failure",
-                            modeID: BASDecisionMode.quick.rawValue,
+                            modeID: BASDecisionMode.primary.rawValue,
                             suppressionWeight: 0.9,
                             evidenceCount: 2,
                             updatedAt: now
@@ -389,9 +398,9 @@ struct BASAppleCurrentBrainBootstrapTests {
         let context = ModelContext(container)
 
         let result: BASAppleCurrentBrainBootstrapBridgeResult<UpdateFixture, CheckpointFixture> =
-            BASAppleCurrentBrainBootstrapBridgeBuilder.bootstrapAndCommit(
+            try BASAppleCurrentBrainBootstrapBridgeBuilder.bootstrapAndCommit(
                 input: BASAppleCurrentBrainBootstrapBridgeInput(
-                    modeID: BASDecisionMode.quick.rawValue,
+                    modeID: BASDecisionMode.primary.rawValue,
                     prompt: "Should I send this tonight?",
                     triggerID: BASCurrentBrainBootstrapTrigger.notification.rawValue,
                     sourceSurfaceOverrideID: BASInteractionSurface.notification.rawValue,
@@ -407,7 +416,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                                 sensitivity: .low,
                                 tier: .hot,
                                 confidence: 0.94,
-                                sourceType: "history",
+                                sourceType: "archive",
                                 governanceStatus: .governed,
                                 provenanceSummary: "goal"
                             )
@@ -422,7 +431,9 @@ struct BASAppleCurrentBrainBootstrapTests {
                     taskGraphActiveNodeCount: 1,
                     taskGraphHasResumeCandidate: true,
                     taskGraphResumeHint: "Sleep on it.",
-                    retrievalMode: "filtered"
+                    retrievalMode: "filtered",
+                    bootstrapBehavior: .generic,
+                    cognitionBehavior: .generic
                 ),
                 in: context,
                 createdAt: now,
@@ -433,7 +444,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                     [
                         BASAppleCurrentBrainBootstrapHostTemplateInput(
                             id: "night_message_cooling",
-                            modeID: BASDecisionMode.quick.rawValue,
+                            modeID: BASDecisionMode.primary.rawValue,
                             riskLevelID: BASRiskLevel.high.rawValue,
                             isPinned: true,
                             successCount: 3,
@@ -445,7 +456,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                     [
                         BASAppleCurrentBrainBootstrapHostFailurePatternInput(
                             id: "night_fast_path_failure",
-                            modeID: BASDecisionMode.quick.rawValue,
+                            modeID: BASDecisionMode.primary.rawValue,
                             suppressionWeight: 0.9,
                             evidenceCount: 2,
                             updatedAt: now
@@ -478,9 +489,9 @@ struct BASAppleCurrentBrainBootstrapTests {
         var preparedLifecycleState = false
 
         let result: BASAppleCurrentBrainLifecycleResult<UpdateFixture, CheckpointFixture> =
-            BASAppleCurrentBrainLifecycleExecutor.bootstrapAndCommit(
+            try BASAppleCurrentBrainLifecycleExecutor.bootstrapAndCommit(
                 input: BASAppleCurrentBrainBootstrapBridgeInput(
-                    modeID: BASDecisionMode.quick.rawValue,
+                    modeID: BASDecisionMode.primary.rawValue,
                     prompt: "Should I pause before sending this?",
                     triggerID: BASCurrentBrainBootstrapTrigger.notification.rawValue,
                     sourceSurfaceOverrideID: BASInteractionSurface.notification.rawValue,
@@ -496,7 +507,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                                 sensitivity: .low,
                                 tier: .hot,
                                 confidence: 0.94,
-                                sourceType: "history",
+                                sourceType: "archive",
                                 governanceStatus: .governed,
                                 provenanceSummary: "goal"
                             )
@@ -511,7 +522,9 @@ struct BASAppleCurrentBrainBootstrapTests {
                     taskGraphActiveNodeCount: 1,
                     taskGraphHasResumeCandidate: true,
                     taskGraphResumeHint: "Sleep on it.",
-                    retrievalMode: "filtered"
+                    retrievalMode: "filtered",
+                    bootstrapBehavior: .generic,
+                    cognitionBehavior: .generic
                 ),
                 in: context,
                 createdAt: now,
@@ -525,7 +538,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                     [
                         BASAppleCurrentBrainBootstrapHostTemplateInput(
                             id: "night_message_cooling",
-                            modeID: BASDecisionMode.quick.rawValue,
+                            modeID: BASDecisionMode.primary.rawValue,
                             riskLevelID: BASRiskLevel.high.rawValue,
                             isPinned: true,
                             successCount: 5,
@@ -537,7 +550,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                     [
                         BASAppleCurrentBrainBootstrapHostFailurePatternInput(
                             id: "night_fast_path_failure",
-                            modeID: BASDecisionMode.quick.rawValue,
+                            modeID: BASDecisionMode.primary.rawValue,
                             suppressionWeight: 0.8,
                             evidenceCount: 3,
                             updatedAt: now
@@ -550,7 +563,7 @@ struct BASAppleCurrentBrainBootstrapTests {
 
         #expect(preparedLifecycleState)
         #expect(result.triggerID == BASCurrentBrainBootstrapTrigger.notification.rawValue)
-        #expect(result.modeID == BASDecisionMode.quick.rawValue)
+        #expect(result.modeID == BASDecisionMode.primary.rawValue)
         #expect(result.sourceSurfaceID == BASInteractionSurface.notification.rawValue)
         #expect(result.riskLevelID == BASRiskLevel.high.rawValue)
         #expect(result.loadedAt == now)
@@ -561,7 +574,7 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(result.commit.orderedCheckpoints.count == 1)
     }
 
-    @Test("prepare resolves default surface, language mode, memory source, and risk overrides")
+    @Test("prepare resolves neutral default surface, language mode, memory source, and risk overrides")
     func prepareResolvesBootstrapInputs() {
         var components = DateComponents()
         components.calendar = Calendar(identifier: .gregorian)
@@ -575,7 +588,7 @@ struct BASAppleCurrentBrainBootstrapTests {
 
         let preparation = BASCurrentBrainBootstrapCoordinator.prepare(
             request: BASCurrentBrainBootstrapPreparationRequest(
-                mode: .quick,
+                mode: .primary,
                 prompt: "我想现在就发这条消息",
                 trigger: .watchHandoff,
                 riskLevelOverride: .high,
@@ -586,7 +599,7 @@ struct BASAppleCurrentBrainBootstrapTests {
 
         #expect(preparation.sourceSurface == .watch)
         #expect(preparation.languageMode == .chinese)
-        #expect(preparation.memorySource == .history)
+        #expect(preparation.memorySource == .pattern)
         #expect(preparation.riskLevel == .high)
     }
 
@@ -594,7 +607,7 @@ struct BASAppleCurrentBrainBootstrapTests {
     func prepareHonorsHostInjectedBootstrapBehavior() {
         let preparation = BASCurrentBrainBootstrapCoordinator.prepare(
             request: BASCurrentBrainBootstrapPreparationRequest(
-                mode: .balance,
+                mode: .comparative,
                 prompt: "Compare these two options with more structure.",
                 trigger: .watchHandoff,
                 preferredLanguages: ["en-AU"],
@@ -604,10 +617,10 @@ struct BASAppleCurrentBrainBootstrapTests {
                     ],
                     enforcedSourceSurfaceByTriggerID: [:],
                     memorySourceOverridesByTriggerID: [
-                        BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue: BASMemorySource.history.rawValue
+                        BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue: BASMemorySource.archive.rawValue
                     ],
                     memorySourceOverridesByModeID: [
-                        BASDecisionMode.balance.identifier: BASMemorySource.pattern.rawValue
+                        BASDecisionMode.comparative.identifier: BASMemorySource.pattern.rawValue
                     ]
                 ),
                 now: Date(timeIntervalSince1970: 1_744_322_320)
@@ -622,13 +635,13 @@ struct BASAppleCurrentBrainBootstrapTests {
     func bootstrapOrdersInterventionsAndBuildsBrainState() {
         let now = Date(timeIntervalSince1970: 1_744_321_800)
         let preparation = BASCurrentBrainBootstrapPreparation(
-            mode: .quick,
+            mode: .primary,
             prompt: "Should I send this tonight?",
             trigger: .notification,
             sourceSurface: .app,
             riskLevel: .medium,
             languageMode: .english,
-            memorySource: .reminder,
+            memorySource: .cue,
             now: now
         )
         let projection = BASBrainProjection(
@@ -640,7 +653,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                     sensitivity: .low,
                     tier: .hot,
                     confidence: 0.92,
-                    sourceType: "history",
+                    sourceType: "archive",
                     governanceStatus: .governed,
                     provenanceSummary: "goal"
                 ),
@@ -651,7 +664,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                     sensitivity: .medium,
                     tier: .warm,
                     confidence: 0.84,
-                    sourceType: "history",
+                    sourceType: "archive",
                     governanceStatus: .governed,
                     provenanceSummary: "support"
                 )
@@ -671,11 +684,12 @@ struct BASAppleCurrentBrainBootstrapTests {
                     resumeHint: "Pause before you send."
                 ),
                 retrievalMode: "filtered",
+                cognitionBehavior: .generic,
                 recommendedTemplateIDs: ["night_message_cooling"],
                 templates: [
                     BASInterventionTemplateDescriptor(
                         id: "fallback_template",
-                        mode: .quick,
+                        mode: .primary,
                         riskLevel: .medium,
                         isPinned: false,
                         successCount: 5,
@@ -683,7 +697,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                     ),
                     BASInterventionTemplateDescriptor(
                         id: "night_message_cooling",
-                        mode: .quick,
+                        mode: .primary,
                         riskLevel: .medium,
                         isPinned: true,
                         successCount: 1,
@@ -693,7 +707,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                 failurePatterns: [
                     BASFailurePatternDescriptor(
                         id: "night_fast_path_failure",
-                        mode: .quick,
+                        mode: .primary,
                         suppressionWeight: 0.9,
                         evidenceCount: 3,
                         updatedAt: now
@@ -708,14 +722,14 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(execution.bootstrapped.failureGuardIDs == execution.orderedFailurePatternIDs)
         #expect(execution.bootstrapped.taskGraphHint?.headline == "Pause before you send.")
         #expect(execution.bootstrapped.brainState.boundaryPolicy.riskLevel == .medium)
-        #expect(execution.bootstrapped.brainState.memorySlices.contains(where: { $0.role == .goal }))
+        #expect(execution.bootstrapped.brainState.memorySlices.contains(where: { $0.role == BASBrainMemoryRole.goal }))
     }
 
     @Test("apple bootstrap adapter owns projection enrichment and intervention descriptor shaping")
     func appleBootstrapAdapterOwnsProjectionEnrichmentAndDescriptors() {
         let now = Date(timeIntervalSince1970: 1_744_321_900)
         let preparation = BASCurrentBrainBootstrapPreparation(
-            mode: .mirror,
+            mode: .reflective,
             prompt: "Should I reopen this conflict tonight?",
             trigger: .watchHandoff,
             sourceSurface: .watch,
@@ -734,7 +748,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                     sensitivity: .low,
                     tier: .hot,
                     confidence: 0.95,
-                    sourceType: "history",
+                    sourceType: "archive",
                     governanceStatus: .governed,
                     provenanceSummary: "Repeated reflection"
                 )
@@ -764,7 +778,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                 templates: [
                     BASAppleCurrentBrainBootstrapTemplateInput(
                         id: "fallback_template",
-                        mode: .mirror,
+                        mode: .reflective,
                         riskLevel: .high,
                         isPinned: false,
                         successCount: 4,
@@ -772,7 +786,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                     ),
                     BASAppleCurrentBrainBootstrapTemplateInput(
                         id: "night_message_cooling",
-                        mode: .mirror,
+                        mode: .reflective,
                         riskLevel: .high,
                         isPinned: true,
                         successCount: 2,
@@ -782,7 +796,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                 failurePatterns: [
                     BASAppleCurrentBrainBootstrapFailurePatternInput(
                         id: "night_fast_path_failure",
-                        mode: .mirror,
+                        mode: .reflective,
                         suppressionWeight: 0.95,
                         evidenceCount: 3,
                         updatedAt: now
@@ -825,13 +839,13 @@ struct BASAppleCurrentBrainBootstrapTests {
         let execution = BASAppleCurrentBrainBootstrapAdapter.bootstrap(
             request: BASAppleCurrentBrainBootstrapRequest(
                 preparation: BASCurrentBrainBootstrapPreparation(
-                    mode: .quick,
+                    mode: .primary,
                     prompt: "Should I wait until tomorrow?",
                     trigger: .launch,
                     sourceSurface: .app,
                     riskLevel: .low,
                     languageMode: .english,
-                    memorySource: .history,
+                    memorySource: .archive,
                     now: now
                 ),
                 baseProjection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
@@ -852,13 +866,13 @@ struct BASAppleCurrentBrainBootstrapTests {
     func appleBootstrapArtifactOwnsPersistenceInputShaping() {
         let now = Date(timeIntervalSince1970: 1_744_322_000)
         let preparation = BASCurrentBrainBootstrapPreparation(
-            mode: .quick,
+            mode: .primary,
             prompt: "Should I wait until tomorrow?",
             trigger: .notification,
             sourceSurface: .notification,
             riskLevel: .medium,
             languageMode: .english,
-            memorySource: .reminder,
+            memorySource: .cue,
             now: now
         )
 
@@ -874,7 +888,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                             sensitivity: .low,
                             tier: .hot,
                             confidence: 0.92,
-                            sourceType: "history",
+                            sourceType: "archive",
                             governanceStatus: .governed,
                             provenanceSummary: "Repeated reflection"
                         )
@@ -889,11 +903,12 @@ struct BASAppleCurrentBrainBootstrapTests {
                     resumeHint: "Reopen after sleep."
                 ),
                 retrievalMode: "filtered",
+                cognitionBehavior: .generic,
                 recommendedTemplateIDs: ["night_message_cooling"],
                 templates: [
                     BASAppleCurrentBrainBootstrapTemplateInput(
                         id: "night_message_cooling",
-                        mode: .quick,
+                        mode: .primary,
                         riskLevel: .medium,
                         isPinned: true,
                         successCount: 2,
@@ -903,7 +918,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                 failurePatterns: [
                     BASAppleCurrentBrainBootstrapFailurePatternInput(
                         id: "night_fast_path_failure",
-                        mode: .quick,
+                        mode: .primary,
                         suppressionWeight: 0.95,
                         evidenceCount: 2,
                         updatedAt: now
@@ -913,7 +928,7 @@ struct BASAppleCurrentBrainBootstrapTests {
         )
 
         #expect(artifact.execution.orderedTemplateIDs == ["night_message_cooling"])
-        #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.identifier)
+        #expect(artifact.persistenceInput.mode == BASDecisionMode.primary.identifier)
         #expect(artifact.persistenceInput.fingerprint == artifact.execution.bootstrapped.brainState.verificationSnapshot.fingerprint)
         #expect(Set(artifact.persistenceInput.activeTemplateIDs) == Set(artifact.execution.orderedTemplateIDs))
         #expect(Set(artifact.persistenceInput.failureGuardIDs) == Set(artifact.execution.orderedFailurePatternIDs))
@@ -943,7 +958,7 @@ struct BASAppleCurrentBrainBootstrapTests {
         let artifact = BASAppleCurrentBrainBootstrapAdapter.artifact(
             source: BASAppleCurrentBrainBootstrapSourceInput(
                 preparationRequest: BASCurrentBrainBootstrapPreparationRequest(
-                    mode: .quick,
+                    mode: .primary,
                     prompt: "我是不是该等到明天？",
                     trigger: .notification,
                     riskLevelOverride: .high,
@@ -959,7 +974,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                             sensitivity: .low,
                             tier: .hot,
                             confidence: 0.9,
-                            sourceType: "history",
+                            sourceType: "archive",
                             governanceStatus: .governed,
                             provenanceSummary: "Repeated goal"
                         )
@@ -986,7 +1001,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                 templates: [
                     BASInterventionTemplateDescriptor(
                         id: "night_message_cooling",
-                        mode: .quick,
+                        mode: .primary,
                         riskLevel: .high,
                         isPinned: true,
                         successCount: 2,
@@ -996,7 +1011,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                 failurePatterns: [
                     BASFailurePatternDescriptor(
                         id: "night_fast_path_failure",
-                        mode: .quick,
+                        mode: .primary,
                         suppressionWeight: 0.95,
                         evidenceCount: 2,
                         updatedAt: now
@@ -1008,7 +1023,7 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(artifact.execution.preparation.languageMode == .chinese)
         #expect(artifact.execution.preparation.riskLevel == .high)
         #expect(artifact.execution.orderedTemplateIDs == ["night_message_cooling"])
-        #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.identifier)
+        #expect(artifact.persistenceInput.mode == BASDecisionMode.primary.identifier)
         #expect(artifact.execution.bootstrapped.brainState.reactionWeights.dominantKey == .interruptiveActionBias)
     }
 
@@ -1037,7 +1052,7 @@ struct BASAppleCurrentBrainBootstrapTests {
         let artifact = BASAppleCurrentBrainBootstrapAdapter.artifact(
             source: BASAppleCurrentBrainBootstrapSourceInput(
                 preparationRequest: BASCurrentBrainBootstrapPreparationRequest(
-                    mode: .quick,
+                    mode: .primary,
                     prompt: "Should I wait?",
                     trigger: .launch,
                     sourceSurfaceOverride: .app,
@@ -1060,12 +1075,12 @@ struct BASAppleCurrentBrainBootstrapTests {
     }
 
     @Test("host bootstrap adapter compiles raw bridge inputs into artifact semantics")
-    func hostBootstrapAdapterCompilesRawBridgeInputsIntoArtifactSemantics() {
+    func hostBootstrapAdapterCompilesRawBridgeInputsIntoArtifactSemantics() throws {
         let now = Date(timeIntervalSince1970: 1_744_322_200)
 
-        let artifact = BASAppleCurrentBrainBootstrapHostAdapter.artifact(
+        let artifact = try BASAppleCurrentBrainBootstrapHostAdapter.artifact(
             from: BASAppleCurrentBrainBootstrapHostSourceInput(
-                modeID: "quick",
+                modeID: BASDecisionMode.primaryID,
                 prompt: "Should I wait until morning?",
                 triggerID: "notification",
                 sourceSurfaceOverrideID: "notification",
@@ -1081,7 +1096,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                             sensitivity: .low,
                             tier: .hot,
                             confidence: 0.91,
-                            sourceType: "history",
+                            sourceType: "archive",
                             governanceStatus: .governed,
                             provenanceSummary: "goal"
                         )
@@ -1102,11 +1117,13 @@ struct BASAppleCurrentBrainBootstrapTests {
                     resumeHint: "Pause before you send."
                 ),
                 retrievalMode: "filtered",
+                bootstrapBehavior: .generic,
+                cognitionBehavior: .generic,
                 recommendedTemplateIDs: ["night_message_cooling"],
                 templates: [
                     BASAppleCurrentBrainBootstrapHostTemplateInput(
                         id: "night_message_cooling",
-                        modeID: "quick",
+                        modeID: BASDecisionMode.primaryID,
                         riskLevelID: "high",
                         isPinned: true,
                         successCount: 3,
@@ -1116,7 +1133,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                 failurePatterns: [
                     BASAppleCurrentBrainBootstrapHostFailurePatternInput(
                         id: "night_fast_path_failure",
-                        modeID: "quick",
+                        modeID: BASDecisionMode.primaryID,
                         suppressionWeight: 0.95,
                         evidenceCount: 2,
                         updatedAt: now
@@ -1125,19 +1142,230 @@ struct BASAppleCurrentBrainBootstrapTests {
             )
         )
 
-        #expect(artifact.execution.preparation.trigger == .notification)
-        #expect(artifact.execution.preparation.sourceSurface == .notification)
-        #expect(artifact.execution.preparation.riskLevel == .high)
+        #expect(artifact.execution.preparation.trigger == BASCurrentBrainBootstrapTrigger.notification)
+        #expect(artifact.execution.preparation.sourceSurface == BASInteractionSurface.notification)
+        #expect(artifact.execution.preparation.riskLevel == BASRiskLevel.high)
         #expect(artifact.execution.orderedTemplateIDs == ["night_message_cooling"])
         #expect(artifact.execution.orderedFailurePatternIDs == ["night_fast_path_failure"])
-        #expect(artifact.persistenceInput.mode == BASDecisionMode.quick.identifier)
+        #expect(artifact.persistenceInput.mode == BASDecisionMode.primary.identifier)
+    }
+
+    @Test("host bootstrap adapter rejects unmapped descriptor identifiers")
+    func hostBootstrapAdapterRejectsUnmappedDescriptorIdentifiers() {
+        let now = Date(timeIntervalSince1970: 1_744_322_260)
+
+        #expect(throws: BASAppleCurrentBrainBootstrapHostResolutionError.self) {
+            try BASAppleCurrentBrainBootstrapHostAdapter.request(
+                from: BASAppleCurrentBrainBootstrapHostSourceInput(
+                    modeID: BASDecisionMode.reflectiveID,
+                    prompt: "Reject unmapped descriptor identifiers.",
+                    triggerID: BASCurrentBrainBootstrapTrigger.launch.rawValue,
+                    preferredLanguages: ["en-AU"],
+                    now: now,
+                    projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+                    retrievalMode: "compact",
+                    bootstrapBehavior: .generic,
+                    cognitionBehavior: .generic,
+                    templates: [
+                        BASAppleCurrentBrainBootstrapHostTemplateInput(
+                            id: "fallback-template",
+                            modeID: "foreign-template-mode",
+                            riskLevelID: BASRiskLevel.high.rawValue,
+                            isPinned: false,
+                            successCount: 1,
+                            updatedAt: now
+                        )
+                    ],
+                    failurePatterns: [
+                        BASAppleCurrentBrainBootstrapHostFailurePatternInput(
+                            id: "fallback-pattern",
+                            modeID: "foreign-pattern-mode",
+                            suppressionWeight: 0.6,
+                            evidenceCount: 1,
+                            updatedAt: now
+                        )
+                    ]
+                )
+            )
+        }
+    }
+
+    @Test("host bootstrap adapter rejects unmapped requested identifiers")
+    func hostBootstrapAdapterRejectsUnmappedRequestedIdentifiers() {
+        let now = Date(timeIntervalSince1970: 1_744_322_260)
+
+        #expect(throws: BASAppleCurrentBrainBootstrapHostResolutionError.self) {
+            try BASAppleCurrentBrainBootstrapHostAdapter.request(
+                from: BASAppleCurrentBrainBootstrapHostSourceInput(
+                    modeID: "unmapped-host-mode",
+                    prompt: "Reject unmapped host identifiers.",
+                    triggerID: "unmapped-host-trigger",
+                    riskLevelOverrideID: "unmapped-risk",
+                    preferredLanguages: ["en-AU"],
+                    now: now,
+                    projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+                    retrievalMode: "compact",
+                    bootstrapBehavior: .generic,
+                    cognitionBehavior: .generic,
+                    templates: [],
+                    failurePatterns: []
+                )
+            )
+        }
+    }
+
+    @Test("host bootstrap adapter rejects invalid source surface overrides")
+    func hostBootstrapAdapterRejectsInvalidSourceSurfaceOverrides() {
+        let now = Date(timeIntervalSince1970: 1_744_322_261)
+
+        #expect(throws: BASAppleCurrentBrainBootstrapHostResolutionError.self) {
+            try BASAppleCurrentBrainBootstrapHostAdapter.request(
+                from: BASAppleCurrentBrainBootstrapHostSourceInput(
+                    modeID: BASDecisionMode.primaryID,
+                    prompt: "Reject invalid source surfaces.",
+                    triggerID: BASCurrentBrainBootstrapTrigger.sessionBootstrapID,
+                    sourceSurfaceOverrideID: "foreign-surface",
+                    preferredLanguages: ["en-AU"],
+                    now: now,
+                    projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+                    retrievalMode: "compact",
+                    bootstrapBehavior: .generic,
+                    cognitionBehavior: .generic,
+                    templates: [],
+                    failurePatterns: []
+                )
+            )
+        }
+    }
+
+    @Test("current brain bootstrap trigger rejects legacy sessionPrime vocabulary")
+    func currentBrainBootstrapTriggerRejectsLegacySessionPrimeVocabulary() {
+        #expect(BASCurrentBrainBootstrapTrigger(identifier: "sessionPrime") == nil)
+    }
+
+    @Test("generic bootstrap behavior defaults to strict requested identifier rejection")
+    func genericBootstrapBehaviorDefaultsToStrictRequestedIdentifierRejection() {
+        let behavior = BASCurrentBrainBootstrapBehavior.generic
+
+        #expect(behavior.unknownRequestedModeFallbackPolicy == .reject)
+        #expect(behavior.unknownRequestedTriggerFallbackPolicy == .reject)
+        #expect(behavior.defaultTriggerID == BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue)
+        #expect(behavior.defaultMemorySourceID == BASMemorySource.pattern.rawValue)
+    }
+
+    @Test("host bootstrap adapter supports foreign host ontology without before vocabulary")
+    func hostBootstrapAdapterSupportsForeignHostOntology() throws {
+        let now = Date(timeIntervalSince1970: 1_744_322_262)
+        let behavior = BASCurrentBrainBootstrapBehavior(
+            defaultModeID: BASDecisionMode.primaryID,
+            defaultTriggerID: BASCurrentBrainBootstrapTrigger.launch.rawValue,
+            defaultRiskLevelID: BASRiskLevel.low.rawValue,
+            defaultSourceSurfaceID: BASInteractionSurface.app.rawValue,
+            modeIDAliasesByID: [
+                "vector-pass": BASDecisionMode.primaryID,
+                "counterweight-pass": BASDecisionMode.comparativeID,
+                "echo-pass": BASDecisionMode.reflectiveID
+            ],
+            triggerIDAliasesByID: [
+                "wake-cycle": BASCurrentBrainBootstrapTrigger.sceneActive.rawValue,
+                "ping": BASCurrentBrainBootstrapTrigger.notification.rawValue
+            ],
+            riskLevelIDAliasesByID: [
+                "guarded": BASRiskLevel.medium.rawValue,
+                "critical": BASRiskLevel.high.rawValue
+            ],
+            memorySourceIDAliasesByID: [
+                "trace-cache": BASMemorySource.pattern.rawValue,
+                "field-note": BASMemorySource.reflection.rawValue
+            ],
+            memorySourceOverridesByTriggerID: [
+                BASCurrentBrainBootstrapTrigger.sceneActive.rawValue: "trace-cache"
+            ],
+            memorySourceOverridesByModeID: [
+                BASDecisionMode.reflectiveID: "field-note"
+            ]
+        )
+
+        let request = try BASAppleCurrentBrainBootstrapHostAdapter.request(
+            from: BASAppleCurrentBrainBootstrapHostSourceInput(
+                modeID: "echo-pass",
+                prompt: "Map the signal before the system reacts.",
+                triggerID: "wake-cycle",
+                riskLevelOverrideID: "guarded",
+                preferredLanguages: ["en-AU"],
+                now: now,
+                projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+                retrievalMode: "signal-grid",
+                bootstrapBehavior: behavior,
+                cognitionBehavior: .generic,
+                recommendedTemplateIDs: ["foreign.template.echo"],
+                templates: [
+                    BASAppleCurrentBrainBootstrapHostTemplateInput(
+                        id: "foreign.template.echo",
+                        modeID: "echo-pass",
+                        riskLevelID: "critical",
+                        isPinned: true,
+                        successCount: 3,
+                        updatedAt: now
+                    )
+                ],
+                failurePatterns: [
+                    BASAppleCurrentBrainBootstrapHostFailurePatternInput(
+                        id: "foreign.pattern.echo-loop",
+                        modeID: "echo-pass",
+                        suppressionWeight: 0.72,
+                        evidenceCount: 2,
+                        updatedAt: now
+                    )
+                ]
+            )
+        )
+
+        #expect(request.preparation.mode == BASDecisionMode.reflective)
+        #expect(request.preparation.trigger == BASCurrentBrainBootstrapTrigger.sceneActive)
+        #expect(request.preparation.riskLevel == BASRiskLevel.medium)
+        #expect(behavior.memorySource(for: .sceneActive, mode: .reflective) == .reflection)
+        #expect(request.templates.map { $0.id } == ["foreign.template.echo"])
+        #expect(request.failurePatterns.map { $0.id } == ["foreign.pattern.echo-loop"])
+    }
+
+    @Test("host bootstrap adapter rejects invalid template risk levels")
+    func hostBootstrapAdapterRejectsInvalidTemplateRiskLevels() {
+        let now = Date(timeIntervalSince1970: 1_744_322_261.5)
+
+        #expect(throws: BASAppleCurrentBrainBootstrapHostResolutionError.self) {
+            try BASAppleCurrentBrainBootstrapHostAdapter.request(
+                from: BASAppleCurrentBrainBootstrapHostSourceInput(
+                    modeID: BASDecisionMode.primaryID,
+                    prompt: "Reject invalid template risk levels.",
+                    triggerID: BASCurrentBrainBootstrapTrigger.launch.rawValue,
+                    preferredLanguages: ["en-AU"],
+                    now: now,
+                    projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+                    retrievalMode: "compact",
+                    bootstrapBehavior: .generic,
+                    cognitionBehavior: .generic,
+                    templates: [
+                        BASAppleCurrentBrainBootstrapHostTemplateInput(
+                            id: "configured-template",
+                            modeID: BASDecisionMode.primaryID,
+                            riskLevelID: "foreign-risk",
+                            isPinned: false,
+                            successCount: 1,
+                            updatedAt: now
+                        )
+                    ],
+                    failurePatterns: []
+                )
+            )
+        }
     }
 
     @Test("bridge input builder compiles task graph hint into raw bridge payload")
     func bridgeInputBuilderCompilesTaskGraphHint() {
         let now = Date(timeIntervalSince1970: 1_744_322_205)
         let input = BASAppleCurrentBrainBootstrapBridgeInputBuilder.build(
-            modeID: BASDecisionMode.quick.rawValue,
+            modeID: BASDecisionMode.primary.rawValue,
             prompt: "Should I wait until morning?",
             triggerID: BASCurrentBrainBootstrapTrigger.notification.rawValue,
             sourceSurfaceOverrideID: BASInteractionSurface.notification.rawValue,
@@ -1152,23 +1380,25 @@ struct BASAppleCurrentBrainBootstrapTests {
                 hasResumeCandidate: true,
                 resumeHint: "Sleep on it."
             ),
-            retrievalMode: "filtered"
+            retrievalMode: "filtered",
+            bootstrapBehavior: .generic,
+            cognitionBehavior: .generic
         )
 
         #expect(input.taskGraphHeadline == "Pause before you send.")
         #expect(input.taskGraphActiveNodeCount == 1)
         #expect(input.taskGraphHasResumeCandidate == true)
         #expect(input.taskGraphResumeHint == "Sleep on it.")
-        #expect(input.embeddingScores.map(\.id) == ["goal-1"])
+        #expect(input.embeddingScores.map { $0.id } == ["goal-1"])
     }
 
     @Test("bootstrap coordinator sequences recommendation and selection before compiling artifact")
-    func bootstrapCoordinatorSequencesRecommendationAndSelection() {
+    func bootstrapCoordinatorSequencesRecommendationAndSelection() throws {
         let now = Date(timeIntervalSince1970: 1_744_322_300)
         let baseInput = BASAppleCurrentBrainBootstrapHostSourceInput(
-            modeID: "quick",
+            modeID: BASDecisionMode.primaryID,
             prompt: "Should I send this tonight?",
-            triggerID: "sessionPrime",
+            triggerID: BASCurrentBrainBootstrapTrigger.sessionBootstrapID,
             riskLevelOverrideID: "medium",
             preferredLanguages: ["en-AU"],
             now: now,
@@ -1181,7 +1411,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                         sensitivity: .low,
                         tier: .hot,
                         confidence: 0.93,
-                        sourceType: "history",
+                        sourceType: "archive",
                         governanceStatus: .governed,
                         provenanceSummary: "goal"
                     )
@@ -1190,16 +1420,18 @@ struct BASAppleCurrentBrainBootstrapTests {
                 recentEvents: []
             ),
             retrievalMode: "filtered",
+            bootstrapBehavior: .generic,
+            cognitionBehavior: .generic,
             templates: [],
             failurePatterns: []
         )
 
         var sawPreparation = false
-        let artifact = BASAppleCurrentBrainBootstrapCoordinator.artifact(
+        let artifact = try BASAppleCurrentBrainBootstrapCoordinator.artifact(
             baseInput: baseInput,
             recommendTemplateIDs: { preparation in
                 sawPreparation = true
-                #expect(preparation.mode == .quick)
+                #expect(preparation.mode == .primary)
                 return ["night_message_cooling"]
             },
             selectTemplates: { _, recommendedTemplateIDs in
@@ -1207,7 +1439,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                 return recommendedTemplateIDs.map {
                     BASAppleCurrentBrainBootstrapHostTemplateInput(
                         id: $0,
-                        modeID: "quick",
+                        modeID: BASDecisionMode.primaryID,
                         riskLevelID: "medium",
                         isPinned: true,
                         successCount: 4,
@@ -1219,7 +1451,7 @@ struct BASAppleCurrentBrainBootstrapTests {
                 [
                     BASAppleCurrentBrainBootstrapHostFailurePatternInput(
                         id: "night_fast_path_failure",
-                        modeID: "quick",
+                        modeID: BASDecisionMode.primaryID,
                         suppressionWeight: 0.95,
                         evidenceCount: 2,
                         updatedAt: now

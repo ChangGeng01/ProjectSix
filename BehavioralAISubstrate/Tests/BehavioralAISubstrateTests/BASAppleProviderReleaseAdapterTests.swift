@@ -37,7 +37,7 @@ struct BASAppleProviderReleaseAdapterTests {
             ) == "Headline: This is the same pattern\nTension: Hope versus depletion\nNext: Name the cost first."
         )
         #expect(
-            BASAppleProviderReleaseAdapter.reminderPreview(content: "Hold this for tomorrow.") == "Hold this for tomorrow."
+            BASAppleProviderReleaseAdapter.selectionPreview(content: "Hold this for tomorrow.") == "Hold this for tomorrow."
         )
         #expect(
             BASAppleProviderReleaseAdapter.referencedFacts(from: blockedGuidanceBrainState()) == [
@@ -50,7 +50,7 @@ struct BASAppleProviderReleaseAdapterTests {
     @Test("adapter verdict keeps provider release decisions package-owned")
     func adapterVerdictKeepsReleaseDecisionPackageOwned() {
         let verdict = BASAppleProviderReleaseAdapter.verdict(
-            traceKindRawValue: "quick",
+            traceKindRawValue: "primary",
             outputPreview: "Current: pause and let the urge settle.\nAfter: come back tomorrow.",
             kernelSnapshot: kernelWithoutTruthState(),
             brainState: blockedGuidanceBrainState()
@@ -67,16 +67,16 @@ struct BASAppleProviderReleaseAdapterTests {
     @Test("adapter can pass host-specific structured truth behavior through release evaluation")
     func adapterVerdictPassesHostSpecificStructuredTruthBehavior() {
         let verdict = BASAppleProviderReleaseAdapter.verdict(
-            traceKindRawValue: "quick",
+            traceKindRawValue: "primary",
             outputPreview: "Current: pause and let the urge settle.\nAfter: come back tomorrow.",
             kernelSnapshot: kernelWithoutTruthState(),
             brainState: blockedGuidanceBrainState(),
             structuredTruthBehavior: BASStructuredTruthBehavior(
                 modeNamesByKindID: [
-                    BASAdaptiveTraceKind.quick.rawValue: "before.quick"
+                    BASAdaptiveTraceKind.primary.rawValue: "before.primary"
                 ],
                 kernelPersonaRulesByKindID: [
-                    BASAdaptiveTraceKind.quick.rawValue: "Keep the interruption short, calm, and non-shaming."
+                    BASAdaptiveTraceKind.primary.rawValue: "Keep the interruption short, calm, and non-shaming."
                 ]
             )
         )
@@ -92,7 +92,7 @@ struct BASAppleProviderReleaseAdapterTests {
     @Test("adapter rejected detail preserves source framing")
     func adapterRejectedDetailPreservesSourceFraming() {
         let detail = BASAppleProviderReleaseAdapter.rejectedConsistencyDetail(
-            base: "Before rejected the result.",
+            base: "The host rejected the result.",
             result: BASConsistencyCheckResult(
                 violations: [
                     BASConsistencyViolation(kind: .forbiddenAction, message: "Action drifted outside the allowed space.")
@@ -130,7 +130,7 @@ struct BASAppleProviderReleaseAdapterTests {
             relevantMemories: ["Waiting overnight usually helps."],
             sessionBiases: ["句子短"],
             retrievalTags: ["cooldown"],
-            reactionWeights: .defaults(forModeName: BASDecisionMode.quick.rawValue),
+            reactionWeights: .defaults(forModeName: BASDecisionMode.primary.rawValue),
             boundaryPolicy: BASBoundaryPolicyState(
                 mode: .localOnlyProtective,
                 riskLevel: .high,

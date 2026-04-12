@@ -166,7 +166,7 @@ public struct BASAppleAdaptiveStrategyRawInput: Codable, Sendable, Equatable {
     }
 }
 
-public struct BASAppleQuickRefinementEnvelopeRequest: Codable, Sendable, Equatable {
+public struct BASApplePrimaryRefinementEnvelopeRequest: Codable, Sendable, Equatable {
     public var modeTitle: String
     public var scenarioTitle: String
     public var motivationTitle: String
@@ -221,7 +221,7 @@ public struct BASAppleQuickRefinementEnvelopeRequest: Codable, Sendable, Equatab
     }
 }
 
-public struct BASAppleBalanceRefinementEnvelopeRequest: Codable, Sendable, Equatable {
+public struct BASAppleComparativeRefinementEnvelopeRequest: Codable, Sendable, Equatable {
     public var modeTitle: String
     public var prompt: String
     public var desire: String
@@ -276,7 +276,7 @@ public struct BASAppleBalanceRefinementEnvelopeRequest: Codable, Sendable, Equat
     }
 }
 
-public struct BASAppleMirrorRefinementEnvelopeRequest: Codable, Sendable, Equatable {
+public struct BASAppleReflectiveRefinementEnvelopeRequest: Codable, Sendable, Equatable {
     public var modeTitle: String
     public var prompt: String
     public var emotion: String
@@ -330,10 +330,6 @@ public struct BASAppleMirrorRefinementEnvelopeRequest: Codable, Sendable, Equata
         self.brainState = brainState
     }
 }
-
-public typealias BASApplePrimaryRefinementEnvelopeRequest = BASAppleQuickRefinementEnvelopeRequest
-public typealias BASAppleComparativeRefinementEnvelopeRequest = BASAppleBalanceRefinementEnvelopeRequest
-public typealias BASAppleReflectiveRefinementEnvelopeRequest = BASAppleMirrorRefinementEnvelopeRequest
 
 public enum BASApplePromptInputAdapter {
     public static func lifecycleSnapshot(
@@ -407,7 +403,7 @@ public enum BASApplePromptInputAdapter {
     ) -> BASAdaptiveTaskStrategy {
         adaptiveStrategy(
             from: BASAppleAdaptiveStrategyInput(
-                kind: BASAdaptiveTraceKind(rawValue: input.kindRawValue) ?? .quick,
+                kind: BASAdaptiveTraceKind(identifier: input.kindRawValue) ?? .primary,
                 entropy: BASTaskEntropyClass(rawValue: input.entropyRawValue) ?? .medium,
                 runtimeGear: BASRuntimeGear(rawValue: input.runtimeGearRawValue) ?? .balanced,
                 contextBudget: input.contextBudget,
@@ -453,16 +449,9 @@ public enum BASAppleReferencePromptBuilder {
         _ request: BASApplePrimaryRefinementEnvelopeRequest,
         behavior: BASReferencePromptBehavior = .generic
     ) -> BASPromptEnvelope<BASReferencePromptKind, BASFrontstageState> {
-        quickEnvelope(request, behavior: behavior)
-    }
-
-    public static func quickEnvelope(
-        _ request: BASAppleQuickRefinementEnvelopeRequest,
-        behavior: BASReferencePromptBehavior = .generic
-    ) -> BASPromptEnvelope<BASReferencePromptKind, BASFrontstageState> {
-        BASReferencePromptBuilder.quickEnvelope(
-            BASQuickRefinementPromptRequest(
-                kind: .quick,
+        BASReferencePromptBuilder.primaryEnvelope(
+            BASPrimaryRefinementPromptRequest(
+                kind: .primary,
                 modeTitle: request.modeTitle,
                 scenarioTitle: request.scenarioTitle,
                 motivationTitle: request.motivationTitle,
@@ -488,16 +477,9 @@ public enum BASAppleReferencePromptBuilder {
         _ request: BASAppleComparativeRefinementEnvelopeRequest,
         behavior: BASReferencePromptBehavior = .generic
     ) -> BASPromptEnvelope<BASReferencePromptKind, BASFrontstageState> {
-        balanceEnvelope(request, behavior: behavior)
-    }
-
-    public static func balanceEnvelope(
-        _ request: BASAppleBalanceRefinementEnvelopeRequest,
-        behavior: BASReferencePromptBehavior = .generic
-    ) -> BASPromptEnvelope<BASReferencePromptKind, BASFrontstageState> {
-        BASReferencePromptBuilder.balanceEnvelope(
-            BASBalanceRefinementPromptRequest(
-                kind: .balance,
+        BASReferencePromptBuilder.comparativeEnvelope(
+            BASComparativeRefinementPromptRequest(
+                kind: .comparative,
                 modeTitle: request.modeTitle,
                 prompt: request.prompt,
                 desire: request.desire,
@@ -523,16 +505,9 @@ public enum BASAppleReferencePromptBuilder {
         _ request: BASAppleReflectiveRefinementEnvelopeRequest,
         behavior: BASReferencePromptBehavior = .generic
     ) -> BASPromptEnvelope<BASReferencePromptKind, BASFrontstageState> {
-        mirrorEnvelope(request, behavior: behavior)
-    }
-
-    public static func mirrorEnvelope(
-        _ request: BASAppleMirrorRefinementEnvelopeRequest,
-        behavior: BASReferencePromptBehavior = .generic
-    ) -> BASPromptEnvelope<BASReferencePromptKind, BASFrontstageState> {
-        BASReferencePromptBuilder.mirrorEnvelope(
-            BASMirrorRefinementPromptRequest(
-                kind: .mirror,
+        BASReferencePromptBuilder.reflectiveEnvelope(
+            BASReflectiveRefinementPromptRequest(
+                kind: .reflective,
                 modeTitle: request.modeTitle,
                 prompt: request.prompt,
                 emotion: request.emotion,
@@ -564,49 +539,26 @@ public enum BASAppleReferencePromptBuilder {
         providerIdentifier: String? = nil,
         strategy: BASAppleAdaptiveStrategyRawInput? = nil,
         behavior: BASReferencePromptBehavior = .generic
-    ) -> BASReferenceReminderSelectionEnvelope<Candidate> {
-        reminderEnvelope(
-            candidates: candidates,
-            candidateText: candidateText,
-            modeTitle: modeTitle,
-            scenarioTitle: scenarioTitle,
-            prompt: prompt,
-            reminderSurfaceModeRawValue: surfaceModeRawValue,
-            providerIdentifier: providerIdentifier,
-            strategy: strategy,
-            behavior: behavior
-        )
-    }
-
-    public static func reminderEnvelope<Candidate: Equatable & Sendable>(
-        candidates: [Candidate],
-        candidateText: (Candidate) -> String,
-        modeTitle: String,
-        scenarioTitle: String,
-        prompt: String,
-        reminderSurfaceModeRawValue: String?,
-        providerIdentifier: String? = nil,
-        strategy: BASAppleAdaptiveStrategyRawInput? = nil,
-        behavior: BASReferencePromptBehavior = .generic
-    ) -> BASReferenceReminderSelectionEnvelope<Candidate> {
-        let clippedCandidates = Array(candidates.prefix(BASReferencePromptLimits.reminderCandidates))
-        let envelope = BASReferencePromptBuilder.reminderEnvelope(
-            BASReminderSelectionPromptRequest<BASReferencePromptKind>(
-                kind: .reminder,
+    ) -> BASReferenceSelectionEnvelope<Candidate> {
+        let clippedCandidates = Array(candidates.prefix(BASReferencePromptLimits.selectionCandidates))
+        let envelope = BASReferencePromptBuilder.selectionEnvelope(
+            BASSelectionPromptRequest<BASReferencePromptKind>(
+                kind: .selection,
                 modeTitle: modeTitle,
-                scenarioTitle: scenarioTitle,
-                prompt: prompt,
+                entryContext: scenarioTitle,
+                activePrompt: prompt,
                 candidateTexts: clippedCandidates.map(candidateText),
-                reminderSurfaceMode: reminderSurfaceModeRawValue.flatMap(BASDecisionMode.init(identifier:)),
+                surfaceMode: surfaceModeRawValue.flatMap(BASDecisionMode.init(identifier:)),
                 providerIdentifier: providerIdentifier,
                 strategy: strategy.map(BASApplePromptInputAdapter.adaptiveStrategy)
             ),
             behavior: behavior
         )
 
-        return BASReferenceReminderSelectionEnvelope(
+        return BASReferenceSelectionEnvelope(
             prompt: envelope,
             candidates: clippedCandidates
         )
     }
+
 }

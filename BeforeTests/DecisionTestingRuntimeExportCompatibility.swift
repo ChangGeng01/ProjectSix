@@ -1,7 +1,5 @@
 import Foundation
-import BASObservability
-import BASPolicy
-import BASRuntimeCore
+import BASHostKit
 @testable import Before
 
 extension DecisionTestingRuntimeExport {
@@ -125,10 +123,10 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let lowPressureModelCallRateByKind: [DecisionIntelligenceTraceKind: Double]
     let avoidableModelCallRate: Double
     let avoidableModelCallRateByKind: [DecisionIntelligenceTraceKind: Double]
-    let reminderRequestCount: Int
-    let reminderKnowledgeNeedRate: Double
-    let reminderControlOnlyRate: Double
-    let reminderRetrievalBypassRate: Double
+    let selectionRequestCount: Int
+    let selectionKnowledgeNeedRate: Double
+    let selectionControlOnlyRate: Double
+    let selectionRetrievalBypassRate: Double
     let deterministicFallbackRate: Double
     let averageRequestDurationMs: Double
     let averageRequestDurationMsByKind: [DecisionIntelligenceTraceKind: Double]
@@ -380,10 +378,10 @@ private extension DecisionTestingRuntimeSummary {
             lowPressureModelCallRateByKind: mapTraceKindDictionary(basSummary.lowPressureModelCallRateByKind),
             avoidableModelCallRate: basSummary.avoidableModelCallRate,
             avoidableModelCallRateByKind: mapTraceKindDictionary(basSummary.avoidableModelCallRateByKind),
-            reminderRequestCount: basSummary.reminderRequestCount,
-            reminderKnowledgeNeedRate: basSummary.reminderKnowledgeNeedRate,
-            reminderControlOnlyRate: basSummary.reminderControlOnlyRate,
-            reminderRetrievalBypassRate: basSummary.reminderRetrievalBypassRate,
+            selectionRequestCount: basSummary.selectionRequestCount,
+            selectionKnowledgeNeedRate: basSummary.selectionKnowledgeNeedRate,
+            selectionControlOnlyRate: basSummary.selectionControlOnlyRate,
+            selectionRetrievalBypassRate: basSummary.selectionRetrievalBypassRate,
             deterministicFallbackRate: basSummary.deterministicFallbackRate,
             averageRequestDurationMs: basSummary.averageRequestDurationMs,
             averageRequestDurationMsByKind: mapTraceKindDictionary(basSummary.averageRequestDurationMsByKind),
@@ -493,7 +491,7 @@ private func mapTraceKindDictionary<Input, Output>(
 ) -> [DecisionIntelligenceTraceKind: Output] {
     values.reduce(into: [:]) { partialResult, item in
         guard
-            let kind = DecisionIntelligenceTraceKind(rawValue: item.key),
+            let kind = DecisionIntelligenceTraceKind(substrateKindID: item.key),
             let mappedValue = transform(item.value)
         else {
             return

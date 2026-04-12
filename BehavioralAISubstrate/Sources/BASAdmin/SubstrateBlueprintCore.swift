@@ -350,7 +350,7 @@ public enum BASSubstrateArchitectureBuilder {
             ),
             BASTruthPlane(
                 kind: .evidence,
-                summary: "History mirror, retrieval slices, traces, and replay bundles provide grounded evidence instead of free-floating persuasion.",
+                summary: "Archived evidence, retrieval slices, traces, and replay bundles provide grounded evidence instead of free-floating persuasion.",
                 anchors: ["Retrieved evidence", "Execution trace", "Replay bundle"]
             )
         ]
@@ -369,7 +369,7 @@ public enum BASSubstrateArchitectureBuilder {
         ]
 
         let innovationThesis = [
-            "Mobile-local AI wins by compact context + consistency harness, not by hoarding raw history.",
+            "Mobile-local AI wins by compact context + consistency harness, not by hoarding raw archived context.",
             "The app shell should become thin enough that cognition, policy, and orchestration live almost entirely in the substrate.",
             "A governed Memory OS is more valuable than a longer prompt because it decides what to remember, what to forget, and what must never cross scope."
         ]

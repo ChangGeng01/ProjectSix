@@ -5,7 +5,7 @@ final class BASEvolutionCoreTests: XCTestCase {
     func testCheckpointPlannerDeduplicatesEquivalentLatestState() {
         let now = Date(timeIntervalSince1970: 1_715_000_000)
         let input = BASEvolutionCheckpointInput(
-            modeName: " quick ",
+            modeName: " primary ",
             sourceID: "launch",
             fingerprint: "fp-1",
             identityRole: .pauseCompanion,
@@ -17,7 +17,7 @@ final class BASEvolutionCoreTests: XCTestCase {
             createdAt: now,
             fingerprint: "fp-1",
             previousCheckpointID: nil,
-            modeName: "quick",
+            modeName: "primary",
             sourceID: "launch",
             identityRole: .pauseCompanion,
             boundaryMode: .localOnlyAdvisory,
@@ -37,7 +37,7 @@ final class BASEvolutionCoreTests: XCTestCase {
             createdAt: now.addingTimeInterval(-60),
             fingerprint: "fp-0",
             previousCheckpointID: nil,
-            modeName: "mirror",
+            modeName: "reflective",
             sourceID: "scene_active",
             identityRole: .pauseCompanion,
             boundaryMode: .localOnlyAdvisory,
@@ -47,10 +47,10 @@ final class BASEvolutionCoreTests: XCTestCase {
             rollbackReady: true
         )
         let input = BASEvolutionCheckpointInput(
-            modeName: "mirror",
+            modeName: "reflective",
             sourceID: "scene_active",
             fingerprint: "fp-1",
-            identityRole: .mirrorWitness,
+            identityRole: .reflectiveWitness,
             boundaryMode: .localOnlyProtective,
             calibrationStatus: .drifting
         )
@@ -73,7 +73,7 @@ final class BASEvolutionCoreTests: XCTestCase {
             createdAt: now.addingTimeInterval(-(BASEvolutionCheckpointPlanner.defaultRetentionInterval + 1)),
             fingerprint: "stale",
             previousCheckpointID: nil,
-            modeName: "quick",
+            modeName: "primary",
             sourceID: "launch",
             identityRole: .pauseCompanion,
             boundaryMode: .localOnlyAdvisory,

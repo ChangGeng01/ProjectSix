@@ -29,16 +29,7 @@ final class BeforeAppModel: ObservableObject {
     let modelContainer: ModelContainer
     let supportInbox: SupportInboxStore
     let sharedLifeStore: SharedLifeStore
-    private let hostRuntime = BASHostRuntime(
-        configuration: BASHostConfiguration(
-            runtimeProfileID: "before.local-cognition",
-            policyProfileID: "before.product-policy",
-            lifecycleBehavior: BeforeProductLanguage.hostLifecycleBehavior,
-            workflowBehavior: BeforeProductLanguage.workflowBehavior,
-            cognitionBehavior: BeforeProductLanguage.hostCognition,
-            presentation: BeforeProductLanguage.hostPresentation
-        )
-    )
+    private let hostRuntime = BeforeProductCompatibility.makeHostRuntime()
     private var memoryProjection: DecisionMemorySystem.BrainStateProjection?
     private var isMemoryProjectionDirty = true
     private var shouldPromptReflectionAfterBackground = false

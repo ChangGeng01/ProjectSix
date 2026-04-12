@@ -6,35 +6,34 @@ import Testing
 @Suite("BASReferencePromptBuilder")
 struct BASReferencePromptModesCoreTests {
     enum TestKind: Sendable, Equatable {
-        case quick
-        case reminder
+        case primary
+        case selection
     }
 
     @Test("reference prompt kind carries package-owned adaptive trace mapping")
     func referencePromptKindCarriesAdaptiveTraceMapping() {
-        #expect(BASReferencePromptKind.quick.adaptiveTraceKind == .quick)
-        #expect(BASReferencePromptKind.balance.adaptiveTraceKind == .balance)
-        #expect(BASReferencePromptKind.mirror.adaptiveTraceKind == .mirror)
-        #expect(BASReferencePromptKind.reminder.adaptiveTraceKind == .reminder)
-        #expect(BASReferencePromptKind.primary == .quick)
-        #expect(BASReferencePromptKind.comparative == .balance)
-        #expect(BASReferencePromptKind.reflective == .mirror)
-        #expect(BASReferencePromptKind.selection == .reminder)
-        #expect(BASReferencePromptKind.quick.identifier == BASAdaptiveTraceKind.primaryID)
-        #expect(BASReferencePromptKind.mirror.legacyIdentifier == "mirror")
-        #expect(BASReferencePromptKind(identifier: "primary") == .quick)
-        #expect(BASReferencePromptKind(identifier: "comparative") == .balance)
-        #expect(BASReferencePromptKind(identifier: "reflective") == .mirror)
-        #expect(BASReferencePromptKind(identifier: "selection") == .reminder)
+        #expect(BASReferencePromptKind.primary.adaptiveTraceKind == .primary)
+        #expect(BASReferencePromptKind.comparative.adaptiveTraceKind == .comparative)
+        #expect(BASReferencePromptKind.reflective.adaptiveTraceKind == .reflective)
+        #expect(BASReferencePromptKind.selection.adaptiveTraceKind == .selection)
+        #expect(BASReferencePromptKind.primary.identifier == BASAdaptiveTraceKind.primaryID)
+        #expect(BASReferencePromptKind(identifier: "primary") == .primary)
+        #expect(BASReferencePromptKind(identifier: "comparative") == .comparative)
+        #expect(BASReferencePromptKind(identifier: "reflective") == .reflective)
+        #expect(BASReferencePromptKind(identifier: "selection") == .selection)
+        #expect(BASReferencePromptKind(identifier: "quick") == nil)
+        #expect(BASReferencePromptKind(identifier: "balance") == nil)
+        #expect(BASReferencePromptKind(identifier: "mirror") == nil)
+        #expect(BASReferencePromptKind(identifier: "reminder") == nil)
     }
 
-    @Test("quick envelope compiles structured state and secondary actions")
-    func quickEnvelopeCompilesStructuredState() {
+    @Test("primary envelope compiles structured state and secondary actions")
+    func primaryEnvelopeCompilesStructuredState() {
         let envelope = BASReferencePromptBuilder.primaryEnvelope(
             BASPrimaryRefinementPromptRequest(
-                kind: TestKind.quick,
-                modeTitle: "Quick",
-                entryContext: "Buy",
+                kind: TestKind.primary,
+                modeTitle: "Primary",
+                entryContext: "Purchase",
                 currentDrive: "Reward",
                 anticipatedShift: "Temporary relief",
                 controlEstimate: "Maybe",
@@ -47,8 +46,8 @@ struct BASReferencePromptModesCoreTests {
             )
         )
 
-        #expect(envelope.payload.contains("\"mode\":\"Quick\""))
-        #expect(envelope.payload.contains("\"entry_context\":\"Buy\""))
+        #expect(envelope.payload.contains("\"mode\":\"Primary\""))
+        #expect(envelope.payload.contains("\"entry_context\":\"Purchase\""))
         #expect(envelope.payload.contains("\"host_note\":\"Not provided.\""))
         #expect(envelope.payload.contains("Present view: You want a little relief."))
         #expect(envelope.payload.contains("Alternate actions: Decide tomorrow"))
@@ -59,7 +58,7 @@ struct BASReferencePromptModesCoreTests {
     func selectionEnvelopeUsesGenericFacade() {
         let envelope = BASReferencePromptBuilder.selectionEnvelope(
             BASSelectionPromptRequest(
-                kind: TestKind.reminder,
+                kind: TestKind.selection,
                 modeTitle: "Primary",
                 entryContext: "Buy",
                 activePrompt: "I want to buy this tonight.",
@@ -67,21 +66,21 @@ struct BASReferencePromptModesCoreTests {
                     "Hold it until tomorrow morning.",
                     "Put it in the holding lane and sleep on it."
                 ],
-                selectionSurfaceMode: .primary
+                surfaceMode: .primary
             )
         )
 
-        #expect(envelope.kind == .reminder)
+        #expect(envelope.kind == .selection)
         #expect(envelope.assembly.kernelSnapshot.truthState?.sessionFacts["surface_mode"] == "primary")
     }
 
-    @Test("reminder envelope clips candidates and suppresses structured truth block")
-    func reminderEnvelopeClipsCandidatesAndSuppressesTruthBlock() {
-        let envelope = BASReferencePromptBuilder.reminderEnvelope(
-            BASReminderSelectionPromptRequest(
-                kind: TestKind.reminder,
-                modeTitle: "Quick",
-                scenarioTitle: "Buy",
+    @Test("selection envelope clips candidates and suppresses structured truth block")
+    func selectionEnvelopeClipsCandidatesAndSuppressesTruthBlock() {
+        let envelope = BASReferencePromptBuilder.selectionEnvelope(
+            BASSelectionPromptRequest(
+                kind: TestKind.selection,
+                modeTitle: "Primary",
+                scenarioTitle: "Purchase",
                 prompt: "I want to buy this tonight.",
                 candidateTexts: [
                     "Hold it until tomorrow morning.",
@@ -89,7 +88,7 @@ struct BASReferencePromptModesCoreTests {
                     "Wait for the weekend before deciding.",
                     "This fourth candidate should be clipped."
                 ],
-                reminderSurfaceMode: .quick
+                surfaceMode: .primary
             )
         )
 
@@ -98,7 +97,7 @@ struct BASReferencePromptModesCoreTests {
         #expect(envelope.payload.contains("2: Wait for the weekend before deciding."))
         #expect(!envelope.payload.contains("This fourth candidate should be clipped."))
         #expect(!envelope.payload.contains("STRUCTURED_TRUTH_JSON:"))
-        #expect(envelope.assembly.kernelSnapshot.truthState?.mode == "reminder")
+        #expect(envelope.assembly.kernelSnapshot.truthState?.mode == BASAdaptiveTraceKind.selectionID)
     }
 
     @Test("reference prompt builder honors injected host presentation behavior")
@@ -107,17 +106,17 @@ struct BASReferencePromptModesCoreTests {
             presentationBehavior: BASPromptPresentationBehavior(
                 sharedPrelude: "Host immutable prefix.",
                 adaptivePrefixByKindID: [
-                    BASSemanticTaskKind.primaryID: "Host quick adaptive prefix."
+                    BASSemanticTaskKind.primaryID: "Host primary adaptive prefix."
                 ]
             ),
             frontstageBehavior: BASFrontstagePresentationBehavior(
                 focusGoalsByKindID: [
-                    BASAdaptiveTraceKind.primaryID: "Host quick focus goal."
+                    BASAdaptiveTraceKind.primaryID: "Host primary focus goal."
                 ]
             ),
             structuredTruthBehavior: BASStructuredTruthBehavior(
                 modeNamesByKindID: [
-                    BASAdaptiveTraceKind.primaryID: "before.quick"
+                    BASAdaptiveTraceKind.primaryID: "host.primary"
                 ],
                 kernelPersonaRulesByKindID: [
                     BASAdaptiveTraceKind.primaryID: "Keep the interruption short, calm, and non-shaming."
@@ -152,11 +151,11 @@ struct BASReferencePromptModesCoreTests {
             ]
         )
 
-        let envelope = BASReferencePromptBuilder.quickEnvelope(
-            BASQuickRefinementPromptRequest(
-                kind: TestKind.quick,
-                modeTitle: "Quick",
-                scenarioTitle: "Buy",
+        let envelope = BASReferencePromptBuilder.primaryEnvelope(
+            BASPrimaryRefinementPromptRequest(
+                kind: TestKind.primary,
+                modeTitle: "Primary",
+                scenarioTitle: "Purchase",
                 motivationTitle: "Reward",
                 expectedOutcomeTitle: "Temporary relief",
                 controlLevelTitle: "Maybe",
@@ -172,15 +171,15 @@ struct BASReferencePromptModesCoreTests {
         )
 
         #expect(envelope.layers.immutablePrefix == "Host immutable prefix.")
-        #expect(envelope.layers.adaptivePrefix == "Host quick adaptive prefix.")
-        #expect(envelope.payload.contains("\"scenario\":\"Buy\""))
+        #expect(envelope.layers.adaptivePrefix == "Host primary adaptive prefix.")
+        #expect(envelope.payload.contains("\"scenario\":\"Purchase\""))
         #expect(envelope.payload.contains("\"note\":\"Not provided.\""))
         #expect(envelope.payload.contains("Current perspective: You want a little relief."))
         #expect(envelope.payload.contains("Secondary actions: Decide tomorrow"))
         #expect(envelope.payload.contains("Keep the host-specific viewpoint framing."))
         #expect(envelope.budget.targetCharacters == 900)
-        #expect(envelope.frontstageState.focusGoal == "Host quick focus goal.")
-        #expect(envelope.assembly.kernelSnapshot.truthState?.mode == "before.quick")
+        #expect(envelope.frontstageState.focusGoal == "Host primary focus goal.")
+        #expect(envelope.assembly.kernelSnapshot.truthState?.mode == "host.primary")
         #expect(envelope.assembly.kernelSnapshot.truthState?.personaRules.contains("Keep the interruption short, calm, and non-shaming.") == true)
     }
 
@@ -191,7 +190,7 @@ struct BASReferencePromptModesCoreTests {
             relevantMemories: ["Similar loops softened after a pause."],
             sessionBiases: ["Keep it short."],
             retrievalTags: ["pause"],
-            reactionWeights: BASReactionWeights.defaults(forModeName: BASDecisionMode.quick.rawValue),
+            reactionWeights: BASReactionWeights.defaults(forModeName: BASDecisionMode.primary.rawValue),
             loadedAt: .now
         )
     }

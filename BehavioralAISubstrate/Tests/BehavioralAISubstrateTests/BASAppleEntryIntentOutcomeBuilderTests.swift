@@ -10,7 +10,7 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
         let resolution = BASAppleEntryIntentOutcomeBuilder.resolve(
             kindID: "predictiveIntervention",
             surfaceID: "watch",
-            preferredModeID: "mirror",
+            preferredModeID: "reflective",
             scenarioID: nil,
             promptSeed: nil,
             riskLevelID: "high",
@@ -21,7 +21,7 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
         #expect(resolution.actionPlan.actionKind == .predictiveIntervention)
         #expect(resolution.refreshTriggerID == BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue)
         #expect(resolution.predictiveIntervention?.riskLevelID == "high")
-        #expect(resolution.predictiveIntervention?.title == "A more deliberate next step may help here.")
+        #expect(resolution.predictiveIntervention?.title == "A lower-pressure next step may help here.")
         #expect(resolution.predictiveIntervention?.evidenceSignalCount == 2)
         #expect(resolution.predictiveIntervention?.reason == "night_pattern")
         #expect(resolution.predictiveIntervention?.expiresAt == expiresAt)
@@ -30,9 +30,9 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
     @Test("non-predictive resolutions keep action plan without synthesizing a suggestion")
     func nonPredictiveResolutionDoesNotCreateSuggestion() {
         let resolution = BASAppleEntryIntentOutcomeBuilder.resolve(
-            kindID: "quickCapture",
+            kindID: "capture",
             surfaceID: "watch",
-            preferredModeID: "quick",
+            preferredModeID: "primary",
             scenarioID: "buy",
             promptSeed: "Hold this.",
             riskLevelID: "medium",
@@ -49,9 +49,9 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
     func entryIntentExecutorRunsMatchingActionThenRefreshesCurrentBrain() {
         var calls: [String] = []
         let resolution = BASAppleEntryIntentOutcomeBuilder.resolve(
-            kindID: "reopenTomorrowItem",
+            kindID: "reopen",
             surfaceID: "app",
-            preferredModeID: "balance",
+            preferredModeID: "comparative",
             scenarioID: nil,
             promptSeed: "reopen this",
             riskLevelID: "medium",
@@ -61,7 +61,7 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
 
         BASAppleEntryIntentOutcomeExecutor.execute(
             resolution: resolution,
-            performCapture: { _ in calls.append("quick") },
+            performCapture: { _ in calls.append("primary") },
             performPresent: { plan in
                 calls.append("open:\(plan.preferredModeID ?? "nil"):\(plan.shouldSelectBoxTab)")
             },
@@ -77,7 +77,7 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
         )
 
         #expect(calls == [
-            "open:balance:true",
+            "open:comparative:true",
             "refresh:explicitRefresh"
         ])
     }
@@ -90,7 +90,7 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
             input: BASAppleEntryIntentRuntimeInput(
                 kindID: "predictiveIntervention",
                 surfaceID: "watch",
-                preferredModeID: "mirror",
+                preferredModeID: "reflective",
                 scenarioID: nil,
                 promptSeed: "Pause.",
                 riskLevelID: "high",
@@ -98,7 +98,7 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
                 expiresAt: Date(timeIntervalSince1970: 200)
             ),
             performCapture: { _ in
-                calls.append("quick")
+                calls.append("primary")
             },
             performPresent: { _ in
                 calls.append("open")
@@ -115,7 +115,7 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
         )
 
         #expect(calls == [
-            "predict:mirror",
+            "predict:reflective",
             "refresh:watchHandoff"
         ])
     }

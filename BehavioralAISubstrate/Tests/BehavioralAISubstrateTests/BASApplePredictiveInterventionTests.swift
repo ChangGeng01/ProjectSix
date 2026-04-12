@@ -81,7 +81,7 @@ final class BASApplePredictiveInterventionTests: XCTestCase {
         XCTAssertEqual(candidate?.riskLevelID, "low")
         XCTAssertNil(candidate?.preferredModeID)
         XCTAssertEqual(candidate?.title, "A lighter next step may be enough.")
-        XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("deliberate next step") == true)
+        XCTAssertTrue(candidate?.reason.localizedCaseInsensitiveContains("lower-pressure next step") == true)
         XCTAssertEqual(candidate?.evidenceSignalCount, 0)
     }
 
@@ -89,7 +89,7 @@ final class BASApplePredictiveInterventionTests: XCTestCase {
         let candidate = BASApplePredictiveInterventionPredictor.predictCandidate(
             input: BASApplePredictiveInterventionInput(
                 predictiveInterventionsEnabled: true,
-                currentModeID: BASDecisionMode.mirror.identifier,
+                currentModeID: BASDecisionMode.reflective.identifier,
                 negativeRecentCount: 0,
                 now: localDate(year: 2026, month: 4, day: 10, hour: 11, minute: 0)
             )
@@ -110,20 +110,20 @@ final class BASApplePredictiveInterventionTests: XCTestCase {
                     lowRisk: BASApplePredictiveInterventionRiskBehavior(
                         title: "Host-owned pause.",
                         detail: "The host wants to slow this down in its own language.",
-                        preferredModeID: BASDecisionMode.quick.identifier
+                        preferredModeID: BASDecisionMode.primary.identifier
                     ),
                     mediumRisk: BASApplePredictiveInterventionRiskBehavior(
                         title: "Host-owned reflect.",
                         detail: "The host wants a reflective pass here.",
-                        preferredModeID: BASDecisionMode.mirror.identifier
+                        preferredModeID: BASDecisionMode.reflective.identifier
                     ),
                     highRisk: BASApplePredictiveInterventionRiskBehavior(
                         title: "Host-owned friction.",
                         detail: "The host wants stronger friction before action.",
-                        preferredModeID: BASDecisionMode.mirror.identifier
+                        preferredModeID: BASDecisionMode.reflective.identifier
                     ),
                     nightWindowReason: "Host-owned time warning.",
-                    negativeRecentReason: "Host-owned recent-history warning.",
+                    negativeRecentReason: "Host-owned recent-archive warning.",
                     failureGuardReasonsByID: [
                         "night_fast_path_failure": "Host-owned guard warning."
                     ],
@@ -141,7 +141,7 @@ final class BASApplePredictiveInterventionTests: XCTestCase {
         let candidate = BASApplePredictiveInterventionPredictor.predictCandidate(
             input: BASApplePredictiveInterventionInput(
                 predictiveInterventionsEnabled: true,
-                currentModeID: BASDecisionMode.mirror.identifier,
+                currentModeID: BASDecisionMode.reflective.identifier,
                 negativeRecentCount: 0,
                 now: localDate(year: 2026, month: 4, day: 10, hour: 11, minute: 0),
                 behavior: BASApplePredictiveInterventionBehavior(
@@ -162,7 +162,7 @@ final class BASApplePredictiveInterventionTests: XCTestCase {
                 negativeRecentCount: 0,
                 now: localDate(year: 2026, month: 4, day: 10, hour: 11, minute: 0),
                 behavior: BASApplePredictiveInterventionBehavior(
-                    preferredModeIDsByCurrentModeID: [BASDecisionMode.quick.identifier: BASDecisionMode.quick.identifier]
+                    preferredModeIDsByCurrentModeID: [BASDecisionMode.primary.identifier: BASDecisionMode.primary.identifier]
                 )
             )
         )
@@ -175,12 +175,12 @@ final class BASApplePredictiveInterventionTests: XCTestCase {
         let candidate = BASApplePredictiveInterventionPredictor.predictCandidate(
             input: BASApplePredictiveInterventionInput(
                 predictiveInterventionsEnabled: true,
-                currentModeID: BASDecisionMode.mirror.identifier,
+                currentModeID: BASDecisionMode.reflective.identifier,
                 negativeRecentCount: 0,
                 now: localDate(year: 2026, month: 4, day: 10, hour: 11, minute: 0),
                 behavior: BASApplePredictiveInterventionBehavior(
                     preferredModeIDsByCurrentModeID: [
-                        BASDecisionMode.mirror.identifier: BASDecisionMode.comparative.identifier
+                        BASDecisionMode.reflective.identifier: BASDecisionMode.comparative.identifier
                     ]
                 )
             )

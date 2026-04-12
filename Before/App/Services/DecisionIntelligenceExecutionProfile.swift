@@ -85,7 +85,8 @@ enum DecisionIntelligenceExecutionProfileResolver {
                 testingOverrideTitle: testingStubProfile?.title,
                 preferredProviderOverrideID: preferredProviderOverride?.rawValue,
                 preferredLanguages: preferredLanguages
-            )
+            ),
+            behavior: BeforeProductCompatibility.executionProfileBehavior
         )
 
         return profile(

@@ -147,21 +147,32 @@ public enum BASPromptEvidenceGuard {
     ) -> Int {
         let lowercased = evidence.lowercased()
         switch true {
-        case lowercased.hasPrefix("current perspective:"),
-             lowercased.hasPrefix("after perspective:"),
+        case lowercased.hasPrefix("current view:"),
+             lowercased.hasPrefix("next view:"),
+             lowercased.hasPrefix("present view:"),
+             lowercased.hasPrefix("later view:"),
+             lowercased.hasPrefix("headline:"),
              lowercased.hasPrefix("current headline:"),
+             lowercased.hasPrefix("tension:"),
              lowercased.hasPrefix("core tension:"):
             return 100
-        case lowercased.hasPrefix("next action:"):
+        case lowercased.hasPrefix("next action:"),
+             lowercased.hasPrefix("next step:"):
             return 90
-        case lowercased.hasPrefix("next action title:"):
+        case lowercased.hasPrefix("next action title:"),
+             lowercased.hasPrefix("next step title:"):
             return 80
-        case lowercased.hasPrefix("current summary:"):
+        case lowercased.hasPrefix("summary:"),
+             lowercased.hasPrefix("current summary:"):
             return 70
-        case lowercased.hasPrefix("verdict:"),
+        case lowercased.hasPrefix("decision summary:"),
+             lowercased.hasPrefix("verdict:"),
+             lowercased.hasPrefix("preferred action:"),
              lowercased.hasPrefix("primary action:"):
             return 60
-        case lowercased.hasPrefix("focus title:"),
+        case lowercased.hasPrefix("priority label:"),
+             lowercased.hasPrefix("priority detail:"),
+             lowercased.hasPrefix("focus title:"),
              lowercased.hasPrefix("focus description:"):
             return 50
         default:

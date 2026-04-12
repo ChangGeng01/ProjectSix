@@ -580,7 +580,7 @@ public enum BASExecutionLanePlanner {
             )
         }
 
-        if outputMode == .deterministicTemplate || outputMode == .jsonShort || traceKind == .quick {
+        if outputMode == .deterministicTemplate || outputMode == .jsonShort || traceKind == .primary {
             return BASExecutionLane.deterministic(
                 preferredRouteKinds: [.local],
                 summary: "\(traceKind.title) is best served by a deterministic lane."

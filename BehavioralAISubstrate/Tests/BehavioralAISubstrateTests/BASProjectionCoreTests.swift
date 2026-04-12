@@ -13,7 +13,7 @@ struct BASProjectionCoreTests {
                     typeID: "goal",
                     headline: "Protect sleep before midnight",
                     confidence: 0.92,
-                    sourceID: "history",
+                    sourceID: "archive",
                     lastConfirmedAt: Date(timeIntervalSince1970: 1_700_000_000),
                     lifecycleStateID: "active",
                     tierID: "hot",
@@ -143,19 +143,19 @@ struct BASProjectionCoreTests {
                 records: [],
                 candidates: [
                     BASProjectionCandidateInput(
-                        id: "candidate.history",
+                        id: "candidate.archive",
                         typeID: "semantic",
                         headline: "Long-lived editorial pattern",
                         confidence: 0.8,
                         priority: 0.72,
-                        sourceID: BASMemorySource.history.rawValue,
+                        sourceID: BASMemorySource.archive.rawValue,
                         retrievalTags: ["publish", "cadence"],
                         lastObservedAt: Date(timeIntervalSince1970: 1_700_010_000),
                         decayPolicyID: BASMemoryDecayPolicy.medium.rawValue,
                         statusID: BASMemoryLoadStatus.pending.rawValue,
                         governanceDecisionID: BASMemoryGovernanceDecision.admit.rawValue,
                         evidenceCount: 1,
-                        provenanceSummary: "clean history"
+                        provenanceSummary: "clean archive"
                     )
                 ],
                 events: []
@@ -167,28 +167,28 @@ struct BASProjectionCoreTests {
                 records: [],
                 candidates: [
                     BASProjectionCandidateInput(
-                        id: "candidate.history",
+                        id: "candidate.archive",
                         typeID: "semantic",
                         headline: "Long-lived editorial pattern",
                         confidence: 0.8,
                         priority: 0.72,
-                        sourceID: BASMemorySource.history.rawValue,
+                        sourceID: BASMemorySource.archive.rawValue,
                         retrievalTags: ["publish", "cadence"],
                         lastObservedAt: Date(timeIntervalSince1970: 1_700_010_000),
                         decayPolicyID: BASMemoryDecayPolicy.medium.rawValue,
                         statusID: BASMemoryLoadStatus.pending.rawValue,
                         governanceDecisionID: BASMemoryGovernanceDecision.admit.rawValue,
                         evidenceCount: 1,
-                        provenanceSummary: "clean history"
+                        provenanceSummary: "clean archive"
                     )
                 ],
                 events: [],
                 memoryTrustBehavior: BASMemoryTrustBehavior(
                     baseScoresBySourceID: [
-                        BASMemorySource.reminder.rawValue: 0.55,
+                        BASMemorySource.cue.rawValue: 0.55,
                         BASMemorySource.pattern.rawValue: 0.62,
                         BASMemorySource.reflection.rawValue: 0.7,
-                        BASMemorySource.history.rawValue: 0.92
+                        BASMemorySource.archive.rawValue: 0.92
                     ]
                 )
             )

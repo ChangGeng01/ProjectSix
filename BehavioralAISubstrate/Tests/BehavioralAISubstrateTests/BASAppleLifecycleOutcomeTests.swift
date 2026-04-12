@@ -1,13 +1,14 @@
 import Foundation
 import Testing
 @testable import BASAppleAdapters
+@testable import BASMemory
 
 @Suite("BASApple Lifecycle Outcomes")
 struct BASAppleLifecycleOutcomeTests {
     @Test("pending launch builder prefers explicit scenario over preferred mode")
     func pendingLaunchBuilderPrefersScenario() {
         let plan = BASApplePendingLaunchOutcomeBuilder.resolve(
-            preferredModeID: "mirror",
+            preferredModeID: "reflective",
             scenarioID: "buy",
             promptSeed: "  hold this  "
         )
@@ -22,21 +23,21 @@ struct BASAppleLifecycleOutcomeTests {
     func pendingLaunchExecutorRoutesToMatchingAction() {
         var calls: [String] = []
         let plan = BASApplePendingLaunchOutcomeBuilder.resolve(
-            preferredModeID: "balance",
+            preferredModeID: "comparative",
             scenarioID: nil,
             promptSeed: " reopen this "
         )
 
         BASApplePendingLaunchOutcomeExecutor.execute(
             plan: plan,
-            performCapture: { _ in calls.append("quick") },
+            performCapture: { _ in calls.append("primary") },
             performPresent: { action in
                 calls.append("open:\(action.preferredModeID ?? "nil"):\(action.promptSeed)")
             },
             performRoutedInput: { _ in calls.append("route") }
         )
 
-        #expect(calls == ["open:balance:reopen this"])
+        #expect(calls == ["open:comparative:reopen this"])
     }
 
     @Test("pending launch runtime executor resolves and routes in one package-owned step")
@@ -50,7 +51,7 @@ struct BASAppleLifecycleOutcomeTests {
                 promptSeed: " hold this "
             ),
             performCapture: { plan in
-                calls.append("quick:\(plan.scenarioID ?? "nil"):\(plan.promptSeed)")
+                calls.append("primary:\(plan.scenarioID ?? "nil"):\(plan.promptSeed)")
             },
             performPresent: { _ in
                 calls.append("open")
@@ -60,7 +61,7 @@ struct BASAppleLifecycleOutcomeTests {
             }
         )
 
-        #expect(calls == ["quick:buy:hold this"])
+        #expect(calls == ["primary:buy:hold this"])
     }
 
     @Test("lifecycle entry source executor prefers handoff over pending launch")
@@ -89,11 +90,11 @@ struct BASAppleLifecycleOutcomeTests {
                 hasActiveReflectiveWorkflow: false,
                 hasReflectionContext: false
             ),
-            loadState: { "quick" },
+            loadState: { "primary" },
             modeID: { $0 },
-            restorePrimary: { _ in calls.append("quick") },
-            restoreComparative: { _ in calls.append("balance") },
-            restoreReflective: { _ in calls.append("mirror") },
+            restorePrimary: { _ in calls.append("primary") },
+            restoreComparative: { _ in calls.append("comparative") },
+            restoreReflective: { _ in calls.append("reflective") },
             selectHomeTab: { calls.append("home") },
             afterRestore: { calls.append("after") }
         )
@@ -113,15 +114,15 @@ struct BASAppleLifecycleOutcomeTests {
                 hasActiveReflectiveWorkflow: false,
                 hasReflectionContext: false
             ),
-            loadState: { "mirror" },
+            loadState: { BASDecisionMode.reflectiveID },
             modeID: { $0 },
-            restorePrimary: { _ in calls.append("quick") },
-            restoreComparative: { _ in calls.append("balance") },
-            restoreReflective: { _ in calls.append("mirror") },
+            restorePrimary: { _ in calls.append("primary") },
+            restoreComparative: { _ in calls.append("comparative") },
+            restoreReflective: { _ in calls.append("reflective") },
             selectHomeTab: { calls.append("home") },
             afterRestore: { calls.append("after") }
         )
 
-        #expect(calls == ["mirror", "home", "after"])
+        #expect(calls == ["reflective", "home", "after"])
     }
 }

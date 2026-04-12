@@ -101,12 +101,12 @@ public struct BASAppleProviderObservationNarrativeBehavior: Codable, Sendable, E
                 cachedConsistencySource: "cached reflective pass",
                 providerConsistencySource: "provider reflective pass"
             ),
-            "reminder": BASAppleProviderObservationNarrative(
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for reminder selection.",
-                admissionSkippedDetailPrefix: "Admission controller skipped reminder selection.",
-                deterministicFallbackBase: "No provider returned a reminder selection, so the host kept the deterministic reminder ordering.",
-                cachedConsistencySource: "cached reminder selection",
-                providerConsistencySource: "provider reminder selection"
+            BASSemanticTaskKind.selectionID: BASAppleProviderObservationNarrative(
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the selection pass.",
+                admissionSkippedDetailPrefix: "Admission controller skipped the selection pass.",
+                deterministicFallbackBase: "No provider returned a selection result, so the host kept the deterministic candidate ordering.",
+                cachedConsistencySource: "cached selection pass",
+                providerConsistencySource: "provider selection pass"
             )
         ],
         fallbackNarrative: BASAppleProviderObservationNarrative = BASAppleProviderObservationNarrative(
@@ -122,25 +122,7 @@ public struct BASAppleProviderObservationNarrativeBehavior: Codable, Sendable, E
     }
 
     public func narrative(for kindID: String) -> BASAppleProviderObservationNarrative {
-        for alias in Self.kindAliases(for: kindID) {
-            if let configured = narrativesByKindID[alias] {
-                return configured
-            }
-        }
-        return fallbackNarrative
-    }
-
-    private static func kindAliases(for kindID: String) -> [String] {
-        switch kindID {
-        case "quick", BASDecisionMode.primaryID:
-            [kindID, BASDecisionMode.primaryID, "quick"]
-        case "balance", BASDecisionMode.comparativeID:
-            [kindID, BASDecisionMode.comparativeID, "balance"]
-        case "mirror", BASDecisionMode.reflectiveID:
-            [kindID, BASDecisionMode.reflectiveID, "mirror"]
-        default:
-            [kindID]
-        }
+        narrativesByKindID[kindID] ?? fallbackNarrative
     }
 }
 
@@ -502,7 +484,7 @@ public struct BASAppleProviderObservationContext: Codable, Sendable, Equatable {
     public var brainState: BASDecisionBrainState?
     public var admissionPressureID: String?
     public var admissionSkipReasonID: String?
-    public var reminderSelectionNeedID: String?
+    public var selectionNeedID: String?
     public var runtimeTimeBudgetMs: Int?
     public var admissionReason: String?
     public var semanticPromptFingerprint: String?
@@ -527,7 +509,7 @@ public struct BASAppleProviderObservationContext: Codable, Sendable, Equatable {
         brainState: BASDecisionBrainState? = nil,
         admissionPressureID: String? = nil,
         admissionSkipReasonID: String? = nil,
-        reminderSelectionNeedID: String? = nil,
+        selectionNeedID: String? = nil,
         runtimeTimeBudgetMs: Int? = nil,
         admissionReason: String? = nil,
         semanticPromptFingerprint: String? = nil,
@@ -551,7 +533,7 @@ public struct BASAppleProviderObservationContext: Codable, Sendable, Equatable {
         self.brainState = brainState
         self.admissionPressureID = admissionPressureID
         self.admissionSkipReasonID = admissionSkipReasonID
-        self.reminderSelectionNeedID = reminderSelectionNeedID
+        self.selectionNeedID = selectionNeedID
         self.runtimeTimeBudgetMs = runtimeTimeBudgetMs
         self.admissionReason = admissionReason
         self.semanticPromptFingerprint = semanticPromptFingerprint
@@ -578,7 +560,7 @@ public struct BASAppleProviderObservationSourceInput: Codable, Sendable, Equatab
     public var brainState: BASDecisionBrainState?
     public var admissionPressureID: String?
     public var admissionSkipReasonID: String?
-    public var reminderSelectionNeedID: String?
+    public var selectionNeedID: String?
     public var runtimeTimeBudgetMs: Int?
     public var admissionReason: String?
     public var semanticPromptFingerprint: String?
@@ -598,7 +580,7 @@ public struct BASAppleProviderObservationSourceInput: Codable, Sendable, Equatab
         brainState: BASDecisionBrainState? = nil,
         admissionPressureID: String? = nil,
         admissionSkipReasonID: String? = nil,
-        reminderSelectionNeedID: String? = nil,
+        selectionNeedID: String? = nil,
         runtimeTimeBudgetMs: Int? = nil,
         admissionReason: String? = nil,
         semanticPromptFingerprint: String? = nil,
@@ -617,7 +599,7 @@ public struct BASAppleProviderObservationSourceInput: Codable, Sendable, Equatab
         self.brainState = brainState
         self.admissionPressureID = admissionPressureID
         self.admissionSkipReasonID = admissionSkipReasonID
-        self.reminderSelectionNeedID = reminderSelectionNeedID
+        self.selectionNeedID = selectionNeedID
         self.runtimeTimeBudgetMs = runtimeTimeBudgetMs
         self.admissionReason = admissionReason
         self.semanticPromptFingerprint = semanticPromptFingerprint
@@ -644,7 +626,7 @@ public enum BASAppleProviderObservationContextBuilder {
             brainState: input.brainState,
             admissionPressureID: input.admissionPressureID,
             admissionSkipReasonID: input.admissionSkipReasonID,
-            reminderSelectionNeedID: input.reminderSelectionNeedID,
+            selectionNeedID: input.selectionNeedID,
             runtimeTimeBudgetMs: input.runtimeTimeBudgetMs,
             admissionReason: input.admissionReason,
             semanticPromptFingerprint: input.semanticPromptFingerprint,
@@ -821,7 +803,7 @@ public enum BASAppleProviderOutcomeObserver {
                         runtimeTimeBudgetMs: context.runtimeTimeBudgetMs,
                         admissionPressureID: context.admissionPressureID,
                         admissionSkipReasonID: context.admissionSkipReasonID,
-                        reminderSelectionNeedID: context.reminderSelectionNeedID
+                        selectionNeedID: context.selectionNeedID
                     )
                 ),
                 trace: context.recordsTemplatePinnedTrace
@@ -858,7 +840,7 @@ public enum BASAppleProviderOutcomeObserver {
                         runtimeTimeBudgetMs: context.runtimeTimeBudgetMs,
                         admissionPressureID: context.admissionPressureID,
                         admissionSkipReasonID: context.admissionSkipReasonID,
-                        reminderSelectionNeedID: context.reminderSelectionNeedID
+                        selectionNeedID: context.selectionNeedID
                     )
                 ),
                 trace: BASAppleObservedProviderTrace(
@@ -924,7 +906,7 @@ public enum BASAppleProviderOutcomeObserver {
                         runtimeTimeBudgetMs: context.runtimeTimeBudgetMs,
                         admissionPressureID: context.admissionPressureID,
                         admissionSkipReasonID: context.admissionSkipReasonID,
-                        reminderSelectionNeedID: context.reminderSelectionNeedID,
+                        selectionNeedID: context.selectionNeedID,
                         activeBackendID: backendID(for: activeProviderID, context: context)
                     )
                 ),
@@ -1000,7 +982,7 @@ public enum BASAppleProviderOutcomeObserver {
                         runtimeTimeBudgetMs: context.runtimeTimeBudgetMs,
                         admissionPressureID: context.admissionPressureID,
                         admissionSkipReasonID: context.admissionSkipReasonID,
-                        reminderSelectionNeedID: context.reminderSelectionNeedID,
+                        selectionNeedID: context.selectionNeedID,
                         activeBackendID: backendID(for: activeProviderID, context: context)
                     )
                 ),
@@ -1055,7 +1037,7 @@ public enum BASAppleProviderOutcomeObserver {
                         runtimeTimeBudgetMs: context.runtimeTimeBudgetMs,
                         admissionPressureID: context.admissionPressureID,
                         admissionSkipReasonID: context.admissionSkipReasonID,
-                        reminderSelectionNeedID: context.reminderSelectionNeedID
+                        selectionNeedID: context.selectionNeedID
                     )
                 ),
                 trace: BASAppleObservedProviderTrace(

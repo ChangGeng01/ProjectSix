@@ -340,7 +340,7 @@ public enum BASBrainProjectionCompiler {
     }
 
     private static func memorySource(from sourceID: String) -> BASMemorySource {
-        BASMemorySource(rawValue: sourceID) ?? .history
+        BASMemorySource(identifier: sourceID) ?? .archive
     }
 
     private static func memoryLoadStatus(

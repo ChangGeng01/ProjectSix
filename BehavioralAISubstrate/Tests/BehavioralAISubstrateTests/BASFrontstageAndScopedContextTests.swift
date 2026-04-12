@@ -6,10 +6,10 @@ import Testing
 
 @Suite("BASFrontstageAndScopedContext")
 struct BASFrontstageAndScopedContextTests {
-    @Test("frontstage compiler keeps mobile quick context tight and explicit")
+    @Test("frontstage compiler keeps mobile primary context tight and explicit")
     func frontstageCompilerKeepsQuickContextTight() {
         let strategy = BASAdaptiveTaskStrategy(
-            kind: .quick,
+            kind: .primary,
             entropy: .low,
             runtimeGear: .low,
             contextBudget: 220,
@@ -24,7 +24,7 @@ struct BASFrontstageAndScopedContextTests {
 
         let state = BASFrontstageStateCompiler.compile(
             BASFrontstageCompilationRequest(
-                kind: .quick,
+                kind: .primary,
                 activeStateSignalCount: 3,
                 openTextSignalCount: 2,
                 retainedEvidence: [
@@ -39,7 +39,7 @@ struct BASFrontstageAndScopedContextTests {
                 strategy: strategy,
                 contextWasRebuilt: true,
                 staleFieldCount: 1,
-                anchorTitles: ["quick note"],
+                anchorTitles: ["primary note"],
                 dominantSignalTitles: ["Constraint pressure", "Concern weight"],
                 suppressedBehaviors: ["instant_verdict"],
                 memoryHeadlines: ["Holding the decision often breaks the loop."],
@@ -61,7 +61,7 @@ struct BASFrontstageAndScopedContextTests {
     func frontstageCompilerHonorsHostPresentationBehavior() {
         let state = BASFrontstageStateCompiler.compile(
             BASFrontstageCompilationRequest(
-                kind: .mirror,
+                kind: .reflective,
                 activeStateSignalCount: 2,
                 openTextSignalCount: 1,
                 retainedEvidence: [
@@ -77,10 +77,10 @@ struct BASFrontstageAndScopedContextTests {
                 staleFieldCount: 1,
                 presentationBehavior: BASFrontstagePresentationBehavior(
                     focusGoalsByKindID: [
-                        BASAdaptiveTraceKind.mirror.rawValue: "Hold the reflective lane without forcing closure."
+                        BASAdaptiveTraceKind.reflective.rawValue: "Hold the reflective lane without forcing closure."
                     ],
                     baseEvidenceCountByKindID: [
-                        BASAdaptiveTraceKind.mirror.rawValue: 2
+                        BASAdaptiveTraceKind.reflective.rawValue: 2
                     ],
                     lowGearEvidenceClampByKindID: [:],
                     contextRebuiltSignal: "Host rebuild",
@@ -98,7 +98,7 @@ struct BASFrontstageAndScopedContextTests {
         #expect(state.dangerSignals.contains("Host filtered evidence"))
     }
 
-    @Test("scoped context compiler compacts low-gear quick and preserves richer balance context")
+    @Test("scoped context compiler compacts low-gear primary and preserves richer comparative context")
     func scopedContextCompilerAdaptsToSurfacePressure() {
         let brainState = BASDecisionBrainState(
             profileCore: ["Short, direct language lands better.", "Long copy causes drift."],
@@ -117,7 +117,7 @@ struct BASFrontstageAndScopedContextTests {
             loadedAt: .now
         )
         let compactStrategy = BASAdaptiveTaskStrategy(
-            kind: .quick,
+            kind: .primary,
             entropy: .low,
             runtimeGear: .low,
             contextBudget: 220,
@@ -131,12 +131,12 @@ struct BASFrontstageAndScopedContextTests {
         )
 
         let compact = BASScopedContextCompiler.compile(
-            kind: .quick,
+            kind: .primary,
             strategy: compactStrategy,
             brainState: brainState
         )
         let full = BASScopedContextCompiler.compile(
-            kind: .balance,
+            kind: .comparative,
             strategy: nil,
             brainState: brainState
         )

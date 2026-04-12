@@ -27,7 +27,7 @@ enum DecisionBoundaryPolicyEngine {
             identityProfile: identityProfile,
             brainState: brainState,
             taskGraphHint: taskGraphHint,
-            behavior: BeforeProductLanguage.hostCognition.substrateBehavior
+            behavior: BeforeProductCompatibility.substrateCognitionBehavior
         )
     }
 

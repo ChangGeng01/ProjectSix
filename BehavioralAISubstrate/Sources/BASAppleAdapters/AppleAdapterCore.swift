@@ -174,20 +174,20 @@ public enum BASAppleEntryIntentPlanBuilder {
             riskLevelID: riskLevelID,
             triggerReason: triggerReason,
             sourceSurface: surface,
-            shouldSelectBoxTab: kindID == "reopenTomorrowItem" || kindID == "reopen",
+            shouldSelectBoxTab: kind == .present,
             refreshTriggerKind: surface == .watch ? .watchHandoff : .explicitRefresh
         )
     }
 
     private static func actionKind(from rawValue: String) -> BASAppleEntryIntentActionKind {
         switch rawValue {
-        case "quickCapture", "capture":
+        case "capture":
             .capture
         case "predictiveIntervention":
             .predictiveIntervention
-        case "resumeCurrentDecision", "resume":
+        case "resume":
             .restore
-        case "openMode", "reopenTomorrowItem", "present", "reopen":
+        case "present", "reopen":
             .present
         default:
             .present
@@ -305,10 +305,10 @@ public enum BASAppleHandoffBridgeBuilder {
     }
 
     private static func taskKind(from preferredWorkflowID: String?) -> BASTaskKind {
-        switch preferredWorkflowID {
-        case "balance":
+        switch preferredWorkflowID.flatMap(BASDecisionMode.init(identifier:)) {
+        case .comparative?:
             .plan
-        case "mirror":
+        case .reflective?:
             .retrieve
         default:
             .chat

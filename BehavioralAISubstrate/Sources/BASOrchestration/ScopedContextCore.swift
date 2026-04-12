@@ -35,7 +35,7 @@ public enum BASScopedContextCompiler {
     ) -> BASScopedContextState? {
         guard let brainState, !brainState.isEmpty else { return nil }
 
-        let compactMobileSurface = strategy?.runtimeGear == .low && (kind == .quick || kind == .reminder)
+        let compactMobileSurface = strategy?.runtimeGear == .low && (kind == .primary || kind == .selection)
         if compactMobileSurface {
             return BASScopedContextState(
                 userProfile: Array(brainState.profileCore.prefix(1)),

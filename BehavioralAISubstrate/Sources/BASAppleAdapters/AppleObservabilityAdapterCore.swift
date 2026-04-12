@@ -100,7 +100,7 @@ public struct BASAppleTelemetryRecordInput: Codable, Sendable, Equatable {
     public var runtimeTimeBudgetMs: Int?
     public var admissionPressureID: String?
     public var admissionSkipReasonID: String?
-    public var reminderSelectionNeedID: String?
+    public var selectionNeedID: String?
     public var activeBackendID: String?
 
     public init(
@@ -115,7 +115,7 @@ public struct BASAppleTelemetryRecordInput: Codable, Sendable, Equatable {
         runtimeTimeBudgetMs: Int? = nil,
         admissionPressureID: String? = nil,
         admissionSkipReasonID: String? = nil,
-        reminderSelectionNeedID: String? = nil,
+        selectionNeedID: String? = nil,
         activeBackendID: String? = nil
     ) {
         self.kind = kind
@@ -129,7 +129,7 @@ public struct BASAppleTelemetryRecordInput: Codable, Sendable, Equatable {
         self.runtimeTimeBudgetMs = runtimeTimeBudgetMs
         self.admissionPressureID = admissionPressureID
         self.admissionSkipReasonID = admissionSkipReasonID
-        self.reminderSelectionNeedID = reminderSelectionNeedID
+        self.selectionNeedID = selectionNeedID
         self.activeBackendID = activeBackendID
     }
 }
@@ -145,7 +145,7 @@ public struct BASAppleTelemetryRecordCompilation: Codable, Sendable, Equatable {
     public var promptBudget: BASPromptBudget?
     public var admissionPressureID: String?
     public var admissionSkipReasonID: String?
-    public var reminderSelectionNeedID: String?
+    public var selectionNeedID: String?
     public var activeBackendID: String?
     public var slowRequestThresholdMs: Double
     public var isSlowRequest: Bool
@@ -164,7 +164,7 @@ public struct BASAppleTelemetryRecordCompilation: Codable, Sendable, Equatable {
         promptBudget: BASPromptBudget?,
         admissionPressureID: String?,
         admissionSkipReasonID: String?,
-        reminderSelectionNeedID: String?,
+        selectionNeedID: String?,
         activeBackendID: String?,
         slowRequestThresholdMs: Double,
         isSlowRequest: Bool,
@@ -182,7 +182,7 @@ public struct BASAppleTelemetryRecordCompilation: Codable, Sendable, Equatable {
         self.promptBudget = promptBudget
         self.admissionPressureID = admissionPressureID
         self.admissionSkipReasonID = admissionSkipReasonID
-        self.reminderSelectionNeedID = reminderSelectionNeedID
+        self.selectionNeedID = selectionNeedID
         self.activeBackendID = activeBackendID
         self.slowRequestThresholdMs = slowRequestThresholdMs
         self.isSlowRequest = isSlowRequest
@@ -340,12 +340,12 @@ public enum BASAppleObservabilityAdapter {
     public static func slowRequestThresholdMs(
         for kind: String
     ) -> Double {
-        switch kind {
-        case "quick":
+        switch BASAdaptiveTraceKind(identifier: kind) {
+        case .primary?:
             800
-        case "balance", "mirror":
+        case .comparative?, .reflective?:
             1_500
-        case "reminder":
+        case .selection?:
             450
         default:
             1_000
@@ -370,7 +370,7 @@ public enum BASAppleObservabilityAdapter {
             promptBudget: input.promptBudget,
             admissionPressureID: input.admissionPressureID,
             admissionSkipReasonID: input.admissionSkipReasonID,
-            reminderSelectionNeedID: input.reminderSelectionNeedID,
+            selectionNeedID: input.selectionNeedID,
             activeBackendID: input.activeBackendID,
             slowRequestThresholdMs: threshold,
             isSlowRequest: input.durationMs >= threshold,

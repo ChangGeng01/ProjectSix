@@ -45,41 +45,41 @@ struct BASObservabilityCoreTests {
     func telemetrySummaryBuilderTracksRates() {
         let summary = BASTelemetrySummaryBuilder.build(
             from: BASTelemetrySummaryInput(
-                requestCountByKind: ["quick": 2, "mirror": 1],
+                requestCountByKind: ["primary": 2, "reflective": 1],
                 outcomeCount: [.providerSuccess: 1, .cacheHit: 1, .admissionSkipped: 1],
                 outcomeCountByKind: [
-                    .providerSuccess: ["quick": 1],
-                    .cacheHit: ["quick": 1],
-                    .admissionSkipped: ["mirror": 1]
+                    .providerSuccess: ["primary": 1],
+                    .cacheHit: ["primary": 1],
+                    .admissionSkipped: ["reflective": 1]
                 ],
                 activeProviderCount: ["gemmaE4B": 1],
                 attemptedProviderCount: ["gemmaE4B": 1, "foundationModels": 1],
                 fallbackActivations: 0,
                 backendCount: ["coreML": 1],
-                slowRequestCountByKind: ["mirror": 1],
-                overTimeBudgetCountByKind: ["mirror": 1],
-                requestDurationTotalMsByKind: ["quick": 510, "mirror": 2_400],
-                firstPresentableTotalMsByKind: ["quick": 216],
-                promptAssemblyTotalMsByKind: ["quick": 58],
-                admissionEvaluationTotalMsByKind: ["quick": 26],
-                providerSelectionTotalMsByKind: ["quick": 14],
-                executionTotalMsByKind: ["quick": 118],
+                slowRequestCountByKind: ["reflective": 1],
+                overTimeBudgetCountByKind: ["reflective": 1],
+                requestDurationTotalMsByKind: ["primary": 510, "reflective": 2_400],
+                firstPresentableTotalMsByKind: ["primary": 216],
+                promptAssemblyTotalMsByKind: ["primary": 58],
+                admissionEvaluationTotalMsByKind: ["primary": 26],
+                providerSelectionTotalMsByKind: ["primary": 14],
+                executionTotalMsByKind: ["primary": 118],
                 activeProviderDurationTotalMs: ["gemmaE4B": 120],
                 backendDurationTotalMs: ["coreML": 120],
                 admissionSkipCountByReason: ["templateAlreadySufficient": 1],
-                admissionSkipCountByReasonAndKind: ["templateAlreadySufficient": ["mirror": 1]],
-                reminderSelectionNeedCount: [:],
-                promptCharactersTotalByKind: ["quick": 200],
-                prefixCharactersTotalByKind: ["quick": 80],
-                immutablePrefixCharactersTotalByKind: ["quick": 48],
-                adaptivePrefixCharactersTotalByKind: ["quick": 32],
-                suffixCharactersTotalByKind: ["quick": 120],
-                overTargetBudgetCountByKind: ["mirror": 1],
-                lowPressureModelCallCountByKind: ["quick": 1],
-                reminderKindRawValue: "reminder",
-                reminderKnowledgeNeedRawValue: "knowledge",
-                reminderControlNeedRawValue: "control",
-                reminderRetrievalBypassReasonRawValues: ["retrievalNotNeeded", "insufficientReminderChoice"],
+                admissionSkipCountByReasonAndKind: ["templateAlreadySufficient": ["reflective": 1]],
+                selectionNeedCount: [:],
+                promptCharactersTotalByKind: ["primary": 200],
+                prefixCharactersTotalByKind: ["primary": 80],
+                immutablePrefixCharactersTotalByKind: ["primary": 48],
+                adaptivePrefixCharactersTotalByKind: ["primary": 32],
+                suffixCharactersTotalByKind: ["primary": 120],
+                overTargetBudgetCountByKind: ["reflective": 1],
+                lowPressureModelCallCountByKind: ["primary": 1],
+                selectionKindRawValue: "selection",
+                selectionKnowledgeNeedRawValue: "knowledge",
+                selectionControlNeedRawValue: "control",
+                selectionRetrievalBypassReasonRawValues: ["retrievalNotNeeded", "insufficientChoiceSpread"],
                 avoidableSkipReasonRawValues: ["templateAlreadySufficient", "insufficientSourceMaterial"]
             )
         )
@@ -91,22 +91,22 @@ struct BASObservabilityCoreTests {
         #expect(summary.providerBypassRate == 2.0 / 3.0)
         #expect(summary.lowPressureModelCallRate == 1.0 / 3.0)
         #expect(summary.avoidableModelCallRate == 1.0 / 3.0)
-        #expect(summary.slowRequestRateByKind["mirror"] == 1)
-        #expect(summary.overTimeBudgetRateByKind["mirror"] == 1)
+        #expect(summary.slowRequestRateByKind["reflective"] == 1)
+        #expect(summary.overTimeBudgetRateByKind["reflective"] == 1)
         #expect(summary.averageRequestDurationMsByActiveProvider["gemmaE4B"] == 120)
         #expect(summary.averageRequestDurationMsByBackend["coreML"] == 120)
-        #expect(summary.averagePrefillEquivalentShareByKind["quick"] == 98.0 / 216.0)
+        #expect(summary.averagePrefillEquivalentShareByKind["primary"] == 98.0 / 216.0)
     }
 
-    @Test("telemetry summary builder tracks reminder retrieval bypass")
+    @Test("telemetry summary builder tracks selection retrieval bypass")
     func telemetrySummaryBuilderTracksReminderBypass() {
         let summary = BASTelemetrySummaryBuilder.build(
             from: BASTelemetrySummaryInput(
-                requestCountByKind: ["reminder": 2],
+                requestCountByKind: ["selection": 2],
                 outcomeCount: [.admissionSkipped: 1, .providerSuccess: 1],
                 outcomeCountByKind: [
-                    .admissionSkipped: ["reminder": 1],
-                    .providerSuccess: ["reminder": 1]
+                    .admissionSkipped: ["selection": 1],
+                    .providerSuccess: ["selection": 1]
                 ],
                 activeProviderCount: ["gemmaE4B": 1],
                 attemptedProviderCount: ["gemmaE4B": 1],
@@ -114,7 +114,7 @@ struct BASObservabilityCoreTests {
                 backendCount: [:],
                 slowRequestCountByKind: [:],
                 overTimeBudgetCountByKind: [:],
-                requestDurationTotalMsByKind: ["reminder": 148],
+                requestDurationTotalMsByKind: ["selection": 148],
                 firstPresentableTotalMsByKind: [:],
                 promptAssemblyTotalMsByKind: [:],
                 admissionEvaluationTotalMsByKind: [:],
@@ -124,7 +124,7 @@ struct BASObservabilityCoreTests {
                 backendDurationTotalMs: [:],
                 admissionSkipCountByReason: ["retrievalNotNeeded": 1],
                 admissionSkipCountByReasonAndKind: [:],
-                reminderSelectionNeedCount: ["knowledge": 1, "control": 1],
+                selectionNeedCount: ["knowledge": 1, "control": 1],
                 promptCharactersTotalByKind: [:],
                 prefixCharactersTotalByKind: [:],
                 immutablePrefixCharactersTotalByKind: [:],
@@ -132,19 +132,19 @@ struct BASObservabilityCoreTests {
                 suffixCharactersTotalByKind: [:],
                 overTargetBudgetCountByKind: [:],
                 lowPressureModelCallCountByKind: [:],
-                reminderKindRawValue: "reminder",
-                reminderKnowledgeNeedRawValue: "knowledge",
-                reminderControlNeedRawValue: "control",
-                reminderRetrievalBypassReasonRawValues: ["retrievalNotNeeded", "insufficientReminderChoice"],
+                selectionKindRawValue: "selection",
+                selectionKnowledgeNeedRawValue: "knowledge",
+                selectionControlNeedRawValue: "control",
+                selectionRetrievalBypassReasonRawValues: ["retrievalNotNeeded", "insufficientChoiceSpread"],
                 avoidableSkipReasonRawValues: ["templateAlreadySufficient", "insufficientSourceMaterial"]
             )
         )
 
-        #expect(summary.reminderRequestCount == 2)
-        #expect(summary.reminderKnowledgeNeedRate == 0.5)
-        #expect(summary.reminderControlOnlyRate == 0.5)
-        #expect(summary.reminderRetrievalBypassCount == 1)
-        #expect(summary.reminderRetrievalBypassRate == 0.5)
+        #expect(summary.selectionRequestCount == 2)
+        #expect(summary.selectionKnowledgeNeedRate == 0.5)
+        #expect(summary.selectionControlOnlyRate == 0.5)
+        #expect(summary.selectionRetrievalBypassCount == 1)
+        #expect(summary.selectionRetrievalBypassRate == 0.5)
     }
 
     @Test("replay fingerprint is stable for identical bundles")
@@ -188,7 +188,7 @@ struct BASObservabilityCoreTests {
     @Test("release decision mirrors policy outcome")
     func releaseDecisionMirrorsPolicyOutcome() {
         let trace = BASExecutionTrace(
-            inputSummary: "quick",
+            inputSummary: "primary",
             selectedRoute: .local("local-fast"),
             memoriesRecalled: [],
             toolsCalled: [],
@@ -262,7 +262,7 @@ struct BASObservabilityCoreTests {
         let summary = BASLifecycleSummaryBuilder.build(
             from: [
                 BASLifecycleTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     hasContextState: true,
                     generation: 2,
                     rebuiltSession: true,
@@ -276,7 +276,7 @@ struct BASObservabilityCoreTests {
                     droppedBudgetEvidenceCount: 1
                 ),
                 BASLifecycleTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     hasContextState: true,
                     generation: 3,
                     rebuiltSession: false,
@@ -290,7 +290,7 @@ struct BASObservabilityCoreTests {
                     droppedBudgetEvidenceCount: 0
                 ),
                 BASLifecycleTraceInput(
-                    kind: "mirror",
+                    kind: "reflective",
                     hasContextState: false,
                     generation: nil,
                     rebuiltSession: false,
@@ -308,17 +308,17 @@ struct BASObservabilityCoreTests {
 
         #expect(summary.contextAwareTraceCount == 2)
         #expect(summary.rebuildCount == 1)
-        #expect(summary.rebuildCountByKind["quick"] == 1)
+        #expect(summary.rebuildCountByKind["primary"] == 1)
         #expect(summary.staleFieldDropCount == 3)
         #expect(summary.retainedEvidenceCount == 6)
-        #expect(summary.retainedEvidenceCountByKind["quick"] == 3)
+        #expect(summary.retainedEvidenceCountByKind["primary"] == 3)
         #expect(summary.droppedEvidenceCount == 3)
-        #expect(summary.droppedInjectedEvidenceCountByKind["quick"] == 1)
-        #expect(summary.droppedDuplicateEvidenceCountByKind["quick"] == 1)
-        #expect(summary.droppedBudgetEvidenceCountByKind["quick"] == 1)
-        #expect(summary.averageAnchorFieldCountByKind["quick"] == 2)
-        #expect(summary.averageRetainedEvidenceCountByKind["quick"] == 1.5)
-        #expect(summary.latestGenerationByKind["quick"] == 3)
+        #expect(summary.droppedInjectedEvidenceCountByKind["primary"] == 1)
+        #expect(summary.droppedDuplicateEvidenceCountByKind["primary"] == 1)
+        #expect(summary.droppedBudgetEvidenceCountByKind["primary"] == 1)
+        #expect(summary.averageAnchorFieldCountByKind["primary"] == 2)
+        #expect(summary.averageRetainedEvidenceCountByKind["primary"] == 1.5)
+        #expect(summary.latestGenerationByKind["primary"] == 3)
     }
 
     @Test("neural summary compiler keeps dominant route and strongest signal by kind")
@@ -326,19 +326,19 @@ struct BASObservabilityCoreTests {
         let summary = BASNeuralSummaryBuilder.build(
             from: [
                 BASNeuralTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     suppressedBehaviorCount: 2,
                     dominantActionRawValue: "waitBuffer",
                     strongestSignalRawValue: "urgency"
                 ),
                 BASNeuralTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     suppressedBehaviorCount: 1,
                     dominantActionRawValue: "stepAway",
                     strongestSignalRawValue: "fatigue"
                 ),
                 BASNeuralTraceInput(
-                    kind: "mirror",
+                    kind: "reflective",
                     suppressedBehaviorCount: 3,
                     dominantActionRawValue: "protectSelf",
                     strongestSignalRawValue: "identityDrift"
@@ -348,8 +348,8 @@ struct BASObservabilityCoreTests {
 
         #expect(summary.neuralTraceCount == 3)
         #expect(summary.suppressedBehaviorCount == 6)
-        #expect(summary.dominantActionByKind["quick"] == "waitBuffer")
-        #expect(summary.strongestSignalByKind["mirror"] == "identityDrift")
+        #expect(summary.dominantActionByKind["primary"] == "waitBuffer")
+        #expect(summary.strongestSignalByKind["reflective"] == "identityDrift")
     }
 
     @Test("brain summary compiler aggregates governance calibration and evolution")
@@ -357,7 +357,7 @@ struct BASObservabilityCoreTests {
         let summary = BASBrainSummaryBuilder.build(
             from: [
                 BASBrainTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     dominantReactionWeight: .briefLanguage,
                     profileCoreCount: 2,
                     activeGoalCount: 1,
@@ -382,7 +382,7 @@ struct BASObservabilityCoreTests {
                     evolutionRollbackReady: false
                 ),
                 BASBrainTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     dominantReactionWeight: .briefLanguage,
                     profileCoreCount: 4,
                     activeGoalCount: 3,
@@ -407,7 +407,7 @@ struct BASObservabilityCoreTests {
                     evolutionRollbackReady: true
                 ),
                 BASBrainTraceInput(
-                    kind: "mirror",
+                    kind: "reflective",
                     dominantReactionWeight: .boundaryNamingBias,
                     profileCoreCount: 1,
                     activeGoalCount: 2,
@@ -422,7 +422,7 @@ struct BASObservabilityCoreTests {
                     snapshotFingerprint: "fp-m-1",
                     lowTrustMemoryLoadRate: 0.1,
                     riskFlags: [],
-                    identityRole: .mirrorWitness,
+                    identityRole: .reflectiveWitness,
                     boundaryMode: .localOnlyReflective,
                     activeConstraints: [.roleLimitedAdvice],
                     calibrationStatus: .stable,
@@ -435,32 +435,32 @@ struct BASObservabilityCoreTests {
         )
 
         #expect(summary.brainTraceCount == 3)
-        #expect(summary.dominantReactionWeightByKind["quick"] == .briefLanguage)
-        #expect(summary.averageProfileCoreCountByKind["quick"] == 3)
-        #expect(summary.averageLoadedPendingMemoryCountByKind["quick"] == 1)
-        #expect(summary.pendingMemoryLoadRateByKind["quick"] == 1.0 / 3.0)
-        #expect(summary.retrievalRejectionRateByKind["quick"] == 0.25)
-        #expect(summary.latestSnapshotFingerprintByKind["quick"] == "fp-q-1")
-        #expect(summary.snapshotVariantCountByKind["quick"] == 2)
-        #expect(summary.lowTrustMemoryLoadRateByKind["quick"] == 0.375)
-        #expect(summary.riskFlagCountsByKind["quick"]?[.lowTrustLoad] == 2)
-        #expect(summary.boundaryConstraintCountsByKind["quick"]?[.lockSensitiveMemory] == 2)
-        #expect(summary.calibrationStatusByKind["quick"] == .watch)
-        #expect(summary.calibrationAlertCountsByKind["quick"]?[.templateCoverageGap] == 1)
-        #expect(summary.evolutionCheckpointCountByKind["quick"] == 3)
-        #expect(summary.evolutionPendingReviewCountByKind["quick"] == 2)
-        #expect(summary.evolutionRollbackReadyByKind["quick"] == true)
+        #expect(summary.dominantReactionWeightByKind["primary"] == .briefLanguage)
+        #expect(summary.averageProfileCoreCountByKind["primary"] == 3)
+        #expect(summary.averageLoadedPendingMemoryCountByKind["primary"] == 1)
+        #expect(summary.pendingMemoryLoadRateByKind["primary"] == 1.0 / 3.0)
+        #expect(summary.retrievalRejectionRateByKind["primary"] == 0.25)
+        #expect(summary.latestSnapshotFingerprintByKind["primary"] == "fp-q-1")
+        #expect(summary.snapshotVariantCountByKind["primary"] == 2)
+        #expect(summary.lowTrustMemoryLoadRateByKind["primary"] == 0.375)
+        #expect(summary.riskFlagCountsByKind["primary"]?[.lowTrustLoad] == 2)
+        #expect(summary.boundaryConstraintCountsByKind["primary"]?[.lockSensitiveMemory] == 2)
+        #expect(summary.calibrationStatusByKind["primary"] == .watch)
+        #expect(summary.calibrationAlertCountsByKind["primary"]?[.templateCoverageGap] == 1)
+        #expect(summary.evolutionCheckpointCountByKind["primary"] == 3)
+        #expect(summary.evolutionPendingReviewCountByKind["primary"] == 2)
+        #expect(summary.evolutionRollbackReadyByKind["primary"] == true)
     }
 
     @Test("runtime inspection builder compiles cross-domain summary from substrate inputs")
     func runtimeInspectionBuilderCompilesCrossDomainSummary() {
         let telemetry = BASTelemetrySummaryBuilder.build(
             from: BASTelemetrySummaryInput(
-                requestCountByKind: ["quick": 2],
+                requestCountByKind: ["primary": 2],
                 outcomeCount: [.providerSuccess: 1, .cacheHit: 1],
                 outcomeCountByKind: [
-                    .providerSuccess: ["quick": 1],
-                    .cacheHit: ["quick": 1]
+                    .providerSuccess: ["primary": 1],
+                    .cacheHit: ["primary": 1]
                 ],
                 activeProviderCount: ["gemmaE4B": 1],
                 attemptedProviderCount: ["gemmaE4B": 1],
@@ -468,35 +468,35 @@ struct BASObservabilityCoreTests {
                 backendCount: ["cpu": 1],
                 slowRequestCountByKind: [:],
                 overTimeBudgetCountByKind: [:],
-                requestDurationTotalMsByKind: ["quick": 220],
-                firstPresentableTotalMsByKind: ["quick": 140],
-                promptAssemblyTotalMsByKind: ["quick": 40],
-                admissionEvaluationTotalMsByKind: ["quick": 20],
-                providerSelectionTotalMsByKind: ["quick": 10],
-                executionTotalMsByKind: ["quick": 70],
+                requestDurationTotalMsByKind: ["primary": 220],
+                firstPresentableTotalMsByKind: ["primary": 140],
+                promptAssemblyTotalMsByKind: ["primary": 40],
+                admissionEvaluationTotalMsByKind: ["primary": 20],
+                providerSelectionTotalMsByKind: ["primary": 10],
+                executionTotalMsByKind: ["primary": 70],
                 activeProviderDurationTotalMs: ["gemmaE4B": 220],
                 backendDurationTotalMs: ["cpu": 220],
                 admissionSkipCountByReason: [:],
                 admissionSkipCountByReasonAndKind: [:],
-                reminderSelectionNeedCount: [:],
-                promptCharactersTotalByKind: ["quick": 480],
-                prefixCharactersTotalByKind: ["quick": 180],
-                immutablePrefixCharactersTotalByKind: ["quick": 120],
-                adaptivePrefixCharactersTotalByKind: ["quick": 60],
-                suffixCharactersTotalByKind: ["quick": 300],
+                selectionNeedCount: [:],
+                promptCharactersTotalByKind: ["primary": 480],
+                prefixCharactersTotalByKind: ["primary": 180],
+                immutablePrefixCharactersTotalByKind: ["primary": 120],
+                adaptivePrefixCharactersTotalByKind: ["primary": 60],
+                suffixCharactersTotalByKind: ["primary": 300],
                 overTargetBudgetCountByKind: [:],
-                lowPressureModelCallCountByKind: ["quick": 1],
-                reminderKindRawValue: "reminder",
-                reminderKnowledgeNeedRawValue: "knowledge",
-                reminderControlNeedRawValue: "control",
-                reminderRetrievalBypassReasonRawValues: ["retrievalNotNeeded", "insufficientReminderChoice"],
+                lowPressureModelCallCountByKind: ["primary": 1],
+                selectionKindRawValue: "selection",
+                selectionKnowledgeNeedRawValue: "knowledge",
+                selectionControlNeedRawValue: "control",
+                selectionRetrievalBypassReasonRawValues: ["retrievalNotNeeded", "insufficientChoiceSpread"],
                 avoidableSkipReasonRawValues: ["templateAlreadySufficient", "insufficientSourceMaterial"]
             )
         )
         let lifecycle = BASLifecycleSummaryBuilder.build(
             from: [
                 BASLifecycleTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     hasContextState: true,
                     generation: 4,
                     rebuiltSession: true,
@@ -514,7 +514,7 @@ struct BASObservabilityCoreTests {
         let neural = BASNeuralSummaryBuilder.build(
             from: [
                 BASNeuralTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     suppressedBehaviorCount: 1,
                     dominantActionRawValue: "waitBuffer",
                     strongestSignalRawValue: "urgency"
@@ -524,7 +524,7 @@ struct BASObservabilityCoreTests {
         let brain = BASBrainSummaryBuilder.build(
             from: [
                 BASBrainTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     dominantReactionWeight: .interruptiveActionBias,
                     profileCoreCount: 1,
                     activeGoalCount: 1,
@@ -559,11 +559,11 @@ struct BASObservabilityCoreTests {
                 environmentClass: .normal,
                 deviceClass: .balancedPhone,
                 languageMode: .english,
-                taskEntropyByKind: ["quick": .low],
-                preferredProviderRawValueByKind: ["quick": "gemmaE4B"],
+                taskEntropyByKind: ["primary": .low],
+                preferredProviderRawValueByKind: ["primary": "gemmaE4B"],
                 strategyByKind: [
-                    "quick": BASAdaptiveTaskStrategy(
-                        kind: .quick,
+                    "primary": BASAdaptiveTaskStrategy(
+                        kind: .primary,
                         entropy: .low,
                         runtimeGear: .low,
                         contextBudget: 220,
@@ -580,13 +580,13 @@ struct BASObservabilityCoreTests {
                         allowsModelInvocation: true
                     )
                 ],
-                effectivePreferredProviderRawValueByKind: ["quick": "gemmaE4B"],
+                effectivePreferredProviderRawValueByKind: ["primary": "gemmaE4B"],
                 traceInputs: [
                     BASRuntimeInspectionTraceInput(
-                        kind: "quick",
+                        kind: "primary",
                         attemptedProviderIDs: ["gemmaE4B"],
                         runtimeStrategy: BASAdaptiveTaskStrategy(
-                            kind: .quick,
+                            kind: .primary,
                             entropy: .low,
                             runtimeGear: .low,
                             contextBudget: 220,
@@ -628,18 +628,18 @@ struct BASObservabilityCoreTests {
         )
 
         #expect(summary.activeProviderID == "gemmaE4B")
-        #expect(summary.runtimeGearByKind["quick"] == .low)
-        #expect(summary.effectiveRuntimeGearByKind["quick"] == .low)
-        #expect(summary.firstAttemptedProviderByKind["quick"] == "gemmaE4B")
-        #expect(summary.effectiveProviderOrderByKind["quick"] == ["gemmaE4B"])
-        #expect(summary.semanticPromptVariantCountByKind["quick"] == 1)
-        #expect(summary.stablePrefixVariantCountByKind["quick"] == 1)
+        #expect(summary.runtimeGearByKind["primary"] == .low)
+        #expect(summary.effectiveRuntimeGearByKind["primary"] == .low)
+        #expect(summary.firstAttemptedProviderByKind["primary"] == "gemmaE4B")
+        #expect(summary.effectiveProviderOrderByKind["primary"] == ["gemmaE4B"])
+        #expect(summary.semanticPromptVariantCountByKind["primary"] == 1)
+        #expect(summary.stablePrefixVariantCountByKind["primary"] == 1)
         #expect(summary.consistencyCheckedTraceCount == 1)
         #expect(summary.consistencyRejectedTraceCount == 0)
         #expect(summary.evidenceRetentionRatio == 2.0 / 3.0)
-        #expect(summary.evidencePollutionRateByKind["quick"] == 1.0 / 3.0)
+        #expect(summary.evidencePollutionRateByKind["primary"] == 1.0 / 3.0)
         #expect(summary.averageRequestDurationMsByBackend["cpu"] == 220)
-        #expect(summary.boundaryModeByKind["quick"] == .localOnlyAdvisory)
+        #expect(summary.boundaryModeByKind["primary"] == .localOnlyAdvisory)
     }
 
     private func makeReplayBundle() -> BASReplayBundle {
@@ -658,7 +658,7 @@ struct BASObservabilityCoreTests {
                 outputSummary: "Released"
             ),
             brainState: BASCurrentBrainState(
-                mode: "quick",
+                mode: "primary",
                 dominantGoals: ["stay calm"],
                 activeConstraints: ["sleep first"],
                 reactionWeights: BASReactionWeights(warmth: 0.7, directness: 0.5, brevity: 0.8, actionBias: 0.6),

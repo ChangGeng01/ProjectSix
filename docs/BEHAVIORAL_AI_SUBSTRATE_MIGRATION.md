@@ -54,8 +54,8 @@ Move façade inputs from product language:
 to generic host language:
 
 - `kind: .interactive / .ambient / .reopen / .handoff / .widget / .notification`
-- `workflowProfile: .rapid / .deliberate / .reflective`
-- `preferredProfile: .rapid`
+- `workflowProfile: .primary / .comparative / .reflective`
+- `preferredProfile: .primary`
 
 `Before` should keep its own `quick / balance / mirror` vocabulary in host mappings and translate into the façade at the edge.
 
@@ -88,7 +88,12 @@ The same rule now applies to entry and lifecycle plumbing:
 - substrate-facing: `capture / present / reopen / resume / routedInput`
 - host-facing: keep product-owned terms like `quickCapture`, `openMode`, `reopenTomorrowItem`, and `resumeCurrentDecision` if they still fit the app
 
-Legacy host raw values are still accepted by bridge builders during migration, but new substrate-facing code should prefer the generic vocabulary.
+Host-facing code should now use a host-owned compatibility layer to map product identifiers into generic substrate identifiers. Product language belongs in host presentation and mapping layers, not in substrate-facing raw values.
+
+`Before` now owns that translation explicitly:
+
+- [`BeforeProductCompatibility`](/Users/changgeng/Project/Project06/Project06/Before/Shared/Domain/BeforeProductCompatibility.swift)
+- [`BeforeLegacyMigration`](/Users/changgeng/Project/Project06/Project06/Before/Shared/Domain/BeforeLegacyMigration.swift)
 
 ## Host Presentation Migration
 
@@ -142,6 +147,21 @@ let runtime = BASHostRuntime(
 
 This keeps substrate execution generic while moving workflow strategy DNA back into the host.
 
+## Residual Enforcement
+
+Substrate residual enforcement is now split across two gates:
+
+- `./scripts/check_substrate_residuals.sh`
+- `./scripts/check_sdk_import_boundaries.sh`
+
+The residual scan now covers:
+
+- `BehavioralAISubstrate/Sources`
+- `BehavioralAISubstrate/README.md`
+- non-whitelisted package tests
+
+Legacy `Before` vocabulary is only allowed inside explicit rejection coverage that proves the substrate rejects host-era identifiers. Generic package fixtures, prompt tests, runtime tests, and public-facing README copy should stay on substrate vocabulary.
+
 ## Reference Prompt Vocabulary Migration
 
 Reference prompt slot vocabulary is now host-owned.
@@ -175,7 +195,7 @@ Example pattern:
 ```swift
 let behavior = BASReferencePromptBehavior(
     slotVocabularyByKindID: [
-        BASSemanticTaskKind.quick.rawValue: BASReferencePromptSlotVocabulary(
+        BASSemanticTaskKind.primaryID: BASReferencePromptSlotVocabulary(
             stateKeysBySlotID: [
                 "scenario": "scenario"
             ],
@@ -188,6 +208,15 @@ let behavior = BASReferencePromptBehavior(
 ```
 
 This keeps substrate prompt compilation generic while letting each host keep its own vocabulary, copy, and product worldview.
+
+Hosts should apply the same rule to:
+
+- execution-profile thresholds and explanation copy
+- memory-derivation copy, IDs, and provenance language
+- predictive-intervention copy and reasons
+- bootstrap risk heuristics and alias policy
+
+Those belong in host compatibility layers such as [`BeforeProductCompatibility`](/Users/changgeng/Project/Project06/Project06/Before/Shared/Domain/BeforeProductCompatibility.swift), not inside substrate defaults.
 
 ## Reference Prompt Request Surface Migration
 
@@ -207,18 +236,12 @@ Preferred substrate-facing builders:
 - `reflectiveEnvelope(...)`
 - `selectionEnvelope(...)`
 
-Legacy request types and helpers still work as compatibility aliases:
+Legacy request types and helpers are no longer part of the substrate contract. If a host still carries legacy vocabulary, migrate it at the host edge and keep branded wording in host-owned slot vocabulary plus presentation behavior.
 
-- `BASQuickRefinementPromptRequest`
-- `BASBalanceRefinementPromptRequest`
-- `BASMirrorRefinementPromptRequest`
-- `BASReminderSelectionPromptRequest`
-- `quickEnvelope(...)`
-- `balanceEnvelope(...)`
-- `mirrorEnvelope(...)`
-- `reminderEnvelope(...)`
+In `Before`, that migration now belongs in:
 
-Hosts should prefer the generic surface for any new integration work, and keep branded wording in host-owned slot vocabulary plus presentation behavior.
+- [`BeforeProductCompatibility`](/Users/changgeng/Project/Project06/Project06/Before/Shared/Domain/BeforeProductCompatibility.swift)
+- [`BeforeLegacyMigration`](/Users/changgeng/Project/Project06/Project06/Before/Shared/Domain/BeforeLegacyMigration.swift)
 
 ## Reference Hosts
 
@@ -229,6 +252,7 @@ Hosts should prefer the generic surface for any new integration work, and keep b
 
 - This private SDK intentionally evolves quickly.
 - Breaking changes are allowed.
+- Substrate compatibility shims for `Before` vocabulary are intentionally removed instead of preserved.
 - Every breaking change must update:
   - this migration note
   - [`BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md`](/Users/changgeng/Project/Project06/Project06/docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md)

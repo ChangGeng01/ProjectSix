@@ -118,10 +118,10 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
         var preparedLifecycleState = false
 
         let built: (String, String, String, String, [String], [String], Int, Int) =
-            BASAppleCurrentBrainHostLifecycleRuntimeExecutor.bootstrapAndBuildCurrentBrain(
+            try BASAppleCurrentBrainHostLifecycleRuntimeExecutor.bootstrapAndBuildCurrentBrain(
             input: BASAppleCurrentBrainHostLifecycleRuntimeInput(
                 bootstrapInput: BASAppleCurrentBrainBootstrapBridgeInput(
-                    modeID: BASDecisionMode.quick.rawValue,
+                    modeID: BASDecisionMode.primary.rawValue,
                     prompt: "Should I hold this until tomorrow?",
                     triggerID: BASCurrentBrainBootstrapTrigger.notification.rawValue,
                     sourceSurfaceOverrideID: BASInteractionSurface.notification.rawValue,
@@ -137,7 +137,7 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
                                 sensitivity: .low,
                                 tier: .hot,
                                 confidence: 0.94,
-                                sourceType: "history",
+                                sourceType: "archive",
                                 governanceStatus: .governed,
                                 provenanceSummary: "goal"
                             )
@@ -150,7 +150,9 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
                     taskGraphActiveNodeCount: 1,
                     taskGraphHasResumeCandidate: true,
                     taskGraphResumeHint: "Sleep on it.",
-                    retrievalMode: "filtered"
+                    retrievalMode: "filtered",
+                    bootstrapBehavior: .generic,
+                    cognitionBehavior: .generic
                 ),
                 checkpointLimit: 4,
                 checkpointRetentionInterval: 60 * 60
@@ -164,7 +166,7 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
                 [
                     BASAppleCurrentBrainBootstrapHostTemplateInput(
                         id: "night_message_cooling",
-                        modeID: BASDecisionMode.quick.rawValue,
+                        modeID: BASDecisionMode.primary.rawValue,
                         riskLevelID: BASRiskLevel.high.rawValue,
                         isPinned: true,
                         successCount: 5,
@@ -176,7 +178,7 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
                 [
                     BASAppleCurrentBrainBootstrapHostFailurePatternInput(
                         id: "night_fast_path_failure",
-                        modeID: BASDecisionMode.quick.rawValue,
+                        modeID: BASDecisionMode.primary.rawValue,
                         suppressionWeight: 0.8,
                         evidenceCount: 3,
                         updatedAt: now
@@ -203,7 +205,7 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
 
         #expect(preparedLifecycleState)
         #expect(built.0 == BASCurrentBrainBootstrapTrigger.notification.rawValue)
-        #expect(built.1 == BASDecisionMode.quick.rawValue)
+        #expect(built.1 == BASDecisionMode.primary.rawValue)
         #expect(built.2 == BASInteractionSurface.notification.rawValue)
         #expect(built.3 == BASRiskLevel.high.rawValue)
         #expect(built.4 == ["night_message_cooling"])
@@ -241,10 +243,10 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
         }
 
         let built: (String, [String], [String], Int, Int) =
-            BASAppleCurrentBrainHostSupportRuntimeExecutor.bootstrapAndBuildCurrentBrain(
+            try BASAppleCurrentBrainHostSupportRuntimeExecutor.bootstrapAndBuildCurrentBrain(
                 input: BASAppleCurrentBrainHostLifecycleRuntimeInput(
                     bootstrapInput: BASAppleCurrentBrainBootstrapBridgeInput(
-                        modeID: BASDecisionMode.quick.rawValue,
+                        modeID: BASDecisionMode.primary.rawValue,
                         prompt: "Should I sleep on this?",
                         triggerID: BASCurrentBrainBootstrapTrigger.sceneActive.rawValue,
                         sourceSurfaceOverrideID: BASInteractionSurface.app.rawValue,
@@ -260,7 +262,7 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
                                     sensitivity: .low,
                                     tier: .hot,
                                     confidence: 0.9,
-                                    sourceType: "history",
+                                    sourceType: "archive",
                                     governanceStatus: .governed,
                                     provenanceSummary: "goal"
                                 )
@@ -269,7 +271,9 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
                             recentEvents: []
                         ),
                         embeddingScores: [],
-                        retrievalMode: "filtered"
+                        retrievalMode: "filtered",
+                        bootstrapBehavior: .generic,
+                        cognitionBehavior: .generic
                     )
                 ),
                 in: context,
@@ -282,7 +286,7 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
                         [
                             TemplateFixture(
                                 id: "night_message_cooling",
-                                modeID: BASDecisionMode.quick.rawValue,
+                                modeID: BASDecisionMode.primary.rawValue,
                                 riskLevelID: BASRiskLevel.medium.rawValue,
                                 isPinned: true,
                                 successCount: 4,
@@ -294,7 +298,7 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
                         [
                             FailurePatternFixture(
                                 id: "long_explanation_backfires",
-                                modeID: BASDecisionMode.quick.rawValue,
+                                modeID: BASDecisionMode.primary.rawValue,
                                 suppressionWeight: 0.7,
                                 evidenceCount: 2,
                                 updatedAt: now

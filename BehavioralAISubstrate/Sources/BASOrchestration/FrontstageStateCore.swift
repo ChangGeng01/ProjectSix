@@ -15,13 +15,13 @@ public struct BASFrontstagePresentationBehavior: Codable, Sendable, Equatable {
             BASAdaptiveTraceKind.primaryID: "Clarify the active state before momentum hardens.",
             BASAdaptiveTraceKind.comparativeID: "Clarify the active trade-off before committing.",
             BASAdaptiveTraceKind.reflectiveID: "Clarify the underlying pattern without forcing closure.",
-            BASAdaptiveTraceKind.reminderID: "Select the retained candidate that best fits the current state."
+            BASAdaptiveTraceKind.selectionID: "Select the retained candidate that best fits the current state."
         ],
         baseEvidenceCountByKindID: [String: Int] = [
             BASAdaptiveTraceKind.primaryID: 2,
             BASAdaptiveTraceKind.comparativeID: 1,
             BASAdaptiveTraceKind.reflectiveID: 1,
-            BASAdaptiveTraceKind.reminderID: 0
+            BASAdaptiveTraceKind.selectionID: 0
         ],
         lowGearEvidenceClampByKindID: [String: Int] = [
             BASAdaptiveTraceKind.primaryID: 1
@@ -58,24 +58,24 @@ public struct BASFrontstagePresentationBehavior: Codable, Sendable, Equatable {
 
     private func fallbackFocusGoal(for kind: BASAdaptiveTraceKind) -> String {
         switch kind {
-        case .quick:
+        case .primary:
             "Clarify the active state before momentum hardens."
-        case .balance:
+        case .comparative:
             "Clarify the active trade-off before committing."
-        case .mirror:
+        case .reflective:
             "Clarify the underlying pattern without forcing closure."
-        case .reminder:
+        case .selection:
             "Select the retained candidate that best fits the current state."
         }
     }
 
     private func fallbackBaseEvidenceCount(for kind: BASAdaptiveTraceKind) -> Int {
         switch kind {
-        case .quick:
+        case .primary:
             2
-        case .balance, .mirror:
+        case .comparative, .reflective:
             1
-        case .reminder:
+        case .selection:
             0
         }
     }

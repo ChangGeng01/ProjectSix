@@ -12,7 +12,7 @@ struct BASAppleInspectionBridgeTests {
     func runtimeContextBuilderCompilesRuntimeView() {
         let context = BASAppleInspectionBridgeBuilder.runtimeContext(
             from: BASAppleRuntimeContextSourceInput(
-                primaryTraceKind: "balance",
+                primaryTraceKind: BASAdaptiveTraceKind.comparativeID,
                 runtimeGear: .high,
                 environmentClass: .lowPower,
                 deviceClass: .balancedPhone,
@@ -36,11 +36,11 @@ struct BASAppleInspectionBridgeTests {
         #expect(context.budget.contextTokens == 420)
     }
 
-    @Test("raw runtime, intent, and handoff builders normalize host raw values")
+    @Test("raw runtime, intent, and handoff builders normalize generic host values")
     func rawBuildersNormalizeHostValues() {
         let context = BASAppleInspectionBridgeBuilder.runtimeContext(
             from: BASAppleRawRuntimeContextSourceInput(
-                primaryTraceKindID: "mirror",
+                primaryTraceKindID: BASAdaptiveTraceKind.reflectiveID,
                 runtimeGearID: "low",
                 environmentClassID: "memoryConstrained",
                 deviceClassID: "memoryConstrainedPhone",
@@ -55,9 +55,9 @@ struct BASAppleInspectionBridgeTests {
             )
         )
         let intent = BASEntryIntentBridgeBuilder.envelope(
-            kindID: "resumeCurrentDecision",
+            kindID: "resume",
             surfaceID: "notification",
-            preferredWorkflowID: "balance",
+            preferredWorkflowID: BASAdaptiveTraceKind.comparativeID,
             promptSeed: "Resume the decision.",
             riskLevelID: "high",
             triggerReason: "prediction",
@@ -68,7 +68,7 @@ struct BASAppleInspectionBridgeTests {
         let handoff = BASAppleHandoffBridgeBuilder.summary(
             id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
             surfaceID: "siri",
-            preferredWorkflowID: "mirror",
+            preferredWorkflowID: BASAdaptiveTraceKind.reflectiveID,
             riskLevelID: "medium",
             payloadSummary: "Hold this until tomorrow morning.",
             createdAt: Date(timeIntervalSince1970: 1_800_000_000)
@@ -99,7 +99,7 @@ struct BASAppleInspectionBridgeTests {
         )
         let brain = BASAppleInspectionBridgeBuilder.brainSnapshot(
             from: BASAppleBrainSnapshotSourceInput(
-                mode: "quick",
+                mode: BASDecisionMode.primaryID,
                 dominantGoals: ["Protect sleep"],
                 activeConstraints: ["Delay irreversible action"],
                 warmth: 0.58,
@@ -119,7 +119,7 @@ struct BASAppleInspectionBridgeTests {
 
         #expect(role?.posture == .guardian)
         #expect(role?.initiative == .balanced)
-        #expect(brain?.mode == "quick")
+        #expect(brain?.mode == BASDecisionMode.primaryID)
         #expect(brain?.dominantGoals == ["Protect sleep"])
         #expect(brain?.activeTemplateIDs.count == 1)
         #expect(brain?.verificationSnapshot == "brain-fingerprint")
@@ -129,7 +129,7 @@ struct BASAppleInspectionBridgeTests {
     func consoleSnapshotBuilderPackagesRuntimeAndBrain() {
         let runtimeContext = BASAppleInspectionBridgeBuilder.runtimeContext(
             from: BASAppleRuntimeContextSourceInput(
-                primaryTraceKind: "quick",
+                primaryTraceKind: BASAdaptiveTraceKind.primaryID,
                 runtimeGear: .balanced,
                 environmentClass: .normal,
                 deviceClass: .fullPhone,
@@ -154,7 +154,7 @@ struct BASAppleInspectionBridgeTests {
         )
         let brain = BASAppleInspectionBridgeBuilder.brainSnapshot(
             from: BASAppleBrainSnapshotSourceInput(
-                mode: "mirror",
+                mode: "reflective",
                 dominantGoals: ["Avoid regret"],
                 activeConstraints: ["Show evidence first"],
                 warmth: 0.7,
@@ -163,7 +163,7 @@ struct BASAppleInspectionBridgeTests {
                 actionBias: 0.4,
                 activeTemplateIDs: [],
                 recentFailurePatternIDs: [],
-                retrievalTags: ["mirror"],
+                retrievalTags: ["reflective"],
                 verificationSnapshot: "fp-123"
             )
         )

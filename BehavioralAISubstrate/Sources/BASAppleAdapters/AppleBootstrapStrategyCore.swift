@@ -100,16 +100,25 @@ public enum BASAppleBootstrapStrategyAdapter {
     ) -> BASAppleActiveSessionSeed {
         for modeID in modePriority {
             guard let fragments = promptFragmentsByModeID[modeID] else { continue }
+            guard BASDecisionMode(identifier: modeID) != nil else {
+                preconditionFailure("Unsupported bootstrap strategy active-session mode identifier: \(modeID)")
+            }
             return BASAppleActiveSessionSeed(
                 modeID: modeID,
                 promptSeed: promptSeed(fragments: fragments)
             )
         }
         if let taskGraphModeID {
+            guard BASDecisionMode(identifier: taskGraphModeID) != nil else {
+                preconditionFailure("Unsupported bootstrap strategy task-graph mode identifier: \(taskGraphModeID)")
+            }
             return BASAppleActiveSessionSeed(
                 modeID: taskGraphModeID,
                 promptSeed: taskGraphPromptSeed ?? ""
             )
+        }
+        guard BASDecisionMode(identifier: defaultModeID) != nil else {
+            preconditionFailure("Unsupported bootstrap strategy default mode identifier: \(defaultModeID)")
         }
         return BASAppleActiveSessionSeed(modeID: defaultModeID, promptSeed: "")
     }
@@ -120,15 +129,28 @@ public enum BASAppleBootstrapStrategyAdapter {
         recommendedTemplateIDs: [String],
         templates: [BASAppleCurrentBrainBootstrapHostTemplateInput]
     ) -> [String] {
-        BASBrainBootstrapAdvisor.orderedTemplateIDs(
-            mode: BASDecisionMode(identifier: modeID) ?? .primary,
-            riskLevel: BASRiskLevel(rawValue: riskLevelID) ?? .low,
+        guard let resolvedMode = BASDecisionMode(identifier: modeID) else {
+            preconditionFailure("Unsupported bootstrap strategy mode identifier: \(modeID)")
+        }
+        guard let resolvedRiskLevel = BASRiskLevel(rawValue: riskLevelID) else {
+            preconditionFailure("Unsupported bootstrap strategy risk level identifier: \(riskLevelID)")
+        }
+
+        return BASBrainBootstrapAdvisor.orderedTemplateIDs(
+            mode: resolvedMode,
+            riskLevel: resolvedRiskLevel,
             recommendedTemplateIDs: recommendedTemplateIDs,
             templates: templates.map { template in
-                BASInterventionTemplateDescriptor(
+                guard let templateMode = BASDecisionMode(identifier: template.modeID) else {
+                    preconditionFailure("Unsupported bootstrap strategy template mode identifier: \(template.modeID)")
+                }
+                guard let templateRiskLevel = BASRiskLevel(rawValue: template.riskLevelID) else {
+                    preconditionFailure("Unsupported bootstrap strategy template risk level identifier: \(template.riskLevelID)")
+                }
+                return BASInterventionTemplateDescriptor(
                     id: template.id,
-                    mode: BASDecisionMode(identifier: template.modeID) ?? .primary,
-                    riskLevel: BASRiskLevel(rawValue: template.riskLevelID) ?? .low,
+                    mode: templateMode,
+                    riskLevel: templateRiskLevel,
                     isPinned: template.isPinned,
                     successCount: template.successCount,
                     updatedAt: template.updatedAt
@@ -141,12 +163,18 @@ public enum BASAppleBootstrapStrategyAdapter {
         modeID: String,
         failurePatterns: [BASAppleCurrentBrainBootstrapHostFailurePatternInput]
     ) -> [String] {
-        BASBrainBootstrapAdvisor.orderedFailurePatternIDs(
-            mode: BASDecisionMode(identifier: modeID) ?? .primary,
+        guard let resolvedMode = BASDecisionMode(identifier: modeID) else {
+            preconditionFailure("Unsupported bootstrap strategy mode identifier: \(modeID)")
+        }
+        return BASBrainBootstrapAdvisor.orderedFailurePatternIDs(
+            mode: resolvedMode,
             failurePatterns: failurePatterns.map { pattern in
-                BASFailurePatternDescriptor(
+                guard let patternMode = BASDecisionMode(identifier: pattern.modeID) else {
+                    preconditionFailure("Unsupported bootstrap strategy failure pattern mode identifier: \(pattern.modeID)")
+                }
+                return BASFailurePatternDescriptor(
                     id: pattern.id,
-                    mode: BASDecisionMode(identifier: pattern.modeID) ?? .primary,
+                    mode: patternMode,
                     suppressionWeight: pattern.suppressionWeight,
                     evidenceCount: pattern.evidenceCount,
                     updatedAt: pattern.updatedAt

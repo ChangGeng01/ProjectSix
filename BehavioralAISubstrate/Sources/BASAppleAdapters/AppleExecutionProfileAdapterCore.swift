@@ -1,6 +1,87 @@
 import Foundation
 import BASRuntimeCore
 
+public struct BASAppleExecutionProfileBehavior: Codable, Equatable, Sendable {
+    public static let generic = BASAppleExecutionProfileBehavior()
+
+    public var conservativeMemoryThresholdGB: Int
+    public var fullAssistiveMemoryThresholdGB: Int
+    public var disabledRuntimeDetail: String
+    public var testingOverrideDetailFormat: String
+    public var testingPinnedDeterministicDetail: String
+    public var testingPinnedSystemManagedDetail: String
+    public var testingPinnedOpenModelDetailPrefix: String
+    public var testingPinnedLocalProviderDetail: String
+    public var deterministicPinnedDetail: String
+    public var preferredOpenModelDetailPrefix: String
+    public var systemManagedDetail: String
+    public var simulatorDetail: String
+    public var lowPowerDetail: String
+    public var lowMemoryDetailFormat: String
+    public var unavailableProviderDetail: String
+    public var balancedAssistiveDetail: String
+    public var fullAssistiveDetail: String
+    public var openModelSimulatorDetail: String
+    public var openModelLowPowerDetail: String
+    public var openModelLowMemoryDetailFormat: String
+
+    public init(
+        conservativeMemoryThresholdGB: Int = 7,
+        fullAssistiveMemoryThresholdGB: Int = 8,
+        disabledRuntimeDetail: String = "Assistive runtime is disabled, so the host stays on the deterministic execution path.",
+        testingOverrideDetailFormat: String = "Testing override '%@' is active, so the configured provider path remains open for verification.",
+        testingPinnedDeterministicDetail: String = "Testing is pinning the deterministic execution path, so no assistive provider is used.",
+        testingPinnedSystemManagedDetail: String = "Testing is pinning the system-managed on-device provider path.",
+        testingPinnedOpenModelDetailPrefix: String = "Testing is pinning the configured open-model runtime.",
+        testingPinnedLocalProviderDetail: String = "Testing is pinning the configured local provider path.",
+        deterministicPinnedDetail: String = "Deterministic execution is pinned, so no assistive provider is used.",
+        preferredOpenModelDetailPrefix: String = "The configured open-model runtime is preferred.",
+        systemManagedDetail: String = "A system-managed on-device provider is available, so the host can keep the assistive path on-device.",
+        simulatorDetail: String = "Simulator runs stay deterministic so tests do not pretend a local model runtime is representative.",
+        lowPowerDetail: String = "Low Power Mode is enabled, so the host stays on the deterministic path to protect responsiveness.",
+        lowMemoryDetailFormat: String = "This device is below the configured assistive headroom threshold (%d GB), so the host keeps the assistive runtime off the critical path.",
+        unavailableProviderDetail: String = "No assistive provider is ready on this device right now, so the host stays on the deterministic path.",
+        balancedAssistiveDetail: String = "This device has enough headroom for a moderated assistive path while keeping fast-turn work latency-aware.",
+        fullAssistiveDetail: String = "This device has enough headroom for the full assistive path.",
+        openModelSimulatorDetail: String = "Simulator runs keep the configured open-model runtime off the critical path and stay deterministic.",
+        openModelLowPowerDetail: String = "Low Power Mode is enabled, so the host keeps the configured open-model runtime off the critical path.",
+        openModelLowMemoryDetailFormat: String = "This device is below the configured open-model headroom threshold (%d GB), so the host keeps the open-model lane deterministic."
+    ) {
+        self.conservativeMemoryThresholdGB = conservativeMemoryThresholdGB
+        self.fullAssistiveMemoryThresholdGB = fullAssistiveMemoryThresholdGB
+        self.disabledRuntimeDetail = disabledRuntimeDetail
+        self.testingOverrideDetailFormat = testingOverrideDetailFormat
+        self.testingPinnedDeterministicDetail = testingPinnedDeterministicDetail
+        self.testingPinnedSystemManagedDetail = testingPinnedSystemManagedDetail
+        self.testingPinnedOpenModelDetailPrefix = testingPinnedOpenModelDetailPrefix
+        self.testingPinnedLocalProviderDetail = testingPinnedLocalProviderDetail
+        self.deterministicPinnedDetail = deterministicPinnedDetail
+        self.preferredOpenModelDetailPrefix = preferredOpenModelDetailPrefix
+        self.systemManagedDetail = systemManagedDetail
+        self.simulatorDetail = simulatorDetail
+        self.lowPowerDetail = lowPowerDetail
+        self.lowMemoryDetailFormat = lowMemoryDetailFormat
+        self.unavailableProviderDetail = unavailableProviderDetail
+        self.balancedAssistiveDetail = balancedAssistiveDetail
+        self.fullAssistiveDetail = fullAssistiveDetail
+        self.openModelSimulatorDetail = openModelSimulatorDetail
+        self.openModelLowPowerDetail = openModelLowPowerDetail
+        self.openModelLowMemoryDetailFormat = openModelLowMemoryDetailFormat
+    }
+
+    public func lowMemoryDetail() -> String {
+        String(format: lowMemoryDetailFormat, conservativeMemoryThresholdGB)
+    }
+
+    public func openModelLowMemoryDetail() -> String {
+        String(format: openModelLowMemoryDetailFormat, conservativeMemoryThresholdGB)
+    }
+
+    public func testingOverrideDetail(title: String) -> String {
+        String(format: testingOverrideDetailFormat, title)
+    }
+}
+
 public struct BASAppleExecutionProfileRequest: Codable, Equatable, Sendable {
     public var runtimeEnabled: Bool
     public var preferredProviderID: String
@@ -71,14 +152,15 @@ public struct BASAppleExecutionProfileCompilation: Codable, Equatable, Sendable 
 
 public enum BASAppleExecutionProfileAdapter {
     public static func compile(
-        request: BASAppleExecutionProfileRequest
+        request: BASAppleExecutionProfileRequest,
+        behavior: BASAppleExecutionProfileBehavior = .generic
     ) -> BASAppleExecutionProfileCompilation {
         if !request.runtimeEnabled {
             return profile(
                 tierID: "off",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "Assistive intelligence is off, so the host app is using the deterministic decision system only.",
+                detail: behavior.disabledRuntimeDetail,
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -89,7 +171,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "testingOverride",
                 effectiveProviderID: request.preferredProviderID,
                 allowFallbacks: request.allowFallbacks,
-                detail: "Testing stub '\(testingOverrideTitle)' is active, so the host app is keeping the full assistive path open for verification.",
+                detail: behavior.testingOverrideDetail(title: testingOverrideTitle),
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -101,7 +183,7 @@ public enum BASAppleExecutionProfileAdapter {
                     tierID: "off",
                     effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                     allowFallbacks: false,
-                    detail: "Testing is pinning deterministic local copy, so the host app is not using a model provider for assistive refinement.",
+                    detail: behavior.testingPinnedDeterministicDetail,
                     preferredLanguages: request.preferredLanguages
                 )
             case BASReferenceProviderRuntime.foundationModelsProviderID where request.foundationAvailable:
@@ -109,20 +191,21 @@ public enum BASAppleExecutionProfileAdapter {
                     tierID: "systemManaged",
                     effectiveProviderID: BASReferenceProviderRuntime.foundationModelsProviderID,
                     allowFallbacks: request.allowFallbacks,
-                    detail: "Testing is pinning Apple's system-managed model, so the host app is keeping the full assistive path open for that provider.",
+                    detail: behavior.testingPinnedSystemManagedDetail,
                     preferredLanguages: request.preferredLanguages
                 )
             case BASReferenceProviderRuntime.openModelProviderID:
                 return openModelProfile(
                     request: request,
-                    detailPrefix: "Testing is pinning the registered open-model runtime."
+                    detailPrefix: behavior.testingPinnedOpenModelDetailPrefix,
+                    behavior: behavior
                 )
             case BASReferenceProviderRuntime.gemmaE4BProviderID where request.gemmaAvailable:
                 return profile(
-                    tierID: request.physicalMemoryGB < 8 ? "balancedGemma" : "fullGemma",
+                    tierID: request.physicalMemoryGB < behavior.fullAssistiveMemoryThresholdGB ? "balancedGemma" : "fullGemma",
                     effectiveProviderID: BASReferenceProviderRuntime.gemmaE4BProviderID,
                     allowFallbacks: request.allowFallbacks,
-                    detail: "Testing is pinning Gemma directly, so the host app is leaving the full assistive path available for that provider.",
+                    detail: behavior.testingPinnedLocalProviderDetail,
                     preferredLanguages: request.preferredLanguages
                 )
             default:
@@ -135,7 +218,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "off",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "Deterministic local copy is pinned, so the host app is not using a model provider for assistive refinement.",
+                detail: behavior.deterministicPinnedDetail,
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -143,7 +226,8 @@ public enum BASAppleExecutionProfileAdapter {
         if request.preferredProviderID == BASReferenceProviderRuntime.openModelProviderID {
             return openModelProfile(
                 request: request,
-                detailPrefix: "The open-model runtime slot is preferred."
+                detailPrefix: behavior.preferredOpenModelDetailPrefix,
+                behavior: behavior
             )
         }
 
@@ -152,7 +236,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "systemManaged",
                 effectiveProviderID: BASReferenceProviderRuntime.foundationModelsProviderID,
                 allowFallbacks: request.allowFallbacks,
-                detail: "Apple's system-managed on-device model is available, so the host app can keep assistive refinement on without pushing device-level model policy into the app.",
+                detail: behavior.systemManagedDetail,
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -162,7 +246,7 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "simulator",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "On Simulator, the host app stays on deterministic local copy so performance and correctness tests do not pretend a local model runtime is representative.",
+                detail: behavior.simulatorDetail,
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -172,17 +256,17 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "conservativeDeterministic",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "Low Power Mode is on, so the host app is staying on deterministic local copy to protect battery life and keep decision flows responsive.",
+                detail: behavior.lowPowerDetail,
                 preferredLanguages: request.preferredLanguages
             )
         }
 
-        if request.physicalMemoryGB < 7 {
+        if request.physicalMemoryGB < behavior.conservativeMemoryThresholdGB {
             return profile(
                 tierID: "conservativeDeterministic",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "This device is running a conservative intelligence profile. The host app keeps the local model off the critical path on 6 GB-class iPhones like iPhone 14 so the experience stays stable, cool, and predictable.",
+                detail: behavior.lowMemoryDetail(),
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -192,17 +276,17 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "conservativeDeterministic",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "No assistive provider is ready on this device right now, so the host app is keeping the deterministic path only.",
+                detail: behavior.unavailableProviderDetail,
                 preferredLanguages: request.preferredLanguages
             )
         }
 
-        if request.physicalMemoryGB < 8 {
+        if request.physicalMemoryGB < behavior.fullAssistiveMemoryThresholdGB {
             return profile(
                 tierID: "balancedGemma",
                 effectiveProviderID: BASReferenceProviderRuntime.gemmaE4BProviderID,
                 allowFallbacks: request.allowFallbacks,
-                detail: "This device has enough headroom for deeper assisted analysis and reminder work, while the host app can still keep fast-turn refinement deterministic to protect latency.",
+                detail: behavior.balancedAssistiveDetail,
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -211,21 +295,22 @@ public enum BASAppleExecutionProfileAdapter {
             tierID: "fullGemma",
             effectiveProviderID: BASReferenceProviderRuntime.gemmaE4BProviderID,
             allowFallbacks: request.allowFallbacks,
-            detail: "This device has enough headroom for the full Gemma-assisted path, while the host app can still keep final verdicts deterministic.",
+            detail: behavior.fullAssistiveDetail,
             preferredLanguages: request.preferredLanguages
         )
     }
 
     private static func openModelProfile(
         request: BASAppleExecutionProfileRequest,
-        detailPrefix: String
+        detailPrefix: String,
+        behavior: BASAppleExecutionProfileBehavior
     ) -> BASAppleExecutionProfileCompilation {
         if request.isSimulator {
             return profile(
                 tierID: "simulator",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "On Simulator, the host app keeps the reserved open-model slot off the critical path and stays deterministic.",
+                detail: behavior.openModelSimulatorDetail,
                 preferredLanguages: request.preferredLanguages
             )
         }
@@ -235,23 +320,23 @@ public enum BASAppleExecutionProfileAdapter {
                 tierID: "conservativeDeterministic",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "Low Power Mode is on, so the host app keeps the open-model runtime off the critical path to protect battery life.",
+                detail: behavior.openModelLowPowerDetail,
                 preferredLanguages: request.preferredLanguages
             )
         }
 
-        if request.physicalMemoryGB < 7 {
+        if request.physicalMemoryGB < behavior.conservativeMemoryThresholdGB {
             return profile(
                 tierID: "conservativeDeterministic",
                 effectiveProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: false,
-                detail: "This device is on a conservative intelligence profile, so the host app keeps the reserved open-model lane deterministic on 6 GB-class phones.",
+                detail: behavior.openModelLowMemoryDetail(),
                 preferredLanguages: request.preferredLanguages
             )
         }
 
         return profile(
-            tierID: request.physicalMemoryGB < 8 ? "balancedGemma" : "fullGemma",
+            tierID: request.physicalMemoryGB < behavior.fullAssistiveMemoryThresholdGB ? "balancedGemma" : "fullGemma",
             effectiveProviderID: BASReferenceProviderRuntime.openModelProviderID,
             allowFallbacks: request.allowFallbacks,
             detail: "\(detailPrefix) \(request.openModelDetail)",

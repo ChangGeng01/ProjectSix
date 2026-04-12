@@ -10,7 +10,7 @@ struct BASPromptPreparationCoreTests {
     @Test("prompt preparation compiler builds envelope from typed task state and runtime snapshots")
     func promptPreparationCompilerBuildsEnvelope() {
         let strategy = BASAdaptiveTaskStrategy(
-            kind: .balance,
+            kind: .comparative,
             entropy: .medium,
             runtimeGear: .balanced,
             contextBudget: 420,
@@ -42,11 +42,11 @@ struct BASPromptPreparationCoreTests {
 
         let envelope = BASPromptPreparationCompiler.compile(
             BASPromptPreparationRequest(
-                kind: "balance",
-                semanticKind: .balance,
-                adaptiveKind: .balance,
+                kind: "comparative",
+                semanticKind: .comparative,
+                adaptiveKind: .comparative,
                 taskState: [
-                    "mode": .string("Balance"),
+                    "mode": .string("Comparative"),
                     "prompt": .string("Should I take this side project?"),
                     "candidate_count": .integer(2)
                 ],
@@ -64,10 +64,10 @@ struct BASPromptPreparationCoreTests {
                 contextLifecycleSnapshot: BASPromptContextLifecycleSnapshot(
                     rebuiltSession: true,
                     generation: 2,
-                    anchorFields: ["balancePrompt"],
-                    activeFields: ["balancePrompt", "balanceConcern"],
-                    staleFields: ["balanceDesire"],
-                    anchorTitles: ["Balance prompt"]
+                    anchorFields: ["comparativePrompt"],
+                    activeFields: ["comparativePrompt", "comparativeConcern"],
+                    staleFields: ["comparativeDesire"],
+                    anchorTitles: ["Comparative prompt"]
                 ),
                 neuralSnapshot: BASPromptNeuralSnapshot(
                     dominantActivations: [
@@ -89,11 +89,11 @@ struct BASPromptPreparationCoreTests {
             )
         )
 
-        #expect(envelope.payload.contains("\"mode\":\"Balance\""))
+        #expect(envelope.payload.contains("\"mode\":\"Comparative\""))
         #expect(envelope.payload.contains("\"candidate_count\":2"))
         #expect(envelope.payload.contains("CONTEXT_LIFECYCLE_JSON:"))
-        #expect(envelope.payload.contains("\"anchor_fields\":[\"balancePrompt\"]"))
-        #expect(envelope.payload.contains("\"anchor_headlines\":[\"Balance prompt\"]"))
+        #expect(envelope.payload.contains("\"anchor_fields\":[\"comparativePrompt\"]"))
+        #expect(envelope.payload.contains("\"anchor_headlines\":[\"Comparative prompt\"]"))
         #expect(envelope.assembly.allBlocks.map(\.kind).contains(.neuralState))
         #expect(envelope.payload.contains("\"danger_signals\":[\"Constraint pressure\",\"Concern weight\",\"Session rebuild\"]"))
         #expect(envelope.assembly.allBlocks.map(\.kind).contains(.brainState))

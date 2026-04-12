@@ -81,7 +81,7 @@ public enum BASAppleInterventionBanditAdvisor {
         let hour = Calendar.autoupdatingCurrent.component(.hour, from: now)
         let daypart: String
         switch hour {
-        case 0..<6: daypart = "late_night"
+        case 0..<6: daypart = "late_session"
         case 6..<12: daypart = "morning"
         case 12..<18: daypart = "afternoon"
         default: daypart = "night"

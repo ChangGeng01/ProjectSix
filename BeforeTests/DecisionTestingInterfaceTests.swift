@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 import Testing
-import BASPolicy
+import BASHostKit
 @testable import Before
 
 @MainActor
@@ -361,9 +361,9 @@ struct DecisionTestingInterfaceTests {
         #expect(telemetrySnapshot.admissionSkipRate == 0)
         #expect(telemetrySnapshot.providerBypassRate == 0)
         #expect(telemetrySnapshot.lowPressureModelCallRate == 0)
-        #expect(telemetrySnapshot.reminderKnowledgeNeedRate == 0)
-        #expect(telemetrySnapshot.reminderControlOnlyRate == 0)
-        #expect(telemetrySnapshot.reminderRetrievalBypassRate == 0)
+        #expect(telemetrySnapshot.selectionKnowledgeNeedRate == 0)
+        #expect(telemetrySnapshot.selectionControlOnlyRate == 0)
+        #expect(telemetrySnapshot.selectionRetrievalBypassRate == 0)
         #expect(cacheSnapshot.hitCountByKind[.reminder] == 1)
         #expect(cacheSnapshot.storeCountByKind[.reminder] == 1)
         #expect(cacheSnapshot.totalRejectedStores == 0)
@@ -610,10 +610,10 @@ struct DecisionTestingInterfaceTests {
         #expect(export.summary.lowPressureModelCallRateByKind[.quick] == 1)
         #expect(export.summary.avoidableModelCallRate == 0)
         #expect(export.summary.avoidableModelCallRateByKind[.quick] == 0)
-        #expect(export.summary.reminderRequestCount == 0)
-        #expect(export.summary.reminderKnowledgeNeedRate == 0)
-        #expect(export.summary.reminderControlOnlyRate == 0)
-        #expect(export.summary.reminderRetrievalBypassRate == 0)
+        #expect(export.summary.selectionRequestCount == 0)
+        #expect(export.summary.selectionKnowledgeNeedRate == 0)
+        #expect(export.summary.selectionControlOnlyRate == 0)
+        #expect(export.summary.selectionRetrievalBypassRate == 0)
         #expect(export.summary.averageRequestDurationMs == 220)
         #expect(export.summary.averageRequestDurationMsByKind[.quick] == 220)
         #expect(export.summary.averageRequestDurationMsByGemmaBackend[.cpu] == 220)

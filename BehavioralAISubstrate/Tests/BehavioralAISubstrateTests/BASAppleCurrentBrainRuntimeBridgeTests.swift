@@ -20,9 +20,10 @@ struct BASAppleCurrentBrainRuntimeBridgeTests {
             retrievalMode: "filtered",
             bootstrapBehavior: BASCurrentBrainBootstrapBehavior(
                 sourceSurfaceOverridesByTriggerID: [
-                    BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue: BASInteractionSurface.shortcut.rawValue
+                    BASCurrentBrainBootstrapTrigger.sessionBootstrapID: BASInteractionSurface.shortcut.rawValue
                 ]
-            )
+            ),
+            cognitionBehavior: .generic
         )
 
         let bootstrapInput = BASAppleCurrentBrainRuntimeBridgeBuilder.sessionBootstrapInput(
@@ -31,11 +32,11 @@ struct BASAppleCurrentBrainRuntimeBridgeTests {
 
         #expect(bootstrapInput.modeID == "primary")
         #expect(bootstrapInput.prompt == "should I wait?")
-        #expect(bootstrapInput.triggerID == BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue)
+        #expect(bootstrapInput.triggerID == BASCurrentBrainBootstrapTrigger.sessionBootstrapID)
         #expect(bootstrapInput.retrievalMode == "filtered")
         #expect(bootstrapInput.preferredLanguages == ["en-AU"])
         #expect(bootstrapInput.bootstrapBehavior.sourceSurfaceOverridesByTriggerID[
-            BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue
+            BASCurrentBrainBootstrapTrigger.sessionBootstrapID
         ] == BASInteractionSurface.shortcut.rawValue)
     }
 
@@ -54,13 +55,16 @@ struct BASAppleCurrentBrainRuntimeBridgeTests {
                 recentEvents: []
             ),
             taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput(
-                headline: "Return to the mirror lane",
+                headline: "Return to the reflective lane",
                 activeNodeCount: 2,
                 hasResumeCandidate: true,
                 resumeHint: "Resume the unresolved self-check"
             ),
             retrievalModesByModeID: ["reflective": "filtered"],
-            triggerID: BASCurrentBrainBootstrapTrigger.sceneActive.rawValue
+            triggerID: BASCurrentBrainBootstrapTrigger.sceneActive.rawValue,
+            lifecycleBehavior: .generic,
+            bootstrapBehavior: .generic,
+            cognitionBehavior: .generic
         )
 
         let bootstrapInput = BASAppleCurrentBrainRuntimeBridgeBuilder.activeBootstrapInput(
@@ -70,7 +74,7 @@ struct BASAppleCurrentBrainRuntimeBridgeTests {
         #expect(bootstrapInput.modeID == "reflective")
         #expect(bootstrapInput.prompt == "resume this tomorrow")
         #expect(bootstrapInput.retrievalMode == "filtered")
-        #expect(bootstrapInput.taskGraphHeadline == "Return to the mirror lane")
+        #expect(bootstrapInput.taskGraphHeadline == "Return to the reflective lane")
         #expect(bootstrapInput.taskGraphActiveNodeCount == 2)
         #expect(bootstrapInput.taskGraphHasResumeCandidate == true)
         #expect(bootstrapInput.taskGraphResumeHint == "Resume the unresolved self-check")

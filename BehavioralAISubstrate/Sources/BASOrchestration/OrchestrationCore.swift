@@ -353,13 +353,13 @@ public enum BASEntryIntentBridgeBuilder {
 
     private static func kind(from rawValue: String) -> BASEntryIntentKind {
         switch rawValue {
-        case "quickCapture", "capture":
+        case "capture":
             .capture
-        case "openMode", "present":
+        case "present":
             .present
-        case "reopenTomorrowItem", "reopen":
+        case "reopen":
             .reopen
-        case "resumeCurrentDecision", "resume":
+        case "resume":
             .resume
         case BASEntryIntentKind.predictiveIntervention.rawValue:
             .predictiveIntervention
@@ -373,10 +373,10 @@ public enum BASEntryIntentBridgeBuilder {
     }
 
     private static func taskKind(from preferredWorkflowID: String?) -> BASTaskKind {
-        switch preferredWorkflowID {
-        case "balance":
+        switch preferredWorkflowID.flatMap(BASDecisionMode.init(identifier:)) {
+        case .comparative?:
             .plan
-        case "mirror":
+        case .reflective?:
             .retrieve
         default:
             .chat

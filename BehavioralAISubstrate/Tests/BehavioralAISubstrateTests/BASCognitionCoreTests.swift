@@ -6,6 +6,15 @@ import Testing
 
 @Suite("BAS cognition core")
 struct BASCognitionCoreTests {
+    @Test("generic cognition identifiers reject legacy host vocabulary")
+    func genericCognitionIdentifiersRejectLegacyVocabulary() {
+        #expect(BASDecisionMode(identifier: "quick") == nil)
+        #expect(BASDecisionMode(identifier: "balance") == nil)
+        #expect(BASDecisionMode(identifier: "mirror") == nil)
+        #expect(BASMemorySource(identifier: "history") == nil)
+        #expect(BASMemorySource(identifier: "reminder") == nil)
+    }
+
     @Test("brain state snapshot surfaces pending and low-trust risk flags")
     func brainStateSnapshotSurfacesRiskFlags() {
         let state = BASDecisionBrainState(
@@ -15,7 +24,7 @@ struct BASCognitionCoreTests {
                     role: .relevant,
                     type: "semantic",
                     headline: "Night texting pattern",
-                    source: "history",
+                    source: "archive",
                     confidence: 0.72,
                     priority: 0.9,
                     lifecycleState: "warming",
@@ -46,9 +55,9 @@ struct BASCognitionCoreTests {
                 )
             ],
             sessionBiases: ["night"],
-            retrievalTags: ["mirror", "night"],
-            reactionWeights: .defaults(for: "mirror"),
-            identityProfile: .default(modeName: "mirror"),
+            retrievalTags: [BASDecisionMode.reflective.identifier, "night"],
+            reactionWeights: .defaults(for: BASDecisionMode.reflective.identifier),
+            identityProfile: .default(modeName: BASDecisionMode.reflective.identifier),
             boundaryPolicy: .default(riskLevel: .high),
             loadedAt: .now
         )
@@ -65,7 +74,7 @@ struct BASCognitionCoreTests {
     @Test("identity evaluator switches to predictive sentinel for high-risk notifications")
     func identityEvaluatorSwitchesToPredictiveSentinel() {
         let profile = BASIdentityRoleResolver.resolve(
-            mode: .quick,
+            mode: .primary,
             sourceSurface: .notification,
             riskLevel: .high
         )
@@ -80,7 +89,7 @@ struct BASCognitionCoreTests {
     @Test("boundary evaluator keeps watch flow local lightweight and confirmable")
     func boundaryEvaluatorKeepsWatchFlowLocalLightweight() {
         let identity = BASIdentityRoleResolver.resolve(
-            mode: .mirror,
+            mode: .reflective,
             sourceSurface: .watch,
             riskLevel: .high
         )
@@ -89,14 +98,14 @@ struct BASCognitionCoreTests {
             activeGoals: ["Sleep before midnight"],
             relevantMemories: [],
             sessionBiases: [],
-            retrievalTags: ["mirror"],
-            reactionWeights: .defaults(for: "mirror"),
+            retrievalTags: [BASDecisionMode.reflective.identifier],
+            reactionWeights: .defaults(for: BASDecisionMode.reflective.identifier),
             failureGuardIDs: ["night_fast_path_failure"],
             loadedAt: .now
         )
 
         let policy = BASBoundaryPolicyEvaluator.evaluate(
-            mode: .mirror,
+            mode: .reflective,
             sourceSurface: .watch,
             riskLevel: .high,
             identityProfile: identity,
@@ -124,8 +133,8 @@ struct BASCognitionCoreTests {
             memorySlices: [],
             sessionBiases: [],
             retrievalTags: [],
-            reactionWeights: .defaults(for: "quick"),
-            identityProfile: .default(modeName: "quick"),
+            reactionWeights: .defaults(for: BASDecisionMode.primary.identifier),
+            identityProfile: .default(modeName: BASDecisionMode.primary.identifier),
             boundaryPolicy: BASBoundaryPolicyState(
                 mode: .localOnlyAdvisory,
                 riskLevel: .high,
@@ -142,7 +151,7 @@ struct BASCognitionCoreTests {
         let calibration = BASCalibrationEvaluator.evaluate(
             brainState: brainState,
             riskLevel: .high,
-            identityProfile: .default(modeName: "quick"),
+            identityProfile: .default(modeName: BASDecisionMode.primary.identifier),
             boundaryPolicy: brainState.boundaryPolicy,
             now: .now
         )

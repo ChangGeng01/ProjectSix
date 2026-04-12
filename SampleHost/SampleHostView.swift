@@ -18,8 +18,8 @@ struct SampleHostView: View {
 
                     HStack(spacing: 12) {
                         Button("Bootstrap") { model.bootstrap() }
-                        Button("Rapid") { model.start(.rapid) }
-                        Button("Deliberate") { model.start(.deliberate) }
+                        Button("Rapid") { model.start(.primary) }
+                        Button("Deliberate") { model.start(.comparative) }
                         Button("Reflective") { model.start(.reflective) }
                         Button("Reopen") { model.reopen() }
                     }
@@ -28,6 +28,11 @@ struct SampleHostView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(model.result.activeSessionTitle)
                             .font(.headline)
+                        if let lastError = model.lastError {
+                            Text(lastError)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
                         Text("Workflow: \(model.result.currentBrain.workflowTitle)")
                             .font(.subheadline.weight(.medium))
                         if !model.result.currentBrain.dominantGoals.isEmpty {

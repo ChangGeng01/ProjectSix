@@ -18,14 +18,14 @@ final class SampleHostTests: XCTestCase {
         model.start(.reflective)
 
         XCTAssertEqual(model.result.currentBrain.workflowProfile, .reflective)
-        XCTAssertEqual(model.result.currentBrain.workflowTitle, "Reflective Lens")
+        XCTAssertEqual(model.result.currentBrain.workflowTitle, "Signal Lens")
         XCTAssertEqual(model.result.requestKind.rawValue, "interactive")
         XCTAssertEqual(model.result.workflowProfile.rawValue, "reflective")
-        XCTAssertEqual(model.result.activeSessionTitle, "Reflective Lens from SampleHost")
-        XCTAssertTrue(model.result.notices.contains("Application entered the reflective lens lane in SampleHost."))
-        XCTAssertEqual(model.result.interventionSuggestion?.title, "Run this through Compare Lens first.")
-        XCTAssertEqual(model.result.interventionSuggestion?.preferredWorkflowProfile, .deliberate)
-        XCTAssertEqual(model.result.projection.activeTemplateIDs, ["samplehost.template.reflective-lens"])
+        XCTAssertEqual(model.result.activeSessionTitle, "Signal Lens from SampleHost")
+        XCTAssertTrue(model.result.notices.contains("Application entered the signal lens lane in SampleHost."))
+        XCTAssertEqual(model.result.interventionSuggestion?.title, "Run this through Contrast Lens first.")
+        XCTAssertEqual(model.result.interventionSuggestion?.preferredWorkflowProfile, .comparative)
+        XCTAssertEqual(model.result.projection.activeTemplateIDs, ["samplehost.template.signal-lens"])
         XCTAssertTrue(model.result.currentBrain.verificationSummary.hasPrefix("samplehost/"))
     }
 

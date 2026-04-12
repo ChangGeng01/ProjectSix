@@ -67,7 +67,7 @@ final class CurrentBrainStateLoaderTests: XCTestCase {
         let current = CurrentBrainStateLoader.bootstrapCurrentBrainState(
             mode: .quick,
             prompt: "I want to send this message right now.",
-            source: .sessionPrime,
+            source: .sessionBootstrap,
             taskGraph: nil,
             context: context,
             projection: projection,
@@ -180,7 +180,7 @@ final class CurrentBrainStateLoaderTests: XCTestCase {
         _ = CurrentBrainStateLoader.bootstrapCurrentBrainState(
             mode: .quick,
             prompt: "Should I text them?",
-            source: .sessionPrime,
+            source: .sessionBootstrap,
             taskGraph: nil,
             context: context,
             projection: projection,
@@ -195,7 +195,7 @@ final class CurrentBrainStateLoaderTests: XCTestCase {
         )
 
         XCTAssertLessThanOrEqual(updates.count, 60)
-        XCTAssertTrue(updates.contains { $0.source == .sessionPrime })
+        XCTAssertTrue(updates.contains(where: { $0.source == .sessionBootstrap }))
     }
 
     @MainActor
@@ -215,7 +215,7 @@ final class CurrentBrainStateLoaderTests: XCTestCase {
             _ = CurrentBrainStateLoader.bootstrapCurrentBrainState(
                 mode: .quick,
                 prompt: "Should I send this tonight?",
-                source: .sessionPrime,
+                source: .sessionBootstrap,
                 taskGraph: nil,
                 context: context,
                 projection: projection,

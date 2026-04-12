@@ -10,7 +10,7 @@ extension BASDerivedMemoryDraft {
             value: value,
             confidence: confidence,
             priority: priority,
-            source: BASMemorySource(rawValue: sourceID) ?? .history,
+            source: BASMemorySource(identifier: sourceID) ?? .archive,
             lastConfirmedAt: lastConfirmedAt,
             decayPolicy: BASMemoryDecayPolicy(rawValue: decayPolicyID) ?? .medium,
             retrievalTags: retrievalTags,

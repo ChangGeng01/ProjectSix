@@ -8,7 +8,7 @@ struct BASAppleInterventionBanditTests {
     func rewardedArmRisesToFront() {
         let now = Date(timeIntervalSince1970: 1_000)
         let bucketID = BASAppleInterventionBanditAdvisor.bucketID(
-            modeID: "mirror",
+            modeID: "reflective",
             riskLevelID: "medium",
             languageModeID: "english",
             now: now
@@ -33,19 +33,19 @@ struct BASAppleInterventionBanditTests {
         let morning = localDate(year: 2026, month: 4, day: 11, hour: 9, minute: 0)
 
         let nightBucket = BASAppleInterventionBanditAdvisor.bucketID(
-            modeID: "quick",
+            modeID: "primary",
             riskLevelID: "high",
             languageModeID: "english",
             now: night
         )
         let morningBucket = BASAppleInterventionBanditAdvisor.bucketID(
-            modeID: "quick",
+            modeID: "primary",
             riskLevelID: "high",
             languageModeID: "english",
             now: morning
         )
         let chineseBucket = BASAppleInterventionBanditAdvisor.bucketID(
-            modeID: "quick",
+            modeID: "primary",
             riskLevelID: "high",
             languageModeID: "chinese",
             now: night
@@ -82,7 +82,7 @@ struct BASAppleInterventionBanditTests {
     func tieScoresStayLexicographic() {
         let now = localDate(year: 2026, month: 4, day: 10, hour: 16, minute: 30)
         let bucketID = BASAppleInterventionBanditAdvisor.bucketID(
-            modeID: "balance",
+            modeID: "comparative",
             riskLevelID: "medium",
             languageModeID: "english",
             now: now

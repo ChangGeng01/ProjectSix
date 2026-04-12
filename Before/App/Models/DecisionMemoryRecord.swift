@@ -192,7 +192,9 @@ extension DecisionMemoryRecord {
     }
 
     var source: DecisionMemorySource {
-        DecisionMemorySource(rawValue: sourceRaw) ?? .history
+        DecisionMemorySource(
+            rawValue: BeforeLegacyMigration.normalizedHostMemorySourceIdentifier(sourceRaw)
+        ) ?? .history
     }
 
     var decayPolicy: DecisionMemoryDecayPolicy {
@@ -239,7 +241,9 @@ extension DecisionMemoryCandidateRecord {
     }
 
     var source: DecisionMemorySource {
-        DecisionMemorySource(rawValue: sourceRaw) ?? .history
+        DecisionMemorySource(
+            rawValue: BeforeLegacyMigration.normalizedHostMemorySourceIdentifier(sourceRaw)
+        ) ?? .history
     }
 
     var decayPolicy: DecisionMemoryDecayPolicy {

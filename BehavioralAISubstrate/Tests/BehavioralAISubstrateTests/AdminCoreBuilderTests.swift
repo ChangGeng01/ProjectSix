@@ -76,7 +76,7 @@ struct AdminCoreBuilderTests {
                 outputSummary: "Released"
             ),
             brainState: BASCurrentBrainState(
-                mode: "quick",
+                mode: "primary",
                 dominantGoals: ["stay calm"],
                 activeConstraints: ["sleep first"],
                 reactionWeights: BASReactionWeights(warmth: 0.7, directness: 0.5, brevity: 0.8, actionBias: 0.6),
@@ -130,7 +130,7 @@ struct AdminCoreBuilderTests {
         let inspectionBundle = BASInspectionBundle(
             generatedAt: Date(timeIntervalSince1970: 1_700_000_789),
             trace: BASExecutionTrace(
-                inputSummary: "quick",
+                inputSummary: "primary",
                 selectedRoute: .local("local-fast"),
                 memoriesRecalled: [],
                 toolsCalled: [],

@@ -64,7 +64,7 @@ struct BASAppleBootstrapStrategyTests {
                     updatedAt: now.addingTimeInterval(-60)
                 ),
                 BASAppleCurrentBrainBootstrapHostFailurePatternInput(
-                    id: "mirror_only_failure",
+                    id: "reflective_only_failure",
                     modeID: "reflective",
                     suppressionWeight: 1.0,
                     evidenceCount: 10,
@@ -80,13 +80,13 @@ struct BASAppleBootstrapStrategyTests {
     func sessionSeedBuilderTrimsAndResolvesActiveMode() {
         let seed = BASAppleBootstrapStrategyAdapter.resolveActiveSessionSeed(
             promptFragmentsByModeID: [
-                BASDecisionMode.balance.identifier: ["  Should I move?  ", "", " protect savings "],
-                BASDecisionMode.mirror.identifier: ["This would be ignored"]
+                BASDecisionMode.comparative.identifier: ["  Should I move?  ", "", " protect savings "],
+                BASDecisionMode.reflective.identifier: ["This would be ignored"]
             ],
             modePriority: [
-                BASDecisionMode.quick.identifier,
-                BASDecisionMode.balance.identifier,
-                BASDecisionMode.mirror.identifier
+                BASDecisionMode.primary.identifier,
+                BASDecisionMode.comparative.identifier,
+                BASDecisionMode.reflective.identifier
             ],
             taskGraphModeID: "reflective",
             taskGraphPromptSeed: "task graph fallback"

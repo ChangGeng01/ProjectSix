@@ -58,9 +58,9 @@ struct BASAppleLifecycleBootstrapTests {
         #expect(plan.retrievalMode == "filtered")
     }
 
-    @Test("session prime plan compacts prompt fragments and preserves retrieval mode")
-    func sessionPrimePlanCompactsPromptFragmentsAndPreservesRetrievalMode() {
-        let plan = BASAppleCurrentBrainRuntimePlanner.sessionPrimePlan(
+    @Test("session bootstrap plan compacts prompt fragments and preserves retrieval mode")
+    func sessionBootstrapPlanCompactsPromptFragmentsAndPreservesRetrievalMode() {
+        let plan = BASAppleCurrentBrainRuntimePlanner.sessionBootstrapPlan(
             modeID: "reflective",
             promptFragments: ["  first  ", "", "second"],
             retrievalMode: "filtered"
@@ -69,7 +69,7 @@ struct BASAppleLifecycleBootstrapTests {
         #expect(plan.modeID == "reflective")
         #expect(plan.promptSeed == "first second")
         #expect(plan.retrievalMode == "filtered")
-        #expect(plan.triggerID == "sessionPrime")
+        #expect(plan.triggerID == BASCurrentBrainBootstrapTrigger.sessionBootstrapID)
     }
 
     @Test("active refresh plan resolves active seed and retrieval mode by mode id")

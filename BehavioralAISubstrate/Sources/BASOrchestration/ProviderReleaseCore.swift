@@ -21,7 +21,7 @@ public struct BASProviderReleaseEvaluationRequest: Sendable, Equatable {
     public var outputPreview: String
     public var kernelSnapshot: BASCognitionKernelSnapshot
     public var brainState: BASDecisionBrainState?
-    public var reminderSurfaceMode: BASDecisionMode?
+    public var selectionSurfaceMode: BASDecisionMode?
     public var structuredTruthBehavior: BASStructuredTruthBehavior
     public var referencedFacts: [String: String]
 
@@ -30,7 +30,7 @@ public struct BASProviderReleaseEvaluationRequest: Sendable, Equatable {
         outputPreview: String,
         kernelSnapshot: BASCognitionKernelSnapshot,
         brainState: BASDecisionBrainState?,
-        reminderSurfaceMode: BASDecisionMode? = nil,
+        selectionSurfaceMode: BASDecisionMode? = nil,
         structuredTruthBehavior: BASStructuredTruthBehavior = .generic,
         referencedFacts: [String: String] = [:]
     ) {
@@ -38,7 +38,7 @@ public struct BASProviderReleaseEvaluationRequest: Sendable, Equatable {
         self.outputPreview = outputPreview
         self.kernelSnapshot = kernelSnapshot
         self.brainState = brainState
-        self.reminderSurfaceMode = reminderSurfaceMode
+        self.selectionSurfaceMode = selectionSurfaceMode
         self.structuredTruthBehavior = structuredTruthBehavior
         self.referencedFacts = referencedFacts
     }
@@ -68,7 +68,7 @@ public enum BASProviderReleaseGate {
                     for: BASStructuredTruthRequest(
                         kind: request.kind,
                         brainState: request.brainState,
-                        reminderSurfaceMode: request.reminderSurfaceMode,
+                        selectionSurfaceMode: request.selectionSurfaceMode,
                         behavior: request.structuredTruthBehavior
                     )
                 ),
@@ -96,7 +96,7 @@ public enum BASProviderReleaseEvaluator {
         outputPreview: String,
         kernelSnapshot: BASCognitionKernelSnapshot,
         brainState: BASDecisionBrainState?,
-        reminderSurfaceModeRawValue: String? = nil,
+        selectionSurfaceModeRawValue: String? = nil,
         structuredTruthBehavior: BASStructuredTruthBehavior = .generic,
         referencedFacts: [String: String] = [:]
     ) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment> {
@@ -106,7 +106,7 @@ public enum BASProviderReleaseEvaluator {
                 outputPreview: outputPreview,
                 kernelSnapshot: kernelSnapshot,
                 brainState: brainState,
-                reminderSurfaceMode: reminderSurfaceModeRawValue.flatMap(BASDecisionMode.init(identifier:)),
+                selectionSurfaceMode: selectionSurfaceModeRawValue.flatMap(BASDecisionMode.init(identifier:)),
                 structuredTruthBehavior: structuredTruthBehavior,
                 referencedFacts: referencedFacts
             )

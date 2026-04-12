@@ -35,9 +35,9 @@ struct BASPromptEnvelopeCoreTests {
 
         let envelope = BASPromptEnvelopeCompiler.compile(
             BASPromptEnvelopeRequest(
-                kind: "quick",
+                kind: "primary",
                 immutablePrefix: "Kernel identity.",
-                adaptivePrefix: "Quick mode rules.",
+                adaptivePrefix: "Primary mode rules.",
                 assembly: assembly,
                 frontstageState: "frontstage",
                 openTextSignalCount: 2,
@@ -45,13 +45,13 @@ struct BASPromptEnvelopeCoreTests {
             )
         )
 
-        #expect(envelope.instructions == "Kernel identity.\n\nQuick mode rules.")
+        #expect(envelope.instructions == "Kernel identity.\n\nPrimary mode rules.")
         #expect(envelope.payload == retainedBlock.rendered)
-        #expect(envelope.layers.stablePrefix == "Kernel identity.\n\nQuick mode rules.")
-        #expect(envelope.runtimePrompt == "Kernel identity.\n\nQuick mode rules.\n\n\(retainedBlock.rendered)")
+        #expect(envelope.layers.stablePrefix == "Kernel identity.\n\nPrimary mode rules.")
+        #expect(envelope.runtimePrompt == "Kernel identity.\n\nPrimary mode rules.\n\n\(retainedBlock.rendered)")
         #expect(envelope.budget.isWithinTarget)
         #expect(envelope.budget.immutablePrefixCharacters == "Kernel identity.".count)
-        #expect(envelope.budget.adaptivePrefixCharacters == "Quick mode rules.".count)
+        #expect(envelope.budget.adaptivePrefixCharacters == "Primary mode rules.".count)
         #expect(envelope.budget.promptPressureSnapshot.prefixCharacters == envelope.budget.prefixCharacters)
         #expect(envelope.debugPrompt.contains("[COMPACTION]"))
         #expect(envelope.debugPrompt.contains("evidence_snippets"))

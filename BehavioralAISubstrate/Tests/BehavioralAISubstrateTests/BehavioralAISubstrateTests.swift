@@ -151,7 +151,7 @@ struct BehavioralAISubstrateTests {
     func applePromptInputAdapterBuildsAdaptiveStrategy() {
         let strategy = BASApplePromptInputAdapter.adaptiveStrategy(
             from: BASAppleAdaptiveStrategyInput(
-                kind: .quick,
+                kind: .primary,
                 entropy: .low,
                 runtimeGear: .low,
                 contextBudget: 220,
@@ -169,7 +169,7 @@ struct BehavioralAISubstrateTests {
             )
         )
 
-        #expect(strategy.kind == .quick)
+        #expect(strategy.kind == .primary)
         #expect(strategy.runtimeGear == .low)
         #expect(strategy.contextBudget == 220)
         #expect(strategy.outputCharacterBudget == 120)
@@ -207,7 +207,7 @@ struct BehavioralAISubstrateTests {
             kind: .resume,
             surface: .notification,
             taskKind: .plan,
-            preferredWorkflowID: "balance",
+            preferredWorkflowID: "comparative",
             promptSeed: "Resume the decision about moving.",
             riskLevel: .high,
             triggerReason: "predictive_nudge",

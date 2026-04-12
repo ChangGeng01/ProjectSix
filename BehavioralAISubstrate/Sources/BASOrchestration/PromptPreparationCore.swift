@@ -237,9 +237,9 @@ public enum BASPromptPreparationCompiler {
     ) -> Int {
         if strategy?.runtimeGear == .low {
             switch kind {
-            case .quick, .reminder:
+            case .primary, .selection:
                 120
-            case .balance, .mirror:
+            case .comparative, .reflective:
                 150
             }
         } else {

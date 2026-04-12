@@ -92,7 +92,7 @@ struct BASMemoryCoreTests {
                 value: "noisy",
                 confidence: 0.42,
                 priority: 0.41,
-                source: .history,
+                source: .archive,
                 lastConfirmedAt: .now,
                 decayPolicy: .fast,
                 retrievalTags: ["noise"],
@@ -157,17 +157,17 @@ struct BASMemoryCoreTests {
         #expect(assessment.decision == .deferred)
     }
 
-    @Test("lifecycle review retires reflection before reminder at same age")
+    @Test("lifecycle review retires reflection before cue at same age")
     func lifecycleReviewRetiresReflectionBeforeReminder() {
         let reviewNow = Date(timeIntervalSince1970: 1_744_156_800)
         let oldDate = Date(timeIntervalSince1970: 1_739_836_800)
 
-        let reminderState = BASMemoryGovernance.nextLifecycleState(
+        let cueState = BASMemoryGovernance.nextLifecycleState(
             for: BASMemoryLifecycleReviewInput(
-                source: .reminder,
+                source: .cue,
                 evidenceCount: 3,
                 decayPolicy: .medium,
-                provenanceSummary: "Repeated reminder completions confirmed this goal.",
+                provenanceSummary: "Repeated cue completions confirmed this goal.",
                 lastConfirmedAt: oldDate,
                 reviewNow: reviewNow
             )
@@ -183,7 +183,7 @@ struct BASMemoryCoreTests {
             )
         )
 
-        #expect(reminderState != .retired)
+        #expect(cueState != .retired)
         #expect(reflectionState == .retired)
     }
 

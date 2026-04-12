@@ -59,7 +59,7 @@ public struct BASDerivedMemoryDraft: Codable, Equatable, Sendable {
     }
 }
 
-public struct BASSelfReminderMemoryInput: Codable, Equatable, Sendable {
+public struct BASCueMemoryInput: Codable, Equatable, Sendable {
     public var content: String
     public var lastUsedAt: Date
 
@@ -116,7 +116,7 @@ public struct BASComparativeMemoryInput: Codable, Equatable, Sendable {
 
     public var workspaceInput: BASWorkspaceMemoryInput {
         BASWorkspaceMemoryInput(
-            workflowID: "comparative",
+            workflowID: BASDecisionMode.comparativeID,
             prompt: prompt,
             longTerm: longTerm,
             updatedAt: updatedAt
@@ -143,16 +143,13 @@ public struct BASReflectiveMemoryInput: Codable, Equatable, Sendable {
 
     public var workspaceInput: BASWorkspaceMemoryInput {
         BASWorkspaceMemoryInput(
-            workflowID: "reflective",
+            workflowID: BASDecisionMode.reflectiveID,
             prompt: prompt,
             longTerm: longTerm,
             updatedAt: updatedAt
         )
     }
 }
-
-public typealias BASBalanceMemoryInput = BASComparativeMemoryInput
-public typealias BASMirrorMemoryInput = BASReflectiveMemoryInput
 
 public struct BASWorkspaceMemoryInput: Codable, Equatable, Sendable {
     public var workflowID: String
@@ -233,68 +230,243 @@ public struct BASSupportActionDraftBehavior: Codable, Equatable, Sendable {
     }
 }
 
-public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
-    public static let generic = BASMemoryDerivationBehavior()
+public struct BASPatternDraftBehavior: Codable, Equatable, Sendable {
+    public var id: String
+    public var typeID: String
+    public var topic: String
+    public var headline: String
+    public var value: String
+    public var confidence: Double
+    public var priority: Double
+    public var sourceID: String
+    public var decayPolicyID: String
+    public var retrievalTags: [String]
+    public var provenanceSummary: String
+    public var promotionPolicy: BASDraftPromotionPolicy
+    public var tierID: String
 
+    public init(
+        id: String,
+        typeID: String,
+        topic: String,
+        headline: String,
+        value: String,
+        confidence: Double,
+        priority: Double,
+        sourceID: String,
+        decayPolicyID: String,
+        retrievalTags: [String],
+        provenanceSummary: String,
+        promotionPolicy: BASDraftPromotionPolicy,
+        tierID: String = "warm"
+    ) {
+        self.id = id
+        self.typeID = typeID
+        self.topic = topic
+        self.headline = headline
+        self.value = value
+        self.confidence = confidence
+        self.priority = priority
+        self.sourceID = sourceID
+        self.decayPolicyID = decayPolicyID
+        self.retrievalTags = retrievalTags
+        self.provenanceSummary = provenanceSummary
+        self.promotionPolicy = promotionPolicy
+        self.tierID = tierID
+    }
+
+    public func makeDraft(
+        lastConfirmedAt: Date,
+        evidenceCount: Int
+    ) -> BASDerivedMemoryDraft {
+        BASDerivedMemoryDraft(
+            id: id,
+            typeID: typeID,
+            topic: topic,
+            headline: headline,
+            value: value,
+            confidence: confidence,
+            priority: priority,
+            sourceID: sourceID,
+            lastConfirmedAt: lastConfirmedAt,
+            decayPolicyID: decayPolicyID,
+            retrievalTags: retrievalTags,
+            evidenceCount: evidenceCount,
+            provenanceSummary: provenanceSummary,
+            promotionPolicy: promotionPolicy,
+            tierID: tierID
+        )
+    }
+}
+
+public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
+    public static let generic = BASMemoryDerivationBehavior(
+        situationalBehaviorsByModeID: [:],
+        primarySituational: BASSituationalDraftBehavior(
+            draftID: "situational.active.recent",
+            topic: "recent_context",
+            primaryHeadlinePrefix: "Recent active context",
+            fallbackHeadlinePrefix: "Recent returning context",
+            provenanceSummary: "Candidate memory staged from a recent active context.",
+            baseTags: ["active", "recent"]
+        ),
+        comparativeSituational: BASSituationalDraftBehavior(
+            draftID: "situational.compare.recent",
+            topic: "recent_comparison_context",
+            primaryHeadlinePrefix: "Recent trade-off context",
+            provenanceSummary: "Candidate memory staged from a recent trade-off context.",
+            baseTags: ["comparison", "recent"]
+        ),
+        reflectiveSituational: BASSituationalDraftBehavior(
+            draftID: "situational.pattern.recent",
+            topic: "recent_pattern_context",
+            primaryHeadlinePrefix: "Recent pattern context",
+            provenanceSummary: "Candidate memory staged from a recent pattern-reading context.",
+            baseTags: ["pattern", "recent"]
+        ),
+        workspaceWorkflowIDsByModeID: [:],
+        comparativeWorkspaceIDs: [],
+        reflectiveWorkspaceIDs: [],
+        workspaceSituationalBehaviors: [],
+        supportActionsByID: [:],
+        concisePreferencePattern: BASPatternDraftBehavior(
+            id: "preference.communication.concise",
+            typeID: "preference",
+            topic: "communication_style",
+            headline: "Short, direct guidance tends to land better.",
+            value: "Prefer brief, concrete phrasing over longer explanations.",
+            confidence: 0.78,
+            priority: 0.92,
+            sourceID: BASMemorySource.pattern.rawValue,
+            decayPolicyID: "slow",
+            retrievalTags: ["style", "communication", "concise", "direct"],
+            provenanceSummary: "Derived from repeated short cues and recent structured interaction note length.",
+            promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
+        ),
+        lateSessionPattern: BASPatternDraftBehavior(
+            id: "semantic.pattern.late_session",
+            typeID: "semantic",
+            topic: "late_session_regulation",
+            headline: "Late sessions usually benefit from lower-load guidance.",
+            value: "late_session_support",
+            confidence: 0.73,
+            priority: 0.77,
+            sourceID: BASMemorySource.pattern.rawValue,
+            decayPolicyID: "slow",
+            retrievalTags: ["night", "late", "fatigue", "support"],
+            provenanceSummary: "Derived from repeated late-session structured interaction archive evidence.",
+            promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
+        ),
+        fallbackSupportTags: ["action_support", "repeat_support"],
+        fallbackSupportProvenanceSummary: "Derived from repeated support actions in the current integration."
+    )
+
+    public var situationalBehaviorsByModeID: [String: BASSituationalDraftBehavior]
     public var primarySituational: BASSituationalDraftBehavior
     public var comparativeSituational: BASSituationalDraftBehavior
     public var reflectiveSituational: BASSituationalDraftBehavior
+    public var workspaceWorkflowIDsByModeID: [String: [String]]
     public var comparativeWorkspaceIDs: [String]
     public var reflectiveWorkspaceIDs: [String]
     public var workspaceSituationalBehaviors: [BASWorkspaceSituationalDraftBehavior]
     public var supportActionsByID: [String: BASSupportActionDraftBehavior]
+    public var concisePreferencePattern: BASPatternDraftBehavior?
+    public var lateSessionPattern: BASPatternDraftBehavior?
     public var fallbackSupportTags: [String]
     public var fallbackSupportProvenanceSummary: String
 
     private enum CodingKeys: String, CodingKey {
+        case situationalBehaviorsByModeID
         case primarySituational
         case comparativeSituational
         case reflectiveSituational
+        case workspaceWorkflowIDsByModeID
         case comparativeWorkspaceIDs
         case reflectiveWorkspaceIDs
         case workspaceSituationalBehaviors
         case supportActionsByID
+        case concisePreferencePattern
+        case lateSessionPattern
         case fallbackSupportTags
         case fallbackSupportProvenanceSummary
     }
 
+    @available(*, unavailable, message: "Use .generic or provide explicit memory derivation behavior.")
+    public init() {
+        fatalError("Unavailable")
+    }
+
     public init(
+        situationalBehaviorsByModeID: [String: BASSituationalDraftBehavior] = [:],
         primarySituational: BASSituationalDraftBehavior = BASSituationalDraftBehavior(
-            draftID: "situational.primary.latest",
-            topic: "recent_primary_workflow",
-            primaryHeadlinePrefix: "Recently holding",
-            fallbackHeadlinePrefix: "Recently revisiting",
-            provenanceSummary: "Candidate memory staged from the latest primary workflow.",
-            baseTags: ["primary", "recent"]
+            draftID: "situational.active.recent",
+            topic: "recent_context",
+            primaryHeadlinePrefix: "Recent active context",
+            fallbackHeadlinePrefix: "Recent returning context",
+            provenanceSummary: "Candidate memory staged from a recent active context.",
+            baseTags: ["active", "recent"]
         ),
         comparativeSituational: BASSituationalDraftBehavior = BASSituationalDraftBehavior(
-            draftID: "situational.comparative.latest",
-            topic: "recent_comparative_workflow",
-            primaryHeadlinePrefix: "Recently comparing",
-            provenanceSummary: "Candidate memory staged from the latest comparative workflow.",
-            baseTags: ["comparative", "recent"]
+            draftID: "situational.compare.recent",
+            topic: "recent_comparison_context",
+            primaryHeadlinePrefix: "Recent trade-off context",
+            provenanceSummary: "Candidate memory staged from a recent trade-off context.",
+            baseTags: ["comparison", "recent"]
         ),
         reflectiveSituational: BASSituationalDraftBehavior = BASSituationalDraftBehavior(
-            draftID: "situational.reflective.latest",
-            topic: "recent_reflective_workflow",
-            primaryHeadlinePrefix: "Recently reflecting on",
-            provenanceSummary: "Candidate memory staged from the latest reflective workflow.",
-            baseTags: ["reflective", "recent"]
+            draftID: "situational.pattern.recent",
+            topic: "recent_pattern_context",
+            primaryHeadlinePrefix: "Recent pattern context",
+            provenanceSummary: "Candidate memory staged from a recent pattern-reading context.",
+            baseTags: ["pattern", "recent"]
         ),
-        comparativeWorkspaceIDs: [String] = ["comparative"],
-        reflectiveWorkspaceIDs: [String] = ["reflective"],
+        workspaceWorkflowIDsByModeID: [String: [String]] = [:],
+        comparativeWorkspaceIDs: [String] = [],
+        reflectiveWorkspaceIDs: [String] = [],
         workspaceSituationalBehaviors: [BASWorkspaceSituationalDraftBehavior] = [],
         supportActionsByID: [String: BASSupportActionDraftBehavior] = [:],
-        fallbackSupportTags: [String] = ["action_support", "stabilizing_action"],
-        fallbackSupportProvenanceSummary: String = "Derived from repeated stabilizing actions in the host runtime."
+        concisePreferencePattern: BASPatternDraftBehavior? = BASPatternDraftBehavior(
+            id: "preference.communication.concise",
+            typeID: "preference",
+            topic: "communication_style",
+            headline: "Short, direct guidance tends to land better.",
+            value: "Prefer brief, concrete phrasing over longer explanations.",
+            confidence: 0.78,
+            priority: 0.92,
+            sourceID: BASMemorySource.pattern.rawValue,
+            decayPolicyID: "slow",
+            retrievalTags: ["style", "communication", "concise", "direct"],
+            provenanceSummary: "Derived from repeated short cues and recent structured interaction note length.",
+            promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
+        ),
+        lateSessionPattern: BASPatternDraftBehavior? = BASPatternDraftBehavior(
+            id: "semantic.pattern.late_session",
+            typeID: "semantic",
+            topic: "late_session_regulation",
+            headline: "Late sessions usually benefit from lower-load guidance.",
+            value: "late_session_support",
+            confidence: 0.73,
+            priority: 0.77,
+            sourceID: BASMemorySource.pattern.rawValue,
+            decayPolicyID: "slow",
+            retrievalTags: ["night", "late", "fatigue", "support"],
+            provenanceSummary: "Derived from repeated late-session structured interaction archive evidence.",
+            promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
+        ),
+        fallbackSupportTags: [String] = ["action_support", "repeat_support"],
+        fallbackSupportProvenanceSummary: String = "Derived from repeated support actions in the current integration."
     ) {
+        self.situationalBehaviorsByModeID = situationalBehaviorsByModeID
         self.primarySituational = primarySituational
         self.comparativeSituational = comparativeSituational
         self.reflectiveSituational = reflectiveSituational
+        self.workspaceWorkflowIDsByModeID = workspaceWorkflowIDsByModeID
         self.comparativeWorkspaceIDs = comparativeWorkspaceIDs
         self.reflectiveWorkspaceIDs = reflectiveWorkspaceIDs
         self.workspaceSituationalBehaviors = workspaceSituationalBehaviors
         self.supportActionsByID = supportActionsByID
+        self.concisePreferencePattern = concisePreferencePattern
+        self.lateSessionPattern = lateSessionPattern
         self.fallbackSupportTags = fallbackSupportTags
         self.fallbackSupportProvenanceSummary = fallbackSupportProvenanceSummary
     }
@@ -302,12 +474,16 @@ public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let fallback = BASMemoryDerivationBehavior.generic
+        situationalBehaviorsByModeID = try container.decodeIfPresent([String: BASSituationalDraftBehavior].self, forKey: .situationalBehaviorsByModeID)
+            ?? fallback.situationalBehaviorsByModeID
         primarySituational = try container.decodeIfPresent(BASSituationalDraftBehavior.self, forKey: .primarySituational)
             ?? fallback.primarySituational
         comparativeSituational = try container.decodeIfPresent(BASSituationalDraftBehavior.self, forKey: .comparativeSituational)
             ?? fallback.comparativeSituational
         reflectiveSituational = try container.decodeIfPresent(BASSituationalDraftBehavior.self, forKey: .reflectiveSituational)
             ?? fallback.reflectiveSituational
+        workspaceWorkflowIDsByModeID = try container.decodeIfPresent([String: [String]].self, forKey: .workspaceWorkflowIDsByModeID)
+            ?? fallback.workspaceWorkflowIDsByModeID
         comparativeWorkspaceIDs = try container.decodeIfPresent([String].self, forKey: .comparativeWorkspaceIDs)
             ?? fallback.comparativeWorkspaceIDs
         reflectiveWorkspaceIDs = try container.decodeIfPresent([String].self, forKey: .reflectiveWorkspaceIDs)
@@ -316,6 +492,10 @@ public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
             ?? []
         supportActionsByID = try container.decodeIfPresent([String: BASSupportActionDraftBehavior].self, forKey: .supportActionsByID)
             ?? fallback.supportActionsByID
+        concisePreferencePattern = try container.decodeIfPresent(BASPatternDraftBehavior.self, forKey: .concisePreferencePattern)
+            ?? fallback.concisePreferencePattern
+        lateSessionPattern = try container.decodeIfPresent(BASPatternDraftBehavior.self, forKey: .lateSessionPattern)
+            ?? fallback.lateSessionPattern
         fallbackSupportTags = try container.decodeIfPresent([String].self, forKey: .fallbackSupportTags)
             ?? fallback.fallbackSupportTags
         fallbackSupportProvenanceSummary = try container.decodeIfPresent(String.self, forKey: .fallbackSupportProvenanceSummary)
@@ -324,13 +504,17 @@ public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(situationalBehaviorsByModeID, forKey: .situationalBehaviorsByModeID)
         try container.encode(primarySituational, forKey: .primarySituational)
         try container.encode(comparativeSituational, forKey: .comparativeSituational)
         try container.encode(reflectiveSituational, forKey: .reflectiveSituational)
+        try container.encode(workspaceWorkflowIDsByModeID, forKey: .workspaceWorkflowIDsByModeID)
         try container.encode(comparativeWorkspaceIDs, forKey: .comparativeWorkspaceIDs)
         try container.encode(reflectiveWorkspaceIDs, forKey: .reflectiveWorkspaceIDs)
         try container.encode(workspaceSituationalBehaviors, forKey: .workspaceSituationalBehaviors)
         try container.encode(supportActionsByID, forKey: .supportActionsByID)
+        try container.encodeIfPresent(concisePreferencePattern, forKey: .concisePreferencePattern)
+        try container.encodeIfPresent(lateSessionPattern, forKey: .lateSessionPattern)
         try container.encode(fallbackSupportTags, forKey: .fallbackSupportTags)
         try container.encode(fallbackSupportProvenanceSummary, forKey: .fallbackSupportProvenanceSummary)
     }
@@ -340,25 +524,106 @@ public struct BASMemoryDerivationBehavior: Codable, Equatable, Sendable {
             return workspaceSituationalBehaviors
         }
 
-        return [
-            BASWorkspaceSituationalDraftBehavior(
-                workflowIDs: comparativeWorkspaceIDs,
-                draft: comparativeSituational,
-                confidence: 0.74,
-                priority: 0.76
-            ),
-            BASWorkspaceSituationalDraftBehavior(
-                workflowIDs: reflectiveWorkspaceIDs,
-                draft: reflectiveSituational,
-                confidence: 0.78,
-                priority: 0.82
+        if workspaceWorkflowIDsByModeID.isEmpty == false {
+            return workspaceWorkflowIDsByModeID
+                .keys
+                .sorted()
+                .compactMap { modeID in
+                    guard let draft = resolvedSituationalBehavior(for: modeID) else {
+                        return nil
+                    }
+                    guard let workflowIDs = workspaceWorkflowIDsByModeID[modeID], workflowIDs.isEmpty == false else {
+                        return nil
+                    }
+                    let priority = modeID == BASDecisionMode.reflectiveID ? 0.82 : 0.76
+                    let confidence = modeID == BASDecisionMode.reflectiveID ? 0.78 : 0.74
+                    return BASWorkspaceSituationalDraftBehavior(
+                        workflowIDs: workflowIDs,
+                        draft: draft,
+                        confidence: confidence,
+                        priority: priority
+                    )
+                }
+        }
+
+        var compatibilityBehaviors: [BASWorkspaceSituationalDraftBehavior] = []
+        if comparativeWorkspaceIDs.isEmpty == false {
+            compatibilityBehaviors.append(
+                BASWorkspaceSituationalDraftBehavior(
+                    workflowIDs: comparativeWorkspaceIDs,
+                    draft: comparativeSituational,
+                    confidence: 0.74,
+                    priority: 0.76
+                )
             )
-        ].filter { $0.workflowIDs.isEmpty == false }
+        }
+        if reflectiveWorkspaceIDs.isEmpty == false {
+            compatibilityBehaviors.append(
+                BASWorkspaceSituationalDraftBehavior(
+                    workflowIDs: reflectiveWorkspaceIDs,
+                    draft: reflectiveSituational,
+                    confidence: 0.78,
+                    priority: 0.82
+                )
+            )
+        }
+        return compatibilityBehaviors
+    }
+
+    public var defaultSituationalBehavior: BASSituationalDraftBehavior {
+        resolvedSituationalBehavior(for: BASDecisionMode.primaryID) ?? primarySituational
+    }
+
+    public func workspaceIDs(for modeID: String) -> [String] {
+        for candidate in modeLookupCandidates(for: modeID) {
+            if let workflowIDs = workspaceWorkflowIDsByModeID[candidate], workflowIDs.isEmpty == false {
+                return workflowIDs
+            }
+        }
+
+        guard let mode = BASDecisionMode(identifier: modeID) else {
+            return []
+        }
+        switch mode {
+        case .primary:
+            return []
+        case .comparative:
+            return comparativeWorkspaceIDs
+        case .reflective:
+            return reflectiveWorkspaceIDs
+        }
+    }
+
+    public func resolvedSituationalBehavior(for modeID: String) -> BASSituationalDraftBehavior? {
+        for candidate in modeLookupCandidates(for: modeID) {
+            if let behavior = situationalBehaviorsByModeID[candidate] {
+                return behavior
+            }
+        }
+
+        guard let mode = BASDecisionMode(identifier: modeID) else {
+            return nil
+        }
+        switch mode {
+        case .primary:
+            return primarySituational
+        case .comparative:
+            return comparativeSituational
+        case .reflective:
+            return reflectiveSituational
+        }
+    }
+
+    private func modeLookupCandidates(for modeID: String) -> [String] {
+        guard let mode = BASDecisionMode(identifier: modeID) else {
+            return [modeID]
+        }
+        return Array(Set([modeID, mode.identifier])).sorted()
     }
 }
 
 public struct BASMemoryDerivationRequest: Codable, Equatable, Sendable {
-    public var reminders: [BASSelfReminderMemoryInput]
+    public var cues: [BASCueMemoryInput]
     public var checkEvents: [BASCheckEventMemoryInput]
     public var workspaceRecords: [BASWorkspaceMemoryInput]
     public var comparativeRecords: [BASComparativeMemoryInput]
@@ -366,57 +631,47 @@ public struct BASMemoryDerivationRequest: Codable, Equatable, Sendable {
     public var now: Date
     public var behavior: BASMemoryDerivationBehavior
 
-    public var balanceRecords: [BASComparativeMemoryInput] {
-        get { comparativeRecords }
-        set { comparativeRecords = newValue }
-    }
-
-    public var mirrorRecords: [BASReflectiveMemoryInput] {
-        get { reflectiveRecords }
-        set { reflectiveRecords = newValue }
-    }
-
     private enum CodingKeys: String, CodingKey {
-        case reminders
+        case cues
         case checkEvents
         case workspaceRecords
         case comparativeRecords
         case reflectiveRecords
-        case balanceRecords
-        case mirrorRecords
         case now
         case behavior
     }
 
     public init(
-        reminders: [BASSelfReminderMemoryInput],
+        cues: [BASCueMemoryInput],
         checkEvents: [BASCheckEventMemoryInput],
         workspaceRecords: [BASWorkspaceMemoryInput],
         now: Date,
         behavior: BASMemoryDerivationBehavior = .generic
     ) {
-        self.reminders = reminders
+        self.cues = cues
         self.checkEvents = checkEvents
         self.workspaceRecords = workspaceRecords
+        let comparativeWorkflowIDs = Set(behavior.workspaceIDs(for: BASDecisionMode.comparativeID))
+        let reflectiveWorkflowIDs = Set(behavior.workspaceIDs(for: BASDecisionMode.reflectiveID))
         self.comparativeRecords = workspaceRecords
-            .filter { behavior.comparativeWorkspaceIDs.contains($0.workflowID) }
+            .filter { comparativeWorkflowIDs.contains($0.workflowID) }
             .map(BASComparativeMemoryInput.init(workspace:))
         self.reflectiveRecords = workspaceRecords
-            .filter { behavior.reflectiveWorkspaceIDs.contains($0.workflowID) }
+            .filter { reflectiveWorkflowIDs.contains($0.workflowID) }
             .map(BASReflectiveMemoryInput.init(workspace:))
         self.now = now
         self.behavior = behavior
     }
 
     public init(
-        reminders: [BASSelfReminderMemoryInput],
+        cues: [BASCueMemoryInput],
         checkEvents: [BASCheckEventMemoryInput],
         comparativeRecords: [BASComparativeMemoryInput],
         reflectiveRecords: [BASReflectiveMemoryInput],
         now: Date,
         behavior: BASMemoryDerivationBehavior = .generic
     ) {
-        self.reminders = reminders
+        self.cues = cues
         self.checkEvents = checkEvents
         self.workspaceRecords = (
             comparativeRecords.map(\.workspaceInput) +
@@ -428,34 +683,12 @@ public struct BASMemoryDerivationRequest: Codable, Equatable, Sendable {
         self.behavior = behavior
     }
 
-    public init(
-        reminders: [BASSelfReminderMemoryInput],
-        checkEvents: [BASCheckEventMemoryInput],
-        balanceRecords: [BASBalanceMemoryInput],
-        mirrorRecords: [BASMirrorMemoryInput],
-        now: Date,
-        behavior: BASMemoryDerivationBehavior = .generic
-    ) {
-        self.init(
-            reminders: reminders,
-            checkEvents: checkEvents,
-            comparativeRecords: balanceRecords,
-            reflectiveRecords: mirrorRecords,
-            now: now,
-            behavior: behavior
-        )
-    }
-
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        reminders = try container.decode([BASSelfReminderMemoryInput].self, forKey: .reminders)
+        cues = try container.decode([BASCueMemoryInput].self, forKey: .cues)
         checkEvents = try container.decode([BASCheckEventMemoryInput].self, forKey: .checkEvents)
-        let decodedComparative = try container.decodeIfPresent([BASComparativeMemoryInput].self, forKey: .comparativeRecords) ??
-            container.decodeIfPresent([BASBalanceMemoryInput].self, forKey: .balanceRecords) ??
-            []
-        let decodedReflective = try container.decodeIfPresent([BASReflectiveMemoryInput].self, forKey: .reflectiveRecords) ??
-            container.decodeIfPresent([BASMirrorMemoryInput].self, forKey: .mirrorRecords) ??
-            []
+        let decodedComparative = try container.decodeIfPresent([BASComparativeMemoryInput].self, forKey: .comparativeRecords) ?? []
+        let decodedReflective = try container.decodeIfPresent([BASReflectiveMemoryInput].self, forKey: .reflectiveRecords) ?? []
         comparativeRecords = decodedComparative
         reflectiveRecords = decodedReflective
         workspaceRecords = try container.decodeIfPresent([BASWorkspaceMemoryInput].self, forKey: .workspaceRecords) ??
@@ -466,7 +699,7 @@ public struct BASMemoryDerivationRequest: Codable, Equatable, Sendable {
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(reminders, forKey: .reminders)
+        try container.encode(cues, forKey: .cues)
         try container.encode(checkEvents, forKey: .checkEvents)
         try container.encode(workspaceRecords, forKey: .workspaceRecords)
         try container.encode(comparativeRecords, forKey: .comparativeRecords)
@@ -480,9 +713,10 @@ public enum BASMemoryDraftCompiler {
     public static func derive(_ request: BASMemoryDerivationRequest) -> [BASDerivedMemoryDraft] {
         var drafts: [BASDerivedMemoryDraft] = []
         drafts += preferenceDrafts(
-            reminders: request.reminders,
+            cues: request.cues,
             checkEvents: request.checkEvents,
-            now: request.now
+            now: request.now,
+            behavior: request.behavior
         )
         drafts += goalDrafts(
             workspaceRecords: request.workspaceRecords
@@ -494,7 +728,8 @@ public enum BASMemoryDraftCompiler {
         )
         drafts += semanticDrafts(
             checkEvents: request.checkEvents,
-            now: request.now
+            now: request.now,
+            behavior: request.behavior
         )
         drafts += supportDrafts(
             checkEvents: request.checkEvents,
@@ -513,41 +748,30 @@ public enum BASMemoryDraftCompiler {
     }
 
     private static func preferenceDrafts(
-        reminders: [BASSelfReminderMemoryInput],
+        cues: [BASCueMemoryInput],
         checkEvents: [BASCheckEventMemoryInput],
-        now: Date
+        now: Date,
+        behavior: BASMemoryDerivationBehavior
     ) -> [BASDerivedMemoryDraft] {
         var drafts: [BASDerivedMemoryDraft] = []
-        let reminderLengths = reminders.map { $0.content.count }
+        let cueLengths = cues.map { $0.content.count }
         let noteLengths = checkEvents
             .map(\.note)
             .map { normalized($0) }
             .filter { !$0.isEmpty }
             .map(\.count)
-        let allLengths = reminderLengths + noteLengths
+        let allLengths = cueLengths + noteLengths
 
         if allLengths.count >= 3 {
             let averageLength = Double(allLengths.reduce(0, +)) / Double(allLengths.count)
-            if averageLength <= 96 {
+            if averageLength <= 96, let pattern = behavior.concisePreferencePattern {
                 drafts.append(
-                    BASDerivedMemoryDraft(
-                        id: "preference.communication.concise",
-                        typeID: "preference",
-                        topic: "communication_style",
-                        headline: "Short, direct language lands better.",
-                        value: "Prefer brief, concrete phrasing over long explanations.",
-                        confidence: 0.78,
-                        priority: 0.92,
-                        sourceID: "pattern",
+                    pattern.makeDraft(
                         lastConfirmedAt: maxDate(
-                            reminders.map(\.lastUsedAt) + checkEvents.map(\.createdAt),
+                            cues.map(\.lastUsedAt) + checkEvents.map(\.createdAt),
                             fallback: now
                         ),
-                        decayPolicyID: "slow",
-                        retrievalTags: ["style", "communication", "concise", "direct"],
-                        evidenceCount: allLengths.count,
-                        provenanceSummary: "Derived from repeated short reminders and recent structured interaction note length.",
-                        promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
+                        evidenceCount: allLengths.count
                     )
                 )
             }
@@ -586,7 +810,7 @@ public enum BASMemoryDraftCompiler {
                     value: goal,
                     confidence: 0.82,
                     priority: max(0.65, 0.95 - (Double(index) * 0.08)),
-                    sourceID: "history",
+                    sourceID: BASMemorySource.archive.rawValue,
                     lastConfirmedAt: lastConfirmedAt,
                     decayPolicyID: "medium",
                     retrievalTags: tags(from: goal) + ["goal", "long_term"],
@@ -603,31 +827,32 @@ public enum BASMemoryDraftCompiler {
         behavior: BASMemoryDerivationBehavior
     ) -> [BASDerivedMemoryDraft] {
         var drafts: [BASDerivedMemoryDraft] = []
+        let defaultSituational = behavior.defaultSituationalBehavior
 
         if let event = checkEvents.first {
             let note = normalized(event.note)
             let headline: String
-            if note.isEmpty, let fallbackPrefix = behavior.primarySituational.fallbackHeadlinePrefix {
+            if note.isEmpty, let fallbackPrefix = defaultSituational.fallbackHeadlinePrefix {
                 headline = "\(fallbackPrefix) \(event.scenarioTitle.lowercased()) pressure."
             } else {
-                headline = "\(behavior.primarySituational.primaryHeadlinePrefix): \(clipped(note.isEmpty ? event.scenarioTitle : note, limit: 96))"
+                headline = "\(defaultSituational.primaryHeadlinePrefix): \(clipped(note.isEmpty ? event.scenarioTitle : note, limit: 96))"
             }
 
             drafts.append(
                 BASDerivedMemoryDraft(
-                    id: behavior.primarySituational.draftID,
+                    id: defaultSituational.draftID,
                     typeID: "situational",
-                    topic: behavior.primarySituational.topic,
+                    topic: defaultSituational.topic,
                     headline: headline,
                     value: note.isEmpty ? event.scenarioTitle : note,
                     confidence: 0.7,
                     priority: 0.72,
-                    sourceID: "history",
+                    sourceID: BASMemorySource.archive.rawValue,
                     lastConfirmedAt: event.createdAt,
                     decayPolicyID: "fast",
-                    retrievalTags: [event.scenarioID] + behavior.primarySituational.baseTags + tags(from: note),
+                    retrievalTags: [event.scenarioID] + defaultSituational.baseTags + tags(from: note),
                     evidenceCount: 1,
-                    provenanceSummary: behavior.primarySituational.provenanceSummary,
+                    provenanceSummary: defaultSituational.provenanceSummary,
                     promotionPolicy: .candidateOnly
                 )
             )
@@ -652,7 +877,7 @@ public enum BASMemoryDraftCompiler {
                     value: prompt,
                     confidence: workspaceBehavior.confidence,
                     priority: workspaceBehavior.priority,
-                    sourceID: "history",
+                    sourceID: BASMemorySource.archive.rawValue,
                     lastConfirmedAt: record.updatedAt,
                     decayPolicyID: "fast",
                     retrievalTags: workspaceBehavior.draft.baseTags + tags(from: prompt),
@@ -668,7 +893,8 @@ public enum BASMemoryDraftCompiler {
 
     private static func semanticDrafts(
         checkEvents: [BASCheckEventMemoryInput],
-        now: Date
+        now: Date,
+        behavior: BASMemoryDerivationBehavior
     ) -> [BASDerivedMemoryDraft] {
         var drafts: [BASDerivedMemoryDraft] = []
         let scenarioGroups = Dictionary(grouping: checkEvents, by: \.scenarioID)
@@ -701,23 +927,13 @@ public enum BASMemoryDraftCompiler {
             let hour = Calendar.current.component(.hour, from: event.createdAt)
             return hour >= 21 || hour < 6
         }
-        if lateNightEvents.count >= 3, lateNightEvents.count * 2 >= checkEvents.count {
+        if lateNightEvents.count >= 3,
+           lateNightEvents.count * 2 >= checkEvents.count,
+           let pattern = behavior.lateSessionPattern {
             drafts.append(
-                BASDerivedMemoryDraft(
-                    id: "semantic.pattern.late_night",
-                    typeID: "semantic",
-                    topic: "late_night_regulation",
-                    headline: "Late sessions need lighter, shorter guidance.",
-                    value: "late_night_support",
-                    confidence: 0.73,
-                    priority: 0.77,
-                    sourceID: "pattern",
+                pattern.makeDraft(
                     lastConfirmedAt: lateNightEvents.map(\.createdAt).max() ?? now,
-                    decayPolicyID: "slow",
-                    retrievalTags: ["night", "late", "fatigue", "support"],
-                    evidenceCount: lateNightEvents.count,
-                    provenanceSummary: "Derived from repeated late-night structured interaction history.",
-                    promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
+                    evidenceCount: lateNightEvents.count
                 )
             )
         }
@@ -750,7 +966,7 @@ public enum BASMemoryDraftCompiler {
                     value: first.actionTitle,
                     confidence: 0.72,
                     priority: 0.79,
-                    sourceID: "history",
+                    sourceID: BASMemorySource.archive.rawValue,
                     lastConfirmedAt: events.map(\.createdAt).max() ?? .now,
                     decayPolicyID: "medium",
                     retrievalTags: tags + [actionID],

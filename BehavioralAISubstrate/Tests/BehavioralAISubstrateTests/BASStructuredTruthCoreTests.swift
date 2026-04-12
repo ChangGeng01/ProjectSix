@@ -27,7 +27,7 @@ struct BASStructuredTruthCoreTests {
 
         let truthState = BASStructuredTruthCompiler.truthState(
             for: BASStructuredTruthRequest(
-                kind: .quick,
+                kind: .primary,
                 brainState: brainState
             )
         )
@@ -42,17 +42,17 @@ struct BASStructuredTruthCoreTests {
         #expect(truthState?.personaRules.contains(brainState.identityProfile.relationshipBoundary) == true)
     }
 
-    @Test("reminder truth state can be built without a loaded brain")
-    func reminderTruthStateWorksWithoutBrainState() {
+    @Test("selection truth state can be built without a loaded brain")
+    func selectionTruthStateWorksWithoutBrainState() {
         let truthState = BASStructuredTruthCompiler.truthState(
             for: BASStructuredTruthRequest(
-                kind: .reminder,
+                kind: .selection,
                 brainState: nil,
-                reminderSurfaceMode: .balance
+                selectionSurfaceMode: .comparative
             )
         )
 
-        #expect(truthState?.mode == "reminder")
+        #expect(truthState?.mode == BASAdaptiveTraceKind.selectionID)
         #expect(truthState?.currentGoal == nil)
         #expect(truthState?.sessionFacts["surface_mode"] == "comparative")
         #expect(truthState?.sessionFacts["boundary_mode"] == nil)
@@ -60,11 +60,11 @@ struct BASStructuredTruthCoreTests {
         #expect(truthState?.allowedActions == ["render_local_guidance", "load_governed_memory"])
     }
 
-    @Test("governed truth is nil for non-reminder flows when no brain is loaded")
-    func nonReminderTruthRequiresBrainState() {
+    @Test("governed truth is nil for non-selection flows when no brain is loaded")
+    func nonSelectionTruthRequiresBrainState() {
         let truthState = BASStructuredTruthCompiler.truthState(
             for: BASStructuredTruthRequest(
-                kind: .mirror,
+                kind: .reflective,
                 brainState: nil
             )
         )
@@ -76,36 +76,36 @@ struct BASStructuredTruthCoreTests {
     func structuredTruthCompilerHonorsHostSpecificBehaviorOverrides() {
         let behavior = BASStructuredTruthBehavior(
             modeNamesByKindID: [
-                BASAdaptiveTraceKind.quick.rawValue: "before.quick",
-                BASAdaptiveTraceKind.reminder.rawValue: "before.reminder"
+                BASAdaptiveTraceKind.primary.rawValue: "atlas.primary",
+                BASAdaptiveTraceKind.selection.rawValue: "atlas.selection"
             ],
             kernelPersonaRulesByKindID: [
-                BASAdaptiveTraceKind.quick.rawValue: "Keep the interruption short, calm, and non-shaming.",
-                BASAdaptiveTraceKind.reminder.rawValue: "Choose from retained reminders only and do not invent new reminders."
+                BASAdaptiveTraceKind.primary.rawValue: "Keep the interruption short, calm, and non-shaming.",
+                BASAdaptiveTraceKind.selection.rawValue: "Choose from retained candidates only and do not invent new ones."
             ]
         )
 
-        let quickTruthState = BASStructuredTruthCompiler.truthState(
+        let primaryTruthState = BASStructuredTruthCompiler.truthState(
             for: BASStructuredTruthRequest(
-                kind: .quick,
+                kind: .primary,
                 brainState: hostOverrideBrainState(),
                 behavior: behavior
             )
         )
 
-        let reminderTruthState = BASStructuredTruthCompiler.truthState(
+        let selectionTruthState = BASStructuredTruthCompiler.truthState(
             for: BASStructuredTruthRequest(
-                kind: .reminder,
+                kind: .selection,
                 brainState: nil,
-                reminderSurfaceMode: .quick,
+                selectionSurfaceMode: .primary,
                 behavior: behavior
             )
         )
 
-        #expect(quickTruthState?.mode == "before.quick")
-        #expect(quickTruthState?.personaRules.contains("Keep the interruption short, calm, and non-shaming.") == true)
-        #expect(reminderTruthState?.mode == "before.reminder")
-        #expect(reminderTruthState?.personaRules.contains("Choose from retained reminders only and do not invent new reminders.") == true)
+        #expect(primaryTruthState?.mode == "atlas.primary")
+        #expect(primaryTruthState?.personaRules.contains("Keep the interruption short, calm, and non-shaming.") == true)
+        #expect(selectionTruthState?.mode == "atlas.selection")
+        #expect(selectionTruthState?.personaRules.contains("Choose from retained candidates only and do not invent new ones.") == true)
     }
 
     private func hostOverrideBrainState() -> BASDecisionBrainState {
@@ -115,7 +115,7 @@ struct BASStructuredTruthCoreTests {
             relevantMemories: ["Similar loops calmed down after a pause."],
             sessionBiases: ["Keep it short."],
             retrievalTags: ["pause"],
-            reactionWeights: BASReactionWeights.defaults(forModeName: BASDecisionMode.quick.rawValue),
+            reactionWeights: BASReactionWeights.defaults(forModeName: BASDecisionMode.primary.rawValue),
             loadedAt: .now
         )
     }

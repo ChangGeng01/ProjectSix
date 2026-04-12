@@ -15,7 +15,7 @@ struct BASOrchestrationTests {
             taskKind: .chat,
             routeKind: .local,
             riskLevel: .low,
-            payloadSummary: "quick capture"
+            payloadSummary: "primary capture"
         )
 
         let data = try JSONEncoder().encode(intent)
@@ -98,7 +98,7 @@ struct BASOrchestrationTests {
         #expect(plan.routeKind == .local)
     }
 
-    @Test("workflow checkpoint rewind restores prior node and trims later history")
+    @Test("workflow checkpoint rewind restores prior node and trims later archive")
     func workflowCheckpointRewindRestoresPriorNode() throws {
         var workflow = BASWorkflowState(
             status: .running,
@@ -196,17 +196,17 @@ struct BASOrchestrationTests {
                         priority: 70
                     ),
                     BASContextBlock(
-                        id: "retrieval.history-a",
+                        id: "retrieval.archive-a",
                         layer: .retrieval,
-                        title: "History",
+                        title: "Archive",
                         content: "Last month a similar late-night reply led to regret.",
                         retention: .onDemand,
                         priority: 60
                     ),
                     BASContextBlock(
-                        id: "retrieval.history-b",
+                        id: "retrieval.archive-b",
                         layer: .retrieval,
-                        title: "History",
+                        title: "Archive",
                         content: "Another night you waited until morning and felt relief.",
                         retention: .onDemand,
                         priority: 50
@@ -219,13 +219,13 @@ struct BASOrchestrationTests {
         #expect(plan.retainedBlocks.contains(where: { $0.id == "active.intent" }))
         #expect(plan.retainedSummaryCount >= 1)
         #expect(plan.retainedRetrievalCount == 1)
-        #expect(plan.droppedBlocks.contains(where: { $0.id == "retrieval.history-b" }))
+        #expect(plan.droppedBlocks.contains(where: { $0.id == "retrieval.archive-b" }))
         #expect(plan.usedCharacters >= plan.retainedBlocks.map(\.estimatedCharacters).reduce(0, +))
     }
 
     private func brainState(snapshot: String) -> BASCurrentBrainState {
         BASCurrentBrainState(
-            mode: "quick",
+            mode: "primary",
             dominantGoals: ["stay calm"],
             activeConstraints: ["pause first"],
             reactionWeights: BASReactionWeights(warmth: 0.6, directness: 0.5, brevity: 0.7, actionBias: 0.4),

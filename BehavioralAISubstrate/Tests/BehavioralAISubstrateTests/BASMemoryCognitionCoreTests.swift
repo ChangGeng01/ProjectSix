@@ -6,46 +6,41 @@ import BASRuntimeCore
 
 @Suite("BASMemory Cognition Core")
 struct BASMemoryCognitionCoreTests {
-    @Test("decision modes keep generic identifiers while tolerating legacy aliases")
+    @Test("decision modes keep generic identifiers and leave legacy aliasing to hosts")
     func decisionModesExposeGenericAliases() {
-        #expect(BASDecisionMode.primary == .quick)
-        #expect(BASDecisionMode.comparative == .balance)
-        #expect(BASDecisionMode.reflective == .mirror)
+        #expect(BASDecisionMode.primary == .primary)
+        #expect(BASDecisionMode.comparative == .comparative)
+        #expect(BASDecisionMode.reflective == .reflective)
         #expect(BASDecisionMode.primary.identifier == BASDecisionMode.primaryID)
-        #expect(BASDecisionMode.primary.legacyIdentifier == "quick")
         #expect(BASDecisionMode(identifier: BASDecisionMode.primaryID) == .primary)
-        #expect(BASDecisionMode(identifier: "balance") == .comparative)
-        #expect(BASDecisionMode(identifier: "mirror") == .reflective)
+        #expect(BASDecisionMode(identifier: "balance") == nil)
+        #expect(BASDecisionMode(identifier: "mirror") == nil)
     }
 
-    @Test("adaptive trace kinds and semantic task kinds expose generic identifiers while tolerating legacy aliases")
+    @Test("adaptive trace kinds and semantic task kinds expose generic identifiers while leaving legacy aliasing to hosts")
     func taskKindsExposeGenericAliases() {
-        #expect(BASAdaptiveTraceKind.primary == .quick)
-        #expect(BASAdaptiveTraceKind.comparative == .balance)
-        #expect(BASAdaptiveTraceKind.reflective == .mirror)
+        #expect(BASAdaptiveTraceKind.primary == .primary)
+        #expect(BASAdaptiveTraceKind.comparative == .comparative)
+        #expect(BASAdaptiveTraceKind.reflective == .reflective)
         #expect(BASAdaptiveTraceKind.primary.identifier == BASAdaptiveTraceKind.primaryID)
-        #expect(BASAdaptiveTraceKind.primary.legacyIdentifier == "quick")
-        #expect(BASAdaptiveTraceKind(identifier: BASAdaptiveTraceKind.comparativeID) == .balance)
-        #expect(BASAdaptiveTraceKind(identifier: "mirror") == .reflective)
+        #expect(BASAdaptiveTraceKind(identifier: BASAdaptiveTraceKind.comparativeID) == .comparative)
+        #expect(BASAdaptiveTraceKind(identifier: "mirror") == nil)
         #expect(BASAdaptiveTraceKind.reflective.title == "Reflective")
 
-        #expect(BASSemanticTaskKind.primary == .quick)
-        #expect(BASSemanticTaskKind.comparative == .balance)
-        #expect(BASSemanticTaskKind.reflective == .mirror)
+        #expect(BASSemanticTaskKind.primary == .primary)
+        #expect(BASSemanticTaskKind.comparative == .comparative)
+        #expect(BASSemanticTaskKind.reflective == .reflective)
         #expect(BASSemanticTaskKind.primary.identifier == BASSemanticTaskKind.primaryID)
-        #expect(BASSemanticTaskKind.primary.legacyIdentifier == "quick")
-        #expect(BASSemanticTaskKind(identifier: BASSemanticTaskKind.reflectiveID) == .mirror)
-        #expect(BASSemanticTaskKind(identifier: "balance") == .comparative)
+        #expect(BASSemanticTaskKind(identifier: BASSemanticTaskKind.reflectiveID) == .reflective)
+        #expect(BASSemanticTaskKind(identifier: "balance") == nil)
         #expect(BASSemanticTaskKind.comparative.title == "Comparative")
     }
 
-    @Test("identity roles expose generic identifiers while accepting legacy aliases")
+    @Test("identity roles expose generic identifiers while accepting supported legacy aliases")
     func identityRolesExposeGenericIdentifiers() {
-        #expect(BASIdentityRole.reflectiveWitness == .mirrorWitness)
         #expect(BASIdentityRole.reflectiveWitness.identifier == "reflective_witness")
         #expect(BASIdentityRole.pauseCompanion.identifier == "stability_guide")
-        #expect(BASIdentityRole(identifier: "reflective_witness") == .mirrorWitness)
-        #expect(BASIdentityRole(identifier: "mirror_witness") == .mirrorWitness)
+        #expect(BASIdentityRole(identifier: "reflective_witness") == .reflectiveWitness)
         #expect(BASIdentityRole(identifier: "comparative_guide") == .tradeoffGuide)
     }
 
@@ -66,24 +61,24 @@ struct BASMemoryCognitionCoreTests {
         let daytime = components.date ?? .distantPast
 
         let nightMessageRisk = BASBrainBootstrapAdvisor.inferRiskLevel(
-            mode: .quick,
+            mode: .primary,
             prompt: "I want to publish this right now.",
             now: lateNight
         )
         let dayQuickRisk = BASBrainBootstrapAdvisor.inferRiskLevel(
-            mode: .quick,
+            mode: .primary,
             prompt: "Should I submit this tonight?",
             now: daytime
         )
-        let mirrorRisk = BASBrainBootstrapAdvisor.inferRiskLevel(
-            mode: .mirror,
+        let reflectiveRisk = BASBrainBootstrapAdvisor.inferRiskLevel(
+            mode: .reflective,
             prompt: "Why am I spiraling again?",
             now: daytime
         )
 
         #expect(nightMessageRisk == .high)
         #expect(dayQuickRisk == .low)
-        #expect(mirrorRisk == .medium)
+        #expect(reflectiveRisk == .low)
     }
 
     @Test("brain bootstrap advisor lets hosts override risk heuristics")
@@ -134,13 +129,13 @@ struct BASMemoryCognitionCoreTests {
     func brainBootstrapAdvisorOrdersInterventionsDeterministically() {
         let now = Date(timeIntervalSince1970: 1_744_321_800)
         let templateIDs = BASBrainBootstrapAdvisor.orderedTemplateIDs(
-            mode: .quick,
+            mode: .primary,
             riskLevel: .medium,
             recommendedTemplateIDs: ["tomorrow_box_interrupt", "fallback_template"],
             templates: [
                 BASInterventionTemplateDescriptor(
                     id: "fallback_template",
-                    mode: .quick,
+                    mode: .primary,
                     riskLevel: .medium,
                     isPinned: false,
                     successCount: 9,
@@ -148,7 +143,7 @@ struct BASMemoryCognitionCoreTests {
                 ),
                 BASInterventionTemplateDescriptor(
                     id: "tomorrow_box_interrupt",
-                    mode: .quick,
+                    mode: .primary,
                     riskLevel: .medium,
                     isPinned: true,
                     successCount: 2,
@@ -156,7 +151,7 @@ struct BASMemoryCognitionCoreTests {
                 ),
                 BASInterventionTemplateDescriptor(
                     id: "ignore_me",
-                    mode: .mirror,
+                    mode: .reflective,
                     riskLevel: .medium,
                     isPinned: true,
                     successCount: 50,
@@ -165,25 +160,25 @@ struct BASMemoryCognitionCoreTests {
             ]
         )
         let failureIDs = BASBrainBootstrapAdvisor.orderedFailurePatternIDs(
-            mode: .quick,
+            mode: .primary,
             failurePatterns: [
                 BASFailurePatternDescriptor(
                     id: "night_fast_path_failure",
-                    mode: .quick,
+                    mode: .primary,
                     suppressionWeight: 0.9,
                     evidenceCount: 2,
                     updatedAt: now.addingTimeInterval(-120)
                 ),
                 BASFailurePatternDescriptor(
                     id: "proceed_without_pause_failure",
-                    mode: .quick,
+                    mode: .primary,
                     suppressionWeight: 0.9,
                     evidenceCount: 4,
                     updatedAt: now.addingTimeInterval(-300)
                 ),
                 BASFailurePatternDescriptor(
-                    id: "mirror_only_failure",
-                    mode: .mirror,
+                    id: "reflective_only_failure",
+                    mode: .reflective,
                     suppressionWeight: 1.0,
                     evidenceCount: 8,
                     updatedAt: now
@@ -215,26 +210,26 @@ struct BASMemoryCognitionCoreTests {
     @Test("trust engine lets hosts override which memory sources count as stronger evidence")
     func trustEngineSupportsHostSpecificSourcePriors() {
         let genericProfile = BASMemoryTrustEngine.profile(
-            source: .history,
+            source: .archive,
             evidenceCount: 1,
             decayPolicy: .medium,
             governanceStatus: .pending,
             isPending: false,
-            provenanceSummary: "clean history"
+            provenanceSummary: "clean archive"
         )
         let hostProfile = BASMemoryTrustEngine.profile(
-            source: .history,
+            source: .archive,
             evidenceCount: 1,
             decayPolicy: .medium,
             governanceStatus: .pending,
             isPending: false,
-            provenanceSummary: "clean history",
+            provenanceSummary: "clean archive",
             behavior: BASMemoryTrustBehavior(
                 baseScoresBySourceID: [
-                    BASMemorySource.reminder.rawValue: 0.55,
+                    BASMemorySource.cue.rawValue: 0.55,
                     BASMemorySource.pattern.rawValue: 0.62,
                     BASMemorySource.reflection.rawValue: 0.7,
-                    BASMemorySource.history.rawValue: 0.92
+                    BASMemorySource.archive.rawValue: 0.92
                 ]
             )
         )
@@ -251,7 +246,7 @@ struct BASMemoryCognitionCoreTests {
             role: .relevant,
             kind: .semantic,
             headline: "night drift",
-            source: .history,
+            source: .archive,
             scope: .user,
             sensitivity: .medium,
             confidence: 0.74,
@@ -262,7 +257,7 @@ struct BASMemoryCognitionCoreTests {
             lifecycleState: "pending",
             governanceStatus: .pending,
             isPending: true,
-            provenanceSummary: "clean history",
+            provenanceSummary: "clean archive",
             sourceTrustScore: 0.24,
             sourceTrustTier: .low,
             effectiveConfidence: 0.3,
@@ -271,7 +266,7 @@ struct BASMemoryCognitionCoreTests {
 
         let decision = BASMemoryEligibilityJudge.decide(
             candidate: candidate,
-            mode: .mirror,
+            mode: .reflective,
             queryTags: ["sleep", "cooling", "brief"],
             now: Date(timeIntervalSince1970: 1_700_060_000)
         )
@@ -311,7 +306,7 @@ struct BASMemoryCognitionCoreTests {
             sensitivity: .high,
             tier: .warm,
             confidence: 0.86,
-            sourceType: "history",
+            sourceType: "archive",
             governanceStatus: .governed,
             provenanceSummary: "```failure"
         )
@@ -343,7 +338,7 @@ struct BASMemoryCognitionCoreTests {
             role: .relevant,
             kind: .semantic,
             headline: "avoid long messages at night",
-            source: .history,
+            source: .archive,
             scope: .user,
             sensitivity: .medium,
             confidence: 0.7,
@@ -354,7 +349,7 @@ struct BASMemoryCognitionCoreTests {
             lifecycleState: "candidate",
             governanceStatus: .pending,
             isPending: true,
-            provenanceSummary: "clean history",
+            provenanceSummary: "clean archive",
             sourceTrustScore: 0.28,
             sourceTrustTier: .low,
             effectiveConfidence: 0.35,
@@ -409,7 +404,7 @@ struct BASMemoryCognitionCoreTests {
         )
 
         let request = BASBrainBootstrapRequest(
-            mode: .mirror,
+            mode: .reflective,
             prompt: "Should I send a long reply tonight?",
             source: .reflection,
             sourceSurface: .notification,
@@ -424,7 +419,7 @@ struct BASMemoryCognitionCoreTests {
                 tradeoffClarityBias: 0.42
             ),
             identityProfileOverride: BASIdentityProfile(
-                role: .mirrorWitness,
+                role: .reflectiveWitness,
                 posture: .reflective,
                 initiative: .passive,
                 confidenceCeiling: 0.68,
@@ -468,7 +463,7 @@ struct BASMemoryCognitionCoreTests {
         #expect(brainState.memorySlices.contains(where: { $0.id == pendingTaggedCandidate.id }))
         #expect(!brainState.memorySlices.contains(where: { $0.id == screenedCandidate.id }))
         #expect(bootstrapped.dominantGoal == "prefer concise answers")
-        #expect(brainState.sessionBiases.contains("Name the active limit before reframing."))
+        #expect(brainState.sessionBiases.contains("State the active limit before reframing."))
         #expect(brainState.sessionBiases.contains(where: { $0.localizedCaseInsensitiveContains("lower-fidelity conditions") }))
     }
 
@@ -481,7 +476,7 @@ struct BASMemoryCognitionCoreTests {
             sensitivity: .medium,
             tier: .warm,
             confidence: 0.88,
-            sourceType: "history",
+            sourceType: "archive",
             governanceStatus: .governed,
             provenanceSummary: "support"
         )
@@ -514,9 +509,9 @@ struct BASMemoryCognitionCoreTests {
         )
 
         let request = BASBrainBootstrapRequest(
-            mode: .quick,
+            mode: .primary,
             prompt: "I want to buy this again late at night.",
-            source: .history,
+            source: .archive,
             sourceSurface: .app,
             riskLevel: .low,
             retrievalMode: "filtered",
@@ -567,7 +562,7 @@ struct BASMemoryCognitionCoreTests {
 
         #expect(brainState.reactionWeights.interruptiveActionBias >= 0.85)
         #expect(brainState.reactionWeights.lowCognitiveLoad >= 0.85)
-        #expect(brainState.sessionBiases.contains("Prefer a stabilizing next step before adding more complexity."))
+        #expect(brainState.sessionBiases.contains("Prefer a reversible next step before adding more complexity."))
     }
 
     @Test("brain compiler preserves goal and support memory taxonomy")
@@ -579,7 +574,7 @@ struct BASMemoryCognitionCoreTests {
             sensitivity: .high,
             tier: .hot,
             confidence: 0.93,
-            sourceType: "history",
+            sourceType: "archive",
             governanceStatus: .governed,
             provenanceSummary: "goal"
         )
@@ -590,7 +585,7 @@ struct BASMemoryCognitionCoreTests {
             sensitivity: .medium,
             tier: .warm,
             confidence: 0.88,
-            sourceType: "history",
+            sourceType: "archive",
             governanceStatus: .governed,
             provenanceSummary: "support"
         )
@@ -610,9 +605,9 @@ struct BASMemoryCognitionCoreTests {
         )
 
         let request = BASBrainBootstrapRequest(
-            mode: .quick,
+            mode: .primary,
             prompt: "Should I send this now?",
-            source: .history,
+            source: .archive,
             sourceSurface: .app,
             riskLevel: .medium,
             retrievalMode: "filtered",
@@ -641,7 +636,7 @@ struct BASMemoryCognitionCoreTests {
                     sensitivity: .medium,
                     tier: .warm,
                     confidence: 0.86,
-                    sourceType: "history",
+                    sourceType: "archive",
                     governanceStatus: .governed,
                     provenanceSummary: "support"
                 )
@@ -651,16 +646,16 @@ struct BASMemoryCognitionCoreTests {
         )
 
         let request = BASBrainBootstrapRequest(
-            mode: .quick,
+            mode: .primary,
             prompt: "I want to send this late tonight.",
-            source: .history,
+            source: .archive,
             sourceSurface: .app,
             riskLevel: .medium,
             retrievalMode: "filtered",
             cognitionBehavior: BASCognitionBehavior(
                 sessionBias: BASSessionBiasBehavior(
                     defaultBiasesByModeID: [
-                        BASDecisionMode.quick.identifier: ["Host says slow the impulse before analysis."]
+                        BASDecisionMode.primary.identifier: ["Host says slow the impulse before analysis."]
                     ],
                     briefLanguageSignals: ["concise"],
                     nightBias: "Host says night pressure lowers reliability.",
@@ -716,7 +711,7 @@ struct BASMemoryCognitionCoreTests {
                 sensitivity: .medium,
                 tier: .warm,
                 confidence: 0.86,
-                sourceType: "history",
+                sourceType: "archive",
                 governanceStatus: .governed,
                 provenanceSummary: "support"
             ),
@@ -727,7 +722,7 @@ struct BASMemoryCognitionCoreTests {
                 sensitivity: .medium,
                 tier: .warm,
                 confidence: 0.84,
-                sourceType: "history",
+                sourceType: "archive",
                 governanceStatus: .governed,
                 provenanceSummary: "support"
             )
@@ -735,18 +730,18 @@ struct BASMemoryCognitionCoreTests {
 
         let projection = BASBrainProjection(records: records, candidates: [], recentEvents: [])
         let defaultRequest = BASBrainBootstrapRequest(
-            mode: .quick,
+            mode: .primary,
             prompt: "I am back in the same loop again.",
-            source: .history,
+            source: .archive,
             sourceSurface: .app,
             riskLevel: .medium,
             retrievalMode: "filtered",
             now: Date(timeIntervalSince1970: 1_700_070_000)
         )
         let hostRequest = BASBrainBootstrapRequest(
-            mode: .quick,
+            mode: .primary,
             prompt: "I am back in the same loop again.",
-            source: .history,
+            source: .archive,
             sourceSurface: .app,
             riskLevel: .medium,
             retrievalMode: "filtered",

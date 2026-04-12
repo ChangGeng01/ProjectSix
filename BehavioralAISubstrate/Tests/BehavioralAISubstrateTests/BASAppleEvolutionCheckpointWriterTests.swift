@@ -68,7 +68,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
         let context = ModelContext(container)
         let baseDate = Date(timeIntervalSince1970: 1_744_100_000)
         let stableInput = BASEvolutionCheckpointInput(
-            modeName: "quick",
+            modeName: "primary",
             sourceID: "launch",
             fingerprint: "fingerprint-a",
             identityRole: .pauseCompanion,
@@ -95,10 +95,10 @@ struct BASAppleEvolutionCheckpointWriterTests {
         let drifting: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
-                    modeName: "mirror",
+                    modeName: "reflective",
                     sourceID: "scene_active",
                     fingerprint: "fingerprint-b",
-                    identityRole: .mirrorWitness,
+                    identityRole: .reflectiveWitness,
                     boundaryMode: .localOnlyProtective,
                     calibrationStatus: .drifting
                 ),
@@ -110,7 +110,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
         let later: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
-                    modeName: "quick",
+                    modeName: "primary",
                     sourceID: "session_prime",
                     fingerprint: "fingerprint-c",
                     identityRole: .pauseCompanion,

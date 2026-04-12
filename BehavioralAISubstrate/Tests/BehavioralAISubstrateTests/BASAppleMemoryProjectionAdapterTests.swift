@@ -24,19 +24,19 @@ struct BASAppleMemoryProjectionAdapterTests {
                 ],
                 candidates: [
                     BASProjectionCandidateInput(
-                        id: "situational.quick.latest",
+                        id: "situational.primary.latest",
                         typeID: "situational",
                         headline: "Late-night buy pressure is active.",
                         confidence: 0.81,
                         priority: 0.73,
-                        sourceID: "history",
-                        retrievalTags: ["quick", "buy", "night"],
+                        sourceID: "archive",
+                        retrievalTags: ["primary", "buy", "night"],
                         lastObservedAt: .now,
                         decayPolicyID: "fast",
                         statusID: "pending",
                         governanceDecisionID: "deferred",
                         evidenceCount: 2,
-                        provenanceSummary: "Recent quick checks."
+                        provenanceSummary: "Recent primary checks."
                     )
                 ],
                 events: [
@@ -67,7 +67,7 @@ struct BASAppleMemoryProjectionAdapterTests {
         #expect(projection.recentEvents.count == 1)
         #expect(projection.governanceSnapshot?.totalRecordCount == 4)
         #expect(projection.governanceSnapshot?.pendingCandidateCount == 1)
-        #expect(projection.candidates.first?.retrievalTags == ["quick", "buy", "night"])
+        #expect(projection.candidates.first?.retrievalTags == ["primary", "buy", "night"])
     }
 
     @Test("overlay embedding scores keeps strongest duplicate match")

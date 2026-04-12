@@ -3,17 +3,17 @@ import BASHostKit
 
 enum DecisionIntelligencePromptContract {
     enum Limit {
-        static let quickCurrentPerspective = BASReferencePromptLimits.quickCurrentPerspective
-        static let quickAfterPerspective = BASReferencePromptLimits.quickAfterPerspective
-        static let balanceHeadline = BASReferencePromptLimits.balanceHeadline
-        static let balanceSummary = BASReferencePromptLimits.balanceSummary
-        static let balanceFocusDescription = BASReferencePromptLimits.balanceFocusDescription
-        static let balanceNextAction = BASReferencePromptLimits.balanceNextAction
-        static let mirrorHeadline = BASReferencePromptLimits.mirrorHeadline
-        static let mirrorCoreTension = BASReferencePromptLimits.mirrorCoreTension
-        static let mirrorNextAction = BASReferencePromptLimits.mirrorNextAction
-        static let reminderCandidates = BASReferencePromptLimits.reminderCandidates
-        static let reminderCandidateLength = BASReferencePromptLimits.reminderCandidateLength
+        static let quickCurrentPerspective = BASReferencePromptLimits.primaryCurrentPerspective
+        static let quickAfterPerspective = BASReferencePromptLimits.primaryAfterPerspective
+        static let balanceHeadline = BASReferencePromptLimits.comparativeHeadline
+        static let balanceSummary = BASReferencePromptLimits.comparativeDetailSummary
+        static let balanceFocusDescription = BASReferencePromptLimits.comparativeFocusDescription
+        static let balanceNextAction = BASReferencePromptLimits.comparativeNextAction
+        static let mirrorHeadline = BASReferencePromptLimits.reflectiveHeadline
+        static let mirrorCoreTension = BASReferencePromptLimits.reflectiveCoreTension
+        static let mirrorNextAction = BASReferencePromptLimits.reflectiveNextAction
+        static let reminderCandidates = BASReferencePromptLimits.selectionCandidates
+        static let reminderCandidateLength = BASReferencePromptLimits.selectionCandidateLength
         static let stateField = BASReferencePromptLimits.stateField
         static let statePrompt = BASReferencePromptLimits.statePrompt
         static let evidenceSnippet = BASReferencePromptLimits.evidenceSnippet
@@ -39,8 +39,8 @@ enum DecisionIntelligencePromptContract {
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
     ) -> PromptEnvelope {
-        BASAppleReferencePromptBuilder.quickEnvelope(
-            BASAppleQuickRefinementEnvelopeRequest(
+        BASAppleReferencePromptBuilder.primaryEnvelope(
+            BASApplePrimaryRefinementEnvelopeRequest(
                 modeTitle: DecisionMode.quick.shortTitle,
                 scenarioTitle: input.scenario.title,
                 motivationTitle: input.motivation.title,
@@ -98,7 +98,7 @@ enum DecisionIntelligencePromptContract {
                 },
                 brainState: brainState
             ),
-            behavior: BeforeProductLanguage.referencePromptBehavior
+            behavior: BeforeProductCompatibility.referencePromptBehavior
         )
     }
 
@@ -128,8 +128,8 @@ enum DecisionIntelligencePromptContract {
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
     ) -> PromptEnvelope {
-        BASAppleReferencePromptBuilder.balanceEnvelope(
-            BASAppleBalanceRefinementEnvelopeRequest(
+        BASAppleReferencePromptBuilder.comparativeEnvelope(
+            BASAppleComparativeRefinementEnvelopeRequest(
                 modeTitle: DecisionMode.balance.shortTitle,
                 prompt: input.prompt,
                 desire: input.desire,
@@ -187,7 +187,7 @@ enum DecisionIntelligencePromptContract {
                 },
                 brainState: brainState
             ),
-            behavior: BeforeProductLanguage.referencePromptBehavior
+            behavior: BeforeProductCompatibility.referencePromptBehavior
         )
     }
 
@@ -217,8 +217,8 @@ enum DecisionIntelligencePromptContract {
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil
     ) -> PromptEnvelope {
-        BASAppleReferencePromptBuilder.mirrorEnvelope(
-            BASAppleMirrorRefinementEnvelopeRequest(
+        BASAppleReferencePromptBuilder.reflectiveEnvelope(
+            BASAppleReflectiveRefinementEnvelopeRequest(
                 modeTitle: DecisionMode.mirror.shortTitle,
                 prompt: input.prompt,
                 emotion: input.emotion,
@@ -276,7 +276,7 @@ enum DecisionIntelligencePromptContract {
                 },
                 brainState: brainState
             ),
-            behavior: BeforeProductLanguage.referencePromptBehavior
+            behavior: BeforeProductCompatibility.referencePromptBehavior
         )
     }
 
@@ -304,14 +304,14 @@ enum DecisionIntelligencePromptContract {
         prompt: String,
         mode: DecisionMode?,
         strategy: DecisionAdaptiveTaskStrategy? = nil
-    ) -> BASReferenceReminderSelectionEnvelope<ReminderSelectionCandidate> {
-        BASAppleReferencePromptBuilder.reminderEnvelope(
+    ) -> BASReferenceSelectionEnvelope<ReminderSelectionCandidate> {
+        BASAppleReferencePromptBuilder.selectionEnvelope(
             candidates: candidates,
             candidateText: \.content,
             modeTitle: mode?.shortTitle ?? "Not specified",
             scenarioTitle: scenario.title,
             prompt: prompt,
-            reminderSurfaceModeRawValue: mode?.rawValue,
+            surfaceModeRawValue: mode?.substrateModeID,
             providerIdentifier: strategy?.preferredProvider.rawValue,
             strategy: strategy.map {
                 BASAppleAdaptiveStrategyRawInput(
@@ -332,7 +332,7 @@ enum DecisionIntelligencePromptContract {
                     allowsModelInvocation: $0.allowsModelInvocation
                 )
             },
-            behavior: BeforeProductLanguage.referencePromptBehavior
+            behavior: BeforeProductCompatibility.referencePromptBehavior
         )
     }
 

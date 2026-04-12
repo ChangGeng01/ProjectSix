@@ -48,10 +48,10 @@ enum BehavioralAISubstrateBridge {
                 embeddingScores: embeddingScores(for: prompt),
                 taskGraphHint: taskGraphInput,
                 retrievalMode: retrievalMode.rawValue,
-                bootstrapBehavior: BeforeProductLanguage.hostLifecycleBehavior.currentBrainBootstrapBehavior,
-                reactionWeightSeed: BeforeProductLanguage.reactionWeights(for: mode),
-                identityProfileOverride: BeforeProductLanguage.identityProfile(for: mode),
-                cognitionBehavior: BeforeProductLanguage.hostCognition.substrateBehavior
+                bootstrapBehavior: BeforeProductCompatibility.currentBrainBootstrapBehavior,
+                reactionWeightSeed: BeforeProductCompatibility.reactionWeights(for: mode),
+                identityProfileOverride: BeforeProductCompatibility.identityProfile(for: mode),
+                cognitionBehavior: BeforeProductCompatibility.substrateCognitionBehavior
             ),
             envelope: envelope,
             taskGraph: taskGraph,
@@ -76,14 +76,14 @@ enum BehavioralAISubstrateBridge {
                 now: now,
                 projection: projection.baseProjection,
                 retrievalMode: retrievalMode.rawValue,
-                bootstrapBehavior: BeforeProductLanguage.hostLifecycleBehavior.currentBrainBootstrapBehavior,
-                cognitionBehavior: BeforeProductLanguage.hostCognition.substrateBehavior
+                bootstrapBehavior: BeforeProductCompatibility.currentBrainBootstrapBehavior,
+                cognitionBehavior: BeforeProductCompatibility.substrateCognitionBehavior
             ),
             bootstrapCurrentBrain: { bootstrapInput in
                 var bootstrapInput = bootstrapInput
                 bootstrapInput.embeddingScores = embeddingScores(for: bootstrapInput.prompt)
-                bootstrapInput.reactionWeightSeed = BeforeProductLanguage.reactionWeights(for: mode)
-                bootstrapInput.identityProfileOverride = BeforeProductLanguage.identityProfile(for: mode)
+                bootstrapInput.reactionWeightSeed = BeforeProductCompatibility.reactionWeights(for: mode)
+                bootstrapInput.identityProfileOverride = BeforeProductCompatibility.identityProfile(for: mode)
                 return bootstrapCurrentBrainState(
                     input: bootstrapInput,
                     context: context
@@ -359,16 +359,16 @@ enum BehavioralAISubstrateBridge {
                 taskGraphHint: taskGraphInput(from: taskGraph),
                 retrievalModesByModeID: retrievalModesByModeID,
                 triggerID: source.rawValue,
-                lifecycleBehavior: BeforeProductLanguage.hostLifecycleBehavior.bootstrapBehavior,
-                bootstrapBehavior: BeforeProductLanguage.hostLifecycleBehavior.currentBrainBootstrapBehavior,
-                cognitionBehavior: BeforeProductLanguage.hostCognition.substrateBehavior
+                lifecycleBehavior: BeforeProductCompatibility.lifecycleBootstrapBehavior,
+                bootstrapBehavior: BeforeProductCompatibility.currentBrainBootstrapBehavior,
+                cognitionBehavior: BeforeProductCompatibility.substrateCognitionBehavior
             ),
             bootstrapCurrentBrain: { bootstrapInput in
                 var bootstrapInput = bootstrapInput
                 bootstrapInput.embeddingScores = embeddingScores(for: bootstrapInput.prompt)
                 if let mode = DecisionMode.fromSubstrateModeID(bootstrapInput.modeID) {
-                    bootstrapInput.reactionWeightSeed = BeforeProductLanguage.reactionWeights(for: mode)
-                    bootstrapInput.identityProfileOverride = BeforeProductLanguage.identityProfile(for: mode)
+                    bootstrapInput.reactionWeightSeed = BeforeProductCompatibility.reactionWeights(for: mode)
+                    bootstrapInput.identityProfileOverride = BeforeProductCompatibility.identityProfile(for: mode)
                 }
                 return bootstrapCurrentBrainState(
                     input: bootstrapInput,
@@ -487,9 +487,29 @@ enum BehavioralAISubstrateBridge {
         taskGraph: DecisionTaskGraphSnapshot? = nil,
         context: ModelContext
     ) -> CurrentBrainState {
-        let mode = DecisionMode.fromSubstrateModeID(input.modeID) ?? .quick
+        let normalizedInput = BASAppleCurrentBrainBootstrapBridgeInput(
+            modeID: BeforeProductCompatibility.substrateModeID(rawValue: input.modeID),
+            prompt: input.prompt,
+            triggerID: BeforeLegacyMigration.normalizedBrainStateUpdateSourceIdentifier(input.triggerID),
+            sourceSurfaceOverrideID: input.sourceSurfaceOverrideID,
+            riskLevelOverrideID: input.riskLevelOverrideID,
+            preferredLanguages: input.preferredLanguages,
+            now: input.now,
+            projection: input.projection,
+            embeddingScores: input.embeddingScores,
+            taskGraphHeadline: input.taskGraphHeadline,
+            taskGraphActiveNodeCount: input.taskGraphActiveNodeCount,
+            taskGraphHasResumeCandidate: input.taskGraphHasResumeCandidate,
+            taskGraphResumeHint: input.taskGraphResumeHint,
+            retrievalMode: input.retrievalMode,
+            bootstrapBehavior: input.bootstrapBehavior,
+            reactionWeightSeed: input.reactionWeightSeed,
+            identityProfileOverride: input.identityProfileOverride,
+            cognitionBehavior: input.cognitionBehavior
+        )
+        let mode = DecisionMode.fromSubstrateModeID(normalizedInput.modeID) ?? .quick
         let runtimeInput = BASAppleCurrentBrainHostLifecycleRuntimeInput(
-            bootstrapInput: input,
+            bootstrapInput: normalizedInput,
             checkpointLimit: BeforePolicy.RuntimeState.evolutionCheckpointLimit,
             checkpointRetentionInterval: BeforePolicy.RuntimeState.evolutionCheckpointRetentionInterval
         )
@@ -498,42 +518,77 @@ enum BehavioralAISubstrateBridge {
             FailurePatternRecord
         > = currentBrainHostSupport(mode: mode, context: context)
 
-        return BASAppleCurrentBrainHostSupportRuntimeExecutor.bootstrapAndBuildCurrentBrain(
-            input: runtimeInput,
-            in: context,
-            support: support,
-            onCheckpointSaveError: { error in
-                PersistenceIssueRecorder.record(
-                    error: error,
-                    operation: "recording evolution checkpoints"
-                )
-            },
-            onUpdateSaveError: { error in
-                PersistenceIssueRecorder.record(
-                    error: error,
-                    operation: "persisting current brain updates"
-                )
-            },
-            buildCurrentBrain: { (committed: BASAppleCurrentBrainLifecycleResult<
-                BrainStateUpdate,
-                DecisionEvolutionCheckpoint
-            >) in
-                CurrentBrainState(
-                    source: BrainStateUpdateSource(rawValue: committed.triggerID) ?? .explicitRefresh,
-                    sourceSurface: DecisionIntentSourceSurface(rawValue: committed.sourceSurfaceID) ?? .app,
-                    mode: DecisionMode.fromSubstrateModeID(committed.modeID) ?? .quick,
-                    riskLevel: InterventionRiskLevel(rawValue: committed.riskLevelID) ?? .low,
-                    taskGraph: taskGraph,
-                    brainState: committed.brainState,
-                    dominantGoal: committed.dominantGoal,
-                    activeConstraints: committed.activeConstraints,
-                    activeTemplateIDs: committed.activeTemplateIDs,
-                    failureGuardIDs: committed.failureGuardIDs,
-                    sourceIntentEnvelope: envelope,
-                    loadedAt: committed.loadedAt
-                )
-            }
-        )
+        do {
+            return try BASAppleCurrentBrainHostSupportRuntimeExecutor.bootstrapAndBuildCurrentBrain(
+                input: runtimeInput,
+                in: context,
+                support: support,
+                onCheckpointSaveError: { error in
+                    PersistenceIssueRecorder.record(
+                        error: error,
+                        operation: "recording evolution checkpoints"
+                    )
+                },
+                onUpdateSaveError: { error in
+                    PersistenceIssueRecorder.record(
+                        error: error,
+                        operation: "persisting current brain updates"
+                    )
+                },
+                buildCurrentBrain: { (committed: BASAppleCurrentBrainLifecycleResult<
+                    BrainStateUpdate,
+                    DecisionEvolutionCheckpoint
+                >) in
+                    CurrentBrainState(
+                        source: BrainStateUpdateSource(identifier: committed.triggerID) ?? .explicitRefresh,
+                        sourceSurface: DecisionIntentSourceSurface(rawValue: committed.sourceSurfaceID) ?? .app,
+                        mode: DecisionMode.fromSubstrateModeID(committed.modeID) ?? .quick,
+                        riskLevel: InterventionRiskLevel(rawValue: committed.riskLevelID) ?? .low,
+                        taskGraph: taskGraph,
+                        brainState: committed.brainState,
+                        dominantGoal: committed.dominantGoal,
+                        activeConstraints: committed.activeConstraints,
+                        activeTemplateIDs: committed.activeTemplateIDs,
+                        failureGuardIDs: committed.failureGuardIDs,
+                        sourceIntentEnvelope: envelope,
+                        loadedAt: committed.loadedAt
+                    )
+                }
+            )
+        } catch {
+            PersistenceIssueRecorder.record(
+                error: error,
+                operation: "bootstrapping current brain state"
+            )
+            let trimmedPrompt = normalizedInput.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            let fallbackBrainState = DecisionBrainState(
+                profileCore: [],
+                activeGoals: trimmedPrompt.isEmpty ? [] : [trimmedPrompt],
+                relevantMemories: normalizedInput.projection.records.prefix(3).map(\.content),
+                sessionBiases: ["host-bootstrap-fallback", "retrieval:\(normalizedInput.retrievalMode)"],
+                retrievalTags: ["fallback", "retrieval:\(normalizedInput.retrievalMode)"],
+                reactionWeights: BeforeProductCompatibility.reactionWeights(for: mode),
+                identityProfile: BeforeProductCompatibility.identityProfile(for: mode),
+                boundaryPolicy: .default(
+                    riskLevel: InterventionRiskLevel(rawValue: normalizedInput.riskLevelOverrideID ?? "") ?? .low
+                ),
+                loadedAt: normalizedInput.now
+            )
+            return CurrentBrainState(
+                source: BrainStateUpdateSource(identifier: normalizedInput.triggerID) ?? .explicitRefresh,
+                sourceSurface: DecisionIntentSourceSurface(rawValue: normalizedInput.sourceSurfaceOverrideID ?? "") ?? .app,
+                mode: mode,
+                riskLevel: InterventionRiskLevel(rawValue: normalizedInput.riskLevelOverrideID ?? "") ?? .low,
+                taskGraph: taskGraph,
+                brainState: fallbackBrainState,
+                dominantGoal: fallbackBrainState.activeGoals.first,
+                activeConstraints: Array(orderedUnique(fallbackBrainState.sessionBiases).prefix(4)),
+                activeTemplateIDs: [],
+                failureGuardIDs: [],
+                sourceIntentEnvelope: envelope,
+                loadedAt: normalizedInput.now
+            )
+        }
     }
 
     private static func currentBrainHostSupport(
@@ -814,8 +869,9 @@ enum BehavioralAISubstrateBridge {
     }
 
     static func entryIntentEnvelope(from envelope: DecisionIntentEnvelope) -> BASEntryIntentEnvelope {
-        BASEntryIntentBridgeBuilder.envelope(
-            kindID: envelope.kind.rawValue,
+        let kindID = BeforeProductCompatibility.substrateEntryIntentKindID(envelope.kind)
+        return BASEntryIntentBridgeBuilder.envelope(
+            kindID: kindID,
             surfaceID: envelope.sourceSurface.rawValue,
             preferredWorkflowID: envelope.preferredMode?.substrateModeID,
             promptSeed: envelope.promptSeed,
@@ -828,8 +884,9 @@ enum BehavioralAISubstrateBridge {
     }
 
     static func entryIntentSummary(from envelope: DecisionIntentEnvelope) -> BASEntryIntentSummary {
-        BASEntryIntentBridgeBuilder.summary(
-            kindID: envelope.kind.rawValue,
+        let kindID = BeforeProductCompatibility.substrateEntryIntentKindID(envelope.kind)
+        return BASEntryIntentBridgeBuilder.summary(
+            kindID: kindID,
             surfaceID: envelope.sourceSurface.rawValue,
             preferredWorkflowID: envelope.preferredMode?.substrateModeID,
             promptSeed: envelope.promptSeed,
@@ -842,12 +899,13 @@ enum BehavioralAISubstrateBridge {
     }
 
     static func handoffSummary(from envelope: DecisionIntentEnvelope) -> BASAppleHandoffSummary {
-        BASAppleHandoffBridgeBuilder.summary(
+        let kindID = BeforeProductCompatibility.substrateEntryIntentKindID(envelope.kind)
+        return BASAppleHandoffBridgeBuilder.summary(
             id: envelope.id,
             surfaceID: envelope.sourceSurface.rawValue,
             preferredWorkflowID: envelope.preferredMode?.substrateModeID,
             riskLevelID: envelope.riskLevel?.rawValue,
-            payloadSummary: envelope.promptSeed ?? envelope.triggerReason ?? envelope.kind.rawValue,
+            payloadSummary: envelope.promptSeed ?? envelope.triggerReason ?? kindID,
             createdAt: envelope.requestedAt,
             route: nil
         )
@@ -936,7 +994,7 @@ enum BehavioralAISubstrateBridge {
             refreshMemoryProjection: refreshMemoryProjection,
             refreshCurrentBrain: { source in
                 refreshCurrentBrain(
-                    BrainStateUpdateSource(rawValue: source) ?? .explicitRefresh
+                    BrainStateUpdateSource(identifier: source) ?? .explicitRefresh
                 )
             },
             presentPendingReflection: presentPendingReflection,
@@ -1000,9 +1058,10 @@ enum BehavioralAISubstrateBridge {
         performRestore: () -> Void,
         refreshCurrentBrain: (BrainStateUpdateSource) -> Void
     ) {
+        let kindID = BeforeProductCompatibility.substrateEntryIntentKindID(envelope.kind)
         BASAppleEntryIntentRuntimeExecutor.execute(
             input: BASAppleEntryIntentRuntimeInput(
-                kindID: envelope.kind.rawValue,
+                kindID: kindID,
                 surfaceID: envelope.sourceSurface.rawValue,
                 preferredModeID: envelope.preferredMode?.substrateModeID,
                 scenarioID: envelope.scenario?.rawValue,
@@ -1010,9 +1069,9 @@ enum BehavioralAISubstrateBridge {
                 riskLevelID: envelope.riskLevel?.rawValue,
                 triggerReason: envelope.triggerReason,
                 predictiveInterventionPresentation: BASAppleEntryIntentSuggestionPresentation(
-                    fallbackTitle: BeforeProductLanguage.hostPresentation.predictiveIntervention.mediumRiskTitle,
-                    fallbackDetail: BeforeProductLanguage.hostPresentation.predictiveIntervention.mediumRiskDetail,
-                    fallbackReason: BeforeProductLanguage.hostPresentation.predictiveIntervention.defaultReason
+                    fallbackTitle: BeforeProductCompatibility.predictiveInterventionPresentation.mediumRiskTitle,
+                    fallbackDetail: BeforeProductCompatibility.predictiveInterventionPresentation.mediumRiskDetail,
+                    fallbackReason: BeforeProductCompatibility.predictiveInterventionPresentation.defaultReason
                 ),
                 expiresAt: envelope.expiresAt
             ),
@@ -1035,7 +1094,7 @@ enum BehavioralAISubstrateBridge {
             performRestore: performRestore,
             refreshCurrentBrain: { triggerID in
                 refreshCurrentBrain(
-                    BrainStateUpdateSource(rawValue: triggerID) ?? .explicitRefresh
+                    BrainStateUpdateSource(identifier: triggerID) ?? .explicitRefresh
                 )
             }
         )
@@ -1610,7 +1669,7 @@ enum BehavioralAISubstrateBridge {
         for mode: DecisionMode,
         preferences: BeforePreferences
     ) -> DecisionRetrievalMode {
-        let traceKind = DecisionIntelligenceTraceKind(rawValue: mode.rawValue) ?? .quick
+        let traceKind = DecisionIntelligenceTraceKind(substrateKindID: mode.substrateModeID) ?? .quick
         return DecisionIntelligenceCoordinator
             .executionProfile(preferences: preferences)
             .strategy(for: traceKind)

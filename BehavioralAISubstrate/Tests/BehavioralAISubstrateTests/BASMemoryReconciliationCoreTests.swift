@@ -17,7 +17,7 @@ struct BASMemoryReconciliationCoreTests {
                         value: "Sleep before midnight",
                         confidence: 0.52,
                         priority: 0.78,
-                        source: .history,
+                        source: .archive,
                         lastConfirmedAt: Date(timeIntervalSince1970: 1_744_156_800),
                         decayPolicy: .medium,
                         retrievalTags: ["goal", "sleep"],
@@ -49,7 +49,7 @@ struct BASMemoryReconciliationCoreTests {
         #expect(record.observationCount == 1)
     }
 
-    @Test("reconciler retires reflection memory before reminder memory at the same age")
+    @Test("reconciler retires reflection memory before cue memory at the same age")
     func reconcilerRetiresReflectionMemoryBeforeReminderMemory() {
         let reviewNow = Date(timeIntervalSince1970: 1_744_156_800)
         let oldDate = Date(timeIntervalSince1970: 1_739_836_800)
@@ -64,13 +64,13 @@ struct BASMemoryReconciliationCoreTests {
                     value: "sleep",
                     confidence: 0.86,
                     priority: 0.84,
-                    source: .reminder,
+                    source: .cue,
                     lastConfirmedAt: oldDate,
                     decayPolicy: .medium,
                     retrievalTags: ["sleep", "goal"],
                     evidenceCount: 3,
                     observationCount: 3,
-                    provenanceSummary: "Repeated reminder completions confirmed this goal.",
+                    provenanceSummary: "Repeated cue completions confirmed this goal.",
                     lifecycleState: .active,
                     lastReviewedAt: oldDate,
                     tierID: "warm"
@@ -100,10 +100,10 @@ struct BASMemoryReconciliationCoreTests {
         )
 
         let plan = BASMemoryReconciler.plan(request)
-        let reminderPlan = try! #require(plan.recordPlans.first(where: { $0.id == "goal.sleep.buffer" }))
+        let cuePlan = try! #require(plan.recordPlans.first(where: { $0.id == "goal.sleep.buffer" }))
         let reflectionPlan = try! #require(plan.recordPlans.first(where: { $0.id == "support.late_night.reflective" }))
 
-        #expect(reminderPlan.snapshot?.lifecycleState != .retired)
+        #expect(cuePlan.snapshot?.lifecycleState != .retired)
         #expect(reflectionPlan.snapshot?.lifecycleState == .retired)
     }
 
@@ -119,10 +119,10 @@ struct BASMemoryReconciliationCoreTests {
                 value: "Decide Tomorrow",
                 confidence: 0.72,
                 priority: 0.79,
-                source: .history,
+                source: .archive,
                 lastConfirmedAt: reviewNow,
                 decayPolicy: .medium,
-                retrievalTags: ["support", "tomorrow", "delay", "loop_break", "quick", "decideTomorrow"],
+                retrievalTags: ["support", "tomorrow", "delay", "loop_break", "primary", "decideTomorrow"],
                 evidenceCount: 2,
                 provenanceSummary: "Derived from repeated successful primary-loop final actions.",
                 promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 2),
@@ -174,10 +174,10 @@ struct BASMemoryReconciliationCoreTests {
             value: "Decide Tomorrow",
             confidence: 0.72,
             priority: 0.79,
-            source: .history,
+            source: .archive,
             lastConfirmedAt: reviewNow,
             decayPolicy: .medium,
-            retrievalTags: ["decidetomorrow", "delay", "loop_break", "quick", "support", "tomorrow"],
+            retrievalTags: ["decidetomorrow", "delay", "loop_break", "primary", "support", "tomorrow"],
             evidenceCount: 3,
             observationCount: 1,
             provenanceSummary: "Derived from repeated successful primary-loop final actions.",
@@ -193,11 +193,11 @@ struct BASMemoryReconciliationCoreTests {
             value: "Decide Tomorrow",
             confidence: 0.72,
             priority: 0.79,
-            source: .history,
+            source: .archive,
             firstObservedAt: reviewNow,
             lastObservedAt: reviewNow,
             decayPolicy: .medium,
-            retrievalTags: ["decidetomorrow", "delay", "loop_break", "quick", "support", "tomorrow"],
+            retrievalTags: ["decidetomorrow", "delay", "loop_break", "primary", "support", "tomorrow"],
             evidenceCount: 3,
             confirmationCount: 1,
             lastObservationFingerprint: "support.action.decideTomorrow::stable",
@@ -217,10 +217,10 @@ struct BASMemoryReconciliationCoreTests {
                 value: "Decide Tomorrow",
                 confidence: 0.72,
                 priority: 0.79,
-                source: .history,
+                source: .archive,
                 lastConfirmedAt: reviewNow,
                 decayPolicy: .medium,
-                retrievalTags: ["support", "tomorrow", "delay", "loop_break", "quick", "decideTomorrow"],
+                retrievalTags: ["support", "tomorrow", "delay", "loop_break", "primary", "decideTomorrow"],
                 evidenceCount: 3,
                 provenanceSummary: "Derived from repeated successful primary-loop final actions.",
                 promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 2),
@@ -246,23 +246,23 @@ struct BASMemoryReconciliationCoreTests {
     func reconcilerUsesHostMemoryTrustBehavior() {
         let draft = BASMemoryReconciliationDraftInput(
             draft: BASMemoryGovernanceDraftInput(
-                id: "semantic.history.publish",
+                id: "semantic.archive.publish",
                 typeID: "semantic",
                 topic: "publish_pattern",
                 headline: "Publishing cadence matters here.",
                 value: "publish cadence",
                 confidence: 0.74,
                 priority: 0.8,
-                source: .history,
+                source: .archive,
                 lastConfirmedAt: Date(timeIntervalSince1970: 1_744_156_800),
                 decayPolicy: .medium,
                 retrievalTags: ["publish", "cadence"],
                 evidenceCount: 1,
-                provenanceSummary: "Structured host history confirms this pattern.",
+                provenanceSummary: "Structured host archive confirms this pattern.",
                 promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 2),
                 tierID: "warm"
             ),
-            fingerprint: "semantic.history.publish::v1"
+            fingerprint: "semantic.archive.publish::v1"
         )
 
         let genericPlan = BASMemoryReconciler.plan(
@@ -281,10 +281,10 @@ struct BASMemoryReconciliationCoreTests {
                 reviewNow: Date(timeIntervalSince1970: 1_744_156_800),
                 memoryTrustBehavior: BASMemoryTrustBehavior(
                     baseScoresBySourceID: [
-                        BASMemorySource.reminder.rawValue: 0.55,
+                        BASMemorySource.cue.rawValue: 0.55,
                         BASMemorySource.pattern.rawValue: 0.62,
                         BASMemorySource.reflection.rawValue: 0.7,
-                        BASMemorySource.history.rawValue: 0.92
+                        BASMemorySource.archive.rawValue: 0.92
                     ]
                 )
             )

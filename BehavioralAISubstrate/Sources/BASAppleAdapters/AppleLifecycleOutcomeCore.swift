@@ -194,11 +194,11 @@ public enum BASAppleWorkspaceRestoreExecutor {
         }
 
         switch resolvedMode {
-        case .quick:
+        case .primary:
             restorePrimary(state)
-        case .balance:
+        case .comparative:
             restoreComparative(state)
-        case .mirror:
+        case .reflective:
             restoreReflective(state)
         case nil:
             return

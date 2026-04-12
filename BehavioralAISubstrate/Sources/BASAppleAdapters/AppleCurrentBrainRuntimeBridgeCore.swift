@@ -25,9 +25,9 @@ public struct BASAppleCurrentBrainSessionBridgeInput: Codable, Equatable, Sendab
         projection: BASBrainProjection,
         taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput? = nil,
         retrievalMode: String,
-        triggerID: String = BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue,
-        bootstrapBehavior: BASCurrentBrainBootstrapBehavior = .generic,
-        cognitionBehavior: BASCognitionBehavior = .generic
+        triggerID: String = BASCurrentBrainBootstrapTrigger.sessionBootstrapID,
+        bootstrapBehavior: BASCurrentBrainBootstrapBehavior,
+        cognitionBehavior: BASCognitionBehavior
     ) {
         self.modeID = modeID
         self.promptFragments = promptFragments
@@ -74,9 +74,9 @@ public struct BASAppleCurrentBrainActiveRefreshBridgeInput: Codable, Equatable, 
         taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput? = nil,
         retrievalModesByModeID: [String: String],
         triggerID: String = BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue,
-        lifecycleBehavior: BASAppleLifecycleBootstrapBehavior = .generic,
-        bootstrapBehavior: BASCurrentBrainBootstrapBehavior = .generic,
-        cognitionBehavior: BASCognitionBehavior = .generic
+        lifecycleBehavior: BASAppleLifecycleBootstrapBehavior,
+        bootstrapBehavior: BASCurrentBrainBootstrapBehavior,
+        cognitionBehavior: BASCognitionBehavior
     ) {
         self.promptFragmentsByModeID = promptFragmentsByModeID
         self.modePriority = modePriority
@@ -100,7 +100,7 @@ public enum BASAppleCurrentBrainRuntimeBridgeBuilder {
     public static func sessionBootstrapInput(
         from input: BASAppleCurrentBrainSessionBridgeInput
     ) -> BASAppleCurrentBrainBootstrapBridgeInput {
-        let runtimePlan = BASAppleCurrentBrainRuntimePlanner.sessionPrimePlan(
+        let runtimePlan = BASAppleCurrentBrainRuntimePlanner.sessionBootstrapPlan(
             modeID: input.modeID,
             promptFragments: input.promptFragments,
             retrievalMode: input.retrievalMode,

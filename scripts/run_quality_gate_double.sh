@@ -8,14 +8,14 @@ SIMULATOR_OS="${SIMULATOR_OS:-26.3.1}"
 WATCH_SIMULATOR_NAME="${WATCH_SIMULATOR_NAME:-Apple Watch Series 11 (46mm)}"
 WATCH_SIMULATOR_OS="${WATCH_SIMULATOR_OS:-26.2}"
 DESTINATION="platform=iOS Simulator,name=${SIMULATOR_NAME},OS=${SIMULATOR_OS}"
-WATCH_DESTINATION="platform=watchOS Simulator,name=${WATCH_SIMULATOR_NAME},OS=${WATCH_SIMULATOR_OS}"
+WATCH_DESTINATION="${WATCH_DESTINATION:-generic/platform=watchOS Simulator}"
 DERIVED_DATA_ROOT="/tmp/before-quality-gate-double"
 IOS_DERIVED_DATA="$DERIVED_DATA_ROOT/ios"
 UI_DERIVED_DATA="$DERIVED_DATA_ROOT/ui"
 WATCH_DERIVED_DATA="$DERIVED_DATA_ROOT/watch"
 
 typeset -i score=0
-typeset -i total=40
+typeset -i total=41
 
 rm -rf "$DERIVED_DATA_ROOT"
 
@@ -148,6 +148,9 @@ run_step "Project metadata listing pass #1" \
 
 run_step "Project metadata listing pass #2" \
   xcodebuild -project "$PROJECT" -list
+
+run_step "SDK boundary and residual checks" \
+  "$ROOT/scripts/check_sdk_import_boundaries.sh"
 
 run_step "BeforeWatch build pass #1" \
   run_watch_build

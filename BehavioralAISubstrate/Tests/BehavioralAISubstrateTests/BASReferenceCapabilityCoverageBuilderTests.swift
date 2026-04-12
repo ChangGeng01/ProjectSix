@@ -64,44 +64,44 @@ struct BASReferenceCapabilityCoverageBuilderTests {
     ) -> BASRuntimeInspectionSummary {
         let telemetrySummary = BASTelemetrySummary(
             input: BASTelemetrySummaryInput(
-                requestCountByKind: ["quick": 1],
+                requestCountByKind: ["primary": 1],
                 outcomeCount: [.providerSuccess: 1],
-                outcomeCountByKind: [.providerSuccess: ["quick": 1]],
+                outcomeCountByKind: [.providerSuccess: ["primary": 1]],
                 activeProviderCount: [activeProviderID: 1],
                 attemptedProviderCount: [activeProviderID: 1],
                 fallbackActivations: 0,
                 backendCount: ["coreML": 1],
                 slowRequestCountByKind: [:],
                 overTimeBudgetCountByKind: [:],
-                requestDurationTotalMsByKind: ["quick": 180],
-                firstPresentableTotalMsByKind: ["quick": 120],
-                promptAssemblyTotalMsByKind: ["quick": 25],
-                admissionEvaluationTotalMsByKind: ["quick": 12],
-                providerSelectionTotalMsByKind: ["quick": 8],
-                executionTotalMsByKind: ["quick": 90],
+                requestDurationTotalMsByKind: ["primary": 180],
+                firstPresentableTotalMsByKind: ["primary": 120],
+                promptAssemblyTotalMsByKind: ["primary": 25],
+                admissionEvaluationTotalMsByKind: ["primary": 12],
+                providerSelectionTotalMsByKind: ["primary": 8],
+                executionTotalMsByKind: ["primary": 90],
                 activeProviderDurationTotalMs: [activeProviderID: 180],
                 backendDurationTotalMs: ["coreML": 180],
                 admissionSkipCountByReason: [:],
                 admissionSkipCountByReasonAndKind: [:],
-                reminderSelectionNeedCount: [:],
-                promptCharactersTotalByKind: ["quick": 320],
-                prefixCharactersTotalByKind: ["quick": 120],
-                immutablePrefixCharactersTotalByKind: ["quick": 80],
-                adaptivePrefixCharactersTotalByKind: ["quick": 40],
-                suffixCharactersTotalByKind: ["quick": 200],
+                selectionNeedCount: [:],
+                promptCharactersTotalByKind: ["primary": 320],
+                prefixCharactersTotalByKind: ["primary": 120],
+                immutablePrefixCharactersTotalByKind: ["primary": 80],
+                adaptivePrefixCharactersTotalByKind: ["primary": 40],
+                suffixCharactersTotalByKind: ["primary": 200],
                 overTargetBudgetCountByKind: [:],
                 lowPressureModelCallCountByKind: [:],
-                reminderKindRawValue: "reminder",
-                reminderKnowledgeNeedRawValue: "needs_knowledge",
-                reminderControlNeedRawValue: "control_only",
-                reminderRetrievalBypassReasonRawValues: ["control_only", "no_relevant_evidence", "budget_exceeded"],
+                selectionKindRawValue: "selection",
+                selectionKnowledgeNeedRawValue: "needs_knowledge",
+                selectionControlNeedRawValue: "control_only",
+                selectionRetrievalBypassReasonRawValues: ["control_only", "no_relevant_evidence", "budget_exceeded"],
                 avoidableSkipReasonRawValues: ["template_pinned", "admission_skipped"]
             )
         )
         let lifecycleSummary = BASLifecycleSummaryBuilder.build(
             from: [
                 BASLifecycleTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     hasContextState: true,
                     generation: 2,
                     rebuiltSession: false,
@@ -119,7 +119,7 @@ struct BASReferenceCapabilityCoverageBuilderTests {
         let neuralSummary = BASNeuralSummaryBuilder.build(
             from: [
                 BASNeuralTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     suppressedBehaviorCount: 1,
                     dominantActionRawValue: "pause",
                     strongestSignalRawValue: "urgency"
@@ -136,17 +136,17 @@ struct BASReferenceCapabilityCoverageBuilderTests {
                 environmentClass: .normal,
                 deviceClass: .fullPhone,
                 languageMode: .english,
-                taskEntropyByKind: ["quick": .low],
-                preferredProviderRawValueByKind: ["quick": activeProviderID],
-                strategyByKind: ["quick": quickStrategy(providerAllowed: activeProviderID != "template")],
-                effectivePreferredProviderRawValueByKind: ["quick": activeProviderID],
+                taskEntropyByKind: ["primary": .low],
+                preferredProviderRawValueByKind: ["primary": activeProviderID],
+                strategyByKind: ["primary": primaryStrategy(providerAllowed: activeProviderID != "template")],
+                effectivePreferredProviderRawValueByKind: ["primary": activeProviderID],
                 traceInputs: [
                     BASRuntimeInspectionTraceInput(
-                        kind: "quick",
+                        kind: "primary",
                         attemptedProviderIDs: [activeProviderID],
-                        runtimeStrategy: quickStrategy(providerAllowed: activeProviderID != "template"),
-                        semanticPromptFingerprint: "semantic-quick",
-                        stablePrefixFingerprint: "prefix-quick",
+                        runtimeStrategy: primaryStrategy(providerAllowed: activeProviderID != "template"),
+                        semanticPromptFingerprint: "semantic-primary",
+                        stablePrefixFingerprint: "prefix-primary",
                         consistencyChecked: consistencyChecked,
                         consistencyRejected: false,
                         consistencyViolationKinds: []
@@ -180,7 +180,7 @@ struct BASReferenceCapabilityCoverageBuilderTests {
         BASBrainSummaryBuilder.build(
             from: brainTraceCount == 0 ? [] : [
                 BASBrainTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     dominantReactionWeight: .briefLanguage,
                     profileCoreCount: 1,
                     activeGoalCount: 1,
@@ -208,9 +208,9 @@ struct BASReferenceCapabilityCoverageBuilderTests {
         )
     }
 
-    private func quickStrategy(providerAllowed: Bool) -> BASAdaptiveTaskStrategy {
+    private func primaryStrategy(providerAllowed: Bool) -> BASAdaptiveTaskStrategy {
         BASAdaptiveTaskStrategy(
-            kind: .quick,
+            kind: .primary,
             entropy: .low,
             runtimeGear: .balanced,
             contextBudget: 320,

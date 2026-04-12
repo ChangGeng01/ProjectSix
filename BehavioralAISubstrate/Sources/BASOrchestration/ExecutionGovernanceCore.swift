@@ -13,19 +13,19 @@ public enum BASPromptPressure: String, Codable, CaseIterable, Sendable {
 public enum BASAdmissionSkipReason: String, Codable, CaseIterable, Sendable {
     case budgetExceeded
     case prefillPressureTooHigh
-    case insufficientReminderChoice
+    case insufficientChoiceSpread
     case retrievalNotNeeded
     case templateAlreadySufficient
     case insufficientSourceMaterial
 }
 
-public enum BASReminderSelectionNeed: String, Codable, CaseIterable, Sendable {
+public enum BASSelectionNeed: String, Codable, CaseIterable, Sendable {
     case control
     case knowledge
 }
 
-public struct BASReminderSelectionAssessment: Codable, Equatable, Sendable {
-    public var need: BASReminderSelectionNeed
+public struct BASSelectionAssessment: Codable, Equatable, Sendable {
+    public var need: BASSelectionNeed
     public var reason: String
     public var promptTokenCount: Int
     public var topCandidateScore: Int
@@ -33,7 +33,7 @@ public struct BASReminderSelectionAssessment: Codable, Equatable, Sendable {
     public var distinctCandidateCount: Int
 
     public init(
-        need: BASReminderSelectionNeed,
+        need: BASSelectionNeed,
         reason: String,
         promptTokenCount: Int,
         topCandidateScore: Int,
@@ -117,21 +117,21 @@ public struct BASAdmissionRequest: Codable, Equatable, Sendable {
     public var kind: BASAdaptiveTraceKind
     public var budget: BASPromptBudgetSnapshot
     public var frontstageState: BASFrontstageSignalSummary
-    public var reminderCandidateCount: Int?
-    public var reminderSelectionAssessment: BASReminderSelectionAssessment?
+    public var selectionCandidateCount: Int?
+    public var selectionAssessment: BASSelectionAssessment?
 
     public init(
         kind: BASAdaptiveTraceKind,
         budget: BASPromptBudgetSnapshot,
         frontstageState: BASFrontstageSignalSummary,
-        reminderCandidateCount: Int? = nil,
-        reminderSelectionAssessment: BASReminderSelectionAssessment? = nil
+        selectionCandidateCount: Int? = nil,
+        selectionAssessment: BASSelectionAssessment? = nil
     ) {
         self.kind = kind
         self.budget = budget
         self.frontstageState = frontstageState
-        self.reminderCandidateCount = reminderCandidateCount
-        self.reminderSelectionAssessment = reminderSelectionAssessment
+        self.selectionCandidateCount = selectionCandidateCount
+        self.selectionAssessment = selectionAssessment
     }
 }
 
@@ -140,20 +140,20 @@ public struct BASAdmissionDecision: Codable, Equatable, Sendable {
     public var pressure: BASPromptPressure
     public var reason: String
     public var skipReason: BASAdmissionSkipReason?
-    public var reminderSelectionNeed: BASReminderSelectionNeed?
+    public var selectionNeed: BASSelectionNeed?
 
     public init(
         isAllowed: Bool,
         pressure: BASPromptPressure,
         reason: String,
         skipReason: BASAdmissionSkipReason?,
-        reminderSelectionNeed: BASReminderSelectionNeed? = nil
+        selectionNeed: BASSelectionNeed? = nil
     ) {
         self.isAllowed = isAllowed
         self.pressure = pressure
         self.reason = reason
         self.skipReason = skipReason
-        self.reminderSelectionNeed = reminderSelectionNeed
+        self.selectionNeed = selectionNeed
     }
 }
 
@@ -202,21 +202,21 @@ public enum BASExecutionGovernance {
     ) -> BASAdmissionDecision {
         let pressure = promptPressure(for: request.budget)
 
-        if request.kind == .reminder,
-           let reminderCandidateCount = request.reminderCandidateCount,
-           reminderCandidateCount < 2 {
+        if request.kind == .selection,
+           let selectionCandidateCount = request.selectionCandidateCount,
+           selectionCandidateCount < 2 {
             return BASAdmissionDecision(
                 isAllowed: false,
                 pressure: pressure,
-                reason: request.reminderSelectionAssessment?.reason
-                    ?? "Reminder selection stayed deterministic because there was not enough choice spread to justify a model pass.",
-                skipReason: .insufficientReminderChoice,
-                reminderSelectionNeed: request.reminderSelectionAssessment?.need ?? .control
+                reason: request.selectionAssessment?.reason
+                    ?? "Candidate selection stayed deterministic because there was not enough choice spread to justify a model pass.",
+                skipReason: .insufficientChoiceSpread,
+                selectionNeed: request.selectionAssessment?.need ?? .control
             )
         }
 
         switch request.kind {
-        case .quick:
+        case .primary:
             if request.frontstageState.openTextSignalCount == 0,
                request.frontstageState.anchorHeadlineCount == 0,
                request.frontstageState.suppressionHintCount == 0,
@@ -237,15 +237,15 @@ public enum BASExecutionGovernance {
                     skipReason: .budgetExceeded
                 )
             }
-        case .reminder:
-            if let reminderSelectionAssessment = request.reminderSelectionAssessment,
-               reminderSelectionAssessment.need == .control {
+        case .selection:
+            if let selectionAssessment = request.selectionAssessment,
+               selectionAssessment.need == .control {
                 return BASAdmissionDecision(
                     isAllowed: false,
                     pressure: pressure,
-                    reason: reminderSelectionAssessment.reason,
+                    reason: selectionAssessment.reason,
                     skipReason: .retrievalNotNeeded,
-                    reminderSelectionNeed: reminderSelectionAssessment.need
+                    selectionNeed: selectionAssessment.need
                 )
             }
 
@@ -253,12 +253,12 @@ public enum BASExecutionGovernance {
                 return BASAdmissionDecision(
                     isAllowed: false,
                     pressure: pressure,
-                    reason: "Reminder selection stayed deterministic because the prompt crossed the safe prefill ceiling for an on-device reminder pass.",
+                    reason: "Candidate selection stayed deterministic because the prompt crossed the safe prefill ceiling for an on-device selection pass.",
                     skipReason: .prefillPressureTooHigh,
-                    reminderSelectionNeed: request.reminderSelectionAssessment?.need
+                    selectionNeed: request.selectionAssessment?.need
                 )
             }
-        case .balance, .mirror:
+        case .comparative, .reflective:
             if request.frontstageState.openTextSignalCount < 3,
                request.frontstageState.anchorHeadlineCount == 0,
                request.frontstageState.suppressionHintCount == 0 {
@@ -285,7 +285,7 @@ public enum BASExecutionGovernance {
             pressure: pressure,
             reason: "Admission controller allowed the model pass because the structured prompt stayed inside the current prefill budget.",
             skipReason: nil,
-            reminderSelectionNeed: request.reminderSelectionAssessment?.need
+            selectionNeed: request.selectionAssessment?.need
         )
     }
 
@@ -328,13 +328,13 @@ public enum BASExecutionGovernance {
         for kind: BASAdaptiveTraceKind
     ) -> String {
         switch kind {
-        case .quick:
-            BASDecisionMode.quick.identifier
-        case .balance:
-            BASDecisionMode.balance.identifier
-        case .mirror:
-            BASDecisionMode.mirror.identifier
-        case .reminder:
+        case .primary:
+            BASDecisionMode.primary.identifier
+        case .comparative:
+            BASDecisionMode.comparative.identifier
+        case .reflective:
+            BASDecisionMode.reflective.identifier
+        case .selection:
             kind.rawValue
         }
     }
@@ -343,9 +343,9 @@ public enum BASExecutionGovernance {
         for kind: BASAdaptiveTraceKind
     ) -> [String] {
         switch kind {
-        case .quick, .balance, .mirror:
+        case .primary, .comparative, .reflective:
             ["render_local_guidance"]
-        case .reminder:
+        case .selection:
             ["load_governed_memory"]
         }
     }

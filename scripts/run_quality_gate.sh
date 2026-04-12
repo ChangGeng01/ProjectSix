@@ -11,7 +11,7 @@ IOS_DERIVED_DATA="$DERIVED_DATA_ROOT/ios"
 UI_DERIVED_DATA="$DERIVED_DATA_ROOT/ui"
 
 typeset -i score=0
-typeset -i total=20
+typeset -i total=21
 
 rm -rf "$DERIVED_DATA_ROOT"
 
@@ -134,6 +134,9 @@ run_step "Project generation" \
 
 run_step "Project metadata listing" \
   xcodebuild -project "$PROJECT" -list
+
+run_step "SDK boundary and residual checks" \
+  "$ROOT/scripts/check_sdk_import_boundaries.sh"
 
 run_step "Full Before suite" \
   run_before_tests

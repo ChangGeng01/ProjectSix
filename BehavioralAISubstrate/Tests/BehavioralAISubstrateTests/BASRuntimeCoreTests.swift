@@ -185,7 +185,7 @@ struct BASRuntimeCoreTests {
     @Test("provider route resolver combines base ordering with task-aware planning")
     func providerRouteResolverCombinesBaseOrderingAndPlanning() {
         let plan = BASProviderRouteResolver.resolve(
-            task: .mirror,
+            task: .reflective,
             preferredProviderID: "local-fast",
             allowFallbacks: true,
             deterministicProviderID: "template",
@@ -196,7 +196,7 @@ struct BASRuntimeCoreTests {
                 )
             ],
             strategy: BASAdaptiveTaskStrategy(
-                kind: .mirror,
+                kind: .reflective,
                 entropy: .high,
                 runtimeGear: .high,
                 contextBudget: 1800,
@@ -211,7 +211,7 @@ struct BASRuntimeCoreTests {
             descriptors: [
                 providerDescriptor(
                     id: "local-fast",
-                    bestFor: [.quick],
+                    bestFor: [.primary],
                     strengths: [.structuredOutput, .lowLatency, .lowMemory],
                     latencyClass: .low,
                     memoryClass: .low,
@@ -220,7 +220,7 @@ struct BASRuntimeCoreTests {
                 ),
                 providerDescriptor(
                     id: "reflective-large",
-                    bestFor: [.mirror],
+                    bestFor: [.reflective],
                     strengths: [.structuredOutput, .deepReflection, .retrievalGrounding],
                     latencyClass: .high,
                     memoryClass: .high,
@@ -229,7 +229,7 @@ struct BASRuntimeCoreTests {
                 ),
                 providerDescriptor(
                     id: "template",
-                    bestFor: [.quick],
+                    bestFor: [.primary],
                     strengths: [.structuredOutput, .lowLatency],
                     latencyClass: .low,
                     memoryClass: .low,
@@ -258,7 +258,7 @@ struct BASRuntimeCoreTests {
         ]
 
         let planning = BASExecutableProviderPlanner.resolve(
-            task: .mirror,
+            task: .reflective,
             preferredProviderID: "local-fast",
             allowFallbacks: true,
             deterministicProviderID: "template",
@@ -269,7 +269,7 @@ struct BASRuntimeCoreTests {
                 )
             ],
             strategy: BASAdaptiveTaskStrategy(
-                kind: .mirror,
+                kind: .reflective,
                 entropy: .high,
                 runtimeGear: .high,
                 contextBudget: 1800,
@@ -284,7 +284,7 @@ struct BASRuntimeCoreTests {
             descriptors: [
                 providerDescriptor(
                     id: "local-fast",
-                    bestFor: [.quick],
+                    bestFor: [.primary],
                     strengths: [.structuredOutput, .lowLatency, .lowMemory],
                     latencyClass: .low,
                     memoryClass: .low,
@@ -293,7 +293,7 @@ struct BASRuntimeCoreTests {
                 ),
                 providerDescriptor(
                     id: "reflective-large",
-                    bestFor: [.mirror],
+                    bestFor: [.reflective],
                     strengths: [.structuredOutput, .deepReflection, .retrievalGrounding],
                     latencyClass: .high,
                     memoryClass: .high,
@@ -302,7 +302,7 @@ struct BASRuntimeCoreTests {
                 ),
                 providerDescriptor(
                     id: "template",
-                    bestFor: [.quick],
+                    bestFor: [.primary],
                     strengths: [.structuredOutput, .lowLatency],
                     latencyClass: .low,
                     memoryClass: .low,
@@ -335,7 +335,7 @@ struct BASRuntimeCoreTests {
         ]
 
         let templatePinned = await BASProviderRequestRunner.execute(
-            task: .quick,
+            task: .primary,
             preferredProviderID: "template",
             allowFallbacks: true,
             deterministicProviderID: "template",
@@ -360,7 +360,7 @@ struct BASRuntimeCoreTests {
         }
 
         let admissionSkipped = await BASProviderRequestRunner.execute(
-            task: .quick,
+            task: .primary,
             preferredProviderID: "local-fast",
             allowFallbacks: true,
             deterministicProviderID: "template",
@@ -403,7 +403,7 @@ struct BASRuntimeCoreTests {
         ]
 
         let outcome = await BASProviderRequestRunner.execute(
-            task: .mirror,
+            task: .reflective,
             preferredProviderID: "local-fast",
             allowFallbacks: true,
             deterministicProviderID: "template",
@@ -414,7 +414,7 @@ struct BASRuntimeCoreTests {
                 )
             ],
             strategy: BASAdaptiveTaskStrategy(
-                kind: .mirror,
+                kind: .reflective,
                 entropy: .high,
                 runtimeGear: .high,
                 contextBudget: 1800,
@@ -429,7 +429,7 @@ struct BASRuntimeCoreTests {
             descriptors: [
                 providerDescriptor(
                     id: "local-fast",
-                    bestFor: [.quick],
+                    bestFor: [.primary],
                     strengths: [.structuredOutput, .lowLatency, .lowMemory],
                     latencyClass: .low,
                     memoryClass: .low,
@@ -438,7 +438,7 @@ struct BASRuntimeCoreTests {
                 ),
                 providerDescriptor(
                     id: "reflective-large",
-                    bestFor: [.mirror],
+                    bestFor: [.reflective],
                     strengths: [.structuredOutput, .deepReflection, .retrievalGrounding],
                     latencyClass: .high,
                     memoryClass: .high,
@@ -463,7 +463,7 @@ struct BASRuntimeCoreTests {
 
         switch outcome {
         case .resolved(let resolution):
-            #expect(resolution.planSummary.task == .mirror)
+            #expect(resolution.planSummary.task == .reflective)
             #expect(resolution.planSummary.preferredProviderID == "local-fast")
             #expect(resolution.planSummary.orderedProviderIDs.first == "reflective-large")
             #expect(resolution.planSummary.resolvedProviderIDs == ["reflective-large"])
@@ -715,7 +715,7 @@ struct BASRuntimeCoreTests {
         #expect(advisory.rationale.contains(where: { $0.contains("Retrieval-assisted lane") }))
     }
 
-    @Test("adaptive matrix downgrades mixed-language mirror work to filtered retrieval")
+    @Test("adaptive matrix downgrades mixed-language reflective work to filtered retrieval")
     func adaptiveMatrixDowngradesMixedLanguageMirrorWork() {
         let matrix = BASAdaptiveRuntimeMatrixResolver.resolve(
             request: BASAdaptiveRuntimeMatrixRequest(
@@ -725,27 +725,27 @@ struct BASRuntimeCoreTests {
                 languageMode: .mixed,
                 allowFallbacks: true,
                 allowsModelInvocationByKind: [
-                    .quick: false,
-                    .balance: true,
-                    .mirror: true,
-                    .reminder: true
+                    .primary: false,
+                    .comparative: true,
+                    .reflective: true,
+                    .selection: true
                 ]
             )
         )
 
         #expect(matrix.runtimeGear == .balanced)
-        #expect(matrix.strategy(for: .quick).allowsModelInvocation == false)
-        #expect(matrix.strategy(for: .quick).outputMode == .deterministicTemplate)
-        #expect(matrix.strategy(for: .mirror).runtimeGear == .balanced)
-        #expect(matrix.strategy(for: .mirror).retrievalMode == .filtered)
-        #expect(matrix.strategy(for: .mirror).thinkingMode == .off)
-        #expect(matrix.strategy(for: .mirror).tone == .groundedDirect)
-        #expect(matrix.strategy(for: .mirror).responseLanguage == .mixed)
-        #expect(matrix.strategy(for: .quick).executionLane.kind == .deterministic)
-        #expect(matrix.executionLane(for: .mirror).kind == .retrievalAssisted)
+        #expect(matrix.strategy(for: .primary).allowsModelInvocation == false)
+        #expect(matrix.strategy(for: .primary).outputMode == .deterministicTemplate)
+        #expect(matrix.strategy(for: .reflective).runtimeGear == .balanced)
+        #expect(matrix.strategy(for: .reflective).retrievalMode == .filtered)
+        #expect(matrix.strategy(for: .reflective).thinkingMode == .off)
+        #expect(matrix.strategy(for: .reflective).tone == .groundedDirect)
+        #expect(matrix.strategy(for: .reflective).responseLanguage == .mixed)
+        #expect(matrix.strategy(for: .primary).executionLane.kind == .deterministic)
+        #expect(matrix.executionLane(for: .reflective).kind == .retrievalAssisted)
     }
 
-    @Test("adaptive matrix allows high-gear mirror thinking only on full phones in stable language mode")
+    @Test("adaptive matrix allows high-gear reflective thinking only on full phones in stable language mode")
     func adaptiveMatrixAllowsHighGearMirrorThinkingOnlyOnFullPhones() {
         let fullPhoneMatrix = BASAdaptiveRuntimeMatrixResolver.resolve(
             request: BASAdaptiveRuntimeMatrixRequest(
@@ -755,10 +755,10 @@ struct BASRuntimeCoreTests {
                 languageMode: .english,
                 allowFallbacks: true,
                 allowsModelInvocationByKind: [
-                    .quick: true,
-                    .balance: true,
-                    .mirror: true,
-                    .reminder: true
+                    .primary: true,
+                    .comparative: true,
+                    .reflective: true,
+                    .selection: true
                 ]
             )
         )
@@ -770,20 +770,20 @@ struct BASRuntimeCoreTests {
                 languageMode: .english,
                 allowFallbacks: true,
                 allowsModelInvocationByKind: [
-                    .quick: true,
-                    .balance: true,
-                    .mirror: true,
-                    .reminder: true
+                    .primary: true,
+                    .comparative: true,
+                    .reflective: true,
+                    .selection: true
                 ]
             )
         )
 
-        #expect(fullPhoneMatrix.strategy(for: .mirror).runtimeGear == .high)
-        #expect(fullPhoneMatrix.strategy(for: .mirror).thinkingMode == .gated)
-        #expect(constrainedMatrix.strategy(for: .mirror).runtimeGear == .low)
-        #expect(constrainedMatrix.strategy(for: .mirror).thinkingMode == .off)
-        #expect(constrainedMatrix.strategy(for: .mirror).actionSpace.contains("save_state"))
-        #expect(constrainedMatrix.strategy(for: .mirror).actionSpace.contains("stay_brief"))
+        #expect(fullPhoneMatrix.strategy(for: .reflective).runtimeGear == .high)
+        #expect(fullPhoneMatrix.strategy(for: .reflective).thinkingMode == .gated)
+        #expect(constrainedMatrix.strategy(for: .reflective).runtimeGear == .low)
+        #expect(constrainedMatrix.strategy(for: .reflective).thinkingMode == .off)
+        #expect(constrainedMatrix.strategy(for: .reflective).actionSpace.contains("save_state"))
+        #expect(constrainedMatrix.strategy(for: .reflective).actionSpace.contains("stay_brief"))
     }
 
     @Test("adaptive runtime helpers classify device and language deterministically")
@@ -812,10 +812,10 @@ struct BASRuntimeCoreTests {
         #expect(BASLanguageMode.detect(preferredLanguages: ["en-AU"], sampleTexts: ["我今晚又想买东西"]) == .chinese)
     }
 
-    @Test("adaptive task strategy compacts low-load mirror work with brief-session signals")
+    @Test("adaptive task strategy compacts low-load reflective work with brief-session signals")
     func adaptiveTaskStrategyCompactsLowLoadMirrorWorkWithBriefSignals() {
         let base = BASAdaptiveTaskStrategy(
-            kind: .mirror,
+            kind: .reflective,
             entropy: .high,
             runtimeGear: .high,
             contextBudget: 620,
@@ -857,7 +857,7 @@ struct BASRuntimeCoreTests {
     @Test("adaptive task strategy guards retrieval and infers response language from governed tags")
     func adaptiveTaskStrategyGuardsRetrievalAndInfersResponseLanguage() {
         let base = BASAdaptiveTaskStrategy(
-            kind: .mirror,
+            kind: .reflective,
             entropy: .high,
             runtimeGear: .balanced,
             contextBudget: 520,
@@ -883,7 +883,7 @@ struct BASRuntimeCoreTests {
                 screenedOutMemoryCount: 4,
                 lowTrustLoad: true,
                 retrievalInstability: false,
-                retrievalTags: ["mirror", "lang:chinese", "relationship"]
+                retrievalTags: ["reflective", "lang:chinese", "relationship"]
             )
         )
 
@@ -892,10 +892,10 @@ struct BASRuntimeCoreTests {
         #expect(adapted.responseLanguage == .chinese)
     }
 
-    @Test("adaptive task strategy promotes boundary-first mirror work and tradeoff-first balance work")
+    @Test("adaptive task strategy promotes boundary-first reflective work and tradeoff-first comparative work")
     func adaptiveTaskStrategyPromotesBoundaryAndTradeoffWorkWhenSignalsAreStrong() {
-        let mirrorBase = BASAdaptiveTaskStrategy(
-            kind: .mirror,
+        let reflectiveBase = BASAdaptiveTaskStrategy(
+            kind: .reflective,
             entropy: .high,
             runtimeGear: .balanced,
             contextBudget: 520,
@@ -907,7 +907,7 @@ struct BASRuntimeCoreTests {
             responseLanguage: .english,
             allowsModelInvocation: true
         )
-        let mirrorAdapted = mirrorBase.adapting(
+        let reflectiveAdapted = reflectiveBase.adapting(
             signals: BASAdaptiveRuntimeSignals(
                 briefBias: 0.3,
                 fatigueSignal: 0.2,
@@ -924,13 +924,13 @@ struct BASRuntimeCoreTests {
             )
         )
 
-        #expect(mirrorAdapted.runtimeGear == .high)
-        #expect(mirrorAdapted.thinkingMode == .gated)
-        #expect(mirrorAdapted.actionSpace.contains("name_boundary"))
-        #expect(mirrorAdapted.contextBudget > mirrorBase.contextBudget)
+        #expect(reflectiveAdapted.runtimeGear == .high)
+        #expect(reflectiveAdapted.thinkingMode == .gated)
+        #expect(reflectiveAdapted.actionSpace.contains("name_boundary"))
+        #expect(reflectiveAdapted.contextBudget > reflectiveBase.contextBudget)
 
-        let balanceBase = BASAdaptiveTaskStrategy(
-            kind: .balance,
+        let comparativeBase = BASAdaptiveTaskStrategy(
+            kind: .comparative,
             entropy: .medium,
             runtimeGear: .balanced,
             contextBudget: 440,
@@ -942,7 +942,7 @@ struct BASRuntimeCoreTests {
             responseLanguage: .english,
             allowsModelInvocation: true
         )
-        let balanceAdapted = balanceBase.adapting(
+        let comparativeAdapted = comparativeBase.adapting(
             signals: BASAdaptiveRuntimeSignals(
                 briefBias: 0.24,
                 fatigueSignal: 0.18,
@@ -959,16 +959,16 @@ struct BASRuntimeCoreTests {
             )
         )
 
-        #expect(balanceAdapted.runtimeGear == .high)
-        #expect(balanceAdapted.thinkingMode == .gated)
-        #expect(balanceAdapted.actionSpace.contains("surface_priority"))
-        #expect(balanceAdapted.contextBudget > balanceBase.contextBudget)
+        #expect(comparativeAdapted.runtimeGear == .high)
+        #expect(comparativeAdapted.thinkingMode == .gated)
+        #expect(comparativeAdapted.actionSpace.contains("surface_priority"))
+        #expect(comparativeAdapted.contextBudget > comparativeBase.contextBudget)
     }
 
     @Test("provider planner filters incompatible providers before scoring")
     func providerPlannerFiltersIncompatibleProvidersBeforeScoring() {
         let strategy = BASAdaptiveTaskStrategy(
-            kind: .mirror,
+            kind: .reflective,
             entropy: .high,
             runtimeGear: .high,
             contextBudget: 900,
@@ -982,14 +982,14 @@ struct BASRuntimeCoreTests {
         )
 
         let plan = BASProviderPlanner.plan(
-            task: .mirror,
+            task: .reflective,
             preferredProviderID: "open-model",
             baseOrderedProviderIDs: ["open-model", "gemma", "foundation"],
             strategy: strategy,
             descriptors: [
                 providerDescriptor(
                     id: "open-model",
-                    bestFor: [.quick, .reminder],
+                    bestFor: [.primary, .selection],
                     strengths: [.structuredOutput, .lowLatency, .lowMemory],
                     latencyClass: .low,
                     memoryClass: .low,
@@ -998,7 +998,7 @@ struct BASRuntimeCoreTests {
                 ),
                 providerDescriptor(
                     id: "gemma",
-                    bestFor: [.balance, .mirror, .reminder],
+                    bestFor: [.comparative, .reflective, .selection],
                     strengths: [.structuredOutput, .deepReflection, .retrievalGrounding, .multilingualChinese],
                     latencyClass: .medium,
                     memoryClass: .medium,
@@ -1007,7 +1007,7 @@ struct BASRuntimeCoreTests {
                 ),
                 providerDescriptor(
                     id: "foundation",
-                    bestFor: [.quick, .reminder],
+                    bestFor: [.primary, .selection],
                     strengths: [.structuredOutput, .lowLatency, .lowMemory, .multilingualChinese],
                     latencyClass: .low,
                     memoryClass: .low,
@@ -1025,14 +1025,14 @@ struct BASRuntimeCoreTests {
     @Test("provider planner preserves base order when scores tie")
     func providerPlannerPreservesBaseOrderWhenScoresTie() {
         let plan = BASProviderPlanner.plan(
-            task: .quick,
+            task: .primary,
             preferredProviderID: "foundation",
             baseOrderedProviderIDs: ["foundation", "gemma"],
             strategy: nil,
             descriptors: [
                 providerDescriptor(
                     id: "foundation",
-                    bestFor: [.quick],
+                    bestFor: [.primary],
                     strengths: [.structuredOutput, .lowLatency, .lowMemory],
                     latencyClass: .low,
                     memoryClass: .low,
@@ -1041,7 +1041,7 @@ struct BASRuntimeCoreTests {
                 ),
                 providerDescriptor(
                     id: "gemma",
-                    bestFor: [.quick],
+                    bestFor: [.primary],
                     strengths: [.structuredOutput, .lowLatency, .lowMemory],
                     latencyClass: .low,
                     memoryClass: .low,
@@ -1057,7 +1057,7 @@ struct BASRuntimeCoreTests {
     @Test("provider planner favors brief low-gear providers when strategy is constrained")
     func providerPlannerFavorsBriefLowGearProvidersWhenStrategyIsConstrained() {
         let strategy = BASAdaptiveTaskStrategy(
-            kind: .quick,
+            kind: .primary,
             entropy: .low,
             runtimeGear: .low,
             contextBudget: 320,
@@ -1071,14 +1071,14 @@ struct BASRuntimeCoreTests {
         )
 
         let plan = BASProviderPlanner.plan(
-            task: .quick,
+            task: .primary,
             preferredProviderID: "gemma",
             baseOrderedProviderIDs: ["gemma", "foundation"],
             strategy: strategy,
             descriptors: [
                 providerDescriptor(
                     id: "gemma",
-                    bestFor: [.balance, .mirror],
+                    bestFor: [.comparative, .reflective],
                     strengths: [.structuredOutput, .deepReflection],
                     latencyClass: .high,
                     memoryClass: .high,
@@ -1087,7 +1087,7 @@ struct BASRuntimeCoreTests {
                 ),
                 providerDescriptor(
                     id: "foundation",
-                    bestFor: [.quick, .reminder],
+                    bestFor: [.primary, .selection],
                     strengths: [.structuredOutput, .lowLatency, .lowMemory],
                     latencyClass: .low,
                     memoryClass: .low,

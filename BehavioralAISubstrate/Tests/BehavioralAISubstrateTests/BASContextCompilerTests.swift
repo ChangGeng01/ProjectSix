@@ -35,7 +35,7 @@ struct BASContextCompilerTests {
                         priority: 70
                     ),
                     block(
-                        id: "retrieval.history",
+                        id: "retrieval.archive",
                         layer: .retrieval,
                         title: "Retrieval",
                         content: "Extra",
@@ -49,7 +49,7 @@ struct BASContextCompilerTests {
 
         #expect(compiled.stablePrefixBlocks.map(\.id) == ["kernel.identity", "active.intent"])
         #expect(compiled.retainedBlocks.map(\.id) == ["kernel.identity", "active.intent"])
-        #expect(compiled.droppedBlocks.map(\.id) == ["summary.goal", "retrieval.history"])
+        #expect(compiled.droppedBlocks.map(\.id) == ["summary.goal", "retrieval.archive"])
         #expect(compiled.stablePrefixPrompt == "Kernel: Keep\nActive: Keep")
         #expect(compiled.volatileSuffixPrompt.isEmpty)
         #expect(compiled.renderedPrompt == compiled.stablePrefixPrompt)
@@ -82,7 +82,7 @@ struct BASContextCompilerTests {
             BASContextCompilationRequest(
                 blocks: stableBlocks + [
                     block(
-                        id: "retrieval.history-a",
+                        id: "retrieval.archive-a",
                         layer: .retrieval,
                         title: "Retrieval",
                         content: "First extra detail",
@@ -98,7 +98,7 @@ struct BASContextCompilerTests {
             BASContextCompilationRequest(
                 blocks: stableBlocks + [
                     block(
-                        id: "retrieval.history-b",
+                        id: "retrieval.archive-b",
                         layer: .retrieval,
                         title: "Retrieval",
                         content: "A different extra detail",
@@ -146,7 +146,7 @@ struct BASContextCompilerTests {
                         priority: 80
                     ),
                     block(
-                        id: "retrieval.history-a",
+                        id: "retrieval.archive-a",
                         layer: .retrieval,
                         title: "Retrieval",
                         content: "Drop second",
@@ -154,7 +154,7 @@ struct BASContextCompilerTests {
                         priority: 70
                     ),
                     block(
-                        id: "retrieval.history-b",
+                        id: "retrieval.archive-b",
                         layer: .retrieval,
                         title: "Retrieval",
                         content: "Drop third",
@@ -168,8 +168,8 @@ struct BASContextCompilerTests {
 
         #expect(compiled.droppedBlocks.map(\.id) == [
             "summary.goal",
-            "retrieval.history-a",
-            "retrieval.history-b"
+            "retrieval.archive-a",
+            "retrieval.archive-b"
         ])
         #expect(compiled.retainedBlocks.map(\.id) == ["kernel.identity", "active.intent"])
     }
@@ -178,7 +178,7 @@ struct BASContextCompilerTests {
     func defaultOutputGuardCarriesResponseLanguageDiscipline() {
         let chinese = BASSemanticContextCompiler.defaultOutputGuard(
             for: BASAdaptiveTaskStrategy(
-                kind: .quick,
+                kind: .primary,
                 entropy: .low,
                 runtimeGear: .low,
                 contextBudget: 1_200,
@@ -193,7 +193,7 @@ struct BASContextCompilerTests {
         )
         let english = BASSemanticContextCompiler.defaultOutputGuard(
             for: BASAdaptiveTaskStrategy(
-                kind: .quick,
+                kind: .primary,
                 entropy: .low,
                 runtimeGear: .balanced,
                 contextBudget: 1_200,

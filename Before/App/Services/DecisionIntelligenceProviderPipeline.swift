@@ -18,7 +18,15 @@ enum DecisionIntelligenceProviderPipeline {
     private static func providerObservationNarrative(
         for kind: DecisionIntelligenceTraceKind
     ) -> BASAppleProviderObservationNarrative? {
-        BeforeProductLanguage.workflowBehavior.providerObservationNarrative(forKindID: kind.rawValue)
+        BeforeProductCompatibility.providerObservationNarrative(
+            forKindID: substrateObservationKindID(for: kind)
+        )
+    }
+
+    private static func substrateObservationKindID(
+        for kind: DecisionIntelligenceTraceKind
+    ) -> String {
+        DecisionIntelligenceTaskRouter.substrateTraceKind(kind).identifier
     }
 
     static func orderedKinds(
@@ -104,7 +112,7 @@ enum DecisionIntelligenceProviderPipeline {
             promptBudget: envelope.budget,
             admissionDecision: admissionDecision,
             sourceInput: BASAppleProviderObservationSourceInput(
-                kind: DecisionIntelligenceTraceKind.quick.rawValue,
+                kind: substrateObservationKindID(for: .quick),
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
                 providerProfilesByID: BehavioralAISubstrateBridge.providerProfiles(),
@@ -112,7 +120,7 @@ enum DecisionIntelligenceProviderPipeline {
                 brainState: brainState,
                 admissionPressureID: admissionDecision.pressure.rawValue,
                 admissionSkipReasonID: admissionDecision.skipReason?.rawValue,
-                reminderSelectionNeedID: admissionDecision.reminderSelectionNeed?.rawValue,
+                selectionNeedID: admissionDecision.selectionNeed?.rawValue,
                 runtimeTimeBudgetMs: strategy?.timeBudgetMs,
                 admissionReason: admissionDecision.reason,
                 semanticPromptFingerprint: semanticPromptFingerprint,
@@ -231,7 +239,7 @@ enum DecisionIntelligenceProviderPipeline {
             promptBudget: envelope.budget,
             admissionDecision: admissionDecision,
             sourceInput: BASAppleProviderObservationSourceInput(
-                kind: DecisionIntelligenceTraceKind.balance.rawValue,
+                kind: substrateObservationKindID(for: .balance),
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
                 providerProfilesByID: BehavioralAISubstrateBridge.providerProfiles(),
@@ -239,7 +247,7 @@ enum DecisionIntelligenceProviderPipeline {
                 brainState: brainState,
                 admissionPressureID: admissionDecision.pressure.rawValue,
                 admissionSkipReasonID: admissionDecision.skipReason?.rawValue,
-                reminderSelectionNeedID: admissionDecision.reminderSelectionNeed?.rawValue,
+                selectionNeedID: admissionDecision.selectionNeed?.rawValue,
                 runtimeTimeBudgetMs: strategy?.timeBudgetMs,
                 admissionReason: admissionDecision.reason,
                 semanticPromptFingerprint: semanticPromptFingerprint,
@@ -358,7 +366,7 @@ enum DecisionIntelligenceProviderPipeline {
             promptBudget: envelope.budget,
             admissionDecision: admissionDecision,
             sourceInput: BASAppleProviderObservationSourceInput(
-                kind: DecisionIntelligenceTraceKind.mirror.rawValue,
+                kind: substrateObservationKindID(for: .mirror),
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
                 providerProfilesByID: BehavioralAISubstrateBridge.providerProfiles(),
@@ -366,7 +374,7 @@ enum DecisionIntelligenceProviderPipeline {
                 brainState: brainState,
                 admissionPressureID: admissionDecision.pressure.rawValue,
                 admissionSkipReasonID: admissionDecision.skipReason?.rawValue,
-                reminderSelectionNeedID: admissionDecision.reminderSelectionNeed?.rawValue,
+                selectionNeedID: admissionDecision.selectionNeed?.rawValue,
                 runtimeTimeBudgetMs: strategy?.timeBudgetMs,
                 admissionReason: admissionDecision.reason,
                 semanticPromptFingerprint: semanticPromptFingerprint,
@@ -470,7 +478,7 @@ enum DecisionIntelligenceProviderPipeline {
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: selection.prompt)
         let promptPreparedMs = elapsedMilliseconds(since: requestStart, clock: clock)
         let clippedCandidates = selection.candidates
-        let reminderSelectionAssessment = ReminderSelectionPolicy.assessSelectionNeed(
+        let selectionAssessment = ReminderSelectionPolicy.assessSelectionNeed(
             candidates: clippedCandidates,
             scenario: scenario,
             prompt: prompt,
@@ -481,8 +489,8 @@ enum DecisionIntelligenceProviderPipeline {
             _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: selection.prompt)
         } ?? DecisionIntelligenceAdmissionController.decide(
             for: selection.prompt,
-            reminderCandidateCount: clippedCandidates.count,
-            reminderSelectionAssessment: reminderSelectionAssessment
+            selectionCandidateCount: clippedCandidates.count,
+            selectionAssessment: selectionAssessment
         )
         let admissionEvaluatedMs = elapsedMilliseconds(since: requestStart, clock: clock)
         let observationContext: ProviderRequestObservationContext = BASAppleHostProviderObservationBridge.context(
@@ -495,7 +503,7 @@ enum DecisionIntelligenceProviderPipeline {
             promptBudget: selection.prompt.budget,
             admissionDecision: admissionDecision,
             sourceInput: BASAppleProviderObservationSourceInput(
-                kind: DecisionIntelligenceTraceKind.reminder.rawValue,
+                kind: substrateObservationKindID(for: .reminder),
                 preferredProviderID: preference.kind.rawValue,
                 allowFallbacks: allowFallbacks,
                 providerProfilesByID: BehavioralAISubstrateBridge.providerProfiles(),
@@ -503,7 +511,7 @@ enum DecisionIntelligenceProviderPipeline {
                 brainState: nil,
                 admissionPressureID: admissionDecision.pressure.rawValue,
                 admissionSkipReasonID: admissionDecision.skipReason?.rawValue,
-                reminderSelectionNeedID: admissionDecision.reminderSelectionNeed?.rawValue,
+                selectionNeedID: admissionDecision.selectionNeed?.rawValue,
                 runtimeTimeBudgetMs: strategy?.timeBudgetMs,
                 admissionReason: admissionDecision.reason,
                 semanticPromptFingerprint: semanticPromptFingerprint,
@@ -542,10 +550,10 @@ enum DecisionIntelligenceProviderPipeline {
             assessCachedResult: { cached in
                 providerAttemptVerdict(
                     kind: .reminder,
-                    outputPreview: reminderPreview(from: cached),
+                    outputPreview: selectionPreview(from: cached),
                     kernelSnapshot: selection.prompt.assembly.kernelSnapshot,
                     brainState: nil,
-                    reminderMode: mode
+                    selectionMode: mode
                 )
             },
             quarantineCachedResult: { provider in
@@ -567,10 +575,10 @@ enum DecisionIntelligenceProviderPipeline {
             assessProviderResult: { selected in
                 providerAttemptVerdict(
                     kind: .reminder,
-                    outputPreview: reminderPreview(from: selected),
+                    outputPreview: selectionPreview(from: selected),
                     kernelSnapshot: selection.prompt.assembly.kernelSnapshot,
                     brainState: nil,
-                    reminderMode: mode
+                    selectionMode: mode
                 )
             },
             storeResolvedResult: { provider, selected in
@@ -612,8 +620,8 @@ enum DecisionIntelligenceProviderPipeline {
         )
     }
 
-    private static func reminderPreview(from candidate: ReminderSelectionCandidate) -> String {
-        BASAppleProviderReleaseAdapter.reminderPreview(content: candidate.content)
+    private static func selectionPreview(from candidate: ReminderSelectionCandidate) -> String {
+        BASAppleProviderReleaseAdapter.selectionPreview(content: candidate.content)
     }
 
     private static func providerAttemptVerdict(
@@ -621,15 +629,15 @@ enum DecisionIntelligenceProviderPipeline {
         outputPreview: String,
         kernelSnapshot: BASCognitionKernelSnapshot,
         brainState: DecisionBrainState?,
-        reminderMode: DecisionMode? = nil
+        selectionMode: DecisionMode? = nil
     ) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment> {
         BASAppleProviderReleaseAdapter.verdict(
-            traceKindRawValue: kind.rawValue,
+            traceKindRawValue: kind.substrateKindID,
             outputPreview: outputPreview,
             kernelSnapshot: kernelSnapshot,
             brainState: brainState,
-            reminderSurfaceModeRawValue: reminderMode?.rawValue,
-            structuredTruthBehavior: BeforeProductLanguage.referencePromptBehavior.structuredTruthBehavior
+            selectionSurfaceModeRawValue: selectionMode?.substrateModeID,
+            structuredTruthBehavior: BeforeProductCompatibility.referencePromptBehavior.structuredTruthBehavior
         )
     }
 

@@ -15,11 +15,11 @@ public enum BASAppleWorkflowModeExecutor {
         }
 
         switch mode {
-        case .quick:
+        case .primary:
             performPrimary()
-        case .balance:
+        case .comparative:
             performComparative()
-        case .mirror:
+        case .reflective:
             performReflective()
         }
         return true

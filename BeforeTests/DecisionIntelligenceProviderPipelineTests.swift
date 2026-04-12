@@ -1,5 +1,5 @@
 import XCTest
-import BASPolicy
+import BASHostKit
 @testable import Before
 
 final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
@@ -624,7 +624,7 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
 
         let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
         XCTAssertEqual(snapshot.outcomeCount[.admissionSkipped], 1)
-        XCTAssertEqual(snapshot.admissionSkipCountByReason[.insufficientReminderChoice], 1)
+        XCTAssertEqual(snapshot.admissionSkipCountByReason[.insufficientChoiceSpread], 1)
     }
 
     @MainActor
@@ -647,8 +647,8 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
         XCTAssertEqual(snapshot.outcomeCount[.admissionSkipped], 1)
         XCTAssertEqual(snapshot.admissionSkipCountByReason[.retrievalNotNeeded], 1)
-        XCTAssertEqual(snapshot.reminderControlOnlyRate, 1, accuracy: 0.0001)
-        XCTAssertEqual(snapshot.reminderRetrievalBypassRate, 1, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.selectionControlOnlyRate, 1, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.selectionRetrievalBypassRate, 1, accuracy: 0.0001)
 
         guard let latestTrace = DecisionIntelligenceDebugStore.shared.traces.first else {
             return XCTFail("Expected an admission-skip trace.")
@@ -656,7 +656,7 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
 
         XCTAssertEqual(latestTrace.kind, .reminder)
         XCTAssertEqual(latestTrace.admissionDecision?.skipReason, .retrievalNotNeeded)
-        XCTAssertEqual(latestTrace.admissionDecision?.reminderSelectionNeed, .control)
+        XCTAssertEqual(latestTrace.admissionDecision?.selectionNeed, .control)
     }
 
     @MainActor

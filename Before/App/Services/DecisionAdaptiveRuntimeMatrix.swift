@@ -282,7 +282,10 @@ enum DecisionAdaptiveRuntimeMatrixResolver {
 
         let strategies = Dictionary(
             uniqueKeysWithValues: DecisionIntelligenceTraceKind.allCases.map { kind in
-                let preferredProvider = compilation.preferredProviderIDByKind[kind.rawValue]
+                let preferredProvider = resolvedPreferredProviderID(
+                    for: kind,
+                    in: compilation.preferredProviderIDByKind
+                )
                     .flatMap(DecisionModelProviderPreference.init(rawValue:))
                     ?? .template
                 return (
@@ -303,6 +306,22 @@ enum DecisionAdaptiveRuntimeMatrixResolver {
             strategiesByKind: strategies
         )
     }
+
+    private static func resolvedPreferredProviderID(
+        for kind: DecisionIntelligenceTraceKind,
+        in mapping: [String: String]
+    ) -> String? {
+        let substrateKind = kind.basAdaptiveTraceKind
+        let lookupKeys = [
+            substrateKind.identifier,
+            kind.rawValue
+        ]
+
+        for key in lookupKeys where mapping[key] != nil {
+            return mapping[key]
+        }
+        return nil
+    }
 }
 
 private extension DecisionAdaptiveTaskStrategy {
@@ -315,25 +334,25 @@ private extension DecisionIntelligenceTraceKind {
     var basAdaptiveTraceKind: BASAdaptiveTraceKind {
         switch self {
         case .quick:
-            .quick
+            .primary
         case .balance:
-            .balance
+            .comparative
         case .mirror:
-            .mirror
+            .reflective
         case .reminder:
-            .reminder
+            .selection
         }
     }
 
     init(_ kind: BASAdaptiveTraceKind) {
         switch kind {
-        case .quick:
+        case .primary:
             self = .quick
-        case .balance:
+        case .comparative:
             self = .balance
-        case .mirror:
+        case .reflective:
             self = .mirror
-        case .reminder:
+        case .selection:
             self = .reminder
         }
     }

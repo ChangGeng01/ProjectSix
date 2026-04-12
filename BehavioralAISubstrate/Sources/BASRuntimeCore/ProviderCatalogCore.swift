@@ -23,7 +23,7 @@ public enum BASReferenceProviderCatalog {
             supportsThinking: true,
             supportsStructuredOutput: true,
             supportsToolUse: true,
-            bestFor: [.balance, .mirror, .reminder]
+            bestFor: [.comparative, .reflective, .selection]
         )
     )
 
@@ -50,7 +50,7 @@ public enum BASReferenceProviderCatalog {
             supportsThinking: false,
             supportsStructuredOutput: true,
             supportsToolUse: true,
-            bestFor: [.quick, .reminder]
+            bestFor: [.primary, .selection]
         )
     )
 
@@ -89,7 +89,7 @@ public enum BASReferenceProviderCatalog {
                     supportsThinking: false,
                     supportsStructuredOutput: true,
                     supportsToolUse: true,
-                    bestFor: [.quick, .reminder]
+                    bestFor: [.primary, .selection]
                 )
             ),
             BASReferenceProviderRuntime.openModelProviderID: BASProviderDescriptor(
@@ -108,38 +108,38 @@ public enum BASReferenceProviderCatalog {
         switch providerID {
         case BASReferenceProviderRuntime.gemmaE4BProviderID:
             [
-                .quick: 70,
-                .balance: 94,
-                .mirror: 100,
-                .reminder: 84
+                .primary: 70,
+                .comparative: 94,
+                .reflective: 100,
+                .selection: 84
             ]
         case BASReferenceProviderRuntime.openModelProviderID:
             [
-                .quick: 88,
-                .balance: 90,
-                .mirror: 92,
-                .reminder: 86
+                .primary: 88,
+                .comparative: 90,
+                .reflective: 92,
+                .selection: 86
             ]
         case BASReferenceProviderRuntime.foundationModelsProviderID:
             [
-                .quick: 100,
-                .balance: 78,
-                .mirror: 72,
-                .reminder: 92
+                .primary: 100,
+                .comparative: 78,
+                .reflective: 72,
+                .selection: 92
             ]
         case BASReferenceProviderRuntime.testingStubProviderID:
             [
-                .quick: 100,
-                .balance: 100,
-                .mirror: 100,
-                .reminder: 100
+                .primary: 100,
+                .comparative: 100,
+                .reflective: 100,
+                .selection: 100
             ]
         case BASReferenceProviderRuntime.templateProviderID:
             [
-                .quick: 0,
-                .balance: 0,
-                .mirror: 0,
-                .reminder: 0
+                .primary: 0,
+                .comparative: 0,
+                .reflective: 0,
+                .selection: 0
             ]
         default:
             [:]

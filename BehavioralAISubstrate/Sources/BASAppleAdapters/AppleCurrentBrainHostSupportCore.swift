@@ -111,8 +111,8 @@ public enum BASAppleCurrentBrainHostSupportRuntimeExecutor {
         onCheckpointSaveError: ((Error) -> Void)? = nil,
         onUpdateSaveError: ((Error) -> Void)? = nil,
         buildCurrentBrain: (BASAppleCurrentBrainLifecycleResult<Update, Checkpoint>) -> CurrentBrain
-    ) -> CurrentBrain {
-        BASAppleCurrentBrainHostLifecycleRuntimeExecutor.bootstrapAndBuildCurrentBrain(
+    ) throws -> CurrentBrain {
+        try BASAppleCurrentBrainHostLifecycleRuntimeExecutor.bootstrapAndBuildCurrentBrain(
             input: input,
             in: modelContext,
             prepareLifecycleState: support.prepareLifecycleState,

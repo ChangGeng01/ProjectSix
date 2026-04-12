@@ -44,7 +44,7 @@ struct BASAppleProviderRequestRuntimeTests {
 
         let templatePinned = await BASAppleProviderRequestRuntimeExecutor.executeObserved(
             input: BASAppleProviderRequestRuntimeInput(
-                task: .quick,
+                task: .primary,
                 preferredProviderID: BASReferenceProviderRuntime.templateProviderID,
                 allowFallbacks: true,
                 descriptors: [],
@@ -69,7 +69,7 @@ struct BASAppleProviderRequestRuntimeTests {
 
         let admissionSkipped = await BASAppleProviderRequestRuntimeExecutor.executeObserved(
             input: BASAppleProviderRequestRuntimeInput(
-                task: .quick,
+                task: .primary,
                 preferredProviderID: "local-fast",
                 allowFallbacks: true,
                 descriptors: [],
@@ -109,7 +109,7 @@ struct BASAppleProviderRequestRuntimeTests {
         let descriptors = [
             providerDescriptor(
                 id: BASReferenceProviderRuntime.foundationModelsProviderID,
-                bestFor: [.quick],
+                bestFor: [.primary],
                 strengths: [.structuredOutput, .lowLatency, .lowMemory],
                 latencyClass: .low,
                 memoryClass: .low,
@@ -118,7 +118,7 @@ struct BASAppleProviderRequestRuntimeTests {
             ),
             providerDescriptor(
                 id: BASReferenceProviderRuntime.gemmaE4BProviderID,
-                bestFor: [.mirror],
+                bestFor: [.reflective],
                 strengths: [.structuredOutput, .deepReflection, .retrievalGrounding],
                 latencyClass: .high,
                 memoryClass: .high,
@@ -129,11 +129,11 @@ struct BASAppleProviderRequestRuntimeTests {
 
         let outcome = await BASAppleProviderRequestRuntimeExecutor.executeObserved(
             input: BASAppleProviderRequestRuntimeInput(
-                task: .mirror,
+                task: .reflective,
                 preferredProviderID: BASReferenceProviderRuntime.foundationModelsProviderID,
                 allowFallbacks: true,
                 strategy: BASAdaptiveTaskStrategy(
-                    kind: .mirror,
+                    kind: .reflective,
                     entropy: .high,
                     runtimeGear: .high,
                     contextBudget: 1800,
@@ -164,7 +164,7 @@ struct BASAppleProviderRequestRuntimeTests {
 
         switch outcome {
         case .resolved(let resolution):
-            #expect(resolution.planSummary.task == BASAdaptiveTraceKind.mirror)
+            #expect(resolution.planSummary.task == BASAdaptiveTraceKind.reflective)
             #expect(resolution.planSummary.preferredProviderID == BASReferenceProviderRuntime.foundationModelsProviderID)
             #expect(resolution.planSummary.orderedProviderIDs.first == BASReferenceProviderRuntime.gemmaE4BProviderID)
             #expect(resolution.planSummary.resolvedProviderIDs == [BASReferenceProviderRuntime.gemmaE4BProviderID])

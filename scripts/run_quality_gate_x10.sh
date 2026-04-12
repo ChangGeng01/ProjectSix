@@ -14,7 +14,7 @@ UI_DERIVED_DATA="$DERIVED_DATA_ROOT/ui"
 WATCH_DERIVED_DATA="$DERIVED_DATA_ROOT/watch"
 
 typeset -i score=0
-typeset -i total=12
+typeset -i total=13
 
 rm -rf "$DERIVED_DATA_ROOT"
 
@@ -226,6 +226,9 @@ run_environment_matrix() {
 
 run_step "Project regenerates cleanly and extreme gate passes first" \
   run_project_regen_and_extreme
+
+run_step "SDK boundary and residual checks stay green" \
+  "$ROOT/scripts/check_sdk_import_boundaries.sh"
 
 run_step "BehavioralAISubstrate package survives 10 consecutive runs" \
   run_repeat 10 run_package

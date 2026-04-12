@@ -11,25 +11,25 @@ public struct BASPromptPresentationBehavior: Codable, Equatable, Sendable {
 
     public init(
         sharedPrelude: String = """
-        You are the language rendering layer for a host-owned cognition system.
+        You are the language adaptation layer inside a host-owned cognition runtime.
         The host owns state, routing, policy, actions, and final release.
-        Tighten language without adding facts, changing decisions, or inventing actions.
-        Keep the tone grounded, calm, and concise.
+        Revise only the supplied material without inventing facts, decisions, or actions.
+        Keep the wording grounded, concise, and calm.
         """,
         adaptivePrefixByKindID: [String: String] = [
             BASSemanticTaskKind.primaryID: """
-            Refine only the supplied primary guidance fields.
-            Preserve the decision frame, actions, and intended emotional direction.
+            Revise only the supplied primary fields.
+            Preserve the supplied decision frame and actions.
             """,
             BASSemanticTaskKind.comparativeID: """
-            Tighten the supplied comparative fields without inventing facts or collapsing them into a verdict.
+            Revise only the supplied comparative fields.
             Preserve the same focus and next-step intent.
             """,
             BASSemanticTaskKind.reflectiveID: """
-            Clarify the supplied reflective fields without becoming dramatic, clinical, or binary.
-            Preserve the same tension and next reflective move.
+            Revise only the supplied reflective fields.
+            Preserve the same tension and next-step intent.
             """,
-            BASSemanticTaskKind.reminderID: """
+            BASSemanticTaskKind.selectionID: """
             Select one retained candidate that best matches the current state.
             Do not rewrite or invent candidate text.
             """
@@ -38,11 +38,11 @@ public struct BASPromptPresentationBehavior: Codable, Equatable, Sendable {
             BASSemanticTaskKind.primaryID: 5,
             BASSemanticTaskKind.comparativeID: 4,
             BASSemanticTaskKind.reflectiveID: 4,
-            BASSemanticTaskKind.reminderID: 3
+            BASSemanticTaskKind.selectionID: 3
         ],
         lowGearClampKindIDs: [String] = [
             BASSemanticTaskKind.primaryID,
-            BASSemanticTaskKind.reminderID
+            BASSemanticTaskKind.selectionID
         ],
         lowGearClampMaximumBudget: Int = 3
     ) {
@@ -106,13 +106,13 @@ public struct BASPromptPresentationBehavior: Codable, Equatable, Sendable {
         for kind: BASSemanticTaskKind
     ) -> String {
         switch kind {
-        case .quick:
-            "Refine only the supplied primary guidance fields."
-        case .balance:
-            "Tighten the supplied comparative fields without inventing facts."
-        case .mirror:
-            "Clarify the supplied reflective fields without changing their meaning."
-        case .reminder:
+        case .primary:
+            "Revise only the supplied primary fields."
+        case .comparative:
+            "Revise only the supplied comparative fields."
+        case .reflective:
+            "Revise only the supplied reflective fields."
+        case .selection:
             "Select one retained candidate without rewriting it."
         }
     }
@@ -121,13 +121,13 @@ public struct BASPromptPresentationBehavior: Codable, Equatable, Sendable {
         for kind: BASSemanticTaskKind
     ) -> Int {
         switch kind {
-        case .quick:
+        case .primary:
             5
-        case .balance:
+        case .comparative:
             4
-        case .mirror:
+        case .reflective:
             4
-        case .reminder:
+        case .selection:
             3
         }
     }
@@ -156,36 +156,31 @@ public enum BASPromptPrefixCatalog {
     public static let genericBehavior = BASPromptPresentationBehavior.generic
 
     public static let sharedPrelude = """
-    You are the language rendering layer for a host-owned cognition system.
+    You are the language adaptation layer inside a host-owned cognition runtime.
     The host owns state, routing, safety, verdicts, and actions.
-    You only tighten wording or select from provided options.
-    Keep the tone calm, short, and non-shaming.
+    You only revise wording or select from provided options.
+    Keep the tone calm, short, and grounded.
     """
 
     public static let primary = """
-    Rewrite only the supplied primary guidance fields.
+    Revise only the supplied primary fields.
     Keep the same meaning and do not change verdicts or actions.
     """
 
     public static let comparative = """
-    Tighten the supplied comparative fields without inventing new facts or turning them into a verdict.
+    Revise only the supplied comparative fields without inventing new facts or turning them into a verdict.
     Preserve the same focus and next-step intent.
     """
 
     public static let reflective = """
-    Clarify the supplied reflective fields without becoming dramatic, therapeutic, or binary.
-    Preserve the same tension and reflective next move.
+    Revise only the supplied reflective fields without becoming dramatic, therapeutic, or binary.
+    Preserve the same tension and next-step intent.
     """
 
     public static let selection = """
     Pick one retained candidate that best matches the current state.
     Do not rewrite or invent candidate text.
     """
-
-    public static let quick = primary
-    public static let balance = comparative
-    public static let mirror = reflective
-    public static let reminder = selection
 
     public static func instructions(
         for kind: BASSemanticTaskKind,

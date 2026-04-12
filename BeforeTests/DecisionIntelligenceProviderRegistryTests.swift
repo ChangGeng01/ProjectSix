@@ -96,10 +96,10 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
                         title: "Open EN",
                         detail: "English-only experimental runtime.",
                         taskAffinities: [
-                            .quick: 98,
-                            .balance: 92,
-                            .mirror: 90,
-                            .reminder: 88
+                            .primary: 98,
+                            .comparative: 92,
+                            .reflective: 90,
+                            .selection: 88
                         ],
                         capabilityProfile: DecisionModelCapabilityProfile(
                             modelID: "lab/open-en",
@@ -111,7 +111,7 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
                             supportsThinking: false,
                             supportsStructuredOutput: true,
                             supportsToolUse: true,
-                            bestFor: [.quick, .reminder]
+                            bestFor: [.primary, .selection]
                         )
                     ),
                     taskAffinities: [
@@ -143,7 +143,7 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
                         supportsThinking: true,
                         supportsStructuredOutput: true,
                         supportsToolUse: true,
-                        bestFor: [.balance, .mirror]
+                        bestFor: [.comparative, .reflective]
                     )
                 )
             ]
@@ -198,7 +198,7 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
                         supportsThinking: false,
                         supportsStructuredOutput: true,
                         supportsToolUse: true,
-                        bestFor: [.quick]
+                        bestFor: [.primary]
                     )
                 ),
                 .gemmaE4B: DecisionModelProviderDescriptor(
@@ -220,7 +220,7 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
                         supportsThinking: true,
                         supportsStructuredOutput: true,
                         supportsToolUse: true,
-                        bestFor: [.mirror]
+                        bestFor: [.reflective]
                     )
                 )
             ]
@@ -275,7 +275,7 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
                         supportsThinking: false,
                         supportsStructuredOutput: true,
                         supportsToolUse: true,
-                        bestFor: [.quick, .balance]
+                        bestFor: [.primary, .comparative]
                     )
                 ),
                 .gemmaE4B: DecisionModelProviderDescriptor(
@@ -297,7 +297,7 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
                         supportsThinking: true,
                         supportsStructuredOutput: true,
                         supportsToolUse: true,
-                        bestFor: [.balance, .mirror]
+                        bestFor: [.comparative, .reflective]
                     )
                 )
             ]
@@ -350,7 +350,7 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
                         supportsThinking: false,
                         supportsStructuredOutput: false,
                         supportsToolUse: true,
-                        bestFor: [.quick]
+                        bestFor: [.primary]
                     )
                 ),
                 .gemmaE4B: DecisionModelProviderDescriptor(
@@ -370,7 +370,7 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
                         supportsThinking: true,
                         supportsStructuredOutput: true,
                         supportsToolUse: true,
-                        bestFor: [.balance]
+                        bestFor: [.comparative]
                     )
                 )
             ]
@@ -400,7 +400,7 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
         )
 
         XCTAssertEqual(ordered.first, .gemmaE4B)
-        XCTAssertFalse(ordered.contains(.openModel))
+        XCTAssertFalse(ordered.contains(DecisionModelProviderKind.openModel))
     }
 
     func testTaskRouterReturnsNoFallbackCandidatesWhenAllAreIncompatible() {
@@ -424,7 +424,7 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
                         supportsThinking: false,
                         supportsStructuredOutput: true,
                         supportsToolUse: true,
-                        bestFor: [.quick]
+                        bestFor: [.primary]
                     )
                 ),
                 .gemmaE4B: DecisionModelProviderDescriptor(
@@ -444,7 +444,7 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
                         supportsThinking: false,
                         supportsStructuredOutput: true,
                         supportsToolUse: true,
-                        bestFor: [.balance]
+                        bestFor: [.comparative]
                     )
                 )
             ]
@@ -487,7 +487,7 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
             supportsThinking: false,
             supportsStructuredOutput: true,
             supportsToolUse: false,
-            bestFor: [.quick]
+            bestFor: [.primary]
         )
 
         XCTAssertTrue(profile.supports(responseLanguage: .mixed))
@@ -502,10 +502,10 @@ private struct FakeOpenModelAdapter: DecisionOpenModelAdapting {
         title: "Future open model",
         detail: "A fake adapter used to verify that the registry can swap open-model runtimes.",
         taskAffinities: [
-            .quick: 82,
-            .balance: 87,
-            .mirror: 92,
-            .reminder: 80
+            .primary: 82,
+            .comparative: 87,
+            .reflective: 92,
+            .selection: 80
         ]
     )
 

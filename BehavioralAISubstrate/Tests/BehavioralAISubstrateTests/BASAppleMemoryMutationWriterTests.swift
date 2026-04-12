@@ -34,7 +34,7 @@ struct BASAppleMemoryMutationWriterTests {
                 basValue = "Old"
                 basConfidence = 0.4
                 basPriority = 0.4
-                basSource = .history
+                basSource = .archive
                 basLastConfirmedAt = .distantPast
                 basDecayPolicy = .fast
                 basRetrievalTags = ["old"]
@@ -60,7 +60,7 @@ struct BASAppleMemoryMutationWriterTests {
                     value: "Decide Tomorrow",
                     confidence: 0.72,
                     priority: 0.79,
-                    source: .history,
+                    source: .archive,
                     lastConfirmedAt: Date(timeIntervalSince1970: 1_744_156_800),
                     decayPolicy: .medium,
                     retrievalTags: ["decidetomorrow", "delay", "support", "tomorrow"],

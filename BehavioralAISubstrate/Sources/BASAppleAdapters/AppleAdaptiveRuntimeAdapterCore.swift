@@ -226,7 +226,7 @@ public enum BASAppleAdaptiveRuntimeAdapter {
         case "off", "simulator", "conservativeDeterministic":
             BASReferenceProviderRuntime.templateProviderID
         case "balancedGemma":
-            kindID == BASAdaptiveTraceKind.quick.rawValue
+            BASAdaptiveTraceKind(identifier: kindID) == .primary
                 ? BASReferenceProviderRuntime.templateProviderID
                 : preferredProviderID
         case "testingOverride", "fullGemma", "systemManaged":

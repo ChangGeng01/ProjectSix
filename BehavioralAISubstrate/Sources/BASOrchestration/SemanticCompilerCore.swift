@@ -3,60 +3,71 @@ import BASPolicy
 import BASRuntimeCore
 
 public enum BASSemanticTaskKind: String, Codable, Sendable, CaseIterable {
-    case quick
-    case balance
-    case mirror
-    case reminder
+    case primary = "primary"
+    case comparative = "comparative"
+    case reflective = "reflective"
+    case selection = "selection"
 
     public static let primaryID = "primary"
     public static let comparativeID = "comparative"
     public static let reflectiveID = "reflective"
-    public static let reminderID = "reminder"
-
-    public static var primary: Self { .quick }
-    public static var comparative: Self { .balance }
-    public static var reflective: Self { .mirror }
+    public static let selectionID = "selection"
 
     public var identifier: String {
         switch self {
-        case .quick:
+        case .primary:
             Self.primaryID
-        case .balance:
+        case .comparative:
             Self.comparativeID
-        case .mirror:
+        case .reflective:
             Self.reflectiveID
-        case .reminder:
-            Self.reminderID
+        case .selection:
+            Self.selectionID
         }
     }
 
-    public var legacyIdentifier: String { rawValue }
-
     public init?(identifier: String) {
         switch identifier {
-        case Self.primaryID, "quick":
-            self = .quick
-        case Self.comparativeID, "balance":
-            self = .balance
-        case Self.reflectiveID, "mirror":
-            self = .mirror
-        case Self.reminderID, "reminder":
-            self = .reminder
+        case Self.primaryID:
+            self = .primary
+        case Self.comparativeID:
+            self = .comparative
+        case Self.reflectiveID:
+            self = .reflective
+        case Self.selectionID:
+            self = .selection
         default:
             return nil
         }
     }
 
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let identifier = try container.decode(String.self)
+        guard let kind = BASSemanticTaskKind(identifier: identifier) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unsupported semantic task kind: \(identifier)"
+            )
+        }
+        self = kind
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+
     public var title: String {
         switch self {
-        case .quick:
+        case .primary:
             "Primary"
-        case .balance:
+        case .comparative:
             "Comparative"
-        case .mirror:
+        case .reflective:
             "Reflective"
-        case .reminder:
-            "Reminder"
+        case .selection:
+            "Selection"
         }
     }
 }
@@ -523,7 +534,7 @@ public enum BASSemanticContextCompiler {
         for request: BASSemanticContextRequest
     ) -> BASSemanticCompactionPolicy {
         let compactMobileSurface = request.strategy?.runtimeGear == .low &&
-            (request.kind == .quick || request.kind == .reminder)
+            (request.kind == .primary || request.kind == .selection)
 
         var preservedKinds: [BASSemanticPromptBlockKind] = [
             .frontstageState,
@@ -531,7 +542,7 @@ public enum BASSemanticContextCompiler {
             .outputGuard
         ]
         if !compactMobileSurface &&
-            (request.kind == .quick || request.kind == .reminder || request.strategy != nil) {
+            (request.kind == .primary || request.kind == .selection || request.strategy != nil) {
             preservedKinds.append(.evidenceSnippets)
         }
         if request.includeStructuredTruthBlock, request.structuredTruth != nil {
@@ -545,25 +556,25 @@ public enum BASSemanticContextCompiler {
         }
 
         let guidance: [String] = switch request.kind {
-        case .quick:
+        case .primary:
             [
                 "Preserve the interruption goal, current state, and retained evidence before any historical detail.",
                 "Prefer stable user patterns and active goals over full historical projections."
             ]
-        case .balance:
+        case .comparative:
             [
                 "Preserve the trade-off state and live evidence before reflective depth.",
-                "Keep active goals and local biases in view even if deeper history is trimmed."
+                "Keep active goals and local biases in view even if deeper archived context is trimmed."
             ]
-        case .mirror:
+        case .reflective:
             [
-                "Preserve the core tension, active goals, and local boundary biases before deeper history.",
+                "Preserve the core tension, active goals, and local boundary biases before deeper archived context.",
                 "Retain stable identity and goal anchors even when reflective detail is compacted."
             ]
-        case .reminder:
+        case .selection:
             [
-                "Preserve the current state and governed memory scope before broader history.",
-                "Choose from retained candidates without inventing new reminders."
+                "Preserve the current state and governed memory scope before broader archived context.",
+                "Choose from retained candidates without inventing new cue text."
             ]
         }
 

@@ -3,29 +3,15 @@ import BASHostKit
 
 extension DecisionMemorySource {
     init(_ source: BASMemorySource) {
-        switch source {
-        case .history:
-            self = .history
-        case .reflection:
-            self = .reflection
-        case .reminder:
-            self = .reminder
-        case .pattern:
-            self = .pattern
-        }
+        self = DecisionMemorySource(
+            rawValue: BeforeLegacyMigration.normalizedHostMemorySourceIdentifier(source.rawValue)
+        ) ?? .pattern
     }
 
     var basSource: BASMemorySource {
-        switch self {
-        case .history:
-            .history
-        case .reflection:
-            .reflection
-        case .reminder:
-            .reminder
-        case .pattern:
-            .pattern
-        }
+        BASMemorySource(
+            rawValue: BeforeLegacyMigration.normalizedMemorySourceIdentifier(rawValue)
+        ) ?? .pattern
     }
 }
 
@@ -184,9 +170,9 @@ extension DecisionMemoryCandidateRecord {
     }
 }
 
-extension SelfReminder: BASAppleReminderMemoryEntity {
-    var basReminderMemoryInput: BASSelfReminderMemoryInput {
-        BASSelfReminderMemoryInput(
+extension SelfReminder: BASAppleCueMemoryEntity {
+    var basCueMemoryInput: BASCueMemoryInput {
+        BASCueMemoryInput(
             content: content,
             lastUsedAt: lastUsedAt
         )
@@ -222,9 +208,9 @@ extension CheckEvent: BASAppleProjectionEventSource {
     }
 }
 
-extension BalanceDecisionRecord: BASAppleBalanceMemoryEntity, BASAppleWorkspaceMemoryEntity {
-    var basBalanceMemoryInput: BASBalanceMemoryInput {
-        BASBalanceMemoryInput(
+extension BalanceDecisionRecord: BASAppleComparativeMemoryEntity, BASAppleWorkspaceMemoryEntity {
+    var basComparativeMemoryInput: BASComparativeMemoryInput {
+        BASComparativeMemoryInput(
             prompt: prompt,
             longTerm: longTerm,
             updatedAt: updatedAt
@@ -241,9 +227,9 @@ extension BalanceDecisionRecord: BASAppleBalanceMemoryEntity, BASAppleWorkspaceM
     }
 }
 
-extension MirrorDecisionRecord: BASAppleMirrorMemoryEntity, BASAppleWorkspaceMemoryEntity {
-    var basMirrorMemoryInput: BASMirrorMemoryInput {
-        BASMirrorMemoryInput(
+extension MirrorDecisionRecord: BASAppleReflectiveMemoryEntity, BASAppleWorkspaceMemoryEntity {
+    var basReflectiveMemoryInput: BASReflectiveMemoryInput {
+        BASReflectiveMemoryInput(
             prompt: prompt,
             longTerm: longTerm,
             updatedAt: updatedAt

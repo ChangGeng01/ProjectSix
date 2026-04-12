@@ -9,17 +9,17 @@ struct BASAppleTelemetryAccumulatorTests {
     func accumulatorBuildsSnapshotAndSummary() async {
         let accumulator = BASAppleTelemetryAccumulator(
             config: BASAppleTelemetryAccumulatorConfig(
-                reminderKindRawValue: "reminder",
-                reminderKnowledgeNeedRawValue: "knowledge",
-                reminderControlNeedRawValue: "control",
-                reminderRetrievalBypassReasonRawValues: ["insufficientReminderChoice", "retrievalNotNeeded"],
+                selectionKindRawValue: "selection",
+                selectionKnowledgeNeedRawValue: "knowledge",
+                selectionControlNeedRawValue: "control",
+                selectionRetrievalBypassReasonRawValues: ["insufficientChoiceSpread", "retrievalNotNeeded"],
                 avoidableSkipReasonRawValues: ["templateAlreadySufficient", "insufficientSourceMaterial"]
             )
         )
 
         await accumulator.record(
             from: BASAppleTelemetryRecordInput(
-                kind: "quick",
+                kind: "primary",
                 outcome: .providerSuccess,
                 activeProviderID: "gemmaE4B",
                 attemptedProviderIDs: ["gemmaE4B"],
@@ -44,7 +44,7 @@ struct BASAppleTelemetryAccumulatorTests {
         )
         await accumulator.record(
             from: BASAppleTelemetryRecordInput(
-                kind: "reminder",
+                kind: "selection",
                 outcome: .admissionSkipped,
                 activeProviderID: nil,
                 attemptedProviderIDs: [],
@@ -53,24 +53,24 @@ struct BASAppleTelemetryAccumulatorTests {
                 runtimeTimeBudgetMs: 600,
                 admissionPressureID: "low",
                 admissionSkipReasonID: "retrievalNotNeeded",
-                reminderSelectionNeedID: "control"
+                selectionNeedID: "control"
             )
         )
 
         let snapshot = await accumulator.snapshot()
 
-        #expect(snapshot.requestCountByKind["quick"] == 1)
-        #expect(snapshot.requestCountByKind["reminder"] == 1)
+        #expect(snapshot.requestCountByKind["primary"] == 1)
+        #expect(snapshot.requestCountByKind["selection"] == 1)
         #expect(snapshot.outcomeCount[.providerSuccess] == 1)
         #expect(snapshot.outcomeCount[.admissionSkipped] == 1)
         #expect(snapshot.activeProviderCount["gemmaE4B"] == 1)
         #expect(snapshot.backendCount["coreML"] == 1)
         #expect(snapshot.promptPressureCount["low"] == 2)
-        #expect(snapshot.reminderSelectionNeedCount["control"] == 1)
+        #expect(snapshot.selectionNeedCount["control"] == 1)
         #expect(snapshot.admissionSkipCountByReason["retrievalNotNeeded"] == 1)
         #expect(snapshot.summary.totalRequests == 2)
         #expect(snapshot.summary.lowPressureModelCallRate == 0.5)
-        #expect(snapshot.summary.reminderControlOnlyRate == 1.0)
+        #expect(snapshot.summary.selectionControlOnlyRate == 1.0)
         #expect(snapshot.summary.averageFirstPresentableMs == 45)
     }
 
@@ -78,17 +78,17 @@ struct BASAppleTelemetryAccumulatorTests {
     func accumulatorClearResetsState() async {
         let accumulator = BASAppleTelemetryAccumulator(
             config: BASAppleTelemetryAccumulatorConfig(
-                reminderKindRawValue: "reminder",
-                reminderKnowledgeNeedRawValue: "knowledge",
-                reminderControlNeedRawValue: "control",
-                reminderRetrievalBypassReasonRawValues: ["insufficientReminderChoice", "retrievalNotNeeded"],
+                selectionKindRawValue: "selection",
+                selectionKnowledgeNeedRawValue: "knowledge",
+                selectionControlNeedRawValue: "control",
+                selectionRetrievalBypassReasonRawValues: ["insufficientChoiceSpread", "retrievalNotNeeded"],
                 avoidableSkipReasonRawValues: ["templateAlreadySufficient", "insufficientSourceMaterial"]
             )
         )
 
         await accumulator.record(
             from: BASAppleTelemetryRecordInput(
-                kind: "mirror",
+                kind: "reflective",
                 outcome: .deterministicFallback,
                 activeProviderID: nil,
                 attemptedProviderIDs: ["foundationModels"],

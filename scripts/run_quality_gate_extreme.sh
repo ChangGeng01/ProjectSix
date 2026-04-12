@@ -8,14 +8,14 @@ SIMULATOR_OS="${SIMULATOR_OS:-26.3.1}"
 WATCH_SIMULATOR_NAME="${WATCH_SIMULATOR_NAME:-Apple Watch Series 11 (46mm)}"
 WATCH_SIMULATOR_OS="${WATCH_SIMULATOR_OS:-26.2}"
 DESTINATION="platform=iOS Simulator,name=${SIMULATOR_NAME},OS=${SIMULATOR_OS}"
-WATCH_DESTINATION="platform=watchOS Simulator,name=${WATCH_SIMULATOR_NAME},OS=${WATCH_SIMULATOR_OS}"
+WATCH_DESTINATION="${WATCH_DESTINATION:-generic/platform=watchOS Simulator}"
 DERIVED_DATA_ROOT="/tmp/before-quality-gate-extreme"
 IOS_DERIVED_DATA="$DERIVED_DATA_ROOT/ios"
 UI_DERIVED_DATA="$DERIVED_DATA_ROOT/ui"
 WATCH_DERIVED_DATA="$DERIVED_DATA_ROOT/watch"
 
 typeset -i score=0
-typeset -i total=12
+typeset -i total=13
 
 rm -rf "$DERIVED_DATA_ROOT"
 
@@ -172,6 +172,9 @@ run_with_ui_flake_retry() {
 
 run_step "Double gate passes first" \
   run_with_ui_flake_retry "$ROOT/scripts/run_quality_gate_double.sh"
+
+run_step "SDK boundary and residual checks" \
+  "$ROOT/scripts/check_sdk_import_boundaries.sh"
 
 run_step "Full Before suite pass #3" \
   run_before_tests

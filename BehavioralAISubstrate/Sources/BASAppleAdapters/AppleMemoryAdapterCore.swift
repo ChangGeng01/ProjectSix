@@ -16,8 +16,8 @@ public protocol BASAppleProjectionEventSource {
     var basProjectionEventInput: BASProjectionEventInput { get }
 }
 
-public protocol BASAppleReminderMemoryEntity: PersistentModel {
-    var basReminderMemoryInput: BASSelfReminderMemoryInput { get }
+public protocol BASAppleCueMemoryEntity: PersistentModel {
+    var basCueMemoryInput: BASCueMemoryInput { get }
 }
 
 public protocol BASAppleCheckEventMemoryEntity: PersistentModel {
@@ -32,24 +32,8 @@ public protocol BASAppleComparativeMemoryEntity: PersistentModel {
     var basComparativeMemoryInput: BASComparativeMemoryInput { get }
 }
 
-public protocol BASAppleBalanceMemoryEntity: BASAppleComparativeMemoryEntity {
-    var basBalanceMemoryInput: BASBalanceMemoryInput { get }
-}
-
-public extension BASAppleBalanceMemoryEntity {
-    var basComparativeMemoryInput: BASComparativeMemoryInput { basBalanceMemoryInput }
-}
-
 public protocol BASAppleReflectiveMemoryEntity: PersistentModel {
     var basReflectiveMemoryInput: BASReflectiveMemoryInput { get }
-}
-
-public protocol BASAppleMirrorMemoryEntity: BASAppleReflectiveMemoryEntity {
-    var basMirrorMemoryInput: BASMirrorMemoryInput { get }
-}
-
-public extension BASAppleMirrorMemoryEntity {
-    var basReflectiveMemoryInput: BASReflectiveMemoryInput { basMirrorMemoryInput }
 }
 
 public struct BASAppleProjectionGovernanceSnapshot: Codable, Equatable, Sendable {
@@ -166,11 +150,11 @@ public enum BASAppleMemoryDraftDerivationAdapter {
     }
 
     public static func deriveDrafts<
-        Reminder: BASAppleReminderMemoryEntity,
+        Cue: BASAppleCueMemoryEntity,
         Event: BASAppleCheckEventMemoryEntity,
         Workspace: BASAppleWorkspaceMemoryEntity
     >(
-        reminders: [Reminder],
+        cues: [Cue],
         checkEvents: [Event],
         workspaceRecords: [Workspace],
         now: Date,
@@ -178,8 +162,8 @@ public enum BASAppleMemoryDraftDerivationAdapter {
     ) -> [BASDerivedMemoryDraft] {
         deriveDrafts(
             BASMemoryDerivationRequest(
-                reminders: reminders
-                    .map(\.basReminderMemoryInput)
+                cues: cues
+                    .map(\.basCueMemoryInput)
                     .sorted { $0.lastUsedAt > $1.lastUsedAt },
                 checkEvents: checkEvents
                     .map(\.basCheckEventMemoryInput)
@@ -194,12 +178,12 @@ public enum BASAppleMemoryDraftDerivationAdapter {
     }
 
     public static func deriveDrafts<
-        Reminder: BASAppleReminderMemoryEntity,
+        Cue: BASAppleCueMemoryEntity,
         Event: BASAppleCheckEventMemoryEntity,
         Comparative: BASAppleComparativeMemoryEntity,
         Reflective: BASAppleReflectiveMemoryEntity
     >(
-        reminders: [Reminder],
+        cues: [Cue],
         checkEvents: [Event],
         comparativeRecords: [Comparative],
         reflectiveRecords: [Reflective],
@@ -208,8 +192,8 @@ public enum BASAppleMemoryDraftDerivationAdapter {
     ) -> [BASDerivedMemoryDraft] {
         deriveDrafts(
             BASMemoryDerivationRequest(
-                reminders: reminders
-                    .map(\.basReminderMemoryInput)
+                cues: cues
+                    .map(\.basCueMemoryInput)
                     .sorted { $0.lastUsedAt > $1.lastUsedAt },
                 checkEvents: checkEvents
                     .map(\.basCheckEventMemoryInput)
@@ -226,26 +210,26 @@ public enum BASAppleMemoryDraftDerivationAdapter {
     }
 
     public static func deriveDrafts<
-        Reminder: BASAppleReminderMemoryEntity,
+        Cue: BASAppleCueMemoryEntity,
         Event: BASAppleCheckEventMemoryEntity,
         Comparative: BASAppleComparativeMemoryEntity,
         Reflective: BASAppleReflectiveMemoryEntity
     >(
         in context: ModelContext,
         now: Date,
-        reminderType: Reminder.Type,
+        cueType: Cue.Type,
         checkEventType: Event.Type,
         comparativeRecordType: Comparative.Type,
         reflectiveRecordType: Reflective.Type,
         behavior: BASMemoryDerivationBehavior = .generic
     ) -> [BASDerivedMemoryDraft] {
-        let reminders = (try? context.fetch(FetchDescriptor<Reminder>())) ?? []
+        let cues = (try? context.fetch(FetchDescriptor<Cue>())) ?? []
         let checkEvents = (try? context.fetch(FetchDescriptor<Event>())) ?? []
         let comparativeRecords = (try? context.fetch(FetchDescriptor<Comparative>())) ?? []
         let reflectiveRecords = (try? context.fetch(FetchDescriptor<Reflective>())) ?? []
 
         return deriveDrafts(
-            reminders: reminders,
+            cues: cues,
             checkEvents: checkEvents,
             comparativeRecords: comparativeRecords,
             reflectiveRecords: reflectiveRecords,
@@ -254,51 +238,4 @@ public enum BASAppleMemoryDraftDerivationAdapter {
         )
     }
 
-    public static func deriveDrafts<
-        Reminder: BASAppleReminderMemoryEntity,
-        Event: BASAppleCheckEventMemoryEntity,
-        Balance: BASAppleBalanceMemoryEntity,
-        Mirror: BASAppleMirrorMemoryEntity
-    >(
-        reminders: [Reminder],
-        checkEvents: [Event],
-        balanceRecords: [Balance],
-        mirrorRecords: [Mirror],
-        now: Date,
-        behavior: BASMemoryDerivationBehavior = .generic
-    ) -> [BASDerivedMemoryDraft] {
-        deriveDrafts(
-            reminders: reminders,
-            checkEvents: checkEvents,
-            comparativeRecords: balanceRecords,
-            reflectiveRecords: mirrorRecords,
-            now: now,
-            behavior: behavior
-        )
-    }
-
-    public static func deriveDrafts<
-        Reminder: BASAppleReminderMemoryEntity,
-        Event: BASAppleCheckEventMemoryEntity,
-        Balance: BASAppleBalanceMemoryEntity,
-        Mirror: BASAppleMirrorMemoryEntity
-    >(
-        in context: ModelContext,
-        now: Date,
-        reminderType: Reminder.Type,
-        checkEventType: Event.Type,
-        balanceRecordType: Balance.Type,
-        mirrorRecordType: Mirror.Type,
-        behavior: BASMemoryDerivationBehavior = .generic
-    ) -> [BASDerivedMemoryDraft] {
-        deriveDrafts(
-            in: context,
-            now: now,
-            reminderType: reminderType,
-            checkEventType: checkEventType,
-            comparativeRecordType: balanceRecordType,
-            reflectiveRecordType: mirrorRecordType,
-            behavior: behavior
-        )
-    }
 }

@@ -67,14 +67,8 @@ public struct BASBrainBootstrapAdvisorBehavior: Codable, Equatable, Sendable {
             ["buy", "purchase", "pay", "checkout", "upgrade", "subscribe"],
             ["delete", "remove", "erase", "cancel", "quit"]
         ],
-        nightFallbackRiskLevelByModeID: [String: String] = [
-            BASDecisionMode.primaryID: BASRiskLevel.medium.rawValue,
-            BASDecisionMode.comparativeID: BASRiskLevel.high.rawValue,
-            BASDecisionMode.reflectiveID: BASRiskLevel.high.rawValue
-        ],
-        defaultRiskLevelByModeID: [String: String] = [
-            BASDecisionMode.reflectiveID: BASRiskLevel.medium.rawValue
-        ],
+        nightFallbackRiskLevelByModeID: [String: String] = [:],
+        defaultRiskLevelByModeID: [String: String] = [:],
         defaultNightFallbackRiskLevelID: String = BASRiskLevel.high.rawValue,
         defaultDayRiskLevelID: String = BASRiskLevel.low.rawValue
     ) {

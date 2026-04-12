@@ -34,7 +34,7 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
             basValue = id
             basConfidence = 0.9
             basPriority = priority
-            basSourceRaw = BASMemorySource.history.rawValue
+            basSourceRaw = BASMemorySource.archive.rawValue
             basLastConfirmedAt = lastConfirmedAt
             basDecayPolicyRaw = BASMemoryDecayPolicy.medium.rawValue
             basRetrievalTags = [id]
@@ -51,7 +51,7 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
         }
 
         var basSource: BASMemorySource {
-            get { BASMemorySource(rawValue: basSourceRaw) ?? .history }
+            get { BASMemorySource(rawValue: basSourceRaw) ?? .archive }
             set { basSourceRaw = newValue.rawValue }
         }
 
@@ -126,7 +126,7 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
             basValue = id
             basConfidence = 0.7
             basPriority = priority
-            basSourceRaw = BASMemorySource.history.rawValue
+            basSourceRaw = BASMemorySource.archive.rawValue
             basFirstObservedAt = lastObservedAt.addingTimeInterval(-60)
             basLastObservedAt = lastObservedAt
             basDecayPolicyRaw = BASMemoryDecayPolicy.medium.rawValue
@@ -153,7 +153,7 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
         }
 
         var basSource: BASMemorySource {
-            get { BASMemorySource(rawValue: basSourceRaw) ?? .history }
+            get { BASMemorySource(rawValue: basSourceRaw) ?? .archive }
             set { basSourceRaw = newValue.rawValue }
         }
 
@@ -230,7 +230,7 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
     }
 
     @Model
-    final class SelectionBalanceFixture: BASAppleBalanceMemoryEntity {
+    final class SelectionComparativeFixture: BASAppleComparativeMemoryEntity {
         @Attribute(.unique) var id: UUID
         var updatedAt: Date
         var prompt: String
@@ -243,8 +243,8 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
             self.updatedAt = updatedAt
         }
 
-        var basBalanceMemoryInput: BASBalanceMemoryInput {
-            BASBalanceMemoryInput(
+        var basComparativeMemoryInput: BASComparativeMemoryInput {
+            BASComparativeMemoryInput(
                 prompt: prompt,
                 longTerm: longTerm,
                 updatedAt: updatedAt
@@ -253,7 +253,7 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
     }
 
     @Model
-    final class SelectionMirrorFixture: BASAppleMirrorMemoryEntity {
+    final class SelectionReflectiveFixture: BASAppleReflectiveMemoryEntity {
         @Attribute(.unique) var id: UUID
         var updatedAt: Date
         var prompt: String
@@ -266,8 +266,8 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
             self.updatedAt = updatedAt
         }
 
-        var basMirrorMemoryInput: BASMirrorMemoryInput {
-            BASMirrorMemoryInput(
+        var basReflectiveMemoryInput: BASReflectiveMemoryInput {
+            BASReflectiveMemoryInput(
                 prompt: prompt,
                 longTerm: longTerm,
                 updatedAt: updatedAt
@@ -331,23 +331,23 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
         let context = try makeContext()
         context.insert(SelectionCheckEventFixture(id: "check-b", createdAt: now.addingTimeInterval(-10)))
         context.insert(SelectionCheckEventFixture(id: "check-a", createdAt: now))
-        context.insert(SelectionBalanceFixture(prompt: "balance-b", updatedAt: now.addingTimeInterval(-10)))
-        context.insert(SelectionBalanceFixture(prompt: "balance-a", updatedAt: now))
-        context.insert(SelectionMirrorFixture(prompt: "mirror-b", updatedAt: now.addingTimeInterval(-10)))
-        context.insert(SelectionMirrorFixture(prompt: "mirror-a", updatedAt: now))
+        context.insert(SelectionComparativeFixture(prompt: "comparative-b", updatedAt: now.addingTimeInterval(-10)))
+        context.insert(SelectionComparativeFixture(prompt: "comparative-a", updatedAt: now))
+        context.insert(SelectionReflectiveFixture(prompt: "reflective-b", updatedAt: now.addingTimeInterval(-10)))
+        context.insert(SelectionReflectiveFixture(prompt: "reflective-a", updatedAt: now))
         try context.save()
 
         let checks = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionCheckEvents(
             in: context,
             eventType: SelectionCheckEventFixture.self
         )
-        let balances = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionComparativeRecords(
+        let comparativeRecords = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionComparativeRecords(
             in: context,
-            comparativeType: SelectionBalanceFixture.self
+            comparativeType: SelectionComparativeFixture.self
         )
-        let mirrors = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionReflectiveRecords(
+        let reflectiveRecords = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionReflectiveRecords(
             in: context,
-            reflectiveType: SelectionMirrorFixture.self
+            reflectiveType: SelectionReflectiveFixture.self
         )
         let genericChecks = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionTemporalEntries(
             in: context,
@@ -357,21 +357,21 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
         )
         let genericBalances = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionTemporalEntries(
             in: context,
-            entryType: SelectionBalanceFixture.self,
-            timestamp: { $0.basBalanceMemoryInput.updatedAt }
+            entryType: SelectionComparativeFixture.self,
+            timestamp: { $0.basComparativeMemoryInput.updatedAt }
         )
         let genericMirrors = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionTemporalEntries(
             in: context,
-            entryType: SelectionMirrorFixture.self,
-            timestamp: { $0.basMirrorMemoryInput.updatedAt }
+            entryType: SelectionReflectiveFixture.self,
+            timestamp: { $0.basReflectiveMemoryInput.updatedAt }
         )
 
         #expect(checks.map(\.id) == ["check-a", "check-b"])
-        #expect(balances.map(\.prompt) == ["balance-a", "balance-b"])
-        #expect(mirrors.map(\.prompt) == ["mirror-a", "mirror-b"])
+        #expect(comparativeRecords.map(\.prompt) == ["comparative-a", "comparative-b"])
+        #expect(reflectiveRecords.map(\.prompt) == ["reflective-a", "reflective-b"])
         #expect(genericChecks.map(\.id) == ["check-a", "check-b"])
-        #expect(genericBalances.map(\.prompt) == ["balance-a", "balance-b"])
-        #expect(genericMirrors.map(\.prompt) == ["mirror-a", "mirror-b"])
+        #expect(genericBalances.map(\.prompt) == ["comparative-a", "comparative-b"])
+        #expect(genericMirrors.map(\.prompt) == ["reflective-a", "reflective-b"])
     }
 
     private func makeContext() throws -> ModelContext {
@@ -379,8 +379,8 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
             GovernedFixture.self,
             CandidateFixture.self,
             SelectionCheckEventFixture.self,
-            SelectionBalanceFixture.self,
-            SelectionMirrorFixture.self
+            SelectionComparativeFixture.self,
+            SelectionReflectiveFixture.self
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: configuration)

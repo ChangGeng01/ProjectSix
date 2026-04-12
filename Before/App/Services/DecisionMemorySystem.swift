@@ -3,7 +3,7 @@ import SwiftData
 import BASHostKit
 
 enum DecisionMemorySystem {
-    static let projectionRefreshLimits = BeforeProductLanguage.hostLifecycleBehavior.projectionRefreshLimits
+    static let projectionRefreshLimits = BeforeProductCompatibility.projectionRefreshLimits
     static let projectionRecordLimit = projectionRefreshLimits.recordLimit
     static let projectionCandidateLimit = projectionRefreshLimits.candidateLimit
     static let projectionCheckEventLimit = projectionRefreshLimits.checkEventLimit
@@ -20,12 +20,12 @@ enum DecisionMemorySystem {
         > = BASAppleMemoryGovernanceAdapter.refreshStoredMemories(
             in: context,
             now: now,
-            reminderType: SelfReminder.self,
+            cueType: SelfReminder.self,
             checkEventType: CheckEvent.self,
             comparativeRecordType: BalanceDecisionRecord.self,
             reflectiveRecordType: MirrorDecisionRecord.self,
-            behavior: BeforeProductLanguage.memoryDerivationBehavior,
-            memoryTrustBehavior: BeforeProductLanguage.hostCognition.substrateBehavior.memoryTrust,
+            behavior: BeforeProductCompatibility.memoryDerivationBehavior,
+            memoryTrustBehavior: BeforeProductCompatibility.memoryTrustBehavior,
             onSaveError: { error in
                 PersistenceIssueRecorder.record(
                     error: error,
@@ -46,12 +46,12 @@ enum DecisionMemorySystem {
             limits: projectionRefreshLimits,
             recordType: DecisionMemoryRecord.self,
             candidateType: DecisionMemoryCandidateRecord.self,
-            reminderType: SelfReminder.self,
+            cueType: SelfReminder.self,
             checkEventType: CheckEvent.self,
             comparativeRecordType: BalanceDecisionRecord.self,
             reflectiveRecordType: MirrorDecisionRecord.self,
-            behavior: BeforeProductLanguage.memoryDerivationBehavior,
-            memoryTrustBehavior: BeforeProductLanguage.hostCognition.substrateBehavior.memoryTrust,
+            behavior: BeforeProductCompatibility.memoryDerivationBehavior,
+            memoryTrustBehavior: BeforeProductCompatibility.memoryTrustBehavior,
             rebuildEmbeddings: { records, candidates, checkEvents, comparativeRecords, reflectiveRecords in
                 EmbeddingMemoryStore.rebuildIndex(
                     records: records,
@@ -93,17 +93,39 @@ enum DecisionMemorySystem {
         retrievalMode: DecisionRetrievalMode = .filtered,
         now: Date = .now
     ) -> DecisionBrainState {
-        BASAppleCurrentBrainProjectionStateCompiler.appSessionBrainState(
-            modeID: mode.rawValue,
-            prompt: prompt,
-            projection: projection.baseProjection,
-            retrievalMode: retrievalMode.rawValue,
-            reactionWeightSeed: BeforeProductLanguage.reactionWeights(for: mode),
-            identityProfileOverride: BeforeProductLanguage.identityProfile(for: mode),
-            cognitionBehavior: BeforeProductLanguage.hostCognition.substrateBehavior,
-            preferredLanguages: Locale.preferredLanguages,
-            now: now
-        )
+        do {
+            return try BASAppleCurrentBrainProjectionStateCompiler.appSessionBrainState(
+                modeID: mode.substrateModeID,
+                prompt: prompt,
+                projection: projection.baseProjection,
+                retrievalMode: retrievalMode.rawValue,
+                reactionWeightSeed: BeforeProductCompatibility.reactionWeights(for: mode),
+                identityProfileOverride: BeforeProductCompatibility.identityProfile(for: mode),
+                cognitionBehavior: BeforeProductCompatibility.substrateCognitionBehavior,
+                preferredLanguages: Locale.preferredLanguages,
+                now: now
+            )
+        } catch {
+            PersistenceIssueRecorder.record(
+                error: error,
+                operation: "bootstrapping current brain state from projection"
+            )
+            let relevantMemories = projection.baseProjection.records
+                .prefix(3)
+                .map(\.content)
+            let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            return DecisionBrainState(
+                profileCore: [],
+                activeGoals: trimmedPrompt.isEmpty ? [] : [trimmedPrompt],
+                relevantMemories: relevantMemories,
+                sessionBiases: ["brain-bootstrap-fallback", "retrieval:\(retrievalMode.rawValue)"],
+                retrievalTags: ["fallback", "retrieval:\(retrievalMode.rawValue)"],
+                reactionWeights: BeforeProductCompatibility.reactionWeights(for: mode),
+                identityProfile: BeforeProductCompatibility.identityProfile(for: mode),
+                boundaryPolicy: .default(riskLevel: InterventionRiskLevel.low),
+                loadedAt: now
+            )
+        }
     }
 
     static func fetchMemoryRecords(

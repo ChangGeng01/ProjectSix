@@ -19,7 +19,7 @@ struct BASAppleProviderOutcomeObserverTests {
     }
 
     private enum MockTraceKind: String, Sendable {
-        case quick
+        case primary
     }
 
     private enum MockProviderKind: String, Sendable {
@@ -67,44 +67,44 @@ struct BASAppleProviderOutcomeObserverTests {
 
     @Test("observation context builder owns task-specific narrative presets")
     func observationContextBuilderOwnsNarrativePresets() {
-        let quick = BASAppleProviderObservationContextBuilder.build(
+        let primary = BASAppleProviderObservationContextBuilder.build(
             from: BASAppleProviderObservationSourceInput(
-                kind: "quick",
+                kind: "primary",
                 preferredProviderID: "foundationModels",
                 allowFallbacks: true,
                 providerProfilesByID: [:],
-                prompt: "quick prompt",
-                baselineOutputPreview: "quick preview",
-                deterministicFallbackOutputPreview: "quick fallback",
+                prompt: "primary prompt",
+                baselineOutputPreview: "primary preview",
+                deterministicFallbackOutputPreview: "primary fallback",
                 recordsTemplatePinnedTrace: true
             )
         )
-        let reminder = BASAppleProviderObservationContextBuilder.build(
+        let selection = BASAppleProviderObservationContextBuilder.build(
             from: BASAppleProviderObservationSourceInput(
-                kind: "reminder",
+                kind: "selection",
                 preferredProviderID: "foundationModels",
                 allowFallbacks: true,
                 providerProfilesByID: [:],
-                prompt: "reminder prompt",
+                prompt: "selection prompt",
                 baselineOutputPreview: "keep ordering",
-                deterministicFallbackOutputPreview: "no reminder",
+                deterministicFallbackOutputPreview: "no selection candidate",
                 recordsTemplatePinnedTrace: false
             )
         )
 
-        #expect(quick.templatePinnedDetail.contains("primary pass"))
-        #expect(quick.admissionSkippedOutputPreview == "quick preview")
-        #expect(quick.cachedConsistencySource == "cached primary pass")
-        #expect(reminder.templatePinnedDetail.contains("reminder selection"))
-        #expect(reminder.providerConsistencySource == "provider reminder selection")
-        #expect(reminder.deterministicFallbackOutputPreview == "no reminder")
+        #expect(primary.templatePinnedDetail.contains("primary pass"))
+        #expect(primary.admissionSkippedOutputPreview == "primary preview")
+        #expect(primary.cachedConsistencySource == "cached primary pass")
+        #expect(selection.templatePinnedDetail.contains("selection pass"))
+        #expect(selection.providerConsistencySource == "provider selection pass")
+        #expect(selection.deterministicFallbackOutputPreview == "no selection candidate")
     }
 
     @Test("observation context builder lets hosts override provider narratives")
     func observationContextBuilderSupportsHostNarratives() {
         let context = BASAppleProviderObservationContextBuilder.build(
             from: BASAppleProviderObservationSourceInput(
-                kind: "quick",
+                kind: "primary",
                 preferredProviderID: "foundationModels",
                 allowFallbacks: true,
                 providerProfilesByID: [:],
@@ -130,7 +130,7 @@ struct BASAppleProviderOutcomeObserverTests {
     @Test("host observation bridge builds host context while keeping substrate narrative compilation package-owned")
     func hostObservationBridgeBuildsHostContext() {
         let context = BASAppleHostProviderObservationBridge.context(
-            kind: MockTraceKind.quick,
+            kind: MockTraceKind.primary,
             frontstageState: "frontstage",
             contextState: "scoped",
             neuralState: "neural",
@@ -139,18 +139,18 @@ struct BASAppleProviderOutcomeObserverTests {
             promptBudget: "budget",
             admissionDecision: "admission",
             sourceInput: BASAppleProviderObservationSourceInput(
-                kind: "quick",
+                kind: "primary",
                 preferredProviderID: "foundationModels",
                 allowFallbacks: true,
                 providerProfilesByID: [:],
-                prompt: "quick prompt",
-                baselineOutputPreview: "quick preview",
+                prompt: "primary prompt",
+                baselineOutputPreview: "primary preview",
                 deterministicFallbackOutputPreview: "fallback preview",
                 recordsTemplatePinnedTrace: true
             )
         )
 
-        #expect(context.kind == .quick)
+        #expect(context.kind == MockTraceKind.primary)
         #expect(context.frontstageState == "frontstage")
         #expect(context.brainState == "brain")
         #expect(context.substrateContext.templatePinnedDetail.contains("primary pass"))
@@ -165,7 +165,7 @@ struct BASAppleProviderOutcomeObserverTests {
                 considerRuntimeTestingContext: false,
                 runtimeTestingContextDetected: false,
                 testingOverridePresent: false,
-                kind: "quick",
+                kind: "primary",
                 preferredProviderID: "foundationModels",
                 activeProviderID: "gemmaE4B",
                 attemptedProviderIDs: ["foundationModels", "gemmaE4B"],
@@ -191,7 +191,7 @@ struct BASAppleProviderOutcomeObserverTests {
         )
         let telemetry = BASAppleProviderOutcomeObserver.telemetryObservation(
             from: BASAppleTelemetryRecordInput(
-                kind: "mirror",
+                kind: "reflective",
                 outcome: .providerSuccess,
                 activeProviderID: "gemmaE4B",
                 attemptedProviderIDs: ["foundationModels", "gemmaE4B"],
@@ -226,7 +226,7 @@ struct BASAppleProviderOutcomeObserverTests {
     @Test("observer can compile provider request events into trace telemetry and circuit outputs")
     func observerCompilesObservedProviderEvents() {
         let context = BASAppleProviderObservationContext(
-            kind: "quick",
+            kind: "primary",
             preferredProviderID: "foundationModels",
             allowFallbacks: true,
             providerProfilesByID: [
@@ -266,7 +266,7 @@ struct BASAppleProviderOutcomeObserverTests {
         let event = BASProviderRequestEvent.providerSuccess(
             BASProviderRequestAttemptEvent(
                 planSummary: BASProviderRequestPlanSummary(
-                    task: .quick,
+                    task: .primary,
                     preferredProviderID: "foundationModels",
                     orderedProviderIDs: ["foundationModels", "gemmaE4B"],
                     resolvedProviderIDs: ["foundationModels", "gemmaE4B"],
@@ -303,7 +303,7 @@ struct BASAppleProviderOutcomeObserverTests {
         #expect(observation.circuitEvents == [
             BASAppleProviderCircuitEvent.providerSuccess(
                 providerID: "gemmaE4B",
-                kind: "quick",
+                kind: "primary",
                 durationMs: 640
             )
         ])
@@ -333,7 +333,7 @@ struct BASAppleProviderOutcomeObserverTests {
         )
         let substrateContext = BASAppleProviderObservationContextBuilder.build(
             from: BASAppleProviderObservationSourceInput(
-                kind: "quick",
+                kind: "primary",
                 preferredProviderID: "foundationModels",
                 allowFallbacks: true,
                 providerProfilesByID: profiles,
@@ -350,7 +350,7 @@ struct BASAppleProviderOutcomeObserverTests {
         )
         let traceRecord = BASAppleHostProviderObservationBridge.traceRecord(
             context: BASAppleHostProviderObservationContext(
-                kind: MockTraceKind.quick,
+                kind: MockTraceKind.primary,
                 frontstageState: "frontstage",
                 contextState: "context",
                 neuralState: "neural",
@@ -383,7 +383,7 @@ struct BASAppleProviderOutcomeObserverTests {
                         storedPrompt: "[REDACTED LIVE PROMPT]\nsemantic-1",
                         storedOutputPreview: "[REDACTED LIVE OUTPUT]",
                         executionTrace: BASExecutionTrace(
-                            inputSummary: "quick prompt",
+                            inputSummary: "primary prompt",
                             selectedRoute: .local(
                                 "gemmaE4B",
                                 fallbackModelIDs: ["foundationModels"]
@@ -404,7 +404,7 @@ struct BASAppleProviderOutcomeObserverTests {
         )
 
         #expect(profiles["gemmaE4B"]?.activeBackendID == "coreML")
-        #expect(traceRecord.kind == MockTraceKind.quick)
+        #expect(traceRecord.kind == MockTraceKind.primary)
         #expect(traceRecord.preferredProviderID == "foundationModels")
         #expect(traceRecord.activeProviderID == "gemmaE4B")
         #expect(traceRecord.usedFallback)
@@ -452,7 +452,7 @@ struct BASAppleProviderOutcomeObserverTests {
         )
 
         await BASAppleHostProviderObservationBridge.applyCircuitEvent(
-            .providerSuccess(providerID: "gemmaE4B", kind: "quick", durationMs: 640),
+            .providerSuccess(providerID: "gemmaE4B", kind: "primary", durationMs: 640),
             providerForID: MockProviderKind.init(rawValue:),
             kindForID: MockTraceKind.init(rawValue:),
             onCacheHit: { provider in
@@ -469,7 +469,7 @@ struct BASAppleProviderOutcomeObserverTests {
         #expect(recorder.values == [
             "cache:foundationModels",
             "failure:gemmaE4B",
-            "success:gemmaE4B:quick:640"
+            "success:gemmaE4B:primary:640"
         ])
     }
 
@@ -500,7 +500,7 @@ struct BASAppleProviderOutcomeObserverTests {
             String,
             String
         > = BASAppleHostProviderObservationBridge.context(
-            kind: MockTraceKind.quick,
+            kind: MockTraceKind.primary,
             frontstageState: "frontstage",
             contextState: "scoped",
             neuralState: "neural",
@@ -509,7 +509,7 @@ struct BASAppleProviderOutcomeObserverTests {
             promptBudget: "budget",
             admissionDecision: "admission",
             sourceInput: BASAppleProviderObservationSourceInput(
-                kind: "quick",
+                kind: "primary",
                 preferredProviderID: "foundationModels",
                 allowFallbacks: true,
                 providerProfilesByID: [
@@ -534,7 +534,7 @@ struct BASAppleProviderOutcomeObserverTests {
         let event = BASProviderRequestEvent.providerSuccess(
             BASProviderRequestAttemptEvent(
                 planSummary: BASProviderRequestPlanSummary(
-                    task: .quick,
+                    task: .primary,
                     preferredProviderID: "foundationModels",
                     orderedProviderIDs: ["foundationModels", "gemmaE4B"],
                     resolvedProviderIDs: ["foundationModels", "gemmaE4B"],
@@ -580,7 +580,7 @@ struct BASAppleProviderOutcomeObserverTests {
         let (stored, circuits, telemetryProviders, traceDetails) = await recorder.snapshot()
 
         #expect(stored == ["stored-result"])
-        #expect(circuits == ["providerSuccess(providerID: \"gemmaE4B\", kind: \"quick\", durationMs: 640.0)"])
+        #expect(circuits == ["providerSuccess(providerID: \"gemmaE4B\", kind: \"primary\", durationMs: 640.0)"])
         #expect(telemetryProviders == ["gemmaE4B"])
         #expect(traceDetails.count == 1)
         #expect(traceDetails.first?.contains("Gemma") == true)

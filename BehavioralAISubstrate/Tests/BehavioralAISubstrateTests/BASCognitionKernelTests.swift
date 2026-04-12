@@ -30,7 +30,7 @@ struct BASCognitionKernelTests {
                         id: "structured_truth",
                         layer: .active,
                         title: "Truth",
-                        content: "mode=quick; allow=wait; forbid=send_now",
+                        content: "mode=primary; allow=wait; forbid=send_now",
                         retention: .preferred,
                         priority: 90
                     ),

@@ -1,19 +1,18 @@
 import XCTest
-import BASMemory
-import BASPolicy
+import BASHostKit
 @testable import Before
 
 final class DecisionIdentityAndBoundaryTests: XCTestCase {
     func testNotificationHighRiskUsesPredictiveSentinelProfile() {
         let substrateProfile = BASIdentityRoleResolver.resolve(
-            mode: .quick,
+            mode: .primary,
             sourceSurface: .notification,
             riskLevel: .high
         )
 
-        XCTAssertEqual(substrateProfile.role, .predictiveSentinel)
-        XCTAssertEqual(substrateProfile.posture, .protective)
-        XCTAssertEqual(substrateProfile.initiative, .guided)
+        XCTAssertEqual(substrateProfile.role, BASIdentityRole.predictiveSentinel)
+        XCTAssertEqual(substrateProfile.posture, BASIdentityPosture.protective)
+        XCTAssertEqual(substrateProfile.initiative, BASIdentityInitiative.guided)
 
         let profile = DecisionIdentityRoleSystem.resolve(
             mode: .quick,
@@ -66,7 +65,7 @@ final class DecisionIdentityAndBoundaryTests: XCTestCase {
         )
 
         let substratePolicy = BASBoundaryPolicyEvaluator.evaluate(
-            mode: .mirror,
+            mode: .reflective,
             sourceSurface: .watch,
             riskLevel: .high,
             identityProfile: identity,
@@ -79,8 +78,8 @@ final class DecisionIdentityAndBoundaryTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(substratePolicy.mode, .localOnlyProtective)
-        XCTAssertTrue(substratePolicy.activeConstraints.contains(.watchSurfaceLightweight))
+        XCTAssertEqual(substratePolicy.mode, BASBoundaryPolicyMode.localOnlyProtective)
+        XCTAssertTrue(substratePolicy.activeConstraints.contains(BASBoundaryConstraint.watchSurfaceLightweight))
         XCTAssertTrue(substratePolicy.requiredConfirmations.contains("irreversible_decision"))
         XCTAssertTrue(substratePolicy.allowedActionClasses.contains("checkpoint_reopen"))
 

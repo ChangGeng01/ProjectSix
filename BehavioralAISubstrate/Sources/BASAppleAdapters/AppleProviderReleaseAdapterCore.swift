@@ -9,7 +9,7 @@ public struct BASAppleProviderReleaseInput: Sendable, Equatable {
     public var outputPreview: String
     public var kernelSnapshot: BASCognitionKernelSnapshot
     public var brainState: BASDecisionBrainState?
-    public var reminderSurfaceModeRawValue: String?
+    public var selectionSurfaceModeRawValue: String?
     public var structuredTruthBehavior: BASStructuredTruthBehavior
     public var referencedFacts: [String: String]
 
@@ -18,7 +18,7 @@ public struct BASAppleProviderReleaseInput: Sendable, Equatable {
         outputPreview: String,
         kernelSnapshot: BASCognitionKernelSnapshot,
         brainState: BASDecisionBrainState?,
-        reminderSurfaceModeRawValue: String? = nil,
+        selectionSurfaceModeRawValue: String? = nil,
         structuredTruthBehavior: BASStructuredTruthBehavior = .generic,
         referencedFacts: [String: String] = [:]
     ) {
@@ -26,7 +26,7 @@ public struct BASAppleProviderReleaseInput: Sendable, Equatable {
         self.outputPreview = outputPreview
         self.kernelSnapshot = kernelSnapshot
         self.brainState = brainState
-        self.reminderSurfaceModeRawValue = reminderSurfaceModeRawValue
+        self.selectionSurfaceModeRawValue = selectionSurfaceModeRawValue
         self.structuredTruthBehavior = structuredTruthBehavior
         self.referencedFacts = referencedFacts
     }
@@ -41,7 +41,7 @@ public enum BASAppleProviderReleaseAdapter {
             .joined(separator: "\n")
     }
 
-    public static func reminderPreview(
+    public static func selectionPreview(
         content: String
     ) -> String {
         content
@@ -62,7 +62,7 @@ public enum BASAppleProviderReleaseAdapter {
         outputPreview: String,
         kernelSnapshot: BASCognitionKernelSnapshot,
         brainState: BASDecisionBrainState?,
-        reminderSurfaceModeRawValue: String? = nil,
+        selectionSurfaceModeRawValue: String? = nil,
         structuredTruthBehavior: BASStructuredTruthBehavior = .generic
     ) -> BASProviderExecutionVerdict<BASProviderReleaseAssessment> {
         verdict(
@@ -71,7 +71,7 @@ public enum BASAppleProviderReleaseAdapter {
                 outputPreview: outputPreview,
                 kernelSnapshot: kernelSnapshot,
                 brainState: brainState,
-                reminderSurfaceModeRawValue: reminderSurfaceModeRawValue,
+                selectionSurfaceModeRawValue: selectionSurfaceModeRawValue,
                 structuredTruthBehavior: structuredTruthBehavior,
                 referencedFacts: referencedFacts(from: brainState)
             )
@@ -86,7 +86,7 @@ public enum BASAppleProviderReleaseAdapter {
             outputPreview: input.outputPreview,
             kernelSnapshot: input.kernelSnapshot,
             brainState: input.brainState,
-            reminderSurfaceModeRawValue: input.reminderSurfaceModeRawValue,
+            selectionSurfaceModeRawValue: input.selectionSurfaceModeRawValue,
             structuredTruthBehavior: input.structuredTruthBehavior,
             referencedFacts: input.referencedFacts
         )

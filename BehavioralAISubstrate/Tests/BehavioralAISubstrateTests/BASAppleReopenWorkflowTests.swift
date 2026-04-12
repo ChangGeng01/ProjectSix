@@ -1,21 +1,22 @@
 import Foundation
 import Testing
 @testable import BASAppleAdapters
+@testable import BASMemory
 
 struct BASAppleReopenWorkflowTests {
-    @Test("decision mode executor routes balance mode deterministically")
+    @Test("decision mode executor routes comparative mode deterministically")
     func decisionModeExecutorRoutesBalanceModeDeterministically() {
         var routed: String?
 
         let handled = BASAppleWorkflowModeExecutor.execute(
-            modeID: "balance",
-            performPrimary: { routed = "quick" },
-            performComparative: { routed = "balance" },
-            performReflective: { routed = "mirror" }
+            modeID: BASDecisionMode.comparativeID,
+            performPrimary: { routed = "primary" },
+            performComparative: { routed = "comparative" },
+            performReflective: { routed = "reflective" }
         )
 
         #expect(handled)
-        #expect(routed == "balance")
+        #expect(routed == "comparative")
     }
 
     @Test("tomorrow box follow-up builder suppresses low risk and creates high-risk suggestion")
@@ -24,7 +25,7 @@ struct BASAppleReopenWorkflowTests {
             riskLevelID: "low",
             title: "Pause",
             detail: "Low risk",
-            modeID: "quick",
+            modeID: BASDecisionMode.primaryID,
             reopenHint: nil,
             templateHint: nil,
             interventionHistorySummary: nil
@@ -33,7 +34,7 @@ struct BASAppleReopenWorkflowTests {
             riskLevelID: "high",
             title: "Pause",
             detail: "High risk",
-            modeID: "balance",
+            modeID: BASDecisionMode.comparativeID,
             reopenHint: "Re-open slowly",
             templateHint: "Use the cooling template",
             interventionHistorySummary: "Delay helped before."
@@ -43,7 +44,7 @@ struct BASAppleReopenWorkflowTests {
         #expect(low.shouldRefreshPredictedIntervention)
         #expect(high.interventionSuggestion?.riskLevelID == "high")
         #expect(high.interventionSuggestion?.title == "Re-open slowly")
-        #expect(high.interventionSuggestion?.suggestedModeID == "balance")
+        #expect(high.interventionSuggestion?.suggestedModeID == BASDecisionMode.comparativeID)
         #expect(high.interventionSuggestion?.reason == "Use the cooling template")
         #expect(high.interventionSuggestion?.evidenceSignalCount == 2)
     }
@@ -59,16 +60,16 @@ struct BASAppleReopenWorkflowTests {
         var persisted = false
 
         BASAppleDeferredReopenExecutor.execute(
-            modeID: "mirror",
+            modeID: BASDecisionMode.reflectiveID,
             promptSeed: "Ignored because draft exists",
             hasDraft: true,
             clearActiveDecisionFlows: { cleared = true },
-            activatePrimaryFromDraft: { activated = "quick" },
-            activateComparativeFromDraft: { activated = "balance" },
-            activateReflectiveFromDraft: { activated = "mirror" },
-            startPrimary: { _ in Issue.record("Unexpected quick start") },
-            startComparative: { _ in Issue.record("Unexpected balance start") },
-            startReflective: { _ in Issue.record("Unexpected mirror start") },
+            activatePrimaryFromDraft: { activated = "primary" },
+            activateComparativeFromDraft: { activated = "comparative" },
+            activateReflectiveFromDraft: { activated = "reflective" },
+            startPrimary: { _ in Issue.record("Unexpected primary start") },
+            startComparative: { _ in Issue.record("Unexpected comparative start") },
+            startReflective: { _ in Issue.record("Unexpected reflective start") },
             removeDeferredItem: { removed = true },
             followUp: BASAppleDeferredReopenFollowUp(
                 interventionSuggestion: BASAppleReopenInterventionSuggestion(
@@ -76,7 +77,7 @@ struct BASAppleReopenWorkflowTests {
                     title: "Re-open slowly",
                     detail: "Delay helped before.",
                     evidenceSignalCount: 2,
-                    suggestedModeID: "mirror",
+                    suggestedModeID: BASDecisionMode.reflectiveID,
                     reason: "Use the cooling template",
                     expiresAt: .now.addingTimeInterval(60)
                 )
@@ -88,7 +89,7 @@ struct BASAppleReopenWorkflowTests {
         )
 
         #expect(cleared)
-        #expect(activated == "mirror")
+        #expect(activated == "reflective")
         #expect(removed)
         #expect(suggestion?.title == "Re-open slowly")
         #expect(refreshed == false)

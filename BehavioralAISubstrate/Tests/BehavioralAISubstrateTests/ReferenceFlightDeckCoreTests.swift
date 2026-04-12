@@ -241,11 +241,11 @@ struct ReferenceFlightDeckCoreTests {
     private func makeInspectionSummary(activeProviderID: String) -> BASRuntimeInspectionSummary {
         let telemetry = BASTelemetrySummaryBuilder.build(
             from: BASTelemetrySummaryInput(
-                requestCountByKind: ["quick": 2],
+                requestCountByKind: ["primary": 2],
                 outcomeCount: [.providerSuccess: 1, .cacheHit: 1],
                 outcomeCountByKind: [
-                    .providerSuccess: ["quick": 1],
-                    .cacheHit: ["quick": 1]
+                    .providerSuccess: ["primary": 1],
+                    .cacheHit: ["primary": 1]
                 ],
                 activeProviderCount: [activeProviderID: 1],
                 attemptedProviderCount: ["gemmaE4B": 1],
@@ -253,35 +253,35 @@ struct ReferenceFlightDeckCoreTests {
                 backendCount: ["cpu": 1],
                 slowRequestCountByKind: [:],
                 overTimeBudgetCountByKind: [:],
-                requestDurationTotalMsByKind: ["quick": 220],
-                firstPresentableTotalMsByKind: ["quick": 140],
-                promptAssemblyTotalMsByKind: ["quick": 40],
-                admissionEvaluationTotalMsByKind: ["quick": 20],
-                providerSelectionTotalMsByKind: ["quick": 10],
-                executionTotalMsByKind: ["quick": 70],
+                requestDurationTotalMsByKind: ["primary": 220],
+                firstPresentableTotalMsByKind: ["primary": 140],
+                promptAssemblyTotalMsByKind: ["primary": 40],
+                admissionEvaluationTotalMsByKind: ["primary": 20],
+                providerSelectionTotalMsByKind: ["primary": 10],
+                executionTotalMsByKind: ["primary": 70],
                 activeProviderDurationTotalMs: [activeProviderID: 220],
                 backendDurationTotalMs: ["cpu": 220],
                 admissionSkipCountByReason: [:],
                 admissionSkipCountByReasonAndKind: [:],
-                reminderSelectionNeedCount: [:],
-                promptCharactersTotalByKind: ["quick": 480],
-                prefixCharactersTotalByKind: ["quick": 180],
-                immutablePrefixCharactersTotalByKind: ["quick": 120],
-                adaptivePrefixCharactersTotalByKind: ["quick": 60],
-                suffixCharactersTotalByKind: ["quick": 300],
+                selectionNeedCount: [:],
+                promptCharactersTotalByKind: ["primary": 480],
+                prefixCharactersTotalByKind: ["primary": 180],
+                immutablePrefixCharactersTotalByKind: ["primary": 120],
+                adaptivePrefixCharactersTotalByKind: ["primary": 60],
+                suffixCharactersTotalByKind: ["primary": 300],
                 overTargetBudgetCountByKind: [:],
-                lowPressureModelCallCountByKind: ["quick": 1],
-                reminderKindRawValue: "reminder",
-                reminderKnowledgeNeedRawValue: "knowledge",
-                reminderControlNeedRawValue: "control",
-                reminderRetrievalBypassReasonRawValues: ["retrievalNotNeeded"],
+                lowPressureModelCallCountByKind: ["primary": 1],
+                selectionKindRawValue: "selection",
+                selectionKnowledgeNeedRawValue: "knowledge",
+                selectionControlNeedRawValue: "control",
+                selectionRetrievalBypassReasonRawValues: ["retrievalNotNeeded"],
                 avoidableSkipReasonRawValues: ["templateAlreadySufficient"]
             )
         )
         let lifecycle = BASLifecycleSummaryBuilder.build(
             from: [
                 BASLifecycleTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     hasContextState: true,
                     generation: 4,
                     rebuiltSession: true,
@@ -299,7 +299,7 @@ struct ReferenceFlightDeckCoreTests {
         let neural = BASNeuralSummaryBuilder.build(
             from: [
                 BASNeuralTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     suppressedBehaviorCount: 1,
                     dominantActionRawValue: "waitBuffer",
                     strongestSignalRawValue: "urgency"
@@ -316,11 +316,11 @@ struct ReferenceFlightDeckCoreTests {
                 environmentClass: .normal,
                 deviceClass: .balancedPhone,
                 languageMode: .english,
-                taskEntropyByKind: ["quick": .low],
-                preferredProviderRawValueByKind: ["quick": "gemmaE4B"],
+                taskEntropyByKind: ["primary": .low],
+                preferredProviderRawValueByKind: ["primary": "gemmaE4B"],
                 strategyByKind: [
-                    "quick": BASAdaptiveTaskStrategy(
-                        kind: .quick,
+                    "primary": BASAdaptiveTaskStrategy(
+                        kind: .primary,
                         entropy: .low,
                         runtimeGear: .low,
                         contextBudget: 220,
@@ -337,13 +337,13 @@ struct ReferenceFlightDeckCoreTests {
                         allowsModelInvocation: true
                     )
                 ],
-                effectivePreferredProviderRawValueByKind: ["quick": "gemmaE4B"],
+                effectivePreferredProviderRawValueByKind: ["primary": "gemmaE4B"],
                 traceInputs: [
                     BASRuntimeInspectionTraceInput(
-                        kind: "quick",
+                        kind: "primary",
                         attemptedProviderIDs: ["gemmaE4B"],
                         runtimeStrategy: BASAdaptiveTaskStrategy(
-                            kind: .quick,
+                            kind: .primary,
                             entropy: .low,
                             runtimeGear: .low,
                             contextBudget: 220,
@@ -389,7 +389,7 @@ struct ReferenceFlightDeckCoreTests {
         BASBrainSummaryBuilder.build(
             from: [
                 BASBrainTraceInput(
-                    kind: "quick",
+                    kind: "primary",
                     dominantReactionWeight: .interruptiveActionBias,
                     profileCoreCount: 1,
                     activeGoalCount: 1,

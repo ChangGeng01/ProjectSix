@@ -3,9 +3,9 @@ import Foundation
 import BASRuntimeCore
 
 public enum BASDecisionMode: String, Codable, Sendable, CaseIterable {
-    case quick
-    case balance
-    case mirror
+    case primary = "primary"
+    case comparative = "comparative"
+    case reflective = "reflective"
 
     public static let primaryID = "primary"
     public static let comparativeID = "comparative"
@@ -16,43 +16,54 @@ public enum BASDecisionMode: String, Codable, Sendable, CaseIterable {
         reflectiveID
     ]
 
-    public static var primary: Self { .quick }
-    public static var comparative: Self { .balance }
-    public static var reflective: Self { .mirror }
-
     public var identifier: String {
         switch self {
-        case .quick:
+        case .primary:
             Self.primaryID
-        case .balance:
+        case .comparative:
             Self.comparativeID
-        case .mirror:
+        case .reflective:
             Self.reflectiveID
         }
     }
 
-    public var legacyIdentifier: String { rawValue }
-
     public init?(identifier: String) {
         switch identifier {
-        case Self.primaryID, "quick":
-            self = .quick
-        case Self.comparativeID, "balance":
-            self = .balance
-        case Self.reflectiveID, "mirror":
-            self = .mirror
+        case Self.primaryID:
+            self = .primary
+        case Self.comparativeID:
+            self = .comparative
+        case Self.reflectiveID:
+            self = .reflective
         default:
             return nil
         }
     }
 
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let identifier = try container.decode(String.self)
+        guard let mode = BASDecisionMode(identifier: identifier) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unsupported decision mode identifier: \(identifier)"
+            )
+        }
+        self = mode
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+
     public var title: String {
         switch self {
-        case .quick:
+        case .primary:
             "Primary"
-        case .balance:
+        case .comparative:
             "Comparative"
-        case .mirror:
+        case .reflective:
             "Reflective"
         }
     }
@@ -88,21 +99,53 @@ public enum BASInteractionSurface: String, Codable, Sendable, CaseIterable {
 }
 
 public enum BASMemorySource: String, Codable, Sendable, CaseIterable {
-    case reminder
+    case cue
     case pattern
     case reflection
-    case history
+    case archive
+
+    public init?(identifier: String) {
+        switch identifier {
+        case Self.cue.rawValue:
+            self = .cue
+        case Self.pattern.rawValue:
+            self = .pattern
+        case Self.reflection.rawValue:
+            self = .reflection
+        case Self.archive.rawValue:
+            self = .archive
+        default:
+            return nil
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let identifier = try container.decode(String.self)
+        guard let source = BASMemorySource(identifier: identifier) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unsupported memory source identifier: \(identifier)"
+            )
+        }
+        self = source
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 
     public var title: String {
         switch self {
-        case .reminder:
-            "Reminder"
+        case .cue:
+            "Cue"
         case .pattern:
             "Pattern"
         case .reflection:
             "Reflection"
-        case .history:
-            "History"
+        case .archive:
+            "Archive"
         }
     }
 }
@@ -148,10 +191,10 @@ public struct BASMemoryTrustBehavior: Codable, Equatable, Sendable {
 
     public init(
         baseScoresBySourceID: [String: Double] = [
-            BASMemorySource.reminder.rawValue: 0.94,
+            BASMemorySource.cue.rawValue: 0.94,
             BASMemorySource.pattern.rawValue: 0.82,
             BASMemorySource.reflection.rawValue: 0.74,
-            BASMemorySource.history.rawValue: 0.66
+            BASMemorySource.archive.rawValue: 0.66
         ],
         governanceAdjustmentsByStatusID: [String: Double] = [
             BASMemoryLoadStatus.admitted.rawValue: 0.04,
@@ -165,9 +208,9 @@ public struct BASMemoryTrustBehavior: Codable, Equatable, Sendable {
             BASMemoryDecayPolicy.fast.rawValue: -0.06
         ],
         sourceDecayMultipliersBySourceID: [String: Double] = [
-            BASMemorySource.reminder.rawValue: 1.32,
+            BASMemorySource.cue.rawValue: 1.32,
             BASMemorySource.pattern.rawValue: 1.12,
-            BASMemorySource.history.rawValue: 0.96,
+            BASMemorySource.archive.rawValue: 0.96,
             BASMemorySource.reflection.rawValue: 0.78
         ],
         governanceDecayMultipliersByStatusID: [String: Double] = [
@@ -1266,8 +1309,11 @@ public enum BASDecisionBrainCompiler {
 
     private static func source(for sourceType: String) -> BASMemorySource {
         let normalized = sourceType.lowercased()
-        if normalized.contains("reminder") {
-            return .reminder
+        if normalized.contains("cue") {
+            return .cue
+        }
+        if normalized.contains("archive") {
+            return .archive
         }
         if normalized.contains("pattern") {
             return .pattern
@@ -1275,7 +1321,7 @@ public enum BASDecisionBrainCompiler {
         if normalized.contains("reflection") {
             return .reflection
         }
-        return .history
+        return .pattern
     }
 
     private static func decay(for memory: BASGovernedMemory) -> BASMemoryDecayPolicy {

@@ -7,7 +7,45 @@ enum BrainStateUpdateSource: String, Codable, Sendable {
     case notification
     case widget
     case explicitRefresh
-    case sessionPrime
+    case sessionBootstrap = "session_bootstrap"
+
+    init?(identifier: String) {
+        switch BeforeLegacyMigration.normalizedBrainStateUpdateSourceIdentifier(identifier) {
+        case Self.launch.rawValue:
+            self = .launch
+        case Self.sceneActive.rawValue:
+            self = .sceneActive
+        case Self.watchHandoff.rawValue:
+            self = .watchHandoff
+        case Self.notification.rawValue:
+            self = .notification
+        case Self.widget.rawValue:
+            self = .widget
+        case Self.explicitRefresh.rawValue:
+            self = .explicitRefresh
+        case Self.sessionBootstrap.rawValue:
+            self = .sessionBootstrap
+        default:
+            return nil
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let identifier = try container.decode(String.self)
+        guard let source = BrainStateUpdateSource(identifier: identifier) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unsupported brain state update source identifier: \(identifier)"
+            )
+        }
+        self = source
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 struct CurrentBrainState: Equatable, Sendable {

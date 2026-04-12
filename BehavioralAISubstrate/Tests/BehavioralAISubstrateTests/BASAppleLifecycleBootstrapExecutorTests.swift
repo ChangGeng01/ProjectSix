@@ -47,7 +47,7 @@ struct BASAppleLifecycleBootstrapExecutorTests {
         var calls: [String] = []
 
         let currentBrain = BASAppleCurrentBrainRuntimeExecutor.primeSession(
-            modeID: "quick",
+            modeID: "primary",
             promptFragments: ["  should ", "I", "wait?  "],
             retrievalMode: "filtered",
             refreshMemoryProjection: {
@@ -65,7 +65,7 @@ struct BASAppleLifecycleBootstrapExecutorTests {
         #expect(currentBrain == "brain")
         #expect(calls == [
             "refresh",
-            "bootstrap:quick:should I wait?:filtered:sessionPrime",
+            "bootstrap:primary:should I wait?:filtered:\(BASCurrentBrainBootstrapTrigger.sessionBootstrapID)",
             "after:brain"
         ])
     }

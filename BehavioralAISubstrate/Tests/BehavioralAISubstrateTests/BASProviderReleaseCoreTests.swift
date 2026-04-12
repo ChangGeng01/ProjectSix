@@ -7,11 +7,11 @@ import Testing
 
 @Suite("BASProviderReleaseGate")
 struct BASProviderReleaseCoreTests {
-    @Test("verdict rejects quick guidance when fallback truth state blocks local guidance")
+    @Test("verdict rejects primary guidance when fallback truth state blocks local guidance")
     func verdictRejectsBlockedGuidance() {
         let verdict = BASProviderReleaseGate.verdict(
             for: BASProviderReleaseEvaluationRequest(
-                kind: .quick,
+                kind: .primary,
                 outputPreview: "Current: pause and let the urge settle.\nAfter: come back tomorrow.",
                 kernelSnapshot: kernelWithoutTruthState(),
                 brainState: blockedGuidanceBrainState()
@@ -27,15 +27,15 @@ struct BASProviderReleaseCoreTests {
         }
     }
 
-    @Test("verdict allows reminder retrieval when governed memory remains permitted")
-    func verdictAllowsReminderRetrieval() {
+    @Test("verdict allows selection retrieval when governed memory remains permitted")
+    func verdictAllowsSelectionRetrieval() {
         let verdict = BASProviderReleaseGate.verdict(
             for: BASProviderReleaseEvaluationRequest(
-                kind: .reminder,
-                outputPreview: "Wait and reuse the sleep-protection reminder you already trust.",
+                kind: .selection,
+                outputPreview: "Wait and reuse the trusted sleep-protection cue.",
                 kernelSnapshot: kernelWithoutTruthState(),
-                brainState: reminderBrainState(),
-                reminderSurfaceMode: .quick
+                brainState: selectionBrainState(),
+                selectionSurfaceMode: .primary
             )
         )
 
@@ -43,7 +43,7 @@ struct BASProviderReleaseCoreTests {
         case let .allow(assessment):
             #expect(assessment.consistencyCheck?.isConsistent == true)
         case .reject:
-            Issue.record("Expected reminder release to stay allowed when governed memory is still permitted.")
+            Issue.record("Expected selection release to stay allowed when governed memory is still permitted.")
         }
     }
 
@@ -75,11 +75,11 @@ struct BASProviderReleaseCoreTests {
     @Test("raw value evaluator bridges host trace kinds without host-owned mapping")
     func rawValueEvaluatorBridgesTraceKinds() {
         let verdict = BASProviderReleaseEvaluator.verdict(
-            traceKindRawValue: BASAdaptiveTraceKind.reminderID,
-            outputPreview: "Wait and reuse the reminder you trust.",
+            traceKindRawValue: BASAdaptiveTraceKind.selectionID,
+            outputPreview: "Wait and reuse the cue you trust.",
             kernelSnapshot: kernelWithoutTruthState(),
-            brainState: reminderBrainState(),
-            reminderSurfaceModeRawValue: BASDecisionMode.primaryID,
+            brainState: selectionBrainState(),
+            selectionSurfaceModeRawValue: BASDecisionMode.primaryID,
             referencedFacts: ["current_goal": "Protect sleep"]
         )
 
@@ -87,7 +87,7 @@ struct BASProviderReleaseCoreTests {
         case let .allow(assessment):
             #expect(assessment.consistencyCheck?.isConsistent == true)
         case .reject:
-            Issue.record("Expected raw-value evaluator to preserve allowed reminder release.")
+            Issue.record("Expected raw-value evaluator to preserve allowed selection release.")
         }
     }
 
@@ -95,16 +95,16 @@ struct BASProviderReleaseCoreTests {
     func releaseGateHonorsHostSpecificStructuredTruthBehavior() {
         let verdict = BASProviderReleaseGate.verdict(
             for: BASProviderReleaseEvaluationRequest(
-                kind: .quick,
+                kind: .primary,
                 outputPreview: "Current: pause now.\nAfter: revisit this tomorrow.",
                 kernelSnapshot: kernelWithoutTruthState(),
                 brainState: blockedGuidanceBrainState(),
                 structuredTruthBehavior: BASStructuredTruthBehavior(
                     modeNamesByKindID: [
-                        BASAdaptiveTraceKind.quick.rawValue: "before.quick"
+                        BASAdaptiveTraceKind.primary.rawValue: "host.primary"
                     ],
                     kernelPersonaRulesByKindID: [
-                        BASAdaptiveTraceKind.quick.rawValue: "Keep the interruption short, calm, and non-shaming."
+                        BASAdaptiveTraceKind.primary.rawValue: "Keep the interruption short, calm, and non-shaming."
                     ]
                 )
             )
@@ -143,7 +143,7 @@ struct BASProviderReleaseCoreTests {
             relevantMemories: ["Waiting overnight usually helps."],
             sessionBiases: ["句子短"],
             retrievalTags: ["cooldown"],
-            reactionWeights: .defaults(forModeName: BASDecisionMode.quick.rawValue),
+            reactionWeights: .defaults(forModeName: BASDecisionMode.primary.rawValue),
             boundaryPolicy: BASBoundaryPolicyState(
                 mode: .localOnlyProtective,
                 riskLevel: .high,
@@ -157,14 +157,14 @@ struct BASProviderReleaseCoreTests {
         )
     }
 
-    private func reminderBrainState() -> BASDecisionBrainState {
+    private func selectionBrainState() -> BASDecisionBrainState {
         BASDecisionBrainState(
             profileCore: ["Protect sleep before making night decisions."],
             activeGoals: ["Protect sleep"],
-            relevantMemories: ["Reusing a proven reminder keeps things calmer."],
+            relevantMemories: ["Reusing a proven cue keeps things calmer."],
             sessionBiases: ["brief"],
             retrievalTags: ["sleep"],
-            reactionWeights: .defaults(forModeName: BASDecisionMode.quick.rawValue),
+            reactionWeights: .defaults(forModeName: BASDecisionMode.primary.rawValue),
             boundaryPolicy: BASBoundaryPolicyState(
                 mode: .localOnlyAdvisory,
                 riskLevel: .low,

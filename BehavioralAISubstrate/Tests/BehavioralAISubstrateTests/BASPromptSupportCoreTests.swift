@@ -6,12 +6,12 @@ import Testing
 struct BASPromptSupportCoreTests {
     @Test("prefix catalog splits immutable and adaptive prompt layers by task kind")
     func prefixCatalogSeparatesStableAndAdaptiveLayers() {
-        let immutable = BASPromptPrefixCatalog.immutablePrefix(for: .quick)
-        let adaptive = BASPromptPrefixCatalog.adaptivePrefix(for: .quick)
-        let instructions = BASPromptPrefixCatalog.instructions(for: .quick)
+        let immutable = BASPromptPrefixCatalog.immutablePrefix(for: .primary)
+        let adaptive = BASPromptPrefixCatalog.adaptivePrefix(for: .primary)
+        let instructions = BASPromptPrefixCatalog.instructions(for: .primary)
 
-        #expect(immutable.contains("host-owned cognition system"))
-        #expect(adaptive.contains("Refine only the supplied primary guidance fields."))
+        #expect(immutable.contains("host-owned cognition runtime"))
+        #expect(adaptive.contains("Revise only the supplied primary fields."))
         #expect(instructions == immutable + "\n" + adaptive)
     }
 
@@ -20,18 +20,18 @@ struct BASPromptSupportCoreTests {
         let behavior = BASPromptPresentationBehavior(
             sharedPrelude: "Host immutable shell.",
             adaptivePrefixByKindID: [
-                BASSemanticTaskKind.quick.rawValue: "Host quick framing."
+                BASSemanticTaskKind.primary.rawValue: "Host primary framing."
             ],
             baseEvidenceRetentionBudgetByKindID: [
-                BASSemanticTaskKind.quick.rawValue: 6
+                BASSemanticTaskKind.primary.rawValue: 6
             ],
             lowGearClampKindIDs: [
-                BASSemanticTaskKind.quick.rawValue
+                BASSemanticTaskKind.primary.rawValue
             ],
             lowGearClampMaximumBudget: 4
         )
         let strategy = BASAdaptiveTaskStrategy(
-            kind: .quick,
+            kind: .primary,
             entropy: .low,
             runtimeGear: .low,
             contextBudget: 220,
@@ -45,11 +45,11 @@ struct BASPromptSupportCoreTests {
             allowsModelInvocation: true
         )
 
-        #expect(BASPromptPrefixCatalog.immutablePrefix(for: .quick, behavior: behavior) == "Host immutable shell.")
-        #expect(BASPromptPrefixCatalog.adaptivePrefix(for: .quick, behavior: behavior) == "Host quick framing.")
+        #expect(BASPromptPrefixCatalog.immutablePrefix(for: .primary, behavior: behavior) == "Host immutable shell.")
+        #expect(BASPromptPrefixCatalog.adaptivePrefix(for: .primary, behavior: behavior) == "Host primary framing.")
         #expect(
             BASPromptRetentionAdvisor.evidenceRetentionBudget(
-                for: .quick,
+                for: .primary,
                 strategy: strategy,
                 behavior: behavior
             ) == 4
@@ -71,10 +71,10 @@ struct BASPromptSupportCoreTests {
     func fingerprintsReflectPromptIdentity() {
         let envelope = BASPromptEnvelopeCompiler.compile(
             BASPromptEnvelopeRequest(
-                kind: "quick",
+                kind: "primary",
                 immutablePrefix: "Kernel identity.",
-                adaptivePrefix: "Quick rules.",
-                assembly: dummyAssembly(payload: #"{"mode":"Quick"}"#),
+                adaptivePrefix: "Primary rules.",
+                assembly: dummyAssembly(payload: #"{"mode":"Primary"}"#),
                 frontstageState: "frontstage",
                 openTextSignalCount: 1,
                 targetCharacters: 320
@@ -99,10 +99,10 @@ struct BASPromptSupportCoreTests {
         )
     }
 
-    @Test("retention advisor clamps low gear quick and reminder retrieval budgets")
+    @Test("retention advisor clamps low gear primary and selection retrieval budgets")
     func retentionAdvisorHonorsStrategyAndLowGearClamp() {
         let lowQuickStrategy = BASAdaptiveTaskStrategy(
-            kind: .quick,
+            kind: .primary,
             entropy: .low,
             runtimeGear: .low,
             contextBudget: 220,
@@ -116,7 +116,7 @@ struct BASPromptSupportCoreTests {
             allowsModelInvocation: true
         )
         let normalMirrorStrategy = BASAdaptiveTaskStrategy(
-            kind: .mirror,
+            kind: .reflective,
             entropy: .medium,
             runtimeGear: .balanced,
             contextBudget: 600,
@@ -131,13 +131,13 @@ struct BASPromptSupportCoreTests {
         )
 
         #expect(
-            BASPromptRetentionAdvisor.evidenceRetentionBudget(for: .quick, strategy: lowQuickStrategy) == 3
+            BASPromptRetentionAdvisor.evidenceRetentionBudget(for: .primary, strategy: lowQuickStrategy) == 3
         )
         #expect(
-            BASPromptRetentionAdvisor.evidenceRetentionBudget(for: .reminder, strategy: lowQuickStrategy) == 3
+            BASPromptRetentionAdvisor.evidenceRetentionBudget(for: .selection, strategy: lowQuickStrategy) == 3
         )
         #expect(
-            BASPromptRetentionAdvisor.evidenceRetentionBudget(for: .mirror, strategy: normalMirrorStrategy) == 3
+            BASPromptRetentionAdvisor.evidenceRetentionBudget(for: .reflective, strategy: normalMirrorStrategy) == 3
         )
     }
 }

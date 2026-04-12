@@ -64,11 +64,11 @@ extension DecisionMode {
     var substrateMode: BASDecisionMode {
         switch self {
         case .quick:
-            BASDecisionMode.quick
+            .primary
         case .balance:
-            BASDecisionMode.balance
+            .comparative
         case .mirror:
-            BASDecisionMode.mirror
+            .reflective
         }
     }
 
@@ -77,16 +77,26 @@ extension DecisionMode {
     }
 
     static func fromSubstrateModeID(_ modeID: String?) -> DecisionMode? {
-        guard let modeID, let substrateMode = BASDecisionMode(identifier: modeID) else {
+        guard let modeID else {
+            return nil
+        }
+
+        let normalizedModeID = BeforeProductCompatibility.hostModeID(rawValue: modeID)
+
+        if let directMode = DecisionMode(rawValue: normalizedModeID) {
+            return directMode
+        }
+
+        guard let substrateMode = BASDecisionMode(identifier: BeforeProductCompatibility.substrateModeID(rawValue: modeID)) else {
             return nil
         }
 
         switch substrateMode {
-        case .quick:
+        case .primary:
             return DecisionMode.quick
-        case .balance:
+        case .comparative:
             return DecisionMode.balance
-        case .mirror:
+        case .reflective:
             return DecisionMode.mirror
         }
     }

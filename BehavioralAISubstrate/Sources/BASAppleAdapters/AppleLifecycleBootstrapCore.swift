@@ -158,11 +158,11 @@ public enum BASAppleLifecycleBootstrapExecutor {
 }
 
 public enum BASAppleCurrentBrainRuntimePlanner {
-    public static func sessionPrimePlan(
+    public static func sessionBootstrapPlan(
         modeID: String,
         promptFragments: [String],
         retrievalMode: String,
-        triggerID: String = BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue
+        triggerID: String = BASCurrentBrainBootstrapTrigger.sessionBootstrapID
     ) -> BASAppleCurrentBrainRuntimePlan {
         BASAppleCurrentBrainRuntimePlan(
             modeID: modeID,
@@ -211,7 +211,7 @@ public enum BASAppleCurrentBrainRuntimeExecutor {
     ) -> CurrentBrain {
         refreshMemoryProjection()
         let currentBrain = bootstrapCurrentBrain(
-            BASAppleCurrentBrainRuntimePlanner.sessionPrimePlan(
+            BASAppleCurrentBrainRuntimePlanner.sessionBootstrapPlan(
                 modeID: modeID,
                 promptFragments: promptFragments,
                 retrievalMode: retrievalMode

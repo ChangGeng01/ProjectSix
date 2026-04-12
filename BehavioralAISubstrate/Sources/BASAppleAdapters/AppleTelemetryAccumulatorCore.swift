@@ -2,23 +2,23 @@ import Foundation
 import BASObservability
 
 public struct BASAppleTelemetryAccumulatorConfig: Codable, Sendable, Equatable {
-    public var reminderKindRawValue: String
-    public var reminderKnowledgeNeedRawValue: String
-    public var reminderControlNeedRawValue: String
-    public var reminderRetrievalBypassReasonRawValues: [String]
+    public var selectionKindRawValue: String
+    public var selectionKnowledgeNeedRawValue: String
+    public var selectionControlNeedRawValue: String
+    public var selectionRetrievalBypassReasonRawValues: [String]
     public var avoidableSkipReasonRawValues: [String]
 
     public init(
-        reminderKindRawValue: String,
-        reminderKnowledgeNeedRawValue: String,
-        reminderControlNeedRawValue: String,
-        reminderRetrievalBypassReasonRawValues: [String],
+        selectionKindRawValue: String,
+        selectionKnowledgeNeedRawValue: String,
+        selectionControlNeedRawValue: String,
+        selectionRetrievalBypassReasonRawValues: [String],
         avoidableSkipReasonRawValues: [String]
     ) {
-        self.reminderKindRawValue = reminderKindRawValue
-        self.reminderKnowledgeNeedRawValue = reminderKnowledgeNeedRawValue
-        self.reminderControlNeedRawValue = reminderControlNeedRawValue
-        self.reminderRetrievalBypassReasonRawValues = reminderRetrievalBypassReasonRawValues
+        self.selectionKindRawValue = selectionKindRawValue
+        self.selectionKnowledgeNeedRawValue = selectionKnowledgeNeedRawValue
+        self.selectionControlNeedRawValue = selectionControlNeedRawValue
+        self.selectionRetrievalBypassReasonRawValues = selectionRetrievalBypassReasonRawValues
         self.avoidableSkipReasonRawValues = avoidableSkipReasonRawValues
     }
 }
@@ -43,8 +43,8 @@ public struct BASAppleTelemetryAccumulatorSnapshot: Codable, Sendable, Equatable
     public var backendDurationTotalMs: [String: Double]
     public var admissionSkipCountByReason: [String: Int]
     public var admissionSkipCountByReasonAndKind: [String: [String: Int]]
-    public var reminderSelectionNeedCount: [String: Int]
-    public var reminderSelectionNeedCountByKind: [String: [String: Int]]
+    public var selectionNeedCount: [String: Int]
+    public var selectionNeedCountByKind: [String: [String: Int]]
     public var promptPressureCount: [String: Int]
     public var promptCharactersTotalByKind: [String: Int]
     public var prefixCharactersTotalByKind: [String: Int]
@@ -75,8 +75,8 @@ public struct BASAppleTelemetryAccumulatorSnapshot: Codable, Sendable, Equatable
         backendDurationTotalMs: [String: Double],
         admissionSkipCountByReason: [String: Int],
         admissionSkipCountByReasonAndKind: [String: [String: Int]],
-        reminderSelectionNeedCount: [String: Int],
-        reminderSelectionNeedCountByKind: [String: [String: Int]],
+        selectionNeedCount: [String: Int],
+        selectionNeedCountByKind: [String: [String: Int]],
         promptPressureCount: [String: Int],
         promptCharactersTotalByKind: [String: Int],
         prefixCharactersTotalByKind: [String: Int],
@@ -106,8 +106,8 @@ public struct BASAppleTelemetryAccumulatorSnapshot: Codable, Sendable, Equatable
         self.backendDurationTotalMs = backendDurationTotalMs
         self.admissionSkipCountByReason = admissionSkipCountByReason
         self.admissionSkipCountByReasonAndKind = admissionSkipCountByReasonAndKind
-        self.reminderSelectionNeedCount = reminderSelectionNeedCount
-        self.reminderSelectionNeedCountByKind = reminderSelectionNeedCountByKind
+        self.selectionNeedCount = selectionNeedCount
+        self.selectionNeedCountByKind = selectionNeedCountByKind
         self.promptPressureCount = promptPressureCount
         self.promptCharactersTotalByKind = promptCharactersTotalByKind
         self.prefixCharactersTotalByKind = prefixCharactersTotalByKind
@@ -140,7 +140,7 @@ public struct BASAppleTelemetryAccumulatorSnapshot: Codable, Sendable, Equatable
             backendDurationTotalMs: backendDurationTotalMs,
             admissionSkipCountByReason: admissionSkipCountByReason,
             admissionSkipCountByReasonAndKind: admissionSkipCountByReasonAndKind,
-            reminderSelectionNeedCount: reminderSelectionNeedCount,
+            selectionNeedCount: selectionNeedCount,
             promptCharactersTotalByKind: promptCharactersTotalByKind,
             prefixCharactersTotalByKind: prefixCharactersTotalByKind,
             immutablePrefixCharactersTotalByKind: immutablePrefixCharactersTotalByKind,
@@ -148,10 +148,10 @@ public struct BASAppleTelemetryAccumulatorSnapshot: Codable, Sendable, Equatable
             suffixCharactersTotalByKind: suffixCharactersTotalByKind,
             overTargetBudgetCountByKind: overTargetBudgetCountByKind,
             lowPressureModelCallCountByKind: lowPressureModelCallCountByKind,
-            reminderKindRawValue: config.reminderKindRawValue,
-            reminderKnowledgeNeedRawValue: config.reminderKnowledgeNeedRawValue,
-            reminderControlNeedRawValue: config.reminderControlNeedRawValue,
-            reminderRetrievalBypassReasonRawValues: config.reminderRetrievalBypassReasonRawValues,
+            selectionKindRawValue: config.selectionKindRawValue,
+            selectionKnowledgeNeedRawValue: config.selectionKnowledgeNeedRawValue,
+            selectionControlNeedRawValue: config.selectionControlNeedRawValue,
+            selectionRetrievalBypassReasonRawValues: config.selectionRetrievalBypassReasonRawValues,
             avoidableSkipReasonRawValues: config.avoidableSkipReasonRawValues
         )
     }
@@ -183,8 +183,8 @@ public actor BASAppleTelemetryAccumulator {
     private var backendDurationTotalMs: [String: Double] = [:]
     private var admissionSkipCountByReason: [String: Int] = [:]
     private var admissionSkipCountByReasonAndKind: [String: [String: Int]] = [:]
-    private var reminderSelectionNeedCount: [String: Int] = [:]
-    private var reminderSelectionNeedCountByKind: [String: [String: Int]] = [:]
+    private var selectionNeedCount: [String: Int] = [:]
+    private var selectionNeedCountByKind: [String: [String: Int]] = [:]
     private var promptPressureCount: [String: Int] = [:]
     private var promptCharactersTotalByKind: [String: Int] = [:]
     private var prefixCharactersTotalByKind: [String: Int] = [:]
@@ -254,11 +254,11 @@ public actor BASAppleTelemetryAccumulator {
             }
         }
 
-        if let reminderSelectionNeedID = compilation.reminderSelectionNeedID {
-            reminderSelectionNeedCount[reminderSelectionNeedID, default: 0] += 1
-            var countsForNeed = reminderSelectionNeedCountByKind[reminderSelectionNeedID, default: [:]]
+        if let selectionNeedID = compilation.selectionNeedID {
+            selectionNeedCount[selectionNeedID, default: 0] += 1
+            var countsForNeed = selectionNeedCountByKind[selectionNeedID, default: [:]]
             countsForNeed[compilation.kind, default: 0] += 1
-            reminderSelectionNeedCountByKind[reminderSelectionNeedID] = countsForNeed
+            selectionNeedCountByKind[selectionNeedID] = countsForNeed
         }
 
         if let admissionSkipReasonID = compilation.admissionSkipReasonID {
@@ -295,8 +295,8 @@ public actor BASAppleTelemetryAccumulator {
             backendDurationTotalMs: backendDurationTotalMs,
             admissionSkipCountByReason: admissionSkipCountByReason,
             admissionSkipCountByReasonAndKind: admissionSkipCountByReasonAndKind,
-            reminderSelectionNeedCount: reminderSelectionNeedCount,
-            reminderSelectionNeedCountByKind: reminderSelectionNeedCountByKind,
+            selectionNeedCount: selectionNeedCount,
+            selectionNeedCountByKind: selectionNeedCountByKind,
             promptPressureCount: promptPressureCount,
             promptCharactersTotalByKind: promptCharactersTotalByKind,
             prefixCharactersTotalByKind: prefixCharactersTotalByKind,
@@ -329,8 +329,8 @@ public actor BASAppleTelemetryAccumulator {
         backendDurationTotalMs.removeAll()
         admissionSkipCountByReason.removeAll()
         admissionSkipCountByReasonAndKind.removeAll()
-        reminderSelectionNeedCount.removeAll()
-        reminderSelectionNeedCountByKind.removeAll()
+        selectionNeedCount.removeAll()
+        selectionNeedCountByKind.removeAll()
         promptPressureCount.removeAll()
         promptCharactersTotalByKind.removeAll()
         prefixCharactersTotalByKind.removeAll()

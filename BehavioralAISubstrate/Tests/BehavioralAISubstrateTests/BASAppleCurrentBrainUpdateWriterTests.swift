@@ -66,7 +66,7 @@ struct BASAppleCurrentBrainUpdateWriterTests {
                 id: UUID(),
                 createdAt: baseDate.addingTimeInterval(Double(index) * 60),
                 source: "launch",
-                mode: "quick",
+                mode: "primary",
                 dominantGoal: "goal-\(index)",
                 dominantReactionWeight: "brief_language",
                 fingerprint: "fingerprint-\(index)",

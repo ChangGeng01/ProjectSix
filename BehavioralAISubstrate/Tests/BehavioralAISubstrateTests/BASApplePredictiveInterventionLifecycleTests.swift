@@ -11,7 +11,7 @@ struct BASApplePredictiveInterventionLifecycleTests {
             title: "Pause first",
             detail: "A slower move should help here.",
             evidenceSignalCount: 2,
-            preferredModeID: "mirror",
+            preferredModeID: "reflective",
             reason: "Recent regret pattern",
             createdAt: Date(timeIntervalSince1970: 100),
             expiresAt: Date(timeIntervalSince1970: 200)
@@ -22,7 +22,7 @@ struct BASApplePredictiveInterventionLifecycleTests {
             title: "Pause first",
             detail: "A slower move should help here.",
             evidenceSignalCount: 2,
-            preferredModeID: "mirror",
+            preferredModeID: "reflective",
             reason: "Recent regret pattern",
             createdAt: Date(timeIntervalSince1970: 300),
             expiresAt: Date(timeIntervalSince1970: 400)
@@ -81,7 +81,7 @@ struct BASApplePredictiveInterventionLifecycleTests {
             title: "Pause first",
             detail: "A slower move should help here.",
             evidenceSignalCount: 3,
-            preferredModeID: "mirror",
+            preferredModeID: "reflective",
             reason: "Recent regret pattern",
             createdAt: .distantPast,
             expiresAt: .distantFuture

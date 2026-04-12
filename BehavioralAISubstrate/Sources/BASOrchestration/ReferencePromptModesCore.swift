@@ -4,26 +4,21 @@ import BASPolicy
 import BASRuntimeCore
 
 public enum BASReferencePromptKind: String, Codable, Sendable, Equatable {
-    case quick
-    case balance
-    case mirror
-    case reminder
-
-    public static var primary: Self { .quick }
-    public static var comparative: Self { .balance }
-    public static var reflective: Self { .mirror }
-    public static var selection: Self { .reminder }
+    case primary = "primary"
+    case comparative = "comparative"
+    case reflective = "reflective"
+    case selection = "selection"
 
     public var adaptiveTraceKind: BASAdaptiveTraceKind {
         switch self {
-        case .quick:
-            .quick
-        case .balance:
-            .balance
-        case .mirror:
-            .mirror
-        case .reminder:
-            .reminder
+        case .primary:
+            .primary
+        case .comparative:
+            .comparative
+        case .reflective:
+            .reflective
+        case .selection:
+            .selection
         }
     }
 
@@ -31,27 +26,40 @@ public enum BASReferencePromptKind: String, Codable, Sendable, Equatable {
         adaptiveTraceKind.identifier
     }
 
-    public var legacyIdentifier: String {
-        rawValue
-    }
-
     public init?(identifier: String) {
         switch identifier {
-        case BASSemanticTaskKind.primaryID, BASAdaptiveTraceKind.quick.identifier, "quick":
-            self = .quick
-        case BASSemanticTaskKind.comparativeID, BASAdaptiveTraceKind.balance.identifier, "balance":
-            self = .balance
-        case BASSemanticTaskKind.reflectiveID, BASAdaptiveTraceKind.mirror.identifier, "mirror":
-            self = .mirror
-        case BASSemanticTaskKind.reminderID, BASAdaptiveTraceKind.reminder.identifier, "reminder", "selection":
-            self = .reminder
+        case BASSemanticTaskKind.primaryID, BASAdaptiveTraceKind.primary.identifier:
+            self = .primary
+        case BASSemanticTaskKind.comparativeID, BASAdaptiveTraceKind.comparative.identifier:
+            self = .comparative
+        case BASSemanticTaskKind.reflectiveID, BASAdaptiveTraceKind.reflective.identifier:
+            self = .reflective
+        case BASSemanticTaskKind.selectionID, BASAdaptiveTraceKind.selection.identifier:
+            self = .selection
         default:
             return nil
         }
     }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let identifier = try container.decode(String.self)
+        guard let kind = BASReferencePromptKind(identifier: identifier) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unsupported reference prompt kind: \(identifier)"
+            )
+        }
+        self = kind
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
-public struct BASReferenceReminderSelectionEnvelope<Candidate: Equatable & Sendable>: Equatable, Sendable {
+public struct BASReferenceSelectionEnvelope<Candidate: Equatable & Sendable>: Equatable, Sendable {
     public var prompt: BASPromptEnvelope<BASReferencePromptKind, BASFrontstageState>
     public var candidates: [Candidate]
 
@@ -80,17 +88,15 @@ public enum BASReferencePromptLimits {
     public static let statePrompt = 170
     public static let evidenceSnippet = 180
 
-    public static let quickCurrentPerspective = primaryPresentView
-    public static let quickAfterPerspective = primaryLaterView
-    public static let balanceHeadline = comparativeSummary
-    public static let balanceSummary = comparativeSynthesis
-    public static let balanceFocusDescription = comparativePriorityDetail
-    public static let balanceNextAction = comparativeSuggestedNextStep
-    public static let mirrorHeadline = reflectiveSummary
-    public static let mirrorCoreTension = reflectiveRecurringTension
-    public static let mirrorNextAction = reflectiveSuggestedMove
-    public static let reminderCandidates = selectionCandidates
-    public static let reminderCandidateLength = selectionCandidateLength
+    public static let primaryCurrentPerspective = primaryPresentView
+    public static let primaryAfterPerspective = primaryLaterView
+    public static let comparativeHeadline = comparativeSummary
+    public static let comparativeDetailSummary = comparativeSynthesis
+    public static let comparativeFocusDescription = comparativePriorityDetail
+    public static let comparativeNextAction = comparativeSuggestedNextStep
+    public static let reflectiveHeadline = reflectiveSummary
+    public static let reflectiveCoreTension = reflectiveRecurringTension
+    public static let reflectiveNextAction = reflectiveSuggestedMove
 }
 
 public struct BASReferencePromptSlotVocabulary: Codable, Equatable, Sendable {
@@ -170,7 +176,7 @@ public struct BASReferencePromptBehavior: Codable, Equatable, Sendable {
                     "next_action": "Suggested reflective move"
                 ]
             ),
-            BASSemanticTaskKind.reminderID: BASReferencePromptSlotVocabulary(
+            BASSemanticTaskKind.selectionID: BASReferencePromptSlotVocabulary(
                 stateKeysBySlotID: [
                     "mode": "mode",
                     "scenario": "entry_context",
@@ -181,21 +187,21 @@ public struct BASReferencePromptBehavior: Codable, Equatable, Sendable {
         ],
         outputGuardsByKindID: [String: [String]] = [
             BASSemanticTaskKind.primaryID: [
-                "Refine only the supplied primary guidance fields.",
-                "Keep the same decision frame, actions, and emotional direction.",
+                "Revise only the supplied primary fields.",
+                "Keep the same decision frame and actions.",
                 "Do not add new facts or unnecessary escalation."
             ],
             BASSemanticTaskKind.comparativeID: [
-                "Keep the same comparative frame, focus, and next step.",
+                "Keep the same comparative frame, focus, and next-step intent.",
                 "Do not invent facts or force a verdict.",
-                "Tighten language only."
+                "Revise language only."
             ],
             BASSemanticTaskKind.reflectiveID: [
                 "Clarify the supplied reflective fields without turning them into a verdict.",
                 "Keep the tone restrained and non-clinical.",
-                "Preserve the same tension and next reflective move."
+                "Preserve the same tension and next-step intent."
             ],
-            BASSemanticTaskKind.reminderID: [
+            BASSemanticTaskKind.selectionID: [
                 "Choose exactly one retained candidate index from the supplied evidence.",
                 "Do not rewrite, combine, or invent candidate text.",
                 "Prefer the retained candidate that most directly matches the current state."
@@ -205,7 +211,7 @@ public struct BASReferencePromptBehavior: Codable, Equatable, Sendable {
             BASSemanticTaskKind.primaryID: 1_500,
             BASSemanticTaskKind.comparativeID: 2_150,
             BASSemanticTaskKind.reflectiveID: 1_700,
-            BASSemanticTaskKind.reminderID: 1_250
+            BASSemanticTaskKind.selectionID: 1_250
         ]
     ) {
         self.presentationBehavior = presentationBehavior
@@ -256,25 +262,25 @@ public struct BASReferencePromptBehavior: Codable, Equatable, Sendable {
         for kind: BASSemanticTaskKind
     ) -> [String] {
         switch kind {
-        case .quick:
+        case .primary:
             [
-                "Refine only the supplied primary guidance fields.",
-                "Keep the same decision frame, actions, and emotional direction.",
+                "Revise only the supplied primary fields.",
+                "Keep the same decision frame and actions.",
                 "Do not add new facts or unnecessary escalation."
             ]
-        case .balance:
+        case .comparative:
             [
-                "Keep the same comparative frame, focus, and next step.",
+                "Keep the same comparative frame, focus, and next-step intent.",
                 "Do not invent facts or force a verdict.",
-                "Tighten language only."
+                "Revise language only."
             ]
-        case .mirror:
+        case .reflective:
             [
                 "Clarify the supplied reflective fields without turning them into a verdict.",
                 "Keep the tone restrained and non-clinical.",
-                "Preserve the same tension and next reflective move."
+                "Preserve the same tension and next-step intent."
             ]
-        case .reminder:
+        case .selection:
             [
                 "Choose exactly one retained candidate index from the supplied evidence.",
                 "Do not rewrite, combine, or invent candidate text.",
@@ -287,13 +293,13 @@ public struct BASReferencePromptBehavior: Codable, Equatable, Sendable {
         for kind: BASSemanticTaskKind
     ) -> Int {
         switch kind {
-        case .quick:
+        case .primary:
             1_500
-        case .balance:
+        case .comparative:
             2_150
-        case .mirror:
+        case .reflective:
             1_700
-        case .reminder:
+        case .selection:
             1_250
         }
     }
@@ -465,8 +471,6 @@ public struct BASPrimaryRefinementPromptRequest<Kind: Equatable & Sendable>: Sen
     }
 }
 
-public typealias BASQuickRefinementPromptRequest<Kind: Equatable & Sendable> = BASPrimaryRefinementPromptRequest<Kind>
-
 public struct BASComparativeRefinementPromptRequest<Kind: Equatable & Sendable>: Sendable, Equatable {
     public var kind: Kind
     public var modeTitle: String
@@ -609,8 +613,6 @@ public struct BASComparativeRefinementPromptRequest<Kind: Equatable & Sendable>:
         set { suggestedNextStep = newValue }
     }
 }
-
-public typealias BASBalanceRefinementPromptRequest<Kind: Equatable & Sendable> = BASComparativeRefinementPromptRequest<Kind>
 
 public struct BASReflectiveRefinementPromptRequest<Kind: Equatable & Sendable>: Sendable, Equatable {
     public var kind: Kind
@@ -760,15 +762,13 @@ public struct BASReflectiveRefinementPromptRequest<Kind: Equatable & Sendable>: 
     }
 }
 
-public typealias BASMirrorRefinementPromptRequest<Kind: Equatable & Sendable> = BASReflectiveRefinementPromptRequest<Kind>
-
 public struct BASSelectionPromptRequest<Kind: Equatable & Sendable>: Sendable, Equatable {
     public var kind: Kind
     public var modeTitle: String
     public var entryContext: String
     public var activePrompt: String
     public var candidateTexts: [String]
-    public var selectionSurfaceMode: BASDecisionMode?
+    public var surfaceMode: BASDecisionMode?
     public var providerIdentifier: String?
     public var strategy: BASAdaptiveTaskStrategy?
 
@@ -778,7 +778,7 @@ public struct BASSelectionPromptRequest<Kind: Equatable & Sendable>: Sendable, E
         entryContext: String,
         activePrompt: String,
         candidateTexts: [String],
-        selectionSurfaceMode: BASDecisionMode?,
+        surfaceMode: BASDecisionMode?,
         providerIdentifier: String? = nil,
         strategy: BASAdaptiveTaskStrategy? = nil
     ) {
@@ -787,7 +787,7 @@ public struct BASSelectionPromptRequest<Kind: Equatable & Sendable>: Sendable, E
         self.entryContext = entryContext
         self.activePrompt = activePrompt
         self.candidateTexts = candidateTexts
-        self.selectionSurfaceMode = selectionSurfaceMode
+        self.surfaceMode = surfaceMode
         self.providerIdentifier = providerIdentifier
         self.strategy = strategy
     }
@@ -798,7 +798,7 @@ public struct BASSelectionPromptRequest<Kind: Equatable & Sendable>: Sendable, E
         scenarioTitle: String,
         prompt: String,
         candidateTexts: [String],
-        reminderSurfaceMode: BASDecisionMode?,
+        surfaceMode: BASDecisionMode?,
         providerIdentifier: String? = nil,
         strategy: BASAdaptiveTaskStrategy? = nil
     ) {
@@ -808,7 +808,7 @@ public struct BASSelectionPromptRequest<Kind: Equatable & Sendable>: Sendable, E
             entryContext: scenarioTitle,
             activePrompt: prompt,
             candidateTexts: candidateTexts,
-            selectionSurfaceMode: reminderSurfaceMode,
+            surfaceMode: surfaceMode,
             providerIdentifier: providerIdentifier,
             strategy: strategy
         )
@@ -824,31 +824,22 @@ public struct BASSelectionPromptRequest<Kind: Equatable & Sendable>: Sendable, E
         set { activePrompt = newValue }
     }
 
-    public var reminderSurfaceMode: BASDecisionMode? {
-        get { selectionSurfaceMode }
-        set { selectionSurfaceMode = newValue }
+    public var selectionSurfaceMode: BASDecisionMode? {
+        get { surfaceMode }
+        set { surfaceMode = newValue }
     }
 }
-
-public typealias BASReminderSelectionPromptRequest<Kind: Equatable & Sendable> = BASSelectionPromptRequest<Kind>
 
 public enum BASReferencePromptBuilder {
     public static func primaryEnvelope<Kind: Equatable & Sendable>(
         _ request: BASPrimaryRefinementPromptRequest<Kind>,
         behavior: BASReferencePromptBehavior = .generic
     ) -> BASPromptEnvelope<Kind, BASFrontstageState> {
-        quickEnvelope(request, behavior: behavior)
-    }
-
-    public static func quickEnvelope<Kind: Equatable & Sendable>(
-        _ request: BASPrimaryRefinementPromptRequest<Kind>,
-        behavior: BASReferencePromptBehavior = .generic
-    ) -> BASPromptEnvelope<Kind, BASFrontstageState> {
-        let kind: BASSemanticTaskKind = .quick
+        let kind: BASSemanticTaskKind = .primary
         return compile(
             kind: request.kind,
             semanticKind: kind,
-            adaptiveKind: .quick,
+            adaptiveKind: .primary,
             state: [
                 behavior.stateKey(for: kind, slotID: "mode", fallback: "mode"): .string(request.modeTitle),
                 behavior.stateKey(for: kind, slotID: "scenario", fallback: "scenario"): .string(request.scenarioTitle),
@@ -887,18 +878,11 @@ public enum BASReferencePromptBuilder {
         _ request: BASComparativeRefinementPromptRequest<Kind>,
         behavior: BASReferencePromptBehavior = .generic
     ) -> BASPromptEnvelope<Kind, BASFrontstageState> {
-        balanceEnvelope(request, behavior: behavior)
-    }
-
-    public static func balanceEnvelope<Kind: Equatable & Sendable>(
-        _ request: BASComparativeRefinementPromptRequest<Kind>,
-        behavior: BASReferencePromptBehavior = .generic
-    ) -> BASPromptEnvelope<Kind, BASFrontstageState> {
-        let kind: BASSemanticTaskKind = .balance
+        let kind: BASSemanticTaskKind = .comparative
         return compile(
             kind: request.kind,
             semanticKind: kind,
-            adaptiveKind: .balance,
+            adaptiveKind: .comparative,
             state: [
                 behavior.stateKey(for: kind, slotID: "mode", fallback: "mode"): .string(request.modeTitle),
                 behavior.stateKey(for: kind, slotID: "prompt", fallback: "prompt"): .string(
@@ -948,18 +932,11 @@ public enum BASReferencePromptBuilder {
         _ request: BASReflectiveRefinementPromptRequest<Kind>,
         behavior: BASReferencePromptBehavior = .generic
     ) -> BASPromptEnvelope<Kind, BASFrontstageState> {
-        mirrorEnvelope(request, behavior: behavior)
-    }
-
-    public static func mirrorEnvelope<Kind: Equatable & Sendable>(
-        _ request: BASReflectiveRefinementPromptRequest<Kind>,
-        behavior: BASReferencePromptBehavior = .generic
-    ) -> BASPromptEnvelope<Kind, BASFrontstageState> {
-        let kind: BASSemanticTaskKind = .mirror
+        let kind: BASSemanticTaskKind = .reflective
         return compile(
             kind: request.kind,
             semanticKind: kind,
-            adaptiveKind: .mirror,
+            adaptiveKind: .reflective,
             state: [
                 behavior.stateKey(for: kind, slotID: "mode", fallback: "mode"): .string(request.modeTitle),
                 behavior.stateKey(for: kind, slotID: "prompt", fallback: "prompt"): .string(
@@ -1012,19 +989,12 @@ public enum BASReferencePromptBuilder {
         _ request: BASSelectionPromptRequest<Kind>,
         behavior: BASReferencePromptBehavior = .generic
     ) -> BASPromptEnvelope<Kind, BASFrontstageState> {
-        reminderEnvelope(request, behavior: behavior)
-    }
-
-    public static func reminderEnvelope<Kind: Equatable & Sendable>(
-        _ request: BASSelectionPromptRequest<Kind>,
-        behavior: BASReferencePromptBehavior = .generic
-    ) -> BASPromptEnvelope<Kind, BASFrontstageState> {
-        let kind: BASSemanticTaskKind = .reminder
-        let clippedCandidateTexts = Array(request.candidateTexts.prefix(BASReferencePromptLimits.reminderCandidates))
+        let kind: BASSemanticTaskKind = .selection
+        let clippedCandidateTexts = Array(request.candidateTexts.prefix(BASReferencePromptLimits.selectionCandidates))
         return compile(
             kind: request.kind,
             semanticKind: kind,
-            adaptiveKind: .reminder,
+            adaptiveKind: .selection,
             state: [
                 behavior.stateKey(for: kind, slotID: "mode", fallback: "mode"): .string(request.modeTitle),
                 behavior.stateKey(for: kind, slotID: "scenario", fallback: "scenario"): .string(request.scenarioTitle),
@@ -1034,7 +1004,7 @@ public enum BASReferencePromptBuilder {
                 behavior.stateKey(for: kind, slotID: "candidate_count", fallback: "candidate_count"): .integer(clippedCandidateTexts.count)
             ],
             evidence: clippedCandidateTexts.enumerated().map { index, candidate in
-                "\(index): \(BASPromptTextSanitizer.sanitized(candidate, fallback: candidate, limit: BASReferencePromptLimits.reminderCandidateLength))"
+                "\(index): \(BASPromptTextSanitizer.sanitized(candidate, fallback: candidate, limit: BASReferencePromptLimits.selectionCandidateLength))"
             },
             outputGuard: behavior.outputGuard(for: kind),
             openTextSignalCount: nonEmptySignalCount([request.prompt]),
@@ -1043,9 +1013,9 @@ public enum BASReferencePromptBuilder {
             strategy: request.strategy,
             structuredTruthOverride: BASStructuredTruthCompiler.truthState(
                 for: BASStructuredTruthRequest(
-                    kind: .reminder,
+                    kind: .selection,
                     brainState: nil,
-                    reminderSurfaceMode: request.reminderSurfaceMode,
+                    selectionSurfaceMode: request.selectionSurfaceMode,
                     behavior: behavior.structuredTruthBehavior
                 )
             ),

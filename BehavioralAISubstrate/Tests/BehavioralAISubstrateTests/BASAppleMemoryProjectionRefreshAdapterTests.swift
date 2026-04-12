@@ -87,7 +87,7 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
         }
 
         var basSource: BASMemorySource {
-            get { BASMemorySource(rawValue: basSourceRaw) ?? .history }
+            get { BASMemorySource(rawValue: basSourceRaw) ?? .archive }
             set { basSourceRaw = newValue.rawValue }
         }
 
@@ -221,7 +221,7 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
         }
 
         var basSource: BASMemorySource {
-            get { BASMemorySource(rawValue: basSourceRaw) ?? .history }
+            get { BASMemorySource(rawValue: basSourceRaw) ?? .archive }
             set { basSourceRaw = newValue.rawValue }
         }
 
@@ -273,7 +273,7 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
     }
 
     @Model
-    final class ReminderFixture: BASAppleReminderMemoryEntity {
+    final class CueFixture: BASAppleCueMemoryEntity {
         @Attribute(.unique) var id: UUID
         var content: String
         var lastUsedAt: Date
@@ -284,8 +284,8 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
             self.lastUsedAt = lastUsedAt
         }
 
-        var basReminderMemoryInput: BASSelfReminderMemoryInput {
-            BASSelfReminderMemoryInput(content: content, lastUsedAt: lastUsedAt)
+        var basCueMemoryInput: BASCueMemoryInput {
+            BASCueMemoryInput(content: content, lastUsedAt: lastUsedAt)
         }
     }
 
@@ -344,7 +344,7 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
     }
 
     @Model
-    final class BalanceFixture: BASAppleBalanceMemoryEntity {
+    final class ComparativeFixture: BASAppleComparativeMemoryEntity {
         @Attribute(.unique) var id: UUID
         var prompt: String
         var longTerm: String
@@ -357,8 +357,8 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
             self.updatedAt = updatedAt
         }
 
-        var basBalanceMemoryInput: BASBalanceMemoryInput {
-            BASBalanceMemoryInput(
+        var basComparativeMemoryInput: BASComparativeMemoryInput {
+            BASComparativeMemoryInput(
                 prompt: prompt,
                 longTerm: longTerm,
                 updatedAt: updatedAt
@@ -367,7 +367,7 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
     }
 
     @Model
-    final class MirrorFixture: BASAppleMirrorMemoryEntity {
+    final class ReflectiveFixture: BASAppleReflectiveMemoryEntity {
         @Attribute(.unique) var id: UUID
         var prompt: String
         var longTerm: String
@@ -380,8 +380,8 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
             self.updatedAt = updatedAt
         }
 
-        var basMirrorMemoryInput: BASMirrorMemoryInput {
-            BASMirrorMemoryInput(
+        var basReflectiveMemoryInput: BASReflectiveMemoryInput {
+            BASReflectiveMemoryInput(
                 prompt: prompt,
                 longTerm: longTerm,
                 updatedAt: updatedAt
@@ -409,15 +409,15 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
                 admittedCandidateCount: 0
             ),
             refreshGovernanceSnapshot: { governanceSnapshot(in: $0) },
-            reminderType: ReminderFixture.self,
+            cueType: CueFixture.self,
             checkEventType: CheckEventFixture.self,
-            comparativeRecordType: BalanceFixture.self,
-            reflectiveRecordType: MirrorFixture.self,
+            comparativeRecordType: ComparativeFixture.self,
+            reflectiveRecordType: ReflectiveFixture.self,
             fetchRecords: { fetchRecords(in: $0, limit: $1) },
             fetchCandidates: { fetchCandidates(in: $0, limit: $1) },
             fetchCheckEvents: { fetchCheckEvents(in: $0, limit: $1) },
-            fetchComparativeRecords: { fetchBalanceRecords(in: $0, limit: $1) },
-            fetchReflectiveRecords: { fetchMirrorRecords(in: $0, limit: $1) },
+            fetchComparativeRecords: { fetchComparativeRecords(in: $0, limit: $1) },
+            fetchReflectiveRecords: { fetchReflectiveRecords(in: $0, limit: $1) },
             rebuildEmbeddings: { records, candidates, checkEvents, comparativeRecords, reflectiveRecords in
                 rebuildCall = (
                     records.count,
@@ -479,15 +479,15 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
                 admittedCandidateCount: 0
             ),
             refreshGovernanceSnapshot: { governanceSnapshot(in: $0) },
-            reminderType: ReminderFixture.self,
+            cueType: CueFixture.self,
             checkEventType: CheckEventFixture.self,
-            comparativeRecordType: BalanceFixture.self,
-            reflectiveRecordType: MirrorFixture.self,
+            comparativeRecordType: ComparativeFixture.self,
+            reflectiveRecordType: ReflectiveFixture.self,
             fetchRecords: { fetchRecords(in: $0, limit: $1) },
             fetchCandidates: { fetchCandidates(in: $0, limit: $1) },
             fetchCheckEvents: { fetchCheckEvents(in: $0, limit: $1) },
-            fetchComparativeRecords: { fetchBalanceRecords(in: $0, limit: $1) },
-            fetchReflectiveRecords: { fetchMirrorRecords(in: $0, limit: $1) },
+            fetchComparativeRecords: { fetchComparativeRecords(in: $0, limit: $1) },
+            fetchReflectiveRecords: { fetchReflectiveRecords(in: $0, limit: $1) },
             rebuildEmbeddings: { _, _, _, _, _ in }
         )
 
@@ -502,17 +502,17 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
         try ModelContainer(
             for: GovernedFixture.self,
             CandidateFixture.self,
-            ReminderFixture.self,
+            CueFixture.self,
             CheckEventFixture.self,
-            BalanceFixture.self,
-            MirrorFixture.self,
+            ComparativeFixture.self,
+            ReflectiveFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
     }
 
     private func seedHistory(into context: ModelContext, now: Date) {
         context.insert(
-            ReminderFixture(
+            CueFixture(
                 content: "Sleep on it.",
                 lastUsedAt: now.addingTimeInterval(-3_600)
             )
@@ -529,14 +529,14 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
             )
         )
         context.insert(
-            BalanceFixture(
+            ComparativeFixture(
                 prompt: "Should I buy this tonight?",
                 longTerm: "Tomorrow usually feels clearer.",
                 updatedAt: now.addingTimeInterval(-600)
             )
         )
         context.insert(
-            MirrorFixture(
+            ReflectiveFixture(
                 prompt: "Why does this feel urgent now?",
                 longTerm: "Nighttime urgency usually passes.",
                 updatedAt: now.addingTimeInterval(-300)
@@ -596,22 +596,22 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
         return (try? context.fetch(descriptor)) ?? []
     }
 
-    private func fetchBalanceRecords(
+    private func fetchComparativeRecords(
         in context: ModelContext,
         limit: Int
-    ) -> [BalanceFixture] {
-        var descriptor = FetchDescriptor<BalanceFixture>(
+    ) -> [ComparativeFixture] {
+        var descriptor = FetchDescriptor<ComparativeFixture>(
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
         )
         descriptor.fetchLimit = limit
         return (try? context.fetch(descriptor)) ?? []
     }
 
-    private func fetchMirrorRecords(
+    private func fetchReflectiveRecords(
         in context: ModelContext,
         limit: Int
-    ) -> [MirrorFixture] {
-        var descriptor = FetchDescriptor<MirrorFixture>(
+    ) -> [ReflectiveFixture] {
+        var descriptor = FetchDescriptor<ReflectiveFixture>(
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
         )
         descriptor.fetchLimit = limit

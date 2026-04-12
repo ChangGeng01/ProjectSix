@@ -323,7 +323,7 @@ final class DecisionIntelligencePromptContractTests: XCTestCase {
                 DecisionIntelligencePromptContract.PromptBlockKind.compactionPolicy
             )
         )
-        XCTAssertEqual(envelope.prompt.assembly.kernelSnapshot.truthState?.mode, "reminder")
+        XCTAssertEqual(envelope.prompt.assembly.kernelSnapshot.truthState?.mode, "selection")
         XCTAssertEqual(envelope.prompt.assembly.kernelSnapshot.truthState?.sessionFacts["surface_mode"], "primary")
         XCTAssertTrue(envelope.prompt.budget.isWithinTarget)
     }

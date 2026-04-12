@@ -37,9 +37,9 @@ public enum BASAppleCurrentBrainHostLifecycleRuntimeExecutor {
         onCheckpointSaveError: ((Error) -> Void)? = nil,
         onUpdateSaveError: ((Error) -> Void)? = nil,
         buildCurrentBrain: (BASAppleCurrentBrainLifecycleResult<Update, Checkpoint>) -> CurrentBrain
-    ) -> CurrentBrain {
+    ) throws -> CurrentBrain {
         let lifecycleResult: BASAppleCurrentBrainLifecycleResult<Update, Checkpoint> =
-            BASAppleCurrentBrainLifecycleExecutor.bootstrapAndCommit(
+            try BASAppleCurrentBrainLifecycleExecutor.bootstrapAndCommit(
                 input: input.bootstrapInput,
                 in: modelContext,
                 createdAt: input.bootstrapInput.now,

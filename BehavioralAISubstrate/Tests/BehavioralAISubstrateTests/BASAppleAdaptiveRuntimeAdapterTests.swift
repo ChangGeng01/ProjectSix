@@ -22,16 +22,16 @@ struct BASAppleAdaptiveRuntimeAdapterTests {
         #expect(compilation.matrix.environmentClass == .normal)
         #expect(compilation.matrix.deviceClass == .balancedPhone)
         #expect(compilation.matrix.languageMode == .english)
-        #expect(compilation.preferredProviderIDByKind["quick"] == "template")
-        #expect(compilation.preferredProviderIDByKind["balance"] == "foundationModels")
-        #expect(compilation.matrix.strategy(for: .quick).allowsModelInvocation == false)
-        #expect(compilation.matrix.strategy(for: .mirror).allowsModelInvocation == true)
+        #expect(compilation.preferredProviderIDByKind[BASAdaptiveTraceKind.primaryID] == "template")
+        #expect(compilation.preferredProviderIDByKind[BASAdaptiveTraceKind.comparativeID] == "foundationModels")
+        #expect(compilation.matrix.strategy(for: .primary).allowsModelInvocation == false)
+        #expect(compilation.matrix.strategy(for: .reflective).allowsModelInvocation == true)
     }
 
     @Test("adapter compiles brief session signals and adapts strategy inside the package")
     func adapterCompilesBriefSignalsAndAdaptsStrategy() {
         let base = BASAdaptiveTaskStrategy(
-            kind: .quick,
+            kind: .primary,
             entropy: .medium,
             runtimeGear: .balanced,
             contextBudget: 220,
@@ -76,7 +76,7 @@ struct BASAppleAdaptiveRuntimeAdapterTests {
     @Test("adapter guards retrieval when memory trust is unstable")
     func adapterGuardsRetrievalWhenSignalsAreUnstable() {
         let base = BASAdaptiveTaskStrategy(
-            kind: .mirror,
+            kind: .reflective,
             entropy: .high,
             runtimeGear: .balanced,
             contextBudget: 440,

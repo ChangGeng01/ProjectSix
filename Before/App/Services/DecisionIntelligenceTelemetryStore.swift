@@ -90,12 +90,12 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
         }
     }
 
-    var reminderSelectionNeedCount: [ReminderSelectionNeed: Int] {
-        mapReminderNeedDictionary(substrateSnapshot.reminderSelectionNeedCount)
+    var selectionNeedCount: [ReminderSelectionNeed: Int] {
+        mapReminderNeedDictionary(substrateSnapshot.selectionNeedCount)
     }
 
-    var reminderSelectionNeedCountByKind: [ReminderSelectionNeed: [DecisionIntelligenceTraceKind: Int]] {
-        substrateSnapshot.reminderSelectionNeedCountByKind.reduce(into: [:]) { partialResult, item in
+    var selectionNeedCountByKind: [ReminderSelectionNeed: [DecisionIntelligenceTraceKind: Int]] {
+        substrateSnapshot.selectionNeedCountByKind.reduce(into: [:]) { partialResult, item in
             guard let need = ReminderSelectionNeed(rawValue: item.key) else { return }
             partialResult[need] = mapKindDictionary(item.value)
         }
@@ -269,20 +269,20 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
         mapKindDictionary(substrateSummary.overTargetBudgetRateByKind)
     }
 
-    var reminderKnowledgeNeedRate: Double {
-        substrateSummary.reminderKnowledgeNeedRate
+    var selectionKnowledgeNeedRate: Double {
+        substrateSummary.selectionKnowledgeNeedRate
     }
 
-    var reminderControlOnlyRate: Double {
-        substrateSummary.reminderControlOnlyRate
+    var selectionControlOnlyRate: Double {
+        substrateSummary.selectionControlOnlyRate
     }
 
-    var reminderRetrievalBypassRate: Double {
-        substrateSummary.reminderRetrievalBypassRate
+    var selectionRetrievalBypassRate: Double {
+        substrateSummary.selectionRetrievalBypassRate
     }
 
-    var reminderRetrievalBypassCount: Int {
-        substrateSummary.reminderRetrievalBypassCount
+    var selectionRetrievalBypassCount: Int {
+        substrateSummary.selectionRetrievalBypassCount
     }
 
     var slowRequestRate: Double {
@@ -309,7 +309,7 @@ struct DecisionIntelligenceTelemetrySnapshot: Equatable, Sendable {
         _ values: [String: Value]
     ) -> [DecisionIntelligenceTraceKind: Value] {
         values.reduce(into: [:]) { partialResult, item in
-            guard let kind = DecisionIntelligenceTraceKind(rawValue: item.key) else { return }
+            guard let kind = DecisionIntelligenceTraceKind(substrateKindID: item.key) else { return }
             partialResult[kind] = item.value
         }
     }
@@ -365,11 +365,11 @@ actor DecisionIntelligenceTelemetryStore {
 
     private let accumulator = BASAppleTelemetryAccumulator(
         config: BASAppleTelemetryAccumulatorConfig(
-            reminderKindRawValue: DecisionIntelligenceTraceKind.reminder.rawValue,
-            reminderKnowledgeNeedRawValue: ReminderSelectionNeed.knowledge.rawValue,
-            reminderControlNeedRawValue: ReminderSelectionNeed.control.rawValue,
-            reminderRetrievalBypassReasonRawValues: [
-                DecisionIntelligenceAdmissionSkipReason.insufficientReminderChoice.rawValue,
+            selectionKindRawValue: DecisionIntelligenceTraceKind.reminder.substrateKindID,
+            selectionKnowledgeNeedRawValue: ReminderSelectionNeed.knowledge.rawValue,
+            selectionControlNeedRawValue: ReminderSelectionNeed.control.rawValue,
+            selectionRetrievalBypassReasonRawValues: [
+                DecisionIntelligenceAdmissionSkipReason.insufficientChoiceSpread.rawValue,
                 DecisionIntelligenceAdmissionSkipReason.retrievalNotNeeded.rawValue
             ],
             avoidableSkipReasonRawValues: [
@@ -394,7 +394,7 @@ actor DecisionIntelligenceTelemetryStore {
     ) async {
         await accumulator.record(
             from: BASAppleTelemetryRecordInput(
-                kind: kind.rawValue,
+                kind: kind.substrateKindID,
                 outcome: outcome,
                 activeProviderID: activeProvider?.rawValue,
                 attemptedProviderIDs: attemptedProviders.map(\.rawValue),
@@ -405,7 +405,7 @@ actor DecisionIntelligenceTelemetryStore {
                 runtimeTimeBudgetMs: runtimeStrategy?.timeBudgetMs,
                 admissionPressureID: admissionDecision?.pressure.rawValue,
                 admissionSkipReasonID: admissionDecision?.skipReason?.rawValue,
-                reminderSelectionNeedID: admissionDecision?.reminderSelectionNeed?.rawValue,
+                selectionNeedID: admissionDecision?.selectionNeed?.rawValue,
                 activeBackendID: gemmaBackendResolution?.effectiveBackend.rawValue
             )
         )

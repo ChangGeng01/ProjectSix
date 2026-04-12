@@ -2,22 +2,22 @@ import Testing
 @testable import BASAppleAdapters
 
 struct BASAppleTaskGraphLifecycleTests {
-    @Test("task graph lifecycle prefers quick over balance and mirror snapshots")
-    func taskGraphLifecyclePrefersQuickSnapshot() {
+    @Test("task graph lifecycle prefers primary over comparative and reflective snapshots")
+    func taskGraphLifecyclePrefersPrimarySnapshot() {
         var saved: [String] = []
 
         let snapshot = BASAppleTaskGraphLifecycleExecutor.refresh(
             snapshotsInPriorityOrder: [
-                { "quick" },
-                { "balance" },
-                { "mirror" }
+                { "primary" },
+                { "comparative" },
+                { "reflective" }
             ],
             saveSnapshot: { saved.append($0) },
             clearSnapshot: { saved.append("clear") }
         )
 
-        #expect(snapshot == "quick")
-        #expect(saved == ["quick"])
+        #expect(snapshot == "primary")
+        #expect(saved == ["primary"])
     }
 
     @Test("task graph lifecycle clears persisted state when no snapshot is available")

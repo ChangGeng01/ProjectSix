@@ -1,60 +1,71 @@
 import Foundation
 
 public enum BASAdaptiveTraceKind: String, CaseIterable, Codable, Sendable {
-    case quick
-    case balance
-    case mirror
-    case reminder
+    case primary = "primary"
+    case comparative = "comparative"
+    case reflective = "reflective"
+    case selection = "selection"
 
     public static let primaryID = "primary"
     public static let comparativeID = "comparative"
     public static let reflectiveID = "reflective"
-    public static let reminderID = "reminder"
-
-    public static var primary: Self { .quick }
-    public static var comparative: Self { .balance }
-    public static var reflective: Self { .mirror }
+    public static let selectionID = "selection"
 
     public var identifier: String {
         switch self {
-        case .quick:
+        case .primary:
             Self.primaryID
-        case .balance:
+        case .comparative:
             Self.comparativeID
-        case .mirror:
+        case .reflective:
             Self.reflectiveID
-        case .reminder:
-            Self.reminderID
+        case .selection:
+            Self.selectionID
         }
     }
 
-    public var legacyIdentifier: String { rawValue }
-
     public init?(identifier: String) {
         switch identifier {
-        case Self.primaryID, "quick":
-            self = .quick
-        case Self.comparativeID, "balance":
-            self = .balance
-        case Self.reflectiveID, "mirror":
-            self = .mirror
-        case Self.reminderID, "reminder":
-            self = .reminder
+        case Self.primaryID:
+            self = .primary
+        case Self.comparativeID:
+            self = .comparative
+        case Self.reflectiveID:
+            self = .reflective
+        case Self.selectionID:
+            self = .selection
         default:
             return nil
         }
     }
 
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let identifier = try container.decode(String.self)
+        guard let kind = BASAdaptiveTraceKind(identifier: identifier) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unsupported adaptive trace kind: \(identifier)"
+            )
+        }
+        self = kind
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+
     public var title: String {
         switch self {
-        case .quick:
+        case .primary:
             "Primary"
-        case .balance:
+        case .comparative:
             "Comparative"
-        case .mirror:
+        case .reflective:
             "Reflective"
-        case .reminder:
-            "Reminder"
+        case .selection:
+            "Selection"
         }
     }
 }
@@ -310,39 +321,39 @@ public struct BASAdaptiveTaskStrategy: Codable, Equatable, Sendable {
     ) -> Int {
         guard allowsModelInvocation else {
             switch kind {
-            case .quick, .reminder:
+            case .primary, .selection:
                 return 180
-            case .balance:
+            case .comparative:
                 return 260
-            case .mirror:
+            case .reflective:
                 return 320
             }
         }
 
         let base: Int = switch (gear, kind) {
-        case (.low, .quick):
+        case (.low, .primary):
             180
-        case (.low, .balance):
+        case (.low, .comparative):
             260
-        case (.low, .mirror):
+        case (.low, .reflective):
             320
-        case (.low, .reminder):
+        case (.low, .selection):
             140
-        case (.balanced, .quick):
+        case (.balanced, .primary):
             220
-        case (.balanced, .balance):
+        case (.balanced, .comparative):
             340
-        case (.balanced, .mirror):
+        case (.balanced, .reflective):
             440
-        case (.balanced, .reminder):
+        case (.balanced, .selection):
             160
-        case (.high, .quick):
+        case (.high, .primary):
             260
-        case (.high, .balance):
+        case (.high, .comparative):
             420
-        case (.high, .mirror):
+        case (.high, .reflective):
             560
-        case (.high, .reminder):
+        case (.high, .selection):
             180
         }
 
@@ -368,39 +379,39 @@ public struct BASAdaptiveTaskStrategy: Codable, Equatable, Sendable {
     ) -> Int {
         guard allowsModelInvocation else {
             switch kind {
-            case .quick, .reminder:
+            case .primary, .selection:
                 return 350
-            case .balance:
+            case .comparative:
                 return 500
-            case .mirror:
+            case .reflective:
                 return 650
             }
         }
 
         let base: Int = switch (gear, kind) {
-        case (.low, .quick):
+        case (.low, .primary):
             500
-        case (.low, .balance):
+        case (.low, .comparative):
             700
-        case (.low, .mirror):
+        case (.low, .reflective):
             900
-        case (.low, .reminder):
+        case (.low, .selection):
             350
-        case (.balanced, .quick):
+        case (.balanced, .primary):
             700
-        case (.balanced, .balance):
+        case (.balanced, .comparative):
             1000
-        case (.balanced, .mirror):
+        case (.balanced, .reflective):
             1300
-        case (.balanced, .reminder):
+        case (.balanced, .selection):
             450
-        case (.high, .quick):
+        case (.high, .primary):
             900
-        case (.high, .balance):
+        case (.high, .comparative):
             1400
-        case (.high, .mirror):
+        case (.high, .reflective):
             1800
-        case (.high, .reminder):
+        case (.high, .selection):
             550
         }
 
@@ -413,13 +424,13 @@ public struct BASAdaptiveTaskStrategy: Codable, Equatable, Sendable {
     ) -> Int {
         guard allowsModelInvocation else { return 0 }
         return switch kind {
-        case .quick:
+        case .primary:
             1
-        case .balance:
+        case .comparative:
             2
-        case .mirror:
+        case .reflective:
             2
-        case .reminder:
+        case .selection:
             1
         }
     }
@@ -432,9 +443,9 @@ public struct BASAdaptiveTaskStrategy: Codable, Equatable, Sendable {
         case .off:
             return 0
         case .filtered:
-            return kind == .reminder ? 2 : 3
+            return kind == .selection ? 2 : 3
         case .adaptive:
-            return kind == .mirror ? 5 : 4
+            return kind == .reflective ? 5 : 4
         }
     }
 }
@@ -497,26 +508,26 @@ public extension BASAdaptiveTaskStrategy {
         var responseLanguage = responseLanguage
 
         let minimumBudget: Int = switch kind {
-        case .quick:
+        case .primary:
             160
-        case .balance:
+        case .comparative:
             220
-        case .mirror:
+        case .reflective:
             260
-        case .reminder:
+        case .selection:
             140
         }
 
         if signals.briefBias >= 0.78 || signals.fatigueSignal >= 0.68 || signals.hasBriefSessionBias {
             runtimeGear = .low
             let reduction: Int = switch kind {
-            case .quick:
+            case .primary:
                 40
-            case .balance:
+            case .comparative:
                 60
-            case .mirror:
+            case .reflective:
                 80
-            case .reminder:
+            case .selection:
                 20
             }
             contextBudget = max(minimumBudget, contextBudget - reduction)
@@ -531,7 +542,7 @@ public extension BASAdaptiveTaskStrategy {
             }
         }
 
-        if kind == .quick, signals.interruptiveBias >= 0.82 {
+        if kind == .primary, signals.interruptiveBias >= 0.82 {
             runtimeGear = .low
             contextBudget = max(minimumBudget, contextBudget - 20)
             outputCharacterBudget = max(120, outputCharacterBudget - 40)
@@ -543,10 +554,10 @@ public extension BASAdaptiveTaskStrategy {
             }
         }
 
-        if kind == .mirror, signals.boundaryBias >= 0.78, !actionSpace.contains("name_boundary") {
+        if kind == .reflective, signals.boundaryBias >= 0.78, !actionSpace.contains("name_boundary") {
             actionSpace.append("name_boundary")
         }
-        if kind == .mirror,
+        if kind == .reflective,
            runtimeGear != .low,
            signals.boundaryBias >= 0.88,
            signals.fatigueSignal < 0.55,
@@ -561,10 +572,10 @@ public extension BASAdaptiveTaskStrategy {
             }
         }
 
-        if kind == .balance, signals.tradeoffBias >= 0.78, !actionSpace.contains("surface_priority") {
+        if kind == .comparative, signals.tradeoffBias >= 0.78, !actionSpace.contains("surface_priority") {
             actionSpace.append("surface_priority")
         }
-        if kind == .balance,
+        if kind == .comparative,
            runtimeGear == .balanced,
            signals.tradeoffBias >= 0.86,
            signals.fatigueSignal < 0.55,
@@ -590,8 +601,8 @@ public extension BASAdaptiveTaskStrategy {
             switch retrievalMode {
             case .adaptive:
                 retrievalMode = .filtered
-                retrievalItemBudget = min(retrievalItemBudget, kind == .mirror ? 3 : 2)
-            case .filtered where kind == .reminder:
+                retrievalItemBudget = min(retrievalItemBudget, kind == .reflective ? 3 : 2)
+            case .filtered where kind == .selection:
                 retrievalMode = .off
                 retrievalItemBudget = 0
             case .off, .filtered:
@@ -844,11 +855,11 @@ public enum BASAdaptiveRuntimeMatrixResolver {
         guard allowsModelInvocation else { return .low }
 
         let baseGear: BASRuntimeGear = switch kind {
-        case .quick, .reminder:
+        case .primary, .selection:
             .low
-        case .balance:
+        case .comparative:
             runtimeGear == .low ? .low : .balanced
-        case .mirror:
+        case .reflective:
             switch runtimeGear {
             case .low:
                 .low
@@ -876,11 +887,11 @@ public enum BASAdaptiveRuntimeMatrixResolver {
 
     private static func entropy(for kind: BASAdaptiveTraceKind) -> BASTaskEntropyClass {
         switch kind {
-        case .quick, .reminder:
+        case .primary, .selection:
             .low
-        case .balance:
+        case .comparative:
             .medium
-        case .mirror:
+        case .reflective:
             .high
         }
     }
@@ -896,24 +907,24 @@ public enum BASAdaptiveRuntimeMatrixResolver {
         let base: Int
         if !allowsModelInvocation {
             switch kind {
-            case .quick, .reminder: base = 160
-            case .balance: base = 220
-            case .mirror: base = 240
+            case .primary, .selection: base = 160
+            case .comparative: base = 220
+            case .reflective: base = 240
             }
         } else {
             switch (gear, kind) {
-            case (.low, .quick): base = 220
-            case (.low, .balance): base = 280
-            case (.low, .mirror): base = 320
-            case (.low, .reminder): base = 160
-            case (.balanced, .quick): base = 320
-            case (.balanced, .balance): base = 440
-            case (.balanced, .mirror): base = 520
-            case (.balanced, .reminder): base = 200
-            case (.high, .quick): base = 360
-            case (.high, .balance): base = 520
-            case (.high, .mirror): base = 620
-            case (.high, .reminder): base = 240
+            case (.low, .primary): base = 220
+            case (.low, .comparative): base = 280
+            case (.low, .reflective): base = 320
+            case (.low, .selection): base = 160
+            case (.balanced, .primary): base = 320
+            case (.balanced, .comparative): base = 440
+            case (.balanced, .reflective): base = 520
+            case (.balanced, .selection): base = 200
+            case (.high, .primary): base = 360
+            case (.high, .comparative): base = 520
+            case (.high, .reflective): base = 620
+            case (.high, .selection): base = 240
             }
         }
 
@@ -935,10 +946,10 @@ public enum BASAdaptiveRuntimeMatrixResolver {
         case .english, .chinese: 0
         }
         let minimumBudget: Int = switch kind {
-        case .quick: 160
-        case .balance: 220
-        case .mirror: 260
-        case .reminder: 140
+        case .primary: 160
+        case .comparative: 220
+        case .reflective: 260
+        case .selection: 140
         }
 
         return max(minimumBudget, base - environmentPenalty - devicePenalty - languagePenalty)
@@ -1023,9 +1034,9 @@ public enum BASAdaptiveRuntimeMatrixResolver {
     ) -> Int {
         guard allowsModelInvocation else { return 0 }
         let base: Int = switch kind {
-        case .quick, .reminder:
+        case .primary, .selection:
             1
-        case .balance, .mirror:
+        case .comparative, .reflective:
             2
         }
         return environmentClass == .normal ? base : max(0, base - 1)
@@ -1038,13 +1049,13 @@ public enum BASAdaptiveRuntimeMatrixResolver {
     ) -> Int {
         guard allowsModelInvocation else { return 0 }
         let base: Int = switch kind {
-        case .quick:
+        case .primary:
             0
-        case .reminder:
+        case .selection:
             2
-        case .balance:
+        case .comparative:
             3
-        case .mirror:
+        case .reflective:
             5
         }
 
@@ -1061,18 +1072,18 @@ public enum BASAdaptiveRuntimeMatrixResolver {
     ) -> BASRetrievalMode {
         guard allowsModelInvocation else { return .off }
         var mode: BASRetrievalMode = switch kind {
-        case .quick:
+        case .primary:
             .off
-        case .reminder:
+        case .selection:
             .filtered
-        case .balance:
+        case .comparative:
             gear == .high ? .adaptive : .filtered
-        case .mirror:
+        case .reflective:
             .adaptive
         }
 
         if environmentClass == .simulator || environmentClass == .lowPower {
-            if kind == .reminder {
+            if kind == .selection {
                 return .off
             }
             if mode == .adaptive {
@@ -1104,7 +1115,7 @@ public enum BASAdaptiveRuntimeMatrixResolver {
         languageMode: BASLanguageMode
     ) -> BASThinkingMode {
         guard allowsModelInvocation else { return .off }
-        guard kind == .balance || kind == .mirror else { return .off }
+        guard kind == .comparative || kind == .reflective else { return .off }
         guard gear == .high,
               environmentClass == .normal,
               deviceClass == .fullPhone,
@@ -1120,13 +1131,13 @@ public enum BASAdaptiveRuntimeMatrixResolver {
     ) -> BASOutputMode {
         guard allowsModelInvocation else { return .deterministicTemplate }
         switch kind {
-        case .quick:
+        case .primary:
             return .guidedShort
-        case .balance:
+        case .comparative:
             return .structuredBoard
-        case .mirror:
+        case .reflective:
             return .reflectiveStructured
-        case .reminder:
+        case .selection:
             return .jsonShort
         }
     }
@@ -1144,19 +1155,19 @@ public enum BASAdaptiveRuntimeMatrixResolver {
 
         if languageMode == .mixed || languageMode == .unknown {
             switch kind {
-            case .quick, .reminder:
+            case .primary, .selection:
                 return .briefWarm
-            case .balance, .mirror:
+            case .comparative, .reflective:
                 return .groundedDirect
             }
         }
 
         switch kind {
-        case .quick, .reminder:
+        case .primary, .selection:
             return .briefWarm
-        case .balance:
+        case .comparative:
             return .groundedDirect
-        case .mirror:
+        case .reflective:
             return .reflectiveClear
         }
     }
@@ -1168,14 +1179,14 @@ public enum BASAdaptiveRuntimeMatrixResolver {
         deviceClass: BASDevicePerformanceClass
     ) -> [String] {
         var actions: [String] = switch kind {
-        case .quick:
+        case .primary:
             ["encourage", "next_step", allowFallbacks ? "fallback_to_template" : "stay_deterministic"]
-        case .balance:
+        case .comparative:
             ["name_tradeoff", "surface_priority", allowFallbacks ? "fallback_to_template" : "stay_deterministic"]
-        case .mirror:
+        case .reflective:
             ["name_pattern", "name_boundary", allowFallbacks ? "fallback_to_template" : "stay_deterministic"]
-        case .reminder:
-            ["select_reminder", allowFallbacks ? "fallback_to_ranked_leader" : "stay_ranked_only"]
+        case .selection:
+            ["select_candidate", allowFallbacks ? "fallback_to_ranked_leader" : "stay_ranked_only"]
         }
 
         if environmentClass != .normal && !actions.contains("save_state") {

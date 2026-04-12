@@ -18,23 +18,25 @@
 
 Default hosts should import `BASHostKit`.
 
-Product language stays in the host. The substrate exposes generic workflow and lifecycle vocabulary, while hosts translate their own mode names, tabs, and branded flows at the edge.
+Product language stays in the host. The substrate exposes generic workflow and lifecycle vocabulary, while each host translates its own mode names, tabs, branded flows, and legacy identifiers at the edge through host-owned compatibility and migration layers.
 
 ```swift
 import BASHostKit
 
+var configuration = BASHostConfiguration.generic
+configuration.workflowBehavior = BASHostWorkflowBehaviorConfiguration(
+    hostNamespace: "host"
+)
+
 let runtime = BASHostRuntime(
-    configuration: BASHostConfiguration(
-        workflowBehavior: BASHostWorkflowBehaviorConfiguration(hostNamespace: "host"),
-        presentation: BASHostPresentationConfiguration()
-    ),
+    configuration: configuration,
     dependencies: BASHostDependencySet()
 )
 
 let result = runtime.startSession(
     BASHostSessionRequest(
         kind: .interactive,
-        workflowProfile: .rapid,
+        workflowProfile: .primary,
         surface: .application,
         prompt: "Should I do this right now?"
     )
@@ -55,14 +57,19 @@ Hosts can also inject their own:
 - workflow template IDs
 - workflow memory source mapping
 - workflow retrieval defaults
+- execution-profile thresholds and runtime explanation copy
+- prompt vocabulary, guards, and presentation copy
+- memory-derivation IDs, headlines, and provenance wording
 - host namespace for verification and projection provenance
 - lifecycle titles
 - lifecycle notices
 - follow-up action phrasing
 - predictive intervention copy
 - reopen wording
+- legacy identifier compatibility
+- bootstrap alias and fallback policy
 
-through `BASHostConfiguration.presentation`, so the substrate keeps generic behavior while each host keeps its own product DNA.
+through `BASHostConfiguration.presentation`, `BASHostConfiguration.workflowBehavior`, and `BASHostConfiguration.lifecycleBehavior.currentBrainBootstrapBehavior`, so the substrate keeps generic behavior while each host keeps its own product DNA.
 
 ## Reference Hosts
 
@@ -96,3 +103,5 @@ Run:
 ```bash
 ./scripts/check_sdk_import_boundaries.sh
 ```
+
+This also runs `./scripts/check_substrate_residuals.sh`, which fails if legacy host vocabulary leaks back into the substrate sources, README, or non-whitelisted package tests.

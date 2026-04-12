@@ -113,11 +113,11 @@ final class DecisionIntelligenceAdmissionControllerTests: XCTestCase {
 
         let decision = DecisionIntelligenceAdmissionController.decide(
             for: selection.prompt,
-            reminderCandidateCount: selection.candidates.count
+            selectionCandidateCount: selection.candidates.count
         )
 
         XCTAssertFalse(decision.isAllowed)
-        XCTAssertEqual(decision.skipReason, .insufficientReminderChoice)
+        XCTAssertEqual(decision.skipReason, .insufficientChoiceSpread)
     }
 
     func testReminderAdmissionSkipsWhenTheRankedLeaderIsAlreadyClearEnough() {
@@ -140,13 +140,13 @@ final class DecisionIntelligenceAdmissionControllerTests: XCTestCase {
 
         let decision = DecisionIntelligenceAdmissionController.decide(
             for: selection.prompt,
-            reminderCandidateCount: selection.candidates.count,
-            reminderSelectionAssessment: assessment
+            selectionCandidateCount: selection.candidates.count,
+            selectionAssessment: assessment
         )
 
         XCTAssertFalse(decision.isAllowed)
         XCTAssertEqual(decision.skipReason, .retrievalNotNeeded)
-        XCTAssertEqual(decision.reminderSelectionNeed, .control)
+        XCTAssertEqual(decision.selectionNeed, .control)
     }
 
     func testReminderAdmissionAllowsWhenKnowledgeNeedIsReal() {
@@ -169,13 +169,13 @@ final class DecisionIntelligenceAdmissionControllerTests: XCTestCase {
 
         let decision = DecisionIntelligenceAdmissionController.decide(
             for: selection.prompt,
-            reminderCandidateCount: selection.candidates.count,
-            reminderSelectionAssessment: assessment
+            selectionCandidateCount: selection.candidates.count,
+            selectionAssessment: assessment
         )
 
         XCTAssertTrue(decision.isAllowed)
         XCTAssertNil(decision.skipReason)
-        XCTAssertEqual(decision.reminderSelectionNeed, .knowledge)
+        XCTAssertEqual(decision.selectionNeed, .knowledge)
     }
 
     func testBalanceAdmissionSkipsWhenThereIsNotEnoughOpenTextMaterial() {

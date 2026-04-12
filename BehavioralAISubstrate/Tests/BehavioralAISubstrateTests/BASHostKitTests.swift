@@ -2,10 +2,36 @@ import XCTest
 @testable import BASHostKit
 
 final class BASHostKitTests: XCTestCase {
-    func testStartSessionBuildsCurrentBrainAndConsoleSnapshot() {
-        let runtime = BASHostRuntime()
+    private func makeGenericRuntime() -> BASHostRuntime {
+        BASHostRuntime(configuration: .generic)
+    }
 
-        let result = runtime.startSession(
+    private func makeConfiguration(
+        runtimeProfileID: String = "host.default-runtime",
+        policyProfileID: String = "host.default-policy",
+        prefersPureLocal: Bool = true,
+        console: BASHostConsoleConfiguration = .generic,
+        lifecycleBehavior: BASHostLifecycleBehaviorConfiguration = .generic,
+        workflowBehavior: BASHostWorkflowBehaviorConfiguration = .generic,
+        cognitionBehavior: BASHostCognitionBehaviorConfiguration = .generic,
+        presentation: BASHostPresentationConfiguration = .generic
+    ) -> BASHostConfiguration {
+        BASHostConfiguration(
+            runtimeProfileID: runtimeProfileID,
+            policyProfileID: policyProfileID,
+            prefersPureLocal: prefersPureLocal,
+            console: console,
+            lifecycleBehavior: lifecycleBehavior,
+            workflowBehavior: workflowBehavior,
+            cognitionBehavior: cognitionBehavior,
+            presentation: presentation
+        )
+    }
+
+    func testStartSessionBuildsCurrentBrainAndConsoleSnapshot() throws {
+        let runtime = makeGenericRuntime()
+
+        let result = try runtime.startSession(
             BASHostSessionRequest(
                 kind: .interactive,
                 workflowProfile: .reflective,
@@ -19,7 +45,7 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(result.requestKind, .interactive)
         XCTAssertEqual(result.workflowProfile, .reflective)
         XCTAssertEqual(result.currentBrain.workflowProfile, .reflective)
-        XCTAssertEqual(result.currentBrain.workflowTitle, "Reflective Lane")
+        XCTAssertEqual(result.currentBrain.workflowTitle, "Reflective")
         XCTAssertFalse(result.currentBrain.roleID.isEmpty)
         XCTAssertFalse(result.currentBrain.relationshipBoundary.isEmpty)
         XCTAssertFalse(result.currentBrain.boundaryHeadline.isEmpty)
@@ -29,25 +55,29 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertNotNil(result.interventionSuggestion)
     }
 
-    func testBootstrapUsesLifecyclePlannerNotices() {
-        let runtime = BASHostRuntime()
+    func testBootstrapUsesLifecyclePlannerNotices() throws {
+        let runtime = makeGenericRuntime()
 
-        let result = runtime.bootstrap(
+        let result = try runtime.bootstrap(
             BASHostLifecycleRequest(
                 phase: .initialAppearance,
-                preferredProfile: .rapid,
-                promptSeed: "Load the substrate before the UI asks for help."
+                sessionKind: .ambient,
+                preferredProfile: .primary,
+                sourceSurface: .application,
+                promptSeed: "Load the substrate before the UI asks for help.",
+                riskLevel: .low
             )
         )
 
-        XCTAssertEqual(result.activeSessionTitle, "Host Bootstrap")
+        XCTAssertEqual(result.activeSessionTitle, "Initial Appearance")
+        XCTAssertEqual(result.requestKind, .ambient)
         XCTAssertTrue(result.notices.contains("Refresh substrate projection"))
-        XCTAssertTrue(result.followUpActions.contains("Prepare current substrate state before presentation"))
+        XCTAssertTrue(result.followUpActions.contains("Load current state for presentation"))
     }
 
-    func testCustomLifecycleBehaviorBelongsToHost() {
+    func testCustomLifecycleBehaviorBelongsToHost() throws {
         let runtime = BASHostRuntime(
-            configuration: BASHostConfiguration(
+            configuration: makeConfiguration(
                 lifecycleBehavior: BASHostLifecycleBehaviorConfiguration(
                     bootstrapBehavior: BASAppleLifecycleBootstrapBehavior(
                         actionsByPhaseID: [
@@ -69,11 +99,14 @@ final class BASHostKitTests: XCTestCase {
             )
         )
 
-        let result = runtime.bootstrap(
+        let result = try runtime.bootstrap(
             BASHostLifecycleRequest(
                 phase: .initialAppearance,
-                preferredProfile: .rapid,
-                promptSeed: "Host bootstrap"
+                sessionKind: .ambient,
+                preferredProfile: .primary,
+                sourceSurface: .application,
+                promptSeed: "Host bootstrap",
+                riskLevel: .low
             )
         )
 
@@ -81,7 +114,7 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(result.followUpActions, ["Host loads first", "Host resumes workspace"])
     }
 
-    func testWorkflowBehaviorLetsHostOwnProviderObservationNarratives() {
+    func testWorkflowBehaviorUsesGenericProviderObservationKeys() {
         let workflowBehavior = BASHostWorkflowBehaviorConfiguration(
             providerObservationNarrativesByKindID: [
                 BASDecisionMode.primaryID: BASAppleProviderObservationNarrative(
@@ -95,21 +128,18 @@ final class BASHostKitTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            workflowBehavior.providerObservationNarrative(forKindID: "quick")?.providerConsistencySource,
-            "provider rapid pass"
-        )
-        XCTAssertEqual(
             workflowBehavior.providerObservationNarrative(forKindID: BASDecisionMode.primaryID)?.cachedConsistencySource,
             "cached rapid pass"
         )
+        XCTAssertNil(workflowBehavior.providerObservationNarrative(forKindID: "legacy-primary"))
     }
 
-    func testReopenHighRiskProducesFollowUpSuggestion() {
-        let runtime = BASHostRuntime()
+    func testReopenHighRiskProducesFollowUpSuggestion() throws {
+        let runtime = makeGenericRuntime()
 
-        let result = runtime.reopen(
+        let result = try runtime.reopen(
             BASHostReopenRequest(
-                workflowProfile: .deliberate,
+                workflowProfile: .comparative,
                 title: "Reopen this choice",
                 detail: "There is enough risk here that we want more structure.",
                 promptSeed: "Look at the cost of acting tonight.",
@@ -120,22 +150,29 @@ final class BASHostKitTests: XCTestCase {
         )
 
         XCTAssertEqual(result.requestKind, .reopen)
-        XCTAssertEqual(result.workflowProfile, .deliberate)
-        XCTAssertEqual(result.currentBrain.workflowProfile, .deliberate)
-        XCTAssertGreaterThan(result.currentBrain.failureGuardCount, 0)
+        XCTAssertEqual(result.workflowProfile, .comparative)
+        XCTAssertEqual(result.currentBrain.workflowProfile, .comparative)
+        XCTAssertEqual(result.currentBrain.failureGuardCount, 0)
         XCTAssertNotNil(result.interventionSuggestion)
-        XCTAssertTrue(result.followUpActions.contains("Require stronger confirmation"))
+        XCTAssertTrue(result.followUpActions.contains("Require confirmation"))
     }
 
-    func testCustomPresentationLetsHostOwnWorkflowLanguage() {
+    func testHostWorkflowProfilesUseGenericIdentifiers() throws {
+        XCTAssertEqual(BASHostWorkflowProfile.primary.rawValue, "primary")
+        XCTAssertEqual(BASHostWorkflowProfile.comparative.rawValue, "comparative")
+        XCTAssertEqual(try JSONDecoder().decode(BASHostWorkflowProfile.self, from: Data(#""primary""#.utf8)), .primary)
+        XCTAssertEqual(try JSONDecoder().decode(BASHostWorkflowProfile.self, from: Data(#""comparative""#.utf8)), .comparative)
+    }
+
+    func testCustomPresentationLetsHostOwnWorkflowLanguage() throws {
         let runtime = BASHostRuntime(
-            configuration: BASHostConfiguration(
-                runtimeProfileID: "before.local-cognition",
+            configuration: makeConfiguration(
+                runtimeProfileID: "atlas.field-runtime",
                 presentation: BASHostPresentationConfiguration(
                     workflowTitles: BASHostWorkflowTitles(
-                        rapid: "Quick Judgment",
-                        deliberate: "Balance Board",
-                        reflective: "Mirror"
+                        primary: "Scan Lane",
+                        comparative: "Fork Lane",
+                        reflective: "Archive Lane"
                     ),
                     surfaceTitles: BASHostSurfaceTitles(
                         application: "App",
@@ -147,94 +184,100 @@ final class BASHostKitTests: XCTestCase {
                         system: "System"
                     ),
                     sessionTitles: BASHostSessionTitles(
-                        rapid: "Quick Judgment",
-                        deliberate: "Balance Board",
-                        reflective: "Mirror",
-                        initialAppearance: "Before Bootstrap",
-                        sceneActive: "Before Refresh"
+                        primary: "Scan Lane",
+                        comparative: "Fork Lane",
+                        reflective: "Archive Lane",
+                        initialAppearance: "Atlas Bootstrap",
+                        sceneActive: "Atlas Refresh"
                     ),
                     followUpActions: BASHostFollowUpActions(
-                        rapid: ["Name the urge", "Choose one clean next move"],
-                        deliberate: ["Surface the real trade-off", "Name one cost and one benefit"],
-                        reflective: ["Slow the story", "Name one grounded truth"],
+                        primary: ["Scan the active pressure", "Pick one bounded next move"],
+                        comparative: ["Fork the active trade-off", "Name one constraint and one opening"],
+                        reflective: ["Archive the pattern", "Keep one anchor visible"],
                         highRiskEscalation: ["Require stronger confirmation"]
                     ),
                     lifecycle: BASHostLifecyclePresentation(
-                        refreshMemoryProjectionNotice: "Refresh Before memory projection",
-                        refreshCurrentBrainNotice: "Refresh Before brain state",
-                        presentPendingReflectionNotice: "Present the pending reflection",
-                        consumePendingLaunchRequestNotice: "Consume the pending launch request",
-                        restoreActiveWorkspaceNotice: "Restore the structured workspace",
-                        refreshPredictedInterventionNotice: "Refresh the guarded intervention state",
-                        syncWidgetSnapshotNotice: "Sync the Before widget snapshot",
-                        loadCurrentBrainFollowUp: "Load the current brain before rendering Before",
-                        resumeStructuredWorkspaceFollowUp: "Resume the last structured Before workspace",
-                        recomputeGuardedInterventionFollowUp: "Recompute the guarded intervention state"
+                        refreshMemoryProjectionNotice: "Refresh Atlas projection",
+                        refreshCurrentBrainNotice: "Refresh Atlas state",
+                        presentPendingReflectionNotice: "Present the deferred archive step",
+                        consumePendingLaunchRequestNotice: "Consume the deferred Atlas launch",
+                        restoreActiveWorkspaceNotice: "Restore the Atlas workspace",
+                        refreshPredictedInterventionNotice: "Refresh the guarded Atlas suggestion",
+                        syncWidgetSnapshotNotice: "Sync the Atlas widget snapshot",
+                        loadCurrentBrainFollowUp: "Load Atlas state before rendering",
+                        resumeStructuredWorkspaceFollowUp: "Resume the Atlas workspace",
+                        recomputeGuardedInterventionFollowUp: "Recompute the guarded Atlas suggestion"
                     ),
                     notices: BASHostNoticeTemplates(
-                        enteredWorkflow: "{surface} entered {workflow} through Before.",
-                        runtimeProfile: "Before runtime profile {runtimeProfile} is active.",
-                        reopenFollowUpAction: "Reopen with {workflow} structure",
-                        emptyPromptGoalFallback: "Stay clear before acting."
+                        enteredWorkflow: "{surface} entered {workflow} through Atlas.",
+                        runtimeProfile: "Atlas runtime profile {runtimeProfile} is active.",
+                        reopenFollowUpAction: "Reopen through {workflow}",
+                        emptyPromptGoalFallback: "Atlas keeps the lane narrow first."
                     ),
                     predictiveIntervention: BASHostPredictiveInterventionPresentation(
-                        mediumRiskTitle: "Pause before you decide.",
-                        mediumRiskDetail: "Before sees a context that benefits from one slower step.",
-                        highRiskTitle: "Add more friction before acting.",
-                        highRiskDetail: "Before sees elevated risk and wants stronger confirmation before the next move.",
-                        reopenRiskDetail: "This reopen path is carrying risk, so Before is asking for more structure.",
-                        fallbackReopenSuggestionDetail: "A prior hold suggests slowing this down.",
-                        defaultReason: "Before prefers a slower path here."
+                        mediumRiskTitle: "Atlas suggests a slower scan.",
+                        mediumRiskDetail: "Atlas sees a context that benefits from one lower-pressure pass.",
+                        highRiskTitle: "Atlas wants a stronger checkpoint.",
+                        highRiskDetail: "Atlas sees elevated risk and wants stronger confirmation before the next move.",
+                        reopenRiskDetail: "This reopen path is carrying risk, so Atlas is asking for more structure.",
+                        fallbackReopenSuggestionDetail: "A prior Atlas hold suggests slowing this down.",
+                        defaultReason: "Atlas prefers a lower-pressure path here."
                     )
                 )
             )
         )
 
-        let session = runtime.startSession(
+        let session = try runtime.startSession(
             BASHostSessionRequest(
                 kind: .interactive,
-                workflowProfile: .rapid,
+                workflowProfile: .primary,
                 surface: .application,
                 prompt: "I want to move fast.",
                 riskLevel: .low
             )
         )
-        let bootstrap = runtime.bootstrap(
+        let bootstrap = try runtime.bootstrap(
             BASHostLifecycleRequest(
                 phase: .initialAppearance,
-                preferredProfile: .rapid,
-                promptSeed: "Load the current brain before speaking."
+                sessionKind: .ambient,
+                preferredProfile: .primary,
+                sourceSurface: .application,
+                promptSeed: "Load the current brain before speaking.",
+                riskLevel: .low
             )
         )
 
-        XCTAssertEqual(session.activeSessionTitle, "Quick Judgment")
-        XCTAssertTrue(session.notices.contains("App entered quick judgment through Before."))
-        XCTAssertTrue(session.notices.contains("Before runtime profile before.local-cognition is active."))
-        XCTAssertEqual(session.followUpActions, ["Name the urge", "Choose one clean next move"])
-        XCTAssertEqual(bootstrap.activeSessionTitle, "Before Bootstrap")
-        XCTAssertTrue(bootstrap.notices.contains("Refresh Before memory projection"))
-        XCTAssertTrue(bootstrap.followUpActions.contains("Load the current brain before rendering Before"))
+        XCTAssertEqual(session.activeSessionTitle, "Scan Lane")
+        XCTAssertTrue(
+            session.notices.contains { notice in
+                notice.contains("Atlas runtime profile") && notice.contains("atlas.field-runtime")
+            }
+        )
+        XCTAssertEqual(session.followUpActions, ["Scan the active pressure", "Pick one bounded next move"])
+        XCTAssertEqual(bootstrap.activeSessionTitle, "Atlas Bootstrap")
+        XCTAssertTrue(bootstrap.notices.contains("Refresh Atlas projection"))
+        XCTAssertTrue(bootstrap.followUpActions.contains("Load Atlas state before rendering"))
     }
 
-    func testCustomPredictiveInterventionCopyBelongsToHost() {
+    func testCustomPredictiveInterventionCopyBelongsToHost() throws {
         let runtime = BASHostRuntime(
-            configuration: BASHostConfiguration(
+            configuration: makeConfiguration(
                 lifecycleBehavior: BASHostLifecycleBehaviorConfiguration(
                     predictiveInterventionBehavior: BASApplePredictiveInterventionBehavior(
                         lowRisk: BASApplePredictiveInterventionRiskBehavior(
                             title: "Host says soften it.",
                             detail: "Host wants a lighter pass.",
-                            preferredModeID: BASDecisionMode.quick.identifier
+                            preferredModeID: BASDecisionMode.primary.identifier
                         ),
                         mediumRisk: BASApplePredictiveInterventionRiskBehavior(
                             title: "Host says pause.",
                             detail: "Host wants one slower pass.",
-                            preferredModeID: BASDecisionMode.balance.identifier
+                            preferredModeID: BASDecisionMode.comparative.identifier
                         ),
                         highRisk: BASApplePredictiveInterventionRiskBehavior(
                             title: "Host wants another checkpoint.",
                             detail: "Host sees elevated risk and wants stronger confirmation.",
-                            preferredModeID: BASDecisionMode.mirror.identifier
+                            preferredModeID: BASDecisionMode.reflective.identifier
                         ),
                         defaultReason: "Host policy prefers a slower workflow."
                     )
@@ -248,18 +291,18 @@ final class BASHostKitTests: XCTestCase {
             )
         )
 
-        let session = runtime.startSession(
+        let session = try runtime.startSession(
             BASHostSessionRequest(
                 kind: .interactive,
-                workflowProfile: .deliberate,
+                workflowProfile: .comparative,
                 surface: .application,
                 prompt: "I need to compare these options carefully.",
                 riskLevel: .medium
             )
         )
-        let reopen = runtime.reopen(
+        let reopen = try runtime.reopen(
             BASHostReopenRequest(
-                workflowProfile: .deliberate,
+                workflowProfile: .comparative,
                 title: "Reopen this choice",
                 promptSeed: "Look at the cost of acting tonight.",
                 riskLevel: .high,
@@ -270,13 +313,13 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(session.interventionSuggestion?.title, "Host says pause.")
         XCTAssertEqual(session.interventionSuggestion?.detail, "Host wants one slower pass.")
         XCTAssertEqual(session.interventionSuggestion?.reason, "Host policy prefers a slower workflow.")
-        XCTAssertEqual(session.interventionSuggestion?.preferredWorkflowProfile, .deliberate)
+        XCTAssertEqual(session.interventionSuggestion?.preferredWorkflowProfile, .comparative)
         XCTAssertEqual(reopen.interventionSuggestion?.detail, "Host says slow this reopen down.")
     }
 
-    func testPreferredPredictiveWorkflowUsesHostModeMapping() {
+    func testPreferredPredictiveWorkflowUsesHostModeMapping() throws {
         let runtime = BASHostRuntime(
-            configuration: BASHostConfiguration(
+            configuration: makeConfiguration(
                 lifecycleBehavior: BASHostLifecycleBehaviorConfiguration(
                     predictiveInterventionBehavior: BASApplePredictiveInterventionBehavior(
                         mediumRisk: BASApplePredictiveInterventionRiskBehavior(
@@ -288,18 +331,18 @@ final class BASHostKitTests: XCTestCase {
                 ),
                 workflowBehavior: BASHostWorkflowBehaviorConfiguration(
                     modeIDsByProfileID: [
-                        BASHostWorkflowProfile.rapid.rawValue: BASDecisionMode.reflectiveID,
-                        BASHostWorkflowProfile.deliberate.rawValue: BASDecisionMode.primaryID,
+                        BASHostWorkflowProfile.primary.rawValue: BASDecisionMode.reflectiveID,
+                        BASHostWorkflowProfile.comparative.rawValue: BASDecisionMode.primaryID,
                         BASHostWorkflowProfile.reflective.rawValue: BASDecisionMode.comparativeID
                     ]
                 )
             )
         )
 
-        let session = runtime.startSession(
+        let session = try runtime.startSession(
             BASHostSessionRequest(
                 kind: .interactive,
-                workflowProfile: .rapid,
+                workflowProfile: .primary,
                 surface: .application,
                 prompt: "Slow this down for one more pass.",
                 riskLevel: .medium
@@ -309,8 +352,75 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(session.interventionSuggestion?.preferredWorkflowProfile, .reflective)
     }
 
+    func testHostKitSupportsForeignHostVocabularyWithoutLegacyCopy() throws {
+        let runtime = BASHostRuntime(
+            configuration: makeConfiguration(
+                runtimeProfileID: "atlas.field-runtime",
+                workflowBehavior: BASHostWorkflowBehaviorConfiguration(
+                    modeIDsByProfileID: [
+                        BASHostWorkflowProfile.primary.rawValue: BASDecisionMode.primaryID,
+                        BASHostWorkflowProfile.comparative.rawValue: BASDecisionMode.comparativeID,
+                        BASHostWorkflowProfile.reflective.rawValue: BASDecisionMode.reflectiveID
+                    ],
+                    providerObservationNarrativesByKindID: [
+                        BASDecisionMode.primaryID: BASAppleProviderObservationNarrative(
+                            templatePinnedDetail: "Atlas pinned the Scan Lane draft.",
+                            admissionSkippedDetailPrefix: "Atlas skipped the Scan Lane pass.",
+                            deterministicFallbackBase: "Atlas kept the deterministic Scan Lane draft.",
+                            cachedConsistencySource: "cached Scan Lane",
+                            providerConsistencySource: "provider Scan Lane"
+                        )
+                    ],
+                    hostNamespace: "atlas"
+                ),
+                presentation: BASHostPresentationConfiguration(
+                    workflowTitles: BASHostWorkflowTitles(
+                        primary: "Scan Lane",
+                        comparative: "Fork Lane",
+                        reflective: "Archive Lane"
+                    ),
+                    sessionTitles: BASHostSessionTitles(
+                        primary: "Scan Lane",
+                        comparative: "Fork Lane",
+                        reflective: "Archive Lane",
+                        initialAppearance: "Atlas Bootstrap",
+                        sceneActive: "Atlas Refresh"
+                    ),
+                    notices: BASHostNoticeTemplates(
+                        enteredWorkflow: "{surface} entered {workflow} through Atlas.",
+                        runtimeProfile: "Atlas runtime profile {runtimeProfile} is active.",
+                        reopenFollowUpAction: "Reopen through {workflow}",
+                        emptyPromptGoalFallback: "Atlas keeps the lane narrow first."
+                    )
+                )
+            )
+        )
+
+        let session = try runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .primary,
+                surface: .application,
+                prompt: "Atlas wants a first-pass scan.",
+                riskLevel: .low
+            )
+        )
+
+        XCTAssertEqual(session.activeSessionTitle, "Scan Lane")
+        XCTAssertTrue(
+            session.notices.contains { notice in
+                notice.contains("Atlas") && notice.localizedCaseInsensitiveContains("Scan Lane")
+            }
+        )
+        XCTAssertTrue(session.notices.contains("Atlas runtime profile atlas.field-runtime is active."))
+        XCTAssertEqual(
+            runtime.configuration.workflowBehavior.providerObservationNarrative(forKindID: BASDecisionMode.primaryID)?.providerConsistencySource,
+            "provider Scan Lane"
+        )
+    }
+
     func testLifecycleBehaviorCarriesHostOwnedProjectionLimits() {
-        let configuration = BASHostConfiguration(
+        let configuration = makeConfiguration(
             lifecycleBehavior: BASHostLifecycleBehaviorConfiguration(
                 projectionRefreshLimits: BASAppleMemoryProjectionRefreshLimits(
                     recordLimit: 48,
@@ -345,62 +455,65 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertNil(configuration.retrievalMode(for: .interactive))
     }
 
-    func testWorkflowBehaviorOwnsModeMappingAndNeutralFallbacks() {
+    func testWorkflowBehaviorOwnsModeMappingAndUsesExplicitGenericDefaults() throws {
         let configuration = BASHostWorkflowBehaviorConfiguration(
             modeIDsByProfileID: [
-                BASHostWorkflowProfile.rapid.rawValue: BASDecisionMode.reflectiveID,
-                BASHostWorkflowProfile.deliberate.rawValue: BASDecisionMode.primaryID,
+                BASHostWorkflowProfile.primary.rawValue: BASDecisionMode.reflectiveID,
+                BASHostWorkflowProfile.comparative.rawValue: BASDecisionMode.primaryID,
                 BASHostWorkflowProfile.reflective.rawValue: BASDecisionMode.comparativeID
             ]
         )
+        let genericConfiguration = BASHostWorkflowBehaviorConfiguration.generic
 
-        XCTAssertEqual(configuration.mode(for: .rapid), .reflective)
-        XCTAssertEqual(configuration.mode(for: .deliberate), .primary)
+        XCTAssertEqual(try configuration.mode(for: .primary), .reflective)
+        XCTAssertEqual(try configuration.mode(for: .comparative), .primary)
         XCTAssertEqual(configuration.workflowProfile(forModeID: BASDecisionMode.comparativeID), .reflective)
-        XCTAssertEqual(configuration.interactiveRetrievalMode(for: .rapid), BASRetrievalMode.adaptive.rawValue)
+        XCTAssertEqual(try configuration.interactiveRetrievalMode(for: .primary), BASRetrievalMode.adaptive.rawValue)
         XCTAssertNil(configuration.defaultMemorySource(for: .reopen))
         XCTAssertNil(configuration.defaultRetrievalMode(for: .reopen))
+        XCTAssertEqual(genericConfiguration.defaultMemorySource(for: .reopen), .archive)
+        XCTAssertEqual(genericConfiguration.defaultRetrievalMode(for: .reopen), BASRetrievalMode.adaptive.rawValue)
     }
 
-    func testCustomWorkflowBehaviorBelongsToHost() {
+    func testCustomWorkflowBehaviorBelongsToHost() throws {
         let runtime = BASHostRuntime(
-            configuration: BASHostConfiguration(
+            configuration: makeConfiguration(
                 workflowBehavior: BASHostWorkflowBehaviorConfiguration(
                     templateIDsByProfileID: [
-                        BASHostWorkflowProfile.rapid.rawValue: ["before.template.quick-judgment"]
+                        BASHostWorkflowProfile.primary.rawValue: ["atlas.template.scan-lane"]
                     ],
                     memorySourceIDsByProfileID: [
-                        BASHostWorkflowProfile.rapid.rawValue: BASMemorySource.history.rawValue
+                        BASHostWorkflowProfile.primary.rawValue: BASMemorySource.archive.rawValue
                     ],
                     interactiveRetrievalModeByProfileID: [
-                        BASHostWorkflowProfile.rapid.rawValue: "balanced"
+                        BASHostWorkflowProfile.primary.rawValue: "balanced"
                     ],
-                    hostNamespace: "before-sdk"
+                    hostNamespace: "atlas-sdk"
                 )
             )
         )
 
-        let result = runtime.startSession(
+        let result = try runtime.startSession(
             BASHostSessionRequest(
                 kind: .interactive,
-                workflowProfile: .rapid,
+                workflowProfile: .primary,
                 surface: .application,
                 prompt: "I need one cleaner pass before I act.",
                 riskLevel: .low
             )
         )
 
-        XCTAssertEqual(result.projection.activeTemplateIDs, ["before.template.quick-judgment"])
-        XCTAssertEqual(result.currentBrain.verificationSummary.split(separator: "/").first, "before-sdk")
+        XCTAssertEqual(result.projection.activeTemplateIDs, ["atlas.template.scan-lane"])
+        XCTAssertEqual(result.currentBrain.verificationSummary.split(separator: "/").first, "atlas-sdk")
     }
 
-    func testGenericWorkflowDefaultsStayNeutralUntilHostInjectsProductSemantics() {
-        let runtime = BASHostRuntime()
+    func testGenericWorkflowDefaultsStayNeutralUntilHostInjectsProductSemantics() throws {
+        let runtime = makeGenericRuntime()
 
-        let result = runtime.startSession(
+        let result = try runtime.startSession(
             BASHostSessionRequest(
                 kind: .interactive,
-                workflowProfile: .rapid,
+                workflowProfile: .primary,
                 surface: .application,
                 prompt: "Hold the state steady for one more pass.",
                 riskLevel: .low
@@ -410,13 +523,13 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertTrue(result.projection.activeTemplateIDs.isEmpty)
         XCTAssertEqual(result.currentBrain.activeTemplateCount, 0)
         XCTAssertTrue(result.currentBrain.verificationSummary.hasPrefix("host/"))
-        XCTAssertEqual(result.currentBrain.workflowTitle, "Primary Lane")
-        XCTAssertEqual(result.activeSessionTitle, "Primary Lane")
+        XCTAssertEqual(result.currentBrain.workflowTitle, "Primary")
+        XCTAssertEqual(result.activeSessionTitle, "Primary")
     }
 
-    func testWorkflowBehaviorLetsHostOwnFailureGuardIdentifiers() {
+    func testWorkflowBehaviorLetsHostOwnFailureGuardIdentifiers() throws {
         let runtime = BASHostRuntime(
-            configuration: BASHostConfiguration(
+            configuration: makeConfiguration(
                 workflowBehavior: BASHostWorkflowBehaviorConfiguration(
                     failureGuardIDsByRiskLevelID: [
                         BASHostRiskLevel.high.rawValue: ["samplehost.guard/elevated-risk"]
@@ -426,10 +539,10 @@ final class BASHostKitTests: XCTestCase {
             )
         )
 
-        let result = runtime.startSession(
+        let result = try runtime.startSession(
             BASHostSessionRequest(
                 kind: .interactive,
-                workflowProfile: .deliberate,
+                workflowProfile: .comparative,
                 surface: .application,
                 prompt: "This needs another checkpoint before I commit.",
                 riskLevel: .high
@@ -439,25 +552,25 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(result.currentBrain.failureGuardCount, 1)
     }
 
-    func testDefaultHighRiskGuardFallsBackToHostNamespace() {
-        let runtime = BASHostRuntime()
+    func testDefaultHighRiskGuardStaysEmptyUntilHostInjectsPolicy() throws {
+        let runtime = makeGenericRuntime()
 
-        let result = runtime.startSession(
+        let result = try runtime.startSession(
             BASHostSessionRequest(
                 kind: .interactive,
-                workflowProfile: .deliberate,
+                workflowProfile: .comparative,
                 surface: .application,
                 prompt: "This needs another checkpoint before I commit.",
                 riskLevel: .high
             )
         )
 
-        XCTAssertEqual(result.currentBrain.failureGuardCount, 1)
+        XCTAssertEqual(result.currentBrain.failureGuardCount, 0)
         XCTAssertTrue(result.currentBrain.verificationSummary.hasPrefix("host/"))
     }
 
     func testExecuteLifecyclePhaseDelegatesEntryConsumptionAndRefreshOrder() {
-        let runtime = BASHostRuntime()
+        let runtime = makeGenericRuntime()
         var actions: [String] = []
 
         runtime.executeLifecyclePhase(
@@ -485,7 +598,7 @@ final class BASHostKitTests: XCTestCase {
     }
 
     func testCommitProjectionRefreshPublishesProjectionAndNotice() {
-        let runtime = BASHostRuntime()
+        let runtime = makeGenericRuntime()
         var committedProjection: String?
         var dirtyFlag = true
         var publishedNotice: String?
@@ -507,7 +620,7 @@ final class BASHostKitTests: XCTestCase {
     }
 
     func testResolveProjectionRefreshUsesResolverAndCommitsState() {
-        let runtime = BASHostRuntime()
+        let runtime = makeGenericRuntime()
         var committedProjection: String?
         var dirtyFlag = true
         var publishedNotice: String?
@@ -531,7 +644,7 @@ final class BASHostKitTests: XCTestCase {
     }
 
     func testActivateSessionCommitsProjectionBrainAndSession() {
-        let runtime = BASHostRuntime()
+        let runtime = makeGenericRuntime()
         var loadedSession: [String] = []
         var committedProjection: String?
         var dirtyFlag = true
@@ -566,7 +679,7 @@ final class BASHostKitTests: XCTestCase {
     }
 
     func testResolveCurrentBrainProjectionUsesResolverAndCommitsBrain() {
-        let runtime = BASHostRuntime()
+        let runtime = makeGenericRuntime()
         var committedProjection: String?
         var dirtyFlag = true
         var publishedNotice: String?
@@ -594,7 +707,7 @@ final class BASHostKitTests: XCTestCase {
     }
 
     func testResolveAndActivateSessionUsesResolverAndCommitsSession() {
-        let runtime = BASHostRuntime()
+        let runtime = makeGenericRuntime()
         var loadedSession: [String] = []
         var committedProjection: String?
         var dirtyFlag = true
@@ -631,12 +744,12 @@ final class BASHostKitTests: XCTestCase {
     }
 
     func testReopenHeldItemAppliesFollowUpSuggestion() {
-        let runtime = BASHostRuntime()
+        let runtime = makeGenericRuntime()
         var actions: [String] = []
         var suggestion: BASAppleReopenInterventionSuggestion?
 
         runtime.reopenHeldItem(
-            modeID: BASDecisionMode.balance.rawValue,
+            modeID: BASDecisionMode.comparative.rawValue,
             promptSeed: "Slow this choice down.",
             hasDraft: false,
             title: "Reopen carefully",
@@ -646,12 +759,12 @@ final class BASHostKitTests: XCTestCase {
             templateHint: "Cooling template",
             interventionHistorySummary: "Past nighttime choices went worse.",
             clearActiveDecisionFlows: { actions.append("clear") },
-            activatePrimaryFromDraft: { actions.append("draft-quick") },
-            activateComparativeFromDraft: { actions.append("draft-balance") },
-            activateReflectiveFromDraft: { actions.append("draft-mirror") },
-            startPrimary: { _ in actions.append("start-quick") },
-            startComparative: { _ in actions.append("start-balance") },
-            startReflective: { _ in actions.append("start-mirror") },
+            activatePrimaryFromDraft: { actions.append("draft-primary") },
+            activateComparativeFromDraft: { actions.append("draft-comparative") },
+            activateReflectiveFromDraft: { actions.append("draft-reflective") },
+            startPrimary: { _ in actions.append("start-primary") },
+            startComparative: { _ in actions.append("start-comparative") },
+            startReflective: { _ in actions.append("start-reflective") },
             removeItem: { actions.append("remove") },
             applyInterventionSuggestion: { suggestion = $0; actions.append("suggest") },
             refreshPredictedIntervention: { actions.append("refresh") },
@@ -660,13 +773,13 @@ final class BASHostKitTests: XCTestCase {
             now: .distantPast
         )
 
-        XCTAssertEqual(actions, ["clear", "start-balance", "remove", "suggest", "home", "persist"])
+        XCTAssertEqual(actions, ["clear", "start-comparative", "remove", "suggest", "home", "persist"])
         XCTAssertEqual(suggestion?.title, "Use more structure")
-        XCTAssertEqual(suggestion?.suggestedModeID, BASDecisionMode.balance.rawValue)
+        XCTAssertEqual(suggestion?.suggestedModeID, BASDecisionMode.comparative.rawValue)
     }
 
     func testRestoreActiveWorkspaceIfNeededRestoresMatchingMode() {
-        let runtime = BASHostRuntime()
+        let runtime = makeGenericRuntime()
         var actions: [String] = []
 
         runtime.restoreActiveWorkspaceIfNeeded(
@@ -675,26 +788,26 @@ final class BASHostKitTests: XCTestCase {
             hasActiveComparativeWorkflow: false,
             hasActiveReflectiveWorkflow: false,
             hasReflectionContext: false,
-            loadState: { "mirror" },
+            loadState: { BASDecisionMode.reflectiveID },
             modeID: { $0 },
-            restorePrimary: { _ in actions.append("quick") },
-            restoreComparative: { _ in actions.append("balance") },
-            restoreReflective: { _ in actions.append("mirror") },
+            restorePrimary: { _ in actions.append("primary") },
+            restoreComparative: { _ in actions.append("comparative") },
+            restoreReflective: { _ in actions.append("reflective") },
             selectHomeTab: { actions.append("home") },
             afterRestore: { actions.append("after") }
         )
 
-        XCTAssertEqual(actions, ["mirror", "home", "after"])
+        XCTAssertEqual(actions, ["reflective", "home", "after"])
     }
 
     func testRefreshActiveTaskGraphChoosesFirstAvailableSnapshot() {
-        let runtime = BASHostRuntime()
+        let runtime = makeGenericRuntime()
         var savedSnapshot: String?
         var cleared = false
         let snapshotLoaders: [() -> String?] = [
             { nil },
-            { "balance-snapshot" },
-            { "mirror-snapshot" }
+            { "comparative-snapshot" },
+            { "reflective-snapshot" }
         ]
 
         let snapshot = runtime.refreshActiveTaskGraph(
@@ -703,20 +816,20 @@ final class BASHostKitTests: XCTestCase {
             clearSnapshot: { cleared = true }
         )
 
-        XCTAssertEqual(snapshot, "balance-snapshot")
-        XCTAssertEqual(savedSnapshot, "balance-snapshot")
+        XCTAssertEqual(snapshot, "comparative-snapshot")
+        XCTAssertEqual(savedSnapshot, "comparative-snapshot")
         XCTAssertFalse(cleared)
     }
 
     func testReconcilePredictiveInterventionKeepsExistingPresentationStable() {
-        let runtime = BASHostRuntime()
+        let runtime = makeGenericRuntime()
         let existing = BASApplePredictiveInterventionCandidateSummary(
             id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
             riskLevelID: BASRiskLevel.medium.rawValue,
             title: "Pause",
             detail: "Slow down",
             evidenceSignalCount: 2,
-            preferredModeID: BASDecisionMode.mirror.rawValue,
+            preferredModeID: BASDecisionMode.reflective.rawValue,
             reason: "Recent signals say pause.",
             createdAt: .distantPast,
             expiresAt: .distantFuture
@@ -727,7 +840,7 @@ final class BASHostKitTests: XCTestCase {
             title: "Pause",
             detail: "Slow down",
             evidenceSignalCount: 2,
-            preferredModeID: BASDecisionMode.mirror.rawValue,
+            preferredModeID: BASDecisionMode.reflective.rawValue,
             reason: "Recent signals say pause.",
             createdAt: .now,
             expiresAt: .distantFuture
@@ -742,14 +855,14 @@ final class BASHostKitTests: XCTestCase {
     }
 
     func testExecutePredictiveInterventionDeliverySchedulesAllowedCandidate() {
-        let runtime = BASHostRuntime()
+        let runtime = makeGenericRuntime()
         let candidate = BASApplePredictiveInterventionCandidateSummary(
             id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
             riskLevelID: BASRiskLevel.high.rawValue,
             title: "Pause",
             detail: "Slow down",
             evidenceSignalCount: 3,
-            preferredModeID: BASDecisionMode.mirror.rawValue,
+            preferredModeID: BASDecisionMode.reflective.rawValue,
             reason: "High-risk context",
             createdAt: .now,
             expiresAt: .distantFuture
@@ -776,12 +889,12 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(scheduled, [candidate.id])
     }
 
-    func testCustomCognitionBehaviorBelongsToHost() {
+    func testCustomCognitionBehaviorBelongsToHost() throws {
         let runtime = BASHostRuntime(
-            configuration: BASHostConfiguration(
+            configuration: makeConfiguration(
                 cognitionBehavior: BASHostCognitionBehaviorConfiguration(
                     reactionWeightsByProfileID: [
-                        BASHostWorkflowProfile.rapid.rawValue: BASReactionWeights(
+                        BASHostWorkflowProfile.primary.rawValue: BASReactionWeights(
                             briefLanguage: 0.71,
                             warmDirectTone: 0.41,
                             lowCognitiveLoad: 0.68,
@@ -791,7 +904,7 @@ final class BASHostKitTests: XCTestCase {
                         )
                     ],
                     identityProfilesByProfileID: [
-                        BASHostWorkflowProfile.rapid.rawValue: BASIdentityProfile(
+                        BASHostWorkflowProfile.primary.rawValue: BASIdentityProfile(
                             role: .tradeoffGuide,
                             posture: .coaching,
                             initiative: .guided,
@@ -844,20 +957,49 @@ final class BASHostKitTests: XCTestCase {
             )
         )
 
-        let result = runtime.startSession(
+        let result = try runtime.startSession(
             BASHostSessionRequest(
                 kind: .notification,
-                workflowProfile: .rapid,
+                workflowProfile: .primary,
                 surface: .notification,
                 prompt: "Host wants a slower notification path.",
                 riskLevel: .high
             )
         )
 
-        XCTAssertEqual(result.currentBrain.workflowProfile, .rapid)
+        XCTAssertEqual(result.currentBrain.workflowProfile, .primary)
         XCTAssertEqual(result.currentBrain.roleID, BASIdentityRole.boundedGuide.rawValue)
         XCTAssertEqual(result.currentBrain.relationshipBoundary, "Host high-risk relationship.")
         XCTAssertEqual(result.currentBrain.boundaryHeadline, "Host protective.")
         XCTAssertNotNil(result.interventionSuggestion)
+    }
+
+    func testBootstrapThrowsTypedErrorWhenHostOmitsSessionDefaults() {
+        let runtime = BASHostRuntime(
+            configuration: makeConfiguration(
+                workflowBehavior: BASHostWorkflowBehaviorConfiguration(
+                    defaultMemorySourceIDsBySessionKindID: [:],
+                    defaultRetrievalModeIDsBySessionKindID: [:]
+                )
+            )
+        )
+
+        XCTAssertThrowsError(
+            try runtime.bootstrap(
+                BASHostLifecycleRequest(
+                    phase: .initialAppearance,
+                    sessionKind: .ambient,
+                    preferredProfile: .primary,
+                    sourceSurface: .application,
+                    promptSeed: "Host omitted ambient routing.",
+                    riskLevel: .low
+                )
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? BASHostIntegrationError,
+                .missingSessionKindMemorySource(kindID: BASHostSessionKind.ambient.rawValue)
+            )
+        }
     }
 }

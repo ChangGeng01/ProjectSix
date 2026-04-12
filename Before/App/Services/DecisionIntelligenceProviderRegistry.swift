@@ -232,10 +232,10 @@ struct GemmaOpenModelAdapter: DecisionOpenModelAdapting {
         title: "Gemma 4 E4B",
         detail: "Built-in open-model adapter. Future bundled open-source runtimes can plug into the same provider contract without changing the intelligence pipeline.",
         taskAffinities: [
-            .quick: 70,
-            .balance: 94,
-            .mirror: 100,
-            .reminder: 84
+            .primary: 70,
+            .comparative: 94,
+            .reflective: 100,
+            .selection: 84
         ],
         capabilityProfile: DecisionModelCapabilityProfile(
             modelID: "google/gemma-4-e4b-it",
@@ -252,7 +252,7 @@ struct GemmaOpenModelAdapter: DecisionOpenModelAdapting {
             supportsThinking: true,
             supportsStructuredOutput: true,
             supportsToolUse: true,
-            bestFor: [.balance, .mirror, .reminder]
+            bestFor: [.comparative, .reflective, .selection]
         )
     )
 
@@ -343,10 +343,10 @@ struct ReservedOpenModelAdapter: DecisionOpenModelAdapting {
         title: "Open model runtime",
         detail: "Reserved integration slot for future bundled or open-source local models. Replace this adapter to add a new model without rewriting the intelligence pipeline.",
         taskAffinities: [
-            .quick: 88,
-            .balance: 90,
-            .mirror: 92,
-            .reminder: 86
+            .primary: 88,
+            .comparative: 90,
+            .reflective: 92,
+            .selection: 86
         ],
         capabilityProfile: DecisionModelCapabilityProfile(
             modelID: "before/open-model-slot",
@@ -364,7 +364,7 @@ struct ReservedOpenModelAdapter: DecisionOpenModelAdapting {
             supportsThinking: false,
             supportsStructuredOutput: true,
             supportsToolUse: true,
-            bestFor: [.quick, .reminder]
+            bestFor: [.primary, .selection]
         )
     )
 
@@ -629,13 +629,13 @@ enum DecisionIntelligenceTaskRouter {
     static func substrateTraceKind(_ task: DecisionIntelligenceTraceKind) -> BASAdaptiveTraceKind {
         switch task {
         case .quick:
-            .quick
+            .primary
         case .balance:
-            .balance
+            .comparative
         case .mirror:
-            .mirror
+            .reflective
         case .reminder:
-            .reminder
+            .selection
         }
     }
 
@@ -743,13 +743,13 @@ enum DecisionIntelligenceTaskRouter {
 
     static func hostTraceKind(_ task: BASAdaptiveTraceKind) -> DecisionIntelligenceTraceKind {
         switch task {
-        case .quick:
+        case .primary:
             .quick
-        case .balance:
+        case .comparative:
             .balance
-        case .mirror:
+        case .reflective:
             .mirror
-        case .reminder:
+        case .selection:
             .reminder
         }
     }

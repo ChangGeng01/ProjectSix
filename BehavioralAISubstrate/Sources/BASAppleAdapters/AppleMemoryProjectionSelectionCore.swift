@@ -129,28 +129,4 @@ public enum BASAppleMemoryProjectionSelectionAdapter {
             timestamp: { $0.basReflectiveMemoryInput.updatedAt }
         )
     }
-
-    public static func fetchProjectionBalanceRecords<Balance: BASAppleBalanceMemoryEntity>(
-        in context: ModelContext,
-        balanceType: Balance.Type,
-        limit: Int? = nil
-    ) -> [Balance] {
-        fetchProjectionComparativeRecords(
-            in: context,
-            comparativeType: balanceType,
-            limit: limit
-        )
-    }
-
-    public static func fetchProjectionMirrorRecords<Mirror: BASAppleMirrorMemoryEntity>(
-        in context: ModelContext,
-        mirrorType: Mirror.Type,
-        limit: Int? = nil
-    ) -> [Mirror] {
-        fetchProjectionReflectiveRecords(
-            in: context,
-            reflectiveType: mirrorType,
-            limit: limit
-        )
-    }
 }

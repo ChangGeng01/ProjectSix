@@ -7,7 +7,7 @@ import Testing
 @Suite("BASApple Memory Draft Derivation Adapter")
 struct BASAppleMemoryDraftDerivationAdapterTests {
     @Model
-    final class ReminderFixture: BASAppleReminderMemoryEntity {
+    final class CueFixture: BASAppleCueMemoryEntity {
         @Attribute(.unique) var id: UUID
         var content: String
         var lastUsedAt: Date
@@ -22,8 +22,8 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
             self.lastUsedAt = lastUsedAt
         }
 
-        var basReminderMemoryInput: BASSelfReminderMemoryInput {
-            BASSelfReminderMemoryInput(
+        var basCueMemoryInput: BASCueMemoryInput {
+            BASCueMemoryInput(
                 content: content,
                 lastUsedAt: lastUsedAt
             )
@@ -72,7 +72,7 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
     }
 
     @Model
-    final class BalanceFixture: BASAppleBalanceMemoryEntity {
+    final class ComparativeFixture: BASAppleComparativeMemoryEntity {
         @Attribute(.unique) var id: UUID
         var prompt: String
         var longTerm: String
@@ -90,8 +90,8 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
             self.updatedAt = updatedAt
         }
 
-        var basBalanceMemoryInput: BASBalanceMemoryInput {
-            BASBalanceMemoryInput(
+        var basComparativeMemoryInput: BASComparativeMemoryInput {
+            BASComparativeMemoryInput(
                 prompt: prompt,
                 longTerm: longTerm,
                 updatedAt: updatedAt
@@ -100,7 +100,7 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
     }
 
     @Model
-    final class MirrorFixture: BASAppleMirrorMemoryEntity {
+    final class ReflectiveFixture: BASAppleReflectiveMemoryEntity {
         @Attribute(.unique) var id: UUID
         var prompt: String
         var longTerm: String
@@ -118,8 +118,8 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
             self.updatedAt = updatedAt
         }
 
-        var basMirrorMemoryInput: BASMirrorMemoryInput {
-            BASMirrorMemoryInput(
+        var basReflectiveMemoryInput: BASReflectiveMemoryInput {
+            BASReflectiveMemoryInput(
                 prompt: prompt,
                 longTerm: longTerm,
                 updatedAt: updatedAt
@@ -131,11 +131,11 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
     func adapterDerivesDraftsFromSwiftDataEntities() throws {
         let now = Date(timeIntervalSince1970: 1_744_200_000)
         let reminders = [
-            ReminderFixture(
+            CueFixture(
                 content: "Sleep on it.",
                 lastUsedAt: Date(timeIntervalSince1970: 1_744_100_000)
             ),
-            ReminderFixture(
+            CueFixture(
                 content: "Keep it short.",
                 lastUsedAt: Date(timeIntervalSince1970: 1_744_150_000)
             )
@@ -160,15 +160,15 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
                 createdAt: Date(timeIntervalSince1970: 1_744_180_000)
             )
         ]
-        let balanceRecords = [
-            BalanceFixture(
+        let comparativeRecords = [
+            ComparativeFixture(
                 prompt: "Should I send this tonight?",
                 longTerm: "I want calmer relationships tomorrow morning.",
                 updatedAt: Date(timeIntervalSince1970: 1_744_170_000)
             )
         ]
-        let mirrorRecords = [
-            MirrorFixture(
+        let reflectiveRecords = [
+            ReflectiveFixture(
                 prompt: "Why do I want to send it now?",
                 longTerm: "Nighttime restraint usually protects the relationship.",
                 updatedAt: Date(timeIntervalSince1970: 1_744_160_000)
@@ -176,39 +176,39 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
         ]
 
         let container = try ModelContainer(
-            for: ReminderFixture.self,
+            for: CueFixture.self,
             CheckEventFixture.self,
-            BalanceFixture.self,
-            MirrorFixture.self,
+            ComparativeFixture.self,
+            ReflectiveFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
         reminders.forEach(context.insert)
         checkEvents.forEach(context.insert)
-        balanceRecords.forEach(context.insert)
-        mirrorRecords.forEach(context.insert)
+        comparativeRecords.forEach(context.insert)
+        reflectiveRecords.forEach(context.insert)
 
         let actual = BASAppleMemoryDraftDerivationAdapter.deriveDrafts(
             in: context,
             now: now,
-            reminderType: ReminderFixture.self,
+            cueType: CueFixture.self,
             checkEventType: CheckEventFixture.self,
-            comparativeRecordType: BalanceFixture.self,
-            reflectiveRecordType: MirrorFixture.self
+            comparativeRecordType: ComparativeFixture.self,
+            reflectiveRecordType: ReflectiveFixture.self
         ).sorted(by: draftOrdering)
 
         let expected = BASMemoryDraftCompiler.derive(
             BASMemoryDerivationRequest(
-                reminders: reminders
-                    .map(\.basReminderMemoryInput)
+                cues: reminders
+                    .map(\.basCueMemoryInput)
                     .sorted { $0.lastUsedAt > $1.lastUsedAt },
                 checkEvents: checkEvents
                     .map(\.basCheckEventMemoryInput)
                     .sorted { $0.createdAt > $1.createdAt },
-                comparativeRecords: balanceRecords
+                comparativeRecords: comparativeRecords
                     .map(\.basComparativeMemoryInput)
                     .sorted { $0.updatedAt > $1.updatedAt },
-                reflectiveRecords: mirrorRecords
+                reflectiveRecords: reflectiveRecords
                     .map(\.basReflectiveMemoryInput)
                     .sorted { $0.updatedAt > $1.updatedAt },
                 now: now

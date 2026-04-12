@@ -12,13 +12,13 @@ public struct BASStructuredTruthBehavior: Codable, Sendable, Equatable {
             BASAdaptiveTraceKind.primaryID: BASDecisionMode.primary.identifier,
             BASAdaptiveTraceKind.comparativeID: BASDecisionMode.comparative.identifier,
             BASAdaptiveTraceKind.reflectiveID: BASDecisionMode.reflective.identifier,
-            BASAdaptiveTraceKind.reminderID: "reminder"
+            BASAdaptiveTraceKind.selectionID: BASAdaptiveTraceKind.selectionID
         ],
         kernelPersonaRulesByKindID: [String: String] = [
             BASAdaptiveTraceKind.primaryID: "Keep the active guidance short, calm, and bounded.",
             BASAdaptiveTraceKind.comparativeID: "Compare the active pressures without collapsing them into a verdict.",
             BASAdaptiveTraceKind.reflectiveID: "Reflect the underlying pattern without becoming dramatic or clinical.",
-            BASAdaptiveTraceKind.reminderID: "Choose only from retained candidates and do not invent a new option."
+            BASAdaptiveTraceKind.selectionID: "Choose only from retained candidates and do not invent a new option."
         ]
     ) {
         self.modeNamesByKindID = modeNamesByKindID
@@ -45,14 +45,14 @@ public struct BASStructuredTruthBehavior: Codable, Sendable, Equatable {
         for kind: BASAdaptiveTraceKind
     ) -> String {
         switch kind {
-        case .quick:
+        case .primary:
             BASDecisionMode.primary.identifier
-        case .balance:
+        case .comparative:
             BASDecisionMode.comparative.identifier
-        case .mirror:
+        case .reflective:
             BASDecisionMode.reflective.identifier
-        case .reminder:
-            "reminder"
+        case .selection:
+            BASAdaptiveTraceKind.selectionID
         }
     }
 
@@ -60,13 +60,13 @@ public struct BASStructuredTruthBehavior: Codable, Sendable, Equatable {
         for kind: BASAdaptiveTraceKind
     ) -> String {
         switch kind {
-        case .quick:
+        case .primary:
             "Keep the active guidance short, calm, and bounded."
-        case .balance:
+        case .comparative:
             "Compare the active pressures without collapsing them into a verdict."
-        case .mirror:
+        case .reflective:
             "Reflect the underlying pattern without becoming dramatic or clinical."
-        case .reminder:
+        case .selection:
             "Choose only from retained candidates and do not invent a new option."
         }
     }
@@ -87,18 +87,18 @@ public struct BASStructuredTruthBehavior: Codable, Sendable, Equatable {
 public struct BASStructuredTruthRequest: Codable, Sendable, Equatable {
     public var kind: BASAdaptiveTraceKind
     public var brainState: BASDecisionBrainState?
-    public var reminderSurfaceMode: BASDecisionMode?
+    public var selectionSurfaceMode: BASDecisionMode?
     public var behavior: BASStructuredTruthBehavior
 
     public init(
         kind: BASAdaptiveTraceKind,
         brainState: BASDecisionBrainState?,
-        reminderSurfaceMode: BASDecisionMode? = nil,
+        selectionSurfaceMode: BASDecisionMode? = nil,
         behavior: BASStructuredTruthBehavior = .generic
     ) {
         self.kind = kind
         self.brainState = brainState
-        self.reminderSurfaceMode = reminderSurfaceMode
+        self.selectionSurfaceMode = selectionSurfaceMode
         self.behavior = behavior
     }
 }
@@ -108,13 +108,13 @@ public enum BASStructuredTruthCompiler {
         for request: BASStructuredTruthRequest
     ) -> BASStructuredTruthState? {
         switch request.kind {
-        case .quick, .balance, .mirror:
+        case .primary, .comparative, .reflective:
             guard let brainState = request.brainState else { return nil }
             return governedTruthState(kind: request.kind, brainState: brainState, behavior: request.behavior)
-        case .reminder:
-            return reminderTruthState(
+        case .selection:
+            return selectionTruthState(
                 brainState: request.brainState,
-                surfaceMode: request.reminderSurfaceMode,
+                surfaceMode: request.selectionSurfaceMode,
                 behavior: request.behavior
             )
         }
@@ -146,7 +146,7 @@ public enum BASStructuredTruthCompiler {
         )
     }
 
-    private static func reminderTruthState(
+    private static func selectionTruthState(
         brainState: BASDecisionBrainState?,
         surfaceMode: BASDecisionMode?,
         behavior: BASStructuredTruthBehavior
@@ -156,7 +156,7 @@ public enum BASStructuredTruthCompiler {
         let sessionBiasRule = Array(brainState?.sessionBiases.prefix(1) ?? [])
         let personaRules = Array(
             orderedUnique(
-                [behavior.kernelPersonaRule(for: .reminder)] +
+                [behavior.kernelPersonaRule(for: .selection)] +
                 relationshipRule +
                 sessionBiasRule
             )
@@ -172,7 +172,7 @@ public enum BASStructuredTruthCompiler {
         }
 
         return BASStructuredTruthState(
-            mode: behavior.modeName(for: .reminder),
+            mode: behavior.modeName(for: .selection),
             currentGoal: brainState?.activeGoals.first,
             allowedActions: Array(boundaryPolicy.allowedActionClasses.prefix(2)),
             forbiddenActions: Array(boundaryPolicy.blockedActionClasses.prefix(2)),

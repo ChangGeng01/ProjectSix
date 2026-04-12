@@ -126,7 +126,7 @@ struct BASAppleCurrentBrainCommitterTests {
                 brevity: 0.83,
                 actionBias: 0.48
             ),
-            identityProfile: BASIdentityProfile.default(modeName: "quick"),
+            identityProfile: BASIdentityProfile.default(modeName: "primary"),
             boundaryPolicy: BASBoundaryPolicyState.default(riskLevel: .high),
             calibrationState: BASCalibrationState(
                 status: .drifting,
@@ -138,7 +138,7 @@ struct BASAppleCurrentBrainCommitterTests {
             loadedAt: now
         )
         let persistenceInput = BASCurrentBrainPersistenceApplier.updateInput(
-            mode: "quick",
+            mode: "primary",
             bootstrapped: BASBootstrappedBrainState(
                 brainState: brainState,
                 dominantGoal: "Wait until morning",
@@ -151,7 +151,7 @@ struct BASAppleCurrentBrainCommitterTests {
 
         let result: BASAppleCurrentBrainCommitWriteResult<UpdateFixture, CheckpointFixture> =
             BASAppleCurrentBrainCommitter.commit(
-                modeName: "quick",
+                modeName: "primary",
                 sourceID: "notification",
                 brainState: brainState,
                 persistenceInput: persistenceInput,

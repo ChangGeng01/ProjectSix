@@ -16,7 +16,7 @@ struct BASAppleObservabilityAdapterTests {
                 considerRuntimeTestingContext: false,
                 runtimeTestingContextDetected: false,
                 testingOverridePresent: false,
-                kind: "quick",
+                kind: "primary",
                 preferredProviderID: "gemmaE4B",
                 activeProviderID: "foundationModels",
                 attemptedProviderIDs: ["gemmaE4B", "foundationModels"],
@@ -44,8 +44,8 @@ struct BASAppleObservabilityAdapterTests {
                     relevantMemories: ["Holding the decision helped before"],
                     sessionBiases: [],
                     retrievalTags: [],
-                    reactionWeights: .defaults(for: "quick"),
-                    identityProfile: .default(modeName: "quick"),
+                    reactionWeights: .defaults(for: "primary"),
+                    identityProfile: .default(modeName: "primary"),
                     boundaryPolicy: .default(riskLevel: .medium)
                 ),
                 consistencyRejected: true,
@@ -73,7 +73,7 @@ struct BASAppleObservabilityAdapterTests {
                 considerRuntimeTestingContext: true,
                 runtimeTestingContextDetected: true,
                 testingOverridePresent: false,
-                kind: "mirror",
+                kind: BASAdaptiveTraceKind.reflectiveID,
                 preferredProviderID: "foundationModels",
                 activeProviderID: "foundationModels",
                 attemptedProviderIDs: ["foundationModels"],
@@ -93,7 +93,7 @@ struct BASAppleObservabilityAdapterTests {
     func telemetryCompilationDerivesExecutionFlags() {
         let compilation = BASAppleObservabilityAdapter.compileTelemetryRecord(
             from: BASAppleTelemetryRecordInput(
-                kind: "mirror",
+                kind: BASAdaptiveTraceKind.reflectiveID,
                 outcome: .providerSuccess,
                 activeProviderID: "gemmaE4B",
                 attemptedProviderIDs: ["foundationModels", "gemmaE4B"],
@@ -114,7 +114,7 @@ struct BASAppleObservabilityAdapterTests {
                 runtimeTimeBudgetMs: 900,
                 admissionPressureID: "low",
                 admissionSkipReasonID: nil,
-                reminderSelectionNeedID: nil,
+                selectionNeedID: nil,
                 activeBackendID: "coreML"
             )
         )
@@ -126,11 +126,11 @@ struct BASAppleObservabilityAdapterTests {
         #expect(compilation.overTargetPromptBudget == true)
     }
 
-    @Test("telemetry compilation keeps reminder thresholds and non-provider outcomes conservative")
+    @Test("telemetry compilation keeps selection thresholds and non-provider outcomes conservative")
     func telemetryCompilationHandlesReminderAndSkippedAdmission() {
         let compilation = BASAppleObservabilityAdapter.compileTelemetryRecord(
             from: BASAppleTelemetryRecordInput(
-                kind: "reminder",
+                kind: BASAdaptiveTraceKind.selectionID,
                 outcome: .admissionSkipped,
                 activeProviderID: nil,
                 attemptedProviderIDs: [],
@@ -144,7 +144,7 @@ struct BASAppleObservabilityAdapterTests {
                 runtimeTimeBudgetMs: 900,
                 admissionPressureID: "low",
                 admissionSkipReasonID: "retrievalNotNeeded",
-                reminderSelectionNeedID: "control",
+                selectionNeedID: "control",
                 activeBackendID: nil
             )
         )
@@ -183,7 +183,7 @@ struct BASAppleObservabilityAdapterTests {
     @Test("consistency detail helper carries source and violations")
     func rejectedConsistencyDetailHelperCarriesSourceAndViolations() {
         let detail = BASAppleObservabilityAdapter.rejectedConsistencyDetail(
-            base: "Before rejected the result.",
+            base: "The host rejected the result.",
             result: BASConsistencyCheckResult(
                 violations: [
                     BASConsistencyViolation(kind: .forbiddenAction, message: "Action drifted outside the allowed space.")
@@ -205,11 +205,11 @@ struct BASAppleObservabilityAdapterTests {
             environmentClass: .lowPower,
             deviceClass: .balancedPhone,
             languageMode: .english,
-            taskEntropyByKind: ["quick": .low],
-            preferredProviderRawValueByKind: ["quick": "gemmaE4B"],
+            taskEntropyByKind: ["primary": .low],
+            preferredProviderRawValueByKind: ["primary": "gemmaE4B"],
             strategyByKind: [
-                "quick": BASAdaptiveTaskStrategy(
-                    kind: .quick,
+                "primary": BASAdaptiveTaskStrategy(
+                    kind: .primary,
                     entropy: .low,
                     runtimeGear: .low,
                     contextBudget: 220,
@@ -226,41 +226,41 @@ struct BASAppleObservabilityAdapterTests {
                     allowsModelInvocation: true
                 )
             ],
-            effectivePreferredProviderRawValueByKind: ["quick": "gemmaE4B"],
+            effectivePreferredProviderRawValueByKind: ["primary": "gemmaE4B"],
             traceInputs: [],
             telemetrySummary: BASTelemetrySummary(
                 input: BASTelemetrySummaryInput(
-                    requestCountByKind: ["quick": 1],
+                    requestCountByKind: ["primary": 1],
                     outcomeCount: [.providerSuccess: 1],
-                    outcomeCountByKind: [.providerSuccess: ["quick": 1]],
+                    outcomeCountByKind: [.providerSuccess: ["primary": 1]],
                     activeProviderCount: ["gemmaE4B": 1],
                     attemptedProviderCount: ["gemmaE4B": 1],
                     fallbackActivations: 0,
                     backendCount: [:],
                     slowRequestCountByKind: [:],
                     overTimeBudgetCountByKind: [:],
-                    requestDurationTotalMsByKind: ["quick": 120],
-                    firstPresentableTotalMsByKind: ["quick": 60],
-                    promptAssemblyTotalMsByKind: ["quick": 20],
-                    admissionEvaluationTotalMsByKind: ["quick": 10],
-                    providerSelectionTotalMsByKind: ["quick": 10],
-                    executionTotalMsByKind: ["quick": 20],
+                    requestDurationTotalMsByKind: ["primary": 120],
+                    firstPresentableTotalMsByKind: ["primary": 60],
+                    promptAssemblyTotalMsByKind: ["primary": 20],
+                    admissionEvaluationTotalMsByKind: ["primary": 10],
+                    providerSelectionTotalMsByKind: ["primary": 10],
+                    executionTotalMsByKind: ["primary": 20],
                     activeProviderDurationTotalMs: ["gemmaE4B": 120],
                     backendDurationTotalMs: [:],
                     admissionSkipCountByReason: [:],
                     admissionSkipCountByReasonAndKind: [:],
-                    reminderSelectionNeedCount: [:],
-                    promptCharactersTotalByKind: ["quick": 240],
-                    prefixCharactersTotalByKind: ["quick": 120],
-                    immutablePrefixCharactersTotalByKind: ["quick": 80],
-                    adaptivePrefixCharactersTotalByKind: ["quick": 40],
-                    suffixCharactersTotalByKind: ["quick": 120],
+                    selectionNeedCount: [:],
+                    promptCharactersTotalByKind: ["primary": 240],
+                    prefixCharactersTotalByKind: ["primary": 120],
+                    immutablePrefixCharactersTotalByKind: ["primary": 80],
+                    adaptivePrefixCharactersTotalByKind: ["primary": 40],
+                    suffixCharactersTotalByKind: ["primary": 120],
                     overTargetBudgetCountByKind: [:],
                     lowPressureModelCallCountByKind: [:],
-                    reminderKindRawValue: "reminder",
-                    reminderKnowledgeNeedRawValue: "knowledge",
-                    reminderControlNeedRawValue: "control",
-                    reminderRetrievalBypassReasonRawValues: [],
+                    selectionKindRawValue: "selection",
+                    selectionKnowledgeNeedRawValue: "knowledge",
+                    selectionControlNeedRawValue: "control",
+                    selectionRetrievalBypassReasonRawValues: [],
                     avoidableSkipReasonRawValues: []
                 )
             ),
@@ -290,45 +290,45 @@ struct BASAppleObservabilityAdapterTests {
         #expect(compilation.totalCacheEntries == 2)
         #expect(compilation.traceCount == 5)
         #expect(compilation.replayCount == 2)
-        #expect(compilation.strategyByKind["quick"]?.kind == .quick)
-        #expect(compilation.preferredProviderRawValueByKind["quick"] == "gemmaE4B")
+        #expect(compilation.strategyByKind["primary"]?.kind == .primary)
+        #expect(compilation.preferredProviderRawValueByKind["primary"] == "gemmaE4B")
     }
 
     @Test("runtime inspection builder compiles lifecycle neural brain and inspection summaries from raw trace inputs")
     func runtimeInspectionBuilderCompilesFromTraceInputs() {
         let telemetrySummary = BASTelemetrySummary(
             input: BASTelemetrySummaryInput(
-                requestCountByKind: ["quick": 1],
+                requestCountByKind: ["primary": 1],
                 outcomeCount: [.providerSuccess: 1],
-                outcomeCountByKind: [.providerSuccess: ["quick": 1]],
+                outcomeCountByKind: [.providerSuccess: ["primary": 1]],
                 activeProviderCount: ["gemmaE4B": 1],
                 attemptedProviderCount: ["gemmaE4B": 1],
                 fallbackActivations: 0,
                 backendCount: [:],
                 slowRequestCountByKind: [:],
                 overTimeBudgetCountByKind: [:],
-                requestDurationTotalMsByKind: ["quick": 120],
-                firstPresentableTotalMsByKind: ["quick": 60],
-                promptAssemblyTotalMsByKind: ["quick": 20],
-                admissionEvaluationTotalMsByKind: ["quick": 10],
-                providerSelectionTotalMsByKind: ["quick": 10],
-                executionTotalMsByKind: ["quick": 20],
+                requestDurationTotalMsByKind: ["primary": 120],
+                firstPresentableTotalMsByKind: ["primary": 60],
+                promptAssemblyTotalMsByKind: ["primary": 20],
+                admissionEvaluationTotalMsByKind: ["primary": 10],
+                providerSelectionTotalMsByKind: ["primary": 10],
+                executionTotalMsByKind: ["primary": 20],
                 activeProviderDurationTotalMs: ["gemmaE4B": 120],
                 backendDurationTotalMs: [:],
                 admissionSkipCountByReason: [:],
                 admissionSkipCountByReasonAndKind: [:],
-                reminderSelectionNeedCount: [:],
-                promptCharactersTotalByKind: ["quick": 240],
-                prefixCharactersTotalByKind: ["quick": 120],
-                immutablePrefixCharactersTotalByKind: ["quick": 80],
-                adaptivePrefixCharactersTotalByKind: ["quick": 40],
-                suffixCharactersTotalByKind: ["quick": 120],
+                selectionNeedCount: [:],
+                promptCharactersTotalByKind: ["primary": 240],
+                prefixCharactersTotalByKind: ["primary": 120],
+                immutablePrefixCharactersTotalByKind: ["primary": 80],
+                adaptivePrefixCharactersTotalByKind: ["primary": 40],
+                suffixCharactersTotalByKind: ["primary": 120],
                 overTargetBudgetCountByKind: [:],
                 lowPressureModelCallCountByKind: [:],
-                reminderKindRawValue: "reminder",
-                reminderKnowledgeNeedRawValue: "knowledge",
-                reminderControlNeedRawValue: "control",
-                reminderRetrievalBypassReasonRawValues: [],
+                selectionKindRawValue: "selection",
+                selectionKnowledgeNeedRawValue: "knowledge",
+                selectionControlNeedRawValue: "control",
+                selectionRetrievalBypassReasonRawValues: [],
                 avoidableSkipReasonRawValues: []
             )
         )
@@ -341,11 +341,11 @@ struct BASAppleObservabilityAdapterTests {
                 environmentClass: .normal,
                 deviceClass: .fullPhone,
                 languageMode: .english,
-                taskEntropyByKind: ["quick": .low],
-                preferredProviderRawValueByKind: ["quick": "gemmaE4B"],
+                taskEntropyByKind: ["primary": .low],
+                preferredProviderRawValueByKind: ["primary": "gemmaE4B"],
                 strategyByKind: [
-                    "quick": BASAdaptiveTaskStrategy(
-                        kind: .quick,
+                    "primary": BASAdaptiveTaskStrategy(
+                        kind: .primary,
                         entropy: .low,
                         runtimeGear: .balanced,
                         contextBudget: 320,
@@ -362,11 +362,11 @@ struct BASAppleObservabilityAdapterTests {
                         allowsModelInvocation: true
                     )
                 ],
-                effectivePreferredProviderRawValueByKind: ["quick": "gemmaE4B"],
+                effectivePreferredProviderRawValueByKind: ["primary": "gemmaE4B"],
                 traceSources: [
                     BASAppleRuntimeInspectionTraceSourceInput(
                         lifecycle: BASLifecycleTraceInput(
-                            kind: "quick",
+                            kind: "primary",
                             hasContextState: true,
                             generation: 3,
                             rebuiltSession: true,
@@ -380,13 +380,13 @@ struct BASAppleObservabilityAdapterTests {
                             droppedBudgetEvidenceCount: 0
                         ),
                         neural: BASNeuralTraceInput(
-                            kind: "quick",
+                            kind: "primary",
                             suppressedBehaviorCount: 1,
                             dominantActionRawValue: "encourage",
                             strongestSignalRawValue: "urgency"
                         ),
                         brain: BASBrainTraceInput(
-                            kind: "quick",
+                            kind: "primary",
                             dominantReactionWeight: .briefLanguage,
                             profileCoreCount: 1,
                             activeGoalCount: 1,
@@ -411,10 +411,10 @@ struct BASAppleObservabilityAdapterTests {
                             evolutionRollbackReady: true
                         ),
                         runtimeInspection: BASRuntimeInspectionTraceInput(
-                            kind: "quick",
+                            kind: "primary",
                             attemptedProviderIDs: ["gemmaE4B"],
                             runtimeStrategy: BASAdaptiveTaskStrategy(
-                                kind: .quick,
+                                kind: .primary,
                                 entropy: .low,
                                 runtimeGear: .balanced,
                                 contextBudget: 320,
@@ -468,37 +468,37 @@ struct BASAppleObservabilityAdapterTests {
     func runtimeExportBuilderCompilesHostLikeRawInspectionInputs() {
         let telemetrySummary = BASTelemetrySummary(
             input: BASTelemetrySummaryInput(
-                requestCountByKind: ["quick": 1],
+                requestCountByKind: ["primary": 1],
                 outcomeCount: [.providerSuccess: 1],
-                outcomeCountByKind: [.providerSuccess: ["quick": 1]],
+                outcomeCountByKind: [.providerSuccess: ["primary": 1]],
                 activeProviderCount: ["gemmaE4B": 1],
                 attemptedProviderCount: ["gemmaE4B": 1],
                 fallbackActivations: 0,
                 backendCount: ["coreML": 1],
                 slowRequestCountByKind: [:],
                 overTimeBudgetCountByKind: [:],
-                requestDurationTotalMsByKind: ["quick": 220],
-                firstPresentableTotalMsByKind: ["quick": 140],
-                promptAssemblyTotalMsByKind: ["quick": 20],
-                admissionEvaluationTotalMsByKind: ["quick": 10],
-                providerSelectionTotalMsByKind: ["quick": 15],
-                executionTotalMsByKind: ["quick": 95],
+                requestDurationTotalMsByKind: ["primary": 220],
+                firstPresentableTotalMsByKind: ["primary": 140],
+                promptAssemblyTotalMsByKind: ["primary": 20],
+                admissionEvaluationTotalMsByKind: ["primary": 10],
+                providerSelectionTotalMsByKind: ["primary": 15],
+                executionTotalMsByKind: ["primary": 95],
                 activeProviderDurationTotalMs: ["gemmaE4B": 220],
                 backendDurationTotalMs: ["coreML": 220],
                 admissionSkipCountByReason: [:],
                 admissionSkipCountByReasonAndKind: [:],
-                reminderSelectionNeedCount: [:],
-                promptCharactersTotalByKind: ["quick": 420],
-                prefixCharactersTotalByKind: ["quick": 220],
-                immutablePrefixCharactersTotalByKind: ["quick": 120],
-                adaptivePrefixCharactersTotalByKind: ["quick": 100],
-                suffixCharactersTotalByKind: ["quick": 200],
+                selectionNeedCount: [:],
+                promptCharactersTotalByKind: ["primary": 420],
+                prefixCharactersTotalByKind: ["primary": 220],
+                immutablePrefixCharactersTotalByKind: ["primary": 120],
+                adaptivePrefixCharactersTotalByKind: ["primary": 100],
+                suffixCharactersTotalByKind: ["primary": 200],
                 overTargetBudgetCountByKind: [:],
                 lowPressureModelCallCountByKind: [:],
-                reminderKindRawValue: "reminder",
-                reminderKnowledgeNeedRawValue: "knowledge",
-                reminderControlNeedRawValue: "control",
-                reminderRetrievalBypassReasonRawValues: [],
+                selectionKindRawValue: "selection",
+                selectionKnowledgeNeedRawValue: "knowledge",
+                selectionControlNeedRawValue: "control",
+                selectionRetrievalBypassReasonRawValues: [],
                 avoidableSkipReasonRawValues: []
             )
         )
@@ -511,11 +511,11 @@ struct BASAppleObservabilityAdapterTests {
                 environmentClassID: "normal",
                 deviceClassID: "fullPhone",
                 languageModeID: "english",
-                taskEntropyIDByKind: ["quick": "low"],
-                preferredProviderIDByKind: ["quick": "gemmaE4B"],
+                taskEntropyIDByKind: ["primary": "low"],
+                preferredProviderIDByKind: ["primary": "gemmaE4B"],
                 strategyByKind: [
-                    "quick": BASAppleRuntimeInspectionAdaptiveStrategySourceInput(
-                        kindID: "quick",
+                    "primary": BASAppleRuntimeInspectionAdaptiveStrategySourceInput(
+                        kindID: "primary",
                         entropyID: "low",
                         runtimeGearID: "balanced",
                         contextBudget: 320,
@@ -532,10 +532,10 @@ struct BASAppleObservabilityAdapterTests {
                         allowsModelInvocation: true
                     )
                 ],
-                effectivePreferredProviderIDByKind: ["quick": "gemmaE4B"],
+                effectivePreferredProviderIDByKind: ["primary": "gemmaE4B"],
                 traceRecords: [
                     BASAppleRuntimeInspectionTraceSourceRecordInput(
-                        kindID: "quick",
+                        kindID: "primary",
                         hasContextState: true,
                         generation: 3,
                         rebuiltSession: true,
@@ -574,7 +574,7 @@ struct BASAppleObservabilityAdapterTests {
                         evolutionRollbackReady: true,
                         attemptedProviderIDs: ["gemmaE4B"],
                         runtimeStrategy: BASAppleRuntimeInspectionAdaptiveStrategySourceInput(
-                            kindID: "quick",
+                            kindID: "primary",
                             entropyID: "low",
                             runtimeGearID: "balanced",
                             contextBudget: 320,
@@ -615,7 +615,7 @@ struct BASAppleObservabilityAdapterTests {
         )
 
         #expect(compilation.runtimeInspectionInput.activeProviderID == "gemmaE4B")
-        #expect(compilation.runtimeInspectionInput.strategyByKind["quick"]?.runtimeGear == .balanced)
+        #expect(compilation.runtimeInspectionInput.strategyByKind["primary"]?.runtimeGear == .balanced)
         #expect(compilation.brainSummary.brainTraceCount == 1)
         #expect(compilation.runtimeInspectionSummary.consistencyCheckedTraceCount == 1)
     }
@@ -624,7 +624,7 @@ struct BASAppleObservabilityAdapterTests {
     func runtimeInspectionTraceSourceBuilderExpandsFlatRecord() {
         let source = BASAppleRuntimeInspectionBuilder.traceSource(
             from: BASAppleRuntimeInspectionTraceRecordInput(
-                kind: "quick",
+                kind: "primary",
                 hasContextState: true,
                 generation: 4,
                 rebuiltSession: true,
@@ -663,7 +663,7 @@ struct BASAppleObservabilityAdapterTests {
                 evolutionRollbackReady: true,
                 attemptedProviderIDs: ["gemmaE4B", "foundationModels"],
                 runtimeStrategy: BASAdaptiveTaskStrategy(
-                    kind: .quick,
+                    kind: .primary,
                     entropy: .low,
                     runtimeGear: .balanced,
                     contextBudget: 320,
@@ -692,7 +692,7 @@ struct BASAppleObservabilityAdapterTests {
         #expect(source.brain?.snapshotFingerprint == "brain_fp")
         #expect(source.brain?.calibrationStatus == .watch)
         #expect(source.runtimeInspection.attemptedProviderIDs == ["gemmaE4B", "foundationModels"])
-        #expect(source.runtimeInspection.runtimeStrategy?.kind == .quick)
+        #expect(source.runtimeInspection.runtimeStrategy?.kind == .primary)
         #expect(source.runtimeInspection.semanticPromptFingerprint == "semantic_fp")
     }
 }

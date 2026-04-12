@@ -93,6 +93,6 @@ struct BASAppleExecutionProfileAdapterTests {
 
         #expect(compilation.tierID == "conservativeDeterministic")
         #expect(compilation.effectiveProviderID == BASReferenceProviderRuntime.templateProviderID)
-        #expect(compilation.detail.contains("iPhone 14"))
+        #expect(compilation.detail.contains("configured assistive headroom threshold"))
     }
 }

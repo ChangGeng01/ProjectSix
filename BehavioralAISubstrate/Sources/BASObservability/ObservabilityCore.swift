@@ -85,7 +85,7 @@ public struct BASTelemetrySummaryInput: Codable, Sendable, Equatable {
     public var backendDurationTotalMs: [String: Double]
     public var admissionSkipCountByReason: [String: Int]
     public var admissionSkipCountByReasonAndKind: [String: [String: Int]]
-    public var reminderSelectionNeedCount: [String: Int]
+    public var selectionNeedCount: [String: Int]
     public var promptCharactersTotalByKind: [String: Int]
     public var prefixCharactersTotalByKind: [String: Int]
     public var immutablePrefixCharactersTotalByKind: [String: Int]
@@ -93,10 +93,10 @@ public struct BASTelemetrySummaryInput: Codable, Sendable, Equatable {
     public var suffixCharactersTotalByKind: [String: Int]
     public var overTargetBudgetCountByKind: [String: Int]
     public var lowPressureModelCallCountByKind: [String: Int]
-    public var reminderKindRawValue: String
-    public var reminderKnowledgeNeedRawValue: String
-    public var reminderControlNeedRawValue: String
-    public var reminderRetrievalBypassReasonRawValues: [String]
+    public var selectionKindRawValue: String
+    public var selectionKnowledgeNeedRawValue: String
+    public var selectionControlNeedRawValue: String
+    public var selectionRetrievalBypassReasonRawValues: [String]
     public var avoidableSkipReasonRawValues: [String]
 
     public init(
@@ -119,7 +119,7 @@ public struct BASTelemetrySummaryInput: Codable, Sendable, Equatable {
         backendDurationTotalMs: [String: Double],
         admissionSkipCountByReason: [String: Int],
         admissionSkipCountByReasonAndKind: [String: [String: Int]],
-        reminderSelectionNeedCount: [String: Int],
+        selectionNeedCount: [String: Int],
         promptCharactersTotalByKind: [String: Int],
         prefixCharactersTotalByKind: [String: Int],
         immutablePrefixCharactersTotalByKind: [String: Int],
@@ -127,10 +127,10 @@ public struct BASTelemetrySummaryInput: Codable, Sendable, Equatable {
         suffixCharactersTotalByKind: [String: Int],
         overTargetBudgetCountByKind: [String: Int],
         lowPressureModelCallCountByKind: [String: Int],
-        reminderKindRawValue: String,
-        reminderKnowledgeNeedRawValue: String,
-        reminderControlNeedRawValue: String,
-        reminderRetrievalBypassReasonRawValues: [String],
+        selectionKindRawValue: String,
+        selectionKnowledgeNeedRawValue: String,
+        selectionControlNeedRawValue: String,
+        selectionRetrievalBypassReasonRawValues: [String],
         avoidableSkipReasonRawValues: [String]
     ) {
         self.requestCountByKind = requestCountByKind
@@ -152,7 +152,7 @@ public struct BASTelemetrySummaryInput: Codable, Sendable, Equatable {
         self.backendDurationTotalMs = backendDurationTotalMs
         self.admissionSkipCountByReason = admissionSkipCountByReason
         self.admissionSkipCountByReasonAndKind = admissionSkipCountByReasonAndKind
-        self.reminderSelectionNeedCount = reminderSelectionNeedCount
+        self.selectionNeedCount = selectionNeedCount
         self.promptCharactersTotalByKind = promptCharactersTotalByKind
         self.prefixCharactersTotalByKind = prefixCharactersTotalByKind
         self.immutablePrefixCharactersTotalByKind = immutablePrefixCharactersTotalByKind
@@ -160,10 +160,10 @@ public struct BASTelemetrySummaryInput: Codable, Sendable, Equatable {
         self.suffixCharactersTotalByKind = suffixCharactersTotalByKind
         self.overTargetBudgetCountByKind = overTargetBudgetCountByKind
         self.lowPressureModelCallCountByKind = lowPressureModelCallCountByKind
-        self.reminderKindRawValue = reminderKindRawValue
-        self.reminderKnowledgeNeedRawValue = reminderKnowledgeNeedRawValue
-        self.reminderControlNeedRawValue = reminderControlNeedRawValue
-        self.reminderRetrievalBypassReasonRawValues = reminderRetrievalBypassReasonRawValues
+        self.selectionKindRawValue = selectionKindRawValue
+        self.selectionKnowledgeNeedRawValue = selectionKnowledgeNeedRawValue
+        self.selectionControlNeedRawValue = selectionControlNeedRawValue
+        self.selectionRetrievalBypassReasonRawValues = selectionRetrievalBypassReasonRawValues
         self.avoidableSkipReasonRawValues = avoidableSkipReasonRawValues
     }
 }
@@ -348,30 +348,30 @@ public struct BASTelemetrySummary: Codable, Sendable, Equatable {
         )
     }
 
-    public var reminderKnowledgeNeedRate: Double {
+    public var selectionKnowledgeNeedRate: Double {
         rate(
-            numerator: input.reminderSelectionNeedCount[input.reminderKnowledgeNeedRawValue] ?? 0,
-            denominator: reminderRequestCount
+            numerator: input.selectionNeedCount[input.selectionKnowledgeNeedRawValue] ?? 0,
+            denominator: selectionRequestCount
         )
     }
 
-    public var reminderControlOnlyRate: Double {
+    public var selectionControlOnlyRate: Double {
         rate(
-            numerator: input.reminderSelectionNeedCount[input.reminderControlNeedRawValue] ?? 0,
-            denominator: reminderRequestCount
+            numerator: input.selectionNeedCount[input.selectionControlNeedRawValue] ?? 0,
+            denominator: selectionRequestCount
         )
     }
 
-    public var reminderRetrievalBypassRate: Double {
-        rate(numerator: reminderRetrievalBypassCount, denominator: reminderRequestCount)
+    public var selectionRetrievalBypassRate: Double {
+        rate(numerator: selectionRetrievalBypassCount, denominator: selectionRequestCount)
     }
 
-    public var reminderRequestCount: Int {
-        input.requestCountByKind[input.reminderKindRawValue] ?? 0
+    public var selectionRequestCount: Int {
+        input.requestCountByKind[input.selectionKindRawValue] ?? 0
     }
 
-    public var reminderRetrievalBypassCount: Int {
-        input.reminderRetrievalBypassReasonRawValues.reduce(0) { partialResult, reason in
+    public var selectionRetrievalBypassCount: Int {
+        input.selectionRetrievalBypassReasonRawValues.reduce(0) { partialResult, reason in
             partialResult + (input.admissionSkipCountByReason[reason] ?? 0)
         }
     }
@@ -1308,10 +1308,10 @@ public struct BASRuntimeInspectionSummary: Codable, Sendable, Equatable {
     public var lowPressureModelCallRateByKind: [String: Double]
     public var avoidableModelCallRate: Double
     public var avoidableModelCallRateByKind: [String: Double]
-    public var reminderRequestCount: Int
-    public var reminderKnowledgeNeedRate: Double
-    public var reminderControlOnlyRate: Double
-    public var reminderRetrievalBypassRate: Double
+    public var selectionRequestCount: Int
+    public var selectionKnowledgeNeedRate: Double
+    public var selectionControlOnlyRate: Double
+    public var selectionRetrievalBypassRate: Double
     public var deterministicFallbackRate: Double
     public var averageRequestDurationMs: Double
     public var averageRequestDurationMsByKind: [String: Double]
@@ -1474,10 +1474,10 @@ public enum BASRuntimeInspectionBuilder {
             lowPressureModelCallRateByKind: input.telemetrySummary.lowPressureModelCallRateByKind,
             avoidableModelCallRate: input.telemetrySummary.avoidableModelCallRate,
             avoidableModelCallRateByKind: input.telemetrySummary.avoidableModelCallRateByKind,
-            reminderRequestCount: input.telemetrySummary.reminderRequestCount,
-            reminderKnowledgeNeedRate: input.telemetrySummary.reminderKnowledgeNeedRate,
-            reminderControlOnlyRate: input.telemetrySummary.reminderControlOnlyRate,
-            reminderRetrievalBypassRate: input.telemetrySummary.reminderRetrievalBypassRate,
+            selectionRequestCount: input.telemetrySummary.selectionRequestCount,
+            selectionKnowledgeNeedRate: input.telemetrySummary.selectionKnowledgeNeedRate,
+            selectionControlOnlyRate: input.telemetrySummary.selectionControlOnlyRate,
+            selectionRetrievalBypassRate: input.telemetrySummary.selectionRetrievalBypassRate,
             deterministicFallbackRate: input.telemetrySummary.deterministicFallbackRate,
             averageRequestDurationMs: input.telemetrySummary.averageRequestDurationMs,
             averageRequestDurationMsByKind: input.telemetrySummary.averageRequestDurationMsByKind,

@@ -29,8 +29,8 @@ enum BeforeProductLanguage {
 
     static let hostPresentation = BASHostPresentationConfiguration(
         workflowTitles: BASHostWorkflowTitles(
-            rapid: DecisionMode.quick.title,
-            deliberate: DecisionMode.balance.title,
+            primary: DecisionMode.quick.title,
+            comparative: DecisionMode.balance.title,
             reflective: DecisionMode.mirror.title
         ),
         surfaceTitles: BASHostSurfaceTitles(
@@ -43,18 +43,18 @@ enum BeforeProductLanguage {
             system: "System"
         ),
         sessionTitles: BASHostSessionTitles(
-            rapid: DecisionMode.quick.title,
-            deliberate: DecisionMode.balance.title,
+            primary: DecisionMode.quick.title,
+            comparative: DecisionMode.balance.title,
             reflective: DecisionMode.mirror.title,
             initialAppearance: "Before Bootstrap",
             sceneActive: "Before Refresh"
         ),
         followUpActions: BASHostFollowUpActions(
-            rapid: [
+            primary: [
                 "Name the urge",
                 "Choose one clean next move"
             ],
-            deliberate: [
+            comparative: [
                 "Surface the real trade-off",
                 "Name one cost and one benefit"
             ],
@@ -106,19 +106,19 @@ enum BeforeProductLanguage {
             Keep the tone calm, short, and non-shaming.
             """,
             adaptivePrefixByKindID: [
-                BASSemanticTaskKind.quick.rawValue: """
+                BASSemanticTaskKind.primary.rawValue: """
                 Rewrite only the two perspective lines.
                 Keep the same meaning and do not change verdicts or actions.
                 """,
-                BASSemanticTaskKind.balance.rawValue: """
+                BASSemanticTaskKind.comparative.rawValue: """
                 Tighten the board without inventing new facts or turning it into a verdict.
                 Preserve the same focus and next-step intent.
                 """,
-                BASSemanticTaskKind.mirror.rawValue: """
+                BASSemanticTaskKind.reflective.rawValue: """
                 Clarify the reflective pass without becoming dramatic, therapeutic, or yes-no.
                 Preserve the same tension and reflective next move.
                 """,
-                BASSemanticTaskKind.reminder.rawValue: """
+                BASSemanticTaskKind.selection.rawValue: """
                 Pick one existing reminder that best matches the current state.
                 Do not rewrite or invent reminder text.
                 """
@@ -126,19 +126,19 @@ enum BeforeProductLanguage {
         ),
         frontstageBehavior: BASFrontstagePresentationBehavior(
             focusGoalsByKindID: [
-                BASAdaptiveTraceKind.quick.rawValue: "Interrupt the automatic reaction before it locks in.",
-                BASAdaptiveTraceKind.balance.rawValue: "Surface the real trade-off before choosing a side.",
-                BASAdaptiveTraceKind.mirror.rawValue: "Name the core tension without forcing a yes-no answer.",
-                BASAdaptiveTraceKind.reminder.rawValue: "Pick the one reminder that best fits the current state."
+                BASAdaptiveTraceKind.primary.rawValue: "Interrupt the automatic reaction before it locks in.",
+                BASAdaptiveTraceKind.comparative.rawValue: "Surface the real trade-off before choosing a side.",
+                BASAdaptiveTraceKind.reflective.rawValue: "Name the core tension without forcing a yes-no answer.",
+                BASAdaptiveTraceKind.selection.rawValue: "Pick the one reminder that best fits the current state."
             ],
             baseEvidenceCountByKindID: [
-                BASAdaptiveTraceKind.quick.rawValue: 2,
-                BASAdaptiveTraceKind.balance.rawValue: 1,
-                BASAdaptiveTraceKind.mirror.rawValue: 1,
-                BASAdaptiveTraceKind.reminder.rawValue: 0
+                BASAdaptiveTraceKind.primary.rawValue: 2,
+                BASAdaptiveTraceKind.comparative.rawValue: 1,
+                BASAdaptiveTraceKind.reflective.rawValue: 1,
+                BASAdaptiveTraceKind.selection.rawValue: 0
             ],
             lowGearEvidenceClampByKindID: [
-                BASAdaptiveTraceKind.quick.rawValue: 1
+                BASAdaptiveTraceKind.primary.rawValue: 1
             ],
             contextRebuiltSignal: "Session rebuild",
             staleFieldsSignal: "Stale fields dropped",
@@ -147,20 +147,20 @@ enum BeforeProductLanguage {
         ),
         structuredTruthBehavior: BASStructuredTruthBehavior(
             modeNamesByKindID: [
-                BASAdaptiveTraceKind.quick.rawValue: DecisionMode.quick.substrateModeID,
-                BASAdaptiveTraceKind.balance.rawValue: DecisionMode.balance.substrateModeID,
-                BASAdaptiveTraceKind.mirror.rawValue: DecisionMode.mirror.substrateModeID,
-                BASAdaptiveTraceKind.reminder.rawValue: "reminder"
+                BASAdaptiveTraceKind.primary.rawValue: DecisionMode.quick.substrateModeID,
+                BASAdaptiveTraceKind.comparative.rawValue: DecisionMode.balance.substrateModeID,
+                BASAdaptiveTraceKind.reflective.rawValue: DecisionMode.mirror.substrateModeID,
+                BASAdaptiveTraceKind.selection.rawValue: "selection"
             ],
             kernelPersonaRulesByKindID: [
-                BASAdaptiveTraceKind.quick.rawValue: "Keep the interruption short, calm, and non-shaming.",
-                BASAdaptiveTraceKind.balance.rawValue: "Clarify trade-offs without turning the board into a verdict.",
-                BASAdaptiveTraceKind.mirror.rawValue: "Reflect the pattern without becoming dramatic or therapeutic.",
-                BASAdaptiveTraceKind.reminder.rawValue: "Choose from retained reminders only and do not invent new reminders."
+                BASAdaptiveTraceKind.primary.rawValue: "Keep the interruption short, calm, and non-shaming.",
+                BASAdaptiveTraceKind.comparative.rawValue: "Clarify trade-offs without turning the board into a verdict.",
+                BASAdaptiveTraceKind.reflective.rawValue: "Reflect the pattern without becoming dramatic or therapeutic.",
+                BASAdaptiveTraceKind.selection.rawValue: "Choose from retained reminders only and do not invent new reminders."
             ]
         ),
         slotVocabularyByKindID: [
-            BASSemanticTaskKind.quick.rawValue: BASReferencePromptSlotVocabulary(
+            BASSemanticTaskKind.primary.rawValue: BASReferencePromptSlotVocabulary(
                 stateKeysBySlotID: [
                     "mode": "mode",
                     "scenario": "scenario",
@@ -177,7 +177,7 @@ enum BeforeProductLanguage {
                     "secondary_actions": "Secondary actions"
                 ]
             ),
-            BASSemanticTaskKind.balance.rawValue: BASReferencePromptSlotVocabulary(
+            BASSemanticTaskKind.comparative.rawValue: BASReferencePromptSlotVocabulary(
                 stateKeysBySlotID: [
                     "mode": "mode",
                     "prompt": "prompt",
@@ -194,7 +194,7 @@ enum BeforeProductLanguage {
                     "next_action": "Next action"
                 ]
             ),
-            BASSemanticTaskKind.mirror.rawValue: BASReferencePromptSlotVocabulary(
+            BASSemanticTaskKind.reflective.rawValue: BASReferencePromptSlotVocabulary(
                 stateKeysBySlotID: [
                     "mode": "mode",
                     "prompt": "prompt",
@@ -211,7 +211,7 @@ enum BeforeProductLanguage {
                     "next_action": "Next action"
                 ]
             ),
-            BASSemanticTaskKind.reminder.rawValue: BASReferencePromptSlotVocabulary(
+            BASSemanticTaskKind.selection.rawValue: BASReferencePromptSlotVocabulary(
                 stateKeysBySlotID: [
                     "mode": "mode",
                     "scenario": "scenario",
@@ -221,22 +221,22 @@ enum BeforeProductLanguage {
             )
         ],
         outputGuardsByKindID: [
-            BASSemanticTaskKind.quick.rawValue: [
+            BASSemanticTaskKind.primary.rawValue: [
                 "Rewrite only the current and after perspective lines.",
                 "Keep the same meaning and emotional direction.",
                 "Do not change the verdict, actions, or scenario."
             ],
-            BASSemanticTaskKind.balance.rawValue: [
+            BASSemanticTaskKind.comparative.rawValue: [
                 "Keep the same focus and next step.",
                 "Do not invent facts or force a verdict.",
                 "Tighten language only."
             ],
-            BASSemanticTaskKind.mirror.rawValue: [
+            BASSemanticTaskKind.reflective.rawValue: [
                 "Clarify the mirror without giving a yes-no answer.",
                 "Keep the tone restrained, reflective, and non-therapeutic.",
                 "Preserve the same core tension and next reflective move."
             ],
-            BASSemanticTaskKind.reminder.rawValue: [
+            BASSemanticTaskKind.selection.rawValue: [
                 "Choose exactly one candidate index from the provided evidence.",
                 "Do not rewrite, combine, or invent reminder text.",
                 "Prefer the reminder that most directly matches the current state."
@@ -246,48 +246,48 @@ enum BeforeProductLanguage {
 
     static let workflowBehavior = BASHostWorkflowBehaviorConfiguration(
         modeIDsByProfileID: [
-            BASHostWorkflowProfile.rapid.rawValue: DecisionMode.quick.substrateModeID,
-            BASHostWorkflowProfile.deliberate.rawValue: DecisionMode.balance.substrateModeID,
+            BASHostWorkflowProfile.primary.rawValue: DecisionMode.quick.substrateModeID,
+            BASHostWorkflowProfile.comparative.rawValue: DecisionMode.balance.substrateModeID,
             BASHostWorkflowProfile.reflective.rawValue: DecisionMode.mirror.substrateModeID
         ],
         templateIDsByProfileID: [
-            BASHostWorkflowProfile.rapid.rawValue: ["before.template.quick-judgment"],
-            BASHostWorkflowProfile.deliberate.rawValue: ["before.template.balance-board"],
+            BASHostWorkflowProfile.primary.rawValue: ["before.template.quick-judgment"],
+            BASHostWorkflowProfile.comparative.rawValue: ["before.template.balance-board"],
             BASHostWorkflowProfile.reflective.rawValue: ["before.template.mirror"]
         ],
         memorySourceIDsByProfileID: [
-            BASHostWorkflowProfile.rapid.rawValue: BASMemorySource.pattern.rawValue,
-            BASHostWorkflowProfile.deliberate.rawValue: BASMemorySource.history.rawValue,
+            BASHostWorkflowProfile.primary.rawValue: BASMemorySource.pattern.rawValue,
+            BASHostWorkflowProfile.comparative.rawValue: BASMemorySource.archive.rawValue,
             BASHostWorkflowProfile.reflective.rawValue: BASMemorySource.reflection.rawValue
         ],
         interactiveRetrievalModeByProfileID: [
-            BASHostWorkflowProfile.rapid.rawValue: "compact",
-            BASHostWorkflowProfile.deliberate.rawValue: "full",
+            BASHostWorkflowProfile.primary.rawValue: "compact",
+            BASHostWorkflowProfile.comparative.rawValue: "full",
             BASHostWorkflowProfile.reflective.rawValue: "full"
         ],
         providerObservationNarrativesByKindID: [
-            "quick": BASAppleProviderObservationNarrative(
+            BASSemanticTaskKind.primaryID: BASAppleProviderObservationNarrative(
                 templatePinnedDetail: "Template mode is pinned, so no model provider was used for primary refinement.",
                 admissionSkippedDetailPrefix: "Admission controller skipped primary refinement.",
                 deterministicFallbackBase: "No provider returned a refined primary-path result, so Before kept the deterministic copy.",
                 cachedConsistencySource: "cached primary refinement",
                 providerConsistencySource: "provider primary refinement"
             ),
-            "balance": BASAppleProviderObservationNarrative(
+            BASSemanticTaskKind.comparativeID: BASAppleProviderObservationNarrative(
                 templatePinnedDetail: "Template mode is pinned, so no model provider was used for comparative refinement.",
                 admissionSkippedDetailPrefix: "Admission controller skipped comparative refinement.",
                 deterministicFallbackBase: "No provider returned a refined comparative analysis, so Before kept the deterministic copy.",
                 cachedConsistencySource: "cached comparative refinement",
                 providerConsistencySource: "provider comparative refinement"
             ),
-            "mirror": BASAppleProviderObservationNarrative(
+            BASSemanticTaskKind.reflectiveID: BASAppleProviderObservationNarrative(
                 templatePinnedDetail: "Template mode is pinned, so no model provider was used for reflective refinement.",
                 admissionSkippedDetailPrefix: "Admission controller skipped reflective refinement.",
                 deterministicFallbackBase: "No provider returned a refined reflective analysis, so Before kept the deterministic copy.",
                 cachedConsistencySource: "cached reflective refinement",
                 providerConsistencySource: "provider reflective refinement"
             ),
-            "reminder": BASAppleProviderObservationNarrative(
+            BASSemanticTaskKind.selectionID: BASAppleProviderObservationNarrative(
                 templatePinnedDetail: "Template mode is pinned, so no model provider was used for reminder selection.",
                 admissionSkippedDetailPrefix: "Admission controller skipped reminder selection.",
                 deterministicFallbackBase: "No provider returned a reminder selection, so Before kept the deterministic reminder ordering.",
@@ -296,9 +296,9 @@ enum BeforeProductLanguage {
             )
         ],
         memorySourceIDsBySessionKindID: [
-            BASHostSessionKind.ambient.rawValue: BASMemorySource.reminder.rawValue,
-            BASHostSessionKind.reopen.rawValue: BASMemorySource.reminder.rawValue,
-            BASHostSessionKind.notification.rawValue: BASMemorySource.reminder.rawValue
+            BASHostSessionKind.ambient.rawValue: BASMemorySource.cue.rawValue,
+            BASHostSessionKind.reopen.rawValue: BASMemorySource.cue.rawValue,
+            BASHostSessionKind.notification.rawValue: BASMemorySource.cue.rawValue
         ],
         retrievalModeIDsBySessionKindID: [
             BASHostSessionKind.ambient.rawValue: "guarded",
@@ -316,13 +316,13 @@ enum BeforeProductLanguage {
 
     static let hostCognition = BASHostCognitionBehaviorConfiguration(
         reactionWeightsByProfileID: [
-            BASHostWorkflowProfile.rapid.rawValue: reactionWeights(for: .quick),
-            BASHostWorkflowProfile.deliberate.rawValue: reactionWeights(for: .balance),
+            BASHostWorkflowProfile.primary.rawValue: reactionWeights(for: .quick),
+            BASHostWorkflowProfile.comparative.rawValue: reactionWeights(for: .balance),
             BASHostWorkflowProfile.reflective.rawValue: reactionWeights(for: .mirror)
         ],
         identityProfilesByProfileID: [
-            BASHostWorkflowProfile.rapid.rawValue: identityProfile(for: .quick),
-            BASHostWorkflowProfile.deliberate.rawValue: identityProfile(for: .balance),
+            BASHostWorkflowProfile.primary.rawValue: identityProfile(for: .quick),
+            BASHostWorkflowProfile.comparative.rawValue: identityProfile(for: .balance),
             BASHostWorkflowProfile.reflective.rawValue: identityProfile(for: .mirror)
         ],
         substrateBehavior: BASCognitionBehavior(
@@ -356,7 +356,7 @@ enum BeforeProductLanguage {
                 relationshipBoundary: "Slow the decision down before offering any stronger interpretation."
             ),
             highRiskInitiativeByRoleID: [
-                BASIdentityRole.mirrorWitness.rawValue: .guided
+                BASIdentityRole.reflectiveWitness.rawValue: .guided
             ],
             boundary: BASBoundaryEvaluationBehavior(
                 defaultAllowedActionClasses: ["render_local_guidance", "load_governed_memory"],
@@ -487,16 +487,16 @@ enum BeforeProductLanguage {
             ),
             memoryTrust: BASMemoryTrustBehavior(
                 baseScoresBySourceID: [
-                    BASMemorySource.reminder.rawValue: 0.95,
+                    BASMemorySource.cue.rawValue: 0.95,
                     BASMemorySource.pattern.rawValue: 0.88,
                     BASMemorySource.reflection.rawValue: 0.72,
-                    BASMemorySource.history.rawValue: 0.62
+                    BASMemorySource.archive.rawValue: 0.62
                 ],
                 sourceDecayMultipliersBySourceID: [
-                    BASMemorySource.reminder.rawValue: 1.36,
+                    BASMemorySource.cue.rawValue: 1.36,
                     BASMemorySource.pattern.rawValue: 1.18,
                     BASMemorySource.reflection.rawValue: 0.8,
-                    BASMemorySource.history.rawValue: 0.92
+                    BASMemorySource.archive.rawValue: 0.92
                 ]
             )
         )
@@ -533,7 +533,15 @@ enum BeforeProductLanguage {
             activeRefreshDefaultRetrievalModeID: BASRetrievalMode.adaptive.rawValue
         ),
         currentBrainBootstrapBehavior: BASCurrentBrainBootstrapBehavior(
+            defaultModeID: DecisionMode.quick.substrateModeID,
+            defaultTriggerID: BASCurrentBrainBootstrapTrigger.sessionBootstrap.rawValue,
+            defaultRiskLevelID: BASRiskLevel.low.rawValue,
             defaultSourceSurfaceID: BASInteractionSurface.app.rawValue,
+            modeIDAliasesByID: [
+                DecisionMode.quick.rawValue: DecisionMode.quick.substrateModeID,
+                DecisionMode.balance.rawValue: DecisionMode.balance.substrateModeID,
+                DecisionMode.mirror.rawValue: DecisionMode.mirror.substrateModeID
+            ],
             sourceSurfaceOverridesByTriggerID: [
                 BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue: BASInteractionSurface.watch.rawValue,
                 BASCurrentBrainBootstrapTrigger.notification.rawValue: BASInteractionSurface.notification.rawValue,
@@ -542,18 +550,19 @@ enum BeforeProductLanguage {
             enforcedSourceSurfaceByTriggerID: [
                 BASCurrentBrainBootstrapTrigger.notification.rawValue: BASInteractionSurface.notification.rawValue
             ],
-            defaultMemorySourceID: BASMemorySource.history.rawValue,
+            defaultMemorySourceID: BASMemorySource.archive.rawValue,
             memorySourceOverridesByTriggerID: [
-                BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue: BASMemorySource.reminder.rawValue,
-                BASCurrentBrainBootstrapTrigger.notification.rawValue: BASMemorySource.reminder.rawValue,
-                BASCurrentBrainBootstrapTrigger.widget.rawValue: BASMemorySource.reminder.rawValue,
+                BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue: BASMemorySource.cue.rawValue,
+                BASCurrentBrainBootstrapTrigger.notification.rawValue: BASMemorySource.cue.rawValue,
+                BASCurrentBrainBootstrapTrigger.widget.rawValue: BASMemorySource.cue.rawValue,
                 BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue: BASMemorySource.pattern.rawValue,
-                BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue: BASMemorySource.pattern.rawValue
+                BASCurrentBrainBootstrapTrigger.sessionBootstrap.rawValue: BASMemorySource.pattern.rawValue
             ],
             memorySourceOverridesByModeID: [
-                DecisionMode.mirror.substrateModeID: BASMemorySource.reflection.rawValue,
-                "mirror": BASMemorySource.reflection.rawValue
+                DecisionMode.mirror.substrateModeID: BASMemorySource.reflection.rawValue
             ],
+            unknownRequestedModeFallbackPolicy: .useConfiguredDefault,
+            unknownRequestedTriggerFallbackPolicy: .useConfiguredDefault,
             bootstrapAdvisorBehavior: BASBrainBootstrapAdvisorBehavior(
                 highRiskSignalGroups: [
                     ["message", "reply", "text", "send", "dm"],
@@ -562,14 +571,10 @@ enum BeforeProductLanguage {
                 nightFallbackRiskLevelByModeID: [
                     DecisionMode.quick.substrateModeID: BASRiskLevel.medium.rawValue,
                     DecisionMode.balance.substrateModeID: BASRiskLevel.high.rawValue,
-                    DecisionMode.mirror.substrateModeID: BASRiskLevel.high.rawValue,
-                    "quick": BASRiskLevel.medium.rawValue,
-                    "balance": BASRiskLevel.high.rawValue,
-                    "mirror": BASRiskLevel.high.rawValue
+                    DecisionMode.mirror.substrateModeID: BASRiskLevel.high.rawValue
                 ],
                 defaultRiskLevelByModeID: [
-                    DecisionMode.mirror.substrateModeID: BASRiskLevel.medium.rawValue,
-                    "mirror": BASRiskLevel.medium.rawValue
+                    DecisionMode.mirror.substrateModeID: BASRiskLevel.medium.rawValue
                 ]
             )
         ),
@@ -583,36 +588,57 @@ enum BeforeProductLanguage {
         )
     )
 
+    static let executionProfileBehavior = BASAppleExecutionProfileBehavior(
+        conservativeMemoryThresholdGB: 7,
+        fullAssistiveMemoryThresholdGB: 8,
+        disabledRuntimeDetail: "Assistive intelligence is off, so Before is using the deterministic decision system only.",
+        testingOverrideDetailFormat: "Testing stub '%@' is active, so Before is keeping the full assistive path open for verification.",
+        testingPinnedDeterministicDetail: "Testing is pinning deterministic local copy, so Before is not using a model provider for assistive refinement.",
+        testingPinnedSystemManagedDetail: "Testing is pinning Apple's system-managed model, so Before is keeping the full assistive path open for that provider.",
+        testingPinnedOpenModelDetailPrefix: "Testing is pinning the registered open-model runtime.",
+        testingPinnedLocalProviderDetail: "Testing is pinning Gemma directly, so Before is leaving the full assistive path available for that provider.",
+        deterministicPinnedDetail: "Deterministic local copy is pinned, so Before is not using a model provider for assistive refinement.",
+        preferredOpenModelDetailPrefix: "The open-model runtime slot is preferred.",
+        systemManagedDetail: "Apple's system-managed on-device model is available, so Before can keep assistive refinement on without pushing device-level model policy into the app.",
+        simulatorDetail: "On Simulator, Before stays on deterministic local copy so performance and correctness tests do not pretend a local model runtime is representative.",
+        lowPowerDetail: "Low Power Mode is on, so Before is staying on deterministic local copy to protect battery life and keep decision flows responsive.",
+        lowMemoryDetailFormat: "This device is running a conservative intelligence profile. Before keeps the local model off the critical path on %d GB-class iPhones like iPhone 14 so the experience stays stable, cool, and predictable.",
+        unavailableProviderDetail: "No assistive provider is ready on this device right now, so Before is keeping the deterministic path only.",
+        balancedAssistiveDetail: "This device has enough headroom for deeper assisted analysis and guided selection work, while Before can still keep fast-turn refinement deterministic to protect latency.",
+        fullAssistiveDetail: "This device has enough headroom for the full Gemma-assisted path, while Before can still keep final verdicts deterministic.",
+        openModelSimulatorDetail: "On Simulator, Before keeps the reserved open-model slot off the critical path and stays deterministic.",
+        openModelLowPowerDetail: "Low Power Mode is on, so Before keeps the open-model runtime off the critical path to protect battery life.",
+        openModelLowMemoryDetailFormat: "This device is on a conservative intelligence profile, so Before keeps the reserved open-model lane deterministic on %d GB-class phones."
+    )
+
     static let memoryDerivationBehavior = BASMemoryDerivationBehavior(
-        primarySituational: BASSituationalDraftBehavior(
-            draftID: "situational.quick.latest",
-            topic: "recent_quick_loop",
-            primaryHeadlinePrefix: "Recently carrying",
-            fallbackHeadlinePrefix: "Recently revisiting",
-            provenanceSummary: "Candidate memory staged from the latest primary decision loop.",
-            baseTags: ["quick", "recent"]
-        ),
-        comparativeSituational: BASSituationalDraftBehavior(
-            draftID: "situational.balance.latest",
-            topic: "recent_balance_board",
-            primaryHeadlinePrefix: "Recently weighing",
-            provenanceSummary: "Candidate memory staged from the latest comparative workspace.",
-            baseTags: ["balance", "recent"]
-        ),
-        reflectiveSituational: BASSituationalDraftBehavior(
-            draftID: "situational.mirror.latest",
-            topic: "recent_mirror_question",
-            primaryHeadlinePrefix: "Recently reflecting on",
-            provenanceSummary: "Candidate memory staged from the latest reflective workspace.",
-            baseTags: ["mirror", "recent"]
-        ),
-        comparativeWorkspaceIDs: [
-            DecisionMode.balance.substrateModeID,
-            "balance"
+        situationalBehaviorsByModeID: [
+            DecisionMode.quick.substrateModeID: BASSituationalDraftBehavior(
+                draftID: "situational.quick.latest",
+                topic: "recent_quick_loop",
+                primaryHeadlinePrefix: "Recently carrying",
+                fallbackHeadlinePrefix: "Recently revisiting",
+                provenanceSummary: "Candidate memory staged from the latest primary decision loop.",
+                baseTags: ["quick", "recent"]
+            ),
+            DecisionMode.balance.substrateModeID: BASSituationalDraftBehavior(
+                draftID: "situational.balance.latest",
+                topic: "recent_balance_board",
+                primaryHeadlinePrefix: "Recently weighing",
+                provenanceSummary: "Candidate memory staged from the latest comparative workspace.",
+                baseTags: ["balance", "recent"]
+            ),
+            DecisionMode.mirror.substrateModeID: BASSituationalDraftBehavior(
+                draftID: "situational.mirror.latest",
+                topic: "recent_mirror_question",
+                primaryHeadlinePrefix: "Recently reflecting on",
+                provenanceSummary: "Candidate memory staged from the latest reflective workspace.",
+                baseTags: ["mirror", "recent"]
+            )
         ],
-        reflectiveWorkspaceIDs: [
-            DecisionMode.mirror.substrateModeID,
-            "mirror"
+        workspaceWorkflowIDsByModeID: [
+            DecisionMode.balance.substrateModeID: [DecisionMode.balance.substrateModeID, "balance"],
+            DecisionMode.mirror.substrateModeID: [DecisionMode.mirror.substrateModeID, "mirror"]
         ],
         supportActionsByID: [
             "decideTomorrow": BASSupportActionDraftBehavior(
@@ -641,6 +667,34 @@ enum BeforeProductLanguage {
                 provenanceSummary: "Derived from repeated successful primary-loop final actions."
             )
         ],
+        concisePreferencePattern: BASPatternDraftBehavior(
+            id: "preference.communication.concise",
+            typeID: "preference",
+            topic: "communication_style",
+            headline: "Short, direct language lands better.",
+            value: "Prefer brief, concrete phrasing over long explanations.",
+            confidence: 0.78,
+            priority: 0.92,
+            sourceID: BASMemorySource.pattern.rawValue,
+            decayPolicyID: "slow",
+            retrievalTags: ["style", "communication", "concise", "direct"],
+            provenanceSummary: "Derived from repeated short cues and recent structured interaction note length.",
+            promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
+        ),
+        lateSessionPattern: BASPatternDraftBehavior(
+            id: "semantic.pattern.late_night",
+            typeID: "semantic",
+            topic: "late_night_regulation",
+            headline: "Late sessions need lighter, shorter guidance.",
+            value: "late_night_support",
+            confidence: 0.73,
+            priority: 0.77,
+            sourceID: BASMemorySource.pattern.rawValue,
+            decayPolicyID: "slow",
+            retrievalTags: ["night", "late", "fatigue", "support"],
+            provenanceSummary: "Derived from repeated late-night structured interaction archive evidence.",
+            promotionPolicy: .repeated(minConfirmationCount: 2, minEvidenceCount: 3)
+        ),
         fallbackSupportTags: ["support", "before", "action_pattern"],
         fallbackSupportProvenanceSummary: "Derived from repeated successful primary-loop final actions."
     )
@@ -732,7 +786,7 @@ enum BeforeProductLanguage {
             )
         case .mirror:
             BASIdentityProfile(
-                role: .mirrorWitness,
+                role: .reflectiveWitness,
                 posture: .reflective,
                 initiative: .passive,
                 confidenceCeiling: 0.68,

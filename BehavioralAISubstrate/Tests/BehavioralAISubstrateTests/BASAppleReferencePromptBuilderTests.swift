@@ -5,11 +5,11 @@ import Testing
 
 @Suite("BASAppleReferencePromptBuilder")
 struct BASAppleReferencePromptBuilderTests {
-    @Test("quick envelope builds package-owned reference kind and prompt snapshots")
-    func quickEnvelopeBuildsReferencePrompt() {
+    @Test("primary envelope builds package-owned reference kind and prompt snapshots")
+    func primaryEnvelopeBuildsReferencePrompt() {
         let envelope = BASAppleReferencePromptBuilder.primaryEnvelope(
-            BASAppleQuickRefinementEnvelopeRequest(
-                modeTitle: "Quick",
+            BASApplePrimaryRefinementEnvelopeRequest(
+                modeTitle: "Primary",
                 scenarioTitle: "Buy",
                 motivationTitle: "Reward",
                 expectedOutcomeTitle: "Temporary relief",
@@ -22,7 +22,7 @@ struct BASAppleReferencePromptBuilderTests {
                 secondaryActionTitles: ["Decide tomorrow"],
                 providerIdentifier: "gemma-e4b",
                 strategy: BASAppleAdaptiveStrategyRawInput(
-                    kindRawValue: "quick",
+                    kindRawValue: "primary",
                     entropyRawValue: "low",
                     runtimeGearRawValue: "low",
                     contextBudget: 220,
@@ -77,8 +77,8 @@ struct BASAppleReferencePromptBuilderTests {
         let neuralBlock = envelope.assembly.allBlocks.first { $0.kind == .neuralState }
         let runtimeStrategyBlock = envelope.assembly.allBlocks.first { $0.kind == .runtimeStrategy }
 
-        #expect(envelope.kind == .quick)
-        #expect(envelope.payload.contains("\"mode\":\"Quick\""))
+        #expect(envelope.kind == .primary)
+        #expect(envelope.payload.contains("\"mode\":\"Primary\""))
         #expect(envelope.payload.contains("\"generation\":2"))
         #expect(neuralBlock?.body.contains("\"dominant_signals\":[{\"signal\":\"urgency\"}]") == true)
         #expect(runtimeStrategyBlock?.body.contains("\"provider\":\"gemma-e4b\"") == true)
@@ -86,8 +86,8 @@ struct BASAppleReferencePromptBuilderTests {
         #expect(envelope.frontstageState.dangerSignals.contains("Session rebuild"))
     }
 
-    @Test("reminder envelope owns clipped candidate wrapper")
-    func reminderEnvelopeOwnsClippedCandidateWrapper() {
+    @Test("selection envelope owns clipped candidate wrapper")
+    func selectionEnvelopeOwnsClippedCandidateWrapper() {
         struct Candidate: Equatable, Sendable {
             let id: Int
             let text: String
@@ -101,13 +101,13 @@ struct BASAppleReferencePromptBuilderTests {
                 Candidate(id: 4, text: "This fourth candidate should be clipped.")
             ],
             candidateText: \.text,
-            modeTitle: "Quick",
+            modeTitle: "Primary",
             scenarioTitle: "Buy",
             prompt: "I want to buy this tonight.",
             surfaceModeRawValue: "primary"
         )
 
-        #expect(envelope.prompt.kind == .reminder)
+        #expect(envelope.prompt.kind == .selection)
         #expect(envelope.candidates.map(\.id) == [1, 2, 3])
         #expect(envelope.prompt.payload.contains("\"candidate_count\":3"))
         #expect(!envelope.prompt.payload.contains("This fourth candidate should be clipped."))

@@ -285,10 +285,8 @@ public enum BASIdentityRole: String, CaseIterable, Codable, Sendable {
     case boundedGuide = "bounded_guide"
     case pauseCompanion = "pause_companion"
     case tradeoffGuide = "tradeoff_guide"
-    case mirrorWitness = "mirror_witness"
+    case reflectiveWitness = "reflective_witness"
     case predictiveSentinel = "predictive_sentinel"
-
-    public static var reflectiveWitness: Self { .mirrorWitness }
 
     public var identifier: String {
         switch self {
@@ -298,7 +296,7 @@ public enum BASIdentityRole: String, CaseIterable, Codable, Sendable {
             "stability_guide"
         case .tradeoffGuide:
             "comparative_guide"
-        case .mirrorWitness:
+        case .reflectiveWitness:
             "reflective_witness"
         case .predictiveSentinel:
             "risk_sentinel"
@@ -313,8 +311,8 @@ public enum BASIdentityRole: String, CaseIterable, Codable, Sendable {
             self = .pauseCompanion
         case Self.tradeoffGuide.identifier, Self.tradeoffGuide.rawValue:
             self = .tradeoffGuide
-        case Self.reflectiveWitness.identifier, Self.mirrorWitness.rawValue:
-            self = .mirrorWitness
+        case Self.reflectiveWitness.identifier, Self.reflectiveWitness.rawValue:
+            self = .reflectiveWitness
         case Self.predictiveSentinel.identifier, Self.predictiveSentinel.rawValue:
             self = .predictiveSentinel
         default:
@@ -330,11 +328,28 @@ public enum BASIdentityRole: String, CaseIterable, Codable, Sendable {
             "Stability Guide"
         case .tradeoffGuide:
             "Comparative Guide"
-        case .mirrorWitness:
+        case .reflectiveWitness:
             "Reflective Witness"
         case .predictiveSentinel:
             "Risk Sentinel"
         }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let identifier = try container.decode(String.self)
+        guard let role = BASIdentityRole(identifier: identifier) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unsupported identity role identifier: \(identifier)"
+            )
+        }
+        self = role
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(identifier)
     }
 }
 
@@ -812,8 +827,8 @@ public struct BASSessionBiasBehavior: Codable, Equatable, Sendable {
 
     public init(
         defaultBiasesByModeID: [String: [String]] = [
-            BASDecisionMode.primaryID: ["Stabilize the active state before expanding it."],
-            BASDecisionMode.comparativeID: ["Keep the active pressures visible without collapsing them."],
+            BASDecisionMode.primaryID: ["Preserve state stability before expanding scope."],
+            BASDecisionMode.comparativeID: ["Keep competing factors visible without collapsing them."],
             BASDecisionMode.reflectiveID: ["Describe the underlying signal before steering it."]
         ],
         briefLanguageSignals: [String] = ["short", "direct", "concise"],
@@ -821,9 +836,9 @@ public struct BASSessionBiasBehavior: Codable, Equatable, Sendable {
         nightLowLoadBias: String = "Prefer a lighter cognitive load when signal quality drops.",
         lowCognitiveLoadSignals: [String] = ["lighter guidance", "lighter", "shorter guidance", "low load", "fatigued", "overloaded"],
         interruptiveActionSignals: [String] = ["hold", "pause", "interrupt", "step away", "slow down"],
-        interruptiveActionBias: String = "Prefer a stabilizing next step before adding more complexity.",
+        interruptiveActionBias: String = "Prefer a reversible next step before adding more complexity.",
         boundaryNamingSignals: [String] = ["boundary", "pattern", "relationship", "limit", "edge"],
-        boundaryNamingBias: String = "Name the active limit before reframing.",
+        boundaryNamingBias: String = "State the active limit before reframing.",
         tradeoffClaritySignals: [String] = ["trade-off", "tradeoff", "constraint", "benefit", "cost"],
         tradeoffClarityBias: String = "Keep the active trade-off visible before polishing language."
     ) {
@@ -849,11 +864,11 @@ public struct BASSessionBiasBehavior: Codable, Equatable, Sendable {
         }
 
         switch mode {
-        case .quick:
+        case .primary:
             return ["Keep the immediate state bounded before expanding."]
-        case .balance:
+        case .comparative:
             return ["Keep the active considerations visible without forcing resolution."]
-        case .mirror:
+        case .reflective:
             return ["Describe the underlying pattern before steering it."]
         }
     }
@@ -1382,7 +1397,7 @@ public struct BASDecisionBrainState: Codable, Equatable, Sendable {
                 role: .goal,
                 type: "goal",
                 headline: headline,
-                source: "history",
+                source: "archive",
                 confidence: 1,
                 priority: 1,
                 lifecycleState: "active",
@@ -1402,7 +1417,7 @@ public struct BASDecisionBrainState: Codable, Equatable, Sendable {
                 role: .relevant,
                 type: "semantic",
                 headline: headline,
-                source: "history",
+                source: "archive",
                 confidence: 1,
                 priority: 1,
                 lifecycleState: "active",

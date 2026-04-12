@@ -9,12 +9,12 @@ struct BASPolicyCognitionCoreTests {
     @Test("identity resolver shifts to predictive sentinel on notification and stays lightweight on watch")
     func identityResolverShiftsForSurfaceAndRisk() {
         let notificationIdentity = BASIdentityRoleResolver.resolve(
-            mode: .mirror,
+            mode: .reflective,
             sourceSurface: .notification,
             riskLevel: .high
         )
         let watchIdentity = BASIdentityRoleResolver.resolve(
-            mode: .balance,
+            mode: .comparative,
             sourceSurface: .watch,
             riskLevel: .medium
         )
@@ -31,12 +31,12 @@ struct BASPolicyCognitionCoreTests {
     func boundaryEvaluatorAddsWatchAndCheckpointProtections() {
         let brainState = makeBrainState()
         let identity = BASIdentityRoleResolver.resolve(
-            mode: .mirror,
+            mode: .reflective,
             sourceSurface: .watch,
             riskLevel: .high
         )
         let boundary = BASBoundaryPolicyEvaluator.evaluate(
-            mode: .mirror,
+            mode: .reflective,
             sourceSurface: .watch,
             riskLevel: .high,
             identityProfile: identity,
@@ -98,11 +98,11 @@ struct BASPolicyCognitionCoreTests {
         )
 
         let identity = BASIdentityRoleResolver.resolve(
-            mode: .mirror,
+            mode: .reflective,
             sourceSurface: .notification,
             riskLevel: .high,
             baseProfile: BASIdentityProfile(
-                role: .mirrorWitness,
+                role: .reflectiveWitness,
                 posture: .reflective,
                 initiative: .guided,
                 confidenceCeiling: 0.72,
@@ -114,7 +114,7 @@ struct BASPolicyCognitionCoreTests {
             behavior: behavior
         )
         let boundary = BASBoundaryPolicyEvaluator.evaluate(
-            mode: .mirror,
+            mode: .reflective,
             sourceSurface: .notification,
             riskLevel: .high,
             identityProfile: identity,
@@ -137,7 +137,7 @@ struct BASPolicyCognitionCoreTests {
     @Test("calibration evaluator detects drift from pending load and missing templates")
     func calibrationEvaluatorDetectsDrift() {
         let brainState = makeBrainState(
-            mode: .balance,
+            mode: .comparative,
             pendingRate: 0.45,
             lowTrustRate: 0.22,
             activeTemplates: []
@@ -172,18 +172,18 @@ struct BASPolicyCognitionCoreTests {
     @Test("evolution evaluator emits review suggested checkpoints when calibration drifts")
     func evolutionEvaluatorEmitsReviewSuggestedCheckpoints() {
         let brainState = makeBrainState(
-            mode: .mirror,
+            mode: .reflective,
             pendingRate: 0.45,
             lowTrustRate: 0.22,
             activeTemplates: []
         )
         let identity = BASIdentityRoleResolver.resolve(
-            mode: .mirror,
+            mode: .reflective,
             sourceSurface: .notification,
             riskLevel: .high
         )
         let boundary = BASBoundaryPolicyEvaluator.evaluate(
-            mode: .mirror,
+            mode: .reflective,
             sourceSurface: .notification,
             riskLevel: .high,
             identityProfile: identity,
@@ -211,7 +211,7 @@ struct BASPolicyCognitionCoreTests {
             brainState: brainState,
             boundaryPolicy: boundary,
             calibrationState: calibration,
-            mode: .mirror,
+            mode: .reflective,
             sourceSurface: .notification,
             checkpointCount: 3,
             now: Date(timeIntervalSince1970: 1_700_100_000)
@@ -228,7 +228,7 @@ struct BASPolicyCognitionCoreTests {
     @Test("cognition bootstrapper enriches brain state with identity boundary and calibration")
     func cognitionBootstrapperEnrichesBrainState() {
         let rawBrainState = makeBrainState(
-            mode: .mirror,
+            mode: .reflective,
             pendingRate: 0.45,
             lowTrustRate: 0.22,
             activeTemplates: ["template-1"],
@@ -237,7 +237,7 @@ struct BASPolicyCognitionCoreTests {
 
         let bootstrapped = BASCognitionBootstrapper.enrich(
             brainState: rawBrainState,
-            mode: .mirror,
+            mode: .reflective,
             sourceSurface: .notification,
             riskLevel: .high,
             taskGraphHint: BASTaskGraphHint(
@@ -247,7 +247,7 @@ struct BASPolicyCognitionCoreTests {
                 resumeHint: "resume tomorrow"
             ),
             dominantGoal: "prefer concise answers",
-            activeConstraints: ["mode:mirror"],
+            activeConstraints: ["mode:reflective"],
             activeTemplateIDs: ["template-1", "template-2"],
             failureGuardIDs: ["failure-1"],
             now: Date(timeIntervalSince1970: 1_700_100_000)
@@ -258,7 +258,7 @@ struct BASPolicyCognitionCoreTests {
         #expect(bootstrapped.brainState.boundaryPolicy.mode == .localOnlyProtective)
         #expect(bootstrapped.brainState.boundaryPolicy.activeConstraints.contains(.notificationRequiresEvidence))
         #expect(bootstrapped.brainState.calibrationState.status == .drifting)
-        #expect(bootstrapped.activeConstraints.contains("mode:mirror"))
+        #expect(bootstrapped.activeConstraints.contains("mode:reflective"))
         #expect(bootstrapped.activeTemplateIDs == ["template-1", "template-2"])
         #expect(bootstrapped.failureGuardIDs == ["failure-1"])
     }
@@ -298,7 +298,7 @@ struct BASPolicyCognitionCoreTests {
     }
 
     private func makeBrainState(
-        mode: BASDecisionMode = .mirror,
+        mode: BASDecisionMode = .reflective,
         pendingRate: Double = 0.45,
         lowTrustRate: Double = 0.22,
         activeTemplates: [String] = ["template-1"],
@@ -317,7 +317,7 @@ struct BASPolicyCognitionCoreTests {
             eligibility: .allowed(.defaultAllowed),
             sourceTrustScore: 0.91,
             sourceTrustTier: .high,
-            retrievalTags: ["mode:mirror", "kind:profile"],
+            retrievalTags: ["mode:reflective", "kind:profile"],
             isPending: false,
             provenanceSummary: "profile"
         )

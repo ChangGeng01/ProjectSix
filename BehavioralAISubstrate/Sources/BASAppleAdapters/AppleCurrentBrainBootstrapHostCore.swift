@@ -4,6 +4,17 @@ import BASMemory
 import BASPolicy
 import BASRuntimeCore
 
+public enum BASAppleCurrentBrainBootstrapHostResolutionError: Error, Equatable, Sendable {
+    case unsupportedModeID(String)
+    case unsupportedTriggerID(String)
+    case unsupportedRiskLevelID(String)
+    case unsupportedSourceSurfaceID(String)
+    case unsupportedTemplateModeID(String)
+    case unsupportedTemplateRiskLevelID(String)
+    case unsupportedFailurePatternModeID(String)
+    case incompleteTaskGraphHint
+}
+
 public struct BASAppleCurrentBrainBootstrapHostTemplateInput: Codable, Equatable, Sendable {
     public var id: String
     public var modeID: String
@@ -102,10 +113,10 @@ public struct BASAppleCurrentBrainBootstrapHostSourceInput: Codable, Equatable, 
         embeddingScores: [BASAppleEmbeddingScoreInput] = [],
         taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput? = nil,
         retrievalMode: String,
-        bootstrapBehavior: BASCurrentBrainBootstrapBehavior = .generic,
+        bootstrapBehavior: BASCurrentBrainBootstrapBehavior,
         reactionWeightSeed: BASReactionWeights? = nil,
         identityProfileOverride: BASIdentityProfile? = nil,
-        cognitionBehavior: BASCognitionBehavior = .generic,
+        cognitionBehavior: BASCognitionBehavior,
         recommendedTemplateIDs: [String] = [],
         templates: [BASAppleCurrentBrainBootstrapHostTemplateInput],
         failurePatterns: [BASAppleCurrentBrainBootstrapHostFailurePatternInput]
@@ -161,10 +172,10 @@ public struct BASAppleCurrentBrainBootstrapHostBuildContext: Codable, Equatable,
         embeddingScores: [BASAppleEmbeddingScoreInput] = [],
         taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput? = nil,
         retrievalMode: String,
-        bootstrapBehavior: BASCurrentBrainBootstrapBehavior = .generic,
+        bootstrapBehavior: BASCurrentBrainBootstrapBehavior,
         reactionWeightSeed: BASReactionWeights? = nil,
         identityProfileOverride: BASIdentityProfile? = nil,
-        cognitionBehavior: BASCognitionBehavior = .generic,
+        cognitionBehavior: BASCognitionBehavior,
         recommendedTemplateIDs: [String] = []
     ) {
         self.modeID = modeID
@@ -203,10 +214,10 @@ public enum BASAppleCurrentBrainBootstrapHostInputBuilder {
         hasResumeCandidate: (TaskGraph) -> Bool,
         resumeHint: (TaskGraph) -> String?,
         retrievalMode: String,
-        bootstrapBehavior: BASCurrentBrainBootstrapBehavior = .generic,
+        bootstrapBehavior: BASCurrentBrainBootstrapBehavior,
         reactionWeightSeed: BASReactionWeights? = nil,
         identityProfileOverride: BASIdentityProfile? = nil,
-        cognitionBehavior: BASCognitionBehavior = .generic,
+        cognitionBehavior: BASCognitionBehavior,
         recommendedTemplateIDs: [String] = []
     ) -> BASAppleCurrentBrainBootstrapHostBuildContext {
         BASAppleCurrentBrainBootstrapHostBuildContext(
@@ -283,44 +294,69 @@ public enum BASAppleCurrentBrainBootstrapHostInputBuilder {
 public enum BASAppleCurrentBrainBootstrapHostAdapter {
     public static func prepare(
         from input: BASAppleCurrentBrainBootstrapHostSourceInput
-    ) -> BASCurrentBrainBootstrapPreparation {
-        BASAppleCurrentBrainBootstrapPlanner.request(from: planningInput(from: input)).preparation
+    ) throws -> BASCurrentBrainBootstrapPreparation {
+        try request(from: input).preparation
     }
 
     public static func execute(
         from input: BASAppleCurrentBrainBootstrapHostSourceInput
-    ) -> BASCurrentBrainBootstrapExecution {
+    ) throws -> BASCurrentBrainBootstrapExecution {
         BASAppleCurrentBrainBootstrapAdapter.bootstrap(
-            request: BASAppleCurrentBrainBootstrapPlanner.request(from: planningInput(from: input))
+            request: try request(from: input)
         )
     }
 
     public static func artifact(
         from input: BASAppleCurrentBrainBootstrapHostSourceInput
-    ) -> BASAppleCurrentBrainBootstrapArtifact {
+    ) throws -> BASAppleCurrentBrainBootstrapArtifact {
         BASAppleCurrentBrainBootstrapAdapter.artifact(
-            request: BASAppleCurrentBrainBootstrapPlanner.request(from: planningInput(from: input))
+            request: try request(from: input)
         )
     }
 
     public static func request(
         from input: BASAppleCurrentBrainBootstrapHostSourceInput
-    ) -> BASAppleCurrentBrainBootstrapRequest {
-        BASAppleCurrentBrainBootstrapPlanner.request(from: planningInput(from: input))
+    ) throws -> BASAppleCurrentBrainBootstrapRequest {
+        BASAppleCurrentBrainBootstrapPlanner.request(from: try planningInput(from: input))
     }
 
     private static func planningInput(
         from input: BASAppleCurrentBrainBootstrapHostSourceInput
-    ) -> BASAppleCurrentBrainBootstrapPlanningSourceInput {
-        BASAppleCurrentBrainBootstrapPlanningSourceInput(
+    ) throws -> BASAppleCurrentBrainBootstrapPlanningSourceInput {
+        let behavior = input.bootstrapBehavior
+        guard let preparationMode = BASDecisionMode(identifier: behavior.canonicalModeID(for: input.modeID)) else {
+            throw BASAppleCurrentBrainBootstrapHostResolutionError.unsupportedModeID(input.modeID)
+        }
+        guard let preparationTrigger = BASCurrentBrainBootstrapTrigger(identifier: behavior.canonicalTriggerID(for: input.triggerID)) else {
+            throw BASAppleCurrentBrainBootstrapHostResolutionError.unsupportedTriggerID(input.triggerID)
+        }
+        let sourceSurfaceOverride: BASInteractionSurface?
+        if let sourceSurfaceOverrideID = input.sourceSurfaceOverrideID {
+            guard let resolvedSourceSurfaceOverride = BASInteractionSurface(rawValue: sourceSurfaceOverrideID) else {
+                throw BASAppleCurrentBrainBootstrapHostResolutionError.unsupportedSourceSurfaceID(sourceSurfaceOverrideID)
+            }
+            sourceSurfaceOverride = resolvedSourceSurfaceOverride
+        } else {
+            sourceSurfaceOverride = nil
+        }
+        let preparationRiskLevel: BASRiskLevel?
+        if let riskLevelOverrideID = input.riskLevelOverrideID {
+            guard let resolvedRiskLevel = BASRiskLevel(rawValue: behavior.canonicalRiskLevelID(for: riskLevelOverrideID)) else {
+                throw BASAppleCurrentBrainBootstrapHostResolutionError.unsupportedRiskLevelID(riskLevelOverrideID)
+            }
+            preparationRiskLevel = resolvedRiskLevel
+        } else {
+            preparationRiskLevel = nil
+        }
+        return BASAppleCurrentBrainBootstrapPlanningSourceInput(
             preparationRequest: BASCurrentBrainBootstrapPreparationRequest(
-                mode: BASDecisionMode(identifier: input.modeID) ?? .primary,
+                mode: preparationMode,
                 prompt: input.prompt,
-                trigger: BASCurrentBrainBootstrapTrigger(rawValue: input.triggerID) ?? .sessionPrime,
-                sourceSurfaceOverride: input.sourceSurfaceOverrideID.flatMap(BASInteractionSurface.init(rawValue:)),
-                riskLevelOverride: input.riskLevelOverrideID.flatMap(BASRiskLevel.init(rawValue:)),
+                trigger: preparationTrigger,
+                sourceSurfaceOverride: sourceSurfaceOverride,
+                riskLevelOverride: preparationRiskLevel,
                 preferredLanguages: input.preferredLanguages,
-                behavior: input.bootstrapBehavior,
+                behavior: behavior,
                 now: input.now
             ),
             projection: input.projection,
@@ -338,20 +374,31 @@ public enum BASAppleCurrentBrainBootstrapHostAdapter {
             identityProfileOverride: input.identityProfileOverride,
             cognitionBehavior: input.cognitionBehavior,
             recommendedTemplateIDs: input.recommendedTemplateIDs,
-            templates: input.templates.map { template in
-                BASAppleCurrentBrainBootstrapTemplateInput(
+            templates: try input.templates.map { template in
+                guard let mode = BASDecisionMode(identifier: behavior.canonicalModeID(for: template.modeID)) else {
+                    throw BASAppleCurrentBrainBootstrapHostResolutionError.unsupportedTemplateModeID(template.modeID)
+                }
+                guard let riskLevel = BASRiskLevel(rawValue: behavior.canonicalRiskLevelID(for: template.riskLevelID)) else {
+                    throw BASAppleCurrentBrainBootstrapHostResolutionError.unsupportedTemplateRiskLevelID(template.riskLevelID)
+                }
+
+                return BASAppleCurrentBrainBootstrapTemplateInput(
                     id: template.id,
-                    mode: BASDecisionMode(identifier: template.modeID) ?? .primary,
-                    riskLevel: BASRiskLevel(rawValue: template.riskLevelID) ?? .low,
+                    mode: mode,
+                    riskLevel: riskLevel,
                     isPinned: template.isPinned,
                     successCount: template.successCount,
                     updatedAt: template.updatedAt
                 )
             },
-            failurePatterns: input.failurePatterns.map { pattern in
-                BASAppleCurrentBrainBootstrapFailurePatternInput(
+            failurePatterns: try input.failurePatterns.map { pattern in
+                guard let mode = BASDecisionMode(identifier: behavior.canonicalModeID(for: pattern.modeID)) else {
+                    throw BASAppleCurrentBrainBootstrapHostResolutionError.unsupportedFailurePatternModeID(pattern.modeID)
+                }
+
+                return BASAppleCurrentBrainBootstrapFailurePatternInput(
                     id: pattern.id,
-                    mode: BASDecisionMode(identifier: pattern.modeID) ?? .primary,
+                    mode: mode,
                     suppressionWeight: pattern.suppressionWeight,
                     evidenceCount: pattern.evidenceCount,
                     updatedAt: pattern.updatedAt
@@ -369,8 +416,8 @@ public enum BASAppleCurrentBrainBootstrapCoordinator {
         selectFailurePatterns: (BASCurrentBrainBootstrapPreparation) -> [FailurePattern],
         mapTemplate: (Template) -> BASAppleCurrentBrainBootstrapHostTemplateInput,
         mapFailurePattern: (FailurePattern) -> BASAppleCurrentBrainBootstrapHostFailurePatternInput
-    ) -> BASAppleCurrentBrainBootstrapArtifact {
-        artifact(
+    ) throws -> BASAppleCurrentBrainBootstrapArtifact {
+        try artifact(
             baseInput: BASAppleCurrentBrainBootstrapHostInputBuilder.build(
                 context: context,
                 templates: [Template](),
@@ -393,13 +440,13 @@ public enum BASAppleCurrentBrainBootstrapCoordinator {
         selectFailurePatterns: (BASCurrentBrainBootstrapPreparation) -> [FailurePattern],
         mapTemplate: (Template) -> BASAppleCurrentBrainBootstrapHostTemplateInput,
         mapFailurePattern: (FailurePattern) -> BASAppleCurrentBrainBootstrapHostFailurePatternInput
-    ) -> BASAppleCurrentBrainBootstrapArtifact {
-        let preparation = BASAppleCurrentBrainBootstrapHostAdapter.prepare(from: baseInput)
+    ) throws -> BASAppleCurrentBrainBootstrapArtifact {
+        let preparation = try BASAppleCurrentBrainBootstrapHostAdapter.prepare(from: baseInput)
         let recommendedTemplateIDs = recommendTemplateIDs(preparation)
         let templates = selectTemplates(preparation, recommendedTemplateIDs).map(mapTemplate)
         let failurePatterns = selectFailurePatterns(preparation).map(mapFailurePattern)
 
-        return BASAppleCurrentBrainBootstrapHostAdapter.artifact(
+        return try BASAppleCurrentBrainBootstrapHostAdapter.artifact(
             from: BASAppleCurrentBrainBootstrapHostSourceInput(
                 modeID: baseInput.modeID,
                 prompt: baseInput.prompt,
@@ -490,10 +537,10 @@ public struct BASAppleCurrentBrainBootstrapBridgeInput: Codable, Equatable, Send
         taskGraphHasResumeCandidate: Bool? = nil,
         taskGraphResumeHint: String? = nil,
         retrievalMode: String,
-        bootstrapBehavior: BASCurrentBrainBootstrapBehavior = .generic,
+        bootstrapBehavior: BASCurrentBrainBootstrapBehavior,
         reactionWeightSeed: BASReactionWeights? = nil,
         identityProfileOverride: BASIdentityProfile? = nil,
-        cognitionBehavior: BASCognitionBehavior = .generic
+        cognitionBehavior: BASCognitionBehavior
     ) {
         self.modeID = modeID
         self.prompt = prompt
@@ -529,10 +576,10 @@ public enum BASAppleCurrentBrainBootstrapBridgeInputBuilder {
         embeddingScores: [BASAppleEmbeddingScoreInput] = [],
         taskGraphHint: BASAppleCurrentBrainBootstrapHostTaskGraphInput? = nil,
         retrievalMode: String,
-        bootstrapBehavior: BASCurrentBrainBootstrapBehavior = .generic,
+        bootstrapBehavior: BASCurrentBrainBootstrapBehavior,
         reactionWeightSeed: BASReactionWeights? = nil,
         identityProfileOverride: BASIdentityProfile? = nil,
-        cognitionBehavior: BASCognitionBehavior = .generic
+        cognitionBehavior: BASCognitionBehavior
     ) -> BASAppleCurrentBrainBootstrapBridgeInput {
         BASAppleCurrentBrainBootstrapBridgeInput(
             modeID: modeID,
@@ -610,7 +657,7 @@ public enum BASAppleCurrentBrainBootstrapBridgeBuilder {
         mapFailurePattern: (FailurePattern) -> BASAppleCurrentBrainBootstrapHostFailurePatternInput,
         onCheckpointSaveError: ((Error) -> Void)? = nil,
         onUpdateSaveError: ((Error) -> Void)? = nil
-    ) -> BASAppleCurrentBrainBootstrapBridgeResult<Update, Checkpoint> {
+    ) throws -> BASAppleCurrentBrainBootstrapBridgeResult<Update, Checkpoint> {
         let context = BASAppleCurrentBrainBootstrapHostBuildContext(
             modeID: input.modeID,
             prompt: input.prompt,
@@ -621,7 +668,7 @@ public enum BASAppleCurrentBrainBootstrapBridgeBuilder {
             now: input.now,
             projection: input.projection,
             embeddingScores: input.embeddingScores,
-            taskGraphHint: taskGraphHint(from: input),
+            taskGraphHint: try taskGraphHint(from: input),
             retrievalMode: input.retrievalMode,
             bootstrapBehavior: input.bootstrapBehavior,
             reactionWeightSeed: input.reactionWeightSeed,
@@ -630,7 +677,7 @@ public enum BASAppleCurrentBrainBootstrapBridgeBuilder {
         )
 
         let committed: BASAppleCurrentBrainBootstrapCommitResult<Update, Checkpoint> =
-            BASAppleCurrentBrainRuntimeCoordinator.bootstrapAndCommit(
+            try BASAppleCurrentBrainRuntimeCoordinator.bootstrapAndCommit(
                 context: context,
                 in: modelContext,
                 createdAt: createdAt,
@@ -659,7 +706,7 @@ public enum BASAppleCurrentBrainBootstrapBridgeBuilder {
 
     private static func taskGraphHint(
         from input: BASAppleCurrentBrainBootstrapBridgeInput
-    ) -> BASAppleCurrentBrainBootstrapHostTaskGraphInput? {
+    ) throws -> BASAppleCurrentBrainBootstrapHostTaskGraphInput? {
         guard input.taskGraphHeadline != nil ||
                 input.taskGraphActiveNodeCount != nil ||
                 input.taskGraphHasResumeCandidate != nil ||
@@ -668,10 +715,15 @@ public enum BASAppleCurrentBrainBootstrapBridgeBuilder {
             return nil
         }
 
+        guard let activeNodeCount = input.taskGraphActiveNodeCount,
+              let hasResumeCandidate = input.taskGraphHasResumeCandidate else {
+            throw BASAppleCurrentBrainBootstrapHostResolutionError.incompleteTaskGraphHint
+        }
+
         return BASAppleCurrentBrainBootstrapHostInputBuilder.taskGraphInput(
             headline: input.taskGraphHeadline,
-            activeNodeCount: input.taskGraphActiveNodeCount ?? 0,
-            hasResumeCandidate: input.taskGraphHasResumeCandidate ?? false,
+            activeNodeCount: activeNodeCount,
+            hasResumeCandidate: hasResumeCandidate,
             resumeHint: input.taskGraphResumeHint
         )
     }
@@ -696,8 +748,8 @@ public enum BASAppleCurrentBrainRuntimeCoordinator {
         mapFailurePattern: (FailurePattern) -> BASAppleCurrentBrainBootstrapHostFailurePatternInput,
         onCheckpointSaveError: ((Error) -> Void)? = nil,
         onUpdateSaveError: ((Error) -> Void)? = nil
-    ) -> BASAppleCurrentBrainBootstrapCommitResult<Update, Checkpoint> {
-        let artifact = BASAppleCurrentBrainBootstrapCoordinator.artifact(
+    ) throws -> BASAppleCurrentBrainBootstrapCommitResult<Update, Checkpoint> {
+        let artifact = try BASAppleCurrentBrainBootstrapCoordinator.artifact(
             context: context,
             recommendTemplateIDs: recommendTemplateIDs,
             selectTemplates: selectTemplates,
@@ -708,8 +760,8 @@ public enum BASAppleCurrentBrainRuntimeCoordinator {
 
         let commit: BASAppleCurrentBrainCommitWriteResult<Update, Checkpoint> =
             BASAppleCurrentBrainCommitter.commit(
-                modeName: context.modeID,
-                sourceID: context.triggerID,
+                modeName: artifact.execution.preparation.mode.identifier,
+                sourceID: artifact.execution.preparation.trigger.rawValue,
                 brainState: artifact.execution.bootstrapped.brainState,
                 persistenceInput: artifact.persistenceInput,
                 in: modelContext,
@@ -739,49 +791,62 @@ public enum BASAppleBrainBootstrapRequestAdapter {
         triggerID: String,
         sourceSurfaceOverrideID: String? = nil,
         riskLevelOverrideID: String? = nil,
-        bootstrapBehavior: BASCurrentBrainBootstrapBehavior = .generic,
+        bootstrapBehavior: BASCurrentBrainBootstrapBehavior,
         reactionWeightSeed: BASReactionWeights? = nil,
         identityProfileOverride: BASIdentityProfile? = nil,
-        cognitionBehavior: BASCognitionBehavior = .generic,
+        cognitionBehavior: BASCognitionBehavior,
         preferredLanguages: [String] = [],
         now: Date = .now,
         retrievalMode: String
-    ) -> BASBrainBootstrapRequest {
-        let request = BASAppleCurrentBrainBootstrapHostAdapter.request(
-            from: BASAppleCurrentBrainBootstrapHostInputBuilder.build(
-                context: BASAppleCurrentBrainBootstrapHostBuildContext(
-                    modeID: modeID,
-                    prompt: prompt,
-                    triggerID: triggerID,
-                    sourceSurfaceOverrideID: sourceSurfaceOverrideID,
-                    riskLevelOverrideID: riskLevelOverrideID,
-                    preferredLanguages: preferredLanguages,
-                    now: now,
-                    projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
-                    retrievalMode: retrievalMode,
-                    bootstrapBehavior: bootstrapBehavior,
-                    reactionWeightSeed: reactionWeightSeed,
-                    identityProfileOverride: identityProfileOverride,
-                    cognitionBehavior: cognitionBehavior
-                ),
-                templates: [BASAppleCurrentBrainBootstrapHostTemplateInput](),
-                failurePatterns: [BASAppleCurrentBrainBootstrapHostFailurePatternInput](),
-                mapTemplate: { $0 },
-                mapFailurePattern: { $0 }
-            )
-        ).preparation
+    ) throws -> BASBrainBootstrapRequest {
+        let canonicalModeID = bootstrapBehavior.canonicalModeID(for: modeID)
+        guard let mode = BASDecisionMode(identifier: canonicalModeID) else {
+            throw BASAppleCurrentBrainBootstrapHostResolutionError.unsupportedModeID(modeID)
+        }
+        let canonicalTriggerID = bootstrapBehavior.canonicalTriggerID(for: triggerID)
+        guard let trigger = BASCurrentBrainBootstrapTrigger(identifier: canonicalTriggerID) else {
+            throw BASAppleCurrentBrainBootstrapHostResolutionError.unsupportedTriggerID(triggerID)
+        }
+
+        let sourceSurfaceOverride: BASInteractionSurface?
+        if let sourceSurfaceOverrideID {
+            guard let resolvedSourceSurface = BASInteractionSurface(rawValue: sourceSurfaceOverrideID) else {
+                throw BASAppleCurrentBrainBootstrapHostResolutionError.unsupportedSourceSurfaceID(sourceSurfaceOverrideID)
+            }
+            sourceSurfaceOverride = resolvedSourceSurface
+        } else {
+            sourceSurfaceOverride = nil
+        }
+
+        let riskLevel: BASRiskLevel
+        if let riskLevelOverrideID {
+            let canonicalRiskLevelID = bootstrapBehavior.canonicalRiskLevelID(for: riskLevelOverrideID)
+            guard let resolvedRiskLevel = BASRiskLevel(rawValue: canonicalRiskLevelID) else {
+                throw BASAppleCurrentBrainBootstrapHostResolutionError.unsupportedRiskLevelID(riskLevelOverrideID)
+            }
+            riskLevel = resolvedRiskLevel
+        } else {
+            guard let resolvedRiskLevel = BASRiskLevel(rawValue: bootstrapBehavior.defaultRiskLevelID) else {
+                throw BASAppleCurrentBrainBootstrapHostResolutionError.unsupportedRiskLevelID(
+                    bootstrapBehavior.defaultRiskLevelID
+                )
+            }
+            riskLevel = resolvedRiskLevel
+        }
 
         return BASBrainBootstrapRequest(
-            mode: request.mode,
-            prompt: request.prompt,
-            source: request.memorySource,
-            sourceSurface: request.sourceSurface,
-            riskLevel: request.riskLevel,
+            mode: mode,
+            prompt: prompt,
+            source: bootstrapBehavior.memorySource(for: trigger, mode: mode),
+            sourceSurface: bootstrapBehavior.resolvedSourceSurface(for: trigger, override: sourceSurfaceOverride),
+            riskLevel: riskLevel,
             retrievalMode: retrievalMode,
             reactionWeightSeed: reactionWeightSeed,
             identityProfileOverride: identityProfileOverride,
             cognitionBehavior: cognitionBehavior,
-            now: request.now
+            goalHints: [prompt].filter { !$0.isEmpty },
+            constraintHints: [],
+            now: now
         )
     }
 }

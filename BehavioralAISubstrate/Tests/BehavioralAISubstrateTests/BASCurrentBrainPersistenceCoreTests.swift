@@ -7,7 +7,7 @@ struct BASCurrentBrainPersistenceCoreTests {
     @Test("update input derives canonical brain snapshot fields")
     func updateInputDerivesCanonicalBrainSnapshotFields() {
         let input = BASCurrentBrainPersistenceApplier.updateInput(
-            mode: " quick ",
+            mode: " primary ",
             bootstrapped: BASBootstrappedBrainState(
                 brainState: BASDecisionBrainState(
                     profileCore: [],
@@ -32,7 +32,7 @@ struct BASCurrentBrainPersistenceCoreTests {
             )
         )
 
-        #expect(input.mode == "quick")
+        #expect(input.mode == "primary")
         #expect(input.dominantGoal == "Wait until morning")
         #expect(input.dominantReactionWeight == BASReactionWeightKey.warmDirectTone.rawValue)
         #expect(input.fingerprint.isEmpty == false)
@@ -50,7 +50,7 @@ struct BASCurrentBrainPersistenceCoreTests {
                     id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!,
                     createdAt: now.addingTimeInterval(-60),
                     source: "launch",
-                    mode: "quick",
+                    mode: "primary",
                     dominantGoal: "c",
                     dominantReactionWeight: BASReactionWeightKey.briefLanguage.rawValue,
                     fingerprint: "c",
@@ -62,7 +62,7 @@ struct BASCurrentBrainPersistenceCoreTests {
                     id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
                     createdAt: now.addingTimeInterval(-60),
                     source: "launch",
-                    mode: "quick",
+                    mode: "primary",
                     dominantGoal: "a",
                     dominantReactionWeight: BASReactionWeightKey.briefLanguage.rawValue,
                     fingerprint: "a",
@@ -74,7 +74,7 @@ struct BASCurrentBrainPersistenceCoreTests {
                     id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
                     createdAt: now.addingTimeInterval(-BASCurrentBrainPersistenceApplier.defaultRetentionInterval - 1),
                     source: "launch",
-                    mode: "quick",
+                    mode: "primary",
                     dominantGoal: "stale",
                     dominantReactionWeight: BASReactionWeightKey.briefLanguage.rawValue,
                     fingerprint: "stale",

@@ -35,17 +35,17 @@ public struct BASApplePredictiveInterventionBehavior: Codable, Equatable, Sendab
     public init(
         lowRisk: BASApplePredictiveInterventionRiskBehavior = BASApplePredictiveInterventionRiskBehavior(
             title: "A lighter next step may be enough.",
-            detail: "Current signals suggest a short hold or lower-pressure next step before proceeding.",
+            detail: "Current signals suggest a short hold or lower-pressure next step.",
             preferredModeID: nil
         ),
         mediumRisk: BASApplePredictiveInterventionRiskBehavior = BASApplePredictiveInterventionRiskBehavior(
-            title: "A more deliberate next step may help here.",
-            detail: "Current signals suggest adding more structure before proceeding.",
+            title: "A lower-pressure next step may help here.",
+            detail: "Current signals suggest lowering pressure on the next step.",
             preferredModeID: nil
         ),
         highRisk: BASApplePredictiveInterventionRiskBehavior = BASApplePredictiveInterventionRiskBehavior(
             title: "This state may need stronger confirmation.",
-            detail: "Current signals suggest raising confirmation and tightening execution boundaries before proceeding.",
+            detail: "Current signals suggest raising confirmation and tightening execution boundaries for the next step.",
             preferredModeID: nil
         ),
         preferredModeIDsByCurrentModeID: [String: String] = [:],
@@ -54,7 +54,7 @@ public struct BASApplePredictiveInterventionBehavior: Codable, Equatable, Sendab
         nightWindowReason: String = "The current time window lowers decision reliability.",
         negativeRecentReason: String = "Recent low-structure passes in comparable conditions ended poorly.",
         failureGuardReasonsByID: [String: String] = [:],
-        defaultReason: String = "Current signals suggest a more deliberate next step."
+        defaultReason: String = "Current signals suggest a lower-pressure next step."
     ) {
         self.lowRisk = lowRisk
         self.mediumRisk = mediumRisk

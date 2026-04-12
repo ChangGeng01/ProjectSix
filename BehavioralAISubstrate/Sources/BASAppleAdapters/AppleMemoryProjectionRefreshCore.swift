@@ -11,24 +11,12 @@ public struct BASAppleMemoryProjectionRefreshLimits: Codable, Equatable, Sendabl
     public var comparativeRecordLimit: Int
     public var reflectiveRecordLimit: Int
 
-    public var balanceRecordLimit: Int {
-        get { comparativeRecordLimit }
-        set { comparativeRecordLimit = newValue }
-    }
-
-    public var mirrorRecordLimit: Int {
-        get { reflectiveRecordLimit }
-        set { reflectiveRecordLimit = newValue }
-    }
-
     private enum CodingKeys: String, CodingKey {
         case recordLimit
         case candidateLimit
         case checkEventLimit
         case comparativeRecordLimit
         case reflectiveRecordLimit
-        case balanceRecordLimit
-        case mirrorRecordLimit
     }
 
     public init(
@@ -36,15 +24,13 @@ public struct BASAppleMemoryProjectionRefreshLimits: Codable, Equatable, Sendabl
         candidateLimit: Int = 32,
         checkEventLimit: Int = 96,
         comparativeRecordLimit: Int = 36,
-        reflectiveRecordLimit: Int = 36,
-        balanceRecordLimit: Int? = nil,
-        mirrorRecordLimit: Int? = nil
+        reflectiveRecordLimit: Int = 36
     ) {
         self.recordLimit = recordLimit
         self.candidateLimit = candidateLimit
         self.checkEventLimit = checkEventLimit
-        self.comparativeRecordLimit = balanceRecordLimit ?? comparativeRecordLimit
-        self.reflectiveRecordLimit = mirrorRecordLimit ?? reflectiveRecordLimit
+        self.comparativeRecordLimit = comparativeRecordLimit
+        self.reflectiveRecordLimit = reflectiveRecordLimit
     }
 
     public init(from decoder: Decoder) throws {
@@ -52,12 +38,8 @@ public struct BASAppleMemoryProjectionRefreshLimits: Codable, Equatable, Sendabl
         recordLimit = try container.decodeIfPresent(Int.self, forKey: .recordLimit) ?? 72
         candidateLimit = try container.decodeIfPresent(Int.self, forKey: .candidateLimit) ?? 32
         checkEventLimit = try container.decodeIfPresent(Int.self, forKey: .checkEventLimit) ?? 96
-        comparativeRecordLimit = try container.decodeIfPresent(Int.self, forKey: .comparativeRecordLimit) ??
-            container.decodeIfPresent(Int.self, forKey: .balanceRecordLimit) ??
-            36
-        reflectiveRecordLimit = try container.decodeIfPresent(Int.self, forKey: .reflectiveRecordLimit) ??
-            container.decodeIfPresent(Int.self, forKey: .mirrorRecordLimit) ??
-            36
+        comparativeRecordLimit = try container.decodeIfPresent(Int.self, forKey: .comparativeRecordLimit) ?? 36
+        reflectiveRecordLimit = try container.decodeIfPresent(Int.self, forKey: .reflectiveRecordLimit) ?? 36
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -109,7 +91,7 @@ public enum BASAppleMemoryProjectionRefreshAdapter {
     public static func refreshProjection<
         Governed: BASAppleGovernedMemoryEntity,
         Candidate: BASAppleCandidateMemoryEntity,
-        Reminder: BASAppleReminderMemoryEntity,
+        Cue: BASAppleCueMemoryEntity,
         Event: BASAppleCheckEventMemoryEntity & BASAppleProjectionEventSource,
         Comparative: BASAppleComparativeMemoryEntity,
         Reflective: BASAppleReflectiveMemoryEntity
@@ -119,7 +101,7 @@ public enum BASAppleMemoryProjectionRefreshAdapter {
         governanceSnapshot: BASAppleProjectionGovernanceSnapshot,
         refreshGovernanceSnapshot: (ModelContext) -> BASAppleProjectionGovernanceSnapshot,
         limits: BASAppleMemoryProjectionRefreshLimits = .default,
-        reminderType: Reminder.Type,
+        cueType: Cue.Type,
         checkEventType: Event.Type,
         comparativeRecordType: Comparative.Type,
         reflectiveRecordType: Reflective.Type,
@@ -151,7 +133,7 @@ public enum BASAppleMemoryProjectionRefreshAdapter {
                 BASAppleMemoryGovernanceAdapter.refreshStoredMemories(
                     in: context,
                     now: now,
-                    reminderType: reminderType,
+                    cueType: cueType,
                     checkEventType: checkEventType,
                     comparativeRecordType: comparativeRecordType,
                     reflectiveRecordType: reflectiveRecordType,
@@ -201,65 +183,13 @@ public enum BASAppleMemoryProjectionRefreshAdapter {
         )
     }
 
-    public static func refreshProjection<
-        Governed: BASAppleGovernedMemoryEntity,
-        Candidate: BASAppleCandidateMemoryEntity,
-        Reminder: BASAppleReminderMemoryEntity,
-        Event: BASAppleCheckEventMemoryEntity & BASAppleProjectionEventSource,
-        Balance: BASAppleBalanceMemoryEntity,
-        Mirror: BASAppleMirrorMemoryEntity
-    >(
-        in context: ModelContext,
-        now: Date,
-        governanceSnapshot: BASAppleProjectionGovernanceSnapshot,
-        refreshGovernanceSnapshot: (ModelContext) -> BASAppleProjectionGovernanceSnapshot,
-        limits: BASAppleMemoryProjectionRefreshLimits = .default,
-        reminderType: Reminder.Type,
-        checkEventType: Event.Type,
-        balanceRecordType: Balance.Type,
-        mirrorRecordType: Mirror.Type,
-        behavior: BASMemoryDerivationBehavior = .generic,
-        fetchRecords: (ModelContext, Int) -> [Governed],
-        fetchCandidates: (ModelContext, Int) -> [Candidate],
-        fetchCheckEvents: (ModelContext, Int) -> [Event],
-        fetchBalanceRecords: (ModelContext, Int) -> [Balance],
-        fetchMirrorRecords: (ModelContext, Int) -> [Mirror],
-        rebuildEmbeddings: (
-            _ records: [Governed],
-            _ candidates: [Candidate],
-            _ checkEvents: [Event],
-            _ balanceRecords: [Balance],
-            _ mirrorRecords: [Mirror]
-        ) -> Void,
-        onSaveError: ((Error) -> Void)? = nil
-    ) -> BASAppleMemoryProjectionRefreshResult {
-        refreshProjection(
-            in: context,
-            now: now,
-            governanceSnapshot: governanceSnapshot,
-            refreshGovernanceSnapshot: refreshGovernanceSnapshot,
-            limits: limits,
-            reminderType: reminderType,
-            checkEventType: checkEventType,
-            comparativeRecordType: balanceRecordType,
-            reflectiveRecordType: mirrorRecordType,
-            behavior: behavior,
-            fetchRecords: fetchRecords,
-            fetchCandidates: fetchCandidates,
-            fetchCheckEvents: fetchCheckEvents,
-            fetchComparativeRecords: fetchBalanceRecords,
-            fetchReflectiveRecords: fetchMirrorRecords,
-            rebuildEmbeddings: rebuildEmbeddings,
-            onSaveError: onSaveError
-        )
-    }
 }
 
 public enum BASAppleMemoryProjectionRuntime {
     public static func refresh<
         Governed: BASAppleGovernedMemoryEntity,
         Candidate: BASAppleCandidateMemoryEntity,
-        Reminder: BASAppleReminderMemoryEntity,
+        Cue: BASAppleCueMemoryEntity,
         Event: BASAppleCheckEventMemoryEntity & BASAppleProjectionEventSource,
         Comparative: BASAppleComparativeMemoryEntity,
         Reflective: BASAppleReflectiveMemoryEntity
@@ -269,7 +199,7 @@ public enum BASAppleMemoryProjectionRuntime {
         limits: BASAppleMemoryProjectionRefreshLimits = .default,
         recordType: Governed.Type,
         candidateType: Candidate.Type,
-        reminderType: Reminder.Type,
+        cueType: Cue.Type,
         checkEventType: Event.Type,
         comparativeRecordType: Comparative.Type,
         reflectiveRecordType: Reflective.Type,
@@ -290,7 +220,7 @@ public enum BASAppleMemoryProjectionRuntime {
             limits: limits,
             recordType: recordType,
             candidateType: candidateType,
-            reminderType: reminderType,
+            cueType: cueType,
             checkEventType: checkEventType,
             comparativeRecordType: comparativeRecordType,
             reflectiveRecordType: reflectiveRecordType,
@@ -341,7 +271,7 @@ public enum BASAppleMemoryProjectionRuntime {
     public static func refresh<
         Governed: BASAppleGovernedMemoryEntity,
         Candidate: BASAppleCandidateMemoryEntity,
-        Reminder: BASAppleReminderMemoryEntity,
+        Cue: BASAppleCueMemoryEntity,
         Event: BASAppleCheckEventMemoryEntity & BASAppleProjectionEventSource,
         Comparative: BASAppleComparativeMemoryEntity,
         Reflective: BASAppleReflectiveMemoryEntity
@@ -351,7 +281,7 @@ public enum BASAppleMemoryProjectionRuntime {
         limits: BASAppleMemoryProjectionRefreshLimits = .default,
         recordType: Governed.Type,
         candidateType: Candidate.Type,
-        reminderType: Reminder.Type,
+        cueType: Cue.Type,
         checkEventType: Event.Type,
         comparativeRecordType: Comparative.Type,
         reflectiveRecordType: Reflective.Type,
@@ -388,7 +318,7 @@ public enum BASAppleMemoryProjectionRuntime {
                 )
             },
             limits: limits,
-            reminderType: reminderType,
+            cueType: cueType,
             checkEventType: checkEventType,
             comparativeRecordType: comparativeRecordType,
             reflectiveRecordType: reflectiveRecordType,
@@ -404,103 +334,4 @@ public enum BASAppleMemoryProjectionRuntime {
         )
     }
 
-    public static func refresh<
-        Governed: BASAppleGovernedMemoryEntity,
-        Candidate: BASAppleCandidateMemoryEntity,
-        Reminder: BASAppleReminderMemoryEntity,
-        Event: BASAppleCheckEventMemoryEntity & BASAppleProjectionEventSource,
-        Balance: BASAppleBalanceMemoryEntity,
-        Mirror: BASAppleMirrorMemoryEntity
-    >(
-        in context: ModelContext,
-        now: Date,
-        limits: BASAppleMemoryProjectionRefreshLimits = .default,
-        recordType: Governed.Type,
-        candidateType: Candidate.Type,
-        reminderType: Reminder.Type,
-        checkEventType: Event.Type,
-        balanceRecordType: Balance.Type,
-        mirrorRecordType: Mirror.Type,
-        behavior: BASMemoryDerivationBehavior = .generic,
-        memoryTrustBehavior: BASMemoryTrustBehavior = .generic,
-        rebuildEmbeddings: (
-            _ records: [Governed],
-            _ candidates: [Candidate],
-            _ checkEvents: [Event],
-            _ balanceRecords: [Balance],
-            _ mirrorRecords: [Mirror]
-        ) -> Void,
-        onSaveError: ((Error) -> Void)? = nil
-    ) -> BASAppleMemoryProjectionRefreshResult {
-        refresh(
-            in: context,
-            now: now,
-            limits: limits,
-            recordType: recordType,
-            candidateType: candidateType,
-            reminderType: reminderType,
-            checkEventType: checkEventType,
-            comparativeRecordType: balanceRecordType,
-            reflectiveRecordType: mirrorRecordType,
-            behavior: behavior,
-            memoryTrustBehavior: memoryTrustBehavior,
-            rebuildEmbeddings: rebuildEmbeddings,
-            onSaveError: onSaveError
-        )
-    }
-
-    public static func refresh<
-        Governed: BASAppleGovernedMemoryEntity,
-        Candidate: BASAppleCandidateMemoryEntity,
-        Reminder: BASAppleReminderMemoryEntity,
-        Event: BASAppleCheckEventMemoryEntity & BASAppleProjectionEventSource,
-        Balance: BASAppleBalanceMemoryEntity,
-        Mirror: BASAppleMirrorMemoryEntity
-    >(
-        in context: ModelContext,
-        now: Date,
-        limits: BASAppleMemoryProjectionRefreshLimits = .default,
-        recordType: Governed.Type,
-        candidateType: Candidate.Type,
-        reminderType: Reminder.Type,
-        checkEventType: Event.Type,
-        balanceRecordType: Balance.Type,
-        mirrorRecordType: Mirror.Type,
-        behavior: BASMemoryDerivationBehavior = .generic,
-        memoryTrustBehavior: BASMemoryTrustBehavior = .generic,
-        fetchRecords: (ModelContext, Int) -> [Governed],
-        fetchCandidates: (ModelContext, Int) -> [Candidate],
-        fetchCheckEvents: (ModelContext, Int) -> [Event],
-        fetchBalanceRecords: (ModelContext, Int) -> [Balance],
-        fetchMirrorRecords: (ModelContext, Int) -> [Mirror],
-        rebuildEmbeddings: (
-            _ records: [Governed],
-            _ candidates: [Candidate],
-            _ checkEvents: [Event],
-            _ balanceRecords: [Balance],
-            _ mirrorRecords: [Mirror]
-        ) -> Void,
-        onSaveError: ((Error) -> Void)? = nil
-    ) -> BASAppleMemoryProjectionRefreshResult {
-        refresh(
-            in: context,
-            now: now,
-            limits: limits,
-            recordType: recordType,
-            candidateType: candidateType,
-            reminderType: reminderType,
-            checkEventType: checkEventType,
-            comparativeRecordType: balanceRecordType,
-            reflectiveRecordType: mirrorRecordType,
-            behavior: behavior,
-            memoryTrustBehavior: memoryTrustBehavior,
-            fetchRecords: fetchRecords,
-            fetchCandidates: fetchCandidates,
-            fetchCheckEvents: fetchCheckEvents,
-            fetchComparativeRecords: fetchBalanceRecords,
-            fetchReflectiveRecords: fetchMirrorRecords,
-            rebuildEmbeddings: rebuildEmbeddings,
-            onSaveError: onSaveError
-        )
-    }
 }

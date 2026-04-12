@@ -1,7 +1,6 @@
 import XCTest
 import SwiftData
-import BASAppleAdapters
-import BASMemory
+import BASHostKit
 @testable import Before
 
 final class DecisionMemoryGovernorTests: XCTestCase {

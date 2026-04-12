@@ -185,7 +185,7 @@ public enum BASReferenceCapabilityCoverageBuilder {
                 BASCapabilityItem(
                     id: "context.summary_layer",
                     title: "Structured summary layer",
-                    summary: "Compress long history into goals, stage, preferences, and constraints instead of replaying raw chat.",
+                    summary: "Compress long archived context into goals, stage, preferences, and constraints instead of replaying raw chat.",
                     status: brainLoaded ? .ready : .partial,
                     evidence: ["Brain bootstrap \(brainLoaded ? "loaded" : "missing")"]
                 ),

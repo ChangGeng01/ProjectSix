@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 import Testing
-import BASAdmin
+import BASHostKit
 @testable import Before
 
 @MainActor

@@ -306,14 +306,12 @@ public enum BASAppleInspectionBridgeBuilder {
     }
 
     private static func taskKind(from primaryTraceKind: String?) -> BASTaskKind {
-        switch primaryTraceKind {
-        case BASAdaptiveTraceKind.balance.rawValue:
+        switch primaryTraceKind.flatMap(BASAdaptiveTraceKind.init(identifier:)) {
+        case .comparative?:
             .plan
-        case BASAdaptiveTraceKind.mirror.rawValue:
+        case .reflective?:
             .retrieve
-        case BASAdaptiveTraceKind.quick.rawValue, BASAdaptiveTraceKind.reminder.rawValue, nil:
-            .chat
-        default:
+        case .primary?, .selection?, nil:
             .chat
         }
     }

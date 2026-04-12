@@ -4,63 +4,64 @@ import BASHostKit
 @MainActor
 final class SampleHostModel: ObservableObject {
     @Published private(set) var result: BASHostSessionResult
+    @Published private(set) var lastError: String?
 
     private let runtime: BASHostRuntime
     private static let workflowBehavior = BASHostWorkflowBehaviorConfiguration(
         modeIDsByProfileID: [
-            BASHostWorkflowProfile.rapid.rawValue: BASDecisionMode.primaryID,
-            BASHostWorkflowProfile.deliberate.rawValue: BASDecisionMode.comparativeID,
+            BASHostWorkflowProfile.primary.rawValue: BASDecisionMode.primaryID,
+            BASHostWorkflowProfile.comparative.rawValue: BASDecisionMode.comparativeID,
             BASHostWorkflowProfile.reflective.rawValue: BASDecisionMode.reflectiveID
         ],
         templateIDsByProfileID: [
-            BASHostWorkflowProfile.rapid.rawValue: ["samplehost.template.rapid-lens"],
-            BASHostWorkflowProfile.deliberate.rawValue: ["samplehost.template.compare-lens"],
-            BASHostWorkflowProfile.reflective.rawValue: ["samplehost.template.reflective-lens"]
+            BASHostWorkflowProfile.primary.rawValue: ["samplehost.template.pulse-lens"],
+            BASHostWorkflowProfile.comparative.rawValue: ["samplehost.template.contrast-lens"],
+            BASHostWorkflowProfile.reflective.rawValue: ["samplehost.template.signal-lens"]
         ],
         memorySourceIDsByProfileID: [
-            BASHostWorkflowProfile.rapid.rawValue: BASMemorySource.pattern.rawValue,
-            BASHostWorkflowProfile.deliberate.rawValue: BASMemorySource.history.rawValue,
+            BASHostWorkflowProfile.primary.rawValue: BASMemorySource.pattern.rawValue,
+            BASHostWorkflowProfile.comparative.rawValue: BASMemorySource.archive.rawValue,
             BASHostWorkflowProfile.reflective.rawValue: BASMemorySource.reflection.rawValue
         ],
         interactiveRetrievalModeByProfileID: [
-            BASHostWorkflowProfile.rapid.rawValue: "compact",
-            BASHostWorkflowProfile.deliberate.rawValue: "balanced",
+            BASHostWorkflowProfile.primary.rawValue: "compact",
+            BASHostWorkflowProfile.comparative.rawValue: "balanced",
             BASHostWorkflowProfile.reflective.rawValue: "full"
         ],
         providerObservationNarrativesByKindID: [
             BASDecisionMode.primaryID: BASAppleProviderObservationNarrative(
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the Rapid Lens pass.",
-                admissionSkippedDetailPrefix: "Admission controller skipped the Rapid Lens pass.",
-                deterministicFallbackBase: "No provider returned a Rapid Lens result, so SampleHost kept the deterministic draft.",
-                cachedConsistencySource: "cached Rapid Lens pass",
-                providerConsistencySource: "provider Rapid Lens pass"
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the Pulse Lens pass.",
+                admissionSkippedDetailPrefix: "Admission controller skipped the Pulse Lens pass.",
+                deterministicFallbackBase: "No provider returned a Pulse Lens result, so SampleHost kept the deterministic draft.",
+                cachedConsistencySource: "cached Pulse Lens pass",
+                providerConsistencySource: "provider Pulse Lens pass"
             ),
             BASDecisionMode.comparativeID: BASAppleProviderObservationNarrative(
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the Compare Lens pass.",
-                admissionSkippedDetailPrefix: "Admission controller skipped the Compare Lens pass.",
-                deterministicFallbackBase: "No provider returned a Compare Lens result, so SampleHost kept the deterministic draft.",
-                cachedConsistencySource: "cached Compare Lens pass",
-                providerConsistencySource: "provider Compare Lens pass"
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the Contrast Lens pass.",
+                admissionSkippedDetailPrefix: "Admission controller skipped the Contrast Lens pass.",
+                deterministicFallbackBase: "No provider returned a Contrast Lens result, so SampleHost kept the deterministic draft.",
+                cachedConsistencySource: "cached Contrast Lens pass",
+                providerConsistencySource: "provider Contrast Lens pass"
             ),
             BASDecisionMode.reflectiveID: BASAppleProviderObservationNarrative(
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the Reflective Lens pass.",
-                admissionSkippedDetailPrefix: "Admission controller skipped the Reflective Lens pass.",
-                deterministicFallbackBase: "No provider returned a Reflective Lens result, so SampleHost kept the deterministic draft.",
-                cachedConsistencySource: "cached Reflective Lens pass",
-                providerConsistencySource: "provider Reflective Lens pass"
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the Signal Lens pass.",
+                admissionSkippedDetailPrefix: "Admission controller skipped the Signal Lens pass.",
+                deterministicFallbackBase: "No provider returned a Signal Lens result, so SampleHost kept the deterministic draft.",
+                cachedConsistencySource: "cached Signal Lens pass",
+                providerConsistencySource: "provider Signal Lens pass"
             ),
-            "reminder": BASAppleProviderObservationNarrative(
-                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the reminder shortlist.",
-                admissionSkippedDetailPrefix: "Admission controller skipped the reminder shortlist.",
-                deterministicFallbackBase: "No provider returned a reminder shortlist, so SampleHost kept the deterministic ordering.",
-                cachedConsistencySource: "cached reminder shortlist",
-                providerConsistencySource: "provider reminder shortlist"
+            BASSemanticTaskKind.selectionID: BASAppleProviderObservationNarrative(
+                templatePinnedDetail: "Template mode is pinned, so no model provider was used for the candidate selection pass.",
+                admissionSkippedDetailPrefix: "Admission controller skipped the candidate selection pass.",
+                deterministicFallbackBase: "No provider returned a candidate selection result, so SampleHost kept the deterministic ordering.",
+                cachedConsistencySource: "cached candidate selection pass",
+                providerConsistencySource: "provider candidate selection pass"
             )
         ],
         memorySourceIDsBySessionKindID: [
-            BASHostSessionKind.ambient.rawValue: BASMemorySource.reminder.rawValue,
-            BASHostSessionKind.reopen.rawValue: BASMemorySource.history.rawValue,
-            BASHostSessionKind.notification.rawValue: BASMemorySource.reminder.rawValue
+            BASHostSessionKind.ambient.rawValue: BASMemorySource.cue.rawValue,
+            BASHostSessionKind.reopen.rawValue: BASMemorySource.archive.rawValue,
+            BASHostSessionKind.notification.rawValue: BASMemorySource.cue.rawValue
         ],
         retrievalModeIDsBySessionKindID: [
             BASHostSessionKind.ambient.rawValue: "guarded",
@@ -98,7 +99,23 @@ final class SampleHostModel: ObservableObject {
             activeRefreshDefaultRetrievalModeID: "balanced"
         ),
         currentBrainBootstrapBehavior: BASCurrentBrainBootstrapBehavior(
+            defaultModeID: BASDecisionMode.primaryID,
+            defaultTriggerID: BASCurrentBrainBootstrapTrigger.sessionBootstrap.rawValue,
+            defaultRiskLevelID: BASRiskLevel.low.rawValue,
             defaultSourceSurfaceID: BASInteractionSurface.app.rawValue,
+            modeIDAliasesByID: [
+                "pulse-lens": BASDecisionMode.primaryID,
+                "contrast-lens": BASDecisionMode.comparativeID,
+                "signal-lens": BASDecisionMode.reflectiveID
+            ],
+            triggerIDAliasesByID: [
+                "alert": BASCurrentBrainBootstrapTrigger.notification.rawValue,
+                "resume": BASCurrentBrainBootstrapTrigger.sceneActive.rawValue
+            ],
+            riskLevelIDAliasesByID: [
+                "elevated": BASRiskLevel.high.rawValue,
+                "guarded": BASRiskLevel.medium.rawValue
+            ],
             sourceSurfaceOverridesByTriggerID: [
                 BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue: BASInteractionSurface.watch.rawValue,
                 BASCurrentBrainBootstrapTrigger.notification.rawValue: BASInteractionSurface.notification.rawValue,
@@ -107,19 +124,26 @@ final class SampleHostModel: ObservableObject {
             enforcedSourceSurfaceByTriggerID: [
                 BASCurrentBrainBootstrapTrigger.notification.rawValue: BASInteractionSurface.notification.rawValue
             ],
-            defaultMemorySourceID: BASMemorySource.history.rawValue,
+            defaultMemorySourceID: BASMemorySource.archive.rawValue,
+            memorySourceIDAliasesByID: [
+                "archive": BASMemorySource.archive.rawValue,
+                "reflection-notes": BASMemorySource.reflection.rawValue,
+                "signal-cache": BASMemorySource.pattern.rawValue
+            ],
             memorySourceOverridesByTriggerID: [
                 BASCurrentBrainBootstrapTrigger.sceneActive.rawValue: BASMemorySource.pattern.rawValue,
-                BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue: BASMemorySource.reminder.rawValue,
-                BASCurrentBrainBootstrapTrigger.notification.rawValue: BASMemorySource.reminder.rawValue,
-                BASCurrentBrainBootstrapTrigger.widget.rawValue: BASMemorySource.reminder.rawValue,
-                BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue: BASMemorySource.history.rawValue,
-                BASCurrentBrainBootstrapTrigger.sessionPrime.rawValue: BASMemorySource.pattern.rawValue
+                BASCurrentBrainBootstrapTrigger.watchHandoff.rawValue: BASMemorySource.cue.rawValue,
+                BASCurrentBrainBootstrapTrigger.notification.rawValue: BASMemorySource.cue.rawValue,
+                BASCurrentBrainBootstrapTrigger.widget.rawValue: BASMemorySource.cue.rawValue,
+                BASCurrentBrainBootstrapTrigger.explicitRefresh.rawValue: BASMemorySource.archive.rawValue,
+                BASCurrentBrainBootstrapTrigger.sessionBootstrap.rawValue: BASMemorySource.pattern.rawValue
             ],
             memorySourceOverridesByModeID: [
-                BASDecisionMode.comparative.identifier: BASMemorySource.history.rawValue,
+                BASDecisionMode.comparative.identifier: BASMemorySource.archive.rawValue,
                 BASDecisionMode.reflective.identifier: BASMemorySource.reflection.rawValue
             ],
+            unknownRequestedModeFallbackPolicy: .useConfiguredDefault,
+            unknownRequestedTriggerFallbackPolicy: .useConfiguredDefault,
             bootstrapAdvisorBehavior: BASBrainBootstrapAdvisorBehavior(
                 highRiskSignalGroups: [
                     ["send", "publish", "post", "reply"],
@@ -137,18 +161,18 @@ final class SampleHostModel: ObservableObject {
         ),
         predictiveInterventionBehavior: BASApplePredictiveInterventionBehavior(
             lowRisk: BASApplePredictiveInterventionRiskBehavior(
-                title: "Hold this in the rapid lane a little longer.",
+                title: "Hold this in the Pulse Lens a little longer.",
                 detail: "SampleHost prefers a short pause before committing this move.",
                 preferredModeID: BASDecisionMode.primary.identifier
             ),
             mediumRisk: BASApplePredictiveInterventionRiskBehavior(
-                title: "Run this through Compare Lens first.",
-                detail: "SampleHost wants one cleaner comparative pass before you act.",
+                title: "Run this through Contrast Lens first.",
+                detail: "SampleHost wants one cleaner comparison pass before you act.",
                 preferredModeID: BASDecisionMode.comparative.identifier
             ),
             highRisk: BASApplePredictiveInterventionRiskBehavior(
-                title: "Switch into Reflective Lens before you move.",
-                detail: "SampleHost sees elevated risk and wants a calmer reflective pass first.",
+                title: "Switch into Signal Lens before you move.",
+                detail: "SampleHost sees elevated risk and wants a calmer signal-reading pass first.",
                 preferredModeID: BASDecisionMode.reflective.identifier
             ),
             preferredModeIDsByCurrentModeID: [
@@ -173,7 +197,7 @@ final class SampleHostModel: ObservableObject {
     )
     private static let cognitionBehavior = BASHostCognitionBehaviorConfiguration(
         reactionWeightsByProfileID: [
-            BASHostWorkflowProfile.rapid.rawValue: BASReactionWeights(
+            BASHostWorkflowProfile.primary.rawValue: BASReactionWeights(
                 briefLanguage: 0.60,
                 warmDirectTone: 0.50,
                 lowCognitiveLoad: 0.56,
@@ -181,7 +205,7 @@ final class SampleHostModel: ObservableObject {
                 boundaryNamingBias: 0.32,
                 tradeoffClarityBias: 0.40
             ),
-            BASHostWorkflowProfile.deliberate.rawValue: BASReactionWeights(
+            BASHostWorkflowProfile.comparative.rawValue: BASReactionWeights(
                 briefLanguage: 0.46,
                 warmDirectTone: 0.52,
                 lowCognitiveLoad: 0.44,
@@ -199,7 +223,7 @@ final class SampleHostModel: ObservableObject {
             )
         ],
         identityProfilesByProfileID: [
-            BASHostWorkflowProfile.rapid.rawValue: BASIdentityProfile(
+            BASHostWorkflowProfile.primary.rawValue: BASIdentityProfile(
                 role: .boundedGuide,
                 posture: .coaching,
                 initiative: .guided,
@@ -209,7 +233,7 @@ final class SampleHostModel: ObservableObject {
                 canEscalateToCloud: false,
                 relationshipBoundary: "SampleHost keeps the lane narrow and practical."
             ),
-            BASHostWorkflowProfile.deliberate.rawValue: BASIdentityProfile(
+            BASHostWorkflowProfile.comparative.rawValue: BASIdentityProfile(
                 role: .tradeoffGuide,
                 posture: .reflective,
                 initiative: .guided,
@@ -220,7 +244,7 @@ final class SampleHostModel: ObservableObject {
                 relationshipBoundary: "SampleHost compares pressures without deciding for you."
             ),
             BASHostWorkflowProfile.reflective.rawValue: BASIdentityProfile(
-                role: .mirrorWitness,
+                role: .reflectiveWitness,
                 posture: .reflective,
                 initiative: .passive,
                 confidenceCeiling: 0.66,
@@ -250,36 +274,36 @@ final class SampleHostModel: ObservableObject {
             ),
             memoryTrust: BASMemoryTrustBehavior(
                 baseScoresBySourceID: [
-                    BASMemorySource.reminder.rawValue: 0.72,
+                    BASMemorySource.cue.rawValue: 0.72,
                     BASMemorySource.pattern.rawValue: 0.78,
                     BASMemorySource.reflection.rawValue: 0.84,
-                    BASMemorySource.history.rawValue: 0.88
+                    BASMemorySource.archive.rawValue: 0.88
                 ],
                 sourceDecayMultipliersBySourceID: [
-                    BASMemorySource.reminder.rawValue: 1.08,
+                    BASMemorySource.cue.rawValue: 1.08,
                     BASMemorySource.pattern.rawValue: 1.04,
                     BASMemorySource.reflection.rawValue: 0.94,
-                    BASMemorySource.history.rawValue: 1.12
+                    BASMemorySource.archive.rawValue: 1.12
                 ]
             )
         )
     )
     private static let sampleHostPresentation = BASHostPresentationConfiguration(
         workflowTitles: BASHostWorkflowTitles(
-            rapid: "Rapid Lens",
-            deliberate: "Compare Lens",
-            reflective: "Reflective Lens"
+            primary: "Pulse Lens",
+            comparative: "Contrast Lens",
+            reflective: "Signal Lens"
         ),
         sessionTitles: BASHostSessionTitles(
-            rapid: "Rapid Lens",
-            deliberate: "Compare Lens",
-            reflective: "Reflective Lens",
+            primary: "Pulse Lens",
+            comparative: "Contrast Lens",
+            reflective: "Signal Lens",
             initialAppearance: "SampleHost Bootstrap",
             sceneActive: "SampleHost Refresh"
         ),
         followUpActions: BASHostFollowUpActions(
-            rapid: ["Spot the impulse", "Name one next move"],
-            deliberate: ["Frame the competing pulls", "Choose one bounded comparison"],
+            primary: ["Spot the impulse", "Name one next move"],
+            comparative: ["Frame the competing pulls", "Choose one bounded comparison"],
             reflective: ["Name the deeper signal", "Choose one grounded reflection"],
             highRiskEscalation: ["Add one more confirmation step"]
         ),
@@ -295,7 +319,7 @@ final class SampleHostModel: ObservableObject {
         ),
         predictiveIntervention: BASHostPredictiveInterventionPresentation(
             mediumRiskTitle: "Pause for one slower pass.",
-            mediumRiskDetail: "SampleHost wants one more deliberate step here.",
+            mediumRiskDetail: "SampleHost wants one more comparison step here.",
             highRiskTitle: "Add one more checkpoint.",
             highRiskDetail: "SampleHost sees elevated risk and wants stronger confirmation.",
             reopenRiskDetail: "This reopen path needs a little more structure in SampleHost.",
@@ -309,6 +333,8 @@ final class SampleHostModel: ObservableObject {
             configuration: BASHostConfiguration(
                 runtimeProfileID: "samplehost.default-runtime",
                 policyProfileID: "samplehost.default-policy",
+                prefersPureLocal: true,
+                console: .generic,
                 lifecycleBehavior: SampleHostModel.lifecycleBehavior,
                 workflowBehavior: SampleHostModel.workflowBehavior,
                 cognitionBehavior: SampleHostModel.cognitionBehavior,
@@ -316,57 +342,144 @@ final class SampleHostModel: ObservableObject {
             )
         )
     ) {
+        var initialError: String?
         self.runtime = runtime
-        self.result = runtime.bootstrap(
-            BASHostLifecycleRequest(
-                phase: .initialAppearance,
-                preferredProfile: .rapid,
-                sourceSurface: .application,
-                promptSeed: "Load the substrate before the host asks it to speak."
-            )
+        self.result = Self.perform(
+            using: runtime,
+            errorSink: { initialError = $0 },
+            request: {
+                try runtime.bootstrap(
+                    BASHostLifecycleRequest(
+                        phase: .initialAppearance,
+                        sessionKind: .ambient,
+                        preferredProfile: .primary,
+                        sourceSurface: .application,
+                        promptSeed: "Load the substrate before the host asks it to speak.",
+                        riskLevel: .low
+                    )
+                )
+            }
         )
+        self.lastError = initialError
     }
 
     func bootstrap() {
-        result = runtime.bootstrap(
-            BASHostLifecycleRequest(
-                phase: .sceneActive,
-                preferredProfile: .rapid,
-                sourceSurface: .application,
-                promptSeed: "Refresh the current brain and restore the shell."
-            )
+        result = Self.perform(
+            using: runtime,
+            errorSink: { lastError = $0 },
+            request: {
+                try runtime.bootstrap(
+                    BASHostLifecycleRequest(
+                        phase: .sceneActive,
+                        sessionKind: .ambient,
+                        preferredProfile: .primary,
+                        sourceSurface: .application,
+                        promptSeed: "Refresh the current brain and restore the shell.",
+                        riskLevel: .low
+                    )
+                )
+            }
         )
     }
 
     func start(_ profile: BASHostWorkflowProfile) {
         let prompts: [BASHostWorkflowProfile: String] = [
-            .rapid: "Should I do this right now?",
-            .deliberate: "What tradeoff am I refusing to name?",
+            .primary: "Should I do this right now?",
+            .comparative: "What tradeoff am I refusing to name?",
             .reflective: "What is the honest story here?"
         ]
-        result = runtime.startSession(
-            BASHostSessionRequest(
-                kind: .interactive,
-                workflowProfile: profile,
-                surface: .application,
-                prompt: prompts[profile] ?? "Hold this decision for one more beat.",
-                title: "\(SampleHostModel.sampleHostPresentation.workflowTitles.title(for: profile)) from SampleHost",
-                riskLevel: profile == .reflective ? .medium : .low
-            )
+        result = Self.perform(
+            using: runtime,
+            errorSink: { lastError = $0 },
+            request: {
+                try runtime.startSession(
+                    BASHostSessionRequest(
+                        kind: .interactive,
+                        workflowProfile: profile,
+                        surface: .application,
+                        prompt: prompts[profile] ?? "Hold this decision for one more beat.",
+                        title: "\(SampleHostModel.sampleHostPresentation.workflowTitles.title(for: profile)) from SampleHost",
+                        riskLevel: profile == .reflective ? .medium : .low
+                    )
+                )
+            }
         )
     }
 
     func reopen() {
-        result = runtime.reopen(
-            BASHostReopenRequest(
-                workflowProfile: .deliberate,
-                title: "Reopen this held decision",
-                detail: "SampleHost is proving the reopen path through BASHostKit.",
-                promptSeed: "Take one slower pass before committing.",
-                riskLevel: .high,
-                reopenHint: "Reopen with more structure",
-                templateHint: "Use a cooling template before acting.",
-                interventionHistorySummary: "High-risk reopen requests should restore more friction."
+        result = Self.perform(
+            using: runtime,
+            errorSink: { lastError = $0 },
+            request: {
+                try runtime.reopen(
+                    BASHostReopenRequest(
+                        workflowProfile: .comparative,
+                        title: "Reopen this held decision",
+                        detail: "SampleHost is proving the reopen path through BASHostKit.",
+                        promptSeed: "Take one slower pass before committing.",
+                        riskLevel: .high,
+                        reopenHint: "Reopen with more structure",
+                        templateHint: "Use a cooling template before acting.",
+                        interventionHistorySummary: "High-risk reopen requests should restore more friction."
+                    )
+                )
+            }
+        )
+    }
+
+    private static func perform(
+        using runtime: BASHostRuntime,
+        errorSink: (String?) -> Void,
+        request: () throws -> BASHostSessionResult
+    ) -> BASHostSessionResult {
+        do {
+            errorSink(nil)
+            return try request()
+        } catch {
+            errorSink(String(describing: error))
+            return fallbackResult(using: runtime)
+        }
+    }
+
+    private static func fallbackResult(using runtime: BASHostRuntime) -> BASHostSessionResult {
+        (try? runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .primary,
+                surface: .application,
+                prompt: "Recover the host shell after an integration error.",
+                title: "Integration Recovery",
+                riskLevel: .low
+            )
+        )) ?? BASHostSessionResult(
+            requestKind: .interactive,
+            workflowProfile: .primary,
+            currentBrain: BASHostCurrentBrain(
+                workflowProfile: .primary,
+                workflowTitle: "Primary",
+                roleID: "samplehost.recovery",
+                relationshipBoundary: "Fallback shell",
+                boundaryHeadline: "SampleHost is holding a safe fallback state.",
+                dominantGoals: ["Recover from host integration failure."],
+                activeConstraints: ["integration-fallback"],
+                retrievalTags: ["fallback"],
+                verificationSummary: "samplehost/fallback",
+                activeTemplateCount: 0,
+                failureGuardCount: 0
+            ),
+            projection: BASHostProjectionSummary(
+                recordCount: 0,
+                candidateCount: 0,
+                recentEventCount: 0,
+                activeTemplateIDs: [],
+                failureGuardIDs: []
+            ),
+            activeSessionTitle: "Integration Recovery",
+            notices: ["SampleHost recovered from an integration configuration error."],
+            followUpActions: [],
+            consoleSnapshot: BASHostConsoleSnapshot(
+                overallSummary: "SampleHost recovered from an integration configuration error.",
+                reports: []
             )
         )
     }
