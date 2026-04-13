@@ -883,7 +883,7 @@ final class BeforeAppModel: ObservableObject {
     @MainActor
     func approvePendingEvolutionCheckpoints(checkpointIDs explicitCheckpointIDs: [String]? = nil) {
         let checkpointIDs = uniqueEvolutionCheckpointIDs(
-            explicitCheckpointIDs ?? makeEvolutionControlSurface().pendingReviewQueue.map(\.checkpointID)
+            explicitCheckpointIDs ?? makeEvolutionControlSurface().pendingReviewPresentations.map(\.checkpointID)
         )
         guard !checkpointIDs.isEmpty else {
             publishEvolutionMutationOutcome(
@@ -931,9 +931,8 @@ final class BeforeAppModel: ObservableObject {
     @MainActor
     func clearPendingEvolutionCheckpointLineages(checkpointIDs explicitCheckpointIDs: [String]? = nil) {
         let checkpointIDs = uniqueEvolutionCheckpointIDs(
-            (explicitCheckpointIDs ?? makeEvolutionControlSurface().pendingReviewQueue
-                .filter { $0.presentation.hasLineage }
-                .map(\.checkpointID))
+            explicitCheckpointIDs
+                ?? makeEvolutionControlSurface().pendingReviewLineagePresentations.map(\.checkpointID)
         )
         guard !checkpointIDs.isEmpty else {
             publishEvolutionMutationOutcome(
@@ -1185,12 +1184,7 @@ final class BeforeAppModel: ObservableObject {
             currentBrain: currentBrainState
         )
 
-        return DecisionEvolutionControlSurfaceFactory.build(
-            activeCheckpointHint: inventory.activeCheckpoint,
-            latestAutomaticLineage: inventory.persistedLineages.first(where: { $0.approvalState == .automatic }),
-            pendingReviewCheckpoints: inventory.pendingReviewQueue,
-            latestPersistedLineage: inventory.latestPersistedLineage
-        )
+        return inventory.buildControlSurface()
     }
 
     func presentEvolutionControlCenter() {
@@ -1700,7 +1694,8 @@ final class BeforeAppModel: ObservableObject {
             runtimeSnapshot: runtimeSnapshot,
             persistedCheckpointLineages: inventory.persistedLineages,
             pendingReviewCheckpoints: inventory.pendingReviewQueue,
-            activeCheckpointHint: inventory.activeCheckpoint
+            activeCheckpointHint: inventory.activeCheckpoint,
+            restorableCheckpointIDs: inventory.restorableCheckpointIDs
         )
     }
 
@@ -1737,18 +1732,11 @@ final class BeforeAppModel: ObservableObject {
             .map { $0 }
     }
 
-    private struct DecisionEvolutionCheckpointInventory {
-        let pendingReviewQueue: [DecisionReviewCheckpointSnapshot]
-        let persistedLineages: [DecisionEvolutionLineageSnapshot]
-        let latestPersistedLineage: DecisionEvolutionLineageSnapshot?
-        let activeCheckpoint: DecisionReviewCheckpointSnapshot?
-    }
-
     @MainActor
     private func evolutionCheckpointInventory(
         in context: ModelContext,
         currentBrain: CurrentBrainState?
-    ) -> DecisionEvolutionCheckpointInventory {
+    ) -> DecisionEvolutionControlSurfaceInventory {
         let allCheckpoints = evolutionCheckpointSnapshots(in: context)
         let persistedLineages = persistedCheckpointLineages(in: context)
         let pendingReviewQueue = allCheckpoints.filter { $0.approvalState == .reviewSuggested }
@@ -1758,11 +1746,11 @@ final class BeforeAppModel: ObservableObject {
             persistedLineages: persistedLineages
         )
 
-        return DecisionEvolutionCheckpointInventory(
+        return DecisionEvolutionControlSurfaceInventory(
             pendingReviewQueue: pendingReviewQueue,
             persistedLineages: persistedLineages,
-            latestPersistedLineage: persistedLineages.first,
-            activeCheckpoint: activeCheckpoint
+            activeCheckpoint: activeCheckpoint,
+            restorableCheckpointIDs: Set(allCheckpoints.filter(\.hasBrainStateSnapshot).map(\.checkpointID))
         )
     }
 
@@ -1869,9 +1857,12 @@ final class BeforeAppModel: ObservableObject {
 
         EBrainTurnDebugStore.shared.record(turn)
 
+        let loadedCheckpointID = currentBrainState?.evolutionState.latestCheckpoint?.id
+
         guard persistLineage,
               let evolutionState = BehavioralAISubstrateBridge.persistEBrainLineage(
                 turn,
+                targeting: loadedCheckpointID,
                 in: modelContainer.mainContext
               ),
               let currentBrainState else {
@@ -2003,7 +1994,12 @@ final class BeforeAppModel: ObservableObject {
         }
 
         if let currentBrainState {
-            commitCurrentBrain(currentBrainState.replacingEvolutionState(evolutionState))
+            let reconciledEvolutionState = BehavioralAISubstrateBridge.reconciledEvolutionState(
+                evolutionState,
+                preservingLoadedCheckpointID: currentBrainState.evolutionState.latestCheckpoint?.id,
+                in: context
+            )
+            commitCurrentBrain(currentBrainState.replacingEvolutionState(reconciledEvolutionState))
             persistActiveWorkspaceState()
         }
 
@@ -2031,7 +2027,12 @@ final class BeforeAppModel: ObservableObject {
         }
 
         if let currentBrainState {
-            commitCurrentBrain(currentBrainState.replacingEvolutionState(latestEvolutionState))
+            let reconciledEvolutionState = BehavioralAISubstrateBridge.reconciledEvolutionState(
+                latestEvolutionState,
+                preservingLoadedCheckpointID: currentBrainState.evolutionState.latestCheckpoint?.id,
+                in: context
+            )
+            commitCurrentBrain(currentBrainState.replacingEvolutionState(reconciledEvolutionState))
             persistActiveWorkspaceState()
         }
 

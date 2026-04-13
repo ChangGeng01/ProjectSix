@@ -6,6 +6,7 @@ final class DecisionEvolutionSurfaceContractTests: XCTestCase {
         let home = DecisionEvolutionSurfaceContract.contract(for: .home)
         let history = DecisionEvolutionSurfaceContract.contract(for: .history)
         let portrait = DecisionEvolutionSurfaceContract.contract(for: .portrait)
+        let settings = DecisionEvolutionSurfaceContract.contract(for: .settings)
         let controlCenter = DecisionEvolutionSurfaceContract.contract(for: .controlCenter)
 
         XCTAssertEqual(home.interactionMode, .observeAndRoute)
@@ -25,6 +26,12 @@ final class DecisionEvolutionSurfaceContractTests: XCTestCase {
         XCTAssertTrue(portrait.routesMutationsToControlCenter)
         XCTAssertTrue(portrait.showsEmbeddedReleaseSummaryInPilotPanel)
         XCTAssertTrue(portrait.showsCheckpointActionBarInSummary)
+
+        XCTAssertEqual(settings.interactionMode, .observeAndRoute)
+        XCTAssertEqual(settings.releaseSummaryMode, .compact)
+        XCTAssertTrue(settings.routesMutationsToControlCenter)
+        XCTAssertFalse(settings.showsEmbeddedReleaseSummaryInPilotPanel)
+        XCTAssertFalse(settings.showsCheckpointActionBarInSummary)
 
         XCTAssertEqual(controlCenter.interactionMode, .mutationHub)
         XCTAssertEqual(controlCenter.releaseSummaryMode, .mutationHub)

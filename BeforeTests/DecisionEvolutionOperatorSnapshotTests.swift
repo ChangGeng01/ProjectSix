@@ -48,7 +48,7 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.headline, "Watching the pending review queue")
         XCTAssertEqual(snapshot.primaryReason, "1 checkpoint still requires review.")
         XCTAssertEqual(snapshot.pendingReviewCount, 1)
-        XCTAssertEqual(snapshot.rollbackReadyCount, 1)
+        XCTAssertEqual(snapshot.rollbackReadyCount, 0)
         XCTAssertEqual(snapshot.activeCheckpointID, "active-1")
         XCTAssertEqual(snapshot.reviewCheckpointID, "review-1")
         XCTAssertEqual(snapshot.killSwitches, ["host-write"])
@@ -83,12 +83,45 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.headline, "Pending review remains visible from this read-first surface")
         XCTAssertEqual(snapshot.primaryReason, "1 checkpoint(s) still require review before the release path is clean.")
         XCTAssertEqual(snapshot.pendingReviewCount, 1)
-        XCTAssertEqual(snapshot.rollbackReadyCount, 1)
+        XCTAssertEqual(snapshot.rollbackReadyCount, 0)
         XCTAssertNil(snapshot.activeCheckpointID)
         XCTAssertEqual(snapshot.reviewCheckpointID, "review-1")
-        XCTAssertTrue(snapshot.killSwitches.isEmpty)
+        XCTAssertEqual(snapshot.killSwitches, ["kill-review-1"])
         XCTAssertEqual(snapshot.surfaceTitle, "History workbench")
         XCTAssertEqual(snapshot.operatorHeadline, DecisionEvolutionControlInteractionMode.observeAndRoute.operatorHeadline)
+    }
+
+    func testOperatorSnapshotPrioritizesQueueKillSwitchesInsideMutationHub() {
+        let review = makeSnapshot(
+            checkpointID: "review-1",
+            createdAt: Date(timeIntervalSince1970: 30),
+            approvalState: .reviewSuggested,
+            hasLineage: true
+        )
+
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: nil,
+                reviewCheckpoint: review,
+                pendingReviewQueue: [review],
+                latestPersistedLineage: nil
+            )
+        )
+
+        let snapshot = DecisionEvolutionOperatorSnapshot.build(
+            surfaceKind: .controlCenter,
+            workspace: workspace,
+            contract: .controlCenter
+        )
+
+        XCTAssertNil(snapshot.releaseState)
+        XCTAssertEqual(snapshot.headline, "Watching queue kill switches")
+        XCTAssertEqual(snapshot.primaryReason, "Queue kill switches remain active until the review path is cleared.")
+        XCTAssertEqual(snapshot.pendingReviewCount, 1)
+        XCTAssertEqual(snapshot.reviewCheckpointID, "review-1")
+        XCTAssertEqual(snapshot.killSwitches, ["kill-review-1"])
+        XCTAssertEqual(snapshot.surfaceTitle, "Evolution Control")
+        XCTAssertEqual(snapshot.operatorHeadline, DecisionEvolutionControlInteractionMode.mutationHub.operatorHeadline)
     }
 
     private func makeSnapshot(

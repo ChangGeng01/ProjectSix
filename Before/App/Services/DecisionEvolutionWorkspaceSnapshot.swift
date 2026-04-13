@@ -35,4 +35,16 @@ struct DecisionEvolutionWorkspaceSnapshot: Equatable, Sendable {
     var historyPresentations: [DecisionEvolutionCheckpointPresentation] {
         spotlightSet.historyPresentations
     }
+
+    var spotlightedPendingReviewCount: Int {
+        reviewPresentation == nil ? 0 : 1
+    }
+
+    var queuedPendingReviewCount: Int {
+        remainingReviewQueue.count
+    }
+
+    var totalPendingReviewCount: Int {
+        controlSurface.pendingReviewCount
+    }
 }

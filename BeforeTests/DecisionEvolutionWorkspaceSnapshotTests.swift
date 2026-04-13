@@ -91,6 +91,46 @@ final class DecisionEvolutionWorkspaceSnapshotTests: XCTestCase {
         XCTAssertEqual(workspace.remainingReviewQueue.map(\.checkpointID), ["review-1"])
     }
 
+    func testWorkspaceSnapshotSeparatesSpotlightReviewFromQueueTailCounts() {
+        let active = makeSnapshot(
+            checkpointID: "active-1",
+            createdAt: Date(timeIntervalSince1970: 40),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let reviewHead = makeSnapshot(
+            checkpointID: "review-2",
+            createdAt: Date(timeIntervalSince1970: 30),
+            approvalState: .reviewSuggested,
+            hasLineage: true
+        )
+        let reviewTailA = makeSnapshot(
+            checkpointID: "review-1",
+            createdAt: Date(timeIntervalSince1970: 20),
+            approvalState: .reviewSuggested,
+            hasLineage: false
+        )
+        let reviewTailB = makeSnapshot(
+            checkpointID: "review-0",
+            createdAt: Date(timeIntervalSince1970: 10),
+            approvalState: .reviewSuggested,
+            hasLineage: false
+        )
+
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: active,
+                reviewCheckpoint: reviewHead,
+                pendingReviewQueue: [reviewHead, reviewTailA, reviewTailB],
+                latestPersistedLineage: nil
+            )
+        )
+
+        XCTAssertEqual(workspace.spotlightedPendingReviewCount, 1)
+        XCTAssertEqual(workspace.queuedPendingReviewCount, 2)
+        XCTAssertEqual(workspace.totalPendingReviewCount, 3)
+    }
+
     private func makeSnapshot(
         checkpointID: String,
         createdAt: Date,

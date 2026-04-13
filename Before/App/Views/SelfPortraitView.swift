@@ -10,11 +10,15 @@ struct SelfPortraitView: View {
     @State private var isLoadingSystemFlightDeck = false
     private let evolutionSurfaceContract = DecisionEvolutionSurfaceContract.portrait
 
-    private var currentEvolutionWorkspace: DecisionEvolutionWorkspaceSnapshot {
-        DecisionEvolutionWorkspaceSnapshot.build(
-            controlSurface: systemFlightDeck?.evolutionControlSurface ?? appModel.makeEvolutionControlSurface(),
-            releaseSummary: systemFlightDeck?.releaseControlSummary
+    private var evolutionSurfaceState: DecisionEvolutionSurfaceState {
+        appModel.makeEvolutionSurfaceState(
+            contract: evolutionSurfaceContract,
+            flightDeck: systemFlightDeck
         )
+    }
+
+    private var currentEvolutionWorkspace: DecisionEvolutionWorkspaceSnapshot {
+        evolutionSurfaceState.workspace
     }
 
     var body: some View {

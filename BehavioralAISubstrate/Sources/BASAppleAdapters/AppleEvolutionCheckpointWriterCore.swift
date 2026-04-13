@@ -92,6 +92,20 @@ public enum BASAppleEvolutionCheckpointWriter {
 
     public static func attachLineageSummary<Checkpoint: BASAppleEvolutionCheckpointEntity>(
         _ lineageSummary: BASEvolutionLineageSummary,
+        for checkpointID: String,
+        in context: ModelContext,
+        onSaveError: ((Error) -> Void)? = nil
+    ) -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        setLineageSummary(
+            lineageSummary,
+            for: checkpointID,
+            in: context,
+            onSaveError: onSaveError
+        )
+    }
+
+    public static func attachLineageSummary<Checkpoint: BASAppleEvolutionCheckpointEntity>(
+        _ lineageSummary: BASEvolutionLineageSummary,
         in context: ModelContext,
         onSaveError: ((Error) -> Void)? = nil
     ) -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {

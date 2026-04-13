@@ -42,7 +42,8 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
                     )
                 )
             ],
-            latestPersistedLineage: nil
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: ["checkpoint-active", "checkpoint-previous"]
         )
 
         let intents = DecisionEvolutionMutationIntentFactory.pilotMutationIntents(
@@ -87,6 +88,39 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
         )
 
         XCTAssertTrue(intents.isEmpty)
+    }
+
+    func testRollbackIntentStaysHiddenWhenPreviousCheckpointIsNotRestorable() {
+        let now = Date()
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: DecisionReviewCheckpointSnapshot(
+                checkpointID: "checkpoint-active",
+                previousCheckpointID: "checkpoint-previous",
+                createdAt: now,
+                mode: .quick,
+                approvalState: .automatic,
+                rollbackReady: true,
+                hasBrainStateSnapshot: true,
+                diffSummary: ["Active checkpoint"],
+                eBrain: replaySummary(
+                    sessionID: "active",
+                    riskLevel: "low",
+                    permitMode: "answer"
+                )
+            ),
+            reviewCheckpoint: nil,
+            pendingReviewQueue: [],
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: ["checkpoint-active"]
+        )
+
+        XCTAssertFalse(controlSurface.canRollbackActiveCheckpoint)
+        XCTAssertNil(controlSurface.activeRollbackCheckpointID)
+        XCTAssertNil(
+            DecisionEvolutionMutationIntentFactory.rollbackActiveCheckpoint(
+                controlSurface: controlSurface
+            )
+        )
     }
 
     func testApplyCheckpointPreviewKeepsAutomaticActiveSlotWhenTargetIsReviewSuggested() {

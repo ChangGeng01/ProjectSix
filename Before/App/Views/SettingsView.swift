@@ -14,7 +14,7 @@ struct SettingsView: View {
     @State private var evolutionFlightDeck: DecisionSystemFlightDeck?
     @State private var isRefreshingEvolutionStatus = false
 
-    private let evolutionSurfaceContract = DecisionEvolutionSurfaceContract.controlCenter
+    private let evolutionSurfaceContract = DecisionEvolutionSurfaceContract.settings
 
     private enum DestructiveAction: Identifiable {
         case history
@@ -329,19 +329,19 @@ struct SettingsView: View {
         return "\(version) (\(build))"
     }
 
-    private var evolutionWorkspace: DecisionEvolutionWorkspaceSnapshot {
-        DecisionEvolutionWorkspaceSnapshot.build(
-            controlSurface: evolutionFlightDeck?.evolutionControlSurface ?? appModel.makeEvolutionControlSurface(),
-            releaseSummary: evolutionFlightDeck?.releaseControlSummary
+    private var evolutionSurfaceState: DecisionEvolutionSurfaceState {
+        appModel.makeEvolutionSurfaceState(
+            contract: evolutionSurfaceContract,
+            flightDeck: evolutionFlightDeck
         )
     }
 
+    private var evolutionWorkspace: DecisionEvolutionWorkspaceSnapshot {
+        evolutionSurfaceState.workspace
+    }
+
     private var evolutionOperatorSnapshot: DecisionEvolutionOperatorSnapshot {
-        DecisionEvolutionOperatorSnapshot.build(
-            surfaceKind: evolutionSurfaceContract.kind,
-            workspace: evolutionWorkspace,
-            contract: evolutionSurfaceContract
-        )
+        evolutionSurfaceState.operatorSnapshot
     }
 
     @MainActor

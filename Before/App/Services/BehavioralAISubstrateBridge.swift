@@ -1001,25 +1001,44 @@ enum BehavioralAISubstrateBridge {
     @discardableResult
     static func persistEBrainLineage(
         _ turn: BASEBrainTurnResult,
+        targeting checkpointID: String? = nil,
         in context: ModelContext
     ) -> DecisionEvolutionState? {
         let result: BASAppleEvolutionCheckpointWriteResult<DecisionEvolutionCheckpoint> =
-            BASAppleEvolutionCheckpointWriter.attachLineageSummary(
-                turn.evolutionLineageSummary,
-                in: context,
-                onSaveError: { error in
-                    PersistenceIssueRecorder.record(
-                        error: error,
-                        operation: "attaching eBrain lineage to evolution checkpoint"
-                    )
-                }
-            )
+            if let checkpointID {
+                BASAppleEvolutionCheckpointWriter.attachLineageSummary(
+                    turn.evolutionLineageSummary,
+                    for: checkpointID,
+                    in: context,
+                    onSaveError: { error in
+                        PersistenceIssueRecorder.record(
+                            error: error,
+                            operation: "attaching eBrain lineage to explicit evolution checkpoint"
+                        )
+                    }
+                )
+            } else {
+                BASAppleEvolutionCheckpointWriter.attachLineageSummary(
+                    turn.evolutionLineageSummary,
+                    in: context,
+                    onSaveError: { error in
+                        PersistenceIssueRecorder.record(
+                            error: error,
+                            operation: "attaching eBrain lineage to evolution checkpoint"
+                        )
+                    }
+                )
+            }
 
         guard !result.orderedCheckpoints.isEmpty else {
             return nil
         }
 
-        return result.currentState
+        return reconciledEvolutionState(
+            result.currentState,
+            preservingLoadedCheckpointID: checkpointID,
+            in: context
+        )
     }
 
     @MainActor
@@ -2163,6 +2182,21 @@ enum BehavioralAISubstrateBridge {
             pendingReviewCount: pendingReviewCount,
             recentDiffSummary: checkpoint.diffSummary
         )
+    }
+
+    @MainActor
+    static func reconciledEvolutionState(
+        _ evolutionState: DecisionEvolutionState,
+        preservingLoadedCheckpointID loadedCheckpointID: String?,
+        in context: ModelContext
+    ) -> DecisionEvolutionState {
+        guard let loadedCheckpointID,
+              let checkpoint = fetchEvolutionCheckpoint(loadedCheckpointID, in: context) else {
+            return evolutionState
+        }
+
+        let checkpoints = (try? context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())) ?? []
+        return restoredEvolutionState(selecting: checkpoint, across: checkpoints)
     }
 
     private static func hostSessionKind(

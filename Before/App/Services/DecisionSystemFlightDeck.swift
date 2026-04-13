@@ -157,9 +157,9 @@ enum DecisionSystemFlightDeckBuilder {
             releaseControlSummary: releaseControlSummary,
             evolutionControlSurface: evolutionControlSurface,
             pendingReviewCheckpointCount: evolutionControlSurface.pendingReviewCount,
-            pendingReviewQueue: evolutionControlSurface.pendingReviewQueue
+            pendingReviewQueue: evolutionControlSurface.pendingReviewPresentations
                 .prefix(3)
-                .map(queueItem(from:))
+                .map(\.queueItem)
         )
     }
 
@@ -225,14 +225,8 @@ enum DecisionSystemFlightDeckBuilder {
             checkpointID: lineage.checkpointID,
             checkpointApprovalState: lineage.approvalState.rawValue,
             checkpointRollbackReady: lineage.rollbackReady,
-            checkpointApplyReady: lineage.rollbackReady && lineage.hasBrainStateSnapshot
+            checkpointApplyReady: lineage.hasBrainStateSnapshot
         )
-    }
-
-    private static func queueItem(
-        from checkpoint: DecisionReviewCheckpointSnapshot
-    ) -> DecisionSystemCheckpointQueueItem {
-        checkpoint.presentation.queueItem
     }
 
     private static func releaseSummary(

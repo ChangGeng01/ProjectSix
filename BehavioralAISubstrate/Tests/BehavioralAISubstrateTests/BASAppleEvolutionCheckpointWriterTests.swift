@@ -251,6 +251,88 @@ struct BASAppleEvolutionCheckpointWriterTests {
         #expect(checkpoints.first?.basSnapshot.lineageSummary == nil)
     }
 
+    @Test("writer can attach lineage summary to an explicit checkpoint without touching the newest checkpoint")
+    func writerAttachesLineageSummaryToExplicitCheckpoint() throws {
+        let container = try ModelContainer(
+            for: CheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        let baseDate = Date(timeIntervalSince1970: 1_744_100_000)
+
+        let older: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.record(
+                input: BASEvolutionCheckpointInput(
+                    modeName: "primary",
+                    sourceID: "launch",
+                    fingerprint: "fingerprint-older",
+                    identityRole: .pauseCompanion,
+                    boundaryMode: .localOnlyAdvisory,
+                    calibrationStatus: .stable,
+                    brainStateSnapshot: BASDecisionBrainState(
+                        profileCore: ["Older checkpoint."],
+                        activeGoals: ["Keep older active."],
+                        relevantMemories: [],
+                        sessionBiases: [],
+                        retrievalTags: ["older"],
+                        reactionWeights: .defaults(for: "primary"),
+                        boundaryPolicy: .default(riskLevel: .low),
+                        loadedAt: baseDate
+                    )
+                ),
+                in: context,
+                createdAt: baseDate
+            )
+        let newer: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.record(
+                input: BASEvolutionCheckpointInput(
+                    modeName: "primary",
+                    sourceID: "scene_active",
+                    fingerprint: "fingerprint-newer",
+                    identityRole: .pauseCompanion,
+                    boundaryMode: .localOnlyAdvisory,
+                    calibrationStatus: .stable
+                ),
+                in: context,
+                createdAt: baseDate.addingTimeInterval(60)
+            )
+
+        let olderID = try #require(
+            older.orderedCheckpoints.first(where: { $0.fingerprint == "fingerprint-older" })?.id
+        )
+        let newerID = try #require(
+            newer.orderedCheckpoints.first(where: { $0.fingerprint == "fingerprint-newer" })?.id
+        )
+
+        let lineage = BASEvolutionLineageSummary(
+            recordedAt: baseDate.addingTimeInterval(120),
+            sessionID: "fixture.explicit-target",
+            taskType: "decision",
+            riskLevel: "high",
+            permitMode: "delay",
+            hostGatePercent: 81,
+            thoughtFoldChecksum: "explicit-target-fold",
+            updateTicketSummaries: ["preserve explicit target"],
+            guardrailFindings: ["attached to older checkpoint"],
+            recommendedKillSwitches: ["disableHighRiskAutoAction"]
+        )
+
+        let attached: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.attachLineageSummary(
+                lineage,
+                for: olderID,
+                in: context
+            )
+
+        let checkpoints = try context.fetch(FetchDescriptor<CheckpointFixture>())
+        let olderCheckpoint = try #require(checkpoints.first(where: { $0.id == olderID }))
+        let newerCheckpoint = try #require(checkpoints.first(where: { $0.id == newerID }))
+
+        #expect(olderCheckpoint.basSnapshot.lineageSummary == lineage)
+        #expect(newerCheckpoint.basSnapshot.lineageSummary == nil)
+        #expect(attached.currentState.latestCheckpoint?.id == newerID)
+    }
+
     @Test("checkpoint input carries a restorable brain snapshot")
     func writerPersistsBrainSnapshot() throws {
         let container = try ModelContainer(

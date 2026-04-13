@@ -4,6 +4,7 @@ enum DecisionEvolutionSurfaceKind: String, CaseIterable, Equatable, Sendable {
     case home
     case history
     case portrait
+    case settings
     case controlCenter
 }
 
@@ -42,6 +43,14 @@ struct DecisionEvolutionSurfaceContract: Equatable, Sendable {
         showsCheckpointActionBarInSummary: true
     )
 
+    static let settings = DecisionEvolutionSurfaceContract(
+        kind: .settings,
+        interactionMode: .observeAndRoute,
+        releaseSummaryMode: .compact,
+        showsEmbeddedReleaseSummaryInPilotPanel: false,
+        showsCheckpointActionBarInSummary: false
+    )
+
     static let controlCenter = DecisionEvolutionSurfaceContract(
         kind: .controlCenter,
         interactionMode: .mutationHub,
@@ -58,6 +67,8 @@ struct DecisionEvolutionSurfaceContract: Equatable, Sendable {
             .history
         case .portrait:
             .portrait
+        case .settings:
+            .settings
         case .controlCenter:
             .controlCenter
         }

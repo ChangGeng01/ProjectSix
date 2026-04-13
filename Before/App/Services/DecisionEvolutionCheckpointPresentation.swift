@@ -64,12 +64,15 @@ struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendabl
         )
     }
 
-    init(snapshot: DecisionReviewCheckpointSnapshot) {
+    init(
+        snapshot: DecisionReviewCheckpointSnapshot,
+        rollbackReadyOverride: Bool? = nil
+    ) {
         checkpointID = snapshot.checkpointID
         createdAt = snapshot.createdAt
         mode = snapshot.mode
         approvalState = snapshot.approvalState
-        rollbackReady = snapshot.rollbackReady
+        rollbackReady = rollbackReadyOverride ?? snapshot.rollbackReady
         applyReady = snapshot.applyReady
         headline = "Recovered \(snapshot.mode.shortTitle) checkpoint"
         primarySummary = snapshot.primarySummary
@@ -115,6 +118,15 @@ struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendabl
 extension DecisionReviewCheckpointSnapshot {
     var presentation: DecisionEvolutionCheckpointPresentation {
         DecisionEvolutionCheckpointPresentation(snapshot: self)
+    }
+
+    func presentation(
+        rollbackReadyOverride: Bool? = nil
+    ) -> DecisionEvolutionCheckpointPresentation {
+        DecisionEvolutionCheckpointPresentation(
+            snapshot: self,
+            rollbackReadyOverride: rollbackReadyOverride
+        )
     }
 }
 

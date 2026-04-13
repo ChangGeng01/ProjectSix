@@ -1187,7 +1187,7 @@ struct DecisionTestingInterfaceTests {
         #expect(export.evolutionControlSurface.activeCheckpoint?.checkpointID == "checkpoint-approved")
         #expect(export.evolutionControlSurface.reviewCheckpoint?.checkpointID == "checkpoint-review-4")
         #expect(export.evolutionControlSurface.pendingReviewCount == 4)
-        #expect(export.evolutionControlSurface.rollbackReadyCount == 3)
+        #expect(export.evolutionControlSurface.rollbackReadyCount == 0)
         #expect(export.evolutionControlSurface.reviewAuditFindings == ["Review guardrail 4"])
         #expect(export.evolutionControlSurface.reviewKillSwitches == ["external-tools"])
         #expect(export.evolutionControlSurface.queueAuditFindings == [
@@ -1271,6 +1271,7 @@ struct DecisionTestingInterfaceTests {
             preferences: .default,
             traceLimit: 0,
             persistedCheckpointLineages: [automaticLatest, reviewHead],
+            restorableCheckpointIDs: ["checkpoint-active-latest", "checkpoint-active-previous"],
             eBrainStore: EBrainTurnDebugStore(),
             telemetryStore: DecisionIntelligenceTelemetryStore(),
             cache: DecisionIntelligenceResponseCache(limit: 2),
@@ -1283,7 +1284,7 @@ struct DecisionTestingInterfaceTests {
         #expect(export.evolutionControlSurface.reviewKillSwitches == ["host-write"])
         #expect(export.evolutionControlSurface.latestPersistedLineage?.checkpointID == "checkpoint-active-latest")
         #expect(export.evolutionControlSurface.pendingReviewCount == 1)
-        #expect(export.evolutionControlSurface.rollbackReadyCount == 1)
+        #expect(export.evolutionControlSurface.rollbackReadyCount == 0)
         #expect(export.evolutionControlSurface.activeRollbackCheckpointID == "checkpoint-active-previous")
     }
 
@@ -1371,6 +1372,7 @@ struct DecisionTestingInterfaceTests {
             persistedCheckpointLineages: [recoveredActive, reviewHead],
             pendingReviewCheckpoints: [DecisionReviewCheckpointSnapshot(lineage: reviewHead)],
             activeCheckpointHint: explicitActiveHint,
+            restorableCheckpointIDs: ["checkpoint-current-brain", "checkpoint-recovered-active"],
             eBrainStore: EBrainTurnDebugStore(),
             telemetryStore: DecisionIntelligenceTelemetryStore(),
             cache: DecisionIntelligenceResponseCache(limit: 2),
@@ -1424,6 +1426,7 @@ struct DecisionTestingInterfaceTests {
             preferences: .default,
             traceLimit: 0,
             persistedCheckpointLineages: [active],
+            restorableCheckpointIDs: ["checkpoint-active-ready", "checkpoint-active-prior"],
             eBrainStore: EBrainTurnDebugStore(),
             telemetryStore: DecisionIntelligenceTelemetryStore(),
             cache: DecisionIntelligenceResponseCache(limit: 2),
@@ -1435,6 +1438,103 @@ struct DecisionTestingInterfaceTests {
         #expect(export.flightDeck.releaseControlSummary.canRollbackActiveCheckpoint == true)
         #expect(export.flightDeck.releaseControlSummary.activeCheckpointID == "checkpoint-active-ready")
         #expect(export.flightDeck.releaseControlSummary.reviewCheckpointID == nil)
+    }
+
+    @Test
+    func runtimeExportFlightDeckReleaseSummaryStaysInWatchWhenRollbackTargetIsNotRestorable() async throws {
+        let active = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-active-watch",
+            previousCheckpointID: "checkpoint-active-missing",
+            createdAt: date("2026-04-10T22:05:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Checkpoint stays watch-only when its previous target cannot be restored."],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T22:05:00.000Z"),
+                    sessionID: "before.quick.release-watch",
+                    taskType: "summary",
+                    riskLevel: "low",
+                    permitMode: "answer",
+                    hostGatePercent: 37,
+                    thoughtFoldChecksum: "fold-release-watch",
+                    updateTicketSummaries: ["watch ticket"],
+                    guardrailFindings: [],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            traceLimit: 0,
+            persistedCheckpointLineages: [active],
+            restorableCheckpointIDs: ["checkpoint-active-watch"],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        #expect(export.evolutionControlSurface.canRollbackActiveCheckpoint == false)
+        #expect(export.evolutionControlSurface.activeRollbackCheckpointID == nil)
+        #expect(export.flightDeck.releaseControlSummary.state == .watch)
+        #expect(export.flightDeck.releaseControlSummary.canRestoreActiveCheckpoint == true)
+        #expect(export.flightDeck.releaseControlSummary.canRollbackActiveCheckpoint == false)
+    }
+
+    @Test
+    func runtimeExportAttachingPreservesRestorableCheckpointIDs() async throws {
+        let active = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-attach-active",
+            previousCheckpointID: "checkpoint-attach-previous",
+            createdAt: date("2026-04-10T22:06:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Attaching a live turn must not drop rollback restore facts."],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T22:06:00.000Z"),
+                    sessionID: "before.quick.attach-active",
+                    taskType: "summary",
+                    riskLevel: "low",
+                    permitMode: "answer",
+                    hostGatePercent: 36,
+                    thoughtFoldChecksum: "fold-attach-active",
+                    updateTicketSummaries: ["attach active"],
+                    guardrailFindings: [],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            traceLimit: 0,
+            persistedCheckpointLineages: [active],
+            restorableCheckpointIDs: ["checkpoint-attach-active", "checkpoint-attach-previous"],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        let attached = export.attaching(eBrainTurn: nil)
+
+        #expect(attached.restorableCheckpointIDs == export.restorableCheckpointIDs)
+        #expect(attached.evolutionControlSurface.canRollbackActiveCheckpoint == export.evolutionControlSurface.canRollbackActiveCheckpoint)
+        #expect(attached.evolutionControlSurface.activeRollbackCheckpointID == export.evolutionControlSurface.activeRollbackCheckpointID)
+        #expect(attached.flightDeck.releaseControlSummary.canRollbackActiveCheckpoint == export.flightDeck.releaseControlSummary.canRollbackActiveCheckpoint)
     }
 
     @Test
@@ -1558,7 +1658,7 @@ struct DecisionTestingInterfaceTests {
 
         #expect(surface.reviewCheckpoint?.checkpointID == "checkpoint-review-1")
         #expect(surface.pendingReviewCount == 1)
-        #expect(surface.rollbackReadyCount == 1)
+        #expect(surface.rollbackReadyCount == 0)
         #expect(surface.reviewAuditFindings == ["Review guardrail 1"])
         #expect(surface.reviewKillSwitches == ["external-tools"])
         #expect(facts.recoveredCheckpoint?.checkpointID == surface.activeCheckpoint?.checkpointID)

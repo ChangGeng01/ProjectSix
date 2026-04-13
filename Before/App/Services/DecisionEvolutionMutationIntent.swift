@@ -113,7 +113,7 @@ extension DecisionEvolutionControlSurface {
 
         append(activePresentation)
         append(reviewPresentation)
-        pendingReviewQueue.map(\.presentation).forEach(append)
+        pendingReviewPresentations.forEach(append)
         return ordered
     }
 
@@ -207,8 +207,7 @@ enum DecisionEvolutionMutationIntentFactory {
             return nil
         }
 
-        let remainingReviewQueue = controlSurface.pendingReviewQueue
-            .map(\.presentation)
+        let remainingReviewQueue = controlSurface.pendingReviewPresentations
             .filter { $0.checkpointID != checkpointID }
         let projectedReviewID = remainingReviewQueue.first?.checkpointID
         let projectedActiveID = projectedActiveCheckpointIDAfterApproval(
@@ -454,10 +453,10 @@ enum DecisionEvolutionMutationIntentFactory {
     static func approvePendingCheckpoints(
         controlSurface: DecisionEvolutionControlSurface
     ) -> DecisionEvolutionMutationIntent? {
-        let targets = controlSurface.pendingReviewQueue.map(\.checkpointID)
+        let targets = controlSurface.pendingReviewPresentations.map(\.checkpointID)
         guard !targets.isEmpty else { return nil }
 
-        let lineageBackedCount = controlSurface.pendingReviewQueue.filter { $0.presentation.hasLineage }.count
+        let lineageBackedCount = controlSurface.pendingReviewLineagePresentations.count
         var retained = ["Active checkpoint remains \(checkpointToken(controlSurface.activePresentation?.checkpointID))."]
         if lineageBackedCount > 0 {
             retained.append("\(lineageBackedCount) lineage-backed review checkpoint(s) keep their recovered facts.")
@@ -492,8 +491,7 @@ enum DecisionEvolutionMutationIntentFactory {
     static func clearPendingReviewLineage(
         controlSurface: DecisionEvolutionControlSurface
     ) -> DecisionEvolutionMutationIntent? {
-        let targets = controlSurface.pendingReviewQueue
-            .map(\.presentation)
+        let targets = controlSurface.pendingReviewPresentations
             .filter(\.hasLineage)
         guard !targets.isEmpty else { return nil }
 

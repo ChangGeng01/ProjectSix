@@ -13,10 +13,11 @@ struct HistoryView: View {
     @State private var selectedProfile: ReviewProfileSelection?
     @State private var systemFlightDeck: DecisionSystemFlightDeck?
     @State private var isRefreshingSystemFlightDeck = false
+    @State private var selectedEvolutionFilter: EvolutionHistoryFilter = .all
     private let evolutionSurfaceContract = DecisionEvolutionSurfaceContract.history
 
     var body: some View {
-        let evolutionWorkspace = currentEvolutionWorkspace
+        let evolutionWorkspace = evolutionSurfaceState.workspace
 
         NavigationStack {
             ZStack {
@@ -110,11 +111,11 @@ struct HistoryView: View {
         }
     }
 
-    private var currentEvolutionWorkspace: DecisionEvolutionWorkspaceSnapshot {
-        DecisionEvolutionWorkspaceSnapshot.build(
-            controlSurface: systemFlightDeck?.evolutionControlSurface ?? appModel.makeEvolutionControlSurface(),
-            releaseSummary: systemFlightDeck?.releaseControlSummary,
-            historyPresentations: evolutionTrailPresentations
+    private var evolutionSurfaceState: DecisionEvolutionSurfaceState {
+        appModel.makeEvolutionSurfaceState(
+            contract: evolutionSurfaceContract,
+            flightDeck: systemFlightDeck,
+            historyCheckpoints: evolutionTrailItems
         )
     }
 
@@ -147,11 +148,19 @@ struct HistoryView: View {
     }
 
     private var evolutionTrailItems: [DecisionEvolutionCheckpoint] {
-        evolutionCheckpoints.filter { $0.lineageSummary != nil || !$0.diffSummary.isEmpty }
+        evolutionCheckpoints.evolutionTrailCheckpoints()
     }
 
-    private var evolutionTrailPresentations: [DecisionEvolutionCheckpointPresentation] {
-        evolutionTrailItems.map(\.presentation)
+    private var filteredEvolutionQueue: [DecisionEvolutionCheckpointPresentation] {
+        evolutionSurfaceState.workspace.remainingReviewQueue.filter {
+            selectedEvolutionFilter.matches($0, inReviewQueue: true)
+        }
+    }
+
+    private var filteredEvolutionHistory: [DecisionEvolutionCheckpointPresentation] {
+        evolutionSurfaceState.workspace.historyPresentations.filter {
+            selectedEvolutionFilter.matches($0, inReviewQueue: false)
+        }
     }
 
     private func evolutionTrailSection(
@@ -269,7 +278,7 @@ struct HistoryView: View {
                 )
             }
 
-            if !workspace.remainingReviewQueue.isEmpty {
+            if !filteredEvolutionQueue.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Pending review queue")
                         .font(.headline)
@@ -279,7 +288,7 @@ struct HistoryView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
-                    ForEach(workspace.remainingReviewQueue) { checkpoint in
+                    ForEach(filteredEvolutionQueue) { checkpoint in
                         DecisionEvolutionCheckpointPanelView(
                             checkpoint: checkpoint,
                             controlSurface: workspace.controlSurface,
@@ -296,17 +305,26 @@ struct HistoryView: View {
                 }
             }
 
-            if !workspace.historyPresentations.isEmpty {
+            if !filteredEvolutionHistory.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Checkpoint history")
-                        .font(.headline)
-                        .foregroundStyle(BeforeTheme.ink)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Checkpoint history")
+                            .font(.headline)
+                            .foregroundStyle(BeforeTheme.ink)
+                        Spacer()
+                        Picker("Evolution filter", selection: $selectedEvolutionFilter) {
+                            ForEach(EvolutionHistoryFilter.allCases) { filter in
+                                Text(filter.title).tag(filter)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
 
                     Text("The full recovered trail stays browseable here even after the active/review spotlight changes.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
-                    ForEach(workspace.historyPresentations) { checkpoint in
+                    ForEach(filteredEvolutionHistory) { checkpoint in
                         DecisionEvolutionCheckpointPanelView(
                             checkpoint: checkpoint,
                             controlSurface: workspace.controlSurface,
@@ -559,6 +577,44 @@ private enum HistoryFilter: String, CaseIterable, Identifiable {
             true
         default:
             false
+        }
+    }
+}
+
+private enum EvolutionHistoryFilter: String, CaseIterable, Identifiable {
+    case all
+    case review
+    case rollbackReady
+    case blocked
+    case lineageBacked
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "All"
+        case .review: "Review"
+        case .rollbackReady: "Rollback"
+        case .blocked: "Blocked"
+        case .lineageBacked: "Lineage"
+        }
+    }
+
+    func matches(
+        _ checkpoint: DecisionEvolutionCheckpointPresentation,
+        inReviewQueue: Bool
+    ) -> Bool {
+        switch self {
+        case .all:
+            true
+        case .review:
+            inReviewQueue || checkpoint.approvalState == .reviewSuggested
+        case .rollbackReady:
+            checkpoint.rollbackReady
+        case .blocked:
+            !checkpoint.killSwitches.isEmpty || !checkpoint.auditFindings.isEmpty
+        case .lineageBacked:
+            checkpoint.hasLineage
         }
     }
 }

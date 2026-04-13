@@ -263,6 +263,7 @@ enum DecisionTestingInterface {
         persistedCheckpointLineages: [DecisionEvolutionLineageSnapshot] = [],
         pendingReviewCheckpoints: [DecisionReviewCheckpointSnapshot] = [],
         activeCheckpointHint: DecisionReviewCheckpointSnapshot? = nil,
+        restorableCheckpointIDs: Set<String> = [],
         debugStore: DecisionIntelligenceDebugStore = .shared,
         eBrainStore: EBrainTurnDebugStore = .shared,
         telemetryStore: DecisionIntelligenceTelemetryStore = .shared,
@@ -297,6 +298,7 @@ enum DecisionTestingInterface {
             persistedCheckpointLineages: persistedCheckpointLineages,
             pendingReviewCheckpoints: pendingReviewCheckpoints,
             activeCheckpointHint: activeCheckpointHint,
+            restorableCheckpointIDs: restorableCheckpointIDs,
             eBrainTurn: nil
         )
     }

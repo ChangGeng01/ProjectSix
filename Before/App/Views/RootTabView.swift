@@ -34,6 +34,7 @@ struct RootTabView: View {
                     Label("History", systemImage: "clock")
                 }
                 .tag(AppTab.history)
+                .badge(evolutionHistoryBadge)
 
             SelfPortraitView()
                 .tabItem {
@@ -46,6 +47,7 @@ struct RootTabView: View {
                     Label("Settings", systemImage: "slider.horizontal.3")
                 }
                 .tag(AppTab.settings)
+                .badge(evolutionSettingsBadge)
         }
         .sheet(item: $appModel.activeQuickSession) { session in
             QuickCheckView(session: session)
@@ -107,5 +109,22 @@ struct RootTabView: View {
 
     private var supportBadge: Int {
         appModel.supportInbox.activeRequests.count + appModel.sharedLifeStore.pendingItems.count
+    }
+
+    private var evolutionAttention: DecisionEvolutionAttentionSignal {
+        appModel.makeEvolutionSurfaceState(
+            contract: .settings
+        ).attentionSignal
+    }
+
+    private var evolutionHistoryBadge: String? {
+        guard evolutionAttention.pendingReviewCount > 0 else { return nil }
+        return evolutionAttention.pendingReviewCount > 9
+            ? "9+"
+            : String(evolutionAttention.pendingReviewCount)
+    }
+
+    private var evolutionSettingsBadge: String? {
+        evolutionAttention.badgeValue
     }
 }

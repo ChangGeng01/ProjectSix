@@ -7,6 +7,7 @@ struct DecisionEvolutionControlSurface: Equatable, Sendable {
     let pendingReviewCount: Int
     let rollbackReadyCount: Int
     let latestPersistedLineage: DecisionEvolutionLineageSnapshot?
+    let restorableCheckpointIDs: Set<String>
     let reviewAuditFindings: [String]
     let reviewKillSwitches: [String]
     let queueAuditFindings: [String]
@@ -16,14 +17,18 @@ struct DecisionEvolutionControlSurface: Equatable, Sendable {
         activeCheckpoint: DecisionReviewCheckpointSnapshot?,
         reviewCheckpoint: DecisionReviewCheckpointSnapshot?,
         pendingReviewQueue: [DecisionReviewCheckpointSnapshot],
-        latestPersistedLineage: DecisionEvolutionLineageSnapshot?
+        latestPersistedLineage: DecisionEvolutionLineageSnapshot?,
+        restorableCheckpointIDs: Set<String> = []
     ) {
         self.activeCheckpoint = activeCheckpoint
         self.reviewCheckpoint = reviewCheckpoint ?? pendingReviewQueue.first
         self.pendingReviewQueue = pendingReviewQueue
         self.pendingReviewCount = pendingReviewQueue.count
-        self.rollbackReadyCount = pendingReviewQueue.filter(\.rollbackReady).count
+        self.rollbackReadyCount = pendingReviewQueue.filter {
+            Self.resolvedRollbackReady(for: $0, restorableCheckpointIDs: restorableCheckpointIDs)
+        }.count
         self.latestPersistedLineage = latestPersistedLineage
+        self.restorableCheckpointIDs = restorableCheckpointIDs
         self.reviewAuditFindings = self.reviewCheckpoint?.auditFindings ?? []
         self.reviewKillSwitches = self.reviewCheckpoint?.killSwitches ?? []
         self.queueAuditFindings = Self.orderedUnique(
@@ -39,11 +44,42 @@ struct DecisionEvolutionControlSurface: Equatable, Sendable {
     }
 
     var activePresentation: DecisionEvolutionCheckpointPresentation? {
-        activeCheckpoint?.presentation
+        activeCheckpoint?.presentation(
+            rollbackReadyOverride: resolvedRollbackReady(for: activeCheckpoint)
+        )
     }
 
     var reviewPresentation: DecisionEvolutionCheckpointPresentation? {
-        reviewCheckpoint?.presentation
+        reviewCheckpoint?.presentation(
+            rollbackReadyOverride: resolvedRollbackReady(for: reviewCheckpoint)
+        )
+    }
+
+    var pendingReviewPresentations: [DecisionEvolutionCheckpointPresentation] {
+        pendingReviewQueue.map { checkpoint in
+            checkpoint.presentation(
+                rollbackReadyOverride: resolvedRollbackReady(for: checkpoint)
+            )
+        }
+    }
+
+    var pendingReviewLineagePresentations: [DecisionEvolutionCheckpointPresentation] {
+        pendingReviewPresentations.filter(\.hasLineage)
+    }
+
+    func resolvedPresentation(
+        for checkpoint: DecisionEvolutionCheckpoint
+    ) -> DecisionEvolutionCheckpointPresentation {
+        let snapshot = DecisionReviewCheckpointSnapshot(checkpoint: checkpoint)
+        return snapshot.presentation(
+            rollbackReadyOverride: resolvedRollbackReady(for: snapshot)
+        )
+    }
+
+    func resolvedPresentations(
+        for checkpoints: [DecisionEvolutionCheckpoint]
+    ) -> [DecisionEvolutionCheckpointPresentation] {
+        checkpoints.map { resolvedPresentation(for: $0) }
     }
 
     var distinctReviewPresentation: DecisionEvolutionCheckpointPresentation? {
@@ -52,8 +88,25 @@ struct DecisionEvolutionControlSurface: Equatable, Sendable {
         return reviewPresentation
     }
 
+    func checkpointIsRestorable(_ checkpointID: String?) -> Bool {
+        guard let checkpointID else { return false }
+        return restorableCheckpointIDs.contains(checkpointID)
+    }
+
+    func resolvedRollbackReady(
+        for checkpoint: DecisionReviewCheckpointSnapshot?
+    ) -> Bool {
+        Self.resolvedRollbackReady(
+            for: checkpoint,
+            restorableCheckpointIDs: restorableCheckpointIDs
+        )
+    }
+
     var activeRollbackCheckpointID: String? {
-        activeCheckpoint?.previousCheckpointID
+        guard let rollbackID = activeCheckpoint?.previousCheckpointID else {
+            return nil
+        }
+        return checkpointIsRestorable(rollbackID) ? rollbackID : nil
     }
 
     var canRollbackActiveCheckpoint: Bool {
@@ -65,6 +118,15 @@ struct DecisionEvolutionControlSurface: Equatable, Sendable {
             guard !uniqueValues.contains(value) else { return }
             uniqueValues.append(value)
         }
+    }
+
+    private static func resolvedRollbackReady(
+        for checkpoint: DecisionReviewCheckpointSnapshot?,
+        restorableCheckpointIDs: Set<String>
+    ) -> Bool {
+        guard let checkpoint, checkpoint.rollbackReady else { return false }
+        guard let previousCheckpointID = checkpoint.previousCheckpointID else { return false }
+        return restorableCheckpointIDs.contains(previousCheckpointID)
     }
 }
 

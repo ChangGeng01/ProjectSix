@@ -20,6 +20,8 @@ struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
             "History workbench"
         case .portrait:
             "Portrait overview"
+        case .settings:
+            "Settings monitor"
         case .controlCenter:
             "Evolution Control"
         }
@@ -60,14 +62,19 @@ struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
         for controlSurface: DecisionEvolutionControlSurface,
         contract: DecisionEvolutionSurfaceContract
     ) -> String {
-        if !controlSurface.queueKillSwitches.isEmpty {
-            return "Watching queue kill switches"
-        }
-
         if controlSurface.pendingReviewCount > 0 {
+            if contract.interactionMode.allowsMutations,
+               !controlSurface.queueKillSwitches.isEmpty {
+                return "Watching queue kill switches"
+            }
+
             return contract.interactionMode.allowsMutations
                 ? "Queue mutation workspace is ready"
                 : "Pending review remains visible from this read-first surface"
+        }
+
+        if !controlSurface.queueKillSwitches.isEmpty {
+            return "Watching queue kill switches"
         }
 
         if controlSurface.activePresentation != nil {
@@ -81,14 +88,19 @@ struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
         for controlSurface: DecisionEvolutionControlSurface,
         contract: DecisionEvolutionSurfaceContract
     ) -> String? {
-        if !controlSurface.queueKillSwitches.isEmpty {
-            return "Queue kill switches remain active until the review path is cleared."
-        }
-
         if controlSurface.pendingReviewCount > 0 {
+            if contract.interactionMode.allowsMutations,
+               !controlSurface.queueKillSwitches.isEmpty {
+                return "Queue kill switches remain active until the review path is cleared."
+            }
+
             return contract.interactionMode.allowsMutations
                 ? "\(controlSurface.pendingReviewCount) checkpoint(s) are ready for direct queue work here."
                 : "\(controlSurface.pendingReviewCount) checkpoint(s) still require review before the release path is clean."
+        }
+
+        if !controlSurface.queueKillSwitches.isEmpty {
+            return "Queue kill switches remain active until the review path is cleared."
         }
 
         if controlSurface.activePresentation != nil {

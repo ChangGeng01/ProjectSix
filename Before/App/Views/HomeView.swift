@@ -14,12 +14,32 @@ struct HomeView: View {
         GridItem(.flexible(), spacing: 14)
     ]
 
+    private var evolutionSurfaceState: DecisionEvolutionSurfaceState {
+        appModel.makeEvolutionSurfaceState(
+            contract: evolutionSurfaceContract,
+            flightDeck: systemFlightDeck
+        )
+    }
+
     private var currentEvolutionControlSurface: DecisionEvolutionControlSurface {
-        systemFlightDeck?.evolutionControlSurface ?? appModel.makeEvolutionControlSurface()
+        evolutionSurfaceState.controlSurface
+    }
+
+    private var currentEvolutionWorkspace: DecisionEvolutionWorkspaceSnapshot {
+        evolutionSurfaceState.workspace
     }
 
     private var currentEvolutionSpotlightSet: DecisionEvolutionSpotlightSet {
-        currentEvolutionControlSurface.spotlightSet
+        currentEvolutionWorkspace.spotlightSet
+    }
+
+    private var currentEvolutionAttentionSignal: DecisionEvolutionAttentionSignal {
+        evolutionSurfaceState.attentionSignal
+    }
+
+    private var runtimeSpotlightPresentation: DecisionEvolutionCheckpointPresentation? {
+        currentEvolutionWorkspace.activePresentation
+            ?? currentEvolutionWorkspace.reviewPresentation
     }
 
     var body: some View {
@@ -113,19 +133,30 @@ struct HomeView: View {
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
 
-                                        if let checkpointID = deck.releaseControlSummary.activeCheckpointID {
-                                            let approvalTitle = summary.checkpointApprovalState?
-                                                .replacingOccurrences(of: "_", with: " ")
-                                                .capitalized ?? "Unknown"
-                                            let applyTitle = summary.checkpointApplyReady == true
+                                        if let spotlightPresentation = runtimeSpotlightPresentation {
+                                            let spotlightRole = currentEvolutionWorkspace.activePresentation?.checkpointID == spotlightPresentation.checkpointID
+                                                ? "Active"
+                                                : "Review head"
+                                            let applyTitle = spotlightPresentation.applyReady
                                                 ? "Apply ready"
                                                 : "Apply unavailable"
                                             Text(
-                                                "Checkpoint \(checkpointID) • \(approvalTitle) • \(applyTitle)"
+                                                "\(spotlightRole) \(spotlightPresentation.checkpointID) • \(spotlightPresentation.approvalStateTitle) • \(applyTitle)"
                                             )
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
                                             .lineLimit(2)
+                                        } else if currentEvolutionAttentionSignal.requiresAttention {
+                                            Text(currentEvolutionAttentionSignal.headline)
+                                                .font(.caption2.weight(.semibold))
+                                                .foregroundStyle(BeforeTheme.ember)
+
+                                            if let detail = currentEvolutionAttentionSignal.detail {
+                                                Text(detail)
+                                                    .font(.caption2)
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(2)
+                                            }
                                         }
 
                                         if let blocker = summary.blockers.first {
@@ -141,14 +172,15 @@ struct HomeView: View {
                                         )
                                     }
 
-                                    if let checkpointID = deck.releaseControlSummary.activeCheckpointID {
+                                    if let activeCheckpoint = currentEvolutionWorkspace.activePresentation {
                                         DecisionEvolutionCheckpointActionBar(
-                                            checkpointID: checkpointID,
+                                            checkpointID: activeCheckpoint.checkpointID,
+                                            checkpointPresentation: activeCheckpoint,
                                             controlSurface: currentEvolutionControlSurface,
                                             interactionMode: evolutionSurfaceContract.interactionMode,
-                                            applyReady: summary.checkpointApplyReady == true,
-                                            approvalState: summary.checkpointApprovalState.flatMap(DecisionEvolutionApprovalState.init(rawValue:)),
-                                            hasLineage: true,
+                                            applyReady: activeCheckpoint.applyReady,
+                                            approvalState: activeCheckpoint.approvalState,
+                                            hasLineage: activeCheckpoint.hasLineage,
                                             showControlCenterShortcut: true,
                                             showHistoryShortcut: true,
                                             showPortraitShortcut: true,
@@ -158,8 +190,8 @@ struct HomeView: View {
                                                 }
                                             }
                                         )
-                                    } else if let checkpointID = summary.checkpointID {
-                                        Text("Recovered checkpoint \(checkpointID) is visible in review, but no active checkpoint is attached to the main release path yet.")
+                                    } else if let reviewCheckpoint = currentEvolutionWorkspace.reviewPresentation {
+                                        Text("Review head \(reviewCheckpoint.checkpointID) is visible in the shared control surface, but no active checkpoint is attached to the main release path yet.")
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
 
@@ -178,6 +210,14 @@ struct HomeView: View {
                                         }
                                     } else {
                                         HStack(spacing: 10) {
+                                            BeforeActionButton("Open control center", style: .primary) {
+                                                appModel.presentEvolutionControlCenter()
+                                            }
+
+                                            BeforeActionButton("Open History", style: .secondary) {
+                                                appModel.selectedTab = .history
+                                            }
+
                                             BeforeActionButton("Open Portrait", style: .secondary) {
                                                 appModel.selectedTab = .portrait
                                             }
@@ -230,21 +270,21 @@ struct HomeView: View {
                             )
                         }
 
-                        if pendingReviewCheckpointCount > 0 {
+                        if currentEvolutionWorkspace.totalPendingReviewCount > 0 {
                             PanelCard {
                                 VStack(alignment: .leading, spacing: 14) {
                                     HStack(alignment: .firstTextBaseline) {
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text("Evolution review queue")
-                                                .font(.headline)
-                                            Text("Review-suggested checkpoints stay visible on Home, while checkpoint mutations are centralized in Evolution Control.")
+                                            .font(.headline)
+                                            Text("Home keeps the review head in spotlight, while the remaining queue stays visible here and mutations stay centralized in Evolution Control.")
                                                 .font(.subheadline)
                                                 .foregroundStyle(.secondary)
                                         }
 
                                         Spacer()
 
-                                        Text("\(pendingReviewCheckpointCount) pending")
+                                        Text("\(homePendingQueueCount) queued")
                                             .font(.caption.weight(.bold))
                                             .foregroundStyle(.orange)
                                             .padding(.horizontal, 10)
@@ -253,6 +293,12 @@ struct HomeView: View {
                                                 Capsule()
                                                     .fill(Color.orange.opacity(0.12))
                                             )
+                                    }
+
+                                    if homeReviewHeadCount > 0 {
+                                        Text("Total pending \(currentEvolutionWorkspace.totalPendingReviewCount) • review head \(homeReviewHeadCount) • queue tail \(homePendingQueueCount)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
                                     }
 
                                     ForEach(homePendingReviewPresentations) { checkpoint in
@@ -497,8 +543,12 @@ struct HomeView: View {
         appModel.supportInbox.activeRequests.count
     }
 
-    private var pendingReviewCheckpointCount: Int {
-        systemFlightDeck?.pendingReviewCheckpointCount ?? 0
+    private var homePendingQueueCount: Int {
+        currentEvolutionWorkspace.queuedPendingReviewCount
+    }
+
+    private var homeReviewHeadCount: Int {
+        currentEvolutionWorkspace.spotlightedPendingReviewCount
     }
 
     private var homePendingReviewPresentations: [DecisionEvolutionCheckpointPresentation] {

@@ -11,30 +11,29 @@ struct DecisionEvolutionControlCenterView: View {
     @State private var isRefreshing = false
     private let evolutionSurfaceContract = DecisionEvolutionSurfaceContract.controlCenter
 
-    private var controlSurface: DecisionEvolutionControlSurface {
-        systemFlightDeck?.evolutionControlSurface ?? appModel.makeEvolutionControlSurface()
+    private var evolutionSurfaceState: DecisionEvolutionSurfaceState {
+        appModel.makeEvolutionSurfaceState(
+            contract: evolutionSurfaceContract,
+            flightDeck: systemFlightDeck,
+            historyCheckpoints: evolutionTrailItems
+        )
     }
 
-    private var evolutionTrailPresentations: [DecisionEvolutionCheckpointPresentation] {
+    private var controlSurface: DecisionEvolutionControlSurface {
+        evolutionSurfaceState.controlSurface
+    }
+
+    private var evolutionTrailItems: [DecisionEvolutionCheckpoint] {
         evolutionCheckpoints
-            .filter { $0.lineageSummary != nil || !$0.diffSummary.isEmpty }
-            .map(\.presentation)
+            .evolutionTrailCheckpoints()
     }
 
     private var workspaceSnapshot: DecisionEvolutionWorkspaceSnapshot {
-        DecisionEvolutionWorkspaceSnapshot.build(
-            controlSurface: controlSurface,
-            releaseSummary: systemFlightDeck?.releaseControlSummary,
-            historyPresentations: evolutionTrailPresentations
-        )
+        evolutionSurfaceState.workspace
     }
 
     private var operatorSnapshot: DecisionEvolutionOperatorSnapshot {
-        DecisionEvolutionOperatorSnapshot.build(
-            surfaceKind: evolutionSurfaceContract.kind,
-            workspace: workspaceSnapshot,
-            contract: evolutionSurfaceContract
-        )
+        evolutionSurfaceState.operatorSnapshot
     }
 
     var body: some View {

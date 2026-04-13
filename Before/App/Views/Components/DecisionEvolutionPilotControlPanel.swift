@@ -47,7 +47,7 @@ struct DecisionEvolutionPilotControlPanel: View {
     }
 
     private var pendingReviewLineageCount: Int {
-        controlSurface.pendingReviewQueue.filter { $0.presentation.hasLineage }.count
+        controlSurface.pendingReviewLineagePresentations.count
     }
 
     private var pilotMutationIntents: [DecisionEvolutionMutationIntent] {

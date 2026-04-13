@@ -17,8 +17,7 @@ struct DecisionEvolutionSpotlightSet: Equatable, Sendable {
                 .compactMap { $0 }
         )
 
-        let remainingReviewQueue = controlSurface.pendingReviewQueue
-            .map(\.presentation)
+        let remainingReviewQueue = controlSurface.pendingReviewPresentations
             .filter { checkpoint in
                 guard let reviewPresentation else { return true }
                 return checkpoint.checkpointID != reviewPresentation.checkpointID

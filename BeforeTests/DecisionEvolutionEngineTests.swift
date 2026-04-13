@@ -736,7 +736,7 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         let controlSurface = app.makeEvolutionControlSurface()
 
         XCTAssertEqual(controlSurface.pendingReviewCount, 2)
-        XCTAssertEqual(controlSurface.rollbackReadyCount, 1)
+        XCTAssertEqual(controlSurface.rollbackReadyCount, 0)
         XCTAssertNotNil(controlSurface.activeCheckpoint)
         XCTAssertEqual(controlSurface.activeCheckpoint?.approvalState, .automatic)
         XCTAssertNotEqual(controlSurface.activeCheckpoint?.checkpointID, "checkpoint-control-surface-current")
@@ -834,9 +834,10 @@ final class DecisionEvolutionEngineTests: XCTestCase {
 
         app.markEvolutionCheckpointForReview(checkpointID: "checkpoint-current-review")
         let controlSurface = app.makeEvolutionControlSurface()
+        let liveAutomaticCheckpointID = currentBrain.evolutionState.latestCheckpoint?.id
 
-        XCTAssertEqual(controlSurface.activeCheckpoint?.checkpointID, "checkpoint-automatic-active")
-        XCTAssertEqual(controlSurface.activeCheckpoint?.riskLevel, "low")
+        XCTAssertEqual(controlSurface.activeCheckpoint?.checkpointID, liveAutomaticCheckpointID)
+        XCTAssertNotEqual(controlSurface.activeCheckpoint?.checkpointID, "checkpoint-current-review")
         XCTAssertEqual(controlSurface.reviewCheckpoint?.checkpointID, "checkpoint-current-review")
         XCTAssertEqual(controlSurface.pendingReviewQueue.map(\.checkpointID), ["checkpoint-current-review"])
         XCTAssertFalse(controlSurface.canRollbackActiveCheckpoint)
@@ -924,7 +925,7 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         XCTAssertEqual(controlSurface.reviewAuditFindings, ["review head guardrail"])
         XCTAssertEqual(controlSurface.reviewKillSwitches, ["host-write"])
         XCTAssertEqual(controlSurface.pendingReviewCount, 1)
-        XCTAssertEqual(controlSurface.rollbackReadyCount, 1)
+        XCTAssertEqual(controlSurface.rollbackReadyCount, 0)
         XCTAssertEqual(controlSurface.latestPersistedLineage?.checkpointID, "checkpoint-active-latest")
     }
 
@@ -1677,6 +1678,203 @@ final class DecisionEvolutionEngineTests: XCTestCase {
     }
 
     @MainActor
+    func testApprovingNonActiveReviewCheckpointPreservesLoadedCheckpointPointer() throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+
+        let container = try makeCheckpointApplyContainer()
+        let context = container.mainContext
+        let olderDate = localDate(year: 2026, month: 4, day: 11, hour: 8, minute: 0)
+        let newerDate = localDate(year: 2026, month: 4, day: 11, hour: 9, minute: 0)
+
+        let olderBrainState = DecisionBrainState(
+            profileCore: ["Keep the loaded checkpoint stable."],
+            activeGoals: ["Preserve active checkpoint identity."],
+            relevantMemories: ["Older automatic checkpoint."],
+            sessionBiases: ["Stay local."],
+            retrievalTags: ["older", "active"],
+            reactionWeights: .defaults(for: .quick),
+            identityProfile: .default(for: .quick),
+            boundaryPolicy: .default(riskLevel: InterventionRiskLevel.medium),
+            calibrationState: .stable(at: olderDate),
+            loadedAt: olderDate
+        )
+
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-loaded-older",
+                createdAt: olderDate,
+                fingerprint: "fingerprint-loaded-older",
+                previousCheckpointID: nil,
+                mode: .quick,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyAdvisory,
+                calibrationStatus: .stable,
+                diffSummary: ["Older automatic checkpoint stays loaded."],
+                approvalState: .automatic,
+                rollbackReady: true,
+                brainStateSnapshot: olderBrainState,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: olderDate,
+                    sessionID: "session-loaded-older",
+                    taskType: "decision",
+                    riskLevel: "medium",
+                    permitMode: "compare",
+                    hostGatePercent: 53,
+                    thoughtFoldChecksum: "fold-loaded-older",
+                    updateTicketSummaries: ["older active"],
+                    guardrailFindings: [],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-review-newer",
+                createdAt: newerDate,
+                fingerprint: "fingerprint-review-newer",
+                previousCheckpointID: "checkpoint-loaded-older",
+                mode: .mirror,
+                source: .explicitRefresh,
+                identityRole: .reflectiveWitness,
+                boundaryMode: .localOnlyProtective,
+                calibrationStatus: .stable,
+                diffSummary: ["Newer review checkpoint should not steal the loaded pointer."],
+                approvalState: .reviewSuggested,
+                rollbackReady: true,
+                brainStateSnapshot: nil,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: newerDate,
+                    sessionID: "session-review-newer",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 79,
+                    thoughtFoldChecksum: "fold-review-newer",
+                    updateTicketSummaries: ["newer review"],
+                    guardrailFindings: ["review audit"],
+                    recommendedKillSwitches: ["host-write"]
+                )
+            )
+        )
+        try context.save()
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+        app.applyEvolutionCheckpoint(
+            checkpointID: "checkpoint-loaded-older",
+            now: olderDate.addingTimeInterval(60)
+        )
+        XCTAssertEqual(app.currentBrainState?.evolutionState.latestCheckpoint?.id, "checkpoint-loaded-older")
+
+        app.approveEvolutionCheckpoint(checkpointID: "checkpoint-review-newer")
+
+        XCTAssertEqual(app.currentBrainState?.evolutionState.latestCheckpoint?.id, "checkpoint-loaded-older")
+        XCTAssertEqual(app.currentBrainState?.evolutionState.pendingReviewCount, 0)
+        XCTAssertEqual(app.makeEvolutionControlSurface().activeCheckpoint?.checkpointID, "checkpoint-loaded-older")
+    }
+
+    @MainActor
+    func testClearingNonActiveReviewLineagePreservesLoadedCheckpointPointer() throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+
+        let container = try makeCheckpointApplyContainer()
+        let context = container.mainContext
+        let olderDate = localDate(year: 2026, month: 4, day: 12, hour: 8, minute: 0)
+        let newerDate = localDate(year: 2026, month: 4, day: 12, hour: 9, minute: 0)
+
+        let olderBrainState = DecisionBrainState(
+            profileCore: ["Keep loaded pointer stable through metadata changes."],
+            activeGoals: ["Preserve restored state."],
+            relevantMemories: ["Older automatic checkpoint."],
+            sessionBiases: ["Stay local."],
+            retrievalTags: ["older", "restore"],
+            reactionWeights: .defaults(for: .quick),
+            identityProfile: .default(for: .quick),
+            boundaryPolicy: .default(riskLevel: InterventionRiskLevel.low),
+            calibrationState: .stable(at: olderDate),
+            loadedAt: olderDate
+        )
+
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-lineage-loaded",
+                createdAt: olderDate,
+                fingerprint: "fingerprint-lineage-loaded",
+                previousCheckpointID: nil,
+                mode: .quick,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyAdvisory,
+                calibrationStatus: .stable,
+                diffSummary: ["Loaded checkpoint remains active."],
+                approvalState: .automatic,
+                rollbackReady: true,
+                brainStateSnapshot: olderBrainState,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: olderDate,
+                    sessionID: "session-lineage-loaded",
+                    taskType: "decision",
+                    riskLevel: "low",
+                    permitMode: "answer",
+                    hostGatePercent: 31,
+                    thoughtFoldChecksum: "fold-lineage-loaded",
+                    updateTicketSummaries: ["loaded lineage"],
+                    guardrailFindings: [],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-lineage-review",
+                createdAt: newerDate,
+                fingerprint: "fingerprint-lineage-review",
+                previousCheckpointID: "checkpoint-lineage-loaded",
+                mode: .mirror,
+                source: .explicitRefresh,
+                identityRole: .reflectiveWitness,
+                boundaryMode: .localOnlyProtective,
+                calibrationStatus: .stable,
+                diffSummary: ["Lineage-backed review checkpoint can be cleared without moving the loaded pointer."],
+                approvalState: .reviewSuggested,
+                rollbackReady: true,
+                brainStateSnapshot: nil,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: newerDate,
+                    sessionID: "session-lineage-review",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 84,
+                    thoughtFoldChecksum: "fold-lineage-review",
+                    updateTicketSummaries: ["review lineage"],
+                    guardrailFindings: ["lineage audit"],
+                    recommendedKillSwitches: ["host-write"]
+                )
+            )
+        )
+        try context.save()
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+        app.applyEvolutionCheckpoint(
+            checkpointID: "checkpoint-lineage-loaded",
+            now: olderDate.addingTimeInterval(60)
+        )
+        XCTAssertEqual(app.currentBrainState?.evolutionState.latestCheckpoint?.id, "checkpoint-lineage-loaded")
+
+        app.clearEvolutionCheckpointLineage(checkpointID: "checkpoint-lineage-review")
+
+        XCTAssertEqual(app.currentBrainState?.evolutionState.latestCheckpoint?.id, "checkpoint-lineage-loaded")
+        XCTAssertEqual(app.makeEvolutionControlSurface().activeCheckpoint?.checkpointID, "checkpoint-lineage-loaded")
+    }
+
+    @MainActor
     func testRollbackPreviewMatchesActualControlSurface() throws {
         ActiveDecisionWorkspaceStore.clear()
         DecisionTaskGraphStore.clear()
@@ -1766,6 +1964,199 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         XCTAssertEqual(controlSurface.activeCheckpoint?.checkpointID, preview.projectedActiveCheckpointID)
         XCTAssertEqual(controlSurface.reviewCheckpoint?.checkpointID, preview.projectedReviewCheckpointID)
         XCTAssertEqual(controlSurface.activeCheckpoint?.checkpointID, firstCheckpointID)
+        XCTAssertEqual(app.latestEvolutionMutationOutcome?.kind, .rollbackActiveCheckpoint)
+    }
+
+    @MainActor
+    func testEvolutionSurfacesStayAlignedAcrossApplyClearApproveAndRollback() async throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+
+        let container = try makeCheckpointApplyContainer()
+        let context = container.mainContext
+        let previousDate = localDate(year: 2026, month: 4, day: 13, hour: 8, minute: 0)
+        let activeDate = localDate(year: 2026, month: 4, day: 13, hour: 9, minute: 0)
+        let reviewDate = localDate(year: 2026, month: 4, day: 13, hour: 10, minute: 0)
+
+        let previousBrainState = DecisionBrainState(
+            profileCore: ["Keep the baseline state stable."],
+            activeGoals: ["Leave rollback available."],
+            relevantMemories: ["Previous automatic checkpoint."],
+            sessionBiases: ["Stay local."],
+            retrievalTags: ["previous", "automatic"],
+            reactionWeights: .defaults(for: .quick),
+            identityProfile: .default(for: .quick),
+            boundaryPolicy: .default(riskLevel: InterventionRiskLevel.low),
+            calibrationState: .stable(at: previousDate),
+            loadedAt: previousDate
+        )
+        let activeBrainState = DecisionBrainState(
+            profileCore: ["Use the newer active checkpoint."],
+            activeGoals: ["Preserve restore parity."],
+            relevantMemories: ["Active automatic checkpoint."],
+            sessionBiases: ["Stay local."],
+            retrievalTags: ["active", "automatic"],
+            reactionWeights: .defaults(for: .quick),
+            identityProfile: .default(for: .quick),
+            boundaryPolicy: .default(riskLevel: InterventionRiskLevel.medium),
+            calibrationState: .stable(at: activeDate),
+            loadedAt: activeDate
+        )
+
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-sync-previous",
+                createdAt: previousDate,
+                fingerprint: "fingerprint-sync-previous",
+                previousCheckpointID: nil,
+                mode: .quick,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyAdvisory,
+                calibrationStatus: .stable,
+                diffSummary: ["Previous automatic checkpoint anchors rollback."],
+                approvalState: .automatic,
+                rollbackReady: false,
+                brainStateSnapshot: previousBrainState,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: previousDate,
+                    sessionID: "session-sync-previous",
+                    taskType: "summary",
+                    riskLevel: "low",
+                    permitMode: "answer",
+                    hostGatePercent: 33,
+                    thoughtFoldChecksum: "fold-sync-previous",
+                    updateTicketSummaries: ["previous automatic"],
+                    guardrailFindings: [],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-sync-active",
+                createdAt: activeDate,
+                fingerprint: "fingerprint-sync-active",
+                previousCheckpointID: "checkpoint-sync-previous",
+                mode: .quick,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyAdvisory,
+                calibrationStatus: .stable,
+                diffSummary: ["Active automatic checkpoint should stay aligned across all surfaces."],
+                approvalState: .automatic,
+                rollbackReady: true,
+                brainStateSnapshot: activeBrainState,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: activeDate,
+                    sessionID: "session-sync-active",
+                    taskType: "decision",
+                    riskLevel: "medium",
+                    permitMode: "compare",
+                    hostGatePercent: 58,
+                    thoughtFoldChecksum: "fold-sync-active",
+                    updateTicketSummaries: ["active automatic"],
+                    guardrailFindings: [],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-sync-review",
+                createdAt: reviewDate,
+                fingerprint: "fingerprint-sync-review",
+                previousCheckpointID: "checkpoint-sync-active",
+                mode: .mirror,
+                source: .explicitRefresh,
+                identityRole: .reflectiveWitness,
+                boundaryMode: .localOnlyProtective,
+                calibrationStatus: .stable,
+                diffSummary: ["Review checkpoint keeps lineage until it is explicitly cleared."],
+                approvalState: .reviewSuggested,
+                rollbackReady: true,
+                brainStateSnapshot: nil,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: reviewDate,
+                    sessionID: "session-sync-review",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 82,
+                    thoughtFoldChecksum: "fold-sync-review",
+                    updateTicketSummaries: ["review checkpoint"],
+                    guardrailFindings: ["review audit"],
+                    recommendedKillSwitches: ["host-write"]
+                )
+            )
+        )
+        try context.save()
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+
+        app.applyEvolutionCheckpoint(
+            checkpointID: "checkpoint-sync-active",
+            now: activeDate.addingTimeInterval(30)
+        )
+        try await assertEvolutionSurfaceSync(
+            app: app,
+            context: context,
+            expectedActiveCheckpointID: "checkpoint-sync-active",
+            expectedReviewCheckpointID: "checkpoint-sync-review",
+            expectedPendingReviewCount: 1,
+            expectedRollbackReadyCount: 1,
+            expectedReviewHasLineage: true,
+            expectedCanRollbackActive: true
+        )
+        XCTAssertEqual(app.latestEvolutionMutationOutcome?.kind, .applyCheckpoint)
+
+        app.clearPendingEvolutionCheckpointLineages(checkpointIDs: ["checkpoint-sync-review"])
+        try await assertEvolutionSurfaceSync(
+            app: app,
+            context: context,
+            expectedActiveCheckpointID: "checkpoint-sync-active",
+            expectedReviewCheckpointID: "checkpoint-sync-review",
+            expectedPendingReviewCount: 1,
+            expectedRollbackReadyCount: 1,
+            expectedReviewHasLineage: false,
+            expectedCanRollbackActive: true
+        )
+        XCTAssertEqual(app.latestEvolutionMutationOutcome?.kind, .clearPendingReviewLineage)
+        let lineageClearedCheckpoint = try XCTUnwrap(
+            context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>()).first(where: { $0.id == "checkpoint-sync-review" })
+        )
+        XCTAssertNil(lineageClearedCheckpoint.lineageSummary)
+
+        app.approveEvolutionCheckpoint(checkpointID: "checkpoint-sync-review")
+        try await assertEvolutionSurfaceSync(
+            app: app,
+            context: context,
+            expectedActiveCheckpointID: "checkpoint-sync-active",
+            expectedReviewCheckpointID: nil,
+            expectedPendingReviewCount: 0,
+            expectedRollbackReadyCount: 0,
+            expectedReviewHasLineage: nil,
+            expectedCanRollbackActive: true
+        )
+        XCTAssertEqual(app.latestEvolutionMutationOutcome?.kind, .approveCheckpoint)
+        let approvedCheckpoint = try XCTUnwrap(
+            context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>()).first(where: { $0.id == "checkpoint-sync-review" })
+        )
+        XCTAssertEqual(approvedCheckpoint.approvalState, .automatic)
+
+        app.rollbackActiveEvolutionCheckpoint(now: activeDate.addingTimeInterval(60))
+        try await assertEvolutionSurfaceSync(
+            app: app,
+            context: context,
+            expectedActiveCheckpointID: "checkpoint-sync-previous",
+            expectedReviewCheckpointID: nil,
+            expectedPendingReviewCount: 0,
+            expectedRollbackReadyCount: 0,
+            expectedReviewHasLineage: nil,
+            expectedCanRollbackActive: false
+        )
         XCTAssertEqual(app.latestEvolutionMutationOutcome?.kind, .rollbackActiveCheckpoint)
     }
 
@@ -1952,6 +2343,78 @@ final class DecisionEvolutionEngineTests: XCTestCase {
                 entrySource: .app
             )
         )
+    }
+
+    @MainActor
+    private func assertEvolutionSurfaceSync(
+        app: BeforeAppModel,
+        context: ModelContext,
+        expectedActiveCheckpointID: String?,
+        expectedReviewCheckpointID: String?,
+        expectedPendingReviewCount: Int,
+        expectedRollbackReadyCount: Int,
+        expectedReviewHasLineage: Bool?,
+        expectedCanRollbackActive: Bool,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        let controlSurface = app.makeEvolutionControlSurface()
+        let flightDeck = await app.systemFlightDeck()
+        let historyCheckpoints = try context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())
+            .sorted { lhs, rhs in
+                if lhs.createdAt != rhs.createdAt {
+                    return lhs.createdAt > rhs.createdAt
+                }
+                return lhs.id > rhs.id
+            }
+
+        let localState = app.makeEvolutionSurfaceState(
+            contract: .controlCenter,
+            historyCheckpoints: historyCheckpoints
+        )
+        let flightDeckState = app.makeEvolutionSurfaceState(
+            contract: .controlCenter,
+            flightDeck: flightDeck,
+            historyCheckpoints: historyCheckpoints
+        )
+
+        XCTAssertEqual(flightDeck.evolutionControlSurface, controlSurface, file: file, line: line)
+        XCTAssertEqual(localState.controlSurface, controlSurface, file: file, line: line)
+        XCTAssertEqual(flightDeckState.controlSurface, controlSurface, file: file, line: line)
+
+        XCTAssertEqual(controlSurface.activePresentation?.checkpointID, expectedActiveCheckpointID, file: file, line: line)
+        XCTAssertEqual(controlSurface.reviewPresentation?.checkpointID, expectedReviewCheckpointID, file: file, line: line)
+        XCTAssertEqual(controlSurface.pendingReviewCount, expectedPendingReviewCount, file: file, line: line)
+        XCTAssertEqual(controlSurface.rollbackReadyCount, expectedRollbackReadyCount, file: file, line: line)
+        XCTAssertEqual(controlSurface.canRollbackActiveCheckpoint, expectedCanRollbackActive, file: file, line: line)
+
+        XCTAssertEqual(localState.workspace.activePresentation?.checkpointID, expectedActiveCheckpointID, file: file, line: line)
+        XCTAssertEqual(localState.workspace.reviewPresentation?.checkpointID, expectedReviewCheckpointID, file: file, line: line)
+        XCTAssertEqual(localState.operatorSnapshot.activeCheckpointID, expectedActiveCheckpointID, file: file, line: line)
+        XCTAssertEqual(localState.operatorSnapshot.reviewCheckpointID, expectedReviewCheckpointID, file: file, line: line)
+        XCTAssertEqual(localState.operatorSnapshot.pendingReviewCount, expectedPendingReviewCount, file: file, line: line)
+        XCTAssertEqual(localState.operatorSnapshot.rollbackReadyCount, expectedRollbackReadyCount, file: file, line: line)
+
+        XCTAssertEqual(flightDeckState.workspace.activePresentation?.checkpointID, expectedActiveCheckpointID, file: file, line: line)
+        XCTAssertEqual(flightDeckState.workspace.reviewPresentation?.checkpointID, expectedReviewCheckpointID, file: file, line: line)
+        XCTAssertEqual(flightDeckState.operatorSnapshot.activeCheckpointID, expectedActiveCheckpointID, file: file, line: line)
+        XCTAssertEqual(flightDeckState.operatorSnapshot.reviewCheckpointID, expectedReviewCheckpointID, file: file, line: line)
+        XCTAssertEqual(flightDeckState.operatorSnapshot.pendingReviewCount, expectedPendingReviewCount, file: file, line: line)
+        XCTAssertEqual(flightDeckState.operatorSnapshot.rollbackReadyCount, expectedRollbackReadyCount, file: file, line: line)
+
+        XCTAssertEqual(flightDeck.pendingReviewCheckpointCount, expectedPendingReviewCount, file: file, line: line)
+        XCTAssertEqual(flightDeck.releaseControlSummary.activeCheckpointID, expectedActiveCheckpointID, file: file, line: line)
+        XCTAssertEqual(flightDeck.releaseControlSummary.reviewCheckpointID, expectedReviewCheckpointID, file: file, line: line)
+        XCTAssertEqual(flightDeck.releaseControlSummary.pendingReviewCount, expectedPendingReviewCount, file: file, line: line)
+        XCTAssertEqual(flightDeck.releaseControlSummary.rollbackReadyCount, expectedRollbackReadyCount, file: file, line: line)
+        XCTAssertEqual(flightDeck.releaseControlSummary.canRollbackActiveCheckpoint, expectedCanRollbackActive, file: file, line: line)
+
+        if let expectedReviewHasLineage {
+            XCTAssertEqual(controlSurface.reviewPresentation?.hasLineage, expectedReviewHasLineage, file: file, line: line)
+            XCTAssertEqual(localState.workspace.reviewPresentation?.hasLineage, expectedReviewHasLineage, file: file, line: line)
+            XCTAssertEqual(flightDeckState.workspace.reviewPresentation?.hasLineage, expectedReviewHasLineage, file: file, line: line)
+            XCTAssertEqual(flightDeck.pendingReviewQueue.first?.hasLineage, expectedReviewHasLineage, file: file, line: line)
+        }
     }
 
     private func localDate(year: Int, month: Int, day: Int, hour: Int, minute: Int) -> Date {

@@ -5,7 +5,8 @@ enum DecisionEvolutionControlSurfaceFactory {
         activeCheckpointHint: DecisionReviewCheckpointSnapshot?,
         latestAutomaticLineage: DecisionEvolutionLineageSnapshot? = nil,
         pendingReviewCheckpoints: [DecisionReviewCheckpointSnapshot],
-        latestPersistedLineage: DecisionEvolutionLineageSnapshot?
+        latestPersistedLineage: DecisionEvolutionLineageSnapshot?,
+        restorableCheckpointIDs: Set<String> = []
     ) -> DecisionEvolutionControlSurface {
         let pendingReviewQueue = pendingReviewCheckpoints.sorted { lhs, rhs in
             if lhs.createdAt != rhs.createdAt {
@@ -21,7 +22,8 @@ enum DecisionEvolutionControlSurfaceFactory {
             activeCheckpoint: resolvedActiveCheckpoint,
             reviewCheckpoint: pendingReviewQueue.first,
             pendingReviewQueue: pendingReviewQueue,
-            latestPersistedLineage: latestPersistedLineage
+            latestPersistedLineage: latestPersistedLineage,
+            restorableCheckpointIDs: restorableCheckpointIDs
         )
     }
 }
