@@ -9,6 +9,7 @@ struct DecisionEvolutionControlCenterView: View {
 
     @State private var systemFlightDeck: DecisionSystemFlightDeck?
     @State private var isRefreshing = false
+    @State private var selectedCheckpointIDs = Set<String>()
     private let evolutionSurfaceContract = DecisionEvolutionSurfaceContract.controlCenter
 
     private var evolutionSurfaceState: DecisionEvolutionSurfaceState {
@@ -30,6 +31,30 @@ struct DecisionEvolutionControlCenterView: View {
 
     private var workspaceSnapshot: DecisionEvolutionWorkspaceSnapshot {
         evolutionSurfaceState.workspace
+    }
+
+    private var selectablePresentations: [DecisionEvolutionCheckpointPresentation] {
+        var ordered: [DecisionEvolutionCheckpointPresentation] = []
+
+        func append(_ presentation: DecisionEvolutionCheckpointPresentation?) {
+            guard let presentation else { return }
+            guard !ordered.contains(where: { $0.checkpointID == presentation.checkpointID }) else { return }
+            ordered.append(presentation)
+        }
+
+        append(workspaceSnapshot.activePresentation)
+        append(workspaceSnapshot.reviewPresentation)
+        workspaceSnapshot.remainingReviewQueue.forEach(append)
+        workspaceSnapshot.historyPresentations.forEach(append)
+        return ordered
+    }
+
+    private var batchMutationSelection: DecisionEvolutionBatchMutationSelection {
+        DecisionEvolutionBatchMutationSelection(
+            controlSurface: controlSurface,
+            selectablePresentations: selectablePresentations,
+            selectedCheckpointIDs: selectedCheckpointIDs
+        )
     }
 
     private var operatorSnapshot: DecisionEvolutionOperatorSnapshot {
@@ -120,21 +145,40 @@ struct DecisionEvolutionControlCenterView: View {
                 }
 
                 workspaceSection(
-                    title: "Pilot mutations",
-                    detail: "Operate queue-wide actions here before drilling into individual checkpoints."
+                    title: "Operator mutation hub",
+                    detail: "Queue-wide pilot controls and selection-scoped checkpoint mutations now live in one guarded workspace."
                 ) {
-                    DecisionEvolutionPilotControlPanel(
-                        controlSurface: controlSurface,
-                        releaseSummary: workspaceSnapshot.releaseSummary,
-                        interactionMode: evolutionSurfaceContract.interactionMode,
-                        showEmbeddedReleaseSummary: evolutionSurfaceContract.showsEmbeddedReleaseSummaryInPilotPanel,
-                        showControlCenterShortcut: false,
-                        afterMutation: {
-                            Task {
-                                await refreshFlightDeck()
+                    VStack(alignment: .leading, spacing: 12) {
+                        DecisionEvolutionPilotControlPanel(
+                            controlSurface: controlSurface,
+                            releaseSummary: workspaceSnapshot.releaseSummary,
+                            interactionMode: evolutionSurfaceContract.interactionMode,
+                            showsHeader: false,
+                            showEmbeddedReleaseSummary: false,
+                            showControlCenterShortcut: false,
+                            afterMutation: {
+                                Task {
+                                    await refreshFlightDeck()
+                                }
                             }
-                        }
-                    )
+                        )
+
+                        DecisionEvolutionBatchMutationPanel(
+                            selection: batchMutationSelection,
+                            interactionMode: evolutionSurfaceContract.interactionMode,
+                            showsHeader: false,
+                            selectAllVisible: selectAllVisibleCheckpoints,
+                            selectReviewQueue: selectReviewQueueCheckpoints,
+                            selectAutomatic: selectAutomaticCheckpoints,
+                            selectLineageBacked: selectLineageBackedCheckpoints,
+                            clearSelection: clearSelectedCheckpoints,
+                            afterMutation: {
+                                Task {
+                                    await refreshFlightDeck()
+                                }
+                            }
+                        )
+                    }
                 }
 
                 workspaceSection(
@@ -164,6 +208,10 @@ struct DecisionEvolutionControlCenterView: View {
                             checkpoint: activePresentation,
                             controlSurface: controlSurface,
                             interactionMode: evolutionSurfaceContract.interactionMode,
+                            isSelected: batchMutationSelection.contains(activePresentation.checkpointID),
+                            onToggleSelection: {
+                                toggleCheckpointSelection(activePresentation.checkpointID)
+                            },
                             afterMutation: {
                                 Task {
                                     await refreshFlightDeck()
@@ -183,6 +231,10 @@ struct DecisionEvolutionControlCenterView: View {
                             checkpoint: reviewPresentation,
                             controlSurface: controlSurface,
                             interactionMode: evolutionSurfaceContract.interactionMode,
+                            isSelected: batchMutationSelection.contains(reviewPresentation.checkpointID),
+                            onToggleSelection: {
+                                toggleCheckpointSelection(reviewPresentation.checkpointID)
+                            },
                             afterMutation: {
                                 Task {
                                     await refreshFlightDeck()
@@ -202,6 +254,10 @@ struct DecisionEvolutionControlCenterView: View {
                                 checkpoint: checkpoint,
                                 controlSurface: controlSurface,
                                 interactionMode: evolutionSurfaceContract.interactionMode,
+                                isSelected: batchMutationSelection.contains(checkpoint.checkpointID),
+                                onToggleSelection: {
+                                    toggleCheckpointSelection(checkpoint.checkpointID)
+                                },
                                 afterMutation: {
                                     Task {
                                         await refreshFlightDeck()
@@ -222,6 +278,10 @@ struct DecisionEvolutionControlCenterView: View {
                                 checkpoint: checkpoint,
                                 controlSurface: controlSurface,
                                 interactionMode: evolutionSurfaceContract.interactionMode,
+                                isSelected: batchMutationSelection.contains(checkpoint.checkpointID),
+                                onToggleSelection: {
+                                    toggleCheckpointSelection(checkpoint.checkpointID)
+                                },
                                 afterMutation: {
                                     Task {
                                         await refreshFlightDeck()
@@ -261,6 +321,40 @@ struct DecisionEvolutionControlCenterView: View {
         isRefreshing = true
         defer { isRefreshing = false }
         systemFlightDeck = await appModel.systemFlightDeck()
+        pruneSelectedCheckpointIDs()
+    }
+
+    private func toggleCheckpointSelection(_ checkpointID: String) {
+        if selectedCheckpointIDs.contains(checkpointID) {
+            selectedCheckpointIDs.remove(checkpointID)
+        } else {
+            selectedCheckpointIDs.insert(checkpointID)
+        }
+        pruneSelectedCheckpointIDs()
+    }
+
+    private func selectAllVisibleCheckpoints() {
+        selectedCheckpointIDs = batchMutationSelection.selectableCheckpointIDs
+    }
+
+    private func selectReviewQueueCheckpoints() {
+        selectedCheckpointIDs = batchMutationSelection.reviewQueueCheckpointIDs
+    }
+
+    private func selectAutomaticCheckpoints() {
+        selectedCheckpointIDs = batchMutationSelection.automaticCheckpointIDs
+    }
+
+    private func selectLineageBackedCheckpoints() {
+        selectedCheckpointIDs = batchMutationSelection.lineageCheckpointIDs
+    }
+
+    private func clearSelectedCheckpoints() {
+        selectedCheckpointIDs.removeAll()
+    }
+
+    private func pruneSelectedCheckpointIDs() {
+        selectedCheckpointIDs = selectedCheckpointIDs.intersection(batchMutationSelection.selectableCheckpointIDs)
     }
 
     @ViewBuilder

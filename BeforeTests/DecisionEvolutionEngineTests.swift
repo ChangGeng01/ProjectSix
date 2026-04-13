@@ -1069,7 +1069,7 @@ final class DecisionEvolutionEngineTests: XCTestCase {
     }
 
     @MainActor
-    func testBeforeAppModelApprovePendingEvolutionCheckpointsUsesExplicitTargetIDs() throws {
+    func testBeforeAppModelApprovePendingEvolutionCheckpointsUsesExplicitTargetIDs() async throws {
         ActiveDecisionWorkspaceStore.clear()
         DecisionTaskGraphStore.clear()
         PendingLaunchRequestStore.clear()
@@ -1115,11 +1115,35 @@ final class DecisionEvolutionEngineTests: XCTestCase {
                 lineageSummary: nil
             )
         )
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-automatic-explicit",
+                createdAt: localDate(year: 2026, month: 4, day: 11, hour: 10, minute: 0),
+                fingerprint: "fingerprint-automatic-explicit",
+                previousCheckpointID: nil,
+                mode: .balance,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyAdvisory,
+                calibrationStatus: .stable,
+                diffSummary: ["Automatic checkpoint should stay outside the review queue."],
+                approvalState: .automatic,
+                rollbackReady: false,
+                brainStateSnapshot: nil,
+                lineageSummary: nil
+            )
+        )
         try context.save()
 
         let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
 
-        app.approvePendingEvolutionCheckpoints(checkpointIDs: ["checkpoint-review-a-explicit"])
+        app.approvePendingEvolutionCheckpoints(
+            checkpointIDs: [
+                "checkpoint-automatic-explicit",
+                "checkpoint-review-a-explicit",
+                "missing"
+            ]
+        )
 
         let checkpoints = try context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())
         let pendingIDs = checkpoints
@@ -1131,8 +1155,21 @@ final class DecisionEvolutionEngineTests: XCTestCase {
 
         XCTAssertEqual(pendingIDs, ["checkpoint-review-b-explicit"])
         XCTAssertTrue(automaticIDs.contains("checkpoint-review-a-explicit"))
+        XCTAssertTrue(automaticIDs.contains("checkpoint-automatic-explicit"))
         XCTAssertEqual(app.makeEvolutionControlSurface().pendingReviewQueue.map(\.checkpointID), ["checkpoint-review-b-explicit"])
         XCTAssertEqual(app.latestEvolutionMutationOutcome?.affectedCheckpointIDs, ["checkpoint-review-a-explicit"])
+        let synchronizedFlightDeck = await app.systemFlightDeck()
+        let synchronizedControlSurface = synchronizedFlightDeck.evolutionControlSurface
+        try await assertEvolutionSurfaceSync(
+            app: app,
+            context: context,
+            expectedActiveCheckpointID: synchronizedControlSurface.activePresentation?.checkpointID,
+            expectedReviewCheckpointID: "checkpoint-review-b-explicit",
+            expectedPendingReviewCount: 1,
+            expectedRollbackReadyCount: synchronizedControlSurface.rollbackReadyCount,
+            expectedReviewHasLineage: false,
+            expectedCanRollbackActive: synchronizedControlSurface.canRollbackActiveCheckpoint
+        )
     }
 
     @MainActor
@@ -1224,7 +1261,7 @@ final class DecisionEvolutionEngineTests: XCTestCase {
     }
 
     @MainActor
-    func testBeforeAppModelClearPendingEvolutionCheckpointLineagesUsesExplicitTargetIDs() throws {
+    func testBeforeAppModelClearPendingEvolutionCheckpointLineagesUsesExplicitTargetIDs() async throws {
         ActiveDecisionWorkspaceStore.clear()
         DecisionTaskGraphStore.clear()
         PendingLaunchRequestStore.clear()
@@ -1295,19 +1332,76 @@ final class DecisionEvolutionEngineTests: XCTestCase {
                 lineageSummary: lineageB
             )
         )
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-automatic-lineage-explicit",
+                createdAt: localDate(year: 2026, month: 4, day: 11, hour: 10, minute: 0),
+                fingerprint: "fingerprint-automatic-lineage-explicit",
+                previousCheckpointID: nil,
+                mode: .balance,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyAdvisory,
+                calibrationStatus: .stable,
+                diffSummary: ["Automatic lineage should not be clearable through the review-queue mutation."],
+                approvalState: .automatic,
+                rollbackReady: false,
+                brainStateSnapshot: nil,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: localDate(year: 2026, month: 4, day: 11, hour: 10, minute: 0),
+                    sessionID: "session-automatic-lineage-explicit",
+                    taskType: "summary",
+                    riskLevel: "low",
+                    permitMode: "answer",
+                    hostGatePercent: 27,
+                    thoughtFoldChecksum: "fold-automatic-lineage-explicit",
+                    updateTicketSummaries: ["keep automatic lineage"],
+                    guardrailFindings: [],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
         try context.save()
 
         let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
 
-        app.clearPendingEvolutionCheckpointLineages(checkpointIDs: ["checkpoint-review-lineage-a"])
+        app.clearPendingEvolutionCheckpointLineages(
+            checkpointIDs: [
+                "checkpoint-review-lineage-a",
+                "checkpoint-automatic-lineage-explicit",
+                "missing"
+            ]
+        )
 
         let checkpoints = try context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())
         let checkpointA = try XCTUnwrap(checkpoints.first(where: { $0.id == "checkpoint-review-lineage-a" }))
         let checkpointB = try XCTUnwrap(checkpoints.first(where: { $0.id == "checkpoint-review-lineage-b" }))
+        let automaticCheckpoint = try XCTUnwrap(checkpoints.first(where: { $0.id == "checkpoint-automatic-lineage-explicit" }))
 
         XCTAssertNil(checkpointA.lineageSummary)
         XCTAssertNotNil(checkpointB.lineageSummary)
+        XCTAssertNotNil(automaticCheckpoint.lineageSummary)
         XCTAssertEqual(app.latestEvolutionMutationOutcome?.affectedCheckpointIDs, ["checkpoint-review-lineage-a"])
+        let synchronizedFlightDeck = await app.systemFlightDeck()
+        let synchronizedControlSurface = synchronizedFlightDeck.evolutionControlSurface
+        XCTAssertEqual(
+            synchronizedControlSurface.pendingReviewQueue.map(\.checkpointID),
+            ["checkpoint-review-lineage-b", "checkpoint-review-lineage-a"]
+        )
+        XCTAssertEqual(
+            synchronizedControlSurface.pendingReviewLineagePresentations.map(\.checkpointID),
+            ["checkpoint-review-lineage-b"]
+        )
+        try await assertEvolutionSurfaceSync(
+            app: app,
+            context: context,
+            expectedActiveCheckpointID: synchronizedControlSurface.activePresentation?.checkpointID,
+            expectedReviewCheckpointID: "checkpoint-review-lineage-b",
+            expectedPendingReviewCount: 2,
+            expectedRollbackReadyCount: synchronizedControlSurface.rollbackReadyCount,
+            expectedReviewHasLineage: true,
+            expectedCanRollbackActive: synchronizedControlSurface.canRollbackActiveCheckpoint
+        )
     }
 
     @MainActor
@@ -1570,6 +1664,185 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         )
         XCTAssertNil(checkpoint.lineageSummary)
         XCTAssertEqual(app.latestEvolutionMutationOutcome?.kind, .clearPendingReviewLineage)
+    }
+
+    @MainActor
+    func testApproveSelectedCheckpointKeepsUntouchedReviewHeadAndReleaseSummaryInSync() async throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+
+        let container = try makeCheckpointApplyContainer()
+        let context = container.mainContext
+
+        let activeBrainState = DecisionBrainState(
+            profileCore: ["Protect active checkpoint alignment."],
+            activeGoals: ["Keep release summary and review queue synchronized."],
+            relevantMemories: ["This checkpoint represents the current automatic slot."],
+            sessionBiases: ["Prefer stable automatic lineage."],
+            retrievalTags: ["quick", "active", "sync"],
+            reactionWeights: .defaults(for: .quick),
+            identityProfile: .default(for: .quick),
+            boundaryPolicy: .default(riskLevel: InterventionRiskLevel.low),
+            calibrationState: .stable(at: localDate(year: 2026, month: 4, day: 11, hour: 9, minute: 30)),
+            loadedAt: localDate(year: 2026, month: 4, day: 11, hour: 9, minute: 30)
+        )
+
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-active-sync",
+                createdAt: localDate(year: 2026, month: 4, day: 11, hour: 9, minute: 30),
+                fingerprint: "fingerprint-active-sync",
+                previousCheckpointID: "checkpoint-active-sync-previous",
+                mode: .quick,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyAdvisory,
+                calibrationStatus: .stable,
+                diffSummary: ["Active checkpoint."],
+                approvalState: .automatic,
+                rollbackReady: true,
+                brainStateSnapshot: activeBrainState,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: localDate(year: 2026, month: 4, day: 11, hour: 9, minute: 30),
+                    sessionID: "session-active-sync",
+                    taskType: "decision",
+                    riskLevel: "low",
+                    permitMode: "answer",
+                    hostGatePercent: 44,
+                    thoughtFoldChecksum: "fold-active-sync",
+                    updateTicketSummaries: ["active ticket"],
+                    guardrailFindings: [],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-review-head-sync",
+                createdAt: localDate(year: 2026, month: 4, day: 11, hour: 9, minute: 20),
+                fingerprint: "fingerprint-review-head-sync",
+                previousCheckpointID: nil,
+                mode: .mirror,
+                source: .explicitRefresh,
+                identityRole: .reflectiveWitness,
+                boundaryMode: .localOnlyProtective,
+                calibrationStatus: .watch,
+                diffSummary: ["Review head checkpoint."],
+                approvalState: .reviewSuggested,
+                rollbackReady: true,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: localDate(year: 2026, month: 4, day: 11, hour: 9, minute: 20),
+                    sessionID: "session-review-head-sync",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 80,
+                    thoughtFoldChecksum: "fold-review-head-sync",
+                    updateTicketSummaries: ["head ticket"],
+                    guardrailFindings: ["head audit"],
+                    recommendedKillSwitches: ["head-switch"]
+                )
+            )
+        )
+
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-review-middle-sync",
+                createdAt: localDate(year: 2026, month: 4, day: 11, hour: 9, minute: 10),
+                fingerprint: "fingerprint-review-middle-sync",
+                previousCheckpointID: nil,
+                mode: .balance,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyProtective,
+                calibrationStatus: .watch,
+                diffSummary: ["Review middle checkpoint."],
+                approvalState: .reviewSuggested,
+                rollbackReady: true,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: localDate(year: 2026, month: 4, day: 11, hour: 9, minute: 10),
+                    sessionID: "session-review-middle-sync",
+                    taskType: "tradeoff",
+                    riskLevel: "medium",
+                    permitMode: "compare",
+                    hostGatePercent: 68,
+                    thoughtFoldChecksum: "fold-review-middle-sync",
+                    updateTicketSummaries: ["middle ticket"],
+                    guardrailFindings: ["middle audit"],
+                    recommendedKillSwitches: ["middle-switch"]
+                )
+            )
+        )
+
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-review-tail-sync",
+                createdAt: localDate(year: 2026, month: 4, day: 11, hour: 9, minute: 0),
+                fingerprint: "fingerprint-review-tail-sync",
+                previousCheckpointID: nil,
+                mode: .quick,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyProtective,
+                calibrationStatus: .stable,
+                diffSummary: ["Review tail checkpoint."],
+                approvalState: .reviewSuggested,
+                rollbackReady: true,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: localDate(year: 2026, month: 4, day: 11, hour: 9, minute: 0),
+                    sessionID: "session-review-tail-sync",
+                    taskType: "summary",
+                    riskLevel: "medium",
+                    permitMode: "compare",
+                    hostGatePercent: 59,
+                    thoughtFoldChecksum: "fold-review-tail-sync",
+                    updateTicketSummaries: ["tail ticket"],
+                    guardrailFindings: ["tail audit"],
+                    recommendedKillSwitches: ["tail-switch"]
+                )
+            )
+        )
+        try context.save()
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+        let preMutationFlightDeck = await app.systemFlightDeck()
+        let preMutationControlSurface = preMutationFlightDeck.evolutionControlSurface
+        let preview = try XCTUnwrap(
+            DecisionEvolutionMutationIntentFactory.approveSelectedCheckpoints(
+                presentations: preMutationControlSurface.pendingReviewPresentations.filter {
+                    $0.checkpointID == "checkpoint-review-tail-sync"
+                },
+                controlSurface: preMutationControlSurface
+            )?.preview
+        )
+        app.approveEvolutionCheckpoints(checkpointIDs: ["checkpoint-review-tail-sync"])
+
+        let synchronizedFlightDeck = await app.systemFlightDeck()
+        let synchronizedControlSurface = synchronizedFlightDeck.evolutionControlSurface
+        XCTAssertEqual(synchronizedControlSurface.activeCheckpoint?.checkpointID, preview.projectedActiveCheckpointID)
+        XCTAssertEqual(synchronizedControlSurface.reviewCheckpoint?.checkpointID, preview.projectedReviewCheckpointID)
+        XCTAssertEqual(synchronizedControlSurface.pendingReviewQueue.map(\.checkpointID), [
+            "checkpoint-review-head-sync",
+            "checkpoint-review-middle-sync"
+        ])
+        XCTAssertEqual(synchronizedControlSurface.queueAuditFindings, ["head audit", "middle audit"])
+        XCTAssertEqual(synchronizedControlSurface.queueKillSwitches, ["head-switch", "middle-switch"])
+        XCTAssertEqual(app.latestEvolutionMutationOutcome?.kind, .approveSelectedCheckpoints)
+        XCTAssertEqual(app.latestEvolutionMutationOutcome?.affectedCheckpointIDs, ["checkpoint-review-tail-sync"])
+
+        try await assertEvolutionSurfaceSync(
+            app: app,
+            context: context,
+            expectedActiveCheckpointID: synchronizedControlSurface.activeCheckpoint?.checkpointID,
+            expectedReviewCheckpointID: synchronizedControlSurface.reviewCheckpoint?.checkpointID,
+            expectedPendingReviewCount: 2,
+            expectedRollbackReadyCount: synchronizedControlSurface.rollbackReadyCount,
+            expectedReviewHasLineage: true,
+            expectedCanRollbackActive: synchronizedControlSurface.canRollbackActiveCheckpoint
+        )
     }
 
     @MainActor
@@ -2358,8 +2631,8 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) async throws {
-        let controlSurface = app.makeEvolutionControlSurface()
         let flightDeck = await app.systemFlightDeck()
+        let controlSurface = flightDeck.evolutionControlSurface
         let historyCheckpoints = try context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())
             .sorted { lhs, rhs in
                 if lhs.createdAt != rhs.createdAt {
@@ -2370,17 +2643,12 @@ final class DecisionEvolutionEngineTests: XCTestCase {
 
         let localState = app.makeEvolutionSurfaceState(
             contract: .controlCenter,
-            historyCheckpoints: historyCheckpoints
-        )
-        let flightDeckState = app.makeEvolutionSurfaceState(
-            contract: .controlCenter,
             flightDeck: flightDeck,
             historyCheckpoints: historyCheckpoints
         )
 
         XCTAssertEqual(flightDeck.evolutionControlSurface, controlSurface, file: file, line: line)
         XCTAssertEqual(localState.controlSurface, controlSurface, file: file, line: line)
-        XCTAssertEqual(flightDeckState.controlSurface, controlSurface, file: file, line: line)
 
         XCTAssertEqual(controlSurface.activePresentation?.checkpointID, expectedActiveCheckpointID, file: file, line: line)
         XCTAssertEqual(controlSurface.reviewPresentation?.checkpointID, expectedReviewCheckpointID, file: file, line: line)
@@ -2395,13 +2663,6 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         XCTAssertEqual(localState.operatorSnapshot.pendingReviewCount, expectedPendingReviewCount, file: file, line: line)
         XCTAssertEqual(localState.operatorSnapshot.rollbackReadyCount, expectedRollbackReadyCount, file: file, line: line)
 
-        XCTAssertEqual(flightDeckState.workspace.activePresentation?.checkpointID, expectedActiveCheckpointID, file: file, line: line)
-        XCTAssertEqual(flightDeckState.workspace.reviewPresentation?.checkpointID, expectedReviewCheckpointID, file: file, line: line)
-        XCTAssertEqual(flightDeckState.operatorSnapshot.activeCheckpointID, expectedActiveCheckpointID, file: file, line: line)
-        XCTAssertEqual(flightDeckState.operatorSnapshot.reviewCheckpointID, expectedReviewCheckpointID, file: file, line: line)
-        XCTAssertEqual(flightDeckState.operatorSnapshot.pendingReviewCount, expectedPendingReviewCount, file: file, line: line)
-        XCTAssertEqual(flightDeckState.operatorSnapshot.rollbackReadyCount, expectedRollbackReadyCount, file: file, line: line)
-
         XCTAssertEqual(flightDeck.pendingReviewCheckpointCount, expectedPendingReviewCount, file: file, line: line)
         XCTAssertEqual(flightDeck.releaseControlSummary.activeCheckpointID, expectedActiveCheckpointID, file: file, line: line)
         XCTAssertEqual(flightDeck.releaseControlSummary.reviewCheckpointID, expectedReviewCheckpointID, file: file, line: line)
@@ -2412,7 +2673,6 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         if let expectedReviewHasLineage {
             XCTAssertEqual(controlSurface.reviewPresentation?.hasLineage, expectedReviewHasLineage, file: file, line: line)
             XCTAssertEqual(localState.workspace.reviewPresentation?.hasLineage, expectedReviewHasLineage, file: file, line: line)
-            XCTAssertEqual(flightDeckState.workspace.reviewPresentation?.hasLineage, expectedReviewHasLineage, file: file, line: line)
             XCTAssertEqual(flightDeck.pendingReviewQueue.first?.hasLineage, expectedReviewHasLineage, file: file, line: line)
         }
     }

@@ -20,6 +20,7 @@
 		0631D505C4BD028BFDA89AA1 /* DecisionEvolutionCheckpointActionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A32A13B15D20FC5AE43C886C /* DecisionEvolutionCheckpointActionBar.swift */; };
 		063B95CB0003BED2CEFA42C0 /* SupportRequestKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E920EDE589F5E07C3D3C2C1F /* SupportRequestKindTests.swift */; };
 		07457F421CA95B94ED48C8C6 /* CodableStateStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D4DCB98641E43A533CDF23 /* CodableStateStorage.swift */; };
+		085B7BADB090BFED4FD74438 /* DecisionEvolutionBatchMutationSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDA8FFDD4A28F0C1DAEB5E52 /* DecisionEvolutionBatchMutationSelection.swift */; };
 		08AAF44BA0112CC0995586EE /* SharedProtectedStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29B2D56D159527FCF85EB5E4 /* SharedProtectedStateStore.swift */; };
 		08E0CF120EEAFE9A355FA71F /* CheckEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB33E572D887CB4574F01A2 /* CheckEvent.swift */; };
 		09C7278F68876D47C852BB34 /* BeforeBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 788D0A8A1D8137BDA6A5EDE0 /* BeforeBackground.swift */; };
@@ -121,6 +122,7 @@
 		4969D37725010235EDB286FC /* LetGoCopyLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FFF495962DBEFB2CBCD451 /* LetGoCopyLibrary.swift */; };
 		4E2B83A5CC1099AEE16A4AA9 /* LaunchRequestResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC3ED6E2F02764281FE79FDD /* LaunchRequestResolver.swift */; };
 		5106C2BC41287D9186F0155A /* DecisionEvolutionControlSurfaceFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = C79A85E5C1DC319BB570691F /* DecisionEvolutionControlSurfaceFactory.swift */; };
+		514811AD65EF3CB3F6D275C4 /* DecisionEvolutionBatchMutationSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FAC5C6DB191C7409ECB98CD /* DecisionEvolutionBatchMutationSelectionTests.swift */; };
 		514E8C0F9F44F8BAE2173DDB /* TomorrowBoxDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DDB21D625F2F95F5D016974 /* TomorrowBoxDraft.swift */; };
 		5163F8D746F1CF079AB765D5 /* OpenQuickCheckIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEDCB8C02350F6CC22C4DAAC /* OpenQuickCheckIntent.swift */; };
 		52737B94451BEBEE58D6A018 /* BeforeTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FBEC07A4802202A55F07273 /* BeforeTheme.swift */; };
@@ -208,6 +210,7 @@
 		834B0350C43BB3210998BBCB /* SampleHostApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B8A0222B125860714FA85B4 /* SampleHostApp.swift */; };
 		83F0A4ECEA0F8D3ABCAE5C21 /* BeforeProductCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = D17FB9FCEA01565B7E2AF2F3 /* BeforeProductCompatibility.swift */; };
 		84559BF58EFD90CA6BFB97FA /* ProtectedLocalStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ECDE0CE15D946CD950732D2 /* ProtectedLocalStateStore.swift */; };
+		84CBBD4492FAB4598D00B15D /* DecisionEvolutionBatchMutationPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC877D28F772BC8749BB605 /* DecisionEvolutionBatchMutationPanel.swift */; };
 		858897610D7AC7359FD19BE9 /* ReflectionPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7084BBE94DCFAE7AF1AF2241 /* ReflectionPromptView.swift */; };
 		8657FFD90EFC3D8E2B79A948 /* SharedLifeRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832388234BBD87089EB64DD9 /* SharedLifeRule.swift */; };
 		86C0AF0FFC0C65E491F002E2 /* DecisionFieldSuggestionLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E54FE3709A309C60A79794 /* DecisionFieldSuggestionLibrary.swift */; };
@@ -505,6 +508,7 @@
 		2E14988718F0EFD9D9259A35 /* SupportRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportRequest.swift; sourceTree = "<group>"; };
 		2E80E1EA06D6EC8301974704 /* AIFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIFlowUITests.swift; sourceTree = "<group>"; };
 		2F047738D148D3433E732FA5 /* DecisionIntelligenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligenceCoordinator.swift; sourceTree = "<group>"; };
+		2FAC5C6DB191C7409ECB98CD /* DecisionEvolutionBatchMutationSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionBatchMutationSelectionTests.swift; sourceTree = "<group>"; };
 		2FC0E53534B32B214E62F4E5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2FF0AE4C04AAF5821C532270 /* BeforeAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeAppModel.swift; sourceTree = "<group>"; };
 		3196F4083F833BD2CEB714E2 /* EmbeddingMemoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddingMemoryStore.swift; sourceTree = "<group>"; };
@@ -678,6 +682,7 @@
 		CBA45C9352ADB08ABB450160 /* DecisionEvolutionCheckpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionCheckpoint.swift; sourceTree = "<group>"; };
 		CC3ED6E2F02764281FE79FDD /* LaunchRequestResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchRequestResolver.swift; sourceTree = "<group>"; };
 		CC7AFD8BAE5FD8656546EA60 /* ReminderSelectionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderSelectionPolicy.swift; sourceTree = "<group>"; };
+		CDA8FFDD4A28F0C1DAEB5E52 /* DecisionEvolutionBatchMutationSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionBatchMutationSelection.swift; sourceTree = "<group>"; };
 		CE61325D62DB9B360C987740 /* InterventionNotificationPolicyEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterventionNotificationPolicyEngineTests.swift; sourceTree = "<group>"; };
 		D07F875A892342DA7E6EBF09 /* DecisionEvolutionControlSurfaceSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionControlSurfaceSummaryView.swift; sourceTree = "<group>"; };
 		D128D25C85A9030D123405C2 /* DecisionIntelligenceDebugStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligenceDebugStore.swift; sourceTree = "<group>"; };
@@ -701,6 +706,7 @@
 		DDB7F1306151CE6EAB2CA002 /* WidgetSafeCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSafeCopy.swift; sourceTree = "<group>"; };
 		DDDD081226C6B85C84D8D0FA /* LetGoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetGoView.swift; sourceTree = "<group>"; };
 		DE042EFEC57B6C8465029270 /* DecisionTaskGraphStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionTaskGraphStoreTests.swift; sourceTree = "<group>"; };
+		DEC877D28F772BC8749BB605 /* DecisionEvolutionBatchMutationPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionBatchMutationPanel.swift; sourceTree = "<group>"; };
 		DFD2868E97EE717A12832586 /* BrainStateUpdate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainStateUpdate.swift; sourceTree = "<group>"; };
 		DFDA8C2C4F4EB349F7763323 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		E0656CAE27BF88BE30C8D92B /* DecisionCalibrationEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionCalibrationEngineTests.swift; sourceTree = "<group>"; };
@@ -895,6 +901,7 @@
 				AAA15166252EE02385381B36 /* DecisionCapabilityCoverageBuilder.swift */,
 				BD7AE8679F2717EDE797F325 /* DecisionContextLifecycle.swift */,
 				CADB7615D8F88530E8BCF7DD /* DecisionEvolutionAttentionSignal.swift */,
+				CDA8FFDD4A28F0C1DAEB5E52 /* DecisionEvolutionBatchMutationSelection.swift */,
 				DAAB147D1DC8A27E002EB88C /* DecisionEvolutionCheckpointPresentation.swift */,
 				7114FCB6BB7DF1755F774393 /* DecisionEvolutionControlInteractionMode.swift */,
 				80EC72400811F232751C244A /* DecisionEvolutionControlSurface.swift */,
@@ -1009,6 +1016,7 @@
 				E6504AA1C1B1630947561C61 /* DecisionCapabilityCoverageBuilderTests.swift */,
 				167E5FF74A76B475CE75CC1F /* DecisionContextLifecycleTests.swift */,
 				F35B515D642FD6290C2288BB /* DecisionEvolutionAttentionSignalTests.swift */,
+				2FAC5C6DB191C7409ECB98CD /* DecisionEvolutionBatchMutationSelectionTests.swift */,
 				02ED930EC9B2DA7B145893C6 /* DecisionEvolutionControlSurfaceInventoryTests.swift */,
 				BE1CA6C9695EDAE1B9506F27 /* DecisionEvolutionEngineTests.swift */,
 				F3CD847D546C2A16BB784521 /* DecisionEvolutionMutationIntentTests.swift */,
@@ -1249,6 +1257,7 @@
 				2A7B6A83F0C81717A9A5D601 /* BeforeActionButton.swift */,
 				788D0A8A1D8137BDA6A5EDE0 /* BeforeBackground.swift */,
 				5658063272F3B6A6B04B0EFE /* DecisionContinuationActions.swift */,
+				DEC877D28F772BC8749BB605 /* DecisionEvolutionBatchMutationPanel.swift */,
 				A32A13B15D20FC5AE43C886C /* DecisionEvolutionCheckpointActionBar.swift */,
 				0D103FF6D5DF7EFE2B7D4704 /* DecisionEvolutionCheckpointLineageDetailsView.swift */,
 				5A149D9626309B2575BCCE3F /* DecisionEvolutionCheckpointPanelView.swift */,
@@ -1597,6 +1606,8 @@
 				046F56A2947A1E8287D8392E /* DecisionContextPreparedState.swift in Sources */,
 				CC5EF4FD96DC5D33D7F92A37 /* DecisionContinuationActions.swift in Sources */,
 				3961A033BC0325AE93B59910 /* DecisionEvolutionAttentionSignal.swift in Sources */,
+				84CBBD4492FAB4598D00B15D /* DecisionEvolutionBatchMutationPanel.swift in Sources */,
+				085B7BADB090BFED4FD74438 /* DecisionEvolutionBatchMutationSelection.swift in Sources */,
 				97992D80BEEA79ACC39B7933 /* DecisionEvolutionCheckpoint.swift in Sources */,
 				0631D505C4BD028BFDA89AA1 /* DecisionEvolutionCheckpointActionBar.swift in Sources */,
 				C2A96E22FAAC5ACBFBC71928 /* DecisionEvolutionCheckpointLineageDetailsView.swift in Sources */,
@@ -1824,6 +1835,7 @@
 				55CD809783D351CBBCA95D0D /* DecisionCapabilityCoverageBuilderTests.swift in Sources */,
 				F9BD2BED06676E7550F737F7 /* DecisionContextLifecycleTests.swift in Sources */,
 				D98EEE31B2D1AF0B103F9B13 /* DecisionEvolutionAttentionSignalTests.swift in Sources */,
+				514811AD65EF3CB3F6D275C4 /* DecisionEvolutionBatchMutationSelectionTests.swift in Sources */,
 				792B719DABE568FF4D990CF8 /* DecisionEvolutionControlSurfaceInventoryTests.swift in Sources */,
 				4331855BA82900212ECC1F48 /* DecisionEvolutionEngineTests.swift in Sources */,
 				7ECBAF3634F4DA96F69DA40C /* DecisionEvolutionMutationIntentTests.swift in Sources */,

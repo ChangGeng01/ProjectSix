@@ -5,6 +5,9 @@ enum DecisionEvolutionMutationKind: String, Equatable, Sendable {
     case approveCheckpoint
     case markCheckpointForReview
     case clearCheckpointLineage
+    case approveSelectedCheckpoints
+    case markSelectedCheckpointsForReview
+    case clearSelectedCheckpointLineages
     case restoreActiveCheckpoint
     case rollbackActiveCheckpoint
     case approvePendingCheckpoints
@@ -15,6 +18,7 @@ enum DecisionEvolutionMutationScope: String, Equatable, Sendable {
     case checkpoint
     case activePath
     case reviewQueue
+    case selection
 
     var badgeTitle: String {
         switch self {
@@ -24,6 +28,8 @@ enum DecisionEvolutionMutationScope: String, Equatable, Sendable {
             "ACTIVE PATH"
         case .reviewQueue:
             "REVIEW QUEUE"
+        case .selection:
+            "SELECTION"
         }
     }
 
@@ -35,6 +41,8 @@ enum DecisionEvolutionMutationScope: String, Equatable, Sendable {
             "Active-path mutation"
         case .reviewQueue:
             "Review-queue mutation"
+        case .selection:
+            "Selection mutation"
         }
     }
 }
@@ -539,6 +547,154 @@ enum DecisionEvolutionMutationIntentFactory {
         )
     }
 
+    static func approveSelectedCheckpoints(
+        presentations: [DecisionEvolutionCheckpointPresentation],
+        controlSurface: DecisionEvolutionControlSurface
+    ) -> DecisionEvolutionMutationIntent? {
+        let targets = orderedUniqueCheckpointIDs(
+            presentations
+                .filter { $0.approvalState == .reviewSuggested }
+                .map(\.checkpointID)
+        )
+        guard !targets.isEmpty else { return nil }
+
+        let targetSet = Set(targets)
+        let remainingQueue = controlSurface.pendingReviewPresentations.filter {
+            !targetSet.contains($0.checkpointID)
+        }
+        let lineageBackedCount = presentations.filter(\.hasLineage).count
+
+        var retained = ["Active checkpoint remains \(checkpointToken(controlSurface.activePresentation?.checkpointID))."]
+        if lineageBackedCount > 0 {
+            retained.append("\(lineageBackedCount) selected checkpoint(s) keep their recovered lineage facts after approval.")
+        }
+
+        return DecisionEvolutionMutationIntent(
+            kind: .approveSelectedCheckpoints,
+            title: "Approve selected",
+            message: "Approve \(targets.count) selected review checkpoint\(targets.count == 1 ? "" : "s") and move only that slice back to the automatic evolution path.",
+            confirmTitle: "Approve selected",
+            isDestructive: false,
+            preview: DecisionEvolutionMutationPreview(
+                kind: .approveSelectedCheckpoints,
+                scope: .selection,
+                headline: "Approve \(targets.count) selected checkpoint\(targets.count == 1 ? "" : "s")",
+                summary: "Only the selected review checkpoints leave the queue. The untouched review head and queue tail stay visible.",
+                targetCheckpointIDs: targets,
+                currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+                projectedActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+                currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
+                projectedReviewCheckpointID: remainingQueue.first?.checkpointID,
+                changeHighlights: [
+                    "\(targets.count) selected checkpoint(s) will move from review-suggested to automatic.",
+                    remainingQueue.isEmpty
+                        ? "Review queue will be emptied."
+                        : "Review queue will keep \(remainingQueue.count) checkpoint(s) after approval."
+                ],
+                retainedHighlights: retained,
+                warningHighlights: ["Approval does not restore selected checkpoints as the live active brain state."]
+            )
+        )
+    }
+
+    static func markSelectedCheckpointsForReview(
+        presentations: [DecisionEvolutionCheckpointPresentation],
+        controlSurface: DecisionEvolutionControlSurface
+    ) -> DecisionEvolutionMutationIntent? {
+        let targets = orderedUniquePresentations(
+            presentations.filter { $0.approvalState == .automatic }
+        )
+        guard !targets.isEmpty else { return nil }
+
+        let targetIDs = targets.map(\.checkpointID)
+        let targetIDSet = Set(targetIDs)
+        let projectedReviewID = preferredCheckpointID(
+            from: (controlSurface.reviewPresentation.map { [$0] } ?? []) + targets
+        )
+        let currentActiveID = controlSurface.activePresentation?.checkpointID
+        let projectedActiveID = currentActiveID.flatMap { targetIDSet.contains($0) ? nil : $0 }
+
+        return DecisionEvolutionMutationIntent(
+            kind: .markSelectedCheckpointsForReview,
+            title: "Mark selected",
+            message: "Move \(targetIDs.count) selected automatic checkpoint\(targetIDs.count == 1 ? "" : "s") into the explicit review path without restoring them.",
+            confirmTitle: "Mark selected",
+            isDestructive: false,
+            preview: DecisionEvolutionMutationPreview(
+                kind: .markSelectedCheckpointsForReview,
+                scope: .selection,
+                headline: "Mark \(targetIDs.count) selected checkpoint\(targetIDs.count == 1 ? "" : "s") for review",
+                summary: "Only the selected automatic checkpoints move into the review queue.",
+                targetCheckpointIDs: targetIDs,
+                currentActiveCheckpointID: currentActiveID,
+                projectedActiveCheckpointID: projectedActiveID,
+                currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
+                projectedReviewCheckpointID: projectedReviewID,
+                changeHighlights: [
+                    "\(targetIDs.count) selected checkpoint(s) will enter the review queue.",
+                    projectedActiveID == nil
+                        ? "The automatic active slot will no longer point at the selected active checkpoint."
+                        : "The automatic active slot remains \(checkpointToken(projectedActiveID))."
+                ],
+                retainedHighlights: [
+                    "Restoring the live active brain state still requires an explicit apply action."
+                ],
+                warningHighlights: ["Marking for review changes approval state only; it does not restore any checkpoint."]
+            )
+        )
+    }
+
+    static func clearSelectedCheckpointLineages(
+        presentations: [DecisionEvolutionCheckpointPresentation],
+        controlSurface: DecisionEvolutionControlSurface
+    ) -> DecisionEvolutionMutationIntent? {
+        let targets = orderedUniquePresentations(presentations.filter(\.hasLineage))
+        guard !targets.isEmpty else { return nil }
+
+        let ticketCount = targets.reduce(0) { $0 + $1.updateTicketSummaries.count }
+        let auditCount = targets.reduce(0) { $0 + $1.auditFindings.count }
+        let killSwitchCount = targets.reduce(0) { $0 + $1.killSwitches.count }
+
+        var warnings: [String] = []
+        if ticketCount > 0 {
+            warnings.append("\(ticketCount) recovered ticket summary entry/entries will be removed from the selected checkpoints.")
+        }
+        if auditCount > 0 {
+            warnings.append("\(auditCount) audit finding(s) will no longer be recoverable from the selected checkpoints.")
+        }
+        if killSwitchCount > 0 {
+            warnings.append("\(killSwitchCount) suggested kill-switch recommendation(s) will be removed with the lineage payload.")
+        }
+
+        return DecisionEvolutionMutationIntent(
+            kind: .clearSelectedCheckpointLineages,
+            title: "Clear selected lineage",
+            message: "Remove persisted lineage from \(targets.count) selected checkpoint\(targets.count == 1 ? "" : "s"). The checkpoint records remain in place.",
+            confirmTitle: "Clear selected lineage",
+            isDestructive: true,
+            preview: DecisionEvolutionMutationPreview(
+                kind: .clearSelectedCheckpointLineages,
+                scope: .selection,
+                headline: "Clear lineage on \(targets.count) selected checkpoint\(targets.count == 1 ? "" : "s")",
+                summary: "This keeps the selected checkpoint records but removes their recovered L13 lineage facts.",
+                targetCheckpointIDs: targets.map(\.checkpointID),
+                currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+                projectedActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+                currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
+                projectedReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
+                changeHighlights: [
+                    "\(targets.count) selected checkpoint(s) will lose persisted lineage details.",
+                    "Approval state and queue membership remain unchanged."
+                ],
+                retainedHighlights: [
+                    "The active checkpoint remains \(checkpointToken(controlSurface.activePresentation?.checkpointID)).",
+                    "Review queue placement is preserved for review-suggested selections."
+                ],
+                warningHighlights: warnings
+            )
+        )
+    }
+
     private static func resolvedPresentation(
         checkpointID: String,
         controlSurface: DecisionEvolutionControlSurface,
@@ -610,6 +766,37 @@ enum DecisionEvolutionMutationIntentFactory {
 
     private static func checkpointToken(_ checkpointID: String?) -> String {
         checkpointID ?? "none"
+    }
+
+    private static func orderedUniqueCheckpointIDs(
+        _ checkpointIDs: [String]
+    ) -> [String] {
+        checkpointIDs.reduce(into: [String]()) { uniqueIDs, checkpointID in
+            guard !uniqueIDs.contains(checkpointID) else { return }
+            uniqueIDs.append(checkpointID)
+        }
+    }
+
+    private static func orderedUniquePresentations(
+        _ presentations: [DecisionEvolutionCheckpointPresentation]
+    ) -> [DecisionEvolutionCheckpointPresentation] {
+        presentations.reduce(into: [DecisionEvolutionCheckpointPresentation]()) { uniquePresentations, presentation in
+            guard !uniquePresentations.contains(where: { $0.checkpointID == presentation.checkpointID }) else {
+                return
+            }
+            uniquePresentations.append(presentation)
+        }
+    }
+
+    private static func preferredCheckpointID(
+        from presentations: [DecisionEvolutionCheckpointPresentation]
+    ) -> String? {
+        orderedUniquePresentations(presentations).max { lhs, rhs in
+            if lhs.createdAt != rhs.createdAt {
+                return lhs.createdAt < rhs.createdAt
+            }
+            return lhs.checkpointID < rhs.checkpointID
+        }?.checkpointID
     }
 
     private static func projectedRestoredActiveCheckpointID(

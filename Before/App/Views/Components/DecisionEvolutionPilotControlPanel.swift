@@ -7,6 +7,7 @@ struct DecisionEvolutionPilotControlPanel: View {
     let controlSurface: DecisionEvolutionControlSurface
     let releaseSummary: DecisionSystemReleaseControlSummary?
     let interactionMode: DecisionEvolutionControlInteractionMode
+    let showsHeader: Bool
     let showEmbeddedReleaseSummary: Bool
     let showHistoryShortcut: Bool
     let showPortraitShortcut: Bool
@@ -30,6 +31,7 @@ struct DecisionEvolutionPilotControlPanel: View {
         controlSurface: DecisionEvolutionControlSurface,
         releaseSummary: DecisionSystemReleaseControlSummary? = nil,
         interactionMode: DecisionEvolutionControlInteractionMode = .mutationHub,
+        showsHeader: Bool = true,
         showEmbeddedReleaseSummary: Bool = true,
         showHistoryShortcut: Bool = false,
         showPortraitShortcut: Bool = false,
@@ -39,6 +41,7 @@ struct DecisionEvolutionPilotControlPanel: View {
         self.controlSurface = controlSurface
         self.releaseSummary = releaseSummary
         self.interactionMode = interactionMode
+        self.showsHeader = showsHeader
         self.showEmbeddedReleaseSummary = showEmbeddedReleaseSummary
         self.showHistoryShortcut = showHistoryShortcut
         self.showPortraitShortcut = showPortraitShortcut
@@ -129,16 +132,18 @@ struct DecisionEvolutionPilotControlPanel: View {
     var body: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Evolution pilot controls")
-                        .font(.headline)
-                    Text(
-                        interactionMode.allowsMutations
-                            ? "Work the review queue, restore the active checkpoint, and clear stale lineage from the dedicated mutation hub."
-                            : "See release blockers and queue state here, then jump into Evolution Control for checkpoint mutations."
-                    )
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                if showsHeader {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Evolution pilot controls")
+                            .font(.headline)
+                        Text(
+                            interactionMode.allowsMutations
+                                ? "Work the review queue, restore the active checkpoint, and clear stale lineage from the dedicated mutation hub."
+                                : "See release blockers and queue state here, then jump into Evolution Control for checkpoint mutations."
+                        )
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 if let outcome = appModel.latestEvolutionMutationOutcome,

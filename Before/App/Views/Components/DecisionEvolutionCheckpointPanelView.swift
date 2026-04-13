@@ -8,6 +8,8 @@ struct DecisionEvolutionCheckpointPanelView: View {
     let showControlCenterShortcut: Bool
     let showHistoryShortcut: Bool
     let showPortraitShortcut: Bool
+    let isSelected: Bool
+    let onToggleSelection: (() -> Void)?
     let afterMutation: (() -> Void)?
 
     init(
@@ -18,6 +20,8 @@ struct DecisionEvolutionCheckpointPanelView: View {
         showControlCenterShortcut: Bool = false,
         showHistoryShortcut: Bool = false,
         showPortraitShortcut: Bool = false,
+        isSelected: Bool = false,
+        onToggleSelection: (() -> Void)? = nil,
         afterMutation: (() -> Void)? = nil
     ) {
         self.title = title
@@ -27,6 +31,8 @@ struct DecisionEvolutionCheckpointPanelView: View {
         self.showControlCenterShortcut = showControlCenterShortcut
         self.showHistoryShortcut = showHistoryShortcut
         self.showPortraitShortcut = showPortraitShortcut
+        self.isSelected = isSelected
+        self.onToggleSelection = onToggleSelection
         self.afterMutation = afterMutation
     }
 
@@ -66,6 +72,15 @@ struct DecisionEvolutionCheckpointPanelView: View {
                         Text(checkpoint.rollbackReady ? "Rollback ready" : "Rollback unavailable")
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(checkpoint.rollbackReady ? BeforeTheme.moss : .secondary)
+
+                        if let onToggleSelection {
+                            BeforeActionButton(
+                                isSelected ? "Selected" : "Select",
+                                style: isSelected ? .primary : .tertiary
+                            ) {
+                                onToggleSelection()
+                            }
+                        }
                     }
                 }
 
