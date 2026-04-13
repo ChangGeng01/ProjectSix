@@ -174,3 +174,37 @@ final class DecisionIntelligenceDebugStore: ObservableObject {
         traces.removeAll()
     }
 }
+
+private extension BASEBrainTurnResult {
+    var replayLineageFingerprint: String {
+        [
+            runtimeTrace.sessionID,
+            thoughtFold.checksum,
+            riskCard.riskLevel.rawValue,
+            actionPermit.mode.rawValue,
+            renderedOutput.mode.rawValue
+        ].joined(separator: "|")
+    }
+}
+
+@MainActor
+final class EBrainTurnDebugStore: ObservableObject {
+    static let shared = EBrainTurnDebugStore()
+
+    @Published private(set) var turns: [BASEBrainTurnResult] = []
+
+    func record(_ turn: BASEBrainTurnResult) {
+        if turns.first?.replayLineageFingerprint == turn.replayLineageFingerprint {
+            return
+        }
+
+        turns.insert(turn, at: 0)
+        if turns.count > BeforePolicy.Settings.developerReplayLimit {
+            turns.removeLast(turns.count - BeforePolicy.Settings.developerReplayLimit)
+        }
+    }
+
+    func clear() {
+        turns.removeAll()
+    }
+}

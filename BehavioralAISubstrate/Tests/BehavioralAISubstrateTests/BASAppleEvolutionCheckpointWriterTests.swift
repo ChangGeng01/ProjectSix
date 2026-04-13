@@ -21,6 +21,8 @@ struct BASAppleEvolutionCheckpointWriterTests {
         var diffSummary: [String]
         var approvalStateRaw: String
         var rollbackReady: Bool
+        var brainStateSnapshotBlob: String?
+        var lineageSummaryBlob: String?
 
         init(fields: BASEvolutionCheckpointStoredFields) {
             self.id = fields.id
@@ -35,6 +37,8 @@ struct BASAppleEvolutionCheckpointWriterTests {
             self.diffSummary = fields.diffSummary
             self.approvalStateRaw = fields.approvalState.rawValue
             self.rollbackReady = fields.rollbackReady
+            self.brainStateSnapshotBlob = Self.encode(fields.brainStateSnapshot)
+            self.lineageSummaryBlob = Self.encode(fields.lineageSummary)
         }
 
         static func basMake(from fields: BASEvolutionCheckpointStoredFields) -> CheckpointFixture {
@@ -54,8 +58,26 @@ struct BASAppleEvolutionCheckpointWriterTests {
                 calibrationStatus: BASCalibrationStatus(rawValue: calibrationStatusRaw) ?? .stable,
                 diffSummary: diffSummary,
                 approvalState: BASEvolutionApprovalState(rawValue: approvalStateRaw) ?? .automatic,
-                rollbackReady: rollbackReady
+                rollbackReady: rollbackReady,
+                brainStateSnapshot: Self.decode(brainStateSnapshotBlob, as: BASDecisionBrainState.self),
+                lineageSummary: Self.decode(lineageSummaryBlob)
             )
+        }
+
+        private static func encode<Value: Encodable>(_ value: Value?) -> String? {
+            guard let value,
+                  let data = try? JSONEncoder().encode(value) else {
+                return nil
+            }
+            return String(data: data, encoding: .utf8)
+        }
+
+        private static func decode<Value: Decodable>(_ blob: String?, as type: Value.Type = Value.self) -> Value? {
+            guard let blob,
+                  let data = blob.data(using: .utf8) else {
+                return nil
+            }
+            return try? JSONDecoder().decode(Value.self, from: data)
         }
     }
 
@@ -132,5 +154,135 @@ struct BASAppleEvolutionCheckpointWriterTests {
         #expect(checkpoints.count == 2)
         #expect(checkpoints.contains(where: { $0.fingerprint == "fingerprint-c" }))
         #expect(!checkpoints.contains(where: { $0.fingerprint == "fingerprint-a" }))
+    }
+
+    @Test("writer updates checkpoint approval state without adding a checkpoint")
+    func writerUpdatesApprovalState() throws {
+        let container = try ModelContainer(
+            for: CheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        let baseDate = Date(timeIntervalSince1970: 1_744_100_000)
+
+        let initial: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.record(
+                input: BASEvolutionCheckpointInput(
+                    modeName: "reflective",
+                    sourceID: "scene_active",
+                    fingerprint: "fingerprint-review",
+                    identityRole: .reflectiveWitness,
+                    boundaryMode: .localOnlyProtective,
+                    calibrationStatus: .drifting
+                ),
+                in: context,
+                createdAt: baseDate
+            )
+
+        let updated: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.setApprovalState(
+                .automatic,
+                for: initial.currentState.latestCheckpoint?.id ?? "",
+                in: context
+            )
+
+        let checkpoints = try context.fetch(FetchDescriptor<CheckpointFixture>())
+
+        #expect(checkpoints.count == 1)
+        #expect(checkpoints.first?.basSnapshot.approvalState == .automatic)
+        #expect(updated.currentState.pendingReviewCount == 0)
+        #expect(updated.currentState.latestCheckpoint?.approvalState == .automatic)
+    }
+
+    @Test("writer can set and clear lineage summary for an existing checkpoint")
+    func writerSetsAndClearsLineageSummary() throws {
+        let container = try ModelContainer(
+            for: CheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        let baseDate = Date(timeIntervalSince1970: 1_744_100_000)
+
+        let initial: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.record(
+                input: BASEvolutionCheckpointInput(
+                    modeName: "primary",
+                    sourceID: "launch",
+                    fingerprint: "fingerprint-lineage",
+                    identityRole: .pauseCompanion,
+                    boundaryMode: .localOnlyAdvisory,
+                    calibrationStatus: .stable
+                ),
+                in: context,
+                createdAt: baseDate
+            )
+        let checkpointID = try #require(initial.currentState.latestCheckpoint?.id)
+        let lineage = BASEvolutionLineageSummary(
+            recordedAt: baseDate,
+            sessionID: "fixture.lineage",
+            taskType: "decision",
+            riskLevel: "high",
+            permitMode: "delay",
+            hostGatePercent: 74,
+            thoughtFoldChecksum: "fixture-fold",
+            updateTicketSummaries: ["wait for evidence"],
+            guardrailFindings: ["downgraded quick path"],
+            recommendedKillSwitches: ["disableHighRiskAutoAction"]
+        )
+
+        let attached: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.setLineageSummary(
+                lineage,
+                for: checkpointID,
+                in: context
+            )
+        let cleared: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.setLineageSummary(
+                nil,
+                for: checkpointID,
+                in: context
+            )
+
+        let checkpoints = try context.fetch(FetchDescriptor<CheckpointFixture>())
+
+        #expect(checkpoints.count == 1)
+        #expect(attached.currentState.latestCheckpoint?.lineageSummary == lineage)
+        #expect(cleared.currentState.latestCheckpoint?.lineageSummary == nil)
+        #expect(checkpoints.first?.basSnapshot.lineageSummary == nil)
+    }
+
+    @Test("checkpoint input carries a restorable brain snapshot")
+    func writerPersistsBrainSnapshot() throws {
+        let container = try ModelContainer(
+            for: CheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        let baseDate = Date(timeIntervalSince1970: 1_744_100_000)
+        let brainState = BASDecisionBrainState(
+            profileCore: ["Protect sleep."],
+            activeGoals: ["Delay the send."],
+            relevantMemories: ["High-risk conflicts need pacing."],
+            sessionBiases: ["Stay local."],
+            retrievalTags: ["mirror", "high-risk"],
+            reactionWeights: .defaults(for: BASDecisionMode.reflective.identifier),
+            boundaryPolicy: .default(riskLevel: .high),
+            loadedAt: baseDate
+        )
+
+        let result: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.record(
+                input: BASEvolutionCheckpointPlanner.checkpointInput(
+                    modeName: "reflective",
+                    sourceID: "scene_active",
+                    brainState: brainState
+                ),
+                in: context,
+                createdAt: baseDate
+            )
+
+        let checkpoint = try #require(result.orderedCheckpoints.first)
+        #expect(checkpoint.basSnapshot.brainStateSnapshot == brainState)
+        #expect(checkpoint.basSnapshot.brainStateSnapshot?.boundaryPolicy.riskLevel == .high)
     }
 }

@@ -770,6 +770,207 @@ struct DecisionTestingInterfaceTests {
     }
 
     @Test
+    func runtimeExportFallsBackToPersistedCheckpointLineageWhenEBrainStoreIsEmpty() async throws {
+        let container = try makePersistenceContainer()
+        let context = container.mainContext
+        let now = date("2026-04-11T09:00:00Z")
+        context.insert(
+            CheckEvent(
+                createdAt: now,
+                scenario: .buy,
+                motivation: .reward,
+                expectedOutcome: .temporaryRelief,
+                controlLevel: .maybe,
+                note: "note",
+                currentPerspective: "Current",
+                afterPerspective: "After",
+                verdict: .pause,
+                finalAction: .wait90s,
+                entrySource: .app
+            )
+        )
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-quick",
+                createdAt: now.addingTimeInterval(-4),
+                fingerprint: "fingerprint-quick",
+                previousCheckpointID: nil,
+                mode: .quick,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyAdvisory,
+                calibrationStatus: .stable,
+                diffSummary: ["Quick checkpoint should win on mode"],
+                approvalState: .automatic,
+                rollbackReady: true,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: now.addingTimeInterval(-6),
+                    sessionID: "before.quick.lineage",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 78,
+                    thoughtFoldChecksum: "fold-checksum",
+                    updateTicketSummaries: ["Hold before sending"],
+                    guardrailFindings: ["Guardrail matched"],
+                    recommendedKillSwitches: ["host-write"]
+                )
+            )
+        )
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-mirror",
+                createdAt: now.addingTimeInterval(-2),
+                fingerprint: "fingerprint-mirror",
+                previousCheckpointID: "checkpoint-quick",
+                mode: .mirror,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyAdvisory,
+                calibrationStatus: .stable,
+                diffSummary: ["Mirror checkpoint is newer but should lose"],
+                approvalState: .reviewSuggested,
+                rollbackReady: true,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: now.addingTimeInterval(-3),
+                    sessionID: "before.mirror.lineage",
+                    taskType: "reflection",
+                    riskLevel: "medium",
+                    permitMode: "compare",
+                    hostGatePercent: 61,
+                    thoughtFoldChecksum: "fold-mirror",
+                    updateTicketSummaries: ["capture calmer follow-up"],
+                    guardrailFindings: ["Recovered lineage available"],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+        try context.save()
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: DecisionMemorySystem.fetchCheckEvents(in: context),
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            persistedCheckpointLineages: try context
+                .fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())
+                .compactMap { checkpoint in
+                    guard let lineageSummary = checkpoint.lineageSummary else {
+                        return nil
+                    }
+                    return DecisionEvolutionLineageSnapshot(
+                        checkpointID: checkpoint.id,
+                        createdAt: checkpoint.createdAt,
+                        mode: checkpoint.mode,
+                        approvalState: checkpoint.approvalState,
+                        rollbackReady: checkpoint.rollbackReady,
+                        hasBrainStateSnapshot: checkpoint.brainStateSnapshot != nil,
+                        diffSummary: checkpoint.diffSummary,
+                        eBrain: DeveloperDecisionReplayEBrainSummary(lineageSummary: lineageSummary)
+                    )
+                }
+                .sorted { lhs, rhs in
+                    if lhs.createdAt == rhs.createdAt {
+                        return lhs.checkpointID > rhs.checkpointID
+                    }
+                    return lhs.createdAt > rhs.createdAt
+                },
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        #expect(export.eBrainTurn == nil)
+        #expect(export.latestCheckpointLineage?.checkpointID == "checkpoint-quick")
+        #expect(export.effectiveEBrainSource == .persistedCheckpoint)
+        #expect(export.recentReplay.count == 2)
+        #expect(export.recentReplay.first?.mode == .quick)
+        #expect(export.recentReplay.first?.entrySource == .app)
+        #expect(export.recentReplay.first?.eBrain?.source == .persistedCheckpoint)
+        #expect(export.recentReplay.first?.eBrain?.permitMode == "delay")
+        #expect(export.flightDeck.eBrainSummary?.taskType == "conflict")
+        #expect(export.flightDeck.eBrainSummary?.source == .persistedCheckpoint)
+        #expect(export.flightDeck.eBrainSummary?.permitMode == "delay")
+        #expect(export.flightDeck.eBrainSummary?.riskLevel == "high")
+        #expect(export.flightDeck.eBrainSummary?.checkpointID == "checkpoint-quick")
+        #expect(export.flightDeck.eBrainSummary?.checkpointApprovalState == "automatic")
+        #expect(export.flightDeck.eBrainSummary?.checkpointApplyReady == false)
+        #expect(export.runtimeAuditFindings == ["Guardrail matched"])
+        #expect(export.recommendedKillSwitches == ["host-write"])
+        #expect(export.thoughtFoldChecksum == "fold-checksum")
+    }
+
+    @Test
+    func runtimeExportChoosesMostRecentCheckpointLineageWhenReplayContextIsAbsent() async throws {
+        let older = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-quick-older",
+            createdAt: date("2026-04-10T20:20:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            diffSummary: ["Older quick checkpoint"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T20:20:00.000Z"),
+                    sessionID: "before.quick.older",
+                    taskType: "summary",
+                    riskLevel: "low",
+                    permitMode: "answer",
+                    hostGatePercent: 44,
+                    thoughtFoldChecksum: "fold-older",
+                    updateTicketSummaries: ["older ticket"],
+                    guardrailFindings: ["Older guardrail"],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+        let newer = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-quick-newer",
+            createdAt: date("2026-04-10T21:55:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Newer quick checkpoint"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T21:55:00.000Z"),
+                    sessionID: "before.quick.newer",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 88,
+                    thoughtFoldChecksum: "fold-newer",
+                    updateTicketSummaries: ["newer ticket"],
+                    guardrailFindings: ["Newer guardrail"],
+                    recommendedKillSwitches: ["host-write"]
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            traceLimit: 0,
+            persistedCheckpointLineages: [older, newer],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        #expect(export.latestCheckpointLineage?.checkpointID == "checkpoint-quick-newer")
+        #expect(export.flightDeck.eBrainSummary?.taskType == "conflict")
+        #expect(export.flightDeck.eBrainSummary?.permitMode == "delay")
+        #expect(export.flightDeck.eBrainSummary?.checkpointID == "checkpoint-quick-newer")
+        #expect(export.flightDeck.eBrainSummary?.checkpointApplyReady == true)
+        #expect(export.thoughtFoldChecksum == "fold-newer")
+    }
+
+    @Test
     func persistenceBootstrapFallsBackToRecoveredPersistentStore() throws {
         let expectedContainer = try makePersistenceContainer()
         var attemptedModes: [PersistenceBootstrap.LoadMode] = []
@@ -797,6 +998,754 @@ struct DecisionTestingInterfaceTests {
         #expect(bootstrap.container === expectedContainer)
         #expect(bootstrap.loadMode == .recoveredPersistent)
         #expect(bootstrap.recoveryMessage?.contains("clean local store") == true)
+    }
+
+    @Test
+    func runtimeExportIncludesCheckpointOnlyReplayWhenNoDecisionRecordMatches() async throws {
+        let lineageSummary = BASEvolutionLineageSummary(
+            recordedAt: date("2026-04-10T21:15:00.000Z"),
+            sessionID: "before.mirror.lineage",
+            taskType: "reflection",
+            riskLevel: "medium",
+            permitMode: "compare",
+            hostGatePercent: 61,
+            thoughtFoldChecksum: "fold-checkpoint",
+            updateTicketSummaries: ["capture calmer follow-up"],
+            guardrailFindings: ["Recovered lineage available"],
+            recommendedKillSwitches: []
+        )
+        let persistedLineage = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-standalone",
+            createdAt: date("2026-04-10T21:16:00.000Z"),
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            diffSummary: ["Recovered persisted checkpoint without matching replay record"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(lineageSummary: lineageSummary)
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            persistedCheckpointLineages: [persistedLineage],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        #expect(export.recentReplay.count == 1)
+        #expect(export.recentReplay.first?.mode == .mirror)
+        #expect(export.recentReplay.first?.title == "Recovered Mirror lineage")
+        #expect(export.recentReplay.first?.eBrain?.source == .persistedCheckpoint)
+        #expect(export.recentReplay.first?.eBrain?.sessionID == "before.mirror.lineage")
+    }
+
+    @Test
+    func runtimeExportSurfacesPendingReviewQueueThroughFlightDeck() async throws {
+        let approved = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-approved",
+            createdAt: date("2026-04-10T20:00:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            diffSummary: ["Approved checkpoint should not enter the queue"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T20:00:00.000Z"),
+                    sessionID: "before.quick.approved",
+                    taskType: "summary",
+                    riskLevel: "low",
+                    permitMode: "answer",
+                    hostGatePercent: 45,
+                    thoughtFoldChecksum: "fold-approved",
+                    updateTicketSummaries: ["approved ticket"],
+                    guardrailFindings: ["Approved guardrail"],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+        let queueOldest = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-review-1",
+            createdAt: date("2026-04-10T20:15:00.000Z"),
+            mode: .quick,
+            approvalState: .reviewSuggested,
+            rollbackReady: false,
+            diffSummary: ["Oldest review checkpoint"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T20:15:00.000Z"),
+                    sessionID: "before.quick.review-1",
+                    taskType: "conflict",
+                    riskLevel: "medium",
+                    permitMode: "compare",
+                    hostGatePercent: 52,
+                    thoughtFoldChecksum: "fold-review-1",
+                    updateTicketSummaries: ["review ticket 1"],
+                    guardrailFindings: ["Review guardrail 1"],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+        let queueMiddle = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-review-2",
+            createdAt: date("2026-04-10T20:30:00.000Z"),
+            mode: .balance,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Middle review checkpoint"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T20:30:00.000Z"),
+                    sessionID: "before.balance.review-2",
+                    taskType: "tradeoff",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 71,
+                    thoughtFoldChecksum: "fold-review-2",
+                    updateTicketSummaries: ["review ticket 2"],
+                    guardrailFindings: ["Review guardrail 2"],
+                    recommendedKillSwitches: ["host-write"]
+                )
+            )
+        )
+        let queueNewest = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-review-3",
+            createdAt: date("2026-04-10T20:45:00.000Z"),
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Newest review checkpoint"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T20:45:00.000Z"),
+                    sessionID: "before.mirror.review-3",
+                    taskType: "reflection",
+                    riskLevel: "high",
+                    permitMode: "replace",
+                    hostGatePercent: 83,
+                    thoughtFoldChecksum: "fold-review-3",
+                    updateTicketSummaries: ["review ticket 3"],
+                    guardrailFindings: ["Review guardrail 3"],
+                    recommendedKillSwitches: ["tool-call"]
+                )
+            )
+        )
+        let queueOverflow = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-review-4",
+            createdAt: date("2026-04-10T21:00:00.000Z"),
+            mode: .quick,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            diffSummary: ["Overflow review checkpoint"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T21:00:00.000Z"),
+                    sessionID: "before.quick.review-4",
+                    taskType: "conflict",
+                    riskLevel: "extreme",
+                    permitMode: "block",
+                    hostGatePercent: 91,
+                    thoughtFoldChecksum: "fold-review-4",
+                    updateTicketSummaries: ["review ticket 4"],
+                    guardrailFindings: ["Review guardrail 4"],
+                    recommendedKillSwitches: ["external-tools"]
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            traceLimit: 0,
+            persistedCheckpointLineages: [
+                approved,
+                queueOldest,
+                queueMiddle,
+                queueNewest,
+                queueOverflow
+            ],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        #expect(export.pendingReviewCheckpointCount == 4)
+        #expect(export.pendingReviewCheckpointLineages.map(\.checkpointID) == [
+            "checkpoint-review-4",
+            "checkpoint-review-3",
+            "checkpoint-review-2",
+            "checkpoint-review-1"
+        ])
+        #expect(export.evolutionControlSurface.activeCheckpoint?.checkpointID == "checkpoint-approved")
+        #expect(export.evolutionControlSurface.reviewCheckpoint?.checkpointID == "checkpoint-review-4")
+        #expect(export.evolutionControlSurface.pendingReviewCount == 4)
+        #expect(export.evolutionControlSurface.rollbackReadyCount == 3)
+        #expect(export.evolutionControlSurface.reviewAuditFindings == ["Review guardrail 4"])
+        #expect(export.evolutionControlSurface.reviewKillSwitches == ["external-tools"])
+        #expect(export.evolutionControlSurface.queueAuditFindings == [
+            "Review guardrail 4",
+            "Review guardrail 3",
+            "Review guardrail 2",
+            "Review guardrail 1"
+        ])
+        #expect(export.evolutionControlSurface.queueKillSwitches == [
+            "external-tools",
+            "tool-call",
+            "host-write"
+        ])
+        #expect(export.flightDeck.pendingReviewCheckpointCount == 4)
+        #expect(export.flightDeck.pendingReviewQueue.map(\.checkpointID) == [
+            "checkpoint-review-4",
+            "checkpoint-review-3",
+            "checkpoint-review-2"
+        ])
+        #expect(export.flightDeck.releaseControlSummary.activeCheckpointID == "checkpoint-approved")
+        #expect(export.flightDeck.evolutionControlSurface == export.evolutionControlSurface)
+        #expect(export.flightDeck.pendingReviewQueue.first?.primarySummary == "Overflow review checkpoint")
+        #expect(export.flightDeck.pendingReviewQueue.first?.applyReady == false)
+        #expect(export.flightDeck.pendingReviewQueue.last?.applyReady == true)
+        #expect(export.flightDeck.pendingReviewQueue.first?.permitMode == "block")
+    }
+
+    @Test
+    func runtimeExportSplitsActiveCheckpointFromPendingReviewHead() async throws {
+        let automaticLatest = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-active-latest",
+            previousCheckpointID: "checkpoint-active-previous",
+            createdAt: date("2026-04-10T21:40:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Latest active checkpoint should remain separate from review head."],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T21:40:00.000Z"),
+                    sessionID: "before.quick.active-latest",
+                    taskType: "summary",
+                    riskLevel: "low",
+                    permitMode: "answer",
+                    hostGatePercent: 44,
+                    thoughtFoldChecksum: "fold-active-latest",
+                    updateTicketSummaries: ["latest active ticket"],
+                    guardrailFindings: ["Active checkpoint guardrail"],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+        let reviewHead = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-pending-review-head",
+            createdAt: date("2026-04-10T20:45:00.000Z"),
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            diffSummary: ["Pending review head should stay separate from latest active checkpoint."],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T20:45:00.000Z"),
+                    sessionID: "before.mirror.pending-review-head",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 81,
+                    thoughtFoldChecksum: "fold-pending-review-head",
+                    updateTicketSummaries: ["pending review ticket"],
+                    guardrailFindings: ["Pending review guardrail"],
+                    recommendedKillSwitches: ["host-write"]
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            traceLimit: 0,
+            persistedCheckpointLineages: [automaticLatest, reviewHead],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        #expect(export.evolutionControlSurface.activeCheckpoint?.checkpointID == "checkpoint-active-latest")
+        #expect(export.evolutionControlSurface.reviewCheckpoint?.checkpointID == "checkpoint-pending-review-head")
+        #expect(export.evolutionControlSurface.reviewAuditFindings == ["Pending review guardrail"])
+        #expect(export.evolutionControlSurface.reviewKillSwitches == ["host-write"])
+        #expect(export.evolutionControlSurface.latestPersistedLineage?.checkpointID == "checkpoint-active-latest")
+        #expect(export.evolutionControlSurface.pendingReviewCount == 1)
+        #expect(export.evolutionControlSurface.rollbackReadyCount == 1)
+        #expect(export.evolutionControlSurface.activeRollbackCheckpointID == "checkpoint-active-previous")
+    }
+
+    @Test
+    func runtimeExportPrefersExplicitActiveCheckpointHintOverRecoveredLineage() async throws {
+        let recoveredActive = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-recovered-active",
+            previousCheckpointID: "checkpoint-recovered-prior",
+            createdAt: date("2026-04-10T22:30:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Recovered checkpoint should not override the explicit active hint."],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T22:30:00.000Z"),
+                    sessionID: "before.quick.recovered-active",
+                    taskType: "summary",
+                    riskLevel: "low",
+                    permitMode: "answer",
+                    hostGatePercent: 41,
+                    thoughtFoldChecksum: "fold-recovered-active",
+                    updateTicketSummaries: ["recovered active ticket"],
+                    guardrailFindings: ["Recovered checkpoint guardrail"],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+        let reviewHead = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-review-head",
+            previousCheckpointID: nil,
+            createdAt: date("2026-04-10T22:10:00.000Z"),
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Review head stays separate from the explicit active hint."],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T22:10:00.000Z"),
+                    sessionID: "before.mirror.review-head",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 78,
+                    thoughtFoldChecksum: "fold-review-head",
+                    updateTicketSummaries: ["review head ticket"],
+                    guardrailFindings: ["Review head guardrail"],
+                    recommendedKillSwitches: ["host-write"]
+                )
+            )
+        )
+        let explicitActiveHint = DecisionReviewCheckpointSnapshot(
+            checkpointID: "checkpoint-current-brain",
+            previousCheckpointID: "checkpoint-recovered-active",
+            createdAt: date("2026-04-10T22:45:00.000Z"),
+            mode: .balance,
+            approvalState: .automatic,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Current brain checkpoint should remain the active release fact source."],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T22:45:00.000Z"),
+                    sessionID: "before.balance.current-brain",
+                    taskType: "tradeoff",
+                    riskLevel: "medium",
+                    permitMode: "compare",
+                    hostGatePercent: 63,
+                    thoughtFoldChecksum: "fold-current-brain",
+                    updateTicketSummaries: ["current brain ticket"],
+                    guardrailFindings: ["Current brain guardrail"],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            traceLimit: 0,
+            persistedCheckpointLineages: [recoveredActive, reviewHead],
+            pendingReviewCheckpoints: [DecisionReviewCheckpointSnapshot(lineage: reviewHead)],
+            activeCheckpointHint: explicitActiveHint,
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        let facts = DecisionCapabilityCoverageBuilder.evolutionFacts(
+            from: export,
+            currentBrainState: nil
+        )
+
+        #expect(export.evolutionControlSurface.activeCheckpoint?.checkpointID == "checkpoint-current-brain")
+        #expect(export.evolutionControlSurface.reviewCheckpoint?.checkpointID == "checkpoint-review-head")
+        #expect(export.evolutionControlSurface.activeRollbackCheckpointID == "checkpoint-recovered-active")
+        #expect(facts.recoveredCheckpoint?.checkpointID == "checkpoint-current-brain")
+        #expect(facts.recoveredAuditFindingCount == 1)
+        #expect(facts.recoveredTicketCount == 1)
+    }
+
+    @Test
+    func runtimeExportFlightDeckReleaseSummaryBecomesReadyForRestorableActiveCheckpoint() async throws {
+        let active = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-active-ready",
+            previousCheckpointID: "checkpoint-active-prior",
+            createdAt: date("2026-04-10T22:00:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Ready checkpoint should produce a guarded-ready release state."],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T22:00:00.000Z"),
+                    sessionID: "before.quick.release-ready",
+                    taskType: "summary",
+                    riskLevel: "low",
+                    permitMode: "answer",
+                    hostGatePercent: 37,
+                    thoughtFoldChecksum: "fold-release-ready",
+                    updateTicketSummaries: ["ready ticket"],
+                    guardrailFindings: [],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            traceLimit: 0,
+            persistedCheckpointLineages: [active],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        #expect(export.flightDeck.releaseControlSummary.state == .ready)
+        #expect(export.flightDeck.releaseControlSummary.canRestoreActiveCheckpoint == true)
+        #expect(export.flightDeck.releaseControlSummary.canRollbackActiveCheckpoint == true)
+        #expect(export.flightDeck.releaseControlSummary.activeCheckpointID == "checkpoint-active-ready")
+        #expect(export.flightDeck.releaseControlSummary.reviewCheckpointID == nil)
+    }
+
+    @Test
+    func runtimeExportFlightDeckReleaseSummaryBlocksWhenKillSwitchesRemainActive() async throws {
+        let active = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-active-blocked",
+            previousCheckpointID: "checkpoint-active-prior",
+            createdAt: date("2026-04-10T22:15:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Kill switches should block release."],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T22:15:00.000Z"),
+                    sessionID: "before.quick.release-blocked",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 79,
+                    thoughtFoldChecksum: "fold-release-blocked",
+                    updateTicketSummaries: ["blocked ticket"],
+                    guardrailFindings: ["blocked guardrail"],
+                    recommendedKillSwitches: ["disableHighRiskAutoAction"]
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            traceLimit: 0,
+            persistedCheckpointLineages: [active],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        #expect(export.flightDeck.releaseControlSummary.state == .blocked)
+        #expect(export.flightDeck.releaseControlSummary.killSwitches == ["disableHighRiskAutoAction"])
+    }
+
+    @Test
+    func runtimeExportEvolutionControlSurfaceAlignsWithCoverageFacts() async throws {
+        let approved = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-approved",
+            createdAt: date("2026-04-10T20:00:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            diffSummary: ["Approved checkpoint should not enter the queue"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T20:00:00.000Z"),
+                    sessionID: "before.quick.approved",
+                    taskType: "summary",
+                    riskLevel: "low",
+                    permitMode: "answer",
+                    hostGatePercent: 45,
+                    thoughtFoldChecksum: "fold-approved",
+                    updateTicketSummaries: ["approved ticket"],
+                    guardrailFindings: ["Approved guardrail"],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+        let reviewSuggested = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-review-1",
+            createdAt: date("2026-04-10T20:15:00.000Z"),
+            mode: .quick,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            diffSummary: ["Review checkpoint"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T20:15:00.000Z"),
+                    sessionID: "before.quick.review-1",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 82,
+                    thoughtFoldChecksum: "fold-review-1",
+                    updateTicketSummaries: ["review ticket 1"],
+                    guardrailFindings: ["Review guardrail 1"],
+                    recommendedKillSwitches: ["external-tools"]
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            traceLimit: 0,
+            persistedCheckpointLineages: [approved, reviewSuggested],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        let surface = export.evolutionControlSurface
+        let facts = DecisionCapabilityCoverageBuilder.evolutionFacts(
+            from: export,
+            currentBrainState: nil
+        )
+        let directReport = DecisionCapabilityCoverageBuilder.build(
+            from: export,
+            currentBrainState: nil,
+            evolutionFacts: facts
+        )
+        let convenienceReport = DecisionCapabilityCoverageBuilder.build(
+            from: export,
+            currentBrainState: nil
+        )
+
+        #expect(surface.reviewCheckpoint?.checkpointID == "checkpoint-review-1")
+        #expect(surface.pendingReviewCount == 1)
+        #expect(surface.rollbackReadyCount == 1)
+        #expect(surface.reviewAuditFindings == ["Review guardrail 1"])
+        #expect(surface.reviewKillSwitches == ["external-tools"])
+        #expect(facts.recoveredCheckpoint?.checkpointID == surface.activeCheckpoint?.checkpointID)
+        #expect(facts.latestPersistedLineage?.checkpointID == surface.latestPersistedLineage?.checkpointID)
+        #expect(facts.recoveredEBrainAvailable == true)
+        #expect(facts.recoveredAuditFindingCount == surface.activeCheckpoint?.auditFindings.count)
+        #expect(facts.recoveredTicketCount == surface.activeCheckpoint?.updateTicketSummaries.count)
+        #expect(directReport == convenienceReport)
+    }
+
+    @Test
+    func runtimeExportPreservesPendingReviewQueueWithoutPersistedLineage() async throws {
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            traceLimit: 0,
+            pendingReviewCheckpoints: [
+                DecisionReviewCheckpointSnapshot(
+                    checkpointID: "checkpoint-review-legacy",
+                    createdAt: date("2026-04-10T21:10:00.000Z"),
+                    mode: .quick,
+                    approvalState: .reviewSuggested,
+                    rollbackReady: true,
+                    hasBrainStateSnapshot: true,
+                    diffSummary: ["Legacy review checkpoint without lineage"],
+                    eBrain: nil
+                )
+            ],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        #expect(export.pendingReviewCheckpointCount == 1)
+        #expect(export.effectivePendingReviewCheckpoints.map(\.checkpointID) == ["checkpoint-review-legacy"])
+        #expect(export.evolutionControlSurface.activeCheckpoint == nil)
+        #expect(export.evolutionControlSurface.reviewCheckpoint?.checkpointID == "checkpoint-review-legacy")
+        #expect(export.evolutionControlSurface.pendingReviewCount == 1)
+        #expect(export.evolutionControlSurface.reviewAuditFindings.isEmpty)
+        #expect(export.evolutionControlSurface.queueAuditFindings.isEmpty)
+        #expect(export.evolutionControlSurface.queueKillSwitches.isEmpty)
+        #expect(export.flightDeck.releaseControlSummary.activeCheckpointID == nil)
+        #expect(export.flightDeck.pendingReviewCheckpointCount == 1)
+        #expect(export.flightDeck.pendingReviewQueue.first?.checkpointID == "checkpoint-review-legacy")
+        #expect(export.flightDeck.pendingReviewQueue.first?.primarySummary == "Legacy review checkpoint without lineage")
+        #expect(export.flightDeck.pendingReviewQueue.first?.applyReady == true)
+        #expect(export.flightDeck.pendingReviewQueue.first?.riskLevel == nil)
+        #expect(export.flightDeck.evolutionControlSurface == export.evolutionControlSurface)
+    }
+
+    @Test
+    func runtimeExportDoesNotPromoteReviewOnlyLineageToActiveCheckpoint() async throws {
+        let reviewHead = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-review-only",
+            previousCheckpointID: nil,
+            createdAt: date("2026-04-10T21:10:00.000Z"),
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Review-only lineage should stay out of the active release slot."],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T21:10:00.000Z"),
+                    sessionID: "before.mirror.review-only",
+                    taskType: "reflection",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 79,
+                    thoughtFoldChecksum: "fold-review-only",
+                    updateTicketSummaries: ["review-only ticket"],
+                    guardrailFindings: ["Review-only guardrail"],
+                    recommendedKillSwitches: ["host-write"]
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            traceLimit: 0,
+            persistedCheckpointLineages: [reviewHead],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        let facts = DecisionCapabilityCoverageBuilder.evolutionFacts(
+            from: export,
+            currentBrainState: nil
+        )
+
+        #expect(export.evolutionControlSurface.activeCheckpoint == nil)
+        #expect(export.evolutionControlSurface.reviewCheckpoint?.checkpointID == "checkpoint-review-only")
+        #expect(export.flightDeck.releaseControlSummary.activeCheckpointID == nil)
+        #expect(export.flightDeck.releaseControlSummary.reviewCheckpointID == "checkpoint-review-only")
+        #expect(export.flightDeck.releaseControlSummary.state == .watch)
+        #expect(facts.recoveredCheckpoint == nil)
+        #expect(facts.latestPersistedLineage?.checkpointID == "checkpoint-review-only")
+        #expect(facts.recoveredEBrainAvailable == true)
+    }
+
+    @Test
+    func checkpointPresentationFallsBackToPersistedBoundaryAndCalibrationWithoutLineage() {
+        let checkpoint = DecisionEvolutionCheckpoint(
+            id: "checkpoint-presentation-fallback",
+            createdAt: date("2026-04-11T02:00:00.000Z"),
+            fingerprint: "fingerprint-presentation-fallback",
+            previousCheckpointID: nil,
+            mode: .mirror,
+            source: .explicitRefresh,
+            identityRole: .reflectiveWitness,
+            boundaryMode: .localOnlyProtective,
+            calibrationStatus: .watch,
+            diffSummary: ["Fallback presentation should stay readable in history."],
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            lineageSummary: nil
+        )
+
+        let presentation = checkpoint.presentation
+
+        #expect(presentation.displayRiskLevel == "watch")
+        #expect(presentation.displayPermitMode == "local_only_protective")
+        #expect(presentation.hasLineage == false)
+        #expect(presentation.lineageRiskLevel == nil)
+        #expect(presentation.lineagePermitMode == nil)
+        #expect(presentation.summaryText == "WATCH → LOCAL ONLY PROTECTIVE")
+        #expect(presentation.usesSecondarySummaryTone == true)
+        #expect(presentation.queueItem.hasLineage == false)
+        #expect(presentation.queueItem.riskLevel == nil)
+        #expect(presentation.queueItem.permitMode == nil)
+        #expect(presentation.primarySummary == "Fallback presentation should stay readable in history.")
+    }
+
+    @Test
+    func checkpointPresentationKeepsQueueAndHistoryFactsAlignedWhenLineageExists() {
+        let snapshot = DecisionReviewCheckpointSnapshot(
+            checkpointID: "checkpoint-presentation-lineage",
+            createdAt: date("2026-04-11T03:00:00.000Z"),
+            mode: .quick,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Lineage-backed review checkpoint"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-11T03:00:00.000Z"),
+                    sessionID: "before.quick.presentation-lineage",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 82,
+                    thoughtFoldChecksum: "fold-lineage",
+                    updateTicketSummaries: ["lineage ticket"],
+                    guardrailFindings: ["lineage guardrail"],
+                    recommendedKillSwitches: ["external-tools"]
+                )
+            ),
+            fallbackRiskLevel: "watch",
+            fallbackPermitMode: "local_only_protective"
+        )
+
+        let presentation = snapshot.presentation
+        let queueItem = presentation.queueItem
+
+        #expect(presentation.displayRiskLevel == "high")
+        #expect(presentation.displayPermitMode == "delay")
+        #expect(presentation.hasLineage == true)
+        #expect(presentation.summaryText == "HIGH → DELAY")
+        #expect(presentation.metadataText == "Session before.quick.presentation-lineage • Host gate 82% • Fold fold-lineage")
+        #expect(queueItem.hasLineage == true)
+        #expect(queueItem.primarySummary == presentation.primarySummary)
+        #expect(queueItem.summaryText == presentation.summaryText)
+        #expect(queueItem.metadataText == presentation.metadataText)
+        #expect(queueItem.riskLevel == "high")
+        #expect(queueItem.permitMode == "delay")
+        #expect(queueItem.hostGatePercent == 82)
+        #expect(queueItem.updateTicketSummaries == ["lineage ticket"])
+        #expect(queueItem.auditFindings == ["lineage guardrail"])
+        #expect(queueItem.killSwitches == ["external-tools"])
     }
 
     @Test
@@ -847,7 +1796,19 @@ struct DecisionTestingInterfaceTests {
             DecisionMemoryRecord.self,
             DecisionMemoryCandidateRecord.self,
             TomorrowBoxItem.self,
+            DecisionEvolutionCheckpoint.self,
             configurations: configuration
         )
+    }
+
+    private func date(_ value: String) -> Date {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let parsed = formatter.date(from: value) {
+            return parsed
+        }
+
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value) ?? .distantPast
     }
 }

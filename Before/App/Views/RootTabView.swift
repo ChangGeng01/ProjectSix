@@ -81,6 +81,12 @@ struct RootTabView: View {
             ReflectionPromptView(context: context)
                 .environmentObject(appModel)
         }
+        .sheet(isPresented: $appModel.isEvolutionControlCenterPresented) {
+            NavigationStack {
+                DecisionEvolutionControlCenterView()
+                    .environmentObject(appModel)
+            }
+        }
         .fullScreenCover(item: $appModel.letGoContext) { context in
             LetGoView(context: context)
                 .environmentObject(appModel)

@@ -85,6 +85,26 @@ struct CurrentBrainState: Equatable, Sendable {
     var evolutionState: DecisionEvolutionState {
         brainState.evolutionState
     }
+
+    func replacingEvolutionState(_ evolutionState: DecisionEvolutionState) -> CurrentBrainState {
+        var updatedBrainState = brainState
+        updatedBrainState.evolutionState = evolutionState
+
+        return CurrentBrainState(
+            source: source,
+            sourceSurface: sourceSurface,
+            mode: mode,
+            riskLevel: riskLevel,
+            taskGraph: taskGraph,
+            brainState: updatedBrainState,
+            dominantGoal: dominantGoal,
+            activeConstraints: activeConstraints,
+            activeTemplateIDs: activeTemplateIDs,
+            failureGuardIDs: failureGuardIDs,
+            sourceIntentEnvelope: sourceIntentEnvelope,
+            loadedAt: loadedAt
+        )
+    }
 }
 
 struct BrainPortraitMemoryItem: Identifiable, Equatable, Sendable {

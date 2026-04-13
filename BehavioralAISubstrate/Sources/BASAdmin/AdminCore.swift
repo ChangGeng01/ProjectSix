@@ -233,6 +233,7 @@ public struct BASConsoleSnapshot: Codable, Sendable, Equatable {
     public var isPureLocal: Bool
     public var capabilityCoverage: BASCapabilityCoverageReport?
     public var inspectionBundle: BASInspectionBundle?
+    public var programExecutionBlueprint: BASProgramExecutionBlueprint?
 
     public init(
         generatedAt: Date = .now,
@@ -243,7 +244,8 @@ public struct BASConsoleSnapshot: Codable, Sendable, Equatable {
         blockerSummary: [String] = [],
         isPureLocal: Bool = true,
         capabilityCoverage: BASCapabilityCoverageReport? = nil,
-        inspectionBundle: BASInspectionBundle? = nil
+        inspectionBundle: BASInspectionBundle? = nil,
+        programExecutionBlueprint: BASProgramExecutionBlueprint? = BASProgramExecutionBlueprintBuilder.v12
     ) {
         self.generatedAt = generatedAt
         self.overallSummary = overallSummary
@@ -254,6 +256,7 @@ public struct BASConsoleSnapshot: Codable, Sendable, Equatable {
         self.isPureLocal = isPureLocal
         self.capabilityCoverage = capabilityCoverage
         self.inspectionBundle = inspectionBundle
+        self.programExecutionBlueprint = programExecutionBlueprint
     }
 
     public var overallScore: Double {
@@ -284,6 +287,10 @@ public struct BASConsoleSnapshot: Codable, Sendable, Equatable {
             )
         )
     }
+
+    public var currentProgramExecutionBlueprint: BASProgramExecutionBlueprint {
+        programExecutionBlueprint ?? BASProgramExecutionBlueprintBuilder.v12
+    }
 }
 
 public struct BASLayerAssessmentInput: Codable, Sendable, Equatable {
@@ -313,6 +320,7 @@ public struct BASFlightDeckMetrics: Codable, Sendable, Equatable {
     public var isPureLocal: Bool
     public var capabilityCoverage: BASCapabilityCoverageReport?
     public var inspectionBundle: BASInspectionBundle?
+    public var programExecutionBlueprint: BASProgramExecutionBlueprint?
 
     public init(
         generatedAt: Date = .now,
@@ -321,7 +329,8 @@ public struct BASFlightDeckMetrics: Codable, Sendable, Equatable {
         brainSummary: String? = nil,
         isPureLocal: Bool = true,
         capabilityCoverage: BASCapabilityCoverageReport? = nil,
-        inspectionBundle: BASInspectionBundle? = nil
+        inspectionBundle: BASInspectionBundle? = nil,
+        programExecutionBlueprint: BASProgramExecutionBlueprint? = BASProgramExecutionBlueprintBuilder.v12
     ) {
         self.generatedAt = generatedAt
         self.layerInputs = layerInputs
@@ -330,6 +339,7 @@ public struct BASFlightDeckMetrics: Codable, Sendable, Equatable {
         self.isPureLocal = isPureLocal
         self.capabilityCoverage = capabilityCoverage
         self.inspectionBundle = inspectionBundle
+        self.programExecutionBlueprint = programExecutionBlueprint
     }
 }
 
@@ -373,7 +383,8 @@ public enum BASConsoleSnapshotBuilder {
                 .map { $0 },
             isPureLocal: metrics.isPureLocal,
             capabilityCoverage: metrics.capabilityCoverage,
-            inspectionBundle: metrics.inspectionBundle
+            inspectionBundle: metrics.inspectionBundle,
+            programExecutionBlueprint: metrics.programExecutionBlueprint ?? BASProgramExecutionBlueprintBuilder.v12
         )
     }
 
@@ -420,6 +431,7 @@ public struct BASFlightDeckInput: Codable, Sendable, Equatable {
     public var isPureLocal: Bool
     public var capabilityCoverage: BASCapabilityCoverageReport?
     public var inspectionBundle: BASInspectionBundle?
+    public var programExecutionBlueprint: BASProgramExecutionBlueprint?
 
     public init(
         generatedAt: Date = .now,
@@ -429,7 +441,8 @@ public struct BASFlightDeckInput: Codable, Sendable, Equatable {
         layerMetrics: [BASFlightDeckLayerMetric] = [],
         isPureLocal: Bool = true,
         capabilityCoverage: BASCapabilityCoverageReport? = nil,
-        inspectionBundle: BASInspectionBundle? = nil
+        inspectionBundle: BASInspectionBundle? = nil,
+        programExecutionBlueprint: BASProgramExecutionBlueprint? = BASProgramExecutionBlueprintBuilder.v12
     ) {
         self.generatedAt = generatedAt
         self.overallSummary = overallSummary
@@ -439,6 +452,7 @@ public struct BASFlightDeckInput: Codable, Sendable, Equatable {
         self.isPureLocal = isPureLocal
         self.capabilityCoverage = capabilityCoverage
         self.inspectionBundle = inspectionBundle
+        self.programExecutionBlueprint = programExecutionBlueprint
     }
 }
 
@@ -478,7 +492,8 @@ public struct BASFlightDeckBuilder: Sendable {
             blockerSummary: blockerSummary,
             isPureLocal: input.isPureLocal,
             capabilityCoverage: input.capabilityCoverage,
-            inspectionBundle: input.inspectionBundle
+            inspectionBundle: input.inspectionBundle,
+            programExecutionBlueprint: input.programExecutionBlueprint ?? BASProgramExecutionBlueprintBuilder.v12
         )
     }
 }
@@ -560,6 +575,12 @@ public struct BASConsoleView: View {
             if let runtimeSummary = snapshot.runtimeSummary {
                 Text(runtimeSummary)
                     .font(.subheadline.weight(.medium))
+
+                if let killSwitchSummary = runtimeKillSwitchSummary(from: runtimeSummary) {
+                    Text("Kill switches: \(killSwitchSummary)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if let brainSummary = snapshot.brainSummary {
@@ -598,14 +619,18 @@ public struct BASConsoleView: View {
             if let inspectionBundle = snapshot.inspectionBundle {
                 Divider()
 
-                Text("Inspection bundle")
+                Text("Runtime audit")
                     .font(.caption.weight(.semibold))
 
                 Text(inspectionBundle.summary)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
-                Text("Replay \(inspectionBundle.replayFingerprint.value.prefix(12)) • release \(inspectionBundle.releaseDecision.kind.rawValue)")
+                Text("Release \(inspectionBundle.releaseDecision.kind.rawValue) • \(inspectionBundle.releaseDecision.reason)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                Text("Replay \(inspectionBundle.replayFingerprint.value.prefix(12))")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
@@ -616,9 +641,15 @@ public struct BASConsoleView: View {
                 }
 
                 if !inspectionBundle.anomalySignals.isEmpty {
-                    Text(inspectionBundle.anomalySignals.map(\.kind).joined(separator: " • "))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Audit findings")
+                            .font(.caption2.weight(.medium))
+                        ForEach(inspectionBundle.anomalySignals, id: \.id) { signal in
+                            Text("\(signal.severity.uppercased()) • \(signal.kind) • \(signal.message)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
 
@@ -766,6 +797,101 @@ public struct BASConsoleView: View {
                     }
                 }
             }
+
+            Divider()
+
+            let executionBlueprint = snapshot.currentProgramExecutionBlueprint
+            let physiologyLayers = executionBlueprint.layers.filter { $0.kind.track == .physiology }
+            let cognitionLayers = executionBlueprint.layers.filter { $0.kind.track == .cognition }
+            let infrastructurePackages = executionBlueprint.workPackages.filter { $0.ownedLayers.isEmpty }
+            let firstBatchPackages = executionBlueprint.workPackages.filter { $0.deliveryBatch == .first }
+
+            Text(executionBlueprint.title)
+                .font(.caption.weight(.semibold))
+
+            Text(executionBlueprint.summary)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Execution Summary")
+                    .font(.caption.weight(.semibold))
+
+                Text("Layers: \(executionBlueprint.layers.count) total • \(physiologyLayers.count) physiology • \(cognitionLayers.count) cognition")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                Text("Work packages: \(executionBlueprint.workPackages.count) total • \(firstBatchPackages.count) first batch • \(infrastructurePackages.count) infrastructure")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                Text("Milestones: \(executionBlueprint.milestones.count) • Governed schemas: \(executionBlueprint.governedSchemas.count) • Red lines: \(executionBlueprint.hardRedLines.count)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Critical Path")
+                    .font(.caption.weight(.semibold))
+
+                ForEach(firstBatchPackages.prefix(8)) { workPackage in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("\(workPackage.id) • \(workPackage.title)")
+                            .font(.caption2.weight(.medium))
+                        Text(workPackage.summary)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text("Duration \(workPackage.schedule.duration) • milestones \(workPackage.schedule.milestoneIDs.joined(separator: ", "))")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Milestones")
+                    .font(.caption.weight(.semibold))
+
+                ForEach(executionBlueprint.milestones) { milestone in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("\(milestone.id) • \(milestone.title)")
+                            .font(.caption2.weight(.medium))
+                        Text(milestone.summary)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Schema Governance")
+                    .font(.caption.weight(.semibold))
+
+                Text(schemaGovernanceSummary(for: executionBlueprint))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                ForEach(executionBlueprint.governedSchemas) { schema in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("\(schema.objectID) • v\(schema.currentVersion)")
+                            .font(.caption2.weight(.medium))
+                        Text("Compatibility \(schema.compatibilityWindow) • tests \(schema.migrationTestIDs.joined(separator: ", "))")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Hard Red Lines")
+                    .font(.caption.weight(.semibold))
+
+                ForEach(executionBlueprint.hardRedLines.prefix(5), id: \.self) { line in
+                    Text(line)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
@@ -781,5 +907,29 @@ public struct BASConsoleView: View {
             .foregroundStyle(.secondary)
             .textSelection(.enabled)
         #endif
+    }
+
+    private func runtimeKillSwitchSummary(from runtimeSummary: String) -> String? {
+        let marker = " • kill "
+        guard let range = runtimeSummary.range(of: marker) else {
+            return nil
+        }
+
+        let summary = runtimeSummary[range.upperBound...]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return summary.isEmpty ? nil : summary
+    }
+
+    private func schemaGovernanceSummary(for blueprint: BASProgramExecutionBlueprint) -> String {
+        let versionSummary = blueprint.governedSchemas
+            .map(\.currentVersion)
+            .removingDuplicates()
+            .joined(separator: ", ")
+        let migrationTestCount = blueprint.governedSchemas
+            .map(\.migrationTestIDs.count)
+            .reduce(0, +)
+
+        return "Schemas \(blueprint.governedSchemas.count) • versions \(versionSummary) • migration tests \(migrationTestCount) • appendices \(blueprint.requiredAppendices.count)"
     }
 }

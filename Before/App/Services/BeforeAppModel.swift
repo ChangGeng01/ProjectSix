@@ -21,9 +21,12 @@ final class BeforeAppModel: ObservableObject {
     @Published var interventionCandidate: InterventionPredictionCandidate?
     @Published var reflectionContext: ReflectionContext?
     @Published var letGoContext: LetGoContext?
+    @Published var isEvolutionControlCenterPresented = false
     @Published var startupNotice: String?
     @Published var supportSurface: SupportSurfaceTarget = .buddy
     @Published private(set) var preferences: BeforePreferences
+    @Published private(set) var evolutionControlMutationEpoch: Int = 0
+    @Published private(set) var latestEvolutionMutationOutcome: DecisionEvolutionMutationOutcome?
     @AppStorage("before.hasSeenOnboarding") var hasSeenOnboarding = false
 
     let modelContainer: ModelContainer
@@ -79,6 +82,10 @@ final class BeforeAppModel: ObservableObject {
 
     func dismissStartupNotice() {
         startupNotice = nil
+    }
+
+    func dismissEvolutionMutationOutcome() {
+        latestEvolutionMutationOutcome = nil
     }
 
     func startDecisionMode(
@@ -312,6 +319,8 @@ final class BeforeAppModel: ObservableObject {
             break
         }
 
+        recordCurrentEBrainReplayTurn(now: event.createdAt)
+
         refreshWidgetSurfaces()
 
         pendingReflectionContext = ReflectionContext(
@@ -343,6 +352,7 @@ final class BeforeAppModel: ObservableObject {
         )
         context.insert(record)
         persistContext(context, operation: "saving the balance board")
+        recordCurrentEBrainReplayTurn(now: record.updatedAt)
         activeBalanceSession = nil
         presentLetGo( LetGoCopyLibrary.savedBalanceContext(for: record) )
         persistActiveWorkspaceState()
@@ -378,6 +388,7 @@ final class BeforeAppModel: ObservableObject {
         )
         context.insert(record)
         persistContext(context, operation: "saving the mirror workspace")
+        recordCurrentEBrainReplayTurn(now: record.updatedAt)
         activeMirrorSession = nil
         presentLetGo( LetGoCopyLibrary.savedMirrorContext(for: record) )
         persistActiveWorkspaceState()
@@ -455,6 +466,33 @@ final class BeforeAppModel: ObservableObject {
     func refreshMirrorBrainState(_ session: MirrorWorkspaceSession) {
         activateMirrorSession(session)
         refreshActiveTaskGraphSnapshot()
+    }
+
+    func evaluateQuickSessionWithIntelligence(_ session: QuickCheckSession) async {
+        refreshQuickBrainState(session)
+        let turn = currentLiveEBrainTurn(now: .now)
+        await session.evaluateWithIntelligence(
+            preferences: preferences,
+            eBrainTurn: turn
+        )
+    }
+
+    func evaluateBalanceSessionWithIntelligence(_ session: BalanceBoardSession) async {
+        refreshBalanceBrainState(session)
+        let turn = currentLiveEBrainTurn(now: .now)
+        await session.evaluateWithIntelligence(
+            preferences: preferences,
+            eBrainTurn: turn
+        )
+    }
+
+    func evaluateMirrorSessionWithIntelligence(_ session: MirrorWorkspaceSession) async {
+        refreshMirrorBrainState(session)
+        let turn = currentLiveEBrainTurn(now: .now)
+        await session.evaluateWithIntelligence(
+            preferences: preferences,
+            eBrainTurn: turn
+        )
     }
 
     func reopenCheckEvent(_ event: CheckEvent) {
@@ -750,6 +788,257 @@ final class BeforeAppModel: ObservableObject {
         persistContext(context, operation: "clearing Tomorrow Box", refreshMemoryProjection: false)
     }
 
+    @MainActor
+    func approveEvolutionCheckpoint(checkpointID: String) {
+        let updated = updateEvolutionCheckpoint {
+            BehavioralAISubstrateBridge.setEvolutionCheckpointApproval(
+                checkpointID,
+                to: .automatic,
+                in: $0
+            )
+        }
+        guard updated != nil else {
+            publishEvolutionMutationOutcome(
+                kind: .approveCheckpoint,
+                title: "Approve checkpoint",
+                message: "Checkpoint \(checkpointID) could not be approved for automatic evolution.",
+                isSuccess: false,
+                isDestructive: false,
+                checkpointIDs: [checkpointID]
+            )
+            return
+        }
+        publishEvolutionMutationOutcome(
+            kind: .approveCheckpoint,
+            title: "Approve checkpoint",
+            message: "Checkpoint \(checkpointID) is now back on the automatic evolution path.",
+            isSuccess: true,
+            isDestructive: false,
+            checkpointIDs: [checkpointID]
+        )
+        publishStartupNotice("Checkpoint \(checkpointID) approved for automatic evolution.")
+    }
+
+    @MainActor
+    func markEvolutionCheckpointForReview(checkpointID: String) {
+        let updated = updateEvolutionCheckpoint {
+            BehavioralAISubstrateBridge.setEvolutionCheckpointApproval(
+                checkpointID,
+                to: .reviewSuggested,
+                in: $0
+            )
+        }
+        guard updated != nil else {
+            publishEvolutionMutationOutcome(
+                kind: .markCheckpointForReview,
+                title: "Mark review",
+                message: "Checkpoint \(checkpointID) could not be moved into the review queue.",
+                isSuccess: false,
+                isDestructive: false,
+                checkpointIDs: [checkpointID]
+            )
+            return
+        }
+        publishEvolutionMutationOutcome(
+            kind: .markCheckpointForReview,
+            title: "Mark review",
+            message: "Checkpoint \(checkpointID) is now queued for explicit host review.",
+            isSuccess: true,
+            isDestructive: false,
+            checkpointIDs: [checkpointID]
+        )
+        publishStartupNotice("Checkpoint \(checkpointID) marked for review.")
+    }
+
+    @MainActor
+    func clearEvolutionCheckpointLineage(checkpointID: String) {
+        let updated = updateEvolutionCheckpoint {
+            BehavioralAISubstrateBridge.clearEvolutionCheckpointLineage(
+                checkpointID,
+                in: $0
+            )
+        }
+        guard updated != nil else {
+            publishEvolutionMutationOutcome(
+                kind: .clearCheckpointLineage,
+                title: "Clear lineage",
+                message: "Checkpoint \(checkpointID) had no persisted lineage available to clear.",
+                isSuccess: false,
+                isDestructive: true,
+                checkpointIDs: [checkpointID]
+            )
+            return
+        }
+        publishEvolutionMutationOutcome(
+            kind: .clearCheckpointLineage,
+            title: "Clear lineage",
+            message: "Persisted lineage was cleared for checkpoint \(checkpointID) while the checkpoint record stayed in place.",
+            isSuccess: true,
+            isDestructive: true,
+            checkpointIDs: [checkpointID]
+        )
+        publishStartupNotice("Cleared persisted lineage for checkpoint \(checkpointID).")
+    }
+
+    @MainActor
+    func approvePendingEvolutionCheckpoints(checkpointIDs explicitCheckpointIDs: [String]? = nil) {
+        let checkpointIDs = uniqueEvolutionCheckpointIDs(
+            explicitCheckpointIDs ?? makeEvolutionControlSurface().pendingReviewQueue.map(\.checkpointID)
+        )
+        guard !checkpointIDs.isEmpty else {
+            publishEvolutionMutationOutcome(
+                kind: .approvePendingCheckpoints,
+                title: "Approve pending",
+                message: "No pending review checkpoints were available to approve.",
+                isSuccess: false,
+                isDestructive: false,
+                checkpointIDs: []
+            )
+            return
+        }
+
+        let updated = updateEvolutionCheckpoints(checkpointIDs) { checkpointID, context in
+            BehavioralAISubstrateBridge.setEvolutionCheckpointApproval(
+                checkpointID,
+                to: .automatic,
+                in: context
+            )
+        }
+        guard updated != nil else {
+            publishEvolutionMutationOutcome(
+                kind: .approvePendingCheckpoints,
+                title: "Approve pending",
+                message: "The pending review queue could not be approved.",
+                isSuccess: false,
+                isDestructive: false,
+                checkpointIDs: checkpointIDs
+            )
+            return
+        }
+
+        let suffix = checkpointIDs.count == 1 ? "" : "s"
+        publishEvolutionMutationOutcome(
+            kind: .approvePendingCheckpoints,
+            title: "Approve pending",
+            message: "Approved \(checkpointIDs.count) pending review checkpoint\(suffix).",
+            isSuccess: true,
+            isDestructive: false,
+            checkpointIDs: checkpointIDs
+        )
+        publishStartupNotice("Approved \(checkpointIDs.count) pending review checkpoint\(suffix).")
+    }
+
+    @MainActor
+    func clearPendingEvolutionCheckpointLineages(checkpointIDs explicitCheckpointIDs: [String]? = nil) {
+        let checkpointIDs = uniqueEvolutionCheckpointIDs(
+            (explicitCheckpointIDs ?? makeEvolutionControlSurface().pendingReviewQueue
+                .filter { $0.presentation.hasLineage }
+                .map(\.checkpointID))
+        )
+        guard !checkpointIDs.isEmpty else {
+            publishEvolutionMutationOutcome(
+                kind: .clearPendingReviewLineage,
+                title: "Clear review lineage",
+                message: "No lineage-backed review checkpoints were available to clear.",
+                isSuccess: false,
+                isDestructive: true,
+                checkpointIDs: []
+            )
+            return
+        }
+
+        let updated = updateEvolutionCheckpoints(checkpointIDs) { checkpointID, context in
+            BehavioralAISubstrateBridge.clearEvolutionCheckpointLineage(
+                checkpointID,
+                in: context
+            )
+        }
+        guard updated != nil else {
+            publishEvolutionMutationOutcome(
+                kind: .clearPendingReviewLineage,
+                title: "Clear review lineage",
+                message: "Persisted lineage could not be cleared from the pending review queue.",
+                isSuccess: false,
+                isDestructive: true,
+                checkpointIDs: checkpointIDs
+            )
+            return
+        }
+
+        let suffix = checkpointIDs.count == 1 ? "" : "s"
+        publishEvolutionMutationOutcome(
+            kind: .clearPendingReviewLineage,
+            title: "Clear review lineage",
+            message: "Cleared persisted lineage from \(checkpointIDs.count) pending review checkpoint\(suffix) while preserving review membership.",
+            isSuccess: true,
+            isDestructive: true,
+            checkpointIDs: checkpointIDs
+        )
+        publishStartupNotice("Cleared persisted lineage for \(checkpointIDs.count) pending review checkpoint\(suffix).")
+    }
+
+    @MainActor
+    func rollbackActiveEvolutionCheckpoint(to checkpointID: String? = nil, now: Date = .now) {
+        let resolvedCheckpointID = checkpointID ?? makeEvolutionControlSurface().activeRollbackCheckpointID
+        guard let resolvedCheckpointID else {
+            publishEvolutionMutationOutcome(
+                kind: .rollbackActiveCheckpoint,
+                title: "Rollback active",
+                message: "No rollback-ready checkpoint is currently available.",
+                isSuccess: false,
+                isDestructive: true,
+                checkpointIDs: []
+            )
+            return
+        }
+        guard restoreEvolutionCheckpoint(checkpointID: resolvedCheckpointID, now: now) else {
+            publishEvolutionMutationOutcome(
+                kind: .rollbackActiveCheckpoint,
+                title: "Rollback active",
+                message: "Checkpoint \(resolvedCheckpointID) could not be restored as the rollback target.",
+                isSuccess: false,
+                isDestructive: true,
+                checkpointIDs: [resolvedCheckpointID]
+            )
+            return
+        }
+
+        publishEvolutionMutationOutcome(
+            kind: .rollbackActiveCheckpoint,
+            title: "Rollback active",
+            message: "Rolled the active brain state back to checkpoint \(resolvedCheckpointID).",
+            isSuccess: true,
+            isDestructive: true,
+            checkpointIDs: [resolvedCheckpointID]
+        )
+        publishStartupNotice("Rolled back the active checkpoint to \(resolvedCheckpointID).")
+    }
+
+    @MainActor
+    func applyEvolutionCheckpoint(checkpointID: String, now: Date = .now) {
+        guard restoreEvolutionCheckpoint(checkpointID: checkpointID, now: now) else {
+            publishEvolutionMutationOutcome(
+                kind: .applyCheckpoint,
+                title: "Apply checkpoint",
+                message: "Checkpoint \(checkpointID) could not be restored as the active brain state.",
+                isSuccess: false,
+                isDestructive: false,
+                checkpointIDs: [checkpointID]
+            )
+            return
+        }
+
+        publishEvolutionMutationOutcome(
+            kind: .applyCheckpoint,
+            title: "Apply checkpoint",
+            message: "Checkpoint \(checkpointID) is now active and its restored brain state has been loaded into the host.",
+            isSuccess: true,
+            isDestructive: false,
+            checkpointIDs: [checkpointID]
+        )
+        publishStartupNotice("Applied checkpoint \(checkpointID). The restored brain state is now active.")
+    }
+
     func resetLocalData() {
         let context = modelContainer.mainContext
         deleteAll(CheckEvent.self, in: context)
@@ -884,15 +1173,63 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func systemFlightDeck() async -> DecisionSystemFlightDeck {
-        let export = await decisionRuntimeExport()
-        return export.flightDeck
+        let inspection = await substrateInspectionSnapshot()
+        return inspection.flightDeck
+    }
+
+    @MainActor
+    func makeEvolutionControlSurface() -> DecisionEvolutionControlSurface {
+        let context = modelContainer.mainContext
+        let inventory = evolutionCheckpointInventory(
+            in: context,
+            currentBrain: currentBrainState
+        )
+
+        return DecisionEvolutionControlSurfaceFactory.build(
+            activeCheckpointHint: inventory.activeCheckpoint,
+            latestAutomaticLineage: inventory.persistedLineages.first(where: { $0.approvalState == .automatic }),
+            pendingReviewCheckpoints: inventory.pendingReviewQueue,
+            latestPersistedLineage: inventory.latestPersistedLineage
+        )
+    }
+
+    func presentEvolutionControlCenter() {
+        isEvolutionControlCenterPresented = true
+    }
+
+    func dismissEvolutionControlCenter() {
+        isEvolutionControlCenterPresented = false
     }
 
     func substrateConsoleSnapshot() async -> BASHostConsoleSnapshot {
-        let export = await decisionRuntimeExport()
-        return BehavioralAISubstrateBridge.consoleSnapshot(
-            from: export,
-            currentBrainState: currentBrainState
+        let inspection = await substrateInspectionSnapshot()
+        return inspection.consoleSnapshot(currentBrainState: currentBrainState)
+    }
+
+    func substrateEBrainTurn() async -> BASEBrainTurnResult? {
+        let inspection = await substrateInspectionSnapshot()
+        return inspection.eBrainTurn
+    }
+
+    func substrateInspectionSnapshot() async -> DecisionTestingSubstrateInspectionSnapshot {
+        if memoryProjection == nil || isMemoryProjectionDirty {
+            refreshDecisionMemoryStore()
+        }
+        if currentBrainState == nil {
+            refreshGlobalBrainState(source: .explicitRefresh)
+        }
+        let runtimeSnapshot = DecisionTestingInterface.runtimeSnapshot(preferences: preferences)
+        let turn = currentLiveEBrainTurn(
+            runtimeSnapshot: runtimeSnapshot,
+            persistLineage: false,
+            now: .now
+        )
+
+        let export = await decisionRuntimeExport(runtimeSnapshot: runtimeSnapshot)
+
+        return DecisionTestingSubstrateInspectionSnapshot(
+            export: export,
+            eBrainTurn: turn
         )
     }
 
@@ -1135,6 +1472,7 @@ final class BeforeAppModel: ObservableObject {
         clearActiveDecisionFlows()
         reflectionContext = nil
         letGoContext = nil
+        isEvolutionControlCenterPresented = false
         pendingReflectionContext = nil
         shouldPromptReflectionAfterBackground = false
         persistPendingReflectionState()
@@ -1346,14 +1684,203 @@ final class BeforeAppModel: ObservableObject {
         )
     }
 
-    private func decisionRuntimeExport() async -> DecisionTestingRuntimeExport {
+    private func decisionRuntimeExport(
+        runtimeSnapshot: DecisionTestingRuntimeSnapshot? = nil
+    ) async -> DecisionTestingRuntimeExport {
         let context = modelContainer.mainContext
+        let inventory = evolutionCheckpointInventory(
+            in: context,
+            currentBrain: currentBrainState
+        )
         return await DecisionTestingInterface.runtimeExport(
             quick: DecisionMemorySystem.fetchCheckEvents(in: context),
             balance: DecisionMemorySystem.fetchBalanceRecords(in: context),
             mirror: DecisionMemorySystem.fetchMirrorRecords(in: context),
-            preferences: preferences
+            preferences: preferences,
+            runtimeSnapshot: runtimeSnapshot,
+            persistedCheckpointLineages: inventory.persistedLineages,
+            pendingReviewCheckpoints: inventory.pendingReviewQueue,
+            activeCheckpointHint: inventory.activeCheckpoint
         )
+    }
+
+    @MainActor
+    private func persistedCheckpointLineages(
+        in context: ModelContext,
+        limit: Int = BeforePolicy.Settings.developerReplayLimit
+    ) -> [DecisionEvolutionLineageSnapshot] {
+        let checkpoints = (try? context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())) ?? []
+        return checkpoints
+            .compactMap { checkpoint in
+                guard let lineageSummary = checkpoint.lineageSummary else {
+                    return nil
+                }
+                return DecisionEvolutionLineageSnapshot(
+                    checkpointID: checkpoint.id,
+                    previousCheckpointID: checkpoint.previousCheckpointID,
+                    createdAt: checkpoint.createdAt,
+                    mode: checkpoint.mode,
+                    approvalState: checkpoint.approvalState,
+                    rollbackReady: checkpoint.rollbackReady,
+                    hasBrainStateSnapshot: checkpoint.brainStateSnapshot != nil,
+                    diffSummary: checkpoint.diffSummary,
+                    eBrain: DeveloperDecisionReplayEBrainSummary(lineageSummary: lineageSummary)
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.createdAt == rhs.createdAt {
+                    return lhs.checkpointID > rhs.checkpointID
+                }
+                return lhs.createdAt > rhs.createdAt
+            }
+            .prefix(limit)
+            .map { $0 }
+    }
+
+    private struct DecisionEvolutionCheckpointInventory {
+        let pendingReviewQueue: [DecisionReviewCheckpointSnapshot]
+        let persistedLineages: [DecisionEvolutionLineageSnapshot]
+        let latestPersistedLineage: DecisionEvolutionLineageSnapshot?
+        let activeCheckpoint: DecisionReviewCheckpointSnapshot?
+    }
+
+    @MainActor
+    private func evolutionCheckpointInventory(
+        in context: ModelContext,
+        currentBrain: CurrentBrainState?
+    ) -> DecisionEvolutionCheckpointInventory {
+        let allCheckpoints = evolutionCheckpointSnapshots(in: context)
+        let persistedLineages = persistedCheckpointLineages(in: context)
+        let pendingReviewQueue = allCheckpoints.filter { $0.approvalState == .reviewSuggested }
+        let activeCheckpoint = resolveActiveEvolutionCheckpoint(
+            currentBrain: currentBrain,
+            allSnapshots: allCheckpoints,
+            persistedLineages: persistedLineages
+        )
+
+        return DecisionEvolutionCheckpointInventory(
+            pendingReviewQueue: pendingReviewQueue,
+            persistedLineages: persistedLineages,
+            latestPersistedLineage: persistedLineages.first,
+            activeCheckpoint: activeCheckpoint
+        )
+    }
+
+    @MainActor
+    private func evolutionCheckpointSnapshots(
+        in context: ModelContext
+    ) -> [DecisionReviewCheckpointSnapshot] {
+        let checkpoints = (try? context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())) ?? []
+        return checkpoints
+            .map(DecisionReviewCheckpointSnapshot.init(checkpoint:))
+            .sorted { lhs, rhs in
+                if lhs.createdAt != rhs.createdAt {
+                    return lhs.createdAt > rhs.createdAt
+                }
+                return lhs.checkpointID > rhs.checkpointID
+            }
+    }
+
+    @MainActor
+    private func resolveActiveEvolutionCheckpoint(
+        currentBrain: CurrentBrainState?,
+        allSnapshots: [DecisionReviewCheckpointSnapshot]
+    ) -> DecisionReviewCheckpointSnapshot? {
+        resolveActiveEvolutionCheckpoint(
+            currentBrain: currentBrain,
+            allSnapshots: allSnapshots,
+            persistedLineages: []
+        )
+    }
+
+    @MainActor
+    private func resolveActiveEvolutionCheckpoint(
+        currentBrain: CurrentBrainState?,
+        allSnapshots: [DecisionReviewCheckpointSnapshot],
+        persistedLineages: [DecisionEvolutionLineageSnapshot]
+    ) -> DecisionReviewCheckpointSnapshot? {
+        if let latestCheckpoint = currentBrain?.evolutionState.latestCheckpoint,
+           latestCheckpoint.approvalState == .automatic {
+            let persisted = allSnapshots.first(where: { $0.checkpointID == latestCheckpoint.id })
+
+            return DecisionReviewCheckpointSnapshot(
+                checkpointID: latestCheckpoint.id,
+                previousCheckpointID: latestCheckpoint.previousCheckpointID ?? persisted?.previousCheckpointID,
+                createdAt: latestCheckpoint.createdAt,
+                mode: persisted?.mode ?? currentBrain?.mode ?? .quick,
+                approvalState: latestCheckpoint.approvalState,
+                rollbackReady: latestCheckpoint.rollbackReady,
+                hasBrainStateSnapshot: persisted?.hasBrainStateSnapshot ?? false,
+                diffSummary: latestCheckpoint.diffSummary,
+                eBrain: latestCheckpoint.lineageSummary.map(DeveloperDecisionReplayEBrainSummary.init(lineageSummary:))
+                    ?? persisted?.eBrain,
+                fallbackRiskLevel: persisted?.fallbackRiskLevel,
+                fallbackPermitMode: persisted?.fallbackPermitMode
+            )
+        }
+
+        if let persistedActiveID = persistedLineages.first(where: { $0.approvalState == .automatic })?.checkpointID,
+           let persistedActive = allSnapshots.first(where: { $0.checkpointID == persistedActiveID }) {
+            return persistedActive
+        }
+
+        if let persistedAutomatic = allSnapshots.first(where: { $0.approvalState == .automatic }) {
+            return persistedAutomatic
+        }
+
+        return nil
+    }
+
+    @MainActor
+    private func recordCurrentEBrainReplayTurn(now: Date = .now) {
+        _ = currentLiveEBrainTurn(
+            runtimeSnapshot: DecisionTestingInterface.runtimeSnapshot(preferences: preferences),
+            persistLineage: true,
+            now: now
+        )
+    }
+
+    @MainActor
+    func currentLiveEBrainTurn(
+        runtimeSnapshot: DecisionTestingRuntimeSnapshot? = nil,
+        persistLineage: Bool = true,
+        now: Date = .now
+    ) -> BASEBrainTurnResult? {
+        if memoryProjection == nil || isMemoryProjectionDirty {
+            refreshDecisionMemoryStore()
+        }
+        if currentBrainState == nil {
+            refreshGlobalBrainState(source: .explicitRefresh)
+        }
+
+        let resolvedRuntimeSnapshot = runtimeSnapshot ?? DecisionTestingInterface.runtimeSnapshot(preferences: preferences)
+        guard let turn = BehavioralAISubstrateBridge.eBrainTurn(
+            hostRuntime: hostRuntime,
+            activeQuickSession: activeQuickSession,
+            activeBalanceSession: activeBalanceSession,
+            activeMirrorSession: activeMirrorSession,
+            currentBrainState: currentBrainState,
+            projection: memoryProjection,
+            runtimeSnapshot: resolvedRuntimeSnapshot,
+            now: now
+        ) else {
+            return nil
+        }
+
+        EBrainTurnDebugStore.shared.record(turn)
+
+        guard persistLineage,
+              let evolutionState = BehavioralAISubstrateBridge.persistEBrainLineage(
+                turn,
+                in: modelContainer.mainContext
+              ),
+              let currentBrainState else {
+            return turn
+        }
+
+        commitCurrentBrain(currentBrainState.replacingEvolutionState(evolutionState))
+        persistActiveWorkspaceState()
+        return turn
     }
 
     private func refreshGlobalBrainState(source: BrainStateUpdateSource) {
@@ -1466,6 +1993,108 @@ final class BeforeAppModel: ObservableObject {
         }
     }
 
+    @MainActor
+    private func updateEvolutionCheckpoint(
+        mutation: (ModelContext) -> DecisionEvolutionState?
+    ) -> DecisionEvolutionState? {
+        let context = modelContainer.mainContext
+        guard let evolutionState = mutation(context) else {
+            return nil
+        }
+
+        if let currentBrainState {
+            commitCurrentBrain(currentBrainState.replacingEvolutionState(evolutionState))
+            persistActiveWorkspaceState()
+        }
+
+        advanceEvolutionControlMutationEpoch()
+
+        return evolutionState
+    }
+
+    @MainActor
+    private func updateEvolutionCheckpoints(
+        _ checkpointIDs: [String],
+        mutation: (String, ModelContext) -> DecisionEvolutionState?
+    ) -> DecisionEvolutionState? {
+        let context = modelContainer.mainContext
+        var latestEvolutionState: DecisionEvolutionState?
+
+        for checkpointID in uniqueEvolutionCheckpointIDs(checkpointIDs) {
+            if let state = mutation(checkpointID, context) {
+                latestEvolutionState = state
+            }
+        }
+
+        guard let latestEvolutionState else {
+            return nil
+        }
+
+        if let currentBrainState {
+            commitCurrentBrain(currentBrainState.replacingEvolutionState(latestEvolutionState))
+            persistActiveWorkspaceState()
+        }
+
+        advanceEvolutionControlMutationEpoch()
+
+        return latestEvolutionState
+    }
+
+    @MainActor
+    private func restoreEvolutionCheckpoint(
+        checkpointID: String,
+        now: Date = .now
+    ) -> Bool {
+        let context = modelContainer.mainContext
+        guard let restoredBrain = BehavioralAISubstrateBridge.restoreEvolutionCheckpoint(
+            checkpointID,
+            currentBrainState: currentBrainState,
+            taskGraph: activeTaskGraph,
+            in: context,
+            now: now
+        ) else {
+            return false
+        }
+
+        commitCurrentBrain(restoredBrain)
+        isMemoryProjectionDirty = true
+        persistActiveWorkspaceState()
+        advanceEvolutionControlMutationEpoch()
+        return true
+    }
+
+    @MainActor
+    private func commitCurrentBrain(_ currentBrain: CurrentBrainState) {
+        currentBrainState = currentBrain
+        activeQuickSession?.loadBrainState(currentBrain.brainState)
+        activeBalanceSession?.loadBrainState(currentBrain.brainState)
+        activeMirrorSession?.loadBrainState(currentBrain.brainState)
+    }
+
+    private func advanceEvolutionControlMutationEpoch() {
+        evolutionControlMutationEpoch &+= 1
+    }
+
+    private func publishEvolutionMutationOutcome(
+        kind: DecisionEvolutionMutationKind,
+        title: String,
+        message: String,
+        isSuccess: Bool,
+        isDestructive: Bool,
+        checkpointIDs: [String],
+        recordedAt: Date = .now
+    ) {
+        latestEvolutionMutationOutcome = DecisionEvolutionMutationOutcome(
+            kind: kind,
+            title: title,
+            message: message,
+            isSuccess: isSuccess,
+            isDestructive: isDestructive,
+            affectedCheckpointIDs: uniqueEvolutionCheckpointIDs(checkpointIDs),
+            recordedAt: recordedAt
+        )
+    }
+
     private func publishStartupNotice(_ notice: String) {
         guard !notice.isEmpty else { return }
         if let startupNotice {
@@ -1474,6 +2103,13 @@ final class BeforeAppModel: ObservableObject {
             return
         }
         startupNotice = notice
+    }
+
+    private func uniqueEvolutionCheckpointIDs(_ checkpointIDs: [String]) -> [String] {
+        checkpointIDs.reduce(into: [String]()) { uniqueIDs, checkpointID in
+            guard !uniqueIDs.contains(checkpointID) else { return }
+            uniqueIDs.append(checkpointID)
+        }
     }
 
     private func makeInterventionCandidate(

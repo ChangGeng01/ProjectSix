@@ -1,4 +1,5 @@
 import XCTest
+import BASHostKit
 @testable import Before
 
 final class DeveloperDecisionReplayBuilderTests: XCTestCase {
@@ -105,6 +106,94 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         XCTAssertEqual(entries[0].title, "Newest")
         XCTAssertEqual(entries[0].trace?.prompt, "Shared prompt")
         XCTAssertNil(entries[1].trace)
+    }
+
+    func testBuildFallsBackToPersistedCheckpointLineageWhenLiveTurnIsMissing() {
+        let now = Date()
+        let quick = makeQuickEvent(createdAt: now, title: "Quick")
+        let lineage = BASEvolutionLineageSummary(
+            recordedAt: now.addingTimeInterval(-5),
+            sessionID: "before.quick.lineage",
+            taskType: "conflict",
+            riskLevel: "high",
+            permitMode: "delay",
+            hostGatePercent: 82,
+            thoughtFoldChecksum: "fold-checksum",
+            updateTicketSummaries: ["Hold before sending"],
+            guardrailFindings: ["Guardrail matched"],
+            recommendedKillSwitches: ["host-write"]
+        )
+        let persisted = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-1",
+            createdAt: now.addingTimeInterval(-4),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            diffSummary: ["Recovered from checkpoint"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(lineageSummary: lineage)
+        )
+
+        let entries = DeveloperDecisionReplayBuilder.build(
+            quick: [quick],
+            balance: [],
+            mirror: [],
+            traces: [],
+            eBrainTurns: [],
+            persistedLineages: [persisted]
+        )
+
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertNil(entries[0].trace)
+        XCTAssertEqual(entries[0].eBrain?.sessionID, lineage.sessionID)
+        XCTAssertEqual(entries[0].eBrain?.riskLevel, lineage.riskLevel)
+        XCTAssertEqual(entries[0].eBrain?.permitMode, lineage.permitMode)
+        XCTAssertEqual(entries[0].eBrain?.hostGatePercent, lineage.hostGatePercent)
+        XCTAssertEqual(entries[0].eBrain?.thoughtFoldChecksum, lineage.thoughtFoldChecksum)
+        XCTAssertEqual(entries[0].eBrain?.updateTicketSummaries, lineage.updateTicketSummaries)
+        XCTAssertEqual(entries[0].eBrain?.guardrailFindings, lineage.guardrailFindings)
+        XCTAssertEqual(entries[0].eBrain?.killSwitches, lineage.recommendedKillSwitches)
+    }
+
+    func testBuildIncludesCheckpointOnlyReplayEntriesWhenNoMatchingRecordExists() {
+        let now = Date()
+        let lineage = BASEvolutionLineageSummary(
+            recordedAt: now,
+            sessionID: "before.mirror.lineage",
+            taskType: "reflection",
+            riskLevel: "medium",
+            permitMode: "compare",
+            hostGatePercent: 61,
+            thoughtFoldChecksum: "fold-checkpoint",
+            updateTicketSummaries: ["capture calmer follow-up"],
+            guardrailFindings: ["Recovered lineage available"],
+            recommendedKillSwitches: []
+        )
+        let persisted = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-standalone",
+            createdAt: now.addingTimeInterval(5),
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            diffSummary: ["Recovered persisted checkpoint without matching replay record"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(lineageSummary: lineage)
+        )
+
+        let entries = DeveloperDecisionReplayBuilder.build(
+            quick: [],
+            balance: [],
+            mirror: [],
+            traces: [],
+            eBrainTurns: [],
+            persistedLineages: [persisted]
+        )
+
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertEqual(entries[0].mode, .mirror)
+        XCTAssertEqual(entries[0].title, "Recovered Mirror lineage")
+        XCTAssertEqual(entries[0].statusTitle, "Review Suggested")
+        XCTAssertEqual(entries[0].summaryLine, "Recovered persisted checkpoint without matching replay record")
+        XCTAssertEqual(entries[0].eBrain?.source, .persistedCheckpoint)
+        XCTAssertEqual(entries[0].eBrain?.sessionID, lineage.sessionID)
     }
 
     private func makeQuickEvent(createdAt: Date, title: String) -> CheckEvent {

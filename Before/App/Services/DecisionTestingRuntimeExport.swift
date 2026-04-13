@@ -1,6 +1,162 @@
 import Foundation
 import BASHostKit
 
+enum DecisionTestingEBrainSource: String, Equatable, Sendable {
+    case liveRuntime = "live_runtime"
+    case persistedCheckpoint = "persisted_checkpoint"
+
+    var title: String {
+        switch self {
+        case .liveRuntime:
+            "Live runtime"
+        case .persistedCheckpoint:
+            "Checkpoint recovery"
+        }
+    }
+}
+
+struct DecisionEvolutionLineageSnapshot: Identifiable, Equatable, Sendable {
+    let checkpointID: String
+    let previousCheckpointID: String?
+    let createdAt: Date
+    let mode: DecisionMode
+    let approvalState: DecisionEvolutionApprovalState
+    let rollbackReady: Bool
+    let hasBrainStateSnapshot: Bool
+    let diffSummary: [String]
+    let eBrain: DeveloperDecisionReplayEBrainSummary
+
+    var id: String { checkpointID }
+
+    init(
+        checkpointID: String,
+        previousCheckpointID: String? = nil,
+        createdAt: Date,
+        mode: DecisionMode,
+        approvalState: DecisionEvolutionApprovalState,
+        rollbackReady: Bool,
+        hasBrainStateSnapshot: Bool = false,
+        diffSummary: [String],
+        eBrain: DeveloperDecisionReplayEBrainSummary
+    ) {
+        self.checkpointID = checkpointID
+        self.previousCheckpointID = previousCheckpointID
+        self.createdAt = createdAt
+        self.mode = mode
+        self.approvalState = approvalState
+        self.rollbackReady = rollbackReady
+        self.hasBrainStateSnapshot = hasBrainStateSnapshot
+        self.diffSummary = diffSummary
+        self.eBrain = eBrain
+    }
+}
+
+struct DecisionReviewCheckpointSnapshot: Identifiable, Equatable, Sendable {
+    let checkpointID: String
+    let previousCheckpointID: String?
+    let createdAt: Date
+    let mode: DecisionMode
+    let approvalState: DecisionEvolutionApprovalState
+    let rollbackReady: Bool
+    let hasBrainStateSnapshot: Bool
+    let diffSummary: [String]
+    let eBrain: DeveloperDecisionReplayEBrainSummary?
+    let fallbackRiskLevel: String?
+    let fallbackPermitMode: String?
+
+    var id: String { checkpointID }
+
+    var applyReady: Bool {
+        rollbackReady && hasBrainStateSnapshot
+    }
+
+    var primarySummary: String {
+        diffSummary.first
+            ?? eBrain?.updateTicketSummaries.first
+            ?? (eBrain == nil
+                ? "This checkpoint predates persisted lineage data but still needs review."
+                : "This checkpoint is ready for review.")
+    }
+
+    init(
+        checkpointID: String,
+        previousCheckpointID: String? = nil,
+        createdAt: Date,
+        mode: DecisionMode,
+        approvalState: DecisionEvolutionApprovalState,
+        rollbackReady: Bool,
+        hasBrainStateSnapshot: Bool,
+        diffSummary: [String],
+        eBrain: DeveloperDecisionReplayEBrainSummary?,
+        fallbackRiskLevel: String? = nil,
+        fallbackPermitMode: String? = nil
+    ) {
+        self.checkpointID = checkpointID
+        self.previousCheckpointID = previousCheckpointID
+        self.createdAt = createdAt
+        self.mode = mode
+        self.approvalState = approvalState
+        self.rollbackReady = rollbackReady
+        self.hasBrainStateSnapshot = hasBrainStateSnapshot
+        self.diffSummary = diffSummary
+        self.eBrain = eBrain
+        self.fallbackRiskLevel = fallbackRiskLevel
+        self.fallbackPermitMode = fallbackPermitMode
+    }
+}
+
+extension DecisionReviewCheckpointSnapshot {
+    init(checkpoint: DecisionEvolutionCheckpoint) {
+        self.init(
+            checkpointID: checkpoint.id,
+            previousCheckpointID: checkpoint.previousCheckpointID,
+            createdAt: checkpoint.createdAt,
+            mode: checkpoint.mode,
+            approvalState: checkpoint.approvalState,
+            rollbackReady: checkpoint.rollbackReady,
+            hasBrainStateSnapshot: checkpoint.brainStateSnapshot != nil,
+            diffSummary: checkpoint.diffSummary,
+            eBrain: checkpoint.lineageSummary.map(DeveloperDecisionReplayEBrainSummary.init(lineageSummary:)),
+            fallbackRiskLevel: checkpoint.calibrationStatus.rawValue,
+            fallbackPermitMode: checkpoint.boundaryMode.rawValue
+        )
+    }
+
+    init(summary: DecisionEvolutionCheckpointSummary, mode: DecisionMode) {
+        self.init(
+            checkpointID: summary.id,
+            previousCheckpointID: summary.previousCheckpointID,
+            createdAt: summary.createdAt,
+            mode: mode,
+            approvalState: summary.approvalState,
+            rollbackReady: summary.rollbackReady,
+            hasBrainStateSnapshot: false,
+            diffSummary: summary.diffSummary,
+            eBrain: summary.lineageSummary.map(DeveloperDecisionReplayEBrainSummary.init(lineageSummary:))
+        )
+    }
+
+    init(lineage: DecisionEvolutionLineageSnapshot) {
+        self.init(
+            checkpointID: lineage.checkpointID,
+            previousCheckpointID: lineage.previousCheckpointID,
+            createdAt: lineage.createdAt,
+            mode: lineage.mode,
+            approvalState: lineage.approvalState,
+            rollbackReady: lineage.rollbackReady,
+            hasBrainStateSnapshot: lineage.hasBrainStateSnapshot,
+            diffSummary: lineage.diffSummary,
+            eBrain: lineage.eBrain
+        )
+    }
+}
+
+struct DecisionTestingCheckpointSelectionContext: Equatable, Sendable {
+    let mode: DecisionMode?
+    let source: DeveloperDecisionReplayEBrainSource?
+    let referenceDate: Date
+}
+
 struct DecisionTestingRuntimeExport {
     let generatedAt: Date
     let runtimeSnapshot: DecisionTestingRuntimeSnapshot
@@ -10,9 +166,201 @@ struct DecisionTestingRuntimeExport {
     let circuitBreakerSnapshot: DecisionIntelligenceCircuitBreakerSnapshot
     let recentTraces: [DecisionIntelligenceTrace]
     let recentReplay: [DeveloperDecisionReplayEntry]
+    let persistedCheckpointLineages: [DecisionEvolutionLineageSnapshot]
+    let pendingReviewCheckpoints: [DecisionReviewCheckpointSnapshot]
+    let activeCheckpointHint: DecisionReviewCheckpointSnapshot?
+    let eBrainTurn: BASEBrainTurnResult?
+
+    var evolutionControlSurface: DecisionEvolutionControlSurface {
+        DecisionEvolutionControlSurfaceFactory.build(
+            activeCheckpointHint: activeCheckpointHint,
+            latestAutomaticLineage: latestAutomaticCheckpointLineage,
+            pendingReviewCheckpoints: effectivePendingReviewCheckpoints,
+            latestPersistedLineage: latestCheckpointLineage
+        )
+    }
+
+    var pendingReviewCheckpointLineages: [DecisionEvolutionLineageSnapshot] {
+        persistedCheckpointLineages
+            .filter { $0.approvalState == .reviewSuggested }
+            .sorted { lhs, rhs in
+                if lhs.createdAt != rhs.createdAt {
+                    return lhs.createdAt > rhs.createdAt
+                }
+                return lhs.checkpointID > rhs.checkpointID
+            }
+    }
+
+    var pendingReviewCheckpointCount: Int {
+        effectivePendingReviewCheckpoints.count
+    }
+
+    var effectivePendingReviewCheckpoints: [DecisionReviewCheckpointSnapshot] {
+        let checkpoints = if pendingReviewCheckpoints.isEmpty {
+            pendingReviewCheckpointLineages.map(DecisionReviewCheckpointSnapshot.init(lineage:))
+        } else {
+            pendingReviewCheckpoints
+        }
+
+        return checkpoints.sorted { lhs, rhs in
+            if lhs.createdAt != rhs.createdAt {
+                return lhs.createdAt > rhs.createdAt
+            }
+            return lhs.checkpointID > rhs.checkpointID
+        }
+    }
+
+    var latestCheckpointLineage: DecisionEvolutionLineageSnapshot? {
+        selectedCheckpointLineage(
+            in: persistedCheckpointLineages,
+            matching: preferredCheckpointSelectionContext
+        ) ?? selectedCheckpointLineage(in: persistedCheckpointLineages)
+    }
+
+    var latestAutomaticCheckpointLineage: DecisionEvolutionLineageSnapshot? {
+        let automaticLineages = persistedCheckpointLineages.filter { $0.approvalState == .automatic }
+        return selectedCheckpointLineage(
+            in: automaticLineages,
+            matching: preferredCheckpointSelectionContext
+        ) ?? selectedCheckpointLineage(in: automaticLineages)
+    }
+
+    var preferredCheckpointSelectionContext: DecisionTestingCheckpointSelectionContext? {
+        if let preferredReplay = recentReplay.first(where: { !$0.isCheckpointOnlyRecovery }) {
+            return DecisionTestingCheckpointSelectionContext(
+                mode: preferredReplay.mode,
+                source: preferredReplay.eBrain?.source,
+                referenceDate: preferredReplay.timestamp
+            )
+        }
+
+        return nil
+    }
+
+    func selectedCheckpointLineage(
+        matching context: DecisionTestingCheckpointSelectionContext? = nil
+    ) -> DecisionEvolutionLineageSnapshot? {
+        selectedCheckpointLineage(
+            in: persistedCheckpointLineages,
+            matching: context
+        )
+    }
+
+    private func selectedCheckpointLineage(
+        in lineages: [DecisionEvolutionLineageSnapshot],
+        matching context: DecisionTestingCheckpointSelectionContext? = nil
+    ) -> DecisionEvolutionLineageSnapshot? {
+        guard !lineages.isEmpty else {
+            return nil
+        }
+
+        if let resolvedContext = context {
+            return lineages.dropFirst().reduce(lineages[0]) { best, candidate in
+                if isPreferredCheckpointLineage(
+                    candidate,
+                    over: best,
+                    matching: resolvedContext
+                ) {
+                    return candidate
+                }
+
+                if isPreferredCheckpointLineage(
+                    best,
+                    over: candidate,
+                    matching: resolvedContext
+                ) {
+                    return best
+                }
+
+                return candidate.checkpointID > best.checkpointID ? candidate : best
+            }
+        }
+
+        return lineages.reduce(lineages[0]) { best, candidate in
+            if candidate.eBrain.recordedAt != best.eBrain.recordedAt {
+                return candidate.eBrain.recordedAt > best.eBrain.recordedAt ? candidate : best
+            }
+
+            if candidate.createdAt != best.createdAt {
+                return candidate.createdAt > best.createdAt ? candidate : best
+            }
+
+            return candidate.checkpointID > best.checkpointID ? candidate : best
+        }
+    }
+
+    var effectiveEBrainSummary: DeveloperDecisionReplayEBrainSummary? {
+        if let eBrainTurn {
+            return DeveloperDecisionReplayEBrainSummary(turn: eBrainTurn)
+        }
+
+        return latestCheckpointLineage?.eBrain
+    }
+
+    var effectiveEBrainSource: DecisionTestingEBrainSource? {
+        effectiveEBrainSummary.map {
+            $0.source == .liveRuntime ? .liveRuntime : .persistedCheckpoint
+        }
+    }
 
     var flightDeck: DecisionSystemFlightDeck {
-        DecisionSystemFlightDeckBuilder.build(from: self)
+        DecisionSystemFlightDeckBuilder.build(from: self, eBrainTurn: eBrainTurn)
+    }
+
+    func flightDeck(
+        eBrainTurn: BASEBrainTurnResult? = nil
+    ) -> DecisionSystemFlightDeck {
+        DecisionSystemFlightDeckBuilder.build(
+            from: self,
+            eBrainTurn: eBrainTurn ?? self.eBrainTurn
+        )
+    }
+
+    var thoughtFoldChecksum: String? {
+        if let eBrainTurn {
+            return String(eBrainTurn.thoughtFold.checksum.prefix(12))
+        }
+        return effectiveEBrainSummary?.thoughtFoldChecksum
+    }
+
+    var updateTicketSummaries: [String] {
+        if let eBrainTurn {
+            return eBrainTurn.updateTickets.map(\.summary)
+        }
+        return effectiveEBrainSummary?.updateTicketSummaries ?? []
+    }
+
+    var runtimeAuditFindings: [String] {
+        if let eBrainTurn {
+            return eBrainTurn.runtimeTrace.guardrailFindings.map(\.summary)
+        }
+        return effectiveEBrainSummary?.guardrailFindings ?? []
+    }
+
+    var recommendedKillSwitches: [String] {
+        if let eBrainTurn {
+            return eBrainTurn.runtimeTrace.recommendedKillSwitches.map(\.rawValue)
+        }
+        return effectiveEBrainSummary?.killSwitches ?? []
+    }
+
+    func attaching(
+        eBrainTurn: BASEBrainTurnResult?
+    ) -> DecisionTestingRuntimeExport {
+        DecisionTestingRuntimeExport(
+            generatedAt: generatedAt,
+            runtimeSnapshot: runtimeSnapshot,
+            registeredProviders: registeredProviders,
+            intelligenceTelemetry: intelligenceTelemetry,
+            cacheTelemetry: cacheTelemetry,
+            circuitBreakerSnapshot: circuitBreakerSnapshot,
+            recentTraces: recentTraces,
+            recentReplay: recentReplay,
+            persistedCheckpointLineages: persistedCheckpointLineages,
+            pendingReviewCheckpoints: pendingReviewCheckpoints,
+            activeCheckpointHint: activeCheckpointHint,
+            eBrainTurn: eBrainTurn
+        )
     }
 
     var basLifecycleSummary: BASLifecycleSummary {
@@ -191,5 +539,73 @@ struct DecisionTestingRuntimeExport {
         intelligenceTelemetry.gemmaBackendCount
             .max { lhs, rhs in lhs.value < rhs.value }?
             .key
+    }
+
+    private func isPreferredCheckpointLineage(
+        _ lhs: DecisionEvolutionLineageSnapshot,
+        over rhs: DecisionEvolutionLineageSnapshot,
+        matching context: DecisionTestingCheckpointSelectionContext
+    ) -> Bool {
+        let lhsModeScore = lhs.mode == context.mode ? 1 : 0
+        let rhsModeScore = rhs.mode == context.mode ? 1 : 0
+        if lhsModeScore != rhsModeScore {
+            return lhsModeScore > rhsModeScore
+        }
+
+        if let contextSource = context.source {
+            let lhsSourceScore = lhs.eBrain.source == contextSource ? 1 : 0
+            let rhsSourceScore = rhs.eBrain.source == contextSource ? 1 : 0
+            if lhsSourceScore != rhsSourceScore {
+                return lhsSourceScore > rhsSourceScore
+            }
+        }
+
+        let lhsDistance = abs(lhs.eBrain.recordedAt.timeIntervalSince(context.referenceDate))
+        let rhsDistance = abs(rhs.eBrain.recordedAt.timeIntervalSince(context.referenceDate))
+        if lhsDistance != rhsDistance {
+            return lhsDistance < rhsDistance
+        }
+
+        if lhs.eBrain.recordedAt != rhs.eBrain.recordedAt {
+            return lhs.eBrain.recordedAt > rhs.eBrain.recordedAt
+        }
+
+        return lhs.checkpointID > rhs.checkpointID
+    }
+}
+
+struct DecisionTestingSubstrateInspectionSnapshot {
+    let export: DecisionTestingRuntimeExport
+    let eBrainTurn: BASEBrainTurnResult?
+
+    var synchronizedExport: DecisionTestingRuntimeExport {
+        export.attaching(eBrainTurn: eBrainTurn)
+    }
+
+    var effectiveEBrainSource: DecisionTestingEBrainSource? {
+        synchronizedExport.effectiveEBrainSource
+    }
+
+    var flightDeck: DecisionSystemFlightDeck {
+        synchronizedExport.flightDeck
+    }
+
+    func consoleSnapshot(
+        currentBrainState: CurrentBrainState?
+    ) -> BASHostConsoleSnapshot {
+        BehavioralAISubstrateBridge.consoleSnapshot(
+            from: synchronizedExport,
+            currentBrainState: currentBrainState,
+            eBrainTurn: eBrainTurn
+        )
+    }
+}
+
+private extension DeveloperDecisionReplayEntry {
+    var isCheckpointOnlyRecovery: Bool {
+        if case .checkpoint = record {
+            return true
+        }
+        return false
     }
 }

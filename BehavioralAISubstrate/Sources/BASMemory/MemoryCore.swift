@@ -925,6 +925,43 @@ public enum BASEvolutionApprovalState: String, CaseIterable, Codable, Sendable {
     case reviewSuggested
 }
 
+public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable {
+    public let recordedAt: Date
+    public let sessionID: String
+    public let taskType: String
+    public let riskLevel: String
+    public let permitMode: String
+    public let hostGatePercent: Int
+    public let thoughtFoldChecksum: String
+    public let updateTicketSummaries: [String]
+    public let guardrailFindings: [String]
+    public let recommendedKillSwitches: [String]
+
+    public init(
+        recordedAt: Date,
+        sessionID: String,
+        taskType: String,
+        riskLevel: String,
+        permitMode: String,
+        hostGatePercent: Int,
+        thoughtFoldChecksum: String,
+        updateTicketSummaries: [String],
+        guardrailFindings: [String],
+        recommendedKillSwitches: [String]
+    ) {
+        self.recordedAt = recordedAt
+        self.sessionID = sessionID
+        self.taskType = taskType
+        self.riskLevel = riskLevel
+        self.permitMode = permitMode
+        self.hostGatePercent = hostGatePercent
+        self.thoughtFoldChecksum = thoughtFoldChecksum
+        self.updateTicketSummaries = updateTicketSummaries
+        self.guardrailFindings = guardrailFindings
+        self.recommendedKillSwitches = recommendedKillSwitches
+    }
+}
+
 public struct BASEvolutionCheckpointSummary: Codable, Equatable, Sendable {
     public let id: String
     public let previousCheckpointID: String?
@@ -932,6 +969,7 @@ public struct BASEvolutionCheckpointSummary: Codable, Equatable, Sendable {
     public let diffSummary: [String]
     public let rollbackReady: Bool
     public let approvalState: BASEvolutionApprovalState
+    public let lineageSummary: BASEvolutionLineageSummary?
 
     public init(
         id: String,
@@ -939,7 +977,8 @@ public struct BASEvolutionCheckpointSummary: Codable, Equatable, Sendable {
         createdAt: Date,
         diffSummary: [String],
         rollbackReady: Bool,
-        approvalState: BASEvolutionApprovalState
+        approvalState: BASEvolutionApprovalState,
+        lineageSummary: BASEvolutionLineageSummary? = nil
     ) {
         self.id = id
         self.previousCheckpointID = previousCheckpointID
@@ -947,6 +986,7 @@ public struct BASEvolutionCheckpointSummary: Codable, Equatable, Sendable {
         self.diffSummary = diffSummary
         self.rollbackReady = rollbackReady
         self.approvalState = approvalState
+        self.lineageSummary = lineageSummary
     }
 }
 

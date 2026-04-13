@@ -110,6 +110,89 @@ struct BehavioralAISubstrateBridgeTests {
     }
 
     @Test
+    func consoleSnapshotRecoversInspectionBundleFromPersistedCheckpointLineage() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        seedHistory(into: context)
+        try context.save()
+
+        let lineageSummary = BASEvolutionLineageSummary(
+            recordedAt: date("2026-04-10T07:15:00.000Z"),
+            sessionID: "before.quick.lineage",
+            taskType: "conflict",
+            riskLevel: "high",
+            permitMode: "delay",
+            hostGatePercent: 82,
+            thoughtFoldChecksum: "fold-checkpoint",
+            updateTicketSummaries: ["review after cooldown"],
+            guardrailFindings: ["Checkpoint guardrail matched"],
+            recommendedKillSwitches: ["host-write"]
+        )
+        let persistedLineage = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-1",
+            createdAt: date("2026-04-10T07:16:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            diffSummary: ["Checkpoint recovery pending review"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(lineageSummary: lineageSummary)
+        )
+        let mirrorLineage = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-2",
+            createdAt: date("2026-04-10T07:20:00.000Z"),
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            diffSummary: ["Newer mirror checkpoint should not win"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T07:20:00.000Z"),
+                    sessionID: "before.mirror.lineage",
+                    taskType: "reflection",
+                    riskLevel: "medium",
+                    permitMode: "compare",
+                    hostGatePercent: 61,
+                    thoughtFoldChecksum: "fold-mirror",
+                    updateTicketSummaries: ["capture calmer follow-up"],
+                    guardrailFindings: ["Recovered lineage available"],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: DecisionMemorySystem.fetchCheckEvents(in: context),
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            persistedCheckpointLineages: [persistedLineage, mirrorLineage],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        let snapshot = BehavioralAISubstrateBridge.consoleSnapshot(
+            from: export,
+            currentBrainState: nil
+        )
+        let runtimeContext = BehavioralAISubstrateBridge.runtimeContext(from: export)
+
+        #expect(export.effectiveEBrainSource == .persistedCheckpoint)
+        #expect(snapshot.inspectionBundle != nil)
+        #expect(snapshot.runtimeSummary?.contains("Recovered from checkpoint") == true)
+        #expect(snapshot.brainSummary?.contains("Recovered lineage") == true)
+        #expect(snapshot.blockerSummary.contains("Checkpoint recovery pending review"))
+        #expect(snapshot.inspectionBundle?.trace.selectedRoute.preferredModelID == "persisted.checkpoint.quick")
+        #expect(snapshot.inspectionBundle?.releaseDecision.kind == .requireConfirmation)
+        #expect(snapshot.inspectionBundle?.anomalySignals.contains(where: { $0.kind == "checkpoint_kill_switch" }) == true)
+        #expect(snapshot.capabilityCoverage?.sections.first(where: { $0.domain == .context })?.items.first(where: { $0.id == "context.summary_layer" })?.status == .ready)
+        #expect(snapshot.capabilityCoverage?.sections.first(where: { $0.domain == .observability })?.items.first(where: { $0.id == "observability.self_inspection" })?.status == .ready)
+        #expect(snapshot.capabilityCoverage?.sections.first(where: { $0.domain == .delivery })?.items.first(where: { $0.id == "delivery.self_portrait" })?.status == .ready)
+        #expect(runtimeContext.riskLevel == .high)
+    }
+
+    @Test
     func bridgeBootstrapCurrentBrainStateCommitsAndMaterializesHostState() async throws {
         let container = try makeContainer()
         let context = container.mainContext

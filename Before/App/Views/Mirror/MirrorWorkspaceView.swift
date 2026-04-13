@@ -44,8 +44,7 @@ struct MirrorWorkspaceView: View {
                             accessibilityIdentifier: "mirror.evaluate"
                         ) {
                             Task {
-                                appModel.refreshMirrorBrainState(session)
-                                await session.evaluateWithIntelligence(preferences: appModel.preferences)
+                                await appModel.evaluateMirrorSessionWithIntelligence(session)
                             }
                         }
                         .disabled(!session.canEvaluate)

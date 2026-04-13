@@ -1,4 +1,6 @@
 import Foundation
+import SwiftData
+import BASHostKit
 
 struct DecisionTestingRuntimeSnapshot: Equatable, Sendable {
     let preferences: BeforePreferences
@@ -254,16 +256,21 @@ enum DecisionTestingInterface {
         balance: [BalanceDecisionRecord],
         mirror: [MirrorDecisionRecord],
         preferences: BeforePreferences = effectivePreferences(),
+        runtimeSnapshot: DecisionTestingRuntimeSnapshot? = nil,
         environment: [String: String] = ProcessInfo.processInfo.environment,
         traceLimit: Int = BeforePolicy.Settings.developerTraceLimit,
         replayLimit: Int = BeforePolicy.Settings.developerReplayLimit,
+        persistedCheckpointLineages: [DecisionEvolutionLineageSnapshot] = [],
+        pendingReviewCheckpoints: [DecisionReviewCheckpointSnapshot] = [],
+        activeCheckpointHint: DecisionReviewCheckpointSnapshot? = nil,
         debugStore: DecisionIntelligenceDebugStore = .shared,
+        eBrainStore: EBrainTurnDebugStore = .shared,
         telemetryStore: DecisionIntelligenceTelemetryStore = .shared,
         cache: DecisionIntelligenceResponseCache = .shared,
         circuitBreaker: DecisionIntelligenceCircuitBreaker = .shared,
         registry: DecisionIntelligenceProviderRegistry = .shared
     ) async -> DecisionTestingRuntimeExport {
-        let snapshot = runtimeSnapshot(
+        let snapshot = runtimeSnapshot ?? self.runtimeSnapshot(
             preferences: preferences,
             environment: environment
         )
@@ -273,6 +280,8 @@ enum DecisionTestingInterface {
             balance: balance,
             mirror: mirror,
             traces: traces,
+            eBrainTurns: eBrainStore.turns,
+            persistedCheckpointLineages: persistedCheckpointLineages,
             limit: replayLimit
         )
 
@@ -284,17 +293,23 @@ enum DecisionTestingInterface {
             cacheTelemetry: await cache.telemetrySnapshot(),
             circuitBreakerSnapshot: await circuitBreaker.snapshot(),
             recentTraces: traces,
-            recentReplay: replay
+            recentReplay: replay,
+            persistedCheckpointLineages: persistedCheckpointLineages,
+            pendingReviewCheckpoints: pendingReviewCheckpoints,
+            activeCheckpointHint: activeCheckpointHint,
+            eBrainTurn: nil
         )
     }
 
     @MainActor
     static func resetTransientIntelligenceState(
         store: DecisionIntelligenceDebugStore = .shared,
+        eBrainStore: EBrainTurnDebugStore = .shared,
         telemetryStore: DecisionIntelligenceTelemetryStore = .shared,
         circuitBreaker: DecisionIntelligenceCircuitBreaker = .shared
     ) async {
         clearTraces(store: store)
+        eBrainStore.clear()
         await telemetryStore.clear()
         await clearResponseCache()
         await circuitBreaker.clear()
@@ -306,14 +321,20 @@ enum DecisionTestingInterface {
         balance: [BalanceDecisionRecord],
         mirror: [MirrorDecisionRecord],
         traces: [DecisionIntelligenceTrace]? = nil,
+        eBrainTurns: [BASEBrainTurnResult]? = nil,
+        persistedCheckpointLineages: [DecisionEvolutionLineageSnapshot] = [],
+        eBrainStore: EBrainTurnDebugStore = .shared,
         limit: Int = BeforePolicy.Settings.developerReplayLimit
     ) -> [DeveloperDecisionReplayEntry] {
         let resolvedTraces = traces ?? DecisionIntelligenceDebugStore.shared.traces
+        let resolvedTurns = eBrainTurns ?? eBrainStore.turns
         return DeveloperDecisionReplayBuilder.build(
             quick: quick,
             balance: balance,
             mirror: mirror,
             traces: resolvedTraces,
+            eBrainTurns: resolvedTurns,
+            persistedLineages: persistedCheckpointLineages,
             limit: limit
         )
     }

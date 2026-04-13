@@ -35,6 +35,12 @@ struct SampleHostView: View {
                         }
                         Text("Workflow: \(model.result.currentBrain.workflowTitle)")
                             .font(.subheadline.weight(.medium))
+                        Text("Posture \(model.result.currentBrain.identityPosture.rawValue) • initiative \(model.result.currentBrain.identityInitiative.rawValue) • boundary \(model.result.currentBrain.boundaryMode.rawValue)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("Calibration \(model.result.currentBrain.calibrationStatus.rawValue) • confidence \(Int((model.result.currentBrain.confidenceCeiling * 100).rounded()))% • pending review \(model.result.currentBrain.evolutionPendingReviewCount)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                         if !model.result.currentBrain.dominantGoals.isEmpty {
                             Text(model.result.currentBrain.dominantGoals.joined(separator: " • "))
                                 .font(.subheadline)
@@ -51,11 +57,86 @@ struct SampleHostView: View {
                         }
                     }
 
+                    if let turn = model.result.eBrainTurn {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("13-layer turn")
+                                .font(.headline)
+                            sourceBadge(
+                                title: "Live runtime",
+                                detail: "SampleHost is currently rendering the active 13-layer runtime turn returned by BASHostKit."
+                            )
+                            Text("Mode \(turn.budgetFrame.runMode.rawValue) • task \(turn.contextFrame.taskType.rawValue) • risk \(turn.riskCard.riskLevel.rawValue) • permit \(turn.actionPermit.mode.rawValue)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("Fold \(turn.thoughtFold.checksum.prefix(12)) • gate \(Int((turn.hostGateValue * 100).rounded()))% • route \(turn.runtimeTrace.modelRoute)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            if !turn.runtimeTrace.guardrailFindings.isEmpty {
+                                Text("Audit: \(turn.runtimeTrace.guardrailFindings.prefix(3).map { "\($0.layerID):\($0.code)" }.joined(separator: " • "))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !turn.runtimeTrace.recommendedKillSwitches.isEmpty {
+                                Text("Kill switches: \(turn.runtimeTrace.recommendedKillSwitches.map(\.rawValue).joined(separator: " • "))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(turn.decomposeFrame.mirrorText)
+                                .font(.subheadline)
+                            if !turn.memoryBundle.atoms.isEmpty {
+                                Text("Memory: \(turn.memoryBundle.atoms.prefix(3).map(\.summary).joined(separator: " • "))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !turn.thoughtFrame.candidates.isEmpty {
+                                Text("Candidates: \(turn.thoughtFrame.candidates.map(\.title).joined(separator: " • "))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !turn.renderedOutput.alternativeActions.isEmpty {
+                                Text("Alternatives: \(turn.renderedOutput.alternativeActions.joined(separator: " • "))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !turn.thoughtFold.compactSlots.isEmpty {
+                                Text("Slots: \(turn.thoughtFold.compactSlots.keys.sorted().compactMap { key in turn.thoughtFold.compactSlots[key].map { "\(key)=\($0)" } }.joined(separator: " • "))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !turn.runtimeTrace.layerEvents.isEmpty {
+                                Text("Trace: \(turn.runtimeTrace.layerEvents.prefix(4).map { "\($0.layerID):\($0.event)" }.joined(separator: " • "))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !turn.updateTickets.isEmpty {
+                                Text("Tickets: \(turn.updateTickets.map(\.summary).joined(separator: " • "))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+
                     BASHostConsoleView(snapshot: model.result.consoleSnapshot)
                 }
                 .padding(24)
             }
             .navigationTitle("BASHostKit")
+        }
+    }
+
+    @ViewBuilder
+    private func sourceBadge(title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.mint)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(.mint.opacity(0.12), in: Capsule())
+
+            Text(detail)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
     }
 }

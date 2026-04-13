@@ -1125,39 +1125,69 @@ public struct BASHostCurrentBrain: Codable, Equatable, Sendable {
     public var workflowProfile: BASHostWorkflowProfile
     public var workflowTitle: String
     public var roleID: String
+    public var identityPosture: BASIdentityPosture
+    public var identityInitiative: BASIdentityInitiative
+    public var confidenceCeiling: Double
     public var relationshipBoundary: String
     public var boundaryHeadline: String
+    public var boundaryMode: BASBoundaryPolicyMode
+    public var boundaryConstraints: [BASBoundaryConstraint]
+    public var calibrationStatus: BASCalibrationStatus
+    public var calibrationAlerts: [BASMemory.BASCalibrationAlert]
+    public var riskFlags: [BASBrainStateRiskFlag]
     public var dominantGoals: [String]
     public var activeConstraints: [String]
     public var retrievalTags: [String]
     public var verificationSummary: String
     public var activeTemplateCount: Int
     public var failureGuardCount: Int
+    public var evolutionPendingReviewCount: Int
+    public var evolutionRollbackReady: Bool
 
     public init(
         workflowProfile: BASHostWorkflowProfile,
         workflowTitle: String,
         roleID: String,
+        identityPosture: BASIdentityPosture,
+        identityInitiative: BASIdentityInitiative,
+        confidenceCeiling: Double,
         relationshipBoundary: String,
         boundaryHeadline: String,
+        boundaryMode: BASBoundaryPolicyMode,
+        boundaryConstraints: [BASBoundaryConstraint],
+        calibrationStatus: BASCalibrationStatus,
+        calibrationAlerts: [BASMemory.BASCalibrationAlert],
+        riskFlags: [BASBrainStateRiskFlag],
         dominantGoals: [String],
         activeConstraints: [String],
         retrievalTags: [String],
         verificationSummary: String,
         activeTemplateCount: Int,
-        failureGuardCount: Int
+        failureGuardCount: Int,
+        evolutionPendingReviewCount: Int,
+        evolutionRollbackReady: Bool
     ) {
         self.workflowProfile = workflowProfile
         self.workflowTitle = workflowTitle
         self.roleID = roleID
+        self.identityPosture = identityPosture
+        self.identityInitiative = identityInitiative
+        self.confidenceCeiling = confidenceCeiling
         self.relationshipBoundary = relationshipBoundary
         self.boundaryHeadline = boundaryHeadline
+        self.boundaryMode = boundaryMode
+        self.boundaryConstraints = boundaryConstraints
+        self.calibrationStatus = calibrationStatus
+        self.calibrationAlerts = calibrationAlerts
+        self.riskFlags = riskFlags
         self.dominantGoals = dominantGoals
         self.activeConstraints = activeConstraints
         self.retrievalTags = retrievalTags
         self.verificationSummary = verificationSummary
         self.activeTemplateCount = activeTemplateCount
         self.failureGuardCount = failureGuardCount
+        self.evolutionPendingReviewCount = evolutionPendingReviewCount
+        self.evolutionRollbackReady = evolutionRollbackReady
     }
 }
 
@@ -1169,6 +1199,7 @@ public struct BASHostSessionResult: Codable, Equatable, Sendable {
     public var workflowProfile: BASHostWorkflowProfile
     public var currentBrain: BASHostCurrentBrain
     public var projection: BASHostProjectionSummary
+    public var eBrainTurn: BASEBrainTurnResult?
     public var activeSessionTitle: String
     public var notices: [String]
     public var followUpActions: [String]
@@ -1180,6 +1211,7 @@ public struct BASHostSessionResult: Codable, Equatable, Sendable {
         workflowProfile: BASHostWorkflowProfile,
         currentBrain: BASHostCurrentBrain,
         projection: BASHostProjectionSummary,
+        eBrainTurn: BASEBrainTurnResult? = nil,
         activeSessionTitle: String,
         notices: [String],
         followUpActions: [String],
@@ -1190,6 +1222,7 @@ public struct BASHostSessionResult: Codable, Equatable, Sendable {
         self.workflowProfile = workflowProfile
         self.currentBrain = currentBrain
         self.projection = projection
+        self.eBrainTurn = eBrainTurn
         self.activeSessionTitle = activeSessionTitle
         self.notices = notices
         self.followUpActions = followUpActions
@@ -1581,7 +1614,8 @@ public struct BASHostRuntime: Sendable {
             requestKind: request.sessionKind,
             currentBrain: result.currentBrain,
             notices: result.notices,
-            followUpActions: result.followUpActions
+            followUpActions: result.followUpActions,
+            eBrainTurn: result.eBrainTurn
         )
         return result
     }
@@ -1638,17 +1672,24 @@ public struct BASHostRuntime: Sendable {
         let currentBrain = makeHostCurrentBrain(
             from: substrateCurrentBrain,
             workflowProfile: request.workflowProfile,
-            identityProfile: bootstrapped.brainState.identityProfile,
-            boundaryHeadline: bootstrapped.brainState.boundaryPolicy.auditHeadline
+            brainState: bootstrapped.brainState
         )
         let notices = baseNotices(for: request)
         let followUpActions = baseFollowUpActions(for: request)
         let interventionSuggestion = schedulePredictiveIntervention(for: request, now: now)
+        let eBrainTurn = makeEBrainTurn(
+            for: request,
+            currentBrain: currentBrain,
+            projection: projection,
+            deviceStateOverride: nil,
+            now: now
+        )
         return BASHostSessionResult(
             requestKind: request.kind,
             workflowProfile: request.workflowProfile,
             currentBrain: currentBrain,
             projection: makeHostProjection(from: projection),
+            eBrainTurn: eBrainTurn,
             activeSessionTitle: request.title ?? configuration.presentation.sessionTitles.title(for: request.workflowProfile),
             notices: notices,
             followUpActions: followUpActions,
@@ -1657,7 +1698,8 @@ public struct BASHostRuntime: Sendable {
                 requestKind: request.kind,
                 currentBrain: currentBrain,
                 notices: notices,
-                followUpActions: followUpActions
+                followUpActions: followUpActions,
+                eBrainTurn: eBrainTurn
             )
         )
     }
@@ -1713,7 +1755,8 @@ public struct BASHostRuntime: Sendable {
                 requestKind: .reopen,
                 currentBrain: result.currentBrain,
                 notices: result.notices,
-                followUpActions: result.followUpActions
+                followUpActions: result.followUpActions,
+                eBrainTurn: result.eBrainTurn
             )
         }
         return result
@@ -1820,9 +1863,10 @@ public struct BASHostRuntime: Sendable {
         requestKind: BASHostSessionKind,
         currentBrain: BASHostCurrentBrain,
         notices: [String],
-        followUpActions: [String]
+        followUpActions: [String],
+        eBrainTurn: BASEBrainTurnResult? = nil
     ) -> BASHostConsoleSnapshot {
-        BASFlightDeckBuilder().build(
+        let baseSnapshot = BASFlightDeckBuilder().build(
             from: BASFlightDeckInput(
                 overallSummary: "BASHostKit is serving the \(requestKind.title.lowercased()) path through the private SDK façade.",
                 runtimeSummary: configuration.prefersPureLocal
@@ -1842,26 +1886,42 @@ public struct BASHostRuntime: Sendable {
                 isPureLocal: configuration.prefersPureLocal
             )
         )
+
+        guard let eBrainTurn else {
+            return baseSnapshot
+        }
+
+        return BASEBrainConsoleSupport.mergedSnapshot(baseSnapshot, with: eBrainTurn)
     }
 
     private func makeHostCurrentBrain(
         from currentBrain: BASCurrentBrainState,
         workflowProfile: BASHostWorkflowProfile,
-        identityProfile: BASIdentityProfile,
-        boundaryHeadline: String
+        brainState: BASDecisionBrainState
     ) -> BASHostCurrentBrain {
-        BASHostCurrentBrain(
+        let identityProfile = brainState.identityProfile
+        return BASHostCurrentBrain(
             workflowProfile: workflowProfile,
             workflowTitle: workflowTitle(for: workflowProfile),
             roleID: identityProfile.role.identifier,
+            identityPosture: identityProfile.posture,
+            identityInitiative: identityProfile.initiative,
+            confidenceCeiling: identityProfile.confidenceCeiling,
             relationshipBoundary: identityProfile.relationshipBoundary,
-            boundaryHeadline: boundaryHeadline,
+            boundaryHeadline: brainState.boundaryPolicy.auditHeadline,
+            boundaryMode: brainState.boundaryPolicy.mode,
+            boundaryConstraints: brainState.boundaryPolicy.activeConstraints,
+            calibrationStatus: brainState.calibrationState.status,
+            calibrationAlerts: brainState.calibrationState.alerts,
+            riskFlags: brainState.verificationSnapshot.riskFlags,
             dominantGoals: currentBrain.dominantGoals,
             activeConstraints: currentBrain.activeConstraints,
             retrievalTags: currentBrain.retrievalTags,
             verificationSummary: currentBrain.verificationSnapshot,
             activeTemplateCount: currentBrain.activeTemplateIDs.count,
-            failureGuardCount: currentBrain.recentFailurePatternIDs.count
+            failureGuardCount: currentBrain.recentFailurePatternIDs.count,
+            evolutionPendingReviewCount: brainState.evolutionState.pendingReviewCount,
+            evolutionRollbackReady: brainState.evolutionState.rollbackReady
         )
     }
 

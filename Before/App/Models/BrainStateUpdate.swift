@@ -101,12 +101,30 @@ final class BrainStateUpdate {
         return string
     }
 
+    static func encodeCodable<Value: Encodable>(_ value: Value?) -> String? {
+        guard let value,
+              let data = try? JSONEncoder().encode(value),
+              let string = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return string
+    }
+
     static func decode(_ blob: String) -> [String] {
         guard let data = blob.data(using: .utf8),
               let values = try? JSONDecoder().decode([String].self, from: data) else {
             return []
         }
         return values
+    }
+
+    static func decodeCodable<Value: Decodable>(_ blob: String?, as type: Value.Type) -> Value? {
+        guard let blob,
+              let data = blob.data(using: .utf8),
+              let value = try? JSONDecoder().decode(Value.self, from: data) else {
+            return nil
+        }
+        return value
     }
 }
 

@@ -607,6 +607,91 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
     }
 
     @MainActor
+    func testBalanceRefinementUsesProtectiveEBrianTurnWithoutInvokingProvider() async {
+        let base = BalanceBoardResult(
+            headline: "Base headline",
+            summary: "Base summary",
+            focusTitle: "Base focus",
+            focusDescription: "Base description",
+            nextAction: "Base next action"
+        )
+        let input = BalanceBoardInput(
+            prompt: "Should I take the side project?",
+            desire: "Momentum",
+            concern: "Burn out",
+            constraint: "My week is already full.",
+            longTerm: "I want steadier energy next month."
+        )
+        let turn = protectiveTurn(
+            mode: .block,
+            headline: "Hold the boundary",
+            body: "Pause and protect the boundary first.",
+            alternativeActions: ["Leave the stimulus", "Decide tomorrow"]
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertEqual(refined?.headline, turn.renderedOutput.headline)
+        XCTAssertEqual(refined?.summary, turn.renderedOutput.body)
+        XCTAssertEqual(refined?.nextAction, "Leave the stimulus")
+        XCTAssertEqual(refined?.focusTitle, base.focusTitle)
+        XCTAssertEqual(refined?.focusDescription, base.focusDescription)
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertNil(snapshot.requestCountByKind[.balance])
+        XCTAssertNil(snapshot.outcomeCount[.providerSuccess])
+    }
+
+    @MainActor
+    func testMirrorRefinementUsesProtectiveEBrianTurnWithoutInvokingProvider() async {
+        let base = MirrorResult(
+            headline: "Base headline",
+            coreTension: "Base tension",
+            nextActionTitle: "Base next action title",
+            nextAction: "Base next action"
+        )
+        let input = MirrorInput(
+            prompt: "Should I stay in this relationship?",
+            emotion: "I feel tired and sad.",
+            relationship: "We keep repeating the same argument.",
+            reality: "We live far apart and avoid hard conversations.",
+            longTerm: "I want steadier relationships.",
+            selfLens: "I feel pulled between hope and exhaustion."
+        )
+        let turn = protectiveTurn(
+            mode: .replace,
+            headline: "Take the safer step",
+            body: "Use the safer path instead of forcing the current one.",
+            alternativeActions: ["Use the safer step", "Continue mindfully"]
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineMirrorResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertEqual(refined?.headline, turn.renderedOutput.headline)
+        XCTAssertEqual(refined?.coreTension, turn.renderedOutput.body)
+        XCTAssertEqual(refined?.nextActionTitle, "Use the safer step")
+        XCTAssertEqual(refined?.nextAction, "Use the safer step")
+
+        let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
+        XCTAssertNil(snapshot.requestCountByKind[.mirror])
+        XCTAssertNil(snapshot.outcomeCount[.providerSuccess])
+    }
+
+    @MainActor
     func testReminderAdmissionSkipsWhenOnlyOneCandidateExists() async {
         let selected = await DecisionIntelligenceProviderPipeline.pickReminder(
             from: [
@@ -848,6 +933,197 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         XCTAssertFalse(latestTrace.consistencyRejected)
         XCTAssertNotNil(latestTrace.consistencyCheck)
         XCTAssertTrue(latestTrace.consistencyCheck?.isConsistent == true)
+    }
+
+    private func protectiveTurn(
+        mode: BASActionPermitMode,
+        headline: String,
+        body: String,
+        alternativeActions: [String]
+    ) -> BASEBrainTurnResult {
+        let deviceState = BASDeviceState(
+            batteryLevel: 0.66,
+            thermalLevel: .warm,
+            memoryFreeMB: 2_048,
+            networkState: .online,
+            foregroundState: .foreground,
+            cpuLoad: 0.31,
+            gpuLoad: 0.12,
+            npuAvailable: true,
+            latencyBudgetMs: 1_400
+        )
+        let budgetFrame = BASBudgetFrame.guardedLocal(maxLoops: 2, maxCandidates: 2, maxDecodeTokens: 160, retrievalDepth: 2)
+        let hostContext = BASHostProfile(hostID: "host.primary", longTermGoals: ["Stay calm"], noGoZones: ["unsafe"])
+        let contextFrame = BASContextFrame(
+            utterance: body,
+            taskType: .highPressure,
+            emotionalLoad: 0.82,
+            timePressure: 0.74,
+            relationPattern: "self",
+            ambiguityScore: 0.63,
+            consequenceLevel: 0.81,
+            manipulationHints: ["time_pressure"],
+            hostRelevance: 0.91
+        )
+        let decomposeFrame = BASDecomposeFrame(
+            facts: [headline],
+            goals: ["Keep the boundary"],
+            emotions: ["alert"],
+            unknowns: ["best next step"],
+            contradictions: [],
+            pressureSignals: ["urgency"],
+            manipulationSignals: ["forced-now"],
+            mirrorText: body
+        )
+        let memoryAtom = BASMemoryAtom(
+            memoryID: "mem-1",
+            summary: "Protect the boundary first.",
+            contentType: .warm,
+            source: "session",
+            confidence: 0.86,
+            conflictFingerprint: "fp-1"
+        )
+        let memoryBundle = BASMemoryBundle(
+            atoms: [memoryAtom],
+            retrievalTags: ["boundary"],
+            conflictRefs: [],
+            activeHostVersion: hostContext.activeVersion
+        )
+        let candidate = BASCandidatePath(
+            candidateID: "cand-1",
+            title: "Pause and protect",
+            actionSummary: "Hold for a moment before acting.",
+            requiredEvidence: ["high pressure"],
+            expectedBenefit: 0.9,
+            expectedCost: 0.2,
+            reversibility: 0.8,
+            confidence: 0.87
+        )
+        let forecast = BASForecastItem(
+            candidateID: candidate.candidateID,
+            shortTermOutcome: "Less immediate pressure",
+            midTermOutcome: "Better boundary clarity",
+            worstCase: "Minor delay",
+            uncertainty: 0.2,
+            affectedRelations: ["self"]
+        )
+        let critique = BASCritiqueItem(
+            candidateID: candidate.candidateID,
+            critiqueType: .boundaryConflict,
+            critiqueText: "The safer route avoids forcing the choice too early.",
+            severity: 0.74
+        )
+        let triScore = BASTriSelfScore(
+            candidateID: candidate.candidateID,
+            idScore: 0.42,
+            egoScore: 0.81,
+            superegoScore: 0.91,
+            mergedScore: 0.83,
+            veto: false
+        )
+        let mergedChoice = BASMergedChoice(
+            candidateID: candidate.candidateID,
+            title: "Pause first",
+            actionSummary: "Use the safer next step."
+        )
+        let riskCard = BASRiskCard(
+            totalRisk: 0.88,
+            riskLevel: .high,
+            factors: ["pressure", "uncertainty"],
+            uncertainty: 0.56,
+            irreversibility: 0.79,
+            manipulationStrength: 0.73,
+            gsiScore: 0.68,
+            recommendedMode: mode
+        )
+        let actionPermit = BASActionPermit(
+            mode: mode,
+            reasonCodes: ["risk.high", "gsi.elevated"],
+            requireSecondCheck: true,
+            outputLengthCap: 120,
+            tonePolicy: "clear_firm",
+            templatePolicy: "protective_alternative"
+        )
+        let thoughtFrame = BASThoughtFrame(
+            stepIndex: 1,
+            decomposeRef: "decomp-1",
+            memoryRefs: [memoryAtom.memoryID],
+            candidates: [candidate],
+            forecasts: [forecast],
+            critiques: [critique],
+            triScores: [triScore],
+            riskCard: riskCard,
+            actionPermit: actionPermit,
+            stabilityScore: 0.91,
+            stopReason: .blocked
+        )
+        let thoughtFold = BASThoughtFold(
+            foldID: "fold-1",
+            compactSlots: ["headline": headline, "body": body],
+            candidateSignatures: [candidate.candidateID],
+            riskSnapshot: riskCard,
+            hostEffectSummary: "Host boundary remains primary.",
+            restorePointer: "restore-1",
+            checksum: "checksum-1"
+        )
+        let updateTicket = BASUpdateTicket(
+            ticketID: "ticket-1",
+            sessionRef: "session-1",
+            summary: "Record a protective turn.",
+            memoryWriteSuggestion: "Keep the boundary signal in warm memory.",
+            hostProfileChangeSuggestion: nil,
+            ruleCandidateRef: "rule-1",
+            confidence: 0.84,
+            conflictFlag: false,
+            requiresReview: true
+        )
+        let runtimeTrace = BASRuntimeTrace(
+            sessionID: "session-1",
+            layerEvents: [
+                BASRuntimeTraceEvent(layerID: "L11", event: "gate", detail: "Protective mode short-circuited refinement.")
+            ],
+            latencyBreakdownMs: ["guard": 3],
+            powerEstimate: 0.12,
+            thermalTrace: ["cool"],
+            modelRoute: "guarded",
+            loopCount: 1,
+            cacheHitRate: 0,
+            guardrailFindings: [
+                BASRuntimeAuditFinding(
+                    code: "budget.high_risk_fast_path",
+                    layerID: "L1",
+                    summary: "Protective short-circuit requested.",
+                    severity: .high,
+                    enforced: true
+                )
+            ],
+            recommendedKillSwitches: [.forceGuardMode]
+        )
+
+        return BASEBrainTurnResult(
+            deviceState: deviceState,
+            budgetFrame: budgetFrame,
+            hostContext: hostContext,
+            contextFrame: contextFrame,
+            decomposeFrame: decomposeFrame,
+            memoryBundle: memoryBundle,
+            thoughtFrame: thoughtFrame,
+            thoughtFold: thoughtFold,
+            triScores: [triScore],
+            mergedChoice: mergedChoice,
+            riskCard: riskCard,
+            actionPermit: actionPermit,
+            hostGateValue: 0.37,
+            renderedOutput: BASRenderedOutput(
+                mode: mode,
+                headline: headline,
+                body: body,
+                alternativeActions: alternativeActions,
+                explanationCodes: ["risk.high", "gsi.elevated"]
+            ),
+            updateTickets: [updateTicket],
+            runtimeTrace: runtimeTrace
+        )
     }
 
     private func permissiveBrainState(mode: DecisionMode) -> DecisionBrainState {

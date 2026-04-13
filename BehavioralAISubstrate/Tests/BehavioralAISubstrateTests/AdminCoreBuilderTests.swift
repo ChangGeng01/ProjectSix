@@ -56,6 +56,8 @@ struct AdminCoreBuilderTests {
         #expect(snapshot.brainSummary == "brain ok")
         #expect(snapshot.overallSummary == "substrate ready")
         #expect(snapshot.capabilityCoverage?.overallScore == 100)
+        #expect(snapshot.programExecutionBlueprint != nil)
+        #expect(snapshot.currentProgramExecutionBlueprint.milestones.count == 8)
     }
 
     @Test("inspection bundle builder maps calibration into substrate inspection state")
@@ -165,6 +167,7 @@ struct AdminCoreBuilderTests {
 
         #expect(snapshot.inspectionBundle == inspectionBundle)
         #expect(snapshot.inspectionBundle?.summary.contains("Release allow") == true)
+        #expect(snapshot.currentProgramExecutionBlueprint.requiredAppendices.count == 4)
     }
 
     @Test("layer health derives from score when no blockers exist")

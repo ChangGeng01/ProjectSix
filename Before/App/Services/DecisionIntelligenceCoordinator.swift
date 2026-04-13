@@ -196,18 +196,20 @@ enum DecisionIntelligenceCoordinator {
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
+        eBrainTurn: BASEBrainTurnResult? = nil,
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> QuickCheckResult? {
         let profile = executionProfile(preferences: preferences)
         let quickStrategy = profile
             .strategy(for: .quick)
+            .clamped(using: eBrainTurn)
             .adapting(
                 contextState: contextState,
                 neuralState: neuralState,
                 brainState: brainState
             )
         guard preferences.onDeviceIntelligenceMode.isEnabled,
-              quickStrategy.allowsModelInvocation else { return nil }
+              quickStrategy.allowsModelInvocation || eBrainTurn?.actionPermit.mode.isProtective == true else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineQuickResult(
             base: base,
             input: input,
@@ -215,6 +217,7 @@ enum DecisionIntelligenceCoordinator {
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState,
+            eBrainTurn: eBrainTurn,
             preference: quickStrategy.preferredProvider,
             allowFallbacks: profile.allowFallbacks
         )
@@ -226,18 +229,20 @@ enum DecisionIntelligenceCoordinator {
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
+        eBrainTurn: BASEBrainTurnResult? = nil,
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> BalanceBoardResult? {
         let profile = executionProfile(preferences: preferences)
         let balanceStrategy = profile
             .strategy(for: .balance)
+            .clamped(using: eBrainTurn)
             .adapting(
                 contextState: contextState,
                 neuralState: neuralState,
                 brainState: brainState
             )
         guard preferences.onDeviceIntelligenceMode.isEnabled,
-              balanceStrategy.allowsModelInvocation else { return nil }
+              balanceStrategy.allowsModelInvocation || eBrainTurn?.actionPermit.mode.isProtective == true else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineBalanceResult(
             base: base,
             input: input,
@@ -245,6 +250,7 @@ enum DecisionIntelligenceCoordinator {
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState,
+            eBrainTurn: eBrainTurn,
             preference: balanceStrategy.preferredProvider,
             allowFallbacks: profile.allowFallbacks
         )
@@ -256,18 +262,20 @@ enum DecisionIntelligenceCoordinator {
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
+        eBrainTurn: BASEBrainTurnResult? = nil,
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
     ) async -> MirrorResult? {
         let profile = executionProfile(preferences: preferences)
         let mirrorStrategy = profile
             .strategy(for: .mirror)
+            .clamped(using: eBrainTurn)
             .adapting(
                 contextState: contextState,
                 neuralState: neuralState,
                 brainState: brainState
             )
         guard preferences.onDeviceIntelligenceMode.isEnabled,
-              mirrorStrategy.allowsModelInvocation else { return nil }
+              mirrorStrategy.allowsModelInvocation || eBrainTurn?.actionPermit.mode.isProtective == true else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineMirrorResult(
             base: base,
             input: input,
@@ -275,6 +283,7 @@ enum DecisionIntelligenceCoordinator {
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState,
+            eBrainTurn: eBrainTurn,
             preference: mirrorStrategy.preferredProvider,
             allowFallbacks: profile.allowFallbacks
         )

@@ -81,16 +81,21 @@ enum DecisionIntelligenceProviderPipeline {
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
+        eBrainTurn: BASEBrainTurnResult? = nil,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> QuickCheckResult? {
+        let adjustedStrategy = strategy?.clamped(using: eBrainTurn)
+        if let eBrainTurn, eBrainTurn.actionPermit.mode.isProtective {
+            return protectiveQuickResult(base: base, turn: eBrainTurn)
+        }
         let clock = ContinuousClock()
         let requestStart = clock.now
         let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
             base: base,
             input: input,
-            strategy: strategy,
+            strategy: adjustedStrategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -108,7 +113,7 @@ enum DecisionIntelligenceProviderPipeline {
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState,
-            runtimeStrategy: strategy,
+            runtimeStrategy: adjustedStrategy,
             promptBudget: envelope.budget,
             admissionDecision: admissionDecision,
             sourceInput: BASAppleProviderObservationSourceInput(
@@ -121,7 +126,7 @@ enum DecisionIntelligenceProviderPipeline {
                 admissionPressureID: admissionDecision.pressure.rawValue,
                 admissionSkipReasonID: admissionDecision.skipReason?.rawValue,
                 selectionNeedID: admissionDecision.selectionNeed?.rawValue,
-                runtimeTimeBudgetMs: strategy?.timeBudgetMs,
+                runtimeTimeBudgetMs: adjustedStrategy?.timeBudgetMs,
                 admissionReason: admissionDecision.reason,
                 semanticPromptFingerprint: semanticPromptFingerprint,
                 stablePrefixFingerprint: stablePrefixFingerprint,
@@ -134,7 +139,7 @@ enum DecisionIntelligenceProviderPipeline {
         )
         let outcome = await BehavioralAISubstrateBridge.executeObservedProviderRequest(
             task: .quick,
-            strategy: strategy,
+            strategy: adjustedStrategy,
             preference: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile,
@@ -170,7 +175,7 @@ enum DecisionIntelligenceProviderPipeline {
                 await provider.refineQuickResult(
                     base: base,
                     input: input,
-                    strategy: strategy,
+                    strategy: adjustedStrategy,
                     contextState: contextState,
                     neuralState: neuralState,
                     brainState: brainState
@@ -208,16 +213,21 @@ enum DecisionIntelligenceProviderPipeline {
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
+        eBrainTurn: BASEBrainTurnResult? = nil,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> BalanceBoardResult? {
+        let adjustedStrategy = strategy?.clamped(using: eBrainTurn)
+        if let eBrainTurn, eBrainTurn.actionPermit.mode.isProtective {
+            return protectiveBalanceResult(base: base, turn: eBrainTurn)
+        }
         let clock = ContinuousClock()
         let requestStart = clock.now
         let envelope = DecisionIntelligencePromptContract.balanceRefinementEnvelope(
             base: base,
             input: input,
-            strategy: strategy,
+            strategy: adjustedStrategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -235,7 +245,7 @@ enum DecisionIntelligenceProviderPipeline {
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState,
-            runtimeStrategy: strategy,
+            runtimeStrategy: adjustedStrategy,
             promptBudget: envelope.budget,
             admissionDecision: admissionDecision,
             sourceInput: BASAppleProviderObservationSourceInput(
@@ -248,7 +258,7 @@ enum DecisionIntelligenceProviderPipeline {
                 admissionPressureID: admissionDecision.pressure.rawValue,
                 admissionSkipReasonID: admissionDecision.skipReason?.rawValue,
                 selectionNeedID: admissionDecision.selectionNeed?.rawValue,
-                runtimeTimeBudgetMs: strategy?.timeBudgetMs,
+                runtimeTimeBudgetMs: adjustedStrategy?.timeBudgetMs,
                 admissionReason: admissionDecision.reason,
                 semanticPromptFingerprint: semanticPromptFingerprint,
                 stablePrefixFingerprint: stablePrefixFingerprint,
@@ -261,7 +271,7 @@ enum DecisionIntelligenceProviderPipeline {
         )
         let outcome = await BehavioralAISubstrateBridge.executeObservedProviderRequest(
             task: .balance,
-            strategy: strategy,
+            strategy: adjustedStrategy,
             preference: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile,
@@ -297,7 +307,7 @@ enum DecisionIntelligenceProviderPipeline {
                 await provider.refineBalanceResult(
                     base: base,
                     input: input,
-                    strategy: strategy,
+                    strategy: adjustedStrategy,
                     contextState: contextState,
                     neuralState: neuralState,
                     brainState: brainState
@@ -335,16 +345,21 @@ enum DecisionIntelligenceProviderPipeline {
         contextState: DecisionContextPreparedState? = nil,
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
+        eBrainTurn: BASEBrainTurnResult? = nil,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> MirrorResult? {
+        let adjustedStrategy = strategy?.clamped(using: eBrainTurn)
+        if let eBrainTurn, eBrainTurn.actionPermit.mode.isProtective {
+            return protectiveMirrorResult(base: base, turn: eBrainTurn)
+        }
         let clock = ContinuousClock()
         let requestStart = clock.now
         let envelope = DecisionIntelligencePromptContract.mirrorRefinementEnvelope(
             base: base,
             input: input,
-            strategy: strategy,
+            strategy: adjustedStrategy,
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState
@@ -362,7 +377,7 @@ enum DecisionIntelligenceProviderPipeline {
             contextState: contextState,
             neuralState: neuralState,
             brainState: brainState,
-            runtimeStrategy: strategy,
+            runtimeStrategy: adjustedStrategy,
             promptBudget: envelope.budget,
             admissionDecision: admissionDecision,
             sourceInput: BASAppleProviderObservationSourceInput(
@@ -375,7 +390,7 @@ enum DecisionIntelligenceProviderPipeline {
                 admissionPressureID: admissionDecision.pressure.rawValue,
                 admissionSkipReasonID: admissionDecision.skipReason?.rawValue,
                 selectionNeedID: admissionDecision.selectionNeed?.rawValue,
-                runtimeTimeBudgetMs: strategy?.timeBudgetMs,
+                runtimeTimeBudgetMs: adjustedStrategy?.timeBudgetMs,
                 admissionReason: admissionDecision.reason,
                 semanticPromptFingerprint: semanticPromptFingerprint,
                 stablePrefixFingerprint: stablePrefixFingerprint,
@@ -388,7 +403,7 @@ enum DecisionIntelligenceProviderPipeline {
         )
         let outcome = await BehavioralAISubstrateBridge.executeObservedProviderRequest(
             task: .mirror,
-            strategy: strategy,
+            strategy: adjustedStrategy,
             preference: preference,
             allowFallbacks: allowFallbacks,
             testingStubProfile: testingStubProfile,
@@ -424,7 +439,7 @@ enum DecisionIntelligenceProviderPipeline {
                 await provider.refineMirrorResult(
                     base: base,
                     input: input,
-                    strategy: strategy,
+                    strategy: adjustedStrategy,
                     contextState: contextState,
                     neuralState: neuralState,
                     brainState: brainState
@@ -652,4 +667,161 @@ enum DecisionIntelligenceProviderPipeline {
         return (seconds + attoseconds) * 1_000
     }
 
+}
+
+extension BASActionPermitMode {
+    var isProtective: Bool {
+        switch self {
+        case .delay, .block, .replace:
+            return true
+        case .answer, .compare:
+            return false
+        }
+    }
+}
+
+extension DecisionRuntimeGear {
+    var rank: Int {
+        switch self {
+        case .low:
+            return 0
+        case .balanced:
+            return 1
+        case .high:
+            return 2
+        }
+    }
+}
+
+extension DecisionAdaptiveTaskStrategy {
+    func clamped(using eBrainTurn: BASEBrainTurnResult?) -> DecisionAdaptiveTaskStrategy {
+        guard let eBrainTurn else { return self }
+
+        let budget = eBrainTurn.budgetFrame
+        let gearCap: DecisionRuntimeGear = switch budget.runMode {
+        case .dormant, .sentinel:
+            .low
+        case .engage:
+            .balanced
+        case .deepLoop:
+            .high
+        case .guarded:
+            .low
+        }
+
+        let runtimeGear = [runtimeGear, gearCap].min { $0.rank < $1.rank } ?? runtimeGear
+        let cappedContextBudget = min(contextBudget, max(40, budget.maxCandidates * 100 + budget.maxLoops * 60))
+        let cappedOutputBudget = min(outputCharacterBudget, max(80, budget.maxDecodeTokens * 2))
+        let cappedTimeBudget = min(timeBudgetMs, max(250, budget.maxLoops * 320 + budget.retrievalDepth * 120))
+        let cappedToolBudget = min(toolCallBudget, budget.maintenanceAllowed ? toolCallBudget : 1)
+        let cappedRetrievalBudget = min(retrievalItemBudget, max(1, budget.retrievalDepth + max(0, budget.maxCandidates / 2)))
+
+        return DecisionAdaptiveTaskStrategy(
+            kind: kind,
+            entropy: entropy,
+            runtimeGear: runtimeGear,
+            preferredProvider: preferredProvider,
+            contextBudget: cappedContextBudget,
+            outputCharacterBudget: cappedOutputBudget,
+            timeBudgetMs: cappedTimeBudget,
+            toolCallBudget: cappedToolBudget,
+            retrievalItemBudget: cappedRetrievalBudget,
+            retrievalMode: retrievalMode,
+            thinkingMode: thinkingMode,
+            outputMode: outputMode,
+            tone: tone,
+            actionSpace: actionSpace,
+            responseLanguage: responseLanguage,
+            allowsModelInvocation: allowsModelInvocation
+        )
+    }
+}
+
+private extension DecisionIntelligenceProviderPipeline {
+    static func protectiveQuickResult(
+        base: QuickCheckResult,
+        turn: BASEBrainTurnResult
+    ) -> QuickCheckResult {
+        let rendered = turn.renderedOutput
+        let verdict: CheckVerdict = switch rendered.mode {
+        case .delay, .replace:
+            .pause
+        case .block:
+            .notRecommended
+        case .compare, .answer:
+            base.verdict
+        }
+        let primaryAction: CheckAction = switch rendered.mode {
+        case .delay:
+            .wait90s
+        case .block:
+            .leaveStimulus
+        case .replace:
+            .decideTomorrow
+        case .compare, .answer:
+            base.primaryAction
+        }
+        let secondaryActions: [CheckAction] = switch rendered.mode {
+        case .delay:
+            [.decideTomorrow, .continueMindfully]
+        case .block:
+            [.leaveStimulus, .decideTomorrow]
+        case .replace:
+            [.continueMindfully, .decideTomorrow]
+        case .compare, .answer:
+            base.secondaryActions
+        }
+
+        return QuickCheckResult(
+            currentPerspective: nonEmpty(rendered.headline) ?? base.currentPerspective,
+            afterPerspective: nonEmpty(rendered.body) ?? base.afterPerspective,
+            verdict: verdict,
+            primaryAction: primaryAction,
+            secondaryActions: secondaryActions
+        )
+    }
+
+    static func protectiveBalanceResult(
+        base: BalanceBoardResult,
+        turn: BASEBrainTurnResult
+    ) -> BalanceBoardResult {
+        let rendered = turn.renderedOutput
+        let nextAction = rendered.alternativeActions.lazy.compactMap(nonEmpty).first ?? base.nextAction
+        return BalanceBoardResult(
+            headline: nonEmpty(rendered.headline) ?? base.headline,
+            summary: nonEmpty(rendered.body) ?? base.summary,
+            focusTitle: base.focusTitle,
+            focusDescription: base.focusDescription,
+            nextAction: nextAction
+        )
+    }
+
+    static func protectiveMirrorResult(
+        base: MirrorResult,
+        turn: BASEBrainTurnResult
+    ) -> MirrorResult {
+        let rendered = turn.renderedOutput
+        let nextAction = rendered.alternativeActions.lazy.compactMap(nonEmpty).first ?? base.nextAction
+        let nextActionTitle: String = switch rendered.mode {
+        case .delay:
+            "Delay the move"
+        case .block:
+            "Hold the boundary"
+        case .replace:
+            "Use the safer step"
+        case .compare, .answer:
+            base.nextActionTitle
+        }
+        return MirrorResult(
+            headline: nonEmpty(rendered.headline) ?? base.headline,
+            coreTension: nonEmpty(rendered.body) ?? base.coreTension,
+            nextActionTitle: nextActionTitle,
+            nextAction: nextAction
+        )
+    }
+
+    static func nonEmpty(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
 }

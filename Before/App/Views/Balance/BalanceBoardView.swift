@@ -75,8 +75,7 @@ struct BalanceBoardView: View {
 
                         BeforeActionButton("Show the board", isEnabled: session.canEvaluate, accessibilityIdentifier: "balance.evaluate") {
                             Task {
-                                appModel.refreshBalanceBrainState(session)
-                                await session.evaluateWithIntelligence(preferences: appModel.preferences)
+                                await appModel.evaluateBalanceSessionWithIntelligence(session)
                             }
                         }
                         .disabled(!session.canEvaluate)

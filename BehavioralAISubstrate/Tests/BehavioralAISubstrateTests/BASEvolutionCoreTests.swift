@@ -96,4 +96,40 @@ final class BASEvolutionCoreTests: XCTestCase {
         XCTAssertEqual(state.pendingReviewCount, 1)
         XCTAssertEqual(state.latestCheckpoint?.id, "newer")
     }
+
+    func testCheckpointPlannerCarriesLineageSummaryIntoCurrentState() {
+        let now = Date(timeIntervalSince1970: 1_715_000_000)
+        let lineage = BASEvolutionLineageSummary(
+            recordedAt: now,
+            sessionID: "session-1",
+            taskType: "decision",
+            riskLevel: "high",
+            permitMode: "delay",
+            hostGatePercent: 78,
+            thoughtFoldChecksum: "fold-123",
+            updateTicketSummaries: ["review tonight state"],
+            guardrailFindings: ["high-risk direct answer downgraded"],
+            recommendedKillSwitches: ["disableHighRiskAutoAction"]
+        )
+        let input = BASEvolutionCheckpointInput(
+            modeName: "reflective",
+            sourceID: "scene_active",
+            fingerprint: "fp-2",
+            identityRole: .reflectiveWitness,
+            boundaryMode: .localOnlyProtective,
+            calibrationStatus: .stable,
+            lineageSummary: lineage
+        )
+
+        let planned = BASEvolutionCheckpointPlanner.checkpointFields(
+            id: "lineage",
+            createdAt: now,
+            latest: nil,
+            input: input
+        )
+        let state = BASEvolutionCheckpointPlanner.currentState(from: [planned])
+
+        XCTAssertEqual(planned.lineageSummary, lineage)
+        XCTAssertEqual(state.latestCheckpoint?.lineageSummary, lineage)
+    }
 }

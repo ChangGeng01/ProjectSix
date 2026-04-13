@@ -6,12 +6,18 @@ struct HistoryView: View {
     @Query(sort: \CheckEvent.createdAt, order: .reverse) private var events: [CheckEvent]
     @Query(sort: \BalanceDecisionRecord.updatedAt, order: .reverse) private var balanceBoards: [BalanceDecisionRecord]
     @Query(sort: \MirrorDecisionRecord.updatedAt, order: .reverse) private var mirrorRecords: [MirrorDecisionRecord]
+    @Query(sort: \DecisionEvolutionCheckpoint.createdAt, order: .reverse) private var evolutionCheckpoints: [DecisionEvolutionCheckpoint]
     @Query(sort: \TomorrowBoxItem.createdAt, order: .reverse) private var tomorrowItems: [TomorrowBoxItem]
     @State private var selectedFilter: HistoryFilter = .all
     @State private var selectedDetail: HistoryDetailSelection?
     @State private var selectedProfile: ReviewProfileSelection?
+    @State private var systemFlightDeck: DecisionSystemFlightDeck?
+    @State private var isRefreshingSystemFlightDeck = false
+    private let evolutionSurfaceContract = DecisionEvolutionSurfaceContract.history
 
     var body: some View {
+        let evolutionWorkspace = currentEvolutionWorkspace
+
         NavigationStack {
             ZStack {
                 BeforeBackground()
@@ -48,6 +54,10 @@ struct HistoryView: View {
                                         insightCard(for: insight)
                                     }
                                 }
+                            }
+
+                            if !evolutionTrailItems.isEmpty {
+                                evolutionTrailSection(evolutionWorkspace)
                             }
 
                             Picker("History filter", selection: $selectedFilter) {
@@ -89,7 +99,23 @@ struct HistoryView: View {
                     .environmentObject(appModel)
                 }
             }
+            .task {
+                await refreshSystemFlightDeck()
+            }
+            .onChange(of: appModel.evolutionControlMutationEpoch) { _, _ in
+                Task {
+                    await refreshSystemFlightDeck()
+                }
+            }
         }
+    }
+
+    private var currentEvolutionWorkspace: DecisionEvolutionWorkspaceSnapshot {
+        DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: systemFlightDeck?.evolutionControlSurface ?? appModel.makeEvolutionControlSurface(),
+            releaseSummary: systemFlightDeck?.releaseControlSummary,
+            historyPresentations: evolutionTrailPresentations
+        )
     }
 
     private var timelineItems: [HistoryTimelineItem] {
@@ -118,6 +144,192 @@ struct HistoryView: View {
             mirror: mirrorRecords,
             tomorrowCount: tomorrowItems.count
         )
+    }
+
+    private var evolutionTrailItems: [DecisionEvolutionCheckpoint] {
+        evolutionCheckpoints.filter { $0.lineageSummary != nil || !$0.diffSummary.isEmpty }
+    }
+
+    private var evolutionTrailPresentations: [DecisionEvolutionCheckpointPresentation] {
+        evolutionTrailItems.map(\.presentation)
+    }
+
+    private func evolutionTrailSection(
+        _ workspace: DecisionEvolutionWorkspaceSnapshot
+    ) -> some View {
+        return VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(
+                eyebrow: "Evolution",
+                title: "Evolution control center",
+                subtitle: "Checkpoint lineage, risk permits, review state, rollback readiness, and queue operations now stay visible in one full workspace."
+            )
+
+            PanelCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Evolution trail")
+                                .font(.headline)
+                                .foregroundStyle(BeforeTheme.ink)
+                            Text("\(evolutionTrailItems.count) checkpoints • \(workspace.controlSurface.pendingReviewCount) pending review • \(workspace.controlSurface.rollbackReadyCount) rollback-ready")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                            HStack(spacing: 10) {
+                                if isRefreshingSystemFlightDeck {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                BeforeActionButton("Refresh", style: .secondary) {
+                                    Task {
+                                        await refreshSystemFlightDeck()
+                                    }
+                                    }
+                                }
+
+                                BeforeActionButton("Open control center", style: .primary) {
+                                    appModel.presentEvolutionControlCenter()
+                                }
+
+                                BeforeActionButton("Open Portrait", style: .secondary) {
+                                    appModel.selectedTab = .portrait
+                                }
+                            }
+                    }
+
+                    if let releaseSummary = workspace.releaseSummary {
+                        DecisionEvolutionReleaseSummaryView(
+                            releaseSummary: releaseSummary,
+                            controlSurface: workspace.controlSurface,
+                            presentationMode: evolutionSurfaceContract.releaseSummaryMode
+                        )
+                    }
+
+                    DecisionEvolutionControlSurfaceSummaryView(
+                        controlSurface: workspace.controlSurface,
+                        emptyMessage: "No persisted checkpoint lineage is available yet. Once a checkpoint lands, this summary will show its risk, permit, tickets, audit, and rollback readiness.",
+                        interactionMode: evolutionSurfaceContract.interactionMode,
+                        showControlCenterShortcut: true,
+                        showPortraitShortcut: true,
+                        afterMutation: {
+                            Task {
+                                await refreshSystemFlightDeck()
+                            }
+                        }
+                    )
+                }
+            }
+
+            DecisionEvolutionPilotControlPanel(
+                controlSurface: workspace.controlSurface,
+                releaseSummary: workspace.releaseSummary,
+                interactionMode: evolutionSurfaceContract.interactionMode,
+                showEmbeddedReleaseSummary: evolutionSurfaceContract.showsEmbeddedReleaseSummaryInPilotPanel,
+                showPortraitShortcut: true,
+                showControlCenterShortcut: true,
+                afterMutation: {
+                    Task {
+                        await refreshSystemFlightDeck()
+                    }
+                }
+            )
+
+            if let activePresentation = workspace.activePresentation {
+                DecisionEvolutionCheckpointPanelView(
+                    title: "Active checkpoint",
+                    checkpoint: activePresentation,
+                    controlSurface: workspace.controlSurface,
+                    interactionMode: evolutionSurfaceContract.interactionMode,
+                    showControlCenterShortcut: true,
+                    showPortraitShortcut: true,
+                    afterMutation: {
+                        Task {
+                            await refreshSystemFlightDeck()
+                        }
+                    }
+                )
+            }
+
+            if let reviewPresentation = workspace.reviewPresentation {
+                DecisionEvolutionCheckpointPanelView(
+                    title: "Review head",
+                    checkpoint: reviewPresentation,
+                    controlSurface: workspace.controlSurface,
+                    interactionMode: evolutionSurfaceContract.interactionMode,
+                    showControlCenterShortcut: true,
+                    showPortraitShortcut: true,
+                    afterMutation: {
+                        Task {
+                            await refreshSystemFlightDeck()
+                        }
+                    }
+                )
+            }
+
+            if !workspace.remainingReviewQueue.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Pending review queue")
+                        .font(.headline)
+                        .foregroundStyle(BeforeTheme.ink)
+
+                    Text("Every remaining review-suggested checkpoint stays operable here, not just the queue head.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    ForEach(workspace.remainingReviewQueue) { checkpoint in
+                        DecisionEvolutionCheckpointPanelView(
+                            checkpoint: checkpoint,
+                            controlSurface: workspace.controlSurface,
+                            interactionMode: evolutionSurfaceContract.interactionMode,
+                            showControlCenterShortcut: true,
+                            showPortraitShortcut: true,
+                            afterMutation: {
+                                Task {
+                                    await refreshSystemFlightDeck()
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
+            if !workspace.historyPresentations.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Checkpoint history")
+                        .font(.headline)
+                        .foregroundStyle(BeforeTheme.ink)
+
+                    Text("The full recovered trail stays browseable here even after the active/review spotlight changes.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    ForEach(workspace.historyPresentations) { checkpoint in
+                        DecisionEvolutionCheckpointPanelView(
+                            checkpoint: checkpoint,
+                            controlSurface: workspace.controlSurface,
+                            interactionMode: evolutionSurfaceContract.interactionMode,
+                            showControlCenterShortcut: true,
+                            showPortraitShortcut: true,
+                            afterMutation: {
+                                Task {
+                                    await refreshSystemFlightDeck()
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func refreshSystemFlightDeck() async {
+        guard !isRefreshingSystemFlightDeck else { return }
+        isRefreshingSystemFlightDeck = true
+        defer { isRefreshingSystemFlightDeck = false }
+        systemFlightDeck = await appModel.systemFlightDeck()
     }
 
     @ViewBuilder
@@ -315,6 +527,7 @@ struct HistoryView: View {
             DecisionReviewEngine.recentEntries(for: .mirror, quick: events, balance: balanceBoards, mirror: mirrorRecords)
         }
     }
+
 }
 
 private enum HistoryFilter: String, CaseIterable, Identifiable {
@@ -369,5 +582,22 @@ private struct HistoryTimelineItem: Identifiable {
         case .mirror(let record):
             "mirror-\(record.id.uuidString)"
         }
+    }
+}
+
+private struct EvolutionTrailBadge: View {
+    let title: String
+    let tint: Color
+
+    var body: some View {
+        Text(title)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .foregroundStyle(tint)
+            .background(
+                Capsule()
+                    .fill(tint.opacity(0.10))
+            )
     }
 }

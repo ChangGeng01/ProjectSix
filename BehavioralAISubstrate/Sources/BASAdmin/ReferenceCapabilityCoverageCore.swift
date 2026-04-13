@@ -14,6 +14,9 @@ public struct BASReferenceCapabilityCoverageInput: Codable, Sendable, Equatable 
     public var activeTemplateCount: Int
     public var failureGuardCount: Int
     public var hasSensitiveConstraint: Bool
+    public var recoveredEBrainAvailable: Bool
+    public var recoveredAuditFindingCount: Int
+    public var recoveredTicketCount: Int
 
     public init(
         activeProviderTitle: String,
@@ -26,7 +29,10 @@ public struct BASReferenceCapabilityCoverageInput: Codable, Sendable, Equatable 
         brainLoaded: Bool,
         activeTemplateCount: Int,
         failureGuardCount: Int,
-        hasSensitiveConstraint: Bool
+        hasSensitiveConstraint: Bool,
+        recoveredEBrainAvailable: Bool = false,
+        recoveredAuditFindingCount: Int = 0,
+        recoveredTicketCount: Int = 0
     ) {
         self.activeProviderTitle = activeProviderTitle
         self.runtimeSummary = runtimeSummary
@@ -39,6 +45,9 @@ public struct BASReferenceCapabilityCoverageInput: Codable, Sendable, Equatable 
         self.activeTemplateCount = activeTemplateCount
         self.failureGuardCount = failureGuardCount
         self.hasSensitiveConstraint = hasSensitiveConstraint
+        self.recoveredEBrainAvailable = recoveredEBrainAvailable
+        self.recoveredAuditFindingCount = recoveredAuditFindingCount
+        self.recoveredTicketCount = recoveredTicketCount
     }
 }
 
@@ -67,6 +76,7 @@ public enum BASReferenceCapabilityCoverageBuilder {
             !summary.retrievalModeByKind.isEmpty
         let hasCalibration = !brain.calibrationStatusByKind.isEmpty
         let hasEvolution = !brain.evolutionCheckpointCountByKind.isEmpty
+        let hasRecoveredEBrain = input.recoveredEBrainAvailable
         let frontLoadShare = average(summary.averagePrefillEquivalentShareByKind.values)
 
         return [
@@ -74,6 +84,7 @@ public enum BASReferenceCapabilityCoverageBuilder {
             contextSection(
                 summary: summary,
                 hasTaskGraph: input.hasTaskGraph,
+                hasRecoveredEBrain: hasRecoveredEBrain,
                 hasContextLifecycle: hasContextLifecycle,
                 hasRetrievalDiscipline: hasRetrievalDiscipline,
                 brainLoaded: input.brainLoaded,
@@ -92,18 +103,35 @@ public enum BASReferenceCapabilityCoverageBuilder {
                 brain: brain,
                 isPureLocalClosedLoop: input.isPureLocalClosedLoop,
                 brainLoaded: input.brainLoaded,
-                hasSensitiveConstraint: input.hasSensitiveConstraint
+                hasSensitiveConstraint: input.hasSensitiveConstraint,
+                hasRecoveredEBrain: hasRecoveredEBrain
             ),
-            orchestrationSection(summary: summary, hasTaskGraph: input.hasTaskGraph),
+            orchestrationSection(
+                summary: summary,
+                hasTaskGraph: input.hasTaskGraph,
+                hasRecoveredEBrain: hasRecoveredEBrain
+            ),
             observabilitySection(
                 summary: summary,
                 brain: brain,
                 layerReportCount: input.layerReportCount,
                 expectedLayerCount: input.expectedLayerCount,
-                hasCalibration: hasCalibration
+                hasCalibration: hasCalibration,
+                recoveredAuditFindingCount: input.recoveredAuditFindingCount,
+                hasRecoveredEBrain: hasRecoveredEBrain
             ),
-            evaluationSection(brain: brain, hasEvolution: hasEvolution, hasCalibration: hasCalibration),
-            deliverySection(brainLoaded: input.brainLoaded)
+            evaluationSection(
+                brain: brain,
+                hasEvolution: hasEvolution,
+                hasCalibration: hasCalibration,
+                recoveredAuditFindingCount: input.recoveredAuditFindingCount,
+                hasRecoveredEBrain: hasRecoveredEBrain
+            ),
+            deliverySection(
+                brainLoaded: input.brainLoaded,
+                hasRecoveredEBrain: hasRecoveredEBrain,
+                recoveredTicketCount: input.recoveredTicketCount
+            )
         ]
     }
 
@@ -160,6 +188,7 @@ public enum BASReferenceCapabilityCoverageBuilder {
     private static func contextSection(
         summary: BASRuntimeInspectionSummary,
         hasTaskGraph: Bool,
+        hasRecoveredEBrain: Bool,
         hasContextLifecycle: Bool,
         hasRetrievalDiscipline: Bool,
         brainLoaded: Bool,
@@ -186,8 +215,8 @@ public enum BASReferenceCapabilityCoverageBuilder {
                     id: "context.summary_layer",
                     title: "Structured summary layer",
                     summary: "Compress long archived context into goals, stage, preferences, and constraints instead of replaying raw chat.",
-                    status: brainLoaded ? .ready : .partial,
-                    evidence: ["Brain bootstrap \(brainLoaded ? "loaded" : "missing")"]
+                    status: (brainLoaded || hasRecoveredEBrain) ? .ready : .partial,
+                    evidence: [brainLoaded ? "Brain bootstrap loaded" : (hasRecoveredEBrain ? "Recovered checkpoint lineage is available." : "Brain bootstrap missing")]
                 ),
                 BASCapabilityItem(
                     id: "context.on_demand_retrieval",
@@ -280,7 +309,8 @@ public enum BASReferenceCapabilityCoverageBuilder {
         brain: BASBrainSummary,
         isPureLocalClosedLoop: Bool,
         brainLoaded: Bool,
-        hasSensitiveConstraint: Bool
+        hasSensitiveConstraint: Bool,
+        hasRecoveredEBrain: Bool
     ) -> BASCapabilitySection {
         BASCapabilitySection(
             domain: .policy,
@@ -317,8 +347,8 @@ public enum BASReferenceCapabilityCoverageBuilder {
                     id: "policy.consistency_state",
                     title: "Truth-state coherence",
                     summary: "Tie identity, boundary, and calibration into a single release-time truth state.",
-                    status: brainLoaded ? .ready : .partial,
-                    evidence: ["Brain state \(brainLoaded ? "available" : "missing")"]
+                    status: (brainLoaded || hasRecoveredEBrain) ? .ready : .partial,
+                    evidence: [brainLoaded ? "Brain state available" : (hasRecoveredEBrain ? "Recovered checkpoint lineage supports release-time truth state." : "Brain state missing")]
                 )
             ]
         )
@@ -326,7 +356,8 @@ public enum BASReferenceCapabilityCoverageBuilder {
 
     private static func orchestrationSection(
         summary: BASRuntimeInspectionSummary,
-        hasTaskGraph: Bool
+        hasTaskGraph: Bool,
+        hasRecoveredEBrain: Bool
     ) -> BASCapabilitySection {
         BASCapabilitySection(
             domain: .orchestration,
@@ -349,8 +380,11 @@ public enum BASReferenceCapabilityCoverageBuilder {
                     id: "orchestration.checkpoint_replay",
                     title: "Checkpoint, rewind, and replay",
                     summary: "Suspend, resume, and replay flows without recomputing the entire brain.",
-                    status: summary.replayCount > 0 ? .ready : .partial,
-                    evidence: ["Replay entries \(summary.replayCount)"]
+                    status: (summary.replayCount > 0 || hasRecoveredEBrain) ? .ready : .partial,
+                    evidence: [
+                        "Replay entries \(summary.replayCount)",
+                        hasRecoveredEBrain ? "Recovered checkpoint lineage is available." : "Recovered checkpoint lineage is unavailable."
+                    ]
                 ),
                 BASCapabilityItem(
                     id: "orchestration.watch_handoff",
@@ -368,7 +402,9 @@ public enum BASReferenceCapabilityCoverageBuilder {
         brain: BASBrainSummary,
         layerReportCount: Int,
         expectedLayerCount: Int,
-        hasCalibration: Bool
+        hasCalibration: Bool,
+        recoveredAuditFindingCount: Int,
+        hasRecoveredEBrain: Bool
     ) -> BASCapabilitySection {
         BASCapabilitySection(
             domain: .observability,
@@ -384,18 +420,22 @@ public enum BASReferenceCapabilityCoverageBuilder {
                     id: "observability.traces",
                     title: "Trace and replay bundles",
                     summary: "Trace route, memory, latency, release, and replayable bundles.",
-                    status: summary.traceCount > 0 && summary.replayCount > 0 ? .ready : .partial,
+                    status: (summary.traceCount > 0 && summary.replayCount > 0) || hasRecoveredEBrain ? .ready : .partial,
                     evidence: [
                         "Traces \(summary.traceCount)",
-                        "Replay \(summary.replayCount)"
+                        "Replay \(summary.replayCount)",
+                        hasRecoveredEBrain ? "Recovered checkpoint lineage is available." : "Recovered checkpoint lineage is unavailable."
                     ]
                 ),
                 BASCapabilityItem(
                     id: "observability.self_inspection",
                     title: "Calibration and anomaly surfacing",
                     summary: "Expose drift, pending-memory pressure, and boundary under-constraint before they become user-visible failures.",
-                    status: hasCalibration ? .ready : .partial,
-                    evidence: ["Calibration kinds \(brain.calibrationStatusByKind.count)"]
+                    status: hasCalibration || recoveredAuditFindingCount > 0 ? .ready : .partial,
+                    evidence: [
+                        "Calibration kinds \(brain.calibrationStatusByKind.count)",
+                        "Recovered audit findings \(recoveredAuditFindingCount)"
+                    ]
                 )
             ]
         )
@@ -404,14 +444,22 @@ public enum BASReferenceCapabilityCoverageBuilder {
     private static func evaluationSection(
         brain: BASBrainSummary,
         hasEvolution: Bool,
-        hasCalibration: Bool
+        hasCalibration: Bool,
+        recoveredAuditFindingCount: Int,
+        hasRecoveredEBrain: Bool
     ) -> BASCapabilitySection {
         let section = BASEvaluationCoverageBuilder.build(
             input: BASEvaluationCoverageInput(
                 regressionHarnessPresent: true,
-                calibrationKindCount: hasCalibration ? brain.calibrationStatusByKind.count : 0,
-                calibrationAlertKindCount: brain.calibrationAlertCountsByKind.count,
-                evolutionKindCount: hasEvolution ? brain.evolutionCheckpointCountByKind.count : 0
+                calibrationKindCount: max(
+                    hasCalibration ? brain.calibrationStatusByKind.count : 0,
+                    recoveredAuditFindingCount > 0 ? 1 : 0
+                ),
+                calibrationAlertKindCount: brain.calibrationAlertCountsByKind.count + recoveredAuditFindingCount,
+                evolutionKindCount: max(
+                    hasEvolution ? brain.evolutionCheckpointCountByKind.count : 0,
+                    hasRecoveredEBrain ? 1 : 0
+                )
             )
         )
 
@@ -430,7 +478,9 @@ public enum BASReferenceCapabilityCoverageBuilder {
     }
 
     private static func deliverySection(
-        brainLoaded: Bool
+        brainLoaded: Bool,
+        hasRecoveredEBrain: Bool,
+        recoveredTicketCount: Int
     ) -> BASCapabilitySection {
         BASCapabilitySection(
             domain: .delivery,
@@ -439,8 +489,8 @@ public enum BASReferenceCapabilityCoverageBuilder {
                     id: "delivery.self_portrait",
                     title: "Explainable self-portrait",
                     summary: "Show what the system remembers, why it matters, and what can be corrected.",
-                    status: brainLoaded ? .ready : .partial,
-                    evidence: ["Current brain \(brainLoaded ? "loaded" : "not loaded")"]
+                    status: (brainLoaded || hasRecoveredEBrain) ? .ready : .partial,
+                    evidence: [brainLoaded ? "Current brain loaded" : (hasRecoveredEBrain ? "Recovered checkpoint lineage \(recoveredTicketCount) tickets." : "Current brain not loaded")]
                 ),
                 BASCapabilityItem(
                     id: "delivery.cooling_container",

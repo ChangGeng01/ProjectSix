@@ -7,6 +7,8 @@ public struct BASEvolutionCheckpointInput: Codable, Equatable, Sendable {
     public let identityRole: BASIdentityRole
     public let boundaryMode: BASBoundaryPolicyMode
     public let calibrationStatus: BASCalibrationStatus
+    public let brainStateSnapshot: BASDecisionBrainState?
+    public let lineageSummary: BASEvolutionLineageSummary?
 
     public init(
         modeName: String,
@@ -14,7 +16,9 @@ public struct BASEvolutionCheckpointInput: Codable, Equatable, Sendable {
         fingerprint: String,
         identityRole: BASIdentityRole,
         boundaryMode: BASBoundaryPolicyMode,
-        calibrationStatus: BASCalibrationStatus
+        calibrationStatus: BASCalibrationStatus,
+        brainStateSnapshot: BASDecisionBrainState? = nil,
+        lineageSummary: BASEvolutionLineageSummary? = nil
     ) {
         self.modeName = modeName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         self.sourceID = sourceID.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -22,6 +26,8 @@ public struct BASEvolutionCheckpointInput: Codable, Equatable, Sendable {
         self.identityRole = identityRole
         self.boundaryMode = boundaryMode
         self.calibrationStatus = calibrationStatus
+        self.brainStateSnapshot = brainStateSnapshot
+        self.lineageSummary = lineageSummary
     }
 }
 
@@ -38,6 +44,8 @@ public struct BASEvolutionCheckpointStoredFields: Codable, Equatable, Identifiab
     public let diffSummary: [String]
     public let approvalState: BASEvolutionApprovalState
     public let rollbackReady: Bool
+    public let brainStateSnapshot: BASDecisionBrainState?
+    public let lineageSummary: BASEvolutionLineageSummary?
 
     public init(
         id: String,
@@ -51,7 +59,9 @@ public struct BASEvolutionCheckpointStoredFields: Codable, Equatable, Identifiab
         calibrationStatus: BASCalibrationStatus,
         diffSummary: [String],
         approvalState: BASEvolutionApprovalState,
-        rollbackReady: Bool
+        rollbackReady: Bool,
+        brainStateSnapshot: BASDecisionBrainState? = nil,
+        lineageSummary: BASEvolutionLineageSummary? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -65,6 +75,8 @@ public struct BASEvolutionCheckpointStoredFields: Codable, Equatable, Identifiab
         self.diffSummary = diffSummary
         self.approvalState = approvalState
         self.rollbackReady = rollbackReady
+        self.brainStateSnapshot = brainStateSnapshot
+        self.lineageSummary = lineageSummary
     }
 }
 
@@ -75,7 +87,8 @@ public enum BASEvolutionCheckpointPlanner {
     public static func checkpointInput(
         modeName: String,
         sourceID: String,
-        brainState: BASDecisionBrainState
+        brainState: BASDecisionBrainState,
+        lineageSummary: BASEvolutionLineageSummary? = nil
     ) -> BASEvolutionCheckpointInput {
         BASEvolutionCheckpointInput(
             modeName: modeName,
@@ -83,7 +96,9 @@ public enum BASEvolutionCheckpointPlanner {
             fingerprint: brainState.verificationSnapshot.fingerprint,
             identityRole: brainState.identityProfile.role,
             boundaryMode: brainState.boundaryPolicy.mode,
-            calibrationStatus: brainState.calibrationState.status
+            calibrationStatus: brainState.calibrationState.status,
+            brainStateSnapshot: brainState,
+            lineageSummary: lineageSummary
         )
     }
 
@@ -123,7 +138,9 @@ public enum BASEvolutionCheckpointPlanner {
             calibrationStatus: input.calibrationStatus,
             diffSummary: diffSummary,
             approvalState: approvalState,
-            rollbackReady: true
+            rollbackReady: true,
+            brainStateSnapshot: input.brainStateSnapshot,
+            lineageSummary: input.lineageSummary
         )
     }
 
@@ -147,7 +164,8 @@ public enum BASEvolutionCheckpointPlanner {
             createdAt: latest.createdAt,
             diffSummary: latest.diffSummary,
             rollbackReady: latest.rollbackReady,
-            approvalState: latest.approvalState
+            approvalState: latest.approvalState,
+            lineageSummary: latest.lineageSummary
         )
 
         return BASEvolutionState(
@@ -156,6 +174,50 @@ public enum BASEvolutionCheckpointPlanner {
             rollbackReady: latest.rollbackReady,
             pendingReviewCount: ordered.filter { $0.approvalState == .reviewSuggested }.count,
             recentDiffSummary: summary.diffSummary
+        )
+    }
+
+    public static func withLineageSummary(
+        _ lineageSummary: BASEvolutionLineageSummary?,
+        appliedTo checkpoint: BASEvolutionCheckpointStoredFields
+    ) -> BASEvolutionCheckpointStoredFields {
+        BASEvolutionCheckpointStoredFields(
+            id: checkpoint.id,
+            createdAt: checkpoint.createdAt,
+            fingerprint: checkpoint.fingerprint,
+            previousCheckpointID: checkpoint.previousCheckpointID,
+            modeName: checkpoint.modeName,
+            sourceID: checkpoint.sourceID,
+            identityRole: checkpoint.identityRole,
+            boundaryMode: checkpoint.boundaryMode,
+            calibrationStatus: checkpoint.calibrationStatus,
+            diffSummary: checkpoint.diffSummary,
+            approvalState: checkpoint.approvalState,
+            rollbackReady: checkpoint.rollbackReady,
+            brainStateSnapshot: checkpoint.brainStateSnapshot,
+            lineageSummary: lineageSummary
+        )
+    }
+
+    public static func withApprovalState(
+        _ approvalState: BASEvolutionApprovalState,
+        appliedTo checkpoint: BASEvolutionCheckpointStoredFields
+    ) -> BASEvolutionCheckpointStoredFields {
+        BASEvolutionCheckpointStoredFields(
+            id: checkpoint.id,
+            createdAt: checkpoint.createdAt,
+            fingerprint: checkpoint.fingerprint,
+            previousCheckpointID: checkpoint.previousCheckpointID,
+            modeName: checkpoint.modeName,
+            sourceID: checkpoint.sourceID,
+            identityRole: checkpoint.identityRole,
+            boundaryMode: checkpoint.boundaryMode,
+            calibrationStatus: checkpoint.calibrationStatus,
+            diffSummary: checkpoint.diffSummary,
+            approvalState: approvalState,
+            rollbackReady: checkpoint.rollbackReady,
+            brainStateSnapshot: checkpoint.brainStateSnapshot,
+            lineageSummary: checkpoint.lineageSummary
         )
     }
 

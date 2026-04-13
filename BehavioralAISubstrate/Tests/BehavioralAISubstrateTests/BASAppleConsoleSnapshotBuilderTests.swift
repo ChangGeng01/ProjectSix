@@ -53,5 +53,8 @@ struct BASAppleConsoleSnapshotBuilderTests {
         #expect(snapshot.brainSummary == "Stability Guide • localOnlyAdvisory • stable • fingerprint brain_fp")
         #expect(snapshot.reports.first(where: { $0.kind == .runtime })?.summary == "Runtime layer is stable.")
         #expect(snapshot.reports.first(where: { $0.kind == .memory })?.blockers == ["Cold archive is not fully compacted."])
+        #expect(snapshot.programExecutionBlueprint != nil)
+        #expect(snapshot.currentProgramExecutionBlueprint.layers.count == 13)
+        #expect(snapshot.currentProgramExecutionBlueprint.workPackages.count == 19)
     }
 }

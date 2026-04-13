@@ -11,6 +11,10 @@ struct SettingsView: View {
     @Query private var reminders: [SelfReminder]
     @Query private var tomorrowItems: [TomorrowBoxItem]
     @State private var destructiveAction: DestructiveAction?
+    @State private var evolutionFlightDeck: DecisionSystemFlightDeck?
+    @State private var isRefreshingEvolutionStatus = false
+
+    private let evolutionSurfaceContract = DecisionEvolutionSurfaceContract.controlCenter
 
     private enum DestructiveAction: Identifiable {
         case history
@@ -85,6 +89,76 @@ struct SettingsView: View {
                     Label("App Intents ready for Shortcuts and Spotlight", systemImage: "bolt.horizontal.circle")
                 }
 
+                Section("Evolution control") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .top, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(evolutionOperatorSnapshot.headline)
+                                    .font(.headline)
+                                if let primaryReason = evolutionOperatorSnapshot.primaryReason {
+                                    Text(primaryReason)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    Text("Open the mutation hub to inspect active, review, queue, rollback, and lineage state from one place.")
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            Spacer()
+
+                            if isRefreshingEvolutionStatus {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Button("Refresh") {
+                                    Task {
+                                        await refreshEvolutionStatus()
+                                    }
+                                }
+                            }
+                        }
+
+                        HStack(spacing: 8) {
+                            evolutionBadge(
+                                title: evolutionOperatorSnapshot.releaseState?.title.uppercased() ?? "WATCH",
+                                tint: releaseTint(evolutionOperatorSnapshot.releaseState)
+                            )
+                            evolutionBadge(
+                                title: "\(evolutionOperatorSnapshot.pendingReviewCount) PENDING",
+                                tint: evolutionOperatorSnapshot.pendingReviewCount > 0 ? .orange : .secondary
+                            )
+                            evolutionBadge(
+                                title: "\(evolutionOperatorSnapshot.rollbackReadyCount) ROLLBACK READY",
+                                tint: evolutionOperatorSnapshot.rollbackReadyCount > 0 ? .green : .secondary
+                            )
+                        }
+
+                        LabeledContent("Surface", value: evolutionOperatorSnapshot.surfaceTitle)
+                        LabeledContent("Operator mode", value: evolutionOperatorSnapshot.operatorHeadline)
+                        LabeledContent("Active checkpoint", value: evolutionOperatorSnapshot.activeCheckpointID ?? "None")
+                        LabeledContent("Review head", value: evolutionOperatorSnapshot.reviewCheckpointID ?? "None")
+
+                        if !evolutionOperatorSnapshot.killSwitches.isEmpty {
+                            Text("Kill switches: \(evolutionOperatorSnapshot.killSwitches.joined(separator: " • "))")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Button("Open Evolution Control") {
+                            appModel.presentEvolutionControlCenter()
+                        }
+                        Button("Open Portrait") {
+                            appModel.selectedTab = .portrait
+                        }
+                        Button("Open History") {
+                            appModel.selectedTab = .history
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+
                 Section("About") {
                     LabeledContent("Version", value: appVersionLabel)
                 }
@@ -136,6 +210,14 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .background(BeforeBackground())
             .navigationTitle("Settings")
+            .task {
+                await refreshEvolutionStatus()
+            }
+            .onChange(of: appModel.evolutionControlMutationEpoch) { _, _ in
+                Task {
+                    await refreshEvolutionStatus()
+                }
+            }
             .confirmationDialog(
                 destructiveAction?.title ?? "",
                 isPresented: Binding(
@@ -245,5 +327,52 @@ struct SettingsView: View {
         let version = bundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build = bundle.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(version) (\(build))"
+    }
+
+    private var evolutionWorkspace: DecisionEvolutionWorkspaceSnapshot {
+        DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: evolutionFlightDeck?.evolutionControlSurface ?? appModel.makeEvolutionControlSurface(),
+            releaseSummary: evolutionFlightDeck?.releaseControlSummary
+        )
+    }
+
+    private var evolutionOperatorSnapshot: DecisionEvolutionOperatorSnapshot {
+        DecisionEvolutionOperatorSnapshot.build(
+            surfaceKind: evolutionSurfaceContract.kind,
+            workspace: evolutionWorkspace,
+            contract: evolutionSurfaceContract
+        )
+    }
+
+    @MainActor
+    private func refreshEvolutionStatus() async {
+        guard !isRefreshingEvolutionStatus else { return }
+        isRefreshingEvolutionStatus = true
+        defer { isRefreshingEvolutionStatus = false }
+        evolutionFlightDeck = await appModel.systemFlightDeck()
+    }
+
+    private func releaseTint(_ state: DecisionSystemReleaseState?) -> Color {
+        switch state {
+        case .ready:
+            .green
+        case .blocked:
+            .red
+        case .watch, .none:
+            .orange
+        }
+    }
+
+    @ViewBuilder
+    private func evolutionBadge(title: String, tint: Color) -> some View {
+        Text(title)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(tint.opacity(0.12))
+            )
     }
 }

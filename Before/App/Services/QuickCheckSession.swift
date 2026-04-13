@@ -1,4 +1,5 @@
 import Foundation
+import BASHostKit
 
 @MainActor
 final class QuickCheckSession: ObservableObject, Identifiable {
@@ -44,7 +45,10 @@ final class QuickCheckSession: ObservableObject, Identifiable {
         result = DecisionIntelligenceCoordinator.quickResult(for: input)
     }
 
-    func evaluateWithIntelligence(preferences: BeforePreferences = BeforePreferencesStore.load()) async {
+    func evaluateWithIntelligence(
+        preferences: BeforePreferences = BeforePreferencesStore.load(),
+        eBrainTurn: BASEBrainTurnResult? = nil
+    ) async {
         guard let motivation, let expectedOutcome, let controlLevel else { return }
 
         let input = QuickCheckInput(
@@ -74,6 +78,7 @@ final class QuickCheckSession: ObservableObject, Identifiable {
             contextState: prepared.state,
             neuralState: neuralState,
             brainState: brainState,
+            eBrainTurn: eBrainTurn,
             preferences: preferences
         ) {
             result = refined

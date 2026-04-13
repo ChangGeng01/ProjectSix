@@ -5,11 +5,22 @@ struct HomeView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @Query(sort: \TomorrowBoxItem.createdAt, order: .reverse) private var tomorrowItems: [TomorrowBoxItem]
     @State private var decisionPrompt = ""
+    @State private var systemFlightDeck: DecisionSystemFlightDeck?
+    @State private var isLoadingSystemFlightDeck = false
+    private let evolutionSurfaceContract = DecisionEvolutionSurfaceContract.home
 
     private let columns = [
         GridItem(.flexible(), spacing: 14),
         GridItem(.flexible(), spacing: 14)
     ]
+
+    private var currentEvolutionControlSurface: DecisionEvolutionControlSurface {
+        systemFlightDeck?.evolutionControlSurface ?? appModel.makeEvolutionControlSurface()
+    }
+
+    private var currentEvolutionSpotlightSet: DecisionEvolutionSpotlightSet {
+        currentEvolutionControlSurface.spotlightSet
+    }
 
     var body: some View {
         NavigationStack {
@@ -56,6 +67,214 @@ struct HomeView: View {
                                 detail: preview.detail,
                                 isPinned: preview.isPinned
                             )
+                        }
+
+                        PanelCard {
+                            VStack(alignment: .leading, spacing: 14) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("13-layer runtime")
+                                            .font(.headline)
+                                        Text("The active electronic-brain path is now part of the main shell, not just diagnostics.")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Spacer()
+
+                                    if isLoadingSystemFlightDeck {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                    } else if let deck = systemFlightDeck {
+                                        Text(deck.overallHealth.title)
+                                            .font(.caption.weight(.bold))
+                                            .foregroundStyle(healthColor(deck.overallHealth))
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 6)
+                                            .background(
+                                                Capsule()
+                                                    .fill(healthColor(deck.overallHealth).opacity(0.12))
+                                            )
+                                    }
+                                }
+
+                                if let deck = systemFlightDeck,
+                                   let summary = deck.eBrainSummary {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("\(summary.runMode.uppercased()) • \(summary.riskLevel.uppercased()) → \(summary.permitMode.uppercased())")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(BeforeTheme.ember)
+
+                                        Text(summary.taskType.replacingOccurrences(of: "_", with: " "))
+                                            .font(.title3.bold())
+                                            .foregroundStyle(BeforeTheme.ink)
+
+                                        Text("Audit \(summary.auditFindingCount) • Kill switches \(summary.killSwitches.count) • Host gate \(summary.hostGatePercent)%")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+
+                                        if let checkpointID = deck.releaseControlSummary.activeCheckpointID {
+                                            let approvalTitle = summary.checkpointApprovalState?
+                                                .replacingOccurrences(of: "_", with: " ")
+                                                .capitalized ?? "Unknown"
+                                            let applyTitle = summary.checkpointApplyReady == true
+                                                ? "Apply ready"
+                                                : "Apply unavailable"
+                                            Text(
+                                                "Checkpoint \(checkpointID) • \(approvalTitle) • \(applyTitle)"
+                                            )
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(2)
+                                        }
+
+                                        if let blocker = summary.blockers.first {
+                                            Text("Guardrail: \(blocker)")
+                                                .font(.caption2)
+                                            .foregroundStyle(BeforeTheme.ember)
+                                        }
+
+                                        DecisionEvolutionReleaseSummaryView(
+                                            releaseSummary: deck.releaseControlSummary,
+                                            controlSurface: deck.evolutionControlSurface,
+                                            presentationMode: evolutionSurfaceContract.releaseSummaryMode
+                                        )
+                                    }
+
+                                    if let checkpointID = deck.releaseControlSummary.activeCheckpointID {
+                                        DecisionEvolutionCheckpointActionBar(
+                                            checkpointID: checkpointID,
+                                            controlSurface: currentEvolutionControlSurface,
+                                            interactionMode: evolutionSurfaceContract.interactionMode,
+                                            applyReady: summary.checkpointApplyReady == true,
+                                            approvalState: summary.checkpointApprovalState.flatMap(DecisionEvolutionApprovalState.init(rawValue:)),
+                                            hasLineage: true,
+                                            showControlCenterShortcut: true,
+                                            showHistoryShortcut: true,
+                                            showPortraitShortcut: true,
+                                            afterMutation: {
+                                                Task {
+                                                    await refreshSystemFlightDeck()
+                                                }
+                                            }
+                                        )
+                                    } else if let checkpointID = summary.checkpointID {
+                                        Text("Recovered checkpoint \(checkpointID) is visible in review, but no active checkpoint is attached to the main release path yet.")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+
+                                        HStack(spacing: 10) {
+                                            BeforeActionButton("Open control center", style: .primary) {
+                                                appModel.presentEvolutionControlCenter()
+                                            }
+
+                                            BeforeActionButton("Open History", style: .secondary) {
+                                                appModel.selectedTab = .history
+                                            }
+
+                                            BeforeActionButton("Open Portrait", style: .secondary) {
+                                                appModel.selectedTab = .portrait
+                                            }
+                                        }
+                                    } else {
+                                        HStack(spacing: 10) {
+                                            BeforeActionButton("Open Portrait", style: .secondary) {
+                                                appModel.selectedTab = .portrait
+                                            }
+
+                                            BeforeActionButton("Refresh runtime", style: .secondary) {
+                                                Task {
+                                                    await refreshSystemFlightDeck()
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    Text("No live 13-layer turn is attached yet. Open a decision flow or refresh the runtime card.")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+
+                                    HStack(spacing: 10) {
+                                        BeforeActionButton("Open control center", style: .primary) {
+                                            appModel.presentEvolutionControlCenter()
+                                        }
+
+                                        BeforeActionButton("Open Portrait", style: .secondary) {
+                                            appModel.selectedTab = .portrait
+                                        }
+
+                                        BeforeActionButton("Refresh runtime", style: .secondary) {
+                                            Task {
+                                                await refreshSystemFlightDeck()
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if let deck = systemFlightDeck {
+                            DecisionEvolutionPilotControlPanel(
+                                controlSurface: deck.evolutionControlSurface,
+                                releaseSummary: deck.releaseControlSummary,
+                                interactionMode: evolutionSurfaceContract.interactionMode,
+                                showEmbeddedReleaseSummary: evolutionSurfaceContract.showsEmbeddedReleaseSummaryInPilotPanel,
+                                showHistoryShortcut: true,
+                                showPortraitShortcut: true,
+                                showControlCenterShortcut: true,
+                                afterMutation: {
+                                    Task {
+                                        await refreshSystemFlightDeck()
+                                    }
+                                }
+                            )
+                        }
+
+                        if pendingReviewCheckpointCount > 0 {
+                            PanelCard {
+                                VStack(alignment: .leading, spacing: 14) {
+                                    HStack(alignment: .firstTextBaseline) {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("Evolution review queue")
+                                                .font(.headline)
+                                            Text("Review-suggested checkpoints stay visible on Home, while checkpoint mutations are centralized in Evolution Control.")
+                                                .font(.subheadline)
+                                                .foregroundStyle(.secondary)
+                                        }
+
+                                        Spacer()
+
+                                        Text("\(pendingReviewCheckpointCount) pending")
+                                            .font(.caption.weight(.bold))
+                                            .foregroundStyle(.orange)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 6)
+                                            .background(
+                                                Capsule()
+                                                    .fill(Color.orange.opacity(0.12))
+                                            )
+                                    }
+
+                                    ForEach(homePendingReviewPresentations) { checkpoint in
+                                        DecisionEvolutionCheckpointPanelView(
+                                            checkpoint: checkpoint,
+                                            controlSurface: currentEvolutionControlSurface,
+                                            interactionMode: evolutionSurfaceContract.interactionMode,
+                                            showControlCenterShortcut: true,
+                                            showHistoryShortcut: true,
+                                            afterMutation: {
+                                                Task {
+                                                    await refreshSystemFlightDeck()
+                                                }
+                                            }
+                                        )
+                                    }
+
+                                    BeforeActionButton("Open control center", style: .primary) {
+                                        appModel.presentEvolutionControlCenter()
+                                    }
+                                }
+                            }
                         }
 
                         if let candidate = appModel.interventionCandidate {
@@ -225,6 +444,20 @@ struct HomeView: View {
                 }
             }
             .navigationTitle("Before")
+            .task {
+                await refreshSystemFlightDeck()
+            }
+            .onChange(of: appModel.selectedTab) { _, newValue in
+                guard newValue == .home else { return }
+                Task {
+                    await refreshSystemFlightDeck()
+                }
+            }
+            .onChange(of: appModel.evolutionControlMutationEpoch) { _, _ in
+                Task {
+                    await refreshSystemFlightDeck()
+                }
+            }
         }
     }
 
@@ -264,8 +497,34 @@ struct HomeView: View {
         appModel.supportInbox.activeRequests.count
     }
 
+    private var pendingReviewCheckpointCount: Int {
+        systemFlightDeck?.pendingReviewCheckpointCount ?? 0
+    }
+
+    private var homePendingReviewPresentations: [DecisionEvolutionCheckpointPresentation] {
+        Array(currentEvolutionSpotlightSet.remainingReviewQueue.prefix(3))
+    }
+
     private var sharedLifePendingCount: Int {
         appModel.sharedLifeStore.pendingItems.count
+    }
+
+    private func healthColor(_ health: DecisionSystemLayerHealth) -> Color {
+        switch health {
+        case .strong:
+            BeforeTheme.ember
+        case .watch:
+            .orange
+        case .critical:
+            .red
+        }
+    }
+
+    @MainActor
+    private func refreshSystemFlightDeck() async {
+        isLoadingSystemFlightDeck = true
+        systemFlightDeck = await appModel.systemFlightDeck()
+        isLoadingSystemFlightDeck = false
     }
 }
 

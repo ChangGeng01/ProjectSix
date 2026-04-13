@@ -1,4 +1,5 @@
 import Foundation
+import BASHostKit
 
 @MainActor
 final class BalanceBoardSession: ObservableObject, Identifiable {
@@ -59,7 +60,10 @@ final class BalanceBoardSession: ObservableObject, Identifiable {
         )
     }
 
-    func evaluateWithIntelligence(preferences: BeforePreferences = BeforePreferencesStore.load()) async {
+    func evaluateWithIntelligence(
+        preferences: BeforePreferences = BeforePreferencesStore.load(),
+        eBrainTurn: BASEBrainTurnResult? = nil
+    ) async {
         guard canEvaluate else { return }
 
         let input = BalanceBoardInput(
@@ -89,6 +93,7 @@ final class BalanceBoardSession: ObservableObject, Identifiable {
             contextState: prepared.state,
             neuralState: neuralState,
             brainState: brainState,
+            eBrainTurn: eBrainTurn,
             preferences: preferences
         ) {
             result = refined

@@ -16,6 +16,8 @@ final class DecisionEvolutionCheckpoint {
     var diffSummaryBlob: String
     var approvalStateRaw: String
     var rollbackReady: Bool
+    var brainStateSnapshotBlob: String?
+    var lineageSummaryBlob: String?
 
     init(
         id: String,
@@ -29,7 +31,9 @@ final class DecisionEvolutionCheckpoint {
         calibrationStatus: DecisionCalibrationStatus,
         diffSummary: [String],
         approvalState: DecisionEvolutionApprovalState,
-        rollbackReady: Bool
+        rollbackReady: Bool,
+        brainStateSnapshot: DecisionBrainState? = nil,
+        lineageSummary: BASEvolutionLineageSummary? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -43,6 +47,8 @@ final class DecisionEvolutionCheckpoint {
         self.diffSummaryBlob = BrainStateUpdate.encode(diffSummary)
         self.approvalStateRaw = approvalState.rawValue
         self.rollbackReady = rollbackReady
+        self.brainStateSnapshotBlob = BrainStateUpdate.encodeCodable(brainStateSnapshot)
+        self.lineageSummaryBlob = BrainStateUpdate.encodeCodable(lineageSummary)
     }
 
     convenience init(storedFields: BASEvolutionCheckpointStoredFields) {
@@ -58,7 +64,9 @@ final class DecisionEvolutionCheckpoint {
             calibrationStatus: storedFields.calibrationStatus,
             diffSummary: storedFields.diffSummary,
             approvalState: storedFields.approvalState,
-            rollbackReady: storedFields.rollbackReady
+            rollbackReady: storedFields.rollbackReady,
+            brainStateSnapshot: storedFields.brainStateSnapshot,
+            lineageSummary: storedFields.lineageSummary
         )
     }
 
@@ -90,6 +98,14 @@ final class DecisionEvolutionCheckpoint {
         DecisionEvolutionApprovalState(rawValue: approvalStateRaw) ?? .automatic
     }
 
+    var lineageSummary: BASEvolutionLineageSummary? {
+        BrainStateUpdate.decodeCodable(lineageSummaryBlob, as: BASEvolutionLineageSummary.self)
+    }
+
+    var brainStateSnapshot: DecisionBrainState? {
+        BrainStateUpdate.decodeCodable(brainStateSnapshotBlob, as: DecisionBrainState.self)
+    }
+
     var storedFields: BASEvolutionCheckpointStoredFields {
         BASEvolutionCheckpointStoredFields(
             id: id,
@@ -103,7 +119,9 @@ final class DecisionEvolutionCheckpoint {
             calibrationStatus: calibrationStatus,
             diffSummary: diffSummary,
             approvalState: approvalState,
-            rollbackReady: rollbackReady
+            rollbackReady: rollbackReady,
+            brainStateSnapshot: brainStateSnapshot,
+            lineageSummary: lineageSummary
         )
     }
 }

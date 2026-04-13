@@ -841,14 +841,27 @@ enum BehavioralAISubstrateBridge {
 
     static func consoleSnapshot(
         from export: DecisionTestingRuntimeExport,
-        currentBrainState: CurrentBrainState?
+        currentBrainState: CurrentBrainState?,
+        eBrainTurn: BASEBrainTurnResult? = nil
     ) -> BASConsoleSnapshot {
+        let resolvedTurn = eBrainTurn ?? export.eBrainTurn
+        let synchronizedExport = export.attaching(eBrainTurn: resolvedTurn)
+        let checkpointLineage = resolvedTurn == nil
+            ? export.selectedCheckpointLineage(matching: export.preferredCheckpointSelectionContext)
+            : nil
         let flightDeckCompilation = export.basFlightDeckCompilation
         let runtimeContext = runtimeContext(from: export)
         let brainSnapshot = brainSnapshot(from: currentBrainState)
         let roleProfile = roleProfile(from: currentBrainState)
+        let recoveredInspection = checkpointLineage.map {
+            checkpointInspectionBundle(from: $0, generatedAt: export.generatedAt)
+        }
+        let evolutionFacts = DecisionCapabilityCoverageBuilder.evolutionFacts(
+            from: export,
+            currentBrainState: currentBrainState
+        )
 
-        return BASAppleInspectionBridgeBuilder.consoleSnapshot(
+        let baseSnapshot = BASAppleInspectionBridgeBuilder.consoleSnapshot(
             from: BASAppleConsoleBridgeSourceInput(
                 generatedAt: export.generatedAt,
                 flightDeckCompilation: flightDeckCompilation,
@@ -861,10 +874,248 @@ enum BehavioralAISubstrateBridge {
                 calibrationStatusID: currentBrainState?.calibrationState.status.rawValue,
                 brainState: brainSnapshot,
                 capabilityCoverage: DecisionCapabilityCoverageBuilder.build(
-                    from: export,
-                    currentBrainState: currentBrainState
-                )
+                    from: synchronizedExport,
+                    currentBrainState: currentBrainState,
+                    evolutionFacts: evolutionFacts
+                ),
+                inspectionBundle: resolvedTurn.map {
+                    BASEBrainConsoleSupport.inspectionBundle(for: $0, generatedAt: export.generatedAt)
+                } ?? recoveredInspection
             )
+        )
+
+        if let resolvedTurn {
+            return BASEBrainConsoleSupport.mergedSnapshot(baseSnapshot, with: resolvedTurn)
+        }
+
+        guard let checkpointLineage, let recoveredInspection else {
+            return baseSnapshot
+        }
+
+        var recoveredSnapshot = baseSnapshot
+        recoveredSnapshot.runtimeSummary = appendConsoleSummary(
+            base: baseSnapshot.runtimeSummary,
+            addition: checkpointRuntimeSummary(from: checkpointLineage)
+        )
+        recoveredSnapshot.brainSummary = appendConsoleSummary(
+            base: baseSnapshot.brainSummary,
+            addition: checkpointBrainSummary(from: checkpointLineage)
+        )
+        recoveredSnapshot.blockerSummary = orderedUnique(
+            recoveredSnapshot.blockerSummary
+                + checkpointLineage.diffSummary
+                + recoveredInspection.blockerSummary
+        )
+        recoveredSnapshot.inspectionBundle = recoveredInspection
+        return recoveredSnapshot
+    }
+
+    @MainActor
+    static func eBrainTurn(
+        hostRuntime: BASHostRuntime,
+        activeQuickSession: QuickCheckSession?,
+        activeBalanceSession: BalanceBoardSession?,
+        activeMirrorSession: MirrorWorkspaceSession?,
+        currentBrainState: CurrentBrainState?,
+        projection: DecisionMemorySystem.BrainStateProjection?,
+        runtimeSnapshot: DecisionTestingRuntimeSnapshot? = nil,
+        now: Date = .now
+    ) -> BASEBrainTurnResult? {
+        guard let currentBrainState, let projection else {
+            return nil
+        }
+
+        let fragmentsByModeID = promptFragmentsByModeID(
+            activeQuickSession: activeQuickSession,
+            activeBalanceSession: activeBalanceSession,
+            activeMirrorSession: activeMirrorSession
+        )
+        let workflowProfile = hostWorkflowProfile(for: currentBrainState.mode)
+        let modeID = currentBrainState.mode.substrateModeID
+        let fragments = (fragmentsByModeID[modeID] ?? [])
+            .map(trimmed)
+            .filter { !$0.isEmpty }
+        let prompt = fragments.first ?? currentBrainState.dominantGoal ?? currentBrainState.mode.title
+        let detail = Array(fragments.dropFirst())
+            .filter { !$0.isEmpty }
+            .joined(separator: " • ")
+            .nilIfEmpty
+
+        let request = BASHostSessionRequest(
+            kind: hostSessionKind(
+                source: currentBrainState.source,
+                sourceSurface: currentBrainState.sourceSurface
+            ),
+            workflowProfile: workflowProfile,
+            surface: hostSurface(from: currentBrainState.sourceSurface),
+            prompt: prompt,
+            title: currentBrainState.mode.title,
+            detail: detail,
+            riskLevel: hostRiskLevel(from: currentBrainState.riskLevel),
+            triggerReason: currentBrainState.source.rawValue
+        )
+
+        let hostCurrentBrain = BASHostCurrentBrain(
+            workflowProfile: workflowProfile,
+            workflowTitle: currentBrainState.mode.title,
+            roleID: currentBrainState.identityProfile.role.identifier,
+            identityPosture: currentBrainState.identityProfile.posture,
+            identityInitiative: currentBrainState.identityProfile.initiative,
+            confidenceCeiling: currentBrainState.identityProfile.confidenceCeiling,
+            relationshipBoundary: currentBrainState.identityProfile.relationshipBoundary,
+            boundaryHeadline: currentBrainState.boundaryPolicy.auditHeadline,
+            boundaryMode: currentBrainState.boundaryPolicy.mode,
+            boundaryConstraints: currentBrainState.boundaryPolicy.activeConstraints,
+            calibrationStatus: currentBrainState.calibrationState.status,
+            calibrationAlerts: currentBrainState.calibrationState.alerts,
+            riskFlags: currentBrainState.verificationSnapshot.riskFlags,
+            dominantGoals: orderedUnique(
+                [currentBrainState.dominantGoal].compactMap { $0 } +
+                currentBrainState.brainState.activeGoals
+            ),
+            activeConstraints: orderedUnique(
+                currentBrainState.activeConstraints +
+                currentBrainState.brainState.sessionBiases
+            ),
+            retrievalTags: orderedUnique(currentBrainState.brainState.retrievalTags),
+            verificationSummary: currentBrainState.verificationSnapshot.fingerprint,
+            activeTemplateCount: currentBrainState.activeTemplateIDs.count,
+            failureGuardCount: currentBrainState.failureGuardIDs.count,
+            evolutionPendingReviewCount: currentBrainState.evolutionState.pendingReviewCount,
+            evolutionRollbackReady: currentBrainState.evolutionState.rollbackReady
+        )
+
+        return hostRuntime.buildEBrainTurn(
+            request: request,
+            currentBrain: hostCurrentBrain,
+            projection: projection.baseProjection,
+            deviceStateOverride: eBrainDeviceState(
+                from: currentBrainState,
+                runtimeSnapshot: runtimeSnapshot
+            ),
+            now: now
+        )
+    }
+
+    @MainActor
+    @discardableResult
+    static func persistEBrainLineage(
+        _ turn: BASEBrainTurnResult,
+        in context: ModelContext
+    ) -> DecisionEvolutionState? {
+        let result: BASAppleEvolutionCheckpointWriteResult<DecisionEvolutionCheckpoint> =
+            BASAppleEvolutionCheckpointWriter.attachLineageSummary(
+                turn.evolutionLineageSummary,
+                in: context,
+                onSaveError: { error in
+                    PersistenceIssueRecorder.record(
+                        error: error,
+                        operation: "attaching eBrain lineage to evolution checkpoint"
+                    )
+                }
+            )
+
+        guard !result.orderedCheckpoints.isEmpty else {
+            return nil
+        }
+
+        return result.currentState
+    }
+
+    @MainActor
+    @discardableResult
+    static func setEvolutionCheckpointApproval(
+        _ checkpointID: String,
+        to approvalState: DecisionEvolutionApprovalState,
+        in context: ModelContext
+    ) -> DecisionEvolutionState? {
+        let result: BASAppleEvolutionCheckpointWriteResult<DecisionEvolutionCheckpoint> =
+            BASAppleEvolutionCheckpointWriter.setApprovalState(
+                approvalState,
+                for: checkpointID,
+                in: context,
+                onSaveError: { error in
+                    PersistenceIssueRecorder.record(
+                        error: error,
+                        operation: "updating evolution checkpoint approval state"
+                    )
+                }
+            )
+
+        guard !result.orderedCheckpoints.isEmpty else {
+            return nil
+        }
+
+        return result.currentState
+    }
+
+    @MainActor
+    @discardableResult
+    static func clearEvolutionCheckpointLineage(
+        _ checkpointID: String,
+        in context: ModelContext
+    ) -> DecisionEvolutionState? {
+        let result: BASAppleEvolutionCheckpointWriteResult<DecisionEvolutionCheckpoint> =
+            BASAppleEvolutionCheckpointWriter.setLineageSummary(
+                nil,
+                for: checkpointID,
+                in: context,
+                onSaveError: { error in
+                    PersistenceIssueRecorder.record(
+                        error: error,
+                        operation: "clearing evolution checkpoint lineage"
+                    )
+                }
+            )
+
+        guard !result.orderedCheckpoints.isEmpty else {
+            return nil
+        }
+
+        return result.currentState
+    }
+
+    @MainActor
+    static func restoreEvolutionCheckpoint(
+        _ checkpointID: String,
+        currentBrainState: CurrentBrainState?,
+        taskGraph: DecisionTaskGraphSnapshot?,
+        in context: ModelContext,
+        now: Date = .now
+    ) -> CurrentBrainState? {
+        guard let checkpoint = fetchEvolutionCheckpoint(checkpointID, in: context),
+              let snapshot = checkpoint.brainStateSnapshot else {
+            return nil
+        }
+
+        let checkpoints = (try? context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())) ?? []
+        let restoredEvolutionState = restoredEvolutionState(
+            selecting: checkpoint,
+            across: checkpoints
+        )
+
+        var restoredBrainState = snapshot
+        restoredBrainState.evolutionState = restoredEvolutionState
+
+        let source = BrainStateUpdateSource(rawValue: checkpoint.sourceRaw) ?? .explicitRefresh
+        let riskLevel = interventionRiskLevel(
+            from: checkpoint.lineageSummary?.riskLevel,
+            fallback: restoredBrainState.boundaryPolicy.riskLevel
+        )
+
+        return CurrentBrainState(
+            source: source,
+            sourceSurface: currentBrainState?.sourceSurface ?? .app,
+            mode: checkpoint.mode,
+            riskLevel: riskLevel,
+            taskGraph: taskGraph ?? currentBrainState?.taskGraph,
+            brainState: restoredBrainState,
+            dominantGoal: restoredBrainState.activeGoals.first ?? currentBrainState?.dominantGoal,
+            activeConstraints: restoredBrainState.boundaryPolicy.activeConstraints.map(\.title),
+            activeTemplateIDs: restoredBrainState.activeInterventionTemplateIDs,
+            failureGuardIDs: restoredBrainState.failureGuardIDs,
+            sourceIntentEnvelope: currentBrainState?.sourceIntentEnvelope,
+            loadedAt: now
         )
     }
 
@@ -1534,10 +1785,168 @@ enum BehavioralAISubstrateBridge {
            currentBrain.boundaryPolicy.riskLevel == .high {
             return .high
         }
+        if let recoveredRiskLevel = export.selectedCheckpointLineage(
+            matching: export.preferredCheckpointSelectionContext
+        )?.eBrain.riskLevel {
+            switch recoveredRiskLevel {
+            case "extreme", "high":
+                return .high
+            case "medium":
+                return .medium
+            default:
+                break
+            }
+        }
         if export.recentTraces.contains(where: { $0.kind == .mirror }) {
             return .medium
         }
         return .low
+    }
+
+    private static func checkpointInspectionBundle(
+        from lineage: DecisionEvolutionLineageSnapshot,
+        generatedAt: Date
+    ) -> BASInspectionBundle {
+        let auditEvents = lineage.eBrain.guardrailFindings.map {
+            BASAuditEvent(
+                category: "checkpoint_guardrail",
+                message: $0,
+                timestamp: lineage.createdAt
+            )
+        }
+        let anomalySignals = checkpointAnomalySignals(from: lineage)
+        let releaseKind: BASReleaseDecisionKind
+
+        switch lineage.eBrain.permitMode {
+        case "block":
+            releaseKind = .deny
+        case "delay":
+            releaseKind = .requireConfirmation
+        default:
+            releaseKind = .allow
+        }
+
+        return BASInspectionBundle(
+            generatedAt: generatedAt,
+            trace: BASExecutionTrace(
+                inputSummary: "Recovered \(lineage.mode.shortTitle.lowercased()) checkpoint \(lineage.checkpointID)",
+                selectedRoute: BASModelRoute.local("persisted.checkpoint.\(lineage.mode.rawValue)"),
+                memoriesRecalled: Array(lineage.diffSummary.prefix(3)),
+                toolsCalled: [],
+                latency: BASTraceLatencyBreakdown(
+                    routeSelectionMs: 0,
+                    retrievalMs: 0,
+                    generationMs: 0,
+                    toolMs: 0
+                ),
+                auditEvents: auditEvents,
+                outputSummary: "\(lineage.eBrain.riskLevel) → \(lineage.eBrain.permitMode) • host gate \(lineage.eBrain.hostGatePercent)%"
+            ),
+            replayFingerprint: BASReplayFingerprint(
+                value: "\(lineage.checkpointID):\(lineage.eBrain.thoughtFoldChecksum)"
+            ),
+            releaseDecision: BASReleaseDecision(
+                kind: releaseKind,
+                reason: "Recovered from \(lineage.mode.shortTitle) checkpoint • \(lineage.approvalState.rawValue)."
+            ),
+            anomalySignals: anomalySignals,
+            calibration: BASInspectionCalibrationSummary(
+                score: checkpointCalibrationScore(for: lineage),
+                status: lineage.rollbackReady ? "recovered" : "watch",
+                summary: "Checkpoint recovery for \(lineage.eBrain.riskLevel) risk via \(lineage.eBrain.permitMode).",
+                alertCount: anomalySignals.count,
+                alertReasons: orderedUnique(lineage.diffSummary + lineage.eBrain.killSwitches)
+            )
+        )
+    }
+
+    private static func checkpointAnomalySignals(
+        from lineage: DecisionEvolutionLineageSnapshot
+    ) -> [BASAnomalySignal] {
+        let guardrailSignals = lineage.eBrain.guardrailFindings.map {
+            BASAnomalySignal(
+                kind: "checkpoint_guardrail",
+                severity: checkpointSeverity(for: lineage.eBrain.riskLevel),
+                message: $0,
+                timestamp: lineage.createdAt
+            )
+        }
+        let diffSignals = lineage.diffSummary.map {
+            BASAnomalySignal(
+                kind: "checkpoint_diff",
+                severity: "high",
+                message: $0,
+                timestamp: lineage.createdAt
+            )
+        }
+        let killSwitchSignals = lineage.eBrain.killSwitches.map {
+            BASAnomalySignal(
+                kind: "checkpoint_kill_switch",
+                severity: "high",
+                message: "Recommended kill switch: \($0)",
+                timestamp: lineage.createdAt
+            )
+        }
+        return guardrailSignals + diffSignals + killSwitchSignals
+    }
+
+    private static func checkpointRuntimeSummary(
+        from lineage: DecisionEvolutionLineageSnapshot
+    ) -> String {
+        [
+            "Recovered from checkpoint",
+            lineage.mode.shortTitle,
+            "permit \(lineage.eBrain.permitMode)",
+            "risk \(lineage.eBrain.riskLevel)",
+            "fold \(lineage.eBrain.thoughtFoldChecksum)"
+        ].joined(separator: " • ")
+    }
+
+    private static func checkpointBrainSummary(
+        from lineage: DecisionEvolutionLineageSnapshot
+    ) -> String {
+        [
+            "Recovered lineage",
+            "session \(lineage.eBrain.sessionID)",
+            "host gate \(lineage.eBrain.hostGatePercent)%",
+            "\(lineage.eBrain.updateTicketSummaries.count) tickets"
+        ].joined(separator: " • ")
+    }
+
+    private static func checkpointCalibrationScore(
+        for lineage: DecisionEvolutionLineageSnapshot
+    ) -> Double {
+        switch lineage.eBrain.riskLevel {
+        case "extreme":
+            0.45
+        case "high":
+            0.58
+        case "medium":
+            0.74
+        default:
+            0.88
+        }
+    }
+
+    private static func checkpointSeverity(for riskLevel: String) -> String {
+        switch riskLevel {
+        case "extreme", "high":
+            "high"
+        case "medium":
+            "medium"
+        default:
+            "warning"
+        }
+    }
+
+    private static func appendConsoleSummary(
+        base: String?,
+        addition: String
+    ) -> String {
+        guard let base, !base.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return addition
+        }
+        return "\(base) • \(addition)"
     }
 
     private static func predictiveInterventionSummary(
@@ -1665,6 +2074,113 @@ enum BehavioralAISubstrateBridge {
         }
     }
 
+    private static func hostSurface(from sourceSurface: DecisionIntentSourceSurface) -> BASHostSurface {
+        switch sourceSurface {
+        case .app:
+            .application
+        case .watch:
+            .wearable
+        case .widget:
+            .widget
+        case .shortcut:
+            .shortcut
+        case .siri:
+            .voiceAssistant
+        case .notification:
+            .notification
+        }
+    }
+
+    private static func hostWorkflowProfile(for mode: DecisionMode) -> BASHostWorkflowProfile {
+        switch mode {
+        case .quick:
+            .primary
+        case .balance:
+            .comparative
+        case .mirror:
+            .reflective
+        }
+    }
+
+    private static func hostRiskLevel(from riskLevel: InterventionRiskLevel) -> BASHostRiskLevel {
+        switch riskLevel {
+        case .low:
+            .low
+        case .medium:
+            .medium
+        case .high:
+            .high
+        }
+    }
+
+    private static func interventionRiskLevel(
+        from storedRiskLevel: String?,
+        fallback substrateRiskLevel: BASRiskLevel
+    ) -> InterventionRiskLevel {
+        if let storedRiskLevel,
+           let resolved = InterventionRiskLevel(rawValue: storedRiskLevel) {
+            return resolved
+        }
+
+        switch substrateRiskLevel {
+        case .low:
+            return .low
+        case .medium:
+            return .medium
+        case .high:
+            return .high
+        }
+    }
+
+    @MainActor
+    private static func fetchEvolutionCheckpoint(
+        _ checkpointID: String,
+        in context: ModelContext
+    ) -> DecisionEvolutionCheckpoint? {
+        ((try? context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())) ?? [])
+            .first(where: { $0.id == checkpointID })
+    }
+
+    private static func restoredEvolutionState(
+        selecting checkpoint: DecisionEvolutionCheckpoint,
+        across checkpoints: [DecisionEvolutionCheckpoint]
+    ) -> DecisionEvolutionState {
+        let pendingReviewCount = checkpoints.filter { $0.approvalState == .reviewSuggested }.count
+        let summary = DecisionEvolutionCheckpointSummary(
+            id: checkpoint.id,
+            previousCheckpointID: checkpoint.previousCheckpointID,
+            createdAt: checkpoint.createdAt,
+            diffSummary: checkpoint.diffSummary,
+            rollbackReady: checkpoint.rollbackReady,
+            approvalState: checkpoint.approvalState,
+            lineageSummary: checkpoint.lineageSummary
+        )
+
+        return DecisionEvolutionState(
+            latestCheckpoint: summary,
+            checkpointCount: checkpoints.count,
+            rollbackReady: checkpoint.rollbackReady,
+            pendingReviewCount: pendingReviewCount,
+            recentDiffSummary: checkpoint.diffSummary
+        )
+    }
+
+    private static func hostSessionKind(
+        source: BrainStateUpdateSource,
+        sourceSurface: DecisionIntentSourceSurface
+    ) -> BASHostSessionKind {
+        if sourceSurface == .notification || source == .notification {
+            return .notification
+        }
+        if sourceSurface == .widget || source == .widget {
+            return .widget
+        }
+        if sourceSurface == .watch || source == .watchHandoff {
+            return .handoff
+        }
+        return source == .sceneActive ? .ambient : .interactive
+    }
+
     private static func currentBrainRuntimeRetrievalMode(
         for mode: DecisionMode,
         preferences: BeforePreferences
@@ -1773,6 +2289,93 @@ enum BehavioralAISubstrateBridge {
         return interactionSurface(from: sourceSurface)
     }
 
+    private static func eBrainDeviceState(
+        from currentBrainState: CurrentBrainState,
+        runtimeSnapshot: DecisionTestingRuntimeSnapshot?
+    ) -> BASDeviceState {
+        guard let runtimeSnapshot else {
+            return BASDeviceState(
+                batteryLevel: 0.64,
+                thermalLevel: currentBrainState.riskLevel == .high ? .warm : .nominal,
+                memoryFreeMB: 2_048,
+                networkState: .constrained,
+                foregroundState: foregroundState(for: currentBrainState.sourceSurface),
+                cpuLoad: currentBrainState.riskLevel == .high ? 0.28 : 0.16,
+                gpuLoad: currentBrainState.mode == .balance ? 0.22 : 0.10,
+                npuAvailable: true,
+                latencyBudgetMs: currentBrainState.riskLevel == .high ? 1_800 : 1_200
+            )
+        }
+
+        let capabilities = runtimeSnapshot.deviceCapabilities
+        let memoryFreeMB = max(1_024, capabilities.physicalMemoryGB * 768)
+        let batteryLevel = capabilities.isLowPowerModeEnabled ? 0.24 : 0.76
+        let thermalLevel: BASThermalLevel
+        if capabilities.isLowPowerModeEnabled && currentBrainState.riskLevel == .high {
+            thermalLevel = .warm
+        } else if capabilities.isSimulator && currentBrainState.mode == .mirror {
+            thermalLevel = .warm
+        } else {
+            thermalLevel = .nominal
+        }
+
+        let networkState: BASNetworkState =
+            runtimeSnapshot.preferences.onDeviceIntelligenceMode.isEnabled ? .constrained : .online
+
+        let gpuLoad: Double
+        switch runtimeSnapshot.gemmaBackendResolution.effectiveBackend {
+        case .metal:
+            gpuLoad = 0.34
+        case .coreML, .systemManaged:
+            gpuLoad = 0.14
+        case .cpu:
+            gpuLoad = 0.06
+        }
+
+        let cpuLoad: Double
+        switch runtimeSnapshot.executionProfile.tier {
+        case .off, .simulator, .conservativeDeterministic:
+            cpuLoad = currentBrainState.riskLevel == .high ? 0.24 : 0.12
+        case .balancedGemma, .fullGemma, .systemManaged, .testingOverride:
+            cpuLoad = currentBrainState.riskLevel == .high ? 0.36 : 0.20
+        }
+
+        let latencyBudgetMs: Int
+        switch currentBrainState.riskLevel {
+        case .low:
+            latencyBudgetMs = currentBrainState.mode == .quick ? 900 : 1_200
+        case .medium:
+            latencyBudgetMs = 1_400
+        case .high:
+            latencyBudgetMs = 1_800
+        }
+
+        return BASDeviceState(
+            batteryLevel: batteryLevel,
+            thermalLevel: thermalLevel,
+            memoryFreeMB: memoryFreeMB,
+            networkState: networkState,
+            foregroundState: foregroundState(for: currentBrainState.sourceSurface),
+            cpuLoad: cpuLoad,
+            gpuLoad: gpuLoad,
+            npuAvailable: capabilities.supportsCoreMLAcceleration,
+            latencyBudgetMs: latencyBudgetMs
+        )
+    }
+
+    private static func foregroundState(
+        for sourceSurface: DecisionIntentSourceSurface
+    ) -> BASForegroundState {
+        switch sourceSurface {
+        case .widget, .notification:
+            .background
+        case .watch:
+            .suspended
+        case .app, .shortcut, .siri:
+            .foreground
+        }
+    }
+
     private static func orderedUnique(_ values: [String]) -> [String] {
         var seen = Set<String>()
         var ordered: [String] = []
@@ -1780,5 +2383,11 @@ enum BehavioralAISubstrateBridge {
             ordered.append(value)
         }
         return ordered
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }
