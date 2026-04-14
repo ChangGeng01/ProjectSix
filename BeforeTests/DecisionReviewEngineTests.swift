@@ -1,4 +1,5 @@
 import XCTest
+import BASHostKit
 @testable import Before
 
 final class DecisionReviewEngineTests: XCTestCase {
@@ -305,5 +306,162 @@ final class DecisionReviewEngineTests: XCTestCase {
         XCTAssertEqual(entries.count, 1)
         XCTAssertEqual(entries.first?.title, "Should I leave?")
         XCTAssertEqual(entries.first?.actionTitle, "Write the boundary")
+    }
+
+    func testTimelineEntryPresentationForQuickCarriesVerdictAndReflection() {
+        let event = CheckEvent(
+            createdAt: Date(timeIntervalSince1970: 200),
+            scenario: .scroll,
+            motivation: .stressed,
+            expectedOutcome: .regret,
+            controlLevel: .maybe,
+            note: "",
+            currentPerspective: "Pause the spiral",
+            afterPerspective: "Come back after breathing",
+            verdict: .pause,
+            finalAction: .wait90s,
+            reflectionOutcome: .regrettedIt,
+            entrySource: .app
+        )
+
+        let presentation = DecisionReviewEngine.timelineEntryPresentation(for: event)
+
+        XCTAssertEqual(presentation.title, "Pause the spiral")
+        XCTAssertEqual(presentation.secondaryLine, "Come back after breathing")
+        XCTAssertEqual(presentation.labelTitle, "Scroll")
+        XCTAssertEqual(presentation.labelSymbolName, event.scenario.symbolName)
+        XCTAssertEqual(presentation.headerAccentText, "Pause")
+        XCTAssertEqual(presentation.headerAccentStyle, .capsule)
+        XCTAssertEqual(presentation.timestamp, event.createdAt)
+        XCTAssertEqual(presentation.footerAccentText, "I regretted it")
+    }
+
+    func testRecentEntryPresentationUsesEntryModeAndActionTitle() {
+        let record = BalanceDecisionRecord(
+            updatedAt: Date(timeIntervalSince1970: 300),
+            prompt: "Should I take the contract?",
+            desire: "Momentum",
+            concern: "Capacity",
+            constraint: "Time",
+            longTerm: "I do not want to burn out",
+            focusTitle: "Capacity pressure",
+            focusSummary: "The real question is whether you still have room.",
+            nextAction: "Cut one commitment before adding another.",
+            entrySource: .app
+        )
+
+        let presentation = DecisionReviewEngine.recentEntryPresentation(for: .balance(record))
+
+        XCTAssertEqual(presentation.title, "Should I take the contract?")
+        XCTAssertEqual(presentation.secondaryLine, "The real question is whether you still have room.")
+        XCTAssertEqual(presentation.labelTitle, DecisionMode.balance.title)
+        XCTAssertEqual(presentation.labelSymbolName, DecisionMode.balance.symbolName)
+        XCTAssertEqual(presentation.timestamp, record.updatedAt)
+        XCTAssertEqual(presentation.footerText, "Capacity pressure")
+    }
+
+    func testDetailPresentationForQuickFiltersEmptyOptionalRows() {
+        let event = CheckEvent(
+            scenario: .scroll,
+            motivation: .stressed,
+            expectedOutcome: .regret,
+            controlLevel: .maybe,
+            note: "   ",
+            currentPerspective: "Pause the spiral",
+            afterPerspective: "Come back after breathing",
+            verdict: .pause,
+            finalAction: .wait90s,
+            reflectionOutcome: .regrettedIt,
+            reflectionNote: "",
+            entrySource: .app
+        )
+
+        let presentation = DecisionReviewEngine.detailPresentation(for: event)
+
+        XCTAssertEqual(presentation.eyebrow, "Quick check")
+        XCTAssertEqual(presentation.reopenTitle, "Reopen this check")
+        XCTAssertEqual(presentation.rows.map(\.title), [
+            "Scenario",
+            "Verdict",
+            "Why now",
+            "Usually after",
+            "Pull-back",
+            "Reflection"
+        ])
+    }
+
+    func testDetailPresentationForMirrorKeepsOrderedRows() {
+        let record = MirrorDecisionRecord(
+            prompt: "Should I stay?",
+            emotion: "Grief",
+            relationship: "The same boundary keeps slipping",
+            reality: "We still live together",
+            longTerm: "I keep shrinking",
+            selfLens: "I do not trust my no",
+            coreTension: "This is about what staying keeps teaching you to normalize.",
+            nextActionTitle: "Name the boundary",
+            nextAction: "Write the one limit you cannot keep negotiating away.",
+            entrySource: .app
+        )
+
+        let presentation = DecisionReviewEngine.detailPresentation(for: record)
+
+        XCTAssertEqual(presentation.eyebrow, "Mirror")
+        XCTAssertEqual(presentation.title, "Should I stay?")
+        XCTAssertEqual(presentation.rows.map(\.title), [
+            "Emotion",
+            "Relationship",
+            "Reality",
+            "Long-term",
+            "Self",
+            "Mirror action",
+            "Next step"
+        ])
+    }
+
+    func testReviewProfileEntryMatchesReplayRecordByStableIdentity() {
+        let event = CheckEvent(
+            scenario: .scroll,
+            motivation: .stressed,
+            expectedOutcome: .regret,
+            controlLevel: .maybe,
+            note: "",
+            currentPerspective: "Pause the spiral",
+            afterPerspective: "Come back after breathing",
+            verdict: .pause,
+            finalAction: .wait90s,
+            entrySource: .app
+        )
+
+        let entry = ReviewProfileEntry.quick(event)
+        let matchingRecord = DeveloperDecisionReplayRecord.quick(event)
+        let differentRecord = DeveloperDecisionReplayRecord.checkpoint(
+            DecisionEvolutionLineageSnapshot(
+                checkpointID: "checkpoint-1",
+                createdAt: .now,
+                mode: .quick,
+                approvalState: .automatic,
+                rollbackReady: true,
+                diffSummary: ["Recovered"],
+                eBrain: DeveloperDecisionReplayEBrainSummary(
+                    lineageSummary: BASEvolutionLineageSummary(
+                        recordedAt: .now,
+                        sessionID: "lineage-1",
+                        taskType: "high_pressure",
+                        riskLevel: "medium",
+                        permitMode: "compare",
+                        hostGatePercent: 72,
+                        thoughtFoldChecksum: "fold-1",
+                        updateTicketSummaries: ["Hold before sending"],
+                        activeKillSwitches: [],
+                        guardrailFindings: [],
+                        recommendedKillSwitches: []
+                    )
+                )
+            )
+        )
+
+        XCTAssertTrue(entry.matches(matchingRecord))
+        XCTAssertFalse(entry.matches(differentRecord))
     }
 }

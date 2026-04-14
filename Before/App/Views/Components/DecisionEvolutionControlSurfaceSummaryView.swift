@@ -2,31 +2,32 @@ import SwiftUI
 
 struct DecisionEvolutionControlSurfaceSummaryView: View {
     let controlSurface: DecisionEvolutionControlSurface
+    let surfaceContract: DecisionEvolutionSurfaceContract
     let emptyMessage: String
-    let interactionMode: DecisionEvolutionControlInteractionMode
-    let showCheckpointActionBar: Bool
-    let showControlCenterShortcut: Bool
-    let showHistoryShortcut: Bool
-    let showPortraitShortcut: Bool
+    let surfaceOptions: DecisionEvolutionSummarySurfaceOptions
     let afterMutation: (() -> Void)?
 
     init(
         controlSurface: DecisionEvolutionControlSurface,
+        surfaceContract: DecisionEvolutionSurfaceContract,
         emptyMessage: String = "No persisted checkpoint lineage is available yet.",
-        interactionMode: DecisionEvolutionControlInteractionMode = .mutationHub,
-        showCheckpointActionBar: Bool = true,
-        showControlCenterShortcut: Bool = false,
-        showHistoryShortcut: Bool = false,
-        showPortraitShortcut: Bool = false,
+        navigationOptions: DecisionEvolutionNavigationSurfaceOptions? = nil,
+        showCheckpointActionBar: Bool? = nil,
         afterMutation: (() -> Void)? = nil
     ) {
         self.controlSurface = controlSurface
+        self.surfaceContract = surfaceContract
         self.emptyMessage = emptyMessage
-        self.interactionMode = interactionMode
-        self.showCheckpointActionBar = showCheckpointActionBar
-        self.showControlCenterShortcut = showControlCenterShortcut
-        self.showHistoryShortcut = showHistoryShortcut
-        self.showPortraitShortcut = showPortraitShortcut
+        if let navigationOptions {
+            self.surfaceOptions = surfaceContract.summarySurfaceOptions(
+                navigationOptions: navigationOptions,
+                showCheckpointActionBar: showCheckpointActionBar
+            )
+        } else {
+            self.surfaceOptions = surfaceContract.summarySurfaceOptions(
+                showCheckpointActionBar: showCheckpointActionBar
+            )
+        }
         self.afterMutation = afterMutation
     }
 
@@ -92,6 +93,14 @@ struct DecisionEvolutionControlSurfaceSummaryView: View {
                     DecisionEvolutionSummaryBadge(title: permitMode.uppercased(), tint: BeforeTheme.moss)
                 }
 
+                if presentation.checkpointID == controlSurface.activePresentation?.checkpointID,
+                   controlSurface.activeCheckpointSource != .none {
+                    DecisionEvolutionSummaryBadge(
+                        title: controlSurface.activeCheckpointSource.shortTitle,
+                        tint: .blue
+                    )
+                }
+
                 DecisionEvolutionSummaryBadge(
                     title: presentation.rollbackReady ? "ROLLBACK READY" : "ROLLBACK WATCH",
                     tint: presentation.rollbackReady ? BeforeTheme.moss : BeforeTheme.ember
@@ -119,18 +128,16 @@ struct DecisionEvolutionControlSurfaceSummaryView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
-            if showCheckpointActionBar {
+            if surfaceOptions.showCheckpointActionBar {
                 DecisionEvolutionCheckpointActionBar(
                     checkpointID: presentation.checkpointID,
                     checkpointPresentation: presentation,
                     controlSurface: controlSurface,
-                    interactionMode: interactionMode,
+                    surfaceContract: surfaceContract,
                     applyReady: presentation.applyReady,
                     approvalState: presentation.approvalState,
                     hasLineage: presentation.hasLineage,
-                    showControlCenterShortcut: showControlCenterShortcut,
-                    showHistoryShortcut: showHistoryShortcut,
-                    showPortraitShortcut: showPortraitShortcut,
+                    navigationOptions: surfaceOptions.navigationOptions,
                     afterMutation: afterMutation
                 )
             }

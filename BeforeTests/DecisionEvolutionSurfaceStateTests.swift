@@ -88,6 +88,54 @@ final class DecisionEvolutionSurfaceStateTests: XCTestCase {
         XCTAssertFalse(controlSurface.pendingReviewPresentations.first?.rollbackReady == true)
     }
 
+    func testSurfaceStatePrefersReleaseSummaryFactsAcrossWorkspaceOperatorAndAttention() {
+        let now = Date(timeIntervalSince1970: 300)
+        let active = makeSnapshot(
+            checkpointID: "active-release",
+            createdAt: now,
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let review = makeSnapshot(
+            checkpointID: "review-release",
+            createdAt: now.addingTimeInterval(10),
+            approvalState: .reviewSuggested,
+            hasLineage: true
+        )
+
+        let state = DecisionEvolutionSurfaceState.build(
+            contract: .history,
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: active,
+                reviewCheckpoint: review,
+                pendingReviewQueue: [review],
+                latestPersistedLineage: nil
+            ),
+            releaseSummary: DecisionSystemReleaseControlSummary(
+                state: .ready,
+                headline: "Ready after release review",
+                reasons: [],
+                activeKillSwitches: [],
+                recommendedKillSwitches: [],
+                killSwitches: [],
+                pendingReviewCount: 0,
+                rollbackReadyCount: 1,
+                canRestoreActiveCheckpoint: true,
+                canRollbackActiveCheckpoint: true,
+                activeCheckpointID: "active-release",
+                activeCheckpointSource: .automaticFallback,
+                reviewCheckpointID: "review-release"
+            )
+        )
+
+        XCTAssertEqual(state.workspace.effectivePendingReviewCount, 0)
+        XCTAssertEqual(state.workspace.effectiveRollbackReadyCount, 1)
+        XCTAssertEqual(state.operatorSnapshot.pendingReviewCount, 0)
+        XCTAssertEqual(state.operatorSnapshot.rollbackReadyCount, 1)
+        XCTAssertEqual(state.attentionSignal.severity, .rollbackWatch)
+        XCTAssertTrue(state.attentionSignal.rollbackReady)
+    }
+
     func testControlSurfaceResolvesHistoryCheckpointRollbackReadiness() {
         let historyCheckpoint = DecisionEvolutionCheckpoint(
             id: "history-1",

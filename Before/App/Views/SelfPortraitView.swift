@@ -6,7 +6,7 @@ struct SelfPortraitView: View {
     @State private var systemFlightDeck: DecisionSystemFlightDeck?
     @State private var substrateConsoleSnapshot: BASHostConsoleSnapshot?
     @State private var substrateEBrainTurn: BASEBrainTurnResult?
-    @State private var substrateReplayEntries: [DeveloperDecisionReplayEntry] = []
+    @State private var substrateReplayPresentations: [DecisionEvolutionReplayEntryPresentation] = []
     @State private var isLoadingSystemFlightDeck = false
     private let evolutionSurfaceContract = DecisionEvolutionSurfaceContract.portrait
 
@@ -19,6 +19,14 @@ struct SelfPortraitView: View {
 
     private var currentEvolutionWorkspace: DecisionEvolutionWorkspaceSnapshot {
         evolutionSurfaceState.workspace
+    }
+
+    private var checkpointNavigationOptions: DecisionEvolutionNavigationSurfaceOptions {
+        evolutionSurfaceContract.checkpointNavigationOptions
+    }
+
+    private var sessionEnginePresentation: DecisionSessionEnginePresentation {
+        systemFlightDeck.sessionEnginePresentationOrUnattached
     }
 
     var body: some View {
@@ -38,9 +46,11 @@ struct SelfPortraitView: View {
                         )
 
                         systemFlightDeckCard(systemFlightDeck)
+                        sessionEngineCard
+                        localModelLibraryCard
                         substrateConsoleCard(substrateConsoleSnapshot)
                         eBrainTurnCard(substrateEBrainTurn)
-                        replayLineageCard(substrateReplayEntries)
+                        replayLineageCard(substrateReplayPresentations)
                         currentBrainCard(panel.currentBrainState)
                         boundaryCard(panel.currentBrainState)
                         calibrationCard(panel.currentBrainState)
@@ -124,41 +134,50 @@ struct SelfPortraitView: View {
                     }
 
                     if let eBrain = flightDeck.eBrainSummary {
+                        let presentation = eBrain.presentation
                         VStack(alignment: .leading, spacing: 6) {
                             Text("13-layer path")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
 
-                            sourceBadge(sourceDescriptor(for: eBrain))
+                            sourceBadge(presentation.sourceDescriptor)
 
-                            Text("\(eBrain.runMode.uppercased()) • \(eBrain.taskType.replacingOccurrences(of: "_", with: " ")) • \(eBrain.riskLevel.uppercased()) → \(eBrain.permitMode.uppercased())")
+                            Text(presentation.statusLine)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
 
-                            Text("Route \(eBrain.deviceRoute) • Loops \(eBrain.loopCount) • Cache \(eBrain.cacheHitRate)% • Tickets \(eBrain.updateTicketCount)")
+                            Text(presentation.routeLine)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
 
-                            Text("Host gate \(eBrain.hostGatePercent)% • Fold \(eBrain.foldChecksum) • Audit \(eBrain.auditFindingCount)")
+                            Text(presentation.hostLine)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
 
                             DecisionEvolutionReleaseSummaryView(
                                 releaseSummary: flightDeck.releaseControlSummary,
                                 controlSurface: flightDeck.evolutionControlSurface,
-                                presentationMode: evolutionSurfaceContract.releaseSummaryMode
+                                surfaceContract: evolutionSurfaceContract,
+                                presentationMode: evolutionSurfaceContract.releaseSummaryMode,
+                                navigationOptions: checkpointNavigationOptions
                             )
 
-                            Text(eBrain.inspectionHeadline)
+                            Text(presentation.inspectionHeadline)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
 
-                            if let firstBlocker = eBrain.blockers.first {
-                                Text("Guardrail: \(firstBlocker)")
+                            if let primaryGuardrailText = presentation.primaryGuardrailText {
+                                Text(primaryGuardrailText)
                                     .font(.caption2)
                                     .foregroundStyle(BeforeTheme.ember)
                             }
                         }
+                    }
+
+                    if flightDeck.sessionEngineSummary != nil {
+                        DecisionSystemFlightDeckSessionEngineView(
+                            presentation: flightDeck.sessionEnginePresentation
+                        )
                     }
 
                     ForEach(flightDeck.layerReports) { report in
@@ -198,6 +217,52 @@ struct SelfPortraitView: View {
     }
 
     @ViewBuilder
+    private var localModelLibraryCard: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Local model library")
+                    .font(.headline)
+
+                if let localModelSummary = systemFlightDeck?.localModelLibrarySummary {
+                    Text(localModelSummary.headline)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                DecisionLocalModelLibraryPanelView(
+                    presentation: appModel.localModelLibraryPresentation,
+                    showsTitle: false,
+                    preferredGemmaAssetID: nil,
+                    preferredOpenModelAssetID: nil,
+                    importButtonTitle: nil,
+                    downloadButtonTitle: nil,
+                    importOpenModelButtonTitle: nil,
+                    downloadOpenModelButtonTitle: nil,
+                    onImportGemma: nil,
+                    onDownloadGemma: nil,
+                    onImportOpenModel: nil,
+                    onDownloadOpenModel: nil,
+                    onRemoveImportedGemma: nil,
+                    onRemoveImportedOpenModel: nil
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var sessionEngineCard: some View {
+        PanelCard {
+            DecisionSessionEngineSurfaceView(
+                presentation: sessionEnginePresentation,
+                showsTitle: true,
+                maxRecentSessions: 3,
+                correctionPlaceholder: "Describe the correction you want to branch from the active portrait-linked session line.",
+                correctionReason: "portrait session engine correction branch"
+            )
+        }
+    }
+
+    @ViewBuilder
     private func substrateConsoleCard(
         _ snapshot: BASHostConsoleSnapshot?
     ) -> some View {
@@ -216,126 +281,133 @@ struct SelfPortraitView: View {
                     .font(.headline)
 
                 if let turn {
-                    sourceBadge(.liveRuntime)
+                    let diagnostics = turn.diagnosticsPresentation
+
+                    sourceBadge(diagnostics.sourceDescriptor)
 
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(turn.budgetFrame.runMode.rawValue.uppercased())
+                            Text(diagnostics.runModeTitle)
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            Text(turn.contextFrame.taskType.rawValue.replacingOccurrences(of: "_", with: " "))
+                            Text(diagnostics.taskTitle)
                                 .font(.subheadline.bold())
                                 .foregroundStyle(BeforeTheme.ink)
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 4) {
-                            Text(turn.riskCard.riskLevel.rawValue.uppercased())
+                            Text(diagnostics.riskTitle)
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(healthColor(health(from: turn.riskCard.riskLevel)))
-                            Text(turn.actionPermit.mode.rawValue.uppercased())
+                            Text(diagnostics.permitTitle)
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.secondary)
                         }
                     }
 
-                    Text(turn.decomposeFrame.mirrorText)
+                    Text(diagnostics.mirrorText)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
-                    Text("Route: \(turn.runtimeTrace.modelRoute) • Loops: \(turn.runtimeTrace.loopCount) • Power: \(Int((turn.runtimeTrace.powerEstimate * 100).rounded()))%")
+                    Text(diagnostics.routeText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    Text("Host gate \(Int((turn.hostGateValue * 100).rounded()))% • Fold \(turn.thoughtFold.checksum.prefix(12)) • Device \(turn.deviceState.thermalLevel.rawValue)/\(turn.deviceState.memoryFreeMB)MB")
+                    Text(diagnostics.hostText)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
 
-                    Text("Replay session \(turn.runtimeTrace.sessionID) • Recorded \(turn.runtimeTrace.recordedAt.formatted(date: .abbreviated, time: .shortened))")
+                    Text(diagnostics.replayText)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
 
-                    if !turn.runtimeTrace.guardrailFindings.isEmpty {
+                    if !diagnostics.auditLines.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Runtime audit")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            ForEach(Array(turn.runtimeTrace.guardrailFindings.prefix(4)), id: \.id) { finding in
-                                Text("• \(finding.layerID) \(finding.code): \(finding.summary)")
+                            ForEach(diagnostics.auditLines, id: \.self) { line in
+                                Text(line)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
-                            if !turn.runtimeTrace.recommendedKillSwitches.isEmpty {
-                                Text("Kill switches: \(turn.runtimeTrace.recommendedKillSwitches.map(\.rawValue).joined(separator: " • "))")
+                            if let activeKillSwitchesLine = diagnostics.activeKillSwitchesLine {
+                                Text(activeKillSwitchesLine)
+                                    .font(.caption2)
+                                    .foregroundStyle(BeforeTheme.ember)
+                            }
+                            if let recommendedKillSwitchesLine = diagnostics.recommendedKillSwitchesLine {
+                                Text(recommendedKillSwitchesLine)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
                         }
                     }
 
-                    if !turn.thoughtFrame.candidates.isEmpty {
+                    if !diagnostics.candidateTitles.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Candidates")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            ForEach(Array(turn.thoughtFrame.candidates.prefix(3)), id: \.candidateID) { candidate in
-                                Text("• \(candidate.title)")
+                            ForEach(diagnostics.candidateTitles, id: \.self) { title in
+                                Text("• \(title)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
                     }
 
-                    if !turn.memoryBundle.atoms.isEmpty {
+                    if !diagnostics.memorySummaries.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Retrieved memory")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            ForEach(Array(turn.memoryBundle.atoms.prefix(3)), id: \.memoryID) { atom in
-                                Text("• \(atom.summary)")
+                            ForEach(diagnostics.memorySummaries, id: \.self) { summary in
+                                Text("• \(summary)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
                     }
 
-                    if !turn.triScores.isEmpty {
+                    if !diagnostics.triScoreLines.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Tri-self scores")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            ForEach(Array(turn.triScores.prefix(3)), id: \.candidateID) { score in
-                                Text("• \(score.candidateID): id \(Int((score.idScore * 100).rounded())) / ego \(Int((score.egoScore * 100).rounded())) / superego \(Int((score.superegoScore * 100).rounded()))")
+                            ForEach(diagnostics.triScoreLines, id: \.self) { line in
+                                Text(line)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
                     }
 
-                    if !turn.riskCard.factors.isEmpty || !turn.actionPermit.reasonCodes.isEmpty {
+                    if diagnostics.riskFactorsLine != nil || diagnostics.reasonCodesLine != nil {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Risk gate")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            if !turn.riskCard.factors.isEmpty {
-                                Text("Factors: \(turn.riskCard.factors.joined(separator: " • "))")
+                            if let riskFactorsLine = diagnostics.riskFactorsLine {
+                                Text(riskFactorsLine)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
-                            if !turn.actionPermit.reasonCodes.isEmpty {
-                                Text("Reason codes: \(turn.actionPermit.reasonCodes.joined(separator: " • "))")
+                            if let reasonCodesLine = diagnostics.reasonCodesLine {
+                                Text(reasonCodesLine)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
                         }
                     }
 
-                    if !turn.renderedOutput.alternativeActions.isEmpty {
+                    if !diagnostics.alternativeActions.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Safer next moves")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            ForEach(turn.renderedOutput.alternativeActions, id: \.self) { action in
+                            ForEach(diagnostics.alternativeActions, id: \.self) { action in
                                 Text("• \(action)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -343,36 +415,34 @@ struct SelfPortraitView: View {
                         }
                     }
 
-                    if !turn.thoughtFold.compactSlots.isEmpty {
+                    if !diagnostics.thoughtFoldLines.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Thought fold")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            ForEach(turn.thoughtFold.compactSlots.keys.sorted(), id: \.self) { key in
-                                if let value = turn.thoughtFold.compactSlots[key], !value.isEmpty {
-                                    Text("• \(key): \(value)")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-
-                    if !turn.runtimeTrace.layerEvents.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Replay trace")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(BeforeTheme.ember)
-                            ForEach(Array(turn.runtimeTrace.layerEvents.prefix(6).enumerated()), id: \.offset) { _, event in
-                                Text("• \(event.layerID) \(event.event): \(event.detail)")
+                            ForEach(diagnostics.thoughtFoldLines, id: \.self) { line in
+                                Text(line)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
                         }
                     }
 
-                    if let ticket = turn.updateTickets.first {
-                        Text("Ticket: \(ticket.summary)")
+                    if !diagnostics.replayTraceLines.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Replay trace")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(BeforeTheme.ember)
+                            ForEach(diagnostics.replayTraceLines, id: \.self) { line in
+                                Text(line)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+
+                    if let ticketSummary = diagnostics.ticketSummary {
+                        Text("Ticket: \(ticketSummary)")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -387,7 +457,7 @@ struct SelfPortraitView: View {
 
     @ViewBuilder
     private func replayLineageCard(
-        _ entries: [DeveloperDecisionReplayEntry]
+        _ entries: [DecisionEvolutionReplayEntryPresentation]
     ) -> some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
@@ -399,50 +469,19 @@ struct SelfPortraitView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(Array(entries.prefix(3))) { entry in
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(alignment: .firstTextBaseline) {
-                                Text(entry.mode.shortTitle)
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(BeforeTheme.ember)
-                                Text(entry.statusTitle)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text(entry.timestamp.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Text(entry.title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(BeforeTheme.ink)
-
-                            Text(entry.summaryLine)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-
-                            if let eBrain = entry.eBrain {
-                                Text("\(eBrain.source.title) • \(eBrain.riskLevel.uppercased()) → \(eBrain.permitMode.uppercased()) • host gate \(eBrain.hostGatePercent)% • fold \(eBrain.thoughtFoldChecksum)")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-
-                                if !eBrain.guardrailFindings.isEmpty {
-                                    Text("Audit: \(eBrain.guardrailFindings.prefix(2).joined(separator: " • "))")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                if !eBrain.killSwitches.isEmpty {
-                                    Text("Kill switches: \(eBrain.killSwitches.joined(separator: " • "))")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                            } else if let trace = entry.trace {
-                                Text("Trace: \(trace.kind.title) • \(trace.activeProvider?.title ?? trace.preferredProvider.title)")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
+                    ForEach(Array(entries.prefix(3).enumerated()), id: \.offset) { _, presentation in
+                        DecisionReplayEntrySummaryView(
+                            title: presentation.title,
+                            presentation: presentation
+                        ) {
+                            DecisionReplayEntryHeaderRowView(
+                                leadingText: presentation.modeTitle,
+                                secondaryText: presentation.statusTitle,
+                                trailingTimestamp: presentation.timestamp,
+                                trailingTimestampStyle: .absoluteShort
+                            )
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(BeforeTheme.ember)
                         }
                         .padding(.top, 2)
                     }
@@ -592,6 +631,9 @@ struct SelfPortraitView: View {
         let spotlightSet = workspace.spotlightSet
         let activePresentation = spotlightSet.activePresentation
         let reviewPresentation = spotlightSet.reviewPresentation
+        let recoveryPresentation = workspace.recoveryPresentation(
+            hasCurrentBrainState: state != nil
+        )
 
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
@@ -603,15 +645,11 @@ struct SelfPortraitView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(BeforeTheme.ember)
 
-                    Text(controlSurface.canRollbackActiveCheckpoint ? "Rollback ready" : "Rollback unavailable")
+                    Text(workspace.effectiveCanRollbackActiveCheckpoint ? "Rollback ready" : "Rollback unavailable")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                } else if controlSurface.hasAnyCheckpoint {
-                    Text("Live brain state is unavailable right now, but persisted checkpoints remain reviewable and restorable from local lineage.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
                 } else {
-                    Text("Evolution checkpoints appear after the current brain is loaded.")
+                    Text(recoveryPresentation.availabilityText)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -620,10 +658,9 @@ struct SelfPortraitView: View {
                     DecisionEvolutionPilotControlPanel(
                         controlSurface: controlSurface,
                         releaseSummary: workspace.releaseSummary,
-                        interactionMode: evolutionSurfaceContract.interactionMode,
+                        surfaceContract: evolutionSurfaceContract,
                         showEmbeddedReleaseSummary: evolutionSurfaceContract.showsEmbeddedReleaseSummaryInPilotPanel,
-                        showHistoryShortcut: true,
-                        showControlCenterShortcut: true,
+                        navigationOptions: checkpointNavigationOptions,
                         afterMutation: {
                             Task {
                                 await refreshSystemFlightDeck()
@@ -633,24 +670,15 @@ struct SelfPortraitView: View {
                 }
 
                 if controlSurface.hasAnyCheckpoint {
-                    if controlSurface.activePresentation?.hasLineage == true
-                        || controlSurface.reviewPresentation?.hasLineage == true {
-                        sourceBadge(
-                            .checkpointRecovery(
-                                detail: "Recovered lineage stored in persisted checkpoints remains visible even when no live runtime turn is attached."
-                            )
-                        )
+                    if let recoveryDescriptor = recoveryPresentation.sourceDescriptor {
+                        sourceBadge(recoveryDescriptor)
                     }
 
                     DecisionEvolutionControlSurfaceSummaryView(
                         controlSurface: controlSurface,
-                        emptyMessage: state == nil
-                            ? "Recovered checkpoints remain visible here even without a live current brain."
-                            : "Evolution checkpoints will surface here after the current brain is loaded.",
-                        interactionMode: evolutionSurfaceContract.interactionMode,
-                        showCheckpointActionBar: evolutionSurfaceContract.showsCheckpointActionBarInSummary,
-                        showControlCenterShortcut: true,
-                        showHistoryShortcut: true,
+                        surfaceContract: evolutionSurfaceContract,
+                        emptyMessage: recoveryPresentation.emptyMessage,
+                        navigationOptions: checkpointNavigationOptions,
                         afterMutation: {
                             Task {
                                 await refreshSystemFlightDeck()
@@ -663,9 +691,8 @@ struct SelfPortraitView: View {
                             title: "Active checkpoint",
                             checkpoint: activePresentation,
                             controlSurface: controlSurface,
-                            interactionMode: evolutionSurfaceContract.interactionMode,
-                            showControlCenterShortcut: true,
-                            showHistoryShortcut: true,
+                            surfaceContract: evolutionSurfaceContract,
+                            navigationOptions: checkpointNavigationOptions,
                             afterMutation: {
                                 Task {
                                     await refreshSystemFlightDeck()
@@ -679,9 +706,8 @@ struct SelfPortraitView: View {
                             title: "Review head",
                             checkpoint: reviewPresentation,
                             controlSurface: controlSurface,
-                            interactionMode: evolutionSurfaceContract.interactionMode,
-                            showControlCenterShortcut: true,
-                            showHistoryShortcut: true,
+                            surfaceContract: evolutionSurfaceContract,
+                            navigationOptions: checkpointNavigationOptions,
                             afterMutation: {
                                 Task {
                                     await refreshSystemFlightDeck()
@@ -873,63 +899,28 @@ struct SelfPortraitView: View {
         }
     }
 
-    private enum EBrainSourceDescriptor {
-        case liveRuntime
-        case checkpointRecovery(detail: String)
-
-        var title: String {
-            switch self {
-            case .liveRuntime:
-                "Live runtime"
-            case .checkpointRecovery:
-                "Checkpoint recovery"
-            }
-        }
-
-        var detail: String {
-            switch self {
-            case .liveRuntime:
-                "Showing the active 13-layer turn synthesized from the current local runtime."
-            case .checkpointRecovery(let detail):
-                detail
-            }
-        }
-
-        var tint: Color {
-            switch self {
-            case .liveRuntime:
-                .mint
-            case .checkpointRecovery:
-                BeforeTheme.ember
-            }
-        }
-    }
-
-    private func sourceDescriptor(
-        for summary: DecisionSystemEBrainSummary
-    ) -> EBrainSourceDescriptor {
-        if summary.source == .persistedCheckpoint {
-            return .checkpointRecovery(
-                detail: "The flight deck is using recovered lineage from a persisted checkpoint because no live runtime turn is currently attached."
-            )
-        }
-
-        return .liveRuntime
-    }
-
     @ViewBuilder
-    private func sourceBadge(_ descriptor: EBrainSourceDescriptor) -> some View {
+    private func sourceBadge(_ descriptor: DecisionEvolutionSourceDescriptor) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(descriptor.title)
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(descriptor.tint)
+                .foregroundStyle(sourceTint(for: descriptor))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(descriptor.tint.opacity(0.12), in: Capsule())
+                .background(sourceTint(for: descriptor).opacity(0.12), in: Capsule())
 
             Text(descriptor.detail)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private func sourceTint(for descriptor: DecisionEvolutionSourceDescriptor) -> Color {
+        switch descriptor.kind {
+        case .liveRuntime:
+            .mint
+        case .checkpointRecovery:
+            BeforeTheme.ember
         }
     }
 
@@ -940,7 +931,7 @@ struct SelfPortraitView: View {
         systemFlightDeck = inspection.flightDeck
         substrateConsoleSnapshot = inspection.consoleSnapshot(currentBrainState: appModel.currentBrainState)
         substrateEBrainTurn = inspection.eBrainTurn
-        substrateReplayEntries = inspection.synchronizedExport.recentReplay
+        substrateReplayPresentations = await appModel.recentReplayDiagnosticsPresentations(limit: 3)
         isLoadingSystemFlightDeck = false
     }
 }

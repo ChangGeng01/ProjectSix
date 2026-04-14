@@ -16,6 +16,7 @@ final class BeforePreferencesStoreTests: XCTestCase {
 
     func testLoadReturnsDefaultWhenNothingSaved() {
         XCTAssertEqual(BeforePreferencesStore.load(), .default)
+        XCTAssertEqual(BeforePreferencesStore.load().preferredIntelligenceProvider, .foundationModels)
     }
 
     func testSaveAndLoadRoundTrip() {
@@ -26,7 +27,9 @@ final class BeforePreferencesStoreTests: XCTestCase {
             showReviewInsights: false,
             onDeviceIntelligenceMode: .off,
             preferredIntelligenceProvider: .foundationModels,
-            allowModelFallbacks: false
+            allowModelFallbacks: false,
+            preferredGemmaAssetID: "imported:gemma-4-E4B-it.litertlm",
+            preferredOpenModelAssetID: "imported:mistral-7b.gguf"
         )
 
         BeforePreferencesStore.save(preferences)
@@ -53,7 +56,9 @@ final class BeforePreferencesStoreTests: XCTestCase {
         XCTAssertEqual(loaded.restoreInProgressWorkspaces, false)
         XCTAssertEqual(loaded.showReviewInsights, true)
         XCTAssertEqual(loaded.onDeviceIntelligenceMode, .assistive)
-        XCTAssertEqual(loaded.preferredIntelligenceProvider, .gemmaE4B)
+        XCTAssertEqual(loaded.preferredIntelligenceProvider, .foundationModels)
         XCTAssertEqual(loaded.allowModelFallbacks, true)
+        XCTAssertNil(loaded.preferredGemmaAssetID)
+        XCTAssertNil(loaded.preferredOpenModelAssetID)
     }
 }

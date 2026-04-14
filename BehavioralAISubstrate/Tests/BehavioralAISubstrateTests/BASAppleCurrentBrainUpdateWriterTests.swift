@@ -7,7 +7,7 @@ import Testing
 @Suite("BASApple Current Brain Update Writer")
 struct BASAppleCurrentBrainUpdateWriterTests {
     @Model
-    final class UpdateFixture: BASAppleCurrentBrainUpdateEntity {
+    final class UpdateWriterFixture: BASAppleCurrentBrainUpdateEntity {
         @Attribute(.unique) var id: UUID
         var createdAt: Date
         var source: String
@@ -32,8 +32,8 @@ struct BASAppleCurrentBrainUpdateWriterTests {
             self.failureGuardIDs = fields.failureGuardIDs
         }
 
-        static func basMake(from fields: BASCurrentBrainUpdateStoredFields) -> UpdateFixture {
-            UpdateFixture(fields: fields)
+        static func basMake(from fields: BASCurrentBrainUpdateStoredFields) -> UpdateWriterFixture {
+            UpdateWriterFixture(fields: fields)
         }
 
         var basSnapshot: BASCurrentBrainUpdateStoredFields {
@@ -55,7 +55,7 @@ struct BASAppleCurrentBrainUpdateWriterTests {
     @Test("writer inserts updates and trims to the retention cap")
     func writerInsertsUpdatesAndTrimsToCap() throws {
         let container = try ModelContainer(
-            for: UpdateFixture.self,
+            for: UpdateWriterFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
@@ -79,10 +79,10 @@ struct BASAppleCurrentBrainUpdateWriterTests {
                 in: context,
                 maxEntries: 3,
                 retentionInterval: 60 * 60
-            ) as BASAppleCurrentBrainUpdateWriteResult<UpdateFixture>
+            ) as BASAppleCurrentBrainUpdateWriteResult<UpdateWriterFixture>
         }
 
-        let updates = try context.fetch(FetchDescriptor<UpdateFixture>())
+        let updates = try context.fetch(FetchDescriptor<UpdateWriterFixture>())
         let ordered = updates.map(\.basSnapshot)
             .sorted { lhs, rhs in
                 if lhs.createdAt == rhs.createdAt {

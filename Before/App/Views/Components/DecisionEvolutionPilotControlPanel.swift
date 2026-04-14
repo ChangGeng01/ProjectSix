@@ -6,12 +6,11 @@ struct DecisionEvolutionPilotControlPanel: View {
 
     let controlSurface: DecisionEvolutionControlSurface
     let releaseSummary: DecisionSystemReleaseControlSummary?
-    let interactionMode: DecisionEvolutionControlInteractionMode
+    let surfaceContract: DecisionEvolutionSurfaceContract
     let showsHeader: Bool
     let showEmbeddedReleaseSummary: Bool
-    let showHistoryShortcut: Bool
-    let showPortraitShortcut: Bool
-    let showControlCenterShortcut: Bool
+    let navigationOptions: DecisionEvolutionNavigationSurfaceOptions
+    let pilotSnapshot: DecisionEvolutionPilotControlSnapshot
     let afterMutation: (() -> Void)?
 
     private struct PendingMutation: Identifiable {
@@ -19,114 +18,37 @@ struct DecisionEvolutionPilotControlPanel: View {
         let intent: DecisionEvolutionMutationIntent
         let perform: () -> Void
     }
-
-    private struct GuidedAction {
-        let title: String
-        let detail: String
-        let actionTitle: String
-        let action: () -> Void
-    }
-
     init(
         controlSurface: DecisionEvolutionControlSurface,
         releaseSummary: DecisionSystemReleaseControlSummary? = nil,
-        interactionMode: DecisionEvolutionControlInteractionMode = .mutationHub,
+        surfaceContract: DecisionEvolutionSurfaceContract,
         showsHeader: Bool = true,
         showEmbeddedReleaseSummary: Bool = true,
-        showHistoryShortcut: Bool = false,
-        showPortraitShortcut: Bool = false,
-        showControlCenterShortcut: Bool = false,
+        navigationOptions: DecisionEvolutionNavigationSurfaceOptions? = nil,
         afterMutation: (() -> Void)? = nil
     ) {
         self.controlSurface = controlSurface
         self.releaseSummary = releaseSummary
-        self.interactionMode = interactionMode
+        self.surfaceContract = surfaceContract
         self.showsHeader = showsHeader
         self.showEmbeddedReleaseSummary = showEmbeddedReleaseSummary
-        self.showHistoryShortcut = showHistoryShortcut
-        self.showPortraitShortcut = showPortraitShortcut
-        self.showControlCenterShortcut = showControlCenterShortcut
+        let resolvedNavigationOptions = navigationOptions ?? surfaceContract.navigationSurfaceOptions()
+        self.navigationOptions = resolvedNavigationOptions
+        self.pilotSnapshot = DecisionEvolutionPilotControlSnapshot.build(
+            controlSurface: controlSurface,
+            releaseSummary: releaseSummary,
+            surfaceContract: surfaceContract,
+            navigationOptions: resolvedNavigationOptions
+        )
         self.afterMutation = afterMutation
     }
 
-    private var pendingReviewLineageCount: Int {
-        controlSurface.pendingReviewLineagePresentations.count
+    private var interactionMode: DecisionEvolutionControlInteractionMode {
+        pilotSnapshot.interactionMode
     }
 
-    private var pilotMutationIntents: [DecisionEvolutionMutationIntent] {
-        DecisionEvolutionMutationIntentFactory.pilotMutationIntents(
-            controlSurface: controlSurface
-        )
-    }
-
-    private var guidedAction: GuidedAction? {
-        guard let releaseSummary else { return nil }
-
-        if releaseSummary.pendingReviewCount > 0 {
-            if interactionMode.allowsMutations,
-               let intent = DecisionEvolutionMutationIntentFactory.approvePendingCheckpoints(
-                   controlSurface: controlSurface
-               ) {
-                return GuidedAction(
-                    title: "Pending review is the next blocker",
-                    detail: "Clear or approve the review queue before treating this release path as ready.",
-                    actionTitle: "Approve review queue",
-                    action: {
-                        pendingMutation = PendingMutation(intent: intent) {
-                            appModel.approvePendingEvolutionCheckpoints(
-                                checkpointIDs: intent.preview.targetCheckpointIDs
-                            )
-                            afterMutation?()
-                        }
-                    }
-                )
-            }
-
-            return GuidedAction(
-                title: "Pending review is the next blocker",
-                detail: interactionMode.allowsMutations
-                    ? "Open the checkpoint workspace and work the queue before widening rollout."
-                    : "This surface stays read-first. Open Evolution Control and work the queue there before widening rollout.",
-                actionTitle: navigationActionTitle,
-                action: navigateToBestControlSurface
-            )
-        }
-
-        if !releaseSummary.killSwitches.isEmpty {
-            return GuidedAction(
-                title: "Kill switches are holding the release path",
-                detail: "Inspect the active checkpoint and its guardrails before trying to widen rollout.",
-                actionTitle: navigationActionTitle,
-                action: navigateToBestControlSurface
-            )
-        }
-
-        if !releaseSummary.canRestoreActiveCheckpoint {
-            return GuidedAction(
-                title: "The active path is not restorable yet",
-                detail: "Open the control surface and recover a checkpoint with a valid brain-state snapshot.",
-                actionTitle: navigationActionTitle,
-                action: navigateToBestControlSurface
-            )
-        }
-
-        return nil
-    }
-
-    private var navigationActionTitle: String {
-        if showControlCenterShortcut {
-            return "Open control center"
-        }
-
-        if showHistoryShortcut {
-            return "Open History"
-        }
-
-        if showPortraitShortcut {
-            return "Open Portrait"
-        }
-
-        return "Open control surface"
+    private var allowsLocalMutationActions: Bool {
+        pilotSnapshot.allowsLocalMutationActions
     }
 
     var body: some View {
@@ -137,7 +59,7 @@ struct DecisionEvolutionPilotControlPanel: View {
                         Text("Evolution pilot controls")
                             .font(.headline)
                         Text(
-                            interactionMode.allowsMutations
+                            allowsLocalMutationActions
                                 ? "Work the review queue, restore the active checkpoint, and clear stale lineage from the dedicated mutation hub."
                                 : "See release blockers and queue state here, then jump into Evolution Control for checkpoint mutations."
                         )
@@ -158,101 +80,81 @@ struct DecisionEvolutionPilotControlPanel: View {
                     DecisionEvolutionReleaseSummaryView(
                         releaseSummary: releaseSummary,
                         controlSurface: controlSurface,
-                        presentationMode: interactionMode.allowsMutations ? .mutationHub : .surface
+                        surfaceContract: surfaceContract,
+                        presentationMode: allowsLocalMutationActions ? .mutationHub : .surface,
+                        navigationOptions: navigationOptions,
+                        afterMutation: afterMutation
                     )
                 } else {
                     HStack(spacing: 8) {
                         DecisionEvolutionSummaryBadge(
-                            title: "\(controlSurface.pendingReviewCount) PENDING",
-                            tint: controlSurface.pendingReviewCount > 0 ? .orange : .secondary
+                            title: "\(pilotSnapshot.pendingReviewCount) PENDING",
+                            tint: pilotSnapshot.pendingReviewCount > 0 ? .orange : .secondary
                         )
                         DecisionEvolutionSummaryBadge(
-                            title: "\(controlSurface.rollbackReadyCount) ROLLBACK READY",
-                            tint: controlSurface.rollbackReadyCount > 0 ? BeforeTheme.moss : .secondary
+                            title: "\(pilotSnapshot.rollbackReadyCount) ROLLBACK READY",
+                            tint: pilotSnapshot.rollbackReadyCount > 0 ? BeforeTheme.moss : .secondary
                         )
 
-                        if pendingReviewLineageCount > 0 {
+                        if pilotSnapshot.pendingReviewLineageCount > 0 {
                             DecisionEvolutionSummaryBadge(
-                                title: "\(pendingReviewLineageCount) LINEAGE-BACKED",
+                                title: "\(pilotSnapshot.pendingReviewLineageCount) LINEAGE-BACKED",
                                 tint: BeforeTheme.ember
                             )
                         }
                     }
                 }
 
-                DecisionEvolutionPilotImpactStripView(intents: pilotMutationIntents)
+                DecisionEvolutionPilotImpactStripView(intents: pilotSnapshot.mutationIntents)
 
-                if let guidedAction {
+                if let guidedAction = pilotSnapshot.guidedAction {
                     guidedActionCallout(guidedAction)
                 }
 
-                if !interactionMode.allowsMutations {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(interactionMode.operatorHeadline)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(BeforeTheme.ember)
-                        Text(interactionMode.operatorDetail)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
+                if !allowsLocalMutationActions {
+                    DecisionEvolutionOperatorActionFooterView(
+                        interactionMode: interactionMode,
+                        navigationOptions: navigationOptions,
+                        routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter,
+                        showsDetail: true,
+                        controlCenterStyle: .primary,
+                        adjacentShortcutStyle: .tertiary
+                    )
                 }
 
-                if pendingReviewLineageCount > 0, releaseSummary != nil {
-                    Text("\(pendingReviewLineageCount) pending checkpoints still carry recovered lineage.")
+                if pilotSnapshot.pendingReviewLineageCount > 0, releaseSummary != nil {
+                    Text("\(pilotSnapshot.pendingReviewLineageCount) pending checkpoints still carry recovered lineage.")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
 
-                if interactionMode.allowsMutations {
+                if allowsLocalMutationActions {
                     HStack(spacing: 10) {
                         BeforeActionButton(
                             "Restore active path",
                             style: .primary,
-                            isEnabled: controlSurface.activePresentation?.applyReady == true
+                            isEnabled: pilotSnapshot.restoreActiveIntent != nil && allowsLocalMutationActions
                         ) {
-                            guard let checkpointID = controlSurface.activePresentation?.checkpointID else { return }
-                            if let intent = DecisionEvolutionMutationIntentFactory.restoreActiveCheckpoint(
-                                controlSurface: controlSurface
-                            ) {
-                                pendingMutation = PendingMutation(intent: intent) {
-                                    appModel.applyEvolutionCheckpoint(checkpointID: checkpointID)
-                                    afterMutation?()
-                                }
-                            }
+                            guard let intent = pilotSnapshot.restoreActiveIntent else { return }
+                            presentMutation(intent)
                         }
 
                         BeforeActionButton(
                             "Rollback active path",
                             style: .secondary,
-                            isEnabled: controlSurface.canRollbackActiveCheckpoint
+                            isEnabled: pilotSnapshot.rollbackActiveIntent != nil && allowsLocalMutationActions
                         ) {
-                            if let intent = DecisionEvolutionMutationIntentFactory.rollbackActiveCheckpoint(
-                                controlSurface: controlSurface
-                            ) {
-                                pendingMutation = PendingMutation(intent: intent) {
-                                    appModel.rollbackActiveEvolutionCheckpoint(
-                                        to: intent.preview.targetCheckpointIDs.first
-                                    )
-                                    afterMutation?()
-                                }
-                            }
+                            guard let intent = pilotSnapshot.rollbackActiveIntent else { return }
+                            presentMutation(intent)
                         }
 
                         BeforeActionButton(
                             "Approve review queue",
                             style: .secondary,
-                            isEnabled: controlSurface.pendingReviewCount > 0
+                            isEnabled: pilotSnapshot.approveQueueIntent != nil && allowsLocalMutationActions
                         ) {
-                            if let intent = DecisionEvolutionMutationIntentFactory.approvePendingCheckpoints(
-                                controlSurface: controlSurface
-                            ) {
-                                pendingMutation = PendingMutation(intent: intent) {
-                                    appModel.approvePendingEvolutionCheckpoints(
-                                        checkpointIDs: intent.preview.targetCheckpointIDs
-                                    )
-                                    afterMutation?()
-                                }
-                            }
+                            guard let intent = pilotSnapshot.approveQueueIntent else { return }
+                            presentMutation(intent)
                         }
                     }
 
@@ -260,53 +162,32 @@ struct DecisionEvolutionPilotControlPanel: View {
                         BeforeActionButton(
                             "Clear queue lineage",
                             style: .secondary,
-                            isEnabled: pendingReviewLineageCount > 0
+                            isEnabled: pilotSnapshot.clearReviewLineageIntent != nil && allowsLocalMutationActions
                         ) {
-                            if let intent = DecisionEvolutionMutationIntentFactory.clearPendingReviewLineage(
-                                controlSurface: controlSurface
-                            ) {
-                                pendingMutation = PendingMutation(intent: intent) {
-                                    appModel.clearPendingEvolutionCheckpointLineages(
-                                        checkpointIDs: intent.preview.targetCheckpointIDs
-                                    )
-                                    afterMutation?()
-                                }
-                            }
+                            guard let intent = pilotSnapshot.clearReviewLineageIntent else { return }
+                            presentMutation(intent)
                         }
                     }
                 }
 
-                HStack(spacing: 10) {
-                    if showControlCenterShortcut {
-                        BeforeActionButton(
-                            interactionMode.allowsMutations ? "Control center" : "Open control center",
-                            style: interactionMode.allowsMutations ? .tertiary : .primary
-                        ) {
-                            appModel.presentEvolutionControlCenter()
-                        }
-                    }
-
-                    if showHistoryShortcut {
-                        BeforeActionButton("Open History", style: .tertiary) {
-                            appModel.selectedTab = .history
-                        }
-                    }
-
-                    if showPortraitShortcut {
-                        BeforeActionButton("Open Portrait", style: .tertiary) {
-                            appModel.selectedTab = .portrait
-                        }
-                    }
+                if allowsLocalMutationActions {
+                    DecisionEvolutionNavigationActionRow(
+                        navigationOptions: navigationOptions,
+                        routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter,
+                        controlCenterStyle: .tertiary,
+                        adjacentShortcutStyle: .tertiary
+                    )
                 }
 
-                if !controlSurface.reviewAuditFindings.isEmpty {
-                    Text("Review audit: \(controlSurface.reviewAuditFindings.joined(separator: " • "))")
+                if !pilotSnapshot.reviewAuditFindings.isEmpty {
+                    Text("Review audit: \(pilotSnapshot.reviewAuditFindings.joined(separator: " • "))")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
 
-                if !controlSurface.reviewKillSwitches.isEmpty {
-                    Text("Suggested kill switches: \(controlSurface.reviewKillSwitches.joined(separator: " • "))")
+                let recommendedKillSwitches = pilotSnapshot.recommendedKillSwitches
+                if !recommendedKillSwitches.isEmpty {
+                    Text("Suggested kill switches: \(recommendedKillSwitches.joined(separator: " • "))")
                         .font(.caption2)
                         .foregroundStyle(BeforeTheme.ember)
                 }
@@ -327,7 +208,7 @@ struct DecisionEvolutionPilotControlPanel: View {
     }
 
     @ViewBuilder
-    private func guidedActionCallout(_ guidedAction: GuidedAction) -> some View {
+    private func guidedActionCallout(_ guidedAction: DecisionEvolutionPilotGuidedAction) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Recommended next step")
                 .font(.caption.weight(.semibold))
@@ -342,7 +223,7 @@ struct DecisionEvolutionPilotControlPanel: View {
                 .foregroundStyle(.secondary)
 
             BeforeActionButton(guidedAction.actionTitle, style: .secondary) {
-                guidedAction.action()
+                runGuidedAction(guidedAction)
             }
         }
         .padding(12)
@@ -352,13 +233,39 @@ struct DecisionEvolutionPilotControlPanel: View {
         )
     }
 
-    private func navigateToBestControlSurface() {
-        if showControlCenterShortcut {
-            appModel.presentEvolutionControlCenter()
-        } else if showHistoryShortcut {
-            appModel.selectedTab = .history
-        } else if showPortraitShortcut {
-            appModel.selectedTab = .portrait
+    private func runGuidedAction(_ guidedAction: DecisionEvolutionPilotGuidedAction) {
+        switch guidedAction.route {
+        case let .mutation(intent):
+            presentMutation(intent)
+        case let .navigation(destination):
+            destination.perform(using: appModel)
+        }
+    }
+
+    private func presentMutation(_ intent: DecisionEvolutionMutationIntent) {
+        pendingMutation = PendingMutation(intent: intent) {
+            performMutation(intent)
+            afterMutation?()
+        }
+    }
+
+    private func performMutation(_ intent: DecisionEvolutionMutationIntent) {
+        switch intent.kind {
+        case .restoreActiveCheckpoint:
+            guard let checkpointID = intent.preview.targetCheckpointIDs.first else { return }
+            appModel.applyEvolutionCheckpoint(checkpointID: checkpointID)
+        case .rollbackActiveCheckpoint:
+            appModel.rollbackActiveEvolutionCheckpoint(to: intent.preview.targetCheckpointIDs.first)
+        case .approvePendingCheckpoints:
+            appModel.approvePendingEvolutionCheckpoints(
+                checkpointIDs: intent.preview.targetCheckpointIDs
+            )
+        case .clearPendingReviewLineage:
+            appModel.clearPendingEvolutionCheckpointLineages(
+                checkpointIDs: intent.preview.targetCheckpointIDs
+            )
+        default:
+            break
         }
     }
 

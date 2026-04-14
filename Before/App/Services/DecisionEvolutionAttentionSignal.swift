@@ -21,35 +21,37 @@ struct DecisionEvolutionAttentionSignal: Equatable, Sendable {
     }
 
     static func build(
-        controlSurface: DecisionEvolutionControlSurface
+        workspace: DecisionEvolutionWorkspaceSnapshot
     ) -> DecisionEvolutionAttentionSignal {
-        if !controlSurface.queueKillSwitches.isEmpty {
+        let facts = workspace.facts
+
+        if facts.hasRecommendedKillSwitches {
             return DecisionEvolutionAttentionSignal(
                 severity: .blocked,
                 badgeValue: "!",
                 headline: "Evolution is blocked by active kill switches",
                 detail: "Open Evolution Control to clear the blocked review path before release work continues.",
-                pendingReviewCount: controlSurface.pendingReviewCount,
-                killSwitches: controlSurface.queueKillSwitches,
-                rollbackReady: controlSurface.canRollbackActiveCheckpoint
+                pendingReviewCount: facts.pendingReviewCount,
+                killSwitches: facts.recommendedKillSwitches,
+                rollbackReady: facts.canRollbackActiveCheckpoint
             )
         }
 
-        if controlSurface.pendingReviewCount > 0 {
+        if facts.hasPendingReview {
             return DecisionEvolutionAttentionSignal(
                 severity: .review,
-                badgeValue: controlSurface.pendingReviewCount > 9
+                badgeValue: facts.pendingReviewCount > 9
                     ? "9+"
-                    : String(controlSurface.pendingReviewCount),
+                    : String(facts.pendingReviewCount),
                 headline: "Evolution review is waiting",
-                detail: "\(controlSurface.pendingReviewCount) checkpoint(s) still need review before the queue is clear.",
-                pendingReviewCount: controlSurface.pendingReviewCount,
+                detail: "\(facts.pendingReviewCount) checkpoint(s) still need review before the queue is clear.",
+                pendingReviewCount: facts.pendingReviewCount,
                 killSwitches: [],
-                rollbackReady: controlSurface.canRollbackActiveCheckpoint
+                rollbackReady: facts.canRollbackActiveCheckpoint
             )
         }
 
-        if controlSurface.canRollbackActiveCheckpoint {
+        if facts.canRollbackActiveCheckpoint {
             return DecisionEvolutionAttentionSignal(
                 severity: .rollbackWatch,
                 badgeValue: "↺",

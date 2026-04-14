@@ -39,6 +39,28 @@ final class DecisionIntelligenceCoordinatorTests: XCTestCase {
         XCTAssertEqual(assistive.mode, .mirror)
     }
 
+    func testRoutePromotesQuickPathWhenFastPathKillSwitchIsActive() {
+        let routed = DecisionIntelligenceCoordinator.route(
+            prompt: "Should I buy this tonight?",
+            preferences: assistivePreferences,
+            activeKillSwitches: [.disableFastPath]
+        )
+
+        XCTAssertEqual(routed.mode, DecisionMode.balance)
+        XCTAssertTrue(routed.reason.contains("disabled the quick path"))
+    }
+
+    func testRouteEscalatesIntoMirrorWhenGuardModeKillSwitchIsActive() {
+        let routed = DecisionIntelligenceCoordinator.route(
+            prompt: "Should I order this now?",
+            preferences: offPreferences,
+            activeKillSwitches: [.forceGuardMode]
+        )
+
+        XCTAssertEqual(routed.mode, DecisionMode.mirror)
+        XCTAssertTrue(routed.reason.contains("forced guarded routing"))
+    }
+
     func testAssistiveReminderSelectionCanPreferPromptMatchInsideRankedCandidates() {
         let reminders = [
             SelfReminder(

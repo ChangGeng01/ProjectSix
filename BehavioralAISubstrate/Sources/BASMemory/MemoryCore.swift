@@ -925,7 +925,10 @@ public enum BASEvolutionApprovalState: String, CaseIterable, Codable, Sendable {
     case reviewSuggested
 }
 
-public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable {
+public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.1.0"
+
+    public let schemaVersion: String
     public let recordedAt: Date
     public let sessionID: String
     public let taskType: String
@@ -934,8 +937,37 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable {
     public let hostGatePercent: Int
     public let thoughtFoldChecksum: String
     public let updateTicketSummaries: [String]
+    public let activeKillSwitches: [String]
     public let guardrailFindings: [String]
     public let recommendedKillSwitches: [String]
+
+    public init(
+        schemaVersion: String = BASEvolutionLineageSummary.currentSchemaVersion,
+        recordedAt: Date,
+        sessionID: String,
+        taskType: String,
+        riskLevel: String,
+        permitMode: String,
+        hostGatePercent: Int,
+        thoughtFoldChecksum: String,
+        updateTicketSummaries: [String],
+        activeKillSwitches: [String] = [],
+        guardrailFindings: [String],
+        recommendedKillSwitches: [String]
+    ) {
+        self.schemaVersion = schemaVersion
+        self.recordedAt = recordedAt
+        self.sessionID = sessionID
+        self.taskType = taskType
+        self.riskLevel = riskLevel
+        self.permitMode = permitMode
+        self.hostGatePercent = hostGatePercent
+        self.thoughtFoldChecksum = thoughtFoldChecksum
+        self.updateTicketSummaries = updateTicketSummaries
+        self.activeKillSwitches = activeKillSwitches
+        self.guardrailFindings = guardrailFindings
+        self.recommendedKillSwitches = recommendedKillSwitches
+    }
 
     public init(
         recordedAt: Date,
@@ -949,16 +981,67 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable {
         guardrailFindings: [String],
         recommendedKillSwitches: [String]
     ) {
-        self.recordedAt = recordedAt
-        self.sessionID = sessionID
-        self.taskType = taskType
-        self.riskLevel = riskLevel
-        self.permitMode = permitMode
-        self.hostGatePercent = hostGatePercent
-        self.thoughtFoldChecksum = thoughtFoldChecksum
-        self.updateTicketSummaries = updateTicketSummaries
-        self.guardrailFindings = guardrailFindings
-        self.recommendedKillSwitches = recommendedKillSwitches
+        self.init(
+            recordedAt: recordedAt,
+            sessionID: sessionID,
+            taskType: taskType,
+            riskLevel: riskLevel,
+            permitMode: permitMode,
+            hostGatePercent: hostGatePercent,
+            thoughtFoldChecksum: thoughtFoldChecksum,
+            updateTicketSummaries: updateTicketSummaries,
+            activeKillSwitches: [],
+            guardrailFindings: guardrailFindings,
+            recommendedKillSwitches: recommendedKillSwitches
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case recordedAt
+        case sessionID
+        case taskType
+        case riskLevel
+        case permitMode
+        case hostGatePercent
+        case thoughtFoldChecksum
+        case updateTicketSummaries
+        case activeKillSwitches
+        case guardrailFindings
+        case recommendedKillSwitches
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decodeIfPresent(String.self, forKey: .schemaVersion)
+            ?? BASEvolutionLineageSummary.currentSchemaVersion
+        recordedAt = try container.decode(Date.self, forKey: .recordedAt)
+        sessionID = try container.decode(String.self, forKey: .sessionID)
+        taskType = try container.decode(String.self, forKey: .taskType)
+        riskLevel = try container.decode(String.self, forKey: .riskLevel)
+        permitMode = try container.decode(String.self, forKey: .permitMode)
+        hostGatePercent = try container.decode(Int.self, forKey: .hostGatePercent)
+        thoughtFoldChecksum = try container.decode(String.self, forKey: .thoughtFoldChecksum)
+        updateTicketSummaries = try container.decode([String].self, forKey: .updateTicketSummaries)
+        activeKillSwitches = try container.decodeIfPresent([String].self, forKey: .activeKillSwitches) ?? []
+        guardrailFindings = try container.decode([String].self, forKey: .guardrailFindings)
+        recommendedKillSwitches = try container.decode([String].self, forKey: .recommendedKillSwitches)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(recordedAt, forKey: .recordedAt)
+        try container.encode(sessionID, forKey: .sessionID)
+        try container.encode(taskType, forKey: .taskType)
+        try container.encode(riskLevel, forKey: .riskLevel)
+        try container.encode(permitMode, forKey: .permitMode)
+        try container.encode(hostGatePercent, forKey: .hostGatePercent)
+        try container.encode(thoughtFoldChecksum, forKey: .thoughtFoldChecksum)
+        try container.encode(updateTicketSummaries, forKey: .updateTicketSummaries)
+        try container.encode(activeKillSwitches, forKey: .activeKillSwitches)
+        try container.encode(guardrailFindings, forKey: .guardrailFindings)
+        try container.encode(recommendedKillSwitches, forKey: .recommendedKillSwitches)
     }
 }
 

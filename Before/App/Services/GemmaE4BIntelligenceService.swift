@@ -7,6 +7,10 @@ struct GemmaModelBundleStatus: Equatable, Sendable {
 }
 
 enum GemmaE4BIntelligenceService {
+    private static var storedPreferredAssetID: String? {
+        BeforePreferencesStore.load().preferredGemmaAssetID
+    }
+
     static var availabilityStatus: DecisionModelProviderStatus {
         providerStatus()
     }
@@ -19,8 +23,20 @@ enum GemmaE4BIntelligenceService {
         runtimeStatus()
     }
 
+    static var preferredModel: GemmaModelAsset? {
+        preferredModel(preferredAssetID: storedPreferredAssetID)
+    }
+
     static var bundledModel: GemmaModelAsset? {
-        GemmaModelAssetCatalog.preferredAsset()
+        GemmaModelAssetCatalog.bundledAssets().first
+    }
+
+    static var importedModels: [GemmaModelAsset] {
+        GemmaModelAssetCatalog.importedAssets()
+    }
+
+    static func preferredModel(preferredAssetID: String?) -> GemmaModelAsset? {
+        GemmaModelAssetCatalog.preferredAsset(preferredAssetID: preferredAssetID)
     }
 
     static func backendResolution(
@@ -30,12 +46,12 @@ enum GemmaE4BIntelligenceService {
         InferenceBackendResolver.resolve(policy: policy, device: device)
     }
 
-    static func bundleStatus(asset: GemmaModelAsset? = bundledModel) -> GemmaModelBundleStatus {
+    static func bundleStatus(asset: GemmaModelAsset? = preferredModel) -> GemmaModelBundleStatus {
         guard let asset else {
             return GemmaModelBundleStatus(
                 isReady: false,
                 title: "Missing",
-                detail: "No bundled Gemma model was found. Add a .litertlm file under Before/Resources/Models to prepare this build for Gemma."
+                detail: "No local Gemma model was found. Import a previously-downloaded .litertlm file or bundle one under Before/Resources/Models."
             )
         }
 
@@ -45,14 +61,14 @@ enum GemmaE4BIntelligenceService {
             return GemmaModelBundleStatus(
                 isReady: false,
                 title: "Incomplete",
-                detail: "Found \(asset.fileName) at \(asset.displaySize)\(expected)\(progress), but the model asset is still downloading or incomplete."
+                detail: "Found \(asset.sourceTitle.lowercased()) model \(asset.fileName) at \(asset.displaySize)\(expected)\(progress), but the asset is still downloading or incomplete."
             )
         }
 
         return GemmaModelBundleStatus(
             isReady: true,
             title: "Ready",
-            detail: "Found \(asset.fileName) (\(asset.displaySize)) in the app bundle. The model file is complete and ready for a local runtime bridge."
+            detail: "Using \(asset.sourceTitle.lowercased()) model \(asset.fileName) (\(asset.displaySize)). The model file is complete and ready for the local Gemma runtime."
         )
     }
 
@@ -63,7 +79,7 @@ enum GemmaE4BIntelligenceService {
     }
 
     static func providerStatus(
-        asset: GemmaModelAsset? = bundledModel,
+        asset: GemmaModelAsset? = preferredModel,
         runtime: any GemmaLocalRuntimeBridging = GemmaLocalRuntimeBridge.shared
     ) -> DecisionModelProviderStatus {
         let bundleStatus = bundleStatus(asset: asset)

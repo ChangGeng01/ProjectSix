@@ -8,7 +8,7 @@ import Testing
 @Suite("BASApple Current Brain Committer")
 struct BASAppleCurrentBrainCommitterTests {
     @Model
-    final class UpdateFixture: BASAppleCurrentBrainUpdateEntity {
+    final class CommitterUpdateFixture: BASAppleCurrentBrainUpdateEntity {
         @Attribute(.unique) var id: UUID
         var createdAt: Date
         var source: String
@@ -33,8 +33,8 @@ struct BASAppleCurrentBrainCommitterTests {
             self.failureGuardIDs = fields.failureGuardIDs
         }
 
-        static func basMake(from fields: BASCurrentBrainUpdateStoredFields) -> UpdateFixture {
-            UpdateFixture(fields: fields)
+        static func basMake(from fields: BASCurrentBrainUpdateStoredFields) -> CommitterUpdateFixture {
+            CommitterUpdateFixture(fields: fields)
         }
 
         var basSnapshot: BASCurrentBrainUpdateStoredFields {
@@ -54,7 +54,7 @@ struct BASAppleCurrentBrainCommitterTests {
     }
 
     @Model
-    final class CheckpointFixture: BASAppleEvolutionCheckpointEntity {
+    final class CommitterCheckpointFixture: BASAppleEvolutionCheckpointEntity {
         @Attribute(.unique) var id: String
         var createdAt: Date
         var fingerprint: String
@@ -83,8 +83,8 @@ struct BASAppleCurrentBrainCommitterTests {
             self.rollbackReady = fields.rollbackReady
         }
 
-        static func basMake(from fields: BASEvolutionCheckpointStoredFields) -> CheckpointFixture {
-            CheckpointFixture(fields: fields)
+        static func basMake(from fields: BASEvolutionCheckpointStoredFields) -> CommitterCheckpointFixture {
+            CommitterCheckpointFixture(fields: fields)
         }
 
         var basSnapshot: BASEvolutionCheckpointStoredFields {
@@ -108,8 +108,8 @@ struct BASAppleCurrentBrainCommitterTests {
     @Test("committer records checkpoint state and persists brain updates in one package-owned flow")
     func committerRecordsCheckpointAndUpdate() throws {
         let container = try ModelContainer(
-            for: UpdateFixture.self,
-            CheckpointFixture.self,
+            for: CommitterUpdateFixture.self,
+            CommitterCheckpointFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
@@ -149,7 +149,7 @@ struct BASAppleCurrentBrainCommitterTests {
             )
         )
 
-        let result: BASAppleCurrentBrainCommitWriteResult<UpdateFixture, CheckpointFixture> =
+        let result: BASAppleCurrentBrainCommitWriteResult<CommitterUpdateFixture, CommitterCheckpointFixture> =
             BASAppleCurrentBrainCommitter.commit(
                 modeName: "primary",
                 sourceID: "notification",

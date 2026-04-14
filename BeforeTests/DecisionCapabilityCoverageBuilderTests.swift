@@ -188,6 +188,33 @@ struct DecisionCapabilityCoverageBuilderTests {
     }
 
     @Test
+    func evolutionRuntimeFactsStayAlignedWithLegacyExportAccessors() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        seedHistory(into: context)
+        try context.save()
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: DecisionMemorySystem.fetchCheckEvents(in: context),
+            balance: DecisionMemorySystem.fetchBalanceRecords(in: context),
+            mirror: DecisionMemorySystem.fetchMirrorRecords(in: context),
+            preferences: .default
+        )
+
+        let runtimeFacts = export.evolutionRuntimeFacts(currentBrainState: nil)
+
+        #expect(runtimeFacts.effectiveEBrainSummary == export.effectiveEBrainSummary)
+        #expect(runtimeFacts.effectiveEBrainSource == export.effectiveEBrainSource)
+        #expect(runtimeFacts.effectiveEBrainFactsBundle == export.effectiveEBrainFactsBundle)
+        #expect(runtimeFacts.thoughtFoldChecksum == export.thoughtFoldChecksum)
+        #expect(runtimeFacts.updateTicketSummaries == export.updateTicketSummaries)
+        #expect(runtimeFacts.runtimeAuditFindings == export.runtimeAuditFindings)
+        #expect(runtimeFacts.effectiveActiveKillSwitches == export.effectiveActiveKillSwitches)
+        #expect(runtimeFacts.recommendedKillSwitches == export.recommendedKillSwitches)
+        #expect(runtimeFacts.coverageFacts == export.evolutionCoverageFacts(currentBrainState: nil))
+    }
+
+    @Test
     func evolutionFactsDoNotTreatReviewHeadAsRecoveredCheckpointWithoutActivePath() async throws {
         let container = try makeContainer()
         let context = container.mainContext

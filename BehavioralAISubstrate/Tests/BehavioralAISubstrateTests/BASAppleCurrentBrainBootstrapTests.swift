@@ -9,7 +9,7 @@ import Testing
 @Suite("BASApple Current Brain Bootstrap")
 struct BASAppleCurrentBrainBootstrapTests {
     @Model
-    final class UpdateFixture: BASAppleCurrentBrainUpdateEntity {
+    final class BootstrapUpdateFixture: BASAppleCurrentBrainUpdateEntity {
         @Attribute(.unique) var id: UUID
         var createdAt: Date
         var source: String
@@ -34,8 +34,8 @@ struct BASAppleCurrentBrainBootstrapTests {
             self.failureGuardIDs = fields.failureGuardIDs
         }
 
-        static func basMake(from fields: BASCurrentBrainUpdateStoredFields) -> UpdateFixture {
-            UpdateFixture(fields: fields)
+        static func basMake(from fields: BASCurrentBrainUpdateStoredFields) -> BootstrapUpdateFixture {
+            BootstrapUpdateFixture(fields: fields)
         }
 
         var basSnapshot: BASCurrentBrainUpdateStoredFields {
@@ -55,7 +55,7 @@ struct BASAppleCurrentBrainBootstrapTests {
     }
 
     @Model
-    final class CheckpointFixture: BASAppleEvolutionCheckpointEntity {
+    final class BootstrapCheckpointFixture: BASAppleEvolutionCheckpointEntity {
         @Attribute(.unique) var id: String
         var createdAt: Date
         var fingerprint: String
@@ -84,8 +84,8 @@ struct BASAppleCurrentBrainBootstrapTests {
             self.rollbackReady = fields.rollbackReady
         }
 
-        static func basMake(from fields: BASEvolutionCheckpointStoredFields) -> CheckpointFixture {
-            CheckpointFixture(fields: fields)
+        static func basMake(from fields: BASEvolutionCheckpointStoredFields) -> BootstrapCheckpointFixture {
+            BootstrapCheckpointFixture(fields: fields)
         }
 
         var basSnapshot: BASEvolutionCheckpointStoredFields {
@@ -298,13 +298,13 @@ struct BASAppleCurrentBrainBootstrapTests {
     func runtimeCoordinatorBootstrapsAndCommits() throws {
         let now = Date(timeIntervalSince1970: 1_744_322_220)
         let container = try ModelContainer(
-            for: UpdateFixture.self,
-            CheckpointFixture.self,
+            for: BootstrapUpdateFixture.self,
+            BootstrapCheckpointFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
 
-        let result: BASAppleCurrentBrainBootstrapCommitResult<UpdateFixture, CheckpointFixture> =
+        let result: BASAppleCurrentBrainBootstrapCommitResult<BootstrapUpdateFixture, BootstrapCheckpointFixture> =
             try BASAppleCurrentBrainRuntimeCoordinator.bootstrapAndCommit(
                 context: BASAppleCurrentBrainBootstrapHostBuildContext(
                     modeID: BASDecisionMode.primary.rawValue,
@@ -391,13 +391,13 @@ struct BASAppleCurrentBrainBootstrapTests {
     func bridgeBuilderBootstrapsAndCommitsRawHostOutput() throws {
         let now = Date(timeIntervalSince1970: 1_744_322_260)
         let container = try ModelContainer(
-            for: UpdateFixture.self,
-            CheckpointFixture.self,
+            for: BootstrapUpdateFixture.self,
+            BootstrapCheckpointFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
 
-        let result: BASAppleCurrentBrainBootstrapBridgeResult<UpdateFixture, CheckpointFixture> =
+        let result: BASAppleCurrentBrainBootstrapBridgeResult<BootstrapUpdateFixture, BootstrapCheckpointFixture> =
             try BASAppleCurrentBrainBootstrapBridgeBuilder.bootstrapAndCommit(
                 input: BASAppleCurrentBrainBootstrapBridgeInput(
                     modeID: BASDecisionMode.primary.rawValue,
@@ -481,14 +481,14 @@ struct BASAppleCurrentBrainBootstrapTests {
     func lifecycleExecutorBootstrapsAndCommitsCurrentBrainLifecycle() throws {
         let now = Date(timeIntervalSince1970: 1_744_322_300)
         let container = try ModelContainer(
-            for: UpdateFixture.self,
-            CheckpointFixture.self,
+            for: BootstrapUpdateFixture.self,
+            BootstrapCheckpointFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
         var preparedLifecycleState = false
 
-        let result: BASAppleCurrentBrainLifecycleResult<UpdateFixture, CheckpointFixture> =
+        let result: BASAppleCurrentBrainLifecycleResult<BootstrapUpdateFixture, BootstrapCheckpointFixture> =
             try BASAppleCurrentBrainLifecycleExecutor.bootstrapAndCommit(
                 input: BASAppleCurrentBrainBootstrapBridgeInput(
                     modeID: BASDecisionMode.primary.rawValue,

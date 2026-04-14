@@ -70,6 +70,69 @@ struct DecisionTestingInterfaceTests {
     }
 
     @Test
+    func runtimeSnapshotIncludesOpenModelStatusAndRegisteredProviders() {
+        let snapshot = DecisionTestingInterface.runtimeSnapshot(
+            preferences: .default,
+            environment: [:]
+        )
+
+        #expect(snapshot.openModelProviderStatus.kind == .openModel)
+        #expect(snapshot.openModelProviderStatus.title == "Waiting for import")
+        #expect(snapshot.openModelProviderStatus.detail.contains("Import or download a compatible local model"))
+        #expect(snapshot.openModelRuntimeStatus == nil)
+        #expect(snapshot.registeredProviders.contains(where: { $0.kind == .foundationModels }))
+        #expect(snapshot.registeredProviders.contains(where: { $0.kind == .gemmaE4B }))
+        #expect(snapshot.registeredProviders.contains(where: { $0.kind == .openModel }))
+        #expect(snapshot.localModelLibrary.openModelSlot?.stableID != nil)
+        #expect(snapshot.localModelLibrary.openModelRuntimeStatus == nil)
+        #expect(snapshot.localModelLibrary.preferredProvider == .foundationModels)
+    }
+
+    @Test
+    func runtimeSnapshotAndExportReflectImportedPreferredOpenModelAsset() async throws {
+        let sourceURL = try makeTemporaryOpenModelFile(named: "mistral-\(UUID().uuidString).gguf")
+        let imported = try OpenModelAssetCatalog.importModel(from: sourceURL)
+        defer { try? OpenModelAssetCatalog.removeImportedModel(named: imported.fileName) }
+
+        var preferences = BeforePreferences.default
+        preferences.preferredOpenModelAssetID = imported.assetID
+
+        let snapshot = DecisionTestingInterface.runtimeSnapshot(
+            preferences: preferences,
+            environment: [:]
+        )
+
+        #expect(snapshot.localModelLibrary.preferredOpenModelAsset?.assetID == imported.assetID)
+        #expect(snapshot.openModelRuntimeStatus?.mode == .heuristicPreview)
+        #expect(snapshot.localModelLibrary.openModelRuntimeAssetFileName == imported.fileName)
+        #expect(snapshot.openModelProviderStatus.detail.contains("local heuristic adapter"))
+        #expect(snapshot.registeredProviders.contains(where: {
+            $0.kind == .openModel &&
+            $0.openModel?.stableID == imported.generatedStableID &&
+            $0.detail.contains("local heuristic adapter")
+        }))
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: preferences,
+            sessionEngineSnapshot: nil,
+            debugStore: DecisionIntelligenceDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        #expect(export.runtimeSnapshot.localModelLibrary.preferredOpenModelAsset?.assetID == imported.assetID)
+        #expect(export.runtimeSnapshot.openModelProviderStatus.detail.contains("local heuristic adapter"))
+        #expect(export.runtimeSnapshot.openModelRuntimeStatus?.title == "Heuristic preview")
+        #expect(export.flightDeck.localModelLibrarySummary?.openModelRuntimeTitle == "Heuristic preview")
+        #expect(export.flightDeck.localModelLibrarySummary?.openModelRuntimeAssetFileName == imported.fileName)
+        #expect(export.flightDeck.localModelLibrarySummary?.signals.contains(where: { $0.contains(imported.fileName) }) == true)
+    }
+
+    @Test
     func runtimeSnapshotIncludesPersistedTaskGraph() {
         let session = QuickCheckSession(entrySource: .app, initialNote: "Do I buy this?")
         session.scenario = .buy
@@ -547,7 +610,7 @@ struct DecisionTestingInterfaceTests {
             circuitBreaker: breaker
         )
 
-        #expect(export.runtimeSnapshot.runtimeStatus.preferred == .gemmaE4B)
+        #expect(export.runtimeSnapshot.runtimeStatus.preferred == .foundationModels)
         #expect(export.intelligenceTelemetry.totalRequests == 1)
         #expect(export.cacheTelemetry.storeCountByKind[.quick] == 1)
         #expect(export.summary.totalCacheRejectedStores == 0)
@@ -770,6 +833,88 @@ struct DecisionTestingInterfaceTests {
     }
 
     @Test
+    func runtimeExportAttachesSessionEngineSnapshotToFlightDeck() async {
+        let sessionEngineSnapshot = DecisionSessionRuntimeSnapshot(
+            layerPlacement: .foldedLung,
+            sessions: 2,
+            activeSessions: 1,
+            stalledSessions: 1,
+            mergeReadySessions: 1,
+            mergeableBranches: 1,
+            branches: 3,
+            checkpoints: 5,
+            events: 34,
+            steps: 4,
+            recentSessions: [
+                DecisionSessionRuntimeInspectionSession(
+                    sessionID: "sess-inspection",
+                    title: "parser repair",
+                    status: .active,
+                    updatedAt: date("2026-04-14T09:40:00Z"),
+                    headBranchID: "branch-recovery",
+                    latestCheckpointID: "ckpt-42",
+                    latestCheckpointSeq: 28,
+                    latestCheckpointGoal: "repair parser",
+                    latestCheckpointBudgetLine: "eBrain budget: engage • loops 2 • candidates 2 • decode 192",
+                    latestCheckpointRouteLine: "eBrain route: npu • precision mixed • retrieval 3",
+                    latestCheckpointDecisionLine: "eBrain risk: guarded • eBrain permit: replace • eBrain host gate: 61% • eBrain fold: fold42abc",
+                    latestCheckpointTaskLine: "Review update ticket: preserve parser-only correction",
+                    latestEventID: "evt-201",
+                    latestEventSeq: 29,
+                    latestEventType: .sessionRecovered,
+                    latestEventDetail: "Recovered from checkpoint ckpt-42",
+                    openStepCount: 0,
+                    openStepStatus: nil,
+                    stalledStepCount: 0,
+                    branchCount: 2,
+                    mergeableBranchCount: 1,
+                    recoveryCount: 1,
+                    latestRecoveryAt: date("2026-04-14T09:39:00Z")
+                )
+            ]
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            sessionEngineSnapshot: sessionEngineSnapshot,
+            debugStore: DecisionIntelligenceDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        let runtimeReport = export.flightDeck.layerReports.first(where: { $0.layer == .runtime })
+        let dataReport = export.flightDeck.layerReports.first(where: { $0.layer == .data })
+        let deliveryReport = export.flightDeck.layerReports.first(where: { $0.layer == .delivery })
+
+        #expect(export.sessionEngineSnapshot == sessionEngineSnapshot)
+        #expect(export.flightDeck.sessionEngineSummary?.layerPlacement == .foldedLung)
+        #expect(export.flightDeck.sessionEngineSummary?.sessions == 2)
+        #expect(export.flightDeck.sessionEngineSummary?.mergeReadySessions == 1)
+        #expect(export.flightDeck.sessionEngineSummary?.mergeableBranches == 1)
+        #expect(export.flightDeck.sessionEngineSummary?.activeSession?.title == "parser repair")
+        #expect(export.flightDeck.localModelLibrarySummary?.preferredProvider == .foundationModels)
+        #expect(export.flightDeck.localModelLibrarySummary?.openModelSlotStableID != nil)
+        #expect(runtimeReport?.signals.contains(where: { $0.contains("Session Engine L3.folded_lung") }) == true)
+        #expect(runtimeReport?.signals.contains(where: { $0.contains("Local model library") }) == true)
+        #expect(dataReport?.signals.contains(where: { $0.contains("Branches 3") && $0.contains("Merge-ready branches 1") }) == true)
+        #expect(dataReport?.signals.contains(where: { $0.contains("parser repair") && $0.contains("Checkpoint ckpt-42") }) == true)
+        #expect(dataReport?.signals.contains(where: { $0.contains("parser repair") && $0.contains("eBrain budget: engage") && $0.contains("eBrain route: npu") }) == true)
+        #expect(dataReport?.signals.contains(where: { $0.contains("parser repair") && $0.contains("eBrain risk: guarded") && $0.contains("Review update ticket: preserve parser-only correction") }) == true)
+        #expect(dataReport?.signals.contains(where: { $0.contains("Merge review 1") }) == true)
+        #expect(dataReport?.signals.contains(where: { $0.contains("Merge review queue") && $0.contains("Merge-ready branches 1") }) == true)
+        #expect(dataReport?.signals.contains(where: { $0.contains("Replay anchor ready") && $0.contains("Checkpoint ckpt-42") }) == true)
+        #expect(dataReport?.signals.contains(where: { $0.contains("Checkpoint recovery") && $0.contains("Replay session sess-inspection") }) == true)
+        #expect(dataReport?.signals.contains(where: { $0.contains("Gemma assets") || $0.contains("No local Gemma asset") }) == true)
+        #expect(deliveryReport?.signals.contains(where: { $0.contains("Open-model slot") }) == true)
+        #expect(export.summary.localModelPreferredProvider == .foundationModels)
+        #expect(export.summary.localModelOpenModelSlotStableID != nil)
+    }
+
+    @Test
     func runtimeExportFallsBackToPersistedCheckpointLineageWhenEBrainStoreIsEmpty() async throws {
         let container = try makePersistenceContainer()
         let context = container.mainContext
@@ -896,9 +1041,54 @@ struct DecisionTestingInterfaceTests {
         #expect(export.flightDeck.eBrainSummary?.checkpointID == "checkpoint-quick")
         #expect(export.flightDeck.eBrainSummary?.checkpointApprovalState == "automatic")
         #expect(export.flightDeck.eBrainSummary?.checkpointApplyReady == false)
+        #expect(export.effectiveEBrainFactsBundle?.summaryLine.contains("Checkpoint recovery") == true)
+        #expect(export.effectiveEBrainFactsBundle?.taskLine == "Review: Hold before sending")
         #expect(export.runtimeAuditFindings == ["Guardrail matched"])
         #expect(export.recommendedKillSwitches == ["host-write"])
         #expect(export.thoughtFoldChecksum == "fold-checksum")
+        #expect(export.flightDeck.layerReports.first(where: { $0.layer == .data })?.signals.contains(where: {
+            $0.contains("Review: Hold before sending")
+        }) == true)
+    }
+
+    @Test
+    func runtimeExportCarriesPendingSessionEngineImportPreviewIntoFlightDeck() async {
+        let pendingImport = DecisionSessionEnginePendingImportPreview(
+            sourceFileName: "parser-session.json",
+            preview: DecisionSessionImportBundlePreview(
+                id: "preview-1",
+                sourceSessionId: "sess-exported",
+                sourceTitle: "Parser repair",
+                importedTitle: "Parser repair (Imported)",
+                exportedAt: date("2026-04-14T09:45:00Z"),
+                countsLine: "Branches 2 • Checkpoints 3 • Events 12 • Steps 1",
+                integrityLine: "Validated schema v1 • fingerprint abcdef123456",
+                checkpointLine: "Latest checkpoint ckpt-7 • repair parser",
+                branchLine: "Head main • Layer folded_lung",
+                unfinishedStepsLine: "Open steps 1 • unfinished work will import as failed recovery facts.",
+                headline: "Importing creates a new paused recovery-safe session.",
+                branchPreviews: []
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            pendingSessionEngineImportPreview: pendingImport,
+            debugStore: DecisionIntelligenceDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        #expect(export.pendingSessionEngineImportPreview == pendingImport)
+        #expect(export.flightDeck.sessionEngineSummary?.pendingImportPreview?.bundleLine == "Bundle parser-session.json")
+        #expect(export.flightDeck.sessionEngineSummary?.pendingImportPreview?.unfinishedWorkSummary.title == "Open work will be normalized")
+        #expect(export.flightDeck.layerReports.first(where: { $0.layer == .runtime })?.signals.contains(where: {
+            $0.contains("Pending import") && $0.contains("parser-session.json")
+        }) == true)
     }
 
     @Test
@@ -1538,7 +1728,7 @@ struct DecisionTestingInterfaceTests {
     }
 
     @Test
-    func runtimeExportFlightDeckReleaseSummaryBlocksWhenKillSwitchesRemainActive() async throws {
+    func runtimeExportFlightDeckReleaseSummaryWatchesRecommendedKillSwitchesWithoutTreatingThemAsActivePolicy() async throws {
         let active = DecisionEvolutionLineageSnapshot(
             checkpointID: "checkpoint-active-blocked",
             previousCheckpointID: "checkpoint-active-prior",
@@ -1577,7 +1767,9 @@ struct DecisionTestingInterfaceTests {
             circuitBreaker: DecisionIntelligenceCircuitBreaker()
         )
 
-        #expect(export.flightDeck.releaseControlSummary.state == .blocked)
+        #expect(export.flightDeck.releaseControlSummary.state == .watch)
+        #expect(export.flightDeck.releaseControlSummary.activeKillSwitches.isEmpty)
+        #expect(export.flightDeck.releaseControlSummary.recommendedKillSwitches == ["disableHighRiskAutoAction"])
         #expect(export.flightDeck.releaseControlSummary.killSwitches == ["disableHighRiskAutoAction"])
     }
 
@@ -1667,6 +1859,103 @@ struct DecisionTestingInterfaceTests {
         #expect(facts.recoveredAuditFindingCount == surface.activeCheckpoint?.auditFindings.count)
         #expect(facts.recoveredTicketCount == surface.activeCheckpoint?.updateTicketSummaries.count)
         #expect(directReport == convenienceReport)
+    }
+
+    @Test
+    func runtimeExportEvolutionCoverageFactsPreferCurrentBrainAutomaticCheckpoint() async throws {
+        let recoveredActive = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-recovered-active",
+            createdAt: date("2026-04-10T19:00:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            diffSummary: ["Recovered active checkpoint"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T19:00:00.000Z"),
+                    sessionID: "before.quick.recovered-active",
+                    taskType: "summary",
+                    riskLevel: "medium",
+                    permitMode: "compare",
+                    hostGatePercent: 57,
+                    thoughtFoldChecksum: "fold-recovered-active",
+                    updateTicketSummaries: ["checkpoint recovery"],
+                    guardrailFindings: ["Recovered active guardrail"],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            traceLimit: 0,
+            persistedCheckpointLineages: [recoveredActive],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        var brainState = DecisionBrainState(
+            profileCore: ["Stay reflective."],
+            activeGoals: ["Slow the decision down."],
+            relevantMemories: ["Reflection benefits from a pause."],
+            sessionBiases: ["Prefer delay over haste."],
+            retrievalTags: ["reflection"],
+            reactionWeights: .defaults(for: .mirror),
+            loadedAt: date("2026-04-10T21:20:00.000Z")
+        )
+        brainState.evolutionState = DecisionEvolutionState(
+            latestCheckpoint: DecisionEvolutionCheckpointSummary(
+                id: "checkpoint-current-brain-automatic",
+                previousCheckpointID: nil,
+                createdAt: date("2026-04-10T21:20:00.000Z"),
+                diffSummary: ["Current brain automatic checkpoint"],
+                rollbackReady: false,
+                approvalState: .automatic,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T21:20:00.000Z"),
+                    sessionID: "before.mirror.current-brain",
+                    taskType: "reflection",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 84,
+                    thoughtFoldChecksum: "fold-current-brain",
+                    updateTicketSummaries: ["current brain recovery"],
+                    guardrailFindings: ["Current brain guardrail"],
+                    recommendedKillSwitches: []
+                )
+            ),
+            checkpointCount: 1,
+            rollbackReady: false,
+            pendingReviewCount: 0,
+            recentDiffSummary: ["Current brain automatic checkpoint"]
+        )
+        let currentBrainState = CurrentBrainState(
+            source: .launch,
+            sourceSurface: .app,
+            mode: .mirror,
+            riskLevel: .high,
+            taskGraph: nil,
+            brainState: brainState,
+            dominantGoal: "Slow the decision down.",
+            activeConstraints: ["Prefer delay over haste."],
+            activeTemplateIDs: [],
+            failureGuardIDs: [],
+            sourceIntentEnvelope: nil,
+            loadedAt: date("2026-04-10T21:20:00.000Z")
+        )
+
+        let facts = export.evolutionCoverageFacts(currentBrainState: currentBrainState)
+
+        #expect(export.evolutionControlSurface.activeCheckpoint?.checkpointID == "checkpoint-recovered-active")
+        #expect(facts.recoveredCheckpoint?.checkpointID == "checkpoint-current-brain-automatic")
+        #expect(facts.latestPersistedLineage?.checkpointID == "checkpoint-recovered-active")
+        #expect(facts.recoveredAuditFindingCount == 1)
+        #expect(facts.recoveredTicketCount == 1)
     }
 
     @Test
@@ -1765,6 +2054,81 @@ struct DecisionTestingInterfaceTests {
         #expect(facts.recoveredCheckpoint == nil)
         #expect(facts.latestPersistedLineage?.checkpointID == "checkpoint-review-only")
         #expect(facts.recoveredEBrainAvailable == true)
+    }
+
+    @Test
+    func runtimeExportPreservesPinnedActiveCheckpointSourceAcrossControlSurfaceAndFlightDeck() async throws {
+        let active = DecisionReviewCheckpointSnapshot(
+            checkpointID: "checkpoint-active-pinned",
+            previousCheckpointID: "checkpoint-active-prior",
+            createdAt: date("2026-04-10T21:30:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Pinned active checkpoint should survive export."],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T21:30:00.000Z"),
+                    sessionID: "before.quick.active-pinned",
+                    taskType: "summary",
+                    riskLevel: "medium",
+                    permitMode: "compare",
+                    hostGatePercent: 71,
+                    thoughtFoldChecksum: "fold-active-pinned",
+                    updateTicketSummaries: ["pinned active ticket"],
+                    guardrailFindings: ["Pinned active guardrail"],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+
+        let automaticFallback = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-active-fallback",
+            previousCheckpointID: "checkpoint-active-prior",
+            createdAt: date("2026-04-10T21:20:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Older automatic fallback should not replace a pinned hint."],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T21:20:00.000Z"),
+                    sessionID: "before.quick.active-fallback",
+                    taskType: "summary",
+                    riskLevel: "low",
+                    permitMode: "answer",
+                    hostGatePercent: 55,
+                    thoughtFoldChecksum: "fold-active-fallback",
+                    updateTicketSummaries: ["fallback ticket"],
+                    guardrailFindings: [],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            traceLimit: 0,
+            persistedCheckpointLineages: [automaticFallback],
+            activeCheckpointHint: active,
+            activeCheckpointSource: .pinnedHint,
+            restorableCheckpointIDs: ["checkpoint-active-prior"],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        #expect(export.activeCheckpointSource == .pinnedHint)
+        #expect(export.evolutionControlSurface.activeCheckpoint?.checkpointID == "checkpoint-active-pinned")
+        #expect(export.evolutionControlSurface.activeCheckpointSource == .pinnedHint)
+        #expect(export.flightDeck.releaseControlSummary.activeCheckpointID == "checkpoint-active-pinned")
+        #expect(export.flightDeck.releaseControlSummary.activeCheckpointSource == .pinnedHint)
     }
 
     @Test
@@ -1910,5 +2274,16 @@ struct DecisionTestingInterfaceTests {
 
         formatter.formatOptions = [.withInternetDateTime]
         return formatter.date(from: value) ?? .distantPast
+    }
+
+    private func makeTemporaryOpenModelFile(named fileName: String) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DecisionTestingInterfaceTests", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: directory.path) {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        let url = directory.appendingPathComponent(fileName, isDirectory: false)
+        try Data("open-model".utf8).write(to: url)
+        return url
     }
 }

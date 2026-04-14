@@ -1,5 +1,10 @@
 import Foundation
 
+struct DecisionEvolutionOperatorGuidance: Equatable, Sendable {
+    let headline: String
+    let primaryReason: String?
+}
+
 struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
     let surfaceKind: DecisionEvolutionSurfaceKind
     let interactionMode: DecisionEvolutionControlInteractionMode
@@ -9,6 +14,7 @@ struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
     let pendingReviewCount: Int
     let rollbackReadyCount: Int
     let activeCheckpointID: String?
+    let activeCheckpointSource: DecisionEvolutionActiveCheckpointSource
     let reviewCheckpointID: String?
     let killSwitches: [String]
 
@@ -41,72 +47,82 @@ struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
         contract: DecisionEvolutionSurfaceContract
     ) -> DecisionEvolutionOperatorSnapshot {
         let releaseSummary = workspace.releaseSummary
+        let operatorGuidance = workspace.operatorGuidance(for: contract)
 
         return DecisionEvolutionOperatorSnapshot(
             surfaceKind: surfaceKind,
             interactionMode: contract.interactionMode,
             releaseState: releaseSummary?.state,
-            headline: releaseSummary?.headline
-                ?? fallbackHeadline(for: workspace.controlSurface, contract: contract),
-            primaryReason: releaseSummary?.reasons.first
-                ?? fallbackReason(for: workspace.controlSurface, contract: contract),
-            pendingReviewCount: workspace.controlSurface.pendingReviewCount,
-            rollbackReadyCount: workspace.controlSurface.rollbackReadyCount,
+            headline: releaseSummary?.headline ?? operatorGuidance.headline,
+            primaryReason: releaseSummary?.reasons.first ?? operatorGuidance.primaryReason,
+            pendingReviewCount: workspace.facts.pendingReviewCount,
+            rollbackReadyCount: workspace.facts.rollbackReadyCount,
             activeCheckpointID: workspace.activePresentation?.checkpointID,
+            activeCheckpointSource: workspace.controlSurface.activeCheckpointSource,
             reviewCheckpointID: workspace.reviewPresentation?.checkpointID,
-            killSwitches: releaseSummary?.killSwitches ?? workspace.controlSurface.queueKillSwitches
+            killSwitches: workspace.facts.killSwitches
         )
     }
+}
 
-    private static func fallbackHeadline(
-        for controlSurface: DecisionEvolutionControlSurface,
-        contract: DecisionEvolutionSurfaceContract
-    ) -> String {
-        if controlSurface.pendingReviewCount > 0 {
-            if contract.interactionMode.allowsMutations,
-               !controlSurface.queueKillSwitches.isEmpty {
-                return "Watching queue kill switches"
+extension DecisionEvolutionWorkspaceSnapshot {
+    func operatorGuidance(for contract: DecisionEvolutionSurfaceContract) -> DecisionEvolutionOperatorGuidance {
+        let facts = self.facts
+
+        if facts.hasPendingReview {
+            if contract.allowsMutations,
+               facts.hasRecommendedKillSwitches {
+                return DecisionEvolutionOperatorGuidance(
+                    headline: "Watching queue kill switches",
+                    primaryReason: "Queue kill switches remain active until the review path is cleared."
+                )
             }
 
-            return contract.interactionMode.allowsMutations
-                ? "Queue mutation workspace is ready"
-                : "Pending review remains visible from this read-first surface"
+            return DecisionEvolutionOperatorGuidance(
+                headline: contract.allowsMutations
+                    ? "Queue mutation workspace is ready"
+                    : "Pending review remains visible from this read-first surface",
+                primaryReason: contract.allowsMutations
+                    ? "\(facts.pendingReviewCount) checkpoint(s) are ready for direct queue work here."
+                    : "\(facts.pendingReviewCount) checkpoint(s) still require review before the release path is clean."
+            )
         }
 
-        if !controlSurface.queueKillSwitches.isEmpty {
-            return "Watching queue kill switches"
+        if facts.hasRecommendedKillSwitches {
+            return DecisionEvolutionOperatorGuidance(
+                headline: "Watching queue kill switches",
+                primaryReason: "Queue kill switches remain active until the review path is cleared."
+            )
         }
 
-        if controlSurface.activePresentation != nil {
-            return "Recovered active checkpoint is visible"
-        }
-
-        return "No persisted checkpoint lineage is attached yet"
-    }
-
-    private static func fallbackReason(
-        for controlSurface: DecisionEvolutionControlSurface,
-        contract: DecisionEvolutionSurfaceContract
-    ) -> String? {
-        if controlSurface.pendingReviewCount > 0 {
-            if contract.interactionMode.allowsMutations,
-               !controlSurface.queueKillSwitches.isEmpty {
-                return "Queue kill switches remain active until the review path is cleared."
+        if activePresentation != nil {
+            let headline = switch controlSurface.activeCheckpointSource {
+            case .pinnedHint:
+                "Pinned active checkpoint is visible"
+            case .automaticFallback:
+                "Recovered active checkpoint is visible"
+            case .none:
+                "Active checkpoint is visible"
             }
 
-            return contract.interactionMode.allowsMutations
-                ? "\(controlSurface.pendingReviewCount) checkpoint(s) are ready for direct queue work here."
-                : "\(controlSurface.pendingReviewCount) checkpoint(s) still require review before the release path is clean."
+            let primaryReason = switch controlSurface.activeCheckpointSource {
+            case .pinnedHint:
+                "The host-pinned active checkpoint can be inspected without leaving this surface."
+            case .automaticFallback:
+                "The recovered automatic checkpoint can be inspected without leaving this surface."
+            case .none:
+                "The active checkpoint can be inspected without leaving this surface."
+            }
+
+            return DecisionEvolutionOperatorGuidance(
+                headline: headline,
+                primaryReason: primaryReason
+            )
         }
 
-        if !controlSurface.queueKillSwitches.isEmpty {
-            return "Queue kill switches remain active until the review path is cleared."
-        }
-
-        if controlSurface.activePresentation != nil {
-            return "The active checkpoint can be inspected without leaving this surface."
-        }
-
-        return nil
+        return DecisionEvolutionOperatorGuidance(
+            headline: "No persisted checkpoint lineage is attached yet",
+            primaryReason: nil
+        )
     }
 }

@@ -13,6 +13,7 @@ public struct BASEBrainTurnRequest: Codable, Equatable, Sendable {
     public var recordedAt: Date
     public var riskHint: BASBrainRiskLevel?
     public var feedbackEvent: BASFeedbackEvent?
+    public var activeKillSwitches: [BASKillSwitchID]
 
     public init(
         userInput: String,
@@ -20,7 +21,8 @@ public struct BASEBrainTurnRequest: Codable, Equatable, Sendable {
         hostID: String,
         recordedAt: Date = .now,
         riskHint: BASBrainRiskLevel? = nil,
-        feedbackEvent: BASFeedbackEvent? = nil
+        feedbackEvent: BASFeedbackEvent? = nil,
+        activeKillSwitches: [BASKillSwitchID] = []
     ) {
         self.userInput = userInput
         self.deviceState = deviceState
@@ -28,6 +30,7 @@ public struct BASEBrainTurnRequest: Codable, Equatable, Sendable {
         self.recordedAt = recordedAt
         self.riskHint = riskHint
         self.feedbackEvent = feedbackEvent
+        self.activeKillSwitches = activeKillSwitches
     }
 }
 
@@ -97,6 +100,7 @@ public extension BASEBrainTurnResult {
             hostGatePercent: Int((hostGateValue * 100).rounded()),
             thoughtFoldChecksum: thoughtFold.checksum,
             updateTicketSummaries: Array(updateTickets.map(\.summary).prefix(3)),
+            activeKillSwitches: Array(runtimeTrace.activeKillSwitches.map(\.rawValue).prefix(4)),
             guardrailFindings: Array(runtimeTrace.guardrailFindings.map(\.summary).prefix(3)),
             recommendedKillSwitches: Array(runtimeTrace.recommendedKillSwitches.map(\.rawValue).prefix(3))
         )
@@ -149,7 +153,8 @@ public struct BASEBrainRuntimeCoordinator {
         )
         let (plannedBudget, budgetFindings) = normalizeBudget(
             requestedBudget,
-            riskHint: request.riskHint
+            riskHint: request.riskHint,
+            activeKillSwitches: request.activeKillSwitches
         )
 
         let routedBudget = BASBudgetFrame(
@@ -254,7 +259,8 @@ public struct BASEBrainRuntimeCoordinator {
         let (riskCard, actionPermit, riskFindings) = normalizeRiskDecision(
             riskCard: rawRiskCard,
             actionPermit: rawActionPermit,
-            budget: routedBudget
+            budget: routedBudget,
+            activeKillSwitches: request.activeKillSwitches
         )
         thoughtFrame.riskCard = riskCard
         thoughtFrame.actionPermit = actionPermit
@@ -279,7 +285,8 @@ public struct BASEBrainRuntimeCoordinator {
         )
         let (updateTickets, evolutionFindings) = normalizeUpdateTickets(
             rawTickets,
-            riskCard: riskCard
+            riskCard: riskCard,
+            activeKillSwitches: request.activeKillSwitches
         )
         let auditFindings = budgetFindings + memoryFindings + loopFindings + riskFindings + evolutionFindings
         let killSwitches = recommendedKillSwitches(for: auditFindings)
@@ -303,6 +310,7 @@ public struct BASEBrainRuntimeCoordinator {
             thoughtFold: thoughtFold,
             riskCard: riskCard,
             actionPermit: actionPermit,
+            activeKillSwitches: request.activeKillSwitches,
             auditFindings: auditFindings,
             killSwitches: killSwitches
         )
@@ -329,10 +337,43 @@ public struct BASEBrainRuntimeCoordinator {
 
     private func normalizeBudget(
         _ budget: BASBudgetFrame,
-        riskHint: BASBrainRiskLevel?
+        riskHint: BASBrainRiskLevel?,
+        activeKillSwitches: [BASKillSwitchID]
     ) -> (BASBudgetFrame, [BASRuntimeAuditFinding]) {
         var normalized = budget
         var findings: [BASRuntimeAuditFinding] = []
+
+        if activeKillSwitches.contains(.disableFastPath), normalized.runMode == .sentinel {
+            normalized.runMode = .engage
+            normalized.maxLoops = max(normalized.maxLoops, 1)
+            normalized.maxCandidates = max(normalized.maxCandidates, 2)
+            findings.append(
+                BASRuntimeAuditFinding(
+                    code: "kill_switch.disable_fast_path",
+                    layerID: "L1",
+                    summary: "Disable-fast-path kill switch lifted the run mode out of sentinel execution.",
+                    severity: .high,
+                    enforced: true
+                )
+            )
+        }
+
+        if activeKillSwitches.contains(.forceGuardMode) {
+            normalized.runMode = .guarded
+            normalized.maxLoops = max(normalized.maxLoops, 2)
+            normalized.maxCandidates = max(normalized.maxCandidates, 2)
+            normalized.retrievalDepth = max(normalized.retrievalDepth, 3)
+            normalized.precisionProfile = .protected
+            findings.append(
+                BASRuntimeAuditFinding(
+                    code: "kill_switch.force_guard_mode",
+                    layerID: "L1",
+                    summary: "Force-guard-mode kill switch escalated the turn into guarded execution.",
+                    severity: .high,
+                    enforced: true
+                )
+            )
+        }
 
         if let riskHint, riskHint >= .high, normalized.runMode == .sentinel {
             normalized.runMode = .guarded
@@ -466,10 +507,29 @@ public struct BASEBrainRuntimeCoordinator {
     private func normalizeRiskDecision(
         riskCard: BASRiskCard,
         actionPermit: BASActionPermit,
-        budget: BASBudgetFrame
+        budget: BASBudgetFrame,
+        activeKillSwitches: [BASKillSwitchID]
     ) -> (BASRiskCard, BASActionPermit, [BASRuntimeAuditFinding]) {
         var normalizedPermit = actionPermit
         var findings: [BASRuntimeAuditFinding] = []
+
+        if activeKillSwitches.contains(.forceProtectedPermit),
+           normalizedPermit.mode == .answer || normalizedPermit.mode == .compare {
+            normalizedPermit = enforcedPermit(
+                targetMode: .delay,
+                from: normalizedPermit,
+                reasonCode: "kill_switch.force_protected_permit"
+            )
+            findings.append(
+                BASRuntimeAuditFinding(
+                    code: "kill_switch.force_protected_permit",
+                    layerID: "L11",
+                    summary: "Force-protected-permit kill switch downgraded the turn into a protected output mode.",
+                    severity: .high,
+                    enforced: true
+                )
+            )
+        }
 
         if riskCard.riskLevel == .extreme, normalizedPermit.mode == .answer {
             normalizedPermit = enforcedPermit(
@@ -546,8 +606,35 @@ public struct BASEBrainRuntimeCoordinator {
 
     private func normalizeUpdateTickets(
         _ tickets: [BASUpdateTicket],
-        riskCard: BASRiskCard
+        riskCard: BASRiskCard,
+        activeKillSwitches: [BASKillSwitchID]
     ) -> ([BASUpdateTicket], [BASRuntimeAuditFinding]) {
+        if activeKillSwitches.contains(.requireReviewedWrites) {
+            var findings: [BASRuntimeAuditFinding] = []
+            let normalized = tickets.map { ticket in
+                guard !ticket.requiresReview,
+                      ticket.memoryWriteSuggestion != nil || ticket.hostProfileChangeSuggestion != nil else {
+                    return ticket
+                }
+
+                findings.append(
+                    BASRuntimeAuditFinding(
+                        code: "kill_switch.require_reviewed_writes",
+                        layerID: "L13",
+                        summary: "Require-reviewed-writes kill switch forced persistent write proposals back into review.",
+                        severity: .high,
+                        enforced: true
+                    )
+                )
+
+                var adjusted = ticket
+                adjusted.requiresReview = true
+                adjusted.conflictFlag = true
+                return adjusted
+            }
+            return (normalized, findings)
+        }
+
         guard riskCard.riskLevel >= .high else {
             return (tickets, [])
         }
@@ -664,6 +751,7 @@ public struct BASEBrainRuntimeCoordinator {
         thoughtFold: BASThoughtFold,
         riskCard: BASRiskCard,
         actionPermit: BASActionPermit,
+        activeKillSwitches: [BASKillSwitchID],
         auditFindings: [BASRuntimeAuditFinding],
         killSwitches: [BASKillSwitchID]
     ) -> BASRuntimeTrace {
@@ -773,6 +861,7 @@ public struct BASEBrainRuntimeCoordinator {
             modelRoute: budgetFrame.deviceRoute.rawValue,
             loopCount: loopCount,
             cacheHitRate: cacheHitRate,
+            activeKillSwitches: activeKillSwitches.sorted { $0.rawValue < $1.rawValue },
             guardrailFindings: auditFindings,
             recommendedKillSwitches: killSwitches
         )

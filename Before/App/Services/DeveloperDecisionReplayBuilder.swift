@@ -170,19 +170,7 @@ struct DeveloperDecisionReplayTraceSummary: Equatable, Sendable {
     }
 }
 
-enum DeveloperDecisionReplayEBrainSource: String, Equatable, Sendable {
-    case liveRuntime = "live_runtime"
-    case persistedCheckpoint = "persisted_checkpoint"
-
-    var title: String {
-        switch self {
-        case .liveRuntime:
-            "Live runtime"
-        case .persistedCheckpoint:
-            "Checkpoint recovery"
-        }
-    }
-}
+typealias DeveloperDecisionReplayEBrainSource = DecisionTestingEBrainSource
 
 struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
     let source: DeveloperDecisionReplayEBrainSource
@@ -194,10 +182,15 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
     let hostGatePercent: Int
     let thoughtFoldChecksum: String
     let updateTicketSummaries: [String]
+    let activeKillSwitches: [String]
     let guardrailFindings: [String]
     let killSwitches: [String]
+    let checkpointBudgetLine: String?
+    let checkpointTaskLine: String?
 
     init(turn: BASEBrainTurnResult) {
+        let activeKillSwitches = turn.runtimeTrace.activeKillSwitches.map(\.rawValue)
+        let recommendedKillSwitches = turn.runtimeTrace.recommendedKillSwitches.map(\.rawValue)
         self.source = .liveRuntime
         self.recordedAt = turn.runtimeTrace.recordedAt
         self.sessionID = turn.runtimeTrace.sessionID
@@ -207,8 +200,17 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.hostGatePercent = Int((turn.hostGateValue * 100).rounded())
         self.thoughtFoldChecksum = String(turn.thoughtFold.checksum.prefix(12))
         self.updateTicketSummaries = turn.updateTickets.map(\.summary)
+        self.activeKillSwitches = activeKillSwitches
         self.guardrailFindings = turn.runtimeTrace.guardrailFindings.map(\.summary)
-        self.killSwitches = turn.runtimeTrace.recommendedKillSwitches.map(\.rawValue)
+        self.killSwitches = Self.orderedUnique(activeKillSwitches + recommendedKillSwitches)
+        self.checkpointBudgetLine = [
+            "Budget \(Self.readableRunModeTitle(turn.budgetFrame.runMode))",
+            "route \(turn.runtimeTrace.modelRoute)",
+            "loops \(turn.budgetFrame.maxLoops)",
+            "candidates \(turn.budgetFrame.maxCandidates)",
+            "decode \(turn.budgetFrame.maxDecodeTokens)"
+        ].joined(separator: " • ")
+        self.checkpointTaskLine = turn.updateTickets.first.map { "Review: \($0.summary)" }
     }
 
     init(lineageSummary: BASEvolutionLineageSummary) {
@@ -221,8 +223,188 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.hostGatePercent = lineageSummary.hostGatePercent
         self.thoughtFoldChecksum = lineageSummary.thoughtFoldChecksum
         self.updateTicketSummaries = lineageSummary.updateTicketSummaries
+        self.activeKillSwitches = lineageSummary.activeKillSwitches
         self.guardrailFindings = lineageSummary.guardrailFindings
-        self.killSwitches = lineageSummary.recommendedKillSwitches
+        self.killSwitches = Self.orderedUnique(
+            lineageSummary.activeKillSwitches + lineageSummary.recommendedKillSwitches
+        )
+        self.checkpointBudgetLine = nil
+        self.checkpointTaskLine = lineageSummary.updateTicketSummaries.first.map { "Review: \($0)" }
+    }
+
+    private static func orderedUnique(_ values: [String]) -> [String] {
+        values.reduce(into: [String]()) { uniqueValues, value in
+            guard !uniqueValues.contains(value) else { return }
+            uniqueValues.append(value)
+        }
+    }
+
+    private static func readableRunModeTitle(_ runMode: BASEBrainRunMode) -> String {
+        switch runMode {
+        case .guarded:
+            return "GUARDED"
+        default:
+            return runMode.rawValue.uppercased()
+        }
+    }
+}
+
+enum DecisionEvolutionSourceDescriptorKind: Equatable, Sendable {
+    case liveRuntime
+    case checkpointRecovery
+}
+
+struct DecisionEvolutionSourceDescriptor: Equatable, Sendable {
+    let kind: DecisionEvolutionSourceDescriptorKind
+    let title: String
+    let detail: String
+}
+
+extension DecisionEvolutionSourceDescriptor {
+    static let liveRuntimeDefault = DecisionEvolutionSourceDescriptor(
+        kind: .liveRuntime,
+        title: "Live runtime",
+        detail: "Showing the active 13-layer turn synthesized from the current local runtime."
+    )
+
+    static let checkpointRecoveryDefault = DecisionEvolutionSourceDescriptor(
+        kind: .checkpointRecovery,
+        title: "Checkpoint recovery",
+        detail: "Showing recovered lineage restored from a persisted checkpoint."
+    )
+
+    static let checkpointRecoveryWorkspace = DecisionEvolutionSourceDescriptor(
+        kind: .checkpointRecovery,
+        title: "Checkpoint recovery",
+        detail: "Recovered lineage stored in persisted checkpoints remains visible even when no live runtime turn is attached."
+    )
+}
+
+struct DecisionEvolutionTurnDiagnosticsPresentation: Equatable, Sendable {
+    let sourceDescriptor: DecisionEvolutionSourceDescriptor
+    let runModeTitle: String
+    let taskTitle: String
+    let riskTitle: String
+    let permitTitle: String
+    let mirrorText: String
+    let routeText: String
+    let hostText: String
+    let replayText: String
+    let auditLines: [String]
+    let activeKillSwitchesLine: String?
+    let recommendedKillSwitchesLine: String?
+    let candidateTitles: [String]
+    let memorySummaries: [String]
+    let triScoreLines: [String]
+    let riskFactorsLine: String?
+    let reasonCodesLine: String?
+    let alternativeActions: [String]
+    let thoughtFoldLines: [String]
+    let replayTraceLines: [String]
+    let ticketSummary: String?
+}
+
+struct DecisionEvolutionReplayEntryPresentation: Equatable, Sendable {
+    let sourceTitle: String
+    let modeTitle: String
+    let statusTitle: String
+    let timestamp: Date
+    let title: String
+    let summaryLine: String
+    let budgetLine: String?
+    let eBrainLine: String?
+    let taskLine: String?
+    let actionLine: String?
+    let auditLine: String?
+    let activeKillSwitchesLine: String?
+    let killSwitchesLine: String?
+    let traceLine: String?
+}
+
+extension DecisionSystemEBrainSummary {
+    var sourceDescriptor: DecisionEvolutionSourceDescriptor {
+        if source == .persistedCheckpoint {
+            return .checkpointRecoveryWorkspace
+        }
+
+        return .liveRuntimeDefault
+    }
+}
+
+extension DeveloperDecisionReplayEBrainSummary {
+    var sourceDescriptor: DecisionEvolutionSourceDescriptor {
+        switch source {
+        case .liveRuntime:
+            .liveRuntimeDefault
+        case .persistedCheckpoint:
+            .checkpointRecoveryDefault
+        }
+    }
+}
+
+extension BASEBrainTurnResult {
+    var diagnosticsPresentation: DecisionEvolutionTurnDiagnosticsPresentation {
+        DecisionEvolutionTurnDiagnosticsPresentation(
+            sourceDescriptor: .liveRuntimeDefault,
+            runModeTitle: budgetFrame.runMode.rawValue.uppercased(),
+            taskTitle: contextFrame.taskType.rawValue.replacingOccurrences(of: "_", with: " "),
+            riskTitle: riskCard.riskLevel.rawValue.uppercased(),
+            permitTitle: actionPermit.mode.rawValue.uppercased(),
+            mirrorText: decomposeFrame.mirrorText,
+            routeText: "Route: \(runtimeTrace.modelRoute) • Loops: \(runtimeTrace.loopCount) • Power: \(Int((runtimeTrace.powerEstimate * 100).rounded()))%",
+            hostText: "Host gate \(Int((hostGateValue * 100).rounded()))% • Fold \(thoughtFold.checksum.prefix(12)) • Device \(deviceState.thermalLevel.rawValue)/\(deviceState.memoryFreeMB)MB",
+            replayText: "Replay session \(runtimeTrace.sessionID) • Recorded \(runtimeTrace.recordedAt.formatted(date: .abbreviated, time: .shortened))",
+            auditLines: Array(runtimeTrace.guardrailFindings.prefix(4)).map { finding in
+                "• \(finding.layerID) \(finding.code): \(finding.summary)"
+            },
+            activeKillSwitchesLine: runtimeTrace.activeKillSwitches.isEmpty
+                ? nil
+                : "Active kill switches: \(runtimeTrace.activeKillSwitches.map(\.rawValue).joined(separator: " • "))",
+            recommendedKillSwitchesLine: runtimeTrace.recommendedKillSwitches.isEmpty
+                ? nil
+                : "Recommended kill switches: \(runtimeTrace.recommendedKillSwitches.map(\.rawValue).joined(separator: " • "))",
+            candidateTitles: Array(thoughtFrame.candidates.prefix(3)).map(\.title),
+            memorySummaries: Array(memoryBundle.atoms.prefix(3)).map(\.summary),
+            triScoreLines: Array(triScores.prefix(3)).map { score in
+                "• \(score.candidateID): id \(Int((score.idScore * 100).rounded())) / ego \(Int((score.egoScore * 100).rounded())) / superego \(Int((score.superegoScore * 100).rounded()))"
+            },
+            riskFactorsLine: riskCard.factors.isEmpty ? nil : "Factors: \(riskCard.factors.joined(separator: " • "))",
+            reasonCodesLine: actionPermit.reasonCodes.isEmpty ? nil : "Reason codes: \(actionPermit.reasonCodes.joined(separator: " • "))",
+            alternativeActions: renderedOutput.alternativeActions,
+            thoughtFoldLines: thoughtFold.compactSlots.keys.sorted().compactMap { key in
+                guard let value = thoughtFold.compactSlots[key], !value.isEmpty else { return nil }
+                return "• \(key): \(value)"
+            },
+            replayTraceLines: Array(runtimeTrace.layerEvents.prefix(6)).map { event in
+                "• \(event.layerID) \(event.event): \(event.detail)"
+            },
+            ticketSummary: updateTickets.first?.summary
+        )
+    }
+}
+
+extension DeveloperDecisionReplayEntry {
+    var diagnosticsPresentation: DecisionEvolutionReplayEntryPresentation {
+        let replayRecoverySummary = eBrain?.replayRecoverySummary
+
+        return DecisionEvolutionReplayEntryPresentation(
+            sourceTitle: replayRecoverySummary?.sourceDescriptor.title ?? "Trace fallback",
+            modeTitle: mode.shortTitle,
+            statusTitle: statusTitle,
+            timestamp: timestamp,
+            title: title,
+            summaryLine: summaryLine,
+            budgetLine: replayRecoverySummary?.budgetLine,
+            eBrainLine: replayRecoverySummary?.headlineLine,
+            taskLine: replayRecoverySummary?.taskLine,
+            actionLine: replayRecoverySummary?.actionLine,
+            auditLine: replayRecoverySummary?.auditLine,
+            activeKillSwitchesLine: replayRecoverySummary?.activeKillSwitchesLine,
+            killSwitchesLine: replayRecoverySummary?.killSwitchesLine,
+            traceLine: eBrain == nil ? trace.map {
+                "Trace: \($0.kind.title) • \($0.activeProvider?.title ?? $0.preferredProvider.title)"
+            } : nil
+        )
     }
 }
 

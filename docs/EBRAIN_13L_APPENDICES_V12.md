@@ -79,14 +79,31 @@
 
 治理对象：
 
-- `ContextFrame`
-- `RiskCard`
-- `ActionPermit`
+- `DeviceState`
+- `BudgetFrame`
 - `HostProfile`
+- `HostVersion`
 - `MemoryAtom`
+- `MemoryBundle`
+- `RuleCandidate`
+- `ContextFrame`
+- `DecomposeFrame`
+- `CandidatePath`
+- `ForecastItem`
+- `CritiqueItem`
 - `ThoughtFrame`
 - `ThoughtFold`
+- `TriSelfScore`
+- `MergedChoice`
+- `RenderedOutput`
+- `RiskCard`
+- `ActionPermit`
 - `UpdateTicket`
+- `EvolutionLineageSummary`
+- `RuntimeTrace`
+- `EvalSample`
+- `ModelArtifact`
+- `FeedbackEvent`
 
 统一策略：
 
@@ -96,6 +113,17 @@
 - 每次 schema 变更必须补：
   当前版测试、向后兼容测试、迁移测试、回滚测试。
 - 生产回滚时，必须能把最新快照恢复到上一稳定 schema，而不破坏回放能力。
+
+当前 registry 已治理 `25` 个对象。下面这张表保留的是高风险主链对象的最低测试要求；其余对象继续按 registry 中定义的 `current / backward / rollback` 约束执行。
+
+对应的全量治理哨兵已经在 `BASEBrainSchemaGovernanceRegistryTests` 中落地，负责锁定：
+
+- registry 唯一性
+- `25` 个治理对象的完整覆盖
+- compatibility / deprecation / rollback 元数据
+- 所有治理对象与真实 `currentSchemaVersion` 的版本对齐
+
+下表不是“只有这 8 个对象受测”，而是高风险主链对象额外需要被单列追踪的最低门槛。
 
 最低测试要求：
 
@@ -159,7 +187,12 @@
 | `Home` | `observeAndRoute` | `surface` | 否 | 是 | 是 | 主壳读优先，显示 active/review 状态并把 mutation 导向 Control Center |
 | `History` | `observeAndRoute` | `compact` | 否 | 是 | 是 | 以 checkpoint trail 和 queue workbench 为主，不在此页散落 mutation 语义 |
 | `Portrait` | `observeAndRoute` | `surface` | 否 | 是 | 是 | 以当前脑态和 checkpoint lineage 对照为主，和 History / Control Center 共用 workspace 事实源 |
+| `Settings` | `observeAndRoute` | `compact` | 否 | 否 | 否 | 监控优先，承接共享 release summary、shared control-surface summary 与 kill-switch policy 面板 |
 | `Control Center` | `mutationHub` | `mutationHub` | 是 | 否 | 否 | 唯一集中 mutation hub，承接 approve / apply / rollback / clear lineage / queue 操作 |
+
+辅助 surface：
+
+- `Watch / Widget` 只允许暴露安全版 evolution snapshot：release state、pending review、rollback readiness、kill-switch 计数与通用 headline，不允许承载直接 mutation。
 
 统一约束：
 
@@ -170,3 +203,37 @@
   后者针对当前 pending review queue 的明确目标集合。
 - `active checkpoint` 与 `review head` 必须显式分离，不允许用一个“current checkpoint”语义糊过去。
 - `Home / History / Portrait / Control Center` 必须优先共享同一份 `DecisionEvolutionWorkspaceSnapshot` 或其等价事实源，避免同屏 facts 漂移。
+
+## 附录F：Verification Matrix
+
+这一页把 `WP -> regression gate -> owner -> exit gate` 固定下来，避免 v1.2 后续演进只剩 narrative，没有可审计的保护面。
+
+| WP | 核心对象 / 主链 | 主要回归 | 主要负责人 | 退出门槛 |
+| --- | --- | --- | --- | --- |
+| `WP1 灯芯层` | `DeviceState`, `BudgetFrame` | `BASHostKitTests`, `BASEBrainSchemaCoreTests`, 真机热/低电量构建回归 | Runtime Lead | 高风险 turn 不会越预算，降级不绕开风闸 |
+| `WP2 脑肉层` | `Scout/Core`, `ThoughtFrame`, 多头输出 | `DecisionIntelligenceCoordinatorTests`, `OnDeviceIntelligenceSessionTests` | Model Lead | 前哨误分流可测，结构头输出稳定 |
+| `WP3 折叠肺` | `ThoughtFold`, 热启动, cache | `BASEvolutionCoreTests`, `BASAppleEvolutionCheckpointWriterTests` | Compression Lead | 恢复一致性、热启动、写入链稳定 |
+| `WP5 宿纹层` | `HostProfile`, `HostVersion` | `BeforeProductCompatibilityTests`, `DecisionEvolutionEngineTests` | Host & Memory Lead | 版本、删除、回滚、宿主隔离可验证 |
+| `WP6-L7` | `ContextFrame`, `DecomposeFrame` | `DecisionTestingInterfaceTests`, `DecisionCapabilityCoverageBuilderTests` | Loop Lead | 情境/镜像/矛盾检测能进入统一 export |
+| `WP8 海马井` | `MemoryAtom`, `MemoryBundle` | `DecisionEvolutionEngineTests`, `BASEvolutionCoreTests` | Host & Memory Lead | 热温冷/冲突/回放不漂移 |
+| `WP9 梦环层` | `ThoughtFrame`, `CandidatePath`, `ForecastItem`, `CritiqueItem` | `DecisionTestingInterfaceTests`, `DecisionEvolutionMutationIntentTests` | Loop Lead | 收敛、停止条件、候选排序稳定 |
+| `WP10 三我庭` | `TriSelfScore`, `MergedChoice` | `DecisionEvolutionMutationIntentTests`, `DecisionCapabilityCoverageBuilderTests` | Loop Lead | veto 与融合逻辑可解释、可回归 |
+| `WP11 风闸层` | `RiskCard`, `ActionPermit`, `GSI` | `BehavioralAISubstrateBridgeTests`, `DecisionEvolutionKillSwitchStoreTests`, 风险专项回归 | Risk Lead | block / delay / replace 不可被宿主绕过 |
+| `WP12 柔手层` | `RenderedOutput` | `DecisionTestingInterfaceTests`, `DecisionEvolutionOperatorSnapshotTests` | Product Lead | 输出模式切换稳定，边界与语气协同 |
+| `WP13 蜕变炉` | `UpdateTicket`, `RuleCandidate`, lineage | `DecisionEvolutionEngineTests`, `BASAppleEvolutionCheckpointWriterTests`, `BASEvolutionCoreTests` | Host & Memory Lead | 长期写入只能经票据链和 checkpoint |
+| `WP16 评测红队` | `RuntimeTrace`, `EvalSample`, release gates | `BASEBrainProgramBlueprintTests`, `BASEBrainSchemaGovernanceRegistryTests`, 长会话/真机矩阵 | Evaluation Lead | 指标、红队、回放门禁可审计 |
+| `WP17 SDK/集成` | `DecisionTestingRuntimeExport`, `DecisionSystemFlightDeck`, watch/widget handoff | `BehavioralAISubstrateBridgeTests`, `DecisionIntentEnvelopeStoreTests`, `WidgetSnapshotStoreTests` | SDK Lead | 多 surface 共享同一事实源，不同屏不漂移 |
+| `Schema governance sentinel` | `BASSchemaGovernanceEntry`, `BASEBrainSchemaGovernanceRegistry` | `BASEBrainSchemaGovernanceRegistryTests`, `BASEBrainSchemaCoreTests`, `BASEBrainProgramBlueprintTests` | Chief Architect + Evaluation Lead | unknown object lookup、registry uniqueness、compatibility / migration / rollback 元数据、全量版本对齐全部可回归 |
+
+v1.2 稳定化最低要求：
+
+- schema registry 必须覆盖主链对象，并带 `compatibility / migration / rollback` 元数据。
+- `Home / History / Portrait / Settings / Control Center / watch / widget` 必须通过共享 control-surface/export 事实源读数。
+- `active checkpoint` 与 `review head` 的语义不能混淆，必须有单独回归保护。
+- `openEvolutionControl`、`rollback`、`clear lineage`、`kill switch policy` 必须都有专门回归，不允许只靠人工走查。
+
+说明：
+
+- `BASEBrainSchemaGovernanceRegistryTests` 负责 schema registry 和 version alignment 的治理面。
+- `DecisionEvolutionEngineTests`、`DecisionTestingInterfaceTests`、`DecisionEvolutionKillSwitchStoreTests`、`DecisionCapabilityCoverageBuilderTests` 负责宿主控制面、runtime export、kill-switch policy、active/review checkpoint 语义的产品面。
+- 两类保护必须同时存在，不能用 registry 元数据测试替代真实宿主控制链回归。

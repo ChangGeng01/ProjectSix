@@ -20,6 +20,7 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
         let workspace = DecisionEvolutionWorkspaceSnapshot.build(
             controlSurface: DecisionEvolutionControlSurface(
                 activeCheckpoint: active,
+                activeCheckpointSource: .pinnedHint,
                 reviewCheckpoint: review,
                 pendingReviewQueue: [review],
                 latestPersistedLineage: nil
@@ -28,12 +29,15 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
                 state: .watch,
                 headline: "Watching the pending review queue",
                 reasons: ["1 checkpoint still requires review."],
+                activeKillSwitches: [],
+                recommendedKillSwitches: ["host-write"],
                 killSwitches: ["host-write"],
                 pendingReviewCount: 1,
                 rollbackReadyCount: 2,
                 canRestoreActiveCheckpoint: true,
                 canRollbackActiveCheckpoint: true,
                 activeCheckpointID: "active-1",
+                activeCheckpointSource: .pinnedHint,
                 reviewCheckpointID: "review-1"
             )
         )
@@ -48,8 +52,9 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.headline, "Watching the pending review queue")
         XCTAssertEqual(snapshot.primaryReason, "1 checkpoint still requires review.")
         XCTAssertEqual(snapshot.pendingReviewCount, 1)
-        XCTAssertEqual(snapshot.rollbackReadyCount, 0)
+        XCTAssertEqual(snapshot.rollbackReadyCount, 2)
         XCTAssertEqual(snapshot.activeCheckpointID, "active-1")
+        XCTAssertEqual(snapshot.activeCheckpointSource, .pinnedHint)
         XCTAssertEqual(snapshot.reviewCheckpointID, "review-1")
         XCTAssertEqual(snapshot.killSwitches, ["host-write"])
         XCTAssertEqual(snapshot.surfaceTitle, "Evolution Control")
@@ -85,6 +90,7 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.pendingReviewCount, 1)
         XCTAssertEqual(snapshot.rollbackReadyCount, 0)
         XCTAssertNil(snapshot.activeCheckpointID)
+        XCTAssertEqual(snapshot.activeCheckpointSource, .none)
         XCTAssertEqual(snapshot.reviewCheckpointID, "review-1")
         XCTAssertEqual(snapshot.killSwitches, ["kill-review-1"])
         XCTAssertEqual(snapshot.surfaceTitle, "History workbench")
@@ -119,6 +125,7 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.primaryReason, "Queue kill switches remain active until the review path is cleared.")
         XCTAssertEqual(snapshot.pendingReviewCount, 1)
         XCTAssertEqual(snapshot.reviewCheckpointID, "review-1")
+        XCTAssertEqual(snapshot.activeCheckpointSource, .none)
         XCTAssertEqual(snapshot.killSwitches, ["kill-review-1"])
         XCTAssertEqual(snapshot.surfaceTitle, "Evolution Control")
         XCTAssertEqual(snapshot.operatorHeadline, DecisionEvolutionControlInteractionMode.mutationHub.operatorHeadline)

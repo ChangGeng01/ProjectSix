@@ -40,6 +40,23 @@ enum WatchHandoffCoordinator {
         )
     }
 
+    static func enqueueOpenEvolutionControl(
+        headline: String? = nil,
+        reason: String? = nil
+    ) {
+        enqueue(
+            DecisionIntentEnvelope(
+                kind: .openEvolutionControl,
+                sourceSurface: .watch,
+                entrySource: .watch,
+                preferredMode: .mirror,
+                promptSeed: headline,
+                riskLevel: .medium,
+                triggerReason: reason ?? "A watch glance asked the iPhone brain to open Evolution Control."
+            )
+        )
+    }
+
     static func consume() -> DecisionIntentEnvelope? {
         DecisionIntentEnvelopeStore.consume()
     }

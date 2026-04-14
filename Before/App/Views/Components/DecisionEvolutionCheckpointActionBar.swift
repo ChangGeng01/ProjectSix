@@ -7,13 +7,11 @@ struct DecisionEvolutionCheckpointActionBar: View {
     let checkpointID: String
     let checkpointPresentation: DecisionEvolutionCheckpointPresentation?
     let controlSurface: DecisionEvolutionControlSurface
-    let interactionMode: DecisionEvolutionControlInteractionMode
+    let surfaceContract: DecisionEvolutionSurfaceContract
     let applyReady: Bool
     let approvalState: DecisionEvolutionApprovalState?
     let hasLineage: Bool
-    let showControlCenterShortcut: Bool
-    let showHistoryShortcut: Bool
-    let showPortraitShortcut: Bool
+    let navigationOptions: DecisionEvolutionNavigationSurfaceOptions
     let afterMutation: (() -> Void)?
 
     private struct PendingMutation: Identifiable {
@@ -26,26 +24,26 @@ struct DecisionEvolutionCheckpointActionBar: View {
         checkpointID: String,
         checkpointPresentation: DecisionEvolutionCheckpointPresentation? = nil,
         controlSurface: DecisionEvolutionControlSurface,
-        interactionMode: DecisionEvolutionControlInteractionMode = .mutationHub,
+        surfaceContract: DecisionEvolutionSurfaceContract,
         applyReady: Bool,
         approvalState: DecisionEvolutionApprovalState?,
         hasLineage: Bool,
-        showControlCenterShortcut: Bool = false,
-        showHistoryShortcut: Bool = false,
-        showPortraitShortcut: Bool = false,
+        navigationOptions: DecisionEvolutionNavigationSurfaceOptions? = nil,
         afterMutation: (() -> Void)? = nil
     ) {
         self.checkpointID = checkpointID
         self.checkpointPresentation = checkpointPresentation
         self.controlSurface = controlSurface
-        self.interactionMode = interactionMode
+        self.surfaceContract = surfaceContract
         self.applyReady = applyReady
         self.approvalState = approvalState
         self.hasLineage = hasLineage
-        self.showControlCenterShortcut = showControlCenterShortcut
-        self.showHistoryShortcut = showHistoryShortcut
-        self.showPortraitShortcut = showPortraitShortcut
+        self.navigationOptions = navigationOptions ?? surfaceContract.navigationSurfaceOptions()
         self.afterMutation = afterMutation
+    }
+
+    private var interactionMode: DecisionEvolutionControlInteractionMode {
+        surfaceContract.interactionMode
     }
 
     var body: some View {
@@ -58,7 +56,7 @@ struct DecisionEvolutionCheckpointActionBar: View {
                 )
             }
 
-            if interactionMode.allowsMutations {
+            if surfaceContract.allowsMutations {
                 HStack(spacing: 10) {
                     if applyReady {
                         BeforeActionButton("Apply checkpoint", style: .primary) {
@@ -119,39 +117,23 @@ struct DecisionEvolutionCheckpointActionBar: View {
                     }
                 }
             } else {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(interactionMode.operatorHeadline)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(BeforeTheme.ember)
-                    Text(interactionMode.operatorDetail)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+                DecisionEvolutionOperatorActionFooterView(
+                    interactionMode: interactionMode,
+                    navigationOptions: navigationOptions,
+                    routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter,
+                    showsDetail: true,
+                    controlCenterStyle: .primary,
+                    adjacentShortcutStyle: .secondary
+                )
             }
 
-            if showControlCenterShortcut || showHistoryShortcut || showPortraitShortcut {
-                HStack(spacing: 10) {
-                    if showControlCenterShortcut {
-                        BeforeActionButton(
-                            "Open control center",
-                            style: interactionMode.allowsMutations ? .secondary : .primary
-                        ) {
-                            appModel.presentEvolutionControlCenter()
-                        }
-                    }
-
-                    if showHistoryShortcut {
-                        BeforeActionButton("Open History", style: .secondary) {
-                            appModel.selectedTab = .history
-                        }
-                    }
-
-                    if showPortraitShortcut {
-                        BeforeActionButton("Open Portrait", style: .secondary) {
-                            appModel.selectedTab = .portrait
-                        }
-                    }
-                }
+            if surfaceContract.allowsMutations && navigationOptions.showsAnyShortcut {
+                DecisionEvolutionNavigationActionRow(
+                    navigationOptions: navigationOptions,
+                    routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter,
+                    controlCenterStyle: surfaceContract.allowsMutations ? .secondary : .primary,
+                    adjacentShortcutStyle: .secondary
+                )
             }
         }
         .sheet(item: $pendingMutation) { pendingMutation in

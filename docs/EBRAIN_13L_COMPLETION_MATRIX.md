@@ -1,0 +1,65 @@
+# 13层电子脑完成度矩阵
+
+这份矩阵描述的是当前仓库的真实工程状态，不是目标态宣传文案。
+
+状态说明：
+
+- `已落地`：已经进入真实代码与产品/回放链路
+- `Alpha`：已有真实骨架或部分产品接线，但还不是完整量产实现
+- `脚手架`：接口、schema、蓝图已定，但核心能力仍待实装
+- `外部工程`：主要依赖训练、课程或独立产线，不在当前仓库内完成
+
+## L1-L13
+
+| 层 | 名称 | 当前状态 | 当前仓库已落地 | 仍缺的关键口 |
+| --- | --- | --- | --- | --- |
+| L1 | 灯芯层 | Alpha | `DeviceState`、`BudgetFrame`、protective gate、fast-path clamp、runtime route summary 已落入主链与 UI | 真机热模型、异构 CPU/GPU/NPU 路由、维护时钟、长会话热稳定 runtime |
+| L2 | 脑肉层 | 脚手架 | `NeuralCoreService`、`Scout/Core` 语义、结构头协议、多头输出对象已定义并接入主调用链 | 真实 `Scout/Core` 模型、结构头训练、双模型端侧运行、量化后能力保持 |
+| L3 | 折叠肺 | Alpha | `ThoughtFold`、checkpoint lineage、恢复摘要、热启动相关持久化边界已经进入产品回放链；本地 `DecisionSessionEngine` 已作为 append-only event log + checkpoint + correction branch + branch switch/abandon/merge + watchdog + recovery + export/import bundle 的 Session Engine v1 骨架落位到该层，并且其 runtime snapshot 已接入 `DecisionTestingRuntimeExport -> DecisionSystemFlightDeck` 主链，宿主控制面已支持从 checkpoint 直接 restore 到 recovery branch，以及把 session 导入为 `paused` 的安全恢复会话；最新的 timeline rebuild 还能在 merge 事件被 checkpoint 吸收后保留结构化 `mergeNotice`，同时 `Home / History / Portrait / Settings / Control Center` 已统一消费结构化 watchdog/recovery health summary，而不是各自拼 fault/recovery 文案，`merge-ready correction branches` 也已成为 shared runtime fact，可在 panel / control center / flight deck 直接看到等待并回主线的活跃分支数；进一步地，shared Session Engine panel 与 control center 现在都会统一给出 `pending import / merge review / replay anchor` review digest，不需要进入专门的 branch inspector 也能看到当前最该审查的恢复与并线压力，control-center header 也已直接消费共享 `pending import` 预审查 block，而不是只显示 digest 标题；同时 control snapshot 在 aggregate runtime snapshot 不完整时会回退到 per-session merge facts 的更强信号，不会把活跃 correction merge queue 漏掉；flight deck 的 data-layer signals 也已带上结构化 `checkpoint recovery / replay session / stable checkpoint` 恢复线索；这条 review/replay surface 现在还通过单点 `DecisionSessionEngineReviewDigestBuilder`、共享 import-preview digest view、共享 review detail rows、共享 pending-import block 收口，避免 panel / control center / import preview / merge review / runtime export 各自维护一套文案或支撑事实行，同时 runtime replay summary 也不会再把 merge review 文案误标成 kill-switch；Quick / Balance / Mirror 的 live eBrain turn 现在还会把 compact `budget / route / risk / permit / host gate / fold / review task` 写进 Session Engine checkpoint，并由 runtime inspection 重新抽取后送入 shared session digest与 flight-deck data signals，所以恢复线已能明确暴露“checkpoint 里保住了哪一版 eBrain 判定”；这批 compact facts 最近又通过单点 `DecisionEvolutionEBrainFactsBundle` 继续收口，`runtime export / flight deck / substrate bridge` 已统一读取同一套 `summary / runtime / brain / budget / review-task / audit / kill-switch` 事实，不再各自拼恢复 copy；同时 shared `DecisionReplayDiagnosticsView` 已经统一了 `SelfPortrait + HistoryDetail` 的 replay diagnostics 呈现，而 host-owned tool lifecycle 也补上了更细粒度的 `.acting` 心跳与 eBrain-enriched checkpoint draft，因此长动作对 watchdog、recovery 与 replay 叙事都已有中间步态；这条主线最近又继续抬到了 `Replay lineage` 叙事层，shared replay diagnostics 现在会把 compact `budget / review task` 和既有的 `risk / permit / audit / kill-switch` 一起展示出来，因此宿主不进入 Session Engine 专属控制面也能在 replay/history 入口直接看见恢复线保住的预算壳和待复核动作；现在连 `HistoryDetailView` 也会异步匹配共享 replay entry，把同一套 compact facts 带进单条 Quick / Balance / Mirror 历史详情，不再让 detail 层退回为只读业务字段；与此同时，tracked workspace lifecycle 已经扩展到 `persist / restore / clear` 三条边界，显式 reopen 与 support/shared-life 清空都会走同一套 Session Engine tool lifecycle，而 shared `Session Engine` 摘要也会直接显示 checkpoint 中的 `action: persisted/restored/cleared active ... workspace state`，所以宿主现在能在 panel / control center / flight deck 直接看见最近一次恢复安全点到底是保存、恢复还是清空；在同一层的本地模型 runtime 面，宿主现在默认优先使用 `Apple Foundation Model`，但 Gemma 与 generic open-model 资产库已经进入共享 local-model library surface，open-model 保留槽位也能在存在首选导入资产时升级为受控 preview adapter，并复用 `TemplateLocalModelAdapter` 为 `quick / balance / mirror / reminder` 提供安全的本地启发式增强，而不是永远停留在空槽位；最近这条 generic open-model 链又补上了结构化 `OpenModelLocalRuntimeBridge`，所以 host/export/flight-deck 现在能明确区分“slot 仍在但等待导入”和“已经以 Heuristic preview 模式激活”的 runtime 状态 | 真正的图编译、混合量化、KV/状态恢复 runtime、冷热分包工业实现，以及把 Session Engine 全面接入主产品 turn/runtime；generic open-model 仍缺真实推理 runtime，而非仅 preview adapter |
+| L4 | 地平线层 | 外部工程 | 总纲、课程位、对象协议、WBS、训练阶段已经固定 | 基座预训练、结构课程、反事实课程、边界课程、checkpoint 产线 |
+| L5 | 宿纹层 | Alpha | `HostProfile`、版本/删除/回滚 contract、宿主控制面、宿主影响 gate 语义已经进入 schema 与 UI | 真正的宿主 adapter、长期协议晋升链、本地加密宿主仓全量实装 |
+| L6 | 临场眼 | Alpha | `ContextFrame`、task/risk/manipulation 观测对象已进入 turn/export/console | 真实情境识别器、多语种/反话/关系语境专项模型与基准 |
+| L7 | 镜刃层 | Alpha | `DecomposeFrame`、mirror/decompose schema、checkpoint 展示与回放支架已落地 | 真实解构引擎、矛盾检测器、unknowns 质量门禁、历史冲突专模 |
+| L8 | 海马井 | Alpha | 记忆/lineage/checkpoint/replay 已进入产品链，长期写入受 `UpdateTicket` 和 review 控制 | 热温冷三层 promotion/freeze/audit 全闭环、冲突对处理产线 |
+| L9 | 梦环层 | Alpha | `ThoughtFrame`、loop coordinator、protective turn、candidate/forecast/critique 对象已主链接线 | 真实多候选、未来投影、反方攻击、收敛策略与端侧循环优化 |
+| L10 | 三我庭 | 脚手架 | `TriSelfScore`、merge choice contract、调用位与展示位已存在 | 真正的本我/自我/超我多头打分、veto explain、训练与回归体系 |
+| L11 | 风闸层 | Alpha | `RiskCard`、`ActionPermit`、kill switch、block/delay/replace、runtime audit 已进入主链与 UI | 专项 GSI 模型、操控/煤气灯专项校准、风险校准曲线与专项 bench |
+| L12 | 柔手层 | 已落地 | answer/compare/delay/block/replace 模式、protective rendering、宿主控制面解释入口已可见 | 更丰富的替代动作模板、风格细化、更多宿主工作流模板 |
+| L13 | 蜕变炉 | Alpha | `UpdateTicket`、checkpoint lineage、review/apply/rollback/clear lineage、control center 已上线到主产品壳 | 离线学习流水线、规则候选验证、自动晋升、训练资产闭环 |
+
+## 横向基础设施
+
+| 方向 | 当前状态 | 已落地 | 仍缺 |
+| --- | --- | --- | --- |
+| Schema 治理 | 已落地 | schema registry、对象版本、program blueprint、回归测试 | 更细的迁移器与跨版本升级工具 |
+| 回放与观测 | 已落地 | runtime export、flight deck、portrait/history/home/settings/control center 一致化；shared replay diagnostics presentation 已进入 `SelfPortrait` / `HistoryDetail` / `ReviewProfile` / replay builder tests；`DecisionReviewEngine` 现在还统一承担 quick/balance/mirror replay-entry 的 title/detail/action/timestamp 映射，并进一步接管 `HistoryDetail` 的 header/field-row/open-copy 构造，减少 replay/history 页面级语义分叉 | 更完整的 pilot/release 运营面与跨端汇总 |
+| 风险门禁 | Alpha | protect/budget clamp/kill switch/review queue 已可用 | 红队基准、专项 GSI 量化、上线门禁自动化 |
+| 端侧集成 | Alpha | iOS app、widget、watch、sample host 全部吃共享 surface contract | 真机矩阵、热稳、包体/内存/温升优化产线 |
+| 训练与蒸馏 | 外部工程 | 路线、WBS、对象、损失函数已冻结 | 教师编排、蒸馏平台、QAT、模型注册产线 |
+
+## 当前阶段判断
+
+按 `M0-M7` 的里程碑口径，当前仓库更接近：
+
+- `已稳定跨过 M2`
+- `M3 / M4 Alpha 在推进中`
+- `距离 M6 Mobile RC 仍有明显差距`
+
+更准确的产品表述应该是：
+
+`13层执行架构、对象协议、主链路、宿主控制面、风险闸门、checkpoint lineage、review/rollback 已落地；底盘 runtime、双模型训练、GSI 专项模型、离线学习流水线仍在补完。`
+
+## 对外可讲 / 不可讲
+
+### 可讲
+
+- 13 层对象协议与主调用链已落进真实工程
+- 风险闸门、保护性 permit、kill switch、checkpoint lineage 已进入产品主链
+- 宿主控制面、review/apply/rollback 已经不是概念图
+
+### 暂不应夸大
+
+- 不应说“13层脑核已完整实现”
+- 不应说“完整双模型端侧量产已完成”
+- 不应说“GSI 专项模型与移动端深思 runtime 已 fully shipped”
+- 不应说“离线学习与自我进化已经闭环自动化”

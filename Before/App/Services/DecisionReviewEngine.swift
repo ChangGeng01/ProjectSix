@@ -40,6 +40,47 @@ struct ReviewProfile: Equatable {
     let sections: [ReviewProfileSection]
 }
 
+struct DecisionReviewTimelineEntryPresentation: Equatable {
+    enum HeaderAccentStyle: Equatable {
+        case capsule
+        case accent
+    }
+
+    let title: String
+    let secondaryLine: String?
+    let labelTitle: String
+    let labelSymbolName: String
+    let headerAccentText: String
+    let headerAccentStyle: HeaderAccentStyle
+    let supplementaryLine: String?
+    let timestamp: Date
+    let footerAccentText: String?
+}
+
+struct DecisionReviewRecentEntryPresentation: Equatable {
+    let title: String
+    let secondaryLine: String?
+    let labelTitle: String
+    let labelSymbolName: String
+    let timestamp: Date
+    let footerText: String
+}
+
+struct DecisionReviewDetailRow: Identifiable, Equatable {
+    let title: String
+    let value: String
+
+    var id: String { title }
+}
+
+struct DecisionReviewDetailPresentation: Equatable {
+    let eyebrow: String
+    let title: String
+    let subtitle: String
+    let reopenTitle: String
+    let rows: [DecisionReviewDetailRow]
+}
+
 enum ReviewProfileEntry: Identifiable {
     case quick(CheckEvent)
     case balance(BalanceDecisionRecord)
@@ -89,6 +130,17 @@ enum ReviewProfileEntry: Identifiable {
         }
     }
 
+    var mode: DecisionMode {
+        switch self {
+        case .quick:
+            .quick
+        case .balance:
+            .balance
+        case .mirror:
+            .mirror
+        }
+    }
+
     var timestamp: Date {
         switch self {
         case .quick(let event):
@@ -99,9 +151,159 @@ enum ReviewProfileEntry: Identifiable {
             record.updatedAt
         }
     }
+
+    func matches(_ record: DeveloperDecisionReplayRecord) -> Bool {
+        id == record.id
+    }
 }
 
 enum DecisionReviewEngine {
+    static func detailPresentation(
+        for event: CheckEvent
+    ) -> DecisionReviewDetailPresentation {
+        var rows = [
+            detailRow("Scenario", event.scenario.title),
+            detailRow("Verdict", event.verdict.title),
+            detailRow("Why now", event.motivation.title),
+            detailRow("Usually after", event.expectedOutcome.title),
+            detailRow("Pull-back", event.controlLevel.title)
+        ]
+        .compactMap { $0 }
+
+        if let noteRow = detailRow("Note", event.note) {
+            rows.append(noteRow)
+        }
+
+        if let reflection = event.reflectionOutcome,
+           let reflectionRow = detailRow("Reflection", reflection.title) {
+            rows.append(reflectionRow)
+        }
+
+        if let reflectionNote = event.reflectionNote,
+           let reflectionNoteRow = detailRow("After note", reflectionNote) {
+            rows.append(reflectionNoteRow)
+        }
+
+        return DecisionReviewDetailPresentation(
+            eyebrow: "Quick check",
+            title: event.currentPerspective,
+            subtitle: event.afterPerspective,
+            reopenTitle: "Reopen this check",
+            rows: rows
+        )
+    }
+
+    static func detailPresentation(
+        for record: BalanceDecisionRecord
+    ) -> DecisionReviewDetailPresentation {
+        DecisionReviewDetailPresentation(
+            eyebrow: "Balance board",
+            title: record.prompt,
+            subtitle: record.focusSummary,
+            reopenTitle: "Reopen this board",
+            rows: [
+                detailRow("What you want", record.desire),
+                detailRow("What you protect", record.concern),
+                detailRow("Reality", record.constraint),
+                detailRow("Long-term", record.longTerm),
+                detailRow("Focus", record.focusTitle),
+                detailRow("Next action", record.nextAction)
+            ]
+            .compactMap { $0 }
+        )
+    }
+
+    static func detailPresentation(
+        for record: MirrorDecisionRecord
+    ) -> DecisionReviewDetailPresentation {
+        DecisionReviewDetailPresentation(
+            eyebrow: "Mirror",
+            title: record.prompt,
+            subtitle: record.coreTension,
+            reopenTitle: "Reopen this mirror",
+            rows: [
+                detailRow("Emotion", record.emotion),
+                detailRow("Relationship", record.relationship),
+                detailRow("Reality", record.reality),
+                detailRow("Long-term", record.longTerm),
+                detailRow("Self", record.selfLens),
+                detailRow("Mirror action", record.nextActionTitle),
+                detailRow("Next step", record.nextAction)
+            ]
+            .compactMap { $0 }
+        )
+    }
+
+    static func timelineEntryPresentation(
+        for event: CheckEvent
+    ) -> DecisionReviewTimelineEntryPresentation {
+        DecisionReviewTimelineEntryPresentation(
+            title: event.currentPerspective,
+            secondaryLine: event.afterPerspective,
+            labelTitle: event.scenario.title,
+            labelSymbolName: event.scenario.symbolName,
+            headerAccentText: event.verdict.title,
+            headerAccentStyle: .capsule,
+            supplementaryLine: nil,
+            timestamp: event.createdAt,
+            footerAccentText: event.reflectionOutcome?.title
+        )
+    }
+
+    static func timelineEntryPresentation(
+        for record: BalanceDecisionRecord
+    ) -> DecisionReviewTimelineEntryPresentation {
+        DecisionReviewTimelineEntryPresentation(
+            title: record.prompt,
+            secondaryLine: record.focusSummary,
+            labelTitle: "Balance board",
+            labelSymbolName: DecisionMode.balance.symbolName,
+            headerAccentText: record.focusTitle,
+            headerAccentStyle: .accent,
+            supplementaryLine: record.nextAction,
+            timestamp: record.updatedAt,
+            footerAccentText: nil
+        )
+    }
+
+    static func timelineEntryPresentation(
+        for record: MirrorDecisionRecord
+    ) -> DecisionReviewTimelineEntryPresentation {
+        DecisionReviewTimelineEntryPresentation(
+            title: record.prompt,
+            secondaryLine: record.coreTension,
+            labelTitle: "Mirror",
+            labelSymbolName: DecisionMode.mirror.symbolName,
+            headerAccentText: record.nextActionTitle,
+            headerAccentStyle: .accent,
+            supplementaryLine: record.nextAction,
+            timestamp: record.updatedAt,
+            footerAccentText: nil
+        )
+    }
+
+    static func recentEntryPresentation(
+        for entry: ReviewProfileEntry
+    ) -> DecisionReviewRecentEntryPresentation {
+        DecisionReviewRecentEntryPresentation(
+            title: entry.title,
+            secondaryLine: entry.detail,
+            labelTitle: entry.mode.title,
+            labelSymbolName: entry.mode.symbolName,
+            timestamp: entry.timestamp,
+            footerText: entry.actionTitle
+        )
+    }
+
+    private static func detailRow(
+        _ title: String,
+        _ value: String
+    ) -> DecisionReviewDetailRow? {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedValue.isEmpty else { return nil }
+        return DecisionReviewDetailRow(title: title, value: trimmedValue)
+    }
+
     static func summaries(
         quick: [CheckEvent],
         balance: [BalanceDecisionRecord],

@@ -9,6 +9,18 @@ struct DecisionEvolutionCoverageFacts: Equatable, Sendable {
     let recoveredTicketCount: Int
 }
 
+struct DecisionEvolutionRuntimeFacts: Equatable, Sendable {
+    let effectiveEBrainSummary: DeveloperDecisionReplayEBrainSummary?
+    let effectiveEBrainSource: DecisionTestingEBrainSource?
+    let effectiveEBrainFactsBundle: DecisionEvolutionEBrainFactsBundle?
+    let thoughtFoldChecksum: String?
+    let updateTicketSummaries: [String]
+    let runtimeAuditFindings: [String]
+    let effectiveActiveKillSwitches: [String]
+    let recommendedKillSwitches: [String]
+    let coverageFacts: DecisionEvolutionCoverageFacts
+}
+
 enum DecisionCapabilityCoverageBuilder {
     static func build(
         from export: DecisionTestingRuntimeExport,
@@ -42,24 +54,7 @@ enum DecisionCapabilityCoverageBuilder {
         from export: DecisionTestingRuntimeExport,
         currentBrainState: CurrentBrainState?
     ) -> DecisionEvolutionCoverageFacts {
-        let recoveredCheckpoint = currentBrainState?.evolutionState.latestCheckpoint
-            .flatMap { checkpoint -> DecisionReviewCheckpointSnapshot? in
-                guard checkpoint.approvalState == .automatic else { return nil }
-                return DecisionReviewCheckpointSnapshot(
-                    summary: checkpoint,
-                    mode: currentBrainState?.mode ?? .quick
-                )
-            } ?? export.evolutionControlSurface.activeCheckpoint
-
-        let latestPersistedLineage = export.latestCheckpointLineage
-
-        return DecisionEvolutionCoverageFacts(
-            recoveredCheckpoint: recoveredCheckpoint,
-            latestPersistedLineage: latestPersistedLineage,
-            recoveredEBrainAvailable: recoveredCheckpoint != nil || latestPersistedLineage != nil,
-            recoveredAuditFindingCount: recoveredCheckpoint?.auditFindings.count ?? export.runtimeAuditFindings.count,
-            recoveredTicketCount: recoveredCheckpoint?.updateTicketSummaries.count ?? export.updateTicketSummaries.count
-        )
+        export.evolutionRuntimeFacts(currentBrainState: currentBrainState).coverageFacts
     }
 
     private static func referenceInput(

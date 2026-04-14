@@ -13,8 +13,12 @@ struct DecisionTestingRuntimeSnapshot: Equatable, Sendable {
     let runtimeStatus: DecisionModelRuntimeStatus
     let foundationStatus: DecisionModelProviderStatus
     let gemmaProviderStatus: DecisionModelProviderStatus
+    let openModelProviderStatus: DecisionModelProviderStatus
+    let openModelRuntimeStatus: OpenModelLocalRuntimeStatus?
     let gemmaBundleStatus: GemmaModelBundleStatus
     let gemmaRuntimeStatus: GemmaLocalRuntimeStatus
+    let registeredProviders: [DecisionModelProviderDescriptor]
+    let localModelLibrary: DecisionLocalModelLibrarySnapshot
 }
 
 struct DecisionTestingLaunchOptions: Equatable, Sendable {
@@ -140,6 +144,10 @@ enum DecisionTestingInterface {
         environmentOverride(environment: environment)?.inferenceBackendPolicy ?? .auto
     }
 
+    static func runtimeTestingContextDetected() -> Bool {
+        NSClassFromString("XCTestCase") != nil
+    }
+
     static func effectivePreferences(
         stored: BeforePreferences = BeforePreferencesStore.load(),
         environment: [String: String] = ProcessInfo.processInfo.environment
@@ -168,10 +176,36 @@ enum DecisionTestingInterface {
         let stubProfile = override?.stubProfile
         let backendPolicy = override?.inferenceBackendPolicy ?? .auto
         let deviceCapabilities = DeviceCapabilitySnapshot.current
+        DecisionOpenModelRuntimeRegistration.syncRegistry(
+            preferredAssetID: preferences.preferredOpenModelAssetID
+        )
+        let registry = DecisionIntelligenceProviderRegistry.shared
+        let registeredProviders = registry.descriptors()
+        let openModelProviderStatus = registry.statusesByKind()[.openModel] ?? DecisionModelProviderStatus(
+            kind: .openModel,
+            isAvailable: false,
+            title: "Unavailable",
+            detail: "No open-model runtime is registered."
+        )
         let executionProfile = DecisionIntelligenceCoordinator.executionProfile(
             preferences: preferences,
             testingStubProfile: stubProfile,
             device: deviceCapabilities
+        )
+        let localModelLibrary = DecisionLocalModelLibrarySnapshot.current(
+            preferredProvider: preferences.preferredIntelligenceProvider,
+            preferredGemmaAssetID: preferences.preferredGemmaAssetID,
+            preferredGemmaAsset: GemmaE4BIntelligenceService.preferredModel(
+                preferredAssetID: preferences.preferredGemmaAssetID
+            ),
+            importedGemmaAssets: GemmaE4BIntelligenceService.importedModels,
+            bundledGemmaAsset: GemmaE4BIntelligenceService.bundledModel,
+            preferredOpenModelAssetID: preferences.preferredOpenModelAssetID,
+            preferredOpenModelAsset: OpenModelAssetCatalog.preferredAsset(
+                preferredAssetID: preferences.preferredOpenModelAssetID
+            ),
+            importedOpenModelAssets: OpenModelAssetCatalog.importedAssets(),
+            openModelDescriptor: registry.descriptor(for: .openModel)
         )
         let gemmaBackendResolution = GemmaE4BIntelligenceService.backendResolution(
             policy: backendPolicy,
@@ -192,8 +226,12 @@ enum DecisionTestingInterface {
             ),
             foundationStatus: FoundationModelsIntelligenceService.availabilityStatus,
             gemmaProviderStatus: GemmaE4BIntelligenceService.availabilityStatus,
+            openModelProviderStatus: openModelProviderStatus,
+            openModelRuntimeStatus: localModelLibrary.openModelRuntimeStatus,
             gemmaBundleStatus: GemmaE4BIntelligenceService.modelBundleStatus,
-            gemmaRuntimeStatus: GemmaE4BIntelligenceService.localRuntimeStatus
+            gemmaRuntimeStatus: GemmaE4BIntelligenceService.localRuntimeStatus,
+            registeredProviders: registeredProviders,
+            localModelLibrary: localModelLibrary
         )
     }
 
@@ -257,12 +295,16 @@ enum DecisionTestingInterface {
         mirror: [MirrorDecisionRecord],
         preferences: BeforePreferences = effectivePreferences(),
         runtimeSnapshot: DecisionTestingRuntimeSnapshot? = nil,
+        sessionEngineSnapshot: DecisionSessionRuntimeSnapshot? = nil,
+        pendingSessionEngineImportPreview: DecisionSessionEnginePendingImportPreview? = nil,
+        activeKillSwitches: [String] = [],
         environment: [String: String] = ProcessInfo.processInfo.environment,
         traceLimit: Int = BeforePolicy.Settings.developerTraceLimit,
         replayLimit: Int = BeforePolicy.Settings.developerReplayLimit,
         persistedCheckpointLineages: [DecisionEvolutionLineageSnapshot] = [],
         pendingReviewCheckpoints: [DecisionReviewCheckpointSnapshot] = [],
         activeCheckpointHint: DecisionReviewCheckpointSnapshot? = nil,
+        activeCheckpointSource: DecisionEvolutionActiveCheckpointSource = .none,
         restorableCheckpointIDs: Set<String> = [],
         debugStore: DecisionIntelligenceDebugStore = .shared,
         eBrainStore: EBrainTurnDebugStore = .shared,
@@ -289,6 +331,8 @@ enum DecisionTestingInterface {
         return DecisionTestingRuntimeExport(
             generatedAt: .now,
             runtimeSnapshot: snapshot,
+            sessionEngineSnapshot: sessionEngineSnapshot,
+            pendingSessionEngineImportPreview: pendingSessionEngineImportPreview,
             registeredProviders: registry.descriptors(),
             intelligenceTelemetry: await telemetryStore.snapshot(),
             cacheTelemetry: await cache.telemetrySnapshot(),
@@ -298,7 +342,9 @@ enum DecisionTestingInterface {
             persistedCheckpointLineages: persistedCheckpointLineages,
             pendingReviewCheckpoints: pendingReviewCheckpoints,
             activeCheckpointHint: activeCheckpointHint,
+            activeCheckpointSource: activeCheckpointSource,
             restorableCheckpointIDs: restorableCheckpointIDs,
+            activeKillSwitches: activeKillSwitches,
             eBrainTurn: nil
         )
     }

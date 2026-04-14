@@ -49,6 +49,18 @@ struct BeforeWidgetView: View {
             Text("Before")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.7))
+
+            if let evolution = entry.snapshot.evolution, evolution.surfacesAttention {
+                widgetIntentButton(
+                    title: evolution.controlEntryTitle,
+                    systemImage: evolution.controlEntrySystemImage,
+                    intent: OpenEvolutionControlIntent(
+                        entrySource: .homeWidgetSmall,
+                        prompt: evolution.controlEntryPrompt
+                    )
+                )
+            }
+
             Spacer()
             widgetIntentButton(
                 title: "Worth it?",
@@ -86,6 +98,13 @@ struct BeforeWidgetView: View {
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.82))
                     .lineLimit(3)
+
+                if let evolution = entry.snapshot.evolution, evolution.surfacesAttention {
+                    Text(evolution.compactStatusLine)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .lineLimit(2)
+                }
             }
 
             HStack(spacing: 8) {
@@ -103,6 +122,17 @@ struct BeforeWidgetView: View {
                     title: "Mirror",
                     systemImage: DecisionMode.mirror.symbolName,
                     intent: OpenDecisionModeIntent(mode: .mirror, entrySource: .homeWidgetMedium)
+                )
+            }
+
+            if let evolution = entry.snapshot.evolution, evolution.surfacesAttention {
+                widgetIntentButton(
+                    title: evolution.controlEntryTitle,
+                    systemImage: evolution.controlEntrySystemImage,
+                    intent: OpenEvolutionControlIntent(
+                        entrySource: .homeWidgetMedium,
+                        prompt: evolution.controlEntryPrompt
+                    )
                 )
             }
         }
@@ -143,6 +173,8 @@ struct BeforeWidgetView: View {
             Label(title, systemImage: systemImage)
                 .font(prominent ? .headline.weight(.bold) : .caption.weight(.semibold))
                 .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .allowsTightening(true)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, prominent ? 10 : 8)
                 .padding(.horizontal, 10)

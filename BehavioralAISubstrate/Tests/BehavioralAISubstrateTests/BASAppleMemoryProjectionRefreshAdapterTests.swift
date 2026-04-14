@@ -7,7 +7,7 @@ import Testing
 @Suite("BASApple Memory Projection Refresh Adapter")
 struct BASAppleMemoryProjectionRefreshAdapterTests {
     @Model
-    final class GovernedFixture: BASAppleGovernedMemoryEntity {
+    final class RefreshGovernedFixture: BASAppleGovernedMemoryEntity {
         @Attribute(.unique) var basID: String
         var basTypeID: String
         var basTopic: String
@@ -64,8 +64,8 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
             self.basTierID = basTierID
         }
 
-        static func basMake(from fields: BASGovernedMemoryStoredFields) -> GovernedFixture {
-            GovernedFixture(
+        static func basMake(from fields: BASGovernedMemoryStoredFields) -> RefreshGovernedFixture {
+            RefreshGovernedFixture(
                 basID: fields.id,
                 basTypeID: fields.typeID,
                 basTopic: fields.topic,
@@ -125,7 +125,7 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
     }
 
     @Model
-    final class CandidateFixture: BASAppleCandidateMemoryEntity {
+    final class RefreshCandidateFixture: BASAppleCandidateMemoryEntity {
         @Attribute(.unique) var basID: String
         var basTypeID: String
         var basTopic: String
@@ -194,8 +194,8 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
             self.basTierID = basTierID
         }
 
-        static func basMake(from fields: BASCandidateMemoryStoredFields) -> CandidateFixture {
-            CandidateFixture(
+        static func basMake(from fields: BASCandidateMemoryStoredFields) -> RefreshCandidateFixture {
+            RefreshCandidateFixture(
                 basID: fields.id,
                 basTypeID: fields.typeID,
                 basTopic: fields.topic,
@@ -273,7 +273,7 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
     }
 
     @Model
-    final class CueFixture: BASAppleCueMemoryEntity {
+    final class RefreshCueFixture: BASAppleCueMemoryEntity {
         @Attribute(.unique) var id: UUID
         var content: String
         var lastUsedAt: Date
@@ -290,7 +290,7 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
     }
 
     @Model
-    final class CheckEventFixture: BASAppleCheckEventMemoryEntity, BASAppleProjectionEventSource {
+    final class RefreshCheckEventFixture: BASAppleCheckEventMemoryEntity, BASAppleProjectionEventSource {
         @Attribute(.unique) var id: String
         var scenarioID: String
         var scenarioTitle: String
@@ -344,7 +344,7 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
     }
 
     @Model
-    final class ComparativeFixture: BASAppleComparativeMemoryEntity {
+    final class RefreshComparativeFixture: BASAppleComparativeMemoryEntity {
         @Attribute(.unique) var id: UUID
         var prompt: String
         var longTerm: String
@@ -367,7 +367,7 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
     }
 
     @Model
-    final class ReflectiveFixture: BASAppleReflectiveMemoryEntity {
+    final class RefreshReflectiveFixture: BASAppleReflectiveMemoryEntity {
         @Attribute(.unique) var id: UUID
         var prompt: String
         var longTerm: String
@@ -409,10 +409,10 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
                 admittedCandidateCount: 0
             ),
             refreshGovernanceSnapshot: { governanceSnapshot(in: $0) },
-            cueType: CueFixture.self,
-            checkEventType: CheckEventFixture.self,
-            comparativeRecordType: ComparativeFixture.self,
-            reflectiveRecordType: ReflectiveFixture.self,
+            cueType: RefreshCueFixture.self,
+            checkEventType: RefreshCheckEventFixture.self,
+            comparativeRecordType: RefreshComparativeFixture.self,
+            reflectiveRecordType: RefreshReflectiveFixture.self,
             fetchRecords: { fetchRecords(in: $0, limit: $1) },
             fetchCandidates: { fetchCandidates(in: $0, limit: $1) },
             fetchCheckEvents: { fetchCheckEvents(in: $0, limit: $1) },
@@ -444,7 +444,7 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
         let context = ModelContext(container)
 
         context.insert(
-            GovernedFixture(
+            RefreshGovernedFixture(
                 basID: "profile.concise",
                 basTypeID: "profile",
                 basTopic: "communication",
@@ -479,10 +479,10 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
                 admittedCandidateCount: 0
             ),
             refreshGovernanceSnapshot: { governanceSnapshot(in: $0) },
-            cueType: CueFixture.self,
-            checkEventType: CheckEventFixture.self,
-            comparativeRecordType: ComparativeFixture.self,
-            reflectiveRecordType: ReflectiveFixture.self,
+            cueType: RefreshCueFixture.self,
+            checkEventType: RefreshCheckEventFixture.self,
+            comparativeRecordType: RefreshComparativeFixture.self,
+            reflectiveRecordType: RefreshReflectiveFixture.self,
             fetchRecords: { fetchRecords(in: $0, limit: $1) },
             fetchCandidates: { fetchCandidates(in: $0, limit: $1) },
             fetchCheckEvents: { fetchCheckEvents(in: $0, limit: $1) },
@@ -491,7 +491,7 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
             rebuildEmbeddings: { _, _, _, _, _ in }
         )
 
-        let storedRecords = try context.fetch(FetchDescriptor<GovernedFixture>())
+        let storedRecords = try context.fetch(FetchDescriptor<RefreshGovernedFixture>())
         #expect(storedRecords.count == 1)
         #expect(refreshed.diagnostics.recordCount == 1)
         #expect(refreshed.baseProjection.records.count == 1)
@@ -500,25 +500,25 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
 
     private func makeContainer() throws -> ModelContainer {
         try ModelContainer(
-            for: GovernedFixture.self,
-            CandidateFixture.self,
-            CueFixture.self,
-            CheckEventFixture.self,
-            ComparativeFixture.self,
-            ReflectiveFixture.self,
+            for: RefreshGovernedFixture.self,
+            RefreshCandidateFixture.self,
+            RefreshCueFixture.self,
+            RefreshCheckEventFixture.self,
+            RefreshComparativeFixture.self,
+            RefreshReflectiveFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
     }
 
     private func seedHistory(into context: ModelContext, now: Date) {
         context.insert(
-            CueFixture(
+            RefreshCueFixture(
                 content: "Sleep on it.",
                 lastUsedAt: now.addingTimeInterval(-3_600)
             )
         )
         context.insert(
-            CheckEventFixture(
+            RefreshCheckEventFixture(
                 id: "event-1",
                 scenarioID: "buy",
                 scenarioTitle: "Buy",
@@ -529,14 +529,14 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
             )
         )
         context.insert(
-            ComparativeFixture(
+            RefreshComparativeFixture(
                 prompt: "Should I buy this tonight?",
                 longTerm: "Tomorrow usually feels clearer.",
                 updatedAt: now.addingTimeInterval(-600)
             )
         )
         context.insert(
-            ReflectiveFixture(
+            RefreshReflectiveFixture(
                 prompt: "Why does this feel urgent now?",
                 longTerm: "Nighttime urgency usually passes.",
                 updatedAt: now.addingTimeInterval(-300)
@@ -545,8 +545,8 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
     }
 
     private func governanceSnapshot(in context: ModelContext) -> BASAppleProjectionGovernanceSnapshot {
-        let records = (try? context.fetch(FetchDescriptor<GovernedFixture>())) ?? []
-        let candidates = (try? context.fetch(FetchDescriptor<CandidateFixture>())) ?? []
+        let records = (try? context.fetch(FetchDescriptor<RefreshGovernedFixture>())) ?? []
+        let candidates = (try? context.fetch(FetchDescriptor<RefreshCandidateFixture>())) ?? []
         return BASAppleProjectionGovernanceSnapshot(
             totalRecordCount: records.count,
             totalCandidateCount: candidates.count,
@@ -560,8 +560,8 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
     private func fetchRecords(
         in context: ModelContext,
         limit: Int
-    ) -> [GovernedFixture] {
-        var descriptor = FetchDescriptor<GovernedFixture>(
+    ) -> [RefreshGovernedFixture] {
+        var descriptor = FetchDescriptor<RefreshGovernedFixture>(
             sortBy: [
                 SortDescriptor(\.basPriority, order: .reverse),
                 SortDescriptor(\.basLastConfirmedAt, order: .reverse)
@@ -574,8 +574,8 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
     private func fetchCandidates(
         in context: ModelContext,
         limit: Int
-    ) -> [CandidateFixture] {
-        var descriptor = FetchDescriptor<CandidateFixture>(
+    ) -> [RefreshCandidateFixture] {
+        var descriptor = FetchDescriptor<RefreshCandidateFixture>(
             sortBy: [
                 SortDescriptor(\.basPriority, order: .reverse),
                 SortDescriptor(\.basLastObservedAt, order: .reverse)
@@ -588,8 +588,8 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
     private func fetchCheckEvents(
         in context: ModelContext,
         limit: Int
-    ) -> [CheckEventFixture] {
-        var descriptor = FetchDescriptor<CheckEventFixture>(
+    ) -> [RefreshCheckEventFixture] {
+        var descriptor = FetchDescriptor<RefreshCheckEventFixture>(
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         descriptor.fetchLimit = limit
@@ -599,8 +599,8 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
     private func fetchComparativeRecords(
         in context: ModelContext,
         limit: Int
-    ) -> [ComparativeFixture] {
-        var descriptor = FetchDescriptor<ComparativeFixture>(
+    ) -> [RefreshComparativeFixture] {
+        var descriptor = FetchDescriptor<RefreshComparativeFixture>(
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
         )
         descriptor.fetchLimit = limit
@@ -610,8 +610,8 @@ struct BASAppleMemoryProjectionRefreshAdapterTests {
     private func fetchReflectiveRecords(
         in context: ModelContext,
         limit: Int
-    ) -> [ReflectiveFixture] {
-        var descriptor = FetchDescriptor<ReflectiveFixture>(
+    ) -> [RefreshReflectiveFixture] {
+        var descriptor = FetchDescriptor<RefreshReflectiveFixture>(
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
         )
         descriptor.fetchLimit = limit

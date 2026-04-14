@@ -73,6 +73,15 @@ struct BalanceBoardView: View {
                             text: $session.longTerm
                         )
 
+                        DecisionSessionEngineResultActionsCard(
+                            sessionID: session.sessionEngineSessionID,
+                            headline: "Session Engine workspace line",
+                            detail: "Open the local recovery line for this board, or branch a correction before you lock in the comparison.",
+                            correctionTitle: "Branch this board from here",
+                            correctionPlaceholder: "Correction: continue this board from a new comparison or constraint line without rewriting the old path.",
+                            correctionReason: "balance workspace correction branch"
+                        )
+
                         BeforeActionButton("Show the board", isEnabled: session.canEvaluate, accessibilityIdentifier: "balance.evaluate") {
                             Task {
                                 await appModel.evaluateBalanceSessionWithIntelligence(session)
@@ -144,6 +153,15 @@ struct BalanceBoardView: View {
                                     session.result = nil
                                 }
                             }
+
+                            DecisionSessionEngineResultActionsCard(
+                                sessionID: session.sessionEngineSessionID,
+                                headline: "Session Engine recovery line",
+                                detail: "Open the local execution history for this board, or branch from this result if the constraints or scope have changed.",
+                                correctionTitle: "Branch this board from here",
+                                correctionPlaceholder: "Correction: change the scope, constraints, or comparison you want this board to continue from.",
+                                correctionReason: "balance board correction branch"
+                            )
                         }
                     }
                     .padding(20)

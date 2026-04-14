@@ -116,7 +116,14 @@ public enum BASEBrainConsoleSupport {
             merged.score = adjustedScore(base: report.score, fallback: blockers.isEmpty ? 0.91 : 0.60)
         case .observability:
             let thermalSummary = turn.runtimeTrace.thermalTrace.joined(separator: " -> ")
-            let killSwitchSummary = turn.runtimeTrace.recommendedKillSwitches.map(\.rawValue).joined(separator: ", ")
+            let activeKillSwitchSummary = turn.runtimeTrace.activeKillSwitches.map(\.rawValue).joined(separator: ", ")
+            let recommendedKillSwitchSummary = turn.runtimeTrace.recommendedKillSwitches.map(\.rawValue).joined(separator: ", ")
+            let killSwitchSummary = [
+                activeKillSwitchSummary.isEmpty ? nil : "active \(activeKillSwitchSummary)",
+                recommendedKillSwitchSummary.isEmpty ? nil : "recommended \(recommendedKillSwitchSummary)"
+            ]
+            .compactMap { $0 }
+            .joined(separator: " • ")
             merged.summary = "Trace \(turn.runtimeTrace.layerEvents.count) events • fold \(turn.thoughtFold.checksum.prefix(12)) • audit \(turn.runtimeTrace.guardrailFindings.count) • cache \(Int((turn.runtimeTrace.cacheHitRate * 100).rounded()))% • thermal \(thermalSummary)\(killSwitchSummary.isEmpty ? "" : " • kill \(killSwitchSummary)")"
             merged.blockers = []
             merged.score = adjustedScore(base: report.score, fallback: 0.92)

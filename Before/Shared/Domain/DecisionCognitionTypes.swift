@@ -3,6 +3,7 @@ import Foundation
 enum DecisionIntentKind: String, Codable, Sendable {
     case quickCapture
     case openMode
+    case openEvolutionControl
     case reopenTomorrowItem
     case predictiveIntervention
     case resumeCurrentDecision

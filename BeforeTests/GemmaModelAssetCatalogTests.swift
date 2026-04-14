@@ -32,6 +32,135 @@ final class GemmaModelAssetCatalogTests: XCTestCase {
         XCTAssertEqual(asset.progressDescription, "13%")
     }
 
+    func testPreferredAssetPrefersReadyImportedAssetOverBundledFallback() {
+        let imported = GemmaModelAsset(
+            fileName: "gemma-4-E4B-it.litertlm",
+            fileSizeBytes: 3_654_467_584,
+            expectedSizeBytes: 3_654_467_584,
+            source: .imported
+        )
+        let bundled = GemmaModelAsset(
+            fileName: "gemma-4-E4B-it.litertlm",
+            fileSizeBytes: 3_654_467_584,
+            expectedSizeBytes: 3_654_467_584,
+            source: .bundled
+        )
+
+        let preferred = GemmaModelAssetCatalog.preferredAsset(
+            importedAssets: [imported],
+            bundledAssets: [bundled]
+        )
+
+        XCTAssertEqual(preferred?.source, .imported)
+    }
+
+    func testPreferredAssetPrefersCompleteBundledAssetOverIncompleteImportedAsset() {
+        let imported = GemmaModelAsset(
+            fileName: "gemma-4-E4B-it.litertlm",
+            fileSizeBytes: 500_000_000,
+            expectedSizeBytes: 3_654_467_584,
+            source: .imported
+        )
+        let bundled = GemmaModelAsset(
+            fileName: "gemma-4-E4B-it.litertlm",
+            fileSizeBytes: 3_654_467_584,
+            expectedSizeBytes: 3_654_467_584,
+            source: .bundled
+        )
+
+        let preferred = GemmaModelAssetCatalog.preferredAsset(
+            importedAssets: [imported],
+            bundledAssets: [bundled]
+        )
+
+        XCTAssertEqual(preferred?.source, .bundled)
+    }
+
+    func testPreferredAssetIDOverridesAutomaticOrderingWhenAssetExists() {
+        let imported = GemmaModelAsset(
+            fileName: "gemma-4-E4B-it.litertlm",
+            fileSizeBytes: 3_654_467_584,
+            expectedSizeBytes: 3_654_467_584,
+            source: .imported
+        )
+        let bundled = GemmaModelAsset(
+            fileName: "gemma-4-E4B-it.litertlm",
+            fileSizeBytes: 3_654_467_584,
+            expectedSizeBytes: 3_654_467_584,
+            source: .bundled
+        )
+
+        let preferred = GemmaModelAssetCatalog.preferredAsset(
+            importedAssets: [imported],
+            bundledAssets: [bundled],
+            preferredAssetID: bundled.assetID
+        )
+
+        XCTAssertEqual(preferred?.assetID, bundled.assetID)
+        XCTAssertEqual(preferred?.source, .bundled)
+    }
+
+    func testAssetIDDifferentiatesImportedAndBundledAssetsWithSameFileName() {
+        let imported = GemmaModelAsset(
+            fileName: "gemma-4-E4B-it.litertlm",
+            fileSizeBytes: 3_654_467_584,
+            expectedSizeBytes: 3_654_467_584,
+            source: .imported
+        )
+        let bundled = GemmaModelAsset(
+            fileName: "gemma-4-E4B-it.litertlm",
+            fileSizeBytes: 3_654_467_584,
+            expectedSizeBytes: 3_654_467_584,
+            source: .bundled
+        )
+
+        XCTAssertNotEqual(imported.assetID, bundled.assetID)
+        XCTAssertEqual(imported.assetID, "imported:gemma-4-E4B-it.litertlm")
+        XCTAssertEqual(bundled.assetID, "bundled:gemma-4-E4B-it.litertlm")
+    }
+
+    func testImportModelCopiesAssetIntoImportedLibrary() throws {
+        let sourceDirectory = temporaryDirectoryURL()
+        let libraryDirectory = temporaryDirectoryURL()
+        let sourceURL = temporaryFileURL(
+            in: sourceDirectory,
+            name: "gemma-4-E4B-it.litertlm",
+            size: 3_654_467_584
+        )
+
+        let imported = try GemmaModelAssetCatalog.importModel(
+            from: sourceURL,
+            baseDirectoryURL: libraryDirectory
+        )
+
+        XCTAssertEqual(imported.source, .imported)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: imported.fileURL.path))
+        XCTAssertTrue(imported.fileURL.path.contains("GemmaModels"))
+    }
+
+    func testRemoveImportedModelDeletesImportedAsset() throws {
+        let sourceDirectory = temporaryDirectoryURL()
+        let libraryDirectory = temporaryDirectoryURL()
+        let sourceURL = temporaryFileURL(
+            in: sourceDirectory,
+            name: "gemma-4-E4B-it.litertlm",
+            size: 3_654_467_584
+        )
+
+        let imported = try GemmaModelAssetCatalog.importModel(
+            from: sourceURL,
+            baseDirectoryURL: libraryDirectory
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: imported.fileURL.path))
+
+        try GemmaModelAssetCatalog.removeImportedModel(
+            named: imported.fileName,
+            baseDirectoryURL: libraryDirectory
+        )
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: imported.fileURL.path))
+    }
+
     private func temporaryDirectoryURL() -> URL {
         let directory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

@@ -4,10 +4,8 @@ struct DecisionEvolutionCheckpointPanelView: View {
     let title: String?
     let checkpoint: DecisionEvolutionCheckpointPresentation
     let controlSurface: DecisionEvolutionControlSurface
-    let interactionMode: DecisionEvolutionControlInteractionMode
-    let showControlCenterShortcut: Bool
-    let showHistoryShortcut: Bool
-    let showPortraitShortcut: Bool
+    let surfaceContract: DecisionEvolutionSurfaceContract
+    let navigationOptions: DecisionEvolutionNavigationSurfaceOptions
     let isSelected: Bool
     let onToggleSelection: (() -> Void)?
     let afterMutation: (() -> Void)?
@@ -16,10 +14,8 @@ struct DecisionEvolutionCheckpointPanelView: View {
         title: String? = nil,
         checkpoint: DecisionEvolutionCheckpointPresentation,
         controlSurface: DecisionEvolutionControlSurface,
-        interactionMode: DecisionEvolutionControlInteractionMode = .mutationHub,
-        showControlCenterShortcut: Bool = false,
-        showHistoryShortcut: Bool = false,
-        showPortraitShortcut: Bool = false,
+        surfaceContract: DecisionEvolutionSurfaceContract,
+        navigationOptions: DecisionEvolutionNavigationSurfaceOptions? = nil,
         isSelected: Bool = false,
         onToggleSelection: (() -> Void)? = nil,
         afterMutation: (() -> Void)? = nil
@@ -27,10 +23,8 @@ struct DecisionEvolutionCheckpointPanelView: View {
         self.title = title
         self.checkpoint = checkpoint
         self.controlSurface = controlSurface
-        self.interactionMode = interactionMode
-        self.showControlCenterShortcut = showControlCenterShortcut
-        self.showHistoryShortcut = showHistoryShortcut
-        self.showPortraitShortcut = showPortraitShortcut
+        self.surfaceContract = surfaceContract
+        self.navigationOptions = navigationOptions ?? surfaceContract.navigationSurfaceOptions()
         self.isSelected = isSelected
         self.onToggleSelection = onToggleSelection
         self.afterMutation = afterMutation
@@ -103,13 +97,11 @@ struct DecisionEvolutionCheckpointPanelView: View {
                     checkpointID: checkpoint.checkpointID,
                     checkpointPresentation: checkpoint,
                     controlSurface: controlSurface,
-                    interactionMode: interactionMode,
+                    surfaceContract: surfaceContract,
                     applyReady: checkpoint.applyReady,
                     approvalState: checkpoint.approvalState,
                     hasLineage: checkpoint.hasLineage,
-                    showControlCenterShortcut: showControlCenterShortcut,
-                    showHistoryShortcut: showHistoryShortcut,
-                    showPortraitShortcut: showPortraitShortcut,
+                    navigationOptions: navigationOptions,
                     afterMutation: afterMutation
                 )
             }

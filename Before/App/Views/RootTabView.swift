@@ -89,6 +89,12 @@ struct RootTabView: View {
                     .environmentObject(appModel)
             }
         }
+        .sheet(isPresented: $appModel.isSessionEngineControlCenterPresented) {
+            NavigationStack {
+                DecisionSessionEngineControlCenterView()
+                    .environmentObject(appModel)
+            }
+        }
         .fullScreenCover(item: $appModel.letGoContext) { context in
             LetGoView(context: context)
                 .environmentObject(appModel)

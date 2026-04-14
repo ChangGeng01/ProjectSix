@@ -2,6 +2,32 @@ import XCTest
 @testable import BASMemory
 
 final class BASEvolutionCoreTests: XCTestCase {
+    func testLineageSummaryBackfillsSchemaVersionWhenDecodingLegacyPayload() throws {
+        let legacyJSON = """
+        {
+          "recordedAt": 1715000000,
+          "sessionID": "legacy-session",
+          "taskType": "decision",
+          "riskLevel": "high",
+          "permitMode": "delay",
+          "hostGatePercent": 78,
+          "thoughtFoldChecksum": "fold-legacy",
+          "updateTicketSummaries": ["legacy ticket"],
+          "guardrailFindings": ["legacy guardrail"],
+          "recommendedKillSwitches": ["disableHighRiskAutoAction"]
+        }
+        """.data(using: .utf8)!
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+
+        let summary = try decoder.decode(BASEvolutionLineageSummary.self, from: legacyJSON)
+
+        XCTAssertEqual(summary.schemaVersion, BASEvolutionLineageSummary.currentSchemaVersion)
+        XCTAssertEqual(summary.activeKillSwitches, [])
+        XCTAssertEqual(summary.recommendedKillSwitches, ["disableHighRiskAutoAction"])
+    }
+
     func testCheckpointPlannerDeduplicatesEquivalentLatestState() {
         let now = Date(timeIntervalSince1970: 1_715_000_000)
         let input = BASEvolutionCheckpointInput(
@@ -108,6 +134,7 @@ final class BASEvolutionCoreTests: XCTestCase {
             hostGatePercent: 78,
             thoughtFoldChecksum: "fold-123",
             updateTicketSummaries: ["review tonight state"],
+            activeKillSwitches: ["force_guard_mode"],
             guardrailFindings: ["high-risk direct answer downgraded"],
             recommendedKillSwitches: ["disableHighRiskAutoAction"]
         )

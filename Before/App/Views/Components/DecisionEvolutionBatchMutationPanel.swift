@@ -5,7 +5,7 @@ struct DecisionEvolutionBatchMutationPanel: View {
     @State private var pendingMutation: PendingMutation?
 
     let selection: DecisionEvolutionBatchMutationSelection
-    let interactionMode: DecisionEvolutionControlInteractionMode
+    let surfaceContract: DecisionEvolutionSurfaceContract
     let showsHeader: Bool
     let selectAllVisible: () -> Void
     let selectReviewQueue: () -> Void
@@ -22,7 +22,7 @@ struct DecisionEvolutionBatchMutationPanel: View {
 
     init(
         selection: DecisionEvolutionBatchMutationSelection,
-        interactionMode: DecisionEvolutionControlInteractionMode,
+        surfaceContract: DecisionEvolutionSurfaceContract,
         showsHeader: Bool = true,
         selectAllVisible: @escaping () -> Void,
         selectReviewQueue: @escaping () -> Void,
@@ -32,7 +32,7 @@ struct DecisionEvolutionBatchMutationPanel: View {
         afterMutation: (() -> Void)? = nil
     ) {
         self.selection = selection
-        self.interactionMode = interactionMode
+        self.surfaceContract = surfaceContract
         self.showsHeader = showsHeader
         self.selectAllVisible = selectAllVisible
         self.selectReviewQueue = selectReviewQueue
@@ -40,6 +40,10 @@ struct DecisionEvolutionBatchMutationPanel: View {
         self.selectLineageBacked = selectLineageBacked
         self.clearSelection = clearSelection
         self.afterMutation = afterMutation
+    }
+
+    private var interactionMode: DecisionEvolutionControlInteractionMode {
+        surfaceContract.interactionMode
     }
 
     var body: some View {
@@ -85,7 +89,7 @@ struct DecisionEvolutionBatchMutationPanel: View {
                         .textSelection(.enabled)
                 }
 
-                if interactionMode.allowsMutations {
+                if surfaceContract.allowsMutations {
                     if selection.hasSelection {
                         mutationButtons
                     } else {

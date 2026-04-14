@@ -20,8 +20,12 @@ final class NotificationService {
     static let shared = NotificationService()
 
     private let center = UNUserNotificationCenter.current()
+    private var notificationsDisabledForTesting: Bool {
+        DecisionTestingInterface.runtimeTestingContextDetected()
+    }
 
     func requestAuthorizationIfNeeded() async {
+        guard !notificationsDisabledForTesting else { return }
         let settings = await center.notificationSettings()
         guard settings.authorizationStatus == .notDetermined else { return }
         _ = try? await center.requestAuthorization(options: [.alert, .badge, .sound])
@@ -31,6 +35,7 @@ final class NotificationService {
         sessionID: UUID,
         duration: QuickBufferDuration = BeforePolicy.QuickCheck.defaultBufferDuration
     ) async {
+        guard !notificationsDisabledForTesting else { return }
         await requestAuthorizationIfNeeded()
 
         let content = UNMutableNotificationContent()
@@ -60,11 +65,13 @@ final class NotificationService {
     }
 
     func scheduleTomorrowNotification(eventID: UUID, from baseDate: Date = .now) async {
+        guard !notificationsDisabledForTesting else { return }
         let fireDate = Self.nextTomorrowReminderDate(after: baseDate)
         await scheduleTomorrowNotification(eventID: eventID, at: fireDate)
     }
 
     func scheduleTomorrowNotification(eventID: UUID, at fireDate: Date) async {
+        guard !notificationsDisabledForTesting else { return }
         await requestAuthorizationIfNeeded()
 
         let content = UNMutableNotificationContent()
@@ -95,6 +102,7 @@ final class NotificationService {
     }
 
     func schedulePredictiveInterventionNotification(_ candidate: InterventionPredictionCandidate) async {
+        guard !notificationsDisabledForTesting else { return }
         await requestAuthorizationIfNeeded()
 
         let content = UNMutableNotificationContent()

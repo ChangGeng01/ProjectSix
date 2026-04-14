@@ -341,7 +341,7 @@ struct ReservedOpenModelAdapter: DecisionOpenModelAdapting {
         family: "Open model runtime",
         version: "reserved",
         title: "Open model runtime",
-        detail: "Reserved integration slot for future bundled or open-source local models. Replace this adapter to add a new model without rewriting the intelligence pipeline.",
+        detail: "Reserved integration slot for future bundled or open-source local models. Import or download a compatible local asset to activate this lane without rewriting the intelligence pipeline.",
         taskAffinities: [
             .primary: 88,
             .comparative: 90,
@@ -372,8 +372,8 @@ struct ReservedOpenModelAdapter: DecisionOpenModelAdapting {
         DecisionModelProviderStatus(
             kind: .openModel,
             isAvailable: false,
-            title: "Reserved",
-            detail: "No open-model runtime is registered yet. This slot is ready for future bundled or open-source local model adapters."
+            title: "Waiting for import",
+            detail: "No imported open-model asset is active yet. Import or download a compatible local model to activate this reserved runtime slot."
         )
     }
 
@@ -418,6 +418,187 @@ struct ReservedOpenModelAdapter: DecisionOpenModelAdapting {
         strategy: DecisionAdaptiveTaskStrategy?
     ) async -> ReminderSelectionCandidate? {
         nil
+    }
+}
+
+struct ConfiguredOpenModelPreviewAdapter: DecisionOpenModelAdapting {
+    let asset: OpenModelAsset
+    private let runtime: any OpenModelLocalRuntimeBridging
+
+    init(
+        asset: OpenModelAsset,
+        runtime: any OpenModelLocalRuntimeBridging = OpenModelLocalRuntimeBridge.shared
+    ) {
+        self.asset = asset
+        self.runtime = runtime
+    }
+
+    var descriptor: DecisionOpenModelDescriptor {
+        let runtimeStatus = runtime.status(for: asset)
+        return DecisionOpenModelDescriptor(
+            stableID: asset.generatedStableID,
+            family: "Configured open model",
+            version: asset.fileExtension.uppercased(),
+            title: asset.displayTitle.isEmpty ? asset.fileName : asset.displayTitle,
+            detail: "Registered from imported asset \(asset.fileName). \(runtimeStatus.detail)",
+            taskAffinities: [
+                .primary: 84,
+                .comparative: 86,
+                .reflective: 82,
+                .selection: 80
+            ],
+            capabilityProfile: DecisionModelCapabilityProfile(
+                modelID: asset.generatedStableID,
+                strengths: [
+                    .structuredOutput,
+                    .lightToolUse
+                ],
+                weaknesses: [
+                    .deepReflection
+                ],
+                latencyClass: latencyClass(for: asset),
+                memoryClass: memoryClass(for: asset),
+                supportedResponseLanguages: [.english, .mixed],
+                supportsThinking: false,
+                supportsStructuredOutput: true,
+                supportsToolUse: true,
+                bestFor: [.primary, .comparative, .selection]
+            )
+        )
+    }
+
+    var availabilityStatus: DecisionModelProviderStatus {
+        let runtimeStatus = runtime.status(for: asset)
+        return DecisionModelProviderStatus(
+            kind: .openModel,
+            isAvailable: runtimeStatus.canServeRequests,
+            title: runtimeStatus.title,
+            detail: "Open-model slot is pinned to \(asset.fileName). \(runtimeStatus.detail)"
+        )
+    }
+
+    func refineQuickResult(
+        base: QuickCheckResult,
+        input: QuickCheckInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
+    ) async -> QuickCheckResult? {
+        await runtime.refineQuickResult(
+            asset: asset,
+            base: base,
+            input: input,
+            strategy: strategy,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
+    }
+
+    func refineBalanceResult(
+        base: BalanceBoardResult,
+        input: BalanceBoardInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
+    ) async -> BalanceBoardResult? {
+        await runtime.refineBalanceResult(
+            asset: asset,
+            base: base,
+            input: input,
+            strategy: strategy,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
+    }
+
+    func refineMirrorResult(
+        base: MirrorResult,
+        input: MirrorInput,
+        strategy: DecisionAdaptiveTaskStrategy?,
+        contextState: DecisionContextPreparedState?,
+        neuralState: DecisionNeuralState?,
+        brainState: DecisionBrainState?
+    ) async -> MirrorResult? {
+        await runtime.refineMirrorResult(
+            asset: asset,
+            base: base,
+            input: input,
+            strategy: strategy,
+            contextState: contextState,
+            neuralState: neuralState,
+            brainState: brainState
+        )
+    }
+
+    func pickReminder(
+        from candidates: [ReminderSelectionCandidate],
+        scenario: ScenarioType,
+        prompt: String,
+        mode: DecisionMode?,
+        strategy: DecisionAdaptiveTaskStrategy?
+    ) async -> ReminderSelectionCandidate? {
+        await runtime.pickReminder(
+            asset: asset,
+            from: candidates,
+            scenario: scenario,
+            prompt: prompt,
+            mode: mode,
+            strategy: strategy
+        )
+    }
+
+    private func latencyClass(for asset: OpenModelAsset) -> DecisionModelLatencyClass {
+        switch asset.fileSizeBytes {
+        case ..<1_000_000_000:
+            .low
+        case ..<4_000_000_000:
+            .medium
+        default:
+            .high
+        }
+    }
+
+    private func memoryClass(for asset: OpenModelAsset) -> DecisionModelMemoryClass {
+        switch asset.fileSizeBytes {
+        case ..<1_000_000_000:
+            .low
+        case ..<4_000_000_000:
+            .medium
+        default:
+            .high
+        }
+    }
+}
+
+enum DecisionOpenModelRuntimeRegistration {
+    static func syncRegistry(
+        preferredAssetID: String?,
+        registry: DecisionIntelligenceProviderRegistry = .shared,
+        fileManager: FileManager = .default,
+        baseDirectoryURL: URL? = nil
+    ) {
+        let importedAssets = OpenModelAssetCatalog.importedAssets(
+            fileManager: fileManager,
+            baseDirectoryURL: baseDirectoryURL
+        )
+        if let asset = OpenModelAssetCatalog.preferredAsset(
+            importedAssets: importedAssets,
+            preferredAssetID: preferredAssetID
+        ) {
+            registry.registerOpenModel(
+                kind: .openModel,
+                adapter: ConfiguredOpenModelPreviewAdapter(asset: asset)
+            )
+        } else {
+            registry.registerOpenModel(
+                kind: .openModel,
+                adapter: ReservedOpenModelAdapter()
+            )
+        }
     }
 }
 

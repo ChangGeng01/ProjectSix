@@ -35,6 +35,10 @@ struct WatchQuickCaptureView: View {
                             .font(.footnote)
                     }
                 }
+
+                Section("Evolution Control") {
+                    WatchEvolutionStatusSection(style: .compact)
+                }
             }
             .navigationTitle("Capture")
         }

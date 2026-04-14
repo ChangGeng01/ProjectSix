@@ -5,6 +5,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
     var savedAt: Date
     var modeRaw: String
     var entrySourceRaw: String
+    var sessionEngineSessionID: String?
     var draft: TomorrowBoxDraft
     var intelligenceLifecycle: DecisionContextLifecycleSnapshot?
     var wasEvaluated: Bool
@@ -19,6 +20,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         savedAt: Date = .now,
         mode: DecisionMode,
         entrySource: EntrySource,
+        sessionEngineSessionID: String? = nil,
         draft: TomorrowBoxDraft,
         intelligenceLifecycle: DecisionContextLifecycleSnapshot? = nil,
         wasEvaluated: Bool = false,
@@ -32,6 +34,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         self.savedAt = savedAt
         self.modeRaw = mode.rawValue
         self.entrySourceRaw = entrySource.rawValue
+        self.sessionEngineSessionID = sessionEngineSessionID
         self.draft = draft
         self.intelligenceLifecycle = intelligenceLifecycle
         self.wasEvaluated = wasEvaluated
@@ -48,6 +51,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         savedAt = try container.decodeIfPresent(Date.self, forKey: .savedAt) ?? .now
         modeRaw = try container.decode(String.self, forKey: .modeRaw)
         entrySourceRaw = try container.decode(String.self, forKey: .entrySourceRaw)
+        sessionEngineSessionID = try container.decodeIfPresent(String.self, forKey: .sessionEngineSessionID)
         draft = try container.decode(TomorrowBoxDraft.self, forKey: .draft)
         intelligenceLifecycle = try container.decodeIfPresent(DecisionContextLifecycleSnapshot.self, forKey: .intelligenceLifecycle)
         wasEvaluated = try container.decode(Bool.self, forKey: .wasEvaluated)
@@ -82,6 +86,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         return ActiveDecisionWorkspaceState(
             mode: .quick,
             entrySource: session.entrySource,
+            sessionEngineSessionID: session.sessionEngineSessionID,
             draft: draft,
             intelligenceLifecycle: session.intelligenceLifecycleSnapshot,
             wasEvaluated: session.result != nil,
@@ -99,6 +104,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         return ActiveDecisionWorkspaceState(
             mode: .balance,
             entrySource: session.entrySource,
+            sessionEngineSessionID: session.sessionEngineSessionID,
             draft: draft,
             intelligenceLifecycle: session.intelligenceLifecycleSnapshot,
             wasEvaluated: session.result != nil,
@@ -114,6 +120,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         return ActiveDecisionWorkspaceState(
             mode: .mirror,
             entrySource: session.entrySource,
+            sessionEngineSessionID: session.sessionEngineSessionID,
             draft: draft,
             intelligenceLifecycle: session.intelligenceLifecycleSnapshot,
             wasEvaluated: session.result != nil,
@@ -124,6 +131,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
     @MainActor
     func restoreQuickSession() -> QuickCheckSession {
         let session = draft.restoreQuickSession(entrySource: entrySource)
+        session.sessionEngineSessionID = sessionEngineSessionID
         if let intelligenceLifecycle {
             session.restoreIntelligenceLifecycle(intelligenceLifecycle)
         }
@@ -140,6 +148,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
     @MainActor
     func restoreBalanceSession() -> BalanceBoardSession {
         let session = draft.restoreBalanceSession(entrySource: entrySource)
+        session.sessionEngineSessionID = sessionEngineSessionID
         if let intelligenceLifecycle {
             session.restoreIntelligenceLifecycle(intelligenceLifecycle)
         }
@@ -154,6 +163,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
     @MainActor
     func restoreMirrorSession() -> MirrorWorkspaceSession {
         let session = draft.restoreMirrorSession(entrySource: entrySource)
+        session.sessionEngineSessionID = sessionEngineSessionID
         if let intelligenceLifecycle {
             session.restoreIntelligenceLifecycle(intelligenceLifecycle)
         }

@@ -856,8 +856,7 @@ enum BehavioralAISubstrateBridge {
         let recoveredInspection = checkpointLineage.map {
             checkpointInspectionBundle(from: $0, generatedAt: export.generatedAt)
         }
-        let evolutionFacts = DecisionCapabilityCoverageBuilder.evolutionFacts(
-            from: export,
+        let evolutionRuntimeFacts = export.evolutionRuntimeFacts(
             currentBrainState: currentBrainState
         )
 
@@ -876,7 +875,7 @@ enum BehavioralAISubstrateBridge {
                 capabilityCoverage: DecisionCapabilityCoverageBuilder.build(
                     from: synchronizedExport,
                     currentBrainState: currentBrainState,
-                    evolutionFacts: evolutionFacts
+                    evolutionFacts: evolutionRuntimeFacts.coverageFacts
                 ),
                 inspectionBundle: resolvedTurn.map {
                     BASEBrainConsoleSupport.inspectionBundle(for: $0, generatedAt: export.generatedAt)
@@ -918,6 +917,7 @@ enum BehavioralAISubstrateBridge {
         activeMirrorSession: MirrorWorkspaceSession?,
         currentBrainState: CurrentBrainState?,
         projection: DecisionMemorySystem.BrainStateProjection?,
+        activeKillSwitches: [BASKillSwitchID] = [],
         runtimeSnapshot: DecisionTestingRuntimeSnapshot? = nil,
         now: Date = .now
     ) -> BASEBrainTurnResult? {
@@ -952,7 +952,8 @@ enum BehavioralAISubstrateBridge {
             title: currentBrainState.mode.title,
             detail: detail,
             riskLevel: hostRiskLevel(from: currentBrainState.riskLevel),
-            triggerReason: currentBrainState.source.rawValue
+            triggerReason: currentBrainState.source.rawValue,
+            activeKillSwitches: activeKillSwitches
         )
 
         let hostCurrentBrain = BASHostCurrentBrain(
@@ -1191,6 +1192,7 @@ enum BehavioralAISubstrateBridge {
         selectBoxTab: () -> Void,
         performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
         performRestore: () -> Void,
+        performOpenEvolutionControl: () -> Void,
         refreshCurrentBrain: (BrainStateUpdateSource) -> Void
     ) {
         BASAppleAppLifecycleOrchestrationExecutor.consumeEntriesIfNeeded(
@@ -1209,6 +1211,7 @@ enum BehavioralAISubstrateBridge {
                     },
                     performPredictiveIntervention: performPredictiveIntervention,
                     performRestore: performRestore,
+                    performOpenEvolutionControl: performOpenEvolutionControl,
                     refreshCurrentBrain: refreshCurrentBrain
                 )
             },
@@ -1256,6 +1259,7 @@ enum BehavioralAISubstrateBridge {
         selectBoxTab: () -> Void,
         performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
         performRestore: () -> Void,
+        performOpenEvolutionControl: () -> Void,
         refreshPredictedIntervention: () -> Void,
         syncWidgetSnapshot: () -> Void = {}
     ) {
@@ -1283,6 +1287,7 @@ enum BehavioralAISubstrateBridge {
                     },
                     performPredictiveIntervention: performPredictiveIntervention,
                     performRestore: performRestore,
+                    performOpenEvolutionControl: performOpenEvolutionControl,
                     refreshCurrentBrain: refreshCurrentBrain
                 )
             },
@@ -1326,8 +1331,15 @@ enum BehavioralAISubstrateBridge {
         performPresent: (DecisionIntentEnvelope, DecisionMode, Bool, String) -> Void,
         performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
         performRestore: () -> Void,
+        performOpenEvolutionControl: () -> Void,
         refreshCurrentBrain: (BrainStateUpdateSource) -> Void
     ) {
+        if envelope.kind == .openEvolutionControl {
+            performOpenEvolutionControl()
+            refreshCurrentBrain(.watchHandoff)
+            return
+        }
+
         let kindID = BeforeProductCompatibility.substrateEntryIntentKindID(envelope.kind)
         BASAppleEntryIntentRuntimeExecutor.execute(
             input: BASAppleEntryIntentRuntimeInput(
@@ -1912,24 +1924,17 @@ enum BehavioralAISubstrateBridge {
     private static func checkpointRuntimeSummary(
         from lineage: DecisionEvolutionLineageSnapshot
     ) -> String {
-        [
-            "Recovered from checkpoint",
-            lineage.mode.shortTitle,
-            "permit \(lineage.eBrain.permitMode)",
-            "risk \(lineage.eBrain.riskLevel)",
-            "fold \(lineage.eBrain.thoughtFoldChecksum)"
-        ].joined(separator: " • ")
+        lineage.eBrain
+            .factsBundle(modeTitle: lineage.mode.shortTitle)
+            .runtimeSummaryLine
     }
 
     private static func checkpointBrainSummary(
         from lineage: DecisionEvolutionLineageSnapshot
     ) -> String {
-        [
-            "Recovered lineage",
-            "session \(lineage.eBrain.sessionID)",
-            "host gate \(lineage.eBrain.hostGatePercent)%",
-            "\(lineage.eBrain.updateTicketSummaries.count) tickets"
-        ].joined(separator: " • ")
+        lineage.eBrain
+            .factsBundle(modeTitle: lineage.mode.shortTitle)
+            .brainSummaryLine
     }
 
     private static func checkpointCalibrationScore(

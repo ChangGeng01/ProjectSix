@@ -16,6 +16,25 @@ private struct InspectionBrainSnapshot {
     let now: Date
 }
 
+private struct DecisionSessionEngineEvaluationContext {
+    let sessionID: String
+    let stepID: String?
+}
+
+struct DecisionSessionEnginePendingImportDraft: Identifiable, Sendable {
+    let sourceFileName: String
+    let bundleData: Data
+    let preview: DecisionSessionImportBundlePreview
+
+    var id: String { "\(sourceFileName)|\(preview.id)" }
+    var presentation: DecisionSessionEngineImportPreviewPresentation {
+        DecisionSessionEnginePendingImportPreview(
+            sourceFileName: sourceFileName,
+            preview: preview
+        ).presentation
+    }
+}
+
 @MainActor
 final class BeforeAppModel: ObservableObject {
     @Published var selectedTab: AppTab = .home
@@ -28,11 +47,18 @@ final class BeforeAppModel: ObservableObject {
     @Published var reflectionContext: ReflectionContext?
     @Published var letGoContext: LetGoContext?
     @Published var isEvolutionControlCenterPresented = false
+    @Published var isSessionEngineControlCenterPresented = false
     @Published var startupNotice: String?
     @Published var supportSurface: SupportSurfaceTarget = .buddy
     @Published private(set) var preferences: BeforePreferences
     @Published private(set) var evolutionControlMutationEpoch: Int = 0
     @Published private(set) var latestEvolutionMutationOutcome: DecisionEvolutionMutationOutcome?
+    @Published private(set) var activeEvolutionKillSwitches: [BASKillSwitchID]
+    @Published private(set) var gemmaLibraryMutationEpoch: Int = 0
+    @Published private(set) var isDownloadingGemmaModel = false
+    @Published private(set) var isDownloadingOpenModel = false
+    @Published private(set) var pendingSessionEngineImportDraft: DecisionSessionEnginePendingImportDraft?
+    @Published private(set) var sessionEngineBundleIssue: String?
     @AppStorage("before.hasSeenOnboarding") var hasSeenOnboarding = false
 
     let modelContainer: ModelContainer
@@ -49,12 +75,16 @@ final class BeforeAppModel: ObservableObject {
         self.modelContainer = modelContainer
         self.startupNotice = testingLaunchOptions.cleanLaunch ? nil : startupNotice
         self.preferences = DecisionTestingInterface.effectivePreferences()
+        self.activeEvolutionKillSwitches = DecisionEvolutionKillSwitchStore.load()
         self.supportInbox = SupportInboxStore()
         self.sharedLifeStore = SharedLifeStore()
         self.activeTaskGraph = (testingLaunchOptions.cleanLaunch || !preferences.restoreInProgressWorkspaces)
             ? nil
             : DecisionTaskGraphStore.load()
         applyTestingLaunchOptions(testingLaunchOptions)
+        DecisionOpenModelRuntimeRegistration.syncRegistry(
+            preferredAssetID: preferences.preferredOpenModelAssetID
+        )
         restorePendingReflectionState()
     }
 
@@ -70,6 +100,63 @@ final class BeforeAppModel: ObservableObject {
         GemmaE4BIntelligenceService.availabilityStatus
     }
 
+    var openModelStatus: DecisionModelProviderStatus {
+        DecisionIntelligenceProviderRegistry.shared.statusesByKind()[.openModel] ?? DecisionModelProviderStatus(
+            kind: .openModel,
+            isAvailable: false,
+            title: "Unavailable",
+            detail: "No open-model runtime is registered."
+        )
+    }
+
+    var registeredProviderDescriptors: [DecisionModelProviderDescriptor] {
+        DecisionIntelligenceProviderRegistry.shared.descriptors()
+    }
+
+    var preferredProviderDescriptor: DecisionModelProviderDescriptor? {
+        DecisionIntelligenceProviderRegistry.shared.descriptor(
+            for: preferences.preferredIntelligenceProvider.kind
+        )
+    }
+
+    var activeProviderDescriptor: DecisionModelProviderDescriptor? {
+        DecisionIntelligenceProviderRegistry.shared.descriptor(
+            for: intelligenceRuntimeStatus.active
+        )
+    }
+
+    var openModelProviderDescriptor: DecisionModelProviderDescriptor? {
+        DecisionIntelligenceProviderRegistry.shared.descriptor(for: .openModel)
+    }
+
+    var activeDecisionSessionEngineSessionID: String? {
+        if let quickID = activeQuickSession?.sessionEngineSessionID {
+            return quickID
+        }
+        if let balanceID = activeBalanceSession?.sessionEngineSessionID {
+            return balanceID
+        }
+        return activeMirrorSession?.sessionEngineSessionID
+    }
+
+    var localModelLibrarySnapshot: DecisionLocalModelLibrarySnapshot {
+        DecisionLocalModelLibrarySnapshot.current(
+            preferredProvider: preferences.preferredIntelligenceProvider,
+            preferredGemmaAssetID: preferences.preferredGemmaAssetID,
+            preferredGemmaAsset: gemmaPreferredAsset,
+            importedGemmaAssets: gemmaImportedAssets,
+            bundledGemmaAsset: gemmaBundledAsset,
+            preferredOpenModelAssetID: preferences.preferredOpenModelAssetID,
+            preferredOpenModelAsset: openModelPreferredAsset,
+            importedOpenModelAssets: openModelImportedAssets,
+            openModelDescriptor: openModelProviderDescriptor
+        )
+    }
+
+    var localModelLibraryPresentation: DecisionLocalModelLibraryPresentation {
+        DecisionLocalModelLibraryPresentation.build(from: localModelLibrarySnapshot)
+    }
+
     var gemmaBundleStatus: GemmaModelBundleStatus {
         GemmaE4BIntelligenceService.modelBundleStatus
     }
@@ -82,6 +169,32 @@ final class BeforeAppModel: ObservableObject {
         GemmaE4BIntelligenceService.bundledModel
     }
 
+    var gemmaPreferredAsset: GemmaModelAsset? {
+        GemmaE4BIntelligenceService.preferredModel(preferredAssetID: preferences.preferredGemmaAssetID)
+    }
+
+    var gemmaImportedAssets: [GemmaModelAsset] {
+        GemmaE4BIntelligenceService.importedModels
+    }
+
+    var preferredGemmaAssetID: String? {
+        preferences.preferredGemmaAssetID
+    }
+
+    var openModelImportedAssets: [OpenModelAsset] {
+        OpenModelAssetCatalog.importedAssets()
+    }
+
+    var openModelPreferredAsset: OpenModelAsset? {
+        OpenModelAssetCatalog.preferredAsset(
+            preferredAssetID: preferences.preferredOpenModelAssetID
+        )
+    }
+
+    var preferredOpenModelAssetID: String? {
+        preferences.preferredOpenModelAssetID
+    }
+
     func handleInitialAppearance() {
         executeLifecyclePhase(.initialAppearance, syncWidgetSnapshot: true)
     }
@@ -90,8 +203,228 @@ final class BeforeAppModel: ObservableObject {
         startupNotice = nil
     }
 
+    func dismissSessionEngineBundleIssue() {
+        sessionEngineBundleIssue = nil
+    }
+
+    func presentSessionEngineBundleIssue(_ issue: String) {
+        sessionEngineBundleIssue = issue
+    }
+
+    func clearPendingSessionEngineImportDraft() {
+        pendingSessionEngineImportDraft = nil
+    }
+
     func dismissEvolutionMutationOutcome() {
         latestEvolutionMutationOutcome = nil
+    }
+
+    @discardableResult
+    func importGemmaModel(from sourceURL: URL) throws -> GemmaModelAsset {
+        let hasSecurityScope = sourceURL.startAccessingSecurityScopedResource()
+        defer {
+            if hasSecurityScope {
+                sourceURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let asset = try GemmaModelAssetCatalog.importModel(from: sourceURL)
+        updatePreferences { $0.preferredGemmaAssetID = asset.assetID }
+        gemmaLibraryMutationEpoch &+= 1
+        publishStartupNotice("Imported \(asset.fileName) into the local Gemma library.")
+        return asset
+    }
+
+    @discardableResult
+    func downloadGemmaModel(from remoteURL: URL) async throws -> GemmaModelAsset {
+        isDownloadingGemmaModel = true
+        defer { isDownloadingGemmaModel = false }
+
+        let asset = try await GemmaModelDownloadService.downloadModel(from: remoteURL)
+        updatePreferences { $0.preferredGemmaAssetID = asset.assetID }
+        gemmaLibraryMutationEpoch &+= 1
+        publishStartupNotice("Downloaded \(asset.fileName) into the local Gemma library.")
+        return asset
+    }
+
+    @discardableResult
+    func importOpenModel(from sourceURL: URL) throws -> OpenModelAsset {
+        let hasSecurityScope = sourceURL.startAccessingSecurityScopedResource()
+        defer {
+            if hasSecurityScope {
+                sourceURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let asset = try OpenModelAssetCatalog.importModel(from: sourceURL)
+        updatePreferences { $0.preferredOpenModelAssetID = asset.assetID }
+        DecisionOpenModelRuntimeRegistration.syncRegistry(
+            preferredAssetID: asset.assetID
+        )
+        gemmaLibraryMutationEpoch &+= 1
+        publishStartupNotice("Imported \(asset.fileName) into the open-model library slot.")
+        return asset
+    }
+
+    @discardableResult
+    func downloadOpenModel(from remoteURL: URL) async throws -> OpenModelAsset {
+        isDownloadingOpenModel = true
+        defer { isDownloadingOpenModel = false }
+
+        let asset = try await OpenModelDownloadService.downloadModel(from: remoteURL)
+        updatePreferences { $0.preferredOpenModelAssetID = asset.assetID }
+        DecisionOpenModelRuntimeRegistration.syncRegistry(
+            preferredAssetID: asset.assetID
+        )
+        gemmaLibraryMutationEpoch &+= 1
+        publishStartupNotice("Downloaded \(asset.fileName) into the open-model library slot.")
+        return asset
+    }
+
+    func removeImportedGemmaModel(named fileName: String) throws {
+        let removedAssetID = GemmaModelAsset(
+            fileName: fileName,
+            fileSizeBytes: 0,
+            expectedSizeBytes: nil,
+            source: .imported
+        ).assetID
+        try GemmaModelAssetCatalog.removeImportedModel(named: fileName)
+        if preferences.preferredGemmaAssetID == removedAssetID {
+            updatePreferences { $0.preferredGemmaAssetID = nil }
+        }
+        gemmaLibraryMutationEpoch &+= 1
+        publishStartupNotice("Removed \(fileName) from the local Gemma library.")
+    }
+
+    func setPreferredGemmaAssetID(_ assetID: String?) {
+        guard preferences.preferredGemmaAssetID != assetID else { return }
+        updatePreferences { $0.preferredGemmaAssetID = assetID }
+        gemmaLibraryMutationEpoch &+= 1
+        if let assetID,
+           let selectedAsset = GemmaE4BIntelligenceService.preferredModel(preferredAssetID: assetID) {
+            publishStartupNotice("Gemma will now prefer \(selectedAsset.sourceTitle.lowercased()) asset \(selectedAsset.fileName).")
+        } else {
+            publishStartupNotice("Gemma asset selection returned to automatic mode.")
+        }
+    }
+
+    func removeImportedOpenModel(named fileName: String) throws {
+        let removedAssetID = OpenModelAsset(
+            fileName: fileName,
+            fileSizeBytes: 0,
+            source: .imported
+        ).assetID
+        try OpenModelAssetCatalog.removeImportedModel(named: fileName)
+        if preferences.preferredOpenModelAssetID == removedAssetID {
+            updatePreferences { $0.preferredOpenModelAssetID = nil }
+        }
+        DecisionOpenModelRuntimeRegistration.syncRegistry(
+            preferredAssetID: preferences.preferredOpenModelAssetID
+        )
+        gemmaLibraryMutationEpoch &+= 1
+        publishStartupNotice("Removed \(fileName) from the open-model library slot.")
+    }
+
+    func setPreferredOpenModelAssetID(_ assetID: String?) {
+        guard preferences.preferredOpenModelAssetID != assetID else { return }
+        updatePreferences { $0.preferredOpenModelAssetID = assetID }
+        DecisionOpenModelRuntimeRegistration.syncRegistry(
+            preferredAssetID: assetID
+        )
+        gemmaLibraryMutationEpoch &+= 1
+        if let assetID,
+           let selectedAsset = OpenModelAssetCatalog.preferredAsset(
+            importedAssets: openModelImportedAssets,
+            preferredAssetID: assetID
+           ) {
+            publishStartupNotice("Open model runtime will now prefer imported asset \(selectedAsset.fileName).")
+        } else {
+            publishStartupNotice("Open-model asset selection returned to automatic mode.")
+        }
+    }
+
+    func setPreferredIntelligenceProvider(_ provider: DecisionModelProviderPreference) {
+        guard preferences.preferredIntelligenceProvider != provider else { return }
+        updatePreferences { $0.preferredIntelligenceProvider = provider }
+
+        let notice: String
+        switch provider {
+        case .foundationModels:
+            notice = "Preferred provider set to Apple Foundation Model. Before will try the Apple on-device model first."
+        case .gemmaE4B:
+            if let preferredAsset = gemmaPreferredAsset {
+                notice = "Preferred provider set to Gemma 4 E4B. Before will use \(preferredAsset.sourceTitle.lowercased()) asset \(preferredAsset.fileName) when Gemma is active."
+            } else {
+                notice = "Preferred provider set to Gemma 4 E4B. Import or download a local `.litertlm` file to make Gemma available."
+            }
+        case .openModel:
+            if let descriptor = openModelProviderDescriptor?.openModel {
+                notice = "Preferred provider set to \(descriptor.title). Before will route to open-model runtime \(descriptor.stableID) when that adapter is available."
+            } else {
+                notice = "Preferred provider set to Open model runtime. Before will use the registered open-model adapter when one is available."
+            }
+        case .template:
+            notice = "Preferred provider set to Deterministic local copy. Before will stay on the rule-based local layer unless you switch providers again."
+        }
+
+        publishStartupNotice(notice)
+    }
+
+    func setAllowModelFallbacks(_ enabled: Bool) {
+        guard preferences.allowModelFallbacks != enabled else { return }
+        updatePreferences { $0.allowModelFallbacks = enabled }
+        publishStartupNotice(
+            enabled
+                ? "Provider fallbacks are now enabled. Before can step down to another local provider if the preferred one is unavailable."
+                : "Provider fallbacks are now disabled. Before will stay on the preferred provider or deterministic local copy."
+        )
+    }
+
+    func evolutionKillSwitchIsEnabled(_ killSwitchID: BASKillSwitchID) -> Bool {
+        activeEvolutionKillSwitches.contains(killSwitchID)
+    }
+
+    @MainActor
+    func setEvolutionKillSwitch(
+        _ killSwitchID: BASKillSwitchID,
+        enabled: Bool,
+        now: Date = .now
+    ) {
+        activeEvolutionKillSwitches = DecisionEvolutionKillSwitchStore.setEnabled(
+            killSwitchID,
+            enabled: enabled,
+            now: now
+        )
+        publishStartupNotice(
+            enabled
+                ? "\(killSwitchID.displayTitle) is now active."
+                : "\(killSwitchID.displayTitle) is no longer active."
+        )
+        advanceEvolutionControlMutationEpoch()
+    }
+
+    @MainActor
+    func applyRecommendedEvolutionKillSwitches(
+        _ killSwitchIDs: [String],
+        now: Date = .now
+    ) {
+        let resolvedKillSwitches = BASKillSwitchID.resolvePolicyIDs(killSwitchIDs)
+        guard !resolvedKillSwitches.isEmpty else { return }
+
+        let mergedKillSwitches = Array(Set(activeEvolutionKillSwitches + resolvedKillSwitches))
+            .sorted { $0.rawValue < $1.rawValue }
+        DecisionEvolutionKillSwitchStore.save(mergedKillSwitches, now: now)
+        activeEvolutionKillSwitches = mergedKillSwitches
+        publishStartupNotice("Applied \(resolvedKillSwitches.count) recommended kill switch(es) to the runtime control plane.")
+        advanceEvolutionControlMutationEpoch()
+    }
+
+    @MainActor
+    func clearEvolutionKillSwitches(now: Date = .now) {
+        DecisionEvolutionKillSwitchStore.clear(now: now)
+        activeEvolutionKillSwitches = []
+        publishStartupNotice("Cleared all active runtime kill switches.")
+        advanceEvolutionControlMutationEpoch()
     }
 
     func startDecisionMode(
@@ -110,7 +443,11 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func routeDecision(prompt: String, entrySource: EntrySource) -> RoutedDecision {
-        let route = DecisionIntelligenceCoordinator.route(prompt: prompt, preferences: preferences)
+        let route = DecisionIntelligenceCoordinator.route(
+            prompt: prompt,
+            preferences: preferences,
+            activeKillSwitches: activeEvolutionKillSwitches
+        )
         startDecisionMode(route.mode, entrySource: entrySource, prompt: prompt)
         return route
     }
@@ -120,14 +457,26 @@ final class BeforeAppModel: ObservableObject {
         case .autoRoute:
             return routeDecision(prompt: prompt, entrySource: entrySource)
         case .quick:
-            startQuickCheck(entrySource: entrySource, prompt: prompt)
-            return RoutedDecision(mode: .quick, reason: "Preferred quick judgment")
+            let routed = DecisionIntelligenceCoordinator.enforceRuntimeControlPlane(
+                on: RoutedDecision(mode: .quick, reason: "Preferred quick judgment"),
+                activeKillSwitches: activeEvolutionKillSwitches
+            )
+            startDecisionMode(routed.mode, entrySource: entrySource, prompt: prompt)
+            return routed
         case .balance:
-            startBalanceBoard(entrySource: entrySource, prompt: prompt)
-            return RoutedDecision(mode: .balance, reason: "Preferred balance board")
+            let routed = DecisionIntelligenceCoordinator.enforceRuntimeControlPlane(
+                on: RoutedDecision(mode: .balance, reason: "Preferred balance board"),
+                activeKillSwitches: activeEvolutionKillSwitches
+            )
+            startDecisionMode(routed.mode, entrySource: entrySource, prompt: prompt)
+            return routed
         case .mirror:
-            startMirrorWorkspace(entrySource: entrySource, prompt: prompt)
-            return RoutedDecision(mode: .mirror, reason: "Preferred mirror")
+            let routed = DecisionIntelligenceCoordinator.enforceRuntimeControlPlane(
+                on: RoutedDecision(mode: .mirror, reason: "Preferred mirror"),
+                activeKillSwitches: activeEvolutionKillSwitches
+            )
+            startDecisionMode(routed.mode, entrySource: entrySource, prompt: prompt)
+            return routed
         }
     }
 
@@ -136,6 +485,9 @@ final class BeforeAppModel: ObservableObject {
         transform(&updated)
         BeforePreferencesStore.save(updated)
         preferences = DecisionTestingInterface.effectivePreferences(stored: updated)
+        DecisionOpenModelRuntimeRegistration.syncRegistry(
+            preferredAssetID: preferences.preferredOpenModelAssetID
+        )
 
         if updated.restoreInProgressWorkspaces {
             persistActiveWorkspaceState()
@@ -191,10 +543,10 @@ final class BeforeAppModel: ObservableObject {
                 shouldPromptReflectionAfterBackground = true
                 persistPendingReflectionState()
             }
-            persistActiveWorkspaceState()
+            persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
             schedulePredictiveInterventionIfNeeded()
         case .inactive:
-            persistActiveWorkspaceState()
+            persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
         default:
             break
         }
@@ -238,6 +590,9 @@ final class BeforeAppModel: ObservableObject {
                         interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
                     },
                     performRestore: { restoreActiveWorkspaceIfNeeded() },
+                    performOpenEvolutionControl: {
+                        presentEvolutionControlCenter()
+                    },
                     refreshCurrentBrain: { source in
                         refreshGlobalBrainState(source: source)
                     }
@@ -326,6 +681,10 @@ final class BeforeAppModel: ObservableObject {
         }
 
         recordCurrentEBrainReplayTurn(now: event.createdAt)
+        let eBrainTurn = currentLiveEBrainTurn(
+            persistLineage: false,
+            now: event.createdAt
+        )
 
         refreshWidgetSurfaces()
 
@@ -337,8 +696,15 @@ final class BeforeAppModel: ObservableObject {
         )
         persistPendingReflectionState()
         reflectionContext = nil
+        await recordQuickSessionEngineAction(
+            session,
+            result: result,
+            action: action,
+            eBrainTurn: eBrainTurn,
+            now: event.createdAt
+        )
         activeQuickSession = nil
-        persistActiveWorkspaceState()
+        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
     }
 
     func saveBalanceBoard(_ session: BalanceBoardSession) {
@@ -359,9 +725,27 @@ final class BeforeAppModel: ObservableObject {
         context.insert(record)
         persistContext(context, operation: "saving the balance board")
         recordCurrentEBrainReplayTurn(now: record.updatedAt)
+        let eBrainTurn = currentLiveEBrainTurn(
+            persistLineage: false,
+            now: record.updatedAt
+        )
+        Task { @MainActor in
+            await recordBalanceSessionEngineAction(
+                session,
+                result: result,
+                actionSummary: "saved balance board",
+                tool: "save_balance_board",
+                argsPreview: [
+                    "entrySource": session.entrySource.rawValue,
+                    "focus": result.focusTitle
+                ],
+                eBrainTurn: eBrainTurn,
+                now: record.updatedAt
+            )
+        }
         activeBalanceSession = nil
         presentLetGo( LetGoCopyLibrary.savedBalanceContext(for: record) )
-        persistActiveWorkspaceState()
+        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
     }
 
     func moveBalanceBoardToTomorrow(_ session: BalanceBoardSession) {
@@ -371,9 +755,27 @@ final class BeforeAppModel: ObservableObject {
         let tomorrowItem = TomorrowBoxItemFactory.makeBalanceItem(from: session, result: result)
         context.insert(tomorrowItem)
         persistContext(context, operation: "moving the balance board into Tomorrow Box")
+        let eBrainTurn = currentLiveEBrainTurn(
+            persistLineage: false,
+            now: tomorrowItem.createdAt
+        )
+        Task { @MainActor in
+            await recordBalanceSessionEngineAction(
+                session,
+                result: result,
+                actionSummary: "moved balance board to Tomorrow Box",
+                tool: "move_balance_board_to_tomorrow",
+                argsPreview: [
+                    "entrySource": session.entrySource.rawValue,
+                    "tomorrowItemID": tomorrowItem.id.uuidString
+                ],
+                eBrainTurn: eBrainTurn,
+                now: tomorrowItem.createdAt
+            )
+        }
         activeBalanceSession = nil
         presentLetGo(for: tomorrowItem)
-        persistActiveWorkspaceState()
+        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
     }
 
     func saveMirrorWorkspace(_ session: MirrorWorkspaceSession) {
@@ -395,9 +797,27 @@ final class BeforeAppModel: ObservableObject {
         context.insert(record)
         persistContext(context, operation: "saving the mirror workspace")
         recordCurrentEBrainReplayTurn(now: record.updatedAt)
+        let eBrainTurn = currentLiveEBrainTurn(
+            persistLineage: false,
+            now: record.updatedAt
+        )
+        Task { @MainActor in
+            await recordMirrorSessionEngineAction(
+                session,
+                result: result,
+                actionSummary: "saved mirror workspace",
+                tool: "save_mirror_workspace",
+                argsPreview: [
+                    "entrySource": session.entrySource.rawValue,
+                    "nextActionTitle": result.nextActionTitle
+                ],
+                eBrainTurn: eBrainTurn,
+                now: record.updatedAt
+            )
+        }
         activeMirrorSession = nil
         presentLetGo( LetGoCopyLibrary.savedMirrorContext(for: record) )
-        persistActiveWorkspaceState()
+        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
     }
 
     func moveMirrorWorkspaceToTomorrow(_ session: MirrorWorkspaceSession) {
@@ -407,9 +827,27 @@ final class BeforeAppModel: ObservableObject {
         let tomorrowItem = TomorrowBoxItemFactory.makeMirrorItem(from: session, result: result)
         context.insert(tomorrowItem)
         persistContext(context, operation: "moving the mirror workspace into Tomorrow Box")
+        let eBrainTurn = currentLiveEBrainTurn(
+            persistLineage: false,
+            now: tomorrowItem.createdAt
+        )
+        Task { @MainActor in
+            await recordMirrorSessionEngineAction(
+                session,
+                result: result,
+                actionSummary: "moved mirror workspace to Tomorrow Box",
+                tool: "move_mirror_workspace_to_tomorrow",
+                argsPreview: [
+                    "entrySource": session.entrySource.rawValue,
+                    "tomorrowItemID": tomorrowItem.id.uuidString
+                ],
+                eBrainTurn: eBrainTurn,
+                now: tomorrowItem.createdAt
+            )
+        }
         activeMirrorSession = nil
         presentLetGo(for: tomorrowItem)
-        persistActiveWorkspaceState()
+        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
     }
 
     func reopenTomorrowBoxItem(_ item: TomorrowBoxItem) {
@@ -455,7 +893,7 @@ final class BeforeAppModel: ObservableObject {
             selectHomeTab: {
                 selectedTab = .home
             },
-            persistActiveWorkspaceState: { persistActiveWorkspaceState() }
+            persistActiveWorkspaceState: { persistActiveWorkspaceState(trackSessionEngineLifecycle: true) }
         )
     }
 
@@ -475,28 +913,49 @@ final class BeforeAppModel: ObservableObject {
     }
 
     func evaluateQuickSessionWithIntelligence(_ session: QuickCheckSession) async {
+        guard session.canEvaluate else { return }
         refreshQuickBrainState(session)
+        let sessionEngineContext = await beginQuickSessionEngineEvaluation(session)
         let turn = currentLiveEBrainTurn(now: .now)
         await session.evaluateWithIntelligence(
             preferences: preferences,
+            eBrainTurn: turn
+        )
+        await finalizeQuickSessionEngineEvaluation(
+            session,
+            context: sessionEngineContext,
             eBrainTurn: turn
         )
     }
 
     func evaluateBalanceSessionWithIntelligence(_ session: BalanceBoardSession) async {
+        guard session.canEvaluate else { return }
         refreshBalanceBrainState(session)
+        let sessionEngineContext = await beginBalanceSessionEngineEvaluation(session)
         let turn = currentLiveEBrainTurn(now: .now)
         await session.evaluateWithIntelligence(
             preferences: preferences,
             eBrainTurn: turn
         )
+        await finalizeBalanceSessionEngineEvaluation(
+            session,
+            context: sessionEngineContext,
+            eBrainTurn: turn
+        )
     }
 
     func evaluateMirrorSessionWithIntelligence(_ session: MirrorWorkspaceSession) async {
+        guard session.canEvaluate else { return }
         refreshMirrorBrainState(session)
+        let sessionEngineContext = await beginMirrorSessionEngineEvaluation(session)
         let turn = currentLiveEBrainTurn(now: .now)
         await session.evaluateWithIntelligence(
             preferences: preferences,
+            eBrainTurn: turn
+        )
+        await finalizeMirrorSessionEngineEvaluation(
+            session,
+            context: sessionEngineContext,
             eBrainTurn: turn
         )
     }
@@ -510,7 +969,7 @@ final class BeforeAppModel: ObservableObject {
             selectHomeTab: {
                 selectedTab = .home
             },
-            persistActiveWorkspaceState: { persistActiveWorkspaceState() }
+            persistActiveWorkspaceState: { persistActiveWorkspaceState(trackSessionEngineLifecycle: true) }
         )
     }
 
@@ -523,7 +982,7 @@ final class BeforeAppModel: ObservableObject {
             selectHomeTab: {
                 selectedTab = .home
             },
-            persistActiveWorkspaceState: { persistActiveWorkspaceState() }
+            persistActiveWorkspaceState: { persistActiveWorkspaceState(trackSessionEngineLifecycle: true) }
         )
     }
 
@@ -536,7 +995,7 @@ final class BeforeAppModel: ObservableObject {
             selectHomeTab: {
                 selectedTab = .home
             },
-            persistActiveWorkspaceState: { persistActiveWorkspaceState() }
+            persistActiveWorkspaceState: { persistActiveWorkspaceState(trackSessionEngineLifecycle: true) }
         )
     }
 
@@ -1200,6 +1659,8 @@ final class BeforeAppModel: ObservableObject {
         clearTomorrowBox()
         supportInbox.clearAll()
         sharedLifeStore.clearAll()
+        DecisionEvolutionKillSwitchStore.clear()
+        activeEvolutionKillSwitches = []
 
         PendingLaunchRequestStore.clear()
         DecisionIntentEnvelopeStore.clear()
@@ -1211,6 +1672,15 @@ final class BeforeAppModel: ObservableObject {
 
     func syncWidgetSnapshot() {
         let latest = latestEvents(limit: 1).first
+        let evolutionSurfaceState = makeEvolutionSurfaceState(contract: .home)
+        let workspace = evolutionSurfaceState.workspace
+        let workspaceFacts = workspace.facts
+        let controlSurface = evolutionSurfaceState.controlSurface
+        let attentionSignal = evolutionSurfaceState.attentionSignal
+        let activeKillSwitchIDs = activeEvolutionKillSwitches.map(\.rawValue)
+        let recommendedKillSwitchCount = workspaceFacts.recommendedKillSwitches.filter {
+            !activeKillSwitchIDs.contains($0)
+        }.count
         let snapshot = WidgetSnapshot(
             safeMessage: WidgetSafeCopy.message(
                 for: latest?.scenario,
@@ -1218,6 +1688,26 @@ final class BeforeAppModel: ObservableObject {
             ),
             latestVerdict: latest?.verdict,
             latestScenario: latest?.scenario,
+            evolution: WidgetEvolutionSnapshot(
+                releaseStateID: widgetEvolutionReleaseStateID(
+                    workspace: workspace,
+                    activeKillSwitchCount: activeKillSwitchIDs.count,
+                    recommendedKillSwitchCount: recommendedKillSwitchCount
+                ),
+                activeCheckpointSourceID: controlSurface.activeCheckpointSource.rawValue,
+                headline: evolutionSurfaceState.operatorSnapshot.headline,
+                primaryReason: evolutionSurfaceState.operatorSnapshot.primaryReason,
+                attentionSeverityID: attentionSignal.severity.rawValue,
+                attentionBadgeValue: attentionSignal.badgeValue,
+                attentionHeadline: attentionSignal.headline,
+                attentionDetail: attentionSignal.detail,
+                hasActiveCheckpoint: controlSurface.activePresentation != nil,
+                hasReviewCheckpoint: controlSurface.reviewPresentation != nil,
+                pendingReviewCount: workspaceFacts.pendingReviewCount,
+                rollbackReadyCount: workspaceFacts.rollbackReadyCount,
+                activeKillSwitchCount: activeKillSwitchIDs.count,
+                recommendedKillSwitchCount: recommendedKillSwitchCount
+            ),
             updatedAt: .now
         )
         WidgetSnapshotStore.save(snapshot)
@@ -1324,6 +1814,60 @@ final class BeforeAppModel: ObservableObject {
     }
 
     @MainActor
+    func recentReplayEntries() async -> [DeveloperDecisionReplayEntry] {
+        let export = await decisionRuntimeExport()
+        return export.recentReplay
+    }
+
+    @MainActor
+    func recentReplayDiagnosticsPresentations(
+        limit: Int? = nil
+    ) async -> [DecisionEvolutionReplayEntryPresentation] {
+        let entries = await recentReplayEntries()
+        let slice = limit.map { Array(entries.prefix($0)) } ?? entries
+        return slice.map(\.diagnosticsPresentation)
+    }
+
+    @MainActor
+    func replayEntry(matchingRecordID recordID: String) async -> DeveloperDecisionReplayEntry? {
+        guard !recordID.isEmpty else { return nil }
+        return await recentReplayEntries().first { $0.id == recordID }
+    }
+
+    @MainActor
+    func replayDiagnosticsPresentation(
+        matchingRecordID recordID: String
+    ) async -> DecisionEvolutionReplayEntryPresentation? {
+        await replayEntry(matchingRecordID: recordID)?.diagnosticsPresentation
+    }
+
+    @MainActor
+    func replayEntriesByRecordID<S: Sequence>(
+        matching recordIDs: S
+    ) async -> [String: DeveloperDecisionReplayEntry] where S.Element == String {
+        let requestedIDs = Set(recordIDs.filter { !$0.isEmpty })
+        guard !requestedIDs.isEmpty else { return [:] }
+
+        let replayEntries = await recentReplayEntries()
+        return Dictionary(
+            uniqueKeysWithValues: replayEntries.compactMap { replayEntry in
+                guard requestedIDs.contains(replayEntry.id) else {
+                    return nil
+                }
+                return (replayEntry.id, replayEntry)
+            }
+        )
+    }
+
+    @MainActor
+    func replayDiagnosticsPresentationsByRecordID<S: Sequence>(
+        matching recordIDs: S
+    ) async -> [String: DecisionEvolutionReplayEntryPresentation] where S.Element == String {
+        let replayEntries = await replayEntriesByRecordID(matching: recordIDs)
+        return replayEntries.mapValues(\.diagnosticsPresentation)
+    }
+
+    @MainActor
     func makeEvolutionControlSurface(
         currentBrainOverride: CurrentBrainState? = nil
     ) -> DecisionEvolutionControlSurface {
@@ -1342,6 +1886,492 @@ final class BeforeAppModel: ObservableObject {
 
     func dismissEvolutionControlCenter() {
         isEvolutionControlCenterPresented = false
+    }
+
+    func presentSessionEngineControlCenter() {
+        isSessionEngineControlCenterPresented = true
+    }
+
+    func dismissSessionEngineControlCenter() {
+        isSessionEngineControlCenterPresented = false
+    }
+
+    @MainActor
+    func sessionEngineControlSnapshot(
+        selectedSessionID: String? = nil,
+        selectedBranchID: String? = nil
+    ) async -> DecisionSessionEngineControlSnapshot {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            return .build(
+                runtimeSnapshot: nil,
+                sessions: [],
+                inspectionBySessionID: [:],
+                selectedSessionID: nil,
+                selectedBranchID: nil,
+                selectedBranches: [],
+                selectedCheckpoint: nil,
+                selectedTimeline: nil,
+                pendingImportPreview: pendingSessionEngineImportDraft?.presentation
+            )
+        }
+
+        do {
+            let runtimeSnapshot = try await sessionEngine.snapshot()
+            let sessions = try await sessionEngine.listSessions(limit: 12)
+            let selectedSession = sessions.first(where: { $0.id == selectedSessionID }) ?? sessions.first
+            let selectedBranches: [DecisionSessionBranch]
+            if let selectedSession {
+                selectedBranches = try await sessionEngine.listBranches(sessionId: selectedSession.id)
+            } else {
+                selectedBranches = []
+            }
+            let resolvedBranchID: String?
+            if let selectedSession {
+                resolvedBranchID = selectedBranches.contains(where: { $0.id == selectedBranchID })
+                    ? selectedBranchID
+                    : selectedSession.headBranchId
+            } else {
+                resolvedBranchID = nil
+            }
+            let selectedCheckpoint: DecisionSessionCheckpoint?
+            if let selectedSession, let resolvedBranchID {
+                selectedCheckpoint = try await sessionEngine.getLatestCheckpoint(
+                    sessionId: selectedSession.id,
+                    branchId: resolvedBranchID
+                )
+            } else {
+                selectedCheckpoint = nil
+            }
+            let selectedTimeline: DecisionSessionTimeline?
+            if let selectedSession, let resolvedBranchID {
+                selectedTimeline = try await sessionEngine.rebuildTimeline(
+                    sessionId: selectedSession.id,
+                    branchId: resolvedBranchID
+                )
+            } else {
+                selectedTimeline = nil
+            }
+
+            return .build(
+                runtimeSnapshot: runtimeSnapshot,
+                sessions: sessions,
+                inspectionBySessionID: Dictionary(
+                    uniqueKeysWithValues: runtimeSnapshot.recentSessions.map { ($0.sessionID, $0) }
+                ),
+                selectedSessionID: selectedSession?.id,
+                selectedBranchID: resolvedBranchID,
+                selectedBranches: selectedBranches,
+                selectedCheckpoint: selectedCheckpoint,
+                selectedTimeline: selectedTimeline,
+                pendingImportPreview: pendingSessionEngineImportDraft?.presentation
+            )
+        } catch {
+            publishStartupNotice("Session Engine control surface could not load: \(error.localizedDescription)")
+            return .build(
+                runtimeSnapshot: nil,
+                sessions: [],
+                inspectionBySessionID: [:],
+                selectedSessionID: nil,
+                selectedBranchID: nil,
+                selectedBranches: [],
+                selectedCheckpoint: nil,
+                selectedTimeline: nil,
+                pendingImportPreview: pendingSessionEngineImportDraft?.presentation
+            )
+        }
+    }
+
+    @MainActor
+    func pauseSessionEngineSession(_ sessionID: String) async {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            publishStartupNotice("Session Engine is unavailable.")
+            return
+        }
+
+        do {
+            let session = try await sessionEngine.pauseSession(sessionID)
+            publishStartupNotice("Paused session \(session.title).")
+        } catch {
+            publishStartupNotice("Unable to pause session \(sessionID): \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    func resumeSessionEngineSession(_ sessionID: String) async {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            publishStartupNotice("Session Engine is unavailable.")
+            return
+        }
+
+        do {
+            let session = try await sessionEngine.resumeSession(sessionID)
+            publishStartupNotice("Resumed session \(session.title).")
+        } catch {
+            publishStartupNotice("Unable to resume session \(sessionID): \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    func recoverSessionEngineSession(_ sessionID: String) async {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            publishStartupNotice("Session Engine is unavailable.")
+            return
+        }
+
+        do {
+            let recovery = try await sessionEngine.recoverSession(sessionID)
+            publishStartupNotice(
+                "Recovered session \(recovery.session.title) on branch \(recovery.recoveredBranch.name)."
+            )
+        } catch {
+            publishStartupNotice("Unable to recover session \(sessionID): \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    func restoreSessionEngineCheckpoint(_ checkpointID: String) async {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            publishStartupNotice("Session Engine is unavailable.")
+            return
+        }
+
+        do {
+            let checkpoint = try await sessionEngine.getCheckpointForHost(checkpointID)
+            let recovery = try await sessionEngine.restoreFromCheckpoint(checkpointID)
+            let checkpointDescriptor = checkpoint.summary.goal.isEmpty
+                ? checkpoint.id
+                : checkpoint.summary.goal
+            publishStartupNotice(
+                "Restored \(recovery.session.title) from checkpoint \(checkpointDescriptor) on branch \(recovery.recoveredBranch.name)."
+            )
+        } catch {
+            publishStartupNotice("Unable to restore checkpoint \(checkpointID): \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    @discardableResult
+    func exportSessionEngineSession(_ sessionID: String) async -> URL? {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            publishStartupNotice("Session Engine is unavailable.")
+            return nil
+        }
+
+        do {
+            let exportURL = try await performTrackedSessionEngineToolLifecycle(
+                sessionID: sessionID,
+                tool: "export_session_engine_bundle",
+                argsPreview: [
+                    "sessionID": sessionID
+                ]
+            ) {
+                try await sessionEngine.exportSession(sessionID)
+            } resultSummary: { exportURL in
+                "Exported Session Engine bundle \(exportURL.lastPathComponent)."
+            }
+            publishStartupNotice("Exported Session Engine bundle \(exportURL.lastPathComponent).")
+            return exportURL
+        } catch {
+            publishStartupNotice("Unable to export session \(sessionID): \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    @MainActor
+    @discardableResult
+    func importSessionEngineBundle(from sourceURL: URL) async -> DecisionSession? {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            sessionEngineBundleIssue = "Session Engine is unavailable."
+            publishStartupNotice("Session Engine is unavailable.")
+            return nil
+        }
+
+        do {
+            let bundleData = try readSessionEngineBundleData(from: sourceURL)
+            let preview = try await sessionEngine.inspectImportBundle(bundleData: bundleData)
+            let trackedSessionID = await trackedSessionEngineLifecycleSessionID(
+                preview.sourceSessionId,
+                sessionEngine: sessionEngine
+            )
+            let session: DecisionSession
+            if let trackedSessionID {
+                session = try await performTrackedSessionEngineToolLifecycle(
+                    sessionID: trackedSessionID,
+                    tool: "import_session_engine_bundle",
+                    argsPreview: [
+                        "sourceFile": sourceURL.lastPathComponent,
+                        "sourceSessionID": preview.sourceSessionId,
+                        "importedTitle": preview.importedTitle
+                    ]
+                ) {
+                    try await sessionEngine.importSession(bundleData: bundleData)
+                } resultSummary: { importedSession in
+                    "Imported Session Engine bundle as \(importedSession.title)."
+                }
+            } else {
+                session = try await sessionEngine.importSession(bundleData: bundleData)
+            }
+            pendingSessionEngineImportDraft = nil
+            sessionEngineBundleIssue = nil
+            publishStartupNotice("Imported Session Engine bundle as \(session.title).")
+            return session
+        } catch {
+            sessionEngineBundleIssue = "Unable to import Session Engine bundle: \(error.localizedDescription)"
+            publishStartupNotice("Unable to import Session Engine bundle: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    @MainActor
+    @discardableResult
+    func inspectSessionEngineBundle(from sourceURL: URL) async -> DecisionSessionImportBundlePreview? {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            sessionEngineBundleIssue = "Session Engine is unavailable."
+            publishStartupNotice("Session Engine is unavailable.")
+            return nil
+        }
+
+        do {
+            let bundleData = try readSessionEngineBundleData(from: sourceURL)
+            let preview = try await sessionEngine.inspectImportBundle(bundleData: bundleData)
+            sessionEngineBundleIssue = nil
+            return preview
+        } catch {
+            sessionEngineBundleIssue = "Unable to inspect Session Engine bundle: \(error.localizedDescription)"
+            publishStartupNotice("Unable to inspect Session Engine bundle: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    @MainActor
+    @discardableResult
+    func stageSessionEngineBundleImport(from sourceURL: URL) async -> DecisionSessionEnginePendingImportDraft? {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            sessionEngineBundleIssue = "Session Engine is unavailable."
+            publishStartupNotice("Session Engine is unavailable.")
+            return nil
+        }
+
+        do {
+            let bundleData = try readSessionEngineBundleData(from: sourceURL)
+            let preview = try await sessionEngine.inspectImportBundle(bundleData: bundleData)
+            let draft = DecisionSessionEnginePendingImportDraft(
+                sourceFileName: sourceURL.lastPathComponent,
+                bundleData: bundleData,
+                preview: preview
+            )
+            pendingSessionEngineImportDraft = draft
+            sessionEngineBundleIssue = nil
+            return draft
+        } catch {
+            pendingSessionEngineImportDraft = nil
+            sessionEngineBundleIssue = "Unable to inspect Session Engine bundle: \(error.localizedDescription)"
+            publishStartupNotice("Unable to inspect Session Engine bundle: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    @MainActor
+    @discardableResult
+    func importStagedSessionEngineBundle() async -> DecisionSession? {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            sessionEngineBundleIssue = "Session Engine is unavailable."
+            publishStartupNotice("Session Engine is unavailable.")
+            return nil
+        }
+
+        guard let draft = pendingSessionEngineImportDraft else {
+            sessionEngineBundleIssue = "Choose a Session Engine bundle to import."
+            return nil
+        }
+
+        do {
+            let trackedSessionID = await trackedSessionEngineLifecycleSessionID(
+                draft.preview.sourceSessionId,
+                sessionEngine: sessionEngine
+            )
+            let session: DecisionSession
+            if let trackedSessionID {
+                session = try await performTrackedSessionEngineToolLifecycle(
+                    sessionID: trackedSessionID,
+                    tool: "import_session_engine_bundle",
+                    argsPreview: [
+                        "sourceFile": draft.sourceFileName,
+                        "sourceSessionID": draft.preview.sourceSessionId,
+                        "importedTitle": draft.preview.importedTitle
+                    ]
+                ) {
+                    try await sessionEngine.importSession(bundleData: draft.bundleData)
+                } resultSummary: { importedSession in
+                    "Imported Session Engine bundle as \(importedSession.title)."
+                }
+            } else {
+                session = try await sessionEngine.importSession(bundleData: draft.bundleData)
+            }
+            pendingSessionEngineImportDraft = nil
+            sessionEngineBundleIssue = nil
+            publishStartupNotice("Imported Session Engine bundle as \(session.title).")
+            return session
+        } catch {
+            sessionEngineBundleIssue = "Unable to import Session Engine bundle: \(error.localizedDescription)"
+            publishStartupNotice("Unable to import Session Engine bundle: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    @MainActor
+    func archiveSessionEngineSession(_ sessionID: String) async {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            publishStartupNotice("Session Engine is unavailable.")
+            return
+        }
+
+        do {
+            let session = try await sessionEngine.archiveSession(sessionID)
+            publishStartupNotice("Archived session \(session.title).")
+        } catch {
+            publishStartupNotice("Unable to archive session \(sessionID): \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    func appendSessionEngineCorrection(
+        _ sessionID: String,
+        targetEventID: String? = nil,
+        newText: String,
+        reason: String = "host correction branch"
+    ) async {
+        let correctionText = trimmed(newText)
+        guard correctionText.isEmpty == false else {
+            publishStartupNotice("Enter a correction before creating a new branch.")
+            return
+        }
+
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            publishStartupNotice("Session Engine is unavailable.")
+            return
+        }
+
+        do {
+            let session = try await sessionEngine.getSession(sessionID)
+            let events = try await sessionEngine.listEvents(
+                sessionId: sessionID,
+                branchId: session.headBranchId
+            )
+            let explicitTargetEvent = targetEventID.flatMap { candidateID in
+                events.first(where: { $0.id == candidateID })
+            }
+            guard let targetEvent = explicitTargetEvent ?? sessionEngineCorrectionTargetEvent(in: events) else {
+                publishStartupNotice("Session Engine could not find a stable event to correct.")
+                return
+            }
+            if targetEventID != nil, explicitTargetEvent == nil {
+                publishStartupNotice("Session Engine could not find the selected history point to correct.")
+                return
+            }
+
+            let correction = try await sessionEngine.appendCorrection(
+                sessionId: sessionID,
+                targetEventId: targetEvent.id,
+                newText: correctionText,
+                reason: reason
+            )
+            publishStartupNotice(
+                "Created correction branch \(correction.branch.name) for \(session.title) from event \(targetEvent.seq)."
+            )
+        } catch {
+            publishStartupNotice("Unable to create a correction branch: \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    func switchSessionEngineBranch(
+        sessionID: String,
+        branchID: String
+    ) async {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            publishStartupNotice("Session Engine is unavailable.")
+            return
+        }
+
+        do {
+            let session = try await sessionEngine.switchBranch(sessionId: sessionID, branchId: branchID)
+            publishStartupNotice("Switched \(session.title) to branch \(branchID).")
+        } catch {
+            publishStartupNotice("Unable to switch branch \(branchID): \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    func mergeSessionEngineBranch(
+        sessionID: String,
+        sourceBranchID: String
+    ) async {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            publishStartupNotice("Session Engine is unavailable.")
+            return
+        }
+
+        do {
+            let session = try await sessionEngine.getSession(sessionID)
+            guard session.headBranchId != sourceBranchID else {
+                publishStartupNotice("Switch to a different active head before merging this branch.")
+                return
+            }
+
+            let mergedBranch = try await sessionEngine.mergeBranch(
+                sourceBranchId: sourceBranchID,
+                targetBranchId: session.headBranchId
+            )
+            publishStartupNotice(
+                "Merged branch \(mergedBranch.name) into \(session.headBranchId)."
+            )
+        } catch {
+            publishStartupNotice("Unable to merge branch \(sourceBranchID): \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    func abandonSessionEngineBranch(
+        sessionID: String,
+        branchID: String
+    ) async {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            publishStartupNotice("Session Engine is unavailable.")
+            return
+        }
+
+        do {
+            let session = try await sessionEngine.getSession(sessionID)
+            guard session.headBranchId != branchID else {
+                publishStartupNotice("Switch away from the current head before abandoning this branch.")
+                return
+            }
+
+            let abandonedBranch = try await sessionEngine.abandonBranch(branchID)
+            publishStartupNotice("Abandoned branch \(abandonedBranch.name).")
+        } catch {
+            publishStartupNotice("Unable to abandon branch \(branchID): \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    func sweepSessionEngineWatchdog() async {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            publishStartupNotice("Session Engine is unavailable.")
+            return
+        }
+
+        do {
+            let actions = try await sessionEngine.sweepWatchdog()
+            if actions.isEmpty {
+                publishStartupNotice("Session Engine watchdog found no stalled steps.")
+            } else {
+                publishStartupNotice("Session Engine watchdog recovered \(actions.count) stalled step(s).")
+            }
+        } catch {
+            publishStartupNotice("Session Engine watchdog sweep failed: \(error.localizedDescription)")
+        }
     }
 
     @MainActor
@@ -1367,6 +2397,7 @@ final class BeforeAppModel: ObservableObject {
             activeMirrorSession: activeMirrorSession,
             currentBrainState: inspectionBrain.currentBrain,
             projection: inspectionBrain.projection,
+            activeKillSwitches: activeEvolutionKillSwitches,
             runtimeSnapshot: runtimeSnapshot,
             now: inspectionBrain.now
         )
@@ -1442,7 +2473,7 @@ final class BeforeAppModel: ObservableObject {
         activeQuickSession = nil
         supportSurface = .buddy
         selectedTab = .support
-        ActiveDecisionWorkspaceStore.clear()
+        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
     }
 
     @MainActor
@@ -1452,7 +2483,7 @@ final class BeforeAppModel: ObservableObject {
         activeBalanceSession = nil
         supportSurface = .buddy
         selectedTab = .support
-        ActiveDecisionWorkspaceStore.clear()
+        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
     }
 
     @MainActor
@@ -1462,7 +2493,7 @@ final class BeforeAppModel: ObservableObject {
         activeMirrorSession = nil
         supportSurface = .buddy
         selectedTab = .support
-        ActiveDecisionWorkspaceStore.clear()
+        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
     }
 
     func reopenSupportRequest(_ request: SupportRequest) {
@@ -1509,7 +2540,7 @@ final class BeforeAppModel: ObservableObject {
         activeQuickSession = nil
         supportSurface = .sharedLife
         selectedTab = .support
-        ActiveDecisionWorkspaceStore.clear()
+        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
     }
 
     @MainActor
@@ -1518,7 +2549,7 @@ final class BeforeAppModel: ObservableObject {
         activeBalanceSession = nil
         supportSurface = .sharedLife
         selectedTab = .support
-        ActiveDecisionWorkspaceStore.clear()
+        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
     }
 
     @MainActor
@@ -1527,7 +2558,7 @@ final class BeforeAppModel: ObservableObject {
         activeMirrorSession = nil
         supportSurface = .sharedLife
         selectedTab = .support
-        ActiveDecisionWorkspaceStore.clear()
+        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
     }
 
     func reopenSharedLifeItem(_ item: SharedLifeBoxItem) {
@@ -1656,6 +2687,8 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func restoreActiveWorkspaceIfNeeded() {
+        var restoredWorkspaceState: ActiveDecisionWorkspaceState?
+
         hostRuntime.restoreActiveWorkspaceIfNeeded(
             restoreEnabled: preferences.restoreInProgressWorkspaces,
             hasActivePrimaryWorkflow: activeQuickSession != nil,
@@ -1663,14 +2696,21 @@ final class BeforeAppModel: ObservableObject {
             hasActiveReflectiveWorkflow: activeMirrorSession != nil,
             hasReflectionContext: reflectionContext != nil,
             loadState: { ActiveDecisionWorkspaceStore.load() },
-            modeID: { $0.modeRaw },
+            modeID: {
+                $0.mode?.substrateModeID
+                ?? DecisionMode.fromSubstrateModeID($0.modeRaw)?.substrateModeID
+                ?? BeforeProductCompatibility.substrateModeID(rawValue: $0.modeRaw)
+            },
             restorePrimary: { state in
+                restoredWorkspaceState = state
                 activateQuickSession(state.restoreQuickSession())
             },
             restoreComparative: { state in
+                restoredWorkspaceState = state
                 activateBalanceSession(state.restoreBalanceSession())
             },
             restoreReflective: { state in
+                restoredWorkspaceState = state
                 activateMirrorSession(state.restoreMirrorSession())
             },
             selectHomeTab: {
@@ -1679,30 +2719,45 @@ final class BeforeAppModel: ObservableObject {
             afterRestore: {
                 refreshActiveTaskGraphSnapshot()
                 refreshPredictedIntervention()
+                if let restoredWorkspaceState {
+                    recordActiveWorkspaceRestoreLifecycle(restoredWorkspaceState)
+                }
             }
         )
     }
 
-    private func persistActiveWorkspaceState() {
-        let state: ActiveDecisionWorkspaceState?
-
-        if let session = activeQuickSession {
-            state = ActiveDecisionWorkspaceState.capture(from: session)
-        } else if let session = activeBalanceSession {
-            state = ActiveDecisionWorkspaceState.capture(from: session)
-        } else if let session = activeMirrorSession {
-            state = ActiveDecisionWorkspaceState.capture(from: session)
-        } else {
-            state = nil
-        }
+    private func persistActiveWorkspaceState(
+        trackSessionEngineLifecycle: Bool = false
+    ) {
+        let state = capturedActiveWorkspaceState()
+        let previousState = trackSessionEngineLifecycle ? ActiveDecisionWorkspaceStore.load() : nil
 
         if let state {
             ActiveDecisionWorkspaceStore.save(state)
+            if trackSessionEngineLifecycle {
+                recordActiveWorkspacePersistenceLifecycle(state)
+            }
         } else {
             ActiveDecisionWorkspaceStore.clear()
+            if trackSessionEngineLifecycle, let previousState {
+                recordActiveWorkspaceClearLifecycle(previousState)
+            }
         }
 
         refreshActiveTaskGraphSnapshot()
+    }
+
+    private func capturedActiveWorkspaceState() -> ActiveDecisionWorkspaceState? {
+        if let session = activeQuickSession {
+            return ActiveDecisionWorkspaceState.capture(from: session)
+        }
+        if let session = activeBalanceSession {
+            return ActiveDecisionWorkspaceState.capture(from: session)
+        }
+        if let session = activeMirrorSession {
+            return ActiveDecisionWorkspaceState.capture(from: session)
+        }
+        return nil
     }
 
     private func trimmed(_ value: String) -> String {
@@ -1783,6 +2838,7 @@ final class BeforeAppModel: ObservableObject {
             commitCurrentBrain: { currentBrainState = $0 },
             commitSession: { activeQuickSession = $0 }
         )
+        primeSessionEngineBinding(for: session)
     }
 
     private func activateBalanceSession(_ session: BalanceBoardSession) {
@@ -1807,6 +2863,7 @@ final class BeforeAppModel: ObservableObject {
             commitCurrentBrain: { currentBrainState = $0 },
             commitSession: { activeBalanceSession = $0 }
         )
+        primeSessionEngineBinding(for: session)
     }
 
     private func activateMirrorSession(_ session: MirrorWorkspaceSession) {
@@ -1831,6 +2888,1097 @@ final class BeforeAppModel: ObservableObject {
             commitCurrentBrain: { currentBrainState = $0 },
             commitSession: { activeMirrorSession = $0 }
         )
+        primeSessionEngineBinding(for: session)
+    }
+
+    private func primeSessionEngineBinding(for session: QuickCheckSession) {
+        Task {
+            _ = await ensureSessionEngineSession(
+                existingID: { session.sessionEngineSessionID },
+                bindingTask: { session.sessionEngineBindingTask },
+                setBindingTask: { session.sessionEngineBindingTask = $0 },
+                setSessionID: { session.sessionEngineSessionID = $0 },
+                title: sessionEngineTitle(
+                    prefix: "Quick",
+                    seed: session.note,
+                    fallback: "Quick - \(session.scenario.title)"
+                )
+            )
+        }
+    }
+
+    private func primeSessionEngineBinding(for session: BalanceBoardSession) {
+        Task {
+            _ = await ensureSessionEngineSession(
+                existingID: { session.sessionEngineSessionID },
+                bindingTask: { session.sessionEngineBindingTask },
+                setBindingTask: { session.sessionEngineBindingTask = $0 },
+                setSessionID: { session.sessionEngineSessionID = $0 },
+                title: sessionEngineTitle(
+                    prefix: "Balance",
+                    seed: session.prompt,
+                    fallback: "Balance board"
+                )
+            )
+        }
+    }
+
+    private func primeSessionEngineBinding(for session: MirrorWorkspaceSession) {
+        Task {
+            _ = await ensureSessionEngineSession(
+                existingID: { session.sessionEngineSessionID },
+                bindingTask: { session.sessionEngineBindingTask },
+                setBindingTask: { session.sessionEngineBindingTask = $0 },
+                setSessionID: { session.sessionEngineSessionID = $0 },
+                title: sessionEngineTitle(
+                    prefix: "Mirror",
+                    seed: session.prompt,
+                    fallback: "Mirror workspace"
+                )
+            )
+        }
+    }
+
+    private func ensureSessionEngineSession(
+        existingID: () -> String?,
+        bindingTask: () -> Task<String?, Never>?,
+        setBindingTask: (Task<String?, Never>?) -> Void,
+        setSessionID: (String?) -> Void,
+        title: String
+    ) async -> String? {
+        if let existingID = existingID() {
+            return existingID
+        }
+
+        if let task = bindingTask() {
+            let resolvedID = await task.value
+            setBindingTask(nil)
+            if let resolvedID, existingID() != resolvedID {
+                setSessionID(resolvedID)
+                persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
+            }
+            return resolvedID
+        }
+
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            return nil
+        }
+
+        let task = Task<String?, Never> {
+            do {
+                let session = try await sessionEngine.createSession(title: title)
+                return session.id
+            } catch {
+                await MainActor.run {
+                    publishStartupNotice("Session Engine could not create a local recovery session for \(title).")
+                }
+                return nil
+            }
+        }
+
+        setBindingTask(task)
+        let resolvedID = await task.value
+        setBindingTask(nil)
+
+        if let resolvedID, existingID() != resolvedID {
+            setSessionID(resolvedID)
+            persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
+        }
+
+        return resolvedID
+    }
+
+    private func beginQuickSessionEngineEvaluation(
+        _ session: QuickCheckSession
+    ) async -> DecisionSessionEngineEvaluationContext? {
+        guard let sessionID = await ensureSessionEngineSession(
+            existingID: { session.sessionEngineSessionID },
+            bindingTask: { session.sessionEngineBindingTask },
+            setBindingTask: { session.sessionEngineBindingTask = $0 },
+            setSessionID: { session.sessionEngineSessionID = $0 },
+            title: sessionEngineTitle(
+                prefix: "Quick",
+                seed: session.note,
+                fallback: "Quick - \(session.scenario.title)"
+            )
+        ) else {
+            return nil
+        }
+
+        return await beginSessionEngineEvaluation(
+            sessionID: sessionID,
+            userText: quickSessionEventText(session),
+            intent: "quick_check",
+            checkpointDraft: quickSessionCheckpointDraft(session, result: nil)
+        )
+    }
+
+    private func recordQuickSessionEngineAction(
+        _ session: QuickCheckSession,
+        result: QuickCheckResult,
+        action: CheckAction,
+        eBrainTurn: BASEBrainTurnResult? = nil,
+        now: Date = .now
+    ) async {
+        guard let sessionID = await ensureSessionEngineSession(
+            existingID: { session.sessionEngineSessionID },
+            bindingTask: { session.sessionEngineBindingTask },
+            setBindingTask: { session.sessionEngineBindingTask = $0 },
+            setSessionID: { session.sessionEngineSessionID = $0 },
+            title: sessionEngineTitle(
+                prefix: "Quick",
+                seed: session.note,
+                fallback: "Quick - \(session.scenario.title)"
+            )
+        ) else {
+            return
+        }
+
+        await recordSessionEngineToolLifecycle(
+            sessionID: sessionID,
+            tool: "complete_quick_check",
+            argsPreview: [
+                "action": action.rawValue,
+                "scenario": session.scenario.rawValue,
+                "entrySource": session.entrySource.rawValue
+            ],
+            resultSummary: "Completed quick check with action \(action.title(using: BeforePolicy.QuickCheck.defaultBufferDuration)).",
+            checkpointDraft: sessionEngineCheckpointDraft(
+                quickSessionCheckpointDraft(session, result: result),
+                actionSummary: "completed quick check with action \(action.title(using: BeforePolicy.QuickCheck.defaultBufferDuration))",
+                eBrainTurn: eBrainTurn
+            ),
+            now: now
+        )
+    }
+
+    private func beginBalanceSessionEngineEvaluation(
+        _ session: BalanceBoardSession
+    ) async -> DecisionSessionEngineEvaluationContext? {
+        guard let sessionID = await ensureSessionEngineSession(
+            existingID: { session.sessionEngineSessionID },
+            bindingTask: { session.sessionEngineBindingTask },
+            setBindingTask: { session.sessionEngineBindingTask = $0 },
+            setSessionID: { session.sessionEngineSessionID = $0 },
+            title: sessionEngineTitle(
+                prefix: "Balance",
+                seed: session.prompt,
+                fallback: "Balance board"
+            )
+        ) else {
+            return nil
+        }
+
+        return await beginSessionEngineEvaluation(
+            sessionID: sessionID,
+            userText: balanceSessionEventText(session),
+            intent: "balance_board",
+            checkpointDraft: balanceSessionCheckpointDraft(session, result: nil)
+        )
+    }
+
+    private func recordBalanceSessionEngineAction(
+        _ session: BalanceBoardSession,
+        result: BalanceBoardResult,
+        actionSummary: String,
+        tool: String,
+        argsPreview: [String: String],
+        eBrainTurn: BASEBrainTurnResult? = nil,
+        now: Date = .now
+    ) async {
+        guard let sessionID = await ensureSessionEngineSession(
+            existingID: { session.sessionEngineSessionID },
+            bindingTask: { session.sessionEngineBindingTask },
+            setBindingTask: { session.sessionEngineBindingTask = $0 },
+            setSessionID: { session.sessionEngineSessionID = $0 },
+            title: sessionEngineTitle(
+                prefix: "Balance",
+                seed: session.prompt,
+                fallback: "Balance board"
+            )
+        ) else {
+            return
+        }
+
+        await recordSessionEngineToolLifecycle(
+            sessionID: sessionID,
+            tool: tool,
+            argsPreview: argsPreview,
+            resultSummary: sessionEngineActionResultSummary(actionSummary),
+            checkpointDraft: sessionEngineCheckpointDraft(
+                balanceSessionCheckpointDraft(session, result: result),
+                actionSummary: actionSummary,
+                eBrainTurn: eBrainTurn
+            ),
+            now: now
+        )
+    }
+
+    private func beginMirrorSessionEngineEvaluation(
+        _ session: MirrorWorkspaceSession
+    ) async -> DecisionSessionEngineEvaluationContext? {
+        guard let sessionID = await ensureSessionEngineSession(
+            existingID: { session.sessionEngineSessionID },
+            bindingTask: { session.sessionEngineBindingTask },
+            setBindingTask: { session.sessionEngineBindingTask = $0 },
+            setSessionID: { session.sessionEngineSessionID = $0 },
+            title: sessionEngineTitle(
+                prefix: "Mirror",
+                seed: session.prompt,
+                fallback: "Mirror workspace"
+            )
+        ) else {
+            return nil
+        }
+
+        return await beginSessionEngineEvaluation(
+            sessionID: sessionID,
+            userText: mirrorSessionEventText(session),
+            intent: "mirror_workspace",
+            checkpointDraft: mirrorSessionCheckpointDraft(session, result: nil)
+        )
+    }
+
+    private func recordMirrorSessionEngineAction(
+        _ session: MirrorWorkspaceSession,
+        result: MirrorResult,
+        actionSummary: String,
+        tool: String,
+        argsPreview: [String: String],
+        eBrainTurn: BASEBrainTurnResult? = nil,
+        now: Date = .now
+    ) async {
+        guard let sessionID = await ensureSessionEngineSession(
+            existingID: { session.sessionEngineSessionID },
+            bindingTask: { session.sessionEngineBindingTask },
+            setBindingTask: { session.sessionEngineBindingTask = $0 },
+            setSessionID: { session.sessionEngineSessionID = $0 },
+            title: sessionEngineTitle(
+                prefix: "Mirror",
+                seed: session.prompt,
+                fallback: "Mirror workspace"
+            )
+        ) else {
+            return
+        }
+
+        await recordSessionEngineToolLifecycle(
+            sessionID: sessionID,
+            tool: tool,
+            argsPreview: argsPreview,
+            resultSummary: sessionEngineActionResultSummary(actionSummary),
+            checkpointDraft: sessionEngineCheckpointDraft(
+                mirrorSessionCheckpointDraft(session, result: result),
+                actionSummary: actionSummary,
+                eBrainTurn: eBrainTurn
+            ),
+            now: now
+        )
+    }
+
+    private func beginSessionEngineEvaluation(
+        sessionID: String,
+        userText: String,
+        intent: String,
+        checkpointDraft: DecisionSessionCheckpointDraft
+    ) async -> DecisionSessionEngineEvaluationContext? {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            return nil
+        }
+
+        do {
+            _ = try await sessionEngine.appendUserMessage(
+                sessionId: sessionID,
+                text: userText,
+                intent: intent,
+                checkpointDraft: checkpointDraft
+            )
+            let step = try await sessionEngine.startStep(
+                sessionId: sessionID,
+                status: .planning
+            )
+            _ = try await sessionEngine.heartbeat(
+                stepId: step.id,
+                progress: 0.35,
+                status: .acting
+            )
+            return DecisionSessionEngineEvaluationContext(
+                sessionID: sessionID,
+                stepID: step.id
+            )
+        } catch {
+            publishStartupNotice("Session Engine could not record the start of this evaluation.")
+            return DecisionSessionEngineEvaluationContext(
+                sessionID: sessionID,
+                stepID: nil
+            )
+        }
+    }
+
+    private func finalizeQuickSessionEngineEvaluation(
+        _ session: QuickCheckSession,
+        context: DecisionSessionEngineEvaluationContext?,
+        eBrainTurn: BASEBrainTurnResult?
+    ) async {
+        guard let context else { return }
+        guard let result = session.result else {
+            await markSessionEngineStepStalled(
+                context.stepID,
+                errorCode: "quick_result_missing"
+            )
+            return
+        }
+
+        await finalizeSessionEngineEvaluation(
+            context: context,
+            assistantText: quickSessionResultText(result),
+            summary: result.verdict.title,
+            checkpointDraft: quickSessionCheckpointDraft(session, result: result),
+            eBrainTurn: eBrainTurn
+        )
+    }
+
+    private func finalizeBalanceSessionEngineEvaluation(
+        _ session: BalanceBoardSession,
+        context: DecisionSessionEngineEvaluationContext?,
+        eBrainTurn: BASEBrainTurnResult?
+    ) async {
+        guard let context else { return }
+        guard let result = session.result else {
+            await markSessionEngineStepStalled(
+                context.stepID,
+                errorCode: "balance_result_missing"
+            )
+            return
+        }
+
+        await finalizeSessionEngineEvaluation(
+            context: context,
+            assistantText: balanceSessionResultText(result),
+            summary: result.focusTitle,
+            checkpointDraft: balanceSessionCheckpointDraft(session, result: result),
+            eBrainTurn: eBrainTurn
+        )
+    }
+
+    private func finalizeMirrorSessionEngineEvaluation(
+        _ session: MirrorWorkspaceSession,
+        context: DecisionSessionEngineEvaluationContext?,
+        eBrainTurn: BASEBrainTurnResult?
+    ) async {
+        guard let context else { return }
+        guard let result = session.result else {
+            await markSessionEngineStepStalled(
+                context.stepID,
+                errorCode: "mirror_result_missing"
+            )
+            return
+        }
+
+        await finalizeSessionEngineEvaluation(
+            context: context,
+            assistantText: mirrorSessionResultText(result),
+            summary: result.nextActionTitle,
+            checkpointDraft: mirrorSessionCheckpointDraft(session, result: result),
+            eBrainTurn: eBrainTurn
+        )
+    }
+
+    private func finalizeSessionEngineEvaluation(
+        context: DecisionSessionEngineEvaluationContext,
+        assistantText: String,
+        summary: String,
+        checkpointDraft: DecisionSessionCheckpointDraft,
+        eBrainTurn: BASEBrainTurnResult?
+    ) async {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            return
+        }
+
+        do {
+            let enrichedCheckpointDraft = sessionEngineCheckpointDraft(
+                checkpointDraft,
+                eBrainTurn: eBrainTurn
+            )
+            if let stepID = context.stepID {
+                _ = try await sessionEngine.heartbeat(
+                    stepId: stepID,
+                    progress: 0.85,
+                    status: .writing
+                )
+            }
+            _ = try await sessionEngine.appendAssistantMessage(
+                sessionId: context.sessionID,
+                text: assistantText,
+                summary: summary,
+                checkpointDraft: enrichedCheckpointDraft
+            )
+            if let stepID = context.stepID {
+                _ = try await sessionEngine.completeStep(stepId: stepID)
+            }
+        } catch {
+            await markSessionEngineStepStalled(
+                context.stepID,
+                errorCode: "evaluation_commit_failed"
+            )
+            publishStartupNotice("Session Engine could not checkpoint this evaluation cleanly.")
+        }
+    }
+
+    private func recordSessionEngineToolLifecycle(
+        sessionID: String,
+        tool: String,
+        argsPreview: [String: String],
+        resultSummary: String,
+        checkpointDraft: DecisionSessionCheckpointDraft,
+        eBrainTurn: BASEBrainTurnResult? = nil,
+        now: Date = .now
+    ) async {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            return
+        }
+
+        var toolStepID: String?
+        var started = false
+        var finished = false
+        do {
+            let toolStep = try await sessionEngine.startStep(
+                sessionId: sessionID,
+                status: .waitingTool,
+                now: now
+            )
+            toolStepID = toolStep.id
+            _ = try await sessionEngine.heartbeat(
+                stepId: toolStep.id,
+                progress: 0.2,
+                status: .waitingTool,
+                now: now
+            )
+            _ = try await sessionEngine.appendToolCallStarted(
+                sessionId: sessionID,
+                tool: tool,
+                argsPreview: argsPreview,
+                now: now
+            )
+            started = true
+            _ = try await sessionEngine.heartbeat(
+                stepId: toolStep.id,
+                progress: 0.55,
+                status: .acting,
+                now: now
+            )
+            _ = try await sessionEngine.heartbeat(
+                stepId: toolStep.id,
+                progress: 0.85,
+                status: .writing,
+                now: now
+            )
+            _ = try await sessionEngine.appendToolCallFinished(
+                sessionId: sessionID,
+                tool: tool,
+                resultSummary: resultSummary,
+                checkpointDraft: sessionEngineCheckpointDraft(
+                    checkpointDraft,
+                    eBrainTurn: eBrainTurn
+                ),
+                now: now
+            )
+            finished = true
+            _ = try await sessionEngine.completeStep(stepId: toolStep.id, now: now)
+        } catch {
+            if started && !finished {
+                _ = try? await sessionEngine.appendToolCallFailed(
+                    sessionId: sessionID,
+                    tool: tool,
+                    errorCode: "tool_lifecycle_commit_failed",
+                    recoverable: true,
+                    now: now
+                )
+            }
+            if let toolStepID {
+                _ = try? await sessionEngine.markStepStalled(
+                    stepId: toolStepID,
+                    errorCode: "tool_lifecycle_commit_failed",
+                    now: now
+                )
+            }
+            let toolLabel = tool.replacingOccurrences(of: "_", with: " ")
+            publishStartupNotice("Session Engine could not record \(toolLabel).")
+        }
+    }
+
+    private func trackedSessionEngineLifecycleSessionID(
+        _ sessionID: String,
+        sessionEngine: DecisionSessionEngine
+    ) async -> String? {
+        guard !sessionID.isEmpty else {
+            return nil
+        }
+
+        guard (try? await sessionEngine.getSession(sessionID)) != nil else {
+            return nil
+        }
+
+        return sessionID
+    }
+
+    private func performTrackedSessionEngineToolLifecycle<Result>(
+        sessionID: String,
+        tool: String,
+        argsPreview: [String: String],
+        checkpointDraft: DecisionSessionCheckpointDraft? = nil,
+        eBrainTurn: BASEBrainTurnResult? = nil,
+        operation: () async throws -> Result,
+        resultSummary: (Result) -> String
+    ) async throws -> Result {
+        guard let sessionEngine = DecisionSessionEngine.shared else {
+            return try await operation()
+        }
+
+        var toolStepID: String?
+        var started = false
+        var finished = false
+
+        do {
+            let startedAt = Date.now
+            let toolStep = try await sessionEngine.startStep(
+                sessionId: sessionID,
+                status: .waitingTool,
+                now: startedAt
+            )
+            toolStepID = toolStep.id
+            _ = try await sessionEngine.heartbeat(
+                stepId: toolStep.id,
+                progress: 0.15,
+                status: .waitingTool,
+                now: startedAt
+            )
+            _ = try await sessionEngine.appendToolCallStarted(
+                sessionId: sessionID,
+                tool: tool,
+                argsPreview: argsPreview,
+                now: startedAt
+            )
+            started = true
+
+            _ = try await sessionEngine.heartbeat(
+                stepId: toolStep.id,
+                progress: 0.5,
+                status: .acting,
+                now: Date.now
+            )
+
+            let result = try await operation()
+
+            _ = try await sessionEngine.heartbeat(
+                stepId: toolStep.id,
+                progress: 0.85,
+                status: .writing,
+                now: Date.now
+            )
+            let enrichedCheckpointDraft = checkpointDraft.map {
+                sessionEngineCheckpointDraft($0, eBrainTurn: eBrainTurn)
+            }
+            _ = try await sessionEngine.appendToolCallFinished(
+                sessionId: sessionID,
+                tool: tool,
+                resultSummary: resultSummary(result),
+                checkpointDraft: enrichedCheckpointDraft,
+                now: Date.now
+            )
+            finished = true
+            _ = try await sessionEngine.completeStep(stepId: toolStep.id, now: Date.now)
+            return result
+        } catch {
+            if started && !finished {
+                _ = try? await sessionEngine.appendToolCallFailed(
+                    sessionId: sessionID,
+                    tool: tool,
+                    errorCode: "tool_lifecycle_commit_failed",
+                    recoverable: true,
+                    now: Date.now
+                )
+            }
+            if let toolStepID {
+                _ = try? await sessionEngine.markStepStalled(
+                    stepId: toolStepID,
+                    errorCode: "tool_lifecycle_commit_failed",
+                    now: Date.now
+                )
+            }
+            throw error
+        }
+    }
+
+    private func recordActiveWorkspacePersistenceLifecycle(
+        _ state: ActiveDecisionWorkspaceState
+    ) {
+        recordActiveWorkspaceLifecycle(
+            state,
+            tool: "persist_active_workspace_state",
+            actionSummary: "persisted active \(workspaceLifecycleModeLabel(state)) workspace state",
+            now: state.savedAt
+        )
+    }
+
+    private func recordActiveWorkspaceRestoreLifecycle(
+        _ state: ActiveDecisionWorkspaceState
+    ) {
+        recordActiveWorkspaceLifecycle(
+            state,
+            tool: "restore_active_workspace_state",
+            actionSummary: "restored active \(workspaceLifecycleModeLabel(state)) workspace state",
+            now: .now
+        )
+    }
+
+    private func recordActiveWorkspaceClearLifecycle(
+        _ state: ActiveDecisionWorkspaceState
+    ) {
+        recordActiveWorkspaceLifecycle(
+            state,
+            tool: "clear_active_workspace_state",
+            actionSummary: "cleared active \(workspaceLifecycleModeLabel(state)) workspace state",
+            now: .now
+        )
+    }
+
+    private func recordActiveWorkspaceLifecycle(
+        _ state: ActiveDecisionWorkspaceState,
+        tool: String,
+        actionSummary: String,
+        now: Date
+    ) {
+        guard let rawSessionID = state.sessionEngineSessionID,
+              !rawSessionID.isEmpty else {
+            return
+        }
+
+        let argsPreview = workspaceLifecycleArgsPreview(for: state)
+
+        Task { @MainActor in
+            guard let sessionEngine = DecisionSessionEngine.shared,
+                  let sessionID = await trackedSessionEngineLifecycleSessionID(
+                    rawSessionID,
+                    sessionEngine: sessionEngine
+                  ) else {
+                return
+            }
+
+            let eBrainTurn = currentLiveEBrainTurn(
+                persistLineage: false,
+                now: now
+            )
+            let checkpointDraft = sessionEngineCheckpointDraft(
+                workspaceStateCheckpointDraft(state),
+                actionSummary: actionSummary,
+                eBrainTurn: eBrainTurn
+            )
+
+            await recordSessionEngineToolLifecycle(
+                sessionID: sessionID,
+                tool: tool,
+                argsPreview: argsPreview,
+                resultSummary: sessionEngineActionResultSummary(actionSummary),
+                checkpointDraft: checkpointDraft,
+                now: now
+            )
+        }
+    }
+
+    private func workspaceLifecycleArgsPreview(
+        for state: ActiveDecisionWorkspaceState
+    ) -> [String: String] {
+        [
+            "mode": state.mode?.rawValue ?? state.modeRaw,
+            "entrySource": state.entrySource.rawValue,
+            "evaluated": state.wasEvaluated ? "true" : "false",
+            "savedAt": ISO8601DateFormatter().string(from: state.savedAt)
+        ]
+    }
+
+    private func workspaceLifecycleModeLabel(
+        _ state: ActiveDecisionWorkspaceState
+    ) -> String {
+        (state.mode?.rawValue ?? state.modeRaw)
+            .replacingOccurrences(of: "_", with: " ")
+    }
+
+    private func workspaceStateCheckpointDraft(
+        _ state: ActiveDecisionWorkspaceState
+    ) -> DecisionSessionCheckpointDraft {
+        switch state.mode ?? .quick {
+        case .quick:
+            return quickSessionCheckpointDraft(
+                state.restoreQuickSession(),
+                result: state.quickResult
+            )
+        case .balance:
+            return balanceSessionCheckpointDraft(
+                state.restoreBalanceSession(),
+                result: state.balanceResult
+            )
+        case .mirror:
+            return mirrorSessionCheckpointDraft(
+                state.restoreMirrorSession(),
+                result: state.mirrorResult
+            )
+        }
+    }
+
+    private func sessionEngineCheckpointDraft(
+        _ draft: DecisionSessionCheckpointDraft,
+        actionSummary: String
+    ) -> DecisionSessionCheckpointDraft {
+        sessionEngineCheckpointDraft(
+            draft,
+            actionSummary: actionSummary,
+            eBrainTurn: nil
+        )
+    }
+
+    private func sessionEngineCheckpointDraft(
+        _ draft: DecisionSessionCheckpointDraft,
+        actionSummary: String,
+        eBrainTurn: BASEBrainTurnResult?
+    ) -> DecisionSessionCheckpointDraft {
+        var summary = draft.summary
+        let fact = "action: \(actionSummary)"
+        if !summary.confirmedFacts.contains(fact) {
+            summary.confirmedFacts.append(fact)
+        }
+        guard let eBrainTurn else {
+            return DecisionSessionCheckpointDraft(
+                summary: summary,
+                runtimeState: draft.runtimeState
+            )
+        }
+
+        return sessionEngineCheckpointDraft(
+            DecisionSessionCheckpointDraft(
+                summary: summary,
+                runtimeState: draft.runtimeState
+            ),
+            eBrainTurn: eBrainTurn
+        )
+    }
+
+    private func sessionEngineCheckpointDraft(
+        _ draft: DecisionSessionCheckpointDraft,
+        eBrainTurn: BASEBrainTurnResult?
+    ) -> DecisionSessionCheckpointDraft {
+        guard let eBrainTurn else {
+            return draft
+        }
+
+        var summary = draft.summary
+        var runtimeState = draft.runtimeState
+        appendUnique("eBrain budget: \(eBrainTurn.budgetFrame.runMode.rawValue) • loops \(eBrainTurn.budgetFrame.maxLoops) • candidates \(eBrainTurn.budgetFrame.maxCandidates) • decode \(eBrainTurn.budgetFrame.maxDecodeTokens)", to: &summary.acceptedConstraints)
+        appendUnique("eBrain route: \(eBrainTurn.budgetFrame.deviceRoute.rawValue) • precision \(eBrainTurn.budgetFrame.precisionProfile.rawValue) • retrieval \(eBrainTurn.budgetFrame.retrievalDepth)", to: &summary.acceptedConstraints)
+        appendUnique("eBrain risk: \(eBrainTurn.riskCard.riskLevel.rawValue)", to: &summary.confirmedFacts)
+        appendUnique("eBrain permit: \(eBrainTurn.actionPermit.mode.rawValue)", to: &summary.confirmedFacts)
+        appendUnique("eBrain host gate: \(Int((eBrainTurn.hostGateValue * 100).rounded()))%", to: &summary.confirmedFacts)
+        appendUnique("eBrain fold: \(String(eBrainTurn.thoughtFold.checksum.prefix(12)))", to: &summary.confirmedFacts)
+
+        if !eBrainTurn.runtimeTrace.guardrailFindings.isEmpty {
+            appendUnique("eBrain audit findings: \(eBrainTurn.runtimeTrace.guardrailFindings.count)", to: &summary.confirmedFacts)
+        }
+
+        if let firstTicket = eBrainTurn.updateTickets.first?.summary,
+           !trimmed(firstTicket).isEmpty {
+            appendUnique("Review update ticket: \(trimmed(firstTicket))", to: &summary.openTasks)
+        }
+
+        if eBrainTurn.actionPermit.mode.isProtective {
+            appendUnique("Review protective path: \(eBrainTurn.actionPermit.mode.rawValue)", to: &summary.openTasks)
+            runtimeState.currentMode = .review
+        }
+
+        appendUnique("ebrain", to: &summary.currentScope)
+        appendUnique(eBrainTurn.contextFrame.taskType.rawValue, to: &summary.currentScope)
+        appendUnique("run:\(eBrainTurn.budgetFrame.runMode.rawValue)", to: &summary.currentScope)
+
+        return DecisionSessionCheckpointDraft(
+            summary: summary,
+            runtimeState: runtimeState
+        )
+    }
+
+    private func appendUnique(_ value: String, to values: inout [String]) {
+        guard !values.contains(value) else {
+            return
+        }
+        values.append(value)
+    }
+
+    private func sessionEngineActionResultSummary(_ actionSummary: String) -> String {
+        let trimmedSummary = trimmed(actionSummary)
+        guard let first = trimmedSummary.first else {
+            return "Recorded session action."
+        }
+        let remainder = trimmedSummary.dropFirst()
+        return String(first).uppercased() + remainder + "."
+    }
+
+    private func readSessionEngineBundleData(from sourceURL: URL) throws -> Data {
+        let hasSecurityScope = sourceURL.startAccessingSecurityScopedResource()
+        defer {
+            if hasSecurityScope {
+                sourceURL.stopAccessingSecurityScopedResource()
+            }
+        }
+        return try Data(contentsOf: sourceURL)
+    }
+
+    private func markSessionEngineStepStalled(
+        _ stepID: String?,
+        errorCode: String
+    ) async {
+        guard let stepID,
+              let sessionEngine = DecisionSessionEngine.shared else {
+            return
+        }
+        _ = try? await sessionEngine.markStepStalled(
+            stepId: stepID,
+            errorCode: errorCode
+        )
+    }
+
+    private func sessionEngineCorrectionTargetEvent(
+        in events: [DecisionSessionEvent]
+    ) -> DecisionSessionEvent? {
+        let preferredTypes: Set<DecisionSessionEventType> = [
+            .assistantMessage,
+            .userMessage,
+            .correctionAdded,
+            .toolCallFinished,
+            .toolCallFailed,
+            .toolCallStarted
+        ]
+
+        return events.last(where: { preferredTypes.contains($0.type) }) ?? events.last
+    }
+
+    private func quickSessionEventText(_ session: QuickCheckSession) -> String {
+        let lines = [
+            "Scenario: \(session.scenario.title)",
+            "Motivation: \(session.motivation?.title ?? "Unspecified")",
+            "Expected outcome: \(session.expectedOutcome?.title ?? "Unspecified")",
+            "Control level: \(session.controlLevel?.title ?? "Unspecified")",
+            "Note: \(trimmed(session.note).isEmpty ? "None" : trimmed(session.note))"
+        ]
+        return lines.joined(separator: "\n")
+    }
+
+    private func balanceSessionEventText(_ session: BalanceBoardSession) -> String {
+        let lines = [
+            "Prompt: \(trimmed(session.prompt).isEmpty ? "None" : trimmed(session.prompt))",
+            "Desire: \(trimmed(session.desire).isEmpty ? "None" : trimmed(session.desire))",
+            "Concern: \(trimmed(session.concern).isEmpty ? "None" : trimmed(session.concern))",
+            "Constraint: \(trimmed(session.constraint).isEmpty ? "None" : trimmed(session.constraint))",
+            "Long term: \(trimmed(session.longTerm).isEmpty ? "None" : trimmed(session.longTerm))"
+        ]
+        return lines.joined(separator: "\n")
+    }
+
+    private func mirrorSessionEventText(_ session: MirrorWorkspaceSession) -> String {
+        let lines = [
+            "Prompt: \(trimmed(session.prompt).isEmpty ? "None" : trimmed(session.prompt))",
+            "Emotion: \(trimmed(session.emotion).isEmpty ? "None" : trimmed(session.emotion))",
+            "Relationship: \(trimmed(session.relationship).isEmpty ? "None" : trimmed(session.relationship))",
+            "Reality: \(trimmed(session.reality).isEmpty ? "None" : trimmed(session.reality))",
+            "Long term: \(trimmed(session.longTerm).isEmpty ? "None" : trimmed(session.longTerm))",
+            "Self lens: \(trimmed(session.selfLens).isEmpty ? "None" : trimmed(session.selfLens))"
+        ]
+        return lines.joined(separator: "\n")
+    }
+
+    private func quickSessionResultText(_ result: QuickCheckResult) -> String {
+        [
+            "Verdict: \(result.verdict.title)",
+            "Current perspective: \(result.currentPerspective)",
+            "After perspective: \(result.afterPerspective)",
+            "Primary action: \(result.primaryAction.title)"
+        ].joined(separator: "\n")
+    }
+
+    private func balanceSessionResultText(_ result: BalanceBoardResult) -> String {
+        [
+            "Headline: \(result.headline)",
+            "Focus: \(result.focusTitle)",
+            "Summary: \(result.summary)",
+            "Next action: \(result.nextAction)"
+        ].joined(separator: "\n")
+    }
+
+    private func mirrorSessionResultText(_ result: MirrorResult) -> String {
+        [
+            "Headline: \(result.headline)",
+            "Core tension: \(result.coreTension)",
+            "Next action title: \(result.nextActionTitle)",
+            "Next action: \(result.nextAction)"
+        ].joined(separator: "\n")
+    }
+
+    private func quickSessionCheckpointDraft(
+        _ session: QuickCheckSession,
+        result: QuickCheckResult?
+    ) -> DecisionSessionCheckpointDraft {
+        var constraints = ["entry source: \(session.entrySource.rawValue)"]
+        if let control = session.controlLevel?.title {
+            constraints.append("control level: \(control)")
+        }
+
+        var facts = ["scenario: \(session.scenario.title)"]
+        if let motivation = session.motivation?.title {
+            facts.append("motivation: \(motivation)")
+        }
+        if let expectedOutcome = session.expectedOutcome?.title {
+            facts.append("expected outcome: \(expectedOutcome)")
+        }
+        if let result {
+            facts.append("verdict: \(result.verdict.title)")
+        }
+
+        var openTasks: [String] = []
+        if let result {
+            openTasks.append("Review primary action: \(result.primaryAction.title)")
+        } else {
+            openTasks.append("Produce a quick recommendation")
+        }
+
+        let goalSeed = trimmed(session.note)
+        let goal = goalSeed.isEmpty
+            ? "Run a quick check for \(session.scenario.title.lowercased())"
+            : goalSeed
+
+        return DecisionSessionCheckpointDraft(
+            summary: DecisionSessionCheckpointSummary(
+                goal: goal,
+                acceptedConstraints: constraints,
+                confirmedFacts: facts,
+                openTasks: openTasks,
+                currentScope: ["quick", session.scenario.rawValue]
+            ),
+            runtimeState: DecisionSessionCheckpointRuntimeState(
+                workspacePath: nil,
+                branchName: nil,
+                activeFiles: [],
+                currentMode: .chat
+            )
+        )
+    }
+
+    private func balanceSessionCheckpointDraft(
+        _ session: BalanceBoardSession,
+        result: BalanceBoardResult?
+    ) -> DecisionSessionCheckpointDraft {
+        var constraints = ["entry source: \(session.entrySource.rawValue)"]
+        let constraintText = trimmed(session.constraint)
+        if !constraintText.isEmpty {
+            constraints.append("constraint: \(constraintText)")
+        }
+
+        var facts: [String] = []
+        let desireText = trimmed(session.desire)
+        let concernText = trimmed(session.concern)
+        let longTermText = trimmed(session.longTerm)
+        if !desireText.isEmpty {
+            facts.append("desire: \(desireText)")
+        }
+        if !concernText.isEmpty {
+            facts.append("concern: \(concernText)")
+        }
+        if !longTermText.isEmpty {
+            facts.append("long term: \(longTermText)")
+        }
+        if let result {
+            facts.append("focus: \(result.focusTitle)")
+        }
+
+        let promptText = trimmed(session.prompt)
+        let goal = promptText.isEmpty ? "Work through a balance board" : promptText
+        let openTasks = result.map { ["Review next action: \($0.nextAction)"] } ?? ["Compare the trade-off clearly"]
+
+        return DecisionSessionCheckpointDraft(
+            summary: DecisionSessionCheckpointSummary(
+                goal: goal,
+                acceptedConstraints: constraints,
+                confirmedFacts: facts,
+                openTasks: openTasks,
+                currentScope: ["balance"]
+            ),
+            runtimeState: DecisionSessionCheckpointRuntimeState(
+                workspacePath: nil,
+                branchName: nil,
+                activeFiles: [],
+                currentMode: .review
+            )
+        )
+    }
+
+    private func mirrorSessionCheckpointDraft(
+        _ session: MirrorWorkspaceSession,
+        result: MirrorResult?
+    ) -> DecisionSessionCheckpointDraft {
+        let constraints = ["entry source: \(session.entrySource.rawValue)"]
+        var facts: [String] = []
+        let emotionText = trimmed(session.emotion)
+        let relationshipText = trimmed(session.relationship)
+        let realityText = trimmed(session.reality)
+        let longTermText = trimmed(session.longTerm)
+        let selfLensText = trimmed(session.selfLens)
+
+        if !emotionText.isEmpty {
+            facts.append("emotion: \(emotionText)")
+        }
+        if !relationshipText.isEmpty {
+            facts.append("relationship: \(relationshipText)")
+        }
+        if !realityText.isEmpty {
+            facts.append("reality: \(realityText)")
+        }
+        if !longTermText.isEmpty {
+            facts.append("long term: \(longTermText)")
+        }
+        if !selfLensText.isEmpty {
+            facts.append("self lens: \(selfLensText)")
+        }
+        if let result {
+            facts.append("next action title: \(result.nextActionTitle)")
+        }
+
+        let promptText = trimmed(session.prompt)
+        let goal = promptText.isEmpty ? "Reflect through a mirror workspace" : promptText
+        let openTasks = result.map { ["Review next action: \($0.nextActionTitle)"] } ?? ["Name the core tension clearly"]
+
+        return DecisionSessionCheckpointDraft(
+            summary: DecisionSessionCheckpointSummary(
+                goal: goal,
+                acceptedConstraints: constraints,
+                confirmedFacts: facts,
+                openTasks: openTasks,
+                currentScope: ["mirror"]
+            ),
+            runtimeState: DecisionSessionCheckpointRuntimeState(
+                workspacePath: nil,
+                branchName: nil,
+                activeFiles: [],
+                currentMode: .review
+            )
+        )
+    }
+
+    private func sessionEngineTitle(
+        prefix: String,
+        seed: String,
+        fallback: String
+    ) -> String {
+        let trimmedSeed = trimmed(seed)
+        guard !trimmedSeed.isEmpty else {
+            return fallback
+        }
+        return "\(prefix) - \(String(trimmedSeed.prefix(48)))"
     }
 
     @MainActor
@@ -1840,6 +3988,18 @@ final class BeforeAppModel: ObservableObject {
     ) async -> DecisionTestingRuntimeExport {
         let context = modelContainer.mainContext
         let resolvedCurrentBrain = currentBrainOverride ?? currentBrainState
+        let sessionEngineSnapshot: DecisionSessionRuntimeSnapshot?
+        if let sessionEngine = DecisionSessionEngine.shared {
+            sessionEngineSnapshot = try? await sessionEngine.snapshot()
+        } else {
+            sessionEngineSnapshot = nil
+        }
+        let pendingSessionEngineImportPreview = pendingSessionEngineImportDraft.map {
+            DecisionSessionEnginePendingImportPreview(
+                sourceFileName: $0.sourceFileName,
+                preview: $0.preview
+            )
+        }
         let controlSurface = makeEvolutionControlSurface(
             currentBrainOverride: resolvedCurrentBrain
         )
@@ -1853,9 +4013,13 @@ final class BeforeAppModel: ObservableObject {
             mirror: DecisionMemorySystem.fetchMirrorRecords(in: context),
             preferences: preferences,
             runtimeSnapshot: runtimeSnapshot,
+            sessionEngineSnapshot: sessionEngineSnapshot,
+            pendingSessionEngineImportPreview: pendingSessionEngineImportPreview,
+            activeKillSwitches: activeEvolutionKillSwitches.map(\.rawValue),
             persistedCheckpointLineages: inventory.persistedLineages,
             pendingReviewCheckpoints: controlSurface.pendingReviewQueue,
             activeCheckpointHint: controlSurface.activeCheckpoint,
+            activeCheckpointSource: controlSurface.activeCheckpointSource,
             restorableCheckpointIDs: controlSurface.restorableCheckpointIDs
         )
     }
@@ -1893,6 +4057,11 @@ final class BeforeAppModel: ObservableObject {
             .map { $0 }
     }
 
+    private struct ResolvedActiveEvolutionCheckpoint {
+        let snapshot: DecisionReviewCheckpointSnapshot?
+        let source: DecisionEvolutionActiveCheckpointSource
+    }
+
     @MainActor
     private func evolutionCheckpointInventory(
         in context: ModelContext,
@@ -1901,7 +4070,7 @@ final class BeforeAppModel: ObservableObject {
         let allCheckpoints = evolutionCheckpointSnapshots(in: context)
         let persistedLineages = persistedCheckpointLineages(in: context)
         let pendingReviewQueue = allCheckpoints.filter { $0.approvalState == .reviewSuggested }
-        let activeCheckpoint = resolveActiveEvolutionCheckpoint(
+        let activeCheckpointResolution = resolveActiveEvolutionCheckpoint(
             currentBrain: currentBrain,
             allSnapshots: allCheckpoints,
             persistedLineages: persistedLineages
@@ -1910,7 +4079,8 @@ final class BeforeAppModel: ObservableObject {
         return DecisionEvolutionControlSurfaceInventory(
             pendingReviewQueue: pendingReviewQueue,
             persistedLineages: persistedLineages,
-            activeCheckpoint: activeCheckpoint,
+            activeCheckpoint: activeCheckpointResolution.snapshot,
+            activeCheckpointSource: activeCheckpointResolution.source,
             restorableCheckpointIDs: Set(allCheckpoints.filter(\.hasBrainStateSnapshot).map(\.checkpointID))
         )
     }
@@ -1934,7 +4104,7 @@ final class BeforeAppModel: ObservableObject {
     private func resolveActiveEvolutionCheckpoint(
         currentBrain: CurrentBrainState?,
         allSnapshots: [DecisionReviewCheckpointSnapshot]
-    ) -> DecisionReviewCheckpointSnapshot? {
+    ) -> ResolvedActiveEvolutionCheckpoint {
         resolveActiveEvolutionCheckpoint(
             currentBrain: currentBrain,
             allSnapshots: allSnapshots,
@@ -1947,37 +4117,49 @@ final class BeforeAppModel: ObservableObject {
         currentBrain: CurrentBrainState?,
         allSnapshots: [DecisionReviewCheckpointSnapshot],
         persistedLineages: [DecisionEvolutionLineageSnapshot]
-    ) -> DecisionReviewCheckpointSnapshot? {
+    ) -> ResolvedActiveEvolutionCheckpoint {
         if let latestCheckpoint = currentBrain?.evolutionState.latestCheckpoint,
            latestCheckpoint.approvalState == .automatic {
             let persisted = allSnapshots.first(where: { $0.checkpointID == latestCheckpoint.id })
 
-            return DecisionReviewCheckpointSnapshot(
-                checkpointID: latestCheckpoint.id,
-                previousCheckpointID: latestCheckpoint.previousCheckpointID ?? persisted?.previousCheckpointID,
-                createdAt: latestCheckpoint.createdAt,
-                mode: persisted?.mode ?? currentBrain?.mode ?? .quick,
-                approvalState: latestCheckpoint.approvalState,
-                rollbackReady: latestCheckpoint.rollbackReady,
-                hasBrainStateSnapshot: persisted?.hasBrainStateSnapshot ?? false,
-                diffSummary: latestCheckpoint.diffSummary,
-                eBrain: latestCheckpoint.lineageSummary.map(DeveloperDecisionReplayEBrainSummary.init(lineageSummary:))
-                    ?? persisted?.eBrain,
-                fallbackRiskLevel: persisted?.fallbackRiskLevel,
-                fallbackPermitMode: persisted?.fallbackPermitMode
+            return ResolvedActiveEvolutionCheckpoint(
+                snapshot: DecisionReviewCheckpointSnapshot(
+                    checkpointID: latestCheckpoint.id,
+                    previousCheckpointID: latestCheckpoint.previousCheckpointID ?? persisted?.previousCheckpointID,
+                    createdAt: latestCheckpoint.createdAt,
+                    mode: persisted?.mode ?? currentBrain?.mode ?? .quick,
+                    approvalState: latestCheckpoint.approvalState,
+                    rollbackReady: latestCheckpoint.rollbackReady,
+                    hasBrainStateSnapshot: persisted?.hasBrainStateSnapshot ?? false,
+                    diffSummary: latestCheckpoint.diffSummary,
+                    eBrain: latestCheckpoint.lineageSummary.map(DeveloperDecisionReplayEBrainSummary.init(lineageSummary:))
+                        ?? persisted?.eBrain,
+                    fallbackRiskLevel: persisted?.fallbackRiskLevel,
+                    fallbackPermitMode: persisted?.fallbackPermitMode
+                ),
+                source: .pinnedHint
             )
         }
 
         if let latestAutomaticSnapshot = allSnapshots.first(where: { $0.approvalState == .automatic }) {
-            return latestAutomaticSnapshot
+            return ResolvedActiveEvolutionCheckpoint(
+                snapshot: latestAutomaticSnapshot,
+                source: .automaticFallback
+            )
         }
 
         if let persistedActiveID = persistedLineages.first(where: { $0.approvalState == .automatic })?.checkpointID,
            let persistedActive = allSnapshots.first(where: { $0.checkpointID == persistedActiveID }) {
-            return persistedActive
+            return ResolvedActiveEvolutionCheckpoint(
+                snapshot: persistedActive,
+                source: .automaticFallback
+            )
         }
 
-        return nil
+        return ResolvedActiveEvolutionCheckpoint(
+            snapshot: nil,
+            source: .none
+        )
     }
 
     @MainActor
@@ -2046,6 +4228,7 @@ final class BeforeAppModel: ObservableObject {
             activeMirrorSession: activeMirrorSession,
             currentBrainState: currentBrainState,
             projection: memoryProjection,
+            activeKillSwitches: activeEvolutionKillSwitches,
             runtimeSnapshot: resolvedRuntimeSnapshot,
             now: now
         ) else {
@@ -2291,10 +4474,29 @@ final class BeforeAppModel: ObservableObject {
         }
 
         commitCurrentBrain(restoredBrain)
+        if let checkpoint = fetchEvolutionCheckpoint(checkpointID: checkpointID, in: context),
+           let lineageSummary = checkpoint.lineageSummary {
+            let restoredKillSwitches = BASKillSwitchID.resolvePolicyIDs(lineageSummary.activeKillSwitches)
+            DecisionEvolutionKillSwitchStore.save(restoredKillSwitches, now: now)
+            activeEvolutionKillSwitches = restoredKillSwitches
+        }
         isMemoryProjectionDirty = true
         persistActiveWorkspaceState()
         advanceEvolutionControlMutationEpoch()
         return true
+    }
+
+    @MainActor
+    private func fetchEvolutionCheckpoint(
+        checkpointID: String,
+        in context: ModelContext
+    ) -> DecisionEvolutionCheckpoint? {
+        let descriptor = FetchDescriptor<DecisionEvolutionCheckpoint>(
+            predicate: #Predicate { checkpoint in
+                checkpoint.id == checkpointID
+            }
+        )
+        return try? context.fetch(descriptor).first
     }
 
     @MainActor
@@ -2307,6 +4509,32 @@ final class BeforeAppModel: ObservableObject {
 
     private func advanceEvolutionControlMutationEpoch() {
         evolutionControlMutationEpoch &+= 1
+        refreshWidgetSurfaces()
+    }
+
+    private func widgetEvolutionReleaseStateID(
+        workspace: DecisionEvolutionWorkspaceSnapshot,
+        activeKillSwitchCount: Int,
+        recommendedKillSwitchCount: Int
+    ) -> String {
+        let workspaceFacts = workspace.facts
+
+        if activeKillSwitchCount > 0 {
+            return "blocked"
+        }
+
+        if workspaceFacts.pendingReviewCount > 0
+            || recommendedKillSwitchCount > 0
+            || workspace.reviewPresentation != nil
+        {
+            return "watch"
+        }
+
+        if workspace.activePresentation != nil {
+            return workspaceFacts.canRollbackActiveCheckpoint ? "ready" : "watch"
+        }
+
+        return "watch"
     }
 
     private func publishEvolutionMutationOutcome(

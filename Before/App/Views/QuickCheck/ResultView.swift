@@ -87,6 +87,15 @@ struct ResultView: View {
                                 dismiss()
                             }
                         }
+
+                        DecisionSessionEngineResultActionsCard(
+                            sessionID: session.sessionEngineSessionID,
+                            headline: "Session Engine recovery line",
+                            detail: "Open the local recovery line for this verdict, or create a correction branch without rewriting the earlier turn.",
+                            correctionTitle: "Create correction branch",
+                            correctionPlaceholder: "Correction: revise the requirement or verdict from here without changing the old history.",
+                            correctionReason: "quick verdict correction branch"
+                        )
                     }
                     .padding(20)
                 }

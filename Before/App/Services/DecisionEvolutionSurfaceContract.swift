@@ -14,9 +14,30 @@ struct DecisionEvolutionSurfaceContract: Equatable, Sendable {
     let releaseSummaryMode: DecisionEvolutionReleaseSummaryPresentationMode
     let showsEmbeddedReleaseSummaryInPilotPanel: Bool
     let showsCheckpointActionBarInSummary: Bool
+    let routesMutationsToControlCenter: Bool
 
-    var routesMutationsToControlCenter: Bool {
-        !interactionMode.allowsMutations
+    var allowsMutations: Bool {
+        !routesMutationsToControlCenter
+    }
+
+    var showsControlCenterShortcut: Bool {
+        routesMutationsToControlCenter
+    }
+
+    var checkpointNavigationOptions: DecisionEvolutionNavigationSurfaceOptions {
+        switch kind {
+        case .home, .settings:
+            navigationSurfaceOptions(
+                showHistoryShortcut: true,
+                showPortraitShortcut: true
+            )
+        case .history:
+            navigationSurfaceOptions(showPortraitShortcut: true)
+        case .portrait:
+            navigationSurfaceOptions(showHistoryShortcut: true)
+        case .controlCenter:
+            navigationSurfaceOptions()
+        }
     }
 
     static let home = DecisionEvolutionSurfaceContract(
@@ -24,7 +45,8 @@ struct DecisionEvolutionSurfaceContract: Equatable, Sendable {
         interactionMode: .observeAndRoute,
         releaseSummaryMode: .surface,
         showsEmbeddedReleaseSummaryInPilotPanel: true,
-        showsCheckpointActionBarInSummary: true
+        showsCheckpointActionBarInSummary: true,
+        routesMutationsToControlCenter: true
     )
 
     static let history = DecisionEvolutionSurfaceContract(
@@ -32,7 +54,8 @@ struct DecisionEvolutionSurfaceContract: Equatable, Sendable {
         interactionMode: .observeAndRoute,
         releaseSummaryMode: .compact,
         showsEmbeddedReleaseSummaryInPilotPanel: true,
-        showsCheckpointActionBarInSummary: true
+        showsCheckpointActionBarInSummary: true,
+        routesMutationsToControlCenter: true
     )
 
     static let portrait = DecisionEvolutionSurfaceContract(
@@ -40,7 +63,8 @@ struct DecisionEvolutionSurfaceContract: Equatable, Sendable {
         interactionMode: .observeAndRoute,
         releaseSummaryMode: .surface,
         showsEmbeddedReleaseSummaryInPilotPanel: true,
-        showsCheckpointActionBarInSummary: true
+        showsCheckpointActionBarInSummary: true,
+        routesMutationsToControlCenter: true
     )
 
     static let settings = DecisionEvolutionSurfaceContract(
@@ -48,7 +72,8 @@ struct DecisionEvolutionSurfaceContract: Equatable, Sendable {
         interactionMode: .observeAndRoute,
         releaseSummaryMode: .compact,
         showsEmbeddedReleaseSummaryInPilotPanel: false,
-        showsCheckpointActionBarInSummary: false
+        showsCheckpointActionBarInSummary: false,
+        routesMutationsToControlCenter: true
     )
 
     static let controlCenter = DecisionEvolutionSurfaceContract(
@@ -56,7 +81,8 @@ struct DecisionEvolutionSurfaceContract: Equatable, Sendable {
         interactionMode: .mutationHub,
         releaseSummaryMode: .mutationHub,
         showsEmbeddedReleaseSummaryInPilotPanel: false,
-        showsCheckpointActionBarInSummary: false
+        showsCheckpointActionBarInSummary: false,
+        routesMutationsToControlCenter: false
     )
 
     static func contract(for kind: DecisionEvolutionSurfaceKind) -> DecisionEvolutionSurfaceContract {
@@ -72,5 +98,106 @@ struct DecisionEvolutionSurfaceContract: Equatable, Sendable {
         case .controlCenter:
             .controlCenter
         }
+    }
+
+    func summarySurfaceOptions(
+        showCheckpointActionBar overrideShowCheckpointActionBar: Bool? = nil,
+        showControlCenterShortcut overrideShowControlCenterShortcut: Bool? = nil,
+        showHistoryShortcut: Bool = false,
+        showPortraitShortcut: Bool = false
+    ) -> DecisionEvolutionSummarySurfaceOptions {
+        let navigationOptions = navigationSurfaceOptions(
+            showControlCenterShortcut: overrideShowControlCenterShortcut,
+            showHistoryShortcut: showHistoryShortcut,
+            showPortraitShortcut: showPortraitShortcut
+        )
+        return DecisionEvolutionSummarySurfaceOptions(
+            showCheckpointActionBar: overrideShowCheckpointActionBar ?? showsCheckpointActionBarInSummary,
+            showControlCenterShortcut: navigationOptions.showControlCenterShortcut,
+            showHistoryShortcut: navigationOptions.showHistoryShortcut,
+            showPortraitShortcut: navigationOptions.showPortraitShortcut
+        )
+    }
+
+    func summarySurfaceOptions(
+        navigationOptions: DecisionEvolutionNavigationSurfaceOptions,
+        showCheckpointActionBar overrideShowCheckpointActionBar: Bool? = nil
+    ) -> DecisionEvolutionSummarySurfaceOptions {
+        DecisionEvolutionSummarySurfaceOptions(
+            showCheckpointActionBar: overrideShowCheckpointActionBar ?? showsCheckpointActionBarInSummary,
+            showControlCenterShortcut: navigationOptions.showControlCenterShortcut,
+            showHistoryShortcut: navigationOptions.showHistoryShortcut,
+            showPortraitShortcut: navigationOptions.showPortraitShortcut
+        )
+    }
+
+    func navigationSurfaceOptions(
+        showControlCenterShortcut overrideShowControlCenterShortcut: Bool? = nil,
+        showHistoryShortcut: Bool = false,
+        showPortraitShortcut: Bool = false
+    ) -> DecisionEvolutionNavigationSurfaceOptions {
+        DecisionEvolutionNavigationSurfaceOptions(
+            showControlCenterShortcut: overrideShowControlCenterShortcut ?? showsControlCenterShortcut,
+            showHistoryShortcut: showHistoryShortcut,
+            showPortraitShortcut: showPortraitShortcut
+        )
+    }
+}
+
+struct DecisionEvolutionNavigationSurfaceOptions: Equatable, Sendable {
+    let showControlCenterShortcut: Bool
+    let showHistoryShortcut: Bool
+    let showPortraitShortcut: Bool
+
+    var showsAnyShortcut: Bool {
+        showControlCenterShortcut || showHistoryShortcut || showPortraitShortcut
+    }
+
+    var preferredDestination: DecisionEvolutionNavigationDestination? {
+        if showControlCenterShortcut {
+            return .controlCenter
+        }
+
+        if showHistoryShortcut {
+            return .history
+        }
+
+        if showPortraitShortcut {
+            return .portrait
+        }
+
+        return nil
+    }
+}
+
+enum DecisionEvolutionNavigationDestination: String, Equatable, Sendable {
+    case controlCenter
+    case history
+    case portrait
+
+    func actionTitle(routesMutationsToControlCenter: Bool) -> String {
+        switch self {
+        case .controlCenter:
+            return routesMutationsToControlCenter ? "Open control center" : "Control center"
+        case .history:
+            return "Open History"
+        case .portrait:
+            return "Open Portrait"
+        }
+    }
+}
+
+struct DecisionEvolutionSummarySurfaceOptions: Equatable, Sendable {
+    let showCheckpointActionBar: Bool
+    let showControlCenterShortcut: Bool
+    let showHistoryShortcut: Bool
+    let showPortraitShortcut: Bool
+
+    var navigationOptions: DecisionEvolutionNavigationSurfaceOptions {
+        DecisionEvolutionNavigationSurfaceOptions(
+            showControlCenterShortcut: showControlCenterShortcut,
+            showHistoryShortcut: showHistoryShortcut,
+            showPortraitShortcut: showPortraitShortcut
+        )
     }
 }

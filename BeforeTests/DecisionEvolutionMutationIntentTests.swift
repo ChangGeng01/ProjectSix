@@ -174,6 +174,102 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
         XCTAssertEqual(intent?.preview.projectedReviewCheckpointID, "checkpoint-review")
     }
 
+    func testApprovePendingPreviewPromotesMostRecentCheckpointWhenActiveSlotIsAutomaticFallback() {
+        let now = Date()
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: DecisionReviewCheckpointSnapshot(
+                checkpointID: "checkpoint-active",
+                previousCheckpointID: nil,
+                createdAt: now,
+                mode: .quick,
+                approvalState: .automatic,
+                rollbackReady: true,
+                hasBrainStateSnapshot: false,
+                diffSummary: ["Fallback active checkpoint"],
+                eBrain: replaySummary(
+                    sessionID: "active",
+                    riskLevel: "low",
+                    permitMode: "answer"
+                )
+            ),
+            activeCheckpointSource: .automaticFallback,
+            reviewCheckpoint: nil,
+            pendingReviewQueue: [
+                DecisionReviewCheckpointSnapshot(
+                    checkpointID: "checkpoint-review-b",
+                    previousCheckpointID: nil,
+                    createdAt: now.addingTimeInterval(60),
+                    mode: .mirror,
+                    approvalState: .reviewSuggested,
+                    rollbackReady: true,
+                    hasBrainStateSnapshot: false,
+                    diffSummary: ["Newest review checkpoint"],
+                    eBrain: nil
+                )
+            ],
+            latestPersistedLineage: nil
+        )
+
+        let intent = DecisionEvolutionMutationIntentFactory.approvePendingCheckpoints(
+            controlSurface: controlSurface
+        )
+
+        XCTAssertEqual(intent?.preview.currentActiveCheckpointID, "checkpoint-active")
+        XCTAssertEqual(intent?.preview.projectedActiveCheckpointID, "checkpoint-review-b")
+        XCTAssertEqual(
+            intent?.preview.summary,
+            "Empty the review queue and let the automatic active slot advance to the most recent approved checkpoint."
+        )
+    }
+
+    func testApprovePendingPreviewKeepsPinnedActiveCheckpointStable() {
+        let now = Date()
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: DecisionReviewCheckpointSnapshot(
+                checkpointID: "checkpoint-active",
+                previousCheckpointID: nil,
+                createdAt: now,
+                mode: .quick,
+                approvalState: .automatic,
+                rollbackReady: true,
+                hasBrainStateSnapshot: true,
+                diffSummary: ["Pinned active checkpoint"],
+                eBrain: replaySummary(
+                    sessionID: "active",
+                    riskLevel: "low",
+                    permitMode: "answer"
+                )
+            ),
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: nil,
+            pendingReviewQueue: [
+                DecisionReviewCheckpointSnapshot(
+                    checkpointID: "checkpoint-review-b",
+                    previousCheckpointID: nil,
+                    createdAt: now.addingTimeInterval(60),
+                    mode: .mirror,
+                    approvalState: .reviewSuggested,
+                    rollbackReady: true,
+                    hasBrainStateSnapshot: false,
+                    diffSummary: ["Newest review checkpoint"],
+                    eBrain: nil
+                )
+            ],
+            latestPersistedLineage: nil
+        )
+
+        let intent = DecisionEvolutionMutationIntentFactory.approvePendingCheckpoints(
+            controlSurface: controlSurface
+        )
+
+        XCTAssertEqual(intent?.preview.currentActiveCheckpointID, "checkpoint-active")
+        XCTAssertEqual(intent?.preview.projectedActiveCheckpointID, "checkpoint-active")
+        XCTAssertEqual(
+            intent?.preview.summary,
+            "Empty the review queue without restoring or rewriting the active brain state."
+        )
+    }
+
     func testMarkReviewPreviewBreaksTimestampTiesUsingCheckpointIDOrdering() {
         let now = Date()
         let controlSurface = DecisionEvolutionControlSurface(

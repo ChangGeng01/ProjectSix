@@ -5,13 +5,17 @@ enum DecisionTestingEBrainSource: String, Equatable, Sendable {
     case liveRuntime = "live_runtime"
     case persistedCheckpoint = "persisted_checkpoint"
 
-    var title: String {
+    var sourceDescriptor: DecisionEvolutionSourceDescriptor {
         switch self {
         case .liveRuntime:
-            "Live runtime"
+            .liveRuntimeDefault
         case .persistedCheckpoint:
-            "Checkpoint recovery"
+            .checkpointRecoveryDefault
         }
+    }
+
+    var title: String {
+        sourceDescriptor.title
     }
 }
 
@@ -160,6 +164,8 @@ struct DecisionTestingCheckpointSelectionContext: Equatable, Sendable {
 struct DecisionTestingRuntimeExport {
     let generatedAt: Date
     let runtimeSnapshot: DecisionTestingRuntimeSnapshot
+    let sessionEngineSnapshot: DecisionSessionRuntimeSnapshot?
+    let pendingSessionEngineImportPreview: DecisionSessionEnginePendingImportPreview?
     let registeredProviders: [DecisionModelProviderDescriptor]
     let intelligenceTelemetry: DecisionIntelligenceTelemetrySnapshot
     let cacheTelemetry: DecisionIntelligenceCacheTelemetrySnapshot
@@ -169,12 +175,16 @@ struct DecisionTestingRuntimeExport {
     let persistedCheckpointLineages: [DecisionEvolutionLineageSnapshot]
     let pendingReviewCheckpoints: [DecisionReviewCheckpointSnapshot]
     let activeCheckpointHint: DecisionReviewCheckpointSnapshot?
+    let activeCheckpointSource: DecisionEvolutionActiveCheckpointSource
     let restorableCheckpointIDs: Set<String>
+    let activeKillSwitches: [String]
     let eBrainTurn: BASEBrainTurnResult?
 
     init(
         generatedAt: Date,
         runtimeSnapshot: DecisionTestingRuntimeSnapshot,
+        sessionEngineSnapshot: DecisionSessionRuntimeSnapshot? = nil,
+        pendingSessionEngineImportPreview: DecisionSessionEnginePendingImportPreview? = nil,
         registeredProviders: [DecisionModelProviderDescriptor],
         intelligenceTelemetry: DecisionIntelligenceTelemetrySnapshot,
         cacheTelemetry: DecisionIntelligenceCacheTelemetrySnapshot,
@@ -184,11 +194,15 @@ struct DecisionTestingRuntimeExport {
         persistedCheckpointLineages: [DecisionEvolutionLineageSnapshot],
         pendingReviewCheckpoints: [DecisionReviewCheckpointSnapshot],
         activeCheckpointHint: DecisionReviewCheckpointSnapshot?,
+        activeCheckpointSource: DecisionEvolutionActiveCheckpointSource = .none,
         restorableCheckpointIDs: Set<String> = [],
+        activeKillSwitches: [String] = [],
         eBrainTurn: BASEBrainTurnResult?
     ) {
         self.generatedAt = generatedAt
         self.runtimeSnapshot = runtimeSnapshot
+        self.sessionEngineSnapshot = sessionEngineSnapshot
+        self.pendingSessionEngineImportPreview = pendingSessionEngineImportPreview
         self.registeredProviders = registeredProviders
         self.intelligenceTelemetry = intelligenceTelemetry
         self.cacheTelemetry = cacheTelemetry
@@ -198,7 +212,9 @@ struct DecisionTestingRuntimeExport {
         self.persistedCheckpointLineages = persistedCheckpointLineages
         self.pendingReviewCheckpoints = pendingReviewCheckpoints
         self.activeCheckpointHint = activeCheckpointHint
+        self.activeCheckpointSource = activeCheckpointSource
         self.restorableCheckpointIDs = restorableCheckpointIDs
+        self.activeKillSwitches = activeKillSwitches
         self.eBrainTurn = eBrainTurn
     }
 
@@ -213,6 +229,7 @@ struct DecisionTestingRuntimeExport {
             pendingReviewQueue: effectivePendingReviewCheckpoints,
             persistedLineages: persistedCheckpointLineages,
             activeCheckpoint: activeCheckpointHint,
+            activeCheckpointSource: activeCheckpointSource,
             restorableCheckpointIDs: restorableCheckpointIDs
         )
     }
@@ -290,17 +307,15 @@ struct DecisionTestingRuntimeExport {
     }
 
     var effectiveEBrainSummary: DeveloperDecisionReplayEBrainSummary? {
-        if let eBrainTurn {
-            return DeveloperDecisionReplayEBrainSummary(turn: eBrainTurn)
-        }
-
-        return latestCheckpointLineage?.eBrain
+        evolutionRuntimeFacts(currentBrainState: nil).effectiveEBrainSummary
     }
 
     var effectiveEBrainSource: DecisionTestingEBrainSource? {
-        effectiveEBrainSummary.map {
-            $0.source == .liveRuntime ? .liveRuntime : .persistedCheckpoint
-        }
+        evolutionRuntimeFacts(currentBrainState: nil).effectiveEBrainSource
+    }
+
+    var effectiveEBrainFactsBundle: DecisionEvolutionEBrainFactsBundle? {
+        evolutionRuntimeFacts(currentBrainState: nil).effectiveEBrainFactsBundle
     }
 
     var flightDeck: DecisionSystemFlightDeck {
@@ -317,31 +332,105 @@ struct DecisionTestingRuntimeExport {
     }
 
     var thoughtFoldChecksum: String? {
-        if let eBrainTurn {
-            return String(eBrainTurn.thoughtFold.checksum.prefix(12))
-        }
-        return effectiveEBrainSummary?.thoughtFoldChecksum
+        evolutionRuntimeFacts(currentBrainState: nil).thoughtFoldChecksum
     }
 
     var updateTicketSummaries: [String] {
-        if let eBrainTurn {
-            return eBrainTurn.updateTickets.map(\.summary)
-        }
-        return effectiveEBrainSummary?.updateTicketSummaries ?? []
+        evolutionRuntimeFacts(currentBrainState: nil).updateTicketSummaries
     }
 
     var runtimeAuditFindings: [String] {
-        if let eBrainTurn {
-            return eBrainTurn.runtimeTrace.guardrailFindings.map(\.summary)
-        }
-        return effectiveEBrainSummary?.guardrailFindings ?? []
+        evolutionRuntimeFacts(currentBrainState: nil).runtimeAuditFindings
     }
 
     var recommendedKillSwitches: [String] {
-        if let eBrainTurn {
-            return eBrainTurn.runtimeTrace.recommendedKillSwitches.map(\.rawValue)
+        evolutionRuntimeFacts(currentBrainState: nil).recommendedKillSwitches
+    }
+
+    var effectiveActiveKillSwitches: [String] {
+        evolutionRuntimeFacts(currentBrainState: nil).effectiveActiveKillSwitches
+    }
+
+    func evolutionRuntimeFacts(
+        currentBrainState: CurrentBrainState?
+    ) -> DecisionEvolutionRuntimeFacts {
+        let resolvedEffectiveEBrainSummary: DeveloperDecisionReplayEBrainSummary? = if let eBrainTurn {
+            DeveloperDecisionReplayEBrainSummary(turn: eBrainTurn)
+        } else {
+            latestCheckpointLineage?.eBrain
         }
-        return effectiveEBrainSummary?.killSwitches ?? []
+        let resolvedEffectiveEBrainSource = resolvedEffectiveEBrainSummary.map {
+            $0.source == .liveRuntime
+                ? DecisionTestingEBrainSource.liveRuntime
+                : DecisionTestingEBrainSource.persistedCheckpoint
+        }
+        let resolvedEffectiveEBrainFactsBundle = resolvedEffectiveEBrainSummary.map {
+            $0.factsBundle(modeTitle: preferredCheckpointSelectionContext?.mode?.shortTitle)
+        }
+        let resolvedThoughtFoldChecksum: String? = if let eBrainTurn {
+            String(eBrainTurn.thoughtFold.checksum.prefix(12))
+        } else {
+            resolvedEffectiveEBrainSummary?.thoughtFoldChecksum
+        }
+        let resolvedUpdateTicketSummaries: [String] = if let eBrainTurn {
+            eBrainTurn.updateTickets.map(\.summary)
+        } else {
+            resolvedEffectiveEBrainSummary?.updateTicketSummaries ?? []
+        }
+        let resolvedRuntimeAuditFindings: [String] = if let eBrainTurn {
+            eBrainTurn.runtimeTrace.guardrailFindings.map(\.summary)
+        } else {
+            resolvedEffectiveEBrainSummary?.guardrailFindings ?? []
+        }
+        let resolvedEffectiveActiveKillSwitches: [String] = if let eBrainTurn {
+            orderedUnique(
+                activeKillSwitches + eBrainTurn.runtimeTrace.activeKillSwitches.map(\.rawValue)
+            )
+        } else {
+            activeKillSwitches
+        }
+        let resolvedRecommendedKillSwitches: [String] = if let eBrainTurn {
+            eBrainTurn.runtimeTrace.recommendedKillSwitches.map(\.rawValue)
+        } else if let resolvedEffectiveEBrainSummary {
+            resolvedEffectiveEBrainSummary.killSwitches.filter {
+                !resolvedEffectiveEBrainSummary.activeKillSwitches.contains($0)
+            }
+        } else {
+            []
+        }
+        let currentBrainAutomaticCheckpoint = currentBrainState?.evolutionState.latestCheckpoint
+            .flatMap { checkpoint -> DecisionReviewCheckpointSnapshot? in
+                guard checkpoint.approvalState == .automatic else {
+                    return nil
+                }
+
+                return DecisionReviewCheckpointSnapshot(
+                    summary: checkpoint,
+                    mode: currentBrainState?.mode ?? .quick
+                )
+            }
+        let coverageFacts = evolutionControlSurface.coverageFacts(
+            latestPersistedLineage: latestCheckpointLineage,
+            recoveredCheckpointOverride: currentBrainAutomaticCheckpoint ?? evolutionControlSurface.activeCheckpoint
+        )
+
+        return DecisionEvolutionRuntimeFacts(
+            effectiveEBrainSummary: resolvedEffectiveEBrainSummary,
+            effectiveEBrainSource: resolvedEffectiveEBrainSource,
+            effectiveEBrainFactsBundle: resolvedEffectiveEBrainFactsBundle,
+            thoughtFoldChecksum: resolvedThoughtFoldChecksum,
+            updateTicketSummaries: resolvedUpdateTicketSummaries,
+            runtimeAuditFindings: resolvedRuntimeAuditFindings,
+            effectiveActiveKillSwitches: resolvedEffectiveActiveKillSwitches,
+            recommendedKillSwitches: resolvedRecommendedKillSwitches,
+            coverageFacts: coverageFacts
+        )
+    }
+
+    func evolutionCoverageFacts(
+        currentBrainState: CurrentBrainState?
+    ) -> DecisionEvolutionCoverageFacts {
+        evolutionRuntimeFacts(currentBrainState: currentBrainState).coverageFacts
     }
 
     func attaching(
@@ -350,6 +439,8 @@ struct DecisionTestingRuntimeExport {
         DecisionTestingRuntimeExport(
             generatedAt: generatedAt,
             runtimeSnapshot: runtimeSnapshot,
+            sessionEngineSnapshot: sessionEngineSnapshot,
+            pendingSessionEngineImportPreview: pendingSessionEngineImportPreview,
             registeredProviders: registeredProviders,
             intelligenceTelemetry: intelligenceTelemetry,
             cacheTelemetry: cacheTelemetry,
@@ -359,9 +450,18 @@ struct DecisionTestingRuntimeExport {
             persistedCheckpointLineages: persistedCheckpointLineages,
             pendingReviewCheckpoints: pendingReviewCheckpoints,
             activeCheckpointHint: activeCheckpointHint,
+            activeCheckpointSource: activeCheckpointSource,
             restorableCheckpointIDs: restorableCheckpointIDs,
+            activeKillSwitches: activeKillSwitches,
             eBrainTurn: eBrainTurn
         )
+    }
+
+    private func orderedUnique(_ values: [String]) -> [String] {
+        values.reduce(into: [String]()) { uniqueValues, value in
+            guard !uniqueValues.contains(value) else { return }
+            uniqueValues.append(value)
+        }
     }
 
     var basLifecycleSummary: BASLifecycleSummary {

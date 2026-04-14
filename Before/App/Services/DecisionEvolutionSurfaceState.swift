@@ -29,7 +29,7 @@ struct DecisionEvolutionSurfaceState: Equatable, Sendable {
                 contract: contract
             ),
             attentionSignal: DecisionEvolutionAttentionSignal.build(
-                controlSurface: controlSurface
+                workspace: workspace
             )
         )
     }

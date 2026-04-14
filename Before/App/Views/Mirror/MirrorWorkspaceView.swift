@@ -38,6 +38,15 @@ struct MirrorWorkspaceView: View {
 
                         revisitCueCard
 
+                        DecisionSessionEngineResultActionsCard(
+                            sessionID: session.sessionEngineSessionID,
+                            headline: "Session Engine workspace line",
+                            detail: "Open the local recovery line for this mirror, or split a correction branch before you reflect it back.",
+                            correctionTitle: "Branch this mirror from here",
+                            correctionPlaceholder: "Correction: continue this mirror from a new version line without overwriting the current path.",
+                            correctionReason: "mirror workspace correction branch"
+                        )
+
                         BeforeActionButton(
                             session.result == nil ? "Reflect it back" : "Reflect it back again",
                             isEnabled: session.canEvaluate,
@@ -256,6 +265,15 @@ struct MirrorWorkspaceView: View {
                         session.result = nil
                     }
                 }
+
+                DecisionSessionEngineResultActionsCard(
+                    sessionID: session.sessionEngineSessionID,
+                    headline: "Session Engine recovery line",
+                    detail: "Open the local recovery line for this mirror, or split into a correction branch if the pattern needs a new version line.",
+                    correctionTitle: "Create mirror correction branch",
+                    correctionPlaceholder: "Correction: continue this mirror from a new version line without overwriting the old branch.",
+                    correctionReason: "mirror workspace correction branch"
+                )
             }
         }
     }

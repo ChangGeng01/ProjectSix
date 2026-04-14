@@ -1,4 +1,5 @@
 import XCTest
+@testable import BASAdmin
 @testable import BASHostKit
 
 final class BASHostKitTests: XCTestCase {
@@ -55,7 +56,7 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertFalse(result.consoleSnapshot.reports.isEmpty)
         XCTAssertEqual(result.consoleSnapshot.reports.count, BASLayerKind.allCases.count)
         XCTAssertNotNil(result.consoleSnapshot.programExecutionBlueprint)
-        XCTAssertEqual(result.consoleSnapshot.currentProgramExecutionBlueprint.governedSchemas.count, 10)
+        XCTAssertEqual(result.consoleSnapshot.currentProgramExecutionBlueprint.governedSchemas.count, BASEBrainSchemaGovernanceRegistry.governedSchemas.count)
         XCTAssertNotNil(result.consoleSnapshot.inspectionBundle)
         XCTAssertTrue(result.consoleSnapshot.runtimeSummary?.contains("permit") == true)
         XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("Host") == true)

@@ -61,6 +61,10 @@ struct DecisionEvolutionControlCenterView: View {
         evolutionSurfaceState.operatorSnapshot
     }
 
+    private var checkpointNavigationOptions: DecisionEvolutionNavigationSurfaceOptions {
+        evolutionSurfaceContract.checkpointNavigationOptions
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -135,13 +139,37 @@ struct DecisionEvolutionControlCenterView: View {
                         DecisionEvolutionReleaseSummaryView(
                             releaseSummary: releaseSummary,
                             controlSurface: controlSurface,
-                            presentationMode: evolutionSurfaceContract.releaseSummaryMode
+                            surfaceContract: evolutionSurfaceContract,
+                            presentationMode: evolutionSurfaceContract.releaseSummaryMode,
+                            navigationOptions: checkpointNavigationOptions,
+                            afterMutation: {
+                                Task {
+                                    await refreshFlightDeck()
+                                }
+                            }
                         )
                     } else {
                         Text("Release readiness will appear here once a flight-deck summary is available.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
+                }
+
+                workspaceSection(
+                    title: "Kill-switch control plane",
+                    detail: "Active runtime kill switches now live as a first-class host policy instead of staying as passive audit suggestions."
+                ) {
+                    DecisionEvolutionKillSwitchPanelView(
+                        activeKillSwitches: appModel.activeEvolutionKillSwitches,
+                        recommendedKillSwitchIDs: workspaceSnapshot.effectiveRecommendedKillSwitches,
+                        surfaceContract: evolutionSurfaceContract,
+                        navigationOptions: checkpointNavigationOptions,
+                        afterMutation: {
+                            Task {
+                                await refreshFlightDeck()
+                            }
+                        }
+                    )
                 }
 
                 workspaceSection(
@@ -152,10 +180,10 @@ struct DecisionEvolutionControlCenterView: View {
                         DecisionEvolutionPilotControlPanel(
                             controlSurface: controlSurface,
                             releaseSummary: workspaceSnapshot.releaseSummary,
-                            interactionMode: evolutionSurfaceContract.interactionMode,
+                            surfaceContract: evolutionSurfaceContract,
                             showsHeader: false,
                             showEmbeddedReleaseSummary: false,
-                            showControlCenterShortcut: false,
+                            navigationOptions: checkpointNavigationOptions,
                             afterMutation: {
                                 Task {
                                     await refreshFlightDeck()
@@ -165,7 +193,7 @@ struct DecisionEvolutionControlCenterView: View {
 
                         DecisionEvolutionBatchMutationPanel(
                             selection: batchMutationSelection,
-                            interactionMode: evolutionSurfaceContract.interactionMode,
+                            surfaceContract: evolutionSurfaceContract,
                             showsHeader: false,
                             selectAllVisible: selectAllVisibleCheckpoints,
                             selectReviewQueue: selectReviewQueueCheckpoints,
@@ -187,9 +215,9 @@ struct DecisionEvolutionControlCenterView: View {
                 ) {
                     DecisionEvolutionControlSurfaceSummaryView(
                         controlSurface: controlSurface,
+                        surfaceContract: evolutionSurfaceContract,
                         emptyMessage: "No persisted checkpoint lineage is available yet. Once a checkpoint lands, this control center will show active risk, permit, rollback and review facts.",
-                        interactionMode: evolutionSurfaceContract.interactionMode,
-                        showCheckpointActionBar: evolutionSurfaceContract.showsCheckpointActionBarInSummary,
+                        navigationOptions: checkpointNavigationOptions,
                         afterMutation: {
                             Task {
                                 await refreshFlightDeck()
@@ -207,7 +235,8 @@ struct DecisionEvolutionControlCenterView: View {
                             title: "Active checkpoint",
                             checkpoint: activePresentation,
                             controlSurface: controlSurface,
-                            interactionMode: evolutionSurfaceContract.interactionMode,
+                            surfaceContract: evolutionSurfaceContract,
+                            navigationOptions: checkpointNavigationOptions,
                             isSelected: batchMutationSelection.contains(activePresentation.checkpointID),
                             onToggleSelection: {
                                 toggleCheckpointSelection(activePresentation.checkpointID)
@@ -230,7 +259,8 @@ struct DecisionEvolutionControlCenterView: View {
                             title: "Review head",
                             checkpoint: reviewPresentation,
                             controlSurface: controlSurface,
-                            interactionMode: evolutionSurfaceContract.interactionMode,
+                            surfaceContract: evolutionSurfaceContract,
+                            navigationOptions: checkpointNavigationOptions,
                             isSelected: batchMutationSelection.contains(reviewPresentation.checkpointID),
                             onToggleSelection: {
                                 toggleCheckpointSelection(reviewPresentation.checkpointID)
@@ -253,7 +283,8 @@ struct DecisionEvolutionControlCenterView: View {
                             DecisionEvolutionCheckpointPanelView(
                                 checkpoint: checkpoint,
                                 controlSurface: controlSurface,
-                                interactionMode: evolutionSurfaceContract.interactionMode,
+                                surfaceContract: evolutionSurfaceContract,
+                                navigationOptions: checkpointNavigationOptions,
                                 isSelected: batchMutationSelection.contains(checkpoint.checkpointID),
                                 onToggleSelection: {
                                     toggleCheckpointSelection(checkpoint.checkpointID)
@@ -277,7 +308,8 @@ struct DecisionEvolutionControlCenterView: View {
                             DecisionEvolutionCheckpointPanelView(
                                 checkpoint: checkpoint,
                                 controlSurface: controlSurface,
-                                interactionMode: evolutionSurfaceContract.interactionMode,
+                                surfaceContract: evolutionSurfaceContract,
+                                navigationOptions: checkpointNavigationOptions,
                                 isSelected: batchMutationSelection.contains(checkpoint.checkpointID),
                                 onToggleSelection: {
                                     toggleCheckpointSelection(checkpoint.checkpointID)

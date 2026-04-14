@@ -5,6 +5,8 @@ import BASHostKit
 final class MirrorWorkspaceSession: ObservableObject, Identifiable {
     let id = UUID()
     let entrySource: EntrySource
+    var sessionEngineSessionID: String?
+    var sessionEngineBindingTask: Task<String?, Never>?
 
     @Published var prompt: String {
         didSet {
@@ -82,8 +84,12 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
         )
 
         let base = DecisionIntelligenceCoordinator.mirrorResult(for: input, preferences: preferences)
-        result = base
-        guard preferences.onDeviceIntelligenceMode.isEnabled else { return }
+        let shouldProtectBeforePublishing = eBrainTurn?.actionPermit.mode.isProtective == true
+        let shouldRefine = preferences.onDeviceIntelligenceMode.isEnabled || shouldProtectBeforePublishing
+        guard shouldRefine else {
+            result = base
+            return
+        }
 
         isRefiningWithModel = true
         defer { isRefiningWithModel = false }
@@ -104,6 +110,8 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
             preferences: preferences
         ) {
             result = refined
+        } else {
+            result = base
         }
     }
 

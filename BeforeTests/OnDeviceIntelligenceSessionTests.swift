@@ -68,6 +68,29 @@ final class OnDeviceIntelligenceSessionTests: XCTestCase {
         XCTAssertNotEqual(session.result?.currentPerspective, deterministic.currentPerspective)
     }
 
+    func testQuickSessionProtectivePermitWinsBeforeAnyDeterministicResultWhenIntelligenceIsOff() async {
+        let session = QuickCheckSession(entrySource: .app)
+        session.scenario = .buy
+        session.motivation = .reward
+        session.expectedOutcome = .temporaryRelief
+        session.controlLevel = .maybe
+        session.note = "Answer right now."
+
+        let turn = protectiveTurn(
+            mode: .replace,
+            headline: "Use the safer step",
+            body: "Do not publish the baseline answer before the protective gate resolves.",
+            alternativeActions: ["Use the safer step", "Decide tomorrow"]
+        )
+
+        await session.evaluateWithIntelligence(preferences: offPreferences, eBrainTurn: turn)
+
+        XCTAssertFalse(session.isRefiningWithModel)
+        XCTAssertEqual(session.result?.currentPerspective, turn.renderedOutput.headline)
+        XCTAssertEqual(session.result?.afterPerspective, turn.renderedOutput.body)
+        XCTAssertEqual(session.result?.primaryAction, .decideTomorrow)
+    }
+
     func testBalanceSessionEvaluateWithIntelligenceOffKeepsDeterministicResult() async {
         let session = BalanceBoardSession(entrySource: .app, prompt: "Should I take this freelance job?")
         session.desire = "I want the extra money."

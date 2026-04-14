@@ -7,7 +7,7 @@ import Testing
 @Suite("BASApple Memory Projection Selection Adapter")
 struct BASAppleMemoryProjectionSelectionAdapterTests {
     @Model
-    final class GovernedFixture: BASAppleGovernedMemoryEntity {
+    final class SelectionGovernedFixture: BASAppleGovernedMemoryEntity {
         @Attribute(.unique) var basID: String
         var basTypeID: String
         var basTopic: String
@@ -46,8 +46,8 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
             basTierID = "warm"
         }
 
-        static func basMake(from fields: BASGovernedMemoryStoredFields) -> GovernedFixture {
-            GovernedFixture(id: fields.id, priority: fields.priority, lastConfirmedAt: fields.lastConfirmedAt)
+        static func basMake(from fields: BASGovernedMemoryStoredFields) -> SelectionGovernedFixture {
+            SelectionGovernedFixture(id: fields.id, priority: fields.priority, lastConfirmedAt: fields.lastConfirmedAt)
         }
 
         var basSource: BASMemorySource {
@@ -89,7 +89,7 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
     }
 
     @Model
-    final class CandidateFixture: BASAppleCandidateMemoryEntity {
+    final class SelectionCandidateFixture: BASAppleCandidateMemoryEntity {
         @Attribute(.unique) var basID: String
         var basTypeID: String
         var basTopic: String
@@ -142,8 +142,8 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
             basTierID = "warm"
         }
 
-        static func basMake(from fields: BASCandidateMemoryStoredFields) -> CandidateFixture {
-            CandidateFixture(
+        static func basMake(from fields: BASCandidateMemoryStoredFields) -> SelectionCandidateFixture {
+            SelectionCandidateFixture(
                 id: fields.id,
                 priority: fields.priority,
                 lastObservedAt: fields.lastObservedAt,
@@ -278,17 +278,17 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
     @Test("governance snapshot counts candidate status and governance categories")
     func governanceSnapshotCountsStatuses() throws {
         let context = try makeContext()
-        context.insert(GovernedFixture(id: "record-1", priority: 0.8, lastConfirmedAt: .now))
-        context.insert(GovernedFixture(id: "record-2", priority: 0.6, lastConfirmedAt: .now.addingTimeInterval(-10)))
-        context.insert(CandidateFixture(id: "pending-a", priority: 0.9, lastObservedAt: .now, status: .pending, governanceDecision: .deferred))
-        context.insert(CandidateFixture(id: "pending-b", priority: 0.7, lastObservedAt: .now.addingTimeInterval(-10), status: .pending, governanceDecision: .admit))
-        context.insert(CandidateFixture(id: "promoted-a", priority: 0.5, lastObservedAt: .now.addingTimeInterval(-20), status: .promoted, governanceDecision: .admit))
+        context.insert(SelectionGovernedFixture(id: "record-1", priority: 0.8, lastConfirmedAt: .now))
+        context.insert(SelectionGovernedFixture(id: "record-2", priority: 0.6, lastConfirmedAt: .now.addingTimeInterval(-10)))
+        context.insert(SelectionCandidateFixture(id: "pending-a", priority: 0.9, lastObservedAt: .now, status: .pending, governanceDecision: .deferred))
+        context.insert(SelectionCandidateFixture(id: "pending-b", priority: 0.7, lastObservedAt: .now.addingTimeInterval(-10), status: .pending, governanceDecision: .admit))
+        context.insert(SelectionCandidateFixture(id: "promoted-a", priority: 0.5, lastObservedAt: .now.addingTimeInterval(-20), status: .promoted, governanceDecision: .admit))
         try context.save()
 
         let snapshot = BASAppleMemoryProjectionSelectionAdapter.governanceSnapshot(
             in: context,
-            recordType: GovernedFixture.self,
-            candidateType: CandidateFixture.self
+            recordType: SelectionGovernedFixture.self,
+            candidateType: SelectionCandidateFixture.self
         )
 
         #expect(snapshot.totalRecordCount == 2)
@@ -303,22 +303,22 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
     func fetchAdaptersPreserveCanonicalProjectionOrdering() throws {
         let now = Date(timeIntervalSinceReferenceDate: 1_000)
         let context = try makeContext()
-        context.insert(GovernedFixture(id: "record-c", priority: 0.5, lastConfirmedAt: now))
-        context.insert(GovernedFixture(id: "record-a", priority: 0.9, lastConfirmedAt: now.addingTimeInterval(-20)))
-        context.insert(GovernedFixture(id: "record-b", priority: 0.9, lastConfirmedAt: now.addingTimeInterval(-10)))
-        context.insert(CandidateFixture(id: "candidate-b", priority: 0.8, lastObservedAt: now.addingTimeInterval(-10), status: .pending, governanceDecision: .deferred))
-        context.insert(CandidateFixture(id: "candidate-a", priority: 0.8, lastObservedAt: now, status: .pending, governanceDecision: .admit))
-        context.insert(CandidateFixture(id: "candidate-z", priority: 0.95, lastObservedAt: now, status: .promoted, governanceDecision: .admit))
+        context.insert(SelectionGovernedFixture(id: "record-c", priority: 0.5, lastConfirmedAt: now))
+        context.insert(SelectionGovernedFixture(id: "record-a", priority: 0.9, lastConfirmedAt: now.addingTimeInterval(-20)))
+        context.insert(SelectionGovernedFixture(id: "record-b", priority: 0.9, lastConfirmedAt: now.addingTimeInterval(-10)))
+        context.insert(SelectionCandidateFixture(id: "candidate-b", priority: 0.8, lastObservedAt: now.addingTimeInterval(-10), status: .pending, governanceDecision: .deferred))
+        context.insert(SelectionCandidateFixture(id: "candidate-a", priority: 0.8, lastObservedAt: now, status: .pending, governanceDecision: .admit))
+        context.insert(SelectionCandidateFixture(id: "candidate-z", priority: 0.95, lastObservedAt: now, status: .promoted, governanceDecision: .admit))
         try context.save()
 
         let records = BASAppleMemoryProjectionSelectionAdapter.fetchProjectionRecords(
             in: context,
-            recordType: GovernedFixture.self,
+            recordType: SelectionGovernedFixture.self,
             limit: 2
         )
         let candidates = BASAppleMemoryProjectionSelectionAdapter.fetchPendingProjectionCandidates(
             in: context,
-            candidateType: CandidateFixture.self
+            candidateType: SelectionCandidateFixture.self
         )
 
         #expect(records.map(\.basID) == ["record-b", "record-a"])
@@ -376,8 +376,8 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
 
     private func makeContext() throws -> ModelContext {
         let schema = Schema([
-            GovernedFixture.self,
-            CandidateFixture.self,
+            SelectionGovernedFixture.self,
+            SelectionCandidateFixture.self,
             SelectionCheckEventFixture.self,
             SelectionComparativeFixture.self,
             SelectionReflectiveFixture.self

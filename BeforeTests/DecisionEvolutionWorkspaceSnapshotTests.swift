@@ -31,6 +31,7 @@ final class DecisionEvolutionWorkspaceSnapshotTests: XCTestCase {
 
         let surface = DecisionEvolutionControlSurface(
             activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
             reviewCheckpoint: reviewHead,
             pendingReviewQueue: [reviewHead, reviewTail],
             latestPersistedLineage: nil
@@ -39,12 +40,15 @@ final class DecisionEvolutionWorkspaceSnapshotTests: XCTestCase {
             state: .watch,
             headline: "Watching the pending review queue",
             reasons: ["1 checkpoint still requires review."],
+            activeKillSwitches: [],
+            recommendedKillSwitches: [],
             killSwitches: [],
             pendingReviewCount: 1,
             rollbackReadyCount: 2,
             canRestoreActiveCheckpoint: true,
             canRollbackActiveCheckpoint: true,
             activeCheckpointID: active.checkpointID,
+            activeCheckpointSource: .pinnedHint,
             reviewCheckpointID: reviewHead.checkpointID
         )
 
@@ -91,6 +95,61 @@ final class DecisionEvolutionWorkspaceSnapshotTests: XCTestCase {
         XCTAssertEqual(workspace.remainingReviewQueue.map(\.checkpointID), ["review-1"])
     }
 
+    func testWorkspaceSnapshotPrefersReleaseSummaryForEffectiveFacts() {
+        let active = makeSnapshot(
+            checkpointID: "active-1",
+            createdAt: Date(timeIntervalSince1970: 40),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let review = makeSnapshot(
+            checkpointID: "review-1",
+            createdAt: Date(timeIntervalSince1970: 30),
+            approvalState: .reviewSuggested,
+            hasLineage: true
+        )
+
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: active,
+                activeCheckpointSource: .pinnedHint,
+                reviewCheckpoint: review,
+                pendingReviewQueue: [review],
+                latestPersistedLineage: nil
+            ),
+            releaseSummary: DecisionSystemReleaseControlSummary(
+                state: .watch,
+                headline: "Watching the pending review queue",
+                reasons: ["Queue review remains pending."],
+                activeKillSwitches: ["force_guard_mode"],
+                recommendedKillSwitches: ["external-tools"],
+                killSwitches: ["force_guard_mode", "external-tools"],
+                pendingReviewCount: 3,
+                rollbackReadyCount: 2,
+                canRestoreActiveCheckpoint: true,
+                canRollbackActiveCheckpoint: true,
+                activeCheckpointID: active.checkpointID,
+                activeCheckpointSource: .pinnedHint,
+                reviewCheckpointID: review.checkpointID
+            )
+        )
+
+        XCTAssertEqual(workspace.facts.pendingReviewCount, 3)
+        XCTAssertEqual(workspace.facts.rollbackReadyCount, 2)
+        XCTAssertEqual(workspace.facts.activeKillSwitches, ["force_guard_mode"])
+        XCTAssertEqual(workspace.facts.recommendedKillSwitches, ["external-tools"])
+        XCTAssertEqual(workspace.facts.killSwitches, ["force_guard_mode", "external-tools"])
+        XCTAssertTrue(workspace.facts.canRestoreActiveCheckpoint)
+        XCTAssertTrue(workspace.facts.canRollbackActiveCheckpoint)
+        XCTAssertEqual(workspace.effectivePendingReviewCount, 3)
+        XCTAssertEqual(workspace.effectiveRollbackReadyCount, 2)
+        XCTAssertEqual(workspace.effectiveActiveKillSwitches, ["force_guard_mode"])
+        XCTAssertEqual(workspace.effectiveRecommendedKillSwitches, ["external-tools"])
+        XCTAssertEqual(workspace.effectiveKillSwitches, ["force_guard_mode", "external-tools"])
+        XCTAssertTrue(workspace.effectiveCanRestoreActiveCheckpoint)
+        XCTAssertTrue(workspace.effectiveCanRollbackActiveCheckpoint)
+    }
+
     func testWorkspaceSnapshotSeparatesSpotlightReviewFromQueueTailCounts() {
         let active = makeSnapshot(
             checkpointID: "active-1",
@@ -129,6 +188,91 @@ final class DecisionEvolutionWorkspaceSnapshotTests: XCTestCase {
         XCTAssertEqual(workspace.spotlightedPendingReviewCount, 1)
         XCTAssertEqual(workspace.queuedPendingReviewCount, 2)
         XCTAssertEqual(workspace.totalPendingReviewCount, 3)
+    }
+
+    func testRuntimeSpotlightPrefersActiveCheckpointAndCarriesSourceDetails() throws {
+        let active = makeSnapshot(
+            checkpointID: "active-1",
+            createdAt: Date(timeIntervalSince1970: 40),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let review = makeSnapshot(
+            checkpointID: "review-1",
+            createdAt: Date(timeIntervalSince1970: 30),
+            approvalState: .reviewSuggested,
+            hasLineage: true
+        )
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: active,
+                activeCheckpointSource: .pinnedHint,
+                reviewCheckpoint: review,
+                pendingReviewQueue: [review],
+                latestPersistedLineage: nil
+            ),
+            releaseSummary: DecisionSystemReleaseControlSummary(
+                state: .watch,
+                headline: "Watching the pending review queue",
+                reasons: ["Queue review remains pending."],
+                activeKillSwitches: [],
+                recommendedKillSwitches: [],
+                killSwitches: [],
+                pendingReviewCount: 1,
+                rollbackReadyCount: 1,
+                canRestoreActiveCheckpoint: true,
+                canRollbackActiveCheckpoint: true,
+                activeCheckpointID: active.checkpointID,
+                activeCheckpointSource: .pinnedHint,
+                reviewCheckpointID: review.checkpointID
+            )
+        )
+
+        let spotlight = workspace.runtimeSpotlight(
+            releaseSummary: try XCTUnwrap(workspace.releaseSummary)
+        )
+
+        XCTAssertEqual(spotlight?.roleTitle, "Active")
+        XCTAssertEqual(
+            spotlight?.detailText,
+            "Active active-1 • Pinned active • Automatic • Apply ready"
+        )
+    }
+
+    func testRecoveryPresentationPrefersRecoveredDescriptorAndSharedEmptyMessages() {
+        let review = makeSnapshot(
+            checkpointID: "review-1",
+            createdAt: Date(timeIntervalSince1970: 30),
+            approvalState: .reviewSuggested,
+            hasLineage: true
+        )
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: nil,
+                reviewCheckpoint: review,
+                pendingReviewQueue: [review],
+                latestPersistedLineage: nil
+            )
+        )
+
+        let recoveredPresentation = workspace.recoveryPresentation(hasCurrentBrainState: false)
+        XCTAssertEqual(recoveredPresentation.sourceDescriptor?.kind, .checkpointRecovery)
+        XCTAssertEqual(
+            recoveredPresentation.availabilityText,
+            "Live brain state is unavailable right now, but persisted checkpoints remain reviewable and restorable from local lineage."
+        )
+        XCTAssertEqual(
+            recoveredPresentation.emptyMessage,
+            "Recovered checkpoints remain visible here even without a live current brain."
+        )
+
+        let livePresentation = workspace.recoveryPresentation(hasCurrentBrainState: true)
+        XCTAssertEqual(livePresentation.sourceDescriptor?.kind, .checkpointRecovery)
+        XCTAssertEqual(livePresentation.availabilityText, "Rollback ready")
+        XCTAssertEqual(
+            livePresentation.emptyMessage,
+            "Evolution checkpoints will surface here after the current brain is loaded."
+        )
     }
 
     private func makeSnapshot(

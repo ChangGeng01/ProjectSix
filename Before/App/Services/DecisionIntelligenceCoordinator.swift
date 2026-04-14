@@ -83,11 +83,37 @@ enum DecisionIntelligenceCoordinator {
     static func route(
         prompt: String,
         scenario: ScenarioType? = nil,
-        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences(),
+        activeKillSwitches: [BASKillSwitchID] = []
     ) -> RoutedDecision {
         let fallback = DecisionModeRouter.route(prompt: prompt, scenario: scenario)
-        guard preferences.onDeviceIntelligenceMode.isEnabled else { return fallback }
-        return adapter.route(prompt: prompt, scenario: scenario, fallback: fallback)
+        let routed = if preferences.onDeviceIntelligenceMode.isEnabled {
+            adapter.route(prompt: prompt, scenario: scenario, fallback: fallback)
+        } else {
+            fallback
+        }
+        return enforceRuntimeControlPlane(on: routed, activeKillSwitches: activeKillSwitches)
+    }
+
+    static func enforceRuntimeControlPlane(
+        on routed: RoutedDecision,
+        activeKillSwitches: [BASKillSwitchID]
+    ) -> RoutedDecision {
+        if activeKillSwitches.contains(.forceGuardMode), routed.mode != .mirror {
+            return RoutedDecision(
+                mode: .mirror,
+                reason: "Runtime kill-switch policy forced guarded routing before the fast path could open."
+            )
+        }
+
+        if activeKillSwitches.contains(.disableFastPath), routed.mode == .quick {
+            return RoutedDecision(
+                mode: .balance,
+                reason: "Runtime kill-switch policy disabled the quick path and promoted this turn into a fuller review path."
+            )
+        }
+
+        return routed
     }
 
     static func quickResult(
@@ -208,8 +234,9 @@ enum DecisionIntelligenceCoordinator {
                 neuralState: neuralState,
                 brainState: brainState
             )
-        guard preferences.onDeviceIntelligenceMode.isEnabled,
-              quickStrategy.allowsModelInvocation || eBrainTurn?.actionPermit.mode.isProtective == true else { return nil }
+        let allowsProtectivePath = eBrainTurn?.actionPermit.mode.isProtective == true
+        guard (preferences.onDeviceIntelligenceMode.isEnabled && quickStrategy.allowsModelInvocation)
+                || allowsProtectivePath else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineQuickResult(
             base: base,
             input: input,
@@ -241,8 +268,9 @@ enum DecisionIntelligenceCoordinator {
                 neuralState: neuralState,
                 brainState: brainState
             )
-        guard preferences.onDeviceIntelligenceMode.isEnabled,
-              balanceStrategy.allowsModelInvocation || eBrainTurn?.actionPermit.mode.isProtective == true else { return nil }
+        let allowsProtectivePath = eBrainTurn?.actionPermit.mode.isProtective == true
+        guard (preferences.onDeviceIntelligenceMode.isEnabled && balanceStrategy.allowsModelInvocation)
+                || allowsProtectivePath else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineBalanceResult(
             base: base,
             input: input,
@@ -274,8 +302,9 @@ enum DecisionIntelligenceCoordinator {
                 neuralState: neuralState,
                 brainState: brainState
             )
-        guard preferences.onDeviceIntelligenceMode.isEnabled,
-              mirrorStrategy.allowsModelInvocation || eBrainTurn?.actionPermit.mode.isProtective == true else { return nil }
+        let allowsProtectivePath = eBrainTurn?.actionPermit.mode.isProtective == true
+        guard (preferences.onDeviceIntelligenceMode.isEnabled && mirrorStrategy.allowsModelInvocation)
+                || allowsProtectivePath else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineMirrorResult(
             base: base,
             input: input,

@@ -9,7 +9,7 @@ import Testing
 @Suite("BASApple Current Brain Host Lifecycle Runtime")
 struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
     @Model
-    final class UpdateFixture: BASAppleCurrentBrainUpdateEntity {
+    final class HostLifecycleUpdateFixture: BASAppleCurrentBrainUpdateEntity {
         @Attribute(.unique) var id: UUID
         var createdAt: Date
         var source: String
@@ -34,8 +34,8 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
             self.failureGuardIDs = fields.failureGuardIDs
         }
 
-        static func basMake(from fields: BASCurrentBrainUpdateStoredFields) -> UpdateFixture {
-            UpdateFixture(fields: fields)
+        static func basMake(from fields: BASCurrentBrainUpdateStoredFields) -> HostLifecycleUpdateFixture {
+            HostLifecycleUpdateFixture(fields: fields)
         }
 
         var basSnapshot: BASCurrentBrainUpdateStoredFields {
@@ -55,7 +55,7 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
     }
 
     @Model
-    final class CheckpointFixture: BASAppleEvolutionCheckpointEntity {
+    final class HostLifecycleCheckpointFixture: BASAppleEvolutionCheckpointEntity {
         @Attribute(.unique) var id: String
         var createdAt: Date
         var fingerprint: String
@@ -84,8 +84,8 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
             self.rollbackReady = fields.rollbackReady
         }
 
-        static func basMake(from fields: BASEvolutionCheckpointStoredFields) -> CheckpointFixture {
-            CheckpointFixture(fields: fields)
+        static func basMake(from fields: BASEvolutionCheckpointStoredFields) -> HostLifecycleCheckpointFixture {
+            HostLifecycleCheckpointFixture(fields: fields)
         }
 
         var basSnapshot: BASEvolutionCheckpointStoredFields {
@@ -110,8 +110,8 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
     func hostLifecycleRuntimeBuildsHostBrainFromLifecycleCommit() throws {
         let now = Date(timeIntervalSince1970: 1_744_322_500)
         let container = try ModelContainer(
-            for: UpdateFixture.self,
-            CheckpointFixture.self,
+            for: HostLifecycleUpdateFixture.self,
+            HostLifecycleCheckpointFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
@@ -188,7 +188,7 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
             mapTemplate: { $0 },
             mapFailurePattern: { $0 },
             buildCurrentBrain: { (
-                result: BASAppleCurrentBrainLifecycleResult<UpdateFixture, CheckpointFixture>
+                result: BASAppleCurrentBrainLifecycleResult<HostLifecycleUpdateFixture, HostLifecycleCheckpointFixture>
             ) in
                 (
                     result.triggerID,
@@ -218,8 +218,8 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
     func hostSupportRuntimeUsesDescriptorOwnedSupportWiring() throws {
         let now = Date(timeIntervalSince1970: 1_744_322_640)
         let container = try ModelContainer(
-            for: UpdateFixture.self,
-            CheckpointFixture.self,
+            for: HostLifecycleUpdateFixture.self,
+            HostLifecycleCheckpointFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
@@ -322,7 +322,7 @@ struct BASAppleCurrentBrainHostLifecycleRuntimeTests {
                     )
                 ),
                 buildCurrentBrain: { (
-                    result: BASAppleCurrentBrainLifecycleResult<UpdateFixture, CheckpointFixture>
+                    result: BASAppleCurrentBrainLifecycleResult<HostLifecycleUpdateFixture, HostLifecycleCheckpointFixture>
                 ) in
                     (
                         result.riskLevelID,

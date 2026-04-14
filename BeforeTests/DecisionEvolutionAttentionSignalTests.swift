@@ -12,11 +12,13 @@ final class DecisionEvolutionAttentionSignalTests: XCTestCase {
         )
 
         let signal = DecisionEvolutionAttentionSignal.build(
-            controlSurface: DecisionEvolutionControlSurface(
-                activeCheckpoint: nil,
-                reviewCheckpoint: review,
-                pendingReviewQueue: [review],
-                latestPersistedLineage: nil
+            workspace: .build(
+                controlSurface: DecisionEvolutionControlSurface(
+                    activeCheckpoint: nil,
+                    reviewCheckpoint: review,
+                    pendingReviewQueue: [review],
+                    latestPersistedLineage: nil
+                )
             )
         )
 
@@ -41,11 +43,13 @@ final class DecisionEvolutionAttentionSignalTests: XCTestCase {
         )
 
         let signal = DecisionEvolutionAttentionSignal.build(
-            controlSurface: DecisionEvolutionControlSurface(
-                activeCheckpoint: nil,
-                reviewCheckpoint: reviewA,
-                pendingReviewQueue: [reviewA, reviewB],
-                latestPersistedLineage: nil
+            workspace: .build(
+                controlSurface: DecisionEvolutionControlSurface(
+                    activeCheckpoint: nil,
+                    reviewCheckpoint: reviewA,
+                    pendingReviewQueue: [reviewA, reviewB],
+                    latestPersistedLineage: nil
+                )
             )
         )
 
@@ -64,17 +68,64 @@ final class DecisionEvolutionAttentionSignalTests: XCTestCase {
         )
 
         let signal = DecisionEvolutionAttentionSignal.build(
-            controlSurface: DecisionEvolutionControlSurface(
-                activeCheckpoint: active,
-                reviewCheckpoint: nil,
-                pendingReviewQueue: [],
-                latestPersistedLineage: nil,
-                restorableCheckpointIDs: ["active-1", "previous-active-1"]
+            workspace: .build(
+                controlSurface: DecisionEvolutionControlSurface(
+                    activeCheckpoint: active,
+                    reviewCheckpoint: nil,
+                    pendingReviewQueue: [],
+                    latestPersistedLineage: nil,
+                    restorableCheckpointIDs: ["active-1", "previous-active-1"]
+                )
             )
         )
 
         XCTAssertEqual(signal.severity, .rollbackWatch)
         XCTAssertEqual(signal.badgeValue, "↺")
+        XCTAssertTrue(signal.rollbackReady)
+    }
+
+    func testAttentionSignalPrefersReleaseSummaryFactsOverRawControlSurface() {
+        let active = makeSnapshot(
+            checkpointID: "active-1",
+            createdAt: Date(timeIntervalSince1970: 20),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let review = makeSnapshot(
+            checkpointID: "review-1",
+            createdAt: Date(timeIntervalSince1970: 21),
+            approvalState: .reviewSuggested,
+            hasLineage: true
+        )
+
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: active,
+                reviewCheckpoint: review,
+                pendingReviewQueue: [review],
+                latestPersistedLineage: nil
+            ),
+            releaseSummary: DecisionSystemReleaseControlSummary(
+                state: .ready,
+                headline: "Ready",
+                reasons: [],
+                activeKillSwitches: [],
+                recommendedKillSwitches: [],
+                killSwitches: [],
+                pendingReviewCount: 0,
+                rollbackReadyCount: 1,
+                canRestoreActiveCheckpoint: true,
+                canRollbackActiveCheckpoint: true,
+                activeCheckpointID: "active-1",
+                activeCheckpointSource: .automaticFallback,
+                reviewCheckpointID: "review-1"
+            )
+        )
+
+        let signal = DecisionEvolutionAttentionSignal.build(workspace: workspace)
+
+        XCTAssertEqual(signal.severity, .rollbackWatch)
+        XCTAssertEqual(signal.pendingReviewCount, 0)
         XCTAssertTrue(signal.rollbackReady)
     }
 

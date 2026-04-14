@@ -28,30 +28,30 @@ enum OnDeviceIntelligenceMode: String, CaseIterable, Codable, Identifiable, Send
 }
 
 enum DecisionModelProviderPreference: String, CaseIterable, Codable, Identifiable, Sendable {
+    case foundationModels
     case gemmaE4B
     case openModel
-    case foundationModels
     case template
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .foundationModels: "Apple Foundation Model"
         case .gemmaE4B: "Gemma 4 E4B"
         case .openModel: "Open model runtime"
-        case .foundationModels: "Apple Foundation Model"
         case .template: "Deterministic local copy"
         }
     }
 
     var subtitle: String {
         switch self {
+        case .foundationModels:
+            "Use Apple Intelligence as the default on-device language model when it is available."
         case .gemmaE4B:
-            "Use the bundled Gemma model as the primary local intelligence provider."
+            "Use a downloaded or bundled Gemma 4 E4B runtime as the primary local intelligence provider."
         case .openModel:
             "Use the currently registered open-model runtime slot as the primary local intelligence provider."
-        case .foundationModels:
-            "Use Apple Intelligence as the primary on-device language model when it is available."
         case .template:
             "Use the rule-based deterministic layer only, without any model refinement."
         }
@@ -113,6 +113,8 @@ struct BeforePreferences: Codable, Equatable, Sendable {
     var onDeviceIntelligenceMode: OnDeviceIntelligenceMode
     var preferredIntelligenceProvider: DecisionModelProviderPreference
     var allowModelFallbacks: Bool
+    var preferredGemmaAssetID: String?
+    var preferredOpenModelAssetID: String?
 
     static let `default` = BeforePreferences(
         homePromptAction: .autoRoute,
@@ -122,8 +124,10 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         predictiveInterventionsEnabled: true,
         healthTrendSignalsEnabled: false,
         onDeviceIntelligenceMode: .assistive,
-        preferredIntelligenceProvider: .gemmaE4B,
-        allowModelFallbacks: true
+        preferredIntelligenceProvider: .foundationModels,
+        allowModelFallbacks: true,
+        preferredGemmaAssetID: nil,
+        preferredOpenModelAssetID: nil
     )
 
     private enum CodingKeys: String, CodingKey {
@@ -136,6 +140,8 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         case onDeviceIntelligenceMode
         case preferredIntelligenceProvider
         case allowModelFallbacks
+        case preferredGemmaAssetID
+        case preferredOpenModelAssetID
     }
 
     init(
@@ -147,7 +153,9 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         healthTrendSignalsEnabled: Bool = false,
         onDeviceIntelligenceMode: OnDeviceIntelligenceMode,
         preferredIntelligenceProvider: DecisionModelProviderPreference,
-        allowModelFallbacks: Bool = true
+        allowModelFallbacks: Bool = true,
+        preferredGemmaAssetID: String? = nil,
+        preferredOpenModelAssetID: String? = nil
     ) {
         self.homePromptAction = homePromptAction
         self.quickBufferDuration = quickBufferDuration
@@ -158,6 +166,8 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         self.onDeviceIntelligenceMode = onDeviceIntelligenceMode
         self.preferredIntelligenceProvider = preferredIntelligenceProvider
         self.allowModelFallbacks = allowModelFallbacks
+        self.preferredGemmaAssetID = preferredGemmaAssetID
+        self.preferredOpenModelAssetID = preferredOpenModelAssetID
     }
 
     init(from decoder: any Decoder) throws {
@@ -171,6 +181,8 @@ struct BeforePreferences: Codable, Equatable, Sendable {
         self.onDeviceIntelligenceMode = try container.decodeIfPresent(OnDeviceIntelligenceMode.self, forKey: .onDeviceIntelligenceMode) ?? BeforePreferences.default.onDeviceIntelligenceMode
         self.preferredIntelligenceProvider = try container.decodeIfPresent(DecisionModelProviderPreference.self, forKey: .preferredIntelligenceProvider) ?? BeforePreferences.default.preferredIntelligenceProvider
         self.allowModelFallbacks = try container.decodeIfPresent(Bool.self, forKey: .allowModelFallbacks) ?? BeforePreferences.default.allowModelFallbacks
+        self.preferredGemmaAssetID = try container.decodeIfPresent(String.self, forKey: .preferredGemmaAssetID) ?? BeforePreferences.default.preferredGemmaAssetID
+        self.preferredOpenModelAssetID = try container.decodeIfPresent(String.self, forKey: .preferredOpenModelAssetID) ?? BeforePreferences.default.preferredOpenModelAssetID
     }
 }
 

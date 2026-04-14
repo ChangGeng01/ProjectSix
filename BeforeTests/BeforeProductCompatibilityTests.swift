@@ -17,6 +17,10 @@ final class BeforeProductCompatibilityTests: XCTestCase {
             "present"
         )
         XCTAssertEqual(
+            BeforeLegacyMigration.normalizedEntryIntentKindIdentifier("openEvolutionControl"),
+            "resume"
+        )
+        XCTAssertEqual(
             BeforeLegacyMigration.normalizedMemorySourceIdentifier("history"),
             BASMemorySource.archive.rawValue
         )
@@ -33,6 +37,10 @@ final class BeforeProductCompatibilityTests: XCTestCase {
         )
         XCTAssertEqual(
             BeforeProductCompatibility.substrateEntryIntentKindID(rawValue: "resumeCurrentDecision"),
+            "resume"
+        )
+        XCTAssertEqual(
+            BeforeProductCompatibility.substrateEntryIntentKindID(rawValue: "openEvolutionControl"),
             "resume"
         )
         XCTAssertEqual(DecisionMemorySource.history.basSource, .archive)

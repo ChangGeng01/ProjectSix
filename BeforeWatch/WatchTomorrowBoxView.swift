@@ -32,6 +32,10 @@ struct WatchTomorrowBoxView: View {
                     Text("The watch does not carry the full box. It just catches the moment and hands it to the iPhone brain.")
                         .font(.footnote)
                 }
+
+                Section("Evolution Control") {
+                    WatchEvolutionStatusSection(style: .compact)
+                }
             }
             .navigationTitle("Tomorrow")
         }

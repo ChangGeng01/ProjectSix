@@ -76,6 +76,15 @@ struct QuickCheckView: View {
                             }
                         }
 
+                        DecisionSessionEngineResultActionsCard(
+                            sessionID: session.sessionEngineSessionID,
+                            headline: "Session Engine workspace line",
+                            detail: "Open the local recovery line for this draft, or split a correction branch before you evaluate.",
+                            correctionTitle: "Branch this quick check from here",
+                            correctionPlaceholder: "Correction: continue this quick check from a new requirement line without rewriting the old path.",
+                            correctionReason: "quick workspace correction branch"
+                        )
+
                         BeforeActionButton("Show me the call", isEnabled: session.canEvaluate, accessibilityIdentifier: "quick.evaluate") {
                             Task {
                                 await appModel.evaluateQuickSessionWithIntelligence(session)

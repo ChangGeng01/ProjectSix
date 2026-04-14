@@ -7,7 +7,7 @@ import Testing
 @Suite("BASApple Memory Draft Derivation Adapter")
 struct BASAppleMemoryDraftDerivationAdapterTests {
     @Model
-    final class CueFixture: BASAppleCueMemoryEntity {
+    final class DraftCueFixture: BASAppleCueMemoryEntity {
         @Attribute(.unique) var id: UUID
         var content: String
         var lastUsedAt: Date
@@ -31,7 +31,7 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
     }
 
     @Model
-    final class CheckEventFixture: BASAppleCheckEventMemoryEntity {
+    final class DraftCheckEventFixture: BASAppleCheckEventMemoryEntity {
         @Attribute(.unique) var id: String
         var scenarioID: String
         var scenarioTitle: String
@@ -72,7 +72,7 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
     }
 
     @Model
-    final class ComparativeFixture: BASAppleComparativeMemoryEntity {
+    final class DraftComparativeFixture: BASAppleComparativeMemoryEntity {
         @Attribute(.unique) var id: UUID
         var prompt: String
         var longTerm: String
@@ -100,7 +100,7 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
     }
 
     @Model
-    final class ReflectiveFixture: BASAppleReflectiveMemoryEntity {
+    final class DraftReflectiveFixture: BASAppleReflectiveMemoryEntity {
         @Attribute(.unique) var id: UUID
         var prompt: String
         var longTerm: String
@@ -131,17 +131,17 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
     func adapterDerivesDraftsFromSwiftDataEntities() throws {
         let now = Date(timeIntervalSince1970: 1_744_200_000)
         let reminders = [
-            CueFixture(
+            DraftCueFixture(
                 content: "Sleep on it.",
                 lastUsedAt: Date(timeIntervalSince1970: 1_744_100_000)
             ),
-            CueFixture(
+            DraftCueFixture(
                 content: "Keep it short.",
                 lastUsedAt: Date(timeIntervalSince1970: 1_744_150_000)
             )
         ]
         let checkEvents = [
-            CheckEventFixture(
+            DraftCheckEventFixture(
                 id: "event-older",
                 scenarioID: "message",
                 scenarioTitle: "Message",
@@ -150,7 +150,7 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
                 note: "I should wait until morning before replying.",
                 createdAt: Date(timeIntervalSince1970: 1_744_120_000)
             ),
-            CheckEventFixture(
+            DraftCheckEventFixture(
                 id: "event-newer",
                 scenarioID: "message",
                 scenarioTitle: "Message",
@@ -161,14 +161,14 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
             )
         ]
         let comparativeRecords = [
-            ComparativeFixture(
+            DraftComparativeFixture(
                 prompt: "Should I send this tonight?",
                 longTerm: "I want calmer relationships tomorrow morning.",
                 updatedAt: Date(timeIntervalSince1970: 1_744_170_000)
             )
         ]
         let reflectiveRecords = [
-            ReflectiveFixture(
+            DraftReflectiveFixture(
                 prompt: "Why do I want to send it now?",
                 longTerm: "Nighttime restraint usually protects the relationship.",
                 updatedAt: Date(timeIntervalSince1970: 1_744_160_000)
@@ -176,10 +176,10 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
         ]
 
         let container = try ModelContainer(
-            for: CueFixture.self,
-            CheckEventFixture.self,
-            ComparativeFixture.self,
-            ReflectiveFixture.self,
+            for: DraftCueFixture.self,
+            DraftCheckEventFixture.self,
+            DraftComparativeFixture.self,
+            DraftReflectiveFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
@@ -191,10 +191,10 @@ struct BASAppleMemoryDraftDerivationAdapterTests {
         let actual = BASAppleMemoryDraftDerivationAdapter.deriveDrafts(
             in: context,
             now: now,
-            cueType: CueFixture.self,
-            checkEventType: CheckEventFixture.self,
-            comparativeRecordType: ComparativeFixture.self,
-            reflectiveRecordType: ReflectiveFixture.self
+            cueType: DraftCueFixture.self,
+            checkEventType: DraftCheckEventFixture.self,
+            comparativeRecordType: DraftComparativeFixture.self,
+            reflectiveRecordType: DraftReflectiveFixture.self
         ).sorted(by: draftOrdering)
 
         let expected = BASMemoryDraftCompiler.derive(

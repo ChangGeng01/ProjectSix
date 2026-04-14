@@ -3,25 +3,24 @@ import Foundation
 enum DecisionEvolutionControlSurfaceFactory {
     static func build(
         activeCheckpointHint: DecisionReviewCheckpointSnapshot?,
+        activeCheckpointSource: DecisionEvolutionActiveCheckpointSource? = nil,
         latestAutomaticLineage: DecisionEvolutionLineageSnapshot? = nil,
         pendingReviewCheckpoints: [DecisionReviewCheckpointSnapshot],
         latestPersistedLineage: DecisionEvolutionLineageSnapshot?,
         restorableCheckpointIDs: Set<String> = []
     ) -> DecisionEvolutionControlSurface {
-        let pendingReviewQueue = pendingReviewCheckpoints.sorted { lhs, rhs in
-            if lhs.createdAt != rhs.createdAt {
-                return lhs.createdAt > rhs.createdAt
-            }
-            return lhs.checkpointID > rhs.checkpointID
-        }
-
-        let resolvedActiveCheckpoint = activeCheckpointHint
-            ?? latestAutomaticLineage.map(DecisionReviewCheckpointSnapshot.init(lineage:))
+        let slots = DecisionEvolutionControlSurface.resolveCheckpointSlots(
+            activeCheckpointHint: activeCheckpointHint,
+            activeCheckpointSource: activeCheckpointSource,
+            latestAutomaticLineage: latestAutomaticLineage,
+            pendingReviewCheckpoints: pendingReviewCheckpoints
+        )
 
         return DecisionEvolutionControlSurface(
-            activeCheckpoint: resolvedActiveCheckpoint,
-            reviewCheckpoint: pendingReviewQueue.first,
-            pendingReviewQueue: pendingReviewQueue,
+            activeCheckpoint: slots.activeCheckpoint,
+            activeCheckpointSource: slots.activeCheckpointSource,
+            reviewCheckpoint: slots.reviewCheckpoint,
+            pendingReviewQueue: slots.pendingReviewQueue,
             latestPersistedLineage: latestPersistedLineage,
             restorableCheckpointIDs: restorableCheckpointIDs
         )

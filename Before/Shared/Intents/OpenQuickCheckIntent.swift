@@ -1,6 +1,19 @@
 import AppIntents
 import Foundation
 
+private func sourceSurface(for entrySource: EntrySource) -> DecisionIntentSourceSurface {
+    switch entrySource {
+    case .watch:
+        .watch
+    case .homeWidgetSmall, .homeWidgetMedium, .lockScreenWidget:
+        .widget
+    case .siri:
+        .siri
+    case .shortcut, .spotlight, .app:
+        .shortcut
+    }
+}
+
 struct OpenQuickCheckIntent: AppIntent {
     static let title: LocalizedStringResource = "Open Before Quick Check"
     static let description = IntentDescription("Open the quick judgment flow in Before.")
@@ -25,7 +38,7 @@ struct OpenQuickCheckIntent: AppIntent {
         DecisionIntentEnvelopeStore.enqueue(
             DecisionIntentEnvelope(
                 kind: .quickCapture,
-                sourceSurface: entrySource == .siri ? .siri : .shortcut,
+                sourceSurface: sourceSurface(for: entrySource),
                 entrySource: entrySource,
                 preferredMode: .quick,
                 scenario: scenario,
@@ -67,10 +80,48 @@ struct OpenDecisionModeIntent: AppIntent {
         DecisionIntentEnvelopeStore.enqueue(
             DecisionIntentEnvelope(
                 kind: .openMode,
-                sourceSurface: entrySource == .siri ? .siri : .shortcut,
+                sourceSurface: sourceSurface(for: entrySource),
                 entrySource: entrySource,
                 preferredMode: mode,
                 promptSeed: cleanedPrompt?.isEmpty == true ? nil : cleanedPrompt
+            )
+        )
+        return .result()
+    }
+}
+
+struct OpenEvolutionControlIntent: AppIntent {
+    static let title: LocalizedStringResource = "Open Before Evolution Control"
+    static let description = IntentDescription("Open Before directly into the Evolution Control mutation hub.")
+    static let openAppWhenRun: Bool = true
+
+    @Parameter(title: "Entry Source", default: .shortcut)
+    var entrySource: EntrySource
+
+    @Parameter(title: "Headline")
+    var prompt: String?
+
+    init() {
+        entrySource = .shortcut
+        prompt = nil
+    }
+
+    init(entrySource: EntrySource, prompt: String? = nil) {
+        self.entrySource = entrySource
+        self.prompt = prompt
+    }
+
+    func perform() async throws -> some IntentResult {
+        let cleanedPrompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines)
+        DecisionIntentEnvelopeStore.enqueue(
+            DecisionIntentEnvelope(
+                kind: .openEvolutionControl,
+                sourceSurface: sourceSurface(for: entrySource),
+                entrySource: entrySource,
+                preferredMode: .mirror,
+                promptSeed: cleanedPrompt?.isEmpty == true ? nil : cleanedPrompt,
+                riskLevel: .medium,
+                triggerReason: "Open Evolution Control from \(entrySource.label)."
             )
         )
         return .result()
@@ -105,6 +156,15 @@ struct BeforeShortcutsProvider: AppShortcutsProvider {
             ],
             shortTitle: "Mirror",
             systemImageName: "square.split.2x1"
+        )
+        AppShortcut(
+            intent: OpenEvolutionControlIntent(entrySource: .shortcut),
+            phrases: [
+                "Open evolution control in \(.applicationName)",
+                "Review checkpoints in \(.applicationName)"
+            ],
+            shortTitle: "Evolution Control",
+            systemImageName: "shield.lefthalf.filled"
         )
     }
 

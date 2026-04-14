@@ -104,6 +104,42 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
         XCTAssertEqual(queue.first?.promptSeed, "new")
     }
 
+    func testWatchEvolutionControlHandoffRoundTripsThroughIntentQueue() {
+        let now = Date(timeIntervalSince1970: 4_000)
+
+        WatchHandoffCoordinator.enqueueOpenEvolutionControl(
+            headline: "Review the pending queue",
+            reason: "Watch glance requested iPhone review."
+        )
+
+        let next = DecisionIntentEnvelopeStore.consume(now: now)
+
+        XCTAssertEqual(next?.kind, .openEvolutionControl)
+        XCTAssertEqual(next?.sourceSurface, .watch)
+        XCTAssertEqual(next?.entrySource, .watch)
+        XCTAssertEqual(next?.preferredMode, .mirror)
+        XCTAssertEqual(next?.promptSeed, "Review the pending queue")
+        XCTAssertEqual(next?.triggerReason, "Watch glance requested iPhone review.")
+    }
+
+    func testWidgetEvolutionControlIntentQueuesWidgetScopedReviewRequest() async throws {
+        let intent = OpenEvolutionControlIntent(
+            entrySource: .homeWidgetMedium,
+            prompt: "Review the guarded queue"
+        )
+
+        _ = try await intent.perform()
+
+        let next = DecisionIntentEnvelopeStore.consume()
+
+        XCTAssertEqual(next?.kind, .openEvolutionControl)
+        XCTAssertEqual(next?.sourceSurface, .widget)
+        XCTAssertEqual(next?.entrySource, .homeWidgetMedium)
+        XCTAssertEqual(next?.preferredMode, .mirror)
+        XCTAssertEqual(next?.promptSeed, "Review the guarded queue")
+        XCTAssertEqual(next?.riskLevel, .medium)
+    }
+
     func testEnqueueKeepsNewestFiveEnvelopesWhenQueueOverflows() {
         let now = Date()
 

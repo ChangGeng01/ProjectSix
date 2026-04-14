@@ -1018,6 +1018,7 @@ public struct BASHostSessionRequest: Codable, Equatable, Sendable {
     public var detail: String?
     public var riskLevel: BASHostRiskLevel
     public var triggerReason: String?
+    public var activeKillSwitches: [BASKillSwitchID]
 
     public init(
         kind: BASHostSessionKind,
@@ -1027,7 +1028,8 @@ public struct BASHostSessionRequest: Codable, Equatable, Sendable {
         title: String? = nil,
         detail: String? = nil,
         riskLevel: BASHostRiskLevel = .low,
-        triggerReason: String? = nil
+        triggerReason: String? = nil,
+        activeKillSwitches: [BASKillSwitchID] = []
     ) {
         self.kind = kind
         self.workflowProfile = workflowProfile
@@ -1037,6 +1039,7 @@ public struct BASHostSessionRequest: Codable, Equatable, Sendable {
         self.detail = detail
         self.riskLevel = riskLevel
         self.triggerReason = triggerReason
+        self.activeKillSwitches = activeKillSwitches
     }
 }
 
@@ -1049,6 +1052,7 @@ public struct BASHostReopenRequest: Codable, Equatable, Sendable {
     public var reopenHint: String?
     public var templateHint: String?
     public var interventionHistorySummary: String?
+    public var activeKillSwitches: [BASKillSwitchID]
 
     public init(
         workflowProfile: BASHostWorkflowProfile,
@@ -1058,7 +1062,8 @@ public struct BASHostReopenRequest: Codable, Equatable, Sendable {
         riskLevel: BASHostRiskLevel = .low,
         reopenHint: String? = nil,
         templateHint: String? = nil,
-        interventionHistorySummary: String? = nil
+        interventionHistorySummary: String? = nil,
+        activeKillSwitches: [BASKillSwitchID] = []
     ) {
         self.workflowProfile = workflowProfile
         self.title = title
@@ -1068,6 +1073,7 @@ public struct BASHostReopenRequest: Codable, Equatable, Sendable {
         self.reopenHint = reopenHint
         self.templateHint = templateHint
         self.interventionHistorySummary = interventionHistorySummary
+        self.activeKillSwitches = activeKillSwitches
     }
 }
 

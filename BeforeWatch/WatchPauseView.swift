@@ -23,6 +23,8 @@ struct WatchPauseView: View {
                     )
                 }
                 .buttonStyle(.borderedProminent)
+
+                WatchEvolutionStatusSection(style: .compact)
             }
             .padding()
             .navigationTitle("Pause")

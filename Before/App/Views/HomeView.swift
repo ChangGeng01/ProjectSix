@@ -37,9 +37,16 @@ struct HomeView: View {
         evolutionSurfaceState.attentionSignal
     }
 
-    private var runtimeSpotlightPresentation: DecisionEvolutionCheckpointPresentation? {
-        currentEvolutionWorkspace.activePresentation
-            ?? currentEvolutionWorkspace.reviewPresentation
+    private var sessionEnginePresentation: DecisionSessionEnginePresentation {
+        systemFlightDeck.sessionEnginePresentationOrUnattached
+    }
+
+    private var checkpointNavigationOptions: DecisionEvolutionNavigationSurfaceOptions {
+        evolutionSurfaceContract.checkpointNavigationOptions
+    }
+
+    private var shouldAutoRefreshSystemFlightDeck: Bool {
+        !DecisionTestingInterface.runtimeTestingContextDetected()
     }
 
     var body: some View {
@@ -129,19 +136,17 @@ struct HomeView: View {
                                             .font(.title3.bold())
                                             .foregroundStyle(BeforeTheme.ink)
 
-                                        Text("Audit \(summary.auditFindingCount) • Kill switches \(summary.killSwitches.count) • Host gate \(summary.hostGatePercent)%")
+                                        Text(
+                                            "Audit \(summary.auditFindingCount) • Active kill switches \(deck.releaseControlSummary.activeKillSwitches.count) • Recommended \(deck.releaseControlSummary.recommendedKillSwitches.count) • Host gate \(summary.hostGatePercent)%"
+                                        )
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
 
-                                        if let spotlightPresentation = runtimeSpotlightPresentation {
-                                            let spotlightRole = currentEvolutionWorkspace.activePresentation?.checkpointID == spotlightPresentation.checkpointID
-                                                ? "Active"
-                                                : "Review head"
-                                            let applyTitle = spotlightPresentation.applyReady
-                                                ? "Apply ready"
-                                                : "Apply unavailable"
+                                        if let runtimeSpotlight = currentEvolutionWorkspace.runtimeSpotlight(
+                                            releaseSummary: deck.releaseControlSummary
+                                        ) {
                                             Text(
-                                                "\(spotlightRole) \(spotlightPresentation.checkpointID) • \(spotlightPresentation.approvalStateTitle) • \(applyTitle)"
+                                                runtimeSpotlight.detailText
                                             )
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
@@ -159,8 +164,15 @@ struct HomeView: View {
                                             }
                                         }
 
-                                        if let blocker = summary.blockers.first {
-                                            Text("Guardrail: \(blocker)")
+                                        if let localModelLibrary = deck.localModelLibrarySummary {
+                                            Text(localModelLibrary.headline)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(2)
+                                        }
+
+                                        if let primaryGuardrailText = summary.presentation.primaryGuardrailText {
+                                            Text(primaryGuardrailText)
                                                 .font(.caption2)
                                             .foregroundStyle(BeforeTheme.ember)
                                         }
@@ -168,7 +180,14 @@ struct HomeView: View {
                                         DecisionEvolutionReleaseSummaryView(
                                             releaseSummary: deck.releaseControlSummary,
                                             controlSurface: deck.evolutionControlSurface,
-                                            presentationMode: evolutionSurfaceContract.releaseSummaryMode
+                                            surfaceContract: evolutionSurfaceContract,
+                                            presentationMode: evolutionSurfaceContract.releaseSummaryMode,
+                                            navigationOptions: checkpointNavigationOptions,
+                                            afterMutation: {
+                                                Task {
+                                                    await refreshSystemFlightDeck()
+                                                }
+                                            }
                                         )
                                     }
 
@@ -177,13 +196,11 @@ struct HomeView: View {
                                             checkpointID: activeCheckpoint.checkpointID,
                                             checkpointPresentation: activeCheckpoint,
                                             controlSurface: currentEvolutionControlSurface,
-                                            interactionMode: evolutionSurfaceContract.interactionMode,
+                                            surfaceContract: evolutionSurfaceContract,
                                             applyReady: activeCheckpoint.applyReady,
                                             approvalState: activeCheckpoint.approvalState,
                                             hasLineage: activeCheckpoint.hasLineage,
-                                            showControlCenterShortcut: true,
-                                            showHistoryShortcut: true,
-                                            showPortraitShortcut: true,
+                                            navigationOptions: checkpointNavigationOptions,
                                             afterMutation: {
                                                 Task {
                                                     await refreshSystemFlightDeck()
@@ -194,20 +211,21 @@ struct HomeView: View {
                                         Text("Review head \(reviewCheckpoint.checkpointID) is visible in the shared control surface, but no active checkpoint is attached to the main release path yet.")
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
-
-                                        HStack(spacing: 10) {
-                                            BeforeActionButton("Open control center", style: .primary) {
-                                                appModel.presentEvolutionControlCenter()
+                                        DecisionEvolutionCheckpointActionBar(
+                                            checkpointID: reviewCheckpoint.checkpointID,
+                                            checkpointPresentation: reviewCheckpoint,
+                                            controlSurface: currentEvolutionControlSurface,
+                                            surfaceContract: evolutionSurfaceContract,
+                                            applyReady: reviewCheckpoint.applyReady,
+                                            approvalState: reviewCheckpoint.approvalState,
+                                            hasLineage: reviewCheckpoint.hasLineage,
+                                            navigationOptions: checkpointNavigationOptions,
+                                            afterMutation: {
+                                                Task {
+                                                    await refreshSystemFlightDeck()
+                                                }
                                             }
-
-                                            BeforeActionButton("Open History", style: .secondary) {
-                                                appModel.selectedTab = .history
-                                            }
-
-                                            BeforeActionButton("Open Portrait", style: .secondary) {
-                                                appModel.selectedTab = .portrait
-                                            }
-                                        }
+                                        )
                                     } else {
                                         HStack(spacing: 10) {
                                             BeforeActionButton("Open control center", style: .primary) {
@@ -253,15 +271,23 @@ struct HomeView: View {
                             }
                         }
 
+                        PanelCard {
+                            DecisionSessionEngineSurfaceView(
+                                presentation: sessionEnginePresentation,
+                                showsTitle: true,
+                                maxRecentSessions: 1,
+                                correctionPlaceholder: "Describe the correction you want to branch from the active recovery line.",
+                                correctionReason: "home session engine correction branch"
+                            )
+                        }
+
                         if let deck = systemFlightDeck {
                             DecisionEvolutionPilotControlPanel(
                                 controlSurface: deck.evolutionControlSurface,
                                 releaseSummary: deck.releaseControlSummary,
-                                interactionMode: evolutionSurfaceContract.interactionMode,
+                                surfaceContract: evolutionSurfaceContract,
                                 showEmbeddedReleaseSummary: evolutionSurfaceContract.showsEmbeddedReleaseSummaryInPilotPanel,
-                                showHistoryShortcut: true,
-                                showPortraitShortcut: true,
-                                showControlCenterShortcut: true,
+                                navigationOptions: checkpointNavigationOptions,
                                 afterMutation: {
                                     Task {
                                         await refreshSystemFlightDeck()
@@ -305,9 +331,8 @@ struct HomeView: View {
                                         DecisionEvolutionCheckpointPanelView(
                                             checkpoint: checkpoint,
                                             controlSurface: currentEvolutionControlSurface,
-                                            interactionMode: evolutionSurfaceContract.interactionMode,
-                                            showControlCenterShortcut: true,
-                                            showHistoryShortcut: true,
+                                            surfaceContract: evolutionSurfaceContract,
+                                            navigationOptions: checkpointNavigationOptions,
                                             afterMutation: {
                                                 Task {
                                                     await refreshSystemFlightDeck()
@@ -491,15 +516,17 @@ struct HomeView: View {
             }
             .navigationTitle("Before")
             .task {
+                guard shouldAutoRefreshSystemFlightDeck else { return }
                 await refreshSystemFlightDeck()
             }
             .onChange(of: appModel.selectedTab) { _, newValue in
-                guard newValue == .home else { return }
+                guard shouldAutoRefreshSystemFlightDeck, newValue == .home else { return }
                 Task {
                     await refreshSystemFlightDeck()
                 }
             }
             .onChange(of: appModel.evolutionControlMutationEpoch) { _, _ in
+                guard shouldAutoRefreshSystemFlightDeck else { return }
                 Task {
                     await refreshSystemFlightDeck()
                 }
@@ -572,6 +599,11 @@ struct HomeView: View {
 
     @MainActor
     private func refreshSystemFlightDeck() async {
+        guard shouldAutoRefreshSystemFlightDeck else {
+            isLoadingSystemFlightDeck = false
+            systemFlightDeck = nil
+            return
+        }
         isLoadingSystemFlightDeck = true
         systemFlightDeck = await appModel.systemFlightDeck()
         isLoadingSystemFlightDeck = false

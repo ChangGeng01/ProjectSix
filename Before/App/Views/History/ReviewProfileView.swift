@@ -18,6 +18,7 @@ struct ReviewProfileView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @Environment(\.dismiss) private var dismiss
     @State private var selectedDetail: HistoryDetailSelection?
+    @State private var replayPresentationsByID: [String: DecisionEvolutionReplayEntryPresentation] = [:]
 
     let profile: ReviewProfile
     let recentEntries: [ReviewProfileEntry]
@@ -87,6 +88,9 @@ struct ReviewProfileView: View {
                 HistoryDetailView(selection: selection)
                     .environmentObject(appModel)
             }
+            .task(id: replayReloadKey) {
+                await loadReplayEntries()
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close") { dismiss() }
@@ -95,38 +99,35 @@ struct ReviewProfileView: View {
         }
     }
 
+    private var replayReloadKey: String {
+        "\(recentEntries.map(\.id).joined(separator: "|"))-\(appModel.evolutionControlMutationEpoch)"
+    }
+
     private func recentEntryCard(for entry: ReviewProfileEntry) -> some View {
-        PanelCard {
+        let summary = DecisionReviewEngine.recentEntryPresentation(for: entry)
+        return PanelCard {
             VStack(alignment: .leading, spacing: 12) {
                 Button {
                     selectedDetail = detailSelection(for: entry)
                 } label: {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Label(profile.mode.title, systemImage: profile.mode.symbolName)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(BeforeTheme.ember)
-                            Spacer()
-                            Text(entry.timestamp, style: .relative)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Text(entry.title)
-                            .font(.headline)
-                            .foregroundStyle(BeforeTheme.ink)
-                            .multilineTextAlignment(.leading)
-
-                        Text(entry.detail)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.leading)
-
-                        Text(entry.actionTitle)
+                    DecisionReplayEntrySummaryView(
+                        title: summary.title,
+                        secondaryLine: summary.secondaryLine,
+                        presentation: replayPresentationsByID[entry.id]
+                    ) {
+                        DecisionReplayEntryHeaderRowView(
+                            labelTitle: summary.labelTitle,
+                            labelSymbolName: summary.labelSymbolName,
+                            trailingTimestamp: summary.timestamp,
+                            trailingTimestampStyle: .relative
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.ember)
+                    } footer: {
+                        Text(summary.footerText)
                             .font(.caption.weight(.medium))
                             .foregroundStyle(BeforeTheme.moss)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.plain)
 
@@ -181,5 +182,12 @@ struct ReviewProfileView: View {
         }
 
         dismiss()
+    }
+
+    @MainActor
+    private func loadReplayEntries() async {
+        replayPresentationsByID = await appModel.replayDiagnosticsPresentationsByRecordID(
+            matching: recentEntries.map(\.id)
+        )
     }
 }

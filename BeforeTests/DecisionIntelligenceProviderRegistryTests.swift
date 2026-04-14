@@ -11,7 +11,8 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
 
         XCTAssertNotNil(openModelDescriptor)
         XCTAssertEqual(openModelDescriptor?.track, .builtInOpenModel)
-        XCTAssertEqual(openModelDescriptor?.openModel?.stableID, "substrate/open-model-slot")
+        XCTAssertEqual(openModelDescriptor?.openModel?.stableID, "before/open-model-slot")
+        XCTAssertTrue(openModelDescriptor?.detail.contains("Import or download a compatible local asset") == true)
         XCTAssertEqual(gemmaDescriptor?.affinity(for: .mirror), 100)
         XCTAssertEqual(foundationDescriptor?.affinity(for: .quick), 100)
         XCTAssertEqual(gemmaDescriptor?.capabilityProfile.modelID, "google/gemma-4-e4b-it")
@@ -48,6 +49,211 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
         XCTAssertEqual(descriptor?.openModel?.stableID, "lab/future-open-model")
         XCTAssertEqual(descriptor?.title, "Future open model")
         XCTAssertEqual(descriptor?.affinity(for: .mirror), 92)
+    }
+
+    func testOpenModelRuntimeRegistrationUsesConfiguredImportedAssetWhenAvailable() throws {
+        let sourceDirectory = temporaryDirectoryURL()
+        let libraryDirectory = temporaryDirectoryURL()
+        let sourceURL = temporaryFileURL(
+            in: sourceDirectory,
+            name: "mistral-7b.gguf",
+            size: 4_200
+        )
+        let imported = try OpenModelAssetCatalog.importModel(
+            from: sourceURL,
+            baseDirectoryURL: libraryDirectory
+        )
+        let registry = DecisionIntelligenceProviderRegistry(
+            providersByKind: [.openModel: OpenModelDecisionIntelligenceProvider(kind: .openModel, adapter: ReservedOpenModelAdapter())],
+            descriptorsByKind: [
+                .openModel: DecisionModelProviderDescriptor(
+                    kind: .openModel,
+                    title: "Open model runtime",
+                    detail: "Reserved slot.",
+                    track: .builtInOpenModel,
+                    openModel: ReservedOpenModelAdapter().descriptor,
+                    taskAffinities: [
+                        .quick: 88,
+                        .balance: 90,
+                        .mirror: 92,
+                        .reminder: 86
+                    ]
+                )
+            ]
+        )
+
+        DecisionOpenModelRuntimeRegistration.syncRegistry(
+            preferredAssetID: imported.assetID,
+            registry: registry,
+            baseDirectoryURL: libraryDirectory
+        )
+
+        let status = registry.statusesByKind()[.openModel]
+        let descriptor = registry.descriptor(for: .openModel)
+
+        XCTAssertEqual(status?.kind, .openModel)
+        XCTAssertTrue(status?.isAvailable == true)
+        XCTAssertEqual(descriptor?.openModel?.stableID, imported.generatedStableID)
+        XCTAssertEqual(descriptor?.title, imported.displayTitle)
+    }
+
+    func testOpenModelRuntimeRegistrationFallsBackToReservedSlotWhenLibraryIsEmpty() {
+        let registry = DecisionIntelligenceProviderRegistry(
+            providersByKind: [.openModel: OpenModelDecisionIntelligenceProvider(kind: .openModel, adapter: FakeOpenModelAdapter())],
+            descriptorsByKind: [
+                .openModel: DecisionModelProviderDescriptor(
+                    kind: .openModel,
+                    title: "Future open model",
+                    detail: "Fake slot.",
+                    track: .builtInOpenModel,
+                    openModel: FakeOpenModelAdapter().descriptor,
+                    taskAffinities: [
+                        .quick: 82,
+                        .balance: 87,
+                        .mirror: 92,
+                        .reminder: 80
+                    ]
+                )
+            ]
+        )
+
+        DecisionOpenModelRuntimeRegistration.syncRegistry(
+            preferredAssetID: nil,
+            registry: registry,
+            baseDirectoryURL: temporaryDirectoryURL()
+        )
+
+        let descriptor = registry.descriptor(for: .openModel)
+        let status = registry.statusesByKind()[.openModel]
+        XCTAssertEqual(descriptor?.openModel?.stableID, "before/open-model-slot")
+        XCTAssertEqual(status?.title, "Waiting for import")
+        XCTAssertTrue(status?.detail.contains("Import or download a compatible local model") == true)
+    }
+
+    func testConfiguredOpenModelPreviewAdapterReusesLocalHeuristicQuickEnhancement() async {
+        let adapter = ConfiguredOpenModelPreviewAdapter(asset: makeOpenModelAsset())
+        let heuristic = TemplateLocalModelAdapter()
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .stressed,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "After a rough day I want a shopping reward."
+        )
+        let base = QuickCheckResult(
+            currentPerspective: "Base current perspective.",
+            afterPerspective: "Base after perspective.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.leaveStimulus]
+        )
+
+        let refined = await adapter.refineQuickResult(
+            base: base,
+            input: input,
+            strategy: nil,
+            contextState: nil,
+            neuralState: nil,
+            brainState: nil
+        )
+
+        XCTAssertEqual(refined, heuristic.enhanceQuickResult(base, input: input))
+        XCTAssertNotEqual(refined, base)
+    }
+
+    func testConfiguredOpenModelPreviewAdapterReusesLocalHeuristicBalanceAndMirrorEnhancement() async {
+        let adapter = ConfiguredOpenModelPreviewAdapter(asset: makeOpenModelAsset())
+        let heuristic = TemplateLocalModelAdapter()
+        let balanceInput = BalanceBoardInput(
+            prompt: "Should I accept the trip?",
+            desire: "I want the trip",
+            concern: "losing recovery time",
+            constraint: "my budget is tight this month",
+            longTerm: "I do not want to regret overspending later"
+        )
+        let balanceBase = BalanceBoardResult(
+            headline: "Base balance headline.",
+            summary: "Base balance summary.",
+            focusTitle: "Let reality lead first",
+            focusDescription: "Base focus description.",
+            nextAction: "Base next action."
+        )
+        let mirrorInput = MirrorInput(
+            prompt: "Should I keep doing this?",
+            emotion: "afraid of losing them",
+            relationship: "this relationship keeps asking me to get smaller",
+            reality: "rent and family pressure are real",
+            longTerm: "I do not want this pattern again",
+            selfLens: "I feel unseen and unsafe"
+        )
+        let mirrorBase = MirrorResult(
+            headline: "Base mirror headline.",
+            coreTension: "Base mirror tension.",
+            nextActionTitle: "Base mirror action title.",
+            nextAction: "Base mirror action."
+        )
+
+        let refinedBalance = await adapter.refineBalanceResult(
+            base: balanceBase,
+            input: balanceInput,
+            strategy: nil,
+            contextState: nil,
+            neuralState: nil,
+            brainState: nil
+        )
+        let refinedMirror = await adapter.refineMirrorResult(
+            base: mirrorBase,
+            input: mirrorInput,
+            strategy: nil,
+            contextState: nil,
+            neuralState: nil,
+            brainState: nil
+        )
+
+        XCTAssertEqual(refinedBalance, heuristic.enhanceBalanceResult(balanceBase, input: balanceInput))
+        XCTAssertEqual(refinedMirror, heuristic.enhanceMirrorResult(mirrorBase, input: mirrorInput))
+        XCTAssertNotEqual(refinedBalance, balanceBase)
+        XCTAssertNotEqual(refinedMirror, mirrorBase)
+    }
+
+    func testConfiguredOpenModelPreviewAdapterUsesLocalHeuristicReminderSelection() async {
+        let adapter = ConfiguredOpenModelPreviewAdapter(asset: makeOpenModelAsset())
+        let heuristic = TemplateLocalModelAdapter()
+        let candidates = [
+            ReminderSelectionCandidate(
+                id: UUID(),
+                content: "Treat yourself. You had a hard day.",
+                rank: 0
+            ),
+            ReminderSelectionCandidate(
+                id: UUID(),
+                content: "Only replace what is actually needed.",
+                rank: 1
+            ),
+            ReminderSelectionCandidate(
+                id: UUID(),
+                content: "Scroll a little more before deciding.",
+                rank: 2
+            )
+        ]
+
+        let selected = await adapter.pickReminder(
+            from: candidates,
+            scenario: .buy,
+            prompt: "My charger is broken and I need a practical replacement.",
+            mode: .quick,
+            strategy: nil
+        )
+
+        let expectedContent = heuristic.pickReminder(
+            from: candidates.map(\.content),
+            scenario: .buy,
+            prompt: "My charger is broken and I need a practical replacement.",
+            mode: .quick
+        )
+
+        XCTAssertEqual(selected?.content, expectedContent)
+        XCTAssertEqual(selected?.content, "Only replace what is actually needed.")
     }
 
     func testTaskRouterPrefersFoundationForQuickLatency() {
@@ -491,6 +697,35 @@ final class DecisionIntelligenceProviderRegistryTests: XCTestCase {
         )
 
         XCTAssertTrue(profile.supports(responseLanguage: .mixed))
+    }
+}
+
+private extension DecisionIntelligenceProviderRegistryTests {
+    func makeOpenModelAsset() -> OpenModelAsset {
+        OpenModelAsset(
+            fileName: "mistral-7b.gguf",
+            fileSizeBytes: 4_200
+        )
+    }
+
+    func temporaryDirectoryURL() -> URL {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: directory)
+        }
+        return directory
+    }
+
+    func temporaryFileURL(in directory: URL, name: String, size: Int) -> URL {
+        let url = directory.appendingPathComponent(name)
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        if let handle = try? FileHandle(forWritingTo: url) {
+            try? handle.truncate(atOffset: UInt64(size))
+            try? handle.close()
+        }
+        return url
     }
 }
 

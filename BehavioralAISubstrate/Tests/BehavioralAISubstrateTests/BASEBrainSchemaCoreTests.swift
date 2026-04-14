@@ -566,4 +566,232 @@ struct BASEBrainSchemaCoreTests {
         #expect(result.runtimeTrace.recommendedKillSwitches.contains(.forceProtectedPermit))
         #expect(result.runtimeTrace.recommendedKillSwitches.contains(.requireReviewedWrites))
     }
+
+    @Test("active kill switches become executable runtime policy")
+    func activeKillSwitchesAffectRuntimeExecution() {
+        struct PowerClock: BASPowerClockServicing {
+            func planBudget(deviceState: BASDeviceState, taskPing: String, riskHint: BASBrainRiskLevel?) -> BASBudgetFrame {
+                BASBudgetFrame(
+                    runMode: .sentinel,
+                    maxLoops: 1,
+                    maxCandidates: 1,
+                    maxDecodeTokens: 120,
+                    retrievalDepth: 1,
+                    precisionProfile: .balanced,
+                    deviceRoute: .scoutCPU,
+                    thermalGuardLevel: .nominal,
+                    maintenanceAllowed: false
+                )
+            }
+
+            func routeDevice(deviceState: BASDeviceState, budget: BASBudgetFrame) -> BASDeviceRoute { .scoutCPU }
+            func scheduleMaintenance(deviceState: BASDeviceState, budget: BASBudgetFrame) -> Bool { false }
+        }
+
+        struct Host: BASHostProfileServicing {
+            func resolveHost(hostID: String, contextFrame: BASContextFrame?, riskCard: BASRiskCard?) -> BASHostProfile {
+                BASHostProfile(hostID: hostID)
+            }
+
+            func applyHostGate(profile: BASHostProfile, taskType: BASContextTaskType, riskCard: BASRiskCard?, confidence: Double) -> Double { 0.8 }
+
+            func rollbackHostVersion(profile: BASHostProfile, to versionID: String) -> BASHostVersion {
+                BASHostVersion(versionID: versionID, changedFields: [], reason: "rollback", approvedByPolicy: true)
+            }
+        }
+
+        struct Context: BASContextServicing {
+            func analyzeContext(userInput: String, hostContext: BASHostProfile, budget: BASBudgetFrame) -> BASContextFrame {
+                BASContextFrame(
+                    utterance: userInput,
+                    taskType: .task,
+                    emotionalLoad: 0.25,
+                    timePressure: 0.2,
+                    relationPattern: "operator",
+                    ambiguityScore: 0.1,
+                    consequenceLevel: 0.3,
+                    manipulationHints: [],
+                    hostRelevance: 0.4
+                )
+            }
+        }
+
+        struct Decompose: BASDecomposeServicing {
+            func decompose(contextFrame: BASContextFrame, memoryHints: [String]) -> BASDecomposeFrame {
+                BASDecomposeFrame(
+                    facts: ["Need an answer"],
+                    goals: ["Respond"],
+                    emotions: ["neutral"],
+                    unknowns: [],
+                    contradictions: [],
+                    pressureSignals: [],
+                    manipulationSignals: [],
+                    mirrorText: "Need an answer."
+                )
+            }
+
+            func mirror(contextFrame: BASContextFrame, decomposeFrame: BASDecomposeFrame) -> String { decomposeFrame.mirrorText }
+            func checkContradiction(contextFrame: BASContextFrame, decomposeFrame: BASDecomposeFrame) -> [String] { [] }
+        }
+
+        struct Memory: BASMemoryServicing {
+            func retrieve(decomposeFrame: BASDecomposeFrame, hostContext: BASHostProfile, budget: BASBudgetFrame) -> BASMemoryBundle {
+                BASMemoryBundle(atoms: [], retrievalTags: [], activeHostVersion: hostContext.activeVersion)
+            }
+
+            func promote(atom: BASMemoryAtom, hostContext: BASHostProfile) -> BASPromotionState { .admitted }
+            func freeze(memoryID: String) -> Bool { false }
+        }
+
+        struct Loop: BASLoopServicing {
+            func proposePaths(decomposeFrame: BASDecomposeFrame, memoryBundle: BASMemoryBundle, budget: BASBudgetFrame) -> [BASCandidatePath] {
+                [
+                    BASCandidatePath(
+                        candidateID: "candidate-1",
+                        title: "Direct answer",
+                        actionSummary: "Answer immediately.",
+                        expectedBenefit: 0.7,
+                        expectedCost: 0.1,
+                        reversibility: 0.8,
+                        confidence: 0.8
+                    )
+                ]
+            }
+
+            func forecast(candidates: [BASCandidatePath], decomposeFrame: BASDecomposeFrame, memoryBundle: BASMemoryBundle) -> [BASForecastItem] {
+                candidates.map {
+                    BASForecastItem(
+                        candidateID: $0.candidateID,
+                        shortTermOutcome: "Immediate response",
+                        midTermOutcome: "Okay",
+                        worstCase: "Needs review",
+                        uncertainty: 0.2
+                    )
+                }
+            }
+
+            func critique(candidates: [BASCandidatePath], forecasts: [BASForecastItem], hostContext: BASHostProfile) -> [BASCritiqueItem] { [] }
+
+            func iterate(decomposeFrame: BASDecomposeFrame, memoryBundle: BASMemoryBundle, budget: BASBudgetFrame) -> BASThoughtFrame {
+                let candidates = proposePaths(decomposeFrame: decomposeFrame, memoryBundle: memoryBundle, budget: budget)
+                return BASThoughtFrame(
+                    stepIndex: 1,
+                    decomposeRef: "decomp",
+                    memoryRefs: [],
+                    candidates: candidates,
+                    forecasts: forecast(candidates: candidates, decomposeFrame: decomposeFrame, memoryBundle: memoryBundle),
+                    critiques: [],
+                    stabilityScore: 0.6,
+                    stopReason: .candidateStable
+                )
+            }
+        }
+
+        struct TriSelf: BASTriSelfServicing {
+            func mergeChoice(thoughtFrame: BASThoughtFrame, hostContext: BASHostProfile) -> ([BASTriSelfScore], BASMergedChoice) {
+                (
+                    [BASTriSelfScore(candidateID: "candidate-1", idScore: 0.7, egoScore: 0.7, superegoScore: 0.4, mergedScore: 0.75, veto: false)],
+                    BASMergedChoice(candidateID: "candidate-1", title: "Direct answer", actionSummary: "Answer immediately.")
+                )
+            }
+        }
+
+        struct Risk: BASRiskServicing {
+            func calibrateRisk(contextFrame: BASContextFrame, thoughtFrame: BASThoughtFrame, triScores: [BASTriSelfScore], budget: BASBudgetFrame) -> BASRiskCard {
+                BASRiskCard(
+                    totalRisk: 0.42,
+                    riskLevel: .medium,
+                    factors: ["watch"],
+                    uncertainty: 0.2,
+                    irreversibility: 0.3,
+                    manipulationStrength: 0.1,
+                    gsiScore: 0.2,
+                    recommendedMode: .answer
+                )
+            }
+
+            func computeGSI(contextFrame: BASContextFrame, thoughtFrame: BASThoughtFrame) -> Double { 0.2 }
+
+            func gateAction(contextFrame: BASContextFrame, thoughtFrame: BASThoughtFrame, triScores: [BASTriSelfScore], budget: BASBudgetFrame) -> (BASRiskCard, BASActionPermit) {
+                (
+                    calibrateRisk(contextFrame: contextFrame, thoughtFrame: thoughtFrame, triScores: triScores, budget: budget),
+                    BASActionPermit(
+                        mode: .answer,
+                        reasonCodes: ["base.answer"],
+                        requireSecondCheck: false,
+                        outputLengthCap: 220,
+                        tonePolicy: "direct",
+                        templatePolicy: "answer"
+                    )
+                )
+            }
+        }
+
+        struct Action: BASActionServicing {
+            func render(choice: BASMergedChoice, riskCard: BASRiskCard, permit: BASActionPermit, hostContext: BASHostProfile) -> BASRenderedOutput {
+                BASRenderedOutput(mode: permit.mode, headline: choice.title, body: choice.actionSummary)
+            }
+        }
+
+        struct Evolution: BASEvolutionServicing {
+            func buildTickets(thoughtFrame: BASThoughtFrame, output: BASRenderedOutput, feedbackEvent: BASFeedbackEvent?) -> [BASUpdateTicket] {
+                [
+                    BASUpdateTicket(
+                        ticketID: "ticket-1",
+                        sessionRef: "session",
+                        summary: output.body,
+                        memoryWriteSuggestion: "Store as long-term memory.",
+                        confidence: 0.8,
+                        requiresReview: false
+                    )
+                ]
+            }
+        }
+
+        let coordinator = BASEBrainRuntimeCoordinator(
+            powerClockService: PowerClock(),
+            hostProfileService: Host(),
+            contextService: Context(),
+            decomposeService: Decompose(),
+            memoryService: Memory(),
+            loopService: Loop(),
+            triSelfService: TriSelf(),
+            riskService: Risk(),
+            actionService: Action(),
+            evolutionService: Evolution()
+        )
+
+        let result = coordinator.runTurn(
+            BASEBrainTurnRequest(
+                userInput: "Answer quickly.",
+                deviceState: BASDeviceState(
+                    batteryLevel: 0.82,
+                    thermalLevel: .nominal,
+                    memoryFreeMB: 2048,
+                    networkState: .online,
+                    foregroundState: .foreground,
+                    cpuLoad: 0.2,
+                    gpuLoad: 0.1,
+                    npuAvailable: false,
+                    latencyBudgetMs: 600
+                ),
+                hostID: "host.policy",
+                riskHint: .low,
+                activeKillSwitches: [.disableFastPath, .forceGuardMode, .forceProtectedPermit, .requireReviewedWrites]
+            )
+        )
+
+        #expect(result.budgetFrame.runMode == .guarded)
+        #expect(result.budgetFrame.precisionProfile == .protected)
+        #expect(result.actionPermit.mode == .delay)
+        #expect(result.updateTickets.allSatisfy { $0.requiresReview })
+        #expect(result.runtimeTrace.activeKillSwitches.contains(.disableFastPath))
+        #expect(result.runtimeTrace.activeKillSwitches.contains(.forceGuardMode))
+        #expect(result.runtimeTrace.activeKillSwitches.contains(.forceProtectedPermit))
+        #expect(result.runtimeTrace.activeKillSwitches.contains(.requireReviewedWrites))
+        #expect(result.runtimeTrace.guardrailFindings.contains(where: { $0.code == "kill_switch.disable_fast_path" }))
+        #expect(result.runtimeTrace.guardrailFindings.contains(where: { $0.code == "kill_switch.force_guard_mode" }))
+        #expect(result.runtimeTrace.guardrailFindings.contains(where: { $0.code == "kill_switch.force_protected_permit" }))
+        #expect(result.runtimeTrace.guardrailFindings.contains(where: { $0.code == "kill_switch.require_reviewed_writes" }))
+    }
 }

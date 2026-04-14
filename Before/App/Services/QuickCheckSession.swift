@@ -4,6 +4,8 @@ import BASHostKit
 @MainActor
 final class QuickCheckSession: ObservableObject, Identifiable {
     let id = UUID()
+    var sessionEngineSessionID: String?
+    var sessionEngineBindingTask: Task<String?, Never>?
     @Published var scenario: ScenarioType = .buy
     @Published var motivation: MotivationChoice?
     @Published var expectedOutcome: OutcomeChoice?
@@ -60,8 +62,12 @@ final class QuickCheckSession: ObservableObject, Identifiable {
         )
 
         let base = DecisionIntelligenceCoordinator.quickResult(for: input, preferences: preferences)
-        result = base
-        guard preferences.onDeviceIntelligenceMode.isEnabled else { return }
+        let shouldProtectBeforePublishing = eBrainTurn?.actionPermit.mode.isProtective == true
+        let shouldRefine = preferences.onDeviceIntelligenceMode.isEnabled || shouldProtectBeforePublishing
+        guard shouldRefine else {
+            result = base
+            return
+        }
 
         isRefiningWithModel = true
         defer { isRefiningWithModel = false }
@@ -82,6 +88,8 @@ final class QuickCheckSession: ObservableObject, Identifiable {
             preferences: preferences
         ) {
             result = refined
+        } else {
+            result = base
         }
     }
 

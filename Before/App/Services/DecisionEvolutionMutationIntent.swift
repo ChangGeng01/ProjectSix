@@ -465,7 +465,29 @@ enum DecisionEvolutionMutationIntentFactory {
         guard !targets.isEmpty else { return nil }
 
         let lineageBackedCount = controlSurface.pendingReviewLineagePresentations.count
-        var retained = ["Active checkpoint remains \(checkpointToken(controlSurface.activePresentation?.checkpointID))."]
+        let currentActiveCheckpointID = controlSurface.activePresentation?.checkpointID
+        let projectedActiveCheckpointID: String?
+        switch controlSurface.activeCheckpointSource {
+        case .pinnedHint:
+            projectedActiveCheckpointID = currentActiveCheckpointID
+        case .automaticFallback, .none:
+            projectedActiveCheckpointID = controlSurface.projectedAutomaticCheckpointIDAfterApprovingPendingQueue
+        }
+
+        var changeHighlights = [
+            "\(targets.count) checkpoint(s) will move from review-suggested to automatic.",
+            "Review queue will be emptied."
+        ]
+        var retained: [String] = []
+
+        if projectedActiveCheckpointID == currentActiveCheckpointID {
+            retained.append("Active checkpoint remains \(checkpointToken(currentActiveCheckpointID)).")
+        } else {
+            changeHighlights.append(
+                "Active automatic slot will move from \(checkpointToken(currentActiveCheckpointID)) to \(checkpointToken(projectedActiveCheckpointID))."
+            )
+        }
+
         if lineageBackedCount > 0 {
             retained.append("\(lineageBackedCount) lineage-backed review checkpoint(s) keep their recovered facts.")
         }
@@ -480,16 +502,15 @@ enum DecisionEvolutionMutationIntentFactory {
                 kind: .approvePendingCheckpoints,
                 scope: .reviewQueue,
                 headline: "Approve \(targets.count) pending checkpoint\(targets.count == 1 ? "" : "s")",
-                summary: "Empty the review queue without restoring or rewriting the active brain state.",
+                summary: projectedActiveCheckpointID == currentActiveCheckpointID
+                    ? "Empty the review queue without restoring or rewriting the active brain state."
+                    : "Empty the review queue and let the automatic active slot advance to the most recent approved checkpoint.",
                 targetCheckpointIDs: targets,
-                currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
-                projectedActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+                currentActiveCheckpointID: currentActiveCheckpointID,
+                projectedActiveCheckpointID: projectedActiveCheckpointID,
                 currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
                 projectedReviewCheckpointID: nil,
-                changeHighlights: [
-                    "\(targets.count) checkpoint(s) will move from review-suggested to automatic.",
-                    "Review queue will be emptied."
-                ],
+                changeHighlights: changeHighlights,
                 retainedHighlights: retained,
                 warningHighlights: ["Approval does not clear kill-switch recommendations or lineage facts."]
             )

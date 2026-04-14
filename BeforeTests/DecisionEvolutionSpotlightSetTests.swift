@@ -41,6 +41,8 @@ final class DecisionEvolutionSpotlightSetTests: XCTestCase {
             historyPresentations: [active.presentation, reviewHead.presentation, reviewTail.presentation, history.presentation]
         )
 
+        XCTAssertEqual(surface.spotlightCheckpointIDs, ["active-1", "review-2"])
+        XCTAssertEqual(surface.remainingReviewQueuePresentations.map(\.checkpointID), ["review-1"])
         XCTAssertEqual(spotlightSet.activePresentation?.checkpointID, "active-1")
         XCTAssertEqual(spotlightSet.reviewPresentation?.checkpointID, "review-2")
         XCTAssertEqual(spotlightSet.remainingReviewQueue.map(\.checkpointID), ["review-1"])
@@ -73,6 +75,8 @@ final class DecisionEvolutionSpotlightSetTests: XCTestCase {
             historyPresentations: [reviewHead.presentation, reviewTail.presentation]
         )
 
+        XCTAssertEqual(surface.spotlightCheckpointIDs, ["review-2"])
+        XCTAssertEqual(surface.remainingReviewQueuePresentations.map(\.checkpointID), ["review-1"])
         XCTAssertNil(spotlightSet.activePresentation)
         XCTAssertEqual(spotlightSet.reviewPresentation?.checkpointID, "review-2")
         XCTAssertEqual(spotlightSet.remainingReviewQueue.map(\.checkpointID), ["review-1"])

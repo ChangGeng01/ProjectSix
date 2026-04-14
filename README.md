@@ -61,7 +61,7 @@ xcodebuild -project Before.xcodeproj -scheme Before -destination 'platform=iOS S
 - The widget extension uses an app group placeholder: `group.com.changgeng.before`.
 - Widget surfaces only use safe generic copy and never show raw user-written reminders.
 - Personal data stays local in this build.
-- The 13-layer execution blueprint and appendices now live in [docs/EBRAIN_13L_EXECUTION_V12.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_13L_EXECUTION_V12.md) and [docs/EBRAIN_13L_APPENDICES_V12.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_13L_APPENDICES_V12.md).
+- The 13-layer execution blueprint, appendices, and completion matrix now live in [docs/EBRAIN_13L_EXECUTION_V12.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_13L_EXECUTION_V12.md), [docs/EBRAIN_13L_APPENDICES_V12.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_13L_APPENDICES_V12.md), and [docs/EBRAIN_13L_COMPLETION_MATRIX.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_13L_COMPLETION_MATRIX.md).
 - `BASHostKit` is now the preferred host-facing integration surface for the private substrate SDK.
 - `Before` remains the full reference host, while `SampleHost` proves the minimal façade integration path.
 - The quick verdict engine remains rule-based and intentionally lightweight.

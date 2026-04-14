@@ -1,7 +1,43 @@
 import Foundation
 
+enum DecisionEvolutionActiveCheckpointSource: String, Equatable, Sendable {
+    case none
+    case pinnedHint
+    case automaticFallback
+
+    var title: String {
+        switch self {
+        case .none:
+            "No active source"
+        case .pinnedHint:
+            "Pinned active"
+        case .automaticFallback:
+            "Recovered active"
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .none:
+            "NONE"
+        case .pinnedHint:
+            "PINNED"
+        case .automaticFallback:
+            "RECOVERED"
+        }
+    }
+}
+
+struct DecisionEvolutionCheckpointSlots: Equatable, Sendable {
+    let activeCheckpoint: DecisionReviewCheckpointSnapshot?
+    let activeCheckpointSource: DecisionEvolutionActiveCheckpointSource
+    let reviewCheckpoint: DecisionReviewCheckpointSnapshot?
+    let pendingReviewQueue: [DecisionReviewCheckpointSnapshot]
+}
+
 struct DecisionEvolutionControlSurface: Equatable, Sendable {
     let activeCheckpoint: DecisionReviewCheckpointSnapshot?
+    let activeCheckpointSource: DecisionEvolutionActiveCheckpointSource
     let reviewCheckpoint: DecisionReviewCheckpointSnapshot?
     let pendingReviewQueue: [DecisionReviewCheckpointSnapshot]
     let pendingReviewCount: Int
@@ -15,12 +51,15 @@ struct DecisionEvolutionControlSurface: Equatable, Sendable {
 
     init(
         activeCheckpoint: DecisionReviewCheckpointSnapshot?,
+        activeCheckpointSource: DecisionEvolutionActiveCheckpointSource? = nil,
         reviewCheckpoint: DecisionReviewCheckpointSnapshot?,
         pendingReviewQueue: [DecisionReviewCheckpointSnapshot],
         latestPersistedLineage: DecisionEvolutionLineageSnapshot?,
         restorableCheckpointIDs: Set<String> = []
     ) {
         self.activeCheckpoint = activeCheckpoint
+        self.activeCheckpointSource = activeCheckpointSource
+            ?? (activeCheckpoint == nil ? .none : .pinnedHint)
         self.reviewCheckpoint = reviewCheckpoint ?? pendingReviewQueue.first
         self.pendingReviewQueue = pendingReviewQueue
         self.pendingReviewCount = pendingReviewQueue.count
@@ -88,6 +127,10 @@ struct DecisionEvolutionControlSurface: Equatable, Sendable {
         return reviewPresentation
     }
 
+    var activeKillSwitches: [String] {
+        activeCheckpoint?.activeKillSwitches ?? []
+    }
+
     func checkpointIsRestorable(_ checkpointID: String?) -> Bool {
         guard let checkpointID else { return false }
         return restorableCheckpointIDs.contains(checkpointID)
@@ -113,6 +156,18 @@ struct DecisionEvolutionControlSurface: Equatable, Sendable {
         activeRollbackCheckpointID != nil
     }
 
+    var projectedAutomaticCheckpointIDAfterApprovingPendingQueue: String? {
+        let candidates = ([activeCheckpoint].compactMap { $0 } + pendingReviewQueue)
+        guard !candidates.isEmpty else { return nil }
+
+        return candidates.max { lhs, rhs in
+            if lhs.createdAt != rhs.createdAt {
+                return lhs.createdAt < rhs.createdAt
+            }
+            return lhs.checkpointID < rhs.checkpointID
+        }?.checkpointID
+    }
+
     private static func orderedUnique(_ values: [String]) -> [String] {
         values.reduce(into: [String]()) { uniqueValues, value in
             guard !uniqueValues.contains(value) else { return }
@@ -131,6 +186,10 @@ struct DecisionEvolutionControlSurface: Equatable, Sendable {
 }
 
 extension DecisionReviewCheckpointSnapshot {
+    var activeKillSwitches: [String] {
+        eBrain?.activeKillSwitches ?? []
+    }
+
     var riskLevel: String? {
         eBrain?.riskLevel
     }
@@ -173,5 +232,63 @@ extension DecisionReviewCheckpointSnapshot {
 
     var killSwitches: [String] {
         eBrain?.killSwitches ?? []
+    }
+}
+
+extension DecisionEvolutionControlSurface {
+    static func resolveCheckpointSlots(
+        activeCheckpointHint: DecisionReviewCheckpointSnapshot?,
+        activeCheckpointSource: DecisionEvolutionActiveCheckpointSource? = nil,
+        latestAutomaticLineage: DecisionEvolutionLineageSnapshot? = nil,
+        pendingReviewCheckpoints: [DecisionReviewCheckpointSnapshot]
+    ) -> DecisionEvolutionCheckpointSlots {
+        let pendingReviewQueue = pendingReviewCheckpoints.sorted { lhs, rhs in
+            if lhs.createdAt != rhs.createdAt {
+                return lhs.createdAt > rhs.createdAt
+            }
+            return lhs.checkpointID > rhs.checkpointID
+        }
+
+        let activeCheckpoint = activeCheckpointHint
+            ?? latestAutomaticLineage.map(DecisionReviewCheckpointSnapshot.init(lineage:))
+        let resolvedActiveCheckpointSource: DecisionEvolutionActiveCheckpointSource = activeCheckpointSource ?? {
+            if activeCheckpointHint != nil {
+                return .pinnedHint
+            }
+
+            if latestAutomaticLineage != nil {
+                return .automaticFallback
+            }
+
+            return .none
+        }()
+
+        return DecisionEvolutionCheckpointSlots(
+            activeCheckpoint: activeCheckpoint,
+            activeCheckpointSource: resolvedActiveCheckpointSource,
+            reviewCheckpoint: pendingReviewQueue.first,
+            pendingReviewQueue: pendingReviewQueue
+        )
+    }
+}
+
+extension DecisionEvolutionControlSurface {
+    func coverageFacts(
+        latestPersistedLineage: DecisionEvolutionLineageSnapshot?,
+        recoveredCheckpointOverride: DecisionReviewCheckpointSnapshot? = nil
+    ) -> DecisionEvolutionCoverageFacts {
+        let recoveredCheckpoint = recoveredCheckpointOverride ?? activeCheckpoint
+
+        return DecisionEvolutionCoverageFacts(
+            recoveredCheckpoint: recoveredCheckpoint,
+            latestPersistedLineage: latestPersistedLineage,
+            recoveredEBrainAvailable: recoveredCheckpoint != nil || latestPersistedLineage != nil,
+            recoveredAuditFindingCount: recoveredCheckpoint?.auditFindings.count
+                ?? latestPersistedLineage?.eBrain.guardrailFindings.count
+                ?? 0,
+            recoveredTicketCount: recoveredCheckpoint?.updateTicketSummaries.count
+                ?? latestPersistedLineage?.eBrain.updateTicketSummaries.count
+                ?? 0
+        )
     }
 }

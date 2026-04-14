@@ -8,7 +8,7 @@ import Testing
 @Suite("BASApple Evolution Checkpoint Writer")
 struct BASAppleEvolutionCheckpointWriterTests {
     @Model
-    final class CheckpointFixture: BASAppleEvolutionCheckpointEntity {
+    final class EvolutionCheckpointFixture: BASAppleEvolutionCheckpointEntity {
         @Attribute(.unique) var id: String
         var createdAt: Date
         var fingerprint: String
@@ -41,8 +41,8 @@ struct BASAppleEvolutionCheckpointWriterTests {
             self.lineageSummaryBlob = Self.encode(fields.lineageSummary)
         }
 
-        static func basMake(from fields: BASEvolutionCheckpointStoredFields) -> CheckpointFixture {
-            CheckpointFixture(fields: fields)
+        static func basMake(from fields: BASEvolutionCheckpointStoredFields) -> EvolutionCheckpointFixture {
+            EvolutionCheckpointFixture(fields: fields)
         }
 
         var basSnapshot: BASEvolutionCheckpointStoredFields {
@@ -84,7 +84,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
     @Test("writer deduplicates identical checkpoints and trims old ones")
     func writerDeduplicatesAndTrims() throws {
         let container = try ModelContainer(
-            for: CheckpointFixture.self,
+            for: EvolutionCheckpointFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
@@ -98,7 +98,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
             calibrationStatus: .stable
         )
 
-        let first: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+        let first: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.record(
                 input: stableInput,
                 in: context,
@@ -106,7 +106,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
                 maxEntries: 2,
                 retentionInterval: 60 * 60
             )
-        let deduplicated: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+        let deduplicated: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.record(
                 input: stableInput,
                 in: context,
@@ -114,7 +114,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
                 maxEntries: 2,
                 retentionInterval: 60 * 60
             )
-        let drifting: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+        let drifting: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "reflective",
@@ -129,7 +129,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
                 maxEntries: 2,
                 retentionInterval: 60 * 60
             )
-        let later: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+        let later: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "primary",
@@ -145,7 +145,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
                 retentionInterval: 60 * 60
             )
 
-        let checkpoints = try context.fetch(FetchDescriptor<CheckpointFixture>())
+        let checkpoints = try context.fetch(FetchDescriptor<EvolutionCheckpointFixture>())
 
         #expect(first.wroteCheckpoint)
         #expect(!deduplicated.wroteCheckpoint)
@@ -159,13 +159,13 @@ struct BASAppleEvolutionCheckpointWriterTests {
     @Test("writer updates checkpoint approval state without adding a checkpoint")
     func writerUpdatesApprovalState() throws {
         let container = try ModelContainer(
-            for: CheckpointFixture.self,
+            for: EvolutionCheckpointFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
         let baseDate = Date(timeIntervalSince1970: 1_744_100_000)
 
-        let initial: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+        let initial: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "reflective",
@@ -179,14 +179,14 @@ struct BASAppleEvolutionCheckpointWriterTests {
                 createdAt: baseDate
             )
 
-        let updated: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+        let updated: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.setApprovalState(
                 .automatic,
                 for: initial.currentState.latestCheckpoint?.id ?? "",
                 in: context
             )
 
-        let checkpoints = try context.fetch(FetchDescriptor<CheckpointFixture>())
+        let checkpoints = try context.fetch(FetchDescriptor<EvolutionCheckpointFixture>())
 
         #expect(checkpoints.count == 1)
         #expect(checkpoints.first?.basSnapshot.approvalState == .automatic)
@@ -197,13 +197,13 @@ struct BASAppleEvolutionCheckpointWriterTests {
     @Test("writer can set and clear lineage summary for an existing checkpoint")
     func writerSetsAndClearsLineageSummary() throws {
         let container = try ModelContainer(
-            for: CheckpointFixture.self,
+            for: EvolutionCheckpointFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
         let baseDate = Date(timeIntervalSince1970: 1_744_100_000)
 
-        let initial: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+        let initial: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "primary",
@@ -226,24 +226,25 @@ struct BASAppleEvolutionCheckpointWriterTests {
             hostGatePercent: 74,
             thoughtFoldChecksum: "fixture-fold",
             updateTicketSummaries: ["wait for evidence"],
+            activeKillSwitches: ["force_guard_mode"],
             guardrailFindings: ["downgraded quick path"],
             recommendedKillSwitches: ["disableHighRiskAutoAction"]
         )
 
-        let attached: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+        let attached: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.setLineageSummary(
                 lineage,
                 for: checkpointID,
                 in: context
             )
-        let cleared: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+        let cleared: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.setLineageSummary(
                 nil,
                 for: checkpointID,
                 in: context
             )
 
-        let checkpoints = try context.fetch(FetchDescriptor<CheckpointFixture>())
+        let checkpoints = try context.fetch(FetchDescriptor<EvolutionCheckpointFixture>())
 
         #expect(checkpoints.count == 1)
         #expect(attached.currentState.latestCheckpoint?.lineageSummary == lineage)
@@ -254,13 +255,13 @@ struct BASAppleEvolutionCheckpointWriterTests {
     @Test("writer can attach lineage summary to an explicit checkpoint without touching the newest checkpoint")
     func writerAttachesLineageSummaryToExplicitCheckpoint() throws {
         let container = try ModelContainer(
-            for: CheckpointFixture.self,
+            for: EvolutionCheckpointFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
         let baseDate = Date(timeIntervalSince1970: 1_744_100_000)
 
-        let older: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+        let older: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "primary",
@@ -283,7 +284,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
                 in: context,
                 createdAt: baseDate
             )
-        let newer: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+        let newer: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointInput(
                     modeName: "primary",
@@ -313,18 +314,19 @@ struct BASAppleEvolutionCheckpointWriterTests {
             hostGatePercent: 81,
             thoughtFoldChecksum: "explicit-target-fold",
             updateTicketSummaries: ["preserve explicit target"],
+            activeKillSwitches: ["force_guard_mode"],
             guardrailFindings: ["attached to older checkpoint"],
             recommendedKillSwitches: ["disableHighRiskAutoAction"]
         )
 
-        let attached: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+        let attached: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.attachLineageSummary(
                 lineage,
                 for: olderID,
                 in: context
             )
 
-        let checkpoints = try context.fetch(FetchDescriptor<CheckpointFixture>())
+        let checkpoints = try context.fetch(FetchDescriptor<EvolutionCheckpointFixture>())
         let olderCheckpoint = try #require(checkpoints.first(where: { $0.id == olderID }))
         let newerCheckpoint = try #require(checkpoints.first(where: { $0.id == newerID }))
 
@@ -336,7 +338,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
     @Test("checkpoint input carries a restorable brain snapshot")
     func writerPersistsBrainSnapshot() throws {
         let container = try ModelContainer(
-            for: CheckpointFixture.self,
+            for: EvolutionCheckpointFixture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
@@ -352,7 +354,7 @@ struct BASAppleEvolutionCheckpointWriterTests {
             loadedAt: baseDate
         )
 
-        let result: BASAppleEvolutionCheckpointWriteResult<CheckpointFixture> =
+        let result: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
             BASAppleEvolutionCheckpointWriter.record(
                 input: BASEvolutionCheckpointPlanner.checkpointInput(
                     modeName: "reflective",

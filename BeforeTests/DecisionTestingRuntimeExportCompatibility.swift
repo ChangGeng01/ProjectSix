@@ -16,7 +16,10 @@ extension DecisionTestingRuntimeExport {
     }
 
     var summary: DecisionTestingRuntimeSummary {
-        DecisionTestingRuntimeSummary(basSummary: basRuntimeInspectionSummary)
+        DecisionTestingRuntimeSummary(
+            basSummary: basRuntimeInspectionSummary,
+            localModelLibrary: runtimeSnapshot.localModelLibrary
+        )
     }
 }
 
@@ -201,6 +204,12 @@ struct DecisionTestingRuntimeSummary: Equatable, Sendable {
     let dominantGemmaBackend: InferenceBackendKind?
     let registeredProviderCount: Int
     let registeredOpenModelProviderCount: Int
+    let localModelPreferredProvider: DecisionModelProviderPreference
+    let localModelImportedGemmaCount: Int
+    let localModelHasBundledGemmaAsset: Bool
+    let localModelPreferredGemmaAssetID: String?
+    let localModelPreferredGemmaFileName: String?
+    let localModelOpenModelSlotStableID: String?
     let circuitOpenProviderCount: Int
     let activeCircuitProviders: [DecisionModelProviderKind]
     let circuitTripCount: Int
@@ -295,7 +304,10 @@ private extension DecisionTestingBrainSummary {
 }
 
 private extension DecisionTestingRuntimeSummary {
-    init(basSummary: BASRuntimeInspectionSummary) {
+    init(
+        basSummary: BASRuntimeInspectionSummary,
+        localModelLibrary: DecisionLocalModelLibrarySnapshot
+    ) {
         self.init(
             activeProvider: DecisionModelProviderKind(rawValue: basSummary.activeProviderID) ?? .template,
             fallbackProvider: basSummary.fallbackProviderID.flatMap(DecisionModelProviderKind.init(rawValue:)),
@@ -464,6 +476,12 @@ private extension DecisionTestingRuntimeSummary {
             dominantGemmaBackend: basSummary.dominantBackendID.flatMap(InferenceBackendKind.init(rawValue:)),
             registeredProviderCount: basSummary.registeredProviderCount,
             registeredOpenModelProviderCount: basSummary.registeredOpenModelProviderCount,
+            localModelPreferredProvider: localModelLibrary.preferredProvider,
+            localModelImportedGemmaCount: localModelLibrary.importedGemmaAssets.count,
+            localModelHasBundledGemmaAsset: localModelLibrary.bundledGemmaAsset != nil,
+            localModelPreferredGemmaAssetID: localModelLibrary.preferredGemmaAssetID,
+            localModelPreferredGemmaFileName: localModelLibrary.preferredGemmaAsset?.fileName,
+            localModelOpenModelSlotStableID: localModelLibrary.openModelSlot?.stableID,
             circuitOpenProviderCount: basSummary.circuitOpenProviderCount,
             activeCircuitProviders: basSummary.activeCircuitProviderIDs.compactMap(DecisionModelProviderKind.init(rawValue:)),
             circuitTripCount: basSummary.circuitTripCount,

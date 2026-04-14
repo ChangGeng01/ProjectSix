@@ -181,7 +181,10 @@ struct BehavioralAISubstrateBridgeTests {
         #expect(export.effectiveEBrainSource == .persistedCheckpoint)
         #expect(snapshot.inspectionBundle != nil)
         #expect(snapshot.runtimeSummary?.contains("Recovered from checkpoint") == true)
-        #expect(snapshot.brainSummary?.contains("Recovered lineage") == true)
+        #expect(snapshot.brainSummary?.contains("Checkpoint recovery") == true)
+        #expect(snapshot.brainSummary?.contains("session before.quick.lineage") == true)
+        #expect(snapshot.brainSummary?.contains("host gate 82%") == true)
+        #expect(snapshot.brainSummary?.contains("1 tickets") == true)
         #expect(snapshot.blockerSummary.contains("Checkpoint recovery pending review"))
         #expect(snapshot.inspectionBundle?.trace.selectedRoute.preferredModelID == "persisted.checkpoint.quick")
         #expect(snapshot.inspectionBundle?.releaseDecision.kind == .requireConfirmation)
@@ -529,6 +532,9 @@ struct BehavioralAISubstrateBridgeTests {
             performRestore: {
                 Issue.record("Expected open-mode path, not workspace restore")
             },
+            performOpenEvolutionControl: {
+                Issue.record("Expected open-mode path, not Evolution Control")
+            },
             refreshCurrentBrain: { source in
                 refreshedSource = source
             }
@@ -575,6 +581,9 @@ struct BehavioralAISubstrateBridgeTests {
             performRestore: {
                 Issue.record("Expected open-mode handoff path")
             },
+            performOpenEvolutionControl: {
+                Issue.record("Expected open-mode handoff path")
+            },
             refreshCurrentBrain: { source in
                 refreshedSource = source
             }
@@ -604,6 +613,7 @@ struct BehavioralAISubstrateBridgeTests {
             selectBoxTab: { actions.append("box") },
             performPredictiveIntervention: { _ in actions.append("prediction") },
             performRestore: { actions.append("restore") },
+            performOpenEvolutionControl: { actions.append("control") },
             refreshPredictedIntervention: { actions.append("refresh_prediction") },
             syncWidgetSnapshot: { actions.append("widget") }
         )
@@ -614,6 +624,47 @@ struct BehavioralAISubstrateBridgeTests {
                 "brain:launch"
             ]
         )
+    }
+
+    @Test
+    func bridgeConsumeDecisionIntentEnvelopeCanOpenEvolutionControlFromWatch() {
+        let envelope = DecisionIntentEnvelope(
+            kind: .openEvolutionControl,
+            sourceSurface: .watch,
+            entrySource: .watch,
+            preferredMode: .mirror,
+            promptSeed: "Watch the pending review queue",
+            riskLevel: .medium,
+            triggerReason: "Watch requested evolution review."
+        )
+
+        var openedControlCenter = false
+        var refreshedSource: BrainStateUpdateSource?
+
+        BehavioralAISubstrateBridge.consumeDecisionIntentEnvelope(
+            envelope,
+            performCapture: { _, _, _ in
+                Issue.record("Expected control-surface handoff, not quick capture")
+            },
+            performPresent: { _, _, _, _ in
+                Issue.record("Expected control-surface handoff, not decision presentation")
+            },
+            performPredictiveIntervention: { _ in
+                Issue.record("Expected control-surface handoff, not predictive intervention")
+            },
+            performRestore: {
+                Issue.record("Expected control-surface handoff, not workspace restore")
+            },
+            performOpenEvolutionControl: {
+                openedControlCenter = true
+            },
+            refreshCurrentBrain: { source in
+                refreshedSource = source
+            }
+        )
+
+        #expect(openedControlCenter)
+        #expect(refreshedSource == .watchHandoff)
     }
 
     @Test

@@ -4,13 +4,39 @@ struct DecisionEvolutionControlSurfaceInventory: Equatable, Sendable {
     let pendingReviewQueue: [DecisionReviewCheckpointSnapshot]
     let persistedLineages: [DecisionEvolutionLineageSnapshot]
     let activeCheckpoint: DecisionReviewCheckpointSnapshot?
+    let activeCheckpointSource: DecisionEvolutionActiveCheckpointSource
     let restorableCheckpointIDs: Set<String>
+
+    init(
+        pendingReviewQueue: [DecisionReviewCheckpointSnapshot],
+        persistedLineages: [DecisionEvolutionLineageSnapshot],
+        activeCheckpoint: DecisionReviewCheckpointSnapshot?,
+        activeCheckpointSource: DecisionEvolutionActiveCheckpointSource? = nil,
+        restorableCheckpointIDs: Set<String>
+    ) {
+        self.pendingReviewQueue = pendingReviewQueue
+        self.persistedLineages = persistedLineages
+        self.activeCheckpoint = activeCheckpoint
+        self.activeCheckpointSource = activeCheckpointSource ?? {
+            if activeCheckpoint != nil {
+                return .pinnedHint
+            }
+
+            if persistedLineages.contains(where: { $0.approvalState == .automatic }) {
+                return .automaticFallback
+            }
+
+            return .none
+        }()
+        self.restorableCheckpointIDs = restorableCheckpointIDs
+    }
 
     func buildControlSurface(
         preferredCheckpointSelectionContext: DecisionTestingCheckpointSelectionContext? = nil
     ) -> DecisionEvolutionControlSurface {
         DecisionEvolutionControlSurfaceFactory.build(
             activeCheckpointHint: activeCheckpoint,
+            activeCheckpointSource: activeCheckpointSource,
             latestAutomaticLineage: latestAutomaticLineage(
                 matching: preferredCheckpointSelectionContext
             ),

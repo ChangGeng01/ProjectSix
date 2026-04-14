@@ -1,5 +1,6 @@
 import XCTest
 import SwiftData
+import SwiftUI
 import BASHostKit
 @testable import Before
 
@@ -473,6 +474,204 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         XCTAssertEqual(app.latestEvolutionMutationOutcome?.kind, .applyCheckpoint)
         XCTAssertEqual(app.latestEvolutionMutationOutcome?.isSuccess, true)
         XCTAssertEqual(app.latestEvolutionMutationOutcome?.affectedCheckpointIDs, [checkpoint.id])
+    }
+
+    @MainActor
+    func testBeforeAppModelApplyEvolutionCheckpointRestoresPersistedKillSwitchPolicy() throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+
+        let container = try makeCheckpointApplyContainer()
+        let context = container.mainContext
+        seedCheckpointApplyHistory(into: context)
+        try context.save()
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+        app.startQuickCheck(entrySource: .app, prompt: "Should I send this tonight?")
+        app.setEvolutionKillSwitch(.disableFastPath, enabled: true, now: Date(timeIntervalSince1970: 15))
+
+        let preApplyBrain = try XCTUnwrap(app.currentBrainState)
+        let checkpointDate = preApplyBrain.loadedAt.addingTimeInterval(60)
+        let snapshotBrainState = DecisionBrainState(
+            profileCore: ["Protect sleep."],
+            activeGoals: ["Delay the message."],
+            relevantMemories: ["High-risk conflict needs pacing."],
+            sessionBiases: ["Stay local."],
+            retrievalTags: ["mirror", "high-risk"],
+            reactionWeights: .defaults(for: .mirror),
+            identityProfile: .default(for: .mirror),
+            boundaryPolicy: .default(riskLevel: InterventionRiskLevel.high),
+            calibrationState: .stable(at: checkpointDate),
+            loadedAt: checkpointDate
+        )
+        let lineage = BASEvolutionLineageSummary(
+            recordedAt: checkpointDate,
+            sessionID: "session-apply-killswitch",
+            taskType: "conflict",
+            riskLevel: "high",
+            permitMode: "delay",
+            hostGatePercent: 88,
+            thoughtFoldChecksum: "fold-apply-killswitch",
+            updateTicketSummaries: ["wait until tomorrow"],
+            activeKillSwitches: ["host-write", "disableHighRiskAutoAction"],
+            guardrailFindings: ["high-risk direct answer downgraded"],
+            recommendedKillSwitches: ["external-tools"]
+        )
+
+        _ = BASAppleEvolutionCheckpointWriter.record(
+            input: BASEvolutionCheckpointPlanner.checkpointInput(
+                modeName: DecisionMode.mirror.rawValue,
+                sourceID: BrainStateUpdateSource.explicitRefresh.rawValue,
+                brainState: snapshotBrainState,
+                lineageSummary: lineage
+            ),
+            in: context,
+            createdAt: checkpointDate
+        ) as BASAppleEvolutionCheckpointWriteResult<DecisionEvolutionCheckpoint>
+
+        let checkpoint = try XCTUnwrap(
+            context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>()).first(where: {
+                $0.createdAt == checkpointDate && $0.lineageSummary?.sessionID == "session-apply-killswitch"
+            })
+        )
+
+        app.applyEvolutionCheckpoint(
+            checkpointID: checkpoint.id,
+            now: checkpointDate.addingTimeInterval(30)
+        )
+
+        XCTAssertEqual(
+            Set(app.activeEvolutionKillSwitches),
+            Set([.requireReviewedWrites, .forceProtectedPermit])
+        )
+    }
+
+    @MainActor
+    func testBeforeAppModelApplyEvolutionCheckpointRefreshesWidgetEvolutionSnapshot() throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+        WidgetSnapshotStore.clear()
+        defer { WidgetSnapshotStore.clear() }
+
+        let container = try makeCheckpointApplyContainer()
+        let context = container.mainContext
+        seedCheckpointApplyHistory(into: context)
+        try context.save()
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+        app.startQuickCheck(entrySource: .app, prompt: "Should I send this tonight?")
+
+        let checkpointDate = Date(timeIntervalSince1970: 120)
+        let snapshotBrainState = DecisionBrainState(
+            profileCore: ["Protect sleep."],
+            activeGoals: ["Delay the message."],
+            relevantMemories: ["High-risk conflict needs pacing."],
+            sessionBiases: ["Stay local."],
+            retrievalTags: ["mirror", "high-risk"],
+            reactionWeights: .defaults(for: .mirror),
+            identityProfile: .default(for: .mirror),
+            boundaryPolicy: .default(riskLevel: InterventionRiskLevel.high),
+            calibrationState: .stable(at: checkpointDate),
+            loadedAt: checkpointDate
+        )
+        let lineage = BASEvolutionLineageSummary(
+            recordedAt: checkpointDate,
+            sessionID: "session-widget-sync-apply",
+            taskType: "conflict",
+            riskLevel: "high",
+            permitMode: "delay",
+            hostGatePercent: 88,
+            thoughtFoldChecksum: "fold-widget-sync-apply",
+            updateTicketSummaries: ["wait until tomorrow"],
+            activeKillSwitches: ["host-write"],
+            guardrailFindings: ["high-risk direct answer downgraded"],
+            recommendedKillSwitches: ["external-tools"]
+        )
+
+        _ = BASAppleEvolutionCheckpointWriter.record(
+            input: BASEvolutionCheckpointPlanner.checkpointInput(
+                modeName: DecisionMode.mirror.rawValue,
+                sourceID: BrainStateUpdateSource.explicitRefresh.rawValue,
+                brainState: snapshotBrainState,
+                lineageSummary: lineage
+            ),
+            in: context,
+            createdAt: checkpointDate
+        ) as BASAppleEvolutionCheckpointWriteResult<DecisionEvolutionCheckpoint>
+
+        let checkpoint = try XCTUnwrap(
+            context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>()).first(where: {
+                $0.createdAt == checkpointDate && $0.lineageSummary?.sessionID == "session-widget-sync-apply"
+            })
+        )
+
+        app.applyEvolutionCheckpoint(
+            checkpointID: checkpoint.id,
+            now: checkpointDate.addingTimeInterval(30)
+        )
+
+        assertWidgetEvolutionSnapshotMatchesAppState(app)
+    }
+
+    @MainActor
+    func testBeforeAppModelKillSwitchMutationRefreshesWidgetEvolutionSnapshot() throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+        WidgetSnapshotStore.clear()
+        defer { WidgetSnapshotStore.clear() }
+
+        let container = try makeCheckpointApplyContainer()
+        let context = container.mainContext
+        seedCheckpointApplyHistory(into: context)
+        try context.save()
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+        app.startQuickCheck(entrySource: .app, prompt: "Should I send this tonight?")
+
+        app.setEvolutionKillSwitch(.disableFastPath, enabled: true, now: Date(timeIntervalSince1970: 15))
+        assertWidgetEvolutionSnapshotMatchesAppState(app)
+
+        app.clearEvolutionKillSwitches(now: Date(timeIntervalSince1970: 30))
+        assertWidgetEvolutionSnapshotMatchesAppState(app)
+    }
+
+    @MainActor
+    func testBeforeAppModelConsumesWatchOpenEvolutionControlAndSyncsWidgetSnapshot() throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+        DecisionIntentEnvelopeStore.clear()
+        WidgetSnapshotStore.clear()
+        defer {
+            DecisionIntentEnvelopeStore.clear()
+            WidgetSnapshotStore.clear()
+        }
+
+        let container = try makeCheckpointApplyContainer()
+        let context = container.mainContext
+        seedCheckpointApplyHistory(into: context)
+        try context.save()
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+        app.startQuickCheck(entrySource: .app, prompt: "Should I review the queue?")
+
+        WatchHandoffCoordinator.enqueueOpenEvolutionControl(
+            headline: "Review the pending queue",
+            reason: "Watch glance asked the iPhone brain to open Evolution Control."
+        )
+
+        app.handleInitialAppearance()
+
+        XCTAssertTrue(app.isEvolutionControlCenterPresented)
+        XCTAssertNil(WatchHandoffCoordinator.consume())
+        assertWidgetEvolutionSnapshotMatchesAppState(app)
     }
 
     @MainActor
@@ -2583,6 +2782,53 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         XCTAssertEqual(app.latestEvolutionMutationOutcome?.kind, .clearCheckpointLineage)
     }
 
+    @MainActor
+    func testBeforeAppModelHandleInitialAppearancePresentsEvolutionControlCenterFromWatchHandoff() throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+        DecisionIntentEnvelopeStore.clear()
+
+        let container = try makeCheckpointApplyContainer()
+        WatchHandoffCoordinator.enqueueOpenEvolutionControl(
+            headline: "Review the pending queue",
+            reason: "Watch requested evolution review."
+        )
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+        XCTAssertFalse(app.isEvolutionControlCenterPresented)
+
+        app.handleInitialAppearance()
+
+        XCTAssertTrue(app.isEvolutionControlCenterPresented)
+        XCTAssertNil(DecisionIntentEnvelopeStore.consume())
+    }
+
+    @MainActor
+    func testBeforeAppModelSceneActivePresentsEvolutionControlCenterFromWidgetIntent() async throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+        DecisionIntentEnvelopeStore.clear()
+
+        let container = try makeCheckpointApplyContainer()
+        let intent = OpenEvolutionControlIntent(
+            entrySource: .homeWidgetMedium,
+            prompt: "Review the guarded queue"
+        )
+        _ = try await intent.perform()
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+        XCTAssertFalse(app.isEvolutionControlCenterPresented)
+
+        app.handleScenePhase(.active)
+
+        XCTAssertTrue(app.isEvolutionControlCenterPresented)
+        XCTAssertNil(DecisionIntentEnvelopeStore.consume())
+    }
+
     private func makeCheckpointApplyContainer() throws -> ModelContainer {
         try ModelContainer(
             for: CheckEvent.self,
@@ -2616,6 +2862,37 @@ final class DecisionEvolutionEngineTests: XCTestCase {
                 entrySource: .app
             )
         )
+    }
+
+    @MainActor
+    private func assertWidgetEvolutionSnapshotMatchesAppState(
+        _ app: BeforeAppModel,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let snapshot = WidgetSnapshotStore.load()
+        let evolution = snapshot.evolution
+        let controlSurface = app.makeEvolutionControlSurface()
+        let attentionSignal = app.makeEvolutionSurfaceState(contract: .home).attentionSignal
+        let activeKillSwitchCount = app.activeEvolutionKillSwitches.count
+        let recommendedKillSwitchCount = max(
+            0,
+            controlSurface.queueKillSwitches.filter {
+                !app.activeEvolutionKillSwitches.map(\.rawValue).contains($0)
+            }.count
+        )
+
+        XCTAssertEqual(evolution?.activeCheckpointSourceID, controlSurface.activeCheckpointSource.rawValue, file: file, line: line)
+        XCTAssertEqual(evolution?.hasActiveCheckpoint, controlSurface.activePresentation != nil, file: file, line: line)
+        XCTAssertEqual(evolution?.hasReviewCheckpoint, controlSurface.reviewPresentation != nil, file: file, line: line)
+        XCTAssertEqual(evolution?.pendingReviewCount, controlSurface.pendingReviewCount, file: file, line: line)
+        XCTAssertEqual(evolution?.rollbackReadyCount, controlSurface.rollbackReadyCount, file: file, line: line)
+        XCTAssertEqual(evolution?.activeKillSwitchCount, activeKillSwitchCount, file: file, line: line)
+        XCTAssertEqual(evolution?.recommendedKillSwitchCount, recommendedKillSwitchCount, file: file, line: line)
+        XCTAssertEqual(evolution?.attentionSeverityID, attentionSignal.severity.rawValue, file: file, line: line)
+        XCTAssertEqual(evolution?.attentionBadgeValue, attentionSignal.badgeValue, file: file, line: line)
+        XCTAssertEqual(evolution?.attentionHeadline, attentionSignal.headline, file: file, line: line)
+        XCTAssertEqual(evolution?.attentionDetail, attentionSignal.detail, file: file, line: line)
     }
 
     @MainActor

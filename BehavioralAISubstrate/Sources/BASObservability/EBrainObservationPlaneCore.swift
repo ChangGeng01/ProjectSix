@@ -13,6 +13,30 @@ public enum BASKillSwitchID: String, Codable, CaseIterable, Sendable {
     case disableFastPath = "disable_fast_path"
     case requireReviewedWrites = "require_reviewed_writes"
     case forceProtectedPermit = "force_protected_permit"
+
+    public init?(policyID: String) {
+        switch policyID {
+        case Self.forceGuardMode.rawValue:
+            self = .forceGuardMode
+        case Self.disableFastPath.rawValue:
+            self = .disableFastPath
+        case Self.requireReviewedWrites.rawValue:
+            self = .requireReviewedWrites
+        case Self.forceProtectedPermit.rawValue:
+            self = .forceProtectedPermit
+        case "disableHighRiskAutoAction", "tool-call", "external-tools":
+            self = .forceProtectedPermit
+        case "host-write", "lineage-review":
+            self = .requireReviewedWrites
+        default:
+            return nil
+        }
+    }
+
+    public static func resolvePolicyIDs(_ policyIDs: [String]) -> [BASKillSwitchID] {
+        var seen = Set<BASKillSwitchID>()
+        return policyIDs.compactMap(Self.init(policyID:)).filter { seen.insert($0).inserted }
+    }
 }
 
 public struct BASRuntimeAuditFinding: Codable, Equatable, Sendable, Identifiable {
@@ -90,7 +114,7 @@ public struct BASRuntimeTraceEvent: Codable, Equatable, Sendable {
 }
 
 public struct BASRuntimeTrace: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.2.0"
+    public static let currentSchemaVersion = "1.3.0"
 
     public var schemaVersion: String
     public var sessionID: String
@@ -102,6 +126,7 @@ public struct BASRuntimeTrace: BASSchemaVersioned {
     public var modelRoute: String
     public var loopCount: Int
     public var cacheHitRate: Double
+    public var activeKillSwitches: [BASKillSwitchID]
     public var guardrailFindings: [BASRuntimeAuditFinding]
     public var recommendedKillSwitches: [BASKillSwitchID]
 
@@ -116,6 +141,7 @@ public struct BASRuntimeTrace: BASSchemaVersioned {
         modelRoute: String,
         loopCount: Int = 0,
         cacheHitRate: Double = 0,
+        activeKillSwitches: [BASKillSwitchID] = [],
         guardrailFindings: [BASRuntimeAuditFinding] = [],
         recommendedKillSwitches: [BASKillSwitchID] = []
     ) {
@@ -129,6 +155,7 @@ public struct BASRuntimeTrace: BASSchemaVersioned {
         self.modelRoute = modelRoute
         self.loopCount = max(0, loopCount)
         self.cacheHitRate = min(max(cacheHitRate, 0), 1)
+        self.activeKillSwitches = activeKillSwitches
         self.guardrailFindings = guardrailFindings
         self.recommendedKillSwitches = recommendedKillSwitches
     }

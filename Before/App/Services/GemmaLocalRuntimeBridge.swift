@@ -59,7 +59,7 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
     init(
         loadState: GemmaRuntimeLoadState? = nil,
         modelPathProvider: @escaping @Sendable () -> String? = {
-            GemmaE4BIntelligenceService.bundledModel?.fileURLPath
+            GemmaE4BIntelligenceService.preferredModel?.fileURLPath
         }
     ) {
         self.cachedLoadState = loadState ?? Self.defaultLoadState()
@@ -377,15 +377,6 @@ final class DynamicGemmaLocalRuntimeBridge: GemmaLocalRuntimeBridging, @unchecke
             .first
         guard let token else { return nil }
         return Int(token)
-    }
-}
-
-private extension GemmaModelAsset {
-    var fileURLPath: String {
-        Bundle.main.resourceURL?
-            .appendingPathComponent(GemmaModelAssetCatalog.modelSubdirectory, isDirectory: true)
-            .appendingPathComponent(fileName)
-            .path ?? fileName
     }
 }
 

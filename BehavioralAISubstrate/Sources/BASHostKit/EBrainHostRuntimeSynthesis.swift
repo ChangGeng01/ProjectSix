@@ -1106,7 +1106,8 @@ extension BASHostRuntime {
                 hostID: "\(configuration.workflowBehavior.hostNamespace).\(request.workflowProfile.rawValue)",
                 recordedAt: now,
                 riskHint: request.riskLevel.eBrainRiskLevel,
-                feedbackEvent: nil
+                feedbackEvent: nil,
+                activeKillSwitches: request.activeKillSwitches
             )
         )
     }

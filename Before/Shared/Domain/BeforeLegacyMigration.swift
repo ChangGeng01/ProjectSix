@@ -21,6 +21,8 @@ enum BeforeLegacyMigration {
             "capture"
         case "openMode":
             "present"
+        case "openEvolutionControl":
+            "resume"
         case "reopenTomorrowItem":
             "reopen"
         case "resumeCurrentDecision":

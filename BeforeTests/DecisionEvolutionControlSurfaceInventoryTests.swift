@@ -153,6 +153,93 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
         #expect(surface.latestPersistedLineage?.checkpointID == "automatic-persisted")
     }
 
+    @Test
+    func controlSurfaceFactoryPrefersPinnedActiveCheckpointOverAutomaticFallback() {
+        let pinnedActive = DecisionReviewCheckpointSnapshot(
+            checkpointID: "pinned-active",
+            previousCheckpointID: "automatic-persisted",
+            createdAt: Date(timeIntervalSince1970: 140),
+            mode: .balance,
+            approvalState: .automatic,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Pinned active must remain the release head."],
+            eBrain: makeReplaySummary(
+                checkpointID: "pinned-active",
+                recordedAt: Date(timeIntervalSince1970: 140),
+                source: .liveRuntime
+            ),
+            fallbackRiskLevel: "medium",
+            fallbackPermitMode: "compare"
+        )
+        let automaticFallback = makeLineage(
+            checkpointID: "automatic-persisted",
+            createdAt: Date(timeIntervalSince1970: 120),
+            mode: .quick,
+            approvalState: .automatic,
+            source: .persistedCheckpoint
+        )
+        let reviewHead = DecisionReviewCheckpointSnapshot(
+            checkpointID: "review-head",
+            previousCheckpointID: "pinned-active",
+            createdAt: Date(timeIntervalSince1970: 145),
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Review head should remain distinct from active."],
+            eBrain: makeReplaySummary(
+                checkpointID: "review-head",
+                recordedAt: Date(timeIntervalSince1970: 145),
+                source: .persistedCheckpoint
+            ),
+            fallbackRiskLevel: "high",
+            fallbackPermitMode: "delay"
+        )
+
+        let surface = DecisionEvolutionControlSurfaceFactory.build(
+            activeCheckpointHint: pinnedActive,
+            latestAutomaticLineage: automaticFallback,
+            pendingReviewCheckpoints: [reviewHead],
+            latestPersistedLineage: automaticFallback,
+            restorableCheckpointIDs: ["pinned-active", "automatic-persisted"]
+        )
+
+        #expect(surface.activeCheckpoint?.checkpointID == "pinned-active")
+        #expect(surface.activeCheckpointSource == .pinnedHint)
+        #expect(surface.reviewCheckpoint?.checkpointID == "review-head")
+        #expect(surface.distinctReviewPresentation?.checkpointID == "review-head")
+    }
+
+    @Test
+    func controlSurfaceCoverageFactsFallbackToLatestPersistedLineageWhenNoActiveCheckpointExists() {
+        let reviewOnly = makeLineage(
+            checkpointID: "review-only",
+            createdAt: Date(timeIntervalSince1970: 120),
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            source: .persistedCheckpoint
+        )
+
+        let inventory = DecisionEvolutionControlSurfaceInventory(
+            pendingReviewQueue: [DecisionReviewCheckpointSnapshot(lineage: reviewOnly)],
+            persistedLineages: [reviewOnly],
+            activeCheckpoint: nil,
+            restorableCheckpointIDs: []
+        )
+
+        let surface = inventory.buildControlSurface()
+        let facts = surface.coverageFacts(
+            latestPersistedLineage: inventory.latestPersistedLineage()
+        )
+
+        #expect(facts.recoveredCheckpoint == nil)
+        #expect(facts.latestPersistedLineage?.checkpointID == "review-only")
+        #expect(facts.recoveredEBrainAvailable == true)
+        #expect(facts.recoveredAuditFindingCount == reviewOnly.eBrain.guardrailFindings.count)
+        #expect(facts.recoveredTicketCount == reviewOnly.eBrain.updateTicketSummaries.count)
+    }
+
     private func makeLineage(
         checkpointID: String,
         createdAt: Date,
