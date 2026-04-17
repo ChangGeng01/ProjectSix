@@ -7,6 +7,9 @@ struct DecisionSessionEngineSessionSummaryView<Header: View, Footer: View>: View
     let checkpointBudgetLine: String?
     let checkpointDecisionLine: String?
     let checkpointTaskLine: String?
+    let checkpointPressureLine: String?
+    let checkpointAuditLine: String?
+    let checkpointKillSwitchesLine: String?
     let checkpointActionLine: String?
     let activityLine: String?
     let branchLine: String
@@ -26,6 +29,9 @@ struct DecisionSessionEngineSessionSummaryView<Header: View, Footer: View>: View
         checkpointBudgetLine: String? = nil,
         checkpointDecisionLine: String? = nil,
         checkpointTaskLine: String? = nil,
+        checkpointPressureLine: String? = nil,
+        checkpointAuditLine: String? = nil,
+        checkpointKillSwitchesLine: String? = nil,
         checkpointActionLine: String? = nil,
         activityLine: String? = nil,
         branchLine: String,
@@ -44,6 +50,9 @@ struct DecisionSessionEngineSessionSummaryView<Header: View, Footer: View>: View
         self.checkpointBudgetLine = checkpointBudgetLine
         self.checkpointDecisionLine = checkpointDecisionLine
         self.checkpointTaskLine = checkpointTaskLine
+        self.checkpointPressureLine = checkpointPressureLine
+        self.checkpointAuditLine = checkpointAuditLine
+        self.checkpointKillSwitchesLine = checkpointKillSwitchesLine
         self.checkpointActionLine = checkpointActionLine
         self.activityLine = activityLine
         self.branchLine = branchLine
@@ -71,6 +80,9 @@ struct DecisionSessionEngineSessionSummaryView<Header: View, Footer: View>: View
                 checkpointBudgetLine: checkpointBudgetLine,
                 checkpointDecisionLine: checkpointDecisionLine,
                 checkpointTaskLine: checkpointTaskLine,
+                checkpointPressureLine: checkpointPressureLine,
+                checkpointAuditLine: checkpointAuditLine,
+                checkpointKillSwitchesLine: checkpointKillSwitchesLine,
                 checkpointActionLine: checkpointActionLine,
                 activityLine: activityLine,
                 branchLine: branchLine,

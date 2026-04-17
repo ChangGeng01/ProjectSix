@@ -89,6 +89,40 @@ struct DecisionTestingInterfaceTests {
     }
 
     @Test
+    func flightDeckSurfaceHelpersPreferSharedSummaryLines() {
+        let blockerReport = DecisionSystemLayerReport(
+            layer: .runtime,
+            score: 61,
+            health: .watch,
+            headline: "Runtime is watchful",
+            signals: ["Session Engine folded_lung • Sessions 2 • Active 1 • Stalled 1"],
+            blockers: ["Guardrail review is blocking writes"]
+        )
+        #expect(blockerReport.surfaceSummaryLine == "Blocker: Guardrail review is blocking writes")
+        #expect(blockerReport.surfaceSummaryUsesHealthTint == true)
+
+        let signalReport = DecisionSystemLayerReport(
+            layer: .data,
+            score: 84,
+            health: .strong,
+            headline: "Data is steady",
+            signals: ["Branches 3 • Merge-ready sessions 1 • Merge-ready branches 2"],
+            blockers: []
+        )
+        #expect(signalReport.surfaceSummaryLine == "Branches 3 • Merge-ready sessions 1 • Merge-ready branches 2")
+        #expect(signalReport.surfaceSummaryUsesHealthTint == false)
+
+        let runtimeSnapshot = DecisionTestingInterface.runtimeSnapshot(
+            preferences: .default,
+            environment: [:]
+        )
+        let localModelSummary = DecisionSystemLocalModelLibrarySummary.summary(
+            from: runtimeSnapshot.localModelLibrary
+        )
+        #expect(localModelSummary.overviewLine == localModelSummary.headline)
+    }
+
+    @Test
     func runtimeSnapshotAndExportReflectImportedPreferredOpenModelAsset() async throws {
         let sourceURL = try makeTemporaryOpenModelFile(named: "mistral-\(UUID().uuidString).gguf")
         let imported = try OpenModelAssetCatalog.importModel(from: sourceURL)
@@ -833,7 +867,7 @@ struct DecisionTestingInterfaceTests {
     }
 
     @Test
-    func runtimeExportAttachesSessionEngineSnapshotToFlightDeck() async {
+    func runtimeExportAttachesSessionEngineSnapshotToFlightDeck() async throws {
         let sessionEngineSnapshot = DecisionSessionRuntimeSnapshot(
             layerPlacement: .foldedLung,
             sessions: 2,
@@ -855,10 +889,14 @@ struct DecisionTestingInterfaceTests {
                     latestCheckpointID: "ckpt-42",
                     latestCheckpointSeq: 28,
                     latestCheckpointGoal: "repair parser",
-                    latestCheckpointBudgetLine: "eBrain budget: engage • loops 2 • candidates 2 • decode 192",
+                    latestCheckpointBudgetLine: "eBrain budget: engage • loops 2 • candidates 2 • decode 192 • thermal watch",
                     latestCheckpointRouteLine: "eBrain route: npu • precision mixed • retrieval 3",
                     latestCheckpointDecisionLine: "eBrain risk: guarded • eBrain permit: replace • eBrain host gate: 61% • eBrain fold: fold42abc",
                     latestCheckpointTaskLine: "Review update ticket: preserve parser-only correction",
+                    latestCheckpointPressureLine: "eBrain pressure: latency 82/1200ms • power 46% • cache 67% • thermal nominal -> watch",
+                    latestCheckpointAuditLine: "eBrain audit findings: 2",
+                    latestCheckpointActiveKillSwitchesLine: "eBrain active kill switches: force_guard_mode",
+                    latestCheckpointKillSwitchesLine: "eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes",
                     latestEventID: "evt-201",
                     latestEventSeq: 29,
                     latestEventType: .sessionRecovered,
@@ -889,6 +927,10 @@ struct DecisionTestingInterfaceTests {
         let runtimeReport = export.flightDeck.layerReports.first(where: { $0.layer == .runtime })
         let dataReport = export.flightDeck.layerReports.first(where: { $0.layer == .data })
         let deliveryReport = export.flightDeck.layerReports.first(where: { $0.layer == .delivery })
+        let localModelSummary = try #require(export.flightDeck.localModelLibrarySummary)
+        let expectedLocalModelSummary = DecisionSystemLocalModelLibrarySummary.summary(
+            from: export.runtimeSnapshot.localModelLibrary
+        )
 
         #expect(export.sessionEngineSnapshot == sessionEngineSnapshot)
         #expect(export.flightDeck.sessionEngineSummary?.layerPlacement == .foldedLung)
@@ -896,20 +938,42 @@ struct DecisionTestingInterfaceTests {
         #expect(export.flightDeck.sessionEngineSummary?.mergeReadySessions == 1)
         #expect(export.flightDeck.sessionEngineSummary?.mergeableBranches == 1)
         #expect(export.flightDeck.sessionEngineSummary?.activeSession?.title == "parser repair")
-        #expect(export.flightDeck.localModelLibrarySummary?.preferredProvider == .foundationModels)
-        #expect(export.flightDeck.localModelLibrarySummary?.openModelSlotStableID != nil)
+        #expect(localModelSummary == expectedLocalModelSummary)
+        #expect(localModelSummary.preferredProvider == .foundationModels)
+        #expect(localModelSummary.openModelSlotStableID != nil)
+        #expect(localModelSummary.runtimeLayerSignals == [
+            localModelSummary.headline,
+            localModelSummary.preferredLine
+        ])
+        #expect(localModelSummary.dataLayerSignals == [
+            localModelSummary.bundledLine,
+            localModelSummary.openModelSlotLine,
+            localModelSummary.openModelRuntimeLine,
+            localModelSummary.openModelAssetLine
+        ])
+        #expect(localModelSummary.deliveryLayerSignals == [
+            localModelSummary.openModelSlotLine
+        ])
         #expect(runtimeReport?.signals.contains(where: { $0.contains("Session Engine L3.folded_lung") }) == true)
-        #expect(runtimeReport?.signals.contains(where: { $0.contains("Local model library") }) == true)
+        #expect(localModelSummary.runtimeLayerSignals.allSatisfy { signal in
+            runtimeReport?.signals.contains(signal) == true
+        })
         #expect(dataReport?.signals.contains(where: { $0.contains("Branches 3") && $0.contains("Merge-ready branches 1") }) == true)
         #expect(dataReport?.signals.contains(where: { $0.contains("parser repair") && $0.contains("Checkpoint ckpt-42") }) == true)
-        #expect(dataReport?.signals.contains(where: { $0.contains("parser repair") && $0.contains("eBrain budget: engage") && $0.contains("eBrain route: npu") }) == true)
+        #expect(dataReport?.signals.contains(where: { $0.contains("parser repair") && $0.contains("eBrain budget: engage") && $0.contains("thermal watch") && $0.contains("eBrain route: npu") }) == true)
         #expect(dataReport?.signals.contains(where: { $0.contains("parser repair") && $0.contains("eBrain risk: guarded") && $0.contains("Review update ticket: preserve parser-only correction") }) == true)
+        #expect(dataReport?.signals.contains(where: { $0.contains("parser repair") && $0.contains("eBrain pressure: latency 82/1200ms") && $0.contains("thermal nominal -> watch") }) == true)
+        #expect(dataReport?.signals.contains(where: { $0.contains("parser repair") && $0.contains("eBrain audit findings: 2") && $0.contains("force_guard_mode") }) == true)
         #expect(dataReport?.signals.contains(where: { $0.contains("Merge review 1") }) == true)
         #expect(dataReport?.signals.contains(where: { $0.contains("Merge review queue") && $0.contains("Merge-ready branches 1") }) == true)
         #expect(dataReport?.signals.contains(where: { $0.contains("Replay anchor ready") && $0.contains("Checkpoint ckpt-42") }) == true)
         #expect(dataReport?.signals.contains(where: { $0.contains("Checkpoint recovery") && $0.contains("Replay session sess-inspection") }) == true)
-        #expect(dataReport?.signals.contains(where: { $0.contains("Gemma assets") || $0.contains("No local Gemma asset") }) == true)
-        #expect(deliveryReport?.signals.contains(where: { $0.contains("Open-model slot") }) == true)
+        #expect(localModelSummary.dataLayerSignals.allSatisfy { signal in
+            dataReport?.signals.contains(signal) == true
+        })
+        #expect(localModelSummary.deliveryLayerSignals.allSatisfy { signal in
+            deliveryReport?.signals.contains(signal) == true
+        })
         #expect(export.summary.localModelPreferredProvider == .foundationModels)
         #expect(export.summary.localModelOpenModelSlotStableID != nil)
     }
@@ -1065,6 +1129,7 @@ struct DecisionTestingInterfaceTests {
                 integrityLine: "Validated schema v1 • fingerprint abcdef123456",
                 checkpointLine: "Latest checkpoint ckpt-7 • repair parser",
                 branchLine: "Head main • Layer folded_lung",
+                unfinishedStepCount: 1,
                 unfinishedStepsLine: "Open steps 1 • unfinished work will import as failed recovery facts.",
                 headline: "Importing creates a new paused recovery-safe session.",
                 branchPreviews: []

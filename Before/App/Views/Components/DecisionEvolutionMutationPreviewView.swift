@@ -6,6 +6,10 @@ struct DecisionEvolutionMutationPreviewView: View {
     let onCancel: () -> Void
 
     var body: some View {
+        let activeRole = DecisionEvolutionSectionPresentationSupport.checkpointRole(.active)
+        let previewPresentation = intent.previewPresentation
+        let reviewRole = DecisionEvolutionSectionPresentationSupport.checkpointRole(.reviewHead)
+
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 PanelCard {
@@ -33,17 +37,10 @@ struct DecisionEvolutionMutationPreviewView: View {
                                     tint: actionTint
                                 )
 
-                                if intent.isDestructive {
-                                    DecisionEvolutionSummaryBadge(
-                                        title: "DESTRUCTIVE",
-                                        tint: .red
-                                    )
-                                } else {
-                                    DecisionEvolutionSummaryBadge(
-                                        title: "GUARDED",
-                                        tint: BeforeTheme.moss
-                                    )
-                                }
+                                DecisionEvolutionSummaryBadge(
+                                    title: previewPresentation.toneBadgeTitle,
+                                    tint: intent.isDestructive ? .red : BeforeTheme.moss
+                                )
                             }
                         }
 
@@ -60,18 +57,18 @@ struct DecisionEvolutionMutationPreviewView: View {
                 if shouldShowCheckpointTransitions {
                     PanelCard {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("Control-surface impact")
+                            Text(previewPresentation.impactTitle)
                                 .font(.headline)
                                 .foregroundStyle(BeforeTheme.ink)
 
                             checkpointTransitionRow(
-                                title: "Active checkpoint",
+                                title: activeRole.title,
                                 current: intent.preview.currentActiveCheckpointID,
                                 projected: intent.preview.projectedActiveCheckpointID
                             )
 
                             checkpointTransitionRow(
-                                title: "Review head",
+                                title: reviewRole.title,
                                 current: intent.preview.currentReviewCheckpointID,
                                 projected: intent.preview.projectedReviewCheckpointID
                             )
@@ -81,7 +78,7 @@ struct DecisionEvolutionMutationPreviewView: View {
 
                 if !intent.preview.changeHighlights.isEmpty {
                     bulletSection(
-                        title: "Will change",
+                        title: previewPresentation.changeSectionTitle,
                         items: intent.preview.changeHighlights,
                         tint: actionTint
                     )
@@ -89,7 +86,7 @@ struct DecisionEvolutionMutationPreviewView: View {
 
                 if !intent.preview.retainedHighlights.isEmpty {
                     bulletSection(
-                        title: "Will remain",
+                        title: previewPresentation.retainedSectionTitle,
                         items: intent.preview.retainedHighlights,
                         tint: BeforeTheme.moss
                     )
@@ -97,14 +94,14 @@ struct DecisionEvolutionMutationPreviewView: View {
 
                 if !intent.preview.warningHighlights.isEmpty {
                     bulletSection(
-                        title: "Watch",
+                        title: previewPresentation.warningSectionTitle,
                         items: intent.preview.warningHighlights,
                         tint: intent.isDestructive ? .red : BeforeTheme.ember
                     )
                 }
 
                 HStack(spacing: 10) {
-                    BeforeActionButton("Cancel", style: .secondary) {
+                    BeforeActionButton(previewPresentation.cancelTitle, style: .secondary) {
                         onCancel()
                     }
 
@@ -138,6 +135,8 @@ struct DecisionEvolutionMutationPreviewView: View {
         current: String?,
         projected: String?
     ) -> some View {
+        let previewPresentation = intent.previewPresentation
+
         HStack(alignment: .top, spacing: 10) {
             Text(title)
                 .font(.caption.weight(.semibold))
@@ -145,11 +144,11 @@ struct DecisionEvolutionMutationPreviewView: View {
                 .frame(width: 120, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Current: \(current ?? "none")")
+                Text(previewPresentation.currentLine(current))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text("Projected: \(projected ?? "none")")
+                Text(previewPresentation.projectedLine(projected))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(current == projected ? .secondary : actionTint)
             }

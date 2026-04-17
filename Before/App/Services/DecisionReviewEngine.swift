@@ -64,6 +64,8 @@ struct DecisionReviewRecentEntryPresentation: Equatable {
     let labelSymbolName: String
     let timestamp: Date
     let footerText: String
+    let reopenTitle: String
+    let postponeTitle: String
 }
 
 struct DecisionReviewDetailRow: Identifiable, Equatable {
@@ -78,6 +80,7 @@ struct DecisionReviewDetailPresentation: Equatable {
     let title: String
     let subtitle: String
     let reopenTitle: String
+    let postponeTitle: String
     let rows: [DecisionReviewDetailRow]
 }
 
@@ -189,6 +192,7 @@ enum DecisionReviewEngine {
             title: event.currentPerspective,
             subtitle: event.afterPerspective,
             reopenTitle: "Reopen this check",
+            postponeTitle: "Move this to Tomorrow Box",
             rows: rows
         )
     }
@@ -201,6 +205,7 @@ enum DecisionReviewEngine {
             title: record.prompt,
             subtitle: record.focusSummary,
             reopenTitle: "Reopen this board",
+            postponeTitle: "Move this to Tomorrow Box",
             rows: [
                 detailRow("What you want", record.desire),
                 detailRow("What you protect", record.concern),
@@ -221,6 +226,7 @@ enum DecisionReviewEngine {
             title: record.prompt,
             subtitle: record.coreTension,
             reopenTitle: "Reopen this mirror",
+            postponeTitle: "Move this to Tomorrow Box",
             rows: [
                 detailRow("Emotion", record.emotion),
                 detailRow("Relationship", record.relationship),
@@ -291,7 +297,9 @@ enum DecisionReviewEngine {
             labelTitle: entry.mode.title,
             labelSymbolName: entry.mode.symbolName,
             timestamp: entry.timestamp,
-            footerText: entry.actionTitle
+            footerText: entry.actionTitle,
+            reopenTitle: "Reopen",
+            postponeTitle: "Tomorrow Box"
         )
     }
 

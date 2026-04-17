@@ -190,6 +190,150 @@ final class DecisionEvolutionWorkspaceSnapshotTests: XCTestCase {
         XCTAssertEqual(workspace.totalPendingReviewCount, 3)
     }
 
+    func testWorkspaceSnapshotFiltersQueueAndHistoryWithSharedEvolutionFilterContract() {
+        let active = makeSnapshot(
+            checkpointID: "active-1",
+            createdAt: Date(timeIntervalSince1970: 50),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let reviewHead = makeSnapshot(
+            checkpointID: "review-2",
+            createdAt: Date(timeIntervalSince1970: 40),
+            approvalState: .reviewSuggested,
+            hasLineage: true
+        )
+        let reviewTail = makeSnapshot(
+            checkpointID: "review-1",
+            createdAt: Date(timeIntervalSince1970: 30),
+            approvalState: .reviewSuggested,
+            hasLineage: false
+        )
+        let blockedLineage = DecisionEvolutionLineageSnapshot(
+            checkpointID: "history-blocked",
+            previousCheckpointID: nil,
+            createdAt: Date(timeIntervalSince1970: 20),
+            mode: .mirror,
+            approvalState: .automatic,
+            rollbackReady: false,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["history-blocked"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: Date(timeIntervalSince1970: 20),
+                    sessionID: "session-history-blocked",
+                    taskType: "decision",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 77,
+                    thoughtFoldChecksum: "fold-history-blocked",
+                    updateTicketSummaries: ["ticket-history-blocked"],
+                    guardrailFindings: ["audit-history-blocked"],
+                    recommendedKillSwitches: ["kill-history-blocked"]
+                )
+            )
+        )
+        let lineageOnly = DecisionEvolutionLineageSnapshot(
+            checkpointID: "history-lineage",
+            previousCheckpointID: nil,
+            createdAt: Date(timeIntervalSince1970: 10),
+            mode: .mirror,
+            approvalState: .automatic,
+            rollbackReady: false,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["history-lineage"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: Date(timeIntervalSince1970: 10),
+                    sessionID: "session-history-lineage",
+                    taskType: "decision",
+                    riskLevel: "stable",
+                    permitMode: "delay",
+                    hostGatePercent: 55,
+                    thoughtFoldChecksum: "fold-history-lineage",
+                    updateTicketSummaries: ["ticket-history-lineage"],
+                    guardrailFindings: [],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+
+        XCTAssertEqual(
+            [
+                DecisionEvolutionHistoryFilterPresentationSupport.allTitle,
+                DecisionEvolutionHistoryFilterPresentationSupport.reviewTitle,
+                DecisionEvolutionHistoryFilterPresentationSupport.rollbackReadyTitle,
+                DecisionEvolutionHistoryFilterPresentationSupport.blockedTitle,
+                DecisionEvolutionHistoryFilterPresentationSupport.lineageBackedTitle,
+            ],
+            ["All", "Review", "Rollback", "Blocked", "Lineage"]
+        )
+
+        XCTAssertEqual(
+            DecisionEvolutionHistoryFilter.allCases.map(\.title),
+            ["All", "Review", "Rollback", "Blocked", "Lineage"]
+        )
+
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: active,
+                activeCheckpointSource: .pinnedHint,
+                reviewCheckpoint: reviewHead,
+                pendingReviewQueue: [reviewHead, reviewTail],
+                latestPersistedLineage: nil
+            ),
+            historyPresentations: [
+                active.presentation,
+                reviewHead.presentation,
+                reviewTail.presentation,
+                DecisionReviewCheckpointSnapshot(lineage: blockedLineage).presentation,
+                DecisionReviewCheckpointSnapshot(lineage: lineageOnly).presentation
+            ]
+        )
+
+        XCTAssertEqual(
+            workspace.filteredEvolutionQueue(using: .all).map(\.checkpointID),
+            ["review-1"]
+        )
+        XCTAssertEqual(
+            workspace.filteredEvolutionQueue(using: .review).map(\.checkpointID),
+            ["review-1"]
+        )
+        XCTAssertEqual(
+            workspace.filteredEvolutionQueue(using: .rollbackReady).map(\.checkpointID),
+            []
+        )
+        XCTAssertEqual(
+            workspace.filteredEvolutionQueue(using: .blocked).map(\.checkpointID),
+            []
+        )
+        XCTAssertEqual(
+            workspace.filteredEvolutionQueue(using: .lineageBacked).map(\.checkpointID),
+            []
+        )
+
+        XCTAssertEqual(
+            workspace.filteredEvolutionHistory(using: .all).map(\.checkpointID),
+            ["history-blocked", "history-lineage"]
+        )
+        XCTAssertEqual(
+            workspace.filteredEvolutionHistory(using: .review).map(\.checkpointID),
+            []
+        )
+        XCTAssertEqual(
+            workspace.filteredEvolutionHistory(using: .rollbackReady).map(\.checkpointID),
+            []
+        )
+        XCTAssertEqual(
+            workspace.filteredEvolutionHistory(using: .blocked).map(\.checkpointID),
+            ["history-blocked"]
+        )
+        XCTAssertEqual(
+            workspace.filteredEvolutionHistory(using: .lineageBacked).map(\.checkpointID),
+            ["history-blocked", "history-lineage"]
+        )
+    }
+
     func testRuntimeSpotlightPrefersActiveCheckpointAndCarriesSourceDetails() throws {
         let active = makeSnapshot(
             checkpointID: "active-1",
@@ -239,6 +383,139 @@ final class DecisionEvolutionWorkspaceSnapshotTests: XCTestCase {
         )
     }
 
+    func testRuntimeStatusPresentationPrefersSpotlightOverAttention() throws {
+        let active = makeSnapshot(
+            checkpointID: "active-1",
+            createdAt: Date(timeIntervalSince1970: 40),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let review = makeSnapshot(
+            checkpointID: "review-1",
+            createdAt: Date(timeIntervalSince1970: 30),
+            approvalState: .reviewSuggested,
+            hasLineage: true
+        )
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: active,
+                activeCheckpointSource: .pinnedHint,
+                reviewCheckpoint: review,
+                pendingReviewQueue: [review],
+                latestPersistedLineage: nil
+            ),
+            releaseSummary: DecisionSystemReleaseControlSummary(
+                state: .watch,
+                headline: "Watching the pending review queue",
+                reasons: ["Queue review remains pending."],
+                activeKillSwitches: [],
+                recommendedKillSwitches: [],
+                killSwitches: [],
+                pendingReviewCount: 1,
+                rollbackReadyCount: 1,
+                canRestoreActiveCheckpoint: true,
+                canRollbackActiveCheckpoint: true,
+                activeCheckpointID: active.checkpointID,
+                activeCheckpointSource: .pinnedHint,
+                reviewCheckpointID: review.checkpointID
+            )
+        )
+        let attentionSignal = DecisionEvolutionAttentionSignal.build(workspace: workspace)
+
+        let presentation = workspace.runtimeStatusPresentation(attentionSignal: attentionSignal)
+
+        XCTAssertEqual(
+            presentation,
+            DecisionEvolutionRuntimeStatusPresentation(
+                headline: nil,
+                detail: "Active active-1 • Pinned active • Automatic • Apply ready",
+                usesAttentionAccent: false
+            )
+        )
+    }
+
+    func testRuntimeStatusPresentationFallsBackToAttentionWhenNoSpotlightIsAvailable() {
+        let review = makeSnapshot(
+            checkpointID: "review-1",
+            createdAt: Date(timeIntervalSince1970: 30),
+            approvalState: .reviewSuggested,
+            hasLineage: true
+        )
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: nil,
+                reviewCheckpoint: review,
+                pendingReviewQueue: [review],
+                latestPersistedLineage: nil
+            )
+        )
+        let attentionSignal = DecisionEvolutionAttentionSignal.build(workspace: workspace)
+
+        let presentation = workspace.runtimeStatusPresentation(attentionSignal: attentionSignal)
+
+        XCTAssertEqual(
+            presentation,
+            DecisionEvolutionRuntimeStatusPresentation(
+                headline: DecisionEvolutionReviewPathPresentationSupport.blockedKillSwitchHeadline,
+                detail: DecisionEvolutionReviewPathPresentationSupport.blockedKillSwitchDetail,
+                usesAttentionAccent: true
+            )
+        )
+    }
+
+    func testReviewHeadWithoutActiveCheckpointLineUsesSharedReviewHeadCopy() {
+        let review = makeSnapshot(
+            checkpointID: "review-1",
+            createdAt: Date(timeIntervalSince1970: 30),
+            approvalState: .reviewSuggested,
+            hasLineage: true
+        )
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: nil,
+                reviewCheckpoint: review,
+                pendingReviewQueue: [review],
+                latestPersistedLineage: nil
+            )
+        )
+
+        XCTAssertEqual(
+            workspace.reviewHeadWithoutActiveCheckpointLine,
+            "Review head review-1 is visible in the shared control surface, but no active checkpoint is attached to the main release path yet."
+        )
+    }
+
+    func testRuntimePresentationSupportFormatsSharedSpotlightAndReviewHeadCopy() {
+        XCTAssertEqual(
+            DecisionEvolutionRuntimePresentationSupport.roleTitle(isActive: true),
+            "Active"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionRuntimePresentationSupport.roleTitle(isActive: false),
+            "Review head"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionRuntimePresentationSupport.applyTitle(applyReady: true),
+            "Apply ready"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionRuntimePresentationSupport.spotlightDetail(
+                checkpointID: "active-1",
+                isActive: true,
+                approvalStateTitle: "Automatic",
+                applyReady: true,
+                activeCheckpointSource: .pinnedHint
+            ),
+            "Active active-1 • Pinned active • Automatic • Apply ready"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionRuntimePresentationSupport.reviewHeadWithoutActiveCheckpointLine(
+                checkpointID: "review-1"
+            ),
+            "Review head review-1 is visible in the shared control surface, but no active checkpoint is attached to the main release path yet."
+        )
+    }
+
     func testRecoveryPresentationPrefersRecoveredDescriptorAndSharedEmptyMessages() {
         let review = makeSnapshot(
             checkpointID: "review-1",
@@ -271,7 +548,29 @@ final class DecisionEvolutionWorkspaceSnapshotTests: XCTestCase {
         XCTAssertEqual(livePresentation.availabilityText, "Rollback ready")
         XCTAssertEqual(
             livePresentation.emptyMessage,
-            "Evolution checkpoints will surface here after the current brain is loaded."
+            "Evolution checkpoints appear after the current brain is loaded."
+        )
+    }
+
+    func testRecoveryPresentationWithoutCheckpointsUsesPendingSharedCopy() {
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: nil,
+                reviewCheckpoint: nil,
+                pendingReviewQueue: [],
+                latestPersistedLineage: nil
+            )
+        )
+
+        let presentation = workspace.recoveryPresentation(hasCurrentBrainState: false)
+        XCTAssertNil(presentation.sourceDescriptor)
+        XCTAssertEqual(
+            presentation.availabilityText,
+            "Evolution checkpoints appear after the current brain is loaded."
+        )
+        XCTAssertEqual(
+            presentation.emptyMessage,
+            "Evolution checkpoints appear after the current brain is loaded."
         )
     }
 

@@ -3,6 +3,20 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+private enum SettingsPresentedSheet: Identifiable {
+    case gemmaDownload
+    case openModelDownload
+
+    var id: String {
+        switch self {
+        case .gemmaDownload:
+            "gemma-download"
+        case .openModelDownload:
+            "open-model-download"
+        }
+    }
+}
+
 struct SettingsView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @Environment(\.openURL) private var openURL
@@ -221,12 +235,13 @@ struct SettingsView: View {
                 }
 
                 Section("Evolution control") {
+                    let settingsPresentation = DecisionEvolutionSurfaceStatusPresentationSupport.settingsReadFirstPresentation()
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(alignment: .top, spacing: 10) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Read-first evolution control")
+                                Text(settingsPresentation.title)
                                     .font(.headline)
-                                Text("Settings mirrors the shared evolution workspace, but routes any mutation work to the control center.")
+                                Text(settingsPresentation.detail)
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
                             }
@@ -237,7 +252,7 @@ struct SettingsView: View {
                                 ProgressView()
                                     .controlSize(.small)
                             } else {
-                                Button("Refresh") {
+                                Button(settingsPresentation.refreshTitle) {
                                     Task {
                                         await refreshEvolutionStatus()
                                     }
@@ -246,10 +261,10 @@ struct SettingsView: View {
                         }
 
                         DecisionEvolutionNavigationActionRow(
-                            navigationOptions: checkpointNavigationOptions,
-                            routesMutationsToControlCenter: evolutionSurfaceContract.routesMutationsToControlCenter,
-                            controlCenterStyle: .primary,
-                            adjacentShortcutStyle: .secondary
+                            presentation: DecisionEvolutionNavigationRowPresentationSupport.settingsReadFirst(
+                                surfaceContract: evolutionSurfaceContract,
+                                navigationOptions: checkpointNavigationOptions
+                            )
                         )
                     }
                     .padding(.vertical, 4)
@@ -272,7 +287,9 @@ struct SettingsView: View {
                     DecisionEvolutionControlSurfaceSummaryView(
                         controlSurface: evolutionSurfaceState.controlSurface,
                         surfaceContract: evolutionSurfaceContract,
-                        emptyMessage: "No persisted checkpoint lineage is attached yet. Once review traffic appears, Settings will mirror the shared evolution workspace here.",
+                        emptyMessage: DecisionEvolutionSurfaceStatusPresentationSupport.summaryEmptyMessage(
+                            for: .settings
+                        ) ?? DecisionEvolutionCheckpointDetailPresentationSupport.emptyLineageMessage,
                         navigationOptions: checkpointNavigationOptions
                     )
                 }
@@ -489,104 +506,162 @@ struct SettingsView: View {
             } message: {
                 Text(openModelImportIssue ?? "Before couldn't finish the open-model import.")
             }
-            .sheet(isPresented: $isShowingGemmaDownloadSheet) {
-                NavigationStack {
-                    Form {
-                        Section("Remote Gemma file") {
-                            TextField(
-                                "https://example.com/gemma-4-E4B-it.litertlm",
-                                text: $gemmaDownloadURLString
-                            )
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .keyboardType(.URL)
+            .sheet(item: presentedSheet) { sheet in
+                sheetContent(for: sheet)
+            }
+        }
+    }
 
-                            Text("Paste a direct `http` or `https` link to a `.litertlm` file. Before will download it into the local Gemma library and pin it as the preferred Gemma asset.")
+    private var presentedSheet: Binding<SettingsPresentedSheet?> {
+        Binding(
+            get: {
+                if isShowingGemmaDownloadSheet {
+                    return .gemmaDownload
+                }
+                if isShowingOpenModelDownloadSheet {
+                    return .openModelDownload
+                }
+                return nil
+            },
+            set: { newValue in
+                guard newValue == nil, let presentedSheet = currentPresentedSheet else {
+                    return
+                }
+                clear(presentedSheet)
+            }
+        )
+    }
+
+    private var currentPresentedSheet: SettingsPresentedSheet? {
+        if isShowingGemmaDownloadSheet {
+            return .gemmaDownload
+        }
+        if isShowingOpenModelDownloadSheet {
+            return .openModelDownload
+        }
+        return nil
+    }
+
+    @ViewBuilder
+    private func sheetContent(
+        for sheet: SettingsPresentedSheet
+    ) -> some View {
+        switch sheet {
+        case .gemmaDownload:
+            gemmaDownloadSheet
+        case .openModelDownload:
+            openModelDownloadSheet
+        }
+    }
+
+    private func clear(
+        _ sheet: SettingsPresentedSheet
+    ) {
+        switch sheet {
+        case .gemmaDownload:
+            isShowingGemmaDownloadSheet = false
+        case .openModelDownload:
+            isShowingOpenModelDownloadSheet = false
+        }
+    }
+
+    private var gemmaDownloadSheet: some View {
+        NavigationStack {
+            Form {
+                Section("Remote Gemma file") {
+                    TextField(
+                        "https://example.com/gemma-4-E4B-it.litertlm",
+                        text: $gemmaDownloadURLString
+                    )
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+
+                    Text("Paste a direct `http` or `https` link to a `.litertlm` file. Before will download it into the local Gemma library and pin it as the preferred Gemma asset.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                if appModel.isDownloadingGemmaModel {
+                    Section("Download") {
+                        HStack(spacing: 12) {
+                            ProgressView()
+                            Text("Downloading and importing the Gemma model…")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
-                        }
-
-                        if appModel.isDownloadingGemmaModel {
-                            Section("Download") {
-                                HStack(spacing: 12) {
-                                    ProgressView()
-                                    Text("Downloading and importing the Gemma model…")
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-                    .navigationTitle("Download Gemma")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Cancel") {
-                                isShowingGemmaDownloadSheet = false
-                            }
-                            .disabled(appModel.isDownloadingGemmaModel)
-                        }
-
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Download") {
-                                startGemmaDownload()
-                            }
-                            .disabled(
-                                appModel.isDownloadingGemmaModel
-                                    || gemmaDownloadURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            )
                         }
                     }
                 }
             }
-            .sheet(isPresented: $isShowingOpenModelDownloadSheet) {
-                NavigationStack {
-                    Form {
-                        Section("Remote open-model file") {
-                            TextField(
-                                "https://example.com/model.gguf",
-                                text: $openModelDownloadURLString
-                            )
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .keyboardType(.URL)
+            .navigationTitle("Download Gemma")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        isShowingGemmaDownloadSheet = false
+                    }
+                    .disabled(appModel.isDownloadingGemmaModel)
+                }
 
-                            Text("Paste a direct `http` or `https` link to a supported local model file such as `.gguf`, `.onnx`, `.safetensors`, `.bin`, or `.litertlm`. Before will download it into the open-model slot and register it as the current preview adapter.")
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Download") {
+                        startGemmaDownload()
+                    }
+                    .disabled(
+                        appModel.isDownloadingGemmaModel
+                            || gemmaDownloadURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
+                }
+            }
+        }
+    }
+
+    private var openModelDownloadSheet: some View {
+        NavigationStack {
+            Form {
+                Section("Remote open-model file") {
+                    TextField(
+                        "https://example.com/model.gguf",
+                        text: $openModelDownloadURLString
+                    )
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+
+                    Text("Paste a direct `http` or `https` link to a supported local model file such as `.gguf`, `.onnx`, `.safetensors`, `.bin`, or `.litertlm`. Before will download it into the open-model slot and register it as the current preview adapter.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                if appModel.isDownloadingOpenModel {
+                    Section("Download") {
+                        HStack(spacing: 12) {
+                            ProgressView()
+                            Text("Downloading and importing the open-model asset…")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
-
-                        if appModel.isDownloadingOpenModel {
-                            Section("Download") {
-                                HStack(spacing: 12) {
-                                    ProgressView()
-                                    Text("Downloading and importing the open-model asset…")
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
                     }
-                    .navigationTitle("Download Open Model")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Cancel") {
-                                isShowingOpenModelDownloadSheet = false
-                            }
-                            .disabled(appModel.isDownloadingOpenModel)
-                        }
-
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Download") {
-                                startOpenModelDownload()
-                            }
-                            .disabled(
-                                appModel.isDownloadingOpenModel
-                                    || openModelDownloadURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            )
-                        }
+                }
+            }
+            .navigationTitle("Download Open Model")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        isShowingOpenModelDownloadSheet = false
                     }
+                    .disabled(appModel.isDownloadingOpenModel)
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Download") {
+                        startOpenModelDownload()
+                    }
+                    .disabled(
+                        appModel.isDownloadingOpenModel
+                            || openModelDownloadURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
                 }
             }
         }

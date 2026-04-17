@@ -2,6 +2,8 @@ import SwiftUI
 
 struct DecisionEvolutionReleaseSummaryPresentation: Equatable, Sendable {
     let state: DecisionSystemReleaseState
+    let stateTone: DecisionEvolutionSummaryBadgeTone
+    let badgePresentations: [DecisionEvolutionSummaryBadgePresentation]
     let pendingReviewCount: Int
     let rollbackReadyCount: Int
     let headline: String
@@ -19,29 +21,10 @@ struct DecisionEvolutionReleaseSummaryPresentation: Equatable, Sendable {
         controlSurface: DecisionEvolutionControlSurface,
         presentationMode: DecisionEvolutionReleaseSummaryPresentationMode
     ) -> DecisionEvolutionReleaseSummaryPresentation {
-        DecisionEvolutionReleaseSummaryPresentation(
-            state: releaseSummary.state,
-            pendingReviewCount: releaseSummary.pendingReviewCount,
-            rollbackReadyCount: releaseSummary.rollbackReadyCount,
-            headline: releaseSummary.headline,
-            primaryReason: releaseSummary.reasons.first,
-            activeCheckpointHeadline: controlSurface.activePresentation.map { activePresentation in
-                "Active: \(activePresentation.checkpointID) • \(activePresentation.approvalStateTitle) • \(activePresentation.summaryText)"
-            },
-            reviewCheckpointHeadline: controlSurface.spotlightReviewPresentation.map { reviewPresentation in
-                "Review head: \(reviewPresentation.checkpointID) • \(reviewPresentation.approvalStateTitle) • \(reviewPresentation.summaryText)"
-            },
-            activeSourceText: releaseSummary.activeCheckpointID != nil && releaseSummary.activeCheckpointSource != .none
-                ? "Active source: \(releaseSummary.activeCheckpointSource.title)"
-                : nil,
-            activeKillSwitchesText: releaseSummary.activeKillSwitches.isEmpty
-                ? nil
-                : "Active kill switches: \(releaseSummary.activeKillSwitches.joined(separator: " • "))",
-            recommendedKillSwitchesText: releaseSummary.recommendedKillSwitches.isEmpty
-                ? nil
-                : "Recommended kill switches: \(releaseSummary.recommendedKillSwitches.joined(separator: " • "))",
-            operatorHeadline: presentationMode.operatorHeadline,
-            operatorDetail: presentationMode.operatorDetail
+        DecisionEvolutionReleaseSummaryPresentationSupport.build(
+            releaseSummary: releaseSummary,
+            controlSurface: controlSurface,
+            presentationMode: presentationMode
         )
     }
 }
@@ -57,24 +40,6 @@ enum DecisionEvolutionReleaseSummaryPresentationMode: Equatable, Sendable {
             true
         case .compact, .mutationHub:
             false
-        }
-    }
-
-    var operatorHeadline: String? {
-        switch self {
-        case .mutationHub:
-            "Mutation hub"
-        case .surface, .compact:
-            nil
-        }
-    }
-
-    var operatorDetail: String? {
-        switch self {
-        case .mutationHub:
-            "Release readiness is summarized once here. Apply, approve, rollback, and lineage-clearing actions live in the mutation workspace below."
-        case .surface, .compact:
-            nil
         }
     }
 }
@@ -112,10 +77,6 @@ struct DecisionEvolutionReleaseSummaryView: View {
         self.afterMutation = afterMutation
     }
 
-    private var interactionMode: DecisionEvolutionControlInteractionMode {
-        surfaceContract.interactionMode
-    }
-
     private var presentation: DecisionEvolutionReleaseSummaryPresentation {
         DecisionEvolutionReleaseSummaryPresentation.build(
             releaseSummary: releaseSummary,
@@ -124,26 +85,25 @@ struct DecisionEvolutionReleaseSummaryView: View {
         )
     }
 
+    private var actionPresentation: DecisionEvolutionReleaseSummaryActionPresentation {
+        DecisionEvolutionReleaseSummaryActionSupport.build(
+            controlSurface: controlSurface,
+            surfaceContract: surfaceContract,
+            navigationOptions: navigationOptions
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                DecisionEvolutionSummaryBadge(
-                    title: presentation.state.title.uppercased(),
-                    tint: releaseTint(presentation.state)
-                )
-                DecisionEvolutionSummaryBadge(
-                    title: "\(presentation.pendingReviewCount) PENDING",
-                    tint: presentation.pendingReviewCount > 0 ? .orange : .secondary
-                )
-                DecisionEvolutionSummaryBadge(
-                    title: "\(presentation.rollbackReadyCount) ROLLBACK READY",
-                    tint: presentation.rollbackReadyCount > 0 ? BeforeTheme.moss : .secondary
-                )
+                ForEach(Array(presentation.badgePresentations.enumerated()), id: \.offset) { _, badge in
+                    DecisionEvolutionSummaryBadge(presentation: badge)
+                }
             }
 
             Text(presentation.headline)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(releaseTint(presentation.state))
+                .foregroundStyle(releaseTint(presentation.stateTone))
 
             if let reason = presentation.primaryReason {
                 Text(reason)
@@ -177,7 +137,7 @@ struct DecisionEvolutionReleaseSummaryView: View {
             if let activeKillSwitchesText = presentation.activeKillSwitchesText {
                 Text(activeKillSwitchesText)
                     .font(.caption2)
-                    .foregroundStyle(releaseTint(presentation.state))
+                    .foregroundStyle(releaseTint(presentation.stateTone))
                     .lineLimit(3)
             }
 
@@ -200,11 +160,11 @@ struct DecisionEvolutionReleaseSummaryView: View {
                 }
             }
 
-            if showsAnyActionRow {
+            if actionPresentation.showsAnyActionRow {
                 Divider()
                     .padding(.top, 2)
 
-                if allowsLocalMutationActions {
+                if actionPresentation.allowsLocalMutationActions {
                     mutationActionRow
                 } else {
                     observeActionRow
@@ -225,61 +185,35 @@ struct DecisionEvolutionReleaseSummaryView: View {
         }
     }
 
-    private func releaseTint(_ state: DecisionSystemReleaseState) -> Color {
-        switch state {
-        case .ready:
+    private func releaseTint(_ tone: DecisionEvolutionSummaryBadgeTone) -> Color {
+        switch tone {
+        case .moss:
             BeforeTheme.moss
-        case .watch:
+        case .ember:
             BeforeTheme.ember
-        case .blocked:
+        case .red:
             .red
+        case .secondary:
+            .secondary
+        case .blue:
+            .blue
+        case .orange:
+            .orange
         }
-    }
-
-    private var rollbackIntent: DecisionEvolutionMutationIntent? {
-        DecisionEvolutionMutationIntentFactory.rollbackActiveCheckpoint(
-            controlSurface: controlSurface
-        )
-    }
-
-    private var routesMutationsToControlCenter: Bool {
-        surfaceContract.routesMutationsToControlCenter
-    }
-
-    private var allowsLocalMutationActions: Bool {
-        !routesMutationsToControlCenter
-    }
-
-    private var approveQueueIntent: DecisionEvolutionMutationIntent? {
-        DecisionEvolutionMutationIntentFactory.approvePendingCheckpoints(
-            controlSurface: controlSurface
-        )
-    }
-
-    private var clearReviewLineageIntent: DecisionEvolutionMutationIntent? {
-        DecisionEvolutionMutationIntentFactory.clearPendingReviewLineage(
-            controlSurface: controlSurface
-        )
-    }
-
-    private var showsAnyActionRow: Bool {
-        if allowsLocalMutationActions {
-            return rollbackIntent != nil || approveQueueIntent != nil || clearReviewLineageIntent != nil
-        }
-
-        return navigationOptions.showsAnyShortcut
     }
 
     @ViewBuilder
     private var mutationActionRow: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Quick actions")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(BeforeTheme.ember)
+            if let quickActionsTitle = actionPresentation.quickActionsTitle {
+                Text(quickActionsTitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(BeforeTheme.ember)
+            }
 
             HStack(spacing: 10) {
-                if let rollbackIntent {
-                    BeforeActionButton("Rollback active", style: .secondary) {
+                if let rollbackIntent = actionPresentation.rollbackIntent {
+                    BeforeActionButton(actionPresentation.rollbackTitle, style: .secondary) {
                         pendingMutation = PendingMutation(intent: rollbackIntent) {
                             appModel.rollbackActiveEvolutionCheckpoint(
                                 to: rollbackIntent.preview.targetCheckpointIDs.first
@@ -289,8 +223,8 @@ struct DecisionEvolutionReleaseSummaryView: View {
                     }
                 }
 
-                if let approveQueueIntent {
-                    BeforeActionButton("Approve queue", style: .primary) {
+                if let approveQueueIntent = actionPresentation.approveQueueIntent {
+                    BeforeActionButton(actionPresentation.approveQueueTitle, style: .primary) {
                         pendingMutation = PendingMutation(intent: approveQueueIntent) {
                             appModel.approvePendingEvolutionCheckpoints(
                                 checkpointIDs: approveQueueIntent.preview.targetCheckpointIDs
@@ -301,9 +235,9 @@ struct DecisionEvolutionReleaseSummaryView: View {
                 }
             }
 
-            if let clearReviewLineageIntent {
+            if let clearReviewLineageIntent = actionPresentation.clearReviewLineageIntent {
                 HStack(spacing: 10) {
-                    BeforeActionButton("Clear review lineage", style: .tertiary) {
+                    BeforeActionButton(actionPresentation.clearReviewLineageTitle, style: .tertiary) {
                         pendingMutation = PendingMutation(intent: clearReviewLineageIntent) {
                             appModel.clearPendingEvolutionCheckpointLineages(
                                 checkpointIDs: clearReviewLineageIntent.preview.targetCheckpointIDs
@@ -319,12 +253,10 @@ struct DecisionEvolutionReleaseSummaryView: View {
     @ViewBuilder
     private var observeActionRow: some View {
         DecisionEvolutionOperatorActionFooterView(
-            interactionMode: interactionMode,
-            navigationOptions: navigationOptions,
-            routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter,
-            showsDetail: false,
-            controlCenterStyle: .primary,
-            adjacentShortcutStyle: .secondary
+            presentation: DecisionEvolutionOperatorFooterPresentationSupport.releaseSummary(
+                surfaceContract: surfaceContract,
+                navigationOptions: navigationOptions
+            )
         )
     }
 }

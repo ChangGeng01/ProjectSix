@@ -45,6 +45,32 @@ struct HomeView: View {
         evolutionSurfaceContract.checkpointNavigationOptions
     }
 
+    private var runtimeRecoveryNavigationPresentation: DecisionEvolutionNavigationRowPresentation {
+        DecisionEvolutionNavigationRowPresentationSupport.readFirstSurface(
+            surfaceContract: evolutionSurfaceContract,
+            navigationOptions: evolutionSurfaceContract.navigationSurfaceOptions(
+                showHistoryShortcut: true,
+                showPortraitShortcut: true
+            )
+        )
+    }
+
+    private var runtimeDetachedNavigationPresentation: DecisionEvolutionNavigationRowPresentation {
+        DecisionEvolutionNavigationRowPresentationSupport.readFirstSurface(
+            surfaceContract: evolutionSurfaceContract,
+            navigationOptions: evolutionSurfaceContract.navigationSurfaceOptions(
+                showPortraitShortcut: true
+            )
+        )
+    }
+
+    private var queueNavigationPresentation: DecisionEvolutionNavigationRowPresentation {
+        DecisionEvolutionNavigationRowPresentationSupport.readFirstSurface(
+            surfaceContract: evolutionSurfaceContract,
+            navigationOptions: evolutionSurfaceContract.navigationSurfaceOptions()
+        )
+    }
+
     private var shouldAutoRefreshSystemFlightDeck: Bool {
         !DecisionTestingInterface.runtimeTestingContextDetected()
     }
@@ -127,6 +153,7 @@ struct HomeView: View {
 
                                 if let deck = systemFlightDeck,
                                    let summary = deck.eBrainSummary {
+                                    let presentation = summary.presentation
                                     VStack(alignment: .leading, spacing: 8) {
                                         Text("\(summary.runMode.uppercased()) • \(summary.riskLevel.uppercased()) → \(summary.permitMode.uppercased())")
                                             .font(.caption.weight(.semibold))
@@ -142,21 +169,30 @@ struct HomeView: View {
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
 
-                                        if let runtimeSpotlight = currentEvolutionWorkspace.runtimeSpotlight(
-                                            releaseSummary: deck.releaseControlSummary
-                                        ) {
-                                            Text(
-                                                runtimeSpotlight.detailText
-                                            )
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(2)
-                                        } else if currentEvolutionAttentionSignal.requiresAttention {
-                                            Text(currentEvolutionAttentionSignal.headline)
-                                                .font(.caption2.weight(.semibold))
-                                                .foregroundStyle(BeforeTheme.ember)
+                                        if let pressureLine = presentation.pressureLine {
+                                            Text(pressureLine)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
 
-                                            if let detail = currentEvolutionAttentionSignal.detail {
+                                        if let runtimeStatusPresentation = currentEvolutionWorkspace.runtimeStatusPresentation(
+                                            attentionSignal: currentEvolutionAttentionSignal
+                                        ) {
+                                            if let headline = runtimeStatusPresentation.headline {
+                                                Text(headline)
+                                                    .font(
+                                                        runtimeStatusPresentation.usesAttentionAccent
+                                                        ? .caption2.weight(.semibold)
+                                                        : .caption2
+                                                    )
+                                                    .foregroundStyle(
+                                                        runtimeStatusPresentation.usesAttentionAccent
+                                                        ? BeforeTheme.ember
+                                                        : .secondary
+                                                    )
+                                            }
+
+                                            if let detail = runtimeStatusPresentation.detail {
                                                 Text(detail)
                                                     .font(.caption2)
                                                     .foregroundStyle(.secondary)
@@ -164,8 +200,8 @@ struct HomeView: View {
                                             }
                                         }
 
-                                        if let localModelLibrary = deck.localModelLibrarySummary {
-                                            Text(localModelLibrary.headline)
+                                        if let localModelOverviewLine = deck.localModelLibrarySummary?.overviewLine {
+                                            Text(localModelOverviewLine)
                                                 .font(.caption2)
                                                 .foregroundStyle(.secondary)
                                                 .lineLimit(2)
@@ -208,9 +244,11 @@ struct HomeView: View {
                                             }
                                         )
                                     } else if let reviewCheckpoint = currentEvolutionWorkspace.reviewPresentation {
-                                        Text("Review head \(reviewCheckpoint.checkpointID) is visible in the shared control surface, but no active checkpoint is attached to the main release path yet.")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
+                                        if let reviewHeadLine = currentEvolutionWorkspace.reviewHeadWithoutActiveCheckpointLine {
+                                            Text(reviewHeadLine)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
                                         DecisionEvolutionCheckpointActionBar(
                                             checkpointID: reviewCheckpoint.checkpointID,
                                             checkpointPresentation: reviewCheckpoint,
@@ -228,17 +266,9 @@ struct HomeView: View {
                                         )
                                     } else {
                                         HStack(spacing: 10) {
-                                            BeforeActionButton("Open control center", style: .primary) {
-                                                appModel.presentEvolutionControlCenter()
-                                            }
-
-                                            BeforeActionButton("Open History", style: .secondary) {
-                                                appModel.selectedTab = .history
-                                            }
-
-                                            BeforeActionButton("Open Portrait", style: .secondary) {
-                                                appModel.selectedTab = .portrait
-                                            }
+                                            DecisionEvolutionNavigationActionRow(
+                                                presentation: runtimeRecoveryNavigationPresentation
+                                            )
 
                                             BeforeActionButton("Refresh runtime", style: .secondary) {
                                                 Task {
@@ -253,13 +283,9 @@ struct HomeView: View {
                                         .foregroundStyle(.secondary)
 
                                     HStack(spacing: 10) {
-                                        BeforeActionButton("Open control center", style: .primary) {
-                                            appModel.presentEvolutionControlCenter()
-                                        }
-
-                                        BeforeActionButton("Open Portrait", style: .secondary) {
-                                            appModel.selectedTab = .portrait
-                                        }
+                                        DecisionEvolutionNavigationActionRow(
+                                            presentation: runtimeDetachedNavigationPresentation
+                                        )
 
                                         BeforeActionButton("Refresh runtime", style: .secondary) {
                                             Task {
@@ -296,21 +322,21 @@ struct HomeView: View {
                             )
                         }
 
-                        if currentEvolutionWorkspace.totalPendingReviewCount > 0 {
+                        if let homeQueuePresentation {
                             PanelCard {
                                 VStack(alignment: .leading, spacing: 14) {
                                     HStack(alignment: .firstTextBaseline) {
                                         VStack(alignment: .leading, spacing: 4) {
-                                            Text("Evolution review queue")
-                                            .font(.headline)
-                                            Text("Home keeps the review head in spotlight, while the remaining queue stays visible here and mutations stay centralized in Evolution Control.")
+                                            Text(homeQueuePresentation.title)
+                                                .font(.headline)
+                                            Text(homeQueuePresentation.detail)
                                                 .font(.subheadline)
                                                 .foregroundStyle(.secondary)
                                         }
 
                                         Spacer()
 
-                                        Text("\(homePendingQueueCount) queued")
+                                        Text(homeQueuePresentation.queuedBadgeTitle)
                                             .font(.caption.weight(.bold))
                                             .foregroundStyle(.orange)
                                             .padding(.horizontal, 10)
@@ -321,8 +347,8 @@ struct HomeView: View {
                                             )
                                     }
 
-                                    if homeReviewHeadCount > 0 {
-                                        Text("Total pending \(currentEvolutionWorkspace.totalPendingReviewCount) • review head \(homeReviewHeadCount) • queue tail \(homePendingQueueCount)")
+                                    if let countsLine = homeQueuePresentation.countsLine {
+                                        Text(countsLine)
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
                                     }
@@ -341,9 +367,9 @@ struct HomeView: View {
                                         )
                                     }
 
-                                    BeforeActionButton("Open control center", style: .primary) {
-                                        appModel.presentEvolutionControlCenter()
-                                    }
+                                    DecisionEvolutionNavigationActionRow(
+                                        presentation: queueNavigationPresentation
+                                    )
                                 }
                             }
                         }
@@ -570,12 +596,15 @@ struct HomeView: View {
         appModel.supportInbox.activeRequests.count
     }
 
-    private var homePendingQueueCount: Int {
-        currentEvolutionWorkspace.queuedPendingReviewCount
-    }
-
-    private var homeReviewHeadCount: Int {
-        currentEvolutionWorkspace.spotlightedPendingReviewCount
+    private var homeQueuePresentation: DecisionEvolutionHomeQueuePresentation? {
+        guard currentEvolutionWorkspace.totalPendingReviewCount > 0 else {
+            return nil
+        }
+        return DecisionEvolutionHomeQueuePresentationSupport.build(
+            totalPendingReviewCount: currentEvolutionWorkspace.totalPendingReviewCount,
+            spotlightedPendingReviewCount: currentEvolutionWorkspace.spotlightedPendingReviewCount,
+            queuedPendingReviewCount: currentEvolutionWorkspace.queuedPendingReviewCount
+        )
     }
 
     private var homePendingReviewPresentations: [DecisionEvolutionCheckpointPresentation] {

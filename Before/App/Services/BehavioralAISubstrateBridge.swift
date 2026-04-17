@@ -884,21 +884,29 @@ enum BehavioralAISubstrateBridge {
         )
 
         if let resolvedTurn {
-            return BASEBrainConsoleSupport.mergedSnapshot(baseSnapshot, with: resolvedTurn)
+            var mergedSnapshot = BASEBrainConsoleSupport.mergedSnapshot(baseSnapshot, with: resolvedTurn)
+            if let pressureLine = synchronizedExport.effectiveEBrainFactsBundle?.pressureLine {
+                mergedSnapshot.runtimeSummary = appendConsoleSummary(
+                    base: mergedSnapshot.runtimeSummary,
+                    addition: pressureLine
+                )
+            }
+            return mergedSnapshot
         }
 
         guard let checkpointLineage, let recoveredInspection else {
             return baseSnapshot
         }
 
+        let checkpointFacts = checkpointLineage.factsBundle
         var recoveredSnapshot = baseSnapshot
         recoveredSnapshot.runtimeSummary = appendConsoleSummary(
             base: baseSnapshot.runtimeSummary,
-            addition: checkpointRuntimeSummary(from: checkpointLineage)
+            additions: checkpointFacts.consoleRuntimeSummaryAdditions
         )
         recoveredSnapshot.brainSummary = appendConsoleSummary(
             base: baseSnapshot.brainSummary,
-            addition: checkpointBrainSummary(from: checkpointLineage)
+            addition: checkpointFacts.consoleBrainSummaryAddition
         )
         recoveredSnapshot.blockerSummary = orderedUnique(
             recoveredSnapshot.blockerSummary
@@ -936,9 +944,9 @@ enum BehavioralAISubstrateBridge {
             .map(trimmed)
             .filter { !$0.isEmpty }
         let prompt = fragments.first ?? currentBrainState.dominantGoal ?? currentBrainState.mode.title
-        let detail = Array(fragments.dropFirst())
+        let detailFragments = Array(fragments.dropFirst())
             .filter { !$0.isEmpty }
-            .joined(separator: " • ")
+        let detail = DecisionEvolutionNarrativeFormattingSupport.joined(detailFragments)
             .nilIfEmpty
 
         let request = BASHostSessionRequest(
@@ -1860,7 +1868,10 @@ enum BehavioralAISubstrateBridge {
         return BASInspectionBundle(
             generatedAt: generatedAt,
             trace: BASExecutionTrace(
-                inputSummary: "Recovered \(lineage.mode.shortTitle.lowercased()) checkpoint \(lineage.checkpointID)",
+                inputSummary: DecisionEvolutionEBrainPresentationSupport.recoveredCheckpointInputSummary(
+                    modeTitle: lineage.mode.shortTitle,
+                    checkpointID: lineage.checkpointID
+                ),
                 selectedRoute: BASModelRoute.local("persisted.checkpoint.\(lineage.mode.rawValue)"),
                 memoriesRecalled: Array(lineage.diffSummary.prefix(3)),
                 toolsCalled: [],
@@ -1871,20 +1882,30 @@ enum BehavioralAISubstrateBridge {
                     toolMs: 0
                 ),
                 auditEvents: auditEvents,
-                outputSummary: "\(lineage.eBrain.riskLevel) → \(lineage.eBrain.permitMode) • host gate \(lineage.eBrain.hostGatePercent)%"
+                outputSummary: DecisionEvolutionEBrainPresentationSupport.riskPermitHostLine(
+                    riskLevel: lineage.eBrain.riskLevel,
+                    permitMode: lineage.eBrain.permitMode,
+                    hostGatePercent: lineage.eBrain.hostGatePercent
+                )
             ),
             replayFingerprint: BASReplayFingerprint(
                 value: "\(lineage.checkpointID):\(lineage.eBrain.thoughtFoldChecksum)"
             ),
             releaseDecision: BASReleaseDecision(
                 kind: releaseKind,
-                reason: "Recovered from \(lineage.mode.shortTitle) checkpoint • \(lineage.approvalState.rawValue)."
+                reason: DecisionEvolutionEBrainPresentationSupport.recoveredCheckpointReason(
+                    modeTitle: lineage.mode.shortTitle,
+                    approvalStateRawValue: lineage.approvalState.rawValue
+                )
             ),
             anomalySignals: anomalySignals,
             calibration: BASInspectionCalibrationSummary(
                 score: checkpointCalibrationScore(for: lineage),
                 status: lineage.rollbackReady ? "recovered" : "watch",
-                summary: "Checkpoint recovery for \(lineage.eBrain.riskLevel) risk via \(lineage.eBrain.permitMode).",
+                summary: DecisionEvolutionEBrainPresentationSupport.checkpointCalibrationSummary(
+                    riskLevel: lineage.eBrain.riskLevel,
+                    permitMode: lineage.eBrain.permitMode
+                ),
                 alertCount: anomalySignals.count,
                 alertReasons: orderedUnique(lineage.diffSummary + lineage.eBrain.killSwitches)
             )
@@ -1921,22 +1942,6 @@ enum BehavioralAISubstrateBridge {
         return guardrailSignals + diffSignals + killSwitchSignals
     }
 
-    private static func checkpointRuntimeSummary(
-        from lineage: DecisionEvolutionLineageSnapshot
-    ) -> String {
-        lineage.eBrain
-            .factsBundle(modeTitle: lineage.mode.shortTitle)
-            .runtimeSummaryLine
-    }
-
-    private static func checkpointBrainSummary(
-        from lineage: DecisionEvolutionLineageSnapshot
-    ) -> String {
-        lineage.eBrain
-            .factsBundle(modeTitle: lineage.mode.shortTitle)
-            .brainSummaryLine
-    }
-
     private static func checkpointCalibrationScore(
         for lineage: DecisionEvolutionLineageSnapshot
     ) -> Double {
@@ -1971,6 +1976,15 @@ enum BehavioralAISubstrateBridge {
             return addition
         }
         return "\(base) • \(addition)"
+    }
+
+    private static func appendConsoleSummary(
+        base: String?,
+        additions: [String]
+    ) -> String? {
+        additions.reduce(base) { partial, addition in
+            appendConsoleSummary(base: partial, addition: addition)
+        }
     }
 
     private static func predictiveInterventionSummary(

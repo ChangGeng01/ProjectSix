@@ -18,7 +18,6 @@ struct ReviewProfileView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @Environment(\.dismiss) private var dismiss
     @State private var selectedDetail: HistoryDetailSelection?
-    @State private var replayPresentationsByID: [String: DecisionEvolutionReplayEntryPresentation] = [:]
 
     let profile: ReviewProfile
     let recentEntries: [ReviewProfileEntry]
@@ -68,17 +67,18 @@ struct ReviewProfileView: View {
                             }
                         }
 
-                        if !recentEntries.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Recent decisions")
-                                    .font(.headline)
-                                    .foregroundStyle(BeforeTheme.ink)
-
-                                ForEach(recentEntries) { entry in
-                                    recentEntryCard(for: entry)
-                                }
+                        DecisionReviewRecentEntriesSectionView(
+                            entries: recentEntries,
+                            selectAction: { entry in
+                                selectedDetail = detailSelection(for: entry)
+                            },
+                            reopenAction: { entry in
+                                reopen(entry)
+                            },
+                            postponeAction: { entry in
+                                moveToTomorrow(entry)
                             }
-                        }
+                        )
                     }
                     .padding(20)
                 }
@@ -88,61 +88,10 @@ struct ReviewProfileView: View {
                 HistoryDetailView(selection: selection)
                     .environmentObject(appModel)
             }
-            .task(id: replayReloadKey) {
-                await loadReplayEntries()
-            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close") { dismiss() }
                 }
-            }
-        }
-    }
-
-    private var replayReloadKey: String {
-        "\(recentEntries.map(\.id).joined(separator: "|"))-\(appModel.evolutionControlMutationEpoch)"
-    }
-
-    private func recentEntryCard(for entry: ReviewProfileEntry) -> some View {
-        let summary = DecisionReviewEngine.recentEntryPresentation(for: entry)
-        return PanelCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Button {
-                    selectedDetail = detailSelection(for: entry)
-                } label: {
-                    DecisionReplayEntrySummaryView(
-                        title: summary.title,
-                        secondaryLine: summary.secondaryLine,
-                        presentation: replayPresentationsByID[entry.id]
-                    ) {
-                        DecisionReplayEntryHeaderRowView(
-                            labelTitle: summary.labelTitle,
-                            labelSymbolName: summary.labelSymbolName,
-                            trailingTimestamp: summary.timestamp,
-                            trailingTimestampStyle: .relative
-                        )
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(BeforeTheme.ember)
-                    } footer: {
-                        Text(summary.footerText)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(BeforeTheme.moss)
-                    }
-                }
-                .buttonStyle(.plain)
-
-                DecisionContinuationActions(
-                    reopenTitle: "Reopen",
-                    reopenStyle: .secondary,
-                    postponeTitle: "Tomorrow Box",
-                    postponeStyle: .secondary,
-                    reopenAction: {
-                        reopen(entry)
-                    },
-                    postponeAction: {
-                        moveToTomorrow(entry)
-                    }
-                )
             }
         }
     }
@@ -182,12 +131,5 @@ struct ReviewProfileView: View {
         }
 
         dismiss()
-    }
-
-    @MainActor
-    private func loadReplayEntries() async {
-        replayPresentationsByID = await appModel.replayDiagnosticsPresentationsByRecordID(
-            matching: recentEntries.map(\.id)
-        )
     }
 }

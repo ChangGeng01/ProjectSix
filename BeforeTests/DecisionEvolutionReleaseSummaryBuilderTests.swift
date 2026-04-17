@@ -3,6 +3,350 @@ import BASHostKit
 @testable import Before
 
 final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
+    func testReleasePathPresentationSupportExposesSharedHeadlineAndReasonContract() {
+        XCTAssertEqual(
+            DecisionEvolutionKillSwitchPresentationSupport.blockedReleaseHeadline,
+            "Blocked by active kill switches"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionKillSwitchPresentationSupport.blockedReleaseReason,
+            "Kill switches are active on the current release path."
+        )
+        XCTAssertEqual(
+            DecisionEvolutionKillSwitchPresentationSupport.recommendedReleaseHeadline,
+            "Watching recommended kill switches"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionKillSwitchPresentationSupport.blockedReviewHeadline,
+            "Evolution is blocked by active kill switches"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionKillSwitchPresentationSupport.blockedReviewDetail,
+            "Open Evolution Control to clear the blocked review path before release work continues."
+        )
+        XCTAssertEqual(
+            DecisionEvolutionPendingReviewPresentationSupport.releaseHeadline,
+            "Watching the pending review queue"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionPendingReviewPresentationSupport.attentionDetail(
+                pendingReviewCount: 2
+            ),
+            "2 checkpoint(s) still need review before the queue is clear."
+        )
+        XCTAssertEqual(
+            DecisionEvolutionPendingReviewPresentationSupport.operatorReason(
+                pendingReviewCount: 2,
+                allowsMutations: true
+            ),
+            "2 checkpoint(s) are ready for direct queue work here."
+        )
+        XCTAssertEqual(
+            DecisionEvolutionPendingReviewPresentationSupport.releaseReason(
+                pendingReviewCount: 2,
+                beforePromotion: true
+            ),
+            "2 checkpoint(s) still require review before promotion."
+        )
+        XCTAssertEqual(
+            DecisionEvolutionPendingReviewPresentationSupport.pilotDetail(
+                allowsMutations: false
+            ),
+            "This surface stays read-first. Open Evolution Control and work the queue there before widening rollout."
+        )
+        XCTAssertEqual(
+            DecisionEvolutionReleaseStagePresentationSupport.blockedRuntimeGuardrailsHeadline,
+            "Blocked by runtime guardrails"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionReleaseStagePresentationSupport.watchingAuditFindingsHeadline,
+            "Watching audit findings before wider rollout"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionReleaseStagePresentationSupport.readyForGuardedPilotHeadline,
+            "Ready for guarded pilot rollout"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionReleaseStagePresentationSupport.rollbackNotReadyReason,
+            "The active checkpoint does not currently expose a previous checkpoint for rollback."
+        )
+        XCTAssertEqual(
+            DecisionEvolutionRestorabilityPresentationSupport.blockedUntilRestorableHeadline,
+            "Blocked until the active checkpoint is restorable"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionReleasePathPresentationSupport.blockedActiveKillSwitchHeadline,
+            "Blocked by active kill switches"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionReleasePathPresentationSupport.watchingPendingReviewHeadline,
+            "Watching the pending review queue"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionReleasePathPresentationSupport.readyForGuardedPilotHeadline,
+            "Ready for guarded pilot rollout"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionReleasePathPresentationSupport.rollbackNotReadyReason,
+            "The active checkpoint does not currently expose a previous checkpoint for rollback."
+        )
+        XCTAssertEqual(
+            DecisionEvolutionReleasePathPresentationSupport.noActiveCheckpointReason,
+            "No active checkpoint is attached to the current release path yet."
+        )
+        XCTAssertEqual(
+            DecisionEvolutionReleasePathPresentationSupport.activeCheckpointRestorableReason(
+                checkpointID: "active-1"
+            ),
+            "Active checkpoint active-1 is restorable."
+        )
+        XCTAssertEqual(
+            DecisionEvolutionReleasePathPresentationSupport.activeCheckpointRestorableReason(
+                checkpointID: nil
+            ),
+            "The active checkpoint is restorable."
+        )
+        XCTAssertEqual(
+            DecisionEvolutionPendingReviewPresentationSupport.auditLine(
+                auditFindings: ["guardrail-a", "guardrail-b"]
+            ),
+            "Review audit: guardrail-a • guardrail-b"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionKillSwitchPresentationSupport.suggestedLine(
+                killSwitches: ["external-tools", "host-write"]
+            ),
+            "Suggested kill switches: external-tools • host-write"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionKillSwitchPresentationSupport.queueReasonLine(
+                killSwitches: ["queue-a", "queue-b"]
+            ),
+            "Pending review kill switches: queue-a • queue-b"
+        )
+    }
+
+    func testPrimaryBlockerEvaluatorUsesSharedPriorityOrder() {
+        XCTAssertEqual(
+            DecisionEvolutionPrimaryBlockerEvaluator.orderedPriorities(
+                for: DecisionEvolutionPrimaryBlockerContext(
+                    activeKillSwitches: [],
+                    recommendedKillSwitches: ["external-tools"],
+                    runtimeBlockers: [],
+                    hasActiveCheckpoint: false,
+                    canRestoreActiveCheckpoint: false,
+                    pendingReviewCount: 2,
+                    reviewAuditFindings: ["audit-a"],
+                    canRollbackActiveCheckpoint: false
+                )
+            ),
+            [
+                .recommendedKillSwitches,
+                .missingActiveCheckpoint,
+                .pendingReview,
+                .auditFindings
+            ]
+        )
+    }
+
+    func testPrimaryBlockerEvaluatorUsesSharedWorkspaceFactsFallback() {
+        let review = makeSnapshot(
+            checkpointID: "review-workspace",
+            createdAt: Date(timeIntervalSince1970: 20),
+            approvalState: .reviewSuggested,
+            hasLineage: true,
+            killSwitches: ["queue-kill"]
+        )
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: nil,
+                reviewCheckpoint: review,
+                pendingReviewQueue: [review],
+                latestPersistedLineage: nil
+            )
+        )
+
+        XCTAssertEqual(
+            DecisionEvolutionPrimaryBlockerEvaluator.evaluate(workspace: workspace),
+            .recommendedKillSwitches
+        )
+    }
+
+    func testPrimaryBlockerPresentationSupportBuildsSharedReleaseGuidance() {
+        let review = makeSnapshot(
+            checkpointID: "review-guidance",
+            createdAt: Date(timeIntervalSince1970: 20),
+            approvalState: .reviewSuggested,
+            hasLineage: true,
+            killSwitches: ["queue-kill"]
+        )
+        let pendingReviewSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: nil,
+            reviewCheckpoint: review,
+            pendingReviewQueue: [review],
+            latestPersistedLineage: nil
+        )
+
+        let pendingReviewGuidance = DecisionEvolutionPrimaryBlockerPresentationSupport.releaseGuidance(
+            blocker: .missingActiveCheckpoint,
+            blockerSignals: [],
+            controlSurface: pendingReviewSurface,
+            queueAuditFindings: pendingReviewSurface.queueAuditFindings,
+            queueKillSwitches: pendingReviewSurface.queueKillSwitches
+        )
+
+        XCTAssertEqual(pendingReviewGuidance.state, .watch)
+        XCTAssertEqual(
+            pendingReviewGuidance.headline,
+            DecisionEvolutionReleasePathPresentationSupport.watchingFirstActiveCheckpointHeadline
+        )
+        XCTAssertEqual(
+            pendingReviewGuidance.reasons.first,
+            DecisionEvolutionReleasePathPresentationSupport.noActiveCheckpointReason
+        )
+        XCTAssertTrue(
+            pendingReviewGuidance.reasons.contains(
+                DecisionEvolutionReviewPathPresentationSupport.releasePendingReviewReason(
+                    pendingReviewCount: 1,
+                    beforePromotion: true
+                )
+            )
+        )
+        XCTAssertTrue(
+            pendingReviewGuidance.reasons.contains(
+                DecisionEvolutionReviewPathPresentationSupport.queueKillSwitchReasonLine(
+                    killSwitches: ["queue-kill"]
+                )
+            )
+        )
+        XCTAssertEqual(
+            pendingReviewGuidance.state,
+            DecisionEvolutionPrimaryBlockerPresentationSupport.releaseState(
+                for: .missingActiveCheckpoint
+            )
+        )
+        XCTAssertEqual(
+            pendingReviewGuidance.headline,
+            DecisionEvolutionPrimaryBlockerPresentationSupport.releaseHeadline(
+                for: .missingActiveCheckpoint
+            )
+        )
+        XCTAssertEqual(
+            pendingReviewGuidance.reasons,
+            DecisionEvolutionPrimaryBlockerPresentationSupport.releaseReasons(
+                for: .missingActiveCheckpoint,
+                blockerSignals: [],
+                controlSurface: pendingReviewSurface,
+                queueAuditFindings: pendingReviewSurface.queueAuditFindings,
+                queueKillSwitches: pendingReviewSurface.queueKillSwitches
+            )
+        )
+
+        let active = makeSnapshot(
+            checkpointID: "active-guidance",
+            createdAt: Date(timeIntervalSince1970: 10),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let readySurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: nil,
+            pendingReviewQueue: [],
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: ["previous-active-guidance"]
+        )
+
+        let readyGuidance = DecisionEvolutionPrimaryBlockerPresentationSupport.releaseGuidance(
+            blocker: .ready,
+            blockerSignals: [],
+            controlSurface: readySurface,
+            queueAuditFindings: [],
+            queueKillSwitches: []
+        )
+
+        XCTAssertEqual(readyGuidance.state, .ready)
+        XCTAssertEqual(
+            readyGuidance.headline,
+            DecisionEvolutionReleasePathPresentationSupport.readyForGuardedPilotHeadline
+        )
+        XCTAssertEqual(
+            readyGuidance.reasons,
+            [
+                DecisionEvolutionReleasePathPresentationSupport.activeCheckpointRestorableReason(
+                    checkpointID: "active-guidance"
+                )
+            ]
+        )
+        XCTAssertEqual(
+            readyGuidance.state,
+            DecisionEvolutionPrimaryBlockerPresentationSupport.releaseState(for: .ready)
+        )
+        XCTAssertEqual(
+            readyGuidance.headline,
+            DecisionEvolutionPrimaryBlockerPresentationSupport.releaseHeadline(for: .ready)
+        )
+        XCTAssertEqual(
+            readyGuidance.reasons,
+            DecisionEvolutionPrimaryBlockerPresentationSupport.releaseReasons(
+                for: .ready,
+                blockerSignals: [],
+                controlSurface: readySurface,
+                queueAuditFindings: [],
+                queueKillSwitches: []
+            )
+        )
+        XCTAssertEqual(
+            DecisionEvolutionPrimaryBlockerPresentationSupport.releaseState(for: .runtimeGuardrails),
+            .blocked
+        )
+        XCTAssertEqual(
+            DecisionEvolutionPrimaryBlockerPresentationSupport.releaseHeadline(for: .pendingReview),
+            DecisionEvolutionReleasePathPresentationSupport.watchingPendingReviewHeadline
+        )
+        XCTAssertEqual(
+            DecisionEvolutionPrimaryBlockerPresentationSupport.releaseReasons(
+                for: .activeKillSwitches,
+                blockerSignals: [],
+                controlSurface: readySurface,
+                queueAuditFindings: [],
+                queueKillSwitches: []
+            ),
+            [DecisionEvolutionReleasePathPresentationSupport.activeKillSwitchReason]
+        )
+    }
+
+    func testPrimaryBlockerEvaluatorUsesSharedControlSurfaceFallbackOrdering() {
+        let review = makeSnapshot(
+            checkpointID: "review-fallback",
+            createdAt: Date(timeIntervalSince1970: 20),
+            approvalState: .reviewSuggested,
+            hasLineage: true
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: nil,
+            reviewCheckpoint: review,
+            pendingReviewQueue: [review],
+            latestPersistedLineage: nil
+        )
+
+        XCTAssertEqual(
+            DecisionEvolutionPrimaryBlockerEvaluator.orderedPriorities(
+                controlSurface: controlSurface,
+                releaseSummary: nil,
+                activeKillSwitches: [],
+                recommendedKillSwitches: controlSurface.queueKillSwitches,
+                canRestoreActiveCheckpoint: false,
+                canRollbackActiveCheckpoint: false
+            ),
+            [
+                .missingActiveCheckpoint,
+                .pendingReview,
+                .auditFindings
+            ]
+        )
+    }
+
     func testBuilderBlocksWhenActiveKillSwitchesArePresent() {
         let active = makeSnapshot(
             checkpointID: "active-1",
@@ -72,6 +416,76 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
         XCTAssertTrue(summary.reasons.contains("Recommended kill switches are waiting for operator review before wider rollout."))
     }
 
+    func testBuilderUsesSharedQueueSignalCopy() {
+        let active = makeSnapshot(
+            checkpointID: "active-1",
+            createdAt: Date(timeIntervalSince1970: 10),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let review = makeSnapshot(
+            checkpointID: "review-1",
+            createdAt: Date(timeIntervalSince1970: 20),
+            approvalState: .reviewSuggested,
+            hasLineage: true,
+            killSwitches: ["external-tools", "host-write"]
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: review,
+            pendingReviewQueue: [review],
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: ["previous-active-1", "previous-review-1"]
+        )
+
+        let summary = DecisionEvolutionReleaseSummaryBuilder.build(
+            evolutionControlSurface: controlSurface,
+            eBrainSummary: nil,
+            dominantBlockers: [],
+            activeKillSwitches: [],
+            recommendedKillSwitchesHint: ["external-tools", "host-write"]
+        )
+
+        XCTAssertTrue(
+            summary.reasons.contains(
+                DecisionEvolutionReviewPathPresentationSupport.queueKillSwitchReasonLine(
+                    killSwitches: ["external-tools", "host-write"]
+                )
+            )
+        )
+        XCTAssertTrue(
+            summary.reasons.contains(
+                DecisionEvolutionReviewPathPresentationSupport.queueAuditFindingsReasonLine(
+                    auditFindings: ["guardrail-review-1"]
+                )
+            )
+        )
+        XCTAssertEqual(
+            DecisionEvolutionPendingReviewPresentationSupport.guidanceReasonLines(
+                auditFindings: ["guardrail-review-1"],
+                killSwitches: ["external-tools", "host-write"]
+            ),
+            [
+                DecisionEvolutionReviewPathPresentationSupport.queueKillSwitchReasonLine(
+                    killSwitches: ["external-tools", "host-write"]
+                ),
+                DecisionEvolutionReviewPathPresentationSupport.queueAuditFindingsReasonLine(
+                    auditFindings: ["guardrail-review-1"]
+                )
+            ]
+        )
+    }
+
+    func testReleaseStagePresentationSupportReturnsSharedAuditReasonLines() {
+        XCTAssertEqual(
+            DecisionEvolutionReleaseStagePresentationSupport.auditReasonLines(
+                auditFindings: ["audit-a", "audit-b"]
+            ),
+            ["audit-a", "audit-b"]
+        )
+    }
+
     func testPresentationBuildCarriesCheckpointAndKillSwitchCopy() {
         let active = makeSnapshot(
             checkpointID: "active-1",
@@ -108,7 +522,107 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
             presentationMode: .surface
         )
 
-        XCTAssertEqual(presentation.activeSourceText, "Active source: Pinned active")
+        XCTAssertEqual(presentation.stateTone, .red)
+        XCTAssertEqual(
+            presentation.badgePresentations,
+            [
+                DecisionEvolutionSummaryBadgePresentation(title: "BLOCKED", tone: .red),
+                DecisionEvolutionSummaryBadgePresentation(title: "1 PENDING", tone: .orange),
+                DecisionEvolutionSummaryBadgePresentation(title: "1 ROLLBACK READY", tone: .moss)
+            ]
+        )
+        XCTAssertEqual(
+            presentation.activeSourceText,
+            DecisionEvolutionNarrativeFormattingSupport.labeledLine(
+                prefix: DecisionEvolutionReleaseSummaryPresentationSupport.activeSourcePrefix,
+                values: ["Pinned active"]
+            )
+        )
+        XCTAssertEqual(presentation.activeKillSwitchesText, "Active kill switches: force_guard_mode")
+        XCTAssertEqual(presentation.recommendedKillSwitchesText, "Recommended kill switches: external-tools")
+        XCTAssertEqual(presentation.activeCheckpointHeadline, "Active: active-1 • Automatic • HIGH → DELAY")
+        XCTAssertEqual(presentation.reviewCheckpointHeadline, "Review head: review-1 • Review suggested • HIGH → DELAY")
+    }
+
+    func testPresentationSupportBuildCarriesCheckpointAndKillSwitchCopy() {
+        let active = makeSnapshot(
+            checkpointID: "active-1",
+            createdAt: Date(timeIntervalSince1970: 10),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let review = makeSnapshot(
+            checkpointID: "review-1",
+            createdAt: Date(timeIntervalSince1970: 20),
+            approvalState: .reviewSuggested,
+            hasLineage: true,
+            killSwitches: ["external-tools"]
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: review,
+            pendingReviewQueue: [review],
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: ["previous-active-1", "previous-review-1"]
+        )
+        let summary = DecisionEvolutionReleaseSummaryBuilder.build(
+            evolutionControlSurface: controlSurface,
+            eBrainSummary: nil,
+            dominantBlockers: [],
+            activeKillSwitches: ["force_guard_mode"],
+            recommendedKillSwitchesHint: ["external-tools"]
+        )
+
+        let presentation = DecisionEvolutionReleaseSummaryPresentationSupport.build(
+            releaseSummary: summary,
+            controlSurface: controlSurface,
+            presentationMode: .surface
+        )
+
+        XCTAssertEqual(presentation.stateTone, .red)
+        XCTAssertEqual(
+            DecisionEvolutionReleaseSummaryPresentationSupport.activeSourcePrefix,
+            "Active source"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionReleaseSummaryPresentationSupport.checkpointHeadline(
+                roleTitle: DecisionEvolutionRuntimePresentationSupport.activeRoleTitle,
+                presentation: controlSurface.activePresentation!
+            ),
+            "Active: active-1 • Automatic • HIGH → DELAY"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionReleaseSummaryPresentationSupport.checkpointHeadline(
+                roleTitle: DecisionEvolutionRuntimePresentationSupport.reviewHeadRoleTitle,
+                presentation: controlSurface.spotlightReviewPresentation!
+            ),
+            "Review head: review-1 • Review suggested • HIGH → DELAY"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionReleaseSummaryPresentationSupport.activeSourceText(
+                releaseSummary: summary
+            ),
+            DecisionEvolutionNarrativeFormattingSupport.labeledLine(
+                prefix: DecisionEvolutionReleaseSummaryPresentationSupport.activeSourcePrefix,
+                values: ["Pinned active"]
+            )
+        )
+        XCTAssertEqual(
+            presentation.badgePresentations,
+            [
+                DecisionEvolutionSummaryBadgePresentation(title: "BLOCKED", tone: .red),
+                DecisionEvolutionSummaryBadgePresentation(title: "1 PENDING", tone: .orange),
+                DecisionEvolutionSummaryBadgePresentation(title: "1 ROLLBACK READY", tone: .moss)
+            ]
+        )
+        XCTAssertEqual(
+            presentation.activeSourceText,
+            DecisionEvolutionNarrativeFormattingSupport.labeledLine(
+                prefix: DecisionEvolutionReleaseSummaryPresentationSupport.activeSourcePrefix,
+                values: ["Pinned active"]
+            )
+        )
         XCTAssertEqual(presentation.activeKillSwitchesText, "Active kill switches: force_guard_mode")
         XCTAssertEqual(presentation.recommendedKillSwitchesText, "Recommended kill switches: external-tools")
         XCTAssertEqual(presentation.activeCheckpointHeadline, "Active: active-1 • Automatic • HIGH → DELAY")
@@ -145,6 +659,114 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
 
         XCTAssertEqual(presentation.operatorHeadline, "Mutation hub")
         XCTAssertTrue(presentation.operatorDetail?.contains("Apply, approve, rollback") == true)
+        XCTAssertEqual(
+            DecisionEvolutionReleaseSummaryPresentationSupport.operatorHeadline(for: .mutationHub),
+            "Mutation hub"
+        )
+        XCTAssertTrue(
+            DecisionEvolutionReleaseSummaryPresentationSupport.operatorDetail(for: .mutationHub)?
+                .contains("Apply, approve, rollback") == true
+        )
+    }
+
+    func testActionSupportUsesMutationHubQuickActionsWhenLocalMutationsAreAllowed() {
+        let active = makeSnapshot(
+            checkpointID: "active-1",
+            createdAt: Date(timeIntervalSince1970: 10),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let review = makeSnapshot(
+            checkpointID: "review-1",
+            createdAt: Date(timeIntervalSince1970: 20),
+            approvalState: .reviewSuggested,
+            hasLineage: true,
+            killSwitches: ["external-tools"]
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: review,
+            pendingReviewQueue: [review],
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: ["previous-active-1", "previous-review-1"]
+        )
+
+        let actionPresentation = DecisionEvolutionReleaseSummaryActionSupport.build(
+            controlSurface: controlSurface,
+            surfaceContract: .controlCenter,
+            navigationOptions: DecisionEvolutionSurfaceContract.controlCenter.navigationSurfaceOptions()
+        )
+
+        XCTAssertTrue(actionPresentation.allowsLocalMutationActions)
+        XCTAssertTrue(actionPresentation.showsAnyActionRow)
+        XCTAssertEqual(actionPresentation.quickActionsTitle, "Quick actions")
+        XCTAssertEqual(actionPresentation.rollbackTitle, "Rollback active")
+        XCTAssertEqual(actionPresentation.approveQueueTitle, "Approve queue")
+        XCTAssertEqual(actionPresentation.clearReviewLineageTitle, "Clear review lineage")
+        XCTAssertEqual(actionPresentation.rollbackIntent?.kind, .rollbackActiveCheckpoint)
+        XCTAssertEqual(actionPresentation.approveQueueIntent?.kind, .approvePendingCheckpoints)
+        XCTAssertEqual(actionPresentation.clearReviewLineageIntent?.kind, .clearPendingReviewLineage)
+    }
+
+    func testActionSupportKeepsObserveFooterWhenSurfaceRoutesMutationsAway() {
+        let active = makeSnapshot(
+            checkpointID: "active-1",
+            createdAt: Date(timeIntervalSince1970: 10),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let review = makeSnapshot(
+            checkpointID: "review-1",
+            createdAt: Date(timeIntervalSince1970: 20),
+            approvalState: .reviewSuggested,
+            hasLineage: true,
+            killSwitches: ["external-tools"]
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: review,
+            pendingReviewQueue: [review],
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: ["previous-active-1", "previous-review-1"]
+        )
+
+        let actionPresentation = DecisionEvolutionReleaseSummaryActionSupport.build(
+            controlSurface: controlSurface,
+            surfaceContract: .home,
+            navigationOptions: DecisionEvolutionSurfaceContract.home.navigationSurfaceOptions()
+        )
+
+        XCTAssertFalse(actionPresentation.allowsLocalMutationActions)
+        XCTAssertTrue(actionPresentation.showsAnyActionRow)
+        XCTAssertNil(actionPresentation.quickActionsTitle)
+        XCTAssertEqual(actionPresentation.rollbackTitle, "Rollback active")
+        XCTAssertEqual(actionPresentation.approveQueueTitle, "Approve queue")
+        XCTAssertEqual(actionPresentation.clearReviewLineageTitle, "Clear review lineage")
+        XCTAssertEqual(actionPresentation.rollbackIntent?.kind, .rollbackActiveCheckpoint)
+        XCTAssertEqual(actionPresentation.approveQueueIntent?.kind, .approvePendingCheckpoints)
+        XCTAssertEqual(actionPresentation.clearReviewLineageIntent?.kind, .clearPendingReviewLineage)
+    }
+
+    func testKillSwitchPresentationSupportFormatsSharedActiveAndRecommendedLines() {
+        XCTAssertEqual(
+            DecisionEvolutionKillSwitchPresentationSupport.activeLine(
+                killSwitches: ["force_guard_mode", "require_reviewed_writes"]
+            ),
+            "Active kill switches: force_guard_mode • require_reviewed_writes"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionKillSwitchPresentationSupport.recommendedLine(
+                killSwitches: ["external-tools"]
+            ),
+            "Recommended kill switches: external-tools"
+        )
+        XCTAssertNil(
+            DecisionEvolutionKillSwitchPresentationSupport.activeLine(
+                killSwitches: []
+            )
+        )
     }
 
     private func makeSnapshot(

@@ -5,6 +5,19 @@ struct DecisionEvolutionBatchMutationSelection: Equatable, Sendable {
     let selectablePresentations: [DecisionEvolutionCheckpointPresentation]
     let selectedCheckpointIDs: Set<String>
 
+    static func orderedSelectablePresentations(
+        activePresentation: DecisionEvolutionCheckpointPresentation?,
+        reviewPresentation: DecisionEvolutionCheckpointPresentation?,
+        remainingReviewQueue: [DecisionEvolutionCheckpointPresentation],
+        historyPresentations: [DecisionEvolutionCheckpointPresentation]
+    ) -> [DecisionEvolutionCheckpointPresentation] {
+        orderedUnique(
+            [activePresentation, reviewPresentation].compactMap { $0 }
+            + remainingReviewQueue
+            + historyPresentations
+        )
+    }
+
     init(
         controlSurface: DecisionEvolutionControlSurface,
         selectablePresentations: [DecisionEvolutionCheckpointPresentation],
@@ -62,29 +75,6 @@ struct DecisionEvolutionBatchMutationSelection: Equatable, Sendable {
 
     var lineageCheckpointIDs: Set<String> {
         Set(selectablePresentations.filter(\.hasLineage).map(\.checkpointID))
-    }
-
-    var selectedSummary: String {
-        if selectedPresentations.isEmpty {
-            return "No checkpoints are selected yet. Pick a slice of the control surface, then run guarded batch mutations from here."
-        }
-
-        var parts = ["\(selectedPresentations.count) selected"]
-        if !selectedReviewPresentations.isEmpty {
-            parts.append("\(selectedReviewPresentations.count) review")
-        }
-        if !selectedAutomaticPresentations.isEmpty {
-            parts.append("\(selectedAutomaticPresentations.count) automatic")
-        }
-        if !selectedLineagePresentations.isEmpty {
-            parts.append("\(selectedLineagePresentations.count) lineage-backed")
-        }
-        return parts.joined(separator: " • ")
-    }
-
-    var targetListText: String? {
-        guard !selectedPresentations.isEmpty else { return nil }
-        return selectedPresentations.map(\.checkpointID).joined(separator: " • ")
     }
 
     var approveSelectedIntent: DecisionEvolutionMutationIntent? {

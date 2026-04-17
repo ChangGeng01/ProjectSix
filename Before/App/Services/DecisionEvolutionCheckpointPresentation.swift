@@ -1,5 +1,237 @@
 import Foundation
 
+enum DecisionEvolutionCheckpointRecoverySupport {
+    static let unavailableAvailabilityText = "Live brain state is unavailable right now, but persisted checkpoints remain reviewable and restorable from local lineage."
+    static let pendingEmptyMessage = "Evolution checkpoints appear after the current brain is loaded."
+    static let recoveredEmptyMessage = "Recovered checkpoints remain visible here even without a live current brain."
+    static let noPersistedLineageHeadline = "No persisted checkpoint lineage is attached yet"
+    static let timelineRecoveryNotice = "Recovered from the last stable checkpoint after an incomplete or stalled step."
+    static let recoveredDescriptorDetail = "Showing recovered lineage restored from a persisted checkpoint."
+    static let recoveredWorkspaceDescriptorDetail = "Recovered lineage stored in persisted checkpoints remains visible even when no live runtime turn is attached."
+
+    static func timelineCheckpointDetail(
+        goal: String,
+        basedOnEventSeq: Int
+    ) -> String {
+        goal.isEmpty
+            ? "Recovered stable state at event \(basedOnEventSeq)."
+            : goal
+    }
+
+    static func availabilityText(
+        hasCurrentBrainState: Bool,
+        hasAnyCheckpoint: Bool
+    ) -> String {
+        if hasCurrentBrainState {
+            return DecisionEvolutionCheckpointLexiconSupport.rollbackStateTitle(
+                rollbackReady: true
+            )
+        }
+
+        return hasAnyCheckpoint
+            ? unavailableAvailabilityText
+            : pendingEmptyMessage
+    }
+
+    static func emptyMessage(
+        hasCurrentBrainState: Bool,
+        hasAnyCheckpoint: Bool
+    ) -> String {
+        if hasCurrentBrainState {
+            return pendingEmptyMessage
+        }
+
+        return hasAnyCheckpoint
+            ? recoveredEmptyMessage
+            : pendingEmptyMessage
+    }
+
+    static func activeCheckpointHeadline(
+        source: DecisionEvolutionActiveCheckpointSource
+    ) -> String {
+        source.visibleCheckpointHeadline
+    }
+
+    static func activeCheckpointReason(
+        source: DecisionEvolutionActiveCheckpointSource
+    ) -> String {
+        source.visibleCheckpointReason
+    }
+}
+
+enum DecisionEvolutionCheckpointDetailPresentationSupport {
+    static let emptyLineageMessage = "No persisted checkpoint lineage is available yet."
+    static let lineagePendingSummaryText = "Lineage pending • review details stay available, but recovered risk facts are not attached yet."
+    static let ticketsPrefix = "Tickets"
+    static let auditPrefix = "Audit"
+    static let killSwitchesPrefix = "Kill switches"
+    static let diffPrefix = "Diff"
+    static let selectTitle = "Select"
+    static let selectedTitle = "Selected"
+
+    static func rollbackStateTitle(rollbackReady: Bool) -> String {
+        DecisionEvolutionCheckpointLexiconSupport.rollbackStateTitle(
+            rollbackReady: rollbackReady
+        )
+    }
+
+    static func rollbackBadgeTitle(rollbackReady: Bool) -> String {
+        DecisionEvolutionCheckpointLexiconSupport.rollbackBadgeTitle(
+            rollbackReady: rollbackReady
+        )
+    }
+
+    static func labeledLine(prefix: String, values: [String]) -> String? {
+        DecisionEvolutionNarrativeFormattingSupport.labeledLine(
+            prefix: prefix,
+            values: values
+        )
+    }
+
+    static func diffLine(values: [String]) -> String? {
+        labeledLine(prefix: diffPrefix, values: values)
+    }
+
+    static func recordedLine(createdAt: Date, checkpointID: String) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        let relative = formatter.localizedString(for: createdAt, relativeTo: .now)
+        return "Recorded \(relative) • \(checkpointID)"
+    }
+
+    static func selectionAction(
+        isSelected: Bool
+    ) -> DecisionEvolutionCheckpointSelectionActionPresentation {
+        DecisionEvolutionCheckpointSelectionActionPresentation(
+            title: isSelected ? selectedTitle : selectTitle,
+            usesPrimaryStyle: isSelected
+        )
+    }
+
+    static func summaryBadges(
+        riskLevel: String?,
+        permitMode: String?,
+        activeSource: DecisionEvolutionActiveCheckpointSource,
+        rollbackReady: Bool
+    ) -> [DecisionEvolutionSummaryBadgePresentation] {
+        var badges: [DecisionEvolutionSummaryBadgePresentation] = []
+
+        if let riskLevel {
+            badges.append(
+                DecisionEvolutionSummaryBadgePresentation(
+                    title: riskLevel.uppercased(),
+                    tone: .ember
+                )
+            )
+        }
+
+        if let permitMode {
+            badges.append(
+                DecisionEvolutionSummaryBadgePresentation(
+                    title: permitMode.uppercased(),
+                    tone: .moss
+                )
+            )
+        }
+
+        if activeSource != .none {
+            badges.append(
+                DecisionEvolutionSummaryBadgePresentation(
+                    title: activeSource.shortTitle,
+                    tone: .blue
+                )
+            )
+        }
+
+        badges.append(
+            DecisionEvolutionSummaryBadgePresentation(
+                title: rollbackBadgeTitle(rollbackReady: rollbackReady),
+                tone: rollbackReady ? .moss : .ember
+            )
+        )
+
+        return badges
+    }
+
+    static func diffBulletLines(values: [String]) -> [String] {
+        values.map { "\u{2022} \($0)" }
+    }
+}
+
+struct DecisionEvolutionCheckpointSelectionActionPresentation: Equatable, Sendable {
+    let title: String
+    let usesPrimaryStyle: Bool
+}
+
+enum DecisionEvolutionSummaryBadgeTone: Equatable, Sendable {
+    case ember
+    case moss
+    case secondary
+    case blue
+    case orange
+    case red
+}
+
+struct DecisionEvolutionSummaryBadgePresentation: Equatable, Sendable {
+    let title: String
+    let tone: DecisionEvolutionSummaryBadgeTone
+}
+
+enum DecisionEvolutionCheckpointLexiconSupport {
+    static let missingCheckpointToken = "none"
+    static let automaticApprovalTitle = "Automatic"
+    static let reviewSuggestedApprovalTitle = "Review suggested"
+    static let activeCheckpointRoleTitle = "Active checkpoint"
+    static let reviewHeadRoleTitle = "Review head"
+    static let activeRuntimeRoleTitle = "Active"
+    static let rollbackReadyTitle = "Rollback ready"
+    static let rollbackUnavailableTitle = "Rollback unavailable"
+    static let rollbackReadyBadgeTitle = "ROLLBACK READY"
+    static let rollbackWatchBadgeTitle = "ROLLBACK WATCH"
+
+    static func checkpointToken(_ checkpointID: String?) -> String {
+        checkpointID ?? missingCheckpointToken
+    }
+
+    static func checkpointRoleTitle(
+        _ role: DecisionEvolutionCheckpointRole
+    ) -> String {
+        switch role {
+        case .active:
+            activeCheckpointRoleTitle
+        case .reviewHead:
+            reviewHeadRoleTitle
+        }
+    }
+
+    static func runtimeRoleTitle(isActive: Bool) -> String {
+        isActive ? activeRuntimeRoleTitle : reviewHeadRoleTitle
+    }
+
+    static func rollbackStateTitle(rollbackReady: Bool) -> String {
+        rollbackReady ? rollbackReadyTitle : rollbackUnavailableTitle
+    }
+
+    static func rollbackBadgeTitle(rollbackReady: Bool) -> String {
+        rollbackReady ? rollbackReadyBadgeTitle : rollbackWatchBadgeTitle
+    }
+
+    static func rollbackReadyCountBadgeTitle(_ count: Int) -> String {
+        "\(count) \(rollbackReadyBadgeTitle)"
+    }
+
+    static func approvalStateTitle(
+        _ approvalState: DecisionEvolutionApprovalState
+    ) -> String {
+        switch approvalState {
+        case .automatic:
+            automaticApprovalTitle
+        case .reviewSuggested:
+            reviewSuggestedApprovalTitle
+        }
+    }
+}
+
 struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendable {
     let checkpointID: String
     let createdAt: Date
@@ -25,12 +257,74 @@ struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendabl
     var id: String { checkpointID }
 
     var approvalStateTitle: String {
-        switch approvalState {
-        case .automatic:
-            "Automatic"
-        case .reviewSuggested:
-            "Review suggested"
-        }
+        DecisionEvolutionCheckpointLexiconSupport.approvalStateTitle(approvalState)
+    }
+
+    var rollbackStateTitle: String {
+        DecisionEvolutionCheckpointDetailPresentationSupport.rollbackStateTitle(
+            rollbackReady: rollbackReady
+        )
+    }
+
+    var rollbackBadgeTitle: String {
+        DecisionEvolutionCheckpointDetailPresentationSupport.rollbackBadgeTitle(
+            rollbackReady: rollbackReady
+        )
+    }
+
+    func selectionActionPresentation(
+        isSelected: Bool
+    ) -> DecisionEvolutionCheckpointSelectionActionPresentation {
+        DecisionEvolutionCheckpointDetailPresentationSupport.selectionAction(
+            isSelected: isSelected
+        )
+    }
+
+    func summaryBadgePresentations(
+        activeSource: DecisionEvolutionActiveCheckpointSource = .none
+    ) -> [DecisionEvolutionSummaryBadgePresentation] {
+        DecisionEvolutionCheckpointDetailPresentationSupport.summaryBadges(
+            riskLevel: displayRiskLevel,
+            permitMode: displayPermitMode,
+            activeSource: activeSource,
+            rollbackReady: rollbackReady
+        )
+    }
+
+    var ticketsLine: String? {
+        DecisionEvolutionCheckpointDetailPresentationSupport.labeledLine(
+            prefix: DecisionEvolutionCheckpointDetailPresentationSupport.ticketsPrefix,
+            values: updateTicketSummaries
+        )
+    }
+
+    var auditLine: String? {
+        DecisionEvolutionCheckpointDetailPresentationSupport.labeledLine(
+            prefix: DecisionEvolutionCheckpointDetailPresentationSupport.auditPrefix,
+            values: auditFindings
+        )
+    }
+
+    var killSwitchesLine: String? {
+        DecisionEvolutionCheckpointDetailPresentationSupport.labeledLine(
+            prefix: DecisionEvolutionCheckpointDetailPresentationSupport.killSwitchesPrefix,
+            values: killSwitches
+        )
+    }
+
+    var diffLine: String? {
+        DecisionEvolutionCheckpointDetailPresentationSupport.diffLine(values: diffSummary)
+    }
+
+    var diffBulletLines: [String] {
+        DecisionEvolutionCheckpointDetailPresentationSupport.diffBulletLines(values: diffSummary)
+    }
+
+    var recordedLine: String {
+        DecisionEvolutionCheckpointDetailPresentationSupport.recordedLine(
+            createdAt: createdAt,
+            checkpointID: checkpointID
+        )
     }
 
     var hasLineage: Bool {
@@ -74,7 +368,9 @@ struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendabl
         approvalState = snapshot.approvalState
         rollbackReady = rollbackReadyOverride ?? snapshot.rollbackReady
         applyReady = snapshot.applyReady
-        headline = "Recovered \(snapshot.mode.shortTitle) checkpoint"
+        headline = DecisionEvolutionEBrainPresentationSupport.recoveredCheckpointTitle(
+            modeTitle: snapshot.mode.shortTitle
+        )
         primarySummary = snapshot.primarySummary
         displayRiskLevel = snapshot.resolvedRiskLevel
         displayPermitMode = snapshot.resolvedPermitMode
@@ -88,17 +384,24 @@ struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendabl
 
         if let riskLevel = snapshot.resolvedRiskLevel,
            let permitMode = snapshot.resolvedPermitMode {
-            summaryText = "\(Self.displayToken(riskLevel)) → \(Self.displayToken(permitMode))"
+            summaryText = DecisionEvolutionEBrainPresentationSupport.riskPermitLine(
+                riskLevel: riskLevel,
+                permitMode: permitMode
+            )
             usesSecondarySummaryTone = snapshot.eBrain == nil
         } else {
-            summaryText = "Lineage pending • review details stay available, but recovered risk facts are not attached yet."
+            summaryText = DecisionEvolutionCheckpointDetailPresentationSupport.lineagePendingSummaryText
             usesSecondarySummaryTone = true
         }
 
         if let sessionID = snapshot.sessionID,
            let hostGatePercent = snapshot.hostGatePercent,
            let thoughtFoldChecksum = snapshot.thoughtFoldChecksum {
-            metadataText = "Session \(sessionID) • Host gate \(hostGatePercent)% • Fold \(thoughtFoldChecksum)"
+            metadataText = DecisionEvolutionEBrainPresentationSupport.sessionHostFoldLine(
+                sessionID: sessionID,
+                hostGatePercent: hostGatePercent,
+                foldChecksum: thoughtFoldChecksum
+            )
         } else {
             metadataText = nil
         }
@@ -106,12 +409,6 @@ struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendabl
 
     init(checkpoint: DecisionEvolutionCheckpoint) {
         self.init(snapshot: DecisionReviewCheckpointSnapshot(checkpoint: checkpoint))
-    }
-
-    private static func displayToken(_ rawValue: String) -> String {
-        rawValue
-            .replacingOccurrences(of: "_", with: " ")
-            .uppercased()
     }
 }
 

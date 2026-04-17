@@ -44,10 +44,14 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
             latestCheckpointID: "ckpt_1",
             latestCheckpointSeq: 8,
             latestCheckpointGoal: "repair parser only",
-            latestCheckpointBudgetLine: "eBrain budget: guarded • loops 1 • candidates 1 • decode 128",
+            latestCheckpointBudgetLine: "eBrain budget: guarded • loops 1 • candidates 1 • decode 128 • thermal watch",
             latestCheckpointRouteLine: "eBrain route: cpu • precision low • retrieval 1",
             latestCheckpointDecisionLine: "eBrain risk: guarded • eBrain permit: delay • eBrain host gate: 40% • eBrain fold: fold1abc",
             latestCheckpointTaskLine: "Review protective path: delay",
+            latestCheckpointPressureLine: "eBrain pressure: latency 57/900ms • power 32% • cache 100% • thermal warm -> watch",
+            latestCheckpointAuditLine: "eBrain audit findings: 1",
+            latestCheckpointActiveKillSwitchesLine: "eBrain active kill switches: force_guard_mode",
+            latestCheckpointKillSwitchesLine: "eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes",
             latestCheckpointActionLine: "action: restored active quick workspace state",
             latestEventID: "evt_9",
             latestEventSeq: 9,
@@ -184,7 +188,11 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
         XCTAssertTrue(snapshot.reviewItems[1].detail.contains("Checkpoint ckpt_1"))
         XCTAssertEqual(
             snapshot.sessions[0].checkpointBudgetLine,
-            "eBrain budget: guarded • loops 1 • candidates 1 • decode 128 • eBrain route: cpu • precision low • retrieval 1"
+            "eBrain budget: guarded • loops 1 • candidates 1 • decode 128 • thermal watch • eBrain route: cpu • precision low • retrieval 1"
+        )
+        XCTAssertEqual(
+            snapshot.sessions[0].checkpointPressureLine,
+            "eBrain pressure: latency 57/900ms • power 32% • cache 100% • thermal warm -> watch"
         )
         XCTAssertEqual(
             snapshot.sessions[0].checkpointDecisionLine,
@@ -194,6 +202,11 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
         XCTAssertEqual(
             snapshot.sessions[0].checkpointActionLine,
             "action: restored active quick workspace state"
+        )
+        XCTAssertEqual(snapshot.sessions[0].checkpointAuditLine, "eBrain audit findings: 1")
+        XCTAssertEqual(
+            snapshot.sessions[0].checkpointKillSwitchesLine,
+            "eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes"
         )
         XCTAssertTrue(snapshot.sessions[0].branchLine.contains("Merge-ready 1"))
         XCTAssertEqual(
@@ -325,6 +338,7 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
                 integrityLine: "Validated schema v1 • fingerprint abcdef123456",
                 checkpointLine: "Latest checkpoint ckpt-7 • repair parser",
                 branchLine: "Head main • Layer folded_lung",
+                unfinishedStepCount: 1,
                 unfinishedStepsLine: "Open steps 1 • unfinished work will import as failed recovery facts.",
                 headline: "Importing creates a new paused recovery-safe session.",
                 branchPreviews: []

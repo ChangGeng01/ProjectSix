@@ -9,14 +9,18 @@ struct DecisionEvolutionPilotImpactStripView: View {
 
     var body: some View {
         if !intents.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Preflight impact")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(BeforeTheme.ember)
+            let previewPresentation = intents.first?.previewPresentation
 
-                Text("See the active/review shift before you open the guarded confirmation sheet.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 10) {
+                if let previewPresentation {
+                    Text(previewPresentation.impactTitle)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.ember)
+
+                    Text(previewPresentation.impactDetail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
 
                 ForEach(intents) { intent in
                     impactRow(intent)
@@ -28,6 +32,7 @@ struct DecisionEvolutionPilotImpactStripView: View {
     @ViewBuilder
     private func impactRow(_ intent: DecisionEvolutionMutationIntent) -> some View {
         let preview = intent.preview
+        let previewPresentation = intent.previewPresentation
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 8) {
                 Text(intent.title)
@@ -46,8 +51,8 @@ struct DecisionEvolutionPilotImpactStripView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            if !preview.targetCheckpointIDs.isEmpty {
-                Text("Targets: \(preview.targetCheckpointIDs.joined(separator: " • "))")
+            if let impactTargetsLine = previewPresentation.impactTargetsLine(preview.targetCheckpointIDs) {
+                Text(impactTargetsLine)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -55,17 +60,19 @@ struct DecisionEvolutionPilotImpactStripView: View {
 
             HStack(spacing: 8) {
                 transitionBadge(
-                    title: "Active",
+                    title: previewPresentation.activeTransitionTitle,
                     current: preview.currentActiveCheckpointID,
                     projected: preview.projectedActiveCheckpointID,
-                    tint: BeforeTheme.moss
+                    tint: BeforeTheme.moss,
+                    previewPresentation: previewPresentation
                 )
 
                 transitionBadge(
-                    title: "Review",
+                    title: previewPresentation.reviewTransitionTitle,
                     current: preview.currentReviewCheckpointID,
                     projected: preview.projectedReviewCheckpointID,
-                    tint: BeforeTheme.ember
+                    tint: BeforeTheme.ember,
+                    previewPresentation: previewPresentation
                 )
             }
         }
@@ -81,16 +88,14 @@ struct DecisionEvolutionPilotImpactStripView: View {
         title: String,
         current: String?,
         projected: String?,
-        tint: Color
+        tint: Color,
+        previewPresentation: DecisionEvolutionMutationPreviewPresentation
     ) -> some View {
-        let currentToken = current ?? "none"
-        let projectedToken = projected ?? "none"
-
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(tint)
-            Text("\(currentToken) → \(projectedToken)")
+            Text(previewPresentation.transitionLine(current: current, projected: projected))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)

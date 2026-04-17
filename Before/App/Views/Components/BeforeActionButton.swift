@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct BeforeActionButton: View {
-    enum Style {
+    enum Style: Equatable, Sendable {
         case primary
         case secondary
         case tertiary

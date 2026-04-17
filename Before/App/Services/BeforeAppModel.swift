@@ -199,6 +199,22 @@ final class BeforeAppModel: ObservableObject {
         executeLifecyclePhase(.initialAppearance, syncWidgetSnapshot: true)
     }
 
+    func suppressHostedTestPresentations() {
+        hasSeenOnboarding = true
+        activeQuickSession = nil
+        activeBalanceSession = nil
+        activeMirrorSession = nil
+        reflectionContext = nil
+        letGoContext = nil
+        isEvolutionControlCenterPresented = false
+        isSessionEngineControlCenterPresented = false
+        pendingSessionEngineImportDraft = nil
+        sessionEngineBundleIssue = nil
+        latestEvolutionMutationOutcome = nil
+        pendingReflectionContext = nil
+        shouldPromptReflectionAfterBackground = false
+    }
+
     func dismissStartupNotice() {
         startupNotice = nil
     }
@@ -3671,44 +3687,7 @@ final class BeforeAppModel: ObservableObject {
             return draft
         }
 
-        var summary = draft.summary
-        var runtimeState = draft.runtimeState
-        appendUnique("eBrain budget: \(eBrainTurn.budgetFrame.runMode.rawValue) • loops \(eBrainTurn.budgetFrame.maxLoops) • candidates \(eBrainTurn.budgetFrame.maxCandidates) • decode \(eBrainTurn.budgetFrame.maxDecodeTokens)", to: &summary.acceptedConstraints)
-        appendUnique("eBrain route: \(eBrainTurn.budgetFrame.deviceRoute.rawValue) • precision \(eBrainTurn.budgetFrame.precisionProfile.rawValue) • retrieval \(eBrainTurn.budgetFrame.retrievalDepth)", to: &summary.acceptedConstraints)
-        appendUnique("eBrain risk: \(eBrainTurn.riskCard.riskLevel.rawValue)", to: &summary.confirmedFacts)
-        appendUnique("eBrain permit: \(eBrainTurn.actionPermit.mode.rawValue)", to: &summary.confirmedFacts)
-        appendUnique("eBrain host gate: \(Int((eBrainTurn.hostGateValue * 100).rounded()))%", to: &summary.confirmedFacts)
-        appendUnique("eBrain fold: \(String(eBrainTurn.thoughtFold.checksum.prefix(12)))", to: &summary.confirmedFacts)
-
-        if !eBrainTurn.runtimeTrace.guardrailFindings.isEmpty {
-            appendUnique("eBrain audit findings: \(eBrainTurn.runtimeTrace.guardrailFindings.count)", to: &summary.confirmedFacts)
-        }
-
-        if let firstTicket = eBrainTurn.updateTickets.first?.summary,
-           !trimmed(firstTicket).isEmpty {
-            appendUnique("Review update ticket: \(trimmed(firstTicket))", to: &summary.openTasks)
-        }
-
-        if eBrainTurn.actionPermit.mode.isProtective {
-            appendUnique("Review protective path: \(eBrainTurn.actionPermit.mode.rawValue)", to: &summary.openTasks)
-            runtimeState.currentMode = .review
-        }
-
-        appendUnique("ebrain", to: &summary.currentScope)
-        appendUnique(eBrainTurn.contextFrame.taskType.rawValue, to: &summary.currentScope)
-        appendUnique("run:\(eBrainTurn.budgetFrame.runMode.rawValue)", to: &summary.currentScope)
-
-        return DecisionSessionCheckpointDraft(
-            summary: summary,
-            runtimeState: runtimeState
-        )
-    }
-
-    private func appendUnique(_ value: String, to values: inout [String]) {
-        guard !values.contains(value) else {
-            return
-        }
-        values.append(value)
+        return eBrainTurn.sessionCheckpointFacts.applied(to: draft)
     }
 
     private func sessionEngineActionResultSummary(_ actionSummary: String) -> String {

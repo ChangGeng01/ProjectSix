@@ -43,10 +43,6 @@ struct DecisionEvolutionPilotControlPanel: View {
         self.afterMutation = afterMutation
     }
 
-    private var interactionMode: DecisionEvolutionControlInteractionMode {
-        pilotSnapshot.interactionMode
-    }
-
     private var allowsLocalMutationActions: Bool {
         pilotSnapshot.allowsLocalMutationActions
     }
@@ -56,13 +52,9 @@ struct DecisionEvolutionPilotControlPanel: View {
             VStack(alignment: .leading, spacing: 14) {
                 if showsHeader {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Evolution pilot controls")
+                        Text(pilotSnapshot.headerTitle)
                             .font(.headline)
-                        Text(
-                            allowsLocalMutationActions
-                                ? "Work the review queue, restore the active checkpoint, and clear stale lineage from the dedicated mutation hub."
-                                : "See release blockers and queue state here, then jump into Evolution Control for checkpoint mutations."
-                        )
+                        Text(pilotSnapshot.headerDetail)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -76,31 +68,21 @@ struct DecisionEvolutionPilotControlPanel: View {
                     )
                 }
 
-                if let releaseSummary, showEmbeddedReleaseSummary {
+                if let releaseSummary,
+                   showEmbeddedReleaseSummary,
+                   let releaseSummaryMode = pilotSnapshot.embeddedReleaseSummaryMode {
                     DecisionEvolutionReleaseSummaryView(
                         releaseSummary: releaseSummary,
                         controlSurface: controlSurface,
                         surfaceContract: surfaceContract,
-                        presentationMode: allowsLocalMutationActions ? .mutationHub : .surface,
+                        presentationMode: releaseSummaryMode,
                         navigationOptions: navigationOptions,
                         afterMutation: afterMutation
                     )
                 } else {
                     HStack(spacing: 8) {
-                        DecisionEvolutionSummaryBadge(
-                            title: "\(pilotSnapshot.pendingReviewCount) PENDING",
-                            tint: pilotSnapshot.pendingReviewCount > 0 ? .orange : .secondary
-                        )
-                        DecisionEvolutionSummaryBadge(
-                            title: "\(pilotSnapshot.rollbackReadyCount) ROLLBACK READY",
-                            tint: pilotSnapshot.rollbackReadyCount > 0 ? BeforeTheme.moss : .secondary
-                        )
-
-                        if pilotSnapshot.pendingReviewLineageCount > 0 {
-                            DecisionEvolutionSummaryBadge(
-                                title: "\(pilotSnapshot.pendingReviewLineageCount) LINEAGE-BACKED",
-                                tint: BeforeTheme.ember
-                            )
+                        ForEach(Array(pilotSnapshot.summaryBadgePresentations.enumerated()), id: \.offset) { _, badge in
+                            DecisionEvolutionSummaryBadge(presentation: badge)
                         }
                     }
                 }
@@ -113,17 +95,15 @@ struct DecisionEvolutionPilotControlPanel: View {
 
                 if !allowsLocalMutationActions {
                     DecisionEvolutionOperatorActionFooterView(
-                        interactionMode: interactionMode,
-                        navigationOptions: navigationOptions,
-                        routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter,
-                        showsDetail: true,
-                        controlCenterStyle: .primary,
-                        adjacentShortcutStyle: .tertiary
+                        presentation: DecisionEvolutionOperatorFooterPresentationSupport.pilotControl(
+                            surfaceContract: surfaceContract,
+                            navigationOptions: navigationOptions
+                        )
                     )
                 }
 
-                if pilotSnapshot.pendingReviewLineageCount > 0, releaseSummary != nil {
-                    Text("\(pilotSnapshot.pendingReviewLineageCount) pending checkpoints still carry recovered lineage.")
+                if let pendingReviewLineageNotice = pilotSnapshot.pendingReviewLineageNotice {
+                    Text(pendingReviewLineageNotice)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -131,7 +111,7 @@ struct DecisionEvolutionPilotControlPanel: View {
                 if allowsLocalMutationActions {
                     HStack(spacing: 10) {
                         BeforeActionButton(
-                            "Restore active path",
+                            pilotSnapshot.restoreActiveTitle,
                             style: .primary,
                             isEnabled: pilotSnapshot.restoreActiveIntent != nil && allowsLocalMutationActions
                         ) {
@@ -140,7 +120,7 @@ struct DecisionEvolutionPilotControlPanel: View {
                         }
 
                         BeforeActionButton(
-                            "Rollback active path",
+                            pilotSnapshot.rollbackActiveTitle,
                             style: .secondary,
                             isEnabled: pilotSnapshot.rollbackActiveIntent != nil && allowsLocalMutationActions
                         ) {
@@ -149,7 +129,7 @@ struct DecisionEvolutionPilotControlPanel: View {
                         }
 
                         BeforeActionButton(
-                            "Approve review queue",
+                            pilotSnapshot.approveQueueTitle,
                             style: .secondary,
                             isEnabled: pilotSnapshot.approveQueueIntent != nil && allowsLocalMutationActions
                         ) {
@@ -160,7 +140,7 @@ struct DecisionEvolutionPilotControlPanel: View {
 
                     HStack(spacing: 10) {
                         BeforeActionButton(
-                            "Clear queue lineage",
+                            pilotSnapshot.clearQueueLineageTitle,
                             style: .secondary,
                             isEnabled: pilotSnapshot.clearReviewLineageIntent != nil && allowsLocalMutationActions
                         ) {
@@ -172,22 +152,21 @@ struct DecisionEvolutionPilotControlPanel: View {
 
                 if allowsLocalMutationActions {
                     DecisionEvolutionNavigationActionRow(
-                        navigationOptions: navigationOptions,
-                        routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter,
-                        controlCenterStyle: .tertiary,
-                        adjacentShortcutStyle: .tertiary
+                        presentation: DecisionEvolutionNavigationRowPresentationSupport.pilotMutationHub(
+                            surfaceContract: surfaceContract,
+                            navigationOptions: navigationOptions
+                        )
                     )
                 }
 
-                if !pilotSnapshot.reviewAuditFindings.isEmpty {
-                    Text("Review audit: \(pilotSnapshot.reviewAuditFindings.joined(separator: " • "))")
+                if let reviewAuditLine = pilotSnapshot.reviewAuditLine {
+                    Text(reviewAuditLine)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
 
-                let recommendedKillSwitches = pilotSnapshot.recommendedKillSwitches
-                if !recommendedKillSwitches.isEmpty {
-                    Text("Suggested kill switches: \(recommendedKillSwitches.joined(separator: " • "))")
+                if let recommendedKillSwitchesLine = pilotSnapshot.recommendedKillSwitchesLine {
+                    Text(recommendedKillSwitchesLine)
                         .font(.caption2)
                         .foregroundStyle(BeforeTheme.ember)
                 }
@@ -210,7 +189,7 @@ struct DecisionEvolutionPilotControlPanel: View {
     @ViewBuilder
     private func guidedActionCallout(_ guidedAction: DecisionEvolutionPilotGuidedAction) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Recommended next step")
+            Text(pilotSnapshot.guidedActionSectionTitle)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(BeforeTheme.ember)
 

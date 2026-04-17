@@ -358,6 +358,8 @@ final class DecisionReviewEngineTests: XCTestCase {
         XCTAssertEqual(presentation.labelSymbolName, DecisionMode.balance.symbolName)
         XCTAssertEqual(presentation.timestamp, record.updatedAt)
         XCTAssertEqual(presentation.footerText, "Capacity pressure")
+        XCTAssertEqual(presentation.reopenTitle, "Reopen")
+        XCTAssertEqual(presentation.postponeTitle, "Tomorrow Box")
     }
 
     func testDetailPresentationForQuickFiltersEmptyOptionalRows() {
@@ -380,6 +382,7 @@ final class DecisionReviewEngineTests: XCTestCase {
 
         XCTAssertEqual(presentation.eyebrow, "Quick check")
         XCTAssertEqual(presentation.reopenTitle, "Reopen this check")
+        XCTAssertEqual(presentation.postponeTitle, "Move this to Tomorrow Box")
         XCTAssertEqual(presentation.rows.map(\.title), [
             "Scenario",
             "Verdict",
@@ -408,6 +411,7 @@ final class DecisionReviewEngineTests: XCTestCase {
 
         XCTAssertEqual(presentation.eyebrow, "Mirror")
         XCTAssertEqual(presentation.title, "Should I stay?")
+        XCTAssertEqual(presentation.postponeTitle, "Move this to Tomorrow Box")
         XCTAssertEqual(presentation.rows.map(\.title), [
             "Emotion",
             "Relationship",

@@ -24,10 +24,6 @@ struct DecisionEvolutionKillSwitchPanelView: View {
         self.afterMutation = afterMutation
     }
 
-    private var interactionMode: DecisionEvolutionControlInteractionMode {
-        surfaceContract.interactionMode
-    }
-
     private var recommendedKillSwitches: [BASKillSwitchID] {
         BASKillSwitchID.resolvePolicyIDs(recommendedKillSwitchIDs)
     }
@@ -36,29 +32,35 @@ struct DecisionEvolutionKillSwitchPanelView: View {
         recommendedKillSwitches.filter { !activeKillSwitches.contains($0) }
     }
 
+    private var presentation: DecisionEvolutionKillSwitchPanelPresentation {
+        DecisionEvolutionKillSwitchPanelPresentationSupport.build(
+            surfaceContract: surfaceContract,
+            navigationOptions: navigationOptions,
+            activeKillSwitchCount: activeKillSwitches.count,
+            recommendedKillSwitchIDs: recommendedKillSwitchIDs,
+            unresolvedRecommendedCount: unresolvedRecommendedKillSwitches.count
+        )
+    }
+
     var body: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Kill-switch control plane")
+                    Text(presentation.headerTitle)
                         .font(.headline)
 
-                    Text(
-                        surfaceContract.allowsMutations
-                            ? "Promote runtime kill switches from suggestions into a real host-controlled policy surface."
-                            : "This surface shows the active runtime kill-switch policy. Open Evolution Control to mutate it."
-                    )
+                    Text(presentation.headerDetail)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 }
 
                 HStack(spacing: 8) {
                     DecisionEvolutionSummaryBadge(
-                        title: "\(activeKillSwitches.count) ACTIVE",
+                        title: presentation.activeBadgeTitle,
                         tint: activeKillSwitches.isEmpty ? .secondary : BeforeTheme.ember
                     )
                     DecisionEvolutionSummaryBadge(
-                        title: "\(unresolvedRecommendedKillSwitches.count) RECOMMENDED",
+                        title: presentation.recommendedBadgeTitle,
                         tint: unresolvedRecommendedKillSwitches.isEmpty ? .secondary : .orange
                     )
                 }
@@ -67,16 +69,16 @@ struct DecisionEvolutionKillSwitchPanelView: View {
                     killSwitchRow(for: killSwitch)
                 }
 
-                if !recommendedKillSwitchIDs.isEmpty {
-                    Text("Recommended: \(recommendedKillSwitchIDs.joined(separator: " • "))")
+                if let recommendedLine = presentation.recommendedLine {
+                    Text(recommendedLine)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
 
-                if surfaceContract.allowsMutations {
+                if presentation.showsMutationActions {
                     HStack(spacing: 10) {
                         BeforeActionButton(
-                            "Apply recommended",
+                            presentation.applyRecommendedTitle,
                             style: .secondary,
                             isEnabled: !unresolvedRecommendedKillSwitches.isEmpty
                         ) {
@@ -85,7 +87,7 @@ struct DecisionEvolutionKillSwitchPanelView: View {
                         }
 
                         BeforeActionButton(
-                            "Clear active switches",
+                            presentation.clearActiveTitle,
                             style: .tertiary,
                             isEnabled: !activeKillSwitches.isEmpty
                         ) {
@@ -93,14 +95,9 @@ struct DecisionEvolutionKillSwitchPanelView: View {
                             afterMutation?()
                         }
                     }
-                } else if navigationOptions.showsAnyShortcut {
+                } else if let footerPresentation = presentation.footerPresentation {
                     DecisionEvolutionOperatorActionFooterView(
-                        interactionMode: interactionMode,
-                        navigationOptions: navigationOptions,
-                        routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter,
-                        showsDetail: false,
-                        controlCenterStyle: .primary,
-                        adjacentShortcutStyle: .secondary
+                        presentation: footerPresentation
                     )
                 }
             }
@@ -121,9 +118,15 @@ struct DecisionEvolutionKillSwitchPanelView: View {
                             .foregroundStyle(BeforeTheme.ink)
 
                         if isActive {
-                            DecisionEvolutionSummaryBadge(title: "ACTIVE", tint: BeforeTheme.ember)
+                            DecisionEvolutionSummaryBadge(
+                                title: presentation.activeStateBadgeTitle,
+                                tint: BeforeTheme.ember
+                            )
                         } else if isRecommended {
-                            DecisionEvolutionSummaryBadge(title: "RECOMMENDED", tint: .orange)
+                            DecisionEvolutionSummaryBadge(
+                                title: presentation.recommendedStateBadgeTitle,
+                                tint: .orange
+                            )
                         }
                     }
 
@@ -134,9 +137,9 @@ struct DecisionEvolutionKillSwitchPanelView: View {
 
                 Spacer()
 
-                if surfaceContract.allowsMutations {
+                if presentation.showsMutationActions {
                     BeforeActionButton(
-                        isActive ? "Disable" : "Enable",
+                        isActive ? presentation.disableTitle : presentation.enableTitle,
                         style: isActive ? .secondary : .primary
                     ) {
                         appModel.setEvolutionKillSwitch(killSwitch, enabled: !isActive)

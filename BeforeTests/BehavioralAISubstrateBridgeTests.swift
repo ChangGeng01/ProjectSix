@@ -196,6 +196,30 @@ struct BehavioralAISubstrateBridgeTests {
     }
 
     @Test
+    func consoleSnapshotMergesLivePressureIntoRuntimeSummary() async throws {
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            debugStore: DecisionIntelligenceDebugStore(),
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        let snapshot = BehavioralAISubstrateBridge.consoleSnapshot(
+            from: export,
+            currentBrainState: nil,
+            eBrainTurn: makeProtectiveTurn()
+        )
+
+        #expect(snapshot.runtimeSummary?.contains("Pressure latency 3/1400ms") == true)
+        #expect(snapshot.runtimeSummary?.contains("thermal cool") == true)
+    }
+
+    @Test
     func bridgeBootstrapCurrentBrainStateCommitsAndMaterializesHostState() async throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -237,6 +261,206 @@ struct BehavioralAISubstrateBridgeTests {
         #expect(updates.first?.fingerprint == current.verificationSnapshot.fingerprint)
         #expect(current.identityProfile.role == .predictiveSentinel)
         #expect(current.boundaryPolicy.riskLevel == .high)
+    }
+
+    private func makeProtectiveTurn() -> BASEBrainTurnResult {
+        let deviceState = BASDeviceState(
+            batteryLevel: 0.66,
+            thermalLevel: .warm,
+            memoryFreeMB: 2_048,
+            networkState: .online,
+            foregroundState: .foreground,
+            cpuLoad: 0.31,
+            gpuLoad: 0.12,
+            npuAvailable: true,
+            latencyBudgetMs: 1_400
+        )
+        let budgetFrame = BASBudgetFrame.guardedLocal(
+            maxLoops: 2,
+            maxCandidates: 2,
+            maxDecodeTokens: 160,
+            retrievalDepth: 2
+        )
+        let hostContext = BASHostProfile(
+            hostID: "host.primary",
+            longTermGoals: ["Stay calm"],
+            noGoZones: ["unsafe"]
+        )
+        let contextFrame = BASContextFrame(
+            utterance: "Mirror body",
+            taskType: .highPressure,
+            emotionalLoad: 0.82,
+            timePressure: 0.74,
+            relationPattern: "self",
+            ambiguityScore: 0.63,
+            consequenceLevel: 0.81,
+            manipulationHints: ["time_pressure"],
+            hostRelevance: 0.91
+        )
+        let decomposeFrame = BASDecomposeFrame(
+            facts: ["Pause first"],
+            goals: ["Keep the boundary"],
+            emotions: ["alert"],
+            unknowns: ["best next step"],
+            contradictions: [],
+            pressureSignals: ["urgency"],
+            manipulationSignals: ["forced-now"],
+            mirrorText: "Mirror body"
+        )
+        let memoryAtom = BASMemoryAtom(
+            memoryID: "mem-1",
+            summary: "Protect the boundary first.",
+            contentType: .warm,
+            source: "session",
+            confidence: 0.86,
+            conflictFingerprint: "fp-1"
+        )
+        let memoryBundle = BASMemoryBundle(
+            atoms: [memoryAtom],
+            retrievalTags: ["boundary"],
+            conflictRefs: [],
+            activeHostVersion: hostContext.activeVersion
+        )
+        let candidate = BASCandidatePath(
+            candidateID: "cand-1",
+            title: "Pause and protect",
+            actionSummary: "Hold for a moment before acting.",
+            requiredEvidence: ["high pressure"],
+            expectedBenefit: 0.9,
+            expectedCost: 0.2,
+            reversibility: 0.8,
+            confidence: 0.87
+        )
+        let forecast = BASForecastItem(
+            candidateID: candidate.candidateID,
+            shortTermOutcome: "Less immediate pressure",
+            midTermOutcome: "Better boundary clarity",
+            worstCase: "Minor delay",
+            uncertainty: 0.2,
+            affectedRelations: ["self"]
+        )
+        let critique = BASCritiqueItem(
+            candidateID: candidate.candidateID,
+            critiqueType: .boundaryConflict,
+            critiqueText: "The safer route avoids forcing the choice too early.",
+            severity: 0.74
+        )
+        let triScore = BASTriSelfScore(
+            candidateID: candidate.candidateID,
+            idScore: 0.42,
+            egoScore: 0.81,
+            superegoScore: 0.91,
+            mergedScore: 0.83,
+            veto: false
+        )
+        let mergedChoice = BASMergedChoice(
+            candidateID: candidate.candidateID,
+            title: "Pause first",
+            actionSummary: "Use the safer next step."
+        )
+        let riskCard = BASRiskCard(
+            totalRisk: 0.88,
+            riskLevel: .high,
+            factors: ["pressure", "uncertainty"],
+            uncertainty: 0.56,
+            irreversibility: 0.79,
+            manipulationStrength: 0.73,
+            gsiScore: 0.68,
+            recommendedMode: .delay
+        )
+        let actionPermit = BASActionPermit(
+            mode: .delay,
+            reasonCodes: ["risk.high", "gsi.elevated"],
+            requireSecondCheck: true,
+            outputLengthCap: 120,
+            tonePolicy: "clear_firm",
+            templatePolicy: "protective_alternative"
+        )
+        let thoughtFrame = BASThoughtFrame(
+            stepIndex: 1,
+            decomposeRef: "decomp-1",
+            memoryRefs: [memoryAtom.memoryID],
+            candidates: [candidate],
+            forecasts: [forecast],
+            critiques: [critique],
+            triScores: [triScore],
+            riskCard: riskCard,
+            actionPermit: actionPermit,
+            stabilityScore: 0.91,
+            stopReason: .blocked
+        )
+        let thoughtFold = BASThoughtFold(
+            foldID: "fold-1",
+            compactSlots: ["headline": "Pause first", "body": "Mirror body"],
+            candidateSignatures: [candidate.candidateID],
+            riskSnapshot: riskCard,
+            hostEffectSummary: "Host boundary remains primary.",
+            restorePointer: "restore-1",
+            checksum: "checksum-1"
+        )
+        let updateTicket = BASUpdateTicket(
+            ticketID: "ticket-1",
+            sessionRef: "session-1",
+            summary: "Record a protective turn.",
+            memoryWriteSuggestion: "Keep the boundary signal in warm memory.",
+            hostProfileChangeSuggestion: nil,
+            ruleCandidateRef: "rule-1",
+            confidence: 0.84,
+            conflictFlag: false,
+            requiresReview: true
+        )
+        let runtimeTrace = BASRuntimeTrace(
+            sessionID: "session-1",
+            layerEvents: [
+                BASRuntimeTraceEvent(
+                    layerID: "L11",
+                    event: "gate",
+                    detail: "Protective short-circuited refinement."
+                )
+            ],
+            latencyBreakdownMs: ["guard": 3],
+            powerEstimate: 0.12,
+            thermalTrace: ["cool"],
+            modelRoute: "guarded",
+            loopCount: 1,
+            cacheHitRate: 0,
+            activeKillSwitches: [.forceGuardMode],
+            guardrailFindings: [
+                BASRuntimeAuditFinding(
+                    code: "protected_permit",
+                    layerID: "L11",
+                    summary: "Protective short-circuit requested.",
+                    severity: .high,
+                    enforced: true
+                )
+            ],
+            recommendedKillSwitches: [.requireReviewedWrites]
+        )
+
+        return BASEBrainTurnResult(
+            deviceState: deviceState,
+            budgetFrame: budgetFrame,
+            hostContext: hostContext,
+            contextFrame: contextFrame,
+            decomposeFrame: decomposeFrame,
+            memoryBundle: memoryBundle,
+            thoughtFrame: thoughtFrame,
+            thoughtFold: thoughtFold,
+            triScores: [triScore],
+            mergedChoice: mergedChoice,
+            riskCard: riskCard,
+            actionPermit: actionPermit,
+            hostGateValue: 0.37,
+            renderedOutput: BASRenderedOutput(
+                mode: .delay,
+                headline: "Pause first",
+                body: "Mirror body",
+                alternativeActions: ["Wait 24 hours", "Draft but do not send"],
+                explanationCodes: ["risk.high", "gsi.elevated"]
+            ),
+            updateTickets: [updateTicket],
+            runtimeTrace: runtimeTrace
+        )
     }
 
     @Test

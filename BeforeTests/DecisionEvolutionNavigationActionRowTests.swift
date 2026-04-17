@@ -1,6 +1,7 @@
 import XCTest
 @testable import Before
 
+@MainActor
 final class DecisionEvolutionNavigationActionRowTests: XCTestCase {
     func testNavigationActionRowDefaultsStayAlignedWithSharedNavigationContract() {
         let options = DecisionEvolutionSurfaceContract.settings.navigationSurfaceOptions(
@@ -78,5 +79,57 @@ final class DecisionEvolutionNavigationActionRowTests: XCTestCase {
         XCTAssertEqual(row.controlCenterTitle, "Inspect control center")
         XCTAssertEqual(row.historyTitle, "Inspect history")
         XCTAssertEqual(row.portraitTitle, "Inspect portrait")
+    }
+
+    func testNavigationActionRowCanBeBuiltFromSharedPresentation() {
+        let presentation = DecisionEvolutionNavigationRowPresentationSupport.pilotMutationHub(
+            surfaceContract: .controlCenter,
+            navigationOptions: DecisionEvolutionSurfaceContract.controlCenter.navigationSurfaceOptions(
+                showHistoryShortcut: true
+            )
+        )
+
+        let row = DecisionEvolutionNavigationActionRow(presentation: presentation)
+
+        XCTAssertEqual(row.navigationOptions, presentation.navigationOptions)
+        XCTAssertFalse(row.routesMutationsToControlCenter)
+        XCTAssertEqual(row.controlCenterTitle, "Control center")
+        XCTAssertEqual(row.controlCenterStyle, .tertiary)
+        XCTAssertEqual(row.adjacentShortcutStyle, .tertiary)
+    }
+
+    func testNavigationActionRowCanBeBuiltFromReadFirstAndCheckpointHubPresentations() {
+        let readFirstPresentation = DecisionEvolutionNavigationRowPresentationSupport.settingsReadFirst(
+            surfaceContract: .settings,
+            navigationOptions: DecisionEvolutionSurfaceContract.settings.navigationSurfaceOptions(
+                showControlCenterShortcut: true,
+                showHistoryShortcut: true,
+                showPortraitShortcut: true
+            )
+        )
+        let readFirstRow = DecisionEvolutionNavigationActionRow(
+            presentation: readFirstPresentation
+        )
+        XCTAssertTrue(readFirstRow.routesMutationsToControlCenter)
+        XCTAssertEqual(readFirstRow.controlCenterTitle, "Open control center")
+        XCTAssertEqual(readFirstRow.controlCenterStyle, .primary)
+        XCTAssertEqual(readFirstRow.adjacentShortcutStyle, .secondary)
+        XCTAssertEqual(readFirstRow.historyTitle, "Open History")
+        XCTAssertEqual(readFirstRow.portraitTitle, "Open Portrait")
+
+        let checkpointPresentation = DecisionEvolutionNavigationRowPresentationSupport.checkpointMutationHub(
+            surfaceContract: .controlCenter,
+            navigationOptions: DecisionEvolutionSurfaceContract.controlCenter.navigationSurfaceOptions(
+                showPortraitShortcut: true
+            )
+        )
+        let checkpointRow = DecisionEvolutionNavigationActionRow(
+            presentation: checkpointPresentation
+        )
+        XCTAssertFalse(checkpointRow.routesMutationsToControlCenter)
+        XCTAssertEqual(checkpointRow.controlCenterTitle, "Control center")
+        XCTAssertEqual(checkpointRow.controlCenterStyle, .secondary)
+        XCTAssertEqual(checkpointRow.adjacentShortcutStyle, .secondary)
+        XCTAssertEqual(checkpointRow.portraitTitle, "Open Portrait")
     }
 }

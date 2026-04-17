@@ -40,6 +40,10 @@ struct DecisionEvolutionCheckpointPanelView: View {
                 }
 
                 HStack(alignment: .top, spacing: 10) {
+                    let selectionPresentation = checkpoint.selectionActionPresentation(
+                        isSelected: isSelected
+                    )
+
                     VStack(alignment: .leading, spacing: 6) {
                         Label(checkpoint.mode.title, systemImage: checkpoint.mode.symbolName)
                             .font(.headline)
@@ -53,7 +57,7 @@ struct DecisionEvolutionCheckpointPanelView: View {
                     Spacer()
 
                     VStack(alignment: .trailing, spacing: 6) {
-                        Text(approvalTitle(checkpoint.approvalState))
+                        Text(checkpoint.approvalStateTitle)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(approvalColor(checkpoint.approvalState))
                             .padding(.horizontal, 10)
@@ -63,14 +67,14 @@ struct DecisionEvolutionCheckpointPanelView: View {
                                     .fill(approvalColor(checkpoint.approvalState).opacity(0.12))
                             )
 
-                        Text(checkpoint.rollbackReady ? "Rollback ready" : "Rollback unavailable")
+                        Text(checkpoint.rollbackStateTitle)
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(checkpoint.rollbackReady ? BeforeTheme.moss : .secondary)
 
                         if let onToggleSelection {
                             BeforeActionButton(
-                                isSelected ? "Selected" : "Select",
-                                style: isSelected ? .primary : .tertiary
+                                selectionPresentation.title,
+                                style: selectionPresentation.usesPrimaryStyle ? .primary : .tertiary
                             ) {
                                 onToggleSelection()
                             }
@@ -82,13 +86,13 @@ struct DecisionEvolutionCheckpointPanelView: View {
                     summaryText: checkpoint.summaryText,
                     summaryColor: checkpoint.usesSecondarySummaryTone ? .secondary : BeforeTheme.ember,
                     metadataText: checkpoint.metadataText,
-                    ticketSummaries: checkpoint.updateTicketSummaries,
-                    auditFindings: checkpoint.auditFindings,
-                    killSwitches: checkpoint.killSwitches
+                    ticketsLine: checkpoint.ticketsLine,
+                    auditLine: checkpoint.auditLine,
+                    killSwitchesLine: checkpoint.killSwitchesLine
                 )
 
-                if !checkpoint.diffSummary.isEmpty {
-                    Text("Diff: \(checkpoint.diffSummary.joined(separator: " • "))")
+                if let diffLine = checkpoint.diffLine {
+                    Text(diffLine)
                         .font(.caption2)
                         .foregroundStyle(BeforeTheme.ember)
                 }
@@ -105,15 +109,6 @@ struct DecisionEvolutionCheckpointPanelView: View {
                     afterMutation: afterMutation
                 )
             }
-        }
-    }
-
-    private func approvalTitle(_ state: DecisionEvolutionApprovalState) -> String {
-        switch state {
-        case .automatic:
-            "Automatic"
-        case .reviewSuggested:
-            "Review suggested"
         }
     }
 

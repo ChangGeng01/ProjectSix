@@ -17,8 +17,8 @@ struct DecisionEvolutionNavigationActionRow: View {
         controlCenterTitle: String? = nil,
         controlCenterStyle: BeforeActionButton.Style = .primary,
         adjacentShortcutStyle: BeforeActionButton.Style = .secondary,
-        historyTitle: String = "Open History",
-        portraitTitle: String = "Open Portrait"
+        historyTitle: String = DecisionEvolutionNavigationRowPresentationSupport.historyTitle,
+        portraitTitle: String = DecisionEvolutionNavigationRowPresentationSupport.portraitTitle
     ) {
         self.navigationOptions = navigationOptions
         self.routesMutationsToControlCenter = routesMutationsToControlCenter
@@ -30,6 +30,18 @@ struct DecisionEvolutionNavigationActionRow: View {
         self.adjacentShortcutStyle = adjacentShortcutStyle
         self.historyTitle = historyTitle
         self.portraitTitle = portraitTitle
+    }
+
+    init(presentation: DecisionEvolutionNavigationRowPresentation) {
+        self.init(
+            navigationOptions: presentation.navigationOptions,
+            routesMutationsToControlCenter: presentation.routesMutationsToControlCenter,
+            controlCenterTitle: presentation.controlCenterTitle,
+            controlCenterStyle: presentation.controlCenterStyle.buttonStyle,
+            adjacentShortcutStyle: presentation.adjacentShortcutStyle.buttonStyle,
+            historyTitle: presentation.historyTitle,
+            portraitTitle: presentation.portraitTitle
+        )
     }
 
     var body: some View {

@@ -11,18 +11,18 @@ enum DecisionEvolutionControlInteractionMode: String, Equatable, Sendable {
     var operatorHeadline: String {
         switch self {
         case .mutationHub:
-            "Operate mutations here"
+            DecisionEvolutionMutationHubPresentationSupport.headline
         case .observeAndRoute:
-            "Mutations are centralized in Evolution Control"
+            DecisionEvolutionControlSurfaceLexiconSupport.mutationCentralizedHeadline
         }
     }
 
     var operatorDetail: String {
         switch self {
         case .mutationHub:
-            "Apply, approve, rollback, and lineage-clearing actions stay available in this dedicated control surface."
+            DecisionEvolutionMutationHubPresentationSupport.operatorDetail
         case .observeAndRoute:
-            "This surface stays aligned as a read-first status view. Open the control center to mutate checkpoints without splitting review facts across multiple shells."
+            DecisionEvolutionMutationRoutingPresentationSupport.readFirstOperatorDetail
         }
     }
 }

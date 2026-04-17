@@ -2,6 +2,15 @@ import XCTest
 @testable import Before
 
 final class SharedContainerTests: XCTestCase {
+    func testDefaultContainerURLSkipsLookupWhenRunningTests() {
+        XCTAssertNil(
+            SharedContainer.defaultContainerURL(
+                for: SharedContainer.appGroupID,
+                isRunningTests: true
+            )
+        )
+    }
+
     func testResolveUsesFallbackNoticeWhenSuiteCannotBeOpened() {
         let fallback = UserDefaults.standard
 

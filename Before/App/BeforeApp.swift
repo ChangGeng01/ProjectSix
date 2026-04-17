@@ -5,6 +5,7 @@ import SwiftUI
 struct BeforeApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var bootstrapState = AppBootstrapState()
+    private let isHostedUnitTest = DecisionTestingInterface.runtimeTestingContextDetected()
 
     var body: some Scene {
         WindowGroup {
@@ -14,9 +15,11 @@ struct BeforeApp: App {
                         .environmentObject(appModel)
                         .modelContainer(appModel.modelContainer)
                         .onAppear {
+                            guard !isHostedUnitTest else { return }
                             appModel.handleInitialAppearance()
                         }
                         .onChange(of: scenePhase) { _, newValue in
+                            guard !isHostedUnitTest else { return }
                             appModel.handleScenePhase(newValue)
                         }
                 } else {
@@ -49,10 +52,14 @@ private final class AppBootstrapState: ObservableObject {
             : startupMessages.joined(separator: "\n\n")
 
         if let container = bootstrap.container {
-            appModel = BeforeAppModel(
+            let appModel = BeforeAppModel(
                 modelContainer: container,
                 startupNotice: startupNotice
             )
+            if DecisionTestingInterface.runtimeTestingContextDetected() {
+                appModel.suppressHostedTestPresentations()
+            }
+            self.appModel = appModel
         } else {
             appModel = nil
         }

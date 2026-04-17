@@ -46,6 +46,14 @@ struct DecisionSystemLayerReport: Identifiable, Equatable, Sendable {
     let blockers: [String]
 
     var id: DecisionSystemLayer { layer }
+
+    var surfaceSummaryLine: String? {
+        blockers.first.map { "Blocker: \($0)" } ?? signals.first
+    }
+
+    var surfaceSummaryUsesHealthTint: Bool {
+        !blockers.isEmpty
+    }
 }
 
 struct DecisionSystemEBrainSummary: Equatable, Sendable {
@@ -58,6 +66,7 @@ struct DecisionSystemEBrainSummary: Equatable, Sendable {
     let loopCount: Int
     let cacheHitRate: Int
     let hostGatePercent: Int
+    let pressureLine: String?
     let foldChecksum: String
     let updateTicketCount: Int
     let auditFindingCount: Int
@@ -76,6 +85,7 @@ struct DecisionSystemEBrainSummaryPresentation: Equatable, Sendable {
     let sourceDescriptor: DecisionEvolutionSourceDescriptor
     let statusLine: String
     let routeLine: String
+    let pressureLine: String?
     let hostLine: String
     let inspectionHeadline: String
     let primaryGuardrailText: String?
@@ -85,11 +95,80 @@ extension DecisionSystemEBrainSummary {
     var presentation: DecisionSystemEBrainSummaryPresentation {
         DecisionSystemEBrainSummaryPresentation(
             sourceDescriptor: sourceDescriptor,
-            statusLine: "\(runMode.uppercased()) • \(taskType.replacingOccurrences(of: "_", with: " ")) • \(riskLevel.uppercased()) → \(permitMode.uppercased())",
+            statusLine: "\(runMode.uppercased()) • \(taskType.replacingOccurrences(of: "_", with: " ")) • \(DecisionEvolutionEBrainPresentationSupport.riskPermitLine(riskLevel: riskLevel, permitMode: permitMode))",
             routeLine: "Route \(deviceRoute) • Loops \(loopCount) • Cache \(cacheHitRate)% • Tickets \(updateTicketCount)",
-            hostLine: "Host gate \(hostGatePercent)% • Fold \(foldChecksum) • Audit \(auditFindingCount)",
+            pressureLine: pressureLine,
+            hostLine: "\(DecisionEvolutionEBrainPresentationSupport.hostFoldLine(hostGatePercent: hostGatePercent, foldChecksum: foldChecksum)) • Audit \(auditFindingCount)",
             inspectionHeadline: inspectionHeadline,
             primaryGuardrailText: blockers.first.map { "Guardrail: \($0)" }
+        )
+    }
+}
+
+extension BASEBrainTurnResult {
+    var systemFlightDeckSummary: DecisionSystemEBrainSummary {
+        let inspection = BASEBrainConsoleSupport.inspectionBundle(for: self)
+        let factsBundle = DeveloperDecisionReplayEBrainSummary(turn: self).factsBundle()
+
+        return DecisionSystemEBrainSummary(
+            source: .liveRuntime,
+            runMode: budgetFrame.runMode.rawValue,
+            taskType: contextFrame.taskType.rawValue,
+            riskLevel: riskCard.riskLevel.rawValue,
+            permitMode: actionPermit.mode.rawValue,
+            deviceRoute: runtimeTrace.modelRoute,
+            loopCount: runtimeTrace.loopCount,
+            cacheHitRate: Int((runtimeTrace.cacheHitRate * 100).rounded()),
+            hostGatePercent: Int((hostGateValue * 100).rounded()),
+            pressureLine: factsBundle.pressureLine,
+            foldChecksum: String(thoughtFold.checksum.prefix(12)),
+            updateTicketCount: updateTickets.count,
+            auditFindingCount: runtimeTrace.guardrailFindings.count,
+            activeKillSwitches: runtimeTrace.activeKillSwitches.map(\.rawValue),
+            recommendedKillSwitches: runtimeTrace.recommendedKillSwitches.map(\.rawValue),
+            killSwitches: DecisionSystemFlightDeckBuilder.orderedUnique(
+                runtimeTrace.activeKillSwitches.map(\.rawValue)
+                + runtimeTrace.recommendedKillSwitches.map(\.rawValue)
+            ),
+            inspectionHeadline: inspection.summary,
+            blockers: inspection.blockerSummary,
+            checkpointID: nil,
+            checkpointApprovalState: nil,
+            checkpointRollbackReady: nil,
+            checkpointApplyReady: nil
+        )
+    }
+}
+
+extension DecisionEvolutionLineageSnapshot {
+    var systemFlightDeckSummary: DecisionSystemEBrainSummary {
+        let factsBundle = factsBundle
+
+        return DecisionSystemEBrainSummary(
+            source: eBrain.source == .liveRuntime ? .liveRuntime : .persistedCheckpoint,
+            runMode: "checkpoint",
+            taskType: eBrain.taskType,
+            riskLevel: eBrain.riskLevel,
+            permitMode: eBrain.permitMode,
+            deviceRoute: "persisted",
+            loopCount: 0,
+            cacheHitRate: 0,
+            hostGatePercent: eBrain.hostGatePercent,
+            pressureLine: factsBundle.pressureLine,
+            foldChecksum: eBrain.thoughtFoldChecksum,
+            updateTicketCount: eBrain.updateTicketSummaries.count,
+            auditFindingCount: eBrain.guardrailFindings.count,
+            activeKillSwitches: eBrain.activeKillSwitches,
+            recommendedKillSwitches: eBrain.killSwitches.filter {
+                !eBrain.activeKillSwitches.contains($0)
+            },
+            killSwitches: eBrain.killSwitches,
+            inspectionHeadline: "\(factsBundle.runtimeSummaryLine) • \(approvalState.rawValue)",
+            blockers: diffSummary,
+            checkpointID: checkpointID,
+            checkpointApprovalState: approvalState.rawValue,
+            checkpointRollbackReady: rollbackReady,
+            checkpointApplyReady: hasBrainStateSnapshot
         )
     }
 }
@@ -108,8 +187,12 @@ struct DecisionSystemSessionEngineSummary: Equatable, Sendable {
     let activeSession: DecisionSessionRuntimeInspectionSession?
     let recentSessions: [DecisionSessionRuntimeInspectionSession]
     let headline: String
-    let signals: [String]
+    let signalBreakdown: DecisionSessionSummarySignalBreakdown
     let pendingImportPreview: DecisionSessionEngineImportPreviewPresentation?
+
+    var signals: [String] {
+        signalBreakdown.allSignals
+    }
 
     init(
         layerPlacement: DecisionSessionLayerPlacement,
@@ -125,9 +208,12 @@ struct DecisionSystemSessionEngineSummary: Equatable, Sendable {
         activeSession: DecisionSessionRuntimeInspectionSession?,
         recentSessions: [DecisionSessionRuntimeInspectionSession],
         headline: String,
-        signals: [String],
+        signals: [String] = [],
+        signalBreakdown: DecisionSessionSummarySignalBreakdown? = nil,
         pendingImportPreview: DecisionSessionEngineImportPreviewPresentation? = nil
     ) {
+        let resolvedSignalBreakdown = signalBreakdown
+            ?? DecisionSessionSummarySignalBreakdown.legacy(signals)
         self.layerPlacement = layerPlacement
         self.sessions = sessions
         self.activeSessions = activeSessions
@@ -141,9 +227,161 @@ struct DecisionSystemSessionEngineSummary: Equatable, Sendable {
         self.activeSession = activeSession
         self.recentSessions = recentSessions
         self.headline = headline
-        self.signals = signals
+        self.signalBreakdown = resolvedSignalBreakdown
         self.pendingImportPreview = pendingImportPreview
     }
+}
+
+extension DecisionSystemSessionEngineSummary {
+    private static func summary(
+        layerPlacement: DecisionSessionLayerPlacement,
+        sessions: Int,
+        activeSessions: Int,
+        stalledSessions: Int,
+        mergeReadySessions: Int,
+        mergeableBranches: Int,
+        branches: Int,
+        checkpoints: Int,
+        events: Int,
+        steps: Int,
+        recentSessions: [DecisionSessionRuntimeInspectionSession],
+        headline: String,
+        pendingImportPreview: DecisionSessionEngineImportPreviewPresentation?
+    ) -> DecisionSystemSessionEngineSummary {
+        DecisionSystemSessionEngineSummary(
+            layerPlacement: layerPlacement,
+            sessions: sessions,
+            activeSessions: activeSessions,
+            stalledSessions: stalledSessions,
+            mergeReadySessions: mergeReadySessions,
+            mergeableBranches: mergeableBranches,
+            branches: branches,
+            checkpoints: checkpoints,
+            events: events,
+            steps: steps,
+            activeSession: recentSessions.first,
+            recentSessions: recentSessions,
+            headline: headline,
+            signalBreakdown: DecisionSessionSummaryPresentationSupport.summarySignalBreakdown(
+                layerPlacement: layerPlacement,
+                sessions: sessions,
+                activeSessions: activeSessions,
+                stalledSessions: stalledSessions,
+                mergeReadySessions: mergeReadySessions,
+                mergeableBranches: mergeableBranches,
+                branches: branches,
+                checkpoints: checkpoints,
+                events: events,
+                steps: steps,
+                recentSessions: recentSessions,
+                pendingImportPreview: pendingImportPreview
+            ),
+            pendingImportPreview: pendingImportPreview
+        )
+    }
+
+    private static func recentSessions(
+        runtimeSnapshot: DecisionSessionRuntimeSnapshot?,
+        inspectionBySessionID: [String: DecisionSessionRuntimeInspectionSession]
+    ) -> [DecisionSessionRuntimeInspectionSession] {
+        if let runtimeSnapshot {
+            return runtimeSnapshot.recentSessions
+        }
+        return inspectionBySessionID.values.sorted { lhs, rhs in
+            lhs.updatedAt > rhs.updatedAt
+        }
+    }
+
+    private static func effectiveMergeCounts(
+        runtimeSnapshot: DecisionSessionRuntimeSnapshot?,
+        recentSessions: [DecisionSessionRuntimeInspectionSession]
+    ) -> (mergeReadySessions: Int, mergeableBranches: Int) {
+        let derivedMergeReadySessions = recentSessions.filter { $0.mergeableBranchCount > 0 }.count
+        let derivedMergeableBranches = recentSessions.reduce(into: 0) { $0 += $1.mergeableBranchCount }
+
+        return (
+            max(runtimeSnapshot?.mergeReadySessions ?? 0, derivedMergeReadySessions),
+            max(runtimeSnapshot?.mergeableBranches ?? 0, derivedMergeableBranches)
+        )
+    }
+
+    static func runtimeSummary(
+        from snapshot: DecisionSessionRuntimeSnapshot,
+        pendingImportPreview: DecisionSessionEngineImportPreviewPresentation?
+    ) -> DecisionSystemSessionEngineSummary {
+        summary(
+            layerPlacement: snapshot.layerPlacement,
+            sessions: snapshot.sessions,
+            activeSessions: snapshot.activeSessions,
+            stalledSessions: snapshot.stalledSessions,
+            mergeReadySessions: snapshot.mergeReadySessions,
+            mergeableBranches: snapshot.mergeableBranches,
+            branches: snapshot.branches,
+            checkpoints: snapshot.checkpoints,
+            events: snapshot.events,
+            steps: snapshot.steps,
+            recentSessions: snapshot.recentSessions,
+            headline: DecisionSessionSummaryPresentationSupport.runtimeHeadline(
+                layerPlacement: snapshot.layerPlacement
+            ),
+            pendingImportPreview: pendingImportPreview
+        )
+    }
+
+    static func pendingImportSummary(
+        for preview: DecisionSessionEngineImportPreviewPresentation
+    ) -> DecisionSystemSessionEngineSummary {
+        summary(
+            layerPlacement: .foldedLung,
+            sessions: 0,
+            activeSessions: 0,
+            stalledSessions: 0,
+            mergeReadySessions: 0,
+            mergeableBranches: 0,
+            branches: 0,
+            checkpoints: 0,
+            events: 0,
+            steps: 0,
+            recentSessions: [],
+            headline: DecisionSessionSummaryPresentationSupport.pendingImportHeadline(),
+            pendingImportPreview: preview
+        )
+    }
+
+    static func controlCenterSummary(
+        runtimeSnapshot: DecisionSessionRuntimeSnapshot?,
+        inspectionBySessionID: [String: DecisionSessionRuntimeInspectionSession],
+        pendingImportPreview: DecisionSessionEngineImportPreviewPresentation?
+    ) -> DecisionSystemSessionEngineSummary {
+        let recentSessions = recentSessions(
+            runtimeSnapshot: runtimeSnapshot,
+            inspectionBySessionID: inspectionBySessionID
+        )
+        let inspectionAggregate = DecisionSessionSummaryPresentationSupport.inspectionAggregate(
+            sessions: recentSessions
+        )
+        let mergeCounts = effectiveMergeCounts(
+            runtimeSnapshot: runtimeSnapshot,
+            recentSessions: recentSessions
+        )
+
+        return summary(
+            layerPlacement: runtimeSnapshot?.layerPlacement ?? .foldedLung,
+            sessions: runtimeSnapshot?.sessions ?? inspectionAggregate.sessions,
+            activeSessions: runtimeSnapshot?.activeSessions ?? inspectionAggregate.activeSessions,
+            stalledSessions: runtimeSnapshot?.stalledSessions ?? inspectionAggregate.stalledSessions,
+            mergeReadySessions: mergeCounts.mergeReadySessions,
+            mergeableBranches: mergeCounts.mergeableBranches,
+            branches: runtimeSnapshot?.branches ?? inspectionAggregate.branches,
+            checkpoints: runtimeSnapshot?.checkpoints ?? inspectionAggregate.checkpoints,
+            events: runtimeSnapshot?.events ?? 0,
+            steps: runtimeSnapshot?.steps ?? 0,
+            recentSessions: recentSessions,
+            headline: DecisionSessionControlPresentationSupport.summaryHeadline,
+            pendingImportPreview: pendingImportPreview
+        )
+    }
+
 }
 
 struct DecisionSystemLocalModelLibrarySummary: Equatable, Sendable {
@@ -157,8 +395,100 @@ struct DecisionSystemLocalModelLibrarySummary: Equatable, Sendable {
     let openModelRuntimeTitle: String?
     let openModelRuntimeMode: OpenModelLocalRuntimeMode?
     let openModelRuntimeAssetFileName: String?
+    let preferredLine: String
+    let bundledLine: String
+    let openModelSlotLine: String
+    let openModelRuntimeLine: String
+    let openModelAssetLine: String
     let headline: String
-    let signals: [String]
+
+    var signals: [String] {
+        [
+            preferredLine,
+            bundledLine,
+            openModelSlotLine,
+            openModelRuntimeLine,
+            openModelAssetLine
+        ]
+    }
+
+    var runtimeLayerSignals: [String] {
+        [headline, preferredLine]
+    }
+
+    var dataLayerSignals: [String] {
+        [
+            bundledLine,
+            openModelSlotLine,
+            openModelRuntimeLine,
+            openModelAssetLine
+        ]
+    }
+
+    var deliveryLayerSignals: [String] {
+        [openModelSlotLine]
+    }
+
+    var overviewLine: String {
+        headline
+    }
+
+    static func summary(
+        from snapshot: DecisionLocalModelLibrarySnapshot
+    ) -> DecisionSystemLocalModelLibrarySummary {
+        let bundledLine = snapshot.hasAnyGemmaAsset
+            ? "Gemma assets \(snapshot.allGemmaAssets.count) • Imported \(snapshot.importedGemmaAssets.count) • Bundled \(snapshot.bundledGemmaAsset == nil ? 0 : 1)"
+            : "No local Gemma asset is currently available."
+        let preferredLine = if let preferredAsset = snapshot.preferredGemmaAsset {
+            "Preferred \(snapshot.preferredProvider.title) • Gemma asset \(preferredAsset.fileName)"
+        } else {
+            "Preferred \(snapshot.preferredProvider.title) • Gemma asset automatic"
+        }
+        let openModelLine = if let openModelSlot = snapshot.openModelSlot {
+            if let stableID = openModelSlot.stableID {
+                "Open-model slot \(openModelSlot.title) • \(stableID)"
+            } else {
+                "Open-model slot \(openModelSlot.title)"
+            }
+        } else {
+            "Open-model slot not registered"
+        }
+        let openModelRuntimeLine = if let runtimeStatus = snapshot.openModelRuntimeStatus {
+            "Open-model runtime \(runtimeStatus.title) • \(snapshot.openModelRuntimeAssetFileName ?? "automatic asset")"
+        } else if snapshot.openModelSlot != nil {
+            "Open-model runtime waiting for imported asset"
+        } else if snapshot.hasAnyOpenModelAsset {
+            "Open-model runtime pending activation"
+        } else {
+            "Open-model runtime has no imported asset"
+        }
+        let openModelAssetLine = if let preferredOpenModelAsset = snapshot.preferredOpenModelAsset {
+            "Open-model assets \(snapshot.importedOpenModelAssets.count) • Preferred asset \(preferredOpenModelAsset.fileName)"
+        } else if snapshot.hasAnyOpenModelAsset {
+            "Open-model assets \(snapshot.importedOpenModelAssets.count) • Automatic asset selection"
+        } else {
+            "No imported open-model asset is currently available."
+        }
+
+        return DecisionSystemLocalModelLibrarySummary(
+            preferredProvider: snapshot.preferredProvider,
+            importedGemmaCount: snapshot.importedGemmaAssets.count,
+            hasBundledGemmaAsset: snapshot.bundledGemmaAsset != nil,
+            preferredGemmaAssetID: snapshot.preferredGemmaAssetID,
+            preferredGemmaAssetFileName: snapshot.preferredGemmaAsset?.fileName,
+            openModelSlotTitle: snapshot.openModelSlot?.title,
+            openModelSlotStableID: snapshot.openModelSlot?.stableID,
+            openModelRuntimeTitle: snapshot.openModelRuntimeStatus?.title ?? (snapshot.openModelSlot != nil ? "Waiting for import" : nil),
+            openModelRuntimeMode: snapshot.openModelRuntimeStatus?.mode,
+            openModelRuntimeAssetFileName: snapshot.openModelRuntimeAssetFileName,
+            preferredLine: preferredLine,
+            bundledLine: bundledLine,
+            openModelSlotLine: openModelLine,
+            openModelRuntimeLine: openModelRuntimeLine,
+            openModelAssetLine: openModelAssetLine,
+            headline: "Local model library keeps Apple default while surfacing Gemma and configurable open-model runtime slots."
+        )
+    }
 }
 
 struct DecisionSystemCheckpointQueueItem: Identifiable, Equatable, Sendable {
@@ -243,16 +573,18 @@ enum DecisionSystemFlightDeckBuilder {
         let compilation = export.basFlightDeckCompilation
         let pendingImportPreview = export.pendingSessionEngineImportPreview?.presentation
         let sessionEngineSummary: DecisionSystemSessionEngineSummary? = if let sessionEngineSnapshot = export.sessionEngineSnapshot {
-            summary(
+            DecisionSystemSessionEngineSummary.runtimeSummary(
                 from: sessionEngineSnapshot,
                 pendingImportPreview: pendingImportPreview
             )
         } else if let pendingImportPreview {
-            summary(forPendingImportPreview: pendingImportPreview)
+            DecisionSystemSessionEngineSummary.pendingImportSummary(for: pendingImportPreview)
         } else {
             nil
         }
-        let localModelLibrarySummary = summary(from: export.runtimeSnapshot.localModelLibrary)
+        let localModelLibrarySummary = DecisionSystemLocalModelLibrarySummary.summary(
+            from: export.runtimeSnapshot.localModelLibrary
+        )
         let evolutionRuntimeFacts = export.evolutionRuntimeFacts(currentBrainState: nil)
         let reports = augment(
             reports: compilation.layerReports.map(layerReport(from:)),
@@ -306,239 +638,13 @@ enum DecisionSystemFlightDeckBuilder {
     }
 
     private static func summary(from turn: BASEBrainTurnResult) -> DecisionSystemEBrainSummary {
-        let inspection = BASEBrainConsoleSupport.inspectionBundle(for: turn)
-
-        return DecisionSystemEBrainSummary(
-            source: .liveRuntime,
-            runMode: turn.budgetFrame.runMode.rawValue,
-            taskType: turn.contextFrame.taskType.rawValue,
-            riskLevel: turn.riskCard.riskLevel.rawValue,
-            permitMode: turn.actionPermit.mode.rawValue,
-            deviceRoute: turn.runtimeTrace.modelRoute,
-            loopCount: turn.runtimeTrace.loopCount,
-            cacheHitRate: Int((turn.runtimeTrace.cacheHitRate * 100).rounded()),
-            hostGatePercent: Int((turn.hostGateValue * 100).rounded()),
-            foldChecksum: String(turn.thoughtFold.checksum.prefix(12)),
-            updateTicketCount: turn.updateTickets.count,
-            auditFindingCount: turn.runtimeTrace.guardrailFindings.count,
-            activeKillSwitches: turn.runtimeTrace.activeKillSwitches.map(\.rawValue),
-            recommendedKillSwitches: turn.runtimeTrace.recommendedKillSwitches.map(\.rawValue),
-            killSwitches: orderedUnique(
-                turn.runtimeTrace.activeKillSwitches.map(\.rawValue)
-                + turn.runtimeTrace.recommendedKillSwitches.map(\.rawValue)
-            ),
-            inspectionHeadline: inspection.summary,
-            blockers: inspection.blockerSummary,
-            checkpointID: nil,
-            checkpointApprovalState: nil,
-            checkpointRollbackReady: nil,
-            checkpointApplyReady: nil
-        )
+        turn.systemFlightDeckSummary
     }
 
     private static func summary(
         from lineage: DecisionEvolutionLineageSnapshot
     ) -> DecisionSystemEBrainSummary {
-        let factsBundle = lineage.eBrain.factsBundle(modeTitle: lineage.mode.shortTitle)
-        return DecisionSystemEBrainSummary(
-            source: lineage.eBrain.source == .liveRuntime ? .liveRuntime : .persistedCheckpoint,
-            runMode: "checkpoint",
-            taskType: lineage.eBrain.taskType,
-            riskLevel: lineage.eBrain.riskLevel,
-            permitMode: lineage.eBrain.permitMode,
-            deviceRoute: "persisted",
-            loopCount: 0,
-            cacheHitRate: 0,
-            hostGatePercent: lineage.eBrain.hostGatePercent,
-            foldChecksum: lineage.eBrain.thoughtFoldChecksum,
-            updateTicketCount: lineage.eBrain.updateTicketSummaries.count,
-            auditFindingCount: lineage.eBrain.guardrailFindings.count,
-            activeKillSwitches: lineage.eBrain.activeKillSwitches,
-            recommendedKillSwitches: lineage.eBrain.killSwitches.filter {
-                !lineage.eBrain.activeKillSwitches.contains($0)
-            },
-            killSwitches: lineage.eBrain.killSwitches,
-            inspectionHeadline: "\(factsBundle.runtimeSummaryLine) • \(lineage.approvalState.rawValue)",
-            blockers: lineage.diffSummary,
-            checkpointID: lineage.checkpointID,
-            checkpointApprovalState: lineage.approvalState.rawValue,
-            checkpointRollbackReady: lineage.rollbackReady,
-            checkpointApplyReady: lineage.hasBrainStateSnapshot
-        )
-    }
-
-    private static func summary(
-        from snapshot: DecisionSessionRuntimeSnapshot,
-        pendingImportPreview: DecisionSessionEngineImportPreviewPresentation?
-    ) -> DecisionSystemSessionEngineSummary {
-        DecisionSystemSessionEngineSummary(
-            layerPlacement: snapshot.layerPlacement,
-            sessions: snapshot.sessions,
-            activeSessions: snapshot.activeSessions,
-            stalledSessions: snapshot.stalledSessions,
-            mergeReadySessions: snapshot.mergeReadySessions,
-            mergeableBranches: snapshot.mergeableBranches,
-            branches: snapshot.branches,
-            checkpoints: snapshot.checkpoints,
-            events: snapshot.events,
-            steps: snapshot.steps,
-            activeSession: snapshot.recentSessions.first,
-            recentSessions: snapshot.recentSessions,
-            headline: "Session Engine \(snapshot.layerPlacement.rawValue) protects edits, checkpoints, and recovery.",
-            signals: [
-                "Session Engine \(snapshot.layerPlacement.rawValue) • Sessions \(snapshot.sessions) • Active \(snapshot.activeSessions) • Stalled \(snapshot.stalledSessions)",
-                "Branches \(snapshot.branches) • Merge-ready sessions \(snapshot.mergeReadySessions) • Merge-ready branches \(snapshot.mergeableBranches)",
-                "Checkpoints \(snapshot.checkpoints) • Events \(snapshot.events) • Steps \(snapshot.steps)"
-            ] + pendingImportSignals(for: pendingImportPreview)
-                + replayRecoverySignals(for: snapshot.recentSessions)
-                + checkpointDigestSignals(for: snapshot.recentSessions)
-                + snapshot.recentSessions.prefix(2).map { session in
-                let checkpointDescriptor = session.latestCheckpointID.map { "Checkpoint \($0)" } ?? "Checkpoint none"
-                let recoveryDescriptor = if let latestRecoveryAt = session.latestRecoveryAt {
-                    "Recovered \(latestRecoveryAt.formatted(date: .omitted, time: .shortened))"
-                } else {
-                    "Recoveries \(session.recoveryCount)"
-                }
-                let stepDescriptor = session.openStepAlertLine
-                    ?? session.openStepFreshnessLine
-                    ?? "Open steps \(session.openStepCount)"
-                let mergeDescriptor = session.mergeReviewLine ?? "Merge review 0"
-                return "\(session.headline) • \(checkpointDescriptor) • \(recoveryDescriptor) • \(stepDescriptor) • \(mergeDescriptor)"
-            },
-            pendingImportPreview: pendingImportPreview
-        )
-    }
-
-    private static func summary(
-        forPendingImportPreview preview: DecisionSessionEngineImportPreviewPresentation
-    ) -> DecisionSystemSessionEngineSummary {
-        DecisionSystemSessionEngineSummary(
-            layerPlacement: .foldedLung,
-            sessions: 0,
-            activeSessions: 0,
-            stalledSessions: 0,
-            mergeReadySessions: 0,
-            mergeableBranches: 0,
-            branches: 0,
-            checkpoints: 0,
-            events: 0,
-            steps: 0,
-            activeSession: nil,
-            recentSessions: [],
-            headline: "Session Engine folded_lung has a pending import draft ready for review before local recovery state is attached.",
-            signals: pendingImportSignals(for: preview),
-            pendingImportPreview: preview
-        )
-    }
-
-    private static func pendingImportSignals(
-        for preview: DecisionSessionEngineImportPreviewPresentation?
-    ) -> [String] {
-        guard let preview else { return [] }
-        return [
-            "Pending import • \(preview.bundleLine) • \(preview.importedLine)",
-            "\(preview.unfinishedWorkSummary.title) • \(preview.countsLine)"
-        ]
-    }
-
-    private static func replayRecoverySignals(
-        for sessions: [DecisionSessionRuntimeInspectionSession]
-    ) -> [String] {
-        sessions.prefix(2).flatMap { session in
-            let presentation = session.replayRecoverySummary
-            return [
-                "\(presentation.title) • \(presentation.replayLine) • \(presentation.recoveryLine)",
-                "\(presentation.detailLine)\(presentation.killSwitchesLine.map { " • \($0)" } ?? "")"
-            ]
-        }
-    }
-
-    private static func checkpointDigestSignals(
-        for sessions: [DecisionSessionRuntimeInspectionSession]
-    ) -> [String] {
-        sessions.prefix(2).flatMap { session in
-            var signals: [String] = []
-
-            let budgetLine = [session.latestCheckpointBudgetLine, session.latestCheckpointRouteLine]
-                .compactMap { $0 }
-                .joined(separator: " • ")
-
-            if budgetLine.isEmpty == false {
-                signals.append("\(session.title) • \(budgetLine)")
-            }
-
-            if let decisionLine = session.latestCheckpointDecisionLine {
-                let taskSuffix = session.latestCheckpointTaskLine.map { " • \($0)" } ?? ""
-                signals.append("\(session.title) • \(decisionLine)\(taskSuffix)")
-            } else if let taskLine = session.latestCheckpointTaskLine {
-                signals.append("\(session.title) • \(taskLine)")
-            }
-
-            if let actionLine = session.latestCheckpointActionLine {
-                signals.append("\(session.title) • \(actionLine)")
-            }
-
-            return signals
-        }
-    }
-
-    private static func summary(
-        from snapshot: DecisionLocalModelLibrarySnapshot
-    ) -> DecisionSystemLocalModelLibrarySummary {
-        let bundledLine = snapshot.hasAnyGemmaAsset
-            ? "Gemma assets \(snapshot.allGemmaAssets.count) • Imported \(snapshot.importedGemmaAssets.count) • Bundled \(snapshot.bundledGemmaAsset == nil ? 0 : 1)"
-            : "No local Gemma asset is currently available."
-        let preferredLine = if let preferredAsset = snapshot.preferredGemmaAsset {
-            "Preferred \(snapshot.preferredProvider.title) • Gemma asset \(preferredAsset.fileName)"
-        } else {
-            "Preferred \(snapshot.preferredProvider.title) • Gemma asset automatic"
-        }
-        let openModelLine = if let openModelSlot = snapshot.openModelSlot {
-            if let stableID = openModelSlot.stableID {
-                "Open-model slot \(openModelSlot.title) • \(stableID)"
-            } else {
-                "Open-model slot \(openModelSlot.title)"
-            }
-        } else {
-            "Open-model slot not registered"
-        }
-        let openModelRuntimeLine = if let runtimeStatus = snapshot.openModelRuntimeStatus {
-            "Open-model runtime \(runtimeStatus.title) • \(snapshot.openModelRuntimeAssetFileName ?? "automatic asset")"
-        } else if snapshot.openModelSlot != nil {
-            "Open-model runtime waiting for imported asset"
-        } else if snapshot.hasAnyOpenModelAsset {
-            "Open-model runtime pending activation"
-        } else {
-            "Open-model runtime has no imported asset"
-        }
-        let openModelAssetLine = if let preferredOpenModelAsset = snapshot.preferredOpenModelAsset {
-            "Open-model assets \(snapshot.importedOpenModelAssets.count) • Preferred asset \(preferredOpenModelAsset.fileName)"
-        } else if snapshot.hasAnyOpenModelAsset {
-            "Open-model assets \(snapshot.importedOpenModelAssets.count) • Automatic asset selection"
-        } else {
-            "No imported open-model asset is currently available."
-        }
-
-        return DecisionSystemLocalModelLibrarySummary(
-            preferredProvider: snapshot.preferredProvider,
-            importedGemmaCount: snapshot.importedGemmaAssets.count,
-            hasBundledGemmaAsset: snapshot.bundledGemmaAsset != nil,
-            preferredGemmaAssetID: snapshot.preferredGemmaAssetID,
-            preferredGemmaAssetFileName: snapshot.preferredGemmaAsset?.fileName,
-            openModelSlotTitle: snapshot.openModelSlot?.title,
-            openModelSlotStableID: snapshot.openModelSlot?.stableID,
-            openModelRuntimeTitle: snapshot.openModelRuntimeStatus?.title ?? (snapshot.openModelSlot != nil ? "Waiting for import" : nil),
-            openModelRuntimeMode: snapshot.openModelRuntimeStatus?.mode,
-            openModelRuntimeAssetFileName: snapshot.openModelRuntimeAssetFileName,
-            headline: "Local model library keeps Apple default while surfacing Gemma and configurable open-model runtime slots.",
-            signals: [
-                preferredLine,
-                bundledLine,
-                openModelLine,
-                openModelRuntimeLine,
-                openModelAssetLine
-            ]
-        )
+        lineage.systemFlightDeckSummary
     }
 
     private static func augment(
@@ -550,12 +656,11 @@ enum DecisionSystemFlightDeckBuilder {
         return reports.map { report in
             switch report.layer {
             case .runtime:
-                let runtimeSignals = [
-                    sessionEngineSummary?.headline,
-                    sessionEngineSummary?.signals.first,
-                    localModelLibrarySummary?.headline,
-                    localModelLibrarySummary?.signals.first
-                ].compactMap { $0 }
+                let runtimeSignals =
+                    (sessionEngineSummary.map {
+                        DecisionSessionSummaryPresentationSupport.runtimeLayerSignals(summary: $0)
+                    } ?? [])
+                    + (localModelLibrarySummary?.runtimeLayerSignals ?? [])
                 return DecisionSystemLayerReport(
                     layer: report.layer,
                     score: report.score,
@@ -565,24 +670,13 @@ enum DecisionSystemFlightDeckBuilder {
                     blockers: report.blockers
                 )
             case .data:
-                let reviewSignals = sessionEngineSummary.map {
-                    DecisionSessionEngineReviewDigestBuilder.build(from: $0).map {
-                        "\($0.title) • \($0.detail)"
-                    }
-                } ?? []
-                let eBrainFactSignals = [
-                    effectiveEBrainFactsBundle?.summaryLine,
-                    effectiveEBrainFactsBundle?.budgetLine,
-                    effectiveEBrainFactsBundle?.taskLine,
-                    effectiveEBrainFactsBundle?.auditLine,
-                    effectiveEBrainFactsBundle?.activeKillSwitchesLine,
-                    effectiveEBrainFactsBundle?.killSwitchesLine
-                ].compactMap { $0 }
+                let eBrainFactSignals = effectiveEBrainFactsBundle?.dataLayerSignals ?? []
                 let dataSignals =
-                    (sessionEngineSummary.map { Array($0.signals.dropFirst()) } ?? [])
-                    + reviewSignals
+                    (sessionEngineSummary.map {
+                        DecisionSessionSummaryPresentationSupport.dataLayerSignals(summary: $0)
+                    } ?? [])
                     + eBrainFactSignals
-                    + (localModelLibrarySummary.map { Array($0.signals.dropFirst()) } ?? [])
+                    + (localModelLibrarySummary?.dataLayerSignals ?? [])
                 return DecisionSystemLayerReport(
                     layer: report.layer,
                     score: report.score,
@@ -592,9 +686,7 @@ enum DecisionSystemFlightDeckBuilder {
                     blockers: report.blockers
                 )
             case .delivery:
-                let deliverySignals = [
-                    localModelLibrarySummary?.signals.dropFirst(2).first
-                ].compactMap { $0 }
+                let deliverySignals = localModelLibrarySummary?.deliveryLayerSignals ?? []
                 return DecisionSystemLayerReport(
                     layer: report.layer,
                     score: report.score,
@@ -609,7 +701,7 @@ enum DecisionSystemFlightDeckBuilder {
         }
     }
 
-    private static func orderedUnique(_ values: [String]) -> [String] {
+    fileprivate static func orderedUnique(_ values: [String]) -> [String] {
         values.reduce(into: [String]()) { uniqueValues, value in
             guard !uniqueValues.contains(value) else { return }
             uniqueValues.append(value)

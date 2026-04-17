@@ -4,24 +4,24 @@ struct DecisionEvolutionCheckpointLineageDetailsView: View {
     let summaryText: String
     let summaryColor: Color
     let metadataText: String?
-    let ticketSummaries: [String]
-    let auditFindings: [String]
-    let killSwitches: [String]
+    let ticketsLine: String?
+    let auditLine: String?
+    let killSwitchesLine: String?
 
     init(
         summaryText: String,
         summaryColor: Color = BeforeTheme.ember,
         metadataText: String? = nil,
-        ticketSummaries: [String] = [],
-        auditFindings: [String] = [],
-        killSwitches: [String] = []
+        ticketsLine: String? = nil,
+        auditLine: String? = nil,
+        killSwitchesLine: String? = nil
     ) {
         self.summaryText = summaryText
         self.summaryColor = summaryColor
         self.metadataText = metadataText
-        self.ticketSummaries = ticketSummaries
-        self.auditFindings = auditFindings
-        self.killSwitches = killSwitches
+        self.ticketsLine = ticketsLine
+        self.auditLine = auditLine
+        self.killSwitchesLine = killSwitchesLine
     }
 
     var body: some View {
@@ -36,20 +36,20 @@ struct DecisionEvolutionCheckpointLineageDetailsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            if !ticketSummaries.isEmpty {
-                Text("Tickets: \(ticketSummaries.joined(separator: " • "))")
+            if let ticketsLine {
+                Text(ticketsLine)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
 
-            if !auditFindings.isEmpty {
-                Text("Audit: \(auditFindings.joined(separator: " • "))")
+            if let auditLine {
+                Text(auditLine)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
 
-            if !killSwitches.isEmpty {
-                Text("Kill switches: \(killSwitches.joined(separator: " • "))")
+            if let killSwitchesLine {
+                Text(killSwitchesLine)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

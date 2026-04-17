@@ -6,6 +6,9 @@ struct DecisionSessionEngineSessionDigestView: View {
     let checkpointBudgetLine: String?
     let checkpointDecisionLine: String?
     let checkpointTaskLine: String?
+    let checkpointPressureLine: String?
+    let checkpointAuditLine: String?
+    let checkpointKillSwitchesLine: String?
     let checkpointActionLine: String?
     let activityLine: String?
     let branchLine: String
@@ -22,6 +25,9 @@ struct DecisionSessionEngineSessionDigestView: View {
         checkpointBudgetLine: String? = nil,
         checkpointDecisionLine: String? = nil,
         checkpointTaskLine: String? = nil,
+        checkpointPressureLine: String? = nil,
+        checkpointAuditLine: String? = nil,
+        checkpointKillSwitchesLine: String? = nil,
         checkpointActionLine: String? = nil,
         activityLine: String? = nil,
         branchLine: String,
@@ -37,6 +43,9 @@ struct DecisionSessionEngineSessionDigestView: View {
         self.checkpointBudgetLine = checkpointBudgetLine
         self.checkpointDecisionLine = checkpointDecisionLine
         self.checkpointTaskLine = checkpointTaskLine
+        self.checkpointPressureLine = checkpointPressureLine
+        self.checkpointAuditLine = checkpointAuditLine
+        self.checkpointKillSwitchesLine = checkpointKillSwitchesLine
         self.checkpointActionLine = checkpointActionLine
         self.activityLine = activityLine
         self.branchLine = branchLine
@@ -74,6 +83,27 @@ struct DecisionSessionEngineSessionDigestView: View {
 
             if let checkpointTaskLine {
                 Text(checkpointTaskLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointPressureLine {
+                Text(checkpointPressureLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointAuditLine {
+                Text(checkpointAuditLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointKillSwitchesLine {
+                Text(checkpointKillSwitchesLine)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)

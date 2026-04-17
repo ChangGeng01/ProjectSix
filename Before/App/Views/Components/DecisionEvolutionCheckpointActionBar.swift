@@ -42,8 +42,14 @@ struct DecisionEvolutionCheckpointActionBar: View {
         self.afterMutation = afterMutation
     }
 
-    private var interactionMode: DecisionEvolutionControlInteractionMode {
-        surfaceContract.interactionMode
+    private var presentation: DecisionEvolutionCheckpointActionPresentation {
+        DecisionEvolutionCheckpointActionPresentationSupport.build(
+            surfaceContract: surfaceContract,
+            navigationOptions: navigationOptions,
+            applyReady: applyReady,
+            approvalState: approvalState,
+            hasLineage: hasLineage
+        )
     }
 
     var body: some View {
@@ -56,10 +62,10 @@ struct DecisionEvolutionCheckpointActionBar: View {
                 )
             }
 
-            if surfaceContract.allowsMutations {
+            if presentation.showsMutationActions {
                 HStack(spacing: 10) {
-                    if applyReady {
-                        BeforeActionButton("Apply checkpoint", style: .primary) {
+                    if presentation.showsApplyAction {
+                        BeforeActionButton(presentation.applyTitle, style: .primary) {
                             if let intent = DecisionEvolutionMutationIntentFactory.applyCheckpoint(
                                 checkpointID: checkpointID,
                                 controlSurface: controlSurface,
@@ -73,8 +79,8 @@ struct DecisionEvolutionCheckpointActionBar: View {
                         }
                     }
 
-                    if approvalState == .reviewSuggested {
-                        BeforeActionButton("Approve checkpoint", style: .secondary) {
+                    if presentation.secondaryActionKind == .approve {
+                        BeforeActionButton(presentation.approveTitle, style: .secondary) {
                             if let intent = DecisionEvolutionMutationIntentFactory.approveCheckpoint(
                                 checkpointID: checkpointID,
                                 controlSurface: controlSurface,
@@ -86,8 +92,8 @@ struct DecisionEvolutionCheckpointActionBar: View {
                                 }
                             }
                         }
-                    } else {
-                        BeforeActionButton("Mark checkpoint", style: .secondary) {
+                    } else if presentation.secondaryActionKind == .markForReview {
+                        BeforeActionButton(presentation.markTitle, style: .secondary) {
                             if let intent = DecisionEvolutionMutationIntentFactory.markCheckpointForReview(
                                 checkpointID: checkpointID,
                                 controlSurface: controlSurface,
@@ -101,8 +107,8 @@ struct DecisionEvolutionCheckpointActionBar: View {
                         }
                     }
 
-                    if hasLineage {
-                        BeforeActionButton("Clear checkpoint lineage", style: .tertiary) {
+                    if presentation.showsClearLineageAction {
+                        BeforeActionButton(presentation.clearLineageTitle, style: .tertiary) {
                             if let intent = DecisionEvolutionMutationIntentFactory.clearCheckpointLineage(
                                 checkpointID: checkpointID,
                                 controlSurface: controlSurface,
@@ -116,24 +122,12 @@ struct DecisionEvolutionCheckpointActionBar: View {
                         }
                     }
                 }
-            } else {
-                DecisionEvolutionOperatorActionFooterView(
-                    interactionMode: interactionMode,
-                    navigationOptions: navigationOptions,
-                    routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter,
-                    showsDetail: true,
-                    controlCenterStyle: .primary,
-                    adjacentShortcutStyle: .secondary
-                )
+            } else if let footerPresentation = presentation.footerPresentation {
+                DecisionEvolutionOperatorActionFooterView(presentation: footerPresentation)
             }
 
-            if surfaceContract.allowsMutations && navigationOptions.showsAnyShortcut {
-                DecisionEvolutionNavigationActionRow(
-                    navigationOptions: navigationOptions,
-                    routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter,
-                    controlCenterStyle: surfaceContract.allowsMutations ? .secondary : .primary,
-                    adjacentShortcutStyle: .secondary
-                )
+            if let navigationPresentation = presentation.navigationPresentation {
+                DecisionEvolutionNavigationActionRow(presentation: navigationPresentation)
             }
         }
         .sheet(item: $pendingMutation) { pendingMutation in

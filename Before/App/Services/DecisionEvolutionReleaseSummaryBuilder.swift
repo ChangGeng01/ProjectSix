@@ -1,5 +1,195 @@
 import Foundation
 
+enum DecisionEvolutionReleasePathPresentationSupport {
+    static let blockedActiveKillSwitchHeadline = DecisionEvolutionKillSwitchPresentationSupport.blockedReleaseHeadline
+    static let watchingRecommendedKillSwitchesHeadline = DecisionEvolutionKillSwitchPresentationSupport.recommendedReleaseHeadline
+    static let blockedRuntimeGuardrailsHeadline = DecisionEvolutionReleaseStagePresentationSupport.blockedRuntimeGuardrailsHeadline
+    static let watchingFirstActiveCheckpointHeadline = DecisionEvolutionRestorabilityPresentationSupport.waitingForFirstActiveCheckpointHeadline
+    static let blockedUntilRestorableHeadline = DecisionEvolutionRestorabilityPresentationSupport.blockedUntilRestorableHeadline
+    static let watchingPendingReviewHeadline = DecisionEvolutionPendingReviewPresentationSupport.releaseHeadline
+    static let watchingAuditFindingsHeadline = DecisionEvolutionReleaseStagePresentationSupport.watchingAuditFindingsHeadline
+    static let watchingRollbackReadinessHeadline = DecisionEvolutionRestorabilityPresentationSupport.watchingRollbackReadinessHeadline
+    static let readyForGuardedPilotHeadline = DecisionEvolutionReleaseStagePresentationSupport.readyForGuardedPilotHeadline
+
+    static let activeKillSwitchReason = DecisionEvolutionKillSwitchPresentationSupport.blockedReleaseReason
+    static let noActiveCheckpointReason = DecisionEvolutionRestorabilityPresentationSupport.noActiveCheckpointReason
+    static let activeCheckpointNotRestorableReason = DecisionEvolutionRestorabilityPresentationSupport.blockedReason
+    static let rollbackNotReadyReason = DecisionEvolutionReleaseStagePresentationSupport.rollbackNotReadyReason
+
+    static func activeCheckpointRestorableReason(
+        checkpointID: String?
+    ) -> String {
+        DecisionEvolutionRestorabilityPresentationSupport.activeCheckpointRestorableReason(
+            checkpointID: checkpointID
+        )
+    }
+}
+
+enum DecisionEvolutionReleaseSummaryPresentationSupport {
+    static let activeSourcePrefix = "Active source"
+
+    static func operatorHeadline(
+        for presentationMode: DecisionEvolutionReleaseSummaryPresentationMode
+    ) -> String? {
+        switch presentationMode {
+        case .mutationHub:
+            DecisionEvolutionMutationHubPresentationSupport.headline
+        case .surface, .compact:
+            nil
+        }
+    }
+
+    static func operatorDetail(
+        for presentationMode: DecisionEvolutionReleaseSummaryPresentationMode
+    ) -> String? {
+        switch presentationMode {
+        case .mutationHub:
+            DecisionEvolutionMutationHubPresentationSupport.releaseSummaryDetail
+        case .surface, .compact:
+            nil
+        }
+    }
+
+    static func stateTone(
+        _ state: DecisionSystemReleaseState
+    ) -> DecisionEvolutionSummaryBadgeTone {
+        switch state {
+        case .ready:
+            .moss
+        case .watch:
+            .ember
+        case .blocked:
+            .red
+        }
+    }
+
+    static func badgePresentations(
+        releaseSummary: DecisionSystemReleaseControlSummary
+    ) -> [DecisionEvolutionSummaryBadgePresentation] {
+        [
+            DecisionEvolutionSummaryBadgePresentation(
+                title: releaseSummary.state.title.uppercased(),
+                tone: stateTone(releaseSummary.state)
+            ),
+            DecisionEvolutionSurfaceBadgePresentationSupport.pendingReviewBadge(
+                count: releaseSummary.pendingReviewCount
+            ),
+            DecisionEvolutionSurfaceBadgePresentationSupport.rollbackReadyBadge(
+                count: releaseSummary.rollbackReadyCount
+            )
+        ]
+    }
+
+    static func build(
+        releaseSummary: DecisionSystemReleaseControlSummary,
+        controlSurface: DecisionEvolutionControlSurface,
+        presentationMode: DecisionEvolutionReleaseSummaryPresentationMode
+    ) -> DecisionEvolutionReleaseSummaryPresentation {
+        DecisionEvolutionReleaseSummaryPresentation(
+            state: releaseSummary.state,
+            stateTone: stateTone(releaseSummary.state),
+            badgePresentations: badgePresentations(releaseSummary: releaseSummary),
+            pendingReviewCount: releaseSummary.pendingReviewCount,
+            rollbackReadyCount: releaseSummary.rollbackReadyCount,
+            headline: releaseSummary.headline,
+            primaryReason: releaseSummary.reasons.first,
+            activeCheckpointHeadline: controlSurface.activePresentation.map {
+                checkpointHeadline(
+                    roleTitle: DecisionEvolutionRuntimePresentationSupport.activeRoleTitle,
+                    presentation: $0
+                )
+            },
+            reviewCheckpointHeadline: controlSurface.spotlightReviewPresentation.map {
+                checkpointHeadline(
+                    roleTitle: DecisionEvolutionRuntimePresentationSupport.reviewHeadRoleTitle,
+                    presentation: $0
+                )
+            },
+            activeSourceText: activeSourceText(releaseSummary: releaseSummary),
+            activeKillSwitchesText: DecisionEvolutionKillSwitchPresentationSupport.activeLine(
+                killSwitches: releaseSummary.activeKillSwitches
+            ),
+            recommendedKillSwitchesText: DecisionEvolutionKillSwitchPresentationSupport.recommendedLine(
+                killSwitches: releaseSummary.recommendedKillSwitches
+            ),
+            operatorHeadline: operatorHeadline(for: presentationMode),
+            operatorDetail: operatorDetail(for: presentationMode)
+        )
+    }
+
+    static func checkpointHeadline(
+        roleTitle: String,
+        presentation: DecisionEvolutionCheckpointPresentation
+    ) -> String {
+        DecisionEvolutionNarrativeFormattingSupport.joined([
+            "\(roleTitle): \(presentation.checkpointID)",
+            presentation.approvalStateTitle,
+            presentation.summaryText,
+        ])
+    }
+
+    static func activeSourceText(
+        releaseSummary: DecisionSystemReleaseControlSummary
+    ) -> String? {
+        guard releaseSummary.activeCheckpointID != nil,
+              releaseSummary.activeCheckpointSource != .none else { return nil }
+        return DecisionEvolutionNarrativeFormattingSupport.labeledLine(
+            prefix: activeSourcePrefix,
+            values: [releaseSummary.activeCheckpointSource.title]
+        )
+    }
+}
+
+struct DecisionEvolutionReleaseSummaryActionPresentation {
+    let allowsLocalMutationActions: Bool
+    let showsAnyActionRow: Bool
+    let quickActionsTitle: String?
+    let rollbackTitle: String
+    let approveQueueTitle: String
+    let clearReviewLineageTitle: String
+    let rollbackIntent: DecisionEvolutionMutationIntent?
+    let approveQueueIntent: DecisionEvolutionMutationIntent?
+    let clearReviewLineageIntent: DecisionEvolutionMutationIntent?
+}
+
+enum DecisionEvolutionReleaseSummaryActionSupport {
+    static func build(
+        controlSurface: DecisionEvolutionControlSurface,
+        surfaceContract: DecisionEvolutionSurfaceContract,
+        navigationOptions: DecisionEvolutionNavigationSurfaceOptions
+    ) -> DecisionEvolutionReleaseSummaryActionPresentation {
+        let allowsLocalMutationActions = !surfaceContract.routesMutationsToControlCenter
+        let rollbackIntent = DecisionEvolutionMutationIntentFactory.rollbackActiveCheckpoint(
+            controlSurface: controlSurface
+        )
+        let approveQueueIntent = DecisionEvolutionMutationIntentFactory.approvePendingCheckpoints(
+            controlSurface: controlSurface
+        )
+        let clearReviewLineageIntent = DecisionEvolutionMutationIntentFactory.clearPendingReviewLineage(
+            controlSurface: controlSurface
+        )
+        let showsAnyActionRow = if allowsLocalMutationActions {
+            rollbackIntent != nil || approveQueueIntent != nil || clearReviewLineageIntent != nil
+        } else {
+            navigationOptions.showsAnyShortcut
+        }
+
+        return DecisionEvolutionReleaseSummaryActionPresentation(
+            allowsLocalMutationActions: allowsLocalMutationActions,
+            showsAnyActionRow: showsAnyActionRow,
+            quickActionsTitle: allowsLocalMutationActions && showsAnyActionRow
+                ? DecisionEvolutionMutationHubPresentationSupport.quickActionsTitle
+                : nil,
+            rollbackTitle: DecisionEvolutionMutationActionLexiconSupport.rollbackActiveTitle,
+            approveQueueTitle: DecisionEvolutionMutationHubPresentationSupport.approveQueueTitle,
+            clearReviewLineageTitle: DecisionEvolutionMutationActionLexiconSupport.clearReviewLineageTitle,
+            rollbackIntent: rollbackIntent,
+            approveQueueIntent: approveQueueIntent,
+            clearReviewLineageIntent: clearReviewLineageIntent
+        )
+    }
+}
+
 enum DecisionEvolutionReleaseSummaryBuilder {
     static func build(
         evolutionControlSurface: DecisionEvolutionControlSurface,
@@ -27,69 +217,30 @@ enum DecisionEvolutionReleaseSummaryBuilder {
         )
         let canRestoreActiveCheckpoint = evolutionControlSurface.activePresentation?.applyReady == true
         let canRollbackActiveCheckpoint = evolutionControlSurface.canRollbackActiveCheckpoint
-        let state: DecisionSystemReleaseState
-        let headline: String
-        var reasons: [String] = []
-
-        if !resolvedActiveKillSwitches.isEmpty {
-            state = .blocked
-            headline = "Blocked by active kill switches"
-            reasons.append("Kill switches are active on the current release path.")
-        } else if !recommendedKillSwitches.isEmpty {
-            state = .watch
-            headline = "Watching recommended kill switches"
-            reasons.append("Recommended kill switches are waiting for operator review before wider rollout.")
-        } else if !blockerSignals.isEmpty {
-            state = .blocked
-            headline = "Blocked by runtime guardrails"
-            reasons.append(contentsOf: blockerSignals)
-        } else if evolutionControlSurface.activePresentation == nil {
-            state = .watch
-            headline = "Watching for the first active checkpoint"
-            reasons.append("No active checkpoint is attached to the current release path yet.")
-            if evolutionControlSurface.pendingReviewCount > 0 {
-                reasons.append("\(evolutionControlSurface.pendingReviewCount) checkpoint(s) still require review before promotion.")
-                appendQueueSignals(
-                    to: &reasons,
-                    auditFindings: queueAuditFindings,
-                    killSwitches: queueKillSwitches
-                )
-            }
-        } else if !canRestoreActiveCheckpoint {
-            state = .blocked
-            headline = "Blocked until the active checkpoint is restorable"
-            reasons.append("The active checkpoint does not currently have a restorable brain-state snapshot.")
-        } else if evolutionControlSurface.pendingReviewCount > 0 {
-            state = .watch
-            headline = "Watching the pending review queue"
-            reasons.append("\(evolutionControlSurface.pendingReviewCount) checkpoint(s) still require review.")
-            appendQueueSignals(
-                to: &reasons,
-                auditFindings: queueAuditFindings,
-                killSwitches: queueKillSwitches
+        let primaryBlocker = DecisionEvolutionPrimaryBlockerEvaluator.evaluate(
+            DecisionEvolutionPrimaryBlockerContext(
+                activeKillSwitches: resolvedActiveKillSwitches,
+                recommendedKillSwitches: recommendedKillSwitches,
+                runtimeBlockers: blockerSignals,
+                hasActiveCheckpoint: evolutionControlSurface.activePresentation != nil,
+                canRestoreActiveCheckpoint: canRestoreActiveCheckpoint,
+                pendingReviewCount: evolutionControlSurface.pendingReviewCount,
+                reviewAuditFindings: evolutionControlSurface.reviewAuditFindings,
+                canRollbackActiveCheckpoint: canRollbackActiveCheckpoint
             )
-        } else if !evolutionControlSurface.reviewAuditFindings.isEmpty {
-            state = .watch
-            headline = "Watching audit findings before wider rollout"
-            reasons.append(contentsOf: evolutionControlSurface.reviewAuditFindings)
-        } else if !canRollbackActiveCheckpoint {
-            state = .watch
-            headline = "Watching rollback readiness"
-            reasons.append("The active checkpoint does not currently expose a previous checkpoint for rollback.")
-        } else {
-            state = .ready
-            headline = "Ready for guarded pilot rollout"
-            if let checkpointID = evolutionControlSurface.activePresentation?.checkpointID {
-                reasons.append("Active checkpoint \(checkpointID) is restorable.")
-            } else {
-                reasons.append("The active checkpoint is restorable.")
-            }
-        }
+        )
+        let guidance = DecisionEvolutionPrimaryBlockerPresentationSupport.releaseGuidance(
+            blocker: primaryBlocker,
+            blockerSignals: blockerSignals,
+            controlSurface: evolutionControlSurface,
+            queueAuditFindings: queueAuditFindings,
+            queueKillSwitches: queueKillSwitches
+        )
 
         return DecisionSystemReleaseControlSummary(
-            state: state,
-            headline: headline,
-            reasons: reasons,
+            state: guidance.state,
+            headline: guidance.headline,
+            reasons: guidance.reasons,
             activeKillSwitches: resolvedActiveKillSwitches,
             recommendedKillSwitches: recommendedKillSwitches,
             killSwitches: killSwitches,
@@ -101,20 +252,6 @@ enum DecisionEvolutionReleaseSummaryBuilder {
             activeCheckpointSource: evolutionControlSurface.activeCheckpointSource,
             reviewCheckpointID: evolutionControlSurface.reviewPresentation?.checkpointID
         )
-    }
-
-    private static func appendQueueSignals(
-        to reasons: inout [String],
-        auditFindings: [String],
-        killSwitches: [String]
-    ) {
-        if !killSwitches.isEmpty {
-            reasons.append("Pending review kill switches: \(killSwitches.joined(separator: " • "))")
-        }
-
-        if !auditFindings.isEmpty {
-            reasons.append("Pending review findings: \(auditFindings.joined(separator: " • "))")
-        }
     }
 
     private static func runtimeActiveKillSwitches(

@@ -1,6 +1,20 @@
 import SwiftData
 import SwiftUI
 
+private enum HistoryPresentedSheet: Identifiable {
+    case detail(HistoryDetailSelection)
+    case profile(ReviewProfileSelection)
+
+    var id: String {
+        switch self {
+        case .detail(let selection):
+            "detail:\(selection.id)"
+        case .profile(let selection):
+            "profile:\(selection.id)"
+        }
+    }
+}
+
 struct HistoryView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @Query(sort: \CheckEvent.createdAt, order: .reverse) private var events: [CheckEvent]
@@ -14,7 +28,7 @@ struct HistoryView: View {
     @State private var systemFlightDeck: DecisionSystemFlightDeck?
     @State private var isRefreshingSystemFlightDeck = false
     @State private var replayPresentationsByID: [String: DecisionEvolutionReplayEntryPresentation] = [:]
-    @State private var selectedEvolutionFilter: EvolutionHistoryFilter = .all
+    @State private var selectedEvolutionFilter: DecisionEvolutionHistoryFilter = .all
     private let evolutionSurfaceContract = DecisionEvolutionSurfaceContract.history
 
     private var sessionEnginePresentation: DecisionSessionEnginePresentation {
@@ -92,18 +106,8 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("History")
-            .sheet(item: $selectedDetail) { selection in
-                HistoryDetailView(selection: selection)
-                    .environmentObject(appModel)
-            }
-            .sheet(item: $selectedProfile) { selection in
-                if let profile = profile(for: selection) {
-                    ReviewProfileView(
-                        profile: profile,
-                        recentEntries: recentEntries(for: selection)
-                    )
-                    .environmentObject(appModel)
-                }
+            .sheet(item: presentedSheet) { sheet in
+                sheetContent(for: sheet)
             }
             .task {
                 await refreshSystemFlightDeck()
@@ -117,6 +121,66 @@ struct HistoryView: View {
                     await loadTimelineReplayEntries()
                 }
             }
+        }
+    }
+
+    private var presentedSheet: Binding<HistoryPresentedSheet?> {
+        Binding(
+            get: {
+                if let selection = selectedDetail {
+                    return .detail(selection)
+                }
+                if let selection = selectedProfile {
+                    return .profile(selection)
+                }
+                return nil
+            },
+            set: { newValue in
+                guard newValue == nil, let presentedSheet = currentPresentedSheet else {
+                    return
+                }
+                clear(presentedSheet)
+            }
+        )
+    }
+
+    private var currentPresentedSheet: HistoryPresentedSheet? {
+        if let selection = selectedDetail {
+            return .detail(selection)
+        }
+        if let selection = selectedProfile {
+            return .profile(selection)
+        }
+        return nil
+    }
+
+    @ViewBuilder
+    private func sheetContent(
+        for sheet: HistoryPresentedSheet
+    ) -> some View {
+        switch sheet {
+        case .detail(let selection):
+            HistoryDetailView(selection: selection)
+                .environmentObject(appModel)
+        case .profile(let selection):
+            if let profile = profile(for: selection) {
+                ReviewProfileView(
+                    profile: profile,
+                    recentEntries: recentEntries(for: selection)
+                )
+                .environmentObject(appModel)
+            }
+        }
+    }
+
+    private func clear(
+        _ sheet: HistoryPresentedSheet
+    ) {
+        switch sheet {
+        case .detail:
+            selectedDetail = nil
+        case .profile:
+            selectedProfile = nil
         }
     }
 
@@ -134,6 +198,15 @@ struct HistoryView: View {
 
     private var checkpointNavigationOptions: DecisionEvolutionNavigationSurfaceOptions {
         evolutionSurfaceContract.checkpointNavigationOptions
+    }
+
+    private var evolutionTrailNavigationPresentation: DecisionEvolutionNavigationRowPresentation {
+        DecisionEvolutionNavigationRowPresentationSupport.readFirstSurface(
+            surfaceContract: evolutionSurfaceContract,
+            navigationOptions: evolutionSurfaceContract.navigationSurfaceOptions(
+                showPortraitShortcut: true
+            )
+        )
     }
 
     private var timelineItems: [HistoryTimelineItem] {
@@ -169,35 +242,39 @@ struct HistoryView: View {
     }
 
     private var filteredEvolutionQueue: [DecisionEvolutionCheckpointPresentation] {
-        evolutionSurfaceState.workspace.remainingReviewQueue.filter {
-            selectedEvolutionFilter.matches($0, inReviewQueue: true)
-        }
+        evolutionSurfaceState.workspace.filteredEvolutionQueue(using: selectedEvolutionFilter)
     }
 
     private var filteredEvolutionHistory: [DecisionEvolutionCheckpointPresentation] {
-        evolutionSurfaceState.workspace.historyPresentations.filter {
-            selectedEvolutionFilter.matches($0, inReviewQueue: false)
-        }
+        evolutionSurfaceState.workspace.filteredEvolutionHistory(using: selectedEvolutionFilter)
     }
 
     private func evolutionTrailSection(
         _ workspace: DecisionEvolutionWorkspaceSnapshot
     ) -> some View {
+        let historyTrailPresentation = DecisionEvolutionHistoryTrailPresentationSupport.build()
+
         return VStack(alignment: .leading, spacing: 12) {
             SectionHeader(
                 eyebrow: "Evolution",
-                title: "Evolution control center",
-                subtitle: "Checkpoint lineage, risk permits, review state, rollback readiness, and queue operations now stay visible in one full workspace."
+                title: historyTrailPresentation.sectionTitle,
+                subtitle: historyTrailPresentation.sectionSubtitle
             )
 
             PanelCard {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .top, spacing: 12) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Evolution trail")
+                            Text(historyTrailPresentation.workspaceTitle)
                                 .font(.headline)
                                 .foregroundStyle(BeforeTheme.ink)
-                            Text("\(evolutionTrailItems.count) checkpoints • \(workspace.effectivePendingReviewCount) pending review • \(workspace.effectiveRollbackReadyCount) rollback-ready")
+                            Text(
+                                historyTrailPresentation.inventoryLine(
+                                    checkpointCount: evolutionTrailItems.count,
+                                    pendingReviewCount: workspace.effectivePendingReviewCount,
+                                    rollbackReadyCount: workspace.effectiveRollbackReadyCount
+                                )
+                            )
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -209,20 +286,19 @@ struct HistoryView: View {
                                     ProgressView()
                                         .controlSize(.small)
                                 } else {
-                                BeforeActionButton("Refresh", style: .secondary) {
+                                BeforeActionButton(
+                                    historyTrailPresentation.refreshTitle,
+                                    style: .secondary
+                                ) {
                                     Task {
                                         await refreshSystemFlightDeck()
                                     }
-                                    }
                                 }
+                            }
 
-                                BeforeActionButton("Open control center", style: .primary) {
-                                    appModel.presentEvolutionControlCenter()
-                                }
-
-                                BeforeActionButton("Open Portrait", style: .secondary) {
-                                    appModel.selectedTab = .portrait
-                                }
+                                DecisionEvolutionNavigationActionRow(
+                                    presentation: evolutionTrailNavigationPresentation
+                                )
                             }
                     }
 
@@ -244,7 +320,9 @@ struct HistoryView: View {
                     DecisionEvolutionControlSurfaceSummaryView(
                         controlSurface: workspace.controlSurface,
                         surfaceContract: evolutionSurfaceContract,
-                        emptyMessage: "No persisted checkpoint lineage is available yet. Once a checkpoint lands, this summary will show its risk, permit, tickets, audit, and rollback readiness.",
+                        emptyMessage: DecisionEvolutionSurfaceStatusPresentationSupport.summaryEmptyMessage(
+                            for: .history
+                        ) ?? DecisionEvolutionCheckpointDetailPresentationSupport.emptyLineageMessage,
                         navigationOptions: checkpointNavigationOptions,
                         afterMutation: {
                             Task {
@@ -276,9 +354,10 @@ struct HistoryView: View {
                 }
             )
 
+            let activeRolePresentation = DecisionEvolutionSectionPresentationSupport.checkpointRole(.active)
             if let activePresentation = workspace.activePresentation {
                 DecisionEvolutionCheckpointPanelView(
-                    title: "Active checkpoint",
+                    title: activeRolePresentation.title,
                     checkpoint: activePresentation,
                     controlSurface: workspace.controlSurface,
                     surfaceContract: evolutionSurfaceContract,
@@ -291,9 +370,10 @@ struct HistoryView: View {
                 )
             }
 
+            let reviewRolePresentation = DecisionEvolutionSectionPresentationSupport.checkpointRole(.reviewHead)
             if let reviewPresentation = workspace.reviewPresentation {
                 DecisionEvolutionCheckpointPanelView(
-                    title: "Review head",
+                    title: reviewRolePresentation.title,
                     checkpoint: reviewPresentation,
                     controlSurface: workspace.controlSurface,
                     surfaceContract: evolutionSurfaceContract,
@@ -308,11 +388,11 @@ struct HistoryView: View {
 
             if !filteredEvolutionQueue.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Pending review queue")
+                    Text(historyTrailPresentation.queueSection.title)
                         .font(.headline)
                         .foregroundStyle(BeforeTheme.ink)
 
-                    Text("Every remaining review-suggested checkpoint stays operable here, not just the queue head.")
+                    Text(historyTrailPresentation.queueSection.detail)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
@@ -335,19 +415,19 @@ struct HistoryView: View {
             if !filteredEvolutionHistory.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .firstTextBaseline) {
-                        Text("Checkpoint history")
+                        Text(historyTrailPresentation.historySection.title)
                             .font(.headline)
                             .foregroundStyle(BeforeTheme.ink)
                         Spacer()
-                        Picker("Evolution filter", selection: $selectedEvolutionFilter) {
-                            ForEach(EvolutionHistoryFilter.allCases) { filter in
-                                Text(filter.title).tag(filter)
+                            Picker(historyTrailPresentation.filterTitle, selection: $selectedEvolutionFilter) {
+                                ForEach(DecisionEvolutionHistoryFilter.allCases) { filter in
+                                    Text(filter.title).tag(filter)
+                                }
                             }
-                        }
                         .pickerStyle(.menu)
                     }
 
-                    Text("The full recovered trail stays browseable here even after the active/review spotlight changes.")
+                    Text(historyTrailPresentation.historySection.detail)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
@@ -381,101 +461,30 @@ struct HistoryView: View {
         switch item.content {
         case .quick(let event):
             let summary = DecisionReviewEngine.timelineEntryPresentation(for: event)
-            Button {
+            DecisionReviewTimelineEntryCardView(
+                summary: summary,
+                presentation: replayPresentationsByID[item.id]
+            ) {
                 selectedDetail = .quick(event)
-            } label: {
-                PanelCard {
-                    DecisionReplayEntrySummaryView(
-                        title: summary.title,
-                        secondaryLine: summary.secondaryLine,
-                        presentation: replayPresentationsByID[item.id]
-                    ) {
-                        DecisionReplayEntryHeaderRowView(
-                            labelTitle: summary.labelTitle,
-                            labelSymbolName: summary.labelSymbolName,
-                            trailingAccentText: summary.headerAccentText,
-                            trailingAccentStyle: .pill
-                        )
-                    } footer: {
-                        HStack {
-                            Text(summary.timestamp, style: .relative)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            if let footerAccentText = summary.footerAccentText {
-                                Text(footerAccentText)
-                                    .font(.caption.weight(.medium))
-                                    .foregroundStyle(BeforeTheme.moss)
-                            }
-                        }
-                    }
-                }
             }
-            .buttonStyle(.plain)
 
         case .balance(let board):
             let summary = DecisionReviewEngine.timelineEntryPresentation(for: board)
-            Button {
+            DecisionReviewTimelineEntryCardView(
+                summary: summary,
+                presentation: replayPresentationsByID[item.id]
+            ) {
                 selectedDetail = .balance(board)
-            } label: {
-                PanelCard {
-                    DecisionReplayEntrySummaryView(
-                        title: summary.title,
-                        secondaryLine: summary.secondaryLine,
-                        presentation: replayPresentationsByID[item.id]
-                    ) {
-                        DecisionReplayEntryHeaderRowView(
-                            labelTitle: summary.labelTitle,
-                            labelSymbolName: summary.labelSymbolName,
-                            trailingAccentText: summary.headerAccentText,
-                            trailingAccentStyle: .text(BeforeTheme.moss)
-                        )
-                    } supplementary: {
-                        if let supplementaryLine = summary.supplementaryLine {
-                            Text(supplementaryLine)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(BeforeTheme.ember)
-                        }
-                    } footer: {
-                        Text(summary.timestamp, style: .relative)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
             }
-            .buttonStyle(.plain)
 
         case .mirror(let record):
             let summary = DecisionReviewEngine.timelineEntryPresentation(for: record)
-            Button {
+            DecisionReviewTimelineEntryCardView(
+                summary: summary,
+                presentation: replayPresentationsByID[item.id]
+            ) {
                 selectedDetail = .mirror(record)
-            } label: {
-                PanelCard {
-                    DecisionReplayEntrySummaryView(
-                        title: summary.title,
-                        secondaryLine: summary.secondaryLine,
-                        presentation: replayPresentationsByID[item.id]
-                    ) {
-                        DecisionReplayEntryHeaderRowView(
-                            labelTitle: summary.labelTitle,
-                            labelSymbolName: summary.labelSymbolName,
-                            trailingAccentText: summary.headerAccentText,
-                            trailingAccentStyle: .text(BeforeTheme.moss)
-                        )
-                    } supplementary: {
-                        if let supplementaryLine = summary.supplementaryLine {
-                            Text(supplementaryLine)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(BeforeTheme.ember)
-                        }
-                    } footer: {
-                        Text(summary.timestamp, style: .relative)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -597,44 +606,6 @@ private enum HistoryFilter: String, CaseIterable, Identifiable {
             true
         default:
             false
-        }
-    }
-}
-
-private enum EvolutionHistoryFilter: String, CaseIterable, Identifiable {
-    case all
-    case review
-    case rollbackReady
-    case blocked
-    case lineageBacked
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .all: "All"
-        case .review: "Review"
-        case .rollbackReady: "Rollback"
-        case .blocked: "Blocked"
-        case .lineageBacked: "Lineage"
-        }
-    }
-
-    func matches(
-        _ checkpoint: DecisionEvolutionCheckpointPresentation,
-        inReviewQueue: Bool
-    ) -> Bool {
-        switch self {
-        case .all:
-            true
-        case .review:
-            inReviewQueue || checkpoint.approvalState == .reviewSuggested
-        case .rollbackReady:
-            checkpoint.rollbackReady
-        case .blocked:
-            !checkpoint.killSwitches.isEmpty || !checkpoint.auditFindings.isEmpty
-        case .lineageBacked:
-            checkpoint.hasLineage
         }
     }
 }

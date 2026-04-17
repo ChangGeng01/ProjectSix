@@ -30,8 +30,6 @@ enum HistoryDetailSelection: Identifiable {
 struct HistoryDetailView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @Environment(\.dismiss) private var dismiss
-    @State private var replayDiagnostics: DecisionEvolutionReplayEntryPresentation?
-    @State private var isLoadingReplay = false
 
     let selection: HistoryDetailSelection
 
@@ -59,21 +57,15 @@ struct HistoryDetailView: View {
                     Button("Close") { dismiss() }
                 }
             }
-            .task(id: replayReloadKey) {
-                await loadReplayEntry()
-            }
         }
-    }
-
-    private var replayReloadKey: String {
-        "\(selection.id)-\(appModel.evolutionControlMutationEpoch)"
     }
 
     @ViewBuilder
     private func quickDetail(_ event: CheckEvent) -> some View {
         let presentation = DecisionReviewEngine.detailPresentation(for: event)
-        detailSection(
+        DecisionReviewDetailSectionView(
             presentation: presentation,
+            replayRecordID: selection.id,
             reopenAction: {
                 appModel.reopenCheckEvent(event)
                 dismiss()
@@ -82,18 +74,15 @@ struct HistoryDetailView: View {
                 appModel.moveCheckEventToTomorrow(event)
                 dismiss()
             }
-        ) {
-            ForEach(presentation.rows) { row in
-                detailPair(row.title, row.value)
-            }
-        }
+        )
     }
 
     @ViewBuilder
     private func balanceDetail(_ record: BalanceDecisionRecord) -> some View {
         let presentation = DecisionReviewEngine.detailPresentation(for: record)
-        detailSection(
+        DecisionReviewDetailSectionView(
             presentation: presentation,
+            replayRecordID: selection.id,
             reopenAction: {
                 appModel.reopenBalanceRecord(record)
                 dismiss()
@@ -102,18 +91,15 @@ struct HistoryDetailView: View {
                 appModel.moveBalanceRecordToTomorrow(record)
                 dismiss()
             }
-        ) {
-            ForEach(presentation.rows) { row in
-                detailPair(row.title, row.value)
-            }
-        }
+        )
     }
 
     @ViewBuilder
     private func mirrorDetail(_ record: MirrorDecisionRecord) -> some View {
         let presentation = DecisionReviewEngine.detailPresentation(for: record)
-        detailSection(
+        DecisionReviewDetailSectionView(
             presentation: presentation,
+            replayRecordID: selection.id,
             reopenAction: {
                 appModel.reopenMirrorRecord(record)
                 dismiss()
@@ -122,78 +108,7 @@ struct HistoryDetailView: View {
                 appModel.moveMirrorRecordToTomorrow(record)
                 dismiss()
             }
-        ) {
-            ForEach(presentation.rows) { row in
-                detailPair(row.title, row.value)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func detailSection<Content: View>(
-        presentation: DecisionReviewDetailPresentation,
-        reopenAction: @escaping () -> Void,
-        postponeAction: @escaping () -> Void,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        SectionHeader(
-            eyebrow: presentation.eyebrow,
-            title: presentation.title,
-            subtitle: presentation.subtitle
-        )
-
-        PanelCard {
-            VStack(alignment: .leading, spacing: 12) {
-                content()
-            }
-        }
-
-        replayDiagnosticsCard()
-
-        DecisionContinuationActions(
-            reopenTitle: presentation.reopenTitle,
-            reopenAction: reopenAction,
-            postponeAction: postponeAction
         )
     }
 
-    @ViewBuilder
-    private func detailPair(_ title: String, _ value: String) -> some View {
-        if !trimmed(value).isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(BeforeTheme.ember)
-                Text(value)
-                    .font(.subheadline)
-                    .foregroundStyle(BeforeTheme.ink)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func replayDiagnosticsCard() -> some View {
-        DecisionReplayDiagnosticsBlockView(
-            presentation: replayDiagnostics,
-            title: "Replay diagnostics",
-            isLoading: isLoadingReplay,
-            emptyMessage: "No replay-safe diagnostics have been attached to this history entry yet.",
-            wrapsInPanelCard: true
-        )
-    }
-
-    @MainActor
-    private func loadReplayEntry() async {
-        guard !isLoadingReplay else { return }
-        isLoadingReplay = true
-        defer { isLoadingReplay = false }
-
-        replayDiagnostics = await appModel.replayDiagnosticsPresentation(
-            matchingRecordID: selection.id
-        )
-    }
-}
-
-private func trimmed(_ value: String) -> String {
-    value.trimmingCharacters(in: .whitespacesAndNewlines)
 }

@@ -10,7 +10,7 @@ struct DecisionEvolutionControlSurfaceSummaryView: View {
     init(
         controlSurface: DecisionEvolutionControlSurface,
         surfaceContract: DecisionEvolutionSurfaceContract,
-        emptyMessage: String = "No persisted checkpoint lineage is available yet.",
+        emptyMessage: String = DecisionEvolutionCheckpointDetailPresentationSupport.emptyLineageMessage,
         navigationOptions: DecisionEvolutionNavigationSurfaceOptions? = nil,
         showCheckpointActionBar: Bool? = nil,
         afterMutation: (() -> Void)? = nil
@@ -32,21 +32,11 @@ struct DecisionEvolutionControlSurfaceSummaryView: View {
     }
 
     var body: some View {
-        let spotlightSet = controlSurface.spotlightSet
+        let summarySections = controlSurface.summarySectionPresentations
 
         VStack(alignment: .leading, spacing: 12) {
-            if let activePresentation = spotlightSet.activePresentation {
-                checkpointSection(
-                    title: "Active checkpoint",
-                    presentation: activePresentation
-                )
-            }
-
-            if let reviewPresentation = spotlightSet.reviewPresentation {
-                checkpointSection(
-                    title: "Review head",
-                    presentation: reviewPresentation
-                )
+            ForEach(summarySections) { section in
+                checkpointSection(section: section)
             }
 
             if !controlSurface.hasAnyCheckpoint {
@@ -59,13 +49,14 @@ struct DecisionEvolutionControlSurfaceSummaryView: View {
 
     @ViewBuilder
     private func checkpointSection(
-        title: String,
-        presentation: DecisionEvolutionCheckpointPresentation
+        section: DecisionEvolutionControlSurfaceSummarySectionPresentation
     ) -> some View {
+        let presentation = section.presentation
+
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
+                    Text(section.title)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(BeforeTheme.ember)
                     Text(presentation.headline)
@@ -85,46 +76,29 @@ struct DecisionEvolutionControlSurfaceSummaryView: View {
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 8) {
-                if let riskLevel = presentation.displayRiskLevel {
-                    DecisionEvolutionSummaryBadge(title: riskLevel.uppercased(), tint: BeforeTheme.ember)
+                ForEach(Array(section.summaryBadges.enumerated()), id: \.offset) { _, badge in
+                    DecisionEvolutionSummaryBadge(presentation: badge)
                 }
-
-                if let permitMode = presentation.displayPermitMode {
-                    DecisionEvolutionSummaryBadge(title: permitMode.uppercased(), tint: BeforeTheme.moss)
-                }
-
-                if presentation.checkpointID == controlSurface.activePresentation?.checkpointID,
-                   controlSurface.activeCheckpointSource != .none {
-                    DecisionEvolutionSummaryBadge(
-                        title: controlSurface.activeCheckpointSource.shortTitle,
-                        tint: .blue
-                    )
-                }
-
-                DecisionEvolutionSummaryBadge(
-                    title: presentation.rollbackReady ? "ROLLBACK READY" : "ROLLBACK WATCH",
-                    tint: presentation.rollbackReady ? BeforeTheme.moss : BeforeTheme.ember
-                )
             }
 
             DecisionEvolutionCheckpointLineageDetailsView(
                 summaryText: presentation.summaryText,
                 summaryColor: presentation.usesSecondarySummaryTone ? .secondary : BeforeTheme.ember,
                 metadataText: presentation.metadataText,
-                ticketSummaries: presentation.updateTicketSummaries,
-                auditFindings: presentation.auditFindings,
-                killSwitches: presentation.killSwitches
+                ticketsLine: presentation.ticketsLine,
+                auditLine: presentation.auditLine,
+                killSwitchesLine: presentation.killSwitchesLine
             )
 
-            if !presentation.diffSummary.isEmpty {
-                ForEach(presentation.diffSummary, id: \.self) { diff in
-                    Text("• \(diff)")
+            if !presentation.diffBulletLines.isEmpty {
+                ForEach(Array(presentation.diffBulletLines.enumerated()), id: \.offset) { _, diffLine in
+                    Text(diffLine)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
 
-            Text("Recorded \(presentation.createdAt, style: .relative) • \(presentation.checkpointID)")
+            Text(presentation.recordedLine)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
@@ -153,6 +127,29 @@ struct DecisionEvolutionControlSurfaceSummaryView: View {
 struct DecisionEvolutionSummaryBadge: View {
     let title: String
     let tint: Color
+
+    init(title: String, tint: Color) {
+        self.title = title
+        self.tint = tint
+    }
+
+    init(presentation: DecisionEvolutionSummaryBadgePresentation) {
+        self.title = presentation.title
+        switch presentation.tone {
+        case .ember:
+            self.tint = BeforeTheme.ember
+        case .moss:
+            self.tint = BeforeTheme.moss
+        case .secondary:
+            self.tint = .secondary
+        case .blue:
+            self.tint = .blue
+        case .orange:
+            self.tint = .orange
+        case .red:
+            self.tint = .red
+        }
+    }
 
     var body: some View {
         Text(title)

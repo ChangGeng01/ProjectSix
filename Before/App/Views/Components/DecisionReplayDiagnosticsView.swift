@@ -19,6 +19,12 @@ struct DecisionReplayDiagnosticsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            if let pressureLine = presentation.pressureLine {
+                Text(pressureLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
             if let eBrainLine = presentation.eBrainLine {
                 Text(eBrainLine)
                     .font(.caption)

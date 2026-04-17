@@ -3,17 +3,20 @@ import SwiftData
 @testable import Before
 
 final class BeforeAppModelSessionEngineTests: XCTestCase {
-    override func setUp() {
-        super.setUp()
-        resetPersistentState()
+    @MainActor
+    override func setUp() async throws {
+        try await super.setUp()
+        try await resetPersistentState()
     }
 
-    override func tearDown() {
-        resetPersistentState()
-        super.tearDown()
+    @MainActor
+    override func tearDown() async throws {
+        try await resetPersistentState()
+        try await super.tearDown()
     }
 
-    private func resetPersistentState() {
+    @MainActor
+    private func resetPersistentState() async throws {
         ActiveDecisionWorkspaceStore.clear()
         PendingReflectionStore.clear()
         PendingLaunchRequestStore.clear()
@@ -21,6 +24,7 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
         StateStorageIssueRecorder.clear()
         UserDefaults.standard.removeObject(forKey: "before.active.decision.workspace")
         UserDefaults.standard.removeObject(forKey: "before.preferences")
+        try await DecisionSessionEngine.shared?.resetForTesting()
     }
 
     @MainActor
@@ -58,13 +62,60 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
         XCTAssertNotNil(inspected.latestCheckpointID)
         XCTAssertTrue(inspected.latestCheckpointBudgetLine?.hasPrefix("eBrain budget:") == true)
         XCTAssertTrue(inspected.latestCheckpointRouteLine?.hasPrefix("eBrain route:") == true)
+        XCTAssertTrue(inspected.latestCheckpointPressureLine?.hasPrefix("eBrain pressure: latency ") == true)
         XCTAssertTrue(inspected.latestCheckpointDecisionLine?.contains("eBrain risk:") == true)
         XCTAssertTrue(inspected.latestCheckpointDecisionLine?.contains("eBrain permit:") == true)
         XCTAssertTrue(latestCheckpoint?.summary.acceptedConstraints.contains(where: { $0.hasPrefix("eBrain budget:") }) == true)
+        XCTAssertTrue(latestCheckpoint?.summary.confirmedFacts.contains(where: { $0.hasPrefix("eBrain pressure: latency ") }) == true)
         XCTAssertTrue(latestCheckpoint?.summary.confirmedFacts.contains(where: { $0.hasPrefix("eBrain risk:") }) == true)
         XCTAssertTrue(latestCheckpoint?.summary.confirmedFacts.contains(where: { $0.hasPrefix("eBrain permit:") }) == true)
         XCTAssertTrue(latestCheckpoint?.summary.confirmedFacts.contains(where: { $0.hasPrefix("eBrain fold:") }) == true)
         XCTAssertTrue(latestCheckpoint?.summary.currentScope.contains("ebrain") == true)
+    }
+
+    @MainActor
+    func testSuppressHostedTestPresentationsClearsTransientModalState() throws {
+        let app = BeforeAppModel(modelContainer: try makeContainer(), startupNotice: nil)
+        app.startQuickCheck(entrySource: .app, prompt: "Transient quick flow")
+        app.startBalanceBoard(entrySource: .app, prompt: "Transient balance flow")
+        app.startMirrorWorkspace(entrySource: .app, prompt: "Transient mirror flow")
+        app.reflectionContext = ReflectionContext(
+            id: UUID(),
+            eventID: UUID(),
+            scenario: .other,
+            finalAction: .wait90s
+        )
+        app.letGoContext = LetGoContext(
+            mode: .quick,
+            eyebrow: "Test",
+            title: "Let it go",
+            subtitle: "Transient state",
+            itemTitle: "Trigger",
+            itemDetail: "Noise",
+            instructionTitle: "Instruction",
+            instructionDetail: "Release it",
+            completionTitle: "Done",
+            completionSubtitle: "Settled",
+            settledTitle: "Settled",
+            settledDetail: "Quiet",
+            primaryActionTitle: "Home",
+            primaryTarget: .home
+        )
+        app.isEvolutionControlCenterPresented = true
+        app.isSessionEngineControlCenterPresented = true
+        app.presentSessionEngineBundleIssue("Import issue")
+
+        app.suppressHostedTestPresentations()
+
+        XCTAssertNil(app.activeQuickSession)
+        XCTAssertNil(app.activeBalanceSession)
+        XCTAssertNil(app.activeMirrorSession)
+        XCTAssertNil(app.reflectionContext)
+        XCTAssertNil(app.letGoContext)
+        XCTAssertFalse(app.isEvolutionControlCenterPresented)
+        XCTAssertFalse(app.isSessionEngineControlCenterPresented)
+        XCTAssertNil(app.sessionEngineBundleIssue)
+        XCTAssertTrue(app.hasSeenOnboarding)
     }
 
     @MainActor
@@ -125,7 +176,9 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
         XCTAssertEqual(presentedActiveSession.sessionID, sessionID)
         XCTAssertTrue(presentation.countsLine.contains("Sessions"))
         XCTAssertTrue(presentedActiveSession.checkpointBudgetLine?.contains("eBrain budget:") == true)
+        XCTAssertTrue(presentedActiveSession.checkpointPressureLine?.contains("eBrain pressure: latency ") == true)
         XCTAssertTrue(presentedActiveSession.replayRecoverySummary.budgetLine?.contains("eBrain budget:") == true)
+        XCTAssertTrue(presentedActiveSession.replayRecoverySummary.pressureLine?.contains("eBrain pressure: latency ") == true)
     }
 
     @MainActor

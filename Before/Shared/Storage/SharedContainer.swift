@@ -10,6 +10,9 @@ struct SharedContainerResolution: @unchecked Sendable {
 enum SharedContainer {
     static let appGroupID = "group.com.changgeng.before"
     private static let defaultResolution = resolve()
+    static let isRunningTests =
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        || ProcessInfo.processInfo.environment["XCTestBundlePath"] != nil
 
     static var defaults: UserDefaults {
         defaultResolution.defaults
@@ -23,13 +26,24 @@ enum SharedContainer {
         defaultResolution.notice
     }
 
+    static func defaultContainerURL(
+        for suiteName: String,
+        isRunningTests: Bool = SharedContainer.isRunningTests
+    ) -> URL? {
+        guard !isRunningTests else {
+            return nil
+        }
+
+        return FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: suiteName
+        )
+    }
+
     static func resolve(
         suiteName: String = appGroupID,
         defaultsFactory: (String) -> UserDefaults? = { UserDefaults(suiteName: $0) },
         fallback: UserDefaults = .standard,
-        containerURLProvider: (String) -> URL? = {
-            FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: $0)
-        }
+        containerURLProvider: (String) -> URL? = { defaultContainerURL(for: $0) }
     ) -> SharedContainerResolution {
         let resolvedDefaults = defaultsFactory(suiteName)
         let defaults = resolvedDefaults ?? fallback

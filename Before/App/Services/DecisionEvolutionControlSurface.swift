@@ -1,38 +1,21 @@
 import Foundation
 
-enum DecisionEvolutionActiveCheckpointSource: String, Equatable, Sendable {
-    case none
-    case pinnedHint
-    case automaticFallback
-
-    var title: String {
-        switch self {
-        case .none:
-            "No active source"
-        case .pinnedHint:
-            "Pinned active"
-        case .automaticFallback:
-            "Recovered active"
-        }
-    }
-
-    var shortTitle: String {
-        switch self {
-        case .none:
-            "NONE"
-        case .pinnedHint:
-            "PINNED"
-        case .automaticFallback:
-            "RECOVERED"
-        }
-    }
-}
-
 struct DecisionEvolutionCheckpointSlots: Equatable, Sendable {
     let activeCheckpoint: DecisionReviewCheckpointSnapshot?
     let activeCheckpointSource: DecisionEvolutionActiveCheckpointSource
     let reviewCheckpoint: DecisionReviewCheckpointSnapshot?
     let pendingReviewQueue: [DecisionReviewCheckpointSnapshot]
+}
+
+struct DecisionEvolutionControlSurfaceSummarySectionPresentation: Identifiable, Equatable, Sendable {
+    let role: DecisionEvolutionCheckpointRole
+    let title: String
+    let presentation: DecisionEvolutionCheckpointPresentation
+    let summaryBadges: [DecisionEvolutionSummaryBadgePresentation]
+
+    var id: String {
+        "\(role)-\(presentation.checkpointID)"
+    }
 }
 
 struct DecisionEvolutionControlSurface: Equatable, Sendable {
@@ -154,6 +137,31 @@ struct DecisionEvolutionControlSurface: Equatable, Sendable {
 
     var canRollbackActiveCheckpoint: Bool {
         activeRollbackCheckpointID != nil
+    }
+
+    var summarySectionPresentations: [DecisionEvolutionControlSurfaceSummarySectionPresentation] {
+        var sections: [DecisionEvolutionControlSurfaceSummarySectionPresentation] = []
+
+        if let activePresentation {
+            sections.append(
+                DecisionEvolutionControlSurfaceSummaryPresentationSupport.sectionPresentation(
+                    role: .active,
+                    presentation: activePresentation,
+                    activeSource: activeCheckpointSource
+                )
+            )
+        }
+
+        if let reviewPresentation = spotlightReviewPresentation {
+            sections.append(
+                DecisionEvolutionControlSurfaceSummaryPresentationSupport.sectionPresentation(
+                    role: .reviewHead,
+                    presentation: reviewPresentation
+                )
+            )
+        }
+
+        return sections
     }
 
     var projectedAutomaticCheckpointIDAfterApprovingPendingQueue: String? {

@@ -66,6 +66,355 @@ struct DecisionEvolutionMutationPreview: Identifiable, Equatable, Sendable {
     }
 }
 
+struct DecisionEvolutionMutationPreviewPresentation: Equatable, Sendable {
+    let toneBadgeTitle: String
+    let impactTitle: String
+    let impactDetail: String
+    let impactTargetsPrefix: String
+    let activeTransitionTitle: String
+    let reviewTransitionTitle: String
+    let transitionArrow: String
+    let currentLineTitle: String
+    let projectedLineTitle: String
+    let missingCheckpointToken: String
+    let changeSectionTitle: String
+    let retainedSectionTitle: String
+    let warningSectionTitle: String
+    let cancelTitle: String
+
+    func checkpointToken(_ checkpointID: String?) -> String {
+        checkpointID ?? missingCheckpointToken
+    }
+
+    func checkpointLine(title: String, checkpointID: String?) -> String {
+        "\(title): \(checkpointToken(checkpointID))"
+    }
+
+    func currentLine(_ checkpointID: String?) -> String {
+        checkpointLine(title: currentLineTitle, checkpointID: checkpointID)
+    }
+
+    func projectedLine(_ checkpointID: String?) -> String {
+        checkpointLine(title: projectedLineTitle, checkpointID: checkpointID)
+    }
+
+    func transitionLine(current: String?, projected: String?) -> String {
+        "\(checkpointToken(current)) \(transitionArrow) \(checkpointToken(projected))"
+    }
+
+    func impactTargetsLine(_ checkpointIDs: [String]) -> String? {
+        DecisionEvolutionNarrativeFormattingSupport.labeledLine(
+            prefix: impactTargetsPrefix,
+            values: checkpointIDs
+        )
+    }
+}
+
+enum DecisionEvolutionMutationOutcomeTone: Equatable, Sendable {
+    case success
+    case caution
+    case failure
+}
+
+enum DecisionEvolutionMutationLabelPresentationSupport {
+    static let targetsPrefix = "Targets"
+    static let activeTransitionTitle = DecisionEvolutionCheckpointLexiconSupport.activeRuntimeRoleTitle
+}
+
+enum DecisionEvolutionMutationOutcomePresentationSupport {
+    static let dismissTitle = "Dismiss"
+    static let targetsPrefix = DecisionEvolutionMutationLabelPresentationSupport.targetsPrefix
+
+    static func statusTitle(isSuccess: Bool, isDestructive: Bool) -> String {
+        if isSuccess {
+            return isDestructive ? "Completed with lineage changes" : "Completed"
+        }
+        return "Action needs attention"
+    }
+
+    static func iconName(isSuccess: Bool, isDestructive: Bool) -> String {
+        if isSuccess {
+            return isDestructive ? "exclamationmark.shield.fill" : "checkmark.seal.fill"
+        }
+        return "xmark.octagon.fill"
+    }
+
+    static func tone(isSuccess: Bool, isDestructive: Bool) -> DecisionEvolutionMutationOutcomeTone {
+        if isSuccess {
+            return isDestructive ? .caution : .success
+        }
+        return .failure
+    }
+
+    static func targetsLine(
+        checkpointIDs: [String],
+        targetsPrefix: String = targetsPrefix
+    ) -> String? {
+        DecisionEvolutionNarrativeFormattingSupport.labeledLine(
+            prefix: targetsPrefix,
+            values: checkpointIDs
+        )
+    }
+}
+
+struct DecisionEvolutionMutationOutcomePresentation: Equatable, Sendable {
+    let statusTitle: String
+    let iconName: String
+    let dismissTitle: String
+    let targetsPrefix: String
+    let tone: DecisionEvolutionMutationOutcomeTone
+
+    func targetsLine(_ checkpointIDs: [String]) -> String? {
+        DecisionEvolutionMutationOutcomePresentationSupport.targetsLine(
+            checkpointIDs: checkpointIDs,
+            targetsPrefix: targetsPrefix
+        )
+    }
+}
+
+enum DecisionEvolutionMutationActionLexiconSupport {
+    static let applyCheckpointTitle = "Apply checkpoint"
+    static let approveCheckpointTitle = "Approve checkpoint"
+    static let markReviewTitle = "Mark review"
+    static let clearLineageTitle = "Clear lineage"
+    static let restoreActiveTitle = "Restore active"
+    static let rollbackActiveTitle = "Rollback active"
+    static let approvePendingTitle = "Approve pending"
+    static let clearReviewLineageTitle = "Clear review lineage"
+    static let approveSelectedTitle = "Approve selected"
+    static let markSelectedTitle = "Mark selected"
+    static let clearSelectedLineageTitle = "Clear selected lineage"
+}
+
+struct DecisionEvolutionMutationIntentCopy: Equatable, Sendable {
+    let message: String
+    let headline: String
+    let summary: String
+}
+
+enum DecisionEvolutionMutationIntentCopySupport {
+    static func applyCheckpoint(
+        checkpointID: String
+    ) -> DecisionEvolutionMutationIntentCopy {
+        DecisionEvolutionMutationIntentCopy(
+            message: "Restore checkpoint \(checkpointID) as the active brain state. This changes the live host state, but it does not auto-approve review status or clear lineage.",
+            headline: "Apply \(checkpointID)",
+            summary: "Restore this checkpoint as the active brain state while keeping review/audit facts visible."
+        )
+    }
+
+    static func approveCheckpoint(
+        checkpointID: String
+    ) -> DecisionEvolutionMutationIntentCopy {
+        DecisionEvolutionMutationIntentCopy(
+            message: "Move checkpoint \(checkpointID) out of the review queue and back onto the automatic evolution path.",
+            headline: "Approve \(checkpointID)",
+            summary: "This keeps the checkpoint record and lineage, but removes its review-suggested status."
+        )
+    }
+
+    static func markCheckpointForReview(
+        checkpointID: String
+    ) -> DecisionEvolutionMutationIntentCopy {
+        DecisionEvolutionMutationIntentCopy(
+            message: "Move checkpoint \(checkpointID) into the review queue. This does not restore the checkpoint or change the active brain state.",
+            headline: "Mark \(checkpointID) for review",
+            summary: "Queue this checkpoint for explicit host review without altering the live active state."
+        )
+    }
+
+    static func clearCheckpointLineage(
+        checkpointID: String
+    ) -> DecisionEvolutionMutationIntentCopy {
+        DecisionEvolutionMutationIntentCopy(
+            message: "Remove recovered lineage from checkpoint \(checkpointID). The checkpoint record stays, but persisted risk, permit, ticket, audit, and kill-switch facts are cleared.",
+            headline: "Clear lineage on \(checkpointID)",
+            summary: "This keeps the checkpoint record but removes recovered L13 lineage facts."
+        )
+    }
+
+    static func restoreActiveCheckpoint(
+        checkpointID: String
+    ) -> DecisionEvolutionMutationIntentCopy {
+        DecisionEvolutionMutationIntentCopy(
+            message: "Restore checkpoint \(checkpointID) as the active brain state. This changes the live host state, but it does not auto-approve review status or clear lineage.",
+            headline: "Restore active checkpoint",
+            summary: "Re-apply the current active checkpoint as the live brain state."
+        )
+    }
+
+    static func rollbackActiveCheckpoint(
+        checkpointID: String
+    ) -> DecisionEvolutionMutationIntentCopy {
+        DecisionEvolutionMutationIntentCopy(
+            message: "Restore the previous checkpoint \(checkpointID) and move the active brain state back to that saved version.",
+            headline: "Rollback to \(checkpointID)",
+            summary: "Restore the previous checkpoint in the active chain."
+        )
+    }
+
+    static func approvePendingCheckpoints(
+        count: Int,
+        keepsActiveBrainStateStable: Bool
+    ) -> DecisionEvolutionMutationIntentCopy {
+        DecisionEvolutionMutationIntentCopy(
+            message: "Approve \(count) pending review checkpoint\(count == 1 ? "" : "s") and move them back to the automatic evolution path.",
+            headline: "Approve \(count) pending checkpoint\(count == 1 ? "" : "s")",
+            summary: keepsActiveBrainStateStable
+                ? "Empty the review queue without restoring or rewriting the active brain state."
+                : "Empty the review queue and let the automatic active slot advance to the most recent approved checkpoint."
+        )
+    }
+
+    static func clearPendingReviewLineage(
+        count: Int
+    ) -> DecisionEvolutionMutationIntentCopy {
+        DecisionEvolutionMutationIntentCopy(
+            message: "Remove persisted lineage from \(count) review checkpoint\(count == 1 ? "" : "s"). Review records remain, but recovered risk, permit, ticket, audit, and kill-switch facts will be cleared.",
+            headline: "Clear lineage on \(count) pending checkpoint\(count == 1 ? "" : "s")",
+            summary: "This preserves the review queue but removes recovered lineage payloads from lineage-backed entries."
+        )
+    }
+
+    static func approveSelectedCheckpoints(
+        count: Int
+    ) -> DecisionEvolutionMutationIntentCopy {
+        DecisionEvolutionMutationIntentCopy(
+            message: "Approve \(count) selected review checkpoint\(count == 1 ? "" : "s") and move only that slice back to the automatic evolution path.",
+            headline: "Approve \(count) selected checkpoint\(count == 1 ? "" : "s")",
+            summary: "Only the selected review checkpoints leave the queue. The untouched review head and queue tail stay visible."
+        )
+    }
+
+    static func markSelectedCheckpointsForReview(
+        count: Int
+    ) -> DecisionEvolutionMutationIntentCopy {
+        DecisionEvolutionMutationIntentCopy(
+            message: "Move \(count) selected automatic checkpoint\(count == 1 ? "" : "s") into the explicit review path without restoring them.",
+            headline: "Mark \(count) selected checkpoint\(count == 1 ? "" : "s") for review",
+            summary: "Only the selected automatic checkpoints move into the review queue."
+        )
+    }
+
+    static func clearSelectedCheckpointLineages(
+        count: Int
+    ) -> DecisionEvolutionMutationIntentCopy {
+        DecisionEvolutionMutationIntentCopy(
+            message: "Remove persisted lineage from \(count) selected checkpoint\(count == 1 ? "" : "s"). The checkpoint records remain in place.",
+            headline: "Clear lineage on \(count) selected checkpoint\(count == 1 ? "" : "s")",
+            summary: "This keeps the selected checkpoint records but removes their recovered L13 lineage facts."
+        )
+    }
+}
+
+enum DecisionEvolutionMutationPhraseSupport {
+    static let reviewQueueWillBeEmptiedLine = "Review queue will be emptied."
+    static let approvalMovesToAutomaticLine = "Approval state will move from review-suggested to automatic."
+
+    static func checkpointToken(_ checkpointID: String?) -> String {
+        DecisionEvolutionCheckpointLexiconSupport.checkpointToken(checkpointID)
+    }
+
+    static func checkpointWillEnterReviewQueueLine(
+        checkpointID: String
+    ) -> String {
+        "Checkpoint \(checkpointID) will enter the review queue."
+    }
+
+    static func selectedCheckpointsMoveToAutomaticLine(
+        count: Int
+    ) -> String {
+        "\(count) selected checkpoint(s) will move from review-suggested to automatic."
+    }
+
+    static func selectedCheckpointsEnterReviewQueueLine(
+        count: Int
+    ) -> String {
+        "\(count) selected checkpoint(s) will enter the review queue."
+    }
+
+    static func pendingCheckpointsMoveToAutomaticLine(
+        count: Int
+    ) -> String {
+        "\(count) checkpoint(s) will move from review-suggested to automatic."
+    }
+
+    static func automaticActiveSlotRemainsLine(
+        projectedActiveID: String
+    ) -> String {
+        "Automatic active slot remains \(projectedActiveID)."
+    }
+
+    static func automaticActiveSlotMovesToLine(
+        projectedActiveID: String
+    ) -> String {
+        "Automatic active slot will move to \(projectedActiveID)."
+    }
+
+    static func automaticActiveSlotTransitionLine(
+        currentCheckpointID: String?,
+        projectedCheckpointID: String?
+    ) -> String {
+        "Active automatic slot will move from \(checkpointToken(currentCheckpointID)) to \(checkpointToken(projectedCheckpointID))."
+    }
+
+    static func activeCheckpointRemainsLine(
+        checkpointID: String?
+    ) -> String {
+        "Active checkpoint remains \(checkpointToken(checkpointID))."
+    }
+
+    static func activeCheckpointTransitionLine(
+        currentCheckpointID: String?,
+        projectedCheckpointID: String
+    ) -> String {
+        "Active checkpoint will move from \(checkpointToken(currentCheckpointID)) to \(projectedCheckpointID)."
+    }
+
+    static func restoredBrainStateLine(
+        checkpointID: String,
+        projectedActiveID: String?
+    ) -> String {
+        "Live brain state will restore from \(checkpointID), but the automatic active slot remains \(checkpointToken(projectedActiveID))."
+    }
+
+    static func reviewHeadAlignedLine(
+        checkpointID: String
+    ) -> String {
+        "Review head stays aligned on \(checkpointID) until its approval state changes."
+    }
+
+    static func reviewHeadRemainsLine(
+        checkpointID: String
+    ) -> String {
+        "Review head remains \(checkpointID)."
+    }
+
+    static func currentReviewHeadRemainsLine(
+        checkpointID: String
+    ) -> String {
+        "Current review head remains \(checkpointID)."
+    }
+
+    static func reviewHeadShiftLine(
+        checkpointID: String
+    ) -> String {
+        "Review head will shift to \(checkpointID)."
+    }
+
+    static func reviewQueueRetainedAfterApprovalLine(
+        count: Int
+    ) -> String {
+        "Review queue will keep \(count) checkpoint(s) after approval."
+    }
+
+    static func suggestedKillSwitchRemovalWarning(
+        count: Int
+    ) -> String {
+        "\(count) suggested kill-switch recommendation(s) will be removed with the lineage payload."
+    }
+}
+
 struct DecisionEvolutionMutationIntent: Identifiable, Equatable, Sendable {
     let kind: DecisionEvolutionMutationKind
     let title: String
@@ -75,6 +424,25 @@ struct DecisionEvolutionMutationIntent: Identifiable, Equatable, Sendable {
     let preview: DecisionEvolutionMutationPreview
 
     var id: String { preview.id }
+
+    var previewPresentation: DecisionEvolutionMutationPreviewPresentation {
+        DecisionEvolutionMutationPreviewPresentation(
+            toneBadgeTitle: isDestructive ? "DESTRUCTIVE" : "GUARDED",
+            impactTitle: "Control-surface impact",
+            impactDetail: "See the active/review shift before you open the guarded confirmation sheet.",
+            impactTargetsPrefix: DecisionEvolutionMutationLabelPresentationSupport.targetsPrefix,
+            activeTransitionTitle: DecisionEvolutionMutationLabelPresentationSupport.activeTransitionTitle,
+            reviewTransitionTitle: "Review",
+            transitionArrow: "→",
+            currentLineTitle: "Current",
+            projectedLineTitle: "Projected",
+            missingCheckpointToken: DecisionEvolutionCheckpointLexiconSupport.missingCheckpointToken,
+            changeSectionTitle: "Will change",
+            retainedSectionTitle: "Will remain",
+            warningSectionTitle: "Watch",
+            cancelTitle: "Cancel"
+        )
+    }
 }
 
 struct DecisionEvolutionMutationOutcome: Identifiable, Equatable, Sendable {
@@ -91,10 +459,26 @@ struct DecisionEvolutionMutationOutcome: Identifiable, Equatable, Sendable {
     }
 
     var statusTitle: String {
-        if isSuccess {
-            return isDestructive ? "Completed with lineage changes" : "Completed"
-        }
-        return "Action needs attention"
+        DecisionEvolutionMutationOutcomePresentationSupport.statusTitle(
+            isSuccess: isSuccess,
+            isDestructive: isDestructive
+        )
+    }
+
+    var presentation: DecisionEvolutionMutationOutcomePresentation {
+        DecisionEvolutionMutationOutcomePresentation(
+            statusTitle: statusTitle,
+            iconName: DecisionEvolutionMutationOutcomePresentationSupport.iconName(
+                isSuccess: isSuccess,
+                isDestructive: isDestructive
+            ),
+            dismissTitle: DecisionEvolutionMutationOutcomePresentationSupport.dismissTitle,
+            targetsPrefix: DecisionEvolutionMutationOutcomePresentationSupport.targetsPrefix,
+            tone: DecisionEvolutionMutationOutcomePresentationSupport.tone(
+                isSuccess: isSuccess,
+                isDestructive: isDestructive
+            )
+        )
     }
 
     func affects(checkpointID: String) -> Bool {
@@ -155,6 +539,9 @@ enum DecisionEvolutionMutationIntentFactory {
         ), presentation.applyReady else {
             return nil
         }
+        let copy = DecisionEvolutionMutationIntentCopySupport.applyCheckpoint(
+            checkpointID: checkpointID
+        )
 
         let currentActiveID = controlSurface.activePresentation?.checkpointID
         let currentReviewID = controlSurface.reviewPresentation?.checkpointID
@@ -166,29 +553,43 @@ enum DecisionEvolutionMutationIntentFactory {
         )
         var changes = [
             projectedActiveID == checkpointID
-                ? "Active checkpoint will move from \(checkpointToken(currentActiveID)) to \(checkpointID)."
-                : "Live brain state will restore from \(checkpointID), but the automatic active slot remains \(checkpointToken(projectedActiveID))."
+                ? DecisionEvolutionMutationPhraseSupport.activeCheckpointTransitionLine(
+                    currentCheckpointID: currentActiveID,
+                    projectedCheckpointID: checkpointID
+                )
+                : DecisionEvolutionMutationPhraseSupport.restoredBrainStateLine(
+                    checkpointID: checkpointID,
+                    projectedActiveID: projectedActiveID
+                )
         ]
 
         if let currentReviewID {
             if currentReviewID == checkpointID {
-                changes.append("Review head stays aligned on \(checkpointID) until its approval state changes.")
+                changes.append(
+                    DecisionEvolutionMutationPhraseSupport.reviewHeadAlignedLine(
+                        checkpointID: checkpointID
+                    )
+                )
             } else {
-                changes.append("Review head remains \(currentReviewID).")
+                changes.append(
+                    DecisionEvolutionMutationPhraseSupport.reviewHeadRemainsLine(
+                        checkpointID: currentReviewID
+                    )
+                )
             }
         }
 
         return DecisionEvolutionMutationIntent(
             kind: .applyCheckpoint,
-            title: "Apply checkpoint",
-            message: "Restore checkpoint \(checkpointID) as the active brain state. This changes the live host state, but it does not auto-approve review status or clear lineage.",
-            confirmTitle: "Apply checkpoint",
+            title: DecisionEvolutionMutationActionLexiconSupport.applyCheckpointTitle,
+            message: copy.message,
+            confirmTitle: DecisionEvolutionMutationActionLexiconSupport.applyCheckpointTitle,
             isDestructive: false,
             preview: DecisionEvolutionMutationPreview(
                 kind: .applyCheckpoint,
                 scope: .checkpoint,
-                headline: "Apply \(checkpointID)",
-                summary: "Restore this checkpoint as the active brain state while keeping review/audit facts visible.",
+                headline: copy.headline,
+                summary: copy.summary,
                 targetCheckpointIDs: [checkpointID],
                 currentActiveCheckpointID: currentActiveID,
                 projectedActiveCheckpointID: projectedActiveID,
@@ -214,6 +615,9 @@ enum DecisionEvolutionMutationIntentFactory {
         ), presentation.approvalState == .reviewSuggested else {
             return nil
         }
+        let copy = DecisionEvolutionMutationIntentCopySupport.approveCheckpoint(
+            checkpointID: checkpointID
+        )
 
         let remainingReviewQueue = controlSurface.pendingReviewPresentations
             .filter { $0.checkpointID != checkpointID }
@@ -223,35 +627,49 @@ enum DecisionEvolutionMutationIntentFactory {
             currentActivePresentation: controlSurface.activePresentation
         )
         var changes = [
-            "Approval state will move from review-suggested to automatic."
+            DecisionEvolutionMutationPhraseSupport.approvalMovesToAutomaticLine
         ]
 
         if projectedActiveID == checkpointID,
            controlSurface.activePresentation?.checkpointID != checkpointID {
-            changes.append("Automatic active slot will move to \(checkpointID).")
+            changes.append(
+                DecisionEvolutionMutationPhraseSupport.automaticActiveSlotMovesToLine(
+                    projectedActiveID: checkpointID
+                )
+            )
         } else if let projectedActiveID {
-            changes.append("Automatic active slot remains \(projectedActiveID).")
+            changes.append(
+                DecisionEvolutionMutationPhraseSupport.automaticActiveSlotRemainsLine(
+                    projectedActiveID: projectedActiveID
+                )
+            )
         }
 
         if controlSurface.reviewPresentation?.checkpointID == checkpointID {
             if let projectedReviewID {
-                changes.append("Review head will shift to \(projectedReviewID).")
+                changes.append(
+                    DecisionEvolutionMutationPhraseSupport.reviewHeadShiftLine(
+                        checkpointID: projectedReviewID
+                    )
+                )
             } else {
-                changes.append("Review queue will be cleared.")
+                changes.append(
+                    DecisionEvolutionMutationPhraseSupport.reviewQueueWillBeEmptiedLine
+                )
             }
         }
 
         return DecisionEvolutionMutationIntent(
             kind: .approveCheckpoint,
-            title: "Approve checkpoint",
-            message: "Move checkpoint \(checkpointID) out of the review queue and back onto the automatic evolution path.",
-            confirmTitle: "Approve checkpoint",
+            title: DecisionEvolutionMutationActionLexiconSupport.approveCheckpointTitle,
+            message: copy.message,
+            confirmTitle: DecisionEvolutionMutationActionLexiconSupport.approveCheckpointTitle,
             isDestructive: false,
             preview: DecisionEvolutionMutationPreview(
                 kind: .approveCheckpoint,
                 scope: .checkpoint,
-                headline: "Approve \(checkpointID)",
-                summary: "This keeps the checkpoint record and lineage, but removes its review-suggested status.",
+                headline: copy.headline,
+                summary: copy.summary,
                 targetCheckpointIDs: [checkpointID],
                 currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
                 projectedActiveCheckpointID: projectedActiveID,
@@ -276,6 +694,9 @@ enum DecisionEvolutionMutationIntentFactory {
         ), presentation.approvalState != .reviewSuggested else {
             return nil
         }
+        let copy = DecisionEvolutionMutationIntentCopySupport.markCheckpointForReview(
+            checkpointID: checkpointID
+        )
 
         let currentReview = controlSurface.reviewPresentation
         let currentActiveID = controlSurface.activePresentation?.checkpointID
@@ -288,29 +709,43 @@ enum DecisionEvolutionMutationIntentFactory {
             currentActiveCheckpointID: currentActiveID
         )
 
-        var changes = ["Checkpoint \(checkpointID) will enter the review queue."]
+        var changes = [DecisionEvolutionMutationPhraseSupport.checkpointWillEnterReviewQueueLine(
+            checkpointID: checkpointID
+        )]
         if currentActiveID == checkpointID {
             changes.append("Automatic active slot will hand off to the next available automatic checkpoint, if one exists.")
         } else if let projectedActiveID {
-            changes.append("Automatic active slot remains \(projectedActiveID).")
+            changes.append(
+                DecisionEvolutionMutationPhraseSupport.automaticActiveSlotRemainsLine(
+                    projectedActiveID: projectedActiveID
+                )
+            )
         }
         if projectedReviewID == checkpointID {
-            changes.append("Review head will shift to \(checkpointID).")
+            changes.append(
+                DecisionEvolutionMutationPhraseSupport.reviewHeadShiftLine(
+                    checkpointID: checkpointID
+                )
+            )
         } else if let projectedReviewID {
-            changes.append("Current review head remains \(projectedReviewID).")
+            changes.append(
+                DecisionEvolutionMutationPhraseSupport.currentReviewHeadRemainsLine(
+                    checkpointID: projectedReviewID
+                )
+            )
         }
 
         return DecisionEvolutionMutationIntent(
             kind: .markCheckpointForReview,
-            title: "Mark review",
-            message: "Move checkpoint \(checkpointID) into the review queue. This does not restore the checkpoint or change the active brain state.",
-            confirmTitle: "Mark review",
+            title: DecisionEvolutionMutationActionLexiconSupport.markReviewTitle,
+            message: copy.message,
+            confirmTitle: DecisionEvolutionMutationActionLexiconSupport.markReviewTitle,
             isDestructive: false,
             preview: DecisionEvolutionMutationPreview(
                 kind: .markCheckpointForReview,
                 scope: .checkpoint,
-                headline: "Mark \(checkpointID) for review",
-                summary: "Queue this checkpoint for explicit host review without altering the live active state.",
+                headline: copy.headline,
+                summary: copy.summary,
                 targetCheckpointIDs: [checkpointID],
                 currentActiveCheckpointID: currentActiveID,
                 projectedActiveCheckpointID: projectedActiveID,
@@ -335,18 +770,21 @@ enum DecisionEvolutionMutationIntentFactory {
         ), presentation.hasLineage else {
             return nil
         }
+        let copy = DecisionEvolutionMutationIntentCopySupport.clearCheckpointLineage(
+            checkpointID: checkpointID
+        )
 
         return DecisionEvolutionMutationIntent(
             kind: .clearCheckpointLineage,
-            title: "Clear lineage",
-            message: "Remove recovered lineage from checkpoint \(checkpointID). The checkpoint record stays, but persisted risk, permit, ticket, audit, and kill-switch facts are cleared.",
-            confirmTitle: "Clear lineage",
+            title: DecisionEvolutionMutationActionLexiconSupport.clearLineageTitle,
+            message: copy.message,
+            confirmTitle: DecisionEvolutionMutationActionLexiconSupport.clearLineageTitle,
             isDestructive: true,
             preview: DecisionEvolutionMutationPreview(
                 kind: .clearCheckpointLineage,
                 scope: .checkpoint,
-                headline: "Clear lineage on \(checkpointID)",
-                summary: "This keeps the checkpoint record but removes recovered L13 lineage facts.",
+                headline: copy.headline,
+                summary: copy.summary,
                 targetCheckpointIDs: [checkpointID],
                 currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
                 projectedActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
@@ -373,6 +811,9 @@ enum DecisionEvolutionMutationIntentFactory {
         guard let activePresentation = controlSurface.activePresentation else {
             return nil
         }
+        let copy = DecisionEvolutionMutationIntentCopySupport.restoreActiveCheckpoint(
+            checkpointID: activePresentation.checkpointID
+        )
         return applyCheckpoint(
             checkpointID: activePresentation.checkpointID,
             controlSurface: controlSurface,
@@ -380,15 +821,15 @@ enum DecisionEvolutionMutationIntentFactory {
         ).map { intent in
             DecisionEvolutionMutationIntent(
                 kind: .restoreActiveCheckpoint,
-                title: "Restore active",
-                message: intent.message,
-                confirmTitle: "Restore active",
+                title: DecisionEvolutionMutationActionLexiconSupport.restoreActiveTitle,
+                message: copy.message,
+                confirmTitle: DecisionEvolutionMutationActionLexiconSupport.restoreActiveTitle,
                 isDestructive: false,
                 preview: DecisionEvolutionMutationPreview(
                     kind: .restoreActiveCheckpoint,
                     scope: .activePath,
-                    headline: "Restore active checkpoint",
-                    summary: "Re-apply the current active checkpoint as the live brain state.",
+                    headline: copy.headline,
+                    summary: copy.summary,
                     targetCheckpointIDs: intent.preview.targetCheckpointIDs,
                     currentActiveCheckpointID: intent.preview.currentActiveCheckpointID,
                     projectedActiveCheckpointID: intent.preview.projectedActiveCheckpointID,
@@ -408,6 +849,9 @@ enum DecisionEvolutionMutationIntentFactory {
         guard let rollbackID = controlSurface.activeRollbackCheckpointID else {
             return nil
         }
+        let copy = DecisionEvolutionMutationIntentCopySupport.rollbackActiveCheckpoint(
+            checkpointID: rollbackID
+        )
 
         let targetPresentation = controlSurface.presentation(for: rollbackID)
         let projectedActiveID = projectedRestoredActiveCheckpointID(
@@ -417,12 +861,22 @@ enum DecisionEvolutionMutationIntentFactory {
         )
         var changes = [
             projectedActiveID == rollbackID
-                ? "Active checkpoint will move from \(checkpointToken(controlSurface.activePresentation?.checkpointID)) to \(rollbackID)."
-                : "Live brain state will restore from \(rollbackID), but the automatic active slot remains \(checkpointToken(projectedActiveID))."
+                ? DecisionEvolutionMutationPhraseSupport.activeCheckpointTransitionLine(
+                    currentCheckpointID: controlSurface.activePresentation?.checkpointID,
+                    projectedCheckpointID: rollbackID
+                )
+                : DecisionEvolutionMutationPhraseSupport.restoredBrainStateLine(
+                    checkpointID: rollbackID,
+                    projectedActiveID: projectedActiveID
+                )
         ]
 
         if let reviewID = controlSurface.reviewPresentation?.checkpointID {
-            changes.append("Review head remains \(reviewID).")
+            changes.append(
+                DecisionEvolutionMutationPhraseSupport.reviewHeadRemainsLine(
+                    checkpointID: reviewID
+                )
+            )
         }
 
         var retained = ["Rollback keeps the persisted checkpoint history intact."]
@@ -437,15 +891,15 @@ enum DecisionEvolutionMutationIntentFactory {
 
         return DecisionEvolutionMutationIntent(
             kind: .rollbackActiveCheckpoint,
-            title: "Rollback active",
-            message: "Restore the previous checkpoint \(rollbackID) and move the active brain state back to that saved version.",
-            confirmTitle: "Rollback active",
+            title: DecisionEvolutionMutationActionLexiconSupport.rollbackActiveTitle,
+            message: copy.message,
+            confirmTitle: DecisionEvolutionMutationActionLexiconSupport.rollbackActiveTitle,
             isDestructive: true,
             preview: DecisionEvolutionMutationPreview(
                 kind: .rollbackActiveCheckpoint,
                 scope: .activePath,
-                headline: "Rollback to \(rollbackID)",
-                summary: "Restore the previous checkpoint in the active chain.",
+                headline: copy.headline,
+                summary: copy.summary,
                 targetCheckpointIDs: [rollbackID],
                 currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
                 projectedActiveCheckpointID: projectedActiveID,
@@ -475,36 +929,49 @@ enum DecisionEvolutionMutationIntentFactory {
         }
 
         var changeHighlights = [
-            "\(targets.count) checkpoint(s) will move from review-suggested to automatic.",
-            "Review queue will be emptied."
+            DecisionEvolutionMutationPhraseSupport.pendingCheckpointsMoveToAutomaticLine(
+                count: targets.count
+            ),
+            DecisionEvolutionMutationPhraseSupport.reviewQueueWillBeEmptiedLine
         ]
         var retained: [String] = []
 
         if projectedActiveCheckpointID == currentActiveCheckpointID {
-            retained.append("Active checkpoint remains \(checkpointToken(currentActiveCheckpointID)).")
+            retained.append(
+                DecisionEvolutionMutationPhraseSupport.activeCheckpointRemainsLine(
+                    checkpointID: currentActiveCheckpointID
+                )
+            )
         } else {
             changeHighlights.append(
-                "Active automatic slot will move from \(checkpointToken(currentActiveCheckpointID)) to \(checkpointToken(projectedActiveCheckpointID))."
+                DecisionEvolutionMutationPhraseSupport.automaticActiveSlotTransitionLine(
+                    currentCheckpointID: currentActiveCheckpointID,
+                    projectedCheckpointID: projectedActiveCheckpointID
+                )
             )
         }
 
-        if lineageBackedCount > 0 {
-            retained.append("\(lineageBackedCount) lineage-backed review checkpoint(s) keep their recovered facts.")
+        if let retainedLine = DecisionEvolutionLineagePresentationSupport.retainedPendingReviewFactsLine(
+            lineageBackedCount: lineageBackedCount
+        ) {
+            retained.append(retainedLine)
         }
+        let copy = DecisionEvolutionMutationIntentCopySupport.approvePendingCheckpoints(
+            count: targets.count,
+            keepsActiveBrainStateStable: projectedActiveCheckpointID == currentActiveCheckpointID
+        )
 
         return DecisionEvolutionMutationIntent(
             kind: .approvePendingCheckpoints,
-            title: "Approve pending",
-            message: "Approve \(targets.count) pending review checkpoint\(targets.count == 1 ? "" : "s") and move them back to the automatic evolution path.",
-            confirmTitle: "Approve pending",
+            title: DecisionEvolutionMutationActionLexiconSupport.approvePendingTitle,
+            message: copy.message,
+            confirmTitle: DecisionEvolutionMutationActionLexiconSupport.approvePendingTitle,
             isDestructive: false,
             preview: DecisionEvolutionMutationPreview(
                 kind: .approvePendingCheckpoints,
                 scope: .reviewQueue,
-                headline: "Approve \(targets.count) pending checkpoint\(targets.count == 1 ? "" : "s")",
-                summary: projectedActiveCheckpointID == currentActiveCheckpointID
-                    ? "Empty the review queue without restoring or rewriting the active brain state."
-                    : "Empty the review queue and let the automatic active slot advance to the most recent approved checkpoint.",
+                headline: copy.headline,
+                summary: copy.summary,
                 targetCheckpointIDs: targets,
                 currentActiveCheckpointID: currentActiveCheckpointID,
                 projectedActiveCheckpointID: projectedActiveCheckpointID,
@@ -536,20 +1003,27 @@ enum DecisionEvolutionMutationIntentFactory {
             warnings.append("\(auditCount) audit finding(s) will no longer be recoverable from those checkpoints.")
         }
         if killSwitchCount > 0 {
-            warnings.append("\(killSwitchCount) suggested kill-switch recommendation(s) will be removed with the lineage payload.")
+            warnings.append(
+                DecisionEvolutionMutationPhraseSupport.suggestedKillSwitchRemovalWarning(
+                    count: killSwitchCount
+                )
+            )
         }
+        let copy = DecisionEvolutionMutationIntentCopySupport.clearPendingReviewLineage(
+            count: targets.count
+        )
 
         return DecisionEvolutionMutationIntent(
             kind: .clearPendingReviewLineage,
-            title: "Clear review lineage",
-            message: "Remove persisted lineage from \(targets.count) review checkpoint\(targets.count == 1 ? "" : "s"). Review records remain, but recovered risk, permit, ticket, audit, and kill-switch facts will be cleared.",
-            confirmTitle: "Clear review lineage",
+            title: DecisionEvolutionMutationActionLexiconSupport.clearReviewLineageTitle,
+            message: copy.message,
+            confirmTitle: DecisionEvolutionMutationActionLexiconSupport.clearReviewLineageTitle,
             isDestructive: true,
             preview: DecisionEvolutionMutationPreview(
                 kind: .clearPendingReviewLineage,
                 scope: .reviewQueue,
-                headline: "Clear lineage on \(targets.count) pending checkpoint\(targets.count == 1 ? "" : "s")",
-                summary: "This preserves the review queue but removes recovered lineage payloads from lineage-backed entries.",
+                headline: copy.headline,
+                summary: copy.summary,
                 targetCheckpointIDs: targets.map(\.checkpointID),
                 currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
                 projectedActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
@@ -561,7 +1035,9 @@ enum DecisionEvolutionMutationIntentFactory {
                 ],
                 retainedHighlights: [
                     "Checkpoint records remain available for review.",
-                    "Active checkpoint remains \(checkpointToken(controlSurface.activePresentation?.checkpointID))."
+                    DecisionEvolutionMutationPhraseSupport.activeCheckpointRemainsLine(
+                        checkpointID: controlSurface.activePresentation?.checkpointID
+                    )
                 ],
                 warningHighlights: warnings
             )
@@ -572,10 +1048,11 @@ enum DecisionEvolutionMutationIntentFactory {
         presentations: [DecisionEvolutionCheckpointPresentation],
         controlSurface: DecisionEvolutionControlSurface
     ) -> DecisionEvolutionMutationIntent? {
+        let selectedReviewPresentations = presentations.filter {
+            $0.approvalState == .reviewSuggested
+        }
         let targets = orderedUniqueCheckpointIDs(
-            presentations
-                .filter { $0.approvalState == .reviewSuggested }
-                .map(\.checkpointID)
+            selectedReviewPresentations.map(\.checkpointID)
         )
         guard !targets.isEmpty else { return nil }
 
@@ -583,34 +1060,47 @@ enum DecisionEvolutionMutationIntentFactory {
         let remainingQueue = controlSurface.pendingReviewPresentations.filter {
             !targetSet.contains($0.checkpointID)
         }
-        let lineageBackedCount = presentations.filter(\.hasLineage).count
+        let lineageBackedCount = selectedReviewPresentations.filter(\.hasLineage).count
 
-        var retained = ["Active checkpoint remains \(checkpointToken(controlSurface.activePresentation?.checkpointID))."]
-        if lineageBackedCount > 0 {
-            retained.append("\(lineageBackedCount) selected checkpoint(s) keep their recovered lineage facts after approval.")
+        var retained = [
+            DecisionEvolutionMutationPhraseSupport.activeCheckpointRemainsLine(
+                checkpointID: controlSurface.activePresentation?.checkpointID
+            )
+        ]
+        if let retainedLine = DecisionEvolutionLineagePresentationSupport.retainedSelectedFactsAfterApprovalLine(
+            lineageBackedCount: lineageBackedCount
+        ) {
+            retained.append(retainedLine)
         }
+        let copy = DecisionEvolutionMutationIntentCopySupport.approveSelectedCheckpoints(
+            count: targets.count
+        )
 
         return DecisionEvolutionMutationIntent(
             kind: .approveSelectedCheckpoints,
-            title: "Approve selected",
-            message: "Approve \(targets.count) selected review checkpoint\(targets.count == 1 ? "" : "s") and move only that slice back to the automatic evolution path.",
-            confirmTitle: "Approve selected",
+            title: DecisionEvolutionMutationActionLexiconSupport.approveSelectedTitle,
+            message: copy.message,
+            confirmTitle: DecisionEvolutionMutationActionLexiconSupport.approveSelectedTitle,
             isDestructive: false,
             preview: DecisionEvolutionMutationPreview(
                 kind: .approveSelectedCheckpoints,
                 scope: .selection,
-                headline: "Approve \(targets.count) selected checkpoint\(targets.count == 1 ? "" : "s")",
-                summary: "Only the selected review checkpoints leave the queue. The untouched review head and queue tail stay visible.",
+                headline: copy.headline,
+                summary: copy.summary,
                 targetCheckpointIDs: targets,
                 currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
                 projectedActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
                 currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
                 projectedReviewCheckpointID: remainingQueue.first?.checkpointID,
                 changeHighlights: [
-                    "\(targets.count) selected checkpoint(s) will move from review-suggested to automatic.",
+                    DecisionEvolutionMutationPhraseSupport.selectedCheckpointsMoveToAutomaticLine(
+                        count: targets.count
+                    ),
                     remainingQueue.isEmpty
-                        ? "Review queue will be emptied."
-                        : "Review queue will keep \(remainingQueue.count) checkpoint(s) after approval."
+                        ? DecisionEvolutionMutationPhraseSupport.reviewQueueWillBeEmptiedLine
+                        : DecisionEvolutionMutationPhraseSupport.reviewQueueRetainedAfterApprovalLine(
+                            count: remainingQueue.count
+                        )
                 ],
                 retainedHighlights: retained,
                 warningHighlights: ["Approval does not restore selected checkpoints as the live active brain state."]
@@ -634,28 +1124,35 @@ enum DecisionEvolutionMutationIntentFactory {
         )
         let currentActiveID = controlSurface.activePresentation?.checkpointID
         let projectedActiveID = currentActiveID.flatMap { targetIDSet.contains($0) ? nil : $0 }
+        let copy = DecisionEvolutionMutationIntentCopySupport.markSelectedCheckpointsForReview(
+            count: targetIDs.count
+        )
 
         return DecisionEvolutionMutationIntent(
             kind: .markSelectedCheckpointsForReview,
-            title: "Mark selected",
-            message: "Move \(targetIDs.count) selected automatic checkpoint\(targetIDs.count == 1 ? "" : "s") into the explicit review path without restoring them.",
-            confirmTitle: "Mark selected",
+            title: DecisionEvolutionMutationActionLexiconSupport.markSelectedTitle,
+            message: copy.message,
+            confirmTitle: DecisionEvolutionMutationActionLexiconSupport.markSelectedTitle,
             isDestructive: false,
             preview: DecisionEvolutionMutationPreview(
                 kind: .markSelectedCheckpointsForReview,
                 scope: .selection,
-                headline: "Mark \(targetIDs.count) selected checkpoint\(targetIDs.count == 1 ? "" : "s") for review",
-                summary: "Only the selected automatic checkpoints move into the review queue.",
+                headline: copy.headline,
+                summary: copy.summary,
                 targetCheckpointIDs: targetIDs,
                 currentActiveCheckpointID: currentActiveID,
                 projectedActiveCheckpointID: projectedActiveID,
                 currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
                 projectedReviewCheckpointID: projectedReviewID,
                 changeHighlights: [
-                    "\(targetIDs.count) selected checkpoint(s) will enter the review queue.",
+                    DecisionEvolutionMutationPhraseSupport.selectedCheckpointsEnterReviewQueueLine(
+                        count: targetIDs.count
+                    ),
                     projectedActiveID == nil
                         ? "The automatic active slot will no longer point at the selected active checkpoint."
-                        : "The automatic active slot remains \(checkpointToken(projectedActiveID))."
+                        : DecisionEvolutionMutationPhraseSupport.automaticActiveSlotRemainsLine(
+                            projectedActiveID: checkpointToken(projectedActiveID)
+                        )
                 ],
                 retainedHighlights: [
                     "Restoring the live active brain state still requires an explicit apply action."
@@ -684,20 +1181,27 @@ enum DecisionEvolutionMutationIntentFactory {
             warnings.append("\(auditCount) audit finding(s) will no longer be recoverable from the selected checkpoints.")
         }
         if killSwitchCount > 0 {
-            warnings.append("\(killSwitchCount) suggested kill-switch recommendation(s) will be removed with the lineage payload.")
+            warnings.append(
+                DecisionEvolutionMutationPhraseSupport.suggestedKillSwitchRemovalWarning(
+                    count: killSwitchCount
+                )
+            )
         }
+        let copy = DecisionEvolutionMutationIntentCopySupport.clearSelectedCheckpointLineages(
+            count: targets.count
+        )
 
         return DecisionEvolutionMutationIntent(
             kind: .clearSelectedCheckpointLineages,
-            title: "Clear selected lineage",
-            message: "Remove persisted lineage from \(targets.count) selected checkpoint\(targets.count == 1 ? "" : "s"). The checkpoint records remain in place.",
-            confirmTitle: "Clear selected lineage",
+            title: DecisionEvolutionMutationActionLexiconSupport.clearSelectedLineageTitle,
+            message: copy.message,
+            confirmTitle: DecisionEvolutionMutationActionLexiconSupport.clearSelectedLineageTitle,
             isDestructive: true,
             preview: DecisionEvolutionMutationPreview(
                 kind: .clearSelectedCheckpointLineages,
                 scope: .selection,
-                headline: "Clear lineage on \(targets.count) selected checkpoint\(targets.count == 1 ? "" : "s")",
-                summary: "This keeps the selected checkpoint records but removes their recovered L13 lineage facts.",
+                headline: copy.headline,
+                summary: copy.summary,
                 targetCheckpointIDs: targets.map(\.checkpointID),
                 currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
                 projectedActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
@@ -708,7 +1212,9 @@ enum DecisionEvolutionMutationIntentFactory {
                     "Approval state and queue membership remain unchanged."
                 ],
                 retainedHighlights: [
-                    "The active checkpoint remains \(checkpointToken(controlSurface.activePresentation?.checkpointID)).",
+                    DecisionEvolutionMutationPhraseSupport.activeCheckpointRemainsLine(
+                        checkpointID: controlSurface.activePresentation?.checkpointID
+                    ),
                     "Review queue placement is preserved for review-suggested selections."
                 ],
                 warningHighlights: warnings
@@ -786,7 +1292,7 @@ enum DecisionEvolutionMutationIntentFactory {
     }
 
     private static func checkpointToken(_ checkpointID: String?) -> String {
-        checkpointID ?? "none"
+        DecisionEvolutionCheckpointLexiconSupport.checkpointToken(checkpointID)
     }
 
     private static func orderedUniqueCheckpointIDs(

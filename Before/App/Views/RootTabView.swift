@@ -1,6 +1,32 @@
 import SwiftData
 import SwiftUI
 
+private enum RootTabPresentedSheet: Identifiable {
+    case quick(QuickCheckSession)
+    case balance(BalanceBoardSession)
+    case mirror(MirrorWorkspaceSession)
+    case reflection(ReflectionContext)
+    case evolutionControl
+    case sessionEngineControl
+
+    var id: String {
+        switch self {
+        case .quick(let session):
+            "quick:\(session.id)"
+        case .balance(let session):
+            "balance:\(session.id)"
+        case .mirror(let session):
+            "mirror:\(session.id)"
+        case .reflection(let context):
+            "reflection:\(context.id)"
+        case .evolutionControl:
+            "evolution-control"
+        case .sessionEngineControl:
+            "session-engine-control"
+        }
+    }
+}
+
 struct RootTabView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @Query(sort: \TomorrowBoxItem.createdAt, order: .reverse) private var tomorrowItems: [TomorrowBoxItem]
@@ -49,51 +75,17 @@ struct RootTabView: View {
                 .tag(AppTab.settings)
                 .badge(evolutionSettingsBadge)
         }
-        .sheet(item: $appModel.activeQuickSession) { session in
-            QuickCheckView(session: session)
-                .environmentObject(appModel)
-                .sheet(
-                    isPresented: Binding(
-                        get: { session.isShowingWaitSheet },
-                        set: { session.isShowingWaitSheet = $0 }
-                    )
-                ) {
-                    WaitView(session: session)
-                        .environmentObject(appModel)
-                }
+        .sheet(item: rootPresentedSheet) { sheet in
+            rootSheetContent(for: sheet)
         }
         .onChange(of: appModel.activeQuickSession?.id) { _, _ in
             appModel.syncWorkspacePersistence()
         }
-        .sheet(item: $appModel.activeBalanceSession) { session in
-            BalanceBoardView(session: session)
-                .environmentObject(appModel)
-        }
         .onChange(of: appModel.activeBalanceSession?.id) { _, _ in
             appModel.syncWorkspacePersistence()
         }
-        .sheet(item: $appModel.activeMirrorSession) { session in
-            MirrorWorkspaceView(session: session)
-                .environmentObject(appModel)
-        }
         .onChange(of: appModel.activeMirrorSession?.id) { _, _ in
             appModel.syncWorkspacePersistence()
-        }
-        .sheet(item: $appModel.reflectionContext) { context in
-            ReflectionPromptView(context: context)
-                .environmentObject(appModel)
-        }
-        .sheet(isPresented: $appModel.isEvolutionControlCenterPresented) {
-            NavigationStack {
-                DecisionEvolutionControlCenterView()
-                    .environmentObject(appModel)
-            }
-        }
-        .sheet(isPresented: $appModel.isSessionEngineControlCenterPresented) {
-            NavigationStack {
-                DecisionSessionEngineControlCenterView()
-                    .environmentObject(appModel)
-            }
         }
         .fullScreenCover(item: $appModel.letGoContext) { context in
             LetGoView(context: context)
@@ -106,6 +98,98 @@ struct RootTabView: View {
             OnboardingView {
                 appModel.hasSeenOnboarding = true
             }
+        }
+    }
+
+    private var rootPresentedSheet: Binding<RootTabPresentedSheet?> {
+        Binding(
+            get: { currentRootPresentedSheet },
+            set: { newValue in
+                guard newValue == nil, let presentedSheet = currentRootPresentedSheet else {
+                    return
+                }
+                clear(presentedSheet)
+            }
+        )
+    }
+
+    private var currentRootPresentedSheet: RootTabPresentedSheet? {
+        if let session = appModel.activeQuickSession {
+            return .quick(session)
+        }
+        if let session = appModel.activeBalanceSession {
+            return .balance(session)
+        }
+        if let session = appModel.activeMirrorSession {
+            return .mirror(session)
+        }
+        if let context = appModel.reflectionContext {
+            return .reflection(context)
+        }
+        if appModel.isEvolutionControlCenterPresented {
+            return .evolutionControl
+        }
+        if appModel.isSessionEngineControlCenterPresented {
+            return .sessionEngineControl
+        }
+        return nil
+    }
+
+    @ViewBuilder
+    private func rootSheetContent(
+        for sheet: RootTabPresentedSheet
+    ) -> some View {
+        switch sheet {
+        case .quick(let session):
+            QuickCheckView(session: session)
+                .environmentObject(appModel)
+                .sheet(
+                    isPresented: Binding(
+                        get: { session.isShowingWaitSheet },
+                        set: { session.isShowingWaitSheet = $0 }
+                    )
+                ) {
+                    WaitView(session: session)
+                        .environmentObject(appModel)
+                }
+        case .balance(let session):
+            BalanceBoardView(session: session)
+                .environmentObject(appModel)
+        case .mirror(let session):
+            MirrorWorkspaceView(session: session)
+                .environmentObject(appModel)
+        case .reflection(let context):
+            ReflectionPromptView(context: context)
+                .environmentObject(appModel)
+        case .evolutionControl:
+            NavigationStack {
+                DecisionEvolutionControlCenterView()
+                    .environmentObject(appModel)
+            }
+        case .sessionEngineControl:
+            NavigationStack {
+                DecisionSessionEngineControlCenterView()
+                    .environmentObject(appModel)
+            }
+        }
+    }
+
+    private func clear(
+        _ sheet: RootTabPresentedSheet
+    ) {
+        switch sheet {
+        case .quick:
+            appModel.activeQuickSession = nil
+        case .balance:
+            appModel.activeBalanceSession = nil
+        case .mirror:
+            appModel.activeMirrorSession = nil
+        case .reflection:
+            appModel.reflectionContext = nil
+        case .evolutionControl:
+            appModel.isEvolutionControlCenterPresented = false
+        case .sessionEngineControl:
+            appModel.isSessionEngineControlCenterPresented = false
         }
     }
 

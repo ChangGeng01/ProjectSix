@@ -1,12 +1,7 @@
 import SwiftUI
 
 struct DecisionEvolutionOperatorActionFooterView: View {
-    let interactionMode: DecisionEvolutionControlInteractionMode
-    let navigationOptions: DecisionEvolutionNavigationSurfaceOptions
-    let routesMutationsToControlCenter: Bool
-    let showsDetail: Bool
-    let controlCenterStyle: BeforeActionButton.Style
-    let adjacentShortcutStyle: BeforeActionButton.Style
+    let presentation: DecisionEvolutionOperatorFooterPresentation
 
     init(
         interactionMode: DecisionEvolutionControlInteractionMode,
@@ -16,34 +11,50 @@ struct DecisionEvolutionOperatorActionFooterView: View {
         controlCenterStyle: BeforeActionButton.Style = .primary,
         adjacentShortcutStyle: BeforeActionButton.Style = .secondary
     ) {
-        self.interactionMode = interactionMode
-        self.navigationOptions = navigationOptions
-        self.routesMutationsToControlCenter = routesMutationsToControlCenter
-        self.showsDetail = showsDetail
-        self.controlCenterStyle = controlCenterStyle
-        self.adjacentShortcutStyle = adjacentShortcutStyle
+        self.presentation = DecisionEvolutionOperatorFooterPresentation(
+            headline: interactionMode.operatorHeadline,
+            detail: interactionMode.operatorDetail,
+            interactionMode: interactionMode,
+            navigationOptions: navigationOptions,
+            routesMutationsToControlCenter: routesMutationsToControlCenter,
+            showsDetail: showsDetail,
+            controlCenterStyle: controlCenterStyle.role,
+            adjacentShortcutStyle: adjacentShortcutStyle.role
+        )
+    }
+
+    init(presentation: DecisionEvolutionOperatorFooterPresentation) {
+        self.presentation = presentation
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(interactionMode.operatorHeadline)
+            Text(presentation.headline)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(BeforeTheme.ember)
 
-            if showsDetail {
-                Text(interactionMode.operatorDetail)
+            if presentation.showsDetail {
+                Text(presentation.detail)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
 
-            if navigationOptions.showsAnyShortcut {
-                DecisionEvolutionNavigationActionRow(
-                    navigationOptions: navigationOptions,
-                    routesMutationsToControlCenter: routesMutationsToControlCenter,
-                    controlCenterStyle: controlCenterStyle,
-                    adjacentShortcutStyle: adjacentShortcutStyle
-                )
+            if presentation.navigationOptions.showsAnyShortcut {
+                DecisionEvolutionNavigationActionRow(presentation: presentation.navigationRowPresentation)
             }
+        }
+    }
+}
+
+private extension BeforeActionButton.Style {
+    var role: DecisionEvolutionOperatorFooterStyleRole {
+        switch self {
+        case .primary:
+            .primary
+        case .secondary:
+            .secondary
+        case .tertiary:
+            .tertiary
         }
     }
 }

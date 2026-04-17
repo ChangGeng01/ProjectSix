@@ -68,7 +68,9 @@ enum DeveloperDecisionReplayRecord: Identifiable {
         case .mirror(let record):
             record.prompt
         case .checkpoint(let lineage):
-            "Recovered \(lineage.mode.shortTitle) lineage"
+            DecisionEvolutionEBrainPresentationSupport.recoveredCheckpointLineageTitle(
+                modeTitle: lineage.mode.shortTitle
+            )
         }
     }
 
@@ -81,7 +83,9 @@ enum DeveloperDecisionReplayRecord: Identifiable {
         case .mirror(let record):
             record.coreTension
         case .checkpoint(let lineage):
-            "Recovered from persisted checkpoint • \(lineage.eBrain.taskType.replacingOccurrences(of: "_", with: " "))"
+            DecisionEvolutionEBrainPresentationSupport.recoveredPersistedCheckpointSubtitle(
+                taskType: lineage.eBrain.taskType
+            )
         }
     }
 
@@ -113,7 +117,10 @@ enum DeveloperDecisionReplayRecord: Identifiable {
             if let firstTicket = lineage.eBrain.updateTicketSummaries.first, !firstTicket.isEmpty {
                 return firstTicket
             }
-            return "Recovered \(lineage.eBrain.riskLevel) risk lineage via \(lineage.eBrain.permitMode)."
+            return DecisionEvolutionEBrainPresentationSupport.recoveredLineageNarrative(
+                riskLevel: lineage.eBrain.riskLevel,
+                permitMode: lineage.eBrain.permitMode
+            )
         }
     }
 }
@@ -186,6 +193,7 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
     let guardrailFindings: [String]
     let killSwitches: [String]
     let checkpointBudgetLine: String?
+    let checkpointPressureLine: String?
     let checkpointTaskLine: String?
 
     init(turn: BASEBrainTurnResult) {
@@ -203,14 +211,9 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.activeKillSwitches = activeKillSwitches
         self.guardrailFindings = turn.runtimeTrace.guardrailFindings.map(\.summary)
         self.killSwitches = Self.orderedUnique(activeKillSwitches + recommendedKillSwitches)
-        self.checkpointBudgetLine = [
-            "Budget \(Self.readableRunModeTitle(turn.budgetFrame.runMode))",
-            "route \(turn.runtimeTrace.modelRoute)",
-            "loops \(turn.budgetFrame.maxLoops)",
-            "candidates \(turn.budgetFrame.maxCandidates)",
-            "decode \(turn.budgetFrame.maxDecodeTokens)"
-        ].joined(separator: " • ")
-        self.checkpointTaskLine = turn.updateTickets.first.map { "Review: \($0.summary)" }
+        self.checkpointBudgetLine = turn.replayCheckpointBudgetLine
+        self.checkpointPressureLine = turn.replayCheckpointPressureLine
+        self.checkpointTaskLine = turn.replayCheckpointTaskLine
     }
 
     init(lineageSummary: BASEvolutionLineageSummary) {
@@ -229,6 +232,7 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
             lineageSummary.activeKillSwitches + lineageSummary.recommendedKillSwitches
         )
         self.checkpointBudgetLine = nil
+        self.checkpointPressureLine = nil
         self.checkpointTaskLine = lineageSummary.updateTicketSummaries.first.map { "Review: \($0)" }
     }
 
@@ -236,15 +240,6 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         values.reduce(into: [String]()) { uniqueValues, value in
             guard !uniqueValues.contains(value) else { return }
             uniqueValues.append(value)
-        }
-    }
-
-    private static func readableRunModeTitle(_ runMode: BASEBrainRunMode) -> String {
-        switch runMode {
-        case .guarded:
-            return "GUARDED"
-        default:
-            return runMode.rawValue.uppercased()
         }
     }
 }
@@ -270,13 +265,13 @@ extension DecisionEvolutionSourceDescriptor {
     static let checkpointRecoveryDefault = DecisionEvolutionSourceDescriptor(
         kind: .checkpointRecovery,
         title: "Checkpoint recovery",
-        detail: "Showing recovered lineage restored from a persisted checkpoint."
+        detail: DecisionEvolutionCheckpointRecoverySupport.recoveredDescriptorDetail
     )
 
     static let checkpointRecoveryWorkspace = DecisionEvolutionSourceDescriptor(
         kind: .checkpointRecovery,
         title: "Checkpoint recovery",
-        detail: "Recovered lineage stored in persisted checkpoints remains visible even when no live runtime turn is attached."
+        detail: DecisionEvolutionCheckpointRecoverySupport.recoveredWorkspaceDescriptorDetail
     )
 }
 
@@ -312,6 +307,7 @@ struct DecisionEvolutionReplayEntryPresentation: Equatable, Sendable {
     let title: String
     let summaryLine: String
     let budgetLine: String?
+    let pressureLine: String?
     let eBrainLine: String?
     let taskLine: String?
     let actionLine: String?
@@ -344,32 +340,28 @@ extension DeveloperDecisionReplayEBrainSummary {
 
 extension BASEBrainTurnResult {
     var diagnosticsPresentation: DecisionEvolutionTurnDiagnosticsPresentation {
-        DecisionEvolutionTurnDiagnosticsPresentation(
+        let support = turnDiagnosticsSupport
+
+        return DecisionEvolutionTurnDiagnosticsPresentation(
             sourceDescriptor: .liveRuntimeDefault,
             runModeTitle: budgetFrame.runMode.rawValue.uppercased(),
             taskTitle: contextFrame.taskType.rawValue.replacingOccurrences(of: "_", with: " "),
             riskTitle: riskCard.riskLevel.rawValue.uppercased(),
             permitTitle: actionPermit.mode.rawValue.uppercased(),
             mirrorText: decomposeFrame.mirrorText,
-            routeText: "Route: \(runtimeTrace.modelRoute) • Loops: \(runtimeTrace.loopCount) • Power: \(Int((runtimeTrace.powerEstimate * 100).rounded()))%",
-            hostText: "Host gate \(Int((hostGateValue * 100).rounded()))% • Fold \(thoughtFold.checksum.prefix(12)) • Device \(deviceState.thermalLevel.rawValue)/\(deviceState.memoryFreeMB)MB",
-            replayText: "Replay session \(runtimeTrace.sessionID) • Recorded \(runtimeTrace.recordedAt.formatted(date: .abbreviated, time: .shortened))",
-            auditLines: Array(runtimeTrace.guardrailFindings.prefix(4)).map { finding in
-                "• \(finding.layerID) \(finding.code): \(finding.summary)"
-            },
-            activeKillSwitchesLine: runtimeTrace.activeKillSwitches.isEmpty
-                ? nil
-                : "Active kill switches: \(runtimeTrace.activeKillSwitches.map(\.rawValue).joined(separator: " • "))",
-            recommendedKillSwitchesLine: runtimeTrace.recommendedKillSwitches.isEmpty
-                ? nil
-                : "Recommended kill switches: \(runtimeTrace.recommendedKillSwitches.map(\.rawValue).joined(separator: " • "))",
+            routeText: support.routeText,
+            hostText: support.hostText,
+            replayText: support.replayText,
+            auditLines: support.auditLines,
+            activeKillSwitchesLine: support.activeKillSwitchesLine,
+            recommendedKillSwitchesLine: support.recommendedKillSwitchesLine,
             candidateTitles: Array(thoughtFrame.candidates.prefix(3)).map(\.title),
             memorySummaries: Array(memoryBundle.atoms.prefix(3)).map(\.summary),
             triScoreLines: Array(triScores.prefix(3)).map { score in
                 "• \(score.candidateID): id \(Int((score.idScore * 100).rounded())) / ego \(Int((score.egoScore * 100).rounded())) / superego \(Int((score.superegoScore * 100).rounded()))"
             },
-            riskFactorsLine: riskCard.factors.isEmpty ? nil : "Factors: \(riskCard.factors.joined(separator: " • "))",
-            reasonCodesLine: actionPermit.reasonCodes.isEmpty ? nil : "Reason codes: \(actionPermit.reasonCodes.joined(separator: " • "))",
+            riskFactorsLine: support.riskFactorsLine,
+            reasonCodesLine: support.reasonCodesLine,
             alternativeActions: renderedOutput.alternativeActions,
             thoughtFoldLines: thoughtFold.compactSlots.keys.sorted().compactMap { key in
                 guard let value = thoughtFold.compactSlots[key], !value.isEmpty else { return nil }
@@ -378,7 +370,7 @@ extension BASEBrainTurnResult {
             replayTraceLines: Array(runtimeTrace.layerEvents.prefix(6)).map { event in
                 "• \(event.layerID) \(event.event): \(event.detail)"
             },
-            ticketSummary: updateTickets.first?.summary
+            ticketSummary: support.ticketSummary
         )
     }
 }
@@ -395,6 +387,7 @@ extension DeveloperDecisionReplayEntry {
             title: title,
             summaryLine: summaryLine,
             budgetLine: replayRecoverySummary?.budgetLine,
+            pressureLine: replayRecoverySummary?.pressureLine,
             eBrainLine: replayRecoverySummary?.headlineLine,
             taskLine: replayRecoverySummary?.taskLine,
             actionLine: replayRecoverySummary?.actionLine,

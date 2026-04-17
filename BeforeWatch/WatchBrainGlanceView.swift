@@ -57,58 +57,49 @@ struct WatchEvolutionStatusSection: View {
 
     var body: some View {
         if let evolution {
+            let presentation = evolution.surfacePresentation
+
             VStack(alignment: .leading, spacing: style == .expanded ? 8 : 6) {
                 HStack(spacing: 6) {
-                    statusBadge(
-                        evolution.releaseStateTitle,
-                        tint: releaseTint(evolution.releaseStateID)
-                    )
-
-                    if evolution.pendingReviewCount > 0 {
-                        statusBadge("P\(evolution.pendingReviewCount)", tint: .orange)
-                    }
-
-                    if evolution.rollbackReadyCount > 0 {
-                        statusBadge("R\(evolution.rollbackReadyCount)", tint: .green)
-                    }
-
-                    if evolution.activeKillSwitchCount > 0 {
-                        statusBadge("K\(evolution.activeKillSwitchCount)", tint: .red)
+                    ForEach(Array(presentation.statusBadges.enumerated()), id: \.offset) { _, badge in
+                        statusBadge(
+                            badge.title,
+                            tint: badgeTint(badge.tone)
+                        )
                     }
                 }
 
-                Text(evolution.displayHeadline)
+                Text(presentation.headline)
                     .font(style == .expanded ? .footnote.weight(.semibold) : .caption.weight(.semibold))
                     .lineLimit(style == .expanded ? 3 : 2)
 
-                if style == .expanded, let detail = evolution.displayDetail {
+                if style == .expanded, let detail = presentation.detail {
                     Text(detail)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
                 }
 
-                Text(evolution.compactStatusLine)
+                Text(presentation.compactStatusLine)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(style == .expanded ? 3 : 2)
 
-                if let activeSource = evolution.activeCheckpointSourceTitle,
-                   evolution.hasActiveCheckpoint {
+                if let activeSource = presentation.activeSourceTitle {
                     Text(activeSource)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.orange)
                 }
 
-                if evolution.surfacesAttention {
-                    Text(evolution.attentionInstruction)
+                if let controlEntry = presentation.controlEntry {
+                    Text(controlEntry.instruction)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
 
-                    Button(evolution.controlEntryTitle) {
+                    Button(controlEntry.title) {
                         WatchHandoffCoordinator.enqueueOpenEvolutionControl(
-                            headline: evolution.controlEntryPrompt,
-                            reason: evolution.displayDetail
+                            headline: controlEntry.prompt,
+                            reason: presentation.detail
                         )
                     }
                     .buttonStyle(.borderedProminent)
@@ -117,13 +108,13 @@ struct WatchEvolutionStatusSection: View {
         }
     }
 
-    private func releaseTint(_ releaseStateID: String?) -> Color {
-        switch releaseStateID {
-        case "ready":
+    private func badgeTint(_ tone: DecisionEvolutionWidgetStatusBadgeTone) -> Color {
+        switch tone {
+        case .green:
             .green
-        case "blocked":
+        case .red:
             .red
-        default:
+        case .orange:
             .orange
         }
     }

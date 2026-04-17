@@ -34,19 +34,12 @@ struct DecisionEvolutionControlCenterView: View {
     }
 
     private var selectablePresentations: [DecisionEvolutionCheckpointPresentation] {
-        var ordered: [DecisionEvolutionCheckpointPresentation] = []
-
-        func append(_ presentation: DecisionEvolutionCheckpointPresentation?) {
-            guard let presentation else { return }
-            guard !ordered.contains(where: { $0.checkpointID == presentation.checkpointID }) else { return }
-            ordered.append(presentation)
-        }
-
-        append(workspaceSnapshot.activePresentation)
-        append(workspaceSnapshot.reviewPresentation)
-        workspaceSnapshot.remainingReviewQueue.forEach(append)
-        workspaceSnapshot.historyPresentations.forEach(append)
-        return ordered
+        DecisionEvolutionBatchMutationSelection.orderedSelectablePresentations(
+            activePresentation: workspaceSnapshot.activePresentation,
+            reviewPresentation: workspaceSnapshot.reviewPresentation,
+            remainingReviewQueue: workspaceSnapshot.remainingReviewQueue,
+            historyPresentations: workspaceSnapshot.historyPresentations
+        )
     }
 
     private var batchMutationSelection: DecisionEvolutionBatchMutationSelection {
@@ -65,6 +58,64 @@ struct DecisionEvolutionControlCenterView: View {
         evolutionSurfaceContract.checkpointNavigationOptions
     }
 
+    private var controlCenterNavigationPresentation: DecisionEvolutionNavigationRowPresentation {
+        DecisionEvolutionNavigationRowPresentationSupport.controlCenterCompanion(
+            surfaceContract: evolutionSurfaceContract,
+            navigationOptions: evolutionSurfaceContract.navigationSurfaceOptions(
+                showHistoryShortcut: true,
+                showPortraitShortcut: true
+            )
+        )
+    }
+
+    private var operatorSummaryPresentation: DecisionEvolutionOperatorSummaryPresentation {
+        operatorSnapshot.summaryPresentation
+    }
+
+    private var headerPresentation: DecisionEvolutionControlCenterHeaderPresentation {
+        DecisionEvolutionSectionPresentationSupport.controlCenterHeader()
+    }
+
+    private var releaseReadinessSection: DecisionEvolutionSectionPresentation {
+        DecisionEvolutionSectionPresentationSupport.controlCenter(.releaseReadiness)
+    }
+
+    private var killSwitchSection: DecisionEvolutionSectionPresentation {
+        DecisionEvolutionSectionPresentationSupport.controlCenter(.killSwitchControlPlane)
+    }
+
+    private var mutationHubSection: DecisionEvolutionSectionPresentation {
+        DecisionEvolutionSectionPresentationSupport.controlCenter(.operatorMutationHub)
+    }
+
+    private var checkpointSpotlightSection: DecisionEvolutionSectionPresentation {
+        DecisionEvolutionSectionPresentationSupport.controlCenter(.checkpointSpotlight)
+    }
+
+    private var activeWorkspaceSection: DecisionEvolutionSectionPresentation {
+        DecisionEvolutionSectionPresentationSupport.controlCenter(.activeCheckpointWorkspace)
+    }
+
+    private var reviewHeadSection: DecisionEvolutionSectionPresentation {
+        DecisionEvolutionSectionPresentationSupport.controlCenter(.reviewHeadWorkspace)
+    }
+
+    private var pendingQueueSection: DecisionEvolutionSectionPresentation {
+        DecisionEvolutionSectionPresentationSupport.controlCenter(.pendingReviewQueue)
+    }
+
+    private var recoveredHistorySection: DecisionEvolutionSectionPresentation {
+        DecisionEvolutionSectionPresentationSupport.controlCenter(.recoveredCheckpointHistory)
+    }
+
+    private var activeCheckpointRolePresentation: DecisionEvolutionCheckpointRolePresentation {
+        DecisionEvolutionSectionPresentationSupport.checkpointRole(.active)
+    }
+
+    private var reviewHeadRolePresentation: DecisionEvolutionCheckpointRolePresentation {
+        DecisionEvolutionSectionPresentationSupport.checkpointRole(.reviewHead)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -72,9 +123,9 @@ struct DecisionEvolutionControlCenterView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(alignment: .top, spacing: 12) {
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("Evolution control center")
+                                Text(headerPresentation.title)
                                     .font(.title3.bold())
-                                Text("Operate the full L13 review path from one place: active checkpoint, review head, pending queue, release readiness, rollback, and persisted lineage.")
+                                Text(headerPresentation.detail)
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
@@ -85,7 +136,7 @@ struct DecisionEvolutionControlCenterView: View {
                                 ProgressView()
                                     .controlSize(.small)
                             } else {
-                                BeforeActionButton("Refresh", style: .secondary) {
+                                BeforeActionButton(headerPresentation.refreshTitle, style: .secondary) {
                                     Task {
                                         await refreshFlightDeck()
                                     }
@@ -93,37 +144,31 @@ struct DecisionEvolutionControlCenterView: View {
                             }
                         }
 
-                        HStack(spacing: 10) {
-                            BeforeActionButton("Open History", style: .secondary) {
-                                appModel.selectedTab = .history
-                            }
-
-                            BeforeActionButton("Open Portrait", style: .secondary) {
-                                appModel.selectedTab = .portrait
-                            }
-                        }
+                        DecisionEvolutionNavigationActionRow(
+                            presentation: controlCenterNavigationPresentation
+                        )
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(operatorSnapshot.headline)
+                            Text(operatorSummaryPresentation.headline)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ink)
 
-                            if let primaryReason = operatorSnapshot.primaryReason {
+                            if let primaryReason = operatorSummaryPresentation.primaryReason {
                                 Text(primaryReason)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
 
-                            Text("\(operatorSnapshot.surfaceTitle) • \(operatorSnapshot.operatorHeadline)")
+                            Text(operatorSummaryPresentation.modeLine)
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
 
-                            Text("Active \(operatorSnapshot.activeCheckpointID ?? "none") • Review \(operatorSnapshot.reviewCheckpointID ?? "none") • Pending \(operatorSnapshot.pendingReviewCount) • Rollback-ready \(operatorSnapshot.rollbackReadyCount)")
+                            Text(operatorSummaryPresentation.countsLine)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
 
-                            if !operatorSnapshot.killSwitches.isEmpty {
-                                Text("Kill switches: \(operatorSnapshot.killSwitches.joined(separator: " • "))")
+                            if let killSwitchesLine = operatorSummaryPresentation.killSwitchesLine {
+                                Text(killSwitchesLine)
                                     .font(.caption2)
                                     .foregroundStyle(BeforeTheme.ember)
                             }
@@ -132,8 +177,7 @@ struct DecisionEvolutionControlCenterView: View {
                 }
 
                 workspaceSection(
-                    title: "Release readiness",
-                    detail: "One summary strip for rollout state, blockers, rollback readiness, and kill-switch posture."
+                    presentation: releaseReadinessSection
                 ) {
                     if let releaseSummary = workspaceSnapshot.releaseSummary {
                         DecisionEvolutionReleaseSummaryView(
@@ -149,15 +193,14 @@ struct DecisionEvolutionControlCenterView: View {
                             }
                         )
                     } else {
-                        Text("Release readiness will appear here once a flight-deck summary is available.")
+                        Text(releaseReadinessSection.emptyMessage ?? "")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                 }
 
                 workspaceSection(
-                    title: "Kill-switch control plane",
-                    detail: "Active runtime kill switches now live as a first-class host policy instead of staying as passive audit suggestions."
+                    presentation: killSwitchSection
                 ) {
                     DecisionEvolutionKillSwitchPanelView(
                         activeKillSwitches: appModel.activeEvolutionKillSwitches,
@@ -173,8 +216,7 @@ struct DecisionEvolutionControlCenterView: View {
                 }
 
                 workspaceSection(
-                    title: "Operator mutation hub",
-                    detail: "Queue-wide pilot controls and selection-scoped checkpoint mutations now live in one guarded workspace."
+                    presentation: mutationHubSection
                 ) {
                     VStack(alignment: .leading, spacing: 12) {
                         DecisionEvolutionPilotControlPanel(
@@ -210,13 +252,16 @@ struct DecisionEvolutionControlCenterView: View {
                 }
 
                 workspaceSection(
-                    title: "Checkpoint spotlight",
-                    detail: "Keep the current active checkpoint and review head visible even as the queue evolves."
+                    presentation: checkpointSpotlightSection
                 ) {
                     DecisionEvolutionControlSurfaceSummaryView(
                         controlSurface: controlSurface,
                         surfaceContract: evolutionSurfaceContract,
-                        emptyMessage: "No persisted checkpoint lineage is available yet. Once a checkpoint lands, this control center will show active risk, permit, rollback and review facts.",
+                        emptyMessage: DecisionEvolutionSurfaceStatusPresentationSupport.summaryEmptyMessage(
+                            for: .controlCenter
+                        )
+                            ?? checkpointSpotlightSection.emptyMessage
+                            ?? DecisionEvolutionCheckpointDetailPresentationSupport.emptyLineageMessage,
                         navigationOptions: checkpointNavigationOptions,
                         afterMutation: {
                             Task {
@@ -228,11 +273,10 @@ struct DecisionEvolutionControlCenterView: View {
 
                 if let activePresentation = workspaceSnapshot.activePresentation {
                     workspaceSection(
-                        title: "Active checkpoint workspace",
-                        detail: "Mutate the live active path without losing sight of restored lineage and rollback readiness."
+                        presentation: activeWorkspaceSection
                     ) {
                         DecisionEvolutionCheckpointPanelView(
-                            title: "Active checkpoint",
+                            title: activeCheckpointRolePresentation.title,
                             checkpoint: activePresentation,
                             controlSurface: controlSurface,
                             surfaceContract: evolutionSurfaceContract,
@@ -252,11 +296,10 @@ struct DecisionEvolutionControlCenterView: View {
 
                 if let reviewPresentation = workspaceSnapshot.reviewPresentation {
                     workspaceSection(
-                        title: "Review head workspace",
-                        detail: "Work the queue head directly without collapsing the rest of the pending review backlog."
+                        presentation: reviewHeadSection
                     ) {
                         DecisionEvolutionCheckpointPanelView(
-                            title: "Review head",
+                            title: reviewHeadRolePresentation.title,
                             checkpoint: reviewPresentation,
                             controlSurface: controlSurface,
                             surfaceContract: evolutionSurfaceContract,
@@ -276,8 +319,7 @@ struct DecisionEvolutionControlCenterView: View {
 
                 if !workspaceSnapshot.remainingReviewQueue.isEmpty {
                     workspaceSection(
-                        title: "Pending review queue",
-                        detail: "The remaining review-suggested checkpoints stay operable here instead of being hidden behind the queue head."
+                        presentation: pendingQueueSection
                     ) {
                         ForEach(workspaceSnapshot.remainingReviewQueue) { checkpoint in
                             DecisionEvolutionCheckpointPanelView(
@@ -301,8 +343,7 @@ struct DecisionEvolutionControlCenterView: View {
 
                 if !workspaceSnapshot.historyPresentations.isEmpty {
                     workspaceSection(
-                        title: "Recovered checkpoint history",
-                        detail: "Recovered lineage history remains browseable here even after the active and review spotlight changes."
+                        presentation: recoveredHistorySection
                     ) {
                         ForEach(workspaceSnapshot.historyPresentations) { checkpoint in
                             DecisionEvolutionCheckpointPanelView(
@@ -328,11 +369,11 @@ struct DecisionEvolutionControlCenterView: View {
             .padding(.vertical, 18)
         }
         .background(BeforeTheme.background.ignoresSafeArea())
-        .navigationTitle("Evolution Control")
+        .navigationTitle(headerPresentation.navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("Done") {
+                Button(headerPresentation.dismissTitle) {
                     appModel.dismissEvolutionControlCenter()
                     dismiss()
                 }
@@ -391,16 +432,15 @@ struct DecisionEvolutionControlCenterView: View {
 
     @ViewBuilder
     private func workspaceSection<Content: View>(
-        title: String,
-        detail: String,
+        presentation: DecisionEvolutionSectionPresentation,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title)
+            Text(presentation.title)
                 .font(.headline)
                 .foregroundStyle(BeforeTheme.ink)
 
-            Text(detail)
+            Text(presentation.detail)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 

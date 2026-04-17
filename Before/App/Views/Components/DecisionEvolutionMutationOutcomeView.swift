@@ -13,30 +13,29 @@ struct DecisionEvolutionMutationOutcomeView: View {
     }
 
     private var tint: Color {
-        if outcome.isSuccess {
-            return outcome.isDestructive ? BeforeTheme.ember : BeforeTheme.moss
+        switch outcome.presentation.tone {
+        case .success:
+            BeforeTheme.moss
+        case .caution:
+            BeforeTheme.ember
+        case .failure:
+            .red
         }
-        return .red
-    }
-
-    private var iconName: String {
-        if outcome.isSuccess {
-            return outcome.isDestructive ? "exclamationmark.shield.fill" : "checkmark.seal.fill"
-        }
-        return "xmark.octagon.fill"
     }
 
     var body: some View {
+        let presentation = outcome.presentation
+
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
-                Label(outcome.statusTitle, systemImage: iconName)
+                Label(presentation.statusTitle, systemImage: presentation.iconName)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(tint)
 
                 Spacer()
 
                 if let onDismiss {
-                    Button("Dismiss") {
+                    Button(presentation.dismissTitle) {
                         onDismiss()
                     }
                     .font(.caption.weight(.semibold))
@@ -52,8 +51,8 @@ struct DecisionEvolutionMutationOutcomeView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            if !outcome.affectedCheckpointIDs.isEmpty {
-                Text("Targets: \(outcome.affectedCheckpointIDs.joined(separator: " • "))")
+            if let targetsLine = presentation.targetsLine(outcome.affectedCheckpointIDs) {
+                Text(targetsLine)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)

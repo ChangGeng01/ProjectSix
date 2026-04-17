@@ -55,6 +55,28 @@ struct DecisionEvolutionLineageSnapshot: Identifiable, Equatable, Sendable {
     }
 }
 
+struct DecisionEvolutionEffectiveEBrainContext: Equatable, Sendable {
+    let summary: DeveloperDecisionReplayEBrainSummary?
+    let source: DecisionTestingEBrainSource?
+    let factsBundle: DecisionEvolutionEBrainFactsBundle?
+    let thoughtFoldChecksum: String?
+    let updateTicketSummaries: [String]
+    let runtimeAuditFindings: [String]
+    let effectiveActiveKillSwitches: [String]
+    let recommendedKillSwitches: [String]
+
+    static let empty = DecisionEvolutionEffectiveEBrainContext(
+        summary: nil,
+        source: nil,
+        factsBundle: nil,
+        thoughtFoldChecksum: nil,
+        updateTicketSummaries: [],
+        runtimeAuditFindings: [],
+        effectiveActiveKillSwitches: [],
+        recommendedKillSwitches: []
+    )
+}
+
 struct DecisionReviewCheckpointSnapshot: Identifiable, Equatable, Sendable {
     let checkpointID: String
     let previousCheckpointID: String?
@@ -354,50 +376,7 @@ struct DecisionTestingRuntimeExport {
     func evolutionRuntimeFacts(
         currentBrainState: CurrentBrainState?
     ) -> DecisionEvolutionRuntimeFacts {
-        let resolvedEffectiveEBrainSummary: DeveloperDecisionReplayEBrainSummary? = if let eBrainTurn {
-            DeveloperDecisionReplayEBrainSummary(turn: eBrainTurn)
-        } else {
-            latestCheckpointLineage?.eBrain
-        }
-        let resolvedEffectiveEBrainSource = resolvedEffectiveEBrainSummary.map {
-            $0.source == .liveRuntime
-                ? DecisionTestingEBrainSource.liveRuntime
-                : DecisionTestingEBrainSource.persistedCheckpoint
-        }
-        let resolvedEffectiveEBrainFactsBundle = resolvedEffectiveEBrainSummary.map {
-            $0.factsBundle(modeTitle: preferredCheckpointSelectionContext?.mode?.shortTitle)
-        }
-        let resolvedThoughtFoldChecksum: String? = if let eBrainTurn {
-            String(eBrainTurn.thoughtFold.checksum.prefix(12))
-        } else {
-            resolvedEffectiveEBrainSummary?.thoughtFoldChecksum
-        }
-        let resolvedUpdateTicketSummaries: [String] = if let eBrainTurn {
-            eBrainTurn.updateTickets.map(\.summary)
-        } else {
-            resolvedEffectiveEBrainSummary?.updateTicketSummaries ?? []
-        }
-        let resolvedRuntimeAuditFindings: [String] = if let eBrainTurn {
-            eBrainTurn.runtimeTrace.guardrailFindings.map(\.summary)
-        } else {
-            resolvedEffectiveEBrainSummary?.guardrailFindings ?? []
-        }
-        let resolvedEffectiveActiveKillSwitches: [String] = if let eBrainTurn {
-            orderedUnique(
-                activeKillSwitches + eBrainTurn.runtimeTrace.activeKillSwitches.map(\.rawValue)
-            )
-        } else {
-            activeKillSwitches
-        }
-        let resolvedRecommendedKillSwitches: [String] = if let eBrainTurn {
-            eBrainTurn.runtimeTrace.recommendedKillSwitches.map(\.rawValue)
-        } else if let resolvedEffectiveEBrainSummary {
-            resolvedEffectiveEBrainSummary.killSwitches.filter {
-                !resolvedEffectiveEBrainSummary.activeKillSwitches.contains($0)
-            }
-        } else {
-            []
-        }
+        let effectiveEBrainContext = resolvedEffectiveEBrainContext()
         let currentBrainAutomaticCheckpoint = currentBrainState?.evolutionState.latestCheckpoint
             .flatMap { checkpoint -> DecisionReviewCheckpointSnapshot? in
                 guard checkpoint.approvalState == .automatic else {
@@ -415,15 +394,60 @@ struct DecisionTestingRuntimeExport {
         )
 
         return DecisionEvolutionRuntimeFacts(
-            effectiveEBrainSummary: resolvedEffectiveEBrainSummary,
-            effectiveEBrainSource: resolvedEffectiveEBrainSource,
-            effectiveEBrainFactsBundle: resolvedEffectiveEBrainFactsBundle,
-            thoughtFoldChecksum: resolvedThoughtFoldChecksum,
-            updateTicketSummaries: resolvedUpdateTicketSummaries,
-            runtimeAuditFindings: resolvedRuntimeAuditFindings,
-            effectiveActiveKillSwitches: resolvedEffectiveActiveKillSwitches,
-            recommendedKillSwitches: resolvedRecommendedKillSwitches,
+            effectiveEBrainSummary: effectiveEBrainContext.summary,
+            effectiveEBrainSource: effectiveEBrainContext.source,
+            effectiveEBrainFactsBundle: effectiveEBrainContext.factsBundle,
+            thoughtFoldChecksum: effectiveEBrainContext.thoughtFoldChecksum,
+            updateTicketSummaries: effectiveEBrainContext.updateTicketSummaries,
+            runtimeAuditFindings: effectiveEBrainContext.runtimeAuditFindings,
+            effectiveActiveKillSwitches: effectiveEBrainContext.effectiveActiveKillSwitches,
+            recommendedKillSwitches: effectiveEBrainContext.recommendedKillSwitches,
             coverageFacts: coverageFacts
+        )
+    }
+
+    private func resolvedEffectiveEBrainContext() -> DecisionEvolutionEffectiveEBrainContext {
+        if let eBrainTurn {
+            let summary = DeveloperDecisionReplayEBrainSummary(turn: eBrainTurn)
+            return DecisionEvolutionEffectiveEBrainContext(
+                summary: summary,
+                source: .liveRuntime,
+                factsBundle: summary.factsBundle(modeTitle: preferredCheckpointSelectionContext?.mode?.shortTitle),
+                thoughtFoldChecksum: String(eBrainTurn.thoughtFold.checksum.prefix(12)),
+                updateTicketSummaries: eBrainTurn.updateTickets.map(\.summary),
+                runtimeAuditFindings: eBrainTurn.runtimeTrace.guardrailFindings.map(\.summary),
+                effectiveActiveKillSwitches: orderedUnique(
+                    activeKillSwitches + eBrainTurn.runtimeTrace.activeKillSwitches.map(\.rawValue)
+                ),
+                recommendedKillSwitches: eBrainTurn.runtimeTrace.recommendedKillSwitches.map(\.rawValue)
+            )
+        }
+
+        if let latestCheckpointLineage {
+            let summary = latestCheckpointLineage.eBrain
+            return DecisionEvolutionEffectiveEBrainContext(
+                summary: summary,
+                source: .persistedCheckpoint,
+                factsBundle: latestCheckpointLineage.factsBundle,
+                thoughtFoldChecksum: summary.thoughtFoldChecksum,
+                updateTicketSummaries: summary.updateTicketSummaries,
+                runtimeAuditFindings: summary.guardrailFindings,
+                effectiveActiveKillSwitches: activeKillSwitches,
+                recommendedKillSwitches: summary.killSwitches.filter {
+                    !summary.activeKillSwitches.contains($0)
+                }
+            )
+        }
+
+        return DecisionEvolutionEffectiveEBrainContext(
+            summary: nil,
+            source: nil,
+            factsBundle: nil,
+            thoughtFoldChecksum: nil,
+            updateTicketSummaries: [],
+            runtimeAuditFindings: [],
+            effectiveActiveKillSwitches: activeKillSwitches,
+            recommendedKillSwitches: []
         )
     }
 

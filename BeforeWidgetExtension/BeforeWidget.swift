@@ -50,13 +50,13 @@ struct BeforeWidgetView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.7))
 
-            if let evolution = entry.snapshot.evolution, evolution.surfacesAttention {
+            if let controlEntry = entry.snapshot.evolution?.surfacePresentation.controlEntry {
                 widgetIntentButton(
-                    title: evolution.controlEntryTitle,
-                    systemImage: evolution.controlEntrySystemImage,
+                    title: controlEntry.title,
+                    systemImage: controlEntry.systemImage,
                     intent: OpenEvolutionControlIntent(
                         entrySource: .homeWidgetSmall,
-                        prompt: evolution.controlEntryPrompt
+                        prompt: controlEntry.prompt
                     )
                 )
             }
@@ -99,8 +99,9 @@ struct BeforeWidgetView: View {
                     .foregroundStyle(.white.opacity(0.82))
                     .lineLimit(3)
 
-                if let evolution = entry.snapshot.evolution, evolution.surfacesAttention {
-                    Text(evolution.compactStatusLine)
+                if let presentation = entry.snapshot.evolution?.surfacePresentation,
+                   presentation.controlEntry != nil {
+                    Text(presentation.compactStatusLine)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.72))
                         .lineLimit(2)
@@ -125,13 +126,13 @@ struct BeforeWidgetView: View {
                 )
             }
 
-            if let evolution = entry.snapshot.evolution, evolution.surfacesAttention {
+            if let controlEntry = entry.snapshot.evolution?.surfacePresentation.controlEntry {
                 widgetIntentButton(
-                    title: evolution.controlEntryTitle,
-                    systemImage: evolution.controlEntrySystemImage,
+                    title: controlEntry.title,
+                    systemImage: controlEntry.systemImage,
                     intent: OpenEvolutionControlIntent(
                         entrySource: .homeWidgetMedium,
-                        prompt: evolution.controlEntryPrompt
+                        prompt: controlEntry.prompt
                     )
                 )
             }

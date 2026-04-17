@@ -1,5 +1,79 @@
 import Foundation
 
+enum DecisionEvolutionPilotControlPresentationSupport {
+    static let headerTitle = "Evolution pilot controls"
+    static let guidedActionSectionTitle = "Recommended next step"
+    static let restoreActiveTitle = DecisionEvolutionMutationHubPresentationSupport.restoreActivePathTitle
+    static let rollbackActiveTitle = DecisionEvolutionMutationHubPresentationSupport.rollbackActivePathTitle
+    static let approveQueueTitle = DecisionEvolutionReviewPathPresentationSupport.approveReviewQueueActionTitle
+    static let clearQueueLineageTitle = DecisionEvolutionMutationHubPresentationSupport.clearQueueLineageTitle
+
+    static func headerDetail(
+        allowsLocalMutationActions: Bool
+    ) -> String {
+        allowsLocalMutationActions
+            ? DecisionEvolutionMutationRoutingPresentationSupport.mutationHubPilotDetail
+            : DecisionEvolutionMutationRoutingPresentationSupport.routedPilotDetail()
+    }
+
+    static func embeddedReleaseSummaryMode(
+        allowsLocalMutationActions: Bool
+    ) -> DecisionEvolutionReleaseSummaryPresentationMode {
+        allowsLocalMutationActions ? .mutationHub : .surface
+    }
+
+    static func pendingReviewLineageNotice(
+        pendingReviewLineageCount: Int,
+        hasReleaseSummary: Bool
+    ) -> String? {
+        DecisionEvolutionLineagePresentationSupport.pendingReviewLineageNotice(
+            pendingReviewLineageCount: pendingReviewLineageCount,
+            hasReleaseSummary: hasReleaseSummary
+        )
+    }
+
+    static func reviewAuditLine(
+        auditFindings: [String]
+    ) -> String? {
+        DecisionEvolutionPendingReviewPresentationSupport.auditLine(
+            auditFindings: auditFindings
+        )
+    }
+
+    static func recommendedKillSwitchesLine(
+        killSwitches: [String]
+    ) -> String? {
+        DecisionEvolutionKillSwitchPresentationSupport.suggestedLine(
+            killSwitches: killSwitches
+        )
+    }
+
+    static func summaryBadgePresentations(
+        pendingReviewCount: Int,
+        rollbackReadyCount: Int,
+        pendingReviewLineageCount: Int
+    ) -> [DecisionEvolutionSummaryBadgePresentation] {
+        var badges: [DecisionEvolutionSummaryBadgePresentation] = [
+            DecisionEvolutionSurfaceBadgePresentationSupport.pendingReviewBadge(
+                count: pendingReviewCount
+            ),
+            DecisionEvolutionSurfaceBadgePresentationSupport.rollbackReadyBadge(
+                count: rollbackReadyCount
+            )
+        ]
+
+        if let lineageBadge = DecisionEvolutionSurfaceBadgePresentationSupport.lineageBackedBadge(
+            count: pendingReviewLineageCount
+        ) {
+            badges.append(
+                lineageBadge
+            )
+        }
+
+        return badges
+    }
+}
+
 enum DecisionEvolutionPilotGuidedActionRoute: Equatable, Sendable {
     case mutation(DecisionEvolutionMutationIntent)
     case navigation(DecisionEvolutionNavigationDestination)
@@ -18,6 +92,18 @@ struct DecisionEvolutionPilotControlSnapshot: Equatable, Sendable {
     let pendingReviewCount: Int
     let rollbackReadyCount: Int
     let pendingReviewLineageCount: Int
+    let summaryBadgePresentations: [DecisionEvolutionSummaryBadgePresentation]
+    let headerTitle: String
+    let headerDetail: String
+    let guidedActionSectionTitle: String
+    let restoreActiveTitle: String
+    let rollbackActiveTitle: String
+    let approveQueueTitle: String
+    let clearQueueLineageTitle: String
+    let embeddedReleaseSummaryMode: DecisionEvolutionReleaseSummaryPresentationMode?
+    let pendingReviewLineageNotice: String?
+    let reviewAuditLine: String?
+    let recommendedKillSwitchesLine: String?
     let mutationIntents: [DecisionEvolutionMutationIntent]
     let restoreActiveIntent: DecisionEvolutionMutationIntent?
     let rollbackActiveIntent: DecisionEvolutionMutationIntent?
@@ -54,13 +140,45 @@ struct DecisionEvolutionPilotControlSnapshot: Equatable, Sendable {
             ?? controlSurface.activeKillSwitches
         let resolvedCanRestoreActiveCheckpoint = releaseSummary?.canRestoreActiveCheckpoint
             ?? (controlSurface.activePresentation?.applyReady == true)
+        let resolvedCanRollbackActiveCheckpoint = releaseSummary?.canRollbackActiveCheckpoint
+            ?? controlSurface.canRollbackActiveCheckpoint
+        let pendingReviewLineageCount = controlSurface.pendingReviewLineagePresentations.count
 
         return DecisionEvolutionPilotControlSnapshot(
             interactionMode: surfaceContract.interactionMode,
             allowsLocalMutationActions: allowsLocalMutationActions,
             pendingReviewCount: resolvedPendingReviewCount,
             rollbackReadyCount: resolvedRollbackReadyCount,
-            pendingReviewLineageCount: controlSurface.pendingReviewLineagePresentations.count,
+            pendingReviewLineageCount: pendingReviewLineageCount,
+            summaryBadgePresentations: DecisionEvolutionPilotControlPresentationSupport.summaryBadgePresentations(
+                pendingReviewCount: resolvedPendingReviewCount,
+                rollbackReadyCount: resolvedRollbackReadyCount,
+                pendingReviewLineageCount: pendingReviewLineageCount
+            ),
+            headerTitle: DecisionEvolutionPilotControlPresentationSupport.headerTitle,
+            headerDetail: DecisionEvolutionPilotControlPresentationSupport.headerDetail(
+                allowsLocalMutationActions: allowsLocalMutationActions
+            ),
+            guidedActionSectionTitle: DecisionEvolutionPilotControlPresentationSupport.guidedActionSectionTitle,
+            restoreActiveTitle: DecisionEvolutionPilotControlPresentationSupport.restoreActiveTitle,
+            rollbackActiveTitle: DecisionEvolutionPilotControlPresentationSupport.rollbackActiveTitle,
+            approveQueueTitle: DecisionEvolutionPilotControlPresentationSupport.approveQueueTitle,
+            clearQueueLineageTitle: DecisionEvolutionPilotControlPresentationSupport.clearQueueLineageTitle,
+            embeddedReleaseSummaryMode: releaseSummary.map { _ in
+                DecisionEvolutionPilotControlPresentationSupport.embeddedReleaseSummaryMode(
+                    allowsLocalMutationActions: allowsLocalMutationActions
+                )
+            },
+            pendingReviewLineageNotice: DecisionEvolutionPilotControlPresentationSupport.pendingReviewLineageNotice(
+                pendingReviewLineageCount: pendingReviewLineageCount,
+                hasReleaseSummary: releaseSummary != nil
+            ),
+            reviewAuditLine: DecisionEvolutionPilotControlPresentationSupport.reviewAuditLine(
+                auditFindings: controlSurface.reviewAuditFindings
+            ),
+            recommendedKillSwitchesLine: DecisionEvolutionPilotControlPresentationSupport.recommendedKillSwitchesLine(
+                killSwitches: resolvedRecommendedKillSwitches
+            ),
             mutationIntents: [
                 restoreActiveIntent,
                 rollbackActiveIntent,
@@ -74,9 +192,15 @@ struct DecisionEvolutionPilotControlSnapshot: Equatable, Sendable {
             reviewAuditFindings: controlSurface.reviewAuditFindings,
             recommendedKillSwitches: resolvedRecommendedKillSwitches,
             guidedAction: guidedAction(
-                pendingReviewCount: resolvedPendingReviewCount,
-                activeKillSwitches: resolvedActiveKillSwitches,
-                canRestoreActiveCheckpoint: resolvedCanRestoreActiveCheckpoint,
+                priorities: DecisionEvolutionPrimaryBlockerEvaluator.orderedPriorities(
+                    controlSurface: controlSurface,
+                    releaseSummary: releaseSummary,
+                    activeKillSwitches: resolvedActiveKillSwitches,
+                    recommendedKillSwitches: resolvedRecommendedKillSwitches,
+                    canRestoreActiveCheckpoint: resolvedCanRestoreActiveCheckpoint,
+                    canRollbackActiveCheckpoint: resolvedCanRollbackActiveCheckpoint
+                ),
+                primaryReason: releaseSummary?.reasons.first,
                 navigationOptions: navigationOptions,
                 allowsLocalMutationActions: allowsLocalMutationActions,
                 routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter,
@@ -86,53 +210,65 @@ struct DecisionEvolutionPilotControlSnapshot: Equatable, Sendable {
     }
 
     private static func guidedAction(
-        pendingReviewCount: Int,
-        activeKillSwitches: [String],
-        canRestoreActiveCheckpoint: Bool,
+        priorities: [DecisionEvolutionPrimaryBlocker],
+        primaryReason: String?,
         navigationOptions: DecisionEvolutionNavigationSurfaceOptions,
         allowsLocalMutationActions: Bool,
         routesMutationsToControlCenter: Bool,
         approveQueueIntent: DecisionEvolutionMutationIntent?
     ) -> DecisionEvolutionPilotGuidedAction? {
-        if pendingReviewCount > 0 {
-            if allowsLocalMutationActions, let approveQueueIntent {
-                return DecisionEvolutionPilotGuidedAction(
-                    title: "Pending review is the next blocker",
-                    detail: "Clear or approve the review queue before treating this release path as ready.",
-                    actionTitle: "Approve review queue",
-                    route: .mutation(approveQueueIntent)
-                )
+        for priority in priorities {
+            if let action = guidedAction(
+                for: priority,
+                primaryReason: primaryReason,
+                navigationOptions: navigationOptions,
+                allowsLocalMutationActions: allowsLocalMutationActions,
+                routesMutationsToControlCenter: routesMutationsToControlCenter,
+                approveQueueIntent: approveQueueIntent
+            ) {
+                return action
             }
-
-            return navigationGuidedAction(
-                title: "Pending review is the next blocker",
-                detail: allowsLocalMutationActions
-                    ? "Open the checkpoint workspace and work the queue before widening rollout."
-                    : "This surface stays read-first. Open Evolution Control and work the queue there before widening rollout.",
-                navigationOptions: navigationOptions,
-                routesMutationsToControlCenter: routesMutationsToControlCenter
-            )
-        }
-
-        if !activeKillSwitches.isEmpty {
-            return navigationGuidedAction(
-                title: "Kill switches are holding the release path",
-                detail: "Inspect the active checkpoint and its guardrails before trying to widen rollout.",
-                navigationOptions: navigationOptions,
-                routesMutationsToControlCenter: routesMutationsToControlCenter
-            )
-        }
-
-        if !canRestoreActiveCheckpoint {
-            return navigationGuidedAction(
-                title: "The active path is not restorable yet",
-                detail: "Open the control surface and recover a checkpoint with a valid brain-state snapshot.",
-                navigationOptions: navigationOptions,
-                routesMutationsToControlCenter: routesMutationsToControlCenter
-            )
         }
 
         return nil
+    }
+
+    private static func guidedAction(
+        for priority: DecisionEvolutionPrimaryBlocker,
+        primaryReason: String?,
+        navigationOptions: DecisionEvolutionNavigationSurfaceOptions,
+        allowsLocalMutationActions: Bool,
+        routesMutationsToControlCenter: Bool,
+        approveQueueIntent: DecisionEvolutionMutationIntent?
+    ) -> DecisionEvolutionPilotGuidedAction? {
+        let guidance = DecisionEvolutionPrimaryBlockerPresentationSupport.pilotGuidance(
+            blocker: priority,
+            primaryReason: primaryReason,
+            allowsLocalMutationActions: allowsLocalMutationActions
+        )
+
+        if priority == .pendingReview,
+           allowsLocalMutationActions,
+           let approveQueueIntent,
+           let guidance,
+           let detail = guidance.detail {
+            return DecisionEvolutionPilotGuidedAction(
+                title: guidance.headline,
+                detail: detail,
+                actionTitle: DecisionEvolutionReviewPathPresentationSupport.approveReviewQueueActionTitle,
+                route: .mutation(approveQueueIntent)
+            )
+        }
+
+        guard let guidance,
+              let detail = guidance.detail else { return nil }
+
+        return navigationGuidedAction(
+            title: guidance.headline,
+            detail: detail,
+            navigationOptions: navigationOptions,
+            routesMutationsToControlCenter: routesMutationsToControlCenter
+        )
     }
 
     private static func navigationGuidedAction(

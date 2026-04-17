@@ -13,6 +13,7 @@ final class DecisionSessionEngineReviewPresentationTests: XCTestCase {
             integrityLine: "Validated schema v1 • fingerprint abcdef123456",
             checkpointLine: "Latest checkpoint ckpt-1 • repair parser",
             branchLine: "Head main • Layer folded_lung",
+            unfinishedStepCount: 0,
             unfinishedStepsLine: "Open steps 0 • import can start from a paused safe point.",
             headline: "Importing creates a new paused recovery-safe session.",
             branchPreviews: [
@@ -70,6 +71,7 @@ final class DecisionSessionEngineReviewPresentationTests: XCTestCase {
             integrityLine: "Validated schema v1 • fingerprint abcdef123456",
             checkpointLine: "Latest checkpoint ckpt-2",
             branchLine: "Head recovery-main • Layer folded_lung",
+            unfinishedStepCount: 2,
             unfinishedStepsLine: "Open steps 2 • unfinished work will import as failed recovery facts.",
             headline: "Importing creates a new paused recovery-safe session.",
             branchPreviews: []
@@ -151,5 +153,67 @@ final class DecisionSessionEngineReviewPresentationTests: XCTestCase {
             ]
         )
         XCTAssertTrue(presentation.summary.detail.contains("branch_merged"))
+    }
+
+    func testReviewPresentationSupportBuildsSharedImportAndMergePayloads() {
+        let importPreview = DecisionSessionImportBundlePreview(
+            id: "sess-preview|3",
+            sourceSessionId: "sess-preview",
+            sourceTitle: "Recovery line",
+            importedTitle: "Recovery line (Imported)",
+            exportedAt: Date(timeIntervalSince1970: 100),
+            countsLine: "Branches 2 • Checkpoints 2 • Events 9 • Steps 1",
+            integrityLine: "Validated schema v1 • fingerprint zyx987",
+            checkpointLine: "Latest checkpoint ckpt-2 • recover parser",
+            branchLine: "Head recovery-main • Layer folded_lung",
+            unfinishedStepCount: 1,
+            unfinishedStepsLine: "Open steps 1 • unfinished work will import as failed recovery facts.",
+            headline: "Importing creates a new paused recovery-safe session.",
+            branchPreviews: [
+                DecisionSessionImportBundleBranchPreview(
+                    id: "recovery-main",
+                    name: "recovery-main",
+                    statusLine: "Active • exported head",
+                    detailLine: "Recovery branch • Base ckpt-2",
+                    isHead: true
+                )
+            ]
+        )
+
+        let importPresentation = DecisionSessionReviewPresentationSupport.importPreviewPresentation(
+            preview: importPreview,
+            sourceFileName: "recovery-line.json"
+        )
+
+        XCTAssertEqual(importPresentation.bundleLine, "Bundle recovery-line.json")
+        XCTAssertEqual(importPresentation.branchPresentations.count, 1)
+        XCTAssertEqual(importPresentation.branchPresentations.first?.name, "recovery-main")
+        XCTAssertEqual(importPresentation.unfinishedWorkSummary.severity, .watch)
+
+        let mergeReview = DecisionSessionEngineControlMergeReview(
+            sourceBranchID: "branch-correction",
+            sourceBranchName: "correction-parser",
+            targetBranchID: "branch-main",
+            targetBranchName: "main",
+            sourceStatusLine: "Active",
+            targetStatusLine: "Active • current head",
+            checkpointLine: "Selected checkpoint ckpt-9 • repair parser",
+            summaryLine: "Merge will append a branch_merged fact onto the current head branch.",
+            detailRows: [
+                DecisionSessionEngineControlReviewDetail(
+                    id: "source-status",
+                    label: "Source status",
+                    value: "Active"
+                )
+            ]
+        )
+
+        let mergePresentation = DecisionSessionReviewPresentationSupport.mergeReviewPresentation(
+            review: mergeReview
+        )
+
+        XCTAssertEqual(mergePresentation.title, "Merge review")
+        XCTAssertEqual(mergePresentation.routeLine, "correction-parser → main")
+        XCTAssertEqual(mergePresentation.detailRows.map(\.label), ["Source status"])
     }
 }

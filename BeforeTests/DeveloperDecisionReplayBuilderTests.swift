@@ -222,6 +222,7 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
             presentation.routeLine,
             "Route guarded • Loops 1 • Cache 0% • Tickets 1"
         )
+        XCTAssertNil(presentation.pressureLine)
         XCTAssertEqual(
             presentation.hostLine,
             "Host gate 37% • Fold checksum-1 • Audit 1"
@@ -231,6 +232,271 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
             "Protective runtime turn attached."
         )
         XCTAssertNil(presentation.primaryGuardrailText)
+    }
+
+    func testDecisionSystemEBrainSummaryPresentationCarriesLivePressureLine() {
+        let summary = makeSystemEBrainSummary(
+            source: .liveRuntime,
+            pressureLine: "Pressure latency 3/1400ms • power 12% • cache 0% • thermal cool"
+        )
+
+        let presentation = summary.presentation
+
+        XCTAssertEqual(presentation.sourceDescriptor.kind, .liveRuntime)
+        XCTAssertEqual(
+            presentation.pressureLine,
+            "Pressure latency 3/1400ms • power 12% • cache 0% • thermal cool"
+        )
+    }
+
+    func testBaseBrainTurnBuildsSystemFlightDeckSummaryFromSharedFacts() {
+        let turn = makeProtectiveTurn()
+        let inspection = BASEBrainConsoleSupport.inspectionBundle(for: turn)
+
+        let summary = turn.systemFlightDeckSummary
+
+        XCTAssertEqual(summary.source, .liveRuntime)
+        XCTAssertEqual(summary.runMode, turn.budgetFrame.runMode.rawValue)
+        XCTAssertEqual(summary.taskType, turn.contextFrame.taskType.rawValue)
+        XCTAssertEqual(summary.riskLevel, turn.riskCard.riskLevel.rawValue)
+        XCTAssertEqual(summary.permitMode, turn.actionPermit.mode.rawValue)
+        XCTAssertEqual(summary.deviceRoute, turn.runtimeTrace.modelRoute)
+        XCTAssertEqual(summary.loopCount, turn.runtimeTrace.loopCount)
+        XCTAssertEqual(summary.cacheHitRate, Int((turn.runtimeTrace.cacheHitRate * 100).rounded()))
+        XCTAssertEqual(summary.hostGatePercent, Int((turn.hostGateValue * 100).rounded()))
+        XCTAssertEqual(summary.pressureLine, turn.replayCheckpointFacts.pressureLine)
+        XCTAssertEqual(summary.updateTicketCount, turn.updateTickets.count)
+        XCTAssertEqual(summary.auditFindingCount, turn.runtimeTrace.guardrailFindings.count)
+        XCTAssertEqual(summary.activeKillSwitches, ["force_guard_mode"])
+        XCTAssertEqual(summary.recommendedKillSwitches, ["require_reviewed_writes"])
+        XCTAssertEqual(summary.killSwitches, ["force_guard_mode", "require_reviewed_writes"])
+        XCTAssertEqual(summary.inspectionHeadline, inspection.summary)
+        XCTAssertEqual(summary.blockers, [])
+    }
+
+    func testLineageBuildsSystemFlightDeckSummaryFromSharedFacts() {
+        let lineage = makeLineageSnapshot(
+            sessionID: "lineage-flightdeck",
+            mode: .mirror,
+            recordedAt: .now,
+            riskLevel: "high",
+            permitMode: "delay",
+            updateTicketSummaries: ["Review checkpoint lineage."],
+            diffSummary: ["Recovered persisted checkpoint without matching replay record"],
+            activeKillSwitches: ["force_guard_mode"],
+            recommendedKillSwitches: ["require_reviewed_writes"]
+        )
+
+        let summary = lineage.systemFlightDeckSummary
+
+        XCTAssertEqual(summary.source, .persistedCheckpoint)
+        XCTAssertEqual(summary.runMode, "checkpoint")
+        XCTAssertEqual(summary.taskType, lineage.eBrain.taskType)
+        XCTAssertEqual(summary.riskLevel, lineage.eBrain.riskLevel)
+        XCTAssertEqual(summary.permitMode, lineage.eBrain.permitMode)
+        XCTAssertEqual(summary.deviceRoute, "persisted")
+        XCTAssertEqual(summary.hostGatePercent, lineage.eBrain.hostGatePercent)
+        XCTAssertEqual(summary.pressureLine, nil)
+        XCTAssertEqual(summary.activeKillSwitches, ["force_guard_mode"])
+        XCTAssertEqual(summary.recommendedKillSwitches, ["require_reviewed_writes"])
+        XCTAssertEqual(summary.killSwitches, ["force_guard_mode", "require_reviewed_writes"])
+        XCTAssertTrue(summary.inspectionHeadline.contains("Recovered from checkpoint"))
+        XCTAssertTrue(summary.inspectionHeadline.contains(lineage.approvalState.rawValue))
+        XCTAssertEqual(summary.blockers, lineage.diffSummary)
+        XCTAssertEqual(summary.checkpointID, lineage.checkpointID)
+        XCTAssertEqual(summary.checkpointApprovalState, lineage.approvalState.rawValue)
+        XCTAssertEqual(summary.checkpointRollbackReady, lineage.rollbackReady)
+        XCTAssertEqual(summary.checkpointApplyReady, lineage.hasBrainStateSnapshot)
+    }
+
+    @MainActor
+    func testRuntimeExportAttachedLiveEBrainSummaryCarriesPressureLine() async {
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            traceLimit: 0,
+            replayLimit: 0,
+            debugStore: DecisionIntelligenceDebugStore(),
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        let attached = export.attaching(eBrainTurn: makeProtectiveTurn())
+
+        XCTAssertEqual(attached.flightDeck.eBrainSummary?.source, .liveRuntime)
+        XCTAssertEqual(
+            attached.flightDeck.eBrainSummary?.pressureLine,
+            "Pressure latency 3/1400ms • power 12% • cache 0% • thermal cool"
+        )
+        XCTAssertEqual(
+            attached.flightDeck.eBrainSummary?.presentation.pressureLine,
+            "Pressure latency 3/1400ms • power 12% • cache 0% • thermal cool"
+        )
+        XCTAssertTrue(
+            attached.flightDeck.layerReports.first(where: { $0.layer == .data })?.signals.contains(where: {
+                $0.contains("Pressure latency 3/1400ms") && $0.contains("thermal cool")
+            }) == true
+        )
+    }
+
+    func testFactsBundleNormalizesSessionCheckpointPressureFactLine() {
+        let factsBundle = DeveloperDecisionReplayEBrainSummary(turn: makeProtectiveTurn()).factsBundle()
+
+        XCTAssertEqual(
+            factsBundle.sessionCheckpointPressureFactLine(),
+            "eBrain pressure: latency 3/1400ms • power 12% • cache 0% • thermal cool"
+        )
+    }
+
+    func testBaseBrainTurnSessionCheckpointFactsReuseSharedPressureLine() {
+        let turn = makeProtectiveTurn()
+        let checkpointFacts = turn.sessionCheckpointFacts
+
+        XCTAssertTrue(checkpointFacts.budgetConstraintLine.hasPrefix("eBrain budget:"))
+        XCTAssertTrue(checkpointFacts.budgetConstraintLine.contains("loops 2"))
+        XCTAssertTrue(checkpointFacts.budgetConstraintLine.contains("decode 160"))
+        XCTAssertTrue(checkpointFacts.routeConstraintLine.hasPrefix("eBrain route:"))
+        XCTAssertEqual(
+            checkpointFacts.decisionFactLines,
+            DecisionEvolutionEBrainPresentationSupport.checkpointDecisionFactLines(
+                riskLevel: turn.riskCard.riskLevel.rawValue,
+                permitMode: turn.actionPermit.mode.rawValue,
+                hostGatePercent: Int((turn.hostGateValue * 100).rounded()),
+                foldChecksum: String(turn.thoughtFold.checksum.prefix(12))
+            )
+        )
+        XCTAssertEqual(
+            checkpointFacts.pressureFactLine,
+            "eBrain pressure: latency 3/1400ms • power 12% • cache 0% • thermal cool"
+        )
+        XCTAssertEqual(checkpointFacts.auditFactLine, "eBrain audit findings: 1")
+        XCTAssertEqual(
+            checkpointFacts.activeKillSwitchesFactLine,
+            "eBrain active kill switches: force_guard_mode"
+        )
+        XCTAssertEqual(
+            checkpointFacts.recommendedKillSwitchesFactLine,
+            "eBrain recommended kill switches: require_reviewed_writes"
+        )
+        XCTAssertTrue(checkpointFacts.openTaskLines.contains("Review update ticket: Record a protective turn."))
+        XCTAssertTrue(checkpointFacts.openTaskLines.contains("Review protective path: delay"))
+        XCTAssertTrue(checkpointFacts.currentScope.contains("ebrain"))
+        XCTAssertTrue(checkpointFacts.currentScope.contains(turn.contextFrame.taskType.rawValue))
+    }
+
+    func testCheckpointDecisionLineUsesSharedOrderedPrefixes() {
+        let confirmedFacts = [
+            "eBrain fold: fold-checksum",
+            "other fact: ignore",
+            "eBrain risk: high",
+            "eBrain audit findings: 2",
+            "eBrain host gate: 37%",
+            "eBrain permit: delay"
+        ]
+
+        XCTAssertEqual(
+            DecisionEvolutionEBrainPresentationSupport.checkpointDecisionLine(from: confirmedFacts),
+            DecisionEvolutionNarrativeFormattingSupport.joined([
+                "eBrain risk: high",
+                "eBrain permit: delay",
+                "eBrain host gate: 37%",
+                "eBrain fold: fold-checksum",
+                "eBrain audit findings: 2"
+            ])
+        )
+    }
+
+    func testSessionCheckpointFactsApplyIntoDraftThroughSharedHelper() {
+        let checkpointFacts = makeProtectiveTurn().sessionCheckpointFacts
+        let applied = checkpointFacts.applied(
+            to: DecisionSessionCheckpointDraft(
+                summary: DecisionSessionCheckpointSummary(
+                    goal: "repair parser",
+                    acceptedConstraints: ["keep history"],
+                    confirmedFacts: ["parser isolated"],
+                    openTasks: ["write tests"],
+                    currentScope: ["src/parser.ts"]
+                ),
+                runtimeState: DecisionSessionCheckpointRuntimeState(
+                    workspacePath: "/tmp/project",
+                    branchName: "feature/parser",
+                    activeFiles: ["src/parser.ts"],
+                    currentMode: .chat
+                )
+            )
+        )
+
+        XCTAssertTrue(applied.summary.acceptedConstraints.contains("keep history"))
+        XCTAssertTrue(applied.summary.acceptedConstraints.contains(where: { $0.hasPrefix("eBrain budget:") }))
+        XCTAssertTrue(applied.summary.acceptedConstraints.contains(where: { $0.hasPrefix("eBrain route:") }))
+        XCTAssertTrue(applied.summary.confirmedFacts.contains("parser isolated"))
+        XCTAssertTrue(applied.summary.confirmedFacts.contains("eBrain risk: high"))
+        XCTAssertTrue(applied.summary.confirmedFacts.contains("eBrain permit: delay"))
+        XCTAssertTrue(applied.summary.confirmedFacts.contains(where: { $0.hasPrefix("eBrain pressure:") }))
+        XCTAssertTrue(applied.summary.confirmedFacts.contains("eBrain audit findings: 1"))
+        XCTAssertTrue(applied.summary.confirmedFacts.contains("eBrain active kill switches: force_guard_mode"))
+        XCTAssertTrue(applied.summary.confirmedFacts.contains("eBrain recommended kill switches: require_reviewed_writes"))
+        XCTAssertTrue(applied.summary.openTasks.contains("write tests"))
+        XCTAssertTrue(applied.summary.openTasks.contains("Review update ticket: Record a protective turn."))
+        XCTAssertTrue(applied.summary.openTasks.contains("Review protective path: delay"))
+        XCTAssertTrue(applied.summary.currentScope.contains("src/parser.ts"))
+        XCTAssertTrue(applied.summary.currentScope.contains("ebrain"))
+        XCTAssertEqual(applied.runtimeState.currentMode, .review)
+    }
+
+    func testBaseBrainTurnReplayCheckpointFactsReuseSharedPressureLine() {
+        let turn = makeProtectiveTurn()
+        let replayCheckpointFacts = turn.replayCheckpointFacts
+
+        XCTAssertEqual(
+            replayCheckpointFacts.budgetLine,
+            DecisionEvolutionNarrativeFormattingSupport.joined([
+                "Budget GUARDED",
+                "route guarded",
+                "loops 2",
+                "candidates 2",
+                "decode 160"
+            ])
+        )
+        XCTAssertEqual(
+            replayCheckpointFacts.pressureLine,
+            DecisionEvolutionNarrativeFormattingSupport.joined([
+                "Pressure latency 3/1400ms",
+                "power 12%",
+                "cache 0%",
+                "thermal cool"
+            ])
+        )
+        XCTAssertEqual(replayCheckpointFacts.taskLine, "Review: Record a protective turn.")
+    }
+
+    func testFactsBundleBuildsOrderedDataLayerSignals() {
+        let turn = makeProtectiveTurn()
+        let factsBundle = DeveloperDecisionReplayEBrainSummary(turn: turn).factsBundle()
+        let killSwitches = turn.runtimeTrace.activeKillSwitches.map(\.rawValue)
+            + turn.runtimeTrace.recommendedKillSwitches.map(\.rawValue)
+
+        XCTAssertEqual(
+            factsBundle.dataLayerSignals,
+            [
+                factsBundle.summaryLine,
+                turn.replayCheckpointFacts.budgetLine,
+                turn.replayCheckpointFacts.pressureLine,
+                turn.replayCheckpointFacts.taskLine,
+                turn.runtimeTrace.guardrailFindings.first.map { "Audit: \($0.summary)" },
+                DecisionEvolutionKillSwitchPresentationSupport.activeLine(
+                    killSwitches: turn.runtimeTrace.activeKillSwitches.map(\.rawValue)
+                ),
+                DecisionSessionReviewPresentationSupport.killSwitchesLine(
+                    killSwitches: killSwitches
+                )
+            ]
+            .compactMap { $0 }
+        )
     }
 
     func testReplayEBrainSummarySourceDescriptorReflectsLineageSource() {
@@ -259,11 +525,20 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         XCTAssertTrue(livePresentation.replayLine.contains("Replay session session-1"))
         XCTAssertEqual(
             livePresentation.recoveryLine,
-            "HIGH → DELAY • host gate 37% • fold checksum-1"
+            DecisionEvolutionEBrainPresentationSupport.riskPermitHostFoldLine(
+                riskLevel: "high",
+                permitMode: "delay",
+                hostGatePercent: 37,
+                foldChecksum: "checksum-1"
+            )
         )
         XCTAssertEqual(
             livePresentation.budgetLine,
             "Budget GUARDED • route guarded • loops 2 • candidates 2 • decode 160"
+        )
+        XCTAssertEqual(
+            livePresentation.pressureLine,
+            "Pressure latency 3/1400ms • power 12% • cache 0% • thermal cool"
         )
         XCTAssertEqual(
             livePresentation.taskLine,
@@ -271,11 +546,18 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         )
         XCTAssertNil(livePresentation.actionLine)
         XCTAssertEqual(livePresentation.detailLine, "Record a protective turn.")
-        XCTAssertEqual(livePresentation.auditLine, "Audit: Protective short-circuit requested.")
+        XCTAssertEqual(
+            livePresentation.auditLine,
+            DecisionSessionReviewPresentationSupport.auditLine(
+                guardrailFindings: ["Protective short-circuit requested."]
+            )
+        )
         XCTAssertEqual(livePresentation.activeKillSwitchesLine, "Active kill switches: force_guard_mode")
         XCTAssertEqual(
             livePresentation.killSwitchesLine,
-            "Kill switches: force_guard_mode • require_reviewed_writes"
+            DecisionSessionReviewPresentationSupport.killSwitchesLine(
+                killSwitches: ["force_guard_mode", "require_reviewed_writes"]
+            )
         )
 
         let checkpointSummary = DeveloperDecisionReplayEBrainSummary(
@@ -293,27 +575,47 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         XCTAssertTrue(checkpointPresentation.replayLine.contains("Replay session lineage-2"))
         XCTAssertEqual(
             checkpointPresentation.recoveryLine,
-            "MEDIUM → COMPARE • host gate 82% • fold fold-checksum"
+            DecisionEvolutionEBrainPresentationSupport.riskPermitHostFoldLine(
+                riskLevel: "medium",
+                permitMode: "compare",
+                hostGatePercent: 82,
+                foldChecksum: "fold-checksum"
+            )
         )
         XCTAssertNil(checkpointPresentation.budgetLine)
+        XCTAssertNil(checkpointPresentation.pressureLine)
         XCTAssertEqual(
             checkpointPresentation.taskLine,
             "Review: Hold before sending"
         )
         XCTAssertNil(checkpointPresentation.actionLine)
         XCTAssertEqual(checkpointPresentation.detailLine, "Hold before sending")
-        XCTAssertEqual(checkpointPresentation.auditLine, "Audit: Guardrail matched")
+        XCTAssertEqual(
+            checkpointPresentation.auditLine,
+            DecisionSessionReviewPresentationSupport.auditLine(
+                guardrailFindings: ["Guardrail matched"]
+            )
+        )
         XCTAssertEqual(
             checkpointPresentation.activeKillSwitchesLine,
             "Active kill switches: force_guard_mode"
         )
         XCTAssertEqual(
             checkpointPresentation.killSwitchesLine,
-            "Kill switches: force_guard_mode • require_reviewed_writes"
+            DecisionSessionReviewPresentationSupport.killSwitchesLine(
+                killSwitches: ["force_guard_mode", "require_reviewed_writes"]
+            )
         )
     }
 
     func testReplayEBrainFactsBundleDerivesSharedBrainSummaryLine() {
+        let liveFactsBundle = DeveloperDecisionReplayEBrainSummary(turn: makeProtectiveTurn())
+            .factsBundle(modeTitle: "Mirror")
+        XCTAssertEqual(
+            liveFactsBundle.pressureLine,
+            "Pressure latency 3/1400ms • power 12% • cache 0% • thermal cool"
+        )
+
         let checkpointSummary = DeveloperDecisionReplayEBrainSummary(
             lineageSummary: makeLineageSummary(
                 sessionID: "lineage-2",
@@ -329,16 +631,29 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         XCTAssertEqual(factsBundle.sourceDescriptor.kind, .checkpointRecovery)
         XCTAssertEqual(
             factsBundle.runtimeSummaryLine,
-            "Recovered from checkpoint • Quick • permit compare • risk medium • fold fold-checksum"
+            DecisionEvolutionEBrainPresentationSupport.runtimeSummaryLine(
+                sourceDescriptor: checkpointSummary.sourceDescriptor,
+                modeTitle: "Quick",
+                permitMode: "compare",
+                riskLevel: "medium",
+                foldChecksum: "fold-checksum"
+            )
         )
         XCTAssertEqual(
             factsBundle.brainSummaryLine,
-            "Checkpoint recovery • session lineage-2 • host gate 82% • 1 tickets"
+            DecisionEvolutionEBrainPresentationSupport.brainSummaryLine(
+                sourceTitle: checkpointSummary.sourceDescriptor.title,
+                sessionID: "lineage-2",
+                hostGatePercent: 82,
+                ticketCount: 1
+            )
         )
+        XCTAssertNil(factsBundle.pressureLine)
     }
 
     func testBaseBrainTurnDiagnosticsPresentationDerivesSharedFields() {
         let turn = makeProtectiveTurn()
+        let support = turn.turnDiagnosticsSupport
 
         let presentation = turn.diagnosticsPresentation
 
@@ -348,24 +663,70 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         XCTAssertEqual(presentation.riskTitle, turn.riskCard.riskLevel.rawValue.uppercased())
         XCTAssertEqual(presentation.permitTitle, turn.actionPermit.mode.rawValue.uppercased())
         XCTAssertEqual(presentation.mirrorText, turn.decomposeFrame.mirrorText)
+        XCTAssertEqual(presentation.routeText, support.routeText)
+        XCTAssertEqual(presentation.hostText, support.hostText)
+        XCTAssertEqual(presentation.replayText, support.replayText)
         XCTAssertTrue(presentation.routeText.contains("Route: guarded"))
         XCTAssertTrue(presentation.hostText.contains("Host gate 37%"))
         XCTAssertTrue(presentation.replayText.contains(turn.runtimeTrace.sessionID))
         XCTAssertEqual(presentation.candidateTitles, ["Pause and protect"])
         XCTAssertEqual(presentation.memorySummaries, ["Protect the boundary first."])
         XCTAssertEqual(presentation.alternativeActions, ["Wait 24 hours", "Draft but do not send"])
-        XCTAssertEqual(presentation.ticketSummary, "Record a protective turn.")
-        XCTAssertEqual(presentation.activeKillSwitchesLine, "Active kill switches: force_guard_mode")
-        XCTAssertEqual(presentation.recommendedKillSwitchesLine, "Recommended kill switches: require_reviewed_writes")
-        XCTAssertEqual(presentation.riskFactorsLine, "Factors: pressure • uncertainty")
-        XCTAssertEqual(presentation.reasonCodesLine, "Reason codes: risk.high • gsi.elevated")
+        XCTAssertEqual(presentation.ticketSummary, support.ticketSummary)
+        XCTAssertEqual(presentation.activeKillSwitchesLine, support.activeKillSwitchesLine)
+        XCTAssertEqual(presentation.recommendedKillSwitchesLine, support.recommendedKillSwitchesLine)
+        XCTAssertEqual(presentation.riskFactorsLine, support.riskFactorsLine)
+        XCTAssertEqual(presentation.reasonCodesLine, support.reasonCodesLine)
         XCTAssertEqual(presentation.thoughtFoldLines, ["• body: Mirror body", "• headline: Pause first"])
         XCTAssertEqual(presentation.replayTraceLines, ["• L11 gate: Protective short-circuited refinement."])
-        XCTAssertEqual(presentation.auditLines, ["• L11 protected_permit: Protective short-circuit requested."])
+        XCTAssertEqual(presentation.auditLines, support.auditLines)
         XCTAssertEqual(
             presentation.triScoreLines,
             ["• cand-1: id 42 / ego 81 / superego 91"]
         )
+    }
+
+    func testBaseBrainTurnDiagnosticsSupportBuildsSharedLines() {
+        let turn = makeProtectiveTurn()
+
+        let support = turn.turnDiagnosticsSupport
+
+        XCTAssertEqual(
+            support.routeText,
+            "Route: guarded • Loops: 1 • Power: 12%"
+        )
+        XCTAssertEqual(
+            support.hostText,
+            "Host gate 37% • Fold checksum-1 • Device warm/2048MB"
+        )
+        XCTAssertTrue(support.replayText.contains(turn.runtimeTrace.sessionID))
+        XCTAssertEqual(
+            support.auditLines,
+            ["• L11 protected_permit: Protective short-circuit requested."]
+        )
+        XCTAssertEqual(
+            support.activeKillSwitchesLine,
+            "Active kill switches: force_guard_mode"
+        )
+        XCTAssertEqual(
+            support.recommendedKillSwitchesLine,
+            "Recommended kill switches: require_reviewed_writes"
+        )
+        XCTAssertEqual(
+            support.riskFactorsLine,
+            DecisionEvolutionNarrativeFormattingSupport.labeledLine(
+                prefix: "Factors",
+                values: ["pressure", "uncertainty"]
+            )
+        )
+        XCTAssertEqual(
+            support.reasonCodesLine,
+            DecisionEvolutionNarrativeFormattingSupport.labeledLine(
+                prefix: "Reason codes",
+                values: ["risk.high", "gsi.elevated"]
+            )
+        )
+        XCTAssertEqual(support.ticketSummary, "Record a protective turn.")
     }
 
     func testReplayEntryDiagnosticsPresentationPrefersEBrainAndFallsBackToTraceWhenMissing() {
@@ -436,6 +797,10 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         XCTAssertEqual(
             presentation.budgetLine,
             "Budget GUARDED • route guarded • loops 2 • candidates 2 • decode 160"
+        )
+        XCTAssertEqual(
+            presentation.pressureLine,
+            "Pressure latency 3/1400ms • power 12% • cache 0% • thermal cool"
         )
         XCTAssertEqual(
             presentation.taskLine,
@@ -509,7 +874,8 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
     }
 
     private func makeSystemEBrainSummary(
-        source: DecisionTestingEBrainSource
+        source: DecisionTestingEBrainSource,
+        pressureLine: String? = nil
     ) -> DecisionSystemEBrainSummary {
         DecisionSystemEBrainSummary(
             source: source,
@@ -521,6 +887,7 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
             loopCount: 1,
             cacheHitRate: 0,
             hostGatePercent: 37,
+            pressureLine: pressureLine,
             foldChecksum: "checksum-1",
             updateTicketCount: 1,
             auditFindingCount: 1,
@@ -555,6 +922,43 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
             activeKillSwitches: activeKillSwitches,
             guardrailFindings: ["Guardrail matched"],
             recommendedKillSwitches: recommendedKillSwitches
+        )
+    }
+
+    private func makeLineageSnapshot(
+        sessionID: String,
+        mode: DecisionMode,
+        recordedAt: Date,
+        riskLevel: String,
+        permitMode: String,
+        updateTicketSummaries: [String],
+        diffSummary: [String],
+        activeKillSwitches: [String],
+        recommendedKillSwitches: [String]
+    ) -> DecisionEvolutionLineageSnapshot {
+        let summary = BASEvolutionLineageSummary(
+            recordedAt: recordedAt,
+            sessionID: sessionID,
+            taskType: "high_pressure",
+            riskLevel: riskLevel,
+            permitMode: permitMode,
+            hostGatePercent: 82,
+            thoughtFoldChecksum: "fold-checksum",
+            updateTicketSummaries: updateTicketSummaries,
+            activeKillSwitches: activeKillSwitches,
+            guardrailFindings: ["Guardrail matched"],
+            recommendedKillSwitches: recommendedKillSwitches
+        )
+
+        return DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-\(sessionID)",
+            createdAt: recordedAt,
+            mode: mode,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: diffSummary,
+            eBrain: DeveloperDecisionReplayEBrainSummary(lineageSummary: summary)
         )
     }
 

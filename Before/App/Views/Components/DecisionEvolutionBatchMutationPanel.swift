@@ -42,8 +42,17 @@ struct DecisionEvolutionBatchMutationPanel: View {
         self.afterMutation = afterMutation
     }
 
-    private var interactionMode: DecisionEvolutionControlInteractionMode {
-        surfaceContract.interactionMode
+    private var presentation: DecisionEvolutionBatchMutationPresentation {
+        DecisionEvolutionBatchMutationPresentationSupport.build(
+            surfaceContract: surfaceContract
+        )
+    }
+
+    private var selectionPresentation: DecisionEvolutionBatchMutationSelectionPresentation {
+        DecisionEvolutionBatchMutationSelectionPresentationSupport.build(
+            selection: selection,
+            targetsPrefix: presentation.targetsPrefix
+        )
     }
 
     var body: some View {
@@ -51,9 +60,9 @@ struct DecisionEvolutionBatchMutationPanel: View {
             VStack(alignment: .leading, spacing: 14) {
                 if showsHeader {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Batch mutation workspace")
+                        Text(presentation.headerTitle)
                             .font(.headline)
-                        Text("Select checkpoints from the control surface, then run guarded batch actions without drilling into every card.")
+                        Text(presentation.headerDetail)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -68,22 +77,22 @@ struct DecisionEvolutionBatchMutationPanel: View {
                 }
 
                 HStack(spacing: 8) {
-                    selectorButton("Select all", action: selectAllVisible, isEnabled: !selection.selectablePresentations.isEmpty)
-                    selectorButton("Review queue", action: selectReviewQueue, isEnabled: !selection.reviewQueueCheckpointIDs.isEmpty)
+                    selectorButton(presentation.selectAllTitle, action: selectAllVisible, isEnabled: !selection.selectablePresentations.isEmpty)
+                    selectorButton(presentation.reviewQueueTitle, action: selectReviewQueue, isEnabled: !selection.reviewQueueCheckpointIDs.isEmpty)
                 }
 
                 HStack(spacing: 8) {
-                    selectorButton("Automatic", action: selectAutomatic, isEnabled: !selection.automaticCheckpointIDs.isEmpty)
-                    selectorButton("Lineage-backed", action: selectLineageBacked, isEnabled: !selection.lineageCheckpointIDs.isEmpty)
-                    selectorButton("Clear", action: clearSelection, isEnabled: selection.hasSelection, style: .tertiary)
+                    selectorButton(presentation.automaticTitle, action: selectAutomatic, isEnabled: !selection.automaticCheckpointIDs.isEmpty)
+                    selectorButton(presentation.lineageBackedTitle, action: selectLineageBacked, isEnabled: !selection.lineageCheckpointIDs.isEmpty)
+                    selectorButton(presentation.clearSelectionTitle, action: clearSelection, isEnabled: selection.hasSelection, style: .tertiary)
                 }
 
-                Text(selection.selectedSummary)
+                Text(selectionPresentation.summaryLine)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(selection.hasSelection ? BeforeTheme.ember : .secondary)
+                    .foregroundStyle(selectionPresentation.usesAccentTone ? BeforeTheme.ember : .secondary)
 
-                if let targetListText = selection.targetListText {
-                    Text("Targets: \(targetListText)")
+                if let targetsLine = selectionPresentation.targetsLine {
+                    Text(targetsLine)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
@@ -92,17 +101,18 @@ struct DecisionEvolutionBatchMutationPanel: View {
                 if surfaceContract.allowsMutations {
                     if selection.hasSelection {
                         mutationButtons
-                    } else {
-                        Text("Pick one or more checkpoints to unlock selection-scoped approve / mark-review / clear-lineage mutations here.")
+                    } else if let emptySelectionLine = presentation.emptySelectionLine {
+                        Text(emptySelectionLine)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
-                } else {
+                } else if let readOnlyHeadline = presentation.readOnlyHeadline,
+                          let readOnlyDetail = presentation.readOnlyDetail {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(interactionMode.operatorHeadline)
+                        Text(readOnlyHeadline)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(BeforeTheme.ember)
-                        Text(interactionMode.operatorDetail)
+                        Text(readOnlyDetail)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -133,7 +143,7 @@ struct DecisionEvolutionBatchMutationPanel: View {
         if singleApplyPresentation != nil || approveIntent != nil || markReviewIntent != nil {
             HStack(spacing: 10) {
                 if let singleApplyPresentation {
-                    BeforeActionButton("Apply selected", style: .primary) {
+                    BeforeActionButton(presentation.applySelectedTitle, style: .primary) {
                         if let intent = DecisionEvolutionMutationIntentFactory.applyCheckpoint(
                             checkpointID: singleApplyPresentation.checkpointID,
                             controlSurface: selection.controlSurface,
@@ -149,7 +159,7 @@ struct DecisionEvolutionBatchMutationPanel: View {
                 }
 
                 if let approveIntent {
-                    BeforeActionButton("Approve selected", style: .secondary) {
+                    BeforeActionButton(presentation.approveSelectedTitle, style: .secondary) {
                         pendingMutation = PendingMutation(intent: approveIntent) {
                             appModel.approveEvolutionCheckpoints(
                                 checkpointIDs: approveIntent.preview.targetCheckpointIDs
@@ -161,7 +171,7 @@ struct DecisionEvolutionBatchMutationPanel: View {
                 }
 
                 if let markReviewIntent {
-                    BeforeActionButton("Mark selected", style: .secondary) {
+                    BeforeActionButton(presentation.markSelectedTitle, style: .secondary) {
                         pendingMutation = PendingMutation(intent: markReviewIntent) {
                             appModel.markEvolutionCheckpointsForReview(
                                 checkpointIDs: markReviewIntent.preview.targetCheckpointIDs
@@ -176,7 +186,7 @@ struct DecisionEvolutionBatchMutationPanel: View {
 
         if let clearLineageIntent {
             HStack(spacing: 10) {
-                BeforeActionButton("Clear selected lineage", style: .tertiary) {
+                BeforeActionButton(presentation.clearSelectedLineageTitle, style: .tertiary) {
                     pendingMutation = PendingMutation(intent: clearLineageIntent) {
                         appModel.clearEvolutionCheckpointLineages(
                             checkpointIDs: clearLineageIntent.preview.targetCheckpointIDs

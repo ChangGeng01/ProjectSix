@@ -124,6 +124,7 @@ final class WidgetSnapshotStoreTests: XCTestCase {
         XCTAssertEqual(evolution.displayHeadline, "Evolution review is waiting")
         XCTAssertEqual(evolution.displayDetail, "2 checkpoint(s) still need review before the queue is clear.")
         XCTAssertEqual(evolution.activeCheckpointSourceTitle, "Recovered active")
+        XCTAssertEqual(evolution.attentionSeverity, .review)
         XCTAssertEqual(
             evolution.compactStatusLine,
             "Recovered active • Pending 2 • Rollback 1 • Active switches 1 • Recommended 2"
@@ -135,6 +136,45 @@ final class WidgetSnapshotStoreTests: XCTestCase {
             evolution.attentionInstruction,
             "Continue on iPhone to review pending checkpoints and clear the queue."
         )
+    }
+
+    func testWidgetEvolutionSurfacePresentationBuildsSharedBadgesAndControlEntry() {
+        let evolution = WidgetEvolutionSnapshot(
+            releaseStateID: "blocked",
+            activeCheckpointSourceID: "automaticFallback",
+            headline: "Watching the pending review queue",
+            primaryReason: "1 checkpoint still requires review.",
+            attentionSeverityID: "review",
+            attentionBadgeValue: "1",
+            attentionHeadline: "Evolution review is waiting",
+            attentionDetail: "1 checkpoint still needs review before the queue is clear.",
+            hasActiveCheckpoint: true,
+            hasReviewCheckpoint: true,
+            pendingReviewCount: 1,
+            rollbackReadyCount: 1,
+            activeKillSwitchCount: 1,
+            recommendedKillSwitchCount: 0
+        )
+
+        let presentation = evolution.surfacePresentation
+
+        XCTAssertEqual(
+            presentation.statusBadges,
+            [
+                DecisionEvolutionWidgetStatusBadgePresentation(title: "BLOCKED", tone: .red),
+                DecisionEvolutionWidgetStatusBadgePresentation(title: "P1", tone: .orange),
+                DecisionEvolutionWidgetStatusBadgePresentation(title: "R1", tone: .green),
+                DecisionEvolutionWidgetStatusBadgePresentation(title: "K1", tone: .red)
+            ]
+        )
+        XCTAssertEqual(presentation.headline, "Evolution review is waiting")
+        XCTAssertEqual(
+            presentation.detail,
+            "1 checkpoint still needs review before the queue is clear."
+        )
+        XCTAssertEqual(presentation.activeSourceTitle, "Recovered active")
+        XCTAssertEqual(presentation.controlEntry?.title, "Review on iPhone")
+        XCTAssertEqual(presentation.controlEntry?.systemImage, "checklist")
     }
 
     func testWidgetEvolutionSnapshotControlEntryPrefersControlWhenOnlyKillSwitchesRemain() {
@@ -211,6 +251,113 @@ final class WidgetSnapshotStoreTests: XCTestCase {
         XCTAssertEqual(evolution.rollbackReadyCount, 0)
         XCTAssertEqual(evolution.activeKillSwitchCount, 0)
         XCTAssertEqual(evolution.recommendedKillSwitchCount, 0)
+    }
+
+    func testWidgetEvolutionSnapshotNormalizesAttentionSeverityContracts() {
+        let absent = WidgetEvolutionSnapshot(
+            releaseStateID: "watch",
+            activeCheckpointSourceID: nil,
+            headline: "Evolution is quiet",
+            primaryReason: nil,
+            attentionSeverityID: nil,
+            attentionBadgeValue: nil,
+            attentionHeadline: nil,
+            attentionDetail: nil,
+            hasActiveCheckpoint: false,
+            hasReviewCheckpoint: false,
+            pendingReviewCount: 0,
+            rollbackReadyCount: 0,
+            activeKillSwitchCount: 0,
+            recommendedKillSwitchCount: 0
+        )
+        let explicitNone = WidgetEvolutionSnapshot(
+            releaseStateID: "watch",
+            activeCheckpointSourceID: nil,
+            headline: "Evolution is quiet",
+            primaryReason: nil,
+            attentionSeverityID: "none",
+            attentionBadgeValue: nil,
+            attentionHeadline: "Evolution is quiet",
+            attentionDetail: nil,
+            hasActiveCheckpoint: false,
+            hasReviewCheckpoint: false,
+            pendingReviewCount: 0,
+            rollbackReadyCount: 0,
+            activeKillSwitchCount: 0,
+            recommendedKillSwitchCount: 0
+        )
+        let invalid = WidgetEvolutionSnapshot(
+            releaseStateID: "watch",
+            activeCheckpointSourceID: nil,
+            headline: "Evolution is quiet",
+            primaryReason: nil,
+            attentionSeverityID: "unexpected",
+            attentionBadgeValue: nil,
+            attentionHeadline: "Evolution is quiet",
+            attentionDetail: nil,
+            hasActiveCheckpoint: false,
+            hasReviewCheckpoint: false,
+            pendingReviewCount: 0,
+            rollbackReadyCount: 0,
+            activeKillSwitchCount: 0,
+            recommendedKillSwitchCount: 0
+        )
+
+        XCTAssertNil(absent.attentionSeverity)
+        XCTAssertFalse(absent.surfacesAttention)
+        XCTAssertEqual(
+            explicitNone.attentionSeverity,
+            DecisionEvolutionWidgetAttentionSeverity.none
+        )
+        XCTAssertFalse(explicitNone.surfacesAttention)
+        XCTAssertEqual(explicitNone.controlEntryTitle, "Open on iPhone")
+        XCTAssertEqual(
+            invalid.attentionSeverity,
+            DecisionEvolutionWidgetAttentionSeverity.none
+        )
+        XCTAssertFalse(invalid.surfacesAttention)
+        XCTAssertEqual(invalid.controlEntryTitle, "Open on iPhone")
+    }
+
+    func testSaveNormalizesInvalidWidgetAttentionSeverityIDsToNone() throws {
+        WidgetSnapshotStore.clear()
+
+        let snapshot = WidgetSnapshot(
+            safeMessage: WidgetSafeMessage(
+                surface: .publicSafe,
+                headline: "Steady",
+                body: "Normalize widget evolution state."
+            ),
+            latestVerdict: .pause,
+            latestScenario: .buy,
+            evolution: WidgetEvolutionSnapshot(
+                releaseStateID: "watch",
+                activeCheckpointSourceID: nil,
+                headline: "Evolution is quiet",
+                primaryReason: nil,
+                attentionSeverityID: "unexpected",
+                attentionBadgeValue: "!",
+                attentionHeadline: "Evolution is quiet",
+                attentionDetail: nil,
+                hasActiveCheckpoint: false,
+                hasReviewCheckpoint: false,
+                pendingReviewCount: 0,
+                rollbackReadyCount: 0,
+                activeKillSwitchCount: 0,
+                recommendedKillSwitchCount: 0
+            ),
+            updatedAt: Date(timeIntervalSince1970: 3_000)
+        )
+
+        WidgetSnapshotStore.save(snapshot)
+        let loaded = try XCTUnwrap(WidgetSnapshotStore.load().evolution)
+
+        XCTAssertEqual(loaded.attentionSeverityID, DecisionEvolutionWidgetAttentionSeverity.none.rawValue)
+        XCTAssertEqual(
+            loaded.attentionSeverity,
+            DecisionEvolutionWidgetAttentionSeverity.none
+        )
+        XCTAssertFalse(loaded.surfacesAttention)
     }
 
     func testWidgetEvolutionSnapshotQuietStateFallsBackToOpenEntry() {
@@ -308,5 +455,90 @@ final class WidgetSnapshotStoreTests: XCTestCase {
 
         XCTAssertEqual(review.watchControlEntryTitle, "Review on iPhone")
         XCTAssertEqual(blocked.watchControlEntryTitle, "Control on iPhone")
+    }
+
+    func testWidgetPresentationSupportBuildsSharedCompactStatusAndControlEntryCopy() {
+        XCTAssertEqual(
+            DecisionEvolutionWidgetCompactStatusLexiconSupport.pendingTitle(2),
+            "Pending 2"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionWidgetCompactStatusLexiconSupport.rollbackTitle(1),
+            "Rollback 1"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionWidgetCompactStatusLexiconSupport.activeSwitchesTitle(1),
+            "Active switches 1"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionWidgetCompactStatusLexiconSupport.recommendedTitle(2),
+            "Recommended 2"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionWidgetCompactStatusLexiconSupport.fallbackTitle(
+                usesAttentionContract: true,
+                attentionSeverity: .rollbackWatch,
+                hasReviewCheckpoint: false,
+                hasActiveCheckpoint: true
+            ),
+            "Rollback watch"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionWidgetCompactStatusLexiconSupport.fallbackTitle(
+                usesAttentionContract: false,
+                attentionSeverity: nil,
+                hasReviewCheckpoint: false,
+                hasActiveCheckpoint: false
+            ),
+            "No checkpoint attached"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionWidgetStatusBadgeLexiconSupport.releaseStateTitle(
+                releaseStateID: nil
+            ),
+            DecisionEvolutionWidgetStatusBadgeLexiconSupport.watchTitle
+        )
+        XCTAssertEqual(
+            DecisionEvolutionWidgetStatusBadgeLexiconSupport.pendingTitle(1),
+            "P1"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionWidgetStatusBadgeLexiconSupport.rollbackTitle(1),
+            "R1"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionWidgetStatusBadgeLexiconSupport.killSwitchTitle(1),
+            "K1"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionWidgetPresentationSupport.compactStatusLine(
+                activeCheckpointSourceTitle: "Recovered active",
+                hasActiveCheckpoint: true,
+                pendingReviewCount: 2,
+                rollbackReadyCount: 1,
+                activeKillSwitchCount: 1,
+                recommendedKillSwitchCount: 2,
+                usesAttentionContract: true,
+                attentionSeverity: .review,
+                hasReviewCheckpoint: true
+            ),
+            "Recovered active • Pending 2 • Rollback 1 • Active switches 1 • Recommended 2"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionWidgetControlEntryLexiconSupport.title(for: .control),
+            "Control on iPhone"
+        )
+        XCTAssertEqual(
+            DecisionEvolutionWidgetControlEntryLexiconSupport.instruction(for: .rollback),
+            "Continue on iPhone to restore the rollback-ready checkpoint."
+        )
+        XCTAssertEqual(
+            DecisionEvolutionWidgetPresentationSupport.controlEntryTitle(kind: .control),
+            DecisionEvolutionWidgetControlEntryLexiconSupport.title(for: .control)
+        )
+        XCTAssertEqual(
+            DecisionEvolutionWidgetPresentationSupport.attentionInstruction(kind: .rollback),
+            DecisionEvolutionWidgetControlEntryLexiconSupport.instruction(for: .rollback)
+        )
     }
 }

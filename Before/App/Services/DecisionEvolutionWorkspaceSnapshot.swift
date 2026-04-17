@@ -1,5 +1,74 @@
 import Foundation
 
+enum DecisionEvolutionRuntimePresentationSupport {
+    static let activeRoleTitle = DecisionEvolutionCheckpointLexiconSupport.activeRuntimeRoleTitle
+    static let reviewHeadRoleTitle = DecisionEvolutionCheckpointLexiconSupport.reviewHeadRoleTitle
+    static let applyReadyTitle = "Apply ready"
+    static let applyUnavailableTitle = "Apply unavailable"
+
+    static func roleTitle(isActive: Bool) -> String {
+        DecisionEvolutionCheckpointLexiconSupport.runtimeRoleTitle(
+            isActive: isActive
+        )
+    }
+
+    static func applyTitle(applyReady: Bool) -> String {
+        applyReady ? applyReadyTitle : applyUnavailableTitle
+    }
+
+    static func spotlightDetail(
+        checkpointID: String,
+        isActive: Bool,
+        approvalStateTitle: String,
+        applyReady: Bool,
+        activeCheckpointSource: DecisionEvolutionActiveCheckpointSource
+    ) -> String {
+        let roleTitle = roleTitle(isActive: isActive)
+        let activeSourceDetail = if isActive, activeCheckpointSource != .none {
+            " • \(activeCheckpointSource.title)"
+        } else {
+            ""
+        }
+
+        return DecisionEvolutionNarrativeFormattingSupport.joined([
+            "\(roleTitle) \(checkpointID)\(activeSourceDetail)",
+            approvalStateTitle,
+            applyTitle(applyReady: applyReady)
+        ])
+    }
+
+    static func reviewHeadWithoutActiveCheckpointLine(
+        checkpointID: String
+    ) -> String {
+        "\(DecisionEvolutionCheckpointLexiconSupport.reviewHeadRoleTitle) \(checkpointID) is visible in the shared control surface, but no active checkpoint is attached to the main release path yet."
+    }
+}
+
+enum DecisionEvolutionHistoryFilterPresentationSupport {
+    static let allTitle = "All"
+    static let reviewTitle = "Review"
+    static let rollbackReadyTitle = "Rollback"
+    static let blockedTitle = "Blocked"
+    static let lineageBackedTitle = "Lineage"
+
+    static func title(
+        for filter: DecisionEvolutionHistoryFilter
+    ) -> String {
+        switch filter {
+        case .all:
+            allTitle
+        case .review:
+            reviewTitle
+        case .rollbackReady:
+            rollbackReadyTitle
+        case .blocked:
+            blockedTitle
+        case .lineageBacked:
+            lineageBackedTitle
+        }
+    }
+}
+
 struct DecisionEvolutionWorkspaceFacts: Equatable, Sendable {
     let pendingReviewCount: Int
     let rollbackReadyCount: Int
@@ -25,6 +94,44 @@ struct DecisionEvolutionWorkspaceFacts: Equatable, Sendable {
 struct DecisionEvolutionRuntimeSpotlight: Equatable, Sendable {
     let roleTitle: String
     let detailText: String
+}
+
+struct DecisionEvolutionRuntimeStatusPresentation: Equatable, Sendable {
+    let headline: String?
+    let detail: String?
+    let usesAttentionAccent: Bool
+}
+
+enum DecisionEvolutionHistoryFilter: String, CaseIterable, Identifiable, Equatable, Sendable {
+    case all
+    case review
+    case rollbackReady
+    case blocked
+    case lineageBacked
+
+    var id: String { rawValue }
+
+    var title: String {
+        DecisionEvolutionHistoryFilterPresentationSupport.title(for: self)
+    }
+
+    func matches(
+        _ checkpoint: DecisionEvolutionCheckpointPresentation,
+        inReviewQueue: Bool
+    ) -> Bool {
+        switch self {
+        case .all:
+            true
+        case .review:
+            inReviewQueue || checkpoint.approvalState == .reviewSuggested
+        case .rollbackReady:
+            checkpoint.rollbackReady
+        case .blocked:
+            !checkpoint.killSwitches.isEmpty || !checkpoint.auditFindings.isEmpty
+        case .lineageBacked:
+            checkpoint.hasLineage
+        }
+    }
 }
 
 struct DecisionEvolutionRecoveryPresentation: Equatable, Sendable {
@@ -67,6 +174,22 @@ struct DecisionEvolutionWorkspaceSnapshot: Equatable, Sendable {
 
     var historyPresentations: [DecisionEvolutionCheckpointPresentation] {
         spotlightSet.historyPresentations
+    }
+
+    func filteredEvolutionQueue(
+        using filter: DecisionEvolutionHistoryFilter
+    ) -> [DecisionEvolutionCheckpointPresentation] {
+        remainingReviewQueue.filter {
+            filter.matches($0, inReviewQueue: true)
+        }
+    }
+
+    func filteredEvolutionHistory(
+        using filter: DecisionEvolutionHistoryFilter
+    ) -> [DecisionEvolutionCheckpointPresentation] {
+        historyPresentations.filter {
+            filter.matches($0, inReviewQueue: false)
+        }
     }
 
     var spotlightedPendingReviewCount: Int {
@@ -127,28 +250,17 @@ struct DecisionEvolutionWorkspaceSnapshot: Equatable, Sendable {
     func recoveryPresentation(hasCurrentBrainState: Bool) -> DecisionEvolutionRecoveryPresentation {
         let hasRecoveredLineage = activePresentation?.hasLineage == true
             || reviewPresentation?.hasLineage == true
-        let availabilityText: String
-        if hasCurrentBrainState {
-            availabilityText = "Rollback ready"
-        } else if controlSurface.hasAnyCheckpoint {
-            availabilityText = "Live brain state is unavailable right now, but persisted checkpoints remain reviewable and restorable from local lineage."
-        } else {
-            availabilityText = "Evolution checkpoints appear after the current brain is loaded."
-        }
-
-        let emptyMessage: String
-        if hasCurrentBrainState {
-            emptyMessage = "Evolution checkpoints will surface here after the current brain is loaded."
-        } else if controlSurface.hasAnyCheckpoint {
-            emptyMessage = "Recovered checkpoints remain visible here even without a live current brain."
-        } else {
-            emptyMessage = "Evolution checkpoints appear after the current brain is loaded."
-        }
 
         return DecisionEvolutionRecoveryPresentation(
             sourceDescriptor: hasRecoveredLineage ? .checkpointRecoveryWorkspace : nil,
-            availabilityText: availabilityText,
-            emptyMessage: emptyMessage
+            availabilityText: DecisionEvolutionCheckpointRecoverySupport.availabilityText(
+                hasCurrentBrainState: hasCurrentBrainState,
+                hasAnyCheckpoint: controlSurface.hasAnyCheckpoint
+            ),
+            emptyMessage: DecisionEvolutionCheckpointRecoverySupport.emptyMessage(
+                hasCurrentBrainState: hasCurrentBrainState,
+                hasAnyCheckpoint: controlSurface.hasAnyCheckpoint
+            )
         )
     }
 
@@ -158,22 +270,48 @@ struct DecisionEvolutionWorkspaceSnapshot: Equatable, Sendable {
         let spotlightPresentation = activePresentation ?? reviewPresentation
         guard let spotlightPresentation else { return nil }
 
-        let roleTitle = activePresentation?.checkpointID == spotlightPresentation.checkpointID
-            ? "Active"
-            : "Review head"
-        let applyTitle = spotlightPresentation.applyReady
-            ? "Apply ready"
-            : "Apply unavailable"
-        let activeSourceDetail = if roleTitle == "Active",
-                                    releaseSummary.activeCheckpointSource != .none {
-            " • \(releaseSummary.activeCheckpointSource.title)"
-        } else {
-            ""
-        }
+        let isActive = activePresentation?.checkpointID == spotlightPresentation.checkpointID
+        let roleTitle = DecisionEvolutionRuntimePresentationSupport.roleTitle(
+            isActive: isActive
+        )
 
         return DecisionEvolutionRuntimeSpotlight(
             roleTitle: roleTitle,
-            detailText: "\(roleTitle) \(spotlightPresentation.checkpointID)\(activeSourceDetail) • \(spotlightPresentation.approvalStateTitle) • \(applyTitle)"
+            detailText: DecisionEvolutionRuntimePresentationSupport.spotlightDetail(
+                checkpointID: spotlightPresentation.checkpointID,
+                isActive: isActive,
+                approvalStateTitle: spotlightPresentation.approvalStateTitle,
+                applyReady: spotlightPresentation.applyReady,
+                activeCheckpointSource: releaseSummary.activeCheckpointSource
+            )
+        )
+    }
+
+    func runtimeStatusPresentation(
+        attentionSignal: DecisionEvolutionAttentionSignal
+    ) -> DecisionEvolutionRuntimeStatusPresentation? {
+        if let releaseSummary,
+           let spotlight = runtimeSpotlight(releaseSummary: releaseSummary) {
+            return DecisionEvolutionRuntimeStatusPresentation(
+                headline: nil,
+                detail: spotlight.detailText,
+                usesAttentionAccent: false
+            )
+        }
+
+        guard attentionSignal.requiresAttention else { return nil }
+        return DecisionEvolutionRuntimeStatusPresentation(
+            headline: attentionSignal.headline,
+            detail: attentionSignal.detail,
+            usesAttentionAccent: true
+        )
+    }
+
+    var reviewHeadWithoutActiveCheckpointLine: String? {
+        guard activePresentation == nil,
+              let reviewPresentation else { return nil }
+        return DecisionEvolutionRuntimePresentationSupport.reviewHeadWithoutActiveCheckpointLine(
+            checkpointID: reviewPresentation.checkpointID
         )
     }
 

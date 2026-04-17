@@ -107,39 +107,71 @@ struct DecisionSessionCheckpointSummary: Codable, Equatable, Sendable {
 }
 
 extension DecisionSessionCheckpointSummary {
-    private func firstLine(withPrefix prefix: String, in values: [String]) -> String? {
-        values.first(where: { $0.hasPrefix(prefix) })
-    }
-
     var eBrainBudgetLine: String? {
-        firstLine(withPrefix: "eBrain budget:", in: acceptedConstraints)
+        DecisionEvolutionEBrainPresentationSupport.firstLine(
+            withPrefix: DecisionEvolutionEBrainPresentationSupport.checkpointBudgetPrefix,
+            in: acceptedConstraints
+        )
     }
 
     var eBrainRouteLine: String? {
-        firstLine(withPrefix: "eBrain route:", in: acceptedConstraints)
+        DecisionEvolutionEBrainPresentationSupport.firstLine(
+            withPrefix: DecisionEvolutionEBrainPresentationSupport.checkpointRoutePrefix,
+            in: acceptedConstraints
+        )
     }
 
     var eBrainDecisionLine: String? {
-        let decisionFacts = confirmedFacts.filter {
-            $0.hasPrefix("eBrain risk:")
-                || $0.hasPrefix("eBrain permit:")
-                || $0.hasPrefix("eBrain host gate:")
-                || $0.hasPrefix("eBrain fold:")
-                || $0.hasPrefix("eBrain audit findings:")
-        }
-        guard decisionFacts.isEmpty == false else { return nil }
-        return decisionFacts.joined(separator: " • ")
+        DecisionEvolutionEBrainPresentationSupport.checkpointDecisionLine(
+            from: confirmedFacts
+        )
     }
 
     var eBrainTaskLine: String? {
-        openTasks.first(where: {
-            $0.hasPrefix("Review update ticket:")
-                || $0.hasPrefix("Review protective path:")
-        })
+        DecisionEvolutionEBrainPresentationSupport.firstLine(
+            matching: DecisionEvolutionEBrainPresentationSupport.checkpointTaskPrefixes,
+            in: openTasks
+        )
+    }
+
+    var eBrainPressureLine: String? {
+        DecisionEvolutionEBrainPresentationSupport.firstLine(
+            withPrefix: DecisionEvolutionEBrainPresentationSupport.checkpointPressurePrefix,
+            in: confirmedFacts
+        )
+    }
+
+    var eBrainAuditLine: String? {
+        DecisionEvolutionEBrainPresentationSupport.firstLine(
+            withPrefix: DecisionEvolutionEBrainPresentationSupport.checkpointAuditPrefix,
+            in: confirmedFacts
+        )
+    }
+
+    var eBrainActiveKillSwitchesLine: String? {
+        DecisionEvolutionEBrainPresentationSupport.firstLine(
+            withPrefix: DecisionEvolutionEBrainPresentationSupport.checkpointActiveKillSwitchesPrefix,
+            in: confirmedFacts
+        )
+    }
+
+    var eBrainKillSwitchesLine: String? {
+        DecisionEvolutionEBrainPresentationSupport.checkpointKillSwitchesLine(
+            from: confirmedFacts
+        )
     }
 
     var actionLine: String? {
-        firstLine(withPrefix: "action:", in: confirmedFacts)
+        DecisionEvolutionEBrainPresentationSupport.firstLine(
+            withPrefix: "action:",
+            in: confirmedFacts
+        )
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }
 
@@ -290,6 +322,10 @@ struct DecisionSessionRuntimeInspectionSession: Equatable, Sendable, Identifiabl
     let latestCheckpointRouteLine: String?
     let latestCheckpointDecisionLine: String?
     let latestCheckpointTaskLine: String?
+    let latestCheckpointPressureLine: String?
+    let latestCheckpointAuditLine: String?
+    let latestCheckpointActiveKillSwitchesLine: String?
+    let latestCheckpointKillSwitchesLine: String?
     let latestCheckpointActionLine: String?
     let latestEventID: String?
     let latestEventSeq: Int?
@@ -324,6 +360,10 @@ struct DecisionSessionRuntimeInspectionSession: Equatable, Sendable, Identifiabl
         latestCheckpointRouteLine: String? = nil,
         latestCheckpointDecisionLine: String? = nil,
         latestCheckpointTaskLine: String? = nil,
+        latestCheckpointPressureLine: String? = nil,
+        latestCheckpointAuditLine: String? = nil,
+        latestCheckpointActiveKillSwitchesLine: String? = nil,
+        latestCheckpointKillSwitchesLine: String? = nil,
         latestCheckpointActionLine: String? = nil,
         latestEventID: String?,
         latestEventSeq: Int?,
@@ -355,6 +395,10 @@ struct DecisionSessionRuntimeInspectionSession: Equatable, Sendable, Identifiabl
         self.latestCheckpointRouteLine = latestCheckpointRouteLine
         self.latestCheckpointDecisionLine = latestCheckpointDecisionLine
         self.latestCheckpointTaskLine = latestCheckpointTaskLine
+        self.latestCheckpointPressureLine = latestCheckpointPressureLine
+        self.latestCheckpointAuditLine = latestCheckpointAuditLine
+        self.latestCheckpointActiveKillSwitchesLine = latestCheckpointActiveKillSwitchesLine
+        self.latestCheckpointKillSwitchesLine = latestCheckpointKillSwitchesLine
         self.latestCheckpointActionLine = latestCheckpointActionLine
         self.latestEventID = latestEventID
         self.latestEventSeq = latestEventSeq
@@ -376,7 +420,11 @@ struct DecisionSessionRuntimeInspectionSession: Equatable, Sendable, Identifiabl
     }
 
     var headline: String {
-        "\(title) • \(status.rawValue) • \(latestEventType?.rawValue ?? "idle")"
+        DecisionSessionInspectionPresentationSupport.headline(
+            title: title,
+            status: status,
+            latestEventType: latestEventType
+        )
     }
 
     var openStepFreshnessLine: String? {
@@ -398,32 +446,112 @@ struct DecisionSessionRuntimeInspectionSession: Equatable, Sendable, Identifiabl
 
     var openStepAlertLine: String? {
         if openStepIsHeartbeatOverdue {
-            return "Watchdog budget expired on the current open step. Recover before continuing."
+            return DecisionSessionRecoveryPresentationSupport.watchdogExpiredLine
         }
         if status == .stalled || stalledStepCount > 0 {
-            return "A stalled step was detected. Recovery should stay available from the last stable checkpoint."
+            return DecisionSessionRecoveryPresentationSupport.stalledRecoveryLine
         }
         return nil
     }
 
     var mergeReviewLine: String? {
-        guard mergeableBranchCount > 0 else { return nil }
-        if mergeableBranchCount == 1 {
-            return "Merge review 1 active correction branch can append back onto head without rewriting history."
-        }
-        return "Merge review \(mergeableBranchCount) active correction branches can append back onto head without rewriting history."
+        DecisionSessionReviewPresentationSupport.mergeReviewLine(
+            mergeableBranchCount: mergeableBranchCount
+        )
+    }
+
+    var checkpointPresentationFacts: DecisionSessionCheckpointPresentationFacts {
+        DecisionSessionCheckpointPresentationFacts(
+            budgetLine: latestCheckpointBudgetLine,
+            routeLine: latestCheckpointRouteLine,
+            decisionLine: latestCheckpointDecisionLine,
+            taskLine: latestCheckpointTaskLine,
+            pressureLine: latestCheckpointPressureLine,
+            auditLine: latestCheckpointAuditLine,
+            activeKillSwitchesLine: latestCheckpointActiveKillSwitchesLine,
+            killSwitchesLine: latestCheckpointKillSwitchesLine,
+            actionLine: latestCheckpointActionLine
+        )
+    }
+
+    var latestCheckpointRuntimeLine: String? {
+        checkpointPresentationFacts.runtimeLine
+    }
+
+    var latestCheckpointAuditPressureLine: String? {
+        checkpointPresentationFacts.auditPressureLine
     }
 
     var detailLine: String {
-        let checkpointDescriptor = latestCheckpointID.map { "ckpt \($0)" } ?? "ckpt none"
-        let eventDescriptor = latestEventSeq.map { "evt \($0)" } ?? "evt none"
-        let stepDescriptor = if let openStepStatus {
-            "steps \(openStepCount) • \(openStepStatus.rawValue)"
-        } else {
-            "steps \(openStepCount)"
+        DecisionSessionInspectionPresentationSupport.detailLine(
+            checkpointID: latestCheckpointID,
+            eventSeq: latestEventSeq,
+            openStepCount: openStepCount,
+            openStepStatus: openStepStatus,
+            openStepFreshnessLine: openStepFreshnessLine,
+            recoveryCount: recoveryCount
+        )
+    }
+}
+
+struct DecisionSessionCheckpointPresentationFacts: Equatable, Sendable {
+    let budgetLine: String?
+    let routeLine: String?
+    let decisionLine: String?
+    let taskLine: String?
+    let pressureLine: String?
+    let auditLine: String?
+    let activeKillSwitchesLine: String?
+    let killSwitchesLine: String?
+    let actionLine: String?
+
+    var runtimeLine: String? {
+        DecisionEvolutionNarrativeFormattingSupport.joined(
+            [budgetLine, routeLine].compactMap { $0 }
+        ).nilIfEmpty
+    }
+
+    var auditPressureLine: String? {
+        DecisionEvolutionNarrativeFormattingSupport.joined(
+            [auditLine, killSwitchesLine].compactMap { $0 }
+        ).nilIfEmpty
+    }
+
+    var digestLines: [String] {
+        var lines: [String] = []
+
+        if let runtimeLine {
+            lines.append(runtimeLine)
         }
-        let freshnessDescriptor = openStepFreshnessLine.map { " • \($0)" } ?? ""
-        return "\(checkpointDescriptor) • \(eventDescriptor) • \(stepDescriptor)\(freshnessDescriptor) • recoveries \(recoveryCount)"
+
+        if let decisionLine {
+            let decisionSegments = [decisionLine, taskLine].compactMap { $0 }
+            lines.append(
+                DecisionEvolutionNarrativeFormattingSupport.joined(decisionSegments)
+            )
+        } else if let taskLine {
+            lines.append(taskLine)
+        }
+
+        if let pressureLine {
+            lines.append(pressureLine)
+        }
+
+        if let auditPressureLine {
+            lines.append(auditPressureLine)
+        }
+
+        if let actionLine {
+            lines.append(actionLine)
+        }
+
+        return lines
+    }
+
+    func combinedAuditLine(addition: String?) -> String? {
+        DecisionEvolutionNarrativeFormattingSupport.joined(
+            [auditLine, addition].compactMap { $0 }
+        ).nilIfEmpty
     }
 }
 
@@ -478,6 +606,7 @@ struct DecisionSessionImportBundlePreview: Equatable, Sendable, Identifiable {
     let integrityLine: String
     let checkpointLine: String
     let branchLine: String
+    let unfinishedStepCount: Int
     let unfinishedStepsLine: String
     let headline: String
     let branchPreviews: [DecisionSessionImportBundleBranchPreview]
@@ -1480,9 +1609,10 @@ actor DecisionSessionEngine {
                     createdAt: checkpoint.createdAt,
                     branchId: checkpoint.branchId,
                     title: "Checkpoint \(checkpoint.id)",
-                    detail: checkpoint.summary.goal.isEmpty
-                        ? "Recovered stable state at event \(checkpoint.basedOnEventSeq)."
-                        : checkpoint.summary.goal,
+                    detail: DecisionEvolutionCheckpointRecoverySupport.timelineCheckpointDetail(
+                        goal: checkpoint.summary.goal,
+                        basedOnEventSeq: checkpoint.basedOnEventSeq
+                    ),
                     kind: .checkpoint(checkpoint)
                 )
             )
@@ -1500,7 +1630,7 @@ actor DecisionSessionEngine {
         }
 
         let recoveryNotice = events.contains(where: { $0.type == .sessionRecovered })
-            ? "Recovered from the last stable checkpoint after an incomplete or stalled step."
+            ? DecisionEvolutionCheckpointRecoverySupport.timelineRecoveryNotice
             : nil
         let mergeNotice = try timelineMergeNotice(
             sessionId: sessionId,
@@ -1556,6 +1686,22 @@ actor DecisionSessionEngine {
             )
         }
         return actions
+    }
+
+    func resetForTesting() throws {
+        try execute(
+            """
+            DELETE FROM steps;
+            DELETE FROM checkpoints;
+            DELETE FROM events;
+            DELETE FROM branches;
+            DELETE FROM sessions;
+            """,
+            bindings: []
+        )
+        try clearDirectoryContents(at: blobsDirectoryURL)
+        try clearDirectoryContents(at: exportsDirectoryURL)
+        try clearDirectoryContents(at: logsDirectoryURL)
     }
 
     func snapshot(now: Date = .now) throws -> DecisionSessionRuntimeSnapshot {
@@ -1830,34 +1976,30 @@ actor DecisionSessionEngine {
         let sortedBranches = bundle.branches.sorted(by: Self.branchSort(lhs:rhs:))
         let branchPreviews = sortedBranches.map { branch in
             let isHead = branch.id == headBranchID
-            let detailSegments = [
-                branch.parentBranchId.map { "Parent \($0)" },
-                branch.baseCheckpointId.map { "Base \($0)" }
-            ].compactMap { $0 }
-            let detailLine = detailSegments.isEmpty
-                ? "Created \(branch.createdAt.formatted(date: .abbreviated, time: .shortened))"
-                : detailSegments.joined(separator: " • ")
+            let detailLine = DecisionSessionBranchPresentationSupport.detailLine(
+                originLine: nil,
+                parentBranchID: branch.parentBranchId,
+                baseCheckpointID: branch.baseCheckpointId,
+                createdAt: branch.createdAt
+            )
 
             return DecisionSessionImportBundleBranchPreview(
                 id: branch.id,
                 name: branch.name,
-                statusLine: isHead ? "\(branch.status.rawValue.capitalized) • exported head" : branch.status.rawValue.capitalized,
+                statusLine: DecisionSessionReviewPresentationSupport.importBranchStatusLine(
+                    status: branch.status,
+                    isHead: isHead
+                ),
                 detailLine: detailLine,
                 isHead: isHead
             )
         }
 
         let latestCheckpointGoal = bundle.checkpoints.first(where: { $0.id == bundle.manifest.sourceLatestCheckpointId })?.summary.goal
-        let checkpointLine: String
-        if let latestCheckpointID = bundle.manifest.sourceLatestCheckpointId {
-            if let latestCheckpointGoal, latestCheckpointGoal.isEmpty == false {
-                checkpointLine = "Latest checkpoint \(latestCheckpointID) • \(latestCheckpointGoal)"
-            } else {
-                checkpointLine = "Latest checkpoint \(latestCheckpointID)"
-            }
-        } else {
-            checkpointLine = "No checkpoint was exported with this session."
-        }
+        let checkpointLine = DecisionSessionReviewPresentationSupport.latestCheckpointLine(
+            latestCheckpointID: bundle.manifest.sourceLatestCheckpointId,
+            goal: latestCheckpointGoal
+        )
 
         let unfinishedSteps = bundle.steps.filter {
             switch $0.status {
@@ -1868,12 +2010,10 @@ actor DecisionSessionEngine {
             }
         }
 
-        let unfinishedStepsLine: String
-        if unfinishedSteps.isEmpty {
-            unfinishedStepsLine = "Open steps 0 • import can start from a paused safe point."
-        } else {
-            unfinishedStepsLine = "Open steps \(unfinishedSteps.count) • unfinished work will import as failed recovery facts."
-        }
+        let unfinishedStepCount = unfinishedSteps.count
+        let unfinishedStepsLine = DecisionSessionStepPresentationSupport.importUnfinishedStepsLine(
+            unfinishedStepCount: unfinishedStepCount
+        )
 
         let headBranchName = sortedBranches.first(where: { $0.id == headBranchID })?.name ?? headBranchID
 
@@ -1890,12 +2030,21 @@ actor DecisionSessionEngine {
             sourceTitle: bundle.manifest.sourceTitle,
             importedTitle: importedTitle,
             exportedAt: bundle.manifest.exportedAt,
-            countsLine: "Branches \(bundle.manifest.counts.branches) • Checkpoints \(bundle.manifest.counts.checkpoints) • Events \(bundle.manifest.counts.events) • Steps \(bundle.manifest.counts.steps)",
+            countsLine: DecisionSessionReviewPresentationSupport.importCountsLine(
+                branches: bundle.manifest.counts.branches,
+                checkpoints: bundle.manifest.counts.checkpoints,
+                events: bundle.manifest.counts.events,
+                steps: bundle.manifest.counts.steps
+            ),
             integrityLine: integrityLine,
             checkpointLine: checkpointLine,
-            branchLine: "Head \(headBranchName) • Layer \(bundle.manifest.layerPlacement.rawValue)",
+            branchLine: DecisionSessionReviewPresentationSupport.importBranchLine(
+                headBranchName: headBranchName,
+                layerPlacement: bundle.manifest.layerPlacement
+            ),
+            unfinishedStepCount: unfinishedStepCount,
             unfinishedStepsLine: unfinishedStepsLine,
-            headline: "Importing creates a new paused recovery-safe session. Old history stays untouched, and unfinished steps become auditable recovery facts.",
+            headline: DecisionSessionReviewPresentationSupport.importPreviewHeadline,
             branchPreviews: branchPreviews
         )
     }
@@ -2319,6 +2468,10 @@ actor DecisionSessionEngine {
         let latestCheckpointRouteLine = latestCheckpoint?.summary.eBrainRouteLine
         let latestCheckpointDecisionLine = latestCheckpoint?.summary.eBrainDecisionLine
         let latestCheckpointTaskLine = latestCheckpoint?.summary.eBrainTaskLine
+        let latestCheckpointPressureLine = latestCheckpoint?.summary.eBrainPressureLine
+        let latestCheckpointAuditLine = latestCheckpoint?.summary.eBrainAuditLine
+        let latestCheckpointActiveKillSwitchesLine = latestCheckpoint?.summary.eBrainActiveKillSwitchesLine
+        let latestCheckpointKillSwitchesLine = latestCheckpoint?.summary.eBrainKillSwitchesLine
         let latestCheckpointActionLine = latestCheckpoint?.summary.actionLine
         let branchCount = try countRows(
             """
@@ -2375,6 +2528,10 @@ actor DecisionSessionEngine {
             latestCheckpointRouteLine: latestCheckpointRouteLine,
             latestCheckpointDecisionLine: latestCheckpointDecisionLine,
             latestCheckpointTaskLine: latestCheckpointTaskLine,
+            latestCheckpointPressureLine: latestCheckpointPressureLine,
+            latestCheckpointAuditLine: latestCheckpointAuditLine,
+            latestCheckpointActiveKillSwitchesLine: latestCheckpointActiveKillSwitchesLine,
+            latestCheckpointKillSwitchesLine: latestCheckpointKillSwitchesLine,
             latestCheckpointActionLine: latestCheckpointActionLine,
             latestEventID: latestHeadEvent?.id,
             latestEventSeq: latestHeadEvent?.seq,
@@ -2449,47 +2606,71 @@ actor DecisionSessionEngine {
             return "Correction: \(payload.newText)"
         case .branchMerged:
             let payload = try decoder.decode(DecisionSessionPayloadBranchMerged.self, from: data)
-            return "Merged branch \(payload.sourceBranchId) into \(payload.targetBranchId)"
+            return DecisionSessionTimelinePresentationSupport.branchMergedDetail(
+                sourceBranchID: payload.sourceBranchId,
+                targetBranchID: payload.targetBranchId
+            )
         case .toolCallStarted:
             let payload = try decoder.decode(DecisionSessionPayloadToolCallStarted.self, from: data)
-            return "Tool started: \(payload.tool)"
+            return DecisionSessionTimelinePresentationSupport.toolStartedDetail(
+                tool: payload.tool
+            )
         case .toolCallFinished:
             let payload = try decoder.decode(DecisionSessionPayloadToolCallFinished.self, from: data)
-            return "Tool finished: \(payload.resultSummary)"
+            return DecisionSessionTimelinePresentationSupport.toolFinishedDetail(
+                resultSummary: payload.resultSummary
+            )
         case .toolCallFailed:
             let payload = try decoder.decode(DecisionSessionPayloadToolCallFailed.self, from: data)
-            return "Tool failed: \(payload.tool) • \(payload.errorCode)"
+            return DecisionSessionTimelinePresentationSupport.toolFailedDetail(
+                tool: payload.tool,
+                errorCode: payload.errorCode
+            )
         case .checkpointCreated:
             let payload = try decoder.decode(DecisionSessionPayloadCheckpointCreated.self, from: data)
-            return "Checkpoint created at event \(payload.basedOnEventSeq)"
+            return DecisionSessionTimelinePresentationSupport.checkpointCreatedDetail(
+                basedOnEventSeq: payload.basedOnEventSeq
+            )
         case .stepStarted:
             let payload = try decoder.decode(DecisionSessionPayloadStepStarted.self, from: data)
-            return "Step \(payload.stepId) started"
+            return DecisionSessionTimelinePresentationSupport.stepStartedDetail(
+                stepID: payload.stepId
+            )
         case .stepHeartbeat:
             let payload = try decoder.decode(DecisionSessionPayloadHeartbeat.self, from: data)
-            if let progress = payload.progress {
-                return "Heartbeat \(payload.stepId) • \(Int(progress * 100))%"
-            }
-            return "Heartbeat \(payload.stepId)"
+            return DecisionSessionTimelinePresentationSupport.heartbeatDetail(
+                stepID: payload.stepId,
+                progress: payload.progress
+            )
         case .stepStalled:
             let payload = try decoder.decode(DecisionSessionPayloadStepStalled.self, from: data)
-            return "Step stalled \(payload.stepId)"
+            return DecisionSessionTimelinePresentationSupport.stepStalledDetail(
+                stepID: payload.stepId
+            )
         case .stepRecovered:
             let payload = try decoder.decode(DecisionSessionPayloadStepStalled.self, from: data)
-            return "Recovered step \(payload.stepId)"
+            return DecisionSessionTimelinePresentationSupport.stepRecoveredDetail(
+                stepID: payload.stepId
+            )
         case .sessionPaused:
-            return "Session paused"
+            return DecisionSessionTimelinePresentationSupport.sessionPausedDetail
         case .sessionResumed:
-            return "Session resumed"
+            return DecisionSessionTimelinePresentationSupport.sessionResumedDetail
         case .sessionError:
             let payload = try decoder.decode(DecisionSessionPayloadSessionError.self, from: data)
-            return "Session error: \(payload.kind)"
+            return DecisionSessionTimelinePresentationSupport.sessionErrorDetail(
+                kind: payload.kind
+            )
         case .sessionRecovered:
             let payload = try decoder.decode(DecisionSessionPayloadSessionRecovered.self, from: data)
-            return "Recovered from checkpoint \(payload.sourceCheckpointId ?? "none")"
+            return DecisionSessionRecoveryPresentationSupport.checkpointEventDetail(
+                sourceCheckpointID: payload.sourceCheckpointId
+            )
         case .branchCreated:
             let payload = try decoder.decode(DecisionSessionPayloadBranchCreated.self, from: data)
-            return "Branch created from \(payload.fromCheckpointId ?? "root")"
+            return DecisionSessionTimelinePresentationSupport.branchCreatedDetail(
+                fromCheckpointID: payload.fromCheckpointId
+            )
         }
     }
 
@@ -2536,13 +2717,15 @@ actor DecisionSessionEngine {
 
         let branchDescriptor = try getBranch(targetBranchId).name
         if foldedSources.isEmpty == false {
-            let foldedLine = "Latest checkpoint on \(branchDescriptor) already folded in merge facts from \(formatMergeSourceList(foldedSources))."
-            if visibleSources.isEmpty {
-                return foldedLine
-            }
-            return "\(foldedLine) Newer merge events remain visible for \(formatMergeSourceList(visibleSources))."
+            return DecisionSessionTimelinePresentationSupport.foldedMergeNotice(
+                branchName: branchDescriptor,
+                foldedSources: formatMergeSourceList(foldedSources),
+                visibleSources: visibleSources.isEmpty ? nil : formatMergeSourceList(visibleSources)
+            )
         }
-        return "This branch recorded merge events after the latest checkpoint from \(formatMergeSourceList(visibleSources))."
+        return DecisionSessionTimelinePresentationSupport.visibleMergeNotice(
+            visibleSources: formatMergeSourceList(visibleSources)
+        )
     }
 
     private func mergeSourceBranchNames(
@@ -3145,6 +3328,18 @@ actor DecisionSessionEngine {
             [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
             ofItemAtPath: url.path
         )
+    }
+
+    private func clearDirectoryContents(at url: URL) throws {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: url.path) else { return }
+
+        for entry in try fileManager.contentsOfDirectory(
+            at: url,
+            includingPropertiesForKeys: nil
+        ) {
+            try fileManager.removeItem(at: entry)
+        }
     }
 
     private static func makeIdentifier(prefix: String) -> String {

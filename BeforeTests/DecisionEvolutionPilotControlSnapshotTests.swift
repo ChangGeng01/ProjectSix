@@ -42,7 +42,27 @@ struct DecisionEvolutionPilotControlSnapshotTests {
 
         #expect(localMutationSnapshot.interactionMode == .mutationHub)
         #expect(localMutationSnapshot.allowsLocalMutationActions)
-        #expect(localMutationSnapshot.guidedAction?.actionTitle == "Approve review queue")
+        #expect(
+            localMutationSnapshot.summaryBadgePresentations
+                == [
+                    DecisionEvolutionSummaryBadgePresentation(title: "1 PENDING", tone: .orange),
+                    DecisionEvolutionSummaryBadgePresentation(title: "0 ROLLBACK READY", tone: .secondary),
+                    DecisionEvolutionSummaryBadgePresentation(title: "1 LINEAGE-BACKED", tone: .ember)
+                ]
+        )
+        #expect(localMutationSnapshot.guidedAction?.title == DecisionEvolutionReviewPathPresentationSupport.pilotPendingReviewHeadline)
+        #expect(
+            localMutationSnapshot.guidedAction?.detail
+                == DecisionEvolutionReviewPathPresentationSupport.pilotPendingReviewDetail(allowsMutations: true)
+        )
+        #expect(
+            DecisionEvolutionPendingReviewPresentationSupport.pilotHeadline
+                == DecisionEvolutionReviewPathPresentationSupport.pilotPendingReviewHeadline
+        )
+        #expect(
+            localMutationSnapshot.guidedAction?.actionTitle
+                == DecisionEvolutionReviewPathPresentationSupport.approveReviewQueueActionTitle
+        )
 
         if case let .mutation(intent)? = localMutationSnapshot.guidedAction?.route {
             #expect(intent.kind == .approvePendingCheckpoints)
@@ -74,6 +94,22 @@ struct DecisionEvolutionPilotControlSnapshotTests {
 
         #expect(controlCenterReadFirstSnapshot.interactionMode == .observeAndRoute)
         #expect(controlCenterReadFirstSnapshot.allowsLocalMutationActions == false)
+        #expect(
+            controlCenterReadFirstSnapshot.summaryBadgePresentations
+                == [
+                    DecisionEvolutionSummaryBadgePresentation(title: "1 PENDING", tone: .orange),
+                    DecisionEvolutionSummaryBadgePresentation(title: "0 ROLLBACK READY", tone: .secondary),
+                    DecisionEvolutionSummaryBadgePresentation(title: "1 LINEAGE-BACKED", tone: .ember)
+                ]
+        )
+        #expect(
+            controlCenterReadFirstSnapshot.guidedAction?.title
+                == DecisionEvolutionReleasePathPresentationSupport.watchingFirstActiveCheckpointHeadline
+        )
+        #expect(
+            controlCenterReadFirstSnapshot.guidedAction?.detail
+                == DecisionEvolutionReleasePathPresentationSupport.noActiveCheckpointReason
+        )
         #expect(controlCenterReadFirstSnapshot.guidedAction?.actionTitle == "Open control center")
 
         if case let .navigation(destination)? = controlCenterReadFirstSnapshot.guidedAction?.route {
@@ -104,6 +140,8 @@ struct DecisionEvolutionPilotControlSnapshotTests {
         )
 
         #expect(historySnapshot.guidedAction?.actionTitle == "Open History")
+        #expect(historySnapshot.guidedAction?.title == DecisionEvolutionReviewPathPresentationSupport.pilotKillSwitchHeadline)
+        #expect(historySnapshot.guidedAction?.detail == DecisionEvolutionReviewPathPresentationSupport.pilotKillSwitchDetail)
         if case let .navigation(destination)? = historySnapshot.guidedAction?.route {
             #expect(destination == .history)
         } else {
@@ -132,6 +170,8 @@ struct DecisionEvolutionPilotControlSnapshotTests {
         )
 
         #expect(portraitSnapshot.guidedAction?.actionTitle == "Open Portrait")
+        #expect(portraitSnapshot.guidedAction?.title == DecisionEvolutionReviewPathPresentationSupport.pilotKillSwitchHeadline)
+        #expect(portraitSnapshot.guidedAction?.detail == DecisionEvolutionReviewPathPresentationSupport.pilotKillSwitchDetail)
         if case let .navigation(destination)? = portraitSnapshot.guidedAction?.route {
             #expect(destination == .portrait)
         } else {
@@ -184,8 +224,47 @@ struct DecisionEvolutionPilotControlSnapshotTests {
         #expect(snapshot.allowsLocalMutationActions)
         #expect(snapshot.pendingReviewCount == 1)
         #expect(snapshot.rollbackReadyCount == 0)
+        #expect(snapshot.headerTitle == "Evolution pilot controls")
+        #expect(
+            snapshot.headerDetail
+                == DecisionEvolutionMutationRoutingPresentationSupport.mutationHubPilotDetail
+        )
+        #expect(snapshot.guidedActionSectionTitle == "Recommended next step")
+        #expect(snapshot.restoreActiveTitle == "Restore active path")
+        #expect(snapshot.rollbackActiveTitle == "Rollback active path")
+        #expect(
+            snapshot.approveQueueTitle
+                == DecisionEvolutionReviewPathPresentationSupport.approveReviewQueueActionTitle
+        )
+        #expect(snapshot.clearQueueLineageTitle == "Clear queue lineage")
+        #expect(
+            snapshot.summaryBadgePresentations
+                == [
+                    DecisionEvolutionSummaryBadgePresentation(title: "1 PENDING", tone: .orange),
+                    DecisionEvolutionSummaryBadgePresentation(title: "0 ROLLBACK READY", tone: .secondary),
+                    DecisionEvolutionSummaryBadgePresentation(title: "1 LINEAGE-BACKED", tone: .ember)
+                ]
+        )
+        #expect(snapshot.embeddedReleaseSummaryMode == .mutationHub)
         #expect(snapshot.approveQueueIntent?.kind == .approvePendingCheckpoints)
-        #expect(snapshot.guidedAction?.actionTitle == "Approve review queue")
+        #expect(snapshot.guidedAction?.title == DecisionEvolutionReviewPathPresentationSupport.pilotPendingReviewHeadline)
+        #expect(
+            snapshot.guidedAction?.detail
+                == DecisionEvolutionReviewPathPresentationSupport.pilotPendingReviewDetail(allowsMutations: true)
+        )
+        #expect(
+            snapshot.guidedAction?.actionTitle
+                == DecisionEvolutionReviewPathPresentationSupport.approveReviewQueueActionTitle
+        )
+        #expect(
+            snapshot.pendingReviewLineageNotice
+                == DecisionEvolutionLineagePresentationSupport.pendingReviewLineageNotice(
+                    pendingReviewLineageCount: 1,
+                    hasReleaseSummary: true
+                )
+        )
+        #expect(snapshot.reviewAuditLine == "Review audit: guardrail-review-queue")
+        #expect(snapshot.recommendedKillSwitchesLine == "Suggested kill switches: external-tools")
 
         if case let .mutation(intent)? = snapshot.guidedAction?.route {
             #expect(intent.kind == .approvePendingCheckpoints)
@@ -239,7 +318,30 @@ struct DecisionEvolutionPilotControlSnapshotTests {
         #expect(snapshot.allowsLocalMutationActions == false)
         #expect(snapshot.pendingReviewCount == 1)
         #expect(snapshot.rollbackReadyCount == 0)
+        #expect(snapshot.headerTitle == "Evolution pilot controls")
+        #expect(
+            snapshot.headerDetail
+                == DecisionEvolutionMutationRoutingPresentationSupport.routedPilotDetail()
+        )
+        #expect(snapshot.embeddedReleaseSummaryMode == .surface)
+        #expect(
+            snapshot.guidedAction?.title
+                == DecisionEvolutionReleasePathPresentationSupport.watchingFirstActiveCheckpointHeadline
+        )
+        #expect(
+            snapshot.guidedAction?.detail
+                == DecisionEvolutionReleasePathPresentationSupport.noActiveCheckpointReason
+        )
         #expect(snapshot.guidedAction?.actionTitle == "Open control center")
+        #expect(
+            snapshot.pendingReviewLineageNotice
+                == DecisionEvolutionLineagePresentationSupport.pendingReviewLineageNotice(
+                    pendingReviewLineageCount: 1,
+                    hasReleaseSummary: true
+                )
+        )
+        #expect(snapshot.reviewAuditLine == "Review audit: guardrail-review-read-first")
+        #expect(snapshot.recommendedKillSwitchesLine == nil)
 
         if case let .navigation(destination)? = snapshot.guidedAction?.route {
             #expect(destination == .controlCenter)
@@ -279,6 +381,12 @@ struct DecisionEvolutionPilotControlSnapshotTests {
         #expect(snapshot.rollbackReadyCount == 0)
         #expect(snapshot.recommendedKillSwitches == ["external-tools", "host-write"])
         #expect(snapshot.pendingReviewLineageCount == 1)
+        #expect(snapshot.embeddedReleaseSummaryMode == nil)
+        #expect(snapshot.pendingReviewLineageNotice == nil)
+        #expect(snapshot.reviewAuditLine == "Review audit: guardrail-review-fallback")
+        #expect(snapshot.recommendedKillSwitchesLine == "Suggested kill switches: external-tools • host-write")
+        #expect(snapshot.guidedAction?.title == DecisionEvolutionReviewPathPresentationSupport.pilotKillSwitchHeadline)
+        #expect(snapshot.guidedAction?.detail == DecisionEvolutionReviewPathPresentationSupport.pilotKillSwitchDetail)
         #expect(snapshot.guidedAction?.actionTitle == "Open control center")
 
         if case let .navigation(destination)? = snapshot.guidedAction?.route {
@@ -286,6 +394,69 @@ struct DecisionEvolutionPilotControlSnapshotTests {
         } else {
             Issue.record("Expected read-first fallback guidance to route pending review through control center.")
         }
+    }
+
+    @Test
+    func notRestorableGuidanceUsesSharedRecoveryCopy() {
+        let snapshot = DecisionEvolutionPilotControlSnapshot.build(
+            controlSurface: makeControlSurface(
+                active: makeCheckpoint(
+                    checkpointID: "active-not-restorable",
+                    createdAt: Date(timeIntervalSince1970: 60),
+                    approvalState: .automatic,
+                    hasLineage: true
+                ),
+                pendingReview: []
+            ),
+            releaseSummary: makeReleaseSummary(
+                headline: "Active path is not restorable.",
+                reasons: ["Recovery is required first."],
+                pendingReviewCount: 0,
+                canRestoreActiveCheckpoint: false,
+                activeCheckpointID: "active-not-restorable"
+            ),
+            surfaceContract: .settings,
+            navigationOptions: DecisionEvolutionSurfaceContract.settings.checkpointNavigationOptions
+        )
+
+        #expect(snapshot.guidedAction?.title == DecisionEvolutionReviewPathPresentationSupport.pilotNotRestorableHeadline)
+        #expect(snapshot.guidedAction?.detail == DecisionEvolutionReviewPathPresentationSupport.pilotNotRestorableDetail)
+        #expect(snapshot.guidedAction?.actionTitle == "Open control center")
+    }
+
+    @Test
+    func primaryBlockerPresentationSupportBuildsSharedPilotGuidance() {
+        #expect(
+            DecisionEvolutionPrimaryBlockerPresentationSupport.pilotGuidance(
+                blocker: .runtimeGuardrails,
+                primaryReason: nil,
+                allowsLocalMutationActions: false
+            )
+                == DecisionEvolutionPrimaryBlockerGuidancePresentation(
+                    headline: DecisionEvolutionReleaseStagePresentationSupport.blockedRuntimeGuardrailsHeadline,
+                    detail: DecisionEvolutionReleaseStagePresentationSupport.pilotRuntimeGuardrailsDetail
+                )
+        )
+        #expect(
+            DecisionEvolutionPrimaryBlockerPresentationSupport.pilotGuidance(
+                blocker: .pendingReview,
+                primaryReason: nil,
+                allowsLocalMutationActions: true
+            )
+                == DecisionEvolutionPrimaryBlockerGuidancePresentation(
+                    headline: DecisionEvolutionReviewPathPresentationSupport.pilotPendingReviewHeadline,
+                    detail: DecisionEvolutionReviewPathPresentationSupport.pilotPendingReviewDetail(
+                        allowsMutations: true
+                    )
+                )
+        )
+        #expect(
+            DecisionEvolutionPrimaryBlockerPresentationSupport.pilotGuidance(
+                blocker: .ready,
+                primaryReason: nil,
+                allowsLocalMutationActions: false
+            ) == nil
+        )
     }
 
     private func makeControlSurface(

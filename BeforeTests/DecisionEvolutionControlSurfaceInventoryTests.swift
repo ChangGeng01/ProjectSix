@@ -240,6 +240,173 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
         #expect(facts.recoveredTicketCount == reviewOnly.eBrain.updateTicketSummaries.count)
     }
 
+    @Test
+    func checkpointPresentationExposesSharedDetailLinesAndRollbackCopy() {
+        let snapshot = DecisionReviewCheckpointSnapshot(
+            checkpointID: "checkpoint-detail",
+            previousCheckpointID: "checkpoint-prev",
+            createdAt: Date(timeIntervalSince1970: 60),
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Queued for guarded review"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(lineageSummary: BASEvolutionLineageSummary(
+                recordedAt: Date(timeIntervalSince1970: 60),
+                sessionID: "session-checkpoint-detail",
+                taskType: "decision-review",
+                riskLevel: "high",
+                permitMode: "delay",
+                hostGatePercent: 88,
+                thoughtFoldChecksum: "fold-checkpoint-detail",
+                updateTicketSummaries: ["ticket-checkpoint-detail"],
+                guardrailFindings: ["guardrail-checkpoint-detail"],
+                recommendedKillSwitches: ["kill-checkpoint-detail"]
+            )),
+            fallbackRiskLevel: "high",
+            fallbackPermitMode: "delay"
+        )
+
+        let presentation = DecisionEvolutionCheckpointPresentation(snapshot: snapshot)
+        let selectedAction = presentation.selectionActionPresentation(isSelected: true)
+        let unselectedAction = presentation.selectionActionPresentation(isSelected: false)
+        let summaryBadges = presentation.summaryBadgePresentations(activeSource: .automaticFallback)
+
+        #expect(presentation.approvalStateTitle == "Review suggested")
+        #expect(presentation.rollbackStateTitle == "Rollback ready")
+        #expect(presentation.rollbackBadgeTitle == "ROLLBACK READY")
+        #expect(DecisionEvolutionCheckpointLexiconSupport.activeCheckpointRoleTitle == "Active checkpoint")
+        #expect(DecisionEvolutionCheckpointLexiconSupport.reviewHeadRoleTitle == "Review head")
+        #expect(DecisionEvolutionCheckpointLexiconSupport.activeRuntimeRoleTitle == "Active")
+        #expect(DecisionEvolutionCheckpointLexiconSupport.rollbackStateTitle(rollbackReady: true) == "Rollback ready")
+        #expect(DecisionEvolutionCheckpointLexiconSupport.rollbackBadgeTitle(rollbackReady: false) == "ROLLBACK WATCH")
+        #expect(DecisionEvolutionCheckpointLexiconSupport.rollbackReadyCountBadgeTitle(2) == "2 ROLLBACK READY")
+        #expect(
+            DecisionEvolutionCheckpointDetailPresentationSupport.lineagePendingSummaryText
+                == "Lineage pending • review details stay available, but recovered risk facts are not attached yet."
+        )
+        #expect(presentation.ticketsLine == "Tickets: ticket-checkpoint-detail")
+        #expect(presentation.auditLine == "Audit: guardrail-checkpoint-detail")
+        #expect(presentation.killSwitchesLine == "Kill switches: kill-checkpoint-detail")
+        #expect(presentation.diffLine == "Diff: Queued for guarded review")
+        #expect(presentation.diffBulletLines == ["• Queued for guarded review"])
+        #expect(presentation.recordedLine.contains("Recorded "))
+        #expect(presentation.recordedLine.contains("checkpoint-detail"))
+        #expect(selectedAction.title == "Selected")
+        #expect(selectedAction.usesPrimaryStyle == true)
+        #expect(unselectedAction.title == "Select")
+        #expect(unselectedAction.usesPrimaryStyle == false)
+        #expect(summaryBadges.count == 4)
+        #expect(summaryBadges[0] == DecisionEvolutionSummaryBadgePresentation(title: "HIGH", tone: .ember))
+        #expect(summaryBadges[1] == DecisionEvolutionSummaryBadgePresentation(title: "DELAY", tone: .moss))
+        #expect(summaryBadges[2] == DecisionEvolutionSummaryBadgePresentation(title: "RECOVERED", tone: .blue))
+        #expect(summaryBadges[3] == DecisionEvolutionSummaryBadgePresentation(title: "ROLLBACK READY", tone: .moss))
+        #expect(
+            DecisionEvolutionCheckpointDetailPresentationSupport.emptyLineageMessage
+                == "No persisted checkpoint lineage is available yet."
+        )
+    }
+
+    @Test
+    func checkpointPresentationUsesSharedLineagePendingFallbackSummary() {
+        let snapshot = DecisionReviewCheckpointSnapshot(
+            checkpointID: "checkpoint-pending-lineage",
+            previousCheckpointID: nil,
+            createdAt: Date(timeIntervalSince1970: 75),
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: false,
+            hasBrainStateSnapshot: false,
+            diffSummary: ["Pending lineage"],
+            eBrain: nil,
+            fallbackRiskLevel: nil,
+            fallbackPermitMode: nil
+        )
+
+        let presentation = DecisionEvolutionCheckpointPresentation(snapshot: snapshot)
+
+        #expect(
+            presentation.summaryText
+                == DecisionEvolutionCheckpointDetailPresentationSupport.lineagePendingSummaryText
+        )
+        #expect(presentation.usesSecondarySummaryTone == true)
+    }
+
+    @Test
+    func controlSurfaceSummarySectionsExposeSharedRoleAndBadgeContracts() {
+        let active = DecisionReviewCheckpointSnapshot(
+            checkpointID: "active-summary",
+            previousCheckpointID: "active-prev",
+            createdAt: Date(timeIntervalSince1970: 80),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["active summary"],
+            eBrain: makeReplaySummary(
+                checkpointID: "active-summary",
+                recordedAt: Date(timeIntervalSince1970: 80),
+                source: .liveRuntime
+            ),
+            fallbackRiskLevel: "stable",
+            fallbackPermitMode: "answer"
+        )
+        let review = DecisionReviewCheckpointSnapshot(
+            checkpointID: "review-summary",
+            previousCheckpointID: "active-summary",
+            createdAt: Date(timeIntervalSince1970: 90),
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["review summary"],
+            eBrain: makeReplaySummary(
+                checkpointID: "review-summary",
+                recordedAt: Date(timeIntervalSince1970: 90),
+                source: .persistedCheckpoint
+            ),
+            fallbackRiskLevel: "high",
+            fallbackPermitMode: "delay"
+        )
+
+        let surface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .automaticFallback,
+            reviewCheckpoint: review,
+            pendingReviewQueue: [review],
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: ["active-prev", "active-summary"]
+        )
+
+        let sections = surface.summarySectionPresentations
+
+        #expect(sections.map(\.title) == ["Active checkpoint", "Review head"])
+        #expect(sections.map(\.presentation.checkpointID) == ["active-summary", "review-summary"])
+        #expect(
+            sections[0] == DecisionEvolutionControlSurfaceSummaryPresentationSupport.sectionPresentation(
+                role: .active,
+                presentation: sections[0].presentation,
+                activeSource: .automaticFallback
+            )
+        )
+        #expect(
+            sections[1] == DecisionEvolutionControlSurfaceSummaryPresentationSupport.sectionPresentation(
+                role: .reviewHead,
+                presentation: sections[1].presentation
+            )
+        )
+        #expect(
+            sections[0].summaryBadges.contains(
+                DecisionEvolutionSummaryBadgePresentation(title: "RECOVERED", tone: .blue)
+            )
+        )
+        #expect(
+            sections[1].summaryBadges.contains(
+                DecisionEvolutionSummaryBadgePresentation(title: "RECOVERED", tone: .blue)
+            ) == false
+        )
+    }
+
     private func makeLineage(
         checkpointID: String,
         createdAt: Date,

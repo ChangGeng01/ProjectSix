@@ -104,7 +104,9 @@ struct SelfPortraitView: View {
                     }
                     Spacer()
                     BeforeActionButton(
-                        isLoadingSystemFlightDeck ? "Refreshing…" : "Refresh",
+                        isLoadingSystemFlightDeck
+                            ? DecisionEvolutionSurfaceStatusPresentationSupport.refreshingTitle
+                            : DecisionEvolutionSurfaceStatusPresentationSupport.refreshTitle,
                         style: .secondary
                     ) {
                         Task {
@@ -149,6 +151,12 @@ struct SelfPortraitView: View {
                             Text(presentation.routeLine)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+
+                            if let pressureLine = presentation.pressureLine {
+                                Text(pressureLine)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
 
                             Text(presentation.hostLine)
                                 .font(.caption2)
@@ -195,14 +203,14 @@ struct SelfPortraitView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
 
-                            if let firstBlocker = report.blockers.first {
-                                Text("Blocker: \(firstBlocker)")
+                            if let surfaceSummaryLine = report.surfaceSummaryLine {
+                                Text(surfaceSummaryLine)
                                     .font(.caption2)
-                                    .foregroundStyle(healthColor(report.health))
-                            } else if let firstSignal = report.signals.first {
-                                Text(firstSignal)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(
+                                        report.surfaceSummaryUsesHealthTint
+                                            ? healthColor(report.health)
+                                            : .secondary
+                                    )
                             }
                         }
                         .padding(.top, 2)
@@ -223,8 +231,8 @@ struct SelfPortraitView: View {
                 Text("Local model library")
                     .font(.headline)
 
-                if let localModelSummary = systemFlightDeck?.localModelLibrarySummary {
-                    Text(localModelSummary.headline)
+                if let localModelOverviewLine = systemFlightDeck?.localModelLibrarySummary?.overviewLine {
+                    Text(localModelOverviewLine)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -459,35 +467,7 @@ struct SelfPortraitView: View {
     private func replayLineageCard(
         _ entries: [DecisionEvolutionReplayEntryPresentation]
     ) -> some View {
-        PanelCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Replay lineage")
-                    .font(.headline)
-
-                if entries.isEmpty {
-                    Text("No replay lineage has been captured yet.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(Array(entries.prefix(3).enumerated()), id: \.offset) { _, presentation in
-                        DecisionReplayEntrySummaryView(
-                            title: presentation.title,
-                            presentation: presentation
-                        ) {
-                            DecisionReplayEntryHeaderRowView(
-                                leadingText: presentation.modeTitle,
-                                secondaryText: presentation.statusTitle,
-                                trailingTimestamp: presentation.timestamp,
-                                trailingTimestampStyle: .absoluteShort
-                            )
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(BeforeTheme.ember)
-                        }
-                        .padding(.top, 2)
-                    }
-                }
-            }
-        }
+        DecisionReplayLineageCardView(entries: entries)
     }
 
     @ViewBuilder
@@ -674,6 +654,8 @@ struct SelfPortraitView: View {
                         sourceBadge(recoveryDescriptor)
                     }
 
+                    let activeRolePresentation = DecisionEvolutionSectionPresentationSupport.checkpointRole(.active)
+                    let reviewRolePresentation = DecisionEvolutionSectionPresentationSupport.checkpointRole(.reviewHead)
                     DecisionEvolutionControlSurfaceSummaryView(
                         controlSurface: controlSurface,
                         surfaceContract: evolutionSurfaceContract,
@@ -688,7 +670,7 @@ struct SelfPortraitView: View {
 
                     if let activePresentation {
                         DecisionEvolutionCheckpointPanelView(
-                            title: "Active checkpoint",
+                            title: activeRolePresentation.title,
                             checkpoint: activePresentation,
                             controlSurface: controlSurface,
                             surfaceContract: evolutionSurfaceContract,
@@ -703,7 +685,7 @@ struct SelfPortraitView: View {
 
                     if let reviewPresentation {
                         DecisionEvolutionCheckpointPanelView(
-                            title: "Review head",
+                            title: reviewRolePresentation.title,
                             checkpoint: reviewPresentation,
                             controlSurface: controlSurface,
                             surfaceContract: evolutionSurfaceContract,

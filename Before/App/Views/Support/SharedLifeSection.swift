@@ -1,5 +1,25 @@
 import SwiftUI
 
+private enum SharedLifePresentedSheet: Identifiable {
+    case item(SharedLifeBoxItem)
+    case editRule(SharedLifeRule)
+    case newRule
+    case newItem
+
+    var id: String {
+        switch self {
+        case .item(let item):
+            "item:\(item.id)"
+        case .editRule(let rule):
+            "rule:\(rule.id)"
+        case .newRule:
+            "new-rule"
+        case .newItem:
+            "new-item"
+        }
+    }
+}
+
 struct SharedLifeSection: View {
     @EnvironmentObject private var sharedLife: SharedLifeStore
     @State private var selectedItem: SharedLifeBoxItem?
@@ -78,28 +98,92 @@ struct SharedLifeSection: View {
                 }
             }
         }
-        .sheet(item: $selectedItem) { item in
-            SharedLifeItemDetailView(item: item)
+        .sheet(item: presentedSheet) { sheet in
+            sheetContent(for: sheet)
         }
-        .sheet(item: $editingRule) { rule in
+    }
+
+    private var presentedSheet: Binding<SharedLifePresentedSheet?> {
+        Binding(
+            get: {
+                if let item = selectedItem {
+                    return .item(item)
+                }
+                if let rule = editingRule {
+                    return .editRule(rule)
+                }
+                if showingNewRule {
+                    return .newRule
+                }
+                if showingNewItem {
+                    return .newItem
+                }
+                return nil
+            },
+            set: { newValue in
+                guard newValue == nil, let presentedSheet = currentPresentedSheet else {
+                    return
+                }
+                clear(presentedSheet)
+            }
+        )
+    }
+
+    private var currentPresentedSheet: SharedLifePresentedSheet? {
+        if let item = selectedItem {
+            return .item(item)
+        }
+        if let rule = editingRule {
+            return .editRule(rule)
+        }
+        if showingNewRule {
+            return .newRule
+        }
+        if showingNewItem {
+            return .newItem
+        }
+        return nil
+    }
+
+    @ViewBuilder
+    private func sheetContent(
+        for sheet: SharedLifePresentedSheet
+    ) -> some View {
+        switch sheet {
+        case .item(let item):
+            SharedLifeItemDetailView(item: item)
+        case .editRule(let rule):
             SharedLifeRuleEditorView(
                 title: "Edit shared rule",
                 rule: rule,
                 onSave: { sharedLife.upsertRule($0) },
                 onDelete: rule.isSeeded ? nil : { sharedLife.removeRule(rule.id) }
             )
-        }
-        .sheet(isPresented: $showingNewRule) {
+        case .newRule:
             SharedLifeRuleEditorView(
                 title: "New shared rule",
                 rule: nil,
                 onSave: { sharedLife.upsertRule($0) }
             )
-        }
-        .sheet(isPresented: $showingNewItem) {
+        case .newItem:
             SharedLifeItemComposerView { item in
                 sharedLife.insert(item)
             }
+        }
+    }
+
+    private func clear(
+        _ sheet: SharedLifePresentedSheet
+    ) {
+        switch sheet {
+        case .item:
+            selectedItem = nil
+        case .editRule:
+            editingRule = nil
+        case .newRule:
+            showingNewRule = false
+        case .newItem:
+            showingNewItem = false
         }
     }
 
