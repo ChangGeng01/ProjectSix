@@ -4,6 +4,9 @@ import BASObservability
 
 public struct BASReferenceCapabilityCoverageInput: Codable, Sendable, Equatable {
     public var activeProviderTitle: String
+    public var executionTierID: String?
+    public var foundationTierID: String?
+    public var horizonCoverage: BASHorizonCoverageSnapshot?
     public var runtimeSummary: BASRuntimeInspectionSummary
     public var brainSummary: BASBrainSummary
     public var isPureLocalClosedLoop: Bool
@@ -20,6 +23,9 @@ public struct BASReferenceCapabilityCoverageInput: Codable, Sendable, Equatable 
 
     public init(
         activeProviderTitle: String,
+        executionTierID: String? = nil,
+        foundationTierID: String? = nil,
+        horizonCoverage: BASHorizonCoverageSnapshot? = nil,
         runtimeSummary: BASRuntimeInspectionSummary,
         brainSummary: BASBrainSummary,
         isPureLocalClosedLoop: Bool,
@@ -35,6 +41,9 @@ public struct BASReferenceCapabilityCoverageInput: Codable, Sendable, Equatable 
         recoveredTicketCount: Int = 0
     ) {
         self.activeProviderTitle = activeProviderTitle
+        self.executionTierID = executionTierID
+        self.foundationTierID = foundationTierID
+        self.horizonCoverage = horizonCoverage
         self.runtimeSummary = runtimeSummary
         self.brainSummary = brainSummary
         self.isPureLocalClosedLoop = isPureLocalClosedLoop
@@ -56,7 +65,10 @@ public enum BASReferenceCapabilityCoverageBuilder {
         input: BASReferenceCapabilityCoverageInput
     ) -> BASCapabilityCoverageReport {
         BASCapabilityCoverageBuilder.build(
-            sections: sections(input: input)
+            sections: sections(input: input),
+            executionTierID: input.executionTierID,
+            foundationTierID: input.foundationTierID,
+            horizonCoverage: input.horizonCoverage
         )
     }
 

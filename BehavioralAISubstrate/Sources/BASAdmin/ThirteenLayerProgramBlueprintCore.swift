@@ -33,6 +33,7 @@ public enum BASEBrainLayerKind: Int, Codable, Sendable, CaseIterable, Identifiab
     case risk = 11
     case action = 12
     case evolution = 13
+    case sovereign = 14
 
     public var id: Int { rawValue }
 
@@ -64,6 +65,8 @@ public enum BASEBrainLayerKind: Int, Codable, Sendable, CaseIterable, Identifiab
             "L12 Action"
         case .evolution:
             "L13 Evolution"
+        case .sovereign:
+            "L14 Sovereign"
         }
     }
 
@@ -73,6 +76,8 @@ public enum BASEBrainLayerKind: Int, Codable, Sendable, CaseIterable, Identifiab
             .physiology
         case .context, .decompose, .memory, .loop, .triSelf, .risk, .action, .evolution:
             .cognition
+        case .sovereign:
+            .infrastructure
         }
     }
 }
@@ -261,11 +266,11 @@ public enum BASProgramExecutionBlueprintBuilder {
         title: "宿基双生·13层电子脑全栈研发总纲 v1.2",
         summary: "Three execution tracks, nineteen work packages, explicit cross-layer schemas, and milestone-gated rollout for a mobile-first thirteen-layer electronic brain stack.",
         layers: [
-            layer(.powerClock, "Power-clock layer owns lifecycle, run mode, and compute budget.", ["DeviceState", "BudgetFrame"], ["ActionPermit", "RuntimeTrace"]),
+            layer(.powerClock, "Power-clock layer owns lifecycle, wake intent, recovery/quarantine, sovereign actuation, and compute budget.", ["DeviceState", "BudgetFrame"], ["ActionPermit", "RuntimeTrace"]),
             layer(.neuralCore, "Neural-core layer owns Scout/Core model routing and structured heads.", ["ModelArtifact", "HeadOutputs"], ["BudgetFrame"]),
-            layer(.compressionRuntime, "Compression runtime owns quantization, ThoughtFold, caching, and hot-start recovery.", ["ThoughtFold", "RuntimeTrace"], ["BudgetFrame"]),
+            layer(.compressionRuntime, "Compression runtime owns Breath-Fold-Resume contracts, ThoughtFold recovery anchors, checkpoint-safe rollback, and hot-start recovery.", ["ThoughtFold", "MorphGraph", "HotColdMap", "PrecisionProfile", "ResumeFrame", "RollbackAnchor", "LungState", "BreathScheduler", "RuntimeTrace"], ["BudgetFrame"]),
             layer(.foundation, "Foundation layer owns stable world priors, structure courses, and boundary priors.", ["BaseCheckpoint", "FoundationEval"], ["EvalSample"]),
-            layer(.hostProfile, "Host layer owns versioned host protocol, host gate, deletion, and rollback.", ["HostProfile", "HostVersion"], ["RiskCard", "UpdateTicket"]),
+            layer(.hostProfile, "Host layer owns the host constitution, compatibility host profile projection, host gate, deletion, rollback, and privacy vault.", ["HostConstitution", "HostConstitutionVault", "HostDeletionManifest", "HostSyncRevocationLedger", "HostVersionTree", "HostProfile", "HostVersion"], ["RiskCard", "UpdateTicket"]),
             layer(.context, "Context layer turns raw input into task, emotion, pressure, relation, and manipulation signals.", ["ContextFrame"], ["BudgetFrame", "HostProfile"]),
             layer(.decompose, "Decompose layer extracts facts, goals, unknowns, contradictions, and mirror text.", ["DecomposeFrame"], ["ContextFrame", "MemoryAtom"]),
             layer(.memory, "Memory layer owns hot/warm/cold retrieval, conflict fingerprints, and promotion.", ["MemoryAtom", "MemoryBundle"], ["HostProfile", "UpdateTicket"]),
@@ -277,11 +282,11 @@ public enum BASProgramExecutionBlueprintBuilder {
         ],
         workPackages: [
             wp("WP0", "总体架构与项目治理", "Freeze layer boundaries, object contracts, regression policy, and change control.", [], .currentRepository, .first, "Chief Architect", ["Chief Architect"], ["Evaluation Lead", "SDK Lead"], "Chief Architect", "2 weeks", [], ["WP14", "WP16"], ["Interface churn before M0"], ["M0"], ["13-layer glossary approved", "Schema governance entries frozen", "Regression gate policy published"]),
-            wp("WP1", "灯芯层", "Implement runtime modes, budget planner, thermal guard, and maintenance scheduling.", [.powerClock], .currentRepository, .first, "Runtime Lead", ["Runtime Lead", "SDK Lead"], ["Loop Lead", "Risk Lead"], "Chief Architect", "4 weeks", ["WP0"], ["WP2", "WP5"], ["Real device thermal data"], ["M1", "M2"], ["BudgetFrame shipped", "High-risk downgrade rules covered by tests", "Maintenance never steals foreground budget"]),
+            wp("WP1", "灯芯层", "Ship the L1 kernel: run-mode state machine, wake intent, lease enforcement, recovery/quarantine, sovereign actuation, and maintenance arbitration.", [.powerClock], .currentRepository, .first, "Runtime Lead", ["Runtime Lead", "SDK Lead"], ["Loop Lead", "Risk Lead"], "Chief Architect", "4 weeks", ["WP0"], ["WP2", "WP5"], ["Real device thermal data"], ["M1", "M2"], ["L1 kernel contracts shipped", "High-risk downgrade and lease-enforcement rules covered by tests", "Maintenance never steals foreground budget and recovery stays auditable"]),
             wp("WP2", "脑肉层", "Build Scout/Core prototypes, structured heads, and decode controller.", [.neuralCore], .mixed, .first, "Model Lead", ["Model Lead", "Training Lead"], ["Runtime Lead", "Evaluation Lead"], "Chief Architect", "6 weeks", ["WP0"], ["WP1", "WP4", "WP15"], ["Checkpoint selection and head interference"], ["M1", "M5"], ["Scout/Core benchmarked", "Structured head pack defined", "High-risk misroute rate tracked"]),
-            wp("WP3", "折叠肺", "Implement quantization, graph compile, ThoughtFold, cache, and hot-start paths.", [.compressionRuntime], .currentRepository, .second, "Compression Lead", ["Compression Lead", "SDK Lead"], ["Runtime Lead", "Risk Lead"], "Chief Architect", "5 weeks", ["WP1", "WP2"], ["WP8", "WP17"], ["ThoughtFold checksum and restore fidelity"], ["M4", "M6"], ["ThoughtFoldSpec published", "Hot-start flow passes regression", "Thermal downgrade remains ordered"]),
+            wp("WP3", "折叠肺", "Implement the L3 v2 folded-lung contracts, Breath-Fold-Resume state machine, sovereign rollback bridge, and checkpoint-safe recovery anchors before industrial quantization work.", [.compressionRuntime], .currentRepository, .second, "Compression Lead", ["Compression Lead", "SDK Lead"], ["Runtime Lead", "Risk Lead"], "Chief Architect", "5 weeks", ["WP1", "WP2"], ["WP8", "WP17"], ["ThoughtFold checksum and restore fidelity"], ["M4", "M6"], ["ThoughtFoldSpec published", "Hot-start flow passes regression", "Thermal downgrade remains ordered"]),
             wp("WP4", "地平线层", "Train stable base priors, structure curriculum, counterfactual curriculum, and boundary priors.", [.foundation], .externalTraining, .third, "Foundation Lead", ["Foundation Lead", "Training Lead"], ["Evaluation Lead", "Risk Lead"], "Chief Architect", "8 weeks", ["WP0", "WP14"], ["WP2", "WP15"], ["Curriculum quality and over-refusal"], ["M1", "M5"], ["Foundation checkpoint evaluated", "Structure course gain proven", "Boundary prior does not collapse language quality"]),
-            wp("WP5", "宿纹层", "Implement versioned host profiles, host gate, delete/freeze/rollback, and privacy vault.", [.hostProfile], .currentRepository, .first, "Host & Memory Lead", ["Host & Memory Lead", "SDK Lead"], ["Risk Lead", "Product Lead"], "Chief Architect", "4 weeks", ["WP0"], ["WP1", "WP8"], ["Deletion verification"], ["M1", "M4"], ["HostProfileSpec shipped", "Rollback is executable", "Host preference cannot bypass risk gate"]),
+            wp("WP5", "宿纹层", "Implement the host constitution fabric, compatibility host profile projection, host gate, delete/freeze/rollback, and privacy vault.", [.hostProfile], .currentRepository, .first, "Host & Memory Lead", ["Host & Memory Lead", "SDK Lead"], ["Risk Lead", "Product Lead"], "Chief Architect", "4 weeks", ["WP0"], ["WP1", "WP8"], ["Deletion verification"], ["M1", "M4"], ["HostConstitutionSpec shipped", "Rollback is executable", "Host preference cannot bypass risk gate"]),
             wp("WP6", "临场眼", "Build task/emotion/pressure/relation/manipulation sensing and ContextFrame.", [.context], .currentRepository, .first, "Loop Lead", ["Loop Lead"], ["Risk Lead", "Foundation Lead"], "Chief Architect", "3 weeks", ["WP0", "WP1"], ["WP7", "WP11"], ["Manipulation false positives"], ["M2"], ["ContextFrame schema stable", "Task and manipulation detectors benchmarked"]),
             wp("WP7", "镜刃层", "Build decompose, mirror, contradiction, and slot validation.", [.decompose], .currentRepository, .first, "Loop Lead", ["Loop Lead"], ["Host & Memory Lead", "Product Lead"], "Chief Architect", "4 weeks", ["WP6"], ["WP8", "WP9"], ["Unknown slots must remain honest"], ["M2"], ["DecomposeFrame stable", "Mirror output validated", "Contradiction checks regression-covered"]),
             wp("WP8", "海马井", "Implement hot/warm/cold memory stores, conflict engine, promotion, and audit replay.", [.memory], .currentRepository, .second, "Host & Memory Lead", ["Host & Memory Lead"], ["Loop Lead", "Risk Lead"], "Chief Architect", "5 weeks", ["WP5", "WP7"], ["WP3", "WP13"], ["Conflict promotion and replay"], ["M4"], ["MemoryBundle stable", "Conflict fingerprints enforced", "Cold writes always require review"]),
@@ -326,6 +331,69 @@ public enum BASProgramExecutionBlueprintBuilder {
             "External messaging must not claim human consciousness, therapy authority, or absolute judgment."
         ]
     )
+
+    public static let v13: BASProgramExecutionBlueprint = {
+        var blueprint = v12
+        blueprint.title = "宿基双生·14层电子脑全栈研发总纲 v1.3"
+        blueprint.summary = "Three execution tracks, nineteen work packages, explicit cross-layer schemas, and milestone-gated rollout for a mobile-first fourteen-layer electronic brain stack."
+        blueprint.layers = v12.layers.map { layer in
+            var updated = layer
+            switch layer.kind {
+            case .powerClock:
+                updated.summary = "Power-clock layer owns lifecycle, wake intent, recovery/quarantine, lease enforcement, and compute budget."
+                updated.guardedBy = ["ActionPermit", "RuntimeTrace", "SovereignExecutionReceipt"]
+            case .evolution:
+                updated.summary = "Evolution layer emits UpdateTicket, rule candidates, review payloads, and offline-learning exports."
+            default:
+                break
+            }
+            return updated
+        } + [
+            layer(
+                .sovereign,
+                "Sovereign layer owns actuation commands, execution receipts, kill-switch contraction, and rollback-safe command bridging.",
+                [
+                    "SovereignVerdict",
+                    "SovereignCommitToken",
+                    "SovereignLock",
+                    "QuarantineRecord",
+                    "SovereignAuditEntry",
+                    "SovereignActuationCommand",
+                    "SovereignExecutionReceipt",
+                    "RuntimePolicyLineage"
+                ],
+                ["ActionPermit", "ThoughtFold", "HostConstitution"]
+            )
+        ]
+        blueprint.workPackages = v12.workPackages.map { package in
+            var updated = package
+            switch package.id {
+            case "WP0":
+                updated.schedule.exitCriteria = updated.schedule.exitCriteria.map { criterion in
+                    criterion == "13-layer glossary approved" ? "14-layer glossary approved" : criterion
+                }
+            case "WP1":
+                updated.summary = "Ship the L1/L14 kernel spine: run-mode state machine, wake intent, lease enforcement, recovery/quarantine, sovereign actuation, and maintenance arbitration."
+                updated.ownedLayers = [.powerClock, .sovereign]
+            default:
+                break
+            }
+            return updated
+        }
+        blueprint.milestones = v12.milestones.map { milestone in
+            var updated = milestone
+            if milestone.id == "M0" {
+                updated.summary = "Freeze 14-layer responsibilities, schema governance, KPI set, and regression gates."
+                updated.exitCriteria = milestone.exitCriteria.map { criterion in
+                    criterion == "13-layer glossary approved" ? "14-layer glossary approved" : criterion
+                }
+            }
+            return updated
+        }
+        return blueprint
+    }()
+
+    public static let latest = v13
 
     private static func layer(
         _ kind: BASEBrainLayerKind,

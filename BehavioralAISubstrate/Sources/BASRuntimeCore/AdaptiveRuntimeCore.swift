@@ -463,6 +463,12 @@ public struct BASAdaptiveRuntimeSignals: Codable, Equatable, Sendable {
     public let lowTrustLoad: Bool
     public let retrievalInstability: Bool
     public let retrievalTags: [String]
+    public let externallyRefreshedCandidateCount: Int
+    public let quarantinedObservationCount: Int
+    public let evidenceCaveatedCandidateCount: Int
+    public let externalRefreshGuardTriggered: Bool
+    public let observationOnlyQuarantine: Bool
+    public let evidenceCaveatLoad: Bool
 
     public init(
         briefBias: Double,
@@ -476,7 +482,13 @@ public struct BASAdaptiveRuntimeSignals: Codable, Equatable, Sendable {
         screenedOutMemoryCount: Int,
         lowTrustLoad: Bool,
         retrievalInstability: Bool,
-        retrievalTags: [String]
+        retrievalTags: [String],
+        externallyRefreshedCandidateCount: Int = 0,
+        quarantinedObservationCount: Int = 0,
+        evidenceCaveatedCandidateCount: Int = 0,
+        externalRefreshGuardTriggered: Bool = false,
+        observationOnlyQuarantine: Bool = false,
+        evidenceCaveatLoad: Bool = false
     ) {
         self.briefBias = briefBias
         self.fatigueSignal = fatigueSignal
@@ -490,6 +502,12 @@ public struct BASAdaptiveRuntimeSignals: Codable, Equatable, Sendable {
         self.lowTrustLoad = lowTrustLoad
         self.retrievalInstability = retrievalInstability
         self.retrievalTags = retrievalTags
+        self.externallyRefreshedCandidateCount = externallyRefreshedCandidateCount
+        self.quarantinedObservationCount = quarantinedObservationCount
+        self.evidenceCaveatedCandidateCount = evidenceCaveatedCandidateCount
+        self.externalRefreshGuardTriggered = externalRefreshGuardTriggered
+        self.observationOnlyQuarantine = observationOnlyQuarantine
+        self.evidenceCaveatLoad = evidenceCaveatLoad
     }
 }
 
@@ -595,7 +613,8 @@ public extension BASAdaptiveTaskStrategy {
             (signals.staleFieldCount > 0) ||
             (signals.screenedOutMemoryCount >= 3) ||
             signals.lowTrustLoad ||
-            signals.retrievalInstability
+            signals.retrievalInstability ||
+            hasHorizonPressure(signals)
 
         if shouldGuardRetrieval {
             switch retrievalMode {
@@ -607,6 +626,14 @@ public extension BASAdaptiveTaskStrategy {
                 retrievalItemBudget = 0
             case .off, .filtered:
                 break
+            }
+        }
+
+        if hasHorizonPressure(signals), retrievalMode != .off {
+            retrievalMode = .filtered
+            retrievalItemBudget = min(retrievalItemBudget, kind == .reflective ? 2 : 1)
+            if !actionSpace.contains("cite_uncertainty") {
+                actionSpace.append("cite_uncertainty")
             }
         }
 
@@ -650,6 +677,20 @@ public extension BASAdaptiveTaskStrategy {
             return .english
         }
         return fallback
+    }
+
+    private func hasHorizonPressure(_ signals: BASAdaptiveRuntimeSignals) -> Bool {
+        let retrievalTagSet = Set(signals.retrievalTags)
+        return signals.externalRefreshGuardTriggered ||
+            signals.observationOnlyQuarantine ||
+            signals.evidenceCaveatLoad ||
+            signals.externallyRefreshedCandidateCount > 0 ||
+            signals.quarantinedObservationCount > 0 ||
+            signals.evidenceCaveatedCandidateCount > 0 ||
+            retrievalTagSet.contains("external_refresh") ||
+            retrievalTagSet.contains("tool_observation") ||
+            retrievalTagSet.contains("quarantined") ||
+            retrievalTagSet.contains("evidence_caveat")
     }
 }
 

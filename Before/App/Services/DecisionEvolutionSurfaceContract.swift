@@ -1010,21 +1010,24 @@ enum DecisionEvolutionCheckpointActionPresentationSupport {
         approvalState: DecisionEvolutionApprovalState?,
         hasLineage: Bool
     ) -> DecisionEvolutionCheckpointActionPresentation {
-        let allowsMutations = surfaceContract.allowsMutations
+        let actionAvailability = DecisionEvolutionPolicyEngine.checkpointActionAvailability(
+            allowsLocalMutationActions: surfaceContract.allowsMutations,
+            applyReady: applyReady,
+            approvalState: approvalState,
+            hasLineage: hasLineage
+        )
         return DecisionEvolutionCheckpointActionPresentation(
-            showsMutationActions: allowsMutations,
-            showsApplyAction: allowsMutations && applyReady,
-            secondaryActionKind: allowsMutations
-                ? (approvalState == .reviewSuggested ? .approve : .markForReview)
-                : nil,
-            showsClearLineageAction: allowsMutations && hasLineage,
-            footerPresentation: allowsMutations
+            showsMutationActions: actionAvailability.showsMutationActions,
+            showsApplyAction: actionAvailability.canApply,
+            secondaryActionKind: actionAvailability.secondaryActionKind,
+            showsClearLineageAction: actionAvailability.canClearLineage,
+            footerPresentation: actionAvailability.showsMutationActions
                 ? nil
                 : DecisionEvolutionOperatorFooterPresentationSupport.checkpointAction(
                     surfaceContract: surfaceContract,
                     navigationOptions: navigationOptions
                 ),
-            navigationPresentation: allowsMutations && navigationOptions.showsAnyShortcut
+            navigationPresentation: actionAvailability.showsMutationActions && navigationOptions.showsAnyShortcut
                 ? DecisionEvolutionNavigationRowPresentationSupport.checkpointMutationHub(
                     surfaceContract: surfaceContract,
                     navigationOptions: navigationOptions

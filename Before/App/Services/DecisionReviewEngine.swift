@@ -68,6 +68,8 @@ struct DecisionReviewRecentEntryPresentation: Equatable {
     let postponeTitle: String
 }
 
+typealias DecisionReviewReplayCardCopy = DecisionEvolutionReplayCardCopy
+
 struct DecisionReviewDetailRow: Identifiable, Equatable {
     let title: String
     let value: String
@@ -82,6 +84,32 @@ struct DecisionReviewDetailPresentation: Equatable {
     let reopenTitle: String
     let postponeTitle: String
     let rows: [DecisionReviewDetailRow]
+}
+
+extension DecisionReviewTimelineEntryPresentation {
+    func replayCardCopy(
+        replayPresentation: DecisionEvolutionReplayEntryPresentation?
+    ) -> DecisionReviewReplayCardCopy {
+        DecisionReviewEngine.replayCardCopy(
+            replayPresentation: replayPresentation,
+            legacyTitle: title,
+            legacySecondaryLine: secondaryLine,
+            legacySupplementaryLine: supplementaryLine
+        )
+    }
+}
+
+extension DecisionReviewRecentEntryPresentation {
+    func replayCardCopy(
+        replayPresentation: DecisionEvolutionReplayEntryPresentation?
+    ) -> DecisionReviewReplayCardCopy {
+        DecisionReviewEngine.replayCardCopy(
+            replayPresentation: replayPresentation,
+            legacyTitle: title,
+            legacySecondaryLine: secondaryLine,
+            legacySupplementaryLine: nil
+        )
+    }
 }
 
 enum ReviewProfileEntry: Identifiable {
@@ -310,6 +338,52 @@ enum DecisionReviewEngine {
         let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedValue.isEmpty else { return nil }
         return DecisionReviewDetailRow(title: title, value: trimmedValue)
+    }
+
+    fileprivate static func replayCardCopy(
+        replayPresentation: DecisionEvolutionReplayEntryPresentation?,
+        legacyTitle: String,
+        legacySecondaryLine: String?,
+        legacySupplementaryLine: String?
+    ) -> DecisionReviewReplayCardCopy {
+        let preferredCardCopy = replayPresentation?.overviewCardCopy.summaryCardCopy
+            ?? replayPresentation?.replayCardCopy
+        let titleLine = firstReplayCardLine(
+            preferredCardCopy?.titleLine,
+            legacyTitle
+        ) ?? legacyTitle
+        let secondaryLine = firstReplayCardLine(
+            preferredCardCopy?.secondaryLine,
+            legacySecondaryLine
+        )
+        let supplementaryLine = firstReplayCardLine(
+            preferredCardCopy?.supplementaryLine,
+            legacySupplementaryLine,
+            excluding: secondaryLine
+        )
+
+        return DecisionReviewReplayCardCopy(
+            titleLine: titleLine,
+            secondaryLine: secondaryLine,
+            supplementaryLine: supplementaryLine
+        )
+    }
+
+    private static func firstReplayCardLine(
+        _ candidates: String?...,
+        excluding excludedValue: String? = nil
+    ) -> String? {
+        let excludedValue = excludedValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+        for candidate in candidates {
+            let trimmedCandidate = candidate?.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let trimmedCandidate,
+                  !trimmedCandidate.isEmpty,
+                  trimmedCandidate != excludedValue else {
+                continue
+            }
+            return trimmedCandidate
+        }
+        return nil
     }
 
     static func summaries(

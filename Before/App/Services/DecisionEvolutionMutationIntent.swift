@@ -514,17 +514,59 @@ extension DecisionEvolutionControlSurface {
     }
 }
 
+struct DecisionEvolutionWorkspaceMutationActionBundle: Equatable, Sendable {
+    let restoreActiveIntent: DecisionEvolutionMutationIntent?
+    let rollbackActiveIntent: DecisionEvolutionMutationIntent?
+    let approveQueueIntent: DecisionEvolutionMutationIntent?
+    let clearReviewLineageIntent: DecisionEvolutionMutationIntent?
+
+    var mutationIntents: [DecisionEvolutionMutationIntent] {
+        [
+            restoreActiveIntent,
+            rollbackActiveIntent,
+            approveQueueIntent,
+            clearReviewLineageIntent
+        ].compactMap { $0 }
+    }
+
+    static func build(
+        controlSurface: DecisionEvolutionControlSurface
+    ) -> DecisionEvolutionWorkspaceMutationActionBundle {
+        DecisionEvolutionWorkspaceMutationActionBundle(
+            restoreActiveIntent: DecisionEvolutionMutationIntentFactory.restoreActiveCheckpoint(
+                controlSurface: controlSurface
+            ),
+            rollbackActiveIntent: DecisionEvolutionMutationIntentFactory.rollbackActiveCheckpoint(
+                controlSurface: controlSurface
+            ),
+            approveQueueIntent: DecisionEvolutionMutationIntentFactory.approvePendingCheckpoints(
+                controlSurface: controlSurface
+            ),
+            clearReviewLineageIntent: DecisionEvolutionMutationIntentFactory.clearPendingReviewLineage(
+                controlSurface: controlSurface
+            )
+        )
+    }
+
+    func mutationIntent(
+        for route: DecisionEvolutionPolicySurfaceActionRoute
+    ) -> DecisionEvolutionMutationIntent? {
+        switch route {
+        case .approvePendingQueue:
+            approveQueueIntent
+        case .navigate:
+            nil
+        }
+    }
+}
+
 enum DecisionEvolutionMutationIntentFactory {
     static func pilotMutationIntents(
         controlSurface: DecisionEvolutionControlSurface
     ) -> [DecisionEvolutionMutationIntent] {
-        [
-            restoreActiveCheckpoint(controlSurface: controlSurface),
-            rollbackActiveCheckpoint(controlSurface: controlSurface),
-            approvePendingCheckpoints(controlSurface: controlSurface),
-            clearPendingReviewLineage(controlSurface: controlSurface)
-        ]
-        .compactMap { $0 }
+        DecisionEvolutionWorkspaceMutationActionBundle.build(
+            controlSurface: controlSurface
+        ).mutationIntents
     }
 
     static func applyCheckpoint(
@@ -536,34 +578,36 @@ enum DecisionEvolutionMutationIntentFactory {
             checkpointID: checkpointID,
             controlSurface: controlSurface,
             override: override
-        ), presentation.applyReady else {
+        ) else {
+            return nil
+        }
+        let checkpointActionAvailability = checkpointActionAvailability(for: presentation)
+        guard checkpointActionAvailability.canApply else {
             return nil
         }
         let copy = DecisionEvolutionMutationIntentCopySupport.applyCheckpoint(
             checkpointID: checkpointID
         )
 
-        let currentActiveID = controlSurface.activePresentation?.checkpointID
-        let currentReviewID = controlSurface.reviewPresentation?.checkpointID
-        let projectedReviewID = currentReviewID == checkpointID ? checkpointID : currentReviewID
-        let projectedActiveID = projectedRestoredActiveCheckpointID(
+        let previewState = DecisionEvolutionPolicyEngine.applyCheckpointPreviewState(
             targetCheckpointID: checkpointID,
             targetPresentation: presentation,
-            currentActiveCheckpointID: currentActiveID
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID
         )
         var changes = [
-            projectedActiveID == checkpointID
+            previewState.projectedActiveCheckpointID == checkpointID
                 ? DecisionEvolutionMutationPhraseSupport.activeCheckpointTransitionLine(
-                    currentCheckpointID: currentActiveID,
+                    currentCheckpointID: previewState.currentActiveCheckpointID,
                     projectedCheckpointID: checkpointID
                 )
                 : DecisionEvolutionMutationPhraseSupport.restoredBrainStateLine(
                     checkpointID: checkpointID,
-                    projectedActiveID: projectedActiveID
+                    projectedActiveID: previewState.projectedActiveCheckpointID
                 )
         ]
 
-        if let currentReviewID {
+        if let currentReviewID = previewState.currentReviewCheckpointID {
             if currentReviewID == checkpointID {
                 changes.append(
                     DecisionEvolutionMutationPhraseSupport.reviewHeadAlignedLine(
@@ -591,10 +635,10 @@ enum DecisionEvolutionMutationIntentFactory {
                 headline: copy.headline,
                 summary: copy.summary,
                 targetCheckpointIDs: [checkpointID],
-                currentActiveCheckpointID: currentActiveID,
-                projectedActiveCheckpointID: projectedActiveID,
-                currentReviewCheckpointID: currentReviewID,
-                projectedReviewCheckpointID: projectedReviewID,
+                currentActiveCheckpointID: previewState.currentActiveCheckpointID,
+                projectedActiveCheckpointID: previewState.projectedActiveCheckpointID,
+                currentReviewCheckpointID: previewState.currentReviewCheckpointID,
+                projectedReviewCheckpointID: previewState.projectedReviewCheckpointID,
                 changeHighlights: changes,
                 retainedHighlights: retainedHighlights(for: presentation)
                     + ["Checkpoint approval stays \(presentation.approvalStateTitle.lowercased())."],
@@ -612,7 +656,11 @@ enum DecisionEvolutionMutationIntentFactory {
             checkpointID: checkpointID,
             controlSurface: controlSurface,
             override: override
-        ), presentation.approvalState == .reviewSuggested else {
+        ) else {
+            return nil
+        }
+        let checkpointActionAvailability = checkpointActionAvailability(for: presentation)
+        guard checkpointActionAvailability.secondaryActionKind == .approve else {
             return nil
         }
         let copy = DecisionEvolutionMutationIntentCopySupport.approveCheckpoint(
@@ -621,23 +669,24 @@ enum DecisionEvolutionMutationIntentFactory {
 
         let remainingReviewQueue = controlSurface.pendingReviewPresentations
             .filter { $0.checkpointID != checkpointID }
-        let projectedReviewID = remainingReviewQueue.first?.checkpointID
-        let projectedActiveID = projectedActiveCheckpointIDAfterApproval(
+        let previewState = DecisionEvolutionPolicyEngine.approveCheckpointPreviewState(
             targetPresentation: presentation,
-            currentActivePresentation: controlSurface.activePresentation
+            currentActivePresentation: controlSurface.activePresentation,
+            currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
+            remainingReviewQueue: remainingReviewQueue
         )
         var changes = [
             DecisionEvolutionMutationPhraseSupport.approvalMovesToAutomaticLine
         ]
 
-        if projectedActiveID == checkpointID,
+        if previewState.projectedActiveCheckpointID == checkpointID,
            controlSurface.activePresentation?.checkpointID != checkpointID {
             changes.append(
                 DecisionEvolutionMutationPhraseSupport.automaticActiveSlotMovesToLine(
                     projectedActiveID: checkpointID
                 )
             )
-        } else if let projectedActiveID {
+        } else if let projectedActiveID = previewState.projectedActiveCheckpointID {
             changes.append(
                 DecisionEvolutionMutationPhraseSupport.automaticActiveSlotRemainsLine(
                     projectedActiveID: projectedActiveID
@@ -646,7 +695,7 @@ enum DecisionEvolutionMutationIntentFactory {
         }
 
         if controlSurface.reviewPresentation?.checkpointID == checkpointID {
-            if let projectedReviewID {
+            if let projectedReviewID = previewState.projectedReviewCheckpointID {
                 changes.append(
                     DecisionEvolutionMutationPhraseSupport.reviewHeadShiftLine(
                         checkpointID: projectedReviewID
@@ -671,10 +720,10 @@ enum DecisionEvolutionMutationIntentFactory {
                 headline: copy.headline,
                 summary: copy.summary,
                 targetCheckpointIDs: [checkpointID],
-                currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
-                projectedActiveCheckpointID: projectedActiveID,
-                currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
-                projectedReviewCheckpointID: projectedReviewID,
+                currentActiveCheckpointID: previewState.currentActiveCheckpointID,
+                projectedActiveCheckpointID: previewState.projectedActiveCheckpointID,
+                currentReviewCheckpointID: previewState.currentReviewCheckpointID,
+                projectedReviewCheckpointID: previewState.projectedReviewCheckpointID,
                 changeHighlights: changes,
                 retainedHighlights: retainedHighlights(for: presentation),
                 warningHighlights: approvalWarnings(for: presentation)
@@ -691,43 +740,42 @@ enum DecisionEvolutionMutationIntentFactory {
             checkpointID: checkpointID,
             controlSurface: controlSurface,
             override: override
-        ), presentation.approvalState != .reviewSuggested else {
+        ) else {
+            return nil
+        }
+        let checkpointActionAvailability = checkpointActionAvailability(for: presentation)
+        guard checkpointActionAvailability.secondaryActionKind == .markForReview else {
             return nil
         }
         let copy = DecisionEvolutionMutationIntentCopySupport.markCheckpointForReview(
             checkpointID: checkpointID
         )
 
-        let currentReview = controlSurface.reviewPresentation
-        let currentActiveID = controlSurface.activePresentation?.checkpointID
-        let projectedReviewID = projectedReviewCheckpointIDAfterMarkReview(
+        let previewState = DecisionEvolutionPolicyEngine.markCheckpointForReviewPreviewState(
             targetPresentation: presentation,
-            currentReviewPresentation: currentReview
-        )
-        let projectedActiveID = projectedActiveCheckpointIDAfterMarkReview(
-            targetCheckpointID: checkpointID,
-            currentActiveCheckpointID: currentActiveID
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewPresentation: controlSurface.reviewPresentation
         )
 
         var changes = [DecisionEvolutionMutationPhraseSupport.checkpointWillEnterReviewQueueLine(
             checkpointID: checkpointID
         )]
-        if currentActiveID == checkpointID {
+        if previewState.currentActiveCheckpointID == checkpointID {
             changes.append("Automatic active slot will hand off to the next available automatic checkpoint, if one exists.")
-        } else if let projectedActiveID {
+        } else if let projectedActiveID = previewState.projectedActiveCheckpointID {
             changes.append(
                 DecisionEvolutionMutationPhraseSupport.automaticActiveSlotRemainsLine(
                     projectedActiveID: projectedActiveID
                 )
             )
         }
-        if projectedReviewID == checkpointID {
+        if previewState.projectedReviewCheckpointID == checkpointID {
             changes.append(
                 DecisionEvolutionMutationPhraseSupport.reviewHeadShiftLine(
                     checkpointID: checkpointID
                 )
             )
-        } else if let projectedReviewID {
+        } else if let projectedReviewID = previewState.projectedReviewCheckpointID {
             changes.append(
                 DecisionEvolutionMutationPhraseSupport.currentReviewHeadRemainsLine(
                     checkpointID: projectedReviewID
@@ -747,10 +795,10 @@ enum DecisionEvolutionMutationIntentFactory {
                 headline: copy.headline,
                 summary: copy.summary,
                 targetCheckpointIDs: [checkpointID],
-                currentActiveCheckpointID: currentActiveID,
-                projectedActiveCheckpointID: projectedActiveID,
-                currentReviewCheckpointID: currentReview?.checkpointID,
-                projectedReviewCheckpointID: projectedReviewID,
+                currentActiveCheckpointID: previewState.currentActiveCheckpointID,
+                projectedActiveCheckpointID: previewState.projectedActiveCheckpointID,
+                currentReviewCheckpointID: previewState.currentReviewCheckpointID,
+                projectedReviewCheckpointID: previewState.projectedReviewCheckpointID,
                 changeHighlights: changes,
                 retainedHighlights: retainedHighlights(for: presentation),
                 warningHighlights: ["This action changes review state only; it does not restore the checkpoint."]
@@ -767,11 +815,19 @@ enum DecisionEvolutionMutationIntentFactory {
             checkpointID: checkpointID,
             controlSurface: controlSurface,
             override: override
-        ), presentation.hasLineage else {
+        ) else {
+            return nil
+        }
+        let checkpointActionAvailability = checkpointActionAvailability(for: presentation)
+        guard checkpointActionAvailability.canClearLineage else {
             return nil
         }
         let copy = DecisionEvolutionMutationIntentCopySupport.clearCheckpointLineage(
             checkpointID: checkpointID
+        )
+        let previewState = DecisionEvolutionPolicyEngine.stablePreviewState(
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID
         )
 
         return DecisionEvolutionMutationIntent(
@@ -786,10 +842,10 @@ enum DecisionEvolutionMutationIntentFactory {
                 headline: copy.headline,
                 summary: copy.summary,
                 targetCheckpointIDs: [checkpointID],
-                currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
-                projectedActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
-                currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
-                projectedReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
+                currentActiveCheckpointID: previewState.currentActiveCheckpointID,
+                projectedActiveCheckpointID: previewState.projectedActiveCheckpointID,
+                currentReviewCheckpointID: previewState.currentReviewCheckpointID,
+                projectedReviewCheckpointID: previewState.projectedReviewCheckpointID,
                 changeHighlights: [
                     "Recovered lineage facts will be removed from checkpoint \(checkpointID).",
                     "Checkpoint record and approval state remain in place."
@@ -854,24 +910,25 @@ enum DecisionEvolutionMutationIntentFactory {
         )
 
         let targetPresentation = controlSurface.presentation(for: rollbackID)
-        let projectedActiveID = projectedRestoredActiveCheckpointID(
-            targetCheckpointID: rollbackID,
+        let previewState = DecisionEvolutionPolicyEngine.rollbackCheckpointPreviewState(
+            rollbackCheckpointID: rollbackID,
             targetPresentation: targetPresentation,
-            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID
         )
         var changes = [
-            projectedActiveID == rollbackID
+            previewState.projectedActiveCheckpointID == rollbackID
                 ? DecisionEvolutionMutationPhraseSupport.activeCheckpointTransitionLine(
-                    currentCheckpointID: controlSurface.activePresentation?.checkpointID,
+                    currentCheckpointID: previewState.currentActiveCheckpointID,
                     projectedCheckpointID: rollbackID
                 )
                 : DecisionEvolutionMutationPhraseSupport.restoredBrainStateLine(
                     checkpointID: rollbackID,
-                    projectedActiveID: projectedActiveID
+                    projectedActiveID: previewState.projectedActiveCheckpointID
                 )
         ]
 
-        if let reviewID = controlSurface.reviewPresentation?.checkpointID {
+        if let reviewID = previewState.currentReviewCheckpointID {
             changes.append(
                 DecisionEvolutionMutationPhraseSupport.reviewHeadRemainsLine(
                     checkpointID: reviewID
@@ -901,10 +958,10 @@ enum DecisionEvolutionMutationIntentFactory {
                 headline: copy.headline,
                 summary: copy.summary,
                 targetCheckpointIDs: [rollbackID],
-                currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
-                projectedActiveCheckpointID: projectedActiveID,
-                currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
-                projectedReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
+                currentActiveCheckpointID: previewState.currentActiveCheckpointID,
+                projectedActiveCheckpointID: previewState.projectedActiveCheckpointID,
+                currentReviewCheckpointID: previewState.currentReviewCheckpointID,
+                projectedReviewCheckpointID: previewState.projectedReviewCheckpointID,
                 changeHighlights: changes,
                 retainedHighlights: retained,
                 warningHighlights: warnings
@@ -919,14 +976,12 @@ enum DecisionEvolutionMutationIntentFactory {
         guard !targets.isEmpty else { return nil }
 
         let lineageBackedCount = controlSurface.pendingReviewLineagePresentations.count
-        let currentActiveCheckpointID = controlSurface.activePresentation?.checkpointID
-        let projectedActiveCheckpointID: String?
-        switch controlSurface.activeCheckpointSource {
-        case .pinnedHint:
-            projectedActiveCheckpointID = currentActiveCheckpointID
-        case .automaticFallback, .none:
-            projectedActiveCheckpointID = controlSurface.projectedAutomaticCheckpointIDAfterApprovingPendingQueue
-        }
+        let previewState = DecisionEvolutionPolicyEngine.approvePendingQueuePreviewState(
+            activeCheckpointSource: controlSurface.activeCheckpointSource,
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
+            projectedAutomaticCheckpointID: controlSurface.projectedAutomaticCheckpointIDAfterApprovingPendingQueue
+        )
 
         var changeHighlights = [
             DecisionEvolutionMutationPhraseSupport.pendingCheckpointsMoveToAutomaticLine(
@@ -936,17 +991,17 @@ enum DecisionEvolutionMutationIntentFactory {
         ]
         var retained: [String] = []
 
-        if projectedActiveCheckpointID == currentActiveCheckpointID {
+        if previewState.projectedActiveCheckpointID == previewState.currentActiveCheckpointID {
             retained.append(
                 DecisionEvolutionMutationPhraseSupport.activeCheckpointRemainsLine(
-                    checkpointID: currentActiveCheckpointID
+                    checkpointID: previewState.currentActiveCheckpointID
                 )
             )
         } else {
             changeHighlights.append(
                 DecisionEvolutionMutationPhraseSupport.automaticActiveSlotTransitionLine(
-                    currentCheckpointID: currentActiveCheckpointID,
-                    projectedCheckpointID: projectedActiveCheckpointID
+                    currentCheckpointID: previewState.currentActiveCheckpointID,
+                    projectedCheckpointID: previewState.projectedActiveCheckpointID
                 )
             )
         }
@@ -958,7 +1013,7 @@ enum DecisionEvolutionMutationIntentFactory {
         }
         let copy = DecisionEvolutionMutationIntentCopySupport.approvePendingCheckpoints(
             count: targets.count,
-            keepsActiveBrainStateStable: projectedActiveCheckpointID == currentActiveCheckpointID
+            keepsActiveBrainStateStable: previewState.projectedActiveCheckpointID == previewState.currentActiveCheckpointID
         )
 
         return DecisionEvolutionMutationIntent(
@@ -973,10 +1028,10 @@ enum DecisionEvolutionMutationIntentFactory {
                 headline: copy.headline,
                 summary: copy.summary,
                 targetCheckpointIDs: targets,
-                currentActiveCheckpointID: currentActiveCheckpointID,
-                projectedActiveCheckpointID: projectedActiveCheckpointID,
-                currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
-                projectedReviewCheckpointID: nil,
+                currentActiveCheckpointID: previewState.currentActiveCheckpointID,
+                projectedActiveCheckpointID: previewState.projectedActiveCheckpointID,
+                currentReviewCheckpointID: previewState.currentReviewCheckpointID,
+                projectedReviewCheckpointID: previewState.projectedReviewCheckpointID,
                 changeHighlights: changeHighlights,
                 retainedHighlights: retained,
                 warningHighlights: ["Approval does not clear kill-switch recommendations or lineage facts."]
@@ -1012,6 +1067,10 @@ enum DecisionEvolutionMutationIntentFactory {
         let copy = DecisionEvolutionMutationIntentCopySupport.clearPendingReviewLineage(
             count: targets.count
         )
+        let previewState = DecisionEvolutionPolicyEngine.stablePreviewState(
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID
+        )
 
         return DecisionEvolutionMutationIntent(
             kind: .clearPendingReviewLineage,
@@ -1025,10 +1084,10 @@ enum DecisionEvolutionMutationIntentFactory {
                 headline: copy.headline,
                 summary: copy.summary,
                 targetCheckpointIDs: targets.map(\.checkpointID),
-                currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
-                projectedActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
-                currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
-                projectedReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
+                currentActiveCheckpointID: previewState.currentActiveCheckpointID,
+                projectedActiveCheckpointID: previewState.projectedActiveCheckpointID,
+                currentReviewCheckpointID: previewState.currentReviewCheckpointID,
+                projectedReviewCheckpointID: previewState.projectedReviewCheckpointID,
                 changeHighlights: [
                     "\(targets.count) review checkpoint(s) will lose persisted lineage details.",
                     "Review queue membership remains unchanged."
@@ -1048,19 +1107,29 @@ enum DecisionEvolutionMutationIntentFactory {
         presentations: [DecisionEvolutionCheckpointPresentation],
         controlSurface: DecisionEvolutionControlSurface
     ) -> DecisionEvolutionMutationIntent? {
-        let selectedReviewPresentations = presentations.filter {
-            $0.approvalState == .reviewSuggested
-        }
+        let selectionEligibility = DecisionEvolutionPolicyEngine.checkpointSetEligibility(
+            allowsLocalMutationActions: true,
+            presentations: presentations
+        )
+        guard selectionEligibility.canApproveCheckpoints else { return nil }
+        let selectedReviewPresentations = filteredPresentations(
+            presentations,
+            matching: selectionEligibility.reviewCheckpointIDs
+        )
         let targets = orderedUniqueCheckpointIDs(
             selectedReviewPresentations.map(\.checkpointID)
         )
-        guard !targets.isEmpty else { return nil }
 
         let targetSet = Set(targets)
         let remainingQueue = controlSurface.pendingReviewPresentations.filter {
             !targetSet.contains($0.checkpointID)
         }
         let lineageBackedCount = selectedReviewPresentations.filter(\.hasLineage).count
+        let previewState = DecisionEvolutionPolicyEngine.approveSelectedCheckpointsPreviewState(
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
+            remainingReviewQueue: remainingQueue
+        )
 
         var retained = [
             DecisionEvolutionMutationPhraseSupport.activeCheckpointRemainsLine(
@@ -1088,10 +1157,10 @@ enum DecisionEvolutionMutationIntentFactory {
                 headline: copy.headline,
                 summary: copy.summary,
                 targetCheckpointIDs: targets,
-                currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
-                projectedActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
-                currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
-                projectedReviewCheckpointID: remainingQueue.first?.checkpointID,
+                currentActiveCheckpointID: previewState.currentActiveCheckpointID,
+                projectedActiveCheckpointID: previewState.projectedActiveCheckpointID,
+                currentReviewCheckpointID: previewState.currentReviewCheckpointID,
+                projectedReviewCheckpointID: previewState.projectedReviewCheckpointID,
                 changeHighlights: [
                     DecisionEvolutionMutationPhraseSupport.selectedCheckpointsMoveToAutomaticLine(
                         count: targets.count
@@ -1112,18 +1181,25 @@ enum DecisionEvolutionMutationIntentFactory {
         presentations: [DecisionEvolutionCheckpointPresentation],
         controlSurface: DecisionEvolutionControlSurface
     ) -> DecisionEvolutionMutationIntent? {
+        let selectionEligibility = DecisionEvolutionPolicyEngine.checkpointSetEligibility(
+            allowsLocalMutationActions: true,
+            presentations: presentations
+        )
+        guard selectionEligibility.canMarkCheckpointsForReview else { return nil }
         let targets = orderedUniquePresentations(
-            presentations.filter { $0.approvalState == .automatic }
+            filteredPresentations(
+                presentations,
+                matching: selectionEligibility.automaticCheckpointIDs
+            )
         )
         guard !targets.isEmpty else { return nil }
 
         let targetIDs = targets.map(\.checkpointID)
-        let targetIDSet = Set(targetIDs)
-        let projectedReviewID = preferredCheckpointID(
-            from: (controlSurface.reviewPresentation.map { [$0] } ?? []) + targets
+        let previewState = DecisionEvolutionPolicyEngine.markSelectedCheckpointsForReviewPreviewState(
+            targetPresentations: targets,
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewPresentation: controlSurface.reviewPresentation
         )
-        let currentActiveID = controlSurface.activePresentation?.checkpointID
-        let projectedActiveID = currentActiveID.flatMap { targetIDSet.contains($0) ? nil : $0 }
         let copy = DecisionEvolutionMutationIntentCopySupport.markSelectedCheckpointsForReview(
             count: targetIDs.count
         )
@@ -1140,18 +1216,18 @@ enum DecisionEvolutionMutationIntentFactory {
                 headline: copy.headline,
                 summary: copy.summary,
                 targetCheckpointIDs: targetIDs,
-                currentActiveCheckpointID: currentActiveID,
-                projectedActiveCheckpointID: projectedActiveID,
-                currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
-                projectedReviewCheckpointID: projectedReviewID,
+                currentActiveCheckpointID: previewState.currentActiveCheckpointID,
+                projectedActiveCheckpointID: previewState.projectedActiveCheckpointID,
+                currentReviewCheckpointID: previewState.currentReviewCheckpointID,
+                projectedReviewCheckpointID: previewState.projectedReviewCheckpointID,
                 changeHighlights: [
                     DecisionEvolutionMutationPhraseSupport.selectedCheckpointsEnterReviewQueueLine(
                         count: targetIDs.count
                     ),
-                    projectedActiveID == nil
+                    previewState.projectedActiveCheckpointID == nil
                         ? "The automatic active slot will no longer point at the selected active checkpoint."
                         : DecisionEvolutionMutationPhraseSupport.automaticActiveSlotRemainsLine(
-                            projectedActiveID: checkpointToken(projectedActiveID)
+                            projectedActiveID: checkpointToken(previewState.projectedActiveCheckpointID)
                         )
                 ],
                 retainedHighlights: [
@@ -1166,8 +1242,17 @@ enum DecisionEvolutionMutationIntentFactory {
         presentations: [DecisionEvolutionCheckpointPresentation],
         controlSurface: DecisionEvolutionControlSurface
     ) -> DecisionEvolutionMutationIntent? {
-        let targets = orderedUniquePresentations(presentations.filter(\.hasLineage))
-        guard !targets.isEmpty else { return nil }
+        let selectionEligibility = DecisionEvolutionPolicyEngine.checkpointSetEligibility(
+            allowsLocalMutationActions: true,
+            presentations: presentations
+        )
+        guard selectionEligibility.canClearCheckpointLineage else { return nil }
+        let targets = orderedUniquePresentations(
+            filteredPresentations(
+                presentations,
+                matching: selectionEligibility.lineageCheckpointIDs
+            )
+        )
 
         let ticketCount = targets.reduce(0) { $0 + $1.updateTicketSummaries.count }
         let auditCount = targets.reduce(0) { $0 + $1.auditFindings.count }
@@ -1190,6 +1275,10 @@ enum DecisionEvolutionMutationIntentFactory {
         let copy = DecisionEvolutionMutationIntentCopySupport.clearSelectedCheckpointLineages(
             count: targets.count
         )
+        let previewState = DecisionEvolutionPolicyEngine.stablePreviewState(
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID
+        )
 
         return DecisionEvolutionMutationIntent(
             kind: .clearSelectedCheckpointLineages,
@@ -1203,10 +1292,10 @@ enum DecisionEvolutionMutationIntentFactory {
                 headline: copy.headline,
                 summary: copy.summary,
                 targetCheckpointIDs: targets.map(\.checkpointID),
-                currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
-                projectedActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
-                currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
-                projectedReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
+                currentActiveCheckpointID: previewState.currentActiveCheckpointID,
+                projectedActiveCheckpointID: previewState.projectedActiveCheckpointID,
+                currentReviewCheckpointID: previewState.currentReviewCheckpointID,
+                projectedReviewCheckpointID: previewState.projectedReviewCheckpointID,
                 changeHighlights: [
                     "\(targets.count) selected checkpoint(s) will lose persisted lineage details.",
                     "Approval state and queue membership remain unchanged."
@@ -1232,6 +1321,28 @@ enum DecisionEvolutionMutationIntentFactory {
         }
 
         return controlSurface.presentation(for: checkpointID)
+    }
+
+    private static func checkpointActionAvailability(
+        for presentation: DecisionEvolutionCheckpointPresentation
+    ) -> DecisionEvolutionPolicyCheckpointActionAvailability {
+        DecisionEvolutionPolicyEngine.checkpointActionAvailability(
+            allowsLocalMutationActions: true,
+            applyReady: presentation.applyReady,
+            approvalState: presentation.approvalState,
+            hasLineage: presentation.hasLineage
+        )
+    }
+
+    private static func filteredPresentations(
+        _ presentations: [DecisionEvolutionCheckpointPresentation],
+        matching checkpointIDs: [String]
+    ) -> [DecisionEvolutionCheckpointPresentation] {
+        guard !checkpointIDs.isEmpty else { return [] }
+        let checkpointIDSet = Set(checkpointIDs)
+        return orderedUniquePresentations(
+            presentations.filter { checkpointIDSet.contains($0.checkpointID) }
+        )
     }
 
     private static func retainedHighlights(
@@ -1315,79 +1426,4 @@ enum DecisionEvolutionMutationIntentFactory {
         }
     }
 
-    private static func preferredCheckpointID(
-        from presentations: [DecisionEvolutionCheckpointPresentation]
-    ) -> String? {
-        orderedUniquePresentations(presentations).max { lhs, rhs in
-            if lhs.createdAt != rhs.createdAt {
-                return lhs.createdAt < rhs.createdAt
-            }
-            return lhs.checkpointID < rhs.checkpointID
-        }?.checkpointID
-    }
-
-    private static func projectedRestoredActiveCheckpointID(
-        targetCheckpointID: String,
-        targetPresentation: DecisionEvolutionCheckpointPresentation?,
-        currentActiveCheckpointID: String?
-    ) -> String? {
-        guard let targetPresentation else {
-            return targetCheckpointID
-        }
-
-        if targetPresentation.approvalState == .automatic {
-            return targetCheckpointID
-        }
-
-        return currentActiveCheckpointID
-    }
-
-    private static func projectedActiveCheckpointIDAfterApproval(
-        targetPresentation: DecisionEvolutionCheckpointPresentation,
-        currentActivePresentation: DecisionEvolutionCheckpointPresentation?
-    ) -> String? {
-        guard let currentActivePresentation else {
-            return targetPresentation.checkpointID
-        }
-
-        if targetPresentation.createdAt != currentActivePresentation.createdAt {
-            return targetPresentation.createdAt > currentActivePresentation.createdAt
-                ? targetPresentation.checkpointID
-                : currentActivePresentation.checkpointID
-        }
-
-        return targetPresentation.checkpointID > currentActivePresentation.checkpointID
-            ? targetPresentation.checkpointID
-            : currentActivePresentation.checkpointID
-    }
-
-    private static func projectedActiveCheckpointIDAfterMarkReview(
-        targetCheckpointID: String,
-        currentActiveCheckpointID: String?
-    ) -> String? {
-        guard currentActiveCheckpointID == targetCheckpointID else {
-            return currentActiveCheckpointID
-        }
-
-        return nil
-    }
-
-    private static func projectedReviewCheckpointIDAfterMarkReview(
-        targetPresentation: DecisionEvolutionCheckpointPresentation,
-        currentReviewPresentation: DecisionEvolutionCheckpointPresentation?
-    ) -> String? {
-        guard let currentReviewPresentation else {
-            return targetPresentation.checkpointID
-        }
-
-        if targetPresentation.createdAt != currentReviewPresentation.createdAt {
-            return targetPresentation.createdAt > currentReviewPresentation.createdAt
-                ? targetPresentation.checkpointID
-                : currentReviewPresentation.checkpointID
-        }
-
-        return targetPresentation.checkpointID > currentReviewPresentation.checkpointID
-            ? targetPresentation.checkpointID
-            : currentReviewPresentation.checkpointID
-    }
 }

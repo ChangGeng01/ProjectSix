@@ -119,16 +119,7 @@ struct DecisionEvolutionPilotControlSnapshot: Equatable, Sendable {
         surfaceContract: DecisionEvolutionSurfaceContract,
         navigationOptions: DecisionEvolutionNavigationSurfaceOptions
     ) -> DecisionEvolutionPilotControlSnapshot {
-        let restoreActiveIntent = DecisionEvolutionMutationIntentFactory.restoreActiveCheckpoint(
-            controlSurface: controlSurface
-        )
-        let rollbackActiveIntent = DecisionEvolutionMutationIntentFactory.rollbackActiveCheckpoint(
-            controlSurface: controlSurface
-        )
-        let approveQueueIntent = DecisionEvolutionMutationIntentFactory.approvePendingCheckpoints(
-            controlSurface: controlSurface
-        )
-        let clearReviewLineageIntent = DecisionEvolutionMutationIntentFactory.clearPendingReviewLineage(
+        let actionBundle = DecisionEvolutionWorkspaceMutationActionBundle.build(
             controlSurface: controlSurface
         )
         let allowsLocalMutationActions = surfaceContract.allowsMutations
@@ -143,10 +134,25 @@ struct DecisionEvolutionPilotControlSnapshot: Equatable, Sendable {
         let resolvedCanRollbackActiveCheckpoint = releaseSummary?.canRollbackActiveCheckpoint
             ?? controlSurface.canRollbackActiveCheckpoint
         let pendingReviewLineageCount = controlSurface.pendingReviewLineagePresentations.count
+        let policy = DecisionEvolutionPolicyEngine.evaluate(
+            DecisionEvolutionPolicyEngine.input(
+                controlSurface: controlSurface,
+                releaseSummary: releaseSummary,
+                activeKillSwitches: resolvedActiveKillSwitches,
+                recommendedKillSwitches: resolvedRecommendedKillSwitches,
+                canRestoreActiveCheckpoint: resolvedCanRestoreActiveCheckpoint,
+                canRollbackActiveCheckpoint: resolvedCanRollbackActiveCheckpoint,
+                allowsLocalMutationActions: allowsLocalMutationActions
+            )
+        )
+        let actionPlan = policy.surfaceActionPlan(
+            navigationOptions: navigationOptions,
+            routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter
+        )
 
         return DecisionEvolutionPilotControlSnapshot(
             interactionMode: surfaceContract.interactionMode,
-            allowsLocalMutationActions: allowsLocalMutationActions,
+            allowsLocalMutationActions: actionPlan.allowsLocalMutationActions,
             pendingReviewCount: resolvedPendingReviewCount,
             rollbackReadyCount: resolvedRollbackReadyCount,
             pendingReviewLineageCount: pendingReviewLineageCount,
@@ -166,7 +172,7 @@ struct DecisionEvolutionPilotControlSnapshot: Equatable, Sendable {
             clearQueueLineageTitle: DecisionEvolutionPilotControlPresentationSupport.clearQueueLineageTitle,
             embeddedReleaseSummaryMode: releaseSummary.map { _ in
                 DecisionEvolutionPilotControlPresentationSupport.embeddedReleaseSummaryMode(
-                    allowsLocalMutationActions: allowsLocalMutationActions
+                    allowsLocalMutationActions: actionPlan.allowsLocalMutationActions
                 )
             },
             pendingReviewLineageNotice: DecisionEvolutionPilotControlPresentationSupport.pendingReviewLineageNotice(
@@ -179,113 +185,42 @@ struct DecisionEvolutionPilotControlSnapshot: Equatable, Sendable {
             recommendedKillSwitchesLine: DecisionEvolutionPilotControlPresentationSupport.recommendedKillSwitchesLine(
                 killSwitches: resolvedRecommendedKillSwitches
             ),
-            mutationIntents: [
-                restoreActiveIntent,
-                rollbackActiveIntent,
-                approveQueueIntent,
-                clearReviewLineageIntent
-            ].compactMap { $0 },
-            restoreActiveIntent: restoreActiveIntent,
-            rollbackActiveIntent: rollbackActiveIntent,
-            approveQueueIntent: approveQueueIntent,
-            clearReviewLineageIntent: clearReviewLineageIntent,
+            mutationIntents: actionBundle.mutationIntents,
+            restoreActiveIntent: actionBundle.restoreActiveIntent,
+            rollbackActiveIntent: actionBundle.rollbackActiveIntent,
+            approveQueueIntent: actionBundle.approveQueueIntent,
+            clearReviewLineageIntent: actionBundle.clearReviewLineageIntent,
             reviewAuditFindings: controlSurface.reviewAuditFindings,
             recommendedKillSwitches: resolvedRecommendedKillSwitches,
             guidedAction: guidedAction(
-                priorities: DecisionEvolutionPrimaryBlockerEvaluator.orderedPriorities(
-                    controlSurface: controlSurface,
-                    releaseSummary: releaseSummary,
-                    activeKillSwitches: resolvedActiveKillSwitches,
-                    recommendedKillSwitches: resolvedRecommendedKillSwitches,
-                    canRestoreActiveCheckpoint: resolvedCanRestoreActiveCheckpoint,
-                    canRollbackActiveCheckpoint: resolvedCanRollbackActiveCheckpoint
-                ),
-                primaryReason: releaseSummary?.reasons.first,
-                navigationOptions: navigationOptions,
-                allowsLocalMutationActions: allowsLocalMutationActions,
-                routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter,
-                approveQueueIntent: approveQueueIntent
+                actionPlan: actionPlan,
+                actionBundle: actionBundle
             )
         )
     }
 
     private static func guidedAction(
-        priorities: [DecisionEvolutionPrimaryBlocker],
-        primaryReason: String?,
-        navigationOptions: DecisionEvolutionNavigationSurfaceOptions,
-        allowsLocalMutationActions: Bool,
-        routesMutationsToControlCenter: Bool,
-        approveQueueIntent: DecisionEvolutionMutationIntent?
+        actionPlan: DecisionEvolutionPolicySurfaceActionPlan,
+        actionBundle: DecisionEvolutionWorkspaceMutationActionBundle
     ) -> DecisionEvolutionPilotGuidedAction? {
-        for priority in priorities {
-            if let action = guidedAction(
-                for: priority,
-                primaryReason: primaryReason,
-                navigationOptions: navigationOptions,
-                allowsLocalMutationActions: allowsLocalMutationActions,
-                routesMutationsToControlCenter: routesMutationsToControlCenter,
-                approveQueueIntent: approveQueueIntent
-            ) {
-                return action
-            }
-        }
+        guard let guidedAction = actionPlan.guidedAction else { return nil }
 
-        return nil
-    }
-
-    private static func guidedAction(
-        for priority: DecisionEvolutionPrimaryBlocker,
-        primaryReason: String?,
-        navigationOptions: DecisionEvolutionNavigationSurfaceOptions,
-        allowsLocalMutationActions: Bool,
-        routesMutationsToControlCenter: Bool,
-        approveQueueIntent: DecisionEvolutionMutationIntent?
-    ) -> DecisionEvolutionPilotGuidedAction? {
-        let guidance = DecisionEvolutionPrimaryBlockerPresentationSupport.pilotGuidance(
-            blocker: priority,
-            primaryReason: primaryReason,
-            allowsLocalMutationActions: allowsLocalMutationActions
-        )
-
-        if priority == .pendingReview,
-           allowsLocalMutationActions,
-           let approveQueueIntent,
-           let guidance,
-           let detail = guidance.detail {
+        switch guidedAction.route {
+        case .approvePendingQueue:
+            guard let mutationIntent = actionBundle.mutationIntent(for: guidedAction.route) else { return nil }
             return DecisionEvolutionPilotGuidedAction(
-                title: guidance.headline,
-                detail: detail,
-                actionTitle: DecisionEvolutionReviewPathPresentationSupport.approveReviewQueueActionTitle,
-                route: .mutation(approveQueueIntent)
+                title: guidedAction.title,
+                detail: guidedAction.detail,
+                actionTitle: guidedAction.actionTitle,
+                route: .mutation(mutationIntent)
+            )
+        case .navigate(let destination):
+            return DecisionEvolutionPilotGuidedAction(
+                title: guidedAction.title,
+                detail: guidedAction.detail,
+                actionTitle: guidedAction.actionTitle,
+                route: .navigation(destination)
             )
         }
-
-        guard let guidance,
-              let detail = guidance.detail else { return nil }
-
-        return navigationGuidedAction(
-            title: guidance.headline,
-            detail: detail,
-            navigationOptions: navigationOptions,
-            routesMutationsToControlCenter: routesMutationsToControlCenter
-        )
-    }
-
-    private static func navigationGuidedAction(
-        title: String,
-        detail: String,
-        navigationOptions: DecisionEvolutionNavigationSurfaceOptions,
-        routesMutationsToControlCenter: Bool
-    ) -> DecisionEvolutionPilotGuidedAction? {
-        guard let destination = navigationOptions.preferredDestination else { return nil }
-
-        return DecisionEvolutionPilotGuidedAction(
-            title: title,
-            detail: detail,
-            actionTitle: destination.actionTitle(
-                routesMutationsToControlCenter: routesMutationsToControlCenter
-            ),
-            route: .navigation(destination)
-        )
     }
 }

@@ -327,6 +327,23 @@ final class SampleHostModel: ObservableObject {
             defaultReason: "SampleHost prefers a slower lane here."
         )
     )
+    private static let runtimeTuning: BASEBrainRuntimeSynthesisPolicy = {
+        var tuning = BASEBrainRuntimeSynthesisPolicy.generic.withSchemaVersion(
+            "samplehost.runtime-synthesis.v1"
+        )
+        tuning.wakeIntent.highRiskGuardThreshold = 0.69
+        tuning.stateTransitions.quarantineFailureGuardThreshold = 3
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: tuning.wakeIntent
+        )
+        tuning.lease.restrictedEnergyQuota = 0.46
+        tuning.maintenance.standardBatteryFloor = 0.36
+        tuning.sovereignExecution.deadStopOnExtremeBlockedPermit = false
+        tuning.context.emotionalLoadDriftingIncrement = 0.09
+        tuning.triSelf.directPathSuperegoPenalty = 0.46
+        tuning.risk.defaultForecastUncertainty = 0.24
+        return tuning
+    }()
 
     init(
         runtime: BASHostRuntime = BASHostRuntime(
@@ -334,11 +351,22 @@ final class SampleHostModel: ObservableObject {
                 runtimeProfileID: "samplehost.default-runtime",
                 policyProfileID: "samplehost.default-policy",
                 prefersPureLocal: true,
+                defaultDeviceState: BASHostConfiguration.genericDefaultDeviceState,
                 console: .generic,
                 lifecycleBehavior: SampleHostModel.lifecycleBehavior,
                 workflowBehavior: SampleHostModel.workflowBehavior,
                 cognitionBehavior: SampleHostModel.cognitionBehavior,
-                presentation: SampleHostModel.sampleHostPresentation
+                presentation: SampleHostModel.sampleHostPresentation,
+                runtimeTuning: SampleHostModel.runtimeTuning,
+                runtimePolicyLineage: BASRuntimePolicyLineage(
+                    bundleVersion: "samplehost.runtime-policy-bundle.v1",
+                    providerRoutingRegistryVersion: "samplehost.provider-routing-registry.v1",
+                    providerRoutingPolicyID: "samplehost.provider-routing.v1",
+                    runtimeTuningRegistryVersion: "samplehost.runtime-tuning-registry.v1",
+                    runtimeTuningPolicyID: "samplehost.runtime-tuning.v1",
+                    resolutionSourceID: "sample_host_default"
+                ),
+                hostRhythmProfile: .generic
             )
         )
     ) {

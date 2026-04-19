@@ -57,6 +57,62 @@ struct BASReferenceCapabilityCoverageBuilderTests {
         #expect(report.sections.first(where: { $0.domain == .observability })?.items.first(where: { $0.id == "observability.flight_deck" })?.status == .partial)
     }
 
+    @Test("carries execution capability tiers through the report")
+    func carriesExecutionCapabilityTiersThroughTheReport() {
+        let horizonCoverage = BASHorizonCoverageSnapshot(
+            worldPriorID: "worldPriorFabric",
+            worldPriorPostureID: "trustedProduction",
+            worldBoundaryID: "externalTraining",
+            hostIsolationID: "hostIsolated",
+            sessionIsolationID: "sessionIsolated",
+            toolTruthModeID: "toolRefreshRequired",
+            temporalKnowledgeTierID: "invariant",
+            temporalRefreshRequirementID: "embedded",
+            temporalDecayPolicyID: "none",
+            temporalTimeScopeID: "crossSession",
+            evidenceGradientID: "grounded",
+            evidenceClaimTypeID: "worldStructure",
+            requiresCaveat: false,
+            requiresExternalRefresh: false,
+            volatileClaimWriteModeID: "admitDirectly",
+            contaminatedWriteModeID: "quarantineCandidate",
+            minimumDurableEvidenceCount: 0,
+            forceStageNonContinuityDrafts: false,
+            evidencePendingTagIDs: ["evidence_caveat"]
+        )
+        let report = BASReferenceCapabilityCoverageBuilder.build(
+            input: BASReferenceCapabilityCoverageInput(
+                activeProviderTitle: "Foundation Models",
+                executionTierID: "systemManaged",
+                foundationTierID: "systemManaged",
+                horizonCoverage: horizonCoverage,
+                runtimeSummary: makeRuntimeSummary(activeProviderID: "foundationModels", replayCount: 1, consistencyChecked: true),
+                brainSummary: makeBrainSummary(calibrationStatus: .stable, brainTraceCount: 1),
+                isPureLocalClosedLoop: true,
+                layerReportCount: BASLayerKind.allCases.count,
+                expectedLayerCount: BASLayerKind.allCases.count,
+                hasTaskGraph: true,
+                brainLoaded: true,
+                activeTemplateCount: 2,
+                failureGuardCount: 1,
+                hasSensitiveConstraint: true
+            )
+        )
+
+        #expect(report.executionTierID == "systemManaged")
+        #expect(report.foundationTierID == "systemManaged")
+        #expect(report.horizonCoverage == horizonCoverage)
+        #expect(report.horizonCoverage?.worldLine == "World worldPriorFabric • Posture trustedProduction • Boundary externalTraining • Host hostIsolated • Session sessionIsolated • Tool toolRefreshRequired")
+        #expect(report.horizonCoverage?.temporalLine == "Temporal invariant • Refresh embedded • Decay none • Scope crossSession")
+        #expect(report.horizonCoverage?.evidenceLine == "Evidence grounded • Claim worldStructure • Caveat no • External refresh no")
+        #expect(report.horizonCoverage?.summaryLines == [
+            "World worldPriorFabric • Posture trustedProduction • Boundary externalTraining • Host hostIsolated • Session sessionIsolated • Tool toolRefreshRequired",
+            "Temporal invariant • Refresh embedded • Decay none • Scope crossSession",
+            "Evidence grounded • Claim worldStructure • Caveat no • External refresh no",
+            "Persistence volatile admitDirectly • contaminated quarantineCandidate • min durable evidence 0 • force stage no • pending tags evidence_caveat"
+        ])
+    }
+
     private func makeRuntimeSummary(
         activeProviderID: String,
         replayCount: Int,

@@ -119,6 +119,9 @@ public struct BASProjectionGovernanceInput: Codable, Equatable, Sendable {
     public var promotedCandidateCount: Int
     public var deferredCandidateCount: Int
     public var admittedCandidateCount: Int
+    public var externallyRefreshedCandidateCount: Int
+    public var quarantinedObservationCount: Int
+    public var evidenceCaveatedCandidateCount: Int
 
     public init(
         totalRecordCount: Int,
@@ -126,7 +129,10 @@ public struct BASProjectionGovernanceInput: Codable, Equatable, Sendable {
         pendingCandidateCount: Int,
         promotedCandidateCount: Int,
         deferredCandidateCount: Int,
-        admittedCandidateCount: Int
+        admittedCandidateCount: Int,
+        externallyRefreshedCandidateCount: Int = 0,
+        quarantinedObservationCount: Int = 0,
+        evidenceCaveatedCandidateCount: Int = 0
     ) {
         self.totalRecordCount = totalRecordCount
         self.totalCandidateCount = totalCandidateCount
@@ -134,6 +140,9 @@ public struct BASProjectionGovernanceInput: Codable, Equatable, Sendable {
         self.promotedCandidateCount = promotedCandidateCount
         self.deferredCandidateCount = deferredCandidateCount
         self.admittedCandidateCount = admittedCandidateCount
+        self.externallyRefreshedCandidateCount = externallyRefreshedCandidateCount
+        self.quarantinedObservationCount = quarantinedObservationCount
+        self.evidenceCaveatedCandidateCount = evidenceCaveatedCandidateCount
     }
 }
 
@@ -279,7 +288,10 @@ public enum BASBrainProjectionCompiler {
             loadedPromotedMemoryCount: 0,
             loadedPendingMemoryCount: 0,
             deferredCandidateCount: input.deferredCandidateCount,
-            admittedCandidateCount: input.admittedCandidateCount
+            admittedCandidateCount: input.admittedCandidateCount,
+            externallyRefreshedCandidateCount: input.externallyRefreshedCandidateCount,
+            quarantinedObservationCount: input.quarantinedObservationCount,
+            evidenceCaveatedCandidateCount: input.evidenceCaveatedCandidateCount
         )
     }
 

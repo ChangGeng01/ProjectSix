@@ -218,4 +218,230 @@ struct BASAppleFlightDeckAdapterTests {
         #expect(compilation.layerReports.first(where: { $0.layerID == "observability" }) != nil)
         #expect(builtCompilation == compilation)
     }
+
+    @Test("flight deck adapter surfaces replay revocation from inspection bundle")
+    func flightDeckAdapterSurfacesReplayRevocationFromInspectionBundle() {
+        let telemetrySummary = BASTelemetrySummary(
+            input: BASTelemetrySummaryInput(
+                requestCountByKind: ["primary": 1],
+                outcomeCount: [.providerSuccess: 1],
+                outcomeCountByKind: [.providerSuccess: ["primary": 1]],
+                activeProviderCount: ["foundationModels": 1],
+                attemptedProviderCount: ["foundationModels": 1],
+                fallbackActivations: 0,
+                backendCount: ["coreML": 1],
+                slowRequestCountByKind: [:],
+                overTimeBudgetCountByKind: [:],
+                requestDurationTotalMsByKind: ["primary": 240],
+                firstPresentableTotalMsByKind: ["primary": 100],
+                promptAssemblyTotalMsByKind: ["primary": 40],
+                admissionEvaluationTotalMsByKind: ["primary": 20],
+                providerSelectionTotalMsByKind: ["primary": 20],
+                executionTotalMsByKind: ["primary": 160],
+                activeProviderDurationTotalMs: ["foundationModels": 240],
+                backendDurationTotalMs: ["coreML": 240],
+                admissionSkipCountByReason: [:],
+                admissionSkipCountByReasonAndKind: [:],
+                selectionNeedCount: [:],
+                promptCharactersTotalByKind: ["primary": 480],
+                prefixCharactersTotalByKind: ["primary": 220],
+                immutablePrefixCharactersTotalByKind: ["primary": 140],
+                adaptivePrefixCharactersTotalByKind: ["primary": 80],
+                suffixCharactersTotalByKind: ["primary": 260],
+                overTargetBudgetCountByKind: [:],
+                lowPressureModelCallCountByKind: [:],
+                selectionKindRawValue: "selection",
+                selectionKnowledgeNeedRawValue: "knowledge",
+                selectionControlNeedRawValue: "control",
+                selectionRetrievalBypassReasonRawValues: [],
+                avoidableSkipReasonRawValues: []
+            )
+        )
+        let lifecycleSummary = BASLifecycleSummaryBuilder.build(
+            from: [
+                BASLifecycleTraceInput(
+                    kind: "primary",
+                    hasContextState: true,
+                    generation: 1,
+                    rebuiltSession: false,
+                    staleFieldCount: 0,
+                    anchorFieldCount: 1,
+                    hasFrontstageState: true,
+                    retainedEvidenceCount: 1,
+                    droppedEvidenceCount: 0,
+                    droppedInjectedEvidenceCount: 0,
+                    droppedDuplicateEvidenceCount: 0,
+                    droppedBudgetEvidenceCount: 0
+                )
+            ]
+        )
+        let neuralSummary = BASNeuralSummaryBuilder.build(
+            from: [
+                BASNeuralTraceInput(
+                    kind: "primary",
+                    suppressedBehaviorCount: 0,
+                    dominantActionRawValue: "encourage",
+                    strongestSignalRawValue: "clarity"
+                )
+            ]
+        )
+        let brainSummary = BASBrainSummaryBuilder.build(
+            from: [
+                BASBrainTraceInput(
+                    kind: "primary",
+                    dominantReactionWeight: .briefLanguage,
+                    profileCoreCount: 1,
+                    activeGoalCount: 1,
+                    relevantMemoryCount: 1,
+                    loadedPromotedMemoryCount: 1,
+                    loadedPendingMemoryCount: 0,
+                    pendingCandidateCount: 0,
+                    promotedRecordCount: 2,
+                    screenedOutMemoryCount: 0,
+                    loadedEligibilityReasonCounts: [:],
+                    screenedOutEligibilityReasonCounts: [:],
+                    snapshotFingerprint: "brain_fp",
+                    lowTrustMemoryLoadRate: 0,
+                    riskFlags: [],
+                    identityRole: .pauseCompanion,
+                    boundaryMode: .localOnlyAdvisory,
+                    activeConstraints: [.lockSensitiveMemory],
+                    calibrationStatus: .stable,
+                    calibrationAlerts: [],
+                    evolutionCheckpointCount: 1,
+                    evolutionPendingReviewCount: 0,
+                    evolutionRollbackReady: true
+                )
+            ]
+        )
+        let inspectionSummary = BASRuntimeInspectionBuilder.build(
+            from: BASRuntimeInspectionInput(
+                activeProviderID: "foundationModels",
+                fallbackProviderID: "template",
+                runtimeGear: .balanced,
+                environmentClass: .normal,
+                deviceClass: .fullPhone,
+                languageMode: .english,
+                taskEntropyByKind: ["primary": .low],
+                preferredProviderRawValueByKind: ["primary": "foundationModels"],
+                strategyByKind: [
+                    "primary": BASAdaptiveTaskStrategy(
+                        kind: .primary,
+                        entropy: .low,
+                        runtimeGear: .balanced,
+                        contextBudget: 320,
+                        outputCharacterBudget: 180,
+                        timeBudgetMs: 900,
+                        toolCallBudget: 0,
+                        retrievalItemBudget: 2,
+                        retrievalMode: .filtered,
+                        thinkingMode: .off,
+                        outputMode: .guidedShort,
+                        tone: .briefWarm,
+                        actionSpace: ["encourage"],
+                        responseLanguage: .english,
+                        allowsModelInvocation: true
+                    )
+                ],
+                effectivePreferredProviderRawValueByKind: ["primary": "foundationModels"],
+                traceInputs: [
+                    BASRuntimeInspectionTraceInput(
+                        kind: "primary",
+                        attemptedProviderIDs: ["foundationModels"],
+                        runtimeStrategy: BASAdaptiveTaskStrategy(
+                            kind: .primary,
+                            entropy: .low,
+                            runtimeGear: .balanced,
+                            contextBudget: 320,
+                            outputCharacterBudget: 180,
+                            timeBudgetMs: 900,
+                            toolCallBudget: 0,
+                            retrievalItemBudget: 2,
+                            retrievalMode: .filtered,
+                            thinkingMode: .off,
+                            outputMode: .guidedShort,
+                            tone: .briefWarm,
+                            actionSpace: ["encourage"],
+                            responseLanguage: .english,
+                            allowsModelInvocation: true
+                        ),
+                        semanticPromptFingerprint: "semantic_fp",
+                        stablePrefixFingerprint: "prefix_fp",
+                        consistencyChecked: true,
+                        consistencyRejected: false,
+                        consistencyViolationKinds: []
+                    )
+                ],
+                telemetrySummary: telemetrySummary,
+                lifecycleSummary: lifecycleSummary,
+                neuralSummary: neuralSummary,
+                brainSummary: brainSummary,
+                totalCacheEntries: 2,
+                totalCacheLookupCount: 4,
+                totalCacheRejectedStores: 0,
+                totalCacheQuarantinedHits: 0,
+                dominantBackendID: "coreML",
+                registeredProviderCount: 4,
+                registeredOpenModelProviderCount: 1,
+                activeCircuitProviderIDs: [],
+                circuitTripCount: 0,
+                circuitTripCountByProvider: [:],
+                circuitTripCountByReason: [:],
+                traceCount: 1,
+                replayCount: 1
+            )
+        )
+        let inspectionBundle = BASInspectionBundle(
+            generatedAt: Date(timeIntervalSince1970: 1_800_000_123),
+            trace: BASExecutionTrace(
+                inputSummary: "resume",
+                selectedRoute: .local("foundationModels"),
+                memoriesRecalled: ["Memory A"],
+                toolsCalled: [],
+                latency: BASTraceLatencyBreakdown(
+                    routeSelectionMs: 12,
+                    retrievalMs: 12,
+                    generationMs: 120,
+                    toolMs: 0
+                ),
+                outputSummary: "ok"
+            ),
+            replayFingerprint: BASReplayFingerprint(value: String(repeating: "b", count: 64)),
+            replayDisposition: BASReplayDisposition(
+                isAvailable: false,
+                reason: "Replay revoked by forget gate forget.guard.anchor after checkpoint exports and sync exports.",
+                forgetRequestID: "forget.guard.anchor",
+                checkpointsRevoked: true,
+                syncExportsRevoked: true
+            ),
+            releaseDecision: BASReleaseDecision(kind: .allow, reason: "allowed"),
+            anomalySignals: [],
+            calibration: nil
+        )
+
+        let compilation = BASAppleFlightDeckBuilder.build(
+            from: BASAppleFlightDeckSourceInput(
+                generatedAt: Date(timeIntervalSince1970: 1_800_000_123),
+                registeredProviderIDs: ["foundationModels", "template"],
+                activeProviderID: "foundationModels",
+                activeProviderTitle: "Foundation Models",
+                backendTitle: "Core ML",
+                activeTaskGraphTaskCount: 1,
+                hardwareAccelerationActive: true,
+                runningOnSimulator: false,
+                onDeviceIntelligenceEnabled: true,
+                fallbackTitle: "Template",
+                inspectionSummary: inspectionSummary,
+                brainSummary: brainSummary,
+                inspectionBundle: inspectionBundle
+            )
+        )
+
+        #expect(compilation.layerReports.first(where: { $0.layerID == "data" })?.blockers.contains(where: {
+            $0.contains("forget.guard.anchor")
+        }) == true)
+        #expect(compilation.layerReports.first(where: { $0.layerID == "observability" })?.blockers.contains(where: {
+            $0.contains("forget.guard.anchor")
+        }) == true)
+    }
 }

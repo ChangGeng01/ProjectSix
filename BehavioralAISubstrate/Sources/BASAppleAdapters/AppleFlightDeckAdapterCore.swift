@@ -16,6 +16,7 @@ public struct BASAppleFlightDeckSourceInput: Codable, Equatable, Sendable {
     public var fallbackTitle: String?
     public var inspectionSummary: BASRuntimeInspectionSummary
     public var brainSummary: BASBrainSummary
+    public var inspectionBundle: BASInspectionBundle?
 
     public init(
         generatedAt: Date = .now,
@@ -29,7 +30,8 @@ public struct BASAppleFlightDeckSourceInput: Codable, Equatable, Sendable {
         onDeviceIntelligenceEnabled: Bool,
         fallbackTitle: String?,
         inspectionSummary: BASRuntimeInspectionSummary,
-        brainSummary: BASBrainSummary
+        brainSummary: BASBrainSummary,
+        inspectionBundle: BASInspectionBundle? = nil
     ) {
         self.generatedAt = generatedAt
         self.registeredProviderIDs = registeredProviderIDs
@@ -43,6 +45,7 @@ public struct BASAppleFlightDeckSourceInput: Codable, Equatable, Sendable {
         self.fallbackTitle = fallbackTitle
         self.inspectionSummary = inspectionSummary
         self.brainSummary = brainSummary
+        self.inspectionBundle = inspectionBundle
     }
 }
 
@@ -114,7 +117,8 @@ public enum BASAppleFlightDeckBuilder {
                     input.onDeviceIntelligenceEnabled,
                 fallbackTitle: input.fallbackTitle,
                 inspectionSummary: input.inspectionSummary,
-                brainSummary: input.brainSummary
+                brainSummary: input.brainSummary,
+                inspectionBundle: input.inspectionBundle
             )
         )
     }

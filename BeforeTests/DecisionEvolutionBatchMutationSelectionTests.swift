@@ -116,6 +116,41 @@ final class DecisionEvolutionBatchMutationSelectionTests: XCTestCase {
         XCTAssertNil(emptyPresentation.targetsLine)
     }
 
+    func testSelectionCanStayReadableWhilePolicyDisablesLocalMutationActions() {
+        let now = Date(timeIntervalSince1970: 100)
+        let review = makePresentation(
+            checkpointID: "checkpoint-review",
+            createdAt: now,
+            approvalState: .reviewSuggested,
+            hasLineage: true,
+            applyReady: false
+        )
+        let restorable = makePresentation(
+            checkpointID: "checkpoint-restorable",
+            createdAt: now.addingTimeInterval(-20),
+            approvalState: .automatic,
+            hasLineage: false,
+            applyReady: true
+        )
+        let selection = DecisionEvolutionBatchMutationSelection(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: nil,
+                reviewCheckpoint: nil,
+                pendingReviewQueue: [],
+                latestPersistedLineage: nil
+            ),
+            selectablePresentations: [review, restorable],
+            selectedCheckpointIDs: ["checkpoint-restorable"],
+            allowsLocalMutationActions: false
+        )
+
+        XCTAssertEqual(selection.selectedCount, 1)
+        XCTAssertEqual(selection.selectedRestorablePresentation?.checkpointID, "checkpoint-restorable")
+        XCTAssertNil(selection.approveSelectedIntent)
+        XCTAssertNil(selection.markSelectedForReviewIntent)
+        XCTAssertNil(selection.clearSelectedLineageIntent)
+    }
+
     func testOrderedSelectablePresentationsKeepSurfacePriorityAndDeduplicate() {
         let now = Date(timeIntervalSince1970: 100)
         let active = makePresentation(

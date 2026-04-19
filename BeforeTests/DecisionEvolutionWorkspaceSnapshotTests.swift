@@ -150,6 +150,45 @@ final class DecisionEvolutionWorkspaceSnapshotTests: XCTestCase {
         XCTAssertTrue(workspace.effectiveCanRollbackActiveCheckpoint)
     }
 
+    func testWorkspacePolicyUsesSurfaceContractMutationModeForSharedConsumers() {
+        let active = makeSnapshot(
+            checkpointID: "active-policy-surface",
+            createdAt: Date(timeIntervalSince1970: 40),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let review = makeSnapshot(
+            checkpointID: "review-policy-surface",
+            createdAt: Date(timeIntervalSince1970: 30),
+            approvalState: .reviewSuggested,
+            hasLineage: true
+        )
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: active,
+                activeCheckpointSource: .automaticFallback,
+                reviewCheckpoint: review,
+                pendingReviewQueue: [review],
+                latestPersistedLineage: nil,
+                restorableCheckpointIDs: ["previous-active-policy-surface", "previous-review-policy-surface"]
+            )
+        )
+
+        let homePolicy = workspace.policy(for: .home)
+        let controlPolicy = workspace.policy(for: .controlCenter)
+
+        XCTAssertFalse(homePolicy.input.allowsLocalMutationActions)
+        XCTAssertTrue(controlPolicy.input.allowsLocalMutationActions)
+        XCTAssertEqual(homePolicy.primaryBlocker, controlPolicy.primaryBlocker)
+        XCTAssertEqual(homePolicy.input.pendingReviewCount, 1)
+        XCTAssertEqual(controlPolicy.input.pendingReviewCount, 1)
+        XCTAssertNil(homePolicy.recommendedPilotStep(canNavigate: false))
+        XCTAssertEqual(
+            controlPolicy.recommendedPilotStep(canNavigate: false)?.action,
+            .approvePendingQueue
+        )
+    }
+
     func testWorkspaceSnapshotSeparatesSpotlightReviewFromQueueTailCounts() {
         let active = makeSnapshot(
             checkpointID: "active-1",

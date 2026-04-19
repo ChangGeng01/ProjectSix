@@ -20,6 +20,7 @@ final class QuickCheckSession: ObservableObject, Identifiable {
     @Published var isShowingWaitSheet = false
     @Published var isRefiningWithModel = false
     @Published private(set) var brainState: DecisionBrainState?
+    @Published private(set) var lastEvaluationEBrainTurn: BASEBrainTurnResult?
 
     let entrySource: EntrySource
     private let intelligenceLifecycle: DecisionContextLifecycle
@@ -37,6 +38,7 @@ final class QuickCheckSession: ObservableObject, Identifiable {
 
     func evaluate() {
         guard let motivation, let expectedOutcome, let controlLevel else { return }
+        lastEvaluationEBrainTurn = nil
         let input = QuickCheckInput(
             scenario: scenario,
             motivation: motivation,
@@ -49,9 +51,11 @@ final class QuickCheckSession: ObservableObject, Identifiable {
 
     func evaluateWithIntelligence(
         preferences: BeforePreferences = BeforePreferencesStore.load(),
-        eBrainTurn: BASEBrainTurnResult? = nil
+        eBrainTurn: BASEBrainTurnResult? = nil,
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy
     ) async {
         guard let motivation, let expectedOutcome, let controlLevel else { return }
+        lastEvaluationEBrainTurn = eBrainTurn
 
         let input = QuickCheckInput(
             scenario: scenario,
@@ -85,7 +89,8 @@ final class QuickCheckSession: ObservableObject, Identifiable {
             neuralState: neuralState,
             brainState: brainState,
             eBrainTurn: eBrainTurn,
-            preferences: preferences
+            preferences: preferences,
+            runtimePolicyResolution: runtimePolicyResolution
         ) {
             result = refined
         } else {
@@ -103,5 +108,9 @@ final class QuickCheckSession: ObservableObject, Identifiable {
 
     func loadBrainState(_ brainState: DecisionBrainState?) {
         self.brainState = brainState
+    }
+
+    func restoreEvaluationEBrainTurn(_ turn: BASEBrainTurnResult?) {
+        lastEvaluationEBrainTurn = turn
     }
 }

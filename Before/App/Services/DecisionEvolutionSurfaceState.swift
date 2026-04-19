@@ -4,6 +4,7 @@ struct DecisionEvolutionSurfaceState: Equatable, Sendable {
     let contract: DecisionEvolutionSurfaceContract
     let controlSurface: DecisionEvolutionControlSurface
     let workspace: DecisionEvolutionWorkspaceSnapshot
+    let policy: DecisionEvolutionPolicyOutput
     let operatorSnapshot: DecisionEvolutionOperatorSnapshot
     let attentionSignal: DecisionEvolutionAttentionSignal
 
@@ -18,18 +19,21 @@ struct DecisionEvolutionSurfaceState: Equatable, Sendable {
             releaseSummary: releaseSummary,
             historyPresentations: historyPresentations
         )
+        let policy = workspace.policy(for: contract)
 
         return DecisionEvolutionSurfaceState(
             contract: contract,
             controlSurface: controlSurface,
             workspace: workspace,
+            policy: policy,
             operatorSnapshot: DecisionEvolutionOperatorSnapshot.build(
                 surfaceKind: contract.kind,
                 workspace: workspace,
-                contract: contract
+                contract: contract,
+                policy: policy
             ),
             attentionSignal: DecisionEvolutionAttentionSignal.build(
-                workspace: workspace
+                policy: policy
             )
         )
     }

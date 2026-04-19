@@ -485,6 +485,9 @@ public enum BASMemoryEligibilityJudge {
         }
 
         if candidate.isPending {
+            if behavior.requireTagOverlapForPendingCandidatesWhenExternalRefreshRequired, !hasTagOverlap {
+                return .screenedOut(.externalRefreshNoOverlap)
+            }
             if candidate.sourceTrustTier == .low, !hasTagOverlap, ageHours <= 18 {
                 return .screenedOut(.lowTrustPending)
             }
@@ -494,6 +497,9 @@ public enum BASMemoryEligibilityJudge {
         }
 
         if candidate.decayPolicy == .fast {
+            if behavior.requireTagOverlapForFastDecayCandidatesWhenExternalRefreshRequired, !hasTagOverlap {
+                return .screenedOut(.externalRefreshNoOverlap)
+            }
             return hasTagOverlap
                 ? .allowed(.fastDecayTagOverlap)
                 : (ageHours <= 24 ? .allowed(.fastDecayGraceWindow) : .screenedOut(.confidenceNoOverlap))

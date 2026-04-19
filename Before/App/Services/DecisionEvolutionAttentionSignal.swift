@@ -31,111 +31,13 @@ struct DecisionEvolutionAttentionPresentation: Equatable, Sendable {
     static func build(
         workspace: DecisionEvolutionWorkspaceSnapshot
     ) -> DecisionEvolutionAttentionPresentation {
-        let facts = workspace.facts
-        let primaryBlocker = primaryAttentionBlocker(
-            workspace: workspace
-        )
-
-        switch primaryBlocker {
-        case .activeKillSwitches:
-            return DecisionEvolutionAttentionPresentation(
-                severity: .blocked,
-                badgeValue: "!",
-                headline: DecisionEvolutionReviewPathPresentationSupport.blockedKillSwitchHeadline,
-                detail: DecisionEvolutionReviewPathPresentationSupport.blockedKillSwitchDetail,
-                pendingReviewCount: facts.pendingReviewCount,
-                killSwitches: facts.activeKillSwitches,
-                rollbackReady: facts.canRollbackActiveCheckpoint
-            )
-        case .recommendedKillSwitches:
-            return DecisionEvolutionAttentionPresentation(
-                severity: .blocked,
-                badgeValue: "!",
-                headline: DecisionEvolutionReviewPathPresentationSupport.blockedKillSwitchHeadline,
-                detail: DecisionEvolutionReviewPathPresentationSupport.blockedKillSwitchDetail,
-                pendingReviewCount: facts.pendingReviewCount,
-                killSwitches: facts.recommendedKillSwitches,
-                rollbackReady: facts.canRollbackActiveCheckpoint
-            )
-        case .pendingReview:
-            return DecisionEvolutionAttentionPresentation(
-                severity: .review,
-                badgeValue: DecisionEvolutionAttentionPresentationSupport.reviewBadgeValue(
-                    pendingReviewCount: facts.pendingReviewCount
-                ),
-                headline: DecisionEvolutionReviewPathPresentationSupport.reviewWaitingHeadline,
-                detail: DecisionEvolutionReviewPathPresentationSupport.attentionPendingReviewDetail(
-                    pendingReviewCount: facts.pendingReviewCount
-                ),
-                pendingReviewCount: facts.pendingReviewCount,
-                killSwitches: [],
-                rollbackReady: facts.canRollbackActiveCheckpoint
-            )
-        case .runtimeGuardrails:
-            return DecisionEvolutionAttentionPresentation(
-                severity: .blocked,
-                badgeValue: "!",
-                headline: DecisionEvolutionReleaseStagePresentationSupport.blockedRuntimeGuardrailsHeadline,
-                detail: workspace.releaseSummary?.reasons.first,
-                pendingReviewCount: facts.pendingReviewCount,
-                killSwitches: [],
-                rollbackReady: facts.canRollbackActiveCheckpoint
-            )
-        case .missingActiveCheckpoint,
-                .nonRestorableActiveCheckpoint,
-                .auditFindings,
-                .rollbackNotReady,
-                .ready:
-            if facts.canRollbackActiveCheckpoint {
-                return DecisionEvolutionAttentionPresentation(
-                    severity: .rollbackWatch,
-                    badgeValue: "↺",
-                    headline: DecisionEvolutionAttentionPresentationSupport.rollbackReadyHeadline,
-                    detail: DecisionEvolutionAttentionPresentationSupport.rollbackReadyDetail,
-                    pendingReviewCount: 0,
-                    killSwitches: [],
-                    rollbackReady: true
-                )
-            }
-
-            return DecisionEvolutionAttentionPresentation(
-                severity: .none,
-                badgeValue: nil,
-                headline: DecisionEvolutionAttentionPresentationSupport.quietHeadline,
-                detail: nil,
-                pendingReviewCount: 0,
-                killSwitches: [],
-                rollbackReady: false
-            )
-        }
+        workspace.policy().attentionPresentation()
     }
 
-    private static func primaryAttentionBlocker(
-        workspace: DecisionEvolutionWorkspaceSnapshot
-    ) -> DecisionEvolutionPrimaryBlocker {
-        if let releaseSummary = workspace.releaseSummary {
-            return DecisionEvolutionPrimaryBlockerEvaluator.orderedPriorities(
-                releaseSummary: releaseSummary,
-                reviewAuditFindings: workspace.controlSurface.reviewAuditFindings
-            ).first ?? .ready
-        }
-
-        let facts = workspace.facts
-        if !facts.activeKillSwitches.isEmpty {
-            return .activeKillSwitches
-        }
-
-        if !facts.recommendedKillSwitches.isEmpty {
-            return .recommendedKillSwitches
-        }
-
-        if facts.pendingReviewCount > 0 {
-            return .pendingReview
-        }
-
-        return DecisionEvolutionPrimaryBlockerEvaluator.evaluate(
-            workspace: workspace
-        )
+    static func build(
+        policy: DecisionEvolutionPolicyOutput
+    ) -> DecisionEvolutionAttentionPresentation {
+        policy.attentionPresentation()
     }
 }
 
@@ -152,11 +54,29 @@ struct DecisionEvolutionAttentionSignal: Equatable, Sendable {
         severity != .none
     }
 
+    func resolvedTriggerReason(
+        fallback: String?
+    ) -> String? {
+        let trimmedDetail = detail?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let trimmedDetail, !trimmedDetail.isEmpty {
+            return trimmedDetail
+        }
+        return fallback
+    }
+
     static func build(
         workspace: DecisionEvolutionWorkspaceSnapshot
     ) -> DecisionEvolutionAttentionSignal {
+        build(
+            policy: workspace.policy()
+        )
+    }
+
+    static func build(
+        policy: DecisionEvolutionPolicyOutput
+    ) -> DecisionEvolutionAttentionSignal {
         let presentation = DecisionEvolutionAttentionPresentation.build(
-            workspace: workspace
+            policy: policy
         )
 
         return DecisionEvolutionAttentionSignal(

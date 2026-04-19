@@ -116,4 +116,52 @@ struct BASAppleAdaptiveRuntimeAdapterTests {
         #expect(adapted.actionSpace.contains("name_boundary"))
         #expect(adapted.responseLanguage == .chinese)
     }
+
+    @Test("adapter guards retrieval when horizon quarantine and evidence caveat load are present")
+    func adapterGuardsRetrievalWhenHorizonPressureIsPresent() {
+        let base = BASAdaptiveTaskStrategy(
+            kind: .reflective,
+            entropy: .high,
+            runtimeGear: .balanced,
+            contextBudget: 440,
+            retrievalMode: .adaptive,
+            thinkingMode: .gated,
+            outputMode: .reflectiveStructured,
+            tone: .reflectiveClear,
+            actionSpace: ["name_pattern"],
+            responseLanguage: .english,
+            allowsModelInvocation: true
+        )
+
+        let adapted = BASAppleAdaptiveRuntimeAdapter.adapt(
+            strategy: base,
+            with: BASAppleAdaptiveRuntimeInput(
+                briefLanguageWeight: 0.2,
+                lowCognitiveLoadWeight: 0.3,
+                fatigueStrength: 0.25,
+                emotionLoadStrength: 0.2,
+                sessionBiases: [],
+                interruptiveActionBias: 0.18,
+                urgencyStrength: 0.15,
+                boundaryNamingBias: 0.55,
+                boundaryRiskStrength: 0.52,
+                tradeoffClarityBias: 0.25,
+                rebuiltSession: false,
+                staleFieldCount: 0,
+                screenedOutMemoryCount: 0,
+                lowTrustLoad: false,
+                retrievalInstability: false,
+                retrievalTags: ["mirror"],
+                externallyRefreshedCandidateCount: 1,
+                quarantinedObservationCount: 1,
+                evidenceCaveatedCandidateCount: 1,
+                externalRefreshGuardTriggered: true,
+                observationOnlyQuarantine: true,
+                evidenceCaveatLoad: true
+            )
+        )
+
+        #expect(adapted.retrievalMode == .filtered)
+        #expect(adapted.retrievalItemBudget <= 2)
+    }
 }

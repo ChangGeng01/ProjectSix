@@ -7,13 +7,16 @@ struct DecisionReviewRecentEntryCardView: View {
     let reopenAction: () -> Void
     let postponeAction: () -> Void
 
+    private var replayCardCopy: DecisionReviewReplayCardCopy {
+        summary.replayCardCopy(replayPresentation: presentation)
+    }
+
     var body: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
                 Button(action: selectAction) {
                     DecisionReplayEntrySummaryView(
-                        title: summary.title,
-                        secondaryLine: summary.secondaryLine,
+                        cardCopy: replayCardCopy,
                         presentation: presentation
                     ) {
                         DecisionReplayEntryHeaderRowView(

@@ -223,94 +223,52 @@ enum DecisionEvolutionPrimaryBlockerEvaluator {
     static func evaluate(
         _ context: DecisionEvolutionPrimaryBlockerContext
     ) -> DecisionEvolutionPrimaryBlocker {
-        orderedPriorities(for: context).first ?? .ready
+        DecisionEvolutionPolicyEngine.evaluate(
+            DecisionEvolutionPolicyEngine.input(context)
+        ).primaryBlocker
     }
 
     static func evaluate(
         workspace: DecisionEvolutionWorkspaceSnapshot
     ) -> DecisionEvolutionPrimaryBlocker {
-        let facts = workspace.facts
-        return evaluate(
-            DecisionEvolutionPrimaryBlockerContext(
-                activeKillSwitches: facts.activeKillSwitches,
-                recommendedKillSwitches: facts.recommendedKillSwitches,
-                runtimeBlockers: [],
-                hasActiveCheckpoint: workspace.activePresentation != nil,
-                canRestoreActiveCheckpoint: facts.canRestoreActiveCheckpoint,
-                pendingReviewCount: facts.pendingReviewCount,
-                reviewAuditFindings: workspace.controlSurface.reviewAuditFindings,
-                canRollbackActiveCheckpoint: facts.canRollbackActiveCheckpoint
-            )
-        )
+        workspace.policy().primaryBlocker
     }
 
     static func orderedPriorities(
         for context: DecisionEvolutionPrimaryBlockerContext
     ) -> [DecisionEvolutionPrimaryBlocker] {
-        var priorities: [DecisionEvolutionPrimaryBlocker] = []
-
-        if !context.activeKillSwitches.isEmpty {
-            priorities.append(.activeKillSwitches)
-        }
-
-        if !context.recommendedKillSwitches.isEmpty {
-            priorities.append(.recommendedKillSwitches)
-        }
-
-        if !context.runtimeBlockers.isEmpty {
-            priorities.append(.runtimeGuardrails)
-        }
-
-        if !context.hasActiveCheckpoint {
-            priorities.append(.missingActiveCheckpoint)
-        }
-
-        if context.hasActiveCheckpoint, !context.canRestoreActiveCheckpoint {
-            priorities.append(.nonRestorableActiveCheckpoint)
-        }
-
-        if context.pendingReviewCount > 0 {
-            priorities.append(.pendingReview)
-        }
-
-        if !context.reviewAuditFindings.isEmpty {
-            priorities.append(.auditFindings)
-        }
-
-        if context.hasActiveCheckpoint, !context.canRollbackActiveCheckpoint {
-            priorities.append(.rollbackNotReady)
-        }
-
-        if priorities.isEmpty {
-            priorities.append(.ready)
-        }
-
-        return priorities
+        DecisionEvolutionPolicyEngine.orderedPriorities(for: context)
     }
 
     static func orderedPriorities(
         releaseSummary: DecisionSystemReleaseControlSummary,
         reviewAuditFindings: [String]
     ) -> [DecisionEvolutionPrimaryBlocker] {
-        let context = DecisionEvolutionPrimaryBlockerContext(
-            activeKillSwitches: releaseSummary.activeKillSwitches,
-            recommendedKillSwitches: releaseSummary.recommendedKillSwitches,
-            runtimeBlockers: stage(from: releaseSummary.headline) == .runtimeGuardrails
-                ? releaseSummary.reasons
-                : [],
-            hasActiveCheckpoint: releaseSummary.activeCheckpointID != nil,
-            canRestoreActiveCheckpoint: releaseSummary.canRestoreActiveCheckpoint,
-            pendingReviewCount: releaseSummary.pendingReviewCount,
-            reviewAuditFindings: reviewAuditFindings,
-            canRollbackActiveCheckpoint: releaseSummary.canRollbackActiveCheckpoint
-        )
-        let fallbackPriorities = orderedPriorities(for: context)
-
-        guard let summaryStage = stage(from: releaseSummary.headline) else {
-            return fallbackPriorities
-        }
-
-        return [summaryStage] + fallbackPriorities.filter { $0 != summaryStage }
+        DecisionEvolutionPolicyEngine.evaluate(
+            DecisionEvolutionPolicyInput(
+                activeCheckpointID: releaseSummary.activeCheckpointID,
+                activeCheckpointSource: releaseSummary.activeCheckpointSource,
+                pendingReviewCount: releaseSummary.pendingReviewCount,
+                pendingReviewLineageCount: 0,
+                canRestoreActiveCheckpoint: releaseSummary.canRestoreActiveCheckpoint,
+                canRollbackActiveCheckpoint: releaseSummary.canRollbackActiveCheckpoint,
+                hasRollbackTarget: false,
+                activeKillSwitches: releaseSummary.activeKillSwitches,
+                recommendedKillSwitches: releaseSummary.recommendedKillSwitches,
+                reviewAuditFindings: reviewAuditFindings,
+                queueAuditFindings: reviewAuditFindings,
+                queueKillSwitches: releaseSummary.recommendedKillSwitches,
+                runtimeBlockerSignals: DecisionEvolutionPolicyEngine.preferredPrimaryBlocker(
+                    from: releaseSummary
+                ) == .runtimeGuardrails
+                    ? releaseSummary.reasons
+                    : [],
+                allowsLocalMutationActions: false,
+                preferredPrimaryBlocker: DecisionEvolutionPolicyEngine.preferredPrimaryBlocker(
+                    from: releaseSummary
+                )
+            )
+        ).blockerOrder
     }
 
     static func orderedPriorities(
@@ -321,52 +279,16 @@ enum DecisionEvolutionPrimaryBlockerEvaluator {
         canRestoreActiveCheckpoint: Bool,
         canRollbackActiveCheckpoint: Bool
     ) -> [DecisionEvolutionPrimaryBlocker] {
-        if let releaseSummary {
-            return orderedPriorities(
+        DecisionEvolutionPolicyEngine.evaluate(
+            DecisionEvolutionPolicyEngine.input(
+                controlSurface: controlSurface,
                 releaseSummary: releaseSummary,
-                reviewAuditFindings: controlSurface.reviewAuditFindings
-            )
-        }
-
-        return orderedPriorities(
-            for: DecisionEvolutionPrimaryBlockerContext(
                 activeKillSwitches: activeKillSwitches,
                 recommendedKillSwitches: recommendedKillSwitches,
-                runtimeBlockers: [],
-                hasActiveCheckpoint: controlSurface.activePresentation != nil,
                 canRestoreActiveCheckpoint: canRestoreActiveCheckpoint,
-                pendingReviewCount: controlSurface.pendingReviewCount,
-                reviewAuditFindings: controlSurface.reviewAuditFindings,
                 canRollbackActiveCheckpoint: canRollbackActiveCheckpoint
             )
-        )
-    }
-
-    private static func stage(
-        from headline: String
-    ) -> DecisionEvolutionPrimaryBlocker? {
-        switch headline {
-        case DecisionEvolutionReleasePathPresentationSupport.blockedActiveKillSwitchHeadline:
-            .activeKillSwitches
-        case DecisionEvolutionReleasePathPresentationSupport.watchingRecommendedKillSwitchesHeadline:
-            .recommendedKillSwitches
-        case DecisionEvolutionReleasePathPresentationSupport.blockedRuntimeGuardrailsHeadline:
-            .runtimeGuardrails
-        case DecisionEvolutionReleasePathPresentationSupport.watchingFirstActiveCheckpointHeadline:
-            .missingActiveCheckpoint
-        case DecisionEvolutionReleasePathPresentationSupport.blockedUntilRestorableHeadline:
-            .nonRestorableActiveCheckpoint
-        case DecisionEvolutionReleasePathPresentationSupport.watchingPendingReviewHeadline:
-            .pendingReview
-        case DecisionEvolutionReleasePathPresentationSupport.watchingAuditFindingsHeadline:
-            .auditFindings
-        case DecisionEvolutionReleasePathPresentationSupport.watchingRollbackReadinessHeadline:
-            .rollbackNotReady
-        case DecisionEvolutionReleasePathPresentationSupport.readyForGuardedPilotHeadline:
-            .ready
-        default:
-            nil
-        }
+        ).blockerOrder
     }
 }
 
@@ -512,10 +434,25 @@ struct DecisionEvolutionReleasePathGuidancePresentation: Equatable, Sendable {
 enum DecisionEvolutionPrimaryBlockerPresentationSupport {
     static func operatorGuidance(
         blocker: DecisionEvolutionPrimaryBlocker,
-        workspace: DecisionEvolutionWorkspaceSnapshot,
+        input: DecisionEvolutionPolicyInput,
         contract: DecisionEvolutionSurfaceContract
     ) -> DecisionEvolutionPrimaryBlockerGuidancePresentation {
-        let facts = workspace.facts
+        if input.hasActiveCheckpoint,
+           input.activeCheckpointSource != .none,
+           input.pendingReviewCount == 0,
+           input.activeKillSwitches.isEmpty,
+           input.recommendedKillSwitches.isEmpty,
+           input.reviewAuditFindings.isEmpty,
+           input.runtimeBlockerSignals.isEmpty {
+            return DecisionEvolutionPrimaryBlockerGuidancePresentation(
+                headline: DecisionEvolutionCheckpointRecoverySupport.activeCheckpointHeadline(
+                    source: input.activeCheckpointSource
+                ),
+                detail: DecisionEvolutionCheckpointRecoverySupport.activeCheckpointReason(
+                    source: input.activeCheckpointSource
+                )
+            )
+        }
 
         switch blocker {
         case .activeKillSwitches:
@@ -528,9 +465,10 @@ enum DecisionEvolutionPrimaryBlockerPresentationSupport {
                 detail: nil
             )
         case .missingActiveCheckpoint:
-            if facts.pendingReviewCount == 0,
-               facts.killSwitches.isEmpty,
-               workspace.controlSurface.reviewAuditFindings.isEmpty {
+            if input.pendingReviewCount == 0,
+               input.activeKillSwitches.isEmpty,
+               input.recommendedKillSwitches.isEmpty,
+               input.reviewAuditFindings.isEmpty {
                 return DecisionEvolutionPrimaryBlockerGuidancePresentation(
                     headline: DecisionEvolutionCheckpointRecoverySupport.noPersistedLineageHeadline,
                     detail: nil
@@ -548,13 +486,13 @@ enum DecisionEvolutionPrimaryBlockerPresentationSupport {
             )
         case .pendingReview:
             return DecisionEvolutionReviewPathPresentationSupport.operatorPendingReviewGuidance(
-                pendingReviewCount: facts.pendingReviewCount,
+                pendingReviewCount: input.pendingReviewCount,
                 allowsMutations: contract.allowsMutations
             )
         case .auditFindings:
             return DecisionEvolutionPrimaryBlockerGuidancePresentation(
                 headline: DecisionEvolutionReleasePathPresentationSupport.watchingAuditFindingsHeadline,
-                detail: workspace.controlSurface.reviewAuditFindings.first
+                detail: input.reviewAuditFindings.first
             )
         case .rollbackNotReady:
             return DecisionEvolutionPrimaryBlockerGuidancePresentation(
@@ -562,13 +500,13 @@ enum DecisionEvolutionPrimaryBlockerPresentationSupport {
                 detail: DecisionEvolutionReleasePathPresentationSupport.rollbackNotReadyReason
             )
         case .ready:
-            if workspace.activePresentation != nil {
+            if input.hasActiveCheckpoint {
                 return DecisionEvolutionPrimaryBlockerGuidancePresentation(
                     headline: DecisionEvolutionCheckpointRecoverySupport.activeCheckpointHeadline(
-                        source: workspace.controlSurface.activeCheckpointSource
+                        source: input.activeCheckpointSource
                     ),
                     detail: DecisionEvolutionCheckpointRecoverySupport.activeCheckpointReason(
-                        source: workspace.controlSurface.activeCheckpointSource
+                        source: input.activeCheckpointSource
                     )
                 )
             }
@@ -578,6 +516,21 @@ enum DecisionEvolutionPrimaryBlockerPresentationSupport {
                 detail: nil
             )
         }
+    }
+
+    static func operatorGuidance(
+        blocker: DecisionEvolutionPrimaryBlocker,
+        workspace: DecisionEvolutionWorkspaceSnapshot,
+        contract: DecisionEvolutionSurfaceContract
+    ) -> DecisionEvolutionPrimaryBlockerGuidancePresentation {
+        operatorGuidance(
+            blocker: blocker,
+            input: DecisionEvolutionPolicyEngine.input(
+                workspace: workspace,
+                allowsLocalMutationActions: contract.allowsMutations
+            ),
+            contract: contract
+        )
     }
 
     static func pilotGuidance(
@@ -621,20 +574,43 @@ enum DecisionEvolutionPrimaryBlockerPresentationSupport {
 
     static func releaseGuidance(
         blocker: DecisionEvolutionPrimaryBlocker,
-        blockerSignals: [String],
-        controlSurface: DecisionEvolutionControlSurface,
-        queueAuditFindings: [String],
-        queueKillSwitches: [String]
+        input: DecisionEvolutionPolicyInput
     ) -> DecisionEvolutionReleasePathGuidancePresentation {
         DecisionEvolutionReleasePathGuidancePresentation(
             state: releaseState(for: blocker),
             headline: releaseHeadline(for: blocker),
             reasons: releaseReasons(
                 for: blocker,
-                blockerSignals: blockerSignals,
-                controlSurface: controlSurface,
+                input: input
+            )
+        )
+    }
+
+    static func releaseGuidance(
+        blocker: DecisionEvolutionPrimaryBlocker,
+        blockerSignals: [String],
+        controlSurface: DecisionEvolutionControlSurface,
+        queueAuditFindings: [String],
+        queueKillSwitches: [String]
+    ) -> DecisionEvolutionReleasePathGuidancePresentation {
+        releaseGuidance(
+            blocker: blocker,
+            input: DecisionEvolutionPolicyInput(
+                activeCheckpointID: controlSurface.activePresentation?.checkpointID,
+                activeCheckpointSource: controlSurface.activeCheckpointSource,
+                pendingReviewCount: controlSurface.pendingReviewCount,
+                pendingReviewLineageCount: controlSurface.pendingReviewLineagePresentations.count,
+                canRestoreActiveCheckpoint: controlSurface.activePresentation?.applyReady == true,
+                canRollbackActiveCheckpoint: controlSurface.canRollbackActiveCheckpoint,
+                hasRollbackTarget: controlSurface.activeRollbackCheckpointID != nil,
+                activeKillSwitches: controlSurface.activeKillSwitches,
+                recommendedKillSwitches: queueKillSwitches,
+                reviewAuditFindings: controlSurface.reviewAuditFindings,
                 queueAuditFindings: queueAuditFindings,
-                queueKillSwitches: queueKillSwitches
+                queueKillSwitches: queueKillSwitches,
+                runtimeBlockerSignals: blockerSignals,
+                allowsLocalMutationActions: false,
+                preferredPrimaryBlocker: nil
             )
         )
     }
@@ -674,6 +650,50 @@ enum DecisionEvolutionPrimaryBlockerPresentationSupport {
             DecisionEvolutionReleasePathPresentationSupport.watchingRollbackReadinessHeadline
         case .ready:
             DecisionEvolutionReleasePathPresentationSupport.readyForGuardedPilotHeadline
+        }
+    }
+
+    static func releaseReasons(
+        for blocker: DecisionEvolutionPrimaryBlocker,
+        input: DecisionEvolutionPolicyInput
+    ) -> [String] {
+        switch blocker {
+        case .activeKillSwitches:
+            return [DecisionEvolutionReleasePathPresentationSupport.activeKillSwitchReason]
+        case .recommendedKillSwitches:
+            return [DecisionEvolutionReviewPathPresentationSupport.recommendedKillSwitchesReleaseReason]
+                + DecisionEvolutionPendingReviewPresentationSupport.guidanceReasonLines(
+                    auditFindings: input.queueAuditFindings,
+                    killSwitches: input.queueKillSwitches
+                )
+        case .runtimeGuardrails:
+            return input.runtimeBlockerSignals
+        case .missingActiveCheckpoint:
+            return missingActiveCheckpointReleaseReasons(input: input)
+        case .nonRestorableActiveCheckpoint:
+            return [DecisionEvolutionReleasePathPresentationSupport.activeCheckpointNotRestorableReason]
+        case .pendingReview:
+            return [
+                DecisionEvolutionReviewPathPresentationSupport.releasePendingReviewReason(
+                    pendingReviewCount: input.pendingReviewCount,
+                    beforePromotion: false
+                )
+            ] + DecisionEvolutionPendingReviewPresentationSupport.guidanceReasonLines(
+                auditFindings: input.queueAuditFindings,
+                killSwitches: input.queueKillSwitches
+            )
+        case .auditFindings:
+            return DecisionEvolutionReleaseStagePresentationSupport.auditReasonLines(
+                auditFindings: input.reviewAuditFindings
+            )
+        case .rollbackNotReady:
+            return [DecisionEvolutionReleasePathPresentationSupport.rollbackNotReadyReason]
+        case .ready:
+            return [
+                DecisionEvolutionReleasePathPresentationSupport.activeCheckpointRestorableReason(
+                    checkpointID: input.activeCheckpointID
+                )
+            ]
         }
     }
 
@@ -726,6 +746,27 @@ enum DecisionEvolutionPrimaryBlockerPresentationSupport {
                 )
             ]
         }
+    }
+
+    private static func missingActiveCheckpointReleaseReasons(
+        input: DecisionEvolutionPolicyInput
+    ) -> [String] {
+        var reasons = [DecisionEvolutionReleasePathPresentationSupport.noActiveCheckpointReason]
+        if input.pendingReviewCount > 0 {
+            reasons.append(
+                DecisionEvolutionReviewPathPresentationSupport.releasePendingReviewReason(
+                    pendingReviewCount: input.pendingReviewCount,
+                    beforePromotion: true
+                )
+            )
+            reasons.append(
+                contentsOf: DecisionEvolutionPendingReviewPresentationSupport.guidanceReasonLines(
+                    auditFindings: input.queueAuditFindings,
+                    killSwitches: input.queueKillSwitches
+                )
+            )
+        }
+        return reasons
     }
 
     private static func missingActiveCheckpointReleaseReasons(
@@ -860,8 +901,22 @@ struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
         workspace: DecisionEvolutionWorkspaceSnapshot,
         contract: DecisionEvolutionSurfaceContract
     ) -> DecisionEvolutionOperatorSnapshot {
+        build(
+            surfaceKind: surfaceKind,
+            workspace: workspace,
+            contract: contract,
+            policy: workspace.policy(for: contract)
+        )
+    }
+
+    static func build(
+        surfaceKind: DecisionEvolutionSurfaceKind,
+        workspace: DecisionEvolutionWorkspaceSnapshot,
+        contract: DecisionEvolutionSurfaceContract,
+        policy: DecisionEvolutionPolicyOutput
+    ) -> DecisionEvolutionOperatorSnapshot {
         let releaseSummary = workspace.releaseSummary
-        let operatorGuidance = workspace.operatorGuidance(for: contract)
+        let operatorGuidance = policy.operatorGuidance(contract: contract)
 
         return DecisionEvolutionOperatorSnapshot(
             surfaceKind: surfaceKind,
@@ -881,32 +936,10 @@ struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
 
 extension DecisionEvolutionWorkspaceSnapshot {
     func operatorGuidance(for contract: DecisionEvolutionSurfaceContract) -> DecisionEvolutionOperatorGuidance {
-        if releaseSummary == nil,
-           activePresentation != nil,
-           controlSurface.activeCheckpointSource != .none,
-           facts.pendingReviewCount == 0,
-           facts.killSwitches.isEmpty,
-           controlSurface.reviewAuditFindings.isEmpty {
-            return DecisionEvolutionOperatorGuidance(
-                headline: DecisionEvolutionCheckpointRecoverySupport.activeCheckpointHeadline(
-                    source: controlSurface.activeCheckpointSource
-                ),
-                primaryReason: DecisionEvolutionCheckpointRecoverySupport.activeCheckpointReason(
-                    source: controlSurface.activeCheckpointSource
-                )
-            )
-        }
-
-        let blocker = DecisionEvolutionPrimaryBlockerEvaluator.evaluate(workspace: self)
-        let guidance = DecisionEvolutionPrimaryBlockerPresentationSupport.operatorGuidance(
-            blocker: blocker,
-            workspace: self,
+        policy(
+            for: contract
+        ).operatorGuidance(
             contract: contract
-        )
-
-        return DecisionEvolutionOperatorGuidance(
-            headline: guidance.headline,
-            primaryReason: guidance.detail
         )
     }
 }

@@ -1,4 +1,5 @@
 import XCTest
+import BASHostKit
 @testable import Before
 
 final class DecisionSessionEnginePresentationTests: XCTestCase {
@@ -810,6 +811,48 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             latestCheckpointSeq: 42,
             latestCheckpointGoal: "repair parser",
             latestCheckpointActionLine: "action: restored parser workspace",
+            latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
+                sessionID: "sess-control",
+                thoughtFoldChecksum: "fold-control",
+                riskLevel: "high",
+                permitMode: "delay",
+                hostGatePercent: 74,
+                reviewDirectiveLine: "Review guarded resume path",
+                lungState: BASLungState(
+                    breathMode: .guard,
+                    breathPhase: .resume,
+                    thermalPressure: 71,
+                    cachePressure: 49,
+                    restoreReadiness: 0.91,
+                    rollbackAnchorRef: "anchor-control"
+                ),
+                resumeFrame: BASResumeFrame(
+                    resumeID: "resume-control",
+                    sourceFoldID: "fold-control",
+                    resumeDepth: 1,
+                    requiredOrgans: [.riskSpine, .stubCore],
+                    consistencyChecks: ["fold_checksum"],
+                    fallbackMode: .rollbackAnchor
+                ),
+                rollbackAnchor: BASRollbackAnchor(
+                    anchorID: "anchor-control",
+                    safeSnapshotRef: "snapshot-control",
+                    foldRefs: ["fold-control"],
+                    hostVersionRef: "host.v3",
+                    cacheStateRef: "cache-control",
+                    integrityHash: "hash-control"
+                ),
+                sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult(
+                    actuationKinds: [.quarantine],
+                    invalidatedResumeFrameIDs: [],
+                    invalidatedCacheRefs: [],
+                    invalidatedFoldRefs: [],
+                    quarantinedFoldRefs: ["fold-control"],
+                    resultingBreathMode: .quarantine,
+                    preservedReadOnlyRecovery: true,
+                    summary: "quarantine -> fold-control"
+                )
+            ),
             latestEventID: "evt-43",
             latestEventSeq: 43,
             latestEventType: .stepStalled,
@@ -842,9 +885,24 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
                 checkpointDecisionLine: nil,
                 checkpointTaskLine: nil,
                 checkpointPressureLine: nil,
+                checkpointRiskFactorsLine: nil,
+                checkpointReasonCodesLine: nil,
                 checkpointAuditLine: nil,
+                checkpointSovereignVerdictLine: nil,
+                checkpointSovereignAuthorityLine: nil,
+                checkpointSovereignAuditLine: nil,
                 checkpointKillSwitchesLine: nil,
                 checkpointActionLine: "action: restored parser workspace",
+                checkpointLungLine: "Breath guard • Phase resume • Restore 91%",
+                checkpointHotColdLine: "Hot pack stubCore, riskSpine • Warm memoryCodecRidge, hostModulationMesh, toolIntentMesh • Cold 7 • preload guard_preload • eviction protective_retain",
+                checkpointResumeLine: "Resume frame resume-control • source fold-control • depth 1 • organs riskSpine, stubCore",
+                checkpointRollbackLine: "Rollback anchor anchor-control • snapshot snapshot-control • cache cache-control",
+                checkpointSovereignBridgeLine: "quarantine -> fold-control",
+                checkpointSovereignBridgeDetailLines: [
+                    "Sovereign quarantined fold fold-control",
+                    "Sovereign readonly recovery",
+                    "Sovereign mode quarantine"
+                ],
                 branchLine: "Head branch-main • Branches 2 • Merge-ready 1",
                 recoveryLine: "Recoveries 2 • latest \(shortenedTime(Date(timeIntervalSince1970: 210)))",
                 mergeReviewLine: "Merge review 1 active correction branch can append back onto head without rewriting history.",
@@ -1487,6 +1545,105 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         )
     }
 
+    func testCheckpointPresentationFactsFallBackToStructuredAnchorWhenSummaryLinesAreMissing() {
+        let inspection = DecisionSessionRuntimeInspectionSession(
+            sessionID: "sess-checkpoint",
+            title: "parser repair",
+            status: .active,
+            updatedAt: Date(timeIntervalSince1970: 100),
+            headBranchID: "branch-main",
+            latestCheckpointID: "ckpt-9",
+            latestCheckpointSeq: 9,
+            latestCheckpointGoal: "repair parser",
+            latestCheckpointBudgetLine: "eBrain budget: guarded • loops 2 • candidates 2 • decode 160 • thermal watch",
+            latestCheckpointRouteLine: "eBrain route: npu • precision mixed • retrieval 3",
+            latestCheckpointDecisionLine: nil,
+            latestCheckpointTaskLine: nil,
+            latestCheckpointPressureLine: "eBrain pressure: latency 82/1200ms • power 46% • cache 67% • thermal nominal -> watch",
+            latestCheckpointAuditLine: "eBrain audit findings: 2",
+            latestCheckpointActiveKillSwitchesLine: "eBrain active kill switches: force_guard_mode",
+            latestCheckpointKillSwitchesLine: "eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes",
+            latestCheckpointActionLine: "action: restored active quick workspace state",
+            latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
+                sessionID: "sess-anchor",
+                thoughtFoldChecksum: "fold9abc",
+                riskLevel: "guarded",
+                permitMode: "replace",
+                hostGatePercent: 61,
+                reviewDirectiveLine: "Review update ticket: preserve parser-only correction",
+                riskFactorsLine: "Factors: evidence_caveat_load",
+                reasonCodesLine: "Reason codes: evidence.caveat"
+            ),
+            latestEventID: "evt-10",
+            latestEventSeq: 10,
+            latestEventType: .stepRecovered,
+            latestEventDetail: "Recovered from stalled tool step.",
+            openStepCount: 1,
+            openStepStatus: .planning,
+            stalledStepCount: 0,
+            branchCount: 2,
+            recoveryCount: 1,
+            latestRecoveryAt: Date(timeIntervalSince1970: 120)
+        )
+
+        let facts = inspection.checkpointPresentationFacts
+
+        XCTAssertEqual(
+            facts.resolvedDecisionLine,
+            "eBrain risk: guarded • eBrain permit: replace • eBrain host gate: 61% • eBrain fold: fold9abc"
+        )
+        XCTAssertEqual(
+            facts.resolvedTaskLine,
+            "Review update ticket: preserve parser-only correction"
+        )
+        XCTAssertEqual(
+            facts.digestLines,
+            [
+                "eBrain budget: guarded • loops 2 • candidates 2 • decode 160 • thermal watch • eBrain route: npu • precision mixed • retrieval 3",
+                "eBrain risk: guarded • eBrain permit: replace • eBrain host gate: 61% • eBrain fold: fold9abc • Review update ticket: preserve parser-only correction",
+                "eBrain pressure: latency 82/1200ms • power 46% • cache 67% • thermal nominal -> watch",
+                "Factors: evidence_caveat_load",
+                "Reason codes: evidence.caveat",
+                "eBrain audit findings: 2 • eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes",
+                "action: restored active quick workspace state"
+            ]
+        )
+
+        let presentation = DecisionSessionEnginePresentation.build(
+            from: DecisionSystemSessionEngineSummary(
+                layerPlacement: .foldedLung,
+                sessions: 1,
+                activeSessions: 1,
+                stalledSessions: 0,
+                branches: 2,
+                checkpoints: 1,
+                events: 10,
+                steps: 1,
+                activeSession: inspection,
+                recentSessions: [inspection],
+                headline: "Session Engine L3.folded_lung protects edits, checkpoints, and recovery.",
+                signals: []
+            )
+        )
+
+        XCTAssertEqual(
+            presentation.activeSession?.checkpointDecisionLine,
+            "eBrain risk: guarded • eBrain permit: replace • eBrain host gate: 61% • eBrain fold: fold9abc"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.checkpointTaskLine,
+            "Review update ticket: preserve parser-only correction"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.checkpointRiskFactorsLine,
+            "Factors: evidence_caveat_load"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.checkpointReasonCodesLine,
+            "Reason codes: evidence.caveat"
+        )
+    }
+
     func testReplayRecoverySummaryBuildsDigestLines() {
         let summary = DecisionSessionEngineReplayRecoverySummary(
             sourceDescriptor: .checkpointRecoveryDefault,
@@ -1498,16 +1655,133 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             taskLine: "Review update ticket: preserve parser-only correction",
             actionLine: "action: restored active quick workspace state",
             pressureLine: "eBrain pressure: latency 82/1200ms",
+            riskFactorsLine: "Factors: evidence_caveat_load",
+            reasonCodesLine: "Reason codes: evidence.caveat",
             auditLine: "eBrain audit findings: 2",
+            sovereignVerdictLine: "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
+            sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • lock session • quarantine session",
+            sovereignAuditLine: "Sovereign audit • BR-SOV-004 • ref audit.session-l14",
             activeKillSwitchesLine: "eBrain active kill switches: force_guard_mode",
-            killSwitchesLine: "eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes"
+            killSwitchesLine: "eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes",
+            lungLine: nil,
+            resumeLine: nil,
+            rollbackLine: nil,
+            sovereignBridgeLine: nil
         )
 
         XCTAssertEqual(
             summary.digestLines,
             [
                 "Checkpoint recovery • Replay session sess-active • Head branch-main • Recovered \(shortenedTime(Date(timeIntervalSince1970: 36_000))) • latest stable checkpoint remains replayable.",
-                "Checkpoint ckpt-9 • repair parser • eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes"
+                "Checkpoint ckpt-9 • repair parser • eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes",
+                "Factors: evidence_caveat_load • Reason codes: evidence.caveat",
+                "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
+                "Sovereign authority • tokens memoryWrite • lock session • quarantine session",
+                "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+            ]
+        )
+    }
+
+    func testCheckpointPresentationFactsDigestLinesExpandFoldedLungReceipts() {
+        let facts = DecisionSessionCheckpointPresentationFacts(
+            budgetLine: nil,
+            routeLine: nil,
+            decisionLine: nil,
+            taskLine: nil,
+            pressureLine: nil,
+            riskFactorsLine: nil,
+            reasonCodesLine: nil,
+            auditLine: nil,
+            activeKillSwitchesLine: nil,
+            killSwitchesLine: nil,
+            actionLine: nil,
+            anchor: DecisionSessionCheckpointEBrainAnchor(
+                sessionID: "sess-active",
+                thoughtFoldChecksum: "fold-capability",
+                riskLevel: "high",
+                permitMode: "delay",
+                hostGatePercent: 61,
+                reviewDirectiveLine: "Review guarded resume path",
+                morphGraph: BASMorphGraph(
+                    graphID: "morph-capability",
+                    activeOrgans: [.stubCore, .riskSpine, .permitKnot],
+                    executionOrder: ["stubCore", "riskSpine", "permitKnot"],
+                    precisionMap: [
+                        BASNeuralOrganPrecision(organ: .stubCore, tier: .full),
+                        BASNeuralOrganPrecision(organ: .riskSpine, tier: .protected),
+                        BASNeuralOrganPrecision(organ: .permitKnot, tier: .protected)
+                    ],
+                    deviceRouteMap: [
+                        "stubCore": "coreNPU",
+                        "riskSpine": "coreNPU",
+                        "permitKnot": "scoutCPU"
+                    ],
+                    thermalProfile: ["thermal.hot", "latency.192", "cadence.resume_guarded"],
+                    sovereignConstraints: ["rollback"]
+                ),
+                precisionProfile: BASPrecisionProfile(
+                    organPrecisions: [
+                        BASNeuralOrganPrecision(organ: .stubCore, tier: .full),
+                        BASNeuralOrganPrecision(organ: .riskSpine, tier: .protected),
+                        BASNeuralOrganPrecision(organ: .permitKnot, tier: .protected)
+                    ],
+                    lockedPrecisions: [.riskSpine, .permitKnot, .stubCore],
+                    degradationOrder: [.full, .protected, .balanced, .minimal],
+                    guardSafeFloor: .protected
+                ),
+                lungState: BASLungState(
+                    breathMode: .guard,
+                    breathPhase: .resume,
+                    thermalPressure: 71,
+                    cachePressure: 49,
+                    restoreReadiness: 0.91,
+                    rollbackAnchorRef: "anchor-safe"
+                ),
+                resumeFrame: BASResumeFrame(
+                    resumeID: "resume-safe",
+                    sourceFoldID: "fold-capability",
+                    resumeDepth: 2,
+                    requiredOrgans: [.riskSpine, .permitKnot, .stubCore],
+                    consistencyChecks: ["fold_checksum"],
+                    fallbackMode: .rollbackAnchor
+                ),
+                rollbackAnchor: BASRollbackAnchor(
+                    anchorID: "anchor-safe",
+                    safeSnapshotRef: "snapshot-safe",
+                    foldRefs: ["fold-capability"],
+                    hostVersionRef: "host-v1",
+                    cacheStateRef: "cache-safe",
+                    integrityHash: "hash-safe"
+                ),
+                sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult(
+                    actuationKinds: [.rollback],
+                    invalidatedResumeFrameIDs: ["resume-safe"],
+                    invalidatedCacheRefs: ["cache-safe"],
+                    invalidatedFoldRefs: ["fold-capability"],
+                    quarantinedFoldRefs: [],
+                    resultingBreathMode: .guard,
+                    preservedReadOnlyRecovery: true,
+                    summary: "rollback -> snapshot-safe • guard breath"
+                )
+            )
+        )
+
+        XCTAssertEqual(
+            facts.digestLines,
+            [
+                "eBrain risk: high • eBrain permit: delay • eBrain host gate: 61% • eBrain fold: fold-capability • Review guarded resume path",
+                "Breath guard • Phase resume • Restore 91%",
+                "Morph graph morph-capability • organs stubCore, riskSpine, permitKnot • route coreNPU • thermal thermal.hot",
+                "Hot pack stubCore, riskSpine, permitKnot • Warm memoryCodecRidge, hostModulationMesh, toolIntentMesh • Cold 6 • preload guard_preload • eviction protective_retain",
+                "Precision profile full -> protected -> balanced -> minimal • floor protected • locked riskSpine, permitKnot, stubCore",
+                "Resume frame resume-safe • source fold-capability • depth 2 • organs riskSpine, permitKnot, stubCore",
+                "Rollback anchor anchor-safe • snapshot snapshot-safe • cache cache-safe",
+                "rollback -> snapshot-safe • guard breath",
+                "Sovereign invalidated resume resume-safe",
+                "Sovereign invalidated cache cache-safe",
+                "Sovereign invalidated fold fold-capability",
+                "Sovereign readonly recovery",
+                "Sovereign mode guard"
             ]
         )
     }
@@ -1522,6 +1796,54 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
     }
 
     func testPresentationCarriesActiveAndRecentSessionInspection() {
+        let checkpointAnchor = DecisionSessionCheckpointEBrainAnchor(
+            sessionID: "sess-active",
+            thoughtFoldChecksum: "fold9abc",
+            riskLevel: "guarded",
+            permitMode: "replace",
+            hostGatePercent: 61,
+            reviewDirectiveLine: "Review update ticket: preserve parser-only correction",
+            riskFactorsLine: "Factors: evidence_caveat_load",
+            reasonCodesLine: "Reason codes: evidence.caveat",
+            sovereignVerdictLine: "Sovereign verdict quarantine • latched • mode quarantine • reason runtime.quarantine",
+            sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • lock session • quarantine session",
+            sovereignAuditLine: "Sovereign audit • BR-SOV-004 • ref audit.session-l14",
+            lungState: BASLungState(
+                breathMode: .guard,
+                breathPhase: .resume,
+                thermalPressure: 67,
+                cachePressure: 54,
+                restoreReadiness: 0.82,
+                rollbackAnchorRef: "anchor-active"
+            ),
+            resumeFrame: BASResumeFrame(
+                resumeID: "resume-active",
+                sourceFoldID: "fold9abc",
+                resumeDepth: 2,
+                requiredOrgans: [.riskSpine, .permitKnot, .stubCore],
+                consistencyChecks: ["fold_checksum", "risk_permit"],
+                fallbackMode: .rollbackAnchor
+            ),
+            rollbackAnchor: BASRollbackAnchor(
+                anchorID: "anchor-active",
+                safeSnapshotRef: "snapshot-active",
+                foldRefs: ["fold9abc"],
+                hostVersionRef: "host.v2",
+                cacheStateRef: "cache-active",
+                integrityHash: "hash-active"
+            ),
+            sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult(
+                actuationKinds: [.rollback],
+                invalidatedResumeFrameIDs: ["resume-stale"],
+                invalidatedCacheRefs: ["cache-dirty"],
+                invalidatedFoldRefs: ["fold-dirty"],
+                quarantinedFoldRefs: [],
+                resultingBreathMode: .guard,
+                preservedReadOnlyRecovery: true,
+                summary: "rollback -> snapshot-active • guard breath"
+            )
+        )
+
         let active = DecisionSessionRuntimeInspectionSession(
             sessionID: "sess-active",
             title: "parser repair",
@@ -1540,6 +1862,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             latestCheckpointActiveKillSwitchesLine: "eBrain active kill switches: force_guard_mode",
             latestCheckpointKillSwitchesLine: "eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes",
             latestCheckpointActionLine: "action: restored active quick workspace state",
+            latestCheckpointEBrainAnchor: checkpointAnchor,
             latestEventID: "evt-10",
             latestEventSeq: 10,
             latestEventType: .stepRecovered,
@@ -1606,10 +1929,21 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         XCTAssertTrue(presentation.healthLine?.contains("Stalled sessions 1") == true)
         XCTAssertEqual(presentation.reviewItems.map(\.title), [
             "Merge review queue",
-            "Replay anchor ready"
+            "Replay anchor ready",
+            "Sovereign posture",
+            "Horizon diagnostics"
         ])
         XCTAssertTrue(presentation.reviewItems[0].detail.contains("Merge-ready branches 1"))
         XCTAssertTrue(presentation.reviewItems[1].detail.contains("Checkpoint ckpt-9"))
+        XCTAssertEqual(
+            presentation.reviewItems[2].detail,
+            "Sovereign verdict quarantine • latched • mode quarantine • reason runtime.quarantine • Sovereign authority • tokens memoryWrite • lock session • quarantine session • Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+        )
+        XCTAssertEqual(presentation.reviewItems[2].severity, .watch)
+        XCTAssertEqual(
+            presentation.reviewItems[3].detail,
+            "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+        )
         XCTAssertEqual(presentation.activeSession?.healthSummary?.severity, .stable)
         XCTAssertEqual(presentation.activeSession?.healthSummary?.title, "Recovered checkpoint line")
         XCTAssertEqual(presentation.activeSession?.replayRecoverySummary.sourceDescriptor.kind, .checkpointRecovery)
@@ -1624,6 +1958,18 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             "eBrain audit findings: 2"
         )
         XCTAssertEqual(
+            presentation.activeSession?.checkpointSovereignVerdictLine,
+            "Sovereign verdict quarantine • latched • mode quarantine • reason runtime.quarantine"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.checkpointSovereignAuthorityLine,
+            "Sovereign authority • tokens memoryWrite • lock session • quarantine session"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.checkpointSovereignAuditLine,
+            "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+        )
+        XCTAssertEqual(
             presentation.activeSession?.checkpointKillSwitchesLine,
             "eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes"
         )
@@ -1634,6 +1980,18 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         XCTAssertEqual(
             presentation.activeSession?.replayRecoverySummary.auditLine,
             "eBrain audit findings: 2"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.sovereignVerdictLine,
+            "Sovereign verdict quarantine • latched • mode quarantine • reason runtime.quarantine"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.sovereignAuthorityLine,
+            "Sovereign authority • tokens memoryWrite • lock session • quarantine session"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.sovereignAuditLine,
+            "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
         )
         XCTAssertEqual(
             presentation.activeSession?.replayRecoverySummary.pressureLine,
@@ -1665,8 +2023,76 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             "action: restored active quick workspace state"
         )
         XCTAssertEqual(
+            presentation.activeSession?.checkpointRiskFactorsLine,
+            "Factors: evidence_caveat_load"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.checkpointReasonCodesLine,
+            "Reason codes: evidence.caveat"
+        )
+        XCTAssertEqual(
             presentation.activeSession?.replayRecoverySummary.actionLine,
             "action: restored active quick workspace state"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.riskFactorsLine,
+            "Factors: evidence_caveat_load"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.reasonCodesLine,
+            "Reason codes: evidence.caveat"
+        )
+        XCTAssertTrue(
+            presentation.activeSession?.replayRecoverySummary.digestLines.contains(
+                "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+            ) == true
+        )
+        XCTAssertTrue(
+            presentation.activeSession?.replayRecoverySummary.digestLines.contains(
+                "Sovereign verdict quarantine • latched • mode quarantine • reason runtime.quarantine"
+            ) == true
+        )
+        XCTAssertTrue(
+            presentation.activeSession?.replayRecoverySummary.digestLines.contains(
+                "Sovereign authority • tokens memoryWrite • lock session • quarantine session"
+            ) == true
+        )
+        XCTAssertTrue(
+            presentation.activeSession?.replayRecoverySummary.digestLines.contains(
+                "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+            ) == true
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.lungLine,
+            "Breath guard • Phase resume • Restore 82%"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.resumeLine,
+            "Resume frame resume-active • source fold9abc • depth 2 • organs riskSpine, permitKnot, stubCore"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.rollbackLine,
+            "Rollback anchor anchor-active • snapshot snapshot-active • cache cache-active"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.sovereignBridgeLine,
+            "rollback -> snapshot-active • guard breath"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.lungLine,
+            "Breath guard • Phase resume • Restore 82%"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.resumeLine,
+            "Resume frame resume-active • source fold9abc • depth 2 • organs riskSpine, permitKnot, stubCore"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.rollbackLine,
+            "Rollback anchor anchor-active • snapshot snapshot-active • cache cache-active"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.sovereignBridgeLine,
+            "rollback -> snapshot-active • guard breath"
         )
         XCTAssertTrue(presentation.activeSession?.activityLine.contains("Open steps 1") == true)
         XCTAssertTrue(presentation.activeSession?.branchLine.contains("Merge-ready 1") == true)
@@ -1743,6 +2169,74 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         XCTAssertEqual(
             presentation.activeSession?.stepAlertLine,
             "Watchdog budget expired on the current open step. Recover before continuing."
+        )
+    }
+
+    func testPresentationElevatesHorizonDiagnosticsIntoHealthSummary() {
+        let active = DecisionSessionRuntimeInspectionSession(
+            sessionID: "sess-horizon",
+            title: "latest policy review",
+            status: .active,
+            updatedAt: Date(timeIntervalSince1970: 260),
+            headBranchID: "branch-main",
+            latestCheckpointID: "ckpt-14",
+            latestCheckpointSeq: 14,
+            latestCheckpointGoal: "preserve stable facts only",
+            latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
+                sessionID: "sess-horizon",
+                thoughtFoldChecksum: "fold14abc",
+                riskLevel: "guarded",
+                permitMode: "delay",
+                hostGatePercent: 44,
+                riskFactorsLine: "Factors: evidence_caveat_load",
+                reasonCodesLine: "Reason codes: evidence.caveat"
+            ),
+            latestEventID: "evt-14",
+            latestEventSeq: 14,
+            latestEventType: .assistantMessage,
+            latestEventDetail: "Checkpoint remains stable.",
+            openStepCount: 0,
+            openStepStatus: nil,
+            stalledStepCount: 0,
+            branchCount: 1,
+            recoveryCount: 0,
+            latestRecoveryAt: nil
+        )
+        let summary = DecisionSystemSessionEngineSummary(
+            layerPlacement: .foldedLung,
+            sessions: 1,
+            activeSessions: 1,
+            stalledSessions: 0,
+            branches: 1,
+            checkpoints: 1,
+            events: 14,
+            steps: 0,
+            activeSession: active,
+            recentSessions: [active],
+            headline: "Session Engine L3.folded_lung protects edits, checkpoints, and recovery.",
+            signals: []
+        )
+
+        let presentation = DecisionSessionEnginePresentation.build(from: summary)
+
+        XCTAssertEqual(presentation.healthSummary?.severity, .watch)
+        XCTAssertEqual(presentation.healthSummary?.title, "Horizon diagnostics active")
+        XCTAssertEqual(
+            presentation.healthLine,
+            "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+        )
+        XCTAssertEqual(presentation.activeSession?.healthSummary?.severity, .watch)
+        XCTAssertEqual(presentation.activeSession?.healthSummary?.title, "Horizon diagnostics active")
+        XCTAssertEqual(
+            presentation.activeSession?.healthSummary?.detail,
+            "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+        )
+        XCTAssertEqual(
+            presentation.reviewItems.map(\.title),
+            [
+                "Replay anchor ready",
+                "Horizon diagnostics"
+            ]
         )
     }
 

@@ -51,6 +51,7 @@ final class WidgetSnapshotStoreTests: XCTestCase {
         XCTAssertEqual(loaded.messageBody, "A little distance can change a buying answer.")
         XCTAssertEqual(loaded.evolution?.releaseStateID, "watch")
         XCTAssertEqual(loaded.evolution?.activeCheckpointSourceID, "automaticFallback")
+        XCTAssertEqual(loaded.evolution?.controlEntryKindID, nil)
         XCTAssertEqual(loaded.evolution?.headline, "Watching the pending review queue")
         XCTAssertEqual(loaded.evolution?.primaryReason, "1 checkpoint still requires review.")
         XCTAssertEqual(loaded.evolution?.attentionSeverityID, "review")
@@ -84,6 +85,79 @@ final class WidgetSnapshotStoreTests: XCTestCase {
         XCTAssertNil(loaded.evolution)
         XCTAssertNil(SharedContainer.defaults.data(forKey: "before.widget.snapshot"))
         XCTAssertNotNil(SharedPublicStateStore.loadData(key: "before.widget.snapshot"))
+    }
+
+    func testLoadDecodesLegacyEvolutionSnapshotWithoutControlEntryFields() throws {
+        WidgetSnapshotStore.clear()
+
+        let legacyPayload = """
+        {
+          "safeMessage": {
+            "surfaceRaw": "publicSafe",
+            "headline": "Steady",
+            "body": "Keep the widget path visible."
+          },
+          "latestVerdict": "pause",
+          "latestScenario": "buy",
+          "evolution": {
+            "releaseStateID": "watch",
+            "activeCheckpointSourceID": "automaticFallback",
+            "headline": "Watching the pending review queue",
+            "primaryReason": "1 checkpoint still requires review.",
+            "attentionSeverityID": "review",
+            "attentionBadgeValue": "1",
+            "attentionHeadline": "Evolution review is waiting",
+            "attentionDetail": "1 checkpoint still needs review before the queue is clear.",
+            "hasActiveCheckpoint": false,
+            "hasReviewCheckpoint": true,
+            "pendingReviewCount": 1,
+            "rollbackReadyCount": 0,
+            "activeKillSwitchCount": 0,
+            "recommendedKillSwitchCount": 1
+          },
+          "updatedAt": 1000
+        }
+        """.data(using: .utf8)!
+
+        SharedPublicStateStore.saveData(legacyPayload, key: "before.widget.snapshot")
+
+        let loaded = WidgetSnapshotStore.load()
+        let evolution = try XCTUnwrap(loaded.evolution)
+
+        XCTAssertEqual(evolution.controlEntryKindID, nil)
+        XCTAssertNil(evolution.storedControlEntry)
+        XCTAssertEqual(evolution.releaseStateID, "watch")
+        XCTAssertEqual(evolution.activeCheckpointSourceID, "automaticFallback")
+        XCTAssertEqual(evolution.displayHeadline, "Evolution review is waiting")
+        XCTAssertEqual(
+            evolution.displayDetail,
+            "1 checkpoint still needs review before the queue is clear."
+        )
+        XCTAssertEqual(evolution.controlEntryTitle, "Review on iPhone")
+        XCTAssertEqual(evolution.controlEntrySystemImage, "checklist")
+        XCTAssertEqual(
+            evolution.attentionInstruction,
+            "Continue on iPhone to review pending checkpoints and clear the queue."
+        )
+    }
+
+    func testWidgetSnapshotPrimaryActionFallsBackToQuickOpenWhenEvolutionIsAbsent() {
+        let snapshot = WidgetSnapshot(
+            safeMessage: WidgetSafeMessage(
+                surface: .publicSafe,
+                headline: "Give it room",
+                body: "A little distance can change a buying answer."
+            ),
+            latestVerdict: .pause,
+            latestScenario: .buy,
+            evolution: nil,
+            updatedAt: Date(timeIntervalSince1970: 0)
+        )
+
+        XCTAssertEqual(snapshot.primaryActionPresentation.kind, .quick)
+        XCTAssertEqual(snapshot.primaryActionPresentation.title, "Open Before")
+        XCTAssertEqual(snapshot.primaryActionPresentation.systemImage, "pause.circle.fill")
+        XCTAssertNil(snapshot.primaryActionPresentation.prompt)
     }
 
     func testLoadQuarantinesCorruptedSharedPublicSnapshot() {
@@ -177,6 +251,131 @@ final class WidgetSnapshotStoreTests: XCTestCase {
         XCTAssertEqual(presentation.controlEntry?.systemImage, "checklist")
     }
 
+    func testWidgetSnapshotPrimaryActionUsesEvolutionControlEntryWhenAttentionIsPresent() {
+        let snapshot = WidgetSnapshot(
+            safeMessage: WidgetSafeMessage(
+                surface: .publicSafe,
+                headline: "Hold",
+                body: "The queue needs a closer look."
+            ),
+            latestVerdict: .pause,
+            latestScenario: .buy,
+            evolution: WidgetEvolutionSnapshot(
+                releaseStateID: "blocked",
+                activeCheckpointSourceID: "recoveredActive",
+                headline: "Evolution review is waiting",
+                primaryReason: "1 checkpoint still needs review before the queue is clear.",
+                attentionSeverityID: "review",
+                attentionBadgeValue: "1",
+                attentionHeadline: "Evolution review is waiting",
+                attentionDetail: "1 checkpoint still needs review before the queue is clear.",
+                hasActiveCheckpoint: true,
+                hasReviewCheckpoint: true,
+                pendingReviewCount: 1,
+                rollbackReadyCount: 0,
+                activeKillSwitchCount: 0,
+                recommendedKillSwitchCount: 0
+            ),
+            updatedAt: Date(timeIntervalSince1970: 0)
+        )
+
+        XCTAssertEqual(snapshot.primaryActionPresentation.kind, .evolutionControl)
+        XCTAssertEqual(snapshot.primaryActionPresentation.title, "Review on iPhone")
+        XCTAssertEqual(snapshot.primaryActionPresentation.systemImage, "checklist")
+        XCTAssertEqual(snapshot.primaryActionPresentation.prompt, "Evolution review is waiting")
+        XCTAssertEqual(
+            snapshot.primaryActionPresentation.triggerReason,
+            "1 checkpoint still needs review before the queue is clear."
+        )
+    }
+
+    func testWidgetEvolutionSnapshotPrefersStoredControlEntryPresentation() {
+        let storedControlEntry = DecisionEvolutionWidgetControlEntryPresentation(
+            title: "Inspect on iPhone",
+            systemImage: "scope",
+            prompt: "Stored prompt",
+            instruction: "Stored instruction",
+            triggerReason: "Stored reason"
+        )
+        let evolution = WidgetEvolutionSnapshot(
+            releaseStateID: "blocked",
+            activeCheckpointSourceID: nil,
+            controlEntryKindID: DecisionEvolutionWidgetControlEntryKind.review.rawValue,
+            storedControlEntry: storedControlEntry,
+            headline: "Fallback headline",
+            primaryReason: "Fallback reason",
+            attentionSeverityID: "review",
+            attentionBadgeValue: "1",
+            attentionHeadline: "Fallback attention",
+            attentionDetail: "Fallback detail",
+            hasActiveCheckpoint: true,
+            hasReviewCheckpoint: true,
+            pendingReviewCount: 1,
+            rollbackReadyCount: 0,
+            activeKillSwitchCount: 0,
+            recommendedKillSwitchCount: 0
+        )
+
+        XCTAssertTrue(evolution.surfacesAttention)
+        XCTAssertEqual(evolution.controlEntryTitle, "Inspect on iPhone")
+        XCTAssertEqual(evolution.controlEntrySystemImage, "scope")
+        XCTAssertEqual(evolution.controlEntryPrompt, "Stored prompt")
+        XCTAssertEqual(evolution.controlEntryTriggerReason, "Stored reason")
+        XCTAssertEqual(evolution.attentionInstruction, "Stored instruction")
+        XCTAssertEqual(evolution.surfacePresentation.controlEntry, storedControlEntry)
+    }
+
+    func testSaveRoundTripsStoredControlEntryFieldsThroughSharedPublicStorage() throws {
+        WidgetSnapshotStore.clear()
+
+        let storedControlEntry = DecisionEvolutionWidgetControlEntryPresentation(
+            title: "Inspect on iPhone",
+            systemImage: "scope",
+            prompt: "Stored prompt",
+            instruction: "Stored instruction",
+            triggerReason: "Stored reason"
+        )
+        let snapshot = WidgetSnapshot(
+            safeMessage: WidgetSafeMessage(
+                surface: .publicSafe,
+                headline: "Steady",
+                body: "Keep the shared state compact."
+            ),
+            latestVerdict: .pause,
+            latestScenario: .buy,
+            evolution: WidgetEvolutionSnapshot(
+                releaseStateID: "blocked",
+                activeCheckpointSourceID: nil,
+                controlEntryKindID: DecisionEvolutionWidgetControlEntryKind.control.rawValue,
+                storedControlEntry: storedControlEntry,
+                headline: "Fallback headline",
+                primaryReason: "Fallback reason",
+                attentionSeverityID: "blocked",
+                attentionBadgeValue: "!",
+                attentionHeadline: "Fallback attention",
+                attentionDetail: "Fallback detail",
+                hasActiveCheckpoint: true,
+                hasReviewCheckpoint: false,
+                pendingReviewCount: 0,
+                rollbackReadyCount: 0,
+                activeKillSwitchCount: 1,
+                recommendedKillSwitchCount: 0
+            ),
+            updatedAt: Date(timeIntervalSince1970: 4_000)
+        )
+
+        WidgetSnapshotStore.save(snapshot)
+        let evolution = try XCTUnwrap(WidgetSnapshotStore.load().evolution)
+
+        XCTAssertEqual(
+            evolution.controlEntryKindID,
+            DecisionEvolutionWidgetControlEntryKind.control.rawValue
+        )
+        XCTAssertEqual(evolution.storedControlEntry, storedControlEntry)
+        XCTAssertEqual(evolution.controlEntryTitle, "Inspect on iPhone")
+        XCTAssertEqual(evolution.surfacePresentation.controlEntry, storedControlEntry)
+    }
+
     func testWidgetEvolutionSnapshotControlEntryPrefersControlWhenOnlyKillSwitchesRemain() {
         let evolution = WidgetEvolutionSnapshot(
             releaseStateID: "blocked",
@@ -205,6 +404,34 @@ final class WidgetSnapshotStoreTests: XCTestCase {
         )
     }
 
+    func testWidgetEvolutionSnapshotUsesExplicitControlEntryKindWhenStored() {
+        let evolution = WidgetEvolutionSnapshot(
+            releaseStateID: "watch",
+            activeCheckpointSourceID: nil,
+            controlEntryKindID: DecisionEvolutionWidgetControlEntryKind.rollback.rawValue,
+            headline: "Policy routed widget action",
+            primaryReason: "Rollback is the only remaining safe move.",
+            attentionSeverityID: "none",
+            attentionBadgeValue: nil,
+            attentionHeadline: nil,
+            attentionDetail: nil,
+            hasActiveCheckpoint: true,
+            hasReviewCheckpoint: false,
+            pendingReviewCount: 0,
+            rollbackReadyCount: 0,
+            activeKillSwitchCount: 0,
+            recommendedKillSwitchCount: 0
+        )
+
+        XCTAssertTrue(evolution.surfacesAttention)
+        XCTAssertEqual(evolution.controlEntryTitle, "Rollback on iPhone")
+        XCTAssertEqual(evolution.controlEntrySystemImage, "arrow.uturn.backward.circle")
+        XCTAssertEqual(
+            evolution.surfacePresentation.controlEntry?.title,
+            "Rollback on iPhone"
+        )
+    }
+
     func testSaveSanitizesEvolutionSnapshotForSharedPublicStorage() throws {
         WidgetSnapshotStore.clear()
 
@@ -219,6 +446,13 @@ final class WidgetSnapshotStoreTests: XCTestCase {
             evolution: WidgetEvolutionSnapshot(
                 releaseStateID: "blocked",
                 activeCheckpointSourceID: "pinnedHint",
+                storedControlEntry: DecisionEvolutionWidgetControlEntryPresentation(
+                    title: String(repeating: "T", count: 80),
+                    systemImage: String(repeating: "S", count: 90),
+                    prompt: String(repeating: "P", count: 220),
+                    instruction: String(repeating: "I", count: 260),
+                    triggerReason: String(repeating: "G", count: 260)
+                ),
                 headline: String(repeating: "H", count: 120),
                 primaryReason: String(repeating: "R", count: 220),
                 attentionSeverityID: "blocked",
@@ -247,6 +481,11 @@ final class WidgetSnapshotStoreTests: XCTestCase {
         XCTAssertEqual(evolution.attentionBadgeValue?.count, 8)
         XCTAssertEqual(evolution.attentionHeadline?.count, 120)
         XCTAssertEqual(evolution.attentionDetail?.count, 160)
+        XCTAssertEqual(evolution.storedControlEntry?.title.count, 40)
+        XCTAssertEqual(evolution.storedControlEntry?.systemImage.count, 60)
+        XCTAssertEqual(evolution.storedControlEntry?.prompt.count, 120)
+        XCTAssertEqual(evolution.storedControlEntry?.instruction.count, 160)
+        XCTAssertEqual(evolution.storedControlEntry?.triggerReason?.count, 160)
         XCTAssertEqual(evolution.pendingReviewCount, 0)
         XCTAssertEqual(evolution.rollbackReadyCount, 0)
         XCTAssertEqual(evolution.activeKillSwitchCount, 0)
@@ -452,9 +691,32 @@ final class WidgetSnapshotStoreTests: XCTestCase {
             activeKillSwitchCount: 1,
             recommendedKillSwitchCount: 0
         )
+        let audit = WidgetEvolutionSnapshot(
+            releaseStateID: "watch",
+            activeCheckpointSourceID: "automaticFallback",
+            controlEntryKindID: DecisionEvolutionWidgetControlEntryKind.audit.rawValue,
+            headline: "Watching audit findings before wider rollout",
+            primaryReason: "Factors: evidence_caveat_load",
+            attentionSeverityID: "review",
+            attentionBadgeValue: "!",
+            attentionHeadline: "Watching audit findings before wider rollout",
+            attentionDetail: "Factors: evidence_caveat_load",
+            hasActiveCheckpoint: true,
+            hasReviewCheckpoint: false,
+            pendingReviewCount: 0,
+            rollbackReadyCount: 0,
+            activeKillSwitchCount: 0,
+            recommendedKillSwitchCount: 0
+        )
 
         XCTAssertEqual(review.watchControlEntryTitle, "Review on iPhone")
         XCTAssertEqual(blocked.watchControlEntryTitle, "Control on iPhone")
+        XCTAssertEqual(audit.watchControlEntryTitle, "Audit on iPhone")
+        XCTAssertEqual(audit.controlEntrySystemImage, "exclamationmark.circle")
+        XCTAssertEqual(
+            audit.attentionInstruction,
+            "Continue on iPhone to inspect audit findings before widening rollout."
+        )
     }
 
     func testWidgetPresentationSupportBuildsSharedCompactStatusAndControlEntryCopy() {

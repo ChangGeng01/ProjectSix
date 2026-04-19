@@ -6,6 +6,9 @@ struct DecisionReplayDiagnosticsBlockView: View {
     var isLoading: Bool = false
     var emptyMessage: String? = nil
     var wrapsInPanelCard: Bool = false
+    var layout: DecisionReplayDiagnosticsView.Layout = .full
+    var showsHeader: Bool = true
+    var excludesOverviewSummary: Bool = false
 
     var body: some View {
         Group {
@@ -33,7 +36,10 @@ struct DecisionReplayDiagnosticsBlockView: View {
                         .controlSize(.small)
                 } else if let presentation {
                     DecisionReplayDiagnosticsView(
-                        presentation: presentation
+                        presentation: presentation,
+                        layout: layout,
+                        showsHeader: showsHeader,
+                        excludesOverviewSummary: excludesOverviewSummary
                     )
                 } else if let emptyMessage, !emptyMessage.isEmpty {
                     Text(emptyMessage)

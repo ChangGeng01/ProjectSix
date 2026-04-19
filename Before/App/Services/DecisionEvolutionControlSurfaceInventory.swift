@@ -84,27 +84,10 @@ struct DecisionEvolutionControlSurfaceInventory: Equatable, Sendable {
         }
 
         if let resolvedContext = context {
-            let contextPreferred = lineages.dropFirst().reduce(lineages[0]) { best, candidate in
-                if isPreferredCheckpointLineage(
-                    candidate,
-                    over: best,
-                    matching: resolvedContext
-                ) {
-                    return candidate
-                }
-
-                if isPreferredCheckpointLineage(
-                    best,
-                    over: candidate,
-                    matching: resolvedContext
-                ) {
-                    return best
-                }
-
-                return candidate.checkpointID > best.checkpointID ? candidate : best
-            }
-
-            return contextPreferred
+            return DecisionEvolutionRuntimeAnchorResolver.preferredLineage(
+                in: lineages,
+                matching: resolvedContext
+            )
         }
 
         return lineages.reduce(lineages[0]) { best, candidate in
@@ -118,37 +101,5 @@ struct DecisionEvolutionControlSurfaceInventory: Equatable, Sendable {
 
             return candidate.checkpointID > best.checkpointID ? candidate : best
         }
-    }
-
-    private func isPreferredCheckpointLineage(
-        _ lhs: DecisionEvolutionLineageSnapshot,
-        over rhs: DecisionEvolutionLineageSnapshot,
-        matching context: DecisionTestingCheckpointSelectionContext
-    ) -> Bool {
-        let lhsModeScore = lhs.mode == context.mode ? 1 : 0
-        let rhsModeScore = rhs.mode == context.mode ? 1 : 0
-        if lhsModeScore != rhsModeScore {
-            return lhsModeScore > rhsModeScore
-        }
-
-        if let contextSource = context.source {
-            let lhsSourceScore = lhs.eBrain.source == contextSource ? 1 : 0
-            let rhsSourceScore = rhs.eBrain.source == contextSource ? 1 : 0
-            if lhsSourceScore != rhsSourceScore {
-                return lhsSourceScore > rhsSourceScore
-            }
-        }
-
-        let lhsDistance = abs(lhs.eBrain.recordedAt.timeIntervalSince(context.referenceDate))
-        let rhsDistance = abs(rhs.eBrain.recordedAt.timeIntervalSince(context.referenceDate))
-        if lhsDistance != rhsDistance {
-            return lhsDistance < rhsDistance
-        }
-
-        if lhs.eBrain.recordedAt != rhs.eBrain.recordedAt {
-            return lhs.eBrain.recordedAt > rhs.eBrain.recordedAt
-        }
-
-        return lhs.checkpointID > rhs.checkpointID
     }
 }

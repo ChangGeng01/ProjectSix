@@ -1,7 +1,211 @@
 import XCTest
+import BASHostKit
 @testable import Before
 
 final class DecisionSessionEngineTests: XCTestCase {
+    func testCheckpointSummaryRecognizesLegacyReviewTaskPrefix() {
+        let summary = DecisionSessionCheckpointSummary(
+            goal: "hold boundary",
+            acceptedConstraints: [],
+            confirmedFacts: [],
+            openTasks: ["Review: Hold before sending"],
+            currentScope: ["ebrain"]
+        )
+
+        XCTAssertEqual(summary.eBrainTaskLine, "Review: Hold before sending")
+    }
+
+    func testCheckpointRuntimeStatePersistsStructuredEBrainAnchor() async throws {
+        let engine = try makeEngine()
+        let session = try await engine.createSession(title: "anchor persistence")
+
+        let created = try await engine.createCheckpoint(
+            sessionId: session.id,
+            draft: DecisionSessionCheckpointDraft(
+                summary: DecisionSessionCheckpointSummary(
+                    goal: "preserve structured anchor",
+                    acceptedConstraints: [],
+                    confirmedFacts: [],
+                    openTasks: [],
+                    currentScope: ["ebrain"]
+                ),
+                runtimeState: DecisionSessionCheckpointRuntimeState(
+                    workspacePath: "/project/a",
+                    branchName: "feature/parser",
+                    activeFiles: ["src/parser.ts"],
+                    currentMode: .review,
+                    eBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
+                        sessionID: "sess-anchor",
+                        thoughtFoldChecksum: "fold9abc12345",
+                        riskLevel: "guarded",
+                        permitMode: "replace",
+                        hostGatePercent: 61,
+                        reviewDirectiveLine: "  Review update ticket: preserve parser-only correction  ",
+                        executionCapability: DecisionSessionCheckpointExecutionCapability(
+                            activeProviderID: DecisionModelProviderKind.foundationModels.rawValue,
+                            preferredProviderID: DecisionModelProviderPreference.foundationModels.rawValue,
+                            fallbackProviderID: DecisionModelProviderKind.gemmaE4B.rawValue,
+                            providerTrackID: DecisionModelProviderTrack.builtInSystem.rawValue,
+                            executionTierID: DecisionIntelligenceExecutionTier.systemManaged.rawValue,
+                            foundationTierID: DecisionEBrainFoundationTier.systemManaged.rawValue,
+                            reasonCodes: [
+                                "tier:\(DecisionIntelligenceExecutionTier.systemManaged.rawValue)",
+                                "active:\(DecisionModelProviderKind.foundationModels.rawValue)",
+                                "preferred:\(DecisionModelProviderPreference.foundationModels.rawValue)",
+                                "fallback:\(DecisionModelProviderKind.gemmaE4B.rawValue)",
+                                "foundation_available"
+                            ]
+                        )
+                    )
+                )
+            )
+        )
+
+        let latestCheckpoint = try await engine.getLatestCheckpoint(
+            sessionId: session.id,
+            branchId: created.branchId
+        )
+        let fetched = try XCTUnwrap(latestCheckpoint)
+
+        XCTAssertEqual(fetched.runtimeState.eBrainAnchor?.sessionID, "sess-anchor")
+        XCTAssertEqual(fetched.runtimeState.eBrainAnchor?.thoughtFoldChecksum, "fold9abc12345")
+        XCTAssertEqual(fetched.runtimeState.eBrainAnchor?.riskLevel, "guarded")
+        XCTAssertEqual(fetched.runtimeState.eBrainAnchor?.permitMode, "replace")
+        XCTAssertEqual(fetched.runtimeState.eBrainAnchor?.hostGatePercent, 61)
+        XCTAssertEqual(
+            fetched.runtimeState.eBrainAnchor?.reviewDirectiveLine,
+            "Review update ticket: preserve parser-only correction"
+        )
+        XCTAssertEqual(
+            fetched.runtimeState.eBrainAnchor?.executionCapability?.activeProviderID,
+            DecisionModelProviderKind.foundationModels.rawValue
+        )
+        XCTAssertEqual(
+            fetched.runtimeState.eBrainAnchor?.executionCapability?.fallbackProviderID,
+            DecisionModelProviderKind.gemmaE4B.rawValue
+        )
+        XCTAssertEqual(
+            fetched.runtimeState.eBrainAnchor?.executionCapability?.foundationTierID,
+            DecisionEBrainFoundationTier.systemManaged.rawValue
+        )
+        XCTAssertEqual(
+            fetched.runtimeState.eBrainAnchor?.executionCapabilityFrame?.detailLine,
+            "Capability systemManaged • Foundation systemManaged • Posture trustedProduction • Boundary externalTraining • Active Apple Foundation Model • Preferred Apple Foundation Model • Track builtInSystem • Fallback Gemma 4 E4B"
+        )
+        XCTAssertEqual(
+            fetched.runtimeState.eBrainAnchor?.executionCapabilityFrame?.horizonLine,
+            "Horizon worldPriorFabric • Stability invariant • Evidence grounded • Host hostIsolated • Session sessionIsolated • Tool toolRefreshRequired"
+        )
+        XCTAssertEqual(
+            fetched.runtimeState.eBrainAnchor?.executionCapabilityFrame?.stabilityTierID,
+            DecisionEBrainHorizonStabilityTier.invariant.rawValue
+        )
+        XCTAssertEqual(
+            fetched.runtimeState.eBrainAnchor?.executionCapabilityFrame?.evidenceGradientID,
+            DecisionEBrainEvidenceGradient.grounded.rawValue
+        )
+    }
+
+    func testCheckpointRuntimeStatePersistsExplicitHorizonContracts() async throws {
+        let engine = try makeEngine()
+        let session = try await engine.createSession(title: "explicit horizon persistence")
+        let worldPrior = DecisionEBrainWorldPriorContract(
+            priorID: "worldPriorFabric.experimental",
+            posture: .heuristicPreview,
+            boundaryID: "referenceOnly",
+            hostIsolationID: "hostQuarantined",
+            sessionIsolationID: "sessionScoped",
+            toolTruthModeID: "toolObserved"
+        )
+        let temporal = DecisionEBrainTemporalKnowledgeContract(
+            tier: .volatile,
+            refreshRequirement: .perUse,
+            decayPolicy: .sessionRecompute,
+            timeScope: .runtimeWindow
+        )
+        let evidence = DecisionEBrainEvidenceContract(
+            gradient: .heuristic,
+            claimType: .heuristicEstimate,
+            requiresCaveat: true,
+            requiresExternalRefresh: true
+        )
+
+        let created = try await engine.createCheckpoint(
+            sessionId: session.id,
+            draft: DecisionSessionCheckpointDraft(
+                summary: DecisionSessionCheckpointSummary(
+                    goal: "preserve explicit horizon contracts",
+                    acceptedConstraints: [],
+                    confirmedFacts: [],
+                    openTasks: [],
+                    currentScope: ["ebrain"]
+                ),
+                runtimeState: DecisionSessionCheckpointRuntimeState(
+                    workspacePath: "/project/horizon",
+                    branchName: "feature/horizon",
+                    activeFiles: ["Sources/Horizon.swift"],
+                    currentMode: .review,
+                    eBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
+                        sessionID: "sess-horizon",
+                        thoughtFoldChecksum: "fold-explicit-horizon",
+                        riskLevel: "guarded",
+                        permitMode: "delay",
+                        hostGatePercent: 58,
+                        reviewDirectiveLine: "Review horizon contract integrity.",
+                        executionCapability: DecisionSessionCheckpointExecutionCapability(
+                            activeProviderID: DecisionModelProviderKind.openModel.rawValue,
+                            preferredProviderID: DecisionModelProviderPreference.openModel.rawValue,
+                            fallbackProviderID: DecisionModelProviderKind.template.rawValue,
+                            providerTrackID: DecisionModelProviderTrack.builtInOpenModel.rawValue,
+                            executionTierID: DecisionIntelligenceExecutionTier.balancedGemma.rawValue,
+                            foundationTierID: DecisionEBrainFoundationTier.openModelHeuristic.rawValue,
+                            reasonCodes: ["external_refresh:yes"],
+                            worldPriorContract: worldPrior,
+                            temporalKnowledgeContract: temporal,
+                            evidenceContract: evidence
+                        )
+                    )
+                )
+            )
+        )
+
+        let latestCheckpoint = try await engine.getLatestCheckpoint(
+            sessionId: session.id,
+            branchId: created.branchId
+        )
+        let fetched = try XCTUnwrap(latestCheckpoint)
+        let restoredFrame = try XCTUnwrap(
+            fetched.runtimeState.eBrainAnchor?.executionCapabilityFrame
+        )
+
+        XCTAssertEqual(restoredFrame.worldPriorContract.priorID, "worldPriorFabric.experimental")
+        XCTAssertEqual(restoredFrame.worldPriorContract.posture, .heuristicPreview)
+        XCTAssertEqual(restoredFrame.worldPriorContract.boundaryID, "referenceOnly")
+        XCTAssertEqual(restoredFrame.worldPriorContract.hostIsolationID, "hostQuarantined")
+        XCTAssertEqual(restoredFrame.worldPriorContract.sessionIsolationID, "sessionScoped")
+        XCTAssertEqual(restoredFrame.worldPriorContract.toolTruthModeID, "toolObserved")
+        XCTAssertEqual(restoredFrame.temporalKnowledgeContract.tier, .volatile)
+        XCTAssertEqual(restoredFrame.temporalKnowledgeContract.refreshRequirement, .perUse)
+        XCTAssertEqual(restoredFrame.temporalKnowledgeContract.decayPolicy, .sessionRecompute)
+        XCTAssertEqual(restoredFrame.temporalKnowledgeContract.timeScope, .runtimeWindow)
+        XCTAssertEqual(restoredFrame.evidenceContract.gradient, .heuristic)
+        XCTAssertEqual(restoredFrame.evidenceContract.claimType, .heuristicEstimate)
+        XCTAssertEqual(restoredFrame.evidenceContract.requiresCaveat, true)
+        XCTAssertEqual(restoredFrame.evidenceContract.requiresExternalRefresh, true)
+        XCTAssertEqual(
+            restoredFrame.horizonLine,
+            "Horizon worldPriorFabric.experimental • Stability volatile • Evidence heuristic • Host hostQuarantined • Session sessionScoped • Tool toolObserved"
+        )
+        XCTAssertEqual(
+            restoredFrame.temporalLine,
+            "Temporal volatile • Refresh perUse • Decay sessionRecompute • Scope runtimeWindow"
+        )
+        XCTAssertEqual(
+            restoredFrame.evidenceLine,
+            "Evidence heuristic • Claim heuristicEstimate • Caveat yes • External refresh yes"
+        )
+    }
+
     func testCorrectionCreatesBranchWithoutDestroyingOriginalHistory() async throws {
         let engine = try makeEngine()
         let session = try await engine.createSession(title: "parser repair")
@@ -405,7 +609,7 @@ final class DecisionSessionEngineTests: XCTestCase {
             )
         )
 
-        let stalledStep = try await engine.startStep(
+        _ = try await engine.startStep(
             sessionId: session.id,
             status: .waitingTool,
             ttlMs: 50

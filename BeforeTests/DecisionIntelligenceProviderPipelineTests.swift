@@ -57,6 +57,41 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         )
     }
 
+    func testOrderedKindsHonorProvidedRuntimePolicyResolutionInsteadOfLiveOverride() throws {
+        let bundled = makeRuntimePolicyBundle(
+            bundleVersion: "bundled.v1",
+            providerRoutingPolicyID: "before.provider-routing.v1"
+        )
+        let bundledData = try JSONEncoder().encode(bundled)
+        let baselineResolution = BeforeRuntimePolicyStore.resolve(
+            bundledData: bundledData
+        )
+
+        let override = makeRuntimePolicyBundle(
+            bundleVersion: "override.v2",
+            providerRoutingPolicyID: "override.provider-routing.v2"
+        )
+        let overrideResolution = BeforeRuntimePolicyStore.resolve(
+            bundledData: try JSONEncoder().encode(override)
+        )
+
+        XCTAssertEqual(
+            DecisionIntelligenceProviderPipeline.orderedKinds(
+                for: .openModel,
+                runtimePolicyResolution: overrideResolution
+            ),
+            [.openModel, .gemmaE4B]
+        )
+
+        XCTAssertEqual(
+            DecisionIntelligenceProviderPipeline.orderedKinds(
+                for: .openModel,
+                runtimePolicyResolution: baselineResolution
+            ),
+            [.openModel, .foundationModels]
+        )
+    }
+
     func testRuntimeStatusFallsBackToGemmaWhenFoundationPreferenceIsUnavailable() {
         let preferences = BeforePreferences(
             homePromptAction: .autoRoute,
@@ -66,6 +101,13 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
             onDeviceIntelligenceMode: .assistive,
             preferredIntelligenceProvider: .foundationModels,
             allowModelFallbacks: true
+        )
+        let device = DeviceCapabilitySnapshot(
+            isSimulator: false,
+            supportsMetal: true,
+            supportsCoreMLAcceleration: true,
+            physicalMemoryBytes: 8 * 1_073_741_824,
+            isLowPowerModeEnabled: false
         )
 
         let status = DecisionIntelligenceProviderPipeline.runtimeStatus(
@@ -83,7 +125,8 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
                     title: "Bundle detected",
                     detail: "Gemma is ready."
                 )
-            ]
+            ],
+            device: device
         )
 
         XCTAssertEqual(status.preferred, .foundationModels)
@@ -173,6 +216,58 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         XCTAssertEqual(status.preferred, .gemmaE4B)
         XCTAssertEqual(status.active, .testingStub)
         XCTAssertEqual(status.fallback, .testingStub)
+    }
+
+    func testRuntimeStatusMatchesSharedRuntimeCoordinationStatus() {
+        let preferences = BeforePreferences(
+            homePromptAction: .autoRoute,
+            quickBufferDuration: .ninetySeconds,
+            restoreInProgressWorkspaces: true,
+            showReviewInsights: true,
+            onDeviceIntelligenceMode: .assistive,
+            preferredIntelligenceProvider: .foundationModels,
+            allowModelFallbacks: true
+        )
+        let device = DeviceCapabilitySnapshot(
+            isSimulator: false,
+            supportsMetal: true,
+            supportsCoreMLAcceleration: true,
+            physicalMemoryBytes: 8 * 1_073_741_824,
+            isLowPowerModeEnabled: false
+        )
+        let statusesByKind: [DecisionModelProviderKind: DecisionModelProviderStatus] = [
+            .foundationModels: DecisionModelProviderStatus(
+                kind: .foundationModels,
+                isAvailable: false,
+                title: "Unavailable",
+                detail: "Apple is unavailable."
+            ),
+            .gemmaE4B: DecisionModelProviderStatus(
+                kind: .gemmaE4B,
+                isAvailable: true,
+                title: "Bundle detected",
+                detail: "Gemma is ready."
+            ),
+            .openModel: DecisionModelProviderStatus(
+                kind: .openModel,
+                isAvailable: false,
+                title: "Reserved",
+                detail: "No open-model runtime is registered."
+            )
+        ]
+
+        let status = DecisionIntelligenceProviderPipeline.runtimeStatus(
+            preferences: preferences,
+            statusesByKind: statusesByKind,
+            device: device
+        )
+        let coordination = DecisionIntelligenceCoordinator.runtimeCoordination(
+            preferences: preferences,
+            device: device,
+            statusesByKind: statusesByKind
+        )
+
+        XCTAssertEqual(status, coordination.runtimeStatus)
     }
 
     @MainActor
@@ -432,6 +527,225 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
 
         XCTAssertEqual(latestTrace.kind, .quick)
         XCTAssertTrue(latestTrace.detail.contains("structured prompt cache"))
+    }
+
+    @MainActor
+    func testQuickRefinementQuarantinesExistingCacheWhenHorizonRequiresExternalRefresh() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let brainState = horizonAwareBrainState(
+            mode: .quick,
+            retrievalTags: ["external_refresh", "volatile"],
+            sessionBiases: ["horizon-external-refresh"]
+        )
+        let cached = QuickCheckResult(
+            currentPerspective: "Cached current",
+            afterPerspective: "Cached after",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
+            base: base,
+            input: input,
+            brainState: brainState
+        )
+        let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+            provider: .testingStub,
+            envelope: envelope
+        )
+
+        await DecisionIntelligenceResponseCache.shared.storeQuickResult(cached, for: cacheKey)
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            brainState: brainState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNotNil(refined)
+        XCTAssertNotEqual(refined?.currentPerspective, cached.currentPerspective)
+        XCTAssertTrue(refined?.currentPerspective.hasPrefix("Stub current:") == true)
+        let cachedAfterQuarantine = await DecisionIntelligenceResponseCache.shared.quickResult(for: cacheKey)
+        XCTAssertNil(cachedAfterQuarantine)
+
+        let cacheSnapshot = await DecisionIntelligenceResponseCache.shared.telemetrySnapshot()
+        XCTAssertEqual(cacheSnapshot.totalQuarantinedHits, 1)
+        XCTAssertEqual(cacheSnapshot.hitCountByKind[.quick] ?? 0, 0)
+    }
+
+    @MainActor
+    func testQuickRefinementSkipsCacheStoreWhenHorizonRequiresToolQuarantine() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let brainState = horizonAwareBrainState(
+            mode: .quick,
+            retrievalTags: ["quarantine", "tool_observation"],
+            sessionBiases: ["horizon-tool-quarantine"]
+        )
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
+            base: base,
+            input: input,
+            brainState: brainState
+        )
+        let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+            provider: .testingStub,
+            envelope: envelope
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            brainState: brainState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNotNil(refined)
+        XCTAssertTrue(refined?.currentPerspective.hasPrefix("Stub current:") == true)
+        let cachedAfterQuarantine = await DecisionIntelligenceResponseCache.shared.quickResult(for: cacheKey)
+        XCTAssertNil(cachedAfterQuarantine)
+
+        let cacheSnapshot = await DecisionIntelligenceResponseCache.shared.telemetrySnapshot()
+        XCTAssertEqual(cacheSnapshot.storeCountByKind[.quick] ?? 0, 0)
+    }
+
+    @MainActor
+    func testQuickRefinementKeepsExistingCacheAvailableWhenHorizonOnlyRequiresEvidenceCaveat() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let brainState = horizonAwareBrainState(
+            mode: .quick,
+            retrievalTags: ["evidence_caveat"],
+            sessionBiases: []
+        )
+        let cached = QuickCheckResult(
+            currentPerspective: "Cached current",
+            afterPerspective: "Cached after",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
+            base: base,
+            input: input,
+            brainState: brainState
+        )
+        let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+            provider: .testingStub,
+            envelope: envelope
+        )
+
+        await DecisionIntelligenceResponseCache.shared.storeQuickResult(cached, for: cacheKey)
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            brainState: brainState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNotNil(refined)
+        XCTAssertEqual(refined?.currentPerspective, cached.currentPerspective)
+        XCTAssertEqual(refined?.afterPerspective, cached.afterPerspective)
+        let cacheSnapshot = await DecisionIntelligenceResponseCache.shared.telemetrySnapshot()
+        let cachedAfterLookup = await DecisionIntelligenceResponseCache.shared.quickResult(for: cacheKey)
+        XCTAssertEqual(cachedAfterLookup, cached)
+
+        XCTAssertEqual(cacheSnapshot.totalQuarantinedHits, 0)
+        XCTAssertEqual(cacheSnapshot.hitCountByKind[.quick] ?? 0, 1)
+    }
+
+    @MainActor
+    func testQuickRefinementStillStoresCacheWhenHorizonOnlyRequiresEvidenceCaveat() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let brainState = horizonAwareBrainState(
+            mode: .quick,
+            retrievalTags: ["evidence_caveat"],
+            sessionBiases: []
+        )
+        let envelope = DecisionIntelligencePromptContract.quickRefinementEnvelope(
+            base: base,
+            input: input,
+            brainState: brainState
+        )
+        let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+            provider: .testingStub,
+            envelope: envelope
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            brainState: brainState,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNotNil(refined)
+        XCTAssertTrue(refined?.currentPerspective.hasPrefix("Stub current:") == true)
+        let cachedAfterStore = await DecisionIntelligenceResponseCache.shared.quickResult(for: cacheKey)
+        XCTAssertEqual(cachedAfterStore, refined)
+
+        let cacheSnapshot = await DecisionIntelligenceResponseCache.shared.telemetrySnapshot()
+        XCTAssertEqual(cacheSnapshot.totalQuarantinedHits, 0)
+        XCTAssertEqual(cacheSnapshot.storeCountByKind[.quick] ?? 0, 1)
     }
 
     @MainActor
@@ -1103,6 +1417,21 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         return BASEBrainTurnResult(
             deviceState: deviceState,
             budgetFrame: budgetFrame,
+            wakeIntent: BASWakeIntent(
+                intentLevel: .guard,
+                estimatedValue: 0.72,
+                estimatedRisk: 0.91,
+                estimatedCost: 0.24,
+                preferredMode: budgetFrame.runMode
+            ),
+            vitalState: BASVitalState(
+                wakeState: budgetFrame.runMode,
+                survivalMargin: 0.76,
+                thermalMargin: 0.88,
+                powerMargin: 0.74,
+                continuityScore: 0.81,
+                stabilityScore: 0.86
+            ),
             hostContext: hostContext,
             contextFrame: contextFrame,
             decomposeFrame: decomposeFrame,
@@ -1167,6 +1496,117 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
             reactionWeights: .defaults(for: mode),
             boundaryPolicy: boundaryPolicy,
             loadedAt: .now
+        )
+    }
+
+    private func horizonAwareBrainState(
+        mode: DecisionMode,
+        retrievalTags: [String],
+        sessionBiases: [String]
+    ) -> DecisionBrainState {
+        var brainState = permissiveBrainState(mode: mode)
+        brainState.retrievalTags = retrievalTags
+        brainState.sessionBiases = sessionBiases
+        return brainState
+    }
+}
+
+private extension DecisionIntelligenceProviderPipelineTests {
+    func makeRuntimePolicyBundle(
+        bundleVersion: String,
+        providerRoutingPolicyID: String
+    ) -> BeforeRuntimePolicyBundle {
+        let baselineRuntimePolicy = BeforeProductCompatibility.resolvedRuntimePolicyBundle
+            .runtimeTuningRegistry
+            .policiesByID["before.host.runtime-synthesis.v1"]!
+        var overrideBudget = baselineRuntimePolicy.budget
+        overrideBudget.standardDecodeTokens = 180
+        overrideBudget.unstableDecodeTokens = 210
+        overrideBudget.guardedDecodeTokens = 240
+        overrideBudget.maintenanceBatteryFloor = 0.4
+        let providerRoutingRegistry = BASProviderRoutingPolicyRegistry(
+            schemaVersion: "before.provider-routing-registry.pipeline-tests.v1",
+            defaultPolicyID: "before.provider-routing.v1",
+            policiesByID: [
+                "before.provider-routing.v1": BASProviderRoutingPolicy(
+                    schemaVersion: "before.provider-routing.v1",
+                    deterministicProviderID: BASReferenceProviderRuntime.templateProviderID,
+                    testingOverrideProviderID: BASReferenceProviderRuntime.testingStubProviderID,
+                    preferenceOrderings: [
+                        BASProviderPreferenceOrdering(
+                            preferredProviderID: BASReferenceProviderRuntime.openModelProviderID,
+                            orderedProviderIDs: [
+                                BASReferenceProviderRuntime.openModelProviderID,
+                                BASReferenceProviderRuntime.foundationModelsProviderID
+                            ]
+                        )
+                    ]
+                ),
+                "override.provider-routing.v2": BASProviderRoutingPolicy(
+                    schemaVersion: "override.provider-routing.v2",
+                    deterministicProviderID: BASReferenceProviderRuntime.templateProviderID,
+                    testingOverrideProviderID: BASReferenceProviderRuntime.testingStubProviderID,
+                    preferenceOrderings: [
+                        BASProviderPreferenceOrdering(
+                            preferredProviderID: BASReferenceProviderRuntime.openModelProviderID,
+                            orderedProviderIDs: [
+                                BASReferenceProviderRuntime.openModelProviderID,
+                                BASReferenceProviderRuntime.gemmaE4BProviderID
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+        let runtimeTuningRegistry = BASEBrainRuntimeSynthesisPolicyRegistry(
+            schemaVersion: "before.runtime-tuning-registry.pipeline-tests.v1",
+            defaultPolicyID: "before.host.runtime-synthesis.v1",
+            policiesByID: [
+                "before.host.runtime-synthesis.v1": baselineRuntimePolicy,
+                "override.runtime-tuning.v2": BASEBrainRuntimeSynthesisPolicy(
+                    schemaVersion: "override.runtime-tuning.v2",
+                    guardrailPressure: .init(
+                        protectiveBoundaryIncrement: 0.21,
+                        calibrationWatchIncrement: 0.11,
+                        calibrationDriftingIncrement: 0.19,
+                        boundaryConstraintUnit: 0.04,
+                        boundaryConstraintCap: 0.20,
+                        calibrationAlertUnit: 0.04,
+                        calibrationAlertCap: 0.16,
+                        failureGuardUnit: 0.03,
+                        failureGuardCap: 0.13,
+                        riskFlagUnit: 0.04,
+                        riskFlagCap: 0.15,
+                        maximumPressure: 0.68
+                    ),
+                    budget: overrideBudget,
+                    wakeIntent: baselineRuntimePolicy.wakeIntent,
+                    stateTransitions: baselineRuntimePolicy.stateTransitions,
+                    lease: baselineRuntimePolicy.lease,
+                    maintenance: baselineRuntimePolicy.maintenance,
+                    sovereignExecution: baselineRuntimePolicy.sovereignExecution,
+                    hostThresholds: .init(
+                        caution: 0.48,
+                        protective: 0.75,
+                        block: 0.95
+                    ),
+                    context: baselineRuntimePolicy.context,
+                    triSelf: baselineRuntimePolicy.triSelf,
+                    risk: baselineRuntimePolicy.risk
+                )
+            ]
+        )
+
+        return BeforeRuntimePolicyBundle(
+            schemaVersion: "before.runtime-policy-bundle.v1",
+            bundleVersion: bundleVersion,
+            providerRoutingRegistry: providerRoutingRegistry,
+            providerRoutingPolicyID: providerRoutingPolicyID,
+            runtimeTuningRegistry: runtimeTuningRegistry,
+            runtimeTuningPolicyID: "before.host.runtime-synthesis.v1",
+            updatedAt: Date(timeIntervalSince1970: 1_713_715_200),
+            hostProfile: BeforeProductCompatibility.resolvedRuntimePolicyBundle.hostProfile,
+            brainBootstrapRecovery: BeforeProductCompatibility.resolvedRuntimePolicyBundle.brainBootstrapRecovery
         )
     }
 }

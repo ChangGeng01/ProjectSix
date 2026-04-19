@@ -30,6 +30,7 @@ struct DecisionModelRuntimeStatus: Equatable, Sendable {
     let active: DecisionModelProviderKind
     let fallback: DecisionModelProviderKind?
     let detail: String
+    let policyLineage: BeforeRuntimePolicyLineage
 }
 
 struct ReminderSelectionCandidate: Equatable, Identifiable, Sendable {

@@ -1,71 +1,88 @@
 import SwiftUI
 
 struct DecisionReplayDiagnosticsView: View {
+    enum Layout {
+        case full
+        case compact
+    }
+
     let presentation: DecisionEvolutionReplayEntryPresentation
+    var layout: Layout = .full
+    var showsHeader: Bool = true
+    var excludesOverviewSummary: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(presentation.sourceTitle)
+            if layout == .full, showsHeader {
+                headerContent
+            }
+
+            ForEach(diagnosticLines, id: \.text) { line in
+                lineView(line)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var headerContent: some View {
+        let headerCopy = presentation.diagnosticsHeaderCopy
+
+        Text(headerCopy.eyebrowLine)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(BeforeTheme.ember)
+
+        if let statusLine = headerCopy.statusLine {
+            Text(statusLine)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(BeforeTheme.ember)
+        }
 
-            Text(presentation.summaryLine)
-                .font(.subheadline)
-                .foregroundStyle(BeforeTheme.ink)
+        Text(headerCopy.titleLine)
+            .font(.subheadline)
+            .foregroundStyle(BeforeTheme.ink)
 
-            if let budgetLine = presentation.budgetLine {
-                Text(budgetLine)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+        ForEach(headerCopy.detailLines, id: \.self) { line in
+            Text(line)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
 
-            if let pressureLine = presentation.pressureLine {
-                Text(pressureLine)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
+    @ViewBuilder
+    private func lineView(_ line: DecisionEvolutionReplayDiagnosticLine) -> some View {
+        switch line.kind {
+        case .operations, .budget:
+            Text(line.text)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .pressure, .action, .audit, .killSwitches, .trace, .riskFactors, .reasonCodes:
+            Text(line.text)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        case .eBrain, .foldedLung, .scheduler, .hotCold, .resume, .rollback, .sovereignBridge:
+            Text(line.text)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .task:
+            Text(line.text)
+                .font(.caption)
+                .foregroundStyle(BeforeTheme.ember)
+        case .activeKillSwitches:
+            Text(line.text)
+                .font(.caption2)
+                .foregroundStyle(BeforeTheme.ember)
+        }
+    }
 
-            if let eBrainLine = presentation.eBrainLine {
-                Text(eBrainLine)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            if let taskLine = presentation.taskLine {
-                Text(taskLine)
-                    .font(.caption)
-                    .foregroundStyle(BeforeTheme.ember)
-            }
-
-            if let actionLine = presentation.actionLine {
-                Text(actionLine)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-
-            if let auditLine = presentation.auditLine {
-                Text(auditLine)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-
-            if let activeKillSwitchesLine = presentation.activeKillSwitchesLine {
-                Text(activeKillSwitchesLine)
-                    .font(.caption2)
-                    .foregroundStyle(BeforeTheme.ember)
-            }
-
-            if let killSwitchesLine = presentation.killSwitchesLine {
-                Text(killSwitchesLine)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-
-            if let traceLine = presentation.traceLine {
-                Text(traceLine)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
+    private var diagnosticLines: [DecisionEvolutionReplayDiagnosticLine] {
+        switch layout {
+        case .full:
+            presentation.fullDiagnosticsLines(
+                excludingHeaderSummary: showsHeader,
+                excludingOverviewSummary: excludesOverviewSummary
+            )
+        case .compact:
+            presentation.compactDiagnosticsLines
         }
     }
 }

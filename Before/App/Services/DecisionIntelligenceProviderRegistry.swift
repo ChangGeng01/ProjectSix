@@ -791,14 +791,20 @@ enum DecisionIntelligenceTaskRouter {
         allowFallbacks: Bool,
         excluding suspendedKinds: Set<DecisionModelProviderKind> = [],
         registry: DecisionIntelligenceProviderRegistry = .shared,
-        strategy: DecisionAdaptiveTaskStrategy? = nil
+        strategy: DecisionAdaptiveTaskStrategy? = nil,
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy
     ) -> [DecisionModelProviderKind] {
+        let routingPolicy = BeforeProductCompatibility.requireProviderRoutingPolicy(
+            from: runtimePolicyResolution
+        )
         let plan = BASProviderRouteResolver.resolve(
             task: substrateTraceKind(task),
             preferredProviderID: preference.kind.rawValue,
             allowFallbacks: allowFallbacks,
-            deterministicProviderID: BASReferenceProviderRuntime.templateProviderID,
-            preferenceOrderings: BASReferenceProviderRuntime.preferenceOrderings,
+            deterministicProviderID: routingPolicy.deterministicProviderID,
+            preferenceOrderings: routingPolicy.preferenceOrderings,
+            appliedRoutingPolicyVersion: routingPolicy.schemaVersion,
+            appliedRoutingRegistryVersion: runtimePolicyResolution.lineage.providerRoutingRegistryVersion,
             suspendedProviderIDs: Set(suspendedKinds.map(\.rawValue)),
             strategy: strategy.map(substrateAdaptiveStrategy),
             descriptors: registry.descriptors().map(substrateProviderDescriptor)

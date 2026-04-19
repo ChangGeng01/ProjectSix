@@ -2,8 +2,36 @@ import XCTest
 import BASHostKit
 @testable import Before
 
+private actor CapturedRuntimePolicyResolutionBox {
+    private var resolution: BeforeRuntimePolicyResolution?
+
+    func store(_ resolution: BeforeRuntimePolicyResolution) {
+        self.resolution = resolution
+    }
+
+    func load() -> BeforeRuntimePolicyResolution? {
+        resolution
+    }
+}
+
 @MainActor
 final class OnDeviceIntelligenceSessionTests: XCTestCase {
+    override func setUp() async throws {
+        try await super.setUp()
+        BeforeRuntimePolicyStore.clearOverride()
+        DecisionIntelligenceDebugStore.shared.clear()
+        await DecisionIntelligenceResponseCache.shared.clear()
+        await DecisionIntelligenceCoordinator.resetTestingRefinementHandlers()
+    }
+
+    override func tearDown() async throws {
+        BeforeRuntimePolicyStore.clearOverride()
+        DecisionIntelligenceDebugStore.shared.clear()
+        await DecisionIntelligenceResponseCache.shared.clear()
+        await DecisionIntelligenceCoordinator.resetTestingRefinementHandlers()
+        try await super.tearDown()
+    }
+
     func testQuickSessionEvaluateWithIntelligenceOffKeepsDeterministicResult() async {
         let session = QuickCheckSession(entrySource: .app)
         session.scenario = .buy
@@ -185,6 +213,60 @@ final class OnDeviceIntelligenceSessionTests: XCTestCase {
         XCTAssertEqual(session.result?.nextAction, "Use the safer step")
     }
 
+    func testQuickSessionEvaluateWithIntelligenceHonorsProvidedRuntimePolicyResolutionInsteadOfLiveOverride() async throws {
+        BeforeRuntimePolicyStore.clearOverride()
+        DecisionIntelligenceDebugStore.shared.clear()
+        await DecisionIntelligenceResponseCache.shared.clear()
+
+        let baselineResolution = BeforeProductCompatibility.resolvedRuntimePolicy
+        XCTAssertEqual(
+            baselineResolution.lineage.providerRoutingPolicyID,
+            "before.provider-routing.v1"
+        )
+
+        let overrideBundle = sessionRuntimePolicyBundle(
+            bundleVersion: "override.v2",
+            providerRoutingPolicyID: "override.provider-routing.v2"
+        )
+        XCTAssertTrue(BeforeRuntimePolicyStore.saveOverride(overrideBundle))
+        XCTAssertEqual(
+            BeforeProductCompatibility.resolvedRuntimePolicy.lineage.providerRoutingPolicyID,
+            "override.provider-routing.v2"
+        )
+
+        let capturedResolution = CapturedRuntimePolicyResolutionBox()
+        await DecisionIntelligenceCoordinator.setTestingQuickRefinementHandler {
+            base,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            runtimePolicyResolution in
+            await capturedResolution.store(runtimePolicyResolution)
+            return base
+        }
+
+        let baselineSession = QuickCheckSession(entrySource: .app)
+        configureQuickSession(baselineSession)
+        await baselineSession.evaluateWithIntelligence(
+            preferences: assistedPreferences,
+            runtimePolicyResolution: baselineResolution
+        )
+
+        let recordedResolution = await capturedResolution.load()
+        let unwrappedResolution = try XCTUnwrap(recordedResolution)
+        XCTAssertEqual(
+            unwrappedResolution.lineage.providerRoutingPolicyID,
+            baselineResolution.lineage.providerRoutingPolicyID
+        )
+        XCTAssertEqual(
+            unwrappedResolution.lineage.bundleVersion,
+            baselineResolution.lineage.bundleVersion
+        )
+    }
+
     private var offPreferences: BeforePreferences {
         BeforePreferences(
             homePromptAction: .autoRoute,
@@ -206,6 +288,64 @@ final class OnDeviceIntelligenceSessionTests: XCTestCase {
             onDeviceIntelligenceMode: .assistive,
             preferredIntelligenceProvider: .gemmaE4B,
             allowModelFallbacks: true
+        )
+    }
+
+    private func configureQuickSession(_ session: QuickCheckSession) {
+        session.scenario = .buy
+        session.motivation = .stressed
+        session.expectedOutcome = .temporaryRelief
+        session.controlLevel = .maybe
+        session.note = "I want relief from a hard day."
+    }
+
+    private func sessionRuntimePolicyBundle(
+        bundleVersion: String,
+        providerRoutingPolicyID: String
+    ) -> BeforeRuntimePolicyBundle {
+        let providerRoutingRegistry = BASProviderRoutingPolicyRegistry(
+            schemaVersion: "before.provider-routing-registry.session-tests.v1",
+            defaultPolicyID: "before.provider-routing.v1",
+            policiesByID: [
+                "before.provider-routing.v1": BASProviderRoutingPolicy(
+                    schemaVersion: "before.provider-routing.v1",
+                    deterministicProviderID: BASReferenceProviderRuntime.templateProviderID,
+                    testingOverrideProviderID: BASReferenceProviderRuntime.testingStubProviderID,
+                    preferenceOrderings: [
+                        BASProviderPreferenceOrdering(
+                            preferredProviderID: BASReferenceProviderRuntime.gemmaE4BProviderID,
+                            orderedProviderIDs: [
+                                BASReferenceProviderRuntime.gemmaE4BProviderID,
+                                BASReferenceProviderRuntime.foundationModelsProviderID
+                            ]
+                        )
+                    ]
+                ),
+                "override.provider-routing.v2": BASProviderRoutingPolicy(
+                    schemaVersion: "override.provider-routing.v2",
+                    deterministicProviderID: BASReferenceProviderRuntime.templateProviderID,
+                    testingOverrideProviderID: BASReferenceProviderRuntime.testingStubProviderID,
+                    preferenceOrderings: [
+                        BASProviderPreferenceOrdering(
+                            preferredProviderID: BASReferenceProviderRuntime.gemmaE4BProviderID,
+                            orderedProviderIDs: [
+                                BASReferenceProviderRuntime.gemmaE4BProviderID,
+                                BASReferenceProviderRuntime.openModelProviderID
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+
+        return BeforeRuntimePolicyBundle(
+            schemaVersion: "before.runtime-policy-bundle.v1",
+            bundleVersion: bundleVersion,
+            providerRoutingRegistry: providerRoutingRegistry,
+            providerRoutingPolicyID: providerRoutingPolicyID,
+            runtimeTuningRegistry: BeforeProductCompatibility.resolvedRuntimePolicy.bundle.runtimeTuningRegistry,
+            runtimeTuningPolicyID: BeforeProductCompatibility.resolvedRuntimePolicy.lineage.runtimeTuningPolicyID,
+            updatedAt: Date(timeIntervalSince1970: 1_713_715_200)
         )
     }
 
@@ -377,6 +517,21 @@ final class OnDeviceIntelligenceSessionTests: XCTestCase {
         return BASEBrainTurnResult(
             deviceState: deviceState,
             budgetFrame: budgetFrame,
+            wakeIntent: BASWakeIntent(
+                intentLevel: .guard,
+                estimatedValue: 0.72,
+                estimatedRisk: 0.91,
+                estimatedCost: 0.24,
+                preferredMode: budgetFrame.runMode
+            ),
+            vitalState: BASVitalState(
+                wakeState: budgetFrame.runMode,
+                survivalMargin: 0.76,
+                thermalMargin: 0.88,
+                powerMargin: 0.74,
+                continuityScore: 0.81,
+                stabilityScore: 0.86
+            ),
             hostContext: hostContext,
             contextFrame: contextFrame,
             decomposeFrame: decomposeFrame,

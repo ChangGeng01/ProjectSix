@@ -72,7 +72,7 @@ struct DecisionEvolutionCheckpointActionBar: View {
                                 presentation: checkpointPresentation
                             ) {
                                 pendingMutation = PendingMutation(intent: intent) {
-                                    appModel.applyEvolutionCheckpoint(checkpointID: checkpointID)
+                                    appModel.performEvolutionMutation(intent)
                                     afterMutation?()
                                 }
                             }
@@ -87,7 +87,7 @@ struct DecisionEvolutionCheckpointActionBar: View {
                                 presentation: checkpointPresentation
                             ) {
                                 pendingMutation = PendingMutation(intent: intent) {
-                                    appModel.approveEvolutionCheckpoint(checkpointID: checkpointID)
+                                    appModel.performEvolutionMutation(intent)
                                     afterMutation?()
                                 }
                             }
@@ -100,7 +100,7 @@ struct DecisionEvolutionCheckpointActionBar: View {
                                 presentation: checkpointPresentation
                             ) {
                                 pendingMutation = PendingMutation(intent: intent) {
-                                    appModel.markEvolutionCheckpointForReview(checkpointID: checkpointID)
+                                    appModel.performEvolutionMutation(intent)
                                     afterMutation?()
                                 }
                             }
@@ -115,7 +115,7 @@ struct DecisionEvolutionCheckpointActionBar: View {
                                 presentation: checkpointPresentation
                             ) {
                                 pendingMutation = PendingMutation(intent: intent) {
-                                    appModel.clearEvolutionCheckpointLineage(checkpointID: checkpointID)
+                                    appModel.performEvolutionMutation(intent)
                                     afterMutation?()
                                 }
                             }

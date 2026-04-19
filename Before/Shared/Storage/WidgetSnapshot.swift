@@ -10,8 +10,9 @@ enum DecisionEvolutionWidgetNarrativeFormattingSupport {
     }
 }
 
-enum DecisionEvolutionWidgetControlEntryKind: Equatable, Sendable {
+enum DecisionEvolutionWidgetControlEntryKind: String, Codable, Equatable, Sendable {
     case review
+    case audit
     case control
     case rollback
     case open
@@ -110,11 +111,13 @@ enum DecisionEvolutionWidgetStatusBadgeLexiconSupport {
 
 enum DecisionEvolutionWidgetControlEntryLexiconSupport {
     static let reviewTitle = "Review on iPhone"
+    static let auditTitle = "Audit on iPhone"
     static let controlTitle = "Control on iPhone"
     static let rollbackTitle = "Rollback on iPhone"
     static let openTitle = "Open on iPhone"
 
     static let reviewInstruction = "Continue on iPhone to review pending checkpoints and clear the queue."
+    static let auditInstruction = "Continue on iPhone to inspect audit findings before widening rollout."
     static let controlInstruction = "Continue on iPhone to inspect kill switches and unblock the release path."
     static let rollbackInstruction = "Continue on iPhone to restore the rollback-ready checkpoint."
     static let openInstruction = "Continue on iPhone to open Evolution Control."
@@ -125,6 +128,8 @@ enum DecisionEvolutionWidgetControlEntryLexiconSupport {
         switch kind {
         case .review:
             reviewTitle
+        case .audit:
+            auditTitle
         case .control:
             controlTitle
         case .rollback:
@@ -140,6 +145,8 @@ enum DecisionEvolutionWidgetControlEntryLexiconSupport {
         switch kind {
         case .review:
             "checklist"
+        case .audit:
+            "exclamationmark.circle"
         case .control:
             "shield.lefthalf.filled"
         case .rollback:
@@ -155,6 +162,8 @@ enum DecisionEvolutionWidgetControlEntryLexiconSupport {
         switch kind {
         case .review:
             reviewInstruction
+        case .audit:
+            auditInstruction
         case .control:
             controlInstruction
         case .rollback:
@@ -165,11 +174,25 @@ enum DecisionEvolutionWidgetControlEntryLexiconSupport {
     }
 }
 
-struct DecisionEvolutionWidgetControlEntryPresentation: Equatable, Sendable {
+struct DecisionEvolutionWidgetControlEntryPresentation: Codable, Equatable, Sendable {
     let title: String
     let systemImage: String
     let prompt: String
     let instruction: String
+    let triggerReason: String?
+}
+
+enum DecisionEvolutionWidgetPrimaryActionKind: Equatable, Sendable {
+    case quick
+    case evolutionControl
+}
+
+struct DecisionEvolutionWidgetPrimaryActionPresentation: Equatable, Sendable {
+    let kind: DecisionEvolutionWidgetPrimaryActionKind
+    let title: String
+    let systemImage: String
+    let prompt: String?
+    let triggerReason: String?
 }
 
 struct DecisionEvolutionWidgetSurfacePresentation: Equatable, Sendable {
@@ -182,6 +205,14 @@ struct DecisionEvolutionWidgetSurfacePresentation: Equatable, Sendable {
 }
 
 enum DecisionEvolutionWidgetPresentationSupport {
+    static let defaultPrimaryAction = DecisionEvolutionWidgetPrimaryActionPresentation(
+        kind: .quick,
+        title: "Open Before",
+        systemImage: "pause.circle.fill",
+        prompt: nil,
+        triggerReason: nil
+    )
+
     static func releaseStateTitle(
         releaseStateID: String?
     ) -> String {
@@ -312,6 +343,20 @@ enum DecisionEvolutionWidgetPresentationSupport {
         DecisionEvolutionWidgetControlEntryLexiconSupport.instruction(for: kind)
     }
 
+    static func controlEntryPresentation(
+        kind: DecisionEvolutionWidgetControlEntryKind,
+        prompt: String,
+        triggerReason: String? = nil
+    ) -> DecisionEvolutionWidgetControlEntryPresentation {
+        DecisionEvolutionWidgetControlEntryPresentation(
+            title: controlEntryTitle(kind: kind),
+            systemImage: controlEntrySystemImage(kind: kind),
+            prompt: prompt,
+            instruction: attentionInstruction(kind: kind),
+            triggerReason: triggerReason
+        )
+    }
+
     static func statusBadges(
         releaseStateID: String?,
         pendingReviewCount: Int,
@@ -365,6 +410,8 @@ enum DecisionEvolutionWidgetPresentationSupport {
 struct WidgetEvolutionSnapshot: Codable, Equatable, Sendable {
     var releaseStateID: String?
     var activeCheckpointSourceID: String?
+    var controlEntryKindID: String?
+    var storedControlEntry: DecisionEvolutionWidgetControlEntryPresentation?
     var headline: String
     var primaryReason: String?
     var attentionSeverityID: String?
@@ -381,6 +428,8 @@ struct WidgetEvolutionSnapshot: Codable, Equatable, Sendable {
     init(
         releaseStateID: String? = nil,
         activeCheckpointSourceID: String? = nil,
+        controlEntryKindID: String? = nil,
+        storedControlEntry: DecisionEvolutionWidgetControlEntryPresentation? = nil,
         headline: String,
         primaryReason: String? = nil,
         attentionSeverityID: String? = nil,
@@ -396,6 +445,8 @@ struct WidgetEvolutionSnapshot: Codable, Equatable, Sendable {
     ) {
         self.releaseStateID = releaseStateID
         self.activeCheckpointSourceID = activeCheckpointSourceID
+        self.controlEntryKindID = controlEntryKindID
+        self.storedControlEntry = storedControlEntry
         self.headline = headline
         self.primaryReason = primaryReason
         self.attentionSeverityID = attentionSeverityID
@@ -438,6 +489,11 @@ struct WidgetEvolutionSnapshot: Codable, Equatable, Sendable {
             ?? DecisionEvolutionWidgetAttentionSeverity.none
     }
 
+    var explicitControlEntryKind: DecisionEvolutionWidgetControlEntryKind? {
+        guard let controlEntryKindID else { return nil }
+        return DecisionEvolutionWidgetControlEntryKind(rawValue: controlEntryKindID)
+    }
+
     private var usesAttentionContract: Bool {
         attentionSeverityID != nil
             || attentionBadgeValue != nil
@@ -446,7 +502,11 @@ struct WidgetEvolutionSnapshot: Codable, Equatable, Sendable {
     }
 
     private var controlEntryKind: DecisionEvolutionWidgetControlEntryKind {
-        DecisionEvolutionWidgetPresentationSupport.controlEntryKind(
+        if let explicitControlEntryKind {
+            return explicitControlEntryKind
+        }
+
+        return DecisionEvolutionWidgetPresentationSupport.controlEntryKind(
             attentionSeverity: attentionSeverity,
             usesAttentionContract: usesAttentionContract,
             pendingReviewCount: pendingReviewCount,
@@ -480,6 +540,14 @@ struct WidgetEvolutionSnapshot: Codable, Equatable, Sendable {
     }
 
     var surfacesAttention: Bool {
+        if storedControlEntry != nil {
+            return true
+        }
+
+        if explicitControlEntryKind != nil {
+            return true
+        }
+
         if usesAttentionContract {
             return attentionSeverity.map { $0 != .none } ?? false
         }
@@ -491,21 +559,25 @@ struct WidgetEvolutionSnapshot: Codable, Equatable, Sendable {
     }
 
     var controlEntryTitle: String {
-        controlEntryPresentation?.title
+        storedControlEntry?.title
             ?? DecisionEvolutionWidgetPresentationSupport.controlEntryTitle(kind: controlEntryKind)
     }
 
     var controlEntrySystemImage: String {
-        controlEntryPresentation?.systemImage
+        storedControlEntry?.systemImage
             ?? DecisionEvolutionWidgetPresentationSupport.controlEntrySystemImage(kind: controlEntryKind)
     }
 
     var controlEntryPrompt: String {
-        controlEntryPresentation?.prompt ?? displayHeadline
+        storedControlEntry?.prompt ?? displayHeadline
+    }
+
+    var controlEntryTriggerReason: String? {
+        storedControlEntry?.triggerReason ?? displayDetail
     }
 
     var attentionInstruction: String {
-        controlEntryPresentation?.instruction
+        storedControlEntry?.instruction
             ?? DecisionEvolutionWidgetPresentationSupport.attentionInstruction(kind: controlEntryKind)
     }
 
@@ -514,18 +586,15 @@ struct WidgetEvolutionSnapshot: Codable, Equatable, Sendable {
     }
 
     var controlEntryPresentation: DecisionEvolutionWidgetControlEntryPresentation? {
+        if let storedControlEntry {
+            return storedControlEntry
+        }
+
         guard surfacesAttention else { return nil }
-        return DecisionEvolutionWidgetControlEntryPresentation(
-            title: DecisionEvolutionWidgetPresentationSupport.controlEntryTitle(
-                kind: controlEntryKind
-            ),
-            systemImage: DecisionEvolutionWidgetPresentationSupport.controlEntrySystemImage(
-                kind: controlEntryKind
-            ),
+        return DecisionEvolutionWidgetPresentationSupport.controlEntryPresentation(
+            kind: controlEntryKind,
             prompt: displayHeadline,
-            instruction: DecisionEvolutionWidgetPresentationSupport.attentionInstruction(
-                kind: controlEntryKind
-            )
+            triggerReason: displayDetail
         )
     }
 
@@ -566,6 +635,20 @@ struct WidgetSnapshot: Codable, Sendable {
 
     var messageSurface: WidgetMessageSurface {
         sanitizedMessage.surface
+    }
+
+    var primaryActionPresentation: DecisionEvolutionWidgetPrimaryActionPresentation {
+        if let controlEntry = evolution?.controlEntryPresentation {
+            return DecisionEvolutionWidgetPrimaryActionPresentation(
+                kind: .evolutionControl,
+                title: controlEntry.title,
+                systemImage: controlEntry.systemImage,
+                prompt: controlEntry.prompt,
+                triggerReason: controlEntry.triggerReason
+            )
+        }
+
+        return DecisionEvolutionWidgetPresentationSupport.defaultPrimaryAction
     }
 
     static let empty = WidgetSnapshot(
@@ -626,6 +709,8 @@ enum WidgetSnapshotStore {
         return WidgetEvolutionSnapshot(
             releaseStateID: evolution.releaseStateID,
             activeCheckpointSourceID: evolution.activeCheckpointSourceID,
+            controlEntryKindID: evolution.explicitControlEntryKind?.rawValue,
+            storedControlEntry: sanitized(evolution.storedControlEntry),
             headline: String(evolution.headline.prefix(120)),
             primaryReason: evolution.primaryReason.map { String($0.prefix(160)) },
             attentionSeverityID: evolution.attentionSeverity.map(\.rawValue)
@@ -641,6 +726,20 @@ enum WidgetSnapshotStore {
             rollbackReadyCount: max(0, evolution.rollbackReadyCount),
             activeKillSwitchCount: max(0, evolution.activeKillSwitchCount),
             recommendedKillSwitchCount: max(0, evolution.recommendedKillSwitchCount)
+        )
+    }
+
+    private static func sanitized(
+        _ controlEntry: DecisionEvolutionWidgetControlEntryPresentation?
+    ) -> DecisionEvolutionWidgetControlEntryPresentation? {
+        guard let controlEntry else { return nil }
+
+        return DecisionEvolutionWidgetControlEntryPresentation(
+            title: String(controlEntry.title.prefix(40)),
+            systemImage: String(controlEntry.systemImage.prefix(60)),
+            prompt: String(controlEntry.prompt.prefix(120)),
+            instruction: String(controlEntry.instruction.prefix(160)),
+            triggerReason: controlEntry.triggerReason.map { String($0.prefix(160)) }
         )
     }
 

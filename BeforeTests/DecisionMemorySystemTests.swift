@@ -1,5 +1,8 @@
 import XCTest
 import SwiftData
+import BASAppleAdapters
+import BASMemory
+import BASRuntimeCore
 @testable import Before
 
 final class DecisionMemorySystemTests: XCTestCase {
@@ -58,6 +61,62 @@ final class DecisionMemorySystemTests: XCTestCase {
         let unchangedSupportCandidate = try XCTUnwrap(candidates.first(where: { $0.id == "support.action.decideTomorrow" }))
         XCTAssertEqual(unchangedSupportCandidate.lastWriteOperation, .noop)
         XCTAssertEqual(unchangedSupportCandidate.confirmationCount, 1)
+    }
+
+    @MainActor
+    func testRefreshStoredMemoriesStagesStableNonGoalDraftsWhenExecutionFrameRequiresExternalRefresh() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        seedHistory(into: context)
+
+        let volatileFrame = DecisionEBrainExecutionCapabilityFrame(
+            activeProvider: .openModel,
+            preferredProvider: .openModel,
+            fallbackProvider: .template,
+            providerTrack: .builtInOpenModel,
+            executionTier: .balancedGemma,
+            foundationTier: .openModelHeuristic,
+            reasonCodes: []
+        )
+
+        let memories = DecisionMemorySystem.refreshStoredMemories(
+            in: context,
+            executionCapabilityFrame: volatileFrame,
+            now: date("2026-04-09T23:10:00Z")
+        )
+        let candidates = try context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())
+
+        XCTAssertTrue(memories.contains(where: { $0.type == .goal }))
+        XCTAssertFalse(memories.contains(where: { $0.id == "semantic.scenario.buy" }))
+
+        let semanticCandidate = try XCTUnwrap(candidates.first(where: { $0.id == "semantic.scenario.buy" }))
+        XCTAssertEqual(semanticCandidate.status, .pending)
+        XCTAssertEqual(semanticCandidate.lastGovernanceDecision, .deferred)
+        XCTAssertEqual(semanticCandidate.decayPolicy, .fast)
+        XCTAssertEqual(semanticCandidate.tierRaw, "volatile")
+        XCTAssertTrue(semanticCandidate.retrievalTags.contains("external_refresh"))
+        XCTAssertTrue(semanticCandidate.retrievalTags.contains("volatile"))
+    }
+
+    func testHorizonAwareMemoryPersistencePolicyRequiresCorroborationWhenExecutionFrameRequiresCaveat() {
+        let supportedFrame = DecisionEBrainExecutionCapabilityFrame(
+            activeProvider: .openModel,
+            preferredProvider: .openModel,
+            fallbackProvider: .template,
+            providerTrack: .builtInOpenModel,
+            executionTier: .balancedGemma,
+            foundationTier: .openModelDedicated,
+            reasonCodes: []
+        )
+
+        let policy = BeforeProductCompatibility.horizonAwareMemoryPersistencePolicy(
+            for: supportedFrame
+        )
+
+        XCTAssertEqual(policy.minimumDurableEvidenceCount, 2)
+        XCTAssertTrue(policy.evidencePendingRetrievalTags.contains("evidence_caveat"))
+        XCTAssertEqual(policy.volatileClaimWriteMode, .admitDirectly)
     }
 
     @MainActor
@@ -190,6 +249,54 @@ final class DecisionMemorySystemTests: XCTestCase {
     }
 
     @MainActor
+    func testLoadBrainStateScreensOutPendingCandidatesWithoutOverlapAfterGraceWindow() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        context.insert(
+            DecisionMemoryCandidateRecord(
+                id: "situational.market.latest",
+                type: .situational,
+                topic: "market_latest",
+                headline: "Tonight's market move",
+                value: "volatile market signal",
+                confidence: 0.79,
+                priority: 0.76,
+                source: .reflection,
+                firstObservedAt: date("2026-04-08T00:00:00Z"),
+                lastObservedAt: date("2026-04-08T00:00:00Z"),
+                decayPolicy: .medium,
+                retrievalTags: ["latest", "market", "night"],
+                evidenceCount: 2,
+                confirmationCount: 1,
+                lastObservationFingerprint: "market-fp",
+                status: .pending,
+                provenanceSummary: "Fresh reflection from tonight.",
+                lastWriteOperation: .noop,
+                lastGovernanceDecision: .deferred,
+                governanceReason: "Awaiting confirmation."
+            )
+        )
+        try context.save()
+
+        let volatileBrainState = DecisionMemorySystem.loadBrainState(
+            mode: .quick,
+            prompt: "Help me decide whether to cook at home tonight.",
+            context: context,
+            now: date("2026-04-09T23:10:00Z")
+        )
+
+        XCTAssertEqual(volatileBrainState.memoryGovernance.loadedPendingMemoryCount, 0)
+        XCTAssertEqual(
+            volatileBrainState.memoryGovernance.screenedOutReasonCounts[.confidenceNoOverlap],
+            1
+        )
+        XCTAssertFalse(
+            volatileBrainState.memorySlices.contains(where: { $0.id == "situational.market.latest" })
+        )
+    }
+
+    @MainActor
     func testLoadBrainStateMakesRetrievalModeExecutable() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -276,6 +383,129 @@ final class DecisionMemorySystemTests: XCTestCase {
     }
 
     @MainActor
+    func testLoadBrainStateAnnotatesHorizonRefreshAndQuarantineSignals() {
+        let compiledState = DecisionBrainState(
+            profileCore: [],
+            activeGoals: ["Ship the fix safely."],
+            relevantMemories: [],
+            sessionBiases: ["baseline"],
+            retrievalTags: ["baseline"],
+            reactionWeights: .defaults(for: "quick"),
+            identityProfile: .default(modeName: "quick"),
+            boundaryPolicy: .default(riskLevel: BASRiskLevel.low),
+            memoryGovernance: BASMemoryGovernanceState(
+                totalRecordCount: 0,
+                totalCandidateCount: 2,
+                pendingCandidateCount: 2,
+                promotedCandidateCount: 0,
+                loadedPromotedMemoryCount: 0,
+                loadedPendingMemoryCount: 0,
+                screenedOutReasonCounts: [.externalRefreshNoOverlap: 1]
+            ),
+            loadedAt: date("2026-04-09T23:10:00Z")
+        )
+
+        let projection = BASAppleMemoryProjectionRefreshResult(
+            baseProjection: BASBrainProjection(
+                records: [],
+                candidates: [
+                    BASMemoryEligibilityCandidate(
+                        id: "candidate.external-refresh",
+                        role: .relevant,
+                        kind: .semantic,
+                        headline: "Latest policy note is still volatile.",
+                        source: .pattern,
+                        scope: .task,
+                        sensitivity: .medium,
+                        confidence: 0.66,
+                        priority: 0.71,
+                        retrievalTags: ["external_refresh", "volatile"],
+                        lastConfirmedAt: date("2026-04-09T23:10:00Z"),
+                        decayPolicy: .fast,
+                        lifecycleState: "warming",
+                        governanceStatus: .deferred,
+                        isPending: true,
+                        provenanceSummary: "Needs refreshed evidence.",
+                        sourceTrustScore: 0.58,
+                        sourceTrustTier: .medium,
+                        effectiveConfidence: 0.61,
+                        provenanceRisk: false
+                    ),
+                    BASMemoryEligibilityCandidate(
+                        id: "candidate.tool-quarantine",
+                        role: .relevant,
+                        kind: .situational,
+                        headline: "Tool observation has not been corroborated yet.",
+                        source: .pattern,
+                        scope: .task,
+                        sensitivity: .medium,
+                        confidence: 0.61,
+                        priority: 0.64,
+                        retrievalTags: ["quarantined", "tool_observation"],
+                        lastConfirmedAt: date("2026-04-09T23:10:00Z"),
+                        decayPolicy: .fast,
+                        lifecycleState: "warming",
+                        governanceStatus: .deferred,
+                        isPending: true,
+                        provenanceSummary: "Observation-only candidate.",
+                        sourceTrustScore: 0.56,
+                        sourceTrustTier: .medium,
+                        effectiveConfidence: 0.58,
+                        provenanceRisk: false
+                    )
+                ],
+                recentEvents: [],
+                governanceSnapshot: BASMemoryGovernanceState(
+                    totalRecordCount: 0,
+                    totalCandidateCount: 2,
+                    pendingCandidateCount: 2,
+                    promotedCandidateCount: 0,
+                    loadedPromotedMemoryCount: 0,
+                    loadedPendingMemoryCount: 0
+                )
+            ),
+            governanceSnapshot: BASAppleProjectionGovernanceSnapshot(
+                totalRecordCount: 0,
+                totalCandidateCount: 2,
+                pendingCandidateCount: 2,
+                promotedCandidateCount: 0,
+                deferredCandidateCount: 2,
+                admittedCandidateCount: 0
+            ),
+            diagnostics: BASAppleMemoryProjectionDiagnostics(
+                recordCount: 0,
+                candidateCount: 2,
+                allCandidatesPending: true
+            ),
+            refreshedAt: date("2026-04-09T23:10:00Z")
+        )
+
+        let brainState = DecisionMemorySystem.loadBrainState(
+            mode: .quick,
+            prompt: "Should I trust the newest tool note?",
+            projection: projection,
+            retrievalMode: .filtered,
+            now: date("2026-04-09T23:10:00Z"),
+            compileBrainState: { _, _, _, _, _, _ in
+                compiledState
+            }
+        )
+
+        XCTAssertTrue(brainState.sessionBiases.contains("horizon-external-refresh"))
+        XCTAssertTrue(brainState.sessionBiases.contains("horizon-tool-quarantine"))
+        XCTAssertTrue(
+            brainState.sessionBiases.contains("Keep uncertainty visible until fresh evidence arrives.")
+        )
+        XCTAssertTrue(
+            brainState.sessionBiases.contains("Treat tool observations as provisional until corroborated.")
+        )
+        XCTAssertTrue(brainState.retrievalTags.contains("external_refresh"))
+        XCTAssertTrue(brainState.retrievalTags.contains("volatile"))
+        XCTAssertTrue(brainState.retrievalTags.contains("quarantine"))
+        XCTAssertTrue(brainState.retrievalTags.contains("tool_observation"))
+    }
+
+    @MainActor
     func testBrainStateVerificationSnapshotIsStableForSameInputs() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -319,6 +549,253 @@ final class DecisionMemorySystemTests: XCTestCase {
         XCTAssertTrue(brainState.retrievalTags.contains("lang:chinese"))
         XCTAssertTrue(brainState.retrievalTags.contains("script:han"))
         XCTAssertTrue(brainState.retrievalTags.contains(where: { $0.contains("今晚") || $0.contains("想买") }))
+    }
+
+    @MainActor
+    func testLoadBrainStateFallbackRecordsAuditableNoticeAndDegradedBias() {
+        enum SyntheticFailure: Error {
+            case compilerRejected
+        }
+
+        PersistenceIssueRecorder.clear()
+        defer { PersistenceIssueRecorder.clear() }
+        let projection = DecisionMemorySystem.BrainStateProjection(
+            baseProjection: BASBrainProjection(
+                records: [],
+                candidates: [],
+                recentEvents: [],
+                activeTemplateIDs: ["projection.template/bootstrap-rebuild"],
+                failureGuardIDs: ["projection.guard/compiler-drift"]
+            ),
+            governanceSnapshot: BASAppleProjectionGovernanceSnapshot(
+                totalRecordCount: 7,
+                totalCandidateCount: 4,
+                pendingCandidateCount: 2,
+                promotedCandidateCount: 2,
+                deferredCandidateCount: 1,
+                admittedCandidateCount: 1
+            ),
+            diagnostics: BASAppleMemoryProjectionDiagnostics(
+                recordCount: 3,
+                candidateCount: 2,
+                allCandidatesPending: false
+            ),
+            refreshedAt: date("2026-04-09T23:09:30Z")
+        )
+
+        let brainState = DecisionMemorySystem.loadBrainState(
+            mode: .quick,
+            prompt: "I need a fallback path.",
+            projection: projection,
+            retrievalMode: .filtered,
+            now: date("2026-04-09T23:10:00Z"),
+            compileBrainState: { _, _, _, _, _, _ in
+                throw SyntheticFailure.compilerRejected
+            }
+        )
+
+        XCTAssertTrue(brainState.sessionBiases.contains("brain-bootstrap-recovery"))
+        XCTAssertTrue(brainState.sessionBiases.contains("brain-bootstrap-remediation-required"))
+        XCTAssertTrue(brainState.retrievalTags.contains("recovery"))
+        XCTAssertTrue(brainState.retrievalTags.contains("restricted"))
+        XCTAssertTrue(brainState.retrievalTags.contains("restricted-lease"))
+        XCTAssertTrue(brainState.retrievalTags.contains("tool-write-blocked"))
+        XCTAssertTrue(brainState.retrievalTags.contains("memory-write-blocked"))
+        XCTAssertTrue(brainState.retrievalTags.contains("deep-loop-blocked"))
+        XCTAssertEqual(brainState.boundaryPolicy.mode, .localOnlyProtective)
+        XCTAssertEqual(
+            brainState.boundaryPolicy.allowedActionClasses,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.recoveryAllowedActionClasses
+        )
+        XCTAssertEqual(
+            brainState.boundaryPolicy.blockedActionClasses,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.recoveryBlockedActionClasses
+        )
+        XCTAssertEqual(
+            brainState.boundaryPolicy.requiredConfirmations,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.recoveryRequiredConfirmations
+        )
+        XCTAssertEqual(
+            brainState.boundaryPolicy.activeConstraints,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.recoveryBoundaryConstraints
+        )
+        XCTAssertEqual(
+            brainState.boundaryPolicy.auditHeadline,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.recoveryBoundaryAuditHeadline
+        )
+        XCTAssertEqual(brainState.calibrationState.status, .drifting)
+        XCTAssertTrue(brainState.calibrationState.alerts.contains(.templateCoverageGap))
+        XCTAssertEqual(
+            brainState.activeInterventionTemplateIDs,
+            [
+                "before.template/recovery-lane",
+                "before.template/recovery-remediation",
+                "projection.template/bootstrap-rebuild"
+            ]
+        )
+        XCTAssertEqual(
+            brainState.failureGuardIDs,
+            [
+                "before.guard/bootstrap-recovery",
+                "before.guard/restricted-writes",
+                "projection.guard/compiler-drift"
+            ]
+        )
+        XCTAssertEqual(
+            brainState.reactionWeights,
+            try XCTUnwrap(
+                BeforeProductCompatibility.currentBrainBootstrapRecoveryContract
+                    .recoveryReactionWeightsByMode?[DecisionMode.quick.rawValue]
+            )
+        )
+        XCTAssertEqual(
+            brainState.identityProfile,
+            try XCTUnwrap(
+                BeforeProductCompatibility.currentBrainBootstrapRecoveryContract
+                    .recoveryIdentityProfilesByMode?[DecisionMode.quick.rawValue]
+            )
+        )
+        XCTAssertEqual(brainState.memoryGovernance.totalRecordCount, 7)
+        XCTAssertEqual(brainState.memoryGovernance.totalCandidateCount, 4)
+        XCTAssertEqual(brainState.memoryGovernance.pendingCandidateCount, 2)
+        XCTAssertEqual(brainState.memoryGovernance.promotedCandidateCount, 2)
+        XCTAssertEqual(brainState.memoryGovernance.deferredCandidateCount, 1)
+        XCTAssertEqual(brainState.memoryGovernance.admittedCandidateCount, 1)
+        XCTAssertEqual(brainState.evolutionState.pendingReviewCount, 2)
+        XCTAssertTrue(
+            brainState.evolutionState.recentDiffSummary.contains(where: {
+                $0.localizedCaseInsensitiveContains("recovery")
+            })
+        )
+        XCTAssertNotNil(PersistenceIssueRecorder.latestNotice())
+        XCTAssertTrue(
+            PersistenceIssueRecorder.latestNotice()?.contains("bootstrapping current brain state from projection") == true
+        )
+        let issue = PersistenceIssueRecorder.latestIssue()
+        XCTAssertEqual(issue?.category, .brainBootstrapFallback)
+        XCTAssertEqual(issue?.severity, .warning)
+        XCTAssertEqual(issue?.operation, "bootstrapping current brain state from projection")
+        XCTAssertTrue(issue?.remediation?.localizedCaseInsensitiveContains("restricted recovery") == true)
+    }
+
+    @MainActor
+    func testRepeatedBrainBootstrapFallbackEscalatesToQuarantineContract() {
+        enum SyntheticFailure: Error {
+            case compilerRejected
+        }
+
+        PersistenceIssueRecorder.clear()
+        defer { PersistenceIssueRecorder.clear() }
+        let projection = DecisionMemorySystem.BrainStateProjection(
+            baseProjection: BASBrainProjection(
+                records: [],
+                candidates: [],
+                recentEvents: [],
+                activeTemplateIDs: ["projection.template/bootstrap-rebuild"],
+                failureGuardIDs: ["projection.guard/compiler-drift"]
+            ),
+            governanceSnapshot: BASAppleProjectionGovernanceSnapshot(
+                totalRecordCount: 9,
+                totalCandidateCount: 5,
+                pendingCandidateCount: 3,
+                promotedCandidateCount: 2,
+                deferredCandidateCount: 2,
+                admittedCandidateCount: 1
+            ),
+            diagnostics: BASAppleMemoryProjectionDiagnostics(
+                recordCount: 4,
+                candidateCount: 3,
+                allCandidatesPending: false
+            ),
+            refreshedAt: date("2026-04-09T23:09:30Z")
+        )
+
+        _ = DecisionMemorySystem.loadBrainState(
+            mode: .quick,
+            prompt: "First recovery attempt.",
+            projection: projection,
+            retrievalMode: .filtered,
+            now: date("2026-04-09T23:10:00Z"),
+            compileBrainState: { _, _, _, _, _, _ in
+                throw SyntheticFailure.compilerRejected
+            }
+        )
+
+        let quarantinedBrainState = DecisionMemorySystem.loadBrainState(
+            mode: .quick,
+            prompt: "Second recovery attempt.",
+            projection: projection,
+            retrievalMode: .filtered,
+            now: date("2026-04-09T23:11:00Z"),
+            compileBrainState: { _, _, _, _, _, _ in
+                throw SyntheticFailure.compilerRejected
+            }
+        )
+
+        XCTAssertTrue(quarantinedBrainState.sessionBiases.contains("brain-bootstrap-quarantine"))
+        XCTAssertTrue(quarantinedBrainState.retrievalTags.contains("quarantine"))
+        XCTAssertTrue(quarantinedBrainState.retrievalTags.contains("restricted-lease"))
+        XCTAssertTrue(quarantinedBrainState.retrievalTags.contains("tool-write-blocked"))
+        XCTAssertTrue(quarantinedBrainState.retrievalTags.contains("memory-write-blocked"))
+        XCTAssertTrue(quarantinedBrainState.retrievalTags.contains("deep-loop-blocked"))
+        XCTAssertEqual(quarantinedBrainState.boundaryPolicy.mode, .localOnlyProtective)
+        XCTAssertEqual(
+            quarantinedBrainState.boundaryPolicy.allowedActionClasses,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.quarantineAllowedActionClasses
+        )
+        XCTAssertEqual(
+            quarantinedBrainState.boundaryPolicy.blockedActionClasses,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.quarantineBlockedActionClasses
+        )
+        XCTAssertEqual(
+            quarantinedBrainState.boundaryPolicy.requiredConfirmations,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.quarantineRequiredConfirmations
+        )
+        XCTAssertEqual(
+            quarantinedBrainState.boundaryPolicy.activeConstraints,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.quarantineBoundaryConstraints
+        )
+        XCTAssertEqual(
+            quarantinedBrainState.boundaryPolicy.auditHeadline,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.quarantineBoundaryAuditHeadline
+        )
+        XCTAssertEqual(
+            quarantinedBrainState.activeInterventionTemplateIDs,
+            [
+                "before.template/recovery-lane",
+                "before.template/quarantine-lane",
+                "before.template/recovery-remediation",
+                "projection.template/bootstrap-rebuild"
+            ]
+        )
+        XCTAssertEqual(
+            quarantinedBrainState.failureGuardIDs,
+            [
+                "before.guard/bootstrap-recovery",
+                "before.guard/bootstrap-quarantine",
+                "before.guard/restricted-writes",
+                "projection.guard/compiler-drift"
+            ]
+        )
+        XCTAssertEqual(
+            quarantinedBrainState.reactionWeights,
+            try XCTUnwrap(
+                BeforeProductCompatibility.currentBrainBootstrapRecoveryContract
+                    .quarantineReactionWeightsByMode?[DecisionMode.quick.rawValue]
+            )
+        )
+        XCTAssertEqual(
+            quarantinedBrainState.identityProfile,
+            try XCTUnwrap(
+                BeforeProductCompatibility.currentBrainBootstrapRecoveryContract
+                    .quarantineIdentityProfilesByMode?[DecisionMode.quick.rawValue]
+            )
+        )
+        XCTAssertEqual(quarantinedBrainState.memoryGovernance.totalRecordCount, 9)
+        XCTAssertEqual(quarantinedBrainState.memoryGovernance.pendingCandidateCount, 3)
+        XCTAssertEqual(quarantinedBrainState.memoryGovernance.deferredCandidateCount, 2)
+        XCTAssertEqual(quarantinedBrainState.evolutionState.pendingReviewCount, 3)
+        XCTAssertEqual(PersistenceIssueRecorder.latestIssue()?.severity, .critical)
     }
 
     @MainActor

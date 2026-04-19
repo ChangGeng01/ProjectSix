@@ -1,5 +1,17 @@
 # 宿基双生·13层电子脑全栈研发总纲 v1.2 附录
 
+> 口径说明
+>
+> `WP5 / L5` 当前仓库执行口径固定为：`HostProfile / HostVersion / HostRhythmProfile + host gate + 基础删除/冻结/回滚 contract`。
+>
+> `L5 v∞` 目标态固定为：`Host Constitution Fabric`。详见 [EBRAIN_L5_HOST_CONSTITUTION_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L5_HOST_CONSTITUTION_TARGET_VINF.md) 与 [EBRAIN_L5_HOST_CONSTITUTION_ROADMAP.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L5_HOST_CONSTITUTION_ROADMAP.md)。
+>
+> `L6 v∞` 目标态固定为：`Presence Situation Field / Presence Field Generator`。详见 [EBRAIN_L6_PRESENCE_EYE_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L6_PRESENCE_EYE_TARGET_VINF.md)。该文档只定义理想完全体白皮书，不改写当前 repo 仍以 `ContextFrame` 与 task/manipulation 基线为准的执行口径。
+>
+> `L7 v∞` 目标态固定为：`Cognitive Dissection Field / MirrorDraft / Canonical Cognitive Frame`。详见 [EBRAIN_L7_MIRROR_BLADE_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L7_MIRROR_BLADE_TARGET_VINF.md)。该文档只定义理想完全体白皮书，不改写当前 repo 仍以 `BASDecomposeFrame / DecomposeFrame` 与 mirror/decompose Alpha 基线为准的执行口径。
+>
+> `L14` 的 `v1` 执行规范与 `v∞` 目标态白皮书，详见 [EBRAIN_L14_BLACK_RING_SPEC_V1.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L14_BLACK_RING_SPEC_V1.md) 与 [EBRAIN_L14_BLACK_RING_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L14_BLACK_RING_TARGET_VINF.md)。这两份文档分别用于约束主权绝断层的当前工程规范与理想完全体目标态。
+
 ## 附录A：关键路径排期表
 
 优先把 `WP1 / WP2 / WP5 / WP6 / WP7 / WP9 / WP11 / WP12` 排成 `M1-M3` 的关键路径。
@@ -9,13 +21,13 @@
 | `WP0` | 2周 | 无 | `WP14`, `WP16` | 接口 churn | `M0` | 13层术语、schema、门禁冻结 |
 | `WP1` | 4周 | `WP0` | `WP2`, `WP5` | 真机热模型 | `M1-M2` | `BudgetFrame` 落地，高风险降配规则可测 |
 | `WP2` | 6周 | `WP0` | `WP1`, `WP4`, `WP15` | 结构头互扰 | `M1-M5` | Scout/Core 原型、头组定义、误分流可测 |
-| `WP5` | 4周 | `WP0` | `WP1`, `WP8` | 删除/回滚验证 | `M1-M4` | `HostProfile` 版本、删除、冻结、回滚可用 |
+| `WP5` | 4周 | `WP0` | `WP1`, `WP8` | 删除/回滚验证 | `M1-M4` | 当前 repo 以 `HostProfile / HostVersion / HostRhythmProfile` 的版本、删除、冻结、回滚可用为退出标准 |
 | `WP6` | 3周 | `WP0`, `WP1` | `WP7`, `WP11` | 操控误报 | `M2` | `ContextFrame` 与 task/manipulation 基线达标 |
 | `WP7` | 4周 | `WP6` | `WP8`, `WP9` | unknowns 诚实性 | `M2` | `DecomposeFrame`、镜像、矛盾检测稳定 |
 | `WP9` | 5周 | `WP1`, `WP7` | `WP10`, `WP11` | 死循环/绕圈 | `M2-M3` | 至少 2 路候选，收敛/停止条件稳定 |
 | `WP11` | 5周 | `WP6`, `WP7`, `WP9` | `WP10`, `WP16` | GSI 精度与校准 | `M2-M3` | `RiskCard`、`ActionPermit`、block/delay/replace 主链稳定 |
 | `WP12` | 3周 | `WP5`, `WP9`, `WP11` | `WP18` | 阻断后的替代动作设计 | `M2-M3` | 五种输出模式可切换且不削弱边界 |
-| `WP3` | 5周 | `WP1`, `WP2` | `WP8`, `WP17` | ThoughtFold 恢复率 | `M4-M6` | 热启动与状态折页稳定 |
+| `WP3` | 5周 | `WP1`, `WP2` | `WP8`, `WP17` | ThoughtFold 恢复率、主权回滚锚一致性 | `M4-M6` | 热启动、状态折页、`Breath-Fold-Resume` 锚稳定 |
 | `WP8` | 5周 | `WP5`, `WP7` | `WP3`, `WP13` | 记忆冲突与晋升 | `M4` | 热/温/冷、冲突引擎与审计回放可用 |
 | `WP10` | 4周 | `WP5`, `WP9` | `WP11`, `WP12` | 过度保守 | `M4` | TriSelf 融合与 veto 原因码稳定 |
 | `WP13` | 4周 | `WP5`, `WP8`, `WP11` | `WP15` | 在线学习失控 | `M4-M7` | `UpdateTicket`、写入闸门、离线导出可用 |
@@ -71,6 +83,7 @@
 
 - `BudgetFrame`
 - `HostProfile`
+- `HostRhythmProfile`
 - `RiskCard`
 - `ActionPermit`
 - `UpdateTicket`
@@ -83,6 +96,7 @@
 - `BudgetFrame`
 - `HostProfile`
 - `HostVersion`
+- `HostRhythmProfile`
 - `MemoryAtom`
 - `MemoryBundle`
 - `RuleCandidate`
@@ -93,6 +107,11 @@
 - `CritiqueItem`
 - `ThoughtFrame`
 - `ThoughtFold`
+- `MorphGraph`
+- `PrecisionProfile`
+- `ResumeFrame`
+- `RollbackAnchor`
+- `LungState`
 - `TriSelfScore`
 - `MergedChoice`
 - `RenderedOutput`
@@ -114,12 +133,17 @@
   当前版测试、向后兼容测试、迁移测试、回滚测试。
 - 生产回滚时，必须能把最新快照恢复到上一稳定 schema，而不破坏回放能力。
 
-当前 registry 已治理 `25` 个对象。下面这张表保留的是高风险主链对象的最低测试要求；其余对象继续按 registry 中定义的 `current / backward / rollback` 约束执行。
+当前 registry 已治理 `44` 个对象。下面这张表保留的是高风险主链对象的最低测试要求；其余对象继续按 registry 中定义的 `current / backward / rollback` 约束执行。
+
+需要特别区分：
+
+- `HostProfile / HostVersion / HostRhythmProfile` 属于当前仓库已存在并已进入治理口径的 `L5` 对象
+- `BASHostConstitution` 对象族属于 `L5 v∞` 目标态路线，目前仍是文档与路线图概念，不计入当前 registry 覆盖数
 
 对应的全量治理哨兵已经在 `BASEBrainSchemaGovernanceRegistryTests` 中落地，负责锁定：
 
 - registry 唯一性
-- `25` 个治理对象的完整覆盖
+- `44` 个治理对象的完整覆盖
 - compatibility / deprecation / rollback 元数据
 - 所有治理对象与真实 `currentSchemaVersion` 的版本对齐
 
@@ -136,6 +160,11 @@
 | `MemoryAtom` | `schema.memory.current` | `schema.memory.backward` | `schema.memory.rollback` |
 | `ThoughtFrame` | `schema.thought.current` | `schema.thought.backward` | `schema.thought.rollback` |
 | `ThoughtFold` | `schema.fold.current` | `schema.fold.backward` | `schema.fold.rollback` |
+| `MorphGraph` | `schema.morph_graph.current` | `schema.morph_graph.backward` | `schema.morph_graph.rollback` |
+| `PrecisionProfile` | `schema.precision_profile.current` | `schema.precision_profile.backward` | `schema.precision_profile.rollback` |
+| `ResumeFrame` | `schema.resume_frame.current` | `schema.resume_frame.backward` | `schema.resume_frame.rollback` |
+| `RollbackAnchor` | `schema.rollback_anchor.current` | `schema.rollback_anchor.backward` | `schema.rollback_anchor.rollback` |
+| `LungState` | `schema.lung_state.current` | `schema.lung_state.backward` | `schema.lung_state.rollback` |
 | `UpdateTicket` | `schema.ticket.current` | `schema.ticket.backward` | `schema.ticket.rollback` |
 
 ## 附录D：安全、隐私与回退预案
@@ -210,10 +239,10 @@
 
 | WP | 核心对象 / 主链 | 主要回归 | 主要负责人 | 退出门槛 |
 | --- | --- | --- | --- | --- |
-| `WP1 灯芯层` | `DeviceState`, `BudgetFrame` | `BASHostKitTests`, `BASEBrainSchemaCoreTests`, 真机热/低电量构建回归 | Runtime Lead | 高风险 turn 不会越预算，降级不绕开风闸 |
+| `WP1 灯芯层` | `DeviceState`, `BudgetFrame`, `WakeIntent`, `VitalState`, `RunLease` | `BASHostKitTests`, `BASEBrainSchemaCoreTests`, 真机热/低电量构建回归 | Runtime Lead | 高风险 turn 不会越预算，lease / recovery 不绕开风闸 |
 | `WP2 脑肉层` | `Scout/Core`, `ThoughtFrame`, 多头输出 | `DecisionIntelligenceCoordinatorTests`, `OnDeviceIntelligenceSessionTests` | Model Lead | 前哨误分流可测，结构头输出稳定 |
-| `WP3 折叠肺` | `ThoughtFold`, 热启动, cache | `BASEvolutionCoreTests`, `BASAppleEvolutionCheckpointWriterTests` | Compression Lead | 恢复一致性、热启动、写入链稳定 |
-| `WP5 宿纹层` | `HostProfile`, `HostVersion` | `BeforeProductCompatibilityTests`, `DecisionEvolutionEngineTests` | Host & Memory Lead | 版本、删除、回滚、宿主隔离可验证 |
+| `WP3 折叠肺` | `ThoughtFold`, `MorphGraph`, `PrecisionProfile`, `ResumeFrame`, `RollbackAnchor`, `LungState`, `EvolutionFoldedLungSummary`, 热启动, cache | `BASEBrainSchemaCoreTests`, `BASEBrainSchemaGovernanceRegistryTests`, `BASEBrainProgramBlueprintTests`, `DecisionSessionEngineTests`, `DecisionTestingInterfaceTests`, `DeveloperDecisionReplayBuilderTests`, `DecisionFoldedLungTests` | Compression Lead | 恢复一致性、热启动、写入链、`Breath-Fold-Resume` 与主权桥稳定 |
+| `WP5 宿纹层` | `HostProfile`, `HostVersion`, `HostRhythmProfile` | `BeforeProductCompatibilityTests`, `DecisionEvolutionEngineTests` | Host & Memory Lead | 当前 repo 的版本、删除、冻结、回滚、宿主隔离可验证；`Host Constitution Fabric` 另走 target-state 路线 |
 | `WP6-L7` | `ContextFrame`, `DecomposeFrame` | `DecisionTestingInterfaceTests`, `DecisionCapabilityCoverageBuilderTests` | Loop Lead | 情境/镜像/矛盾检测能进入统一 export |
 | `WP8 海马井` | `MemoryAtom`, `MemoryBundle` | `DecisionEvolutionEngineTests`, `BASEvolutionCoreTests` | Host & Memory Lead | 热温冷/冲突/回放不漂移 |
 | `WP9 梦环层` | `ThoughtFrame`, `CandidatePath`, `ForecastItem`, `CritiqueItem` | `DecisionTestingInterfaceTests`, `DecisionEvolutionMutationIntentTests` | Loop Lead | 收敛、停止条件、候选排序稳定 |

@@ -150,7 +150,7 @@ struct DecisionEvolutionBatchMutationPanel: View {
                             presentation: singleApplyPresentation
                         ) {
                             pendingMutation = PendingMutation(intent: intent) {
-                                appModel.applyEvolutionCheckpoint(checkpointID: singleApplyPresentation.checkpointID)
+                                appModel.performEvolutionMutation(intent)
                                 clearSelection()
                                 afterMutation?()
                             }
@@ -161,9 +161,7 @@ struct DecisionEvolutionBatchMutationPanel: View {
                 if let approveIntent {
                     BeforeActionButton(presentation.approveSelectedTitle, style: .secondary) {
                         pendingMutation = PendingMutation(intent: approveIntent) {
-                            appModel.approveEvolutionCheckpoints(
-                                checkpointIDs: approveIntent.preview.targetCheckpointIDs
-                            )
+                            appModel.performEvolutionMutation(approveIntent)
                             clearSelection()
                             afterMutation?()
                         }
@@ -173,9 +171,7 @@ struct DecisionEvolutionBatchMutationPanel: View {
                 if let markReviewIntent {
                     BeforeActionButton(presentation.markSelectedTitle, style: .secondary) {
                         pendingMutation = PendingMutation(intent: markReviewIntent) {
-                            appModel.markEvolutionCheckpointsForReview(
-                                checkpointIDs: markReviewIntent.preview.targetCheckpointIDs
-                            )
+                            appModel.performEvolutionMutation(markReviewIntent)
                             clearSelection()
                             afterMutation?()
                         }
@@ -188,9 +184,7 @@ struct DecisionEvolutionBatchMutationPanel: View {
             HStack(spacing: 10) {
                 BeforeActionButton(presentation.clearSelectedLineageTitle, style: .tertiary) {
                     pendingMutation = PendingMutation(intent: clearLineageIntent) {
-                        appModel.clearEvolutionCheckpointLineages(
-                            checkpointIDs: clearLineageIntent.preview.targetCheckpointIDs
-                        )
+                        appModel.performEvolutionMutation(clearLineageIntent)
                         clearSelection()
                         afterMutation?()
                     }

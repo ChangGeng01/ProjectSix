@@ -524,12 +524,20 @@ public struct BASReplayBundle: Codable, Sendable, Equatable {
     public var brainState: BASCurrentBrainState
     public var runtimeContext: BASRuntimeContext
     public var policyDecision: BASPolicyDecisionRecord
+    public var replayDisposition: BASReplayDisposition
 
-    public init(trace: BASExecutionTrace, brainState: BASCurrentBrainState, runtimeContext: BASRuntimeContext, policyDecision: BASPolicyDecisionRecord) {
+    public init(
+        trace: BASExecutionTrace,
+        brainState: BASCurrentBrainState,
+        runtimeContext: BASRuntimeContext,
+        policyDecision: BASPolicyDecisionRecord,
+        replayDisposition: BASReplayDisposition = BASReplayDisposition()
+    ) {
         self.trace = trace
         self.brainState = brainState
         self.runtimeContext = runtimeContext
         self.policyDecision = policyDecision
+        self.replayDisposition = replayDisposition
     }
 }
 
@@ -554,6 +562,46 @@ public struct BASReplayFingerprint: Codable, Sendable, Equatable {
 
     public init(value: String) {
         self.value = value
+    }
+}
+
+public struct BASReplayDisposition: Codable, Sendable, Equatable {
+    public var isAvailable: Bool
+    public var reason: String?
+    public var forgetRequestID: String?
+    public var checkpointsRevoked: Bool
+    public var syncExportsRevoked: Bool
+    public var vaultConsistencyState: String?
+    public var vaultDeletionManifestID: String?
+    public var vaultSyncRevocationCount: Int
+    public var vaultRequiresApproval: Bool
+    public var vaultOutOfSyncDeviceIDs: [String]
+    public var vaultMigrationTargetDeviceID: String?
+
+    public init(
+        isAvailable: Bool = true,
+        reason: String? = nil,
+        forgetRequestID: String? = nil,
+        checkpointsRevoked: Bool = false,
+        syncExportsRevoked: Bool = false,
+        vaultConsistencyState: String? = nil,
+        vaultDeletionManifestID: String? = nil,
+        vaultSyncRevocationCount: Int = 0,
+        vaultRequiresApproval: Bool = false,
+        vaultOutOfSyncDeviceIDs: [String] = [],
+        vaultMigrationTargetDeviceID: String? = nil
+    ) {
+        self.isAvailable = isAvailable
+        self.reason = reason
+        self.forgetRequestID = forgetRequestID
+        self.checkpointsRevoked = checkpointsRevoked
+        self.syncExportsRevoked = syncExportsRevoked
+        self.vaultConsistencyState = vaultConsistencyState
+        self.vaultDeletionManifestID = vaultDeletionManifestID
+        self.vaultSyncRevocationCount = vaultSyncRevocationCount
+        self.vaultRequiresApproval = vaultRequiresApproval
+        self.vaultOutOfSyncDeviceIDs = vaultOutOfSyncDeviceIDs
+        self.vaultMigrationTargetDeviceID = vaultMigrationTargetDeviceID
     }
 }
 
@@ -599,6 +647,7 @@ public struct BASInspectionBundle: Codable, Sendable, Equatable {
     public var generatedAt: Date
     public var trace: BASExecutionTrace
     public var replayFingerprint: BASReplayFingerprint
+    public var replayDisposition: BASReplayDisposition
     public var releaseDecision: BASReleaseDecision
     public var anomalySignals: [BASAnomalySignal]
     public var calibration: BASInspectionCalibrationSummary?
@@ -607,6 +656,7 @@ public struct BASInspectionBundle: Codable, Sendable, Equatable {
         generatedAt: Date = .now,
         trace: BASExecutionTrace,
         replayFingerprint: BASReplayFingerprint,
+        replayDisposition: BASReplayDisposition = BASReplayDisposition(),
         releaseDecision: BASReleaseDecision,
         anomalySignals: [BASAnomalySignal],
         calibration: BASInspectionCalibrationSummary? = nil
@@ -614,6 +664,7 @@ public struct BASInspectionBundle: Codable, Sendable, Equatable {
         self.generatedAt = generatedAt
         self.trace = trace
         self.replayFingerprint = replayFingerprint
+        self.replayDisposition = replayDisposition
         self.releaseDecision = releaseDecision
         self.anomalySignals = anomalySignals
         self.calibration = calibration
@@ -624,7 +675,33 @@ public struct BASInspectionBundle: Codable, Sendable, Equatable {
             ? "no active anomalies"
             : "\(anomalySignals.count) anomaly signal\(anomalySignals.count == 1 ? "" : "s")"
         let calibrationSummary = calibration.map { "calibration \($0.status.lowercased())" } ?? "calibration unavailable"
-        return "Release \(releaseDecision.kind.rawValue); route \(trace.selectedRoute.preferredModelID); \(anomalySummary); \(calibrationSummary)."
+        let replaySummary = replayDisposition.isAvailable ? "replay available" : "replay blocked"
+        let rawVaultSummary = replayDisposition.isAvailable
+            ? nil
+            : [
+                replayDisposition.vaultOutOfSyncDeviceIDs.isEmpty
+                    ? nil
+                    : "devices \(replayDisposition.vaultOutOfSyncDeviceIDs.joined(separator: ", "))",
+                replayDisposition.vaultMigrationTargetDeviceID.map { "migration target \($0)" }
+            ]
+            .compactMap { $0 }
+            .joined(separator: " • ")
+        let vaultSummary: String? = {
+            guard let rawVaultSummary, !rawVaultSummary.isEmpty else {
+                return nil
+            }
+            return rawVaultSummary
+        }()
+        return [
+            "Release \(releaseDecision.kind.rawValue)",
+            "route \(trace.selectedRoute.preferredModelID)",
+            anomalySummary,
+            replaySummary,
+            vaultSummary,
+            calibrationSummary
+        ]
+        .compactMap { $0 }
+        .joined(separator: "; ") + "."
     }
 
     public var blockerSummary: [String] {
@@ -639,6 +716,9 @@ public struct BASInspectionBundle: Codable, Sendable, Equatable {
         )
         if let calibration, calibration.status.caseInsensitiveCompare("fail") == .orderedSame {
             blockers.append(calibration.summary)
+        }
+        if let replayReason = replayDisposition.reason, replayDisposition.isAvailable == false {
+            blockers.append(replayReason)
         }
         return blockers
     }
@@ -678,7 +758,8 @@ public enum BASObservabilityInspector {
 
     public static func anomalySignals(
         for trace: BASExecutionTrace,
-        policyDecision: BASPolicyDecisionRecord
+        policyDecision: BASPolicyDecisionRecord,
+        replayDisposition: BASReplayDisposition = BASReplayDisposition()
     ) -> [BASAnomalySignal] {
         var signals: [BASAnomalySignal] = []
 
@@ -722,7 +803,129 @@ public enum BASObservabilityInspector {
             )
         }
 
+        if replayDisposition.isAvailable == false, let reason = replayDisposition.reason {
+            signals.append(
+                BASAnomalySignal(
+                    kind: "replay_revoked",
+                    severity: "high",
+                    message: reason
+                )
+            )
+        }
+
+        if let vaultConsistencyState = replayDisposition.vaultConsistencyState,
+           replayDisposition.isAvailable == false,
+           ["revocation_pending", "out_of_sync", "migration_pending"].contains(vaultConsistencyState) {
+            signals.append(
+                BASAnomalySignal(
+                    kind: "vault_consistency_risk",
+                    severity: "high",
+                    message: replayDisposition.reason
+                        ?? "Host constitution vault consistency is \(vaultConsistencyState)."
+                )
+            )
+        }
+
         return signals
+    }
+
+    public static func replayDisposition(
+        for brainState: BASCurrentBrainState
+    ) -> BASReplayDisposition {
+        let markers = Set(
+            brainState.retrievalTags
+            + brainState.verificationSnapshot
+                .split(separator: "|")
+                .map(String.init)
+        )
+        let forgetRequestID = markers
+            .first(where: { $0.hasPrefix("forget_request:") })
+            .map { String($0.dropFirst("forget_request:".count)) }
+            ?? markers
+                .first(where: { $0.hasPrefix("forget:") })
+                .map { String($0.dropFirst("forget:".count)) }
+        let forgetVerified = markers.contains("forget_verified:true")
+        let checkpointsRevoked = markers.contains("forget_checkpoints_revoked:true")
+            || markers.contains("forget_checkpoint_exports_revoked:true")
+        let syncExportsRevoked = markers.contains("forget_sync_exports_revoked:true")
+        let vaultConsistencyState = markers
+            .first(where: { $0.hasPrefix("vault_consistency:") })
+            .map { String($0.dropFirst("vault_consistency:".count)) }
+        let vaultDeletionManifestID = markers
+            .first(where: { $0.hasPrefix("vault_deletion_manifest:") })
+            .map { String($0.dropFirst("vault_deletion_manifest:".count)) }
+        let vaultSyncRevocationCount = markers
+            .first(where: { $0.hasPrefix("vault_sync_revocations:") })
+            .flatMap { Int($0.dropFirst("vault_sync_revocations:".count)) }
+            ?? 0
+        let vaultRequiresApproval = markers.contains("vault_requires_approval:true")
+        let vaultOutOfSyncDeviceIDs = markers
+            .first(where: { $0.hasPrefix("vault_out_of_sync_list:") })
+            .map { String($0.dropFirst("vault_out_of_sync_list:".count)) }
+            .map { value in
+                value
+                    .split(separator: ",")
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+            }
+            ?? []
+        let vaultMigrationTargetDeviceID = markers
+            .first(where: { $0.hasPrefix("vault_migration_target:") })
+            .map { String($0.dropFirst("vault_migration_target:".count)) }
+
+        let vaultConsistencyBlocksReplay =
+            vaultConsistencyState == "revocation_pending" ||
+            vaultConsistencyState == "out_of_sync" ||
+            vaultConsistencyState == "migration_pending"
+
+        guard (forgetVerified && (checkpointsRevoked || syncExportsRevoked)) || vaultConsistencyBlocksReplay else {
+            return BASReplayDisposition(
+                isAvailable: true,
+                forgetRequestID: forgetRequestID,
+                checkpointsRevoked: checkpointsRevoked,
+                syncExportsRevoked: syncExportsRevoked,
+                vaultConsistencyState: vaultConsistencyState,
+                vaultDeletionManifestID: vaultDeletionManifestID,
+                vaultSyncRevocationCount: vaultSyncRevocationCount,
+                vaultRequiresApproval: vaultRequiresApproval,
+                vaultOutOfSyncDeviceIDs: vaultOutOfSyncDeviceIDs,
+                vaultMigrationTargetDeviceID: vaultMigrationTargetDeviceID
+            )
+        }
+
+        let vaultReason: String?
+        if vaultConsistencyBlocksReplay {
+            let manifestSummary = vaultDeletionManifestID.map { " for deletion manifest \($0)" } ?? ""
+            let approvalSummary = vaultRequiresApproval ? " Explicit approval is still required." : ""
+            let outOfSyncSummary = vaultOutOfSyncDeviceIDs.isEmpty
+                ? ""
+                : " Out-of-sync devices: \(vaultOutOfSyncDeviceIDs.joined(separator: ", "))."
+            let migrationSummary = vaultMigrationTargetDeviceID.map { " Migration target: \($0)." } ?? ""
+            vaultReason = "Replay blocked while host constitution vault consistency is \(vaultConsistencyState ?? "unavailable")\(manifestSummary).\((vaultSyncRevocationCount > 0) ? " Sync revocations pending: \(vaultSyncRevocationCount)." : "")\(outOfSyncSummary)\(migrationSummary)\(approvalSummary)"
+        } else {
+            vaultReason = nil
+        }
+
+        let revokedScopes = [
+            checkpointsRevoked ? "checkpoint exports" : nil,
+            syncExportsRevoked ? "sync exports" : nil
+        ]
+        .compactMap { $0 }
+        .joined(separator: " and ")
+        let requestID = forgetRequestID ?? "unknown"
+        return BASReplayDisposition(
+            isAvailable: false,
+            reason: vaultReason ?? "Replay revoked by forget gate \(requestID) after \(revokedScopes).",
+            forgetRequestID: forgetRequestID,
+            checkpointsRevoked: checkpointsRevoked,
+            syncExportsRevoked: syncExportsRevoked,
+            vaultConsistencyState: vaultConsistencyState,
+            vaultDeletionManifestID: vaultDeletionManifestID,
+            vaultSyncRevocationCount: vaultSyncRevocationCount,
+            vaultRequiresApproval: vaultRequiresApproval,
+            vaultOutOfSyncDeviceIDs: vaultOutOfSyncDeviceIDs,
+            vaultMigrationTargetDeviceID: vaultMigrationTargetDeviceID
+        )
     }
 
     public static func inspectionBundle(
@@ -733,18 +936,25 @@ public enum BASObservabilityInspector {
         policyDecision: BASPolicyDecisionRecord,
         calibration: BASInspectionCalibrationSummary? = nil
     ) -> BASInspectionBundle {
+        let replayDisposition = replayDisposition(for: brainState)
         let replayBundle = BASReplayBundle(
             trace: trace,
             brainState: brainState,
             runtimeContext: runtimeContext,
-            policyDecision: policyDecision
+            policyDecision: policyDecision,
+            replayDisposition: replayDisposition
         )
         return BASInspectionBundle(
             generatedAt: generatedAt,
             trace: trace,
             replayFingerprint: replayFingerprint(for: replayBundle),
+            replayDisposition: replayDisposition,
             releaseDecision: releaseDecision(for: trace, policyDecision: policyDecision),
-            anomalySignals: anomalySignals(for: trace, policyDecision: policyDecision),
+            anomalySignals: anomalySignals(
+                for: trace,
+                policyDecision: policyDecision,
+                replayDisposition: replayDisposition
+            ),
             calibration: calibration
         )
     }

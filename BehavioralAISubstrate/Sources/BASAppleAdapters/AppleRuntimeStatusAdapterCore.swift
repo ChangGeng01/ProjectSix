@@ -7,6 +7,8 @@ public struct BASAppleProviderRuntimeStatusInput: Codable, Equatable, Sendable {
     public var runtimeEnabled: Bool
     public var statusesByID: [String: BASProviderStatusRecord]
     public var suspendedProviderIDs: Set<String>
+    public var routingPolicy: BASProviderRoutingPolicy
+    public var routingRegistryVersion: String?
     public var testingOverrideEnabled: Bool
     public var testingOverrideTitle: String?
 
@@ -16,6 +18,8 @@ public struct BASAppleProviderRuntimeStatusInput: Codable, Equatable, Sendable {
         runtimeEnabled: Bool,
         statusesByID: [String: BASProviderStatusRecord],
         suspendedProviderIDs: Set<String> = [],
+        routingPolicy: BASProviderRoutingPolicy,
+        routingRegistryVersion: String? = nil,
         testingOverrideEnabled: Bool = false,
         testingOverrideTitle: String? = nil
     ) {
@@ -24,6 +28,8 @@ public struct BASAppleProviderRuntimeStatusInput: Codable, Equatable, Sendable {
         self.runtimeEnabled = runtimeEnabled
         self.statusesByID = statusesByID
         self.suspendedProviderIDs = suspendedProviderIDs
+        self.routingPolicy = routingPolicy
+        self.routingRegistryVersion = routingRegistryVersion
         self.testingOverrideEnabled = testingOverrideEnabled
         self.testingOverrideTitle = testingOverrideTitle
     }
@@ -36,6 +42,8 @@ public struct BASAppleHostVisibleRuntimeStatusInput: Codable, Equatable, Sendabl
     public var runtimeEnabled: Bool
     public var statusesByID: [String: BASProviderStatusRecord]
     public var suspendedProviderIDs: Set<String>
+    public var routingPolicy: BASProviderRoutingPolicy
+    public var routingRegistryVersion: String?
     public var testingOverrideEnabled: Bool
     public var testingOverrideTitle: String?
     public var profileDetail: String
@@ -47,6 +55,8 @@ public struct BASAppleHostVisibleRuntimeStatusInput: Codable, Equatable, Sendabl
         runtimeEnabled: Bool,
         statusesByID: [String: BASProviderStatusRecord],
         suspendedProviderIDs: Set<String> = [],
+        routingPolicy: BASProviderRoutingPolicy,
+        routingRegistryVersion: String? = nil,
         testingOverrideEnabled: Bool = false,
         testingOverrideTitle: String? = nil,
         profileDetail: String
@@ -57,6 +67,8 @@ public struct BASAppleHostVisibleRuntimeStatusInput: Codable, Equatable, Sendabl
         self.runtimeEnabled = runtimeEnabled
         self.statusesByID = statusesByID
         self.suspendedProviderIDs = suspendedProviderIDs
+        self.routingPolicy = routingPolicy
+        self.routingRegistryVersion = routingRegistryVersion
         self.testingOverrideEnabled = testingOverrideEnabled
         self.testingOverrideTitle = testingOverrideTitle
         self.profileDetail = profileDetail
@@ -97,6 +109,9 @@ public enum BASAppleProviderRuntimeStatusAdapter {
             suspendedProviderIDs: input.suspendedProviderIDs,
             testingOverrideEnabled: input.testingOverrideEnabled,
             testingOverrideTitle: input.testingOverrideTitle
+            ,
+            routingRegistryVersion: input.routingRegistryVersion,
+            routingPolicy: input.routingPolicy
         )
 
         return BASAppleProviderRuntimeStatusOutput(
@@ -118,6 +133,8 @@ public enum BASAppleProviderRuntimeStatusAdapter {
                 runtimeEnabled: input.runtimeEnabled,
                 statusesByID: input.statusesByID,
                 suspendedProviderIDs: input.suspendedProviderIDs,
+                routingPolicy: input.routingPolicy,
+                routingRegistryVersion: input.routingRegistryVersion,
                 testingOverrideEnabled: input.testingOverrideEnabled,
                 testingOverrideTitle: input.testingOverrideTitle
             )

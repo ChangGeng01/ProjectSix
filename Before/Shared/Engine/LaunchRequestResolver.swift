@@ -7,27 +7,11 @@ enum LaunchRequestResolution: Equatable {
 }
 
 enum LaunchRequestResolver {
-    static func resolve(_ request: PendingLaunchRequest) -> LaunchRequestResolution {
-        if let scenario = request.scenario {
-            return .quick(
-                scenario: scenario,
-                prompt: sanitizedPrompt(from: request.prompt)
-            )
-        }
-
-        if let preferredMode = request.preferredMode {
-            return .mode(preferredMode, prompt: sanitizedPrompt(from: request.prompt))
-        }
-
-        let prompt = sanitizedPrompt(from: request.prompt)
-        if !prompt.isEmpty {
-            return .routedPrompt(prompt)
-        }
-
-        return .quick(scenario: nil, prompt: "")
+    static func resolve(_ envelope: DecisionIntentEnvelope) -> LaunchRequestResolution {
+        envelope.launchRequestResolution
     }
 
-    private static func sanitizedPrompt(from prompt: String?) -> String {
-        prompt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    static func resolve(_ request: PendingLaunchRequest) -> LaunchRequestResolution {
+        resolve(request.decisionIntentEnvelope)
     }
 }

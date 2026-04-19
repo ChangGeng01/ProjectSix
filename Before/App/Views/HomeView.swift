@@ -152,27 +152,27 @@ struct HomeView: View {
                                 }
 
                                 if let deck = systemFlightDeck,
-                                   let summary = deck.eBrainSummary {
-                                    let presentation = summary.presentation
+                                   let digest = deck.eBrainDigestPresentation {
                                     VStack(alignment: .leading, spacing: 8) {
-                                        Text("\(summary.runMode.uppercased()) • \(summary.riskLevel.uppercased()) → \(summary.permitMode.uppercased())")
+                                        Text(digest.digest.compactStatusLine)
                                             .font(.caption.weight(.semibold))
                                             .foregroundStyle(BeforeTheme.ember)
 
-                                        Text(summary.taskType.replacingOccurrences(of: "_", with: " "))
+                                        Text(digest.digest.taskTitle)
                                             .font(.title3.bold())
                                             .foregroundStyle(BeforeTheme.ink)
 
-                                        Text(
-                                            "Audit \(summary.auditFindingCount) • Active kill switches \(deck.releaseControlSummary.activeKillSwitches.count) • Recommended \(deck.releaseControlSummary.recommendedKillSwitches.count) • Host gate \(summary.hostGatePercent)%"
-                                        )
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-
-                                        if let pressureLine = presentation.pressureLine {
-                                            Text(pressureLine)
-                                                .font(.caption2)
+                                        ForEach(Array(digest.summaryLines.enumerated()), id: \.offset) { index, line in
+                                            Text(line)
+                                                .font(index == 0 ? .caption : .caption2)
                                                 .foregroundStyle(.secondary)
+                                        }
+
+                                        if !digest.layerStackLines.isEmpty {
+                                            DecisionLayerStackView(
+                                                lines: digest.layerStackLines,
+                                                spacing: 4
+                                            )
                                         }
 
                                         if let runtimeStatusPresentation = currentEvolutionWorkspace.runtimeStatusPresentation(
@@ -207,10 +207,10 @@ struct HomeView: View {
                                                 .lineLimit(2)
                                         }
 
-                                        if let primaryGuardrailText = summary.presentation.primaryGuardrailText {
-                                            Text(primaryGuardrailText)
+                                        if let alertLine = digest.alertLine {
+                                            Text(alertLine)
                                                 .font(.caption2)
-                                            .foregroundStyle(BeforeTheme.ember)
+                                                .foregroundStyle(BeforeTheme.ember)
                                         }
 
                                         DecisionEvolutionReleaseSummaryView(

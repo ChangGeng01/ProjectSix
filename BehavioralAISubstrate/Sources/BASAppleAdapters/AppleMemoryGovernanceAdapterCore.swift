@@ -19,6 +19,7 @@ public enum BASAppleMemoryGovernanceAdapter {
         reflectiveRecordType: Reflective.Type,
         behavior: BASMemoryDerivationBehavior = .generic,
         memoryTrustBehavior: BASMemoryTrustBehavior = .generic,
+        persistencePolicy: BASMemoryHorizonPersistencePolicy = .unrestricted,
         onSaveError: ((Error) -> Void)? = nil
     ) -> BASAppleMemoryReconciliationWriteResult<Governed, Candidate> {
         let drafts = BASAppleMemoryDraftDerivationAdapter.deriveDrafts(
@@ -44,7 +45,8 @@ public enum BASAppleMemoryGovernanceAdapter {
                 existingRecords: [],
                 existingCandidates: [],
                 reviewNow: reviewNow,
-                memoryTrustBehavior: memoryTrustBehavior
+                memoryTrustBehavior: memoryTrustBehavior,
+                persistencePolicy: persistencePolicy
             ),
             in: context,
             onSaveError: onSaveError
@@ -53,11 +55,13 @@ public enum BASAppleMemoryGovernanceAdapter {
 
     public static func assess(
         draft: BASDerivedMemoryDraft,
-        memoryTrustBehavior: BASMemoryTrustBehavior = .generic
+        memoryTrustBehavior: BASMemoryTrustBehavior = .generic,
+        persistencePolicy: BASMemoryHorizonPersistencePolicy = .unrestricted
     ) -> BASMemoryGovernanceAssessment {
         BASMemoryGovernance.assess(
             draft: draft.governanceDraftInput,
-            behavior: memoryTrustBehavior
+            behavior: memoryTrustBehavior,
+            persistencePolicy: persistencePolicy
         )
     }
 }

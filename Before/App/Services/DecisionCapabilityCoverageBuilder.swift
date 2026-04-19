@@ -13,6 +13,7 @@ struct DecisionEvolutionRuntimeFacts: Equatable, Sendable {
     let effectiveEBrainSummary: DeveloperDecisionReplayEBrainSummary?
     let effectiveEBrainSource: DecisionTestingEBrainSource?
     let effectiveEBrainFactsBundle: DecisionEvolutionEBrainFactsBundle?
+    let layerStackLines: [String]
     let thoughtFoldChecksum: String?
     let updateTicketSummaries: [String]
     let runtimeAuditFindings: [String]
@@ -67,9 +68,15 @@ enum DecisionCapabilityCoverageBuilder {
             currentBrainState: currentBrainState
         )
         let flightDeck = export.flightDeck
+        let executionCapabilityFrame =
+            flightDeck.eBrainSummary?.executionCapabilityFrame
+            ?? export.executionCapabilityFrame
 
         return BASReferenceCapabilityCoverageInput(
             activeProviderTitle: export.runtimeSnapshot.runtimeStatus.active.title,
+            executionTierID: executionCapabilityFrame.executionTierID,
+            foundationTierID: executionCapabilityFrame.foundationTierID,
+            horizonCoverage: horizonCoverage(from: executionCapabilityFrame),
             runtimeSummary: export.basRuntimeInspectionSummary,
             brainSummary: export.basBrainSummary,
             isPureLocalClosedLoop: flightDeck.isPureLocalClosedLoop,
@@ -83,6 +90,37 @@ enum DecisionCapabilityCoverageBuilder {
             recoveredEBrainAvailable: resolvedEvolutionFacts.recoveredEBrainAvailable,
             recoveredAuditFindingCount: resolvedEvolutionFacts.recoveredAuditFindingCount,
             recoveredTicketCount: resolvedEvolutionFacts.recoveredTicketCount
+        )
+    }
+
+    private static func horizonCoverage(
+        from frame: DecisionEBrainExecutionCapabilityFrame
+    ) -> BASHorizonCoverageSnapshot {
+        let worldPriorContract = frame.worldPriorContract
+        let temporalKnowledgeContract = frame.temporalKnowledgeContract
+        let evidenceContract = frame.evidenceContract
+        let persistenceContract = frame.persistenceContract
+
+        return BASHorizonCoverageSnapshot(
+            worldPriorID: worldPriorContract.priorID,
+            worldPriorPostureID: worldPriorContract.posture.rawValue,
+            worldBoundaryID: worldPriorContract.boundaryID,
+            hostIsolationID: worldPriorContract.hostIsolationID,
+            sessionIsolationID: worldPriorContract.sessionIsolationID,
+            toolTruthModeID: worldPriorContract.toolTruthModeID,
+            temporalKnowledgeTierID: temporalKnowledgeContract.tier.rawValue,
+            temporalRefreshRequirementID: temporalKnowledgeContract.refreshRequirement.rawValue,
+            temporalDecayPolicyID: temporalKnowledgeContract.decayPolicy.rawValue,
+            temporalTimeScopeID: temporalKnowledgeContract.timeScope.rawValue,
+            evidenceGradientID: evidenceContract.gradient.rawValue,
+            evidenceClaimTypeID: evidenceContract.claimType.rawValue,
+            requiresCaveat: evidenceContract.requiresCaveat,
+            requiresExternalRefresh: evidenceContract.requiresExternalRefresh,
+            volatileClaimWriteModeID: persistenceContract.volatileClaimWriteModeID,
+            contaminatedWriteModeID: persistenceContract.contaminatedWriteModeID,
+            minimumDurableEvidenceCount: persistenceContract.minimumDurableEvidenceCount,
+            forceStageNonContinuityDrafts: persistenceContract.forceStageNonContinuityDrafts,
+            evidencePendingTagIDs: persistenceContract.evidencePendingTagIDs
         )
     }
 }

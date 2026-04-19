@@ -1,8 +1,209 @@
 import Foundation
 import BASHostKit
 
+typealias DecisionQuickRefinementHook = @Sendable (
+    QuickCheckResult,
+    QuickCheckInput,
+    DecisionContextPreparedState?,
+    DecisionNeuralState?,
+    DecisionBrainState?,
+    BASEBrainTurnResult?,
+    BeforePreferences,
+    BeforeRuntimePolicyResolution
+) async -> QuickCheckResult?
+
+typealias DecisionBalanceRefinementHook = @Sendable (
+    BalanceBoardResult,
+    BalanceBoardInput,
+    DecisionContextPreparedState?,
+    DecisionNeuralState?,
+    DecisionBrainState?,
+    BASEBrainTurnResult?,
+    BeforePreferences,
+    BeforeRuntimePolicyResolution
+) async -> BalanceBoardResult?
+
+typealias DecisionMirrorRefinementHook = @Sendable (
+    MirrorResult,
+    MirrorInput,
+    DecisionContextPreparedState?,
+    DecisionNeuralState?,
+    DecisionBrainState?,
+    BASEBrainTurnResult?,
+    BeforePreferences,
+    BeforeRuntimePolicyResolution
+) async -> MirrorResult?
+
+private actor DecisionIntelligenceCoordinatorTestingHookStore {
+    private var quickRefinement: DecisionQuickRefinementHook?
+    private var balanceRefinement: DecisionBalanceRefinementHook?
+    private var mirrorRefinement: DecisionMirrorRefinementHook?
+
+    func setQuickRefinement(_ handler: DecisionQuickRefinementHook?) {
+        quickRefinement = handler
+    }
+
+    func quickRefinementHandler() -> DecisionQuickRefinementHook? {
+        quickRefinement
+    }
+
+    func setBalanceRefinement(_ handler: DecisionBalanceRefinementHook?) {
+        balanceRefinement = handler
+    }
+
+    func balanceRefinementHandler() -> DecisionBalanceRefinementHook? {
+        balanceRefinement
+    }
+
+    func setMirrorRefinement(_ handler: DecisionMirrorRefinementHook?) {
+        mirrorRefinement = handler
+    }
+
+    func mirrorRefinementHandler() -> DecisionMirrorRefinementHook? {
+        mirrorRefinement
+    }
+
+    func reset() {
+        quickRefinement = nil
+        balanceRefinement = nil
+        mirrorRefinement = nil
+    }
+}
+
+struct DecisionIntelligenceRuntimeCoordination: Equatable, Sendable {
+    let executionProfile: DecisionIntelligenceExecutionProfile
+    let runtimeStatus: DecisionModelRuntimeStatus
+    let runtimePolicyResolution: BeforeRuntimePolicyResolution
+
+    var allowFallbacks: Bool {
+        executionProfile.allowFallbacks
+    }
+
+    func strategy(for kind: DecisionIntelligenceTraceKind) -> DecisionAdaptiveTaskStrategy {
+        executionProfile.strategy(for: kind)
+    }
+
+    func retrievalMode(for mode: DecisionMode) -> DecisionRetrievalMode {
+        let traceKind = DecisionIntelligenceTraceKind(substrateKindID: mode.substrateModeID) ?? .quick
+        return strategy(for: traceKind).retrievalMode
+    }
+
+    var retrievalModesByModeID: [String: String] {
+        [
+            DecisionMode.quick.substrateModeID: retrievalMode(for: .quick).rawValue,
+            DecisionMode.balance.substrateModeID: retrievalMode(for: .balance).rawValue,
+            DecisionMode.mirror.substrateModeID: retrievalMode(for: .mirror).rawValue
+        ]
+    }
+}
+
 enum DecisionIntelligenceCoordinator {
     private static let adapter: any LocalModelAdapting = TemplateLocalModelAdapter()
+    private static let testingHooks = DecisionIntelligenceCoordinatorTestingHookStore()
+    private static let fallbackOpenModelStatus = DecisionModelProviderStatus(
+        kind: .openModel,
+        isAvailable: false,
+        title: "Reserved",
+        detail: "No open-model runtime is registered."
+    )
+
+    private static func openModelStatus(
+        from statusesByKind: [DecisionModelProviderKind: DecisionModelProviderStatus]
+    ) -> DecisionModelProviderStatus {
+        statusesByKind[.openModel]
+        ?? DecisionIntelligenceProviderRegistry.shared.statusesByKind()[.openModel]
+        ?? fallbackOpenModelStatus
+    }
+
+    private static func gemmaStatus(
+        from statusesByKind: [DecisionModelProviderKind: DecisionModelProviderStatus]
+    ) -> DecisionModelProviderStatus {
+        statusesByKind[.gemmaE4B] ?? GemmaE4BIntelligenceService.availabilityStatus
+    }
+
+    private static func foundationStatus(
+        from statusesByKind: [DecisionModelProviderKind: DecisionModelProviderStatus]
+    ) -> DecisionModelProviderStatus {
+        statusesByKind[.foundationModels] ?? FoundationModelsIntelligenceService.availabilityStatus
+    }
+
+    static func setTestingQuickRefinementHandler(
+        _ handler: DecisionQuickRefinementHook?
+    ) async {
+        await testingHooks.setQuickRefinement(handler)
+    }
+
+    static func setTestingBalanceRefinementHandler(
+        _ handler: DecisionBalanceRefinementHook?
+    ) async {
+        await testingHooks.setBalanceRefinement(handler)
+    }
+
+    static func setTestingMirrorRefinementHandler(
+        _ handler: DecisionMirrorRefinementHook?
+    ) async {
+        await testingHooks.setMirrorRefinement(handler)
+    }
+
+    static func resetTestingRefinementHandlers() async {
+        await testingHooks.reset()
+    }
+
+    static func runtimeCoordination(
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences(),
+        testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile,
+        device: DeviceCapabilitySnapshot = .current,
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy,
+        openModelStatus: DecisionModelProviderStatus = DecisionIntelligenceProviderRegistry.shared.statusesByKind()[.openModel] ?? DecisionModelProviderStatus(
+            kind: .openModel,
+            isAvailable: false,
+            title: "Reserved",
+            detail: "No open-model runtime is registered."
+        ),
+        gemmaStatus: DecisionModelProviderStatus = GemmaE4BIntelligenceService.availabilityStatus,
+        foundationStatus: DecisionModelProviderStatus = FoundationModelsIntelligenceService.availabilityStatus
+    ) -> DecisionIntelligenceRuntimeCoordination {
+        let profile = executionProfile(
+            preferences: preferences,
+            testingStubProfile: testingStubProfile,
+            device: device,
+            openModelStatus: openModelStatus,
+            gemmaStatus: gemmaStatus,
+            foundationStatus: foundationStatus
+        )
+
+        return DecisionIntelligenceRuntimeCoordination(
+            executionProfile: profile,
+            runtimeStatus: runtimeStatus(
+                profile: profile,
+                preferences: preferences,
+                testingStubProfile: testingStubProfile,
+                runtimePolicyResolution: runtimePolicyResolution,
+                openModelStatus: openModelStatus,
+                gemmaStatus: gemmaStatus,
+                foundationStatus: foundationStatus
+            ),
+            runtimePolicyResolution: runtimePolicyResolution
+        )
+    }
+
+    static func runtimeCoordination(
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences(),
+        testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile,
+        device: DeviceCapabilitySnapshot = .current,
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy,
+        statusesByKind: [DecisionModelProviderKind: DecisionModelProviderStatus]
+    ) -> DecisionIntelligenceRuntimeCoordination {
+        runtimeCoordination(
+            preferences: preferences,
+            testingStubProfile: testingStubProfile,
+            device: device,
+            runtimePolicyResolution: runtimePolicyResolution,
+            openModelStatus: openModelStatus(from: statusesByKind),
+            gemmaStatus: gemmaStatus(from: statusesByKind),
+            foundationStatus: foundationStatus(from: statusesByKind)
+        )
+    }
 
     static func executionProfile(
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences(),
@@ -31,6 +232,7 @@ enum DecisionIntelligenceCoordinator {
         preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences(),
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile,
         device: DeviceCapabilitySnapshot = .current,
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy,
         openModelStatus: DecisionModelProviderStatus = DecisionIntelligenceProviderRegistry.shared.statusesByKind()[.openModel] ?? DecisionModelProviderStatus(
             kind: .openModel,
             isAvailable: false,
@@ -40,14 +242,26 @@ enum DecisionIntelligenceCoordinator {
         gemmaStatus: DecisionModelProviderStatus = GemmaE4BIntelligenceService.availabilityStatus,
         foundationStatus: DecisionModelProviderStatus = FoundationModelsIntelligenceService.availabilityStatus
     ) -> DecisionModelRuntimeStatus {
-        let profile = executionProfile(
+        runtimeCoordination(
             preferences: preferences,
             testingStubProfile: testingStubProfile,
             device: device,
+            runtimePolicyResolution: runtimePolicyResolution,
             openModelStatus: openModelStatus,
             gemmaStatus: gemmaStatus,
             foundationStatus: foundationStatus
-        )
+        ).runtimeStatus
+    }
+
+    private static func runtimeStatus(
+        profile: DecisionIntelligenceExecutionProfile,
+        preferences: BeforePreferences,
+        testingStubProfile: DecisionTestingStubProfile?,
+        runtimePolicyResolution: BeforeRuntimePolicyResolution,
+        openModelStatus: DecisionModelProviderStatus,
+        gemmaStatus: DecisionModelProviderStatus,
+        foundationStatus: DecisionModelProviderStatus
+    ) -> DecisionModelRuntimeStatus {
         let statusesByKind: [DecisionModelProviderKind: DecisionModelProviderStatus] = [
             .openModel: openModelStatus,
             .gemmaE4B: gemmaStatus,
@@ -66,6 +280,8 @@ enum DecisionIntelligenceCoordinator {
                     title: \.title,
                     detail: \.detail
                 ),
+                routingPolicy: BeforeProductCompatibility.requireProviderRoutingPolicy(from: runtimePolicyResolution),
+                routingRegistryVersion: runtimePolicyResolution.lineage.providerRoutingRegistryVersion,
                 testingOverrideEnabled: testingStubProfile != nil,
                 testingOverrideTitle: testingStubProfile?.title,
                 profileDetail: profile.detail
@@ -76,7 +292,8 @@ enum DecisionIntelligenceCoordinator {
             preferred: preferences.preferredIntelligenceProvider.kind,
             active: DecisionModelProviderKind(rawValue: summary.activeProviderID) ?? .template,
             fallback: summary.fallbackProviderID.flatMap(DecisionModelProviderKind.init(rawValue:)),
-            detail: summary.detail
+            detail: summary.detail,
+            policyLineage: runtimePolicyResolution.lineage
         )
     }
 
@@ -171,7 +388,8 @@ enum DecisionIntelligenceCoordinator {
         scenario: ScenarioType,
         prompt: String = "",
         mode: DecisionMode? = nil,
-        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences(),
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy
     ) async -> SelfReminder? {
         let deterministic = bestReminder(
             from: reminders,
@@ -182,8 +400,11 @@ enum DecisionIntelligenceCoordinator {
         )
 
         let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        let profile = executionProfile(preferences: preferences)
-        let reminderStrategy = profile.strategy(for: .reminder)
+        let coordination = runtimeCoordination(
+            preferences: preferences,
+            runtimePolicyResolution: runtimePolicyResolution
+        )
+        let reminderStrategy = coordination.strategy(for: .reminder)
         guard preferences.onDeviceIntelligenceMode.isEnabled,
               reminderStrategy.allowsModelInvocation,
               !trimmedPrompt.isEmpty else {
@@ -208,7 +429,8 @@ enum DecisionIntelligenceCoordinator {
             mode: mode,
             strategy: reminderStrategy,
             preference: reminderStrategy.preferredProvider,
-            allowFallbacks: profile.allowFallbacks
+            allowFallbacks: coordination.allowFallbacks,
+            runtimePolicyResolution: runtimePolicyResolution
         ) else {
             return deterministic
         }
@@ -223,10 +445,27 @@ enum DecisionIntelligenceCoordinator {
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
         eBrainTurn: BASEBrainTurnResult? = nil,
-        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences(),
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy
     ) async -> QuickCheckResult? {
-        let profile = executionProfile(preferences: preferences)
-        let quickStrategy = profile
+        if let testingHandler = await testingHooks.quickRefinementHandler() {
+            return await testingHandler(
+                base,
+                input,
+                contextState,
+                neuralState,
+                brainState,
+                eBrainTurn,
+                preferences,
+                runtimePolicyResolution
+            )
+        }
+
+        let coordination = runtimeCoordination(
+            preferences: preferences,
+            runtimePolicyResolution: runtimePolicyResolution
+        )
+        let quickStrategy = coordination
             .strategy(for: .quick)
             .clamped(using: eBrainTurn)
             .adapting(
@@ -246,7 +485,8 @@ enum DecisionIntelligenceCoordinator {
             brainState: brainState,
             eBrainTurn: eBrainTurn,
             preference: quickStrategy.preferredProvider,
-            allowFallbacks: profile.allowFallbacks
+            allowFallbacks: coordination.allowFallbacks,
+            runtimePolicyResolution: runtimePolicyResolution
         )
     }
 
@@ -257,10 +497,27 @@ enum DecisionIntelligenceCoordinator {
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
         eBrainTurn: BASEBrainTurnResult? = nil,
-        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences(),
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy
     ) async -> BalanceBoardResult? {
-        let profile = executionProfile(preferences: preferences)
-        let balanceStrategy = profile
+        if let testingHandler = await testingHooks.balanceRefinementHandler() {
+            return await testingHandler(
+                base,
+                input,
+                contextState,
+                neuralState,
+                brainState,
+                eBrainTurn,
+                preferences,
+                runtimePolicyResolution
+            )
+        }
+
+        let coordination = runtimeCoordination(
+            preferences: preferences,
+            runtimePolicyResolution: runtimePolicyResolution
+        )
+        let balanceStrategy = coordination
             .strategy(for: .balance)
             .clamped(using: eBrainTurn)
             .adapting(
@@ -280,7 +537,8 @@ enum DecisionIntelligenceCoordinator {
             brainState: brainState,
             eBrainTurn: eBrainTurn,
             preference: balanceStrategy.preferredProvider,
-            allowFallbacks: profile.allowFallbacks
+            allowFallbacks: coordination.allowFallbacks,
+            runtimePolicyResolution: runtimePolicyResolution
         )
     }
 
@@ -291,10 +549,27 @@ enum DecisionIntelligenceCoordinator {
         neuralState: DecisionNeuralState? = nil,
         brainState: DecisionBrainState? = nil,
         eBrainTurn: BASEBrainTurnResult? = nil,
-        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences()
+        preferences: BeforePreferences = DecisionTestingInterface.effectivePreferences(),
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy
     ) async -> MirrorResult? {
-        let profile = executionProfile(preferences: preferences)
-        let mirrorStrategy = profile
+        if let testingHandler = await testingHooks.mirrorRefinementHandler() {
+            return await testingHandler(
+                base,
+                input,
+                contextState,
+                neuralState,
+                brainState,
+                eBrainTurn,
+                preferences,
+                runtimePolicyResolution
+            )
+        }
+
+        let coordination = runtimeCoordination(
+            preferences: preferences,
+            runtimePolicyResolution: runtimePolicyResolution
+        )
+        let mirrorStrategy = coordination
             .strategy(for: .mirror)
             .clamped(using: eBrainTurn)
             .adapting(
@@ -314,7 +589,8 @@ enum DecisionIntelligenceCoordinator {
             brainState: brainState,
             eBrainTurn: eBrainTurn,
             preference: mirrorStrategy.preferredProvider,
-            allowFallbacks: profile.allowFallbacks
+            allowFallbacks: coordination.allowFallbacks,
+            runtimePolicyResolution: runtimePolicyResolution
         )
     }
 }

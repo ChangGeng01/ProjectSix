@@ -100,4 +100,80 @@ struct BASAppleBootstrapStrategyTests {
             ) == "one two"
         )
     }
+
+    @Test("invalid bootstrap strategy identifiers recover instead of crashing")
+    func invalidBootstrapIdentifiersRecover() {
+        let seed = BASAppleBootstrapStrategyAdapter.resolveActiveSessionSeed(
+            promptFragmentsByModeID: [
+                "unsupported-mode": ["this should be ignored"],
+                BASDecisionMode.primary.identifier: ["  safe fallback  "]
+            ],
+            modePriority: [
+                "unsupported-mode",
+                BASDecisionMode.primary.identifier
+            ],
+            taskGraphModeID: "unsupported-task-graph",
+            taskGraphPromptSeed: "task graph fallback",
+            defaultModeID: "unsupported-default"
+        )
+
+        #expect(seed.modeID == BASDecisionMode.primary.identifier)
+        #expect(seed.promptSeed == "safe fallback")
+
+        let orderedTemplateIDs = BASAppleBootstrapStrategyAdapter.orderedTemplateIDs(
+            modeID: "unsupported-mode",
+            riskLevelID: "unsupported-risk",
+            recommendedTemplateIDs: ["valid_template"],
+            templates: [
+                BASAppleCurrentBrainBootstrapHostTemplateInput(
+                    id: "valid_template",
+                    modeID: BASDecisionMode.primary.identifier,
+                    riskLevelID: "low",
+                    isPinned: false,
+                    successCount: 3,
+                    updatedAt: .now
+                ),
+                BASAppleCurrentBrainBootstrapHostTemplateInput(
+                    id: "invalid_template_mode",
+                    modeID: "unsupported-mode",
+                    riskLevelID: "low",
+                    isPinned: true,
+                    successCount: 10,
+                    updatedAt: .now
+                ),
+                BASAppleCurrentBrainBootstrapHostTemplateInput(
+                    id: "invalid_template_risk",
+                    modeID: BASDecisionMode.primary.identifier,
+                    riskLevelID: "unsupported-risk",
+                    isPinned: true,
+                    successCount: 10,
+                    updatedAt: .now
+                )
+            ]
+        )
+
+        #expect(orderedTemplateIDs == ["valid_template"])
+
+        let orderedFailurePatternIDs = BASAppleBootstrapStrategyAdapter.orderedFailurePatternIDs(
+            modeID: "unsupported-mode",
+            failurePatterns: [
+                BASAppleCurrentBrainBootstrapHostFailurePatternInput(
+                    id: "valid_failure",
+                    modeID: BASDecisionMode.primary.identifier,
+                    suppressionWeight: 0.7,
+                    evidenceCount: 2,
+                    updatedAt: .now
+                ),
+                BASAppleCurrentBrainBootstrapHostFailurePatternInput(
+                    id: "invalid_failure",
+                    modeID: "unsupported-mode",
+                    suppressionWeight: 0.9,
+                    evidenceCount: 5,
+                    updatedAt: .now
+                )
+            ]
+        )
+
+        #expect(orderedFailurePatternIDs == ["valid_failure"])
+    }
 }

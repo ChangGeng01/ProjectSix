@@ -12,12 +12,12 @@ final class PendingLaunchRequestStoreTests: XCTestCase {
 
     func testNormalizedQueueDropsExpiredRequests() throws {
         let now = Date(timeIntervalSince1970: 1_000)
-        let fresh = PendingLaunchRequest(
+        let fresh = PendingLaunchRequest.quickCapture(
             entrySource: .app,
             requestedAt: now,
             expiresAt: now.addingTimeInterval(60)
         )
-        let expired = PendingLaunchRequest(
+        let expired = PendingLaunchRequest.quickCapture(
             entrySource: .shortcut,
             requestedAt: now.addingTimeInterval(-500),
             expiresAt: now.addingTimeInterval(-1)
@@ -45,9 +45,9 @@ final class PendingLaunchRequestStoreTests: XCTestCase {
 
     func testNormalizedQueueDropsLegacyPromptPayloadFromDefaultsData() throws {
         let now = Date(timeIntervalSince1970: 500)
-        let request = PendingLaunchRequest(
+        let request = PendingLaunchRequest.openMode(
             entrySource: .shortcut,
-            preferredMode: .mirror,
+            mode: .mirror,
             prompt: "Should I leave this relationship?",
             requestedAt: now
         )
@@ -81,6 +81,24 @@ final class PendingLaunchRequestStoreTests: XCTestCase {
         XCTAssertEqual(queue.count, 1)
         XCTAssertEqual(queue.first?.preferredMode, .mirror)
         XCTAssertNil(queue.first?.prompt)
+    }
+
+    func testNormalizedDecisionIntentEnvelopeQueuePreservesLegacyRoutingWithoutRecoveringPrompt() throws {
+        let now = Date(timeIntervalSince1970: 500)
+        let request = PendingLaunchRequest.routedPrompt(
+            entrySource: .shortcut,
+            prompt: "  Route the normalized legacy prompt.  ",
+            requestedAt: now
+        )
+
+        let data = try JSONEncoder().encode([request])
+        let queue = PendingLaunchRequestStore.normalizedDecisionIntentEnvelopeQueue(from: data, now: now)
+
+        XCTAssertEqual(queue.count, 1)
+        XCTAssertEqual(queue.first?.kind, .routedInput)
+        XCTAssertEqual(queue.first?.entrySource, .shortcut)
+        XCTAssertEqual(queue.first?.sourceSurface, .shortcut)
+        XCTAssertNil(queue.first?.promptSeed)
     }
 
     func testEnqueueAndConsumeRoundTripUsesSharedProtectedQueueInsteadOfDefaults() {
@@ -118,14 +136,60 @@ final class PendingLaunchRequestStoreTests: XCTestCase {
         )
     }
 
+    func testEnqueueEnvelopeAndConsumeEnvelopeRoundTripUsesSharedProtectedQueue() {
+        PendingLaunchRequestStore.clear()
+
+        let envelope = DecisionIntentEnvelope.openMode(
+            entrySource: .shortcut,
+            mode: .mirror,
+            promptSeed: "  Keep the envelope-native prompt private.  ",
+            requestedAt: Date()
+        )
+
+        PendingLaunchRequestStore.enqueue(envelope)
+
+        XCTAssertNil(SharedContainer.defaults.data(forKey: "before.pending.launch.request"))
+        XCTAssertNotNil(SharedProtectedStateStore.loadData(key: "before.pending.launch.request"))
+
+        let restored = PendingLaunchRequestStore.consumeEnvelope()
+
+        XCTAssertEqual(restored?.kind, .openMode)
+        XCTAssertEqual(restored?.entrySource, .shortcut)
+        XCTAssertEqual(restored?.preferredMode, .mirror)
+        XCTAssertEqual(restored?.promptSeed, "Keep the envelope-native prompt private.")
+        XCTAssertNil(SharedContainer.defaults.data(forKey: "before.pending.launch.request"))
+        XCTAssertNil(SharedProtectedStateStore.loadData(key: "before.pending.launch.request"))
+    }
+
+    func testSetEnvelopeKeepsLegacyConsumeAsForwardingAdapter() {
+        PendingLaunchRequestStore.clear()
+
+        let envelope = DecisionIntentEnvelope.routedInput(
+            entrySource: .shortcut,
+            promptSeed: "  Route this through the shared write seam.  "
+        )
+
+        PendingLaunchRequestStore.set(envelope)
+
+        let restored = PendingLaunchRequestStore.consume()
+
+        XCTAssertEqual(restored?.entrySource, .shortcut)
+        XCTAssertEqual(restored?.prompt, "Route this through the shared write seam.")
+        XCTAssertEqual(restored?.decisionIntentEnvelope.kind, .routedInput)
+        XCTAssertEqual(
+            restored?.decisionIntentEnvelope.promptSeed,
+            "Route this through the shared write seam."
+        )
+    }
+
     func testExpiredProtectedPayloadIsPurgedWhenQueueIsLoaded() {
         PendingLaunchRequestStore.clear()
 
         let now = Date()
-        let expiredRequest = PendingLaunchRequest(
+        let expiredRequest = PendingLaunchRequest.openMode(
             id: UUID(uuidString: "FFFFFFFF-1111-2222-3333-444444444444")!,
             entrySource: .shortcut,
-            preferredMode: .quick,
+            mode: .quick,
             prompt: "Expired sensitive prompt",
             requestedAt: now.addingTimeInterval(-BeforePolicy.LaunchRequests.expirationInterval - 30)
         )
@@ -151,9 +215,9 @@ final class PendingLaunchRequestStoreTests: XCTestCase {
         PendingLaunchRequestStore.clear()
 
         let now = Date(timeIntervalSince1970: 900)
-        let request = PendingLaunchRequest(
+        let request = PendingLaunchRequest.openMode(
             entrySource: .shortcut,
-            preferredMode: .balance,
+            mode: .balance,
             prompt: "Legacy sensitive launch prompt",
             requestedAt: now
         )
@@ -199,5 +263,74 @@ final class PendingLaunchRequestStoreTests: XCTestCase {
 
         XCTAssertNil(PendingLaunchRequestStore.consume())
         XCTAssertNil(SharedProtectedStateStore.loadData(key: orphanKey))
+    }
+
+    func testOpenModeFactoryTrimsProtectedPromptBeforeRoundTrip() {
+        PendingLaunchRequestStore.clear()
+
+        let request = PendingLaunchRequest.openMode(
+            entrySource: .shortcut,
+            mode: .mirror,
+            prompt: "  Keep only the trimmed prompt.  "
+        )
+
+        PendingLaunchRequestStore.enqueue(request)
+
+        let restored = PendingLaunchRequestStore.consume()
+
+        XCTAssertEqual(restored?.prompt, "Keep only the trimmed prompt.")
+        XCTAssertEqual(restored?.sanitizedPrompt, "Keep only the trimmed prompt.")
+    }
+
+    func testPendingLaunchRequestBridgesToSharedRoutedIntentEnvelope() {
+        let request = PendingLaunchRequest.routedPrompt(
+            entrySource: .shortcut,
+            prompt: "  Route the legacy prompt.  "
+        )
+
+        let envelope = request.decisionIntentEnvelope
+
+        XCTAssertEqual(envelope.kind, .routedInput)
+        XCTAssertEqual(envelope.entrySource, .shortcut)
+        XCTAssertEqual(envelope.sourceSurface, .shortcut)
+        XCTAssertEqual(envelope.promptSeed, "Route the legacy prompt.")
+    }
+
+    func testConsumeDecisionIntentEnvelopeBridgesLegacyQueueToSharedIntentPath() {
+        PendingLaunchRequestStore.clear()
+
+        let request = PendingLaunchRequest.routedPrompt(
+            entrySource: .shortcut,
+            prompt: "  Route the queued prompt.  "
+        )
+        PendingLaunchRequestStore.enqueue(request)
+
+        let envelope = PendingLaunchRequestStore.consume()?.decisionIntentEnvelope
+
+        XCTAssertEqual(envelope?.kind, .routedInput)
+        XCTAssertEqual(envelope?.entrySource, .shortcut)
+        XCTAssertEqual(envelope?.sourceSurface, .shortcut)
+        XCTAssertEqual(envelope?.promptSeed, "Route the queued prompt.")
+        XCTAssertNil(PendingLaunchRequestStore.consume()?.decisionIntentEnvelope)
+    }
+
+    func testConsumeEnvelopeBridgesLegacyQueueToSharedIntentPath() {
+        PendingLaunchRequestStore.clear()
+
+        let request = PendingLaunchRequest.openMode(
+            entrySource: .shortcut,
+            mode: .mirror,
+            prompt: "  Review this through the new envelope seam.  "
+        )
+        PendingLaunchRequestStore.enqueue(request)
+
+        let envelope = PendingLaunchRequestStore.consumeEnvelope()
+
+        XCTAssertEqual(envelope?.kind, .openMode)
+        XCTAssertEqual(envelope?.entrySource, .shortcut)
+        XCTAssertEqual(envelope?.sourceSurface, .shortcut)
+        XCTAssertEqual(envelope?.preferredMode, .mirror)
+        XCTAssertEqual(envelope?.promptSeed, "Review this through the new envelope seam.")
+        XCTAssertNil(PendingLaunchRequestStore.consumeEnvelope())
     }
 }

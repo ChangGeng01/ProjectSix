@@ -24,7 +24,8 @@ struct BASAppleRuntimeStatusAdapterTests {
                         title: "Foundation",
                         detail: "Ready"
                     )
-                ]
+                ],
+                routingPolicy: BASReferenceProviderRuntime.fixtureRoutingPolicy
             )
         )
 
@@ -50,6 +51,7 @@ struct BASAppleRuntimeStatusAdapterTests {
                         detail: "Ready"
                     )
                 ],
+                routingPolicy: BASReferenceProviderRuntime.fixtureRoutingPolicy,
                 profileDetail: "iPhone 14 stays on deterministic local copy for this workload."
             )
         )
@@ -58,5 +60,47 @@ struct BASAppleRuntimeStatusAdapterTests {
         #expect(output.activeProviderID == BASReferenceProviderRuntime.templateProviderID)
         #expect(output.fallbackProviderID == BASReferenceProviderRuntime.templateProviderID)
         #expect(output.detail == "iPhone 14 stays on deterministic local copy for this workload.")
+    }
+
+    @Test("runtime status honors injected routing policy orderings")
+    func runtimeStatusHonorsInjectedRoutingPolicy() {
+        let policy = BASProviderRoutingPolicy(
+            schemaVersion: "custom.policy.v2",
+            deterministicProviderID: BASReferenceProviderRuntime.templateProviderID,
+            preferenceOrderings: [
+                BASProviderPreferenceOrdering(
+                    preferredProviderID: "custom-primary",
+                    orderedProviderIDs: ["custom-primary", "custom-fallback"]
+                )
+            ]
+        )
+
+        let output = BASAppleProviderRuntimeStatusAdapter.runtimeStatus(
+            from: BASAppleProviderRuntimeStatusInput(
+                preferredProviderID: "custom-primary",
+                allowFallbacks: true,
+                runtimeEnabled: true,
+                statusesByID: [
+                    "custom-primary": BASProviderStatusRecord(
+                        providerID: "custom-primary",
+                        isAvailable: false,
+                        title: "Custom primary",
+                        detail: "Unavailable"
+                    ),
+                    "custom-fallback": BASProviderStatusRecord(
+                        providerID: "custom-fallback",
+                        isAvailable: true,
+                        title: "Custom fallback",
+                        detail: "Ready"
+                    )
+                ],
+                routingPolicy: policy,
+                routingRegistryVersion: "custom.registry.v2"
+            )
+        )
+
+        #expect(output.activeProviderID == "custom-fallback")
+        #expect(output.fallbackProviderID == "custom-fallback")
+        #expect(output.orderedProviderIDs == ["custom-primary", "custom-fallback"])
     }
 }

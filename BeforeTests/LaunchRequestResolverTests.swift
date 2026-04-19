@@ -2,54 +2,85 @@ import XCTest
 @testable import Before
 
 final class LaunchRequestResolverTests: XCTestCase {
-    func testScenarioWinsAndPreservesPrompt() {
-        let request = PendingLaunchRequest(
+    func testSharedIntentEnvelopeScenarioWinsAndPreservesPrompt() {
+        let envelope = DecisionIntentEnvelope.quickCapture(
             entrySource: .shortcut,
-            preferredMode: .mirror,
             scenario: .buy,
-            prompt: "  think twice  ",
-            requestedAt: .now
+            promptSeed: "  think twice  "
         )
 
         XCTAssertEqual(
-            LaunchRequestResolver.resolve(request),
+            LaunchRequestResolver.resolve(envelope),
             .quick(scenario: .buy, prompt: "think twice")
         )
     }
 
-    func testPreferredModeWinsWhenScenarioIsMissing() {
-        let request = PendingLaunchRequest(
+    func testSharedIntentEnvelopePreferredModeWinsWhenScenarioIsMissing() {
+        let envelope = DecisionIntentEnvelope.openMode(
             entrySource: .shortcut,
-            preferredMode: .balance,
-            prompt: "Which plan fits better?",
-            requestedAt: .now
+            mode: .balance,
+            promptSeed: "Which plan fits better?"
         )
 
         XCTAssertEqual(
-            LaunchRequestResolver.resolve(request),
+            LaunchRequestResolver.resolve(envelope),
             .mode(.balance, prompt: "Which plan fits better?")
         )
     }
 
-    func testPromptFallsBackToAutoRoutingWhenNoExplicitTargetExists() {
-        let request = PendingLaunchRequest(
+    func testSharedIntentEnvelopePromptFallsBackToAutoRoutingWhenNoExplicitTargetExists() {
+        let envelope = DecisionIntentEnvelope.routedInput(
             entrySource: .shortcut,
-            prompt: "Should I leave this job?",
-            requestedAt: .now
+            promptSeed: "Should I leave this job?"
         )
 
         XCTAssertEqual(
-            LaunchRequestResolver.resolve(request),
+            LaunchRequestResolver.resolve(envelope),
             .routedPrompt("Should I leave this job?")
         )
     }
 
-    func testEmptyRequestFallsBackToQuickMode() {
-        let request = PendingLaunchRequest(entrySource: .homeWidgetSmall, requestedAt: .now)
+    func testEmptySharedIntentEnvelopeFallsBackToQuickMode() {
+        let envelope = DecisionIntentEnvelope(
+            kind: .routedInput,
+            sourceSurface: .widget,
+            entrySource: .homeWidgetSmall,
+            requestedAt: .now
+        )
 
         XCTAssertEqual(
-            LaunchRequestResolver.resolve(request),
+            LaunchRequestResolver.resolve(envelope),
             .quick(scenario: nil, prompt: "")
+        )
+    }
+
+    func testSharedIntentEnvelopeSanitizedPromptSeedTrimsLegacyPromptAccess() {
+        let envelope = DecisionIntentEnvelope(
+            kind: .routedInput,
+            sourceSurface: .shortcut,
+            entrySource: .shortcut,
+            promptSeed: "  shared trim  ",
+            requestedAt: .now
+        )
+
+        XCTAssertEqual(envelope.sanitizedPromptSeed, "shared trim")
+        XCTAssertEqual(
+            LaunchRequestResolver.resolve(envelope),
+            .routedPrompt("shared trim")
+        )
+    }
+
+    func testLegacyPendingLaunchRequestForwardsToSharedIntentResolution() {
+        let request = PendingLaunchRequest(
+            entrySource: .shortcut,
+            prompt: "  legacy trim  ",
+            requestedAt: .now
+        )
+
+        XCTAssertEqual(request.sanitizedPrompt, "legacy trim")
+        XCTAssertEqual(
+            LaunchRequestResolver.resolve(request),
+            LaunchRequestResolver.resolve(request.decisionIntentEnvelope)
         )
     }
 }

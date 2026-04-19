@@ -93,8 +93,7 @@ final class CurrentBrainStateLoaderTests: XCTestCase {
             mode: .quick,
             prompt: "Should I send this tonight?",
             source: .launch,
-            envelope: DecisionIntentEnvelope(
-                kind: .resumeCurrentDecision,
+            envelope: .resumeCurrentDecision(
                 sourceSurface: .notification,
                 entrySource: .app,
                 preferredMode: .quick,

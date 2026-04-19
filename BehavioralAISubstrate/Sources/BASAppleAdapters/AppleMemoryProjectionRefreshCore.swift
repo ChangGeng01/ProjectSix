@@ -85,6 +85,17 @@ public struct BASAppleMemoryProjectionRefreshResult: Codable, Equatable, Sendabl
         self.diagnostics = diagnostics
         self.refreshedAt = refreshedAt
     }
+
+    public static let empty = BASAppleMemoryProjectionRefreshResult(
+        baseProjection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+        governanceSnapshot: .empty,
+        diagnostics: BASAppleMemoryProjectionDiagnostics(
+            recordCount: 0,
+            candidateCount: 0,
+            allCandidatesPending: false
+        ),
+        refreshedAt: .distantPast
+    )
 }
 
 public enum BASAppleMemoryProjectionRefreshAdapter {
@@ -107,6 +118,7 @@ public enum BASAppleMemoryProjectionRefreshAdapter {
         reflectiveRecordType: Reflective.Type,
         behavior: BASMemoryDerivationBehavior = .generic,
         memoryTrustBehavior: BASMemoryTrustBehavior = .generic,
+        persistencePolicy: BASMemoryHorizonPersistencePolicy = .unrestricted,
         fetchRecords: (ModelContext, Int) -> [Governed],
         fetchCandidates: (ModelContext, Int) -> [Candidate],
         fetchCheckEvents: (ModelContext, Int) -> [Event],
@@ -139,6 +151,7 @@ public enum BASAppleMemoryProjectionRefreshAdapter {
                     reflectiveRecordType: reflectiveRecordType,
                     behavior: behavior,
                     memoryTrustBehavior: memoryTrustBehavior,
+                    persistencePolicy: persistencePolicy,
                     onSaveError: onSaveError
                 )
             resolvedRecords = Array(refreshed.orderedRecords.prefix(limits.recordLimit))
@@ -205,6 +218,7 @@ public enum BASAppleMemoryProjectionRuntime {
         reflectiveRecordType: Reflective.Type,
         behavior: BASMemoryDerivationBehavior = .generic,
         memoryTrustBehavior: BASMemoryTrustBehavior = .generic,
+        persistencePolicy: BASMemoryHorizonPersistencePolicy = .unrestricted,
         rebuildEmbeddings: (
             _ records: [Governed],
             _ candidates: [Candidate],
@@ -226,6 +240,7 @@ public enum BASAppleMemoryProjectionRuntime {
             reflectiveRecordType: reflectiveRecordType,
             behavior: behavior,
             memoryTrustBehavior: memoryTrustBehavior,
+            persistencePolicy: persistencePolicy,
             fetchRecords: {
                 BASAppleMemoryProjectionSelectionAdapter.fetchProjectionRecords(
                     in: $0,
@@ -287,6 +302,7 @@ public enum BASAppleMemoryProjectionRuntime {
         reflectiveRecordType: Reflective.Type,
         behavior: BASMemoryDerivationBehavior = .generic,
         memoryTrustBehavior: BASMemoryTrustBehavior = .generic,
+        persistencePolicy: BASMemoryHorizonPersistencePolicy = .unrestricted,
         fetchRecords: (ModelContext, Int) -> [Governed],
         fetchCandidates: (ModelContext, Int) -> [Candidate],
         fetchCheckEvents: (ModelContext, Int) -> [Event],
@@ -324,6 +340,7 @@ public enum BASAppleMemoryProjectionRuntime {
             reflectiveRecordType: reflectiveRecordType,
             behavior: behavior,
             memoryTrustBehavior: memoryTrustBehavior,
+            persistencePolicy: persistencePolicy,
             fetchRecords: fetchRecords,
             fetchCandidates: fetchCandidates,
             fetchCheckEvents: fetchCheckEvents,

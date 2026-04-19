@@ -1253,6 +1253,80 @@ struct BASAppleCurrentBrainBootstrapTests {
         #expect(behavior.defaultMemorySourceID == BASMemorySource.pattern.rawValue)
     }
 
+    @Test("bootstrap behavior records recoverable issues for invalid identifiers instead of crashing")
+    func bootstrapBehaviorRecordsRecoverableIssuesForInvalidIdentifiers() {
+        let behavior = BASCurrentBrainBootstrapBehavior(
+            defaultModeID: "unsupported-default-mode",
+            defaultTriggerID: "unsupported-default-trigger",
+            defaultRiskLevelID: "unsupported-default-risk",
+            defaultSourceSurfaceID: "unsupported-default-surface",
+            defaultMemorySourceID: "unsupported-default-memory",
+            unknownRequestedModeFallbackPolicy: .useConfiguredDefault,
+            unknownRequestedTriggerFallbackPolicy: .useConfiguredDefault
+        )
+
+        var issues: [BASCurrentBrainBootstrapBehaviorIssue] = []
+        let mode = behavior.resolvedMode(from: "unknown-mode", issues: &issues)
+        let trigger = behavior.resolvedTrigger(from: "unknown-trigger", issues: &issues)
+        let riskLevel = behavior.resolvedRiskLevel(from: "unknown-risk", issues: &issues)
+        let sourceSurface = behavior.resolvedSourceSurface(for: .launch, override: nil, issues: &issues)
+        let memorySource = behavior.memorySource(for: .launch, mode: .primary, issues: &issues)
+
+        #expect(mode == .primary)
+        #expect(trigger == .explicitRefresh)
+        #expect(riskLevel == .low)
+        #expect(sourceSurface == .app)
+        #expect(memorySource == .pattern)
+        #expect(issues.contains(where: {
+            $0.kind == .unsupportedRequestedModeID && $0.identifier == "unknown-mode"
+        }))
+        #expect(issues.contains(where: {
+            $0.kind == .unsupportedRequestedTriggerID && $0.identifier == "unknown-trigger"
+        }))
+        #expect(issues.contains(where: {
+            $0.kind == .unsupportedRequestedRiskLevelID && $0.identifier == "unknown-risk"
+        }))
+        #expect(issues.contains(where: {
+            $0.kind == .unsupportedConfiguredDefaultModeID && $0.identifier == "unsupported-default-mode"
+        }))
+        #expect(issues.contains(where: {
+            $0.kind == .unsupportedConfiguredDefaultSourceSurfaceID &&
+                $0.identifier == "unsupported-default-surface"
+        }))
+        #expect(issues.contains(where: {
+            $0.kind == .unsupportedConfiguredDefaultMemorySourceID &&
+                $0.identifier == "unsupported-default-memory"
+        }))
+    }
+
+    @Test("bootstrap preparation carries recoverable issues into the execution path")
+    func bootstrapPreparationCarriesRecoverableIssues() {
+        let behavior = BASCurrentBrainBootstrapBehavior(
+            defaultModeID: BASDecisionMode.primaryID,
+            defaultTriggerID: BASCurrentBrainBootstrapTrigger.launch.rawValue,
+            defaultRiskLevelID: BASRiskLevel.low.rawValue,
+            defaultSourceSurfaceID: "unsupported-default-surface",
+            defaultMemorySourceID: "unsupported-default-memory"
+        )
+
+        let preparation = BASCurrentBrainBootstrapCoordinator.prepare(
+            request: BASCurrentBrainBootstrapPreparationRequest(
+                mode: .primary,
+                prompt: "Keep this local.",
+                trigger: .launch,
+                behavior: behavior,
+                now: Date(timeIntervalSince1970: 1_744_322_500)
+            )
+        )
+
+        #expect(preparation.sourceSurface == .app)
+        #expect(preparation.memorySource == .pattern)
+        #expect(preparation.hasRecoverableIssues)
+        #expect(preparation.issues.count == 2)
+        #expect(preparation.issueLines.contains(where: { $0.contains("Configured source surface unsupported-default-surface recovered") }))
+        #expect(preparation.issueLines.contains(where: { $0.contains("Configured memory source unsupported-default-memory recovered") }))
+    }
+
     @Test("host bootstrap adapter supports foreign host ontology without before vocabulary")
     func hostBootstrapAdapterSupportsForeignHostOntology() throws {
         let now = Date(timeIntervalSince1970: 1_744_322_262)

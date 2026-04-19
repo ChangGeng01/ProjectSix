@@ -11,11 +11,8 @@ enum WatchHandoffCoordinator {
         riskLevel: InterventionRiskLevel = .low
     ) {
         enqueue(
-            DecisionIntentEnvelope(
-                kind: .quickCapture,
-                sourceSurface: .watch,
+            .quickCapture(
                 entrySource: .watch,
-                preferredMode: .quick,
                 scenario: scenario,
                 promptSeed: promptSeed,
                 riskLevel: riskLevel
@@ -29,13 +26,11 @@ enum WatchHandoffCoordinator {
         preferredMode: DecisionMode
     ) {
         enqueue(
-            DecisionIntentEnvelope(
-                kind: .reopenTomorrowItem,
-                sourceSurface: .watch,
+            .reopenTomorrowItem(
                 entrySource: .watch,
-                preferredMode: preferredMode,
-                promptSeed: title,
-                riskLevel: riskLevel
+                title: title,
+                riskLevel: riskLevel,
+                preferredMode: preferredMode
             )
         )
     }
@@ -45,15 +40,20 @@ enum WatchHandoffCoordinator {
         reason: String? = nil
     ) {
         enqueue(
-            DecisionIntentEnvelope(
-                kind: .openEvolutionControl,
-                sourceSurface: .watch,
+            .openEvolutionControl(
                 entrySource: .watch,
-                preferredMode: .mirror,
                 promptSeed: headline,
-                riskLevel: .medium,
-                triggerReason: reason ?? "A watch glance asked the iPhone brain to open Evolution Control."
+                triggerReason: reason
             )
+        )
+    }
+
+    static func enqueueOpenEvolutionControl(
+        _ controlEntry: DecisionEvolutionWidgetControlEntryPresentation
+    ) {
+        enqueueOpenEvolutionControl(
+            headline: controlEntry.prompt,
+            reason: controlEntry.triggerReason
         )
     }
 

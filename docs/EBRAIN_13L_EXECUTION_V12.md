@@ -2,6 +2,21 @@
 
 这是仓库内的执行版总纲。它把 `13 层电子脑`、`WP0-WP18`、主调用链、接口对象、训练阶段、里程碑、红线与附录要求统一到可执行工程语言中。
 
+> 口径说明
+> 本文继续作为当前仓库 `L1-L13` 的执行真相源。若需查看 `L4 地平线层` 的理想完全体定义，请参考 [EBRAIN_L4_HORIZON_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L4_HORIZON_TARGET_VINF.md)。该文档是 `target-state reference`，不改变本文对 `L4` 现状的执行口径。
+>
+> 若需查看 `L5 宿纹层` 的理想完全体定义与总路线，请参考 [EBRAIN_L5_HOST_CONSTITUTION_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L5_HOST_CONSTITUTION_TARGET_VINF.md) 与 [EBRAIN_L5_HOST_CONSTITUTION_ROADMAP.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L5_HOST_CONSTITUTION_ROADMAP.md)。这两份文档分别是 `target-state whitepaper` 与 `roadmap reference`，不改变本文对 `L5` 当前 Alpha 实现的执行口径。
+>
+> 若需查看 `L6 临场眼` 的理想完全体定义，请参考 [EBRAIN_L6_PRESENCE_EYE_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L6_PRESENCE_EYE_TARGET_VINF.md)。该文档是 `target-state whitepaper`，用于描述 `Presence Situation Field` 的目标态，不改变本文对当前 `ContextFrame / Alpha` 执行口径的表述。
+>
+> 若需查看 `L7 镜刃层` 的理想完全体定义，请参考 [EBRAIN_L7_MIRROR_BLADE_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L7_MIRROR_BLADE_TARGET_VINF.md)。该文档是 `target-state whitepaper`，用于描述 `Cognitive Dissection Field / MirrorDraft / Canonical Cognitive Frame` 的目标态，不改变本文对当前 `BASDecomposeFrame / DecomposeFrame / Alpha` 执行口径的表述。
+>
+> `L3` 的仓库内第二阶段骨架已经单独沉淀为 [EBRAIN_L3_FOLDED_LUNG_V2.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L3_FOLDED_LUNG_V2.md)。该文档描述的是当前仓库已经落地的 `Breath-Fold-Resume + Sovereign rollback bridge` 范围，不替代本文的总纲口径。
+>
+> `L14` 的仓库内 `v1` 执行规范与 `v∞` 目标态白皮书，现分别沉淀为 [EBRAIN_L14_BLACK_RING_SPEC_V1.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L14_BLACK_RING_SPEC_V1.md) 与 [EBRAIN_L14_BLACK_RING_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L14_BLACK_RING_TARGET_VINF.md)。前者描述 `repo-real` 主权绝断层，后者描述理想完全体；两者都不自动改写本文对当前主链现实的执行口径。
+>
+> 当前 `L5` 仓库口径固定为：`HostProfile / HostVersion / HostRhythmProfile + host gate + 基础删除/冻结/回滚 contract`。`Host Constitution Fabric` 是目标态，不代表当前仓库已实现。
+
 ## 三条主线
 
 - 生理底盘线：`L1-L5`
@@ -16,11 +31,11 @@
 
 ## 13层主架构
 
-1. 灯芯层：能源时钟与预算
+1. 灯芯层：生命内核、节律与预算
 2. 脑肉层：Scout / Core / 多头
 3. 折叠肺：量化、编译、ThoughtFold、热启动
 4. 地平线层：基座泛化与结构先验
-5. 宿纹层：HostProfile、宿主影响门、版本
+5. 宿纹层：当前执行口径为 `HostProfile / HostVersion / HostRhythmProfile + host gate + 基础删除/冻结/回滚 contract`；目标态为 `Host Constitution Fabric`
 6. 临场眼：情境与操控感知
 7. 镜刃层：解构、镜像、矛盾识别
 8. 海马井：热温冷记忆与冲突处理
@@ -58,6 +73,7 @@ DeviceState
 
 - `HostProfile`
 - `HostVersion`
+- `HostRhythmProfile`
 - `MemoryAtom`
 - `RuleCandidate`
 
@@ -100,6 +116,7 @@ DeviceState
 
 7. Session Engine v1 已明确放入 `L3 折叠肺`  
    新增的本地 `DecisionSessionEngine` 采用 `SQLite + WAL`，以 append-only event log、checkpoint、branch、watchdog、recovery 为核心，专门解决 edit 不覆写历史、卡死后从最近安全点恢复、UI timeline 可重建这三类稳定性问题。它的语义归属是 `L3 折叠肺`，因为它本质上是“状态折页、热启动、受控恢复”的底盘能力，而不是上层认知策略本身。后续 `L1` 可以读取它的 watchdog/runtime facts，`L13` 可以读取它的 recovery/checkpoint lineage，但两侧都不拥有底层真相源。当前代码里，这条 runtime fact 已通过 `DecisionTestingRuntimeExport -> DecisionSystemFlightDeck` 接入主系统回放与运行视图；宿主控制面已经支持 correction branch、branch switch/abandon、从 checkpoint 直接 restore 到 recovery branch，以及把 correction branch append-only 地 merge 回当前 head branch。最新补完点是：即使 `branch_merged` 事件已经被后续 checkpoint 吸收，timeline rebuild 仍会保留结构化 `mergeNotice`，避免 merge 在控制面上“底层存在、界面消失”；与此同时，watchdog / stalled / recovered / stable-checkpoint 状态也已经收成结构化 `DecisionSessionEngineHealthSummary`，由 `panel + control center` 共用，不再让 `Home / History / Portrait / Settings / Control Center` 各自拼一套健康与恢复文案，而 `merge-ready correction branches` 现在也已经进入 runtime inspection / shared panel / flight deck，可以在不打开 branch inspector 的情况下直接看见“有几条修正分支正等待并回主线”。进一步地，shared panel 与 control center 现在会统一给出 `pending import / merge review / replay anchor` review digest，并且连 `pending import` 的具体预审查 block 都通过共享组件进入了 control-center header，让宿主在进入控制面之前就先知道当前最该处理的预审查与恢复压力；同时 control snapshot 已经会在 aggregate runtime snapshot 不完整时，回退读取 per-session merge facts 的更强信号，不再把活跃 correction merge queue 漏成“只有 replay anchor”。而 flight deck / runtime export 的 data-layer 现在也会同步带出结构化 `Checkpoint recovery / Replay session / stable checkpoint` 恢复线索，让非 replay 专页也能读到同一条恢复事实源。最近又进一步收口到了单点 `DecisionSessionEngineReviewDigestBuilder`、共享 import-preview digest view、共享 review detail list、以及共享 pending-import block：panel / control center / import preview / merge review / runtime export 不再各自维护一套 review 文案或支撑事实行，同时 runtime replay/recovery summary 也不会再错误地把 merge review 文案冒充成 kill-switch 文案。再往前一步，Quick / Balance / Mirror 的 live eBrain turn 现在已经会把 compact `budget / route / risk / permit / host gate / fold / review task` 一并写入 Session Engine checkpoint；这些事实随后会被 runtime inspection 重新抽取，并通过 shared session digest 进入 `panel / control center`，所以恢复线现在保留的不只是“有一个 checkpoint”，而是“那个 checkpoint 里保住了哪一版电子脑判定与保护路径”。这批 compact facts 现在已经通过单点 `DecisionEvolutionEBrainFactsBundle` 继续收口：`runtime export / flight deck / substrate bridge` 都读同一份 `summary / runtime / brain / budget / review-task / audit / kill-switch` 事实，而不是各自再拼一套恢复 copy。与此同时，host-owned `recordSessionEngineToolLifecycle(...)` 也补上了更细粒度的 `.acting` 心跳与 eBrain-enriched checkpoint draft，因此真实 Quick / Balance / Mirror 长动作对 watchdog、recovery 与 replay 叙事都不再只是“有个 tool event”，而是有完整的中间步态和恢复摘要。最近这条恢复线又往前推进了一步：新建工作区在首次拿到 `sessionEngineSessionID` 时，宿主会立刻把那次绑定后的 workspace 持久化写入也记录进同一条 `persist_active_workspace_state` lifecycle，所以前台刚打开、还没等到后台场景的工作区，一旦本地恢复会话建成，就已经具备可审计的恢复安全点。现在这条 tracked lifecycle 也覆盖了显式 workspace 清空与 reopen：`persist / restore / clear` 都会走同一套 Session Engine tool lifecycle，support/shared-life 转移不再静默清空工作区状态，而 shared `Session Engine` 摘要则会直接把最新 checkpoint 里的 `action: persisted/restored/cleared active ... workspace state` 提升到 panel / control center / flight deck，让宿主不进入 raw timeline 也能看见最近一次恢复边界到底是保存、恢复还是清空。最新这条 folded-lung checkpoint line 还把更偏 `L1` 的 runtime pressure 一起纳入了同一条恢复边界：checkpoint 现在会持久化 `thermal guard` 和结构化 `eBrain pressure: latency/budget • power • cache • thermal trace`，并由 shared Session Engine digest、control snapshot 与 flight-deck data signals 统一回提，所以宿主在看最近安全点时已经不仅知道“当时是哪个风险/permit/kill-switch 组合”，也能知道“这个安全点是在怎样的热预算与运行压力下被保住的”。
+   这条 `L3` 主线现在已经进入 `v2` 的最小骨架阶段：仓库内已新增 `BASMorphGraph`、`BASPrecisionProfile`、`BASResumeFrame`、`BASRollbackAnchor`、`BASLungState`，并把 `BASThoughtFold` additively 扩到可引用 `tissue / snapshot / resume / rollback / morph / precision / lung` 这组 recoverable facts；`DecisionSessionCheckpointEBrainAnchor` 已开始持久化 `lungState / resumeFrame / rollbackAnchor`，而 substrate `BASEvolutionLineageSummary` 也已新增原生 `foldedLungSummary`，让 persisted checkpoint lineage 自己就能带出 `breath / resume / rollback / sovereign bridge` 事实；`DecisionFoldedLungCoordinator` 与 `DeveloperDecisionReplayBuilder` 则把 live runtime、checkpoint recovery、imported paused session 与 replay lineage 统一收口到一套 `Breath-Fold-Resume + Sovereign rollback bridge` 事实中。当前口径是：`L3 v2` 已经进入“呼吸状态机 + 主权桥 + 可恢复锚”阶段，但真实混合量化、图编译、热 twin 与工业级冷热器官分包仍属于后续工业实现。
 8. Session Engine v1 已支持本地 bundle 导出与导入  
    控制中心和宿主动作现在可以把 session 导出为本地 JSON bundle，并在稍后重新导入为 `paused` 的安全恢复会话。导入流程不会复写旧 session，也不会把未闭合 step 当作正常运行态继续，而是把它们规范化为可审计的失败恢复事实，再从新 session 继续分叉。
 
@@ -147,6 +164,8 @@ DeviceState
 ### 第二批补齐
 
 - `WP3 / WP8 / WP10 / WP13`
+
+其中 `WP3` 的仓库内第二阶段骨架请参考 [EBRAIN_L3_FOLDED_LUNG_V2.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L3_FOLDED_LUNG_V2.md)。当前只补 `contract + 最小状态机 + 主权桥 + recoverable anchor`，不假装已经完成端侧图编译与工业量化 runtime。
 
 ### 第三批做强
 

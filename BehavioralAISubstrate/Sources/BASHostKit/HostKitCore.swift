@@ -920,45 +920,2164 @@ public struct BASHostPresentationConfiguration: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
+    public struct GuardrailPressureTuning: Codable, Equatable, Sendable {
+        public var protectiveBoundaryIncrement: Double
+        public var calibrationWatchIncrement: Double
+        public var calibrationDriftingIncrement: Double
+        public var boundaryConstraintUnit: Double
+        public var boundaryConstraintCap: Double
+        public var calibrationAlertUnit: Double
+        public var calibrationAlertCap: Double
+        public var failureGuardUnit: Double
+        public var failureGuardCap: Double
+        public var riskFlagUnit: Double
+        public var riskFlagCap: Double
+        public var maximumPressure: Double
+
+        public init(
+            protectiveBoundaryIncrement: Double,
+            calibrationWatchIncrement: Double,
+            calibrationDriftingIncrement: Double,
+            boundaryConstraintUnit: Double,
+            boundaryConstraintCap: Double,
+            calibrationAlertUnit: Double,
+            calibrationAlertCap: Double,
+            failureGuardUnit: Double,
+            failureGuardCap: Double,
+            riskFlagUnit: Double,
+            riskFlagCap: Double,
+            maximumPressure: Double
+        ) {
+            self.protectiveBoundaryIncrement = protectiveBoundaryIncrement
+            self.calibrationWatchIncrement = calibrationWatchIncrement
+            self.calibrationDriftingIncrement = calibrationDriftingIncrement
+            self.boundaryConstraintUnit = boundaryConstraintUnit
+            self.boundaryConstraintCap = boundaryConstraintCap
+            self.calibrationAlertUnit = calibrationAlertUnit
+            self.calibrationAlertCap = calibrationAlertCap
+            self.failureGuardUnit = failureGuardUnit
+            self.failureGuardCap = failureGuardCap
+            self.riskFlagUnit = riskFlagUnit
+            self.riskFlagCap = riskFlagCap
+            self.maximumPressure = maximumPressure
+        }
+    }
+
+    public struct BudgetTuning: Codable, Equatable, Sendable {
+        public struct RunModeBudgetProfile: Codable, Equatable, Sendable {
+            public var maxLoops: Int
+            public var maxCandidates: Int
+            public var retrievalDepth: Int
+            public var defaultDecodeTokens: Int?
+            public var unstableDecodeTokens: Int?
+            public var precisionProfile: BASRuntimePrecisionProfile
+            public var defaultDeviceRoute: BASDeviceRoute
+            public var npuUnavailableDeviceRoute: BASDeviceRoute
+            public var pureLocalPreferredDeviceRoute: BASDeviceRoute?
+            public var candidateCountCap: Int?
+            public var standardLoopFloor: Int?
+            public var protectedLoopFloor: Int?
+            public var standardCandidateFloor: Int?
+            public var protectedCandidateFloor: Int?
+            public var unstableLoopIncrement: Int?
+            public var throttleLoopPenalty: Int?
+            public var throttleCandidatePenalty: Int?
+            public var maintenanceSupported: Bool?
+            public var maintenanceBatteryFloor: Double?
+            public var scheduledMaintenanceClass: BASMaintenanceClass?
+            public var deferredMaintenanceClass: BASMaintenanceClass?
+
+            public init(
+                maxLoops: Int,
+                maxCandidates: Int,
+                retrievalDepth: Int,
+                defaultDecodeTokens: Int? = nil,
+                unstableDecodeTokens: Int? = nil,
+                precisionProfile: BASRuntimePrecisionProfile,
+                defaultDeviceRoute: BASDeviceRoute,
+                npuUnavailableDeviceRoute: BASDeviceRoute,
+                pureLocalPreferredDeviceRoute: BASDeviceRoute? = nil,
+                candidateCountCap: Int? = nil,
+                standardLoopFloor: Int? = nil,
+                protectedLoopFloor: Int? = nil,
+                standardCandidateFloor: Int? = nil,
+                protectedCandidateFloor: Int? = nil,
+                unstableLoopIncrement: Int? = nil,
+                throttleLoopPenalty: Int? = nil,
+                throttleCandidatePenalty: Int? = nil,
+                maintenanceSupported: Bool? = nil,
+                maintenanceBatteryFloor: Double? = nil,
+                scheduledMaintenanceClass: BASMaintenanceClass? = nil,
+                deferredMaintenanceClass: BASMaintenanceClass? = nil
+            ) {
+                self.maxLoops = maxLoops
+                self.maxCandidates = maxCandidates
+                self.retrievalDepth = retrievalDepth
+                self.defaultDecodeTokens = defaultDecodeTokens
+                self.unstableDecodeTokens = unstableDecodeTokens
+                self.precisionProfile = precisionProfile
+                self.defaultDeviceRoute = defaultDeviceRoute
+                self.npuUnavailableDeviceRoute = npuUnavailableDeviceRoute
+                self.pureLocalPreferredDeviceRoute = pureLocalPreferredDeviceRoute
+                self.candidateCountCap = candidateCountCap
+                self.standardLoopFloor = standardLoopFloor
+                self.protectedLoopFloor = protectedLoopFloor
+                self.standardCandidateFloor = standardCandidateFloor
+                self.protectedCandidateFloor = protectedCandidateFloor
+                self.unstableLoopIncrement = unstableLoopIncrement
+                self.throttleLoopPenalty = throttleLoopPenalty
+                self.throttleCandidatePenalty = throttleCandidatePenalty
+                self.maintenanceSupported = maintenanceSupported
+                self.maintenanceBatteryFloor = maintenanceBatteryFloor
+                self.scheduledMaintenanceClass = scheduledMaintenanceClass
+                self.deferredMaintenanceClass = deferredMaintenanceClass
+            }
+
+            public func resolvedDeviceRoute(
+                npuAvailable: Bool,
+                prefersPureLocal: Bool
+            ) -> BASDeviceRoute {
+                if prefersPureLocal, let pureLocalPreferredDeviceRoute {
+                    return pureLocalPreferredDeviceRoute
+                }
+                return npuAvailable ? defaultDeviceRoute : npuUnavailableDeviceRoute
+            }
+
+            public func merged(with fallback: RunModeBudgetProfile) -> RunModeBudgetProfile {
+                RunModeBudgetProfile(
+                    maxLoops: maxLoops,
+                    maxCandidates: maxCandidates,
+                    retrievalDepth: retrievalDepth,
+                    defaultDecodeTokens: defaultDecodeTokens ?? fallback.defaultDecodeTokens,
+                    unstableDecodeTokens: unstableDecodeTokens ?? fallback.unstableDecodeTokens,
+                    precisionProfile: precisionProfile,
+                    defaultDeviceRoute: defaultDeviceRoute,
+                    npuUnavailableDeviceRoute: npuUnavailableDeviceRoute,
+                    pureLocalPreferredDeviceRoute: pureLocalPreferredDeviceRoute ?? fallback.pureLocalPreferredDeviceRoute,
+                    candidateCountCap: candidateCountCap ?? fallback.candidateCountCap,
+                    standardLoopFloor: standardLoopFloor ?? fallback.standardLoopFloor,
+                    protectedLoopFloor: protectedLoopFloor ?? fallback.protectedLoopFloor,
+                    standardCandidateFloor: standardCandidateFloor ?? fallback.standardCandidateFloor,
+                    protectedCandidateFloor: protectedCandidateFloor ?? fallback.protectedCandidateFloor,
+                    unstableLoopIncrement: unstableLoopIncrement ?? fallback.unstableLoopIncrement,
+                    throttleLoopPenalty: throttleLoopPenalty ?? fallback.throttleLoopPenalty,
+                    throttleCandidatePenalty: throttleCandidatePenalty ?? fallback.throttleCandidatePenalty,
+                    maintenanceSupported: maintenanceSupported ?? fallback.maintenanceSupported,
+                    maintenanceBatteryFloor: maintenanceBatteryFloor ?? fallback.maintenanceBatteryFloor,
+                    scheduledMaintenanceClass: scheduledMaintenanceClass ?? fallback.scheduledMaintenanceClass,
+                    deferredMaintenanceClass: deferredMaintenanceClass ?? fallback.deferredMaintenanceClass
+                )
+            }
+        }
+
+        public var standardDecodeTokens: Int
+        public var unstableDecodeTokens: Int
+        public var guardedDecodeTokens: Int
+        public var maintenanceBatteryFloor: Double
+        public var lowRiskLoops: Int
+        public var mediumRiskLoops: Int
+        public var highRiskLoops: Int
+        public var extremeRiskLoops: Int
+        public var lowRiskCandidates: Int
+        public var mediumRiskCandidates: Int
+        public var highRiskCandidates: Int
+        public var extremeRiskCandidates: Int
+        public var lowRiskRetrievalDepth: Int
+        public var mediumRiskRetrievalDepth: Int
+        public var guardedRetrievalDepth: Int
+        public var standardLoopFloor: Int
+        public var protectedLoopFloor: Int
+        public var standardCandidateFloor: Int
+        public var protectedCandidateFloor: Int
+        public var maxCandidateCount: Int
+        public var unstableLoopIncrement: Int
+        public var throttleLoopPenalty: Int
+        public var throttleCandidatePenalty: Int
+        public var defaultPrecisionProfile: BASRuntimePrecisionProfile
+        public var unstablePrecisionProfile: BASRuntimePrecisionProfile
+        public var guardedPrecisionProfile: BASRuntimePrecisionProfile
+        public var lowRiskPrecisionProfile: BASRuntimePrecisionProfile
+        public var mediumRiskPrecisionProfile: BASRuntimePrecisionProfile
+        public var highRiskPrecisionProfile: BASRuntimePrecisionProfile
+        public var extremeRiskPrecisionProfile: BASRuntimePrecisionProfile
+        public var pulseRetrievalDepth: Int
+        public var sentinelRetrievalDepth: Int
+        public var engageRetrievalDepth: Int
+        public var reflectRetrievalDepth: Int
+        public var deepLoopRetrievalDepth: Int
+        public var guardRetrievalDepth: Int
+        public var recoveryRetrievalDepth: Int
+        public var quarantineRetrievalDepth: Int
+        public var lockdownRetrievalDepth: Int
+        public var dormantRetrievalDepth: Int
+        public var runModeProfilesByID: [String: RunModeBudgetProfile]?
+
+        private enum CodingKeys: String, CodingKey {
+            case standardDecodeTokens
+            case unstableDecodeTokens
+            case guardedDecodeTokens
+            case maintenanceBatteryFloor
+            case lowRiskLoops
+            case mediumRiskLoops
+            case highRiskLoops
+            case extremeRiskLoops
+            case lowRiskCandidates
+            case mediumRiskCandidates
+            case highRiskCandidates
+            case extremeRiskCandidates
+            case lowRiskRetrievalDepth
+            case mediumRiskRetrievalDepth
+            case guardedRetrievalDepth
+            case standardLoopFloor
+            case protectedLoopFloor
+            case standardCandidateFloor
+            case protectedCandidateFloor
+            case maxCandidateCount
+            case unstableLoopIncrement
+            case throttleLoopPenalty
+            case throttleCandidatePenalty
+            case defaultPrecisionProfile
+            case unstablePrecisionProfile
+            case guardedPrecisionProfile
+            case lowRiskPrecisionProfile
+            case mediumRiskPrecisionProfile
+            case highRiskPrecisionProfile
+            case extremeRiskPrecisionProfile
+            case pulseRetrievalDepth
+            case sentinelRetrievalDepth
+            case engageRetrievalDepth
+            case reflectRetrievalDepth
+            case deepLoopRetrievalDepth
+            case guardRetrievalDepth
+            case recoveryRetrievalDepth
+            case quarantineRetrievalDepth
+            case lockdownRetrievalDepth
+            case dormantRetrievalDepth
+            case runModeProfilesByID
+        }
+
+        public init(
+            standardDecodeTokens: Int,
+            unstableDecodeTokens: Int,
+            guardedDecodeTokens: Int,
+            maintenanceBatteryFloor: Double,
+            lowRiskLoops: Int = 1,
+            mediumRiskLoops: Int = 2,
+            highRiskLoops: Int = 4,
+            extremeRiskLoops: Int = 2,
+            lowRiskCandidates: Int = 2,
+            mediumRiskCandidates: Int = 3,
+            highRiskCandidates: Int = 3,
+            extremeRiskCandidates: Int = 2,
+            lowRiskRetrievalDepth: Int = 2,
+            mediumRiskRetrievalDepth: Int = 3,
+            guardedRetrievalDepth: Int = 4,
+            standardLoopFloor: Int = 1,
+            protectedLoopFloor: Int = 2,
+            standardCandidateFloor: Int = 1,
+            protectedCandidateFloor: Int = 2,
+            maxCandidateCount: Int = 4,
+            unstableLoopIncrement: Int = 1,
+            throttleLoopPenalty: Int = 1,
+            throttleCandidatePenalty: Int = 1,
+            defaultPrecisionProfile: BASRuntimePrecisionProfile = .balanced,
+            unstablePrecisionProfile: BASRuntimePrecisionProfile = .protected,
+            guardedPrecisionProfile: BASRuntimePrecisionProfile = .protected,
+            lowRiskPrecisionProfile: BASRuntimePrecisionProfile? = nil,
+            mediumRiskPrecisionProfile: BASRuntimePrecisionProfile? = nil,
+            highRiskPrecisionProfile: BASRuntimePrecisionProfile? = nil,
+            extremeRiskPrecisionProfile: BASRuntimePrecisionProfile? = nil,
+            pulseRetrievalDepth: Int? = nil,
+            sentinelRetrievalDepth: Int? = nil,
+            engageRetrievalDepth: Int? = nil,
+            reflectRetrievalDepth: Int? = nil,
+            deepLoopRetrievalDepth: Int? = nil,
+            guardRetrievalDepth: Int? = nil,
+            recoveryRetrievalDepth: Int? = nil,
+            quarantineRetrievalDepth: Int? = nil,
+            lockdownRetrievalDepth: Int? = nil,
+            dormantRetrievalDepth: Int? = nil,
+            runModeProfilesByID: [String: RunModeBudgetProfile]? = nil
+        ) {
+            self.standardDecodeTokens = standardDecodeTokens
+            self.unstableDecodeTokens = unstableDecodeTokens
+            self.guardedDecodeTokens = guardedDecodeTokens
+            self.maintenanceBatteryFloor = maintenanceBatteryFloor
+            self.lowRiskLoops = lowRiskLoops
+            self.mediumRiskLoops = mediumRiskLoops
+            self.highRiskLoops = highRiskLoops
+            self.extremeRiskLoops = extremeRiskLoops
+            self.lowRiskCandidates = lowRiskCandidates
+            self.mediumRiskCandidates = mediumRiskCandidates
+            self.highRiskCandidates = highRiskCandidates
+            self.extremeRiskCandidates = extremeRiskCandidates
+            self.lowRiskRetrievalDepth = lowRiskRetrievalDepth
+            self.mediumRiskRetrievalDepth = mediumRiskRetrievalDepth
+            self.guardedRetrievalDepth = guardedRetrievalDepth
+            self.standardLoopFloor = standardLoopFloor
+            self.protectedLoopFloor = protectedLoopFloor
+            self.standardCandidateFloor = standardCandidateFloor
+            self.protectedCandidateFloor = protectedCandidateFloor
+            self.maxCandidateCount = maxCandidateCount
+            self.unstableLoopIncrement = unstableLoopIncrement
+            self.throttleLoopPenalty = throttleLoopPenalty
+            self.throttleCandidatePenalty = throttleCandidatePenalty
+            self.defaultPrecisionProfile = defaultPrecisionProfile
+            self.unstablePrecisionProfile = unstablePrecisionProfile
+            self.guardedPrecisionProfile = guardedPrecisionProfile
+            self.lowRiskPrecisionProfile = lowRiskPrecisionProfile ?? defaultPrecisionProfile
+            self.mediumRiskPrecisionProfile = mediumRiskPrecisionProfile ?? defaultPrecisionProfile
+            self.highRiskPrecisionProfile = highRiskPrecisionProfile ?? guardedPrecisionProfile
+            self.extremeRiskPrecisionProfile = extremeRiskPrecisionProfile ?? guardedPrecisionProfile
+            self.pulseRetrievalDepth = pulseRetrievalDepth ?? lowRiskRetrievalDepth
+            self.sentinelRetrievalDepth = sentinelRetrievalDepth ?? lowRiskRetrievalDepth
+            self.engageRetrievalDepth = engageRetrievalDepth ?? lowRiskRetrievalDepth
+            self.reflectRetrievalDepth = reflectRetrievalDepth ?? mediumRiskRetrievalDepth
+            self.deepLoopRetrievalDepth = deepLoopRetrievalDepth ?? max(mediumRiskRetrievalDepth, lowRiskRetrievalDepth)
+            self.guardRetrievalDepth = guardRetrievalDepth ?? guardedRetrievalDepth
+            self.recoveryRetrievalDepth = recoveryRetrievalDepth ?? guardedRetrievalDepth
+            self.quarantineRetrievalDepth = quarantineRetrievalDepth ?? guardedRetrievalDepth
+            self.lockdownRetrievalDepth = lockdownRetrievalDepth ?? guardedRetrievalDepth
+            self.dormantRetrievalDepth = dormantRetrievalDepth ?? lowRiskRetrievalDepth
+            self.runModeProfilesByID = runModeProfilesByID
+        }
+
+        private static func synthesizedRunModeProfiles(
+            lowRiskLoops: Int,
+            mediumRiskLoops: Int,
+            highRiskLoops: Int,
+            extremeRiskLoops: Int,
+            lowRiskCandidates: Int,
+            mediumRiskCandidates: Int,
+            highRiskCandidates: Int,
+            extremeRiskCandidates: Int,
+            standardDecodeTokens: Int,
+            unstableDecodeTokens: Int,
+            guardedDecodeTokens: Int,
+            lowRiskPrecisionProfile: BASRuntimePrecisionProfile,
+            mediumRiskPrecisionProfile: BASRuntimePrecisionProfile,
+            highRiskPrecisionProfile: BASRuntimePrecisionProfile,
+            extremeRiskPrecisionProfile: BASRuntimePrecisionProfile,
+            pulseRetrievalDepth: Int,
+            sentinelRetrievalDepth: Int,
+            engageRetrievalDepth: Int,
+            reflectRetrievalDepth: Int,
+            deepLoopRetrievalDepth: Int,
+            guardRetrievalDepth: Int,
+            recoveryRetrievalDepth: Int,
+            quarantineRetrievalDepth: Int,
+            lockdownRetrievalDepth: Int,
+            dormantRetrievalDepth: Int,
+            standardLoopFloor: Int,
+            protectedLoopFloor: Int,
+            standardCandidateFloor: Int,
+            protectedCandidateFloor: Int,
+            candidateCountCap: Int,
+            unstableLoopIncrement: Int,
+            throttleLoopPenalty: Int,
+            throttleCandidatePenalty: Int,
+            lightweightMaintenanceBatteryFloor: Double,
+            standardMaintenanceBatteryFloor: Double,
+            restrictedMaintenanceBatteryFloor: Double,
+            lightweightAllowedClass: BASMaintenanceClass,
+            lightweightDeferredClass: BASMaintenanceClass,
+            activeRunModeClass: BASMaintenanceClass,
+            restrictedRunModeClass: BASMaintenanceClass
+        ) -> [String: RunModeBudgetProfile] {
+            [
+                BASEBrainRunMode.dormant.rawValue: .init(
+                    maxLoops: lowRiskLoops,
+                    maxCandidates: lowRiskCandidates,
+                    retrievalDepth: dormantRetrievalDepth,
+                    defaultDecodeTokens: standardDecodeTokens,
+                    unstableDecodeTokens: unstableDecodeTokens,
+                    precisionProfile: lowRiskPrecisionProfile,
+                    defaultDeviceRoute: .coreNPU,
+                    npuUnavailableDeviceRoute: .coreGPU,
+                    candidateCountCap: candidateCountCap,
+                    standardLoopFloor: standardLoopFloor,
+                    protectedLoopFloor: protectedLoopFloor,
+                    standardCandidateFloor: standardCandidateFloor,
+                    protectedCandidateFloor: protectedCandidateFloor,
+                    unstableLoopIncrement: unstableLoopIncrement,
+                    throttleLoopPenalty: throttleLoopPenalty,
+                    throttleCandidatePenalty: throttleCandidatePenalty,
+                    maintenanceSupported: true,
+                    maintenanceBatteryFloor: standardMaintenanceBatteryFloor,
+                    scheduledMaintenanceClass: activeRunModeClass,
+                    deferredMaintenanceClass: activeRunModeClass
+                ),
+                BASEBrainRunMode.pulse.rawValue: .init(
+                    maxLoops: lowRiskLoops,
+                    maxCandidates: lowRiskCandidates,
+                    retrievalDepth: pulseRetrievalDepth,
+                    defaultDecodeTokens: standardDecodeTokens,
+                    unstableDecodeTokens: unstableDecodeTokens,
+                    precisionProfile: lowRiskPrecisionProfile,
+                    defaultDeviceRoute: .scoutNPU,
+                    npuUnavailableDeviceRoute: .scoutCPU,
+                    candidateCountCap: candidateCountCap,
+                    standardLoopFloor: standardLoopFloor,
+                    protectedLoopFloor: protectedLoopFloor,
+                    standardCandidateFloor: standardCandidateFloor,
+                    protectedCandidateFloor: protectedCandidateFloor,
+                    unstableLoopIncrement: unstableLoopIncrement,
+                    throttleLoopPenalty: throttleLoopPenalty,
+                    throttleCandidatePenalty: throttleCandidatePenalty,
+                    maintenanceSupported: true,
+                    maintenanceBatteryFloor: lightweightMaintenanceBatteryFloor,
+                    scheduledMaintenanceClass: lightweightAllowedClass,
+                    deferredMaintenanceClass: lightweightDeferredClass
+                ),
+                BASEBrainRunMode.sentinel.rawValue: .init(
+                    maxLoops: lowRiskLoops,
+                    maxCandidates: lowRiskCandidates,
+                    retrievalDepth: sentinelRetrievalDepth,
+                    defaultDecodeTokens: standardDecodeTokens,
+                    unstableDecodeTokens: unstableDecodeTokens,
+                    precisionProfile: lowRiskPrecisionProfile,
+                    defaultDeviceRoute: .scoutNPU,
+                    npuUnavailableDeviceRoute: .scoutCPU,
+                    candidateCountCap: candidateCountCap,
+                    standardLoopFloor: standardLoopFloor,
+                    protectedLoopFloor: protectedLoopFloor,
+                    standardCandidateFloor: standardCandidateFloor,
+                    protectedCandidateFloor: protectedCandidateFloor,
+                    unstableLoopIncrement: unstableLoopIncrement,
+                    throttleLoopPenalty: throttleLoopPenalty,
+                    throttleCandidatePenalty: throttleCandidatePenalty,
+                    maintenanceSupported: true,
+                    maintenanceBatteryFloor: lightweightMaintenanceBatteryFloor,
+                    scheduledMaintenanceClass: lightweightAllowedClass,
+                    deferredMaintenanceClass: lightweightDeferredClass
+                ),
+                BASEBrainRunMode.engage.rawValue: .init(
+                    maxLoops: lowRiskLoops,
+                    maxCandidates: lowRiskCandidates,
+                    retrievalDepth: engageRetrievalDepth,
+                    defaultDecodeTokens: standardDecodeTokens,
+                    unstableDecodeTokens: unstableDecodeTokens,
+                    precisionProfile: lowRiskPrecisionProfile,
+                    defaultDeviceRoute: .coreNPU,
+                    npuUnavailableDeviceRoute: .coreGPU,
+                    candidateCountCap: candidateCountCap,
+                    standardLoopFloor: standardLoopFloor,
+                    protectedLoopFloor: protectedLoopFloor,
+                    standardCandidateFloor: standardCandidateFloor,
+                    protectedCandidateFloor: protectedCandidateFloor,
+                    unstableLoopIncrement: unstableLoopIncrement,
+                    throttleLoopPenalty: throttleLoopPenalty,
+                    throttleCandidatePenalty: throttleCandidatePenalty,
+                    maintenanceSupported: true,
+                    maintenanceBatteryFloor: standardMaintenanceBatteryFloor,
+                    scheduledMaintenanceClass: activeRunModeClass,
+                    deferredMaintenanceClass: activeRunModeClass
+                ),
+                BASEBrainRunMode.reflect.rawValue: .init(
+                    maxLoops: mediumRiskLoops,
+                    maxCandidates: mediumRiskCandidates,
+                    retrievalDepth: reflectRetrievalDepth,
+                    defaultDecodeTokens: standardDecodeTokens,
+                    unstableDecodeTokens: unstableDecodeTokens,
+                    precisionProfile: mediumRiskPrecisionProfile,
+                    defaultDeviceRoute: .coreNPU,
+                    npuUnavailableDeviceRoute: .coreGPU,
+                    candidateCountCap: candidateCountCap,
+                    standardLoopFloor: standardLoopFloor,
+                    protectedLoopFloor: protectedLoopFloor,
+                    standardCandidateFloor: standardCandidateFloor,
+                    protectedCandidateFloor: protectedCandidateFloor,
+                    unstableLoopIncrement: unstableLoopIncrement,
+                    throttleLoopPenalty: throttleLoopPenalty,
+                    throttleCandidatePenalty: throttleCandidatePenalty,
+                    maintenanceSupported: true,
+                    maintenanceBatteryFloor: standardMaintenanceBatteryFloor,
+                    scheduledMaintenanceClass: activeRunModeClass,
+                    deferredMaintenanceClass: activeRunModeClass
+                ),
+                BASEBrainRunMode.deepLoop.rawValue: .init(
+                    maxLoops: mediumRiskLoops,
+                    maxCandidates: mediumRiskCandidates,
+                    retrievalDepth: deepLoopRetrievalDepth,
+                    defaultDecodeTokens: standardDecodeTokens,
+                    unstableDecodeTokens: unstableDecodeTokens,
+                    precisionProfile: mediumRiskPrecisionProfile,
+                    defaultDeviceRoute: .coreNPU,
+                    npuUnavailableDeviceRoute: .coreGPU,
+                    candidateCountCap: candidateCountCap,
+                    standardLoopFloor: standardLoopFloor,
+                    protectedLoopFloor: protectedLoopFloor,
+                    standardCandidateFloor: standardCandidateFloor,
+                    protectedCandidateFloor: protectedCandidateFloor,
+                    unstableLoopIncrement: unstableLoopIncrement,
+                    throttleLoopPenalty: throttleLoopPenalty,
+                    throttleCandidatePenalty: throttleCandidatePenalty,
+                    maintenanceSupported: true,
+                    maintenanceBatteryFloor: standardMaintenanceBatteryFloor,
+                    scheduledMaintenanceClass: activeRunModeClass,
+                    deferredMaintenanceClass: activeRunModeClass
+                ),
+                BASEBrainRunMode.guard.rawValue: .init(
+                    maxLoops: highRiskLoops,
+                    maxCandidates: highRiskCandidates,
+                    retrievalDepth: guardRetrievalDepth,
+                    defaultDecodeTokens: guardedDecodeTokens,
+                    unstableDecodeTokens: guardedDecodeTokens,
+                    precisionProfile: highRiskPrecisionProfile,
+                    defaultDeviceRoute: .coreNPU,
+                    npuUnavailableDeviceRoute: .coreGPU,
+                    pureLocalPreferredDeviceRoute: .hybridLocal,
+                    candidateCountCap: candidateCountCap,
+                    standardLoopFloor: standardLoopFloor,
+                    protectedLoopFloor: protectedLoopFloor,
+                    standardCandidateFloor: standardCandidateFloor,
+                    protectedCandidateFloor: protectedCandidateFloor,
+                    unstableLoopIncrement: unstableLoopIncrement,
+                    throttleLoopPenalty: throttleLoopPenalty,
+                    throttleCandidatePenalty: throttleCandidatePenalty,
+                    maintenanceSupported: false,
+                    maintenanceBatteryFloor: restrictedMaintenanceBatteryFloor,
+                    scheduledMaintenanceClass: restrictedRunModeClass,
+                    deferredMaintenanceClass: restrictedRunModeClass
+                ),
+                BASEBrainRunMode.recovery.rawValue: .init(
+                    maxLoops: highRiskLoops,
+                    maxCandidates: highRiskCandidates,
+                    retrievalDepth: recoveryRetrievalDepth,
+                    defaultDecodeTokens: guardedDecodeTokens,
+                    unstableDecodeTokens: guardedDecodeTokens,
+                    precisionProfile: highRiskPrecisionProfile,
+                    defaultDeviceRoute: .coreNPU,
+                    npuUnavailableDeviceRoute: .coreGPU,
+                    pureLocalPreferredDeviceRoute: .hybridLocal,
+                    candidateCountCap: candidateCountCap,
+                    standardLoopFloor: standardLoopFloor,
+                    protectedLoopFloor: protectedLoopFloor,
+                    standardCandidateFloor: standardCandidateFloor,
+                    protectedCandidateFloor: protectedCandidateFloor,
+                    unstableLoopIncrement: unstableLoopIncrement,
+                    throttleLoopPenalty: throttleLoopPenalty,
+                    throttleCandidatePenalty: throttleCandidatePenalty,
+                    maintenanceSupported: false,
+                    maintenanceBatteryFloor: restrictedMaintenanceBatteryFloor,
+                    scheduledMaintenanceClass: restrictedRunModeClass,
+                    deferredMaintenanceClass: restrictedRunModeClass
+                ),
+                BASEBrainRunMode.quarantine.rawValue: .init(
+                    maxLoops: highRiskLoops,
+                    maxCandidates: highRiskCandidates,
+                    retrievalDepth: quarantineRetrievalDepth,
+                    defaultDecodeTokens: guardedDecodeTokens,
+                    unstableDecodeTokens: guardedDecodeTokens,
+                    precisionProfile: highRiskPrecisionProfile,
+                    defaultDeviceRoute: .coreNPU,
+                    npuUnavailableDeviceRoute: .coreGPU,
+                    pureLocalPreferredDeviceRoute: .hybridLocal,
+                    candidateCountCap: candidateCountCap,
+                    standardLoopFloor: standardLoopFloor,
+                    protectedLoopFloor: protectedLoopFloor,
+                    standardCandidateFloor: standardCandidateFloor,
+                    protectedCandidateFloor: protectedCandidateFloor,
+                    unstableLoopIncrement: unstableLoopIncrement,
+                    throttleLoopPenalty: throttleLoopPenalty,
+                    throttleCandidatePenalty: throttleCandidatePenalty,
+                    maintenanceSupported: false,
+                    maintenanceBatteryFloor: restrictedMaintenanceBatteryFloor,
+                    scheduledMaintenanceClass: restrictedRunModeClass,
+                    deferredMaintenanceClass: restrictedRunModeClass
+                ),
+                BASEBrainRunMode.lockdown.rawValue: .init(
+                    maxLoops: extremeRiskLoops,
+                    maxCandidates: extremeRiskCandidates,
+                    retrievalDepth: lockdownRetrievalDepth,
+                    defaultDecodeTokens: guardedDecodeTokens,
+                    unstableDecodeTokens: guardedDecodeTokens,
+                    precisionProfile: extremeRiskPrecisionProfile,
+                    defaultDeviceRoute: .coreNPU,
+                    npuUnavailableDeviceRoute: .coreGPU,
+                    pureLocalPreferredDeviceRoute: .hybridLocal,
+                    candidateCountCap: candidateCountCap,
+                    standardLoopFloor: standardLoopFloor,
+                    protectedLoopFloor: protectedLoopFloor,
+                    standardCandidateFloor: standardCandidateFloor,
+                    protectedCandidateFloor: protectedCandidateFloor,
+                    unstableLoopIncrement: unstableLoopIncrement,
+                    throttleLoopPenalty: throttleLoopPenalty,
+                    throttleCandidatePenalty: throttleCandidatePenalty,
+                    maintenanceSupported: false,
+                    maintenanceBatteryFloor: restrictedMaintenanceBatteryFloor,
+                    scheduledMaintenanceClass: restrictedRunModeClass,
+                    deferredMaintenanceClass: restrictedRunModeClass
+                )
+            ]
+        }
+
+        public func resolvedRunModeProfilesByID(
+            maintenance: BASEBrainRuntimeSynthesisPolicy.MaintenanceTuning = .generic
+        ) -> [String: RunModeBudgetProfile] {
+            let synthesizedProfiles = Self.synthesizedRunModeProfiles(
+                lowRiskLoops: lowRiskLoops,
+                mediumRiskLoops: mediumRiskLoops,
+                highRiskLoops: highRiskLoops,
+                extremeRiskLoops: extremeRiskLoops,
+                lowRiskCandidates: lowRiskCandidates,
+                mediumRiskCandidates: mediumRiskCandidates,
+                highRiskCandidates: highRiskCandidates,
+                extremeRiskCandidates: extremeRiskCandidates,
+                standardDecodeTokens: standardDecodeTokens,
+                unstableDecodeTokens: unstableDecodeTokens,
+                guardedDecodeTokens: guardedDecodeTokens,
+                lowRiskPrecisionProfile: lowRiskPrecisionProfile,
+                mediumRiskPrecisionProfile: mediumRiskPrecisionProfile,
+                highRiskPrecisionProfile: highRiskPrecisionProfile,
+                extremeRiskPrecisionProfile: extremeRiskPrecisionProfile,
+                pulseRetrievalDepth: pulseRetrievalDepth,
+                sentinelRetrievalDepth: sentinelRetrievalDepth,
+                engageRetrievalDepth: engageRetrievalDepth,
+                reflectRetrievalDepth: reflectRetrievalDepth,
+                deepLoopRetrievalDepth: deepLoopRetrievalDepth,
+                guardRetrievalDepth: guardRetrievalDepth,
+                recoveryRetrievalDepth: recoveryRetrievalDepth,
+                quarantineRetrievalDepth: quarantineRetrievalDepth,
+                lockdownRetrievalDepth: lockdownRetrievalDepth,
+                dormantRetrievalDepth: dormantRetrievalDepth,
+                standardLoopFloor: standardLoopFloor,
+                protectedLoopFloor: protectedLoopFloor,
+                standardCandidateFloor: standardCandidateFloor,
+                protectedCandidateFloor: protectedCandidateFloor,
+                candidateCountCap: maxCandidateCount,
+                unstableLoopIncrement: unstableLoopIncrement,
+                throttleLoopPenalty: throttleLoopPenalty,
+                throttleCandidatePenalty: throttleCandidatePenalty,
+                lightweightMaintenanceBatteryFloor: maintenance.lightBatteryFloor,
+                standardMaintenanceBatteryFloor: maintenance.standardBatteryFloor,
+                restrictedMaintenanceBatteryFloor: maintenanceBatteryFloor,
+                lightweightAllowedClass: maintenance.lightweightAllowedClass,
+                lightweightDeferredClass: maintenance.lightweightDeferredClass,
+                activeRunModeClass: maintenance.activeRunModeClass,
+                restrictedRunModeClass: maintenance.restrictedRunModeClass
+            )
+            guard let runModeProfilesByID else {
+                return synthesizedProfiles
+            }
+
+            return synthesizedProfiles.merging(runModeProfilesByID) { fallback, explicit in
+                explicit.merged(with: fallback)
+            }
+        }
+
+        public func runModeProfile(
+            for runMode: BASEBrainRunMode,
+            maintenance: BASEBrainRuntimeSynthesisPolicy.MaintenanceTuning = .generic
+        ) -> RunModeBudgetProfile {
+            let resolvedProfiles = resolvedRunModeProfilesByID(maintenance: maintenance)
+            if let explicitProfile = resolvedProfiles[runMode.rawValue] {
+                return explicitProfile
+            }
+
+            return Self.synthesizedRunModeProfiles(
+                lowRiskLoops: lowRiskLoops,
+                mediumRiskLoops: mediumRiskLoops,
+                highRiskLoops: highRiskLoops,
+                extremeRiskLoops: extremeRiskLoops,
+                lowRiskCandidates: lowRiskCandidates,
+                mediumRiskCandidates: mediumRiskCandidates,
+                highRiskCandidates: highRiskCandidates,
+                extremeRiskCandidates: extremeRiskCandidates,
+                standardDecodeTokens: standardDecodeTokens,
+                unstableDecodeTokens: unstableDecodeTokens,
+                guardedDecodeTokens: guardedDecodeTokens,
+                lowRiskPrecisionProfile: lowRiskPrecisionProfile,
+                mediumRiskPrecisionProfile: mediumRiskPrecisionProfile,
+                highRiskPrecisionProfile: highRiskPrecisionProfile,
+                extremeRiskPrecisionProfile: extremeRiskPrecisionProfile,
+                pulseRetrievalDepth: pulseRetrievalDepth,
+                sentinelRetrievalDepth: sentinelRetrievalDepth,
+                engageRetrievalDepth: engageRetrievalDepth,
+                reflectRetrievalDepth: reflectRetrievalDepth,
+                deepLoopRetrievalDepth: deepLoopRetrievalDepth,
+                guardRetrievalDepth: guardRetrievalDepth,
+                recoveryRetrievalDepth: recoveryRetrievalDepth,
+                quarantineRetrievalDepth: quarantineRetrievalDepth,
+                lockdownRetrievalDepth: lockdownRetrievalDepth,
+                dormantRetrievalDepth: dormantRetrievalDepth,
+                standardLoopFloor: standardLoopFloor,
+                protectedLoopFloor: protectedLoopFloor,
+                standardCandidateFloor: standardCandidateFloor,
+                protectedCandidateFloor: protectedCandidateFloor,
+                candidateCountCap: maxCandidateCount,
+                unstableLoopIncrement: unstableLoopIncrement,
+                throttleLoopPenalty: throttleLoopPenalty,
+                throttleCandidatePenalty: throttleCandidatePenalty,
+                lightweightMaintenanceBatteryFloor: maintenance.lightBatteryFloor,
+                standardMaintenanceBatteryFloor: maintenance.standardBatteryFloor,
+                restrictedMaintenanceBatteryFloor: maintenanceBatteryFloor,
+                lightweightAllowedClass: maintenance.lightweightAllowedClass,
+                lightweightDeferredClass: maintenance.lightweightDeferredClass,
+                activeRunModeClass: maintenance.activeRunModeClass,
+                restrictedRunModeClass: maintenance.restrictedRunModeClass
+            )[runMode.rawValue] ?? .init(
+                maxLoops: lowRiskLoops,
+                maxCandidates: lowRiskCandidates,
+                retrievalDepth: lowRiskRetrievalDepth,
+                defaultDecodeTokens: standardDecodeTokens,
+                unstableDecodeTokens: unstableDecodeTokens,
+                precisionProfile: lowRiskPrecisionProfile,
+                defaultDeviceRoute: .coreNPU,
+                npuUnavailableDeviceRoute: .coreGPU,
+                candidateCountCap: maxCandidateCount,
+                standardLoopFloor: standardLoopFloor,
+                protectedLoopFloor: protectedLoopFloor,
+                standardCandidateFloor: standardCandidateFloor,
+                protectedCandidateFloor: protectedCandidateFloor,
+                unstableLoopIncrement: unstableLoopIncrement,
+                throttleLoopPenalty: throttleLoopPenalty,
+                throttleCandidatePenalty: throttleCandidatePenalty,
+                maintenanceSupported: true,
+                maintenanceBatteryFloor: maintenance.standardBatteryFloor,
+                scheduledMaintenanceClass: maintenance.activeRunModeClass,
+                deferredMaintenanceClass: maintenance.activeRunModeClass
+            )
+        }
+
+        public var missingRequiredRunModeProfileIDs: [String] {
+            let requiredRunModes = Set(BASEBrainRunMode.allCases.map(\.rawValue))
+            let declaredRunModes = Set((runModeProfilesByID ?? [:]).keys)
+            return requiredRunModes.subtracting(declaredRunModes).sorted()
+        }
+
+        public var incompleteRunModeProfileIDs: [String] {
+            guard let runModeProfilesByID else {
+                return []
+            }
+
+            return runModeProfilesByID
+                .filter { _, profile in
+                    profile.defaultDecodeTokens == nil ||
+                    profile.unstableDecodeTokens == nil ||
+                    profile.candidateCountCap == nil ||
+                    profile.standardLoopFloor == nil ||
+                    profile.protectedLoopFloor == nil ||
+                    profile.standardCandidateFloor == nil ||
+                    profile.protectedCandidateFloor == nil ||
+                    profile.unstableLoopIncrement == nil ||
+                    profile.throttleLoopPenalty == nil ||
+                    profile.throttleCandidatePenalty == nil ||
+                    profile.maintenanceSupported == nil ||
+                    profile.maintenanceBatteryFloor == nil ||
+                    profile.scheduledMaintenanceClass == nil ||
+                    profile.deferredMaintenanceClass == nil
+                }
+                .map(\.key)
+                .sorted()
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let standardDecodeTokens = try container.decode(Int.self, forKey: .standardDecodeTokens)
+            let unstableDecodeTokens = try container.decode(Int.self, forKey: .unstableDecodeTokens)
+            let guardedDecodeTokens = try container.decode(Int.self, forKey: .guardedDecodeTokens)
+            let maintenanceBatteryFloor = try container.decode(Double.self, forKey: .maintenanceBatteryFloor)
+            let lowRiskLoops = try container.decode(Int.self, forKey: .lowRiskLoops)
+            let mediumRiskLoops = try container.decode(Int.self, forKey: .mediumRiskLoops)
+            let highRiskLoops = try container.decode(Int.self, forKey: .highRiskLoops)
+            let extremeRiskLoops = try container.decode(Int.self, forKey: .extremeRiskLoops)
+            let lowRiskCandidates = try container.decode(Int.self, forKey: .lowRiskCandidates)
+            let mediumRiskCandidates = try container.decode(Int.self, forKey: .mediumRiskCandidates)
+            let highRiskCandidates = try container.decode(Int.self, forKey: .highRiskCandidates)
+            let extremeRiskCandidates = try container.decode(Int.self, forKey: .extremeRiskCandidates)
+            let lowRiskRetrievalDepth = try container.decode(Int.self, forKey: .lowRiskRetrievalDepth)
+            let mediumRiskRetrievalDepth = try container.decode(Int.self, forKey: .mediumRiskRetrievalDepth)
+            let guardedRetrievalDepth = try container.decode(Int.self, forKey: .guardedRetrievalDepth)
+            let standardLoopFloor = try container.decode(Int.self, forKey: .standardLoopFloor)
+            let protectedLoopFloor = try container.decode(Int.self, forKey: .protectedLoopFloor)
+            let standardCandidateFloor = try container.decode(Int.self, forKey: .standardCandidateFloor)
+            let protectedCandidateFloor = try container.decode(Int.self, forKey: .protectedCandidateFloor)
+            let maxCandidateCount = try container.decode(Int.self, forKey: .maxCandidateCount)
+            let unstableLoopIncrement = try container.decode(Int.self, forKey: .unstableLoopIncrement)
+            let throttleLoopPenalty = try container.decode(Int.self, forKey: .throttleLoopPenalty)
+            let throttleCandidatePenalty = try container.decode(Int.self, forKey: .throttleCandidatePenalty)
+            let defaultPrecisionProfile = try container.decode(BASRuntimePrecisionProfile.self, forKey: .defaultPrecisionProfile)
+            let unstablePrecisionProfile = try container.decode(BASRuntimePrecisionProfile.self, forKey: .unstablePrecisionProfile)
+            let guardedPrecisionProfile = try container.decode(BASRuntimePrecisionProfile.self, forKey: .guardedPrecisionProfile)
+
+            self.init(
+                standardDecodeTokens: standardDecodeTokens,
+                unstableDecodeTokens: unstableDecodeTokens,
+                guardedDecodeTokens: guardedDecodeTokens,
+                maintenanceBatteryFloor: maintenanceBatteryFloor,
+                lowRiskLoops: lowRiskLoops,
+                mediumRiskLoops: mediumRiskLoops,
+                highRiskLoops: highRiskLoops,
+                extremeRiskLoops: extremeRiskLoops,
+                lowRiskCandidates: lowRiskCandidates,
+                mediumRiskCandidates: mediumRiskCandidates,
+                highRiskCandidates: highRiskCandidates,
+                extremeRiskCandidates: extremeRiskCandidates,
+                lowRiskRetrievalDepth: lowRiskRetrievalDepth,
+                mediumRiskRetrievalDepth: mediumRiskRetrievalDepth,
+                guardedRetrievalDepth: guardedRetrievalDepth,
+                standardLoopFloor: standardLoopFloor,
+                protectedLoopFloor: protectedLoopFloor,
+                standardCandidateFloor: standardCandidateFloor,
+                protectedCandidateFloor: protectedCandidateFloor,
+                maxCandidateCount: maxCandidateCount,
+                unstableLoopIncrement: unstableLoopIncrement,
+                throttleLoopPenalty: throttleLoopPenalty,
+                throttleCandidatePenalty: throttleCandidatePenalty,
+                defaultPrecisionProfile: defaultPrecisionProfile,
+                unstablePrecisionProfile: unstablePrecisionProfile,
+                guardedPrecisionProfile: guardedPrecisionProfile,
+                lowRiskPrecisionProfile: try container.decodeIfPresent(BASRuntimePrecisionProfile.self, forKey: .lowRiskPrecisionProfile),
+                mediumRiskPrecisionProfile: try container.decodeIfPresent(BASRuntimePrecisionProfile.self, forKey: .mediumRiskPrecisionProfile),
+                highRiskPrecisionProfile: try container.decodeIfPresent(BASRuntimePrecisionProfile.self, forKey: .highRiskPrecisionProfile),
+                extremeRiskPrecisionProfile: try container.decodeIfPresent(BASRuntimePrecisionProfile.self, forKey: .extremeRiskPrecisionProfile),
+                pulseRetrievalDepth: try container.decodeIfPresent(Int.self, forKey: .pulseRetrievalDepth),
+                sentinelRetrievalDepth: try container.decodeIfPresent(Int.self, forKey: .sentinelRetrievalDepth),
+                engageRetrievalDepth: try container.decodeIfPresent(Int.self, forKey: .engageRetrievalDepth),
+                reflectRetrievalDepth: try container.decodeIfPresent(Int.self, forKey: .reflectRetrievalDepth),
+                deepLoopRetrievalDepth: try container.decodeIfPresent(Int.self, forKey: .deepLoopRetrievalDepth),
+                guardRetrievalDepth: try container.decodeIfPresent(Int.self, forKey: .guardRetrievalDepth),
+                recoveryRetrievalDepth: try container.decodeIfPresent(Int.self, forKey: .recoveryRetrievalDepth),
+                quarantineRetrievalDepth: try container.decodeIfPresent(Int.self, forKey: .quarantineRetrievalDepth),
+                lockdownRetrievalDepth: try container.decodeIfPresent(Int.self, forKey: .lockdownRetrievalDepth),
+                dormantRetrievalDepth: try container.decodeIfPresent(Int.self, forKey: .dormantRetrievalDepth),
+                runModeProfilesByID: try container.decodeIfPresent([String: RunModeBudgetProfile].self, forKey: .runModeProfilesByID)
+            )
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(standardDecodeTokens, forKey: .standardDecodeTokens)
+            try container.encode(unstableDecodeTokens, forKey: .unstableDecodeTokens)
+            try container.encode(guardedDecodeTokens, forKey: .guardedDecodeTokens)
+            try container.encode(maintenanceBatteryFloor, forKey: .maintenanceBatteryFloor)
+            try container.encode(lowRiskLoops, forKey: .lowRiskLoops)
+            try container.encode(mediumRiskLoops, forKey: .mediumRiskLoops)
+            try container.encode(highRiskLoops, forKey: .highRiskLoops)
+            try container.encode(extremeRiskLoops, forKey: .extremeRiskLoops)
+            try container.encode(lowRiskCandidates, forKey: .lowRiskCandidates)
+            try container.encode(mediumRiskCandidates, forKey: .mediumRiskCandidates)
+            try container.encode(highRiskCandidates, forKey: .highRiskCandidates)
+            try container.encode(extremeRiskCandidates, forKey: .extremeRiskCandidates)
+            try container.encode(lowRiskRetrievalDepth, forKey: .lowRiskRetrievalDepth)
+            try container.encode(mediumRiskRetrievalDepth, forKey: .mediumRiskRetrievalDepth)
+            try container.encode(guardedRetrievalDepth, forKey: .guardedRetrievalDepth)
+            try container.encode(standardLoopFloor, forKey: .standardLoopFloor)
+            try container.encode(protectedLoopFloor, forKey: .protectedLoopFloor)
+            try container.encode(standardCandidateFloor, forKey: .standardCandidateFloor)
+            try container.encode(protectedCandidateFloor, forKey: .protectedCandidateFloor)
+            try container.encode(maxCandidateCount, forKey: .maxCandidateCount)
+            try container.encode(unstableLoopIncrement, forKey: .unstableLoopIncrement)
+            try container.encode(throttleLoopPenalty, forKey: .throttleLoopPenalty)
+            try container.encode(throttleCandidatePenalty, forKey: .throttleCandidatePenalty)
+            try container.encode(defaultPrecisionProfile, forKey: .defaultPrecisionProfile)
+            try container.encode(unstablePrecisionProfile, forKey: .unstablePrecisionProfile)
+            try container.encode(guardedPrecisionProfile, forKey: .guardedPrecisionProfile)
+            try container.encode(lowRiskPrecisionProfile, forKey: .lowRiskPrecisionProfile)
+            try container.encode(mediumRiskPrecisionProfile, forKey: .mediumRiskPrecisionProfile)
+            try container.encode(highRiskPrecisionProfile, forKey: .highRiskPrecisionProfile)
+            try container.encode(extremeRiskPrecisionProfile, forKey: .extremeRiskPrecisionProfile)
+            try container.encode(pulseRetrievalDepth, forKey: .pulseRetrievalDepth)
+            try container.encode(sentinelRetrievalDepth, forKey: .sentinelRetrievalDepth)
+            try container.encode(engageRetrievalDepth, forKey: .engageRetrievalDepth)
+            try container.encode(reflectRetrievalDepth, forKey: .reflectRetrievalDepth)
+            try container.encode(deepLoopRetrievalDepth, forKey: .deepLoopRetrievalDepth)
+            try container.encode(guardRetrievalDepth, forKey: .guardRetrievalDepth)
+            try container.encode(recoveryRetrievalDepth, forKey: .recoveryRetrievalDepth)
+            try container.encode(quarantineRetrievalDepth, forKey: .quarantineRetrievalDepth)
+            try container.encode(lockdownRetrievalDepth, forKey: .lockdownRetrievalDepth)
+            try container.encode(dormantRetrievalDepth, forKey: .dormantRetrievalDepth)
+            try container.encodeIfPresent(runModeProfilesByID, forKey: .runModeProfilesByID)
+        }
+    }
+
+    public struct WakeIntentTuning: Codable, Equatable, Sendable {
+        public var pulseBatteryFloor: Double
+        public var sentinelBatteryFloor: Double
+        public var engageUrgencyIncrement: Double
+        public var reflectCueIncrement: Double
+        public var deepLoopCueIncrement: Double
+        public var highRiskGuardThreshold: Double
+
+        public init(
+            pulseBatteryFloor: Double,
+            sentinelBatteryFloor: Double,
+            engageUrgencyIncrement: Double,
+            reflectCueIncrement: Double,
+            deepLoopCueIncrement: Double,
+            highRiskGuardThreshold: Double
+        ) {
+            self.pulseBatteryFloor = pulseBatteryFloor
+            self.sentinelBatteryFloor = sentinelBatteryFloor
+            self.engageUrgencyIncrement = engageUrgencyIncrement
+            self.reflectCueIncrement = reflectCueIncrement
+            self.deepLoopCueIncrement = deepLoopCueIncrement
+            self.highRiskGuardThreshold = highRiskGuardThreshold
+        }
+
+        public static let generic = WakeIntentTuning(
+            pulseBatteryFloor: 0.18,
+            sentinelBatteryFloor: 0.12,
+            engageUrgencyIncrement: 0.18,
+            reflectCueIncrement: 0.16,
+            deepLoopCueIncrement: 0.26,
+            highRiskGuardThreshold: 0.70
+        )
+    }
+
+    struct BASRunModeTransitionContext: Equatable, Sendable {
+        var riskLevel: BASBrainRiskLevel
+        var thermalLevel: BASThermalLevel
+        var foregroundState: BASForegroundState
+        var batteryLevel: Double
+        var guardedBudgetRequired: Bool
+        var requiresRecovery: Bool
+        var requiresQuarantine: Bool
+        var urgencyDetected: Bool
+        var reflectiveCueDetected: Bool
+        var deepLoopCueDetected: Bool
+    }
+
+    public struct StateTransitionTuning: Codable, Equatable, Sendable {
+        public struct RunModeTransitionRule: Codable, Equatable, Sendable {
+            public var ruleID: String
+            public var resultMode: BASEBrainRunMode
+            public var riskLevels: [BASBrainRiskLevel]?
+            public var thermalLevels: [BASThermalLevel]?
+            public var foregroundStates: [BASForegroundState]?
+            public var requiresGuardedBudget: Bool?
+            public var requiresRecovery: Bool?
+            public var requiresQuarantine: Bool?
+            public var urgencyDetected: Bool?
+            public var reflectiveCueDetected: Bool?
+            public var deepLoopCueDetected: Bool?
+            public var minimumBatteryLevel: Double?
+
+            public init(
+                ruleID: String,
+                resultMode: BASEBrainRunMode,
+                riskLevels: [BASBrainRiskLevel]? = nil,
+                thermalLevels: [BASThermalLevel]? = nil,
+                foregroundStates: [BASForegroundState]? = nil,
+                requiresGuardedBudget: Bool? = nil,
+                requiresRecovery: Bool? = nil,
+                requiresQuarantine: Bool? = nil,
+                urgencyDetected: Bool? = nil,
+                reflectiveCueDetected: Bool? = nil,
+                deepLoopCueDetected: Bool? = nil,
+                minimumBatteryLevel: Double? = nil
+            ) {
+                self.ruleID = ruleID
+                self.resultMode = resultMode
+                self.riskLevels = riskLevels
+                self.thermalLevels = thermalLevels
+                self.foregroundStates = foregroundStates
+                self.requiresGuardedBudget = requiresGuardedBudget
+                self.requiresRecovery = requiresRecovery
+                self.requiresQuarantine = requiresQuarantine
+                self.urgencyDetected = urgencyDetected
+                self.reflectiveCueDetected = reflectiveCueDetected
+                self.deepLoopCueDetected = deepLoopCueDetected
+                self.minimumBatteryLevel = minimumBatteryLevel.map { min(max($0, 0), 1) }
+            }
+
+            func matches(_ context: BASRunModeTransitionContext) -> Bool {
+                if let riskLevels, riskLevels.contains(context.riskLevel) == false {
+                    return false
+                }
+                if let thermalLevels, thermalLevels.contains(context.thermalLevel) == false {
+                    return false
+                }
+                if let foregroundStates, foregroundStates.contains(context.foregroundState) == false {
+                    return false
+                }
+                if let requiresGuardedBudget, requiresGuardedBudget != context.guardedBudgetRequired {
+                    return false
+                }
+                if let requiresRecovery, requiresRecovery != context.requiresRecovery {
+                    return false
+                }
+                if let requiresQuarantine, requiresQuarantine != context.requiresQuarantine {
+                    return false
+                }
+                if let urgencyDetected, urgencyDetected != context.urgencyDetected {
+                    return false
+                }
+                if let reflectiveCueDetected, reflectiveCueDetected != context.reflectiveCueDetected {
+                    return false
+                }
+                if let deepLoopCueDetected, deepLoopCueDetected != context.deepLoopCueDetected {
+                    return false
+                }
+                if let minimumBatteryLevel, context.batteryLevel < minimumBatteryLevel {
+                    return false
+                }
+                return true
+            }
+        }
+
+        public var backgroundPulseEnabled: Bool
+        public var recoveryOnCriticalThermal: Bool
+        public var reflectOnTrustDrift: Bool
+        public var deepLoopOnProtectedBoundary: Bool
+        public var lockdownOnExtremeBlockedPermit: Bool
+        public var quarantineFailureGuardThreshold: Int
+        public var criticalThermalMode: BASEBrainRunMode
+        public var lowRiskBackgroundMode: BASEBrainRunMode
+        public var lowRiskProtectedMode: BASEBrainRunMode
+        public var lowRiskUrgentMode: BASEBrainRunMode
+        public var lowRiskDefaultMode: BASEBrainRunMode
+        public var mediumRiskProtectedDeepLoopMode: BASEBrainRunMode
+        public var mediumRiskReflectiveMode: BASEBrainRunMode
+        public var mediumRiskDefaultMode: BASEBrainRunMode
+        public var highRiskMode: BASEBrainRunMode
+        public var extremeRiskMode: BASEBrainRunMode
+        public var recoveryMode: BASEBrainRunMode
+        public var quarantineMode: BASEBrainRunMode
+        public var runModeRules: [RunModeTransitionRule]?
+
+        private enum CodingKeys: String, CodingKey {
+            case backgroundPulseEnabled
+            case recoveryOnCriticalThermal
+            case reflectOnTrustDrift
+            case deepLoopOnProtectedBoundary
+            case lockdownOnExtremeBlockedPermit
+            case quarantineFailureGuardThreshold
+            case criticalThermalMode
+            case lowRiskBackgroundMode
+            case lowRiskProtectedMode
+            case lowRiskUrgentMode
+            case lowRiskDefaultMode
+            case mediumRiskProtectedDeepLoopMode
+            case mediumRiskReflectiveMode
+            case mediumRiskDefaultMode
+            case highRiskMode
+            case extremeRiskMode
+            case recoveryMode
+            case quarantineMode
+            case runModeRules
+        }
+
+        public init(
+            backgroundPulseEnabled: Bool,
+            recoveryOnCriticalThermal: Bool,
+            reflectOnTrustDrift: Bool,
+            deepLoopOnProtectedBoundary: Bool,
+            lockdownOnExtremeBlockedPermit: Bool,
+            quarantineFailureGuardThreshold: Int,
+            criticalThermalMode: BASEBrainRunMode? = nil,
+            lowRiskBackgroundMode: BASEBrainRunMode = .pulse,
+            lowRiskProtectedMode: BASEBrainRunMode = .engage,
+            lowRiskUrgentMode: BASEBrainRunMode = .engage,
+            lowRiskDefaultMode: BASEBrainRunMode = .sentinel,
+            mediumRiskProtectedDeepLoopMode: BASEBrainRunMode = .deepLoop,
+            mediumRiskReflectiveMode: BASEBrainRunMode = .reflect,
+            mediumRiskDefaultMode: BASEBrainRunMode = .engage,
+            highRiskMode: BASEBrainRunMode = .guard,
+            extremeRiskMode: BASEBrainRunMode? = nil,
+            recoveryMode: BASEBrainRunMode = .recovery,
+            quarantineMode: BASEBrainRunMode = .quarantine,
+            runModeRules: [RunModeTransitionRule]? = nil
+        ) {
+            self.backgroundPulseEnabled = backgroundPulseEnabled
+            self.recoveryOnCriticalThermal = recoveryOnCriticalThermal
+            self.reflectOnTrustDrift = reflectOnTrustDrift
+            self.deepLoopOnProtectedBoundary = deepLoopOnProtectedBoundary
+            self.lockdownOnExtremeBlockedPermit = lockdownOnExtremeBlockedPermit
+            self.quarantineFailureGuardThreshold = quarantineFailureGuardThreshold
+            self.criticalThermalMode = criticalThermalMode ?? (recoveryOnCriticalThermal ? .recovery : .guard)
+            self.lowRiskBackgroundMode = lowRiskBackgroundMode
+            self.lowRiskProtectedMode = lowRiskProtectedMode
+            self.lowRiskUrgentMode = lowRiskUrgentMode
+            self.lowRiskDefaultMode = lowRiskDefaultMode
+            self.mediumRiskProtectedDeepLoopMode = mediumRiskProtectedDeepLoopMode
+            self.mediumRiskReflectiveMode = mediumRiskReflectiveMode
+            self.mediumRiskDefaultMode = mediumRiskDefaultMode
+            self.highRiskMode = highRiskMode
+            self.extremeRiskMode = extremeRiskMode ?? (lockdownOnExtremeBlockedPermit ? .lockdown : .guard)
+            self.recoveryMode = recoveryMode
+            self.quarantineMode = quarantineMode
+            self.runModeRules = runModeRules
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let backgroundPulseEnabled = try container.decode(Bool.self, forKey: .backgroundPulseEnabled)
+            let recoveryOnCriticalThermal = try container.decode(Bool.self, forKey: .recoveryOnCriticalThermal)
+            let reflectOnTrustDrift = try container.decode(Bool.self, forKey: .reflectOnTrustDrift)
+            let deepLoopOnProtectedBoundary = try container.decode(Bool.self, forKey: .deepLoopOnProtectedBoundary)
+            let lockdownOnExtremeBlockedPermit = try container.decode(Bool.self, forKey: .lockdownOnExtremeBlockedPermit)
+            let quarantineFailureGuardThreshold = try container.decode(Int.self, forKey: .quarantineFailureGuardThreshold)
+
+            self.init(
+                backgroundPulseEnabled: backgroundPulseEnabled,
+                recoveryOnCriticalThermal: recoveryOnCriticalThermal,
+                reflectOnTrustDrift: reflectOnTrustDrift,
+                deepLoopOnProtectedBoundary: deepLoopOnProtectedBoundary,
+                lockdownOnExtremeBlockedPermit: lockdownOnExtremeBlockedPermit,
+                quarantineFailureGuardThreshold: quarantineFailureGuardThreshold,
+                criticalThermalMode: try container.decodeIfPresent(BASEBrainRunMode.self, forKey: .criticalThermalMode),
+                lowRiskBackgroundMode: try container.decodeIfPresent(BASEBrainRunMode.self, forKey: .lowRiskBackgroundMode) ?? .pulse,
+                lowRiskProtectedMode: try container.decodeIfPresent(BASEBrainRunMode.self, forKey: .lowRiskProtectedMode) ?? .engage,
+                lowRiskUrgentMode: try container.decodeIfPresent(BASEBrainRunMode.self, forKey: .lowRiskUrgentMode) ?? .engage,
+                lowRiskDefaultMode: try container.decodeIfPresent(BASEBrainRunMode.self, forKey: .lowRiskDefaultMode) ?? .sentinel,
+                mediumRiskProtectedDeepLoopMode: try container.decodeIfPresent(BASEBrainRunMode.self, forKey: .mediumRiskProtectedDeepLoopMode) ?? .deepLoop,
+                mediumRiskReflectiveMode: try container.decodeIfPresent(BASEBrainRunMode.self, forKey: .mediumRiskReflectiveMode) ?? .reflect,
+                mediumRiskDefaultMode: try container.decodeIfPresent(BASEBrainRunMode.self, forKey: .mediumRiskDefaultMode) ?? .engage,
+                highRiskMode: try container.decodeIfPresent(BASEBrainRunMode.self, forKey: .highRiskMode) ?? .guard,
+                extremeRiskMode: try container.decodeIfPresent(BASEBrainRunMode.self, forKey: .extremeRiskMode),
+                recoveryMode: try container.decodeIfPresent(BASEBrainRunMode.self, forKey: .recoveryMode) ?? .recovery,
+                quarantineMode: try container.decodeIfPresent(BASEBrainRunMode.self, forKey: .quarantineMode) ?? .quarantine,
+                runModeRules: try container.decodeIfPresent([RunModeTransitionRule].self, forKey: .runModeRules)
+            )
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(backgroundPulseEnabled, forKey: .backgroundPulseEnabled)
+            try container.encode(recoveryOnCriticalThermal, forKey: .recoveryOnCriticalThermal)
+            try container.encode(reflectOnTrustDrift, forKey: .reflectOnTrustDrift)
+            try container.encode(deepLoopOnProtectedBoundary, forKey: .deepLoopOnProtectedBoundary)
+            try container.encode(lockdownOnExtremeBlockedPermit, forKey: .lockdownOnExtremeBlockedPermit)
+            try container.encode(quarantineFailureGuardThreshold, forKey: .quarantineFailureGuardThreshold)
+            try container.encode(criticalThermalMode, forKey: .criticalThermalMode)
+            try container.encode(lowRiskBackgroundMode, forKey: .lowRiskBackgroundMode)
+            try container.encode(lowRiskProtectedMode, forKey: .lowRiskProtectedMode)
+            try container.encode(lowRiskUrgentMode, forKey: .lowRiskUrgentMode)
+            try container.encode(lowRiskDefaultMode, forKey: .lowRiskDefaultMode)
+            try container.encode(mediumRiskProtectedDeepLoopMode, forKey: .mediumRiskProtectedDeepLoopMode)
+            try container.encode(mediumRiskReflectiveMode, forKey: .mediumRiskReflectiveMode)
+            try container.encode(mediumRiskDefaultMode, forKey: .mediumRiskDefaultMode)
+            try container.encode(highRiskMode, forKey: .highRiskMode)
+            try container.encode(extremeRiskMode, forKey: .extremeRiskMode)
+            try container.encode(recoveryMode, forKey: .recoveryMode)
+            try container.encode(quarantineMode, forKey: .quarantineMode)
+            try container.encodeIfPresent(runModeRules, forKey: .runModeRules)
+        }
+
+        public var requiredRunModeRuleIDs: Set<String> {
+            [
+                "thermal.critical",
+                "state.quarantine",
+                "state.recovery",
+                "risk.low.default",
+                "risk.medium.default",
+                "risk.high.default",
+                "risk.extreme.default"
+            ]
+        }
+
+        public func missingRequiredRunModeRuleIDs() -> [String] {
+            let declaredRuleIDs = Set((runModeRules ?? []).map(\.ruleID))
+            return requiredRunModeRuleIDs.subtracting(declaredRuleIDs).sorted()
+        }
+
+        public func resolvedRunModeRules(
+            wakeIntent: WakeIntentTuning
+        ) -> [RunModeTransitionRule] {
+            runModeRules ?? synthesizedRunModeRules(wakeIntent: wakeIntent)
+        }
+
+        func resolvedRunMode(
+            for context: BASRunModeTransitionContext,
+            wakeIntent: WakeIntentTuning
+        ) -> BASEBrainRunMode {
+            if let matchedRule = resolvedRunModeRules(wakeIntent: wakeIntent).first(where: { $0.matches(context) }) {
+                return matchedRule.resultMode
+            }
+
+            return quarantineMode
+        }
+
+        private func synthesizedRunModeRules(
+            wakeIntent: WakeIntentTuning
+        ) -> [RunModeTransitionRule] {
+            var rules: [RunModeTransitionRule] = [
+                .init(
+                    ruleID: "thermal.critical",
+                    resultMode: criticalThermalMode,
+                    thermalLevels: [.critical]
+                ),
+                .init(
+                    ruleID: "state.quarantine",
+                    resultMode: quarantineMode,
+                    requiresQuarantine: true
+                ),
+                .init(
+                    ruleID: "state.recovery",
+                    resultMode: recoveryMode,
+                    requiresRecovery: true
+                )
+            ]
+
+            if backgroundPulseEnabled {
+                rules.append(
+                    .init(
+                        ruleID: "risk.low.background_pulse",
+                        resultMode: lowRiskBackgroundMode,
+                        riskLevels: [.low],
+                        foregroundStates: [.background, .suspended],
+                        urgencyDetected: false,
+                        minimumBatteryLevel: wakeIntent.pulseBatteryFloor
+                    )
+                )
+            }
+
+            rules.append(
+                .init(
+                    ruleID: "risk.low.protected",
+                    resultMode: lowRiskProtectedMode,
+                    riskLevels: [.low],
+                    requiresGuardedBudget: true
+                )
+            )
+            rules.append(
+                .init(
+                    ruleID: "risk.low.urgent",
+                    resultMode: lowRiskUrgentMode,
+                    riskLevels: [.low],
+                    requiresGuardedBudget: false,
+                    urgencyDetected: true
+                )
+            )
+            rules.append(
+                .init(
+                    ruleID: "risk.low.default",
+                    resultMode: lowRiskDefaultMode,
+                    riskLevels: [.low],
+                    requiresGuardedBudget: false,
+                    urgencyDetected: false
+                )
+            )
+
+            if deepLoopOnProtectedBoundary {
+                rules.append(
+                    .init(
+                        ruleID: "risk.medium.protected_deep_loop",
+                        resultMode: mediumRiskProtectedDeepLoopMode,
+                        riskLevels: [.medium],
+                        requiresGuardedBudget: true,
+                        deepLoopCueDetected: true
+                    )
+                )
+            }
+
+            rules.append(
+                .init(
+                    ruleID: "risk.medium.reflective_cue",
+                    resultMode: mediumRiskReflectiveMode,
+                    riskLevels: [.medium],
+                    reflectiveCueDetected: true
+                )
+            )
+
+            if reflectOnTrustDrift {
+                rules.append(
+                    .init(
+                        ruleID: "risk.medium.guarded_reflect",
+                        resultMode: mediumRiskReflectiveMode,
+                        riskLevels: [.medium],
+                        requiresGuardedBudget: true
+                    )
+                )
+            }
+
+            rules.append(
+                .init(
+                    ruleID: "risk.medium.default",
+                    resultMode: mediumRiskDefaultMode,
+                    riskLevels: [.medium]
+                )
+            )
+            rules.append(
+                .init(
+                    ruleID: "risk.high.default",
+                    resultMode: highRiskMode,
+                    riskLevels: [.high]
+                )
+            )
+            rules.append(
+                .init(
+                    ruleID: "risk.extreme.default",
+                    resultMode: extremeRiskMode,
+                    riskLevels: [.extreme]
+                )
+            )
+            return rules
+        }
+
+        public static let generic = StateTransitionTuning(
+            backgroundPulseEnabled: true,
+            recoveryOnCriticalThermal: true,
+            reflectOnTrustDrift: true,
+            deepLoopOnProtectedBoundary: true,
+            lockdownOnExtremeBlockedPermit: true,
+            quarantineFailureGuardThreshold: 2
+        )
+    }
+
+    public struct LeaseTuning: Codable, Equatable, Sendable {
+        public var deepLoopDurationMs: Int
+        public var protectedDurationMs: Int
+        public var restrictedDurationMs: Int
+        public var standardEnergyQuota: Double
+        public var restrictedEnergyQuota: Double
+
+        public init(
+            deepLoopDurationMs: Int,
+            protectedDurationMs: Int,
+            restrictedDurationMs: Int,
+            standardEnergyQuota: Double,
+            restrictedEnergyQuota: Double
+        ) {
+            self.deepLoopDurationMs = deepLoopDurationMs
+            self.protectedDurationMs = protectedDurationMs
+            self.restrictedDurationMs = restrictedDurationMs
+            self.standardEnergyQuota = standardEnergyQuota
+            self.restrictedEnergyQuota = restrictedEnergyQuota
+        }
+
+        public static let generic = LeaseTuning(
+            deepLoopDurationMs: 1_800,
+            protectedDurationMs: 1_200,
+            restrictedDurationMs: 900,
+            standardEnergyQuota: 0.74,
+            restrictedEnergyQuota: 0.48
+        )
+    }
+
+    public struct MaintenanceTuning: Codable, Equatable, Sendable {
+        public var lightBatteryFloor: Double
+        public var standardBatteryFloor: Double
+        public var allowedThermalLevels: [BASThermalLevel]
+        public var blockedForegroundStates: [BASForegroundState]
+        public var lightweightAllowedClass: BASMaintenanceClass
+        public var lightweightDeferredClass: BASMaintenanceClass
+        public var activeRunModeClass: BASMaintenanceClass
+        public var restrictedRunModeClass: BASMaintenanceClass
+
+        private enum CodingKeys: String, CodingKey {
+            case lightBatteryFloor
+            case standardBatteryFloor
+            case allowedThermalLevels
+            case blockedForegroundStates
+            case lightweightAllowedClass
+            case lightweightDeferredClass
+            case activeRunModeClass
+            case restrictedRunModeClass
+        }
+
+        public init(
+            lightBatteryFloor: Double,
+            standardBatteryFloor: Double,
+            allowedThermalLevels: [BASThermalLevel] = [.nominal],
+            blockedForegroundStates: [BASForegroundState] = [.foreground],
+            lightweightAllowedClass: BASMaintenanceClass = .light,
+            lightweightDeferredClass: BASMaintenanceClass = .deferred,
+            activeRunModeClass: BASMaintenanceClass = .none,
+            restrictedRunModeClass: BASMaintenanceClass = .none
+        ) {
+            self.lightBatteryFloor = lightBatteryFloor
+            self.standardBatteryFloor = standardBatteryFloor
+            self.allowedThermalLevels = allowedThermalLevels
+            self.blockedForegroundStates = blockedForegroundStates
+            self.lightweightAllowedClass = lightweightAllowedClass
+            self.lightweightDeferredClass = lightweightDeferredClass
+            self.activeRunModeClass = activeRunModeClass
+            self.restrictedRunModeClass = restrictedRunModeClass
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.init(
+                lightBatteryFloor: try container.decode(Double.self, forKey: .lightBatteryFloor),
+                standardBatteryFloor: try container.decode(Double.self, forKey: .standardBatteryFloor),
+                allowedThermalLevels: try container.decode([BASThermalLevel].self, forKey: .allowedThermalLevels),
+                blockedForegroundStates: try container.decode([BASForegroundState].self, forKey: .blockedForegroundStates),
+                lightweightAllowedClass: try container.decodeIfPresent(BASMaintenanceClass.self, forKey: .lightweightAllowedClass) ?? .light,
+                lightweightDeferredClass: try container.decodeIfPresent(BASMaintenanceClass.self, forKey: .lightweightDeferredClass) ?? .deferred,
+                activeRunModeClass: try container.decodeIfPresent(BASMaintenanceClass.self, forKey: .activeRunModeClass) ?? .none,
+                restrictedRunModeClass: try container.decodeIfPresent(BASMaintenanceClass.self, forKey: .restrictedRunModeClass) ?? .none
+            )
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(lightBatteryFloor, forKey: .lightBatteryFloor)
+            try container.encode(standardBatteryFloor, forKey: .standardBatteryFloor)
+            try container.encode(allowedThermalLevels, forKey: .allowedThermalLevels)
+            try container.encode(blockedForegroundStates, forKey: .blockedForegroundStates)
+            try container.encode(lightweightAllowedClass, forKey: .lightweightAllowedClass)
+            try container.encode(lightweightDeferredClass, forKey: .lightweightDeferredClass)
+            try container.encode(activeRunModeClass, forKey: .activeRunModeClass)
+            try container.encode(restrictedRunModeClass, forKey: .restrictedRunModeClass)
+        }
+
+        public static let generic = MaintenanceTuning(
+            lightBatteryFloor: 0.22,
+            standardBatteryFloor: 0.35,
+            allowedThermalLevels: [.nominal],
+            blockedForegroundStates: [.foreground]
+        )
+    }
+
+    public struct SovereignExecutionTuning: Codable, Equatable, Sendable {
+        public var toolCutOnBlockedPermit: Bool
+        public var memoryFreezeOnReviewedWrites: Bool
+        public var guardShiftOnHighRisk: Bool
+        public var deadStopOnExtremeBlockedPermit: Bool
+
+        public init(
+            toolCutOnBlockedPermit: Bool,
+            memoryFreezeOnReviewedWrites: Bool,
+            guardShiftOnHighRisk: Bool,
+            deadStopOnExtremeBlockedPermit: Bool
+        ) {
+            self.toolCutOnBlockedPermit = toolCutOnBlockedPermit
+            self.memoryFreezeOnReviewedWrites = memoryFreezeOnReviewedWrites
+            self.guardShiftOnHighRisk = guardShiftOnHighRisk
+            self.deadStopOnExtremeBlockedPermit = deadStopOnExtremeBlockedPermit
+        }
+
+        public static let generic = SovereignExecutionTuning(
+            toolCutOnBlockedPermit: true,
+            memoryFreezeOnReviewedWrites: true,
+            guardShiftOnHighRisk: true,
+            deadStopOnExtremeBlockedPermit: true
+        )
+    }
+
+    public struct HostThresholdTuning: Codable, Equatable, Sendable {
+        public var caution: Double
+        public var protective: Double
+        public var block: Double
+
+        public init(
+            caution: Double,
+            protective: Double,
+            block: Double
+        ) {
+            self.caution = caution
+            self.protective = protective
+            self.block = block
+        }
+    }
+
+    public struct ContextTuning: Codable, Equatable, Sendable {
+        public var trustInstabilityIncrement: Double
+        public var guardedPressureIncrement: Double
+        public var emotionalLoadHighRisk: Double
+        public var emotionalLoadReflective: Double
+        public var emotionalLoadDefault: Double
+        public var emotionalLoadDriftingIncrement: Double
+        public var timePressureReopen: Double
+        public var timePressureUrgent: Double
+        public var timePressureDefault: Double
+        public var ambiguityComparative: Double
+        public var ambiguityDefault: Double
+        public var consequenceHigh: Double
+        public var consequenceMedium: Double
+        public var consequenceLow: Double
+
+        public init(
+            trustInstabilityIncrement: Double,
+            guardedPressureIncrement: Double,
+            emotionalLoadHighRisk: Double,
+            emotionalLoadReflective: Double,
+            emotionalLoadDefault: Double,
+            emotionalLoadDriftingIncrement: Double,
+            timePressureReopen: Double,
+            timePressureUrgent: Double,
+            timePressureDefault: Double,
+            ambiguityComparative: Double,
+            ambiguityDefault: Double,
+            consequenceHigh: Double,
+            consequenceMedium: Double,
+            consequenceLow: Double
+        ) {
+            self.trustInstabilityIncrement = trustInstabilityIncrement
+            self.guardedPressureIncrement = guardedPressureIncrement
+            self.emotionalLoadHighRisk = emotionalLoadHighRisk
+            self.emotionalLoadReflective = emotionalLoadReflective
+            self.emotionalLoadDefault = emotionalLoadDefault
+            self.emotionalLoadDriftingIncrement = emotionalLoadDriftingIncrement
+            self.timePressureReopen = timePressureReopen
+            self.timePressureUrgent = timePressureUrgent
+            self.timePressureDefault = timePressureDefault
+            self.ambiguityComparative = ambiguityComparative
+            self.ambiguityDefault = ambiguityDefault
+            self.consequenceHigh = consequenceHigh
+            self.consequenceMedium = consequenceMedium
+            self.consequenceLow = consequenceLow
+        }
+
+        public static let generic = ContextTuning(
+            trustInstabilityIncrement: 0.12,
+            guardedPressureIncrement: 0.10,
+            emotionalLoadHighRisk: 0.72,
+            emotionalLoadReflective: 0.46,
+            emotionalLoadDefault: 0.30,
+            emotionalLoadDriftingIncrement: 0.08,
+            timePressureReopen: 0.66,
+            timePressureUrgent: 0.74,
+            timePressureDefault: 0.24,
+            ambiguityComparative: 0.42,
+            ambiguityDefault: 0.28,
+            consequenceHigh: 0.84,
+            consequenceMedium: 0.56,
+            consequenceLow: 0.26
+        )
+    }
+
+    public struct TriSelfWeightProfile: Codable, Equatable, Sendable {
+        public var id: Double
+        public var ego: Double
+        public var superego: Double
+
+        public init(
+            id: Double,
+            ego: Double,
+            superego: Double
+        ) {
+            self.id = id
+            self.ego = ego
+            self.superego = superego
+        }
+    }
+
+    public struct TriSelfTuning: Codable, Equatable, Sendable {
+        public var assertiveInitiativeLift: Double
+        public var idCostWeight: Double
+        public var egoReversibilityWeight: Double
+        public var egoConfidenceWeight: Double
+        public var directPathSuperegoPenalty: Double
+        public var reflectiveWeights: TriSelfWeightProfile
+        public var coachingWeights: TriSelfWeightProfile
+        public var protectiveWeights: TriSelfWeightProfile
+
+        public init(
+            assertiveInitiativeLift: Double,
+            idCostWeight: Double,
+            egoReversibilityWeight: Double,
+            egoConfidenceWeight: Double,
+            directPathSuperegoPenalty: Double,
+            reflectiveWeights: TriSelfWeightProfile,
+            coachingWeights: TriSelfWeightProfile,
+            protectiveWeights: TriSelfWeightProfile
+        ) {
+            self.assertiveInitiativeLift = assertiveInitiativeLift
+            self.idCostWeight = idCostWeight
+            self.egoReversibilityWeight = egoReversibilityWeight
+            self.egoConfidenceWeight = egoConfidenceWeight
+            self.directPathSuperegoPenalty = directPathSuperegoPenalty
+            self.reflectiveWeights = reflectiveWeights
+            self.coachingWeights = coachingWeights
+            self.protectiveWeights = protectiveWeights
+        }
+
+        public static let generic = TriSelfTuning(
+            assertiveInitiativeLift: 0.06,
+            idCostWeight: 0.4,
+            egoReversibilityWeight: 0.5,
+            egoConfidenceWeight: 0.5,
+            directPathSuperegoPenalty: 0.45,
+            reflectiveWeights: TriSelfWeightProfile(id: 0.24, ego: 0.34, superego: 0.42),
+            coachingWeights: TriSelfWeightProfile(id: 0.28, ego: 0.38, superego: 0.34),
+            protectiveWeights: TriSelfWeightProfile(id: 0.18, ego: 0.30, superego: 0.52)
+        )
+    }
+
+    public struct RiskTuning: Codable, Equatable, Sendable {
+        public var directCandidateLowReversibilityThreshold: Double
+        public var directCandidatePenalty: Double
+        public var vetoPressureIncrement: Double
+        public var emotionalLoadWeight: Double
+        public var timePressureWeight: Double
+        public var consequenceWeight: Double
+        public var manipulationHintWeight: Double
+        public var critiqueSeverityWeight: Double
+        public var mediumThreshold: Double
+        public var highThreshold: Double
+        public var extremeThreshold: Double
+        public var defaultForecastUncertainty: Double
+        public var defaultCandidateReversibility: Double
+        public var manipulationStrengthUnit: Double
+        public var gsiHintWeight: Double
+        public var gsiTimePressureThreshold: Double
+        public var gsiTimePressureIncrement: Double
+        public var gsiTrustDriftIncrement: Double
+        public var gsiLowTrustAlertIncrement: Double
+
+        public init(
+            directCandidateLowReversibilityThreshold: Double,
+            directCandidatePenalty: Double,
+            vetoPressureIncrement: Double,
+            emotionalLoadWeight: Double,
+            timePressureWeight: Double,
+            consequenceWeight: Double,
+            manipulationHintWeight: Double,
+            critiqueSeverityWeight: Double,
+            mediumThreshold: Double,
+            highThreshold: Double,
+            extremeThreshold: Double,
+            defaultForecastUncertainty: Double,
+            defaultCandidateReversibility: Double,
+            manipulationStrengthUnit: Double,
+            gsiHintWeight: Double,
+            gsiTimePressureThreshold: Double,
+            gsiTimePressureIncrement: Double,
+            gsiTrustDriftIncrement: Double,
+            gsiLowTrustAlertIncrement: Double
+        ) {
+            self.directCandidateLowReversibilityThreshold = directCandidateLowReversibilityThreshold
+            self.directCandidatePenalty = directCandidatePenalty
+            self.vetoPressureIncrement = vetoPressureIncrement
+            self.emotionalLoadWeight = emotionalLoadWeight
+            self.timePressureWeight = timePressureWeight
+            self.consequenceWeight = consequenceWeight
+            self.manipulationHintWeight = manipulationHintWeight
+            self.critiqueSeverityWeight = critiqueSeverityWeight
+            self.mediumThreshold = mediumThreshold
+            self.highThreshold = highThreshold
+            self.extremeThreshold = extremeThreshold
+            self.defaultForecastUncertainty = defaultForecastUncertainty
+            self.defaultCandidateReversibility = defaultCandidateReversibility
+            self.manipulationStrengthUnit = manipulationStrengthUnit
+            self.gsiHintWeight = gsiHintWeight
+            self.gsiTimePressureThreshold = gsiTimePressureThreshold
+            self.gsiTimePressureIncrement = gsiTimePressureIncrement
+            self.gsiTrustDriftIncrement = gsiTrustDriftIncrement
+            self.gsiLowTrustAlertIncrement = gsiLowTrustAlertIncrement
+        }
+
+        public static let generic = RiskTuning(
+            directCandidateLowReversibilityThreshold: 0.5,
+            directCandidatePenalty: 0.12,
+            vetoPressureIncrement: 0.08,
+            emotionalLoadWeight: 0.20,
+            timePressureWeight: 0.15,
+            consequenceWeight: 0.25,
+            manipulationHintWeight: 0.10,
+            critiqueSeverityWeight: 0.20,
+            mediumThreshold: 0.35,
+            highThreshold: 0.65,
+            extremeThreshold: 0.85,
+            defaultForecastUncertainty: 0.22,
+            defaultCandidateReversibility: 0.5,
+            manipulationStrengthUnit: 0.35,
+            gsiHintWeight: 0.26,
+            gsiTimePressureThreshold: 0.6,
+            gsiTimePressureIncrement: 0.12,
+            gsiTrustDriftIncrement: 0.18,
+            gsiLowTrustAlertIncrement: 0.10
+        )
+    }
+
+    public var schemaVersion: String
+    public var guardrailPressure: GuardrailPressureTuning
+    public var budget: BudgetTuning
+    public var wakeIntent: WakeIntentTuning
+    public var stateTransitions: StateTransitionTuning
+    public var lease: LeaseTuning
+    public var maintenance: MaintenanceTuning
+    public var sovereignExecution: SovereignExecutionTuning
+    public var hostThresholds: HostThresholdTuning
+    public var context: ContextTuning
+    public var triSelf: TriSelfTuning
+    public var risk: RiskTuning
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case guardrailPressure
+        case budget
+        case wakeIntent
+        case stateTransitions
+        case lease
+        case maintenance
+        case sovereignExecution
+        case hostThresholds
+        case context
+        case triSelf
+        case risk
+    }
+
+    public init(
+        schemaVersion: String,
+        guardrailPressure: GuardrailPressureTuning,
+        budget: BudgetTuning,
+        wakeIntent: WakeIntentTuning = .generic,
+        stateTransitions: StateTransitionTuning = .generic,
+        lease: LeaseTuning = .generic,
+        maintenance: MaintenanceTuning = .generic,
+        sovereignExecution: SovereignExecutionTuning = .generic,
+        hostThresholds: HostThresholdTuning,
+        context: ContextTuning = .generic,
+        triSelf: TriSelfTuning = .generic,
+        risk: RiskTuning = .generic
+    ) {
+        self.schemaVersion = schemaVersion
+        self.guardrailPressure = guardrailPressure
+        self.budget = budget
+        self.wakeIntent = wakeIntent
+        self.stateTransitions = stateTransitions
+        self.lease = lease
+        self.maintenance = maintenance
+        self.sovereignExecution = sovereignExecution
+        self.hostThresholds = hostThresholds
+        self.context = context
+        self.triSelf = triSelf
+        self.risk = risk
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            schemaVersion: try container.decode(String.self, forKey: .schemaVersion),
+            guardrailPressure: try container.decode(GuardrailPressureTuning.self, forKey: .guardrailPressure),
+            budget: try container.decode(BudgetTuning.self, forKey: .budget),
+            wakeIntent: try container.decode(WakeIntentTuning.self, forKey: .wakeIntent),
+            stateTransitions: try container.decode(StateTransitionTuning.self, forKey: .stateTransitions),
+            lease: try container.decode(LeaseTuning.self, forKey: .lease),
+            maintenance: try container.decode(MaintenanceTuning.self, forKey: .maintenance),
+            sovereignExecution: try container.decode(SovereignExecutionTuning.self, forKey: .sovereignExecution),
+            hostThresholds: try container.decode(HostThresholdTuning.self, forKey: .hostThresholds),
+            context: try container.decode(ContextTuning.self, forKey: .context),
+            triSelf: try container.decode(TriSelfTuning.self, forKey: .triSelf),
+            risk: try container.decode(RiskTuning.self, forKey: .risk)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(guardrailPressure, forKey: .guardrailPressure)
+        try container.encode(budget, forKey: .budget)
+        try container.encode(wakeIntent, forKey: .wakeIntent)
+        try container.encode(stateTransitions, forKey: .stateTransitions)
+        try container.encode(lease, forKey: .lease)
+        try container.encode(maintenance, forKey: .maintenance)
+        try container.encode(sovereignExecution, forKey: .sovereignExecution)
+        try container.encode(hostThresholds, forKey: .hostThresholds)
+        try container.encode(context, forKey: .context)
+        try container.encode(triSelf, forKey: .triSelf)
+        try container.encode(risk, forKey: .risk)
+    }
+
+    public func withSchemaVersion(_ schemaVersion: String) -> BASEBrainRuntimeSynthesisPolicy {
+        var copy = self
+        copy.schemaVersion = schemaVersion
+        return copy
+    }
+
+    public var compiledGenericFamilyIDs: [String] {
+        var families: [String] = []
+        if wakeIntent == .generic {
+            families.append("wakeIntent")
+        }
+        if stateTransitions == .generic {
+            families.append("stateTransitions")
+        }
+        if lease == .generic {
+            families.append("lease")
+        }
+        if maintenance == .generic {
+            families.append("maintenance")
+        }
+        if sovereignExecution == .generic {
+            families.append("sovereignExecution")
+        }
+        if context == .generic {
+            families.append("context")
+        }
+        if triSelf == .generic {
+            families.append("triSelf")
+        }
+        if risk == .generic {
+            families.append("risk")
+        }
+        return families
+    }
+
+    public var compiledPlannerFallbackComponentIDs: [String] {
+        var components: [String] = []
+
+        if budget.runModeProfilesByID == nil {
+            components.append("budget.runModeProfilesByID")
+        } else {
+            components.append(
+                contentsOf: budget.missingRequiredRunModeProfileIDs.map { "budget.runModeProfilesByID.\($0)" }
+            )
+            components.append(
+                contentsOf: budget.incompleteRunModeProfileIDs.map { "budget.runModeProfilesByID.\($0)" }
+            )
+        }
+
+        if let runModeRules = stateTransitions.runModeRules {
+            if runModeRules.isEmpty {
+                components.append("stateTransitions.runModeRules")
+            } else {
+                components.append(
+                    contentsOf: stateTransitions
+                        .missingRequiredRunModeRuleIDs()
+                        .map { "stateTransitions.runModeRules.\($0)" }
+                )
+            }
+        } else {
+            components.append("stateTransitions.runModeRules")
+        }
+
+        return components
+    }
+
+    public var compiledFallbackComponentIDs: [String] {
+        var components = compiledGenericFamilyIDs
+        components.append(contentsOf: compiledPlannerFallbackComponentIDs)
+        return components
+    }
+
+    public var usesCompiledFallbackEnvelope: Bool {
+        self == .generic || self == .missing || compiledFallbackComponentIDs.isEmpty == false
+    }
+
+    public static let generic = BASEBrainRuntimeSynthesisPolicy(
+        schemaVersion: "host.runtime-synthesis.v1",
+        guardrailPressure: GuardrailPressureTuning(
+            protectiveBoundaryIncrement: 0.18,
+            calibrationWatchIncrement: 0.10,
+            calibrationDriftingIncrement: 0.18,
+            boundaryConstraintUnit: 0.03,
+            boundaryConstraintCap: 0.18,
+            calibrationAlertUnit: 0.03,
+            calibrationAlertCap: 0.15,
+            failureGuardUnit: 0.02,
+            failureGuardCap: 0.12,
+            riskFlagUnit: 0.035,
+            riskFlagCap: 0.14,
+            maximumPressure: 0.65
+        ),
+        budget: BudgetTuning(
+            standardDecodeTokens: 160,
+            unstableDecodeTokens: 192,
+            guardedDecodeTokens: 220,
+            maintenanceBatteryFloor: 0.35,
+            runModeProfilesByID: BudgetTuning(
+                standardDecodeTokens: 160,
+                unstableDecodeTokens: 192,
+                guardedDecodeTokens: 220,
+                maintenanceBatteryFloor: 0.35
+            ).resolvedRunModeProfilesByID()
+        ),
+        wakeIntent: .generic,
+        stateTransitions: .generic,
+        lease: .generic,
+        maintenance: .generic,
+        sovereignExecution: .generic,
+        hostThresholds: HostThresholdTuning(
+            caution: 0.45,
+            protective: 0.72,
+            block: 0.92
+        ),
+        context: .generic,
+        triSelf: .generic,
+        risk: .generic
+    )
+
+    public static let missing: BASEBrainRuntimeSynthesisPolicy = {
+        var policy = BASEBrainRuntimeSynthesisPolicy.generic
+        policy.schemaVersion = "host.runtime-synthesis.missing.v1"
+        return policy
+    }()
+}
+
+public struct BASEBrainRuntimeSynthesisPolicyRegistry: Codable, Equatable, Sendable {
+    public var schemaVersion: String
+    public var defaultPolicyID: String
+    public var policiesByID: [String: BASEBrainRuntimeSynthesisPolicy]
+
+    public init(
+        schemaVersion: String,
+        defaultPolicyID: String,
+        policiesByID: [String: BASEBrainRuntimeSynthesisPolicy]
+    ) {
+        self.schemaVersion = schemaVersion
+        self.defaultPolicyID = defaultPolicyID
+        self.policiesByID = policiesByID
+    }
+
+    public func policyIfAvailable(
+        for policyID: String? = nil
+    ) -> BASEBrainRuntimeSynthesisPolicy? {
+        if let policyID {
+            return policiesByID[policyID]
+        }
+
+        return policiesByID[defaultPolicyID]
+    }
+
+    public func policy(for policyID: String? = nil) -> BASEBrainRuntimeSynthesisPolicy {
+        policyIfAvailable(for: policyID) ?? .missing
+    }
+}
+
+public struct BASEBrainRuntimeSynthesisPolicySource: Codable, Equatable, Sendable {
+    public var registry: BASEBrainRuntimeSynthesisPolicyRegistry
+    public var policyID: String?
+
+    public init(
+        registry: BASEBrainRuntimeSynthesisPolicyRegistry,
+        policyID: String? = nil
+    ) {
+        self.registry = registry
+        self.policyID = policyID
+    }
+
+    public var registryVersion: String {
+        registry.schemaVersion
+    }
+
+    public var resolvedPolicy: BASEBrainRuntimeSynthesisPolicy {
+        registry.policy(for: policyID)
+    }
+
+    public var resolvedPolicyIfAvailable: BASEBrainRuntimeSynthesisPolicy? {
+        registry.policyIfAvailable(for: policyID)
+    }
+}
+
 public struct BASHostConfiguration: Codable, Equatable, Sendable {
+    public enum ControlPlaneIssue: String, Codable, Equatable, Sendable {
+        case missingRuntimePolicyLineage = "missing_runtime_policy_lineage"
+        case compiledDefaultDeviceState = "compiled_default_device_state"
+        case compiledRuntimeTuning = "compiled_runtime_tuning"
+        case compiledHostRhythmProfile = "compiled_host_rhythm_profile"
+    }
+
+    public enum ControlPlaneExecutionDisposition: String, Codable, Equatable, Sendable {
+        case normal
+        case recovery
+        case quarantine
+    }
+
     public var runtimeProfileID: String
     public var policyProfileID: String
     public var prefersPureLocal: Bool
+    public var defaultDeviceState: BASDeviceState
     public var console: BASHostConsoleConfiguration
     public var lifecycleBehavior: BASHostLifecycleBehaviorConfiguration
     public var workflowBehavior: BASHostWorkflowBehaviorConfiguration
     public var cognitionBehavior: BASHostCognitionBehaviorConfiguration
     public var presentation: BASHostPresentationConfiguration
+    public var runtimeTuning: BASEBrainRuntimeSynthesisPolicy
+    public var runtimePolicyLineage: BASRuntimePolicyLineage?
+    public var hostRhythmProfile: BASHostRhythmProfile
+    public var hostConstitution: BASHostConstitution?
+    public var hostConstitutionVault: BASHostConstitutionVault?
+    public var hostVersionTree: BASHostVersionTree?
+    public var hostForgetRequest: BASForgetRequest?
+
+    private enum CodingKeys: String, CodingKey {
+        case runtimeProfileID
+        case policyProfileID
+        case prefersPureLocal
+        case defaultDeviceState
+        case console
+        case lifecycleBehavior
+        case workflowBehavior
+        case cognitionBehavior
+        case presentation
+        case runtimeTuning
+        case runtimePolicyLineage
+        case hostRhythmProfile
+        case hostConstitution
+        case hostConstitutionVault
+        case hostVersionTree
+        case hostForgetRequest
+    }
 
     public init(
         runtimeProfileID: String,
         policyProfileID: String,
         prefersPureLocal: Bool,
+        defaultDeviceState: BASDeviceState = BASHostConfiguration.genericDefaultDeviceState,
         console: BASHostConsoleConfiguration,
         lifecycleBehavior: BASHostLifecycleBehaviorConfiguration,
         workflowBehavior: BASHostWorkflowBehaviorConfiguration,
         cognitionBehavior: BASHostCognitionBehaviorConfiguration,
-        presentation: BASHostPresentationConfiguration
+        presentation: BASHostPresentationConfiguration,
+        runtimeTuning: BASEBrainRuntimeSynthesisPolicy = .generic,
+        runtimePolicyLineage: BASRuntimePolicyLineage? = nil,
+        hostRhythmProfile: BASHostRhythmProfile = .generic,
+        hostConstitution: BASHostConstitution? = nil,
+        hostConstitutionVault: BASHostConstitutionVault? = nil,
+        hostVersionTree: BASHostVersionTree? = nil,
+        hostForgetRequest: BASForgetRequest? = nil
     ) {
         self.runtimeProfileID = runtimeProfileID
         self.policyProfileID = policyProfileID
         self.prefersPureLocal = prefersPureLocal
+        self.defaultDeviceState = defaultDeviceState
         self.console = console
         self.lifecycleBehavior = lifecycleBehavior
         self.workflowBehavior = workflowBehavior
         self.cognitionBehavior = cognitionBehavior
         self.presentation = presentation
+        self.runtimeTuning = runtimeTuning
+        self.runtimePolicyLineage = runtimePolicyLineage
+        self.hostRhythmProfile = hostRhythmProfile
+        self.hostConstitution = hostConstitution
+        self.hostConstitutionVault = hostConstitutionVault
+        self.hostVersionTree = hostVersionTree
+        self.hostForgetRequest = hostForgetRequest
     }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let runtimeProfileID = try container.decode(String.self, forKey: .runtimeProfileID)
+        let policyProfileID = try container.decode(String.self, forKey: .policyProfileID)
+        let prefersPureLocal = try container.decode(Bool.self, forKey: .prefersPureLocal)
+        let runtimePolicyLineage = try container.decodeIfPresent(
+            BASRuntimePolicyLineage.self,
+            forKey: .runtimePolicyLineage
+        )
+        let defaultDeviceState: BASDeviceState
+        let runtimeTuning: BASEBrainRuntimeSynthesisPolicy
+        let hostRhythmProfile: BASHostRhythmProfile
+        let requiresExplicitControlPlaneFields: Bool
+
+        if runtimePolicyLineage != nil {
+            requiresExplicitControlPlaneFields = true
+        } else {
+            let containsExplicitControlPlaneFields = container.contains(.defaultDeviceState) ||
+                container.contains(.runtimeTuning) ||
+                container.contains(.hostRhythmProfile)
+            let generic = BASHostConfiguration.generic
+            let matchesLegacyGenericCompatibilityShell =
+                runtimeProfileID == generic.runtimeProfileID &&
+                policyProfileID == generic.policyProfileID &&
+                prefersPureLocal == generic.prefersPureLocal
+            requiresExplicitControlPlaneFields =
+                containsExplicitControlPlaneFields || !matchesLegacyGenericCompatibilityShell
+        }
+
+        if requiresExplicitControlPlaneFields {
+            defaultDeviceState = try container.decode(BASDeviceState.self, forKey: .defaultDeviceState)
+            runtimeTuning = try container.decode(BASEBrainRuntimeSynthesisPolicy.self, forKey: .runtimeTuning)
+            hostRhythmProfile = try container.decode(BASHostRhythmProfile.self, forKey: .hostRhythmProfile)
+        } else {
+            defaultDeviceState = BASHostConfiguration.genericDefaultDeviceState
+            runtimeTuning = .generic
+            hostRhythmProfile = .generic
+        }
+
+        self.init(
+            runtimeProfileID: runtimeProfileID,
+            policyProfileID: policyProfileID,
+            prefersPureLocal: prefersPureLocal,
+            defaultDeviceState: defaultDeviceState,
+            console: try container.decode(BASHostConsoleConfiguration.self, forKey: .console),
+            lifecycleBehavior: try container.decode(BASHostLifecycleBehaviorConfiguration.self, forKey: .lifecycleBehavior),
+            workflowBehavior: try container.decode(BASHostWorkflowBehaviorConfiguration.self, forKey: .workflowBehavior),
+            cognitionBehavior: try container.decode(BASHostCognitionBehaviorConfiguration.self, forKey: .cognitionBehavior),
+            presentation: try container.decode(BASHostPresentationConfiguration.self, forKey: .presentation),
+            runtimeTuning: runtimeTuning,
+            runtimePolicyLineage: runtimePolicyLineage,
+            hostRhythmProfile: hostRhythmProfile,
+            hostConstitution: try container.decodeIfPresent(BASHostConstitution.self, forKey: .hostConstitution),
+            hostConstitutionVault: try container.decodeIfPresent(BASHostConstitutionVault.self, forKey: .hostConstitutionVault),
+            hostVersionTree: try container.decodeIfPresent(BASHostVersionTree.self, forKey: .hostVersionTree),
+            hostForgetRequest: try container.decodeIfPresent(BASForgetRequest.self, forKey: .hostForgetRequest)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(runtimeProfileID, forKey: .runtimeProfileID)
+        try container.encode(policyProfileID, forKey: .policyProfileID)
+        try container.encode(prefersPureLocal, forKey: .prefersPureLocal)
+        try container.encode(defaultDeviceState, forKey: .defaultDeviceState)
+        try container.encode(console, forKey: .console)
+        try container.encode(lifecycleBehavior, forKey: .lifecycleBehavior)
+        try container.encode(workflowBehavior, forKey: .workflowBehavior)
+        try container.encode(cognitionBehavior, forKey: .cognitionBehavior)
+        try container.encode(presentation, forKey: .presentation)
+        try container.encode(runtimeTuning, forKey: .runtimeTuning)
+        try container.encodeIfPresent(runtimePolicyLineage, forKey: .runtimePolicyLineage)
+        try container.encode(hostRhythmProfile, forKey: .hostRhythmProfile)
+        try container.encodeIfPresent(hostConstitution, forKey: .hostConstitution)
+        try container.encodeIfPresent(hostConstitutionVault, forKey: .hostConstitutionVault)
+        try container.encodeIfPresent(hostVersionTree, forKey: .hostVersionTree)
+        try container.encodeIfPresent(hostForgetRequest, forKey: .hostForgetRequest)
+    }
+
+    public var controlPlaneIssues: [ControlPlaneIssue] {
+        var issues: [ControlPlaneIssue] = []
+
+        if runtimePolicyLineage == nil {
+            issues.append(.missingRuntimePolicyLineage)
+        }
+        if runtimePolicyLineage == nil && defaultDeviceState == BASHostConfiguration.genericDefaultDeviceState {
+            issues.append(.compiledDefaultDeviceState)
+        }
+        if runtimeTuning.usesCompiledFallbackEnvelope {
+            issues.append(.compiledRuntimeTuning)
+        }
+        if runtimePolicyLineage == nil && hostRhythmProfile == .generic {
+            issues.append(.compiledHostRhythmProfile)
+        }
+
+        return issues
+    }
+
+    public var controlPlaneExecutionDisposition: ControlPlaneExecutionDisposition {
+        let issues = controlPlaneIssues
+        guard issues.isEmpty == false else {
+            return .normal
+        }
+
+        if issues.contains(.compiledDefaultDeviceState) ||
+            issues.contains(.compiledRuntimeTuning) ||
+            issues.contains(.compiledHostRhythmProfile) {
+            return .quarantine
+        }
+
+        return .recovery
+    }
+
+    public var controlPlaneReasonCodes: [String] {
+        controlPlaneIssues.map { "control_plane.\($0.rawValue)" }
+    }
+
+    public static let genericDefaultDeviceState = BASDeviceState(
+        batteryLevel: 0.78,
+        thermalLevel: .nominal,
+        memoryFreeMB: 3_072,
+        networkState: .constrained,
+        foregroundState: .foreground,
+        cpuLoad: 0.18,
+        gpuLoad: 0.10,
+        npuAvailable: true,
+        latencyBudgetMs: 1_200
+    )
 
     public static let generic = BASHostConfiguration(
         runtimeProfileID: "host.default-runtime",
         policyProfileID: "host.default-policy",
         prefersPureLocal: true,
+        defaultDeviceState: genericDefaultDeviceState,
         console: .generic,
         lifecycleBehavior: .generic,
         workflowBehavior: .generic,
         cognitionBehavior: .generic,
-        presentation: .generic
+        presentation: .generic,
+        runtimeTuning: .generic,
+        runtimePolicyLineage: nil,
+        hostRhythmProfile: .generic,
+        hostConstitution: nil,
+        hostConstitutionVault: nil,
+        hostVersionTree: nil,
+        hostForgetRequest: nil
     )
 }
 
@@ -1268,13 +3387,92 @@ public struct BASHostInterventionSuggestion: Codable, Equatable, Sendable {
 public struct BASHostRuntime: Sendable {
     public let configuration: BASHostConfiguration
     public let dependencies: BASHostDependencySet
+    public let vitalMonitor: (any BASVitalMonitorServicing)?
 
     public init(
         configuration: BASHostConfiguration,
-        dependencies: BASHostDependencySet = BASHostDependencySet()
+        dependencies: BASHostDependencySet = BASHostDependencySet(),
+        vitalMonitor: (any BASVitalMonitorServicing)? = nil
     ) {
         self.configuration = configuration
         self.dependencies = dependencies
+        self.vitalMonitor = vitalMonitor
+    }
+
+    public func stageHostConstitutionChange(
+        _ candidate: BASHostChangeCandidate,
+        on constitution: BASHostConstitution
+    ) -> BASHostConstitution {
+        constitution.staged(with: candidate)
+    }
+
+    public func approveHostConstitutionChange(
+        _ candidate: BASHostChangeCandidate,
+        on versionTree: BASHostVersionTree
+    ) -> BASHostVersionTree {
+        versionTree.approving(candidate)
+    }
+
+    public func freezeHostConstitutionVersionTree(
+        _ versionTree: BASHostVersionTree,
+        versionID: String
+    ) -> BASHostVersionTree {
+        versionTree.freezing(versionID: versionID)
+    }
+
+    public func thawHostConstitutionVersionTree(
+        _ versionTree: BASHostVersionTree,
+        versionID: String
+    ) -> BASHostVersionTree {
+        versionTree.thawing(versionID: versionID)
+    }
+
+    public func rollbackHostConstitutionVersionTree(
+        _ versionTree: BASHostVersionTree,
+        to versionID: String
+    ) -> BASHostVersionTree {
+        versionTree.rollingBack(to: versionID)
+    }
+
+    public func executeHostForget(
+        _ request: BASForgetRequest,
+        on constitution: BASHostConstitution
+    ) -> BASForgetRequest {
+        request.executingCanonicalCascade()
+    }
+
+    public func applyHostForgetToConstitutionVault(
+        _ request: BASForgetRequest,
+        on vault: BASHostConstitutionVault
+    ) -> BASHostConstitutionVault {
+        vault.applyingForget(request)
+    }
+
+    public func stageHostConstitutionMigration(
+        _ contract: BASHostDeviceMigrationContract,
+        on vault: BASHostConstitutionVault
+    ) -> BASHostConstitutionVault {
+        vault.stagingMigration(contract)
+    }
+
+    public func approveHostConstitutionMigration(
+        _ vault: BASHostConstitutionVault,
+        targetDeviceID: String? = nil
+    ) -> BASHostConstitutionVault {
+        vault.approvingMigration(targetDeviceID: targetDeviceID)
+    }
+
+    public func synchronizeHostConstitutionVault(
+        _ vault: BASHostConstitutionVault,
+        deviceID: String,
+        propagatedRequestIDs: [String] = [],
+        synchronizedAt: Date = .now
+    ) -> BASHostConstitutionVault {
+        vault.synchronizingDevice(
+            deviceID,
+            propagatedRequestIDs: propagatedRequestIDs,
+            synchronizedAt: synchronizedAt
+        )
     }
 
     public func executeLifecyclePhase<Envelope, PendingRequest>(
@@ -1668,11 +3866,23 @@ public struct BASHostRuntime: Sendable {
             reactionWeights: bootstrapped.brainState.reactionWeights,
             activeTemplateIDs: bootstrapped.activeTemplateIDs.map(deterministicUUID(for:)),
             recentFailurePatternIDs: bootstrapped.failureGuardIDs.map(deterministicUUID(for:)),
-            retrievalTags: bootstrapped.brainState.retrievalTags,
-            verificationSnapshot: verificationSnapshot(
-                profile: request.workflowProfile,
-                prompt: request.prompt,
-                riskLevel: request.riskLevel
+            retrievalTags: constitutionAwareRetrievalTags(
+                base: bootstrapped.brainState.retrievalTags,
+                constitution: configuration.hostConstitution,
+                vault: resolvedHostConstitutionVault(constitution: configuration.hostConstitution),
+                versionTree: configuration.hostVersionTree,
+                forgetRequest: configuration.hostForgetRequest
+            ),
+            verificationSnapshot: constitutionAwareVerificationSnapshot(
+                base: verificationSnapshot(
+                    profile: request.workflowProfile,
+                    prompt: request.prompt,
+                    riskLevel: request.riskLevel
+                ),
+                constitution: configuration.hostConstitution,
+                vault: resolvedHostConstitutionVault(constitution: configuration.hostConstitution),
+                versionTree: configuration.hostVersionTree,
+                forgetRequest: configuration.hostForgetRequest
             )
         )
         let currentBrain = makeHostCurrentBrain(
@@ -1708,6 +3918,141 @@ public struct BASHostRuntime: Sendable {
                 eBrainTurn: eBrainTurn
             )
         )
+    }
+
+    private func constitutionAwareRetrievalTags(
+        base: [String],
+        constitution: BASHostConstitution?,
+        vault: BASHostConstitutionVault?,
+        versionTree: BASHostVersionTree?,
+        forgetRequest: BASForgetRequest?
+    ) -> [String] {
+        var tags = base
+        if let constitution {
+            tags += [
+                "constitution:\(constitution.activeVersion)",
+                "constitution_phase:\(constitution.narrativeLoom.currentPhase)",
+                "constitution_value_axes:\(constitution.valueAxes.axes.count)"
+            ]
+        }
+        if let vault {
+            tags += vault.verificationMarkers
+        }
+        if let versionTree {
+            tags += [
+                "constitution_pending:\(versionTree.pendingCandidateIDs.count)",
+                "constitution_frozen:\(versionTree.frozenVersionIDs.count)"
+            ]
+        }
+        if let forgetRequest {
+            tags += [
+                "forget_request:\(forgetRequest.requestID)",
+                "forget_verified:\(forgetRequest.verified)"
+            ]
+            if forgetRequest.executedSteps.contains("checkpoint_exports_revoked") {
+                tags.append("forget_checkpoints_revoked:true")
+            }
+            if forgetRequest.executedSteps.contains("sync_exports_revoked") {
+                tags.append("forget_sync_exports_revoked:true")
+            }
+        }
+        return tags.uniqued()
+    }
+
+    private func constitutionAwareVerificationSnapshot(
+        base: String,
+        constitution: BASHostConstitution?,
+        vault: BASHostConstitutionVault?,
+        versionTree: BASHostVersionTree?,
+        forgetRequest: BASForgetRequest?
+    ) -> String {
+        var segments = [base]
+        if let constitution {
+            segments += [
+                "constitution:\(constitution.activeVersion)",
+                "phase:\(constitution.narrativeLoom.currentPhase)"
+            ]
+        }
+        if let vault {
+            segments += vault.verificationMarkers
+        }
+        if let versionTree {
+            segments += [
+                "pending:\(versionTree.pendingCandidateIDs.count)",
+                "frozen:\(versionTree.frozenVersionIDs.count)"
+            ]
+        }
+        if let forgetRequest {
+            segments += [
+                "forget:\(forgetRequest.requestID)",
+                "forget_verified:\(forgetRequest.verified)"
+            ]
+            if forgetRequest.executedSteps.contains("checkpoint_exports_revoked") {
+                segments.append("forget_checkpoints_revoked:true")
+            }
+            if forgetRequest.executedSteps.contains("sync_exports_revoked") {
+                segments.append("forget_sync_exports_revoked:true")
+            }
+        }
+        return segments.uniqued().joined(separator: "|")
+    }
+
+    private func resolvedHostConstitutionVault(
+        constitution: BASHostConstitution?
+    ) -> BASHostConstitutionVault? {
+        if let hostConstitutionVault = configuration.hostConstitutionVault {
+            guard let constitution else {
+                return hostConstitutionVault
+            }
+            return hostConstitutionVault.reconciling(
+                constitutionSnapshot: constitution,
+                versionTree: configuration.hostVersionTree,
+                forgetRequest: configuration.hostForgetRequest
+            )
+        }
+        guard let constitution else {
+            return nil
+        }
+        return constitution.vaultSnapshot(
+            versionTree: configuration.hostVersionTree,
+            forgetRequest: configuration.hostForgetRequest
+        )
+    }
+
+    private func verificationSnapshot(
+        profile: BASHostWorkflowProfile,
+        prompt: String,
+        riskLevel: BASHostRiskLevel
+    ) -> String {
+        "\(configuration.workflowBehavior.hostNamespace)/\(profile.rawValue)/\(riskLevel.rawValue)/\(fingerprint(for: prompt))"
+    }
+
+    private func hostTags(
+        for profile: BASHostWorkflowProfile,
+        riskLevel: BASHostRiskLevel
+    ) -> [String] {
+        [
+            "profile:\(profile.rawValue)",
+            "risk:\(riskLevel.rawValue)",
+            "source:\(configuration.workflowBehavior.hostNamespace)"
+        ]
+    }
+
+    private func deterministicUUID(for value: String) -> UUID {
+        let digest = SHA256.hash(data: Data(value.utf8))
+        let bytes = Array(digest.prefix(16))
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
+    }
+
+    private func fingerprint(for value: String) -> String {
+        SHA256.hash(data: Data(value.utf8))
+            .compactMap { String(format: "%02x", $0) }
+            .joined()
     }
 
     public func reopen(
@@ -2092,39 +4437,11 @@ public struct BASHostRuntime: Sendable {
         }
     }
 
-    private func verificationSnapshot(
-        profile: BASHostWorkflowProfile,
-        prompt: String,
-        riskLevel: BASHostRiskLevel
-    ) -> String {
-        "\(configuration.workflowBehavior.hostNamespace)/\(profile.rawValue)/\(riskLevel.rawValue)/\(fingerprint(for: prompt))"
-    }
+}
 
-    private func hostTags(
-        for profile: BASHostWorkflowProfile,
-        riskLevel: BASHostRiskLevel
-    ) -> [String] {
-        [
-            "profile:\(profile.rawValue)",
-            "risk:\(riskLevel.rawValue)",
-            "source:\(configuration.workflowBehavior.hostNamespace)"
-        ]
-    }
-
-    private func deterministicUUID(for value: String) -> UUID {
-        let digest = SHA256.hash(data: Data(value.utf8))
-        let bytes = Array(digest.prefix(16))
-        return UUID(uuid: (
-            bytes[0], bytes[1], bytes[2], bytes[3],
-            bytes[4], bytes[5], bytes[6], bytes[7],
-            bytes[8], bytes[9], bytes[10], bytes[11],
-            bytes[12], bytes[13], bytes[14], bytes[15]
-        ))
-    }
-
-    private func fingerprint(for value: String) -> String {
-        SHA256.hash(data: Data(value.utf8))
-            .compactMap { String(format: "%02x", $0) }
-            .joined()
+private extension Sequence where Element == String {
+    func uniqued() -> [String] {
+        var seen = Set<String>()
+        return filter { seen.insert($0).inserted }
     }
 }

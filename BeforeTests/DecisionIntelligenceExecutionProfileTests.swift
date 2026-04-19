@@ -327,6 +327,55 @@ final class DecisionIntelligenceExecutionProfileTests: XCTestCase {
         XCTAssertLessThanOrEqual(adapted.retrievalItemBudget, 3)
     }
 
+    func testAdaptiveStrategyGuardsRetrievalWhenBrainSnapshotShowsHorizonPressure() {
+        let profile = DecisionIntelligenceExecutionProfileResolver.resolve(
+            preferences: assistivePreferences,
+            device: DeviceCapabilitySnapshot(
+                isSimulator: false,
+                supportsMetal: true,
+                supportsCoreMLAcceleration: true,
+                physicalMemoryBytes: 8 * 1_073_741_824,
+                isLowPowerModeEnabled: false
+            ),
+            foundationStatus: unavailableFoundation,
+            gemmaStatus: availableGemma,
+            preferredLanguages: ["en-AU"]
+        )
+
+        let baseStrategy = profile.strategy(for: .mirror)
+        XCTAssertEqual(baseStrategy.retrievalMode, .adaptive)
+
+        let adapted = baseStrategy.adapting(
+            brainState: DecisionBrainState(
+                profileCore: [],
+                activeGoals: [],
+                relevantMemories: [],
+                sessionBiases: [],
+                retrievalTags: ["mirror"],
+                reactionWeights: .defaults(for: .mirror),
+                memoryGovernance: DecisionMemoryGovernanceState(
+                    totalRecordCount: 4,
+                    totalCandidateCount: 3,
+                    pendingCandidateCount: 2,
+                    promotedCandidateCount: 2,
+                    loadedPromotedMemoryCount: 1,
+                    loadedPendingMemoryCount: 0,
+                    deferredCandidateCount: 2,
+                    admittedCandidateCount: 1,
+                    externallyRefreshedCandidateCount: 1,
+                    quarantinedObservationCount: 1,
+                    evidenceCaveatedCandidateCount: 1,
+                    screenedOutMemoryCount: 0,
+                    screenedOutPendingMemoryCount: 0
+                ),
+                loadedAt: .now
+            )
+        )
+
+        XCTAssertEqual(adapted.retrievalMode, .filtered)
+        XCTAssertLessThanOrEqual(adapted.retrievalItemBudget, 2)
+    }
+
     func testAdaptiveStrategyCanShiftResponseLanguageFromBrainStateTags() {
         let profile = DecisionIntelligenceExecutionProfileResolver.resolve(
             preferences: assistivePreferences,

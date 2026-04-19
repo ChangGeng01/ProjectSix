@@ -84,6 +84,16 @@ public struct BASAppleRuntimeInspectionTraceSourceRecordInput: Codable, Sendable
     public var loadedEligibilityReasonCounts: [String: Int]
     public var screenedOutEligibilityReasonCounts: [String: Int]
     public var snapshotFingerprint: String?
+    public var constitutionVersion: String?
+    public var constitutionPhase: String?
+    public var constitutionValueAxisCount: Int?
+    public var forgetRequestID: String?
+    public var forgetVerified: Bool?
+    public var forgetRevokesCheckpoints: Bool?
+    public var vaultConsistencyState: String?
+    public var vaultSyncRevocationCount: Int?
+    public var vaultOutOfSyncDeviceIDs: [String]
+    public var vaultMigrationTargetDeviceID: String?
     public var lowTrustMemoryLoadRate: Double?
     public var riskFlagIDs: [String]
     public var identityRoleID: String?
@@ -130,6 +140,16 @@ public struct BASAppleRuntimeInspectionTraceSourceRecordInput: Codable, Sendable
         loadedEligibilityReasonCounts: [String: Int] = [:],
         screenedOutEligibilityReasonCounts: [String: Int] = [:],
         snapshotFingerprint: String? = nil,
+        constitutionVersion: String? = nil,
+        constitutionPhase: String? = nil,
+        constitutionValueAxisCount: Int? = nil,
+        forgetRequestID: String? = nil,
+        forgetVerified: Bool? = nil,
+        forgetRevokesCheckpoints: Bool? = nil,
+        vaultConsistencyState: String? = nil,
+        vaultSyncRevocationCount: Int? = nil,
+        vaultOutOfSyncDeviceIDs: [String] = [],
+        vaultMigrationTargetDeviceID: String? = nil,
         lowTrustMemoryLoadRate: Double? = nil,
         riskFlagIDs: [String] = [],
         identityRoleID: String? = nil,
@@ -175,6 +195,16 @@ public struct BASAppleRuntimeInspectionTraceSourceRecordInput: Codable, Sendable
         self.loadedEligibilityReasonCounts = loadedEligibilityReasonCounts
         self.screenedOutEligibilityReasonCounts = screenedOutEligibilityReasonCounts
         self.snapshotFingerprint = snapshotFingerprint
+        self.constitutionVersion = constitutionVersion
+        self.constitutionPhase = constitutionPhase
+        self.constitutionValueAxisCount = constitutionValueAxisCount
+        self.forgetRequestID = forgetRequestID
+        self.forgetVerified = forgetVerified
+        self.forgetRevokesCheckpoints = forgetRevokesCheckpoints
+        self.vaultConsistencyState = vaultConsistencyState
+        self.vaultSyncRevocationCount = vaultSyncRevocationCount
+        self.vaultOutOfSyncDeviceIDs = vaultOutOfSyncDeviceIDs
+        self.vaultMigrationTargetDeviceID = vaultMigrationTargetDeviceID
         self.lowTrustMemoryLoadRate = lowTrustMemoryLoadRate
         self.riskFlagIDs = riskFlagIDs
         self.identityRoleID = identityRoleID
@@ -341,7 +371,7 @@ public enum BASAppleRuntimeExportBuilder {
     public static func traceSource(
         from input: BASAppleRuntimeInspectionTraceSourceRecordInput
     ) -> BASAppleRuntimeInspectionTraceSourceInput {
-        BASAppleRuntimeInspectionBuilder.traceSource(
+        return BASAppleRuntimeInspectionBuilder.traceSource(
             from: BASAppleRuntimeInspectionTraceRecordInput(
                 kind: input.kindID,
                 hasContextState: input.hasContextState,
@@ -370,6 +400,16 @@ public enum BASAppleRuntimeExportBuilder {
                 loadedEligibilityReasonCounts: eligibilityReasonCounts(from: input.loadedEligibilityReasonCounts),
                 screenedOutEligibilityReasonCounts: eligibilityReasonCounts(from: input.screenedOutEligibilityReasonCounts),
                 snapshotFingerprint: input.snapshotFingerprint,
+                constitutionVersion: input.constitutionVersion,
+                constitutionPhase: input.constitutionPhase,
+                constitutionValueAxisCount: input.constitutionValueAxisCount,
+                forgetRequestID: input.forgetRequestID,
+                forgetVerified: input.forgetVerified,
+                forgetRevokesCheckpoints: input.forgetRevokesCheckpoints,
+                vaultConsistencyState: input.vaultConsistencyState,
+                vaultSyncRevocationCount: input.vaultSyncRevocationCount,
+                vaultOutOfSyncDeviceIDs: input.vaultOutOfSyncDeviceIDs,
+                vaultMigrationTargetDeviceID: input.vaultMigrationTargetDeviceID,
                 lowTrustMemoryLoadRate: input.lowTrustMemoryLoadRate,
                 riskFlags: input.riskFlagIDs.compactMap(BASBrainStateRiskFlag.init(rawValue:)),
                 identityRole: input.identityRoleID.flatMap(BASIdentityRole.init(rawValue:)),

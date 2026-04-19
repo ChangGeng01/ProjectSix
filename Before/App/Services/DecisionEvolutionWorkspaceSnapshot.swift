@@ -247,6 +247,25 @@ struct DecisionEvolutionWorkspaceSnapshot: Equatable, Sendable {
         facts.killSwitches
     }
 
+    func policy(
+        allowsLocalMutationActions: Bool = false
+    ) -> DecisionEvolutionPolicyOutput {
+        DecisionEvolutionPolicyEngine.evaluate(
+            DecisionEvolutionPolicyEngine.input(
+                workspace: self,
+                allowsLocalMutationActions: allowsLocalMutationActions
+            )
+        )
+    }
+
+    func policy(
+        for contract: DecisionEvolutionSurfaceContract
+    ) -> DecisionEvolutionPolicyOutput {
+        policy(
+            allowsLocalMutationActions: contract.allowsMutations
+        )
+    }
+
     func recoveryPresentation(hasCurrentBrainState: Bool) -> DecisionEvolutionRecoveryPresentation {
         let hasRecoveredLineage = activePresentation?.hasLineage == true
             || reviewPresentation?.hasLineage == true

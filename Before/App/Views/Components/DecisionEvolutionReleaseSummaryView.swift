@@ -214,23 +214,13 @@ struct DecisionEvolutionReleaseSummaryView: View {
             HStack(spacing: 10) {
                 if let rollbackIntent = actionPresentation.rollbackIntent {
                     BeforeActionButton(actionPresentation.rollbackTitle, style: .secondary) {
-                        pendingMutation = PendingMutation(intent: rollbackIntent) {
-                            appModel.rollbackActiveEvolutionCheckpoint(
-                                to: rollbackIntent.preview.targetCheckpointIDs.first
-                            )
-                            afterMutation?()
-                        }
+                        presentMutation(rollbackIntent)
                     }
                 }
 
                 if let approveQueueIntent = actionPresentation.approveQueueIntent {
                     BeforeActionButton(actionPresentation.approveQueueTitle, style: .primary) {
-                        pendingMutation = PendingMutation(intent: approveQueueIntent) {
-                            appModel.approvePendingEvolutionCheckpoints(
-                                checkpointIDs: approveQueueIntent.preview.targetCheckpointIDs
-                            )
-                            afterMutation?()
-                        }
+                        presentMutation(approveQueueIntent)
                     }
                 }
             }
@@ -238,12 +228,7 @@ struct DecisionEvolutionReleaseSummaryView: View {
             if let clearReviewLineageIntent = actionPresentation.clearReviewLineageIntent {
                 HStack(spacing: 10) {
                     BeforeActionButton(actionPresentation.clearReviewLineageTitle, style: .tertiary) {
-                        pendingMutation = PendingMutation(intent: clearReviewLineageIntent) {
-                            appModel.clearPendingEvolutionCheckpointLineages(
-                                checkpointIDs: clearReviewLineageIntent.preview.targetCheckpointIDs
-                            )
-                            afterMutation?()
-                        }
+                        presentMutation(clearReviewLineageIntent)
                     }
                 }
             }
@@ -258,5 +243,12 @@ struct DecisionEvolutionReleaseSummaryView: View {
                 navigationOptions: navigationOptions
             )
         )
+    }
+
+    private func presentMutation(_ intent: DecisionEvolutionMutationIntent) {
+        pendingMutation = PendingMutation(intent: intent) {
+            appModel.performEvolutionMutation(intent)
+            afterMutation?()
+        }
     }
 }

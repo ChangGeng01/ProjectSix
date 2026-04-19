@@ -19,7 +19,7 @@ struct DecisionReplayLineageCardView: View {
                 } else {
                     ForEach(Array(displayedEntries.enumerated()), id: \.offset) { _, presentation in
                         DecisionReplayEntrySummaryView(
-                            title: presentation.title,
+                            cardCopy: presentation.replayCardCopy,
                             presentation: presentation
                         ) {
                             DecisionReplayEntryHeaderRowView(

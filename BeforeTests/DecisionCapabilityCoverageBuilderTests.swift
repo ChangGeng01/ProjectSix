@@ -81,6 +81,58 @@ struct DecisionCapabilityCoverageBuilderTests {
     }
 
     @Test
+    func buildCarriesExecutionCapabilityTierParityFromRuntimeExport() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        seedHistory(into: context)
+        try context.save()
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: DecisionMemorySystem.fetchCheckEvents(in: context),
+            balance: DecisionMemorySystem.fetchBalanceRecords(in: context),
+            mirror: DecisionMemorySystem.fetchMirrorRecords(in: context),
+            preferences: .default
+        )
+
+        let report = DecisionCapabilityCoverageBuilder.build(
+            from: export,
+            currentBrainState: nil
+        )
+
+        #expect(report.executionTierID == export.executionCapabilityFrame.executionTierID)
+        #expect(report.foundationTierID == export.executionCapabilityFrame.foundationTierID)
+        #expect(report.horizonCoverage?.worldPriorID == export.executionCapabilityFrame.worldPriorContract.priorID)
+        #expect(report.horizonCoverage?.worldPriorPostureID == export.executionCapabilityFrame.worldPriorContract.posture.rawValue)
+        #expect(report.horizonCoverage?.worldBoundaryID == export.executionCapabilityFrame.worldPriorContract.boundaryID)
+        #expect(report.horizonCoverage?.hostIsolationID == export.executionCapabilityFrame.worldPriorContract.hostIsolationID)
+        #expect(report.horizonCoverage?.sessionIsolationID == export.executionCapabilityFrame.worldPriorContract.sessionIsolationID)
+        #expect(report.horizonCoverage?.toolTruthModeID == export.executionCapabilityFrame.worldPriorContract.toolTruthModeID)
+        #expect(report.horizonCoverage?.temporalKnowledgeTierID == export.executionCapabilityFrame.temporalKnowledgeContract.tier.rawValue)
+        #expect(report.horizonCoverage?.temporalRefreshRequirementID == export.executionCapabilityFrame.temporalKnowledgeContract.refreshRequirement.rawValue)
+        #expect(report.horizonCoverage?.temporalDecayPolicyID == export.executionCapabilityFrame.temporalKnowledgeContract.decayPolicy.rawValue)
+        #expect(report.horizonCoverage?.temporalTimeScopeID == export.executionCapabilityFrame.temporalKnowledgeContract.timeScope.rawValue)
+        #expect(report.horizonCoverage?.evidenceGradientID == export.executionCapabilityFrame.evidenceContract.gradient.rawValue)
+        #expect(report.horizonCoverage?.evidenceClaimTypeID == export.executionCapabilityFrame.evidenceContract.claimType.rawValue)
+        #expect(report.horizonCoverage?.requiresCaveat == export.executionCapabilityFrame.evidenceContract.requiresCaveat)
+        #expect(report.horizonCoverage?.requiresExternalRefresh == export.executionCapabilityFrame.evidenceContract.requiresExternalRefresh)
+        #expect(report.horizonCoverage?.volatileClaimWriteModeID == export.executionCapabilityFrame.persistenceContract.volatileClaimWriteModeID)
+        #expect(report.horizonCoverage?.contaminatedWriteModeID == export.executionCapabilityFrame.persistenceContract.contaminatedWriteModeID)
+        #expect(report.horizonCoverage?.minimumDurableEvidenceCount == export.executionCapabilityFrame.persistenceContract.minimumDurableEvidenceCount)
+        #expect(report.horizonCoverage?.forceStageNonContinuityDrafts == export.executionCapabilityFrame.persistenceContract.forceStageNonContinuityDrafts)
+        #expect(report.horizonCoverage?.evidencePendingTagIDs == export.executionCapabilityFrame.persistenceContract.evidencePendingTagIDs)
+        if let flightDeckExecutionCapabilityFrame = export.flightDeck.eBrainSummary?.executionCapabilityFrame {
+            #expect(report.executionTierID == flightDeckExecutionCapabilityFrame.executionTierID)
+            #expect(report.foundationTierID == flightDeckExecutionCapabilityFrame.foundationTierID)
+            #expect(report.horizonCoverage?.worldPriorID == flightDeckExecutionCapabilityFrame.worldPriorContract.priorID)
+            #expect(report.horizonCoverage?.temporalKnowledgeTierID == flightDeckExecutionCapabilityFrame.temporalKnowledgeContract.tier.rawValue)
+            #expect(report.horizonCoverage?.evidenceGradientID == flightDeckExecutionCapabilityFrame.evidenceContract.gradient.rawValue)
+            #expect(report.horizonCoverage?.minimumDurableEvidenceCount == flightDeckExecutionCapabilityFrame.persistenceContract.minimumDurableEvidenceCount)
+        } else {
+            #expect(export.flightDeck.eBrainSummary == nil)
+        }
+    }
+
+    @Test
     func buildUsesRecoveredCheckpointLineageWhenLiveBrainStateIsMissing() async throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -206,6 +258,7 @@ struct DecisionCapabilityCoverageBuilderTests {
         #expect(runtimeFacts.effectiveEBrainSummary == export.effectiveEBrainSummary)
         #expect(runtimeFacts.effectiveEBrainSource == export.effectiveEBrainSource)
         #expect(runtimeFacts.effectiveEBrainFactsBundle == export.effectiveEBrainFactsBundle)
+        #expect(runtimeFacts.layerStackLines == export.effectiveLayerStackLines)
         #expect(runtimeFacts.thoughtFoldChecksum == export.thoughtFoldChecksum)
         #expect(runtimeFacts.updateTicketSummaries == export.updateTicketSummaries)
         #expect(runtimeFacts.runtimeAuditFindings == export.runtimeAuditFindings)

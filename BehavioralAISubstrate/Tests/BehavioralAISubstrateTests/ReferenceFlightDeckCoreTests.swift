@@ -138,6 +138,88 @@ struct ReferenceFlightDeckCoreTests {
         #expect(observability.blockers.contains("Consistency-harness coverage is too shallow across sampled traces."))
     }
 
+    @Test("reference flight deck input and assessments honor replay revocation from inspection")
+    func referenceFlightDeckHonorsReplayRevocationFromInspection() throws {
+        let inspectionBundle = BASInspectionBundle(
+            generatedAt: Date(timeIntervalSince1970: 1_710_000_111),
+            trace: BASExecutionTrace(
+                inputSummary: "resume",
+                selectedRoute: .local("gemmaE4B"),
+                memoriesRecalled: ["Memory A"],
+                toolsCalled: [],
+                latency: BASTraceLatencyBreakdown(
+                    routeSelectionMs: 12,
+                    retrievalMs: 10,
+                    generationMs: 120,
+                    toolMs: 0
+                ),
+                outputSummary: "ok"
+            ),
+            replayFingerprint: BASReplayFingerprint(value: String(repeating: "c", count: 64)),
+            replayDisposition: BASReplayDisposition(
+                isAvailable: false,
+                reason: "Replay revoked by forget gate forget.guard.anchor after checkpoint exports and sync exports.",
+                forgetRequestID: "forget.guard.anchor",
+                checkpointsRevoked: true,
+                syncExportsRevoked: true,
+                vaultConsistencyState: "revocation_pending",
+                vaultDeletionManifestID: "forget.guard.anchor",
+                vaultSyncRevocationCount: 1,
+                vaultRequiresApproval: true,
+                vaultOutOfSyncDeviceIDs: ["device.secondary", "device.tablet"],
+                vaultMigrationTargetDeviceID: "device.secondary"
+            ),
+            releaseDecision: BASReleaseDecision(kind: .allow, reason: "allowed"),
+            anomalySignals: [],
+            calibration: nil
+        )
+        let input = BASReferenceFlightDeckInputBuilder.build(
+            from: BASReferenceFlightDeckAssemblyInput(
+                generatedAt: Date(timeIntervalSince1970: 1_710_000_111),
+                isPureLocalClosedLoop: true,
+                activeProviderTitle: "Gemma",
+                backendTitle: "CPU",
+                activeTaskGraphTaskCount: 2,
+                hardwareAccelerationActive: true,
+                activeRuntimeUsingDeterministicFallback: false,
+                fallbackTitle: "Template",
+                inspectionSummary: makeInspectionSummary(activeProviderID: "gemmaE4B"),
+                brainSummary: makeBrainSummary(),
+                inspectionBundle: inspectionBundle
+            )
+        )
+
+        #expect(input.data.replayAvailable == false)
+        #expect(input.data.replayBlocker?.contains("forget.guard.anchor") == true)
+        #expect(input.data.vaultConsistencyState == "revocation_pending")
+        #expect(input.data.vaultSyncRevocationCount == 1)
+        #expect(input.data.vaultOutOfSyncDeviceIDs == ["device.secondary", "device.tablet"])
+        #expect(input.data.vaultMigrationTargetDeviceID == "device.secondary")
+        #expect(input.observability.replayAvailable == false)
+        #expect(input.observability.replayBlocker?.contains("forget.guard.anchor") == true)
+        #expect(input.observability.vaultConsistencyState == "revocation_pending")
+        #expect(input.observability.vaultSyncRevocationCount == 1)
+        #expect(input.observability.vaultOutOfSyncDeviceIDs == ["device.secondary", "device.tablet"])
+        #expect(input.observability.vaultMigrationTargetDeviceID == "device.secondary")
+
+        let output = BASReferenceFlightDeckBuilder.build(from: input)
+        let data = try #require(output.assessments.first(where: { $0.kind == .data }))
+        let observability = try #require(output.assessments.first(where: { $0.kind == .observability }))
+
+        #expect(data.blockers.contains(where: { $0.contains("forget.guard.anchor") }))
+        #expect(data.blockers.contains(where: { $0.contains("vault consistency") }))
+        #expect(data.blockers.contains(where: { $0.contains("device.secondary") }))
+        #expect(observability.blockers.contains(where: { $0.contains("forget.guard.anchor") }))
+        #expect(observability.blockers.contains(where: { $0.contains("vault consistency") }))
+        #expect(observability.blockers.contains(where: { $0.contains("device.secondary") }))
+        #expect(data.signals.contains(where: { $0.contains("Replay status: blocked") }))
+        #expect(data.signals.contains(where: { $0.contains("Vault consistency: revocation_pending") }))
+        #expect(data.signals.contains(where: { $0.contains("device.secondary") }))
+        #expect(observability.signals.contains(where: { $0.contains("Replay status: blocked") }))
+        #expect(observability.signals.contains(where: { $0.contains("Vault consistency: revocation_pending") }))
+        #expect(observability.signals.contains(where: { $0.contains("device.secondary") }))
+    }
+
     @Test("reference flight deck tracks evaluation drift and delivery debt")
     func scoresEvaluationAndDeliveryDebt() throws {
         let output = BASReferenceFlightDeckBuilder.build(

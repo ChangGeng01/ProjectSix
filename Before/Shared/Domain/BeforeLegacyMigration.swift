@@ -21,6 +21,8 @@ enum BeforeLegacyMigration {
             "capture"
         case "openMode":
             "present"
+        case "routedInput":
+            "routedInput"
         case "openEvolutionControl":
             "resume"
         case "reopenTomorrowItem":

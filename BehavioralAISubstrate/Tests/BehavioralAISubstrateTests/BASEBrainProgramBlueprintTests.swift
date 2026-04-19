@@ -9,23 +9,35 @@ import BASRuntimeCore
 
 @Suite("BASEBrain program blueprint")
 struct BASEBrainProgramBlueprintTests {
-    @Test("v1.2 program blueprint exposes thirteen layers, nineteen work packages, and governed schemas")
-    func v12BlueprintCapturesExecutionPlan() {
-        let blueprint = BASProgramExecutionBlueprintBuilder.v12
+    @Test("latest program blueprint exposes fourteen layers, nineteen work packages, and governed schemas")
+    func latestBlueprintCapturesExecutionPlan() {
+        let blueprint = BASProgramExecutionBlueprintBuilder.latest
 
-        #expect(blueprint.layers.count == 13)
+        #expect(blueprint.layers.count == 14)
         #expect(blueprint.workPackages.count == 19)
         #expect(blueprint.milestones.count == 8)
         #expect(blueprint.governedSchemas.count == BASEBrainSchemaGovernanceRegistry.governedSchemas.count)
         #expect(blueprint.requiredAppendices.count == 4)
         #expect(blueprint.hardRedLines.count == 10)
         #expect(blueprint.layers.first?.kind == .powerClock)
-        #expect(blueprint.layers.last?.kind == .evolution)
+        #expect(blueprint.layers.last?.kind == .sovereign)
+        #expect(
+            blueprint.layers.last?.primaryObjectIDs == [
+                "SovereignVerdict",
+                "SovereignCommitToken",
+                "SovereignLock",
+                "QuarantineRecord",
+                "SovereignAuditEntry",
+                "SovereignActuationCommand",
+                "SovereignExecutionReceipt",
+                "RuntimePolicyLineage"
+            ]
+        )
     }
 
     @Test("first-batch work packages match the M1-M3 critical path")
     func firstBatchMatchesCriticalPath() {
-        let blueprint = BASProgramExecutionBlueprintBuilder.v12
+        let blueprint = BASProgramExecutionBlueprintBuilder.latest
         let firstBatchIDs = Set(
             blueprint.workPackages
                 .filter { $0.deliveryBatch == .first }
@@ -40,7 +52,7 @@ struct BASEBrainProgramBlueprintTests {
 
     @Test("schema governance and red lines protect the main contracts")
     func governanceProtectsMainContracts() {
-        let blueprint = BASProgramExecutionBlueprintBuilder.v12
+        let blueprint = BASProgramExecutionBlueprintBuilder.latest
         let governedObjects = Set(blueprint.governedSchemas.map(\.objectID))
 
         #expect(governedObjects.contains("DeviceState"))
@@ -63,23 +75,79 @@ struct BASEBrainProgramBlueprintTests {
     @Test("schema governance registry expands across control, knowledge, cognition, and eval planes")
     func schemaGovernanceRegistryCoversThirteenLayerPlan() {
         let governedObjects = Set(BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID))
-
-        #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == 25)
-        #expect(governedObjects == Set([
+        let expectedObjects: Set<String> = [
             "DeviceState",
             "BudgetFrame",
+            "WakeIntent",
+            "VitalState",
+            "RunLease",
+            "EmergencyBrake",
+            "SovereignActuationCommand",
+            "SovereignExecutionReceipt",
+            "SovereignVerdict",
+            "ConsequenceHorizon",
+            "SovereignCommitToken",
+            "SovereignLock",
+            "QuarantineRecord",
+            "SovereignAuditEntry",
+            "RuntimePolicyLineage",
+            "HostRhythmProfile",
+            "HostConstitution",
+            "HostResonance",
+            "IdentityLattice",
+            "ValueAxisSet",
+            "GoalSpine",
+            "BoundaryVeil",
+            "RelationGravityMap",
+            "RhythmCanopy",
+            "StyleGenome",
+            "RoutineSkeleton",
+            "RoleGeometry",
+            "ConsentLattice",
+            "NarrativeLoom",
+            "ProtectionRing",
+            "HostChangeCandidate",
+            "HostVersionTree",
+            "ForgetRequest",
+            "HostDeletionManifest",
+            "HostSyncRevocationLedger",
+            "HostDeviceConsistencyReport",
+            "HostDeviceMigrationContract",
+            "HostConstitutionVault",
+            "RecoveryDisposition",
             "HostProfile",
             "HostVersion",
             "MemoryAtom",
             "MemoryBundle",
+            "PowerGradient",
+            "NeuralOrganMap",
+            "CandidateFrontier",
+            "CounterfactualBundle",
+            "RiskPermitBinding",
+            "NeuralLeaseReceipt",
+            "ToolIntentEnvelope",
+            "MorphGraph",
+            "HotColdMap",
+            "PrecisionProfile",
+            "ResumeFrame",
+            "RollbackAnchor",
+            "ContinuityAnchor",
+            "LungState",
+            "BreathScheduler",
+            "ContextSceneType",
+            "ContextRouteHint",
             "RuleCandidate",
             "ContextFrame",
             "DecomposeFrame",
             "CandidatePath",
             "ForecastItem",
+            "CritiqueBundle",
             "CritiqueItem",
+            "ManipulationTrace",
             "ThoughtFrame",
             "ThoughtFold",
+            "UrgencyTruth",
+            "EmotionalWeather",
             "TriSelfScore",
             "MergedChoice",
             "RenderedOutput",
@@ -87,13 +155,47 @@ struct BASEBrainProgramBlueprintTests {
             "ActionPermit",
             "UpdateTicket",
             "EvolutionLineageSummary",
+            "EvolutionFoldedLungSummary",
             "RuntimeTrace",
             "EvalSample",
             "ModelArtifact",
             "FeedbackEvent"
-        ]))
+        ]
+
+        #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)
+        #expect(governedObjects == expectedObjects)
         #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "DeviceState")?.currentVersion == BASDeviceState.currentSchemaVersion)
         #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "BudgetFrame")?.currentVersion == BASBudgetFrame.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "WakeIntent")?.currentVersion == BASWakeIntent.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "VitalState")?.currentVersion == BASVitalState.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "RunLease")?.currentVersion == BASRunLease.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "EmergencyBrake")?.currentVersion == BASEmergencyBrake.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "SovereignActuationCommand")?.currentVersion == BASSovereignActuationCommand.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "SovereignExecutionReceipt")?.currentVersion == BASSovereignExecutionReceipt.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "SovereignVerdict")?.currentVersion == BASSovereignVerdict.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "SovereignCommitToken")?.currentVersion == BASSovereignCommitToken.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "SovereignLock")?.currentVersion == BASSovereignLock.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "QuarantineRecord")?.currentVersion == BASQuarantineRecord.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "SovereignAuditEntry")?.currentVersion == BASSovereignAuditEntry.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "RuntimePolicyLineage")?.currentVersion == BASRuntimePolicyLineage.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "HostRhythmProfile")?.currentVersion == BASHostRhythmProfile.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "HostConstitution")?.currentVersion == BASHostConstitution.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "HostConstitutionVault")?.currentVersion == BASHostConstitutionVault.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "IdentityLattice")?.currentVersion == BASIdentityLattice.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "ValueAxisSet")?.currentVersion == BASValueAxisSet.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "GoalSpine")?.currentVersion == BASGoalSpine.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "BoundaryVeil")?.currentVersion == BASBoundaryVeil.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "RelationGravityMap")?.currentVersion == BASRelationGravityMap.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "RhythmCanopy")?.currentVersion == BASRhythmCanopy.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "StyleGenome")?.currentVersion == BASStyleGenome.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "RoutineSkeleton")?.currentVersion == BASRoutineSkeleton.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "ConsentLattice")?.currentVersion == BASConsentLattice.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "NarrativeLoom")?.currentVersion == BASNarrativeLoom.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "ProtectionRing")?.currentVersion == BASProtectionRing.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "HostChangeCandidate")?.currentVersion == BASHostChangeCandidate.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "HostVersionTree")?.currentVersion == BASHostVersionTree.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "ForgetRequest")?.currentVersion == BASForgetRequest.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "RecoveryDisposition")?.currentVersion == BASRecoveryDisposition.currentSchemaVersion)
         #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "HostVersion")?.currentVersion == BASHostVersion.currentSchemaVersion)
         #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "RuleCandidate")?.currentVersion == BASRuleCandidate.currentSchemaVersion)
         #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "DecomposeFrame")?.currentVersion == BASDecomposeFrame.currentSchemaVersion)
@@ -109,7 +211,7 @@ struct BASEBrainProgramBlueprintTests {
         #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "FeedbackEvent")?.currentVersion == BASFeedbackEvent.currentSchemaVersion)
     }
 
-    @Test("console snapshots resolve the v1.2 execution blueprint by default")
+    @Test("console snapshots resolve the latest execution blueprint by default")
     func consoleSnapshotsCarryExecutionBlueprint() {
         let snapshot = BASFlightDeckBuilder().build(
             from: BASFlightDeckInput(
@@ -121,7 +223,8 @@ struct BASEBrainProgramBlueprintTests {
         )
 
         #expect(snapshot.programExecutionBlueprint != nil)
-        #expect(snapshot.currentProgramExecutionBlueprint.title == BASProgramExecutionBlueprintBuilder.v12.title)
+        #expect(snapshot.currentProgramExecutionBlueprint.title == BASProgramExecutionBlueprintBuilder.latest.title)
+        #expect(snapshot.currentProgramExecutionBlueprint.layers.count == 14)
         #expect(snapshot.currentProgramExecutionBlueprint.workPackages.count == 19)
         #expect(snapshot.currentProgramExecutionBlueprint.milestones.map(\.id) == ["M0", "M1", "M2", "M3", "M4", "M5", "M6", "M7"])
     }

@@ -5,12 +5,15 @@ struct DecisionReviewTimelineEntryCardView: View {
     let presentation: DecisionEvolutionReplayEntryPresentation?
     let action: () -> Void
 
+    private var replayCardCopy: DecisionReviewReplayCardCopy {
+        summary.replayCardCopy(replayPresentation: presentation)
+    }
+
     var body: some View {
         Button(action: action) {
             PanelCard {
                 DecisionReplayEntrySummaryView(
-                    title: summary.title,
-                    secondaryLine: summary.secondaryLine,
+                    cardCopy: replayCardCopy,
                     presentation: presentation
                 ) {
                     DecisionReplayEntryHeaderRowView(
@@ -19,12 +22,6 @@ struct DecisionReviewTimelineEntryCardView: View {
                         trailingAccentText: summary.headerAccentText,
                         trailingAccentStyle: headerAccentStyle
                     )
-                } supplementary: {
-                    if let supplementaryLine = summary.supplementaryLine {
-                        Text(supplementaryLine)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(BeforeTheme.ember)
-                    }
                 } footer: {
                     DecisionReplayEntryFooterRowView(
                         timestamp: summary.timestamp,

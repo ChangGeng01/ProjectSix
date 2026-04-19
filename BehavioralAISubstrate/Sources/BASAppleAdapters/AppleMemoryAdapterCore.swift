@@ -43,6 +43,9 @@ public struct BASAppleProjectionGovernanceSnapshot: Codable, Equatable, Sendable
     public var promotedCandidateCount: Int
     public var deferredCandidateCount: Int
     public var admittedCandidateCount: Int
+    public var externallyRefreshedCandidateCount: Int
+    public var quarantinedObservationCount: Int
+    public var evidenceCaveatedCandidateCount: Int
 
     public init(
         totalRecordCount: Int,
@@ -50,7 +53,10 @@ public struct BASAppleProjectionGovernanceSnapshot: Codable, Equatable, Sendable
         pendingCandidateCount: Int,
         promotedCandidateCount: Int,
         deferredCandidateCount: Int,
-        admittedCandidateCount: Int
+        admittedCandidateCount: Int,
+        externallyRefreshedCandidateCount: Int = 0,
+        quarantinedObservationCount: Int = 0,
+        evidenceCaveatedCandidateCount: Int = 0
     ) {
         self.totalRecordCount = totalRecordCount
         self.totalCandidateCount = totalCandidateCount
@@ -58,7 +64,19 @@ public struct BASAppleProjectionGovernanceSnapshot: Codable, Equatable, Sendable
         self.promotedCandidateCount = promotedCandidateCount
         self.deferredCandidateCount = deferredCandidateCount
         self.admittedCandidateCount = admittedCandidateCount
+        self.externallyRefreshedCandidateCount = externallyRefreshedCandidateCount
+        self.quarantinedObservationCount = quarantinedObservationCount
+        self.evidenceCaveatedCandidateCount = evidenceCaveatedCandidateCount
     }
+
+    public static let empty = BASAppleProjectionGovernanceSnapshot(
+        totalRecordCount: 0,
+        totalCandidateCount: 0,
+        pendingCandidateCount: 0,
+        promotedCandidateCount: 0,
+        deferredCandidateCount: 0,
+        admittedCandidateCount: 0
+    )
 }
 
 public enum BASAppleMemoryProjectionAdapter {
@@ -121,7 +139,10 @@ public enum BASAppleMemoryProjectionAdapter {
                         pendingCandidateCount: $0.pendingCandidateCount,
                         promotedCandidateCount: $0.promotedCandidateCount,
                         deferredCandidateCount: $0.deferredCandidateCount,
-                        admittedCandidateCount: $0.admittedCandidateCount
+                        admittedCandidateCount: $0.admittedCandidateCount,
+                        externallyRefreshedCandidateCount: $0.externallyRefreshedCandidateCount,
+                        quarantinedObservationCount: $0.quarantinedObservationCount,
+                        evidenceCaveatedCandidateCount: $0.evidenceCaveatedCandidateCount
                     )
                 },
                 memoryTrustBehavior: memoryTrustBehavior

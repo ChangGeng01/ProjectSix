@@ -142,6 +142,16 @@ public struct BASAppleRuntimeInspectionTraceRecordInput: Codable, Sendable, Equa
     public var loadedEligibilityReasonCounts: [BASMemoryEligibilityReason: Int]
     public var screenedOutEligibilityReasonCounts: [BASMemoryEligibilityReason: Int]
     public var snapshotFingerprint: String?
+    public var constitutionVersion: String?
+    public var constitutionPhase: String?
+    public var constitutionValueAxisCount: Int?
+    public var forgetRequestID: String?
+    public var forgetVerified: Bool?
+    public var forgetRevokesCheckpoints: Bool?
+    public var vaultConsistencyState: String?
+    public var vaultSyncRevocationCount: Int?
+    public var vaultOutOfSyncDeviceIDs: [String]
+    public var vaultMigrationTargetDeviceID: String?
     public var lowTrustMemoryLoadRate: Double?
     public var riskFlags: [BASBrainStateRiskFlag]
     public var identityRole: BASIdentityRole?
@@ -188,6 +198,16 @@ public struct BASAppleRuntimeInspectionTraceRecordInput: Codable, Sendable, Equa
         loadedEligibilityReasonCounts: [BASMemoryEligibilityReason: Int] = [:],
         screenedOutEligibilityReasonCounts: [BASMemoryEligibilityReason: Int] = [:],
         snapshotFingerprint: String? = nil,
+        constitutionVersion: String? = nil,
+        constitutionPhase: String? = nil,
+        constitutionValueAxisCount: Int? = nil,
+        forgetRequestID: String? = nil,
+        forgetVerified: Bool? = nil,
+        forgetRevokesCheckpoints: Bool? = nil,
+        vaultConsistencyState: String? = nil,
+        vaultSyncRevocationCount: Int? = nil,
+        vaultOutOfSyncDeviceIDs: [String] = [],
+        vaultMigrationTargetDeviceID: String? = nil,
         lowTrustMemoryLoadRate: Double? = nil,
         riskFlags: [BASBrainStateRiskFlag] = [],
         identityRole: BASIdentityRole? = nil,
@@ -233,6 +253,16 @@ public struct BASAppleRuntimeInspectionTraceRecordInput: Codable, Sendable, Equa
         self.loadedEligibilityReasonCounts = loadedEligibilityReasonCounts
         self.screenedOutEligibilityReasonCounts = screenedOutEligibilityReasonCounts
         self.snapshotFingerprint = snapshotFingerprint
+        self.constitutionVersion = constitutionVersion
+        self.constitutionPhase = constitutionPhase
+        self.constitutionValueAxisCount = constitutionValueAxisCount
+        self.forgetRequestID = forgetRequestID
+        self.forgetVerified = forgetVerified
+        self.forgetRevokesCheckpoints = forgetRevokesCheckpoints
+        self.vaultConsistencyState = vaultConsistencyState
+        self.vaultSyncRevocationCount = vaultSyncRevocationCount
+        self.vaultOutOfSyncDeviceIDs = vaultOutOfSyncDeviceIDs
+        self.vaultMigrationTargetDeviceID = vaultMigrationTargetDeviceID
         self.lowTrustMemoryLoadRate = lowTrustMemoryLoadRate
         self.riskFlags = riskFlags
         self.identityRole = identityRole
@@ -361,7 +391,20 @@ public enum BASAppleRuntimeInspectionBuilder {
     public static func traceSource(
         from record: BASAppleRuntimeInspectionTraceRecordInput
     ) -> BASAppleRuntimeInspectionTraceSourceInput {
-        BASAppleRuntimeInspectionTraceSourceInput(
+        let snapshotFingerprint = constitutionAwareSnapshotFingerprint(
+            base: record.snapshotFingerprint,
+            constitutionVersion: record.constitutionVersion,
+            constitutionPhase: record.constitutionPhase,
+            constitutionValueAxisCount: record.constitutionValueAxisCount,
+            forgetRequestID: record.forgetRequestID,
+            forgetVerified: record.forgetVerified,
+            forgetRevokesCheckpoints: record.forgetRevokesCheckpoints,
+            vaultConsistencyState: record.vaultConsistencyState,
+            vaultSyncRevocationCount: record.vaultSyncRevocationCount,
+            vaultOutOfSyncDeviceIDs: record.vaultOutOfSyncDeviceIDs,
+            vaultMigrationTargetDeviceID: record.vaultMigrationTargetDeviceID
+        )
+        return BASAppleRuntimeInspectionTraceSourceInput(
             lifecycle: BASLifecycleTraceInput(
                 kind: record.kind,
                 hasContextState: record.hasContextState,
@@ -398,7 +441,7 @@ public enum BASAppleRuntimeInspectionBuilder {
                     screenedOutMemoryCount: record.screenedOutMemoryCount ?? 0,
                     loadedEligibilityReasonCounts: record.loadedEligibilityReasonCounts,
                     screenedOutEligibilityReasonCounts: record.screenedOutEligibilityReasonCounts,
-                    snapshotFingerprint: record.snapshotFingerprint ?? "",
+                    snapshotFingerprint: snapshotFingerprint ?? "",
                     lowTrustMemoryLoadRate: record.lowTrustMemoryLoadRate ?? 0,
                     riskFlags: record.riskFlags,
                     identityRole: record.identityRole ?? .pauseCompanion,
@@ -422,6 +465,56 @@ public enum BASAppleRuntimeInspectionBuilder {
                 consistencyViolationKinds: record.consistencyViolationKinds
             )
         )
+    }
+
+    private static func constitutionAwareSnapshotFingerprint(
+        base: String?,
+        constitutionVersion: String?,
+        constitutionPhase: String?,
+        constitutionValueAxisCount: Int?,
+        forgetRequestID: String?,
+        forgetVerified: Bool?,
+        forgetRevokesCheckpoints: Bool?,
+        vaultConsistencyState: String?,
+        vaultSyncRevocationCount: Int?,
+        vaultOutOfSyncDeviceIDs: [String],
+        vaultMigrationTargetDeviceID: String?
+    ) -> String? {
+        var parts: [String] = []
+        if let base, !base.isEmpty {
+            parts.append(base)
+        }
+        if let constitutionVersion, !constitutionVersion.isEmpty {
+            parts.append("constitution:\(constitutionVersion)")
+        }
+        if let constitutionPhase, !constitutionPhase.isEmpty {
+            parts.append("phase:\(constitutionPhase)")
+        }
+        if let constitutionValueAxisCount {
+            parts.append("value_axes:\(constitutionValueAxisCount)")
+        }
+        if let forgetRequestID, !forgetRequestID.isEmpty {
+            parts.append("forget:\(forgetRequestID)")
+        }
+        if let forgetVerified {
+            parts.append("forget_verified:\(forgetVerified)")
+        }
+        if let forgetRevokesCheckpoints {
+            parts.append("forget_checkpoints_revoked:\(forgetRevokesCheckpoints)")
+        }
+        if let vaultConsistencyState, !vaultConsistencyState.isEmpty {
+            parts.append("vault_consistency:\(vaultConsistencyState)")
+        }
+        if let vaultSyncRevocationCount {
+            parts.append("vault_sync_revocations:\(vaultSyncRevocationCount)")
+        }
+        if !vaultOutOfSyncDeviceIDs.isEmpty {
+            parts.append("vault_out_of_sync_list:\(vaultOutOfSyncDeviceIDs.joined(separator: ","))")
+        }
+        if let vaultMigrationTargetDeviceID, !vaultMigrationTargetDeviceID.isEmpty {
+            parts.append("vault_migration_target:\(vaultMigrationTargetDeviceID)")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: "|")
     }
 
     public static func build(

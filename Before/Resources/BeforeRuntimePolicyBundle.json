@@ -1,0 +1,843 @@
+{
+  "schemaVersion": "before.runtime-policy-bundle.v1",
+  "bundleVersion": "before.runtime-policy-bundle.v1",
+  "providerRoutingRegistry": {
+    "schemaVersion": "before.provider-routing-registry.v1",
+    "defaultPolicyID": "before.provider-routing.v1",
+    "policiesByID": {
+      "before.provider-routing.v1": {
+        "schemaVersion": "before.provider-routing.v1",
+        "deterministicProviderID": "template",
+        "testingOverrideProviderID": "testingStub",
+        "preferenceOrderings": [
+          {
+            "preferredProviderID": "gemmaE4B",
+            "orderedProviderIDs": [
+              "gemmaE4B",
+              "foundationModels"
+            ]
+          },
+          {
+            "preferredProviderID": "openModel",
+            "orderedProviderIDs": [
+              "openModel",
+              "gemmaE4B",
+              "foundationModels"
+            ]
+          },
+          {
+            "preferredProviderID": "foundationModels",
+            "orderedProviderIDs": [
+              "foundationModels",
+              "gemmaE4B"
+            ]
+          },
+          {
+            "preferredProviderID": "template",
+            "orderedProviderIDs": [
+              "template"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "providerRoutingPolicyID": "before.provider-routing.v1",
+  "runtimeTuningRegistry": {
+    "schemaVersion": "before.host.runtime-synthesis-registry.v1",
+    "defaultPolicyID": "before.host.runtime-synthesis.v1",
+    "policiesByID": {
+      "before.host.runtime-synthesis.v1": {
+        "schemaVersion": "host.runtime-synthesis.v1",
+        "guardrailPressure": {
+          "protectiveBoundaryIncrement": 0.18,
+          "calibrationWatchIncrement": 0.1,
+          "calibrationDriftingIncrement": 0.18,
+          "boundaryConstraintUnit": 0.03,
+          "boundaryConstraintCap": 0.18,
+          "calibrationAlertUnit": 0.03,
+          "calibrationAlertCap": 0.15,
+          "failureGuardUnit": 0.02,
+          "failureGuardCap": 0.12,
+          "riskFlagUnit": 0.035,
+          "riskFlagCap": 0.14,
+          "maximumPressure": 0.65
+        },
+        "budget": {
+          "standardDecodeTokens": 160,
+          "unstableDecodeTokens": 192,
+          "guardedDecodeTokens": 220,
+          "maintenanceBatteryFloor": 0.35,
+          "lowRiskLoops": 1,
+          "mediumRiskLoops": 2,
+          "highRiskLoops": 4,
+          "extremeRiskLoops": 2,
+          "lowRiskCandidates": 2,
+          "mediumRiskCandidates": 3,
+          "highRiskCandidates": 3,
+          "extremeRiskCandidates": 2,
+          "lowRiskRetrievalDepth": 2,
+          "mediumRiskRetrievalDepth": 3,
+          "guardedRetrievalDepth": 4,
+          "standardLoopFloor": 1,
+          "protectedLoopFloor": 2,
+          "standardCandidateFloor": 1,
+          "protectedCandidateFloor": 2,
+          "maxCandidateCount": 4,
+          "unstableLoopIncrement": 1,
+          "throttleLoopPenalty": 1,
+          "throttleCandidatePenalty": 1,
+          "defaultPrecisionProfile": "balanced",
+          "unstablePrecisionProfile": "protected",
+          "guardedPrecisionProfile": "protected",
+          "lowRiskPrecisionProfile": "balanced",
+          "mediumRiskPrecisionProfile": "balanced",
+          "highRiskPrecisionProfile": "protected",
+          "extremeRiskPrecisionProfile": "protected",
+          "runModeProfilesByID": {
+            "dormant": {
+              "maxLoops": 1,
+              "maxCandidates": 2,
+              "retrievalDepth": 2,
+              "defaultDecodeTokens": 160,
+              "unstableDecodeTokens": 192,
+              "precisionProfile": "balanced",
+              "defaultDeviceRoute": "coreNPU",
+              "npuUnavailableDeviceRoute": "coreGPU",
+              "maintenanceSupported": true,
+              "maintenanceBatteryFloor": 0.36,
+              "scheduledMaintenanceClass": "none",
+              "deferredMaintenanceClass": "none",
+              "candidateCountCap": 4,
+              "standardLoopFloor": 1,
+              "protectedLoopFloor": 2,
+              "standardCandidateFloor": 1,
+              "protectedCandidateFloor": 2,
+              "unstableLoopIncrement": 1,
+              "throttleLoopPenalty": 1,
+              "throttleCandidatePenalty": 1
+            },
+            "pulse": {
+              "maxLoops": 1,
+              "maxCandidates": 2,
+              "retrievalDepth": 2,
+              "defaultDecodeTokens": 160,
+              "unstableDecodeTokens": 192,
+              "precisionProfile": "balanced",
+              "defaultDeviceRoute": "scoutNPU",
+              "npuUnavailableDeviceRoute": "scoutCPU",
+              "maintenanceSupported": true,
+              "maintenanceBatteryFloor": 0.22,
+              "scheduledMaintenanceClass": "light",
+              "deferredMaintenanceClass": "deferred",
+              "candidateCountCap": 4,
+              "standardLoopFloor": 1,
+              "protectedLoopFloor": 2,
+              "standardCandidateFloor": 1,
+              "protectedCandidateFloor": 2,
+              "unstableLoopIncrement": 1,
+              "throttleLoopPenalty": 1,
+              "throttleCandidatePenalty": 1
+            },
+            "sentinel": {
+              "maxLoops": 1,
+              "maxCandidates": 2,
+              "retrievalDepth": 2,
+              "defaultDecodeTokens": 160,
+              "unstableDecodeTokens": 192,
+              "precisionProfile": "balanced",
+              "defaultDeviceRoute": "scoutNPU",
+              "npuUnavailableDeviceRoute": "scoutCPU",
+              "maintenanceSupported": true,
+              "maintenanceBatteryFloor": 0.22,
+              "scheduledMaintenanceClass": "light",
+              "deferredMaintenanceClass": "deferred",
+              "candidateCountCap": 4,
+              "standardLoopFloor": 1,
+              "protectedLoopFloor": 2,
+              "standardCandidateFloor": 1,
+              "protectedCandidateFloor": 2,
+              "unstableLoopIncrement": 1,
+              "throttleLoopPenalty": 1,
+              "throttleCandidatePenalty": 1
+            },
+            "engage": {
+              "maxLoops": 1,
+              "maxCandidates": 2,
+              "retrievalDepth": 2,
+              "defaultDecodeTokens": 160,
+              "unstableDecodeTokens": 192,
+              "precisionProfile": "balanced",
+              "defaultDeviceRoute": "coreNPU",
+              "npuUnavailableDeviceRoute": "coreGPU",
+              "maintenanceSupported": true,
+              "maintenanceBatteryFloor": 0.36,
+              "scheduledMaintenanceClass": "none",
+              "deferredMaintenanceClass": "none",
+              "candidateCountCap": 4,
+              "standardLoopFloor": 1,
+              "protectedLoopFloor": 2,
+              "standardCandidateFloor": 1,
+              "protectedCandidateFloor": 2,
+              "unstableLoopIncrement": 1,
+              "throttleLoopPenalty": 1,
+              "throttleCandidatePenalty": 1
+            },
+            "reflect": {
+              "maxLoops": 2,
+              "maxCandidates": 3,
+              "retrievalDepth": 3,
+              "defaultDecodeTokens": 160,
+              "unstableDecodeTokens": 192,
+              "precisionProfile": "balanced",
+              "defaultDeviceRoute": "coreNPU",
+              "npuUnavailableDeviceRoute": "coreGPU",
+              "maintenanceSupported": true,
+              "maintenanceBatteryFloor": 0.36,
+              "scheduledMaintenanceClass": "none",
+              "deferredMaintenanceClass": "none",
+              "candidateCountCap": 4,
+              "standardLoopFloor": 1,
+              "protectedLoopFloor": 2,
+              "standardCandidateFloor": 1,
+              "protectedCandidateFloor": 2,
+              "unstableLoopIncrement": 1,
+              "throttleLoopPenalty": 1,
+              "throttleCandidatePenalty": 1
+            },
+            "deepLoop": {
+              "maxLoops": 2,
+              "maxCandidates": 3,
+              "retrievalDepth": 3,
+              "defaultDecodeTokens": 160,
+              "unstableDecodeTokens": 192,
+              "precisionProfile": "balanced",
+              "defaultDeviceRoute": "coreNPU",
+              "npuUnavailableDeviceRoute": "coreGPU",
+              "maintenanceSupported": true,
+              "maintenanceBatteryFloor": 0.36,
+              "scheduledMaintenanceClass": "none",
+              "deferredMaintenanceClass": "none",
+              "candidateCountCap": 4,
+              "standardLoopFloor": 1,
+              "protectedLoopFloor": 2,
+              "standardCandidateFloor": 1,
+              "protectedCandidateFloor": 2,
+              "unstableLoopIncrement": 1,
+              "throttleLoopPenalty": 1,
+              "throttleCandidatePenalty": 1
+            },
+            "guard": {
+              "maxLoops": 4,
+              "maxCandidates": 3,
+              "retrievalDepth": 4,
+              "defaultDecodeTokens": 220,
+              "unstableDecodeTokens": 220,
+              "precisionProfile": "protected",
+              "defaultDeviceRoute": "coreNPU",
+              "npuUnavailableDeviceRoute": "coreGPU",
+              "pureLocalPreferredDeviceRoute": "hybridLocal",
+              "maintenanceSupported": false,
+              "maintenanceBatteryFloor": 0.35,
+              "scheduledMaintenanceClass": "none",
+              "deferredMaintenanceClass": "none",
+              "candidateCountCap": 4,
+              "standardLoopFloor": 1,
+              "protectedLoopFloor": 2,
+              "standardCandidateFloor": 1,
+              "protectedCandidateFloor": 2,
+              "unstableLoopIncrement": 1,
+              "throttleLoopPenalty": 1,
+              "throttleCandidatePenalty": 1
+            },
+            "recovery": {
+              "maxLoops": 4,
+              "maxCandidates": 3,
+              "retrievalDepth": 4,
+              "defaultDecodeTokens": 220,
+              "unstableDecodeTokens": 220,
+              "precisionProfile": "protected",
+              "defaultDeviceRoute": "coreNPU",
+              "npuUnavailableDeviceRoute": "coreGPU",
+              "pureLocalPreferredDeviceRoute": "hybridLocal",
+              "maintenanceSupported": false,
+              "maintenanceBatteryFloor": 0.35,
+              "scheduledMaintenanceClass": "none",
+              "deferredMaintenanceClass": "none",
+              "candidateCountCap": 4,
+              "standardLoopFloor": 1,
+              "protectedLoopFloor": 2,
+              "standardCandidateFloor": 1,
+              "protectedCandidateFloor": 2,
+              "unstableLoopIncrement": 1,
+              "throttleLoopPenalty": 1,
+              "throttleCandidatePenalty": 1
+            },
+            "quarantine": {
+              "maxLoops": 4,
+              "maxCandidates": 3,
+              "retrievalDepth": 4,
+              "defaultDecodeTokens": 220,
+              "unstableDecodeTokens": 220,
+              "precisionProfile": "protected",
+              "defaultDeviceRoute": "coreNPU",
+              "npuUnavailableDeviceRoute": "coreGPU",
+              "pureLocalPreferredDeviceRoute": "hybridLocal",
+              "maintenanceSupported": false,
+              "maintenanceBatteryFloor": 0.35,
+              "scheduledMaintenanceClass": "none",
+              "deferredMaintenanceClass": "none",
+              "candidateCountCap": 4,
+              "standardLoopFloor": 1,
+              "protectedLoopFloor": 2,
+              "standardCandidateFloor": 1,
+              "protectedCandidateFloor": 2,
+              "unstableLoopIncrement": 1,
+              "throttleLoopPenalty": 1,
+              "throttleCandidatePenalty": 1
+            },
+            "lockdown": {
+              "maxLoops": 2,
+              "maxCandidates": 2,
+              "retrievalDepth": 4,
+              "defaultDecodeTokens": 220,
+              "unstableDecodeTokens": 220,
+              "precisionProfile": "protected",
+              "defaultDeviceRoute": "coreNPU",
+              "npuUnavailableDeviceRoute": "coreGPU",
+              "pureLocalPreferredDeviceRoute": "hybridLocal",
+              "maintenanceSupported": false,
+              "maintenanceBatteryFloor": 0.35,
+              "scheduledMaintenanceClass": "none",
+              "deferredMaintenanceClass": "none",
+              "candidateCountCap": 4,
+              "standardLoopFloor": 1,
+              "protectedLoopFloor": 2,
+              "standardCandidateFloor": 1,
+              "protectedCandidateFloor": 2,
+              "unstableLoopIncrement": 1,
+              "throttleLoopPenalty": 1,
+              "throttleCandidatePenalty": 1
+            }
+          },
+          "pulseRetrievalDepth": 2,
+          "sentinelRetrievalDepth": 2,
+          "engageRetrievalDepth": 2,
+          "reflectRetrievalDepth": 3,
+          "deepLoopRetrievalDepth": 3,
+          "guardRetrievalDepth": 4,
+          "recoveryRetrievalDepth": 4,
+          "quarantineRetrievalDepth": 4,
+          "lockdownRetrievalDepth": 4,
+          "dormantRetrievalDepth": 2
+        },
+        "wakeIntent": {
+          "pulseBatteryFloor": 0.18,
+          "sentinelBatteryFloor": 0.12,
+          "engageUrgencyIncrement": 0.18,
+          "reflectCueIncrement": 0.16,
+          "deepLoopCueIncrement": 0.26,
+          "highRiskGuardThreshold": 0.68
+        },
+        "stateTransitions": {
+          "backgroundPulseEnabled": true,
+          "recoveryOnCriticalThermal": true,
+          "reflectOnTrustDrift": true,
+          "deepLoopOnProtectedBoundary": true,
+          "lockdownOnExtremeBlockedPermit": true,
+          "quarantineFailureGuardThreshold": 3,
+          "criticalThermalMode": "recovery",
+          "lowRiskBackgroundMode": "pulse",
+          "lowRiskProtectedMode": "engage",
+          "lowRiskUrgentMode": "engage",
+          "lowRiskDefaultMode": "sentinel",
+          "mediumRiskProtectedDeepLoopMode": "deepLoop",
+          "mediumRiskReflectiveMode": "reflect",
+          "mediumRiskDefaultMode": "engage",
+          "highRiskMode": "guard",
+          "extremeRiskMode": "lockdown",
+          "recoveryMode": "recovery",
+          "quarantineMode": "quarantine",
+          "runModeRules": [
+            {
+              "ruleID": "thermal.critical",
+              "resultMode": "recovery",
+              "thermalLevels": [
+                "critical"
+              ]
+            },
+            {
+              "ruleID": "state.quarantine",
+              "resultMode": "quarantine",
+              "requiresQuarantine": true
+            },
+            {
+              "ruleID": "state.recovery",
+              "resultMode": "recovery",
+              "requiresRecovery": true
+            },
+            {
+              "ruleID": "risk.low.background_pulse",
+              "resultMode": "pulse",
+              "riskLevels": [
+                "low"
+              ],
+              "foregroundStates": [
+                "background",
+                "suspended"
+              ],
+              "urgencyDetected": false,
+              "minimumBatteryLevel": 0.18
+            },
+            {
+              "ruleID": "risk.low.protected",
+              "resultMode": "engage",
+              "riskLevels": [
+                "low"
+              ],
+              "requiresGuardedBudget": true
+            },
+            {
+              "ruleID": "risk.low.urgent",
+              "resultMode": "engage",
+              "riskLevels": [
+                "low"
+              ],
+              "requiresGuardedBudget": false,
+              "urgencyDetected": true
+            },
+            {
+              "ruleID": "risk.low.default",
+              "resultMode": "sentinel",
+              "riskLevels": [
+                "low"
+              ],
+              "requiresGuardedBudget": false,
+              "urgencyDetected": false
+            },
+            {
+              "ruleID": "risk.medium.protected_deep_loop",
+              "resultMode": "deepLoop",
+              "riskLevels": [
+                "medium"
+              ],
+              "requiresGuardedBudget": true,
+              "deepLoopCueDetected": true
+            },
+            {
+              "ruleID": "risk.medium.reflective_cue",
+              "resultMode": "reflect",
+              "riskLevels": [
+                "medium"
+              ],
+              "reflectiveCueDetected": true
+            },
+            {
+              "ruleID": "risk.medium.guarded_reflect",
+              "resultMode": "reflect",
+              "riskLevels": [
+                "medium"
+              ],
+              "requiresGuardedBudget": true
+            },
+            {
+              "ruleID": "risk.medium.default",
+              "resultMode": "engage",
+              "riskLevels": [
+                "medium"
+              ]
+            },
+            {
+              "ruleID": "risk.high.default",
+              "resultMode": "guard",
+              "riskLevels": [
+                "high"
+              ]
+            },
+            {
+              "ruleID": "risk.extreme.default",
+              "resultMode": "lockdown",
+              "riskLevels": [
+                "extreme"
+              ]
+            }
+          ]
+        },
+        "lease": {
+          "deepLoopDurationMs": 1800,
+          "protectedDurationMs": 1200,
+          "restrictedDurationMs": 900,
+          "standardEnergyQuota": 0.74,
+          "restrictedEnergyQuota": 0.46
+        },
+        "maintenance": {
+          "lightBatteryFloor": 0.22,
+          "standardBatteryFloor": 0.36,
+          "allowedThermalLevels": [
+            "nominal"
+          ],
+          "blockedForegroundStates": [
+            "foreground"
+          ],
+          "lightweightAllowedClass": "light",
+          "lightweightDeferredClass": "deferred",
+          "activeRunModeClass": "none",
+          "restrictedRunModeClass": "none"
+        },
+        "sovereignExecution": {
+          "toolCutOnBlockedPermit": true,
+          "memoryFreezeOnReviewedWrites": true,
+          "guardShiftOnHighRisk": true,
+          "deadStopOnExtremeBlockedPermit": false
+        },
+        "hostThresholds": {
+          "caution": 0.45,
+          "protective": 0.72,
+          "block": 0.92
+        },
+        "context": {
+          "trustInstabilityIncrement": 0.12,
+          "guardedPressureIncrement": 0.1,
+          "emotionalLoadHighRisk": 0.72,
+          "emotionalLoadReflective": 0.46,
+          "emotionalLoadDefault": 0.3,
+          "emotionalLoadDriftingIncrement": 0.09,
+          "timePressureReopen": 0.66,
+          "timePressureUrgent": 0.74,
+          "timePressureDefault": 0.24,
+          "ambiguityComparative": 0.42,
+          "ambiguityDefault": 0.28,
+          "consequenceHigh": 0.84,
+          "consequenceMedium": 0.56,
+          "consequenceLow": 0.26
+        },
+        "triSelf": {
+          "assertiveInitiativeLift": 0.06,
+          "idCostWeight": 0.4,
+          "egoReversibilityWeight": 0.5,
+          "egoConfidenceWeight": 0.5,
+          "directPathSuperegoPenalty": 0.46,
+          "reflectiveWeights": {
+            "id": 0.24,
+            "ego": 0.34,
+            "superego": 0.42
+          },
+          "coachingWeights": {
+            "id": 0.28,
+            "ego": 0.38,
+            "superego": 0.34
+          },
+          "protectiveWeights": {
+            "id": 0.18,
+            "ego": 0.3,
+            "superego": 0.52
+          }
+        },
+        "risk": {
+          "directCandidateLowReversibilityThreshold": 0.5,
+          "directCandidatePenalty": 0.12,
+          "vetoPressureIncrement": 0.08,
+          "emotionalLoadWeight": 0.2,
+          "timePressureWeight": 0.15,
+          "consequenceWeight": 0.25,
+          "manipulationHintWeight": 0.1,
+          "critiqueSeverityWeight": 0.2,
+          "mediumThreshold": 0.35,
+          "highThreshold": 0.65,
+          "extremeThreshold": 0.85,
+          "defaultForecastUncertainty": 0.24,
+          "defaultCandidateReversibility": 0.5,
+          "manipulationStrengthUnit": 0.35,
+          "gsiHintWeight": 0.26,
+          "gsiTimePressureThreshold": 0.6,
+          "gsiTimePressureIncrement": 0.12,
+          "gsiTrustDriftIncrement": 0.18,
+          "gsiLowTrustAlertIncrement": 0.1
+        }
+      }
+    }
+  },
+  "runtimeTuningPolicyID": "before.host.runtime-synthesis.v1",
+  "updatedAt": 0,
+  "hostProfile": {
+    "runtimeProfileID": "before.local-cognition",
+    "policyProfileID": "before.product-policy",
+    "prefersPureLocal": true,
+    "defaultDeviceState": {
+      "schemaVersion": "1.0.0",
+      "batteryLevel": 0.78,
+      "thermalLevel": "nominal",
+      "memoryFreeMB": 3072,
+      "networkState": "constrained",
+      "foregroundState": "foreground",
+      "cpuLoad": 0.18,
+      "gpuLoad": 0.1,
+      "npuAvailable": true,
+      "latencyBudgetMs": 1200
+    },
+    "hostRhythmProfile": {
+      "schemaVersion": "1.0.0",
+      "activeWindows": [
+        "foreground_interaction"
+      ],
+      "highFocusWindows": [
+        "deep_reflection"
+      ],
+      "lowEnergyWindows": [
+        "background_recovery"
+      ],
+      "preferredInteractionStyle": "bounded_reflective",
+      "sensitivityPeriods": [
+        "supportive_intervention"
+      ]
+    }
+  },
+  "brainBootstrapRecovery": {
+    "recoverySessionBiases": [
+      "brain-bootstrap-recovery",
+      "brain-bootstrap-remediation-required"
+    ],
+    "recoveryRetrievalTags": [
+      "recovery",
+      "restricted"
+    ],
+    "recoveryRestrictionTags": [
+      "restricted-lease",
+      "tool-write-blocked",
+      "memory-write-blocked",
+      "deep-loop-blocked"
+    ],
+    "recoveryFailureGuardIDs": [
+      "before.guard/bootstrap-recovery",
+      "before.guard/restricted-writes"
+    ],
+    "recoveryAllowedActionClasses": [
+      "render_local_guidance",
+      "load_governed_memory",
+      "render_recovery_status"
+    ],
+    "recoveryBlockedActionClasses": [
+      "cloud_escalation",
+      "autonomous_external_action",
+      "tool_write",
+      "memory_write",
+      "deep_loop_execution"
+    ],
+    "recoveryRequiredConfirmations": [
+      "operator_recovery_review"
+    ],
+    "recoveryBoundaryConstraints": [
+      "no_cloud_escalation",
+      "no_autonomous_external_action",
+      "lock_sensitive_memory",
+      "notification_requires_evidence",
+      "role_limited_advice"
+    ],
+    "recoveryBoundaryAuditHeadline": "Restricted recovery is active. Stay local, keep writes frozen, and recompile before trusting automation.",
+    "recoveryActiveTemplateIDs": [
+      "before.template/recovery-lane",
+      "before.template/recovery-remediation"
+    ],
+    "recoveryReactionWeightsByMode": {
+      "quick": {
+        "briefLanguage": 0.62,
+        "warmDirectTone": 0.58,
+        "lowCognitiveLoad": 0.54,
+        "interruptiveActionBias": 0.72,
+        "boundaryNamingBias": 0.34,
+        "tradeoffClarityBias": 0.38
+      },
+      "balance": {
+        "briefLanguage": 0.48,
+        "warmDirectTone": 0.56,
+        "lowCognitiveLoad": 0.4,
+        "interruptiveActionBias": 0.36,
+        "boundaryNamingBias": 0.44,
+        "tradeoffClarityBias": 0.76
+      },
+      "mirror": {
+        "briefLanguage": 0.44,
+        "warmDirectTone": 0.62,
+        "lowCognitiveLoad": 0.46,
+        "interruptiveActionBias": 0.28,
+        "boundaryNamingBias": 0.78,
+        "tradeoffClarityBias": 0.42
+      }
+    },
+    "recoveryIdentityProfilesByMode": {
+      "quick": {
+        "role": "stability_guide",
+        "posture": "coaching",
+        "initiative": "guided",
+        "confidenceCeiling": 0.72,
+        "canAdvise": true,
+        "canExecuteActions": false,
+        "canEscalateToCloud": false,
+        "relationshipBoundary": "Interrupt velocity without pretending certainty."
+      },
+      "balance": {
+        "role": "comparative_guide",
+        "posture": "reflective",
+        "initiative": "guided",
+        "confidenceCeiling": 0.76,
+        "canAdvise": true,
+        "canExecuteActions": false,
+        "canEscalateToCloud": false,
+        "relationshipBoundary": "Clarify competing pressures without taking ownership of the decision."
+      },
+      "mirror": {
+        "role": "reflective_witness",
+        "posture": "reflective",
+        "initiative": "passive",
+        "confidenceCeiling": 0.68,
+        "canAdvise": true,
+        "canExecuteActions": false,
+        "canEscalateToCloud": false,
+        "relationshipBoundary": "Reflect the pattern without becoming the center of the story."
+      }
+    },
+    "recoveryBoundaryRiskLevel": "low",
+    "recoveryCalibrationStatus": "drifting",
+    "recoveryCalibrationAlertIDs": [
+      "template_coverage_gap"
+    ],
+    "recoveryDriftScore": 0.82,
+    "recoveryPendingReviewCount": 2,
+    "recoverySuggestedAdjustments": [
+      "Restricted recovery is active. Review the projection-backed compiler before relying on this session."
+    ],
+    "recoveryDiffSummary": [
+      "Projection bootstrap recovery is active until the current brain state recompiles cleanly."
+    ],
+    "recoveryIssueSeverity": "warning",
+    "recoveryIssueSummary": "Before entered a restricted recovery lane while bootstrapping current brain state from projection.",
+    "recoveryIssueRemediation": "Keep the session in restricted recovery, block deep loops, memory writes, and tool writes, then re-run bootstrap before trusting new automatic state.",
+    "quarantineEscalationThreshold": 2,
+    "quarantineSessionBiases": [
+      "brain-bootstrap-quarantine",
+      "brain-bootstrap-remediation-required"
+    ],
+    "quarantineRetrievalTags": [
+      "quarantine",
+      "restricted"
+    ],
+    "quarantineRestrictionTags": [
+      "restricted-lease",
+      "tool-write-blocked",
+      "memory-write-blocked",
+      "deep-loop-blocked"
+    ],
+    "quarantineFailureGuardIDs": [
+      "before.guard/bootstrap-recovery",
+      "before.guard/bootstrap-quarantine",
+      "before.guard/restricted-writes"
+    ],
+    "quarantineAllowedActionClasses": [
+      "render_local_guidance",
+      "load_governed_memory",
+      "render_recovery_status"
+    ],
+    "quarantineBlockedActionClasses": [
+      "cloud_escalation",
+      "autonomous_external_action",
+      "tool_write",
+      "memory_write",
+      "deep_loop_execution",
+      "checkpoint_mutation",
+      "notification_dispatch"
+    ],
+    "quarantineRequiredConfirmations": [
+      "operator_recovery_review",
+      "operator_quarantine_release"
+    ],
+    "quarantineBoundaryConstraints": [
+      "no_cloud_escalation",
+      "no_autonomous_external_action",
+      "lock_sensitive_memory",
+      "notification_requires_evidence",
+      "role_limited_advice",
+      "confirm_irreversible_action"
+    ],
+    "quarantineBoundaryAuditHeadline": "Bootstrap quarantine is active. Keep automation bounded, preserve evidence, and require operator review before any release.",
+    "quarantineActiveTemplateIDs": [
+      "before.template/recovery-lane",
+      "before.template/quarantine-lane",
+      "before.template/recovery-remediation"
+    ],
+    "quarantineReactionWeightsByMode": {
+      "quick": {
+        "briefLanguage": 0.62,
+        "warmDirectTone": 0.58,
+        "lowCognitiveLoad": 0.54,
+        "interruptiveActionBias": 0.72,
+        "boundaryNamingBias": 0.34,
+        "tradeoffClarityBias": 0.38
+      },
+      "balance": {
+        "briefLanguage": 0.48,
+        "warmDirectTone": 0.56,
+        "lowCognitiveLoad": 0.4,
+        "interruptiveActionBias": 0.36,
+        "boundaryNamingBias": 0.44,
+        "tradeoffClarityBias": 0.76
+      },
+      "mirror": {
+        "briefLanguage": 0.44,
+        "warmDirectTone": 0.62,
+        "lowCognitiveLoad": 0.46,
+        "interruptiveActionBias": 0.28,
+        "boundaryNamingBias": 0.78,
+        "tradeoffClarityBias": 0.42
+      }
+    },
+    "quarantineIdentityProfilesByMode": {
+      "quick": {
+        "role": "stability_guide",
+        "posture": "coaching",
+        "initiative": "guided",
+        "confidenceCeiling": 0.72,
+        "canAdvise": true,
+        "canExecuteActions": false,
+        "canEscalateToCloud": false,
+        "relationshipBoundary": "Interrupt velocity without pretending certainty."
+      },
+      "balance": {
+        "role": "comparative_guide",
+        "posture": "reflective",
+        "initiative": "guided",
+        "confidenceCeiling": 0.76,
+        "canAdvise": true,
+        "canExecuteActions": false,
+        "canEscalateToCloud": false,
+        "relationshipBoundary": "Clarify competing pressures without taking ownership of the decision."
+      },
+      "mirror": {
+        "role": "reflective_witness",
+        "posture": "reflective",
+        "initiative": "passive",
+        "confidenceCeiling": 0.68,
+        "canAdvise": true,
+        "canExecuteActions": false,
+        "canEscalateToCloud": false,
+        "relationshipBoundary": "Reflect the pattern without becoming the center of the story."
+      }
+    },
+    "quarantineBoundaryRiskLevel": "low",
+    "quarantineCalibrationStatus": "drifting",
+    "quarantineCalibrationAlertIDs": [
+      "template_coverage_gap",
+      "low_trust_load"
+    ],
+    "quarantineDriftScore": 0.94,
+    "quarantinePendingReviewCount": 3,
+    "quarantineSuggestedAdjustments": [
+      "Quarantine is active. Hold tool and memory writes until the projection-backed compiler recompiles cleanly."
+    ],
+    "quarantineDiffSummary": [
+      "Projection bootstrap entered quarantine after repeated failure and remains blocked until a clean recovery completes."
+    ],
+    "quarantineIssueSeverity": "critical",
+    "quarantineIssueSummary": "Before escalated current-brain bootstrap into quarantine after repeated projection bootstrap failure.",
+    "quarantineIssueRemediation": "Keep the session in quarantine, maintain the restricted recovery contract, and do not re-enable writes until the current brain state recompiles cleanly."
+  }
+}

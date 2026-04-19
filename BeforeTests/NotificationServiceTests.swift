@@ -41,4 +41,58 @@ final class NotificationServiceTests: XCTestCase {
         XCTAssertEqual(identifier, "before.predictive.intervention.aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
         XCTAssertEqual(identifier, identifier.lowercased())
     }
+
+    func testPredictiveNotificationPresentationUsesCandidateCopyAndFutureDelay() {
+        let id = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!
+        let now = Date(timeIntervalSince1970: 100)
+        let candidate = InterventionPredictionCandidate(
+            id: id,
+            riskLevel: .medium,
+            title: "  Use the candidate headline.  ",
+            detail: "Use the candidate detail.",
+            reason: "candidate reason",
+            createdAt: now,
+            expiresAt: now.addingTimeInterval(300)
+        )
+
+        let presentation = BeforePredictiveInterventionNotificationPresentationSupport.presentation(
+            for: candidate,
+            now: now
+        )
+
+        XCTAssertEqual(
+            presentation.identifier,
+            "before.predictive.intervention.11111111-2222-3333-4444-555555555555"
+        )
+        XCTAssertEqual(presentation.title, "Use the candidate headline.")
+        XCTAssertEqual(presentation.body, "Use the candidate detail.")
+        XCTAssertEqual(presentation.timeInterval, 90)
+    }
+
+    func testPredictiveNotificationPresentationFallsBackToSharedRiskCopyWhenCandidateCopyIsBlank() {
+        let now = Date(timeIntervalSince1970: 200)
+        let candidate = InterventionPredictionCandidate(
+            riskLevel: .high,
+            title: "   ",
+            detail: "\n",
+            reason: "candidate reason",
+            createdAt: now,
+            expiresAt: now.addingTimeInterval(-10)
+        )
+
+        let presentation = BeforePredictiveInterventionNotificationPresentationSupport.presentation(
+            for: candidate,
+            now: now
+        )
+
+        XCTAssertEqual(
+            presentation.title,
+            BeforeProductCompatibility.predictiveInterventionPresentation.highRiskTitle
+        )
+        XCTAssertEqual(
+            presentation.body,
+            BeforeProductCompatibility.predictiveInterventionPresentation.highRiskDetail
+        )
+        XCTAssertEqual(presentation.timeInterval, 60)
+    }
 }

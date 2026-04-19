@@ -24,7 +24,7 @@ struct PendingLaunchRequest: Codable, Sendable, Equatable {
         self.entrySource = entrySource
         self.preferredModeRaw = preferredMode?.rawValue
         self.scenarioRaw = scenario?.rawValue
-        self.prompt = prompt
+        self.prompt = Self.cleanedPrompt(prompt)
         self.requestedAt = requestedAt
         self.expiresAt = expiresAt ?? requestedAt.addingTimeInterval(BeforePolicy.LaunchRequests.expirationInterval)
         self.schemaVersion = schemaVersion
@@ -40,6 +40,100 @@ struct PendingLaunchRequest: Codable, Sendable, Equatable {
 
     var scenario: ScenarioType? {
         scenarioRaw.flatMap(ScenarioType.init(rawValue:))
+    }
+
+    var sanitizedPrompt: String {
+        Self.cleanedPrompt(prompt) ?? ""
+    }
+
+    var decisionIntentEnvelope: DecisionIntentEnvelope {
+        if let scenario {
+            return .quickCapture(
+                entrySource: entrySource,
+                scenario: scenario,
+                promptSeed: prompt,
+                requestedAt: requestedAt,
+                expiresAt: expiresAt
+            )
+        }
+
+        if let preferredMode {
+            return .openMode(
+                entrySource: entrySource,
+                mode: preferredMode,
+                promptSeed: prompt,
+                requestedAt: requestedAt,
+                expiresAt: expiresAt
+            )
+        }
+
+        return .routedInput(
+            entrySource: entrySource,
+            promptSeed: prompt,
+            requestedAt: requestedAt,
+            expiresAt: expiresAt
+        )
+    }
+
+    static func quickCapture(
+        id: UUID = UUID(),
+        entrySource: EntrySource,
+        scenario: ScenarioType? = nil,
+        prompt: String? = nil,
+        requestedAt: Date = .now,
+        expiresAt: Date? = nil
+    ) -> PendingLaunchRequest {
+        PendingLaunchRequest(
+            id: id,
+            entrySource: entrySource,
+            preferredMode: nil,
+            scenario: scenario,
+            prompt: prompt,
+            requestedAt: requestedAt,
+            expiresAt: expiresAt
+        )
+    }
+
+    static func openMode(
+        id: UUID = UUID(),
+        entrySource: EntrySource,
+        mode: DecisionMode,
+        prompt: String? = nil,
+        requestedAt: Date = .now,
+        expiresAt: Date? = nil
+    ) -> PendingLaunchRequest {
+        PendingLaunchRequest(
+            id: id,
+            entrySource: entrySource,
+            preferredMode: mode,
+            scenario: nil,
+            prompt: prompt,
+            requestedAt: requestedAt,
+            expiresAt: expiresAt
+        )
+    }
+
+    static func routedPrompt(
+        id: UUID = UUID(),
+        entrySource: EntrySource,
+        prompt: String,
+        requestedAt: Date = .now,
+        expiresAt: Date? = nil
+    ) -> PendingLaunchRequest {
+        PendingLaunchRequest(
+            id: id,
+            entrySource: entrySource,
+            preferredMode: nil,
+            scenario: nil,
+            prompt: prompt,
+            requestedAt: requestedAt,
+            expiresAt: expiresAt
+        )
+    }
+
+    private static func cleanedPrompt(_ text: String?) -> String? {
+        let cleanedText = text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleanedText?.isEmpty == true ? nil : cleanedText
     }
 }
 
@@ -61,8 +155,18 @@ private struct PendingLaunchRequestEnvelope: Codable, Equatable {
         self.requestedAt = request.requestedAt
         self.expiresAt = request.expiresAt
         self.schemaVersion = request.schemaVersion
-        self.hasProtectedPayload = preservingProtectedPayload
-            && !(request.prompt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        self.hasProtectedPayload = preservingProtectedPayload && !request.sanitizedPrompt.isEmpty
+    }
+
+    init(envelope: DecisionIntentEnvelope, preservingProtectedPayload: Bool = true) {
+        self.id = envelope.id
+        self.entrySource = envelope.entrySource
+        self.preferredModeRaw = envelope.preferredModeRaw
+        self.scenarioRaw = envelope.scenarioRaw
+        self.requestedAt = envelope.requestedAt
+        self.expiresAt = envelope.expiresAt
+        self.schemaVersion = BeforePolicy.LaunchRequests.schemaVersion
+        self.hasProtectedPayload = preservingProtectedPayload && !envelope.sanitizedPromptSeed.isEmpty
     }
 
     var preferredMode: DecisionMode? {
@@ -95,17 +199,42 @@ enum PendingLaunchRequestStore {
     private static let queueStorage = CodableStateStorage.sharedProtected
 
     static func enqueue(_ request: PendingLaunchRequest) {
+        enqueueStoredEnvelope(
+            PendingLaunchRequestEnvelope(request: request),
+            protectedPrompt: request.prompt
+        )
+    }
+
+    static func enqueue(_ envelope: DecisionIntentEnvelope) {
+        enqueueStoredEnvelope(
+            PendingLaunchRequestEnvelope(envelope: envelope),
+            protectedPrompt: envelope.promptSeed
+        )
+    }
+
+    static func set(_ request: PendingLaunchRequest) {
+        enqueue(request)
+    }
+
+    static func set(_ envelope: DecisionIntentEnvelope) {
+        enqueue(envelope)
+    }
+
+    private static func enqueueStoredEnvelope(
+        _ envelope: PendingLaunchRequestEnvelope,
+        protectedPrompt: String?
+    ) {
         let current = loadStoredEnvelopeQueue()
         let merged = Array(
-            (current.filter { $0.id != request.id } + [PendingLaunchRequestEnvelope(request: request)])
+            (current.filter { $0.id != envelope.id } + [envelope])
                 .suffix(BeforePolicy.LaunchRequests.maxQueuedRequests)
         )
 
-        guard persistProtectedPayload(for: request) else { return }
+        guard persistProtectedPayload(for: envelope.id, prompt: protectedPrompt) else { return }
         let queuePersisted = persistQueue(merged)
         if !queuePersisted {
-            if !current.contains(where: { $0.id == request.id }) {
-                clearProtectedPayload(for: request.id)
+            if !current.contains(where: { $0.id == envelope.id }) {
+                clearProtectedPayload(for: envelope.id)
             }
             cleanupOrphanProtectedPayloads(referencedBy: current)
             scrubLegacyStorage()
@@ -117,28 +246,16 @@ enum PendingLaunchRequestStore {
         scrubLegacyStorage()
     }
 
-    static func set(_ request: PendingLaunchRequest) {
-        enqueue(request)
+    static func consume() -> PendingLaunchRequest? {
+        consumeStoredValue(materialize)
     }
 
-    static func consume() -> PendingLaunchRequest? {
-        var queue = loadStoredEnvelopeQueue()
-        guard !queue.isEmpty else {
-            queueStorage.clear(key: key)
-            cleanupOrphanProtectedPayloads(referencedBy: [])
-            scrubLegacyStorage()
-            return nil
-        }
+    static func consumeEnvelope() -> DecisionIntentEnvelope? {
+        consumeStoredValue(materializeDecisionIntentEnvelope)
+    }
 
-        let next = queue.removeFirst()
-        let persisted = persistQueue(queue)
-        if !persisted {
-            return nil
-        }
-        let restored = materialize(next)
-        cleanupOrphanProtectedPayloads(referencedBy: queue)
-        defer { clearProtectedPayload(for: next.id) }
-        return restored
+    static func consumeDecisionIntentEnvelope() -> DecisionIntentEnvelope? {
+        consumeEnvelope()
     }
 
     static func clear() {
@@ -151,6 +268,13 @@ enum PendingLaunchRequestStore {
 
     static func normalizedQueue(from data: Data?, now: Date = .now) -> [PendingLaunchRequest] {
         normalizedEnvelopeQueue(from: data, now: now).map(materialize)
+    }
+
+    static func normalizedDecisionIntentEnvelopeQueue(
+        from data: Data?,
+        now: Date = .now
+    ) -> [DecisionIntentEnvelope] {
+        normalizedEnvelopeQueue(from: data, now: now).map(materializeDecisionIntentEnvelope)
     }
 
     private static func loadStoredEnvelopeQueue(now: Date = .now) -> [PendingLaunchRequestEnvelope] {
@@ -241,41 +365,84 @@ enum PendingLaunchRequestStore {
     }
 
     private static func materialize(_ envelope: PendingLaunchRequestEnvelope) -> PendingLaunchRequest {
-        let payload: PendingLaunchRequestPayload?
-        if envelope.hasProtectedPayload {
-            payload = CodableStateStorage.sharedProtected.load(
-                PendingLaunchRequestPayload.self,
-                key: payloadKey(for: envelope.id)
-            )
-        } else {
-            payload = nil
-        }
-
         return PendingLaunchRequest(
             id: envelope.id,
             entrySource: envelope.entrySource,
             preferredMode: envelope.preferredMode,
             scenario: envelope.scenario,
-            prompt: payload?.prompt,
+            prompt: protectedPrompt(for: envelope),
             requestedAt: envelope.requestedAt,
             expiresAt: envelope.expiresAt,
             schemaVersion: envelope.schemaVersion
         )
     }
 
+    private static func materializeDecisionIntentEnvelope(
+        _ envelope: PendingLaunchRequestEnvelope
+    ) -> DecisionIntentEnvelope {
+        let kind: DecisionIntentKind
+        if envelope.scenario != nil {
+            kind = .quickCapture
+        } else if envelope.preferredMode != nil {
+            kind = .openMode
+        } else {
+            kind = .routedInput
+        }
+
+        return DecisionIntentEnvelope(
+            id: envelope.id,
+            kind: kind,
+            sourceSurface: envelope.entrySource.intentSourceSurface,
+            entrySource: envelope.entrySource,
+            preferredMode: envelope.preferredMode,
+            scenario: envelope.scenario,
+            promptSeed: protectedPrompt(for: envelope),
+            requestedAt: envelope.requestedAt,
+            expiresAt: envelope.expiresAt
+        )
+    }
+
+    private static func protectedPrompt(for envelope: PendingLaunchRequestEnvelope) -> String? {
+        guard envelope.hasProtectedPayload else { return nil }
+        return CodableStateStorage.sharedProtected.load(
+            PendingLaunchRequestPayload.self,
+            key: payloadKey(for: envelope.id)
+        )?.prompt
+    }
+
+    private static func consumeStoredValue<T>(
+        _ materialize: (PendingLaunchRequestEnvelope) -> T
+    ) -> T? {
+        var queue = loadStoredEnvelopeQueue()
+        guard !queue.isEmpty else {
+            queueStorage.clear(key: key)
+            cleanupOrphanProtectedPayloads(referencedBy: [])
+            scrubLegacyStorage()
+            return nil
+        }
+
+        let next = queue.removeFirst()
+        let persisted = persistQueue(queue)
+        if !persisted {
+            return nil
+        }
+        let restored = materialize(next)
+        cleanupOrphanProtectedPayloads(referencedBy: queue)
+        defer { clearProtectedPayload(for: next.id) }
+        return restored
+    }
+
     @discardableResult
-    private static func persistProtectedPayload(for request: PendingLaunchRequest) -> Bool {
-        guard
-            let prompt = request.prompt?.trimmingCharacters(in: .whitespacesAndNewlines),
-            !prompt.isEmpty
-        else {
-            clearProtectedPayload(for: request.id)
+    private static func persistProtectedPayload(for id: UUID, prompt: String?) -> Bool {
+        let prompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !prompt.isEmpty else {
+            clearProtectedPayload(for: id)
             return true
         }
 
         return CodableStateStorage.sharedProtected.save(
             PendingLaunchRequestPayload(prompt: prompt),
-            key: payloadKey(for: request.id)
+            key: payloadKey(for: id)
         )
     }
 

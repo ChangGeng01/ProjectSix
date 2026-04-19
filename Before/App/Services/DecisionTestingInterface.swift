@@ -6,6 +6,7 @@ struct DecisionTestingRuntimeSnapshot: Equatable, Sendable {
     let preferences: BeforePreferences
     let testingStubProfile: DecisionTestingStubProfile?
     let executionProfile: DecisionIntelligenceExecutionProfile
+    let runtimePolicyResolution: BeforeRuntimePolicyResolution
     let activeTaskGraph: DecisionTaskGraphSnapshot?
     let inferenceBackendPolicy: InferenceBackendPolicy
     let deviceCapabilities: DeviceCapabilitySnapshot
@@ -19,6 +20,100 @@ struct DecisionTestingRuntimeSnapshot: Equatable, Sendable {
     let gemmaRuntimeStatus: GemmaLocalRuntimeStatus
     let registeredProviders: [DecisionModelProviderDescriptor]
     let localModelLibrary: DecisionLocalModelLibrarySnapshot
+
+    var runtimePolicyLineage: BeforeRuntimePolicyLineage {
+        runtimePolicyResolution.lineage
+    }
+
+    var runtimePolicyIssues: [BeforeRuntimePolicyIssue] {
+        runtimePolicyResolution.issues
+    }
+
+    var hostRuntime: BASHostRuntime {
+        BeforeProductCompatibility.makeHostRuntime(
+            runtimePolicyResolution: runtimePolicyResolution,
+            vitalMonitor: DecisionTestingRuntimeSnapshotVitalMonitor(snapshot: self)
+        )
+    }
+
+    var executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame {
+        DecisionEBrainExecutionCapabilityFrame.build(
+            runtimeSnapshot: self,
+            registeredProviders: registeredProviders
+        )
+    }
+}
+
+private struct DecisionTestingRuntimeSnapshotVitalMonitor: BASVitalMonitorServicing {
+    let snapshot: DecisionTestingRuntimeSnapshot
+
+    func currentDeviceState(now: Date) -> BASDeviceState {
+        let capabilities = snapshot.deviceCapabilities
+        let memoryFreeMB = max(1_024, capabilities.physicalMemoryGB * 768)
+        let batteryLevel = capabilities.isLowPowerModeEnabled ? 0.24 : 0.76
+        let networkState: BASNetworkState =
+            snapshot.preferences.onDeviceIntelligenceMode.isEnabled ? .constrained : .online
+
+        let gpuLoad: Double
+        switch snapshot.gemmaBackendResolution.effectiveBackend {
+        case .metal:
+            gpuLoad = 0.34
+        case .coreML, .systemManaged:
+            gpuLoad = 0.14
+        case .cpu:
+            gpuLoad = 0.06
+        }
+
+        let cpuLoad: Double
+        switch snapshot.executionProfile.tier {
+        case .off, .simulator, .conservativeDeterministic:
+            cpuLoad = 0.12
+        case .balancedGemma, .fullGemma, .systemManaged, .testingOverride:
+            cpuLoad = 0.20
+        }
+
+        let latencyBudgetMs: Int
+        switch snapshot.executionProfile.adaptationMatrix.runtimeGear {
+        case .low:
+            latencyBudgetMs = 1_200
+        case .balanced:
+            latencyBudgetMs = 1_500
+        case .high:
+            latencyBudgetMs = 1_800
+        }
+
+        return BASDeviceState(
+            batteryLevel: batteryLevel,
+            thermalLevel: thermalLevel(
+                isLowPowerModeEnabled: capabilities.isLowPowerModeEnabled
+            ),
+            memoryFreeMB: memoryFreeMB,
+            networkState: networkState,
+            foregroundState: .foreground,
+            cpuLoad: cpuLoad,
+            gpuLoad: gpuLoad,
+            npuAvailable: capabilities.supportsCoreMLAcceleration,
+            latencyBudgetMs: latencyBudgetMs
+        )
+    }
+
+    private func thermalLevel(
+        isLowPowerModeEnabled: Bool
+    ) -> BASThermalLevel {
+        let processThermal = ProcessInfo.processInfo.thermalState
+        switch processThermal {
+        case .nominal:
+            return isLowPowerModeEnabled ? .warm : .nominal
+        case .fair:
+            return .warm
+        case .serious:
+            return .hot
+        case .critical:
+            return .critical
+        @unknown default:
+            return isLowPowerModeEnabled ? .warm : .nominal
+        }
+    }
 }
 
 struct DecisionTestingLaunchOptions: Equatable, Sendable {
@@ -170,6 +265,7 @@ enum DecisionTestingInterface {
 
     static func runtimeSnapshot(
         preferences: BeforePreferences = effectivePreferences(),
+        runtimePolicyResolution: BeforeRuntimePolicyResolution? = nil,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> DecisionTestingRuntimeSnapshot {
         let override = environmentOverride(environment: environment)
@@ -187,10 +283,18 @@ enum DecisionTestingInterface {
             title: "Unavailable",
             detail: "No open-model runtime is registered."
         )
-        let executionProfile = DecisionIntelligenceCoordinator.executionProfile(
+        let foundationStatus = FoundationModelsIntelligenceService.availabilityStatus
+        let gemmaProviderStatus = GemmaE4BIntelligenceService.availabilityStatus
+        let resolvedRuntimePolicyResolution =
+            runtimePolicyResolution ?? BeforeProductCompatibility.resolvedRuntimePolicy
+        let runtimeCoordination = DecisionIntelligenceCoordinator.runtimeCoordination(
             preferences: preferences,
             testingStubProfile: stubProfile,
-            device: deviceCapabilities
+            device: deviceCapabilities,
+            runtimePolicyResolution: resolvedRuntimePolicyResolution,
+            openModelStatus: openModelProviderStatus,
+            gemmaStatus: gemmaProviderStatus,
+            foundationStatus: foundationStatus
         )
         let localModelLibrary = DecisionLocalModelLibrarySnapshot.current(
             preferredProvider: preferences.preferredIntelligenceProvider,
@@ -214,18 +318,15 @@ enum DecisionTestingInterface {
         return DecisionTestingRuntimeSnapshot(
             preferences: preferences,
             testingStubProfile: stubProfile,
-            executionProfile: executionProfile,
+            executionProfile: runtimeCoordination.executionProfile,
+            runtimePolicyResolution: resolvedRuntimePolicyResolution,
             activeTaskGraph: preferences.restoreInProgressWorkspaces ? DecisionTaskGraphStore.load() : nil,
             inferenceBackendPolicy: backendPolicy,
             deviceCapabilities: deviceCapabilities,
             gemmaBackendResolution: gemmaBackendResolution,
-            runtimeStatus: DecisionIntelligenceCoordinator.runtimeStatus(
-                preferences: preferences,
-                testingStubProfile: stubProfile,
-                device: deviceCapabilities
-            ),
-            foundationStatus: FoundationModelsIntelligenceService.availabilityStatus,
-            gemmaProviderStatus: GemmaE4BIntelligenceService.availabilityStatus,
+            runtimeStatus: runtimeCoordination.runtimeStatus,
+            foundationStatus: foundationStatus,
+            gemmaProviderStatus: gemmaProviderStatus,
             openModelProviderStatus: openModelProviderStatus,
             openModelRuntimeStatus: localModelLibrary.openModelRuntimeStatus,
             gemmaBundleStatus: GemmaE4BIntelligenceService.modelBundleStatus,

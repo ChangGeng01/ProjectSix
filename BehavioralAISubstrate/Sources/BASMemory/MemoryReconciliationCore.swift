@@ -191,19 +191,22 @@ public struct BASMemoryReconciliationRequest: Codable, Equatable, Sendable {
     public var existingCandidates: [BASExistingCandidateMemorySnapshot]
     public var reviewNow: Date
     public var memoryTrustBehavior: BASMemoryTrustBehavior
+    public var persistencePolicy: BASMemoryHorizonPersistencePolicy
 
     public init(
         drafts: [BASMemoryReconciliationDraftInput],
         existingRecords: [BASExistingGovernedMemorySnapshot],
         existingCandidates: [BASExistingCandidateMemorySnapshot],
         reviewNow: Date,
-        memoryTrustBehavior: BASMemoryTrustBehavior = .generic
+        memoryTrustBehavior: BASMemoryTrustBehavior = .generic,
+        persistencePolicy: BASMemoryHorizonPersistencePolicy = .unrestricted
     ) {
         self.drafts = drafts
         self.existingRecords = existingRecords
         self.existingCandidates = existingCandidates
         self.reviewNow = reviewNow
         self.memoryTrustBehavior = memoryTrustBehavior
+        self.persistencePolicy = persistencePolicy
     }
 }
 
@@ -231,13 +234,15 @@ public enum BASMemoryReconciler {
         var seenDraftIDs = Set<String>()
 
         for input in request.drafts {
-            let draft = input.draft
+            let preparedDraft = BASMemoryGovernance.prepare(
+                draft: input.draft,
+                behavior: request.memoryTrustBehavior,
+                persistencePolicy: request.persistencePolicy
+            )
+            let draft = preparedDraft.draft
             seenDraftIDs.insert(draft.id)
 
-            let assessment = BASMemoryGovernance.assess(
-                draft: draft,
-                behavior: request.memoryTrustBehavior
-            )
+            let assessment = preparedDraft.assessment
 
             if assessment.decision == .reject {
                 if recordsByID[draft.id] != nil {

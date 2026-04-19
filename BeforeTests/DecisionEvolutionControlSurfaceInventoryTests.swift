@@ -43,6 +43,130 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
     }
 
     @Test
+    func inventoryPrefersExplicitCheckpointAnchorOverCloserTimestamp() {
+        let target = makeLineage(
+            checkpointID: "anchor-target",
+            createdAt: Date(timeIntervalSince1970: 10),
+            mode: .quick,
+            approvalState: .automatic,
+            source: .persistedCheckpoint
+        )
+        let closer = makeLineage(
+            checkpointID: "anchor-closer",
+            createdAt: Date(timeIntervalSince1970: 20),
+            mode: .quick,
+            approvalState: .automatic,
+            source: .persistedCheckpoint
+        )
+        let inventory = DecisionEvolutionControlSurfaceInventory(
+            pendingReviewQueue: [],
+            persistedLineages: [target, closer],
+            activeCheckpoint: nil,
+            restorableCheckpointIDs: []
+        )
+        let context = DecisionTestingCheckpointSelectionContext(
+            mode: .quick,
+            source: .liveRuntime,
+            referenceDate: Date(timeIntervalSince1970: 21),
+            explicitCheckpointID: "anchor-target"
+        )
+
+        #expect(
+            inventory.latestPersistedLineage(matching: context)?.checkpointID == "anchor-target"
+        )
+    }
+
+    @Test
+    func inventoryPrefersThoughtFoldAnchorOverSharedSessionAndCloserTimestamp() {
+        let checksumTarget = makeLineage(
+            checkpointID: "fold-target",
+            createdAt: Date(timeIntervalSince1970: 10),
+            mode: .quick,
+            approvalState: .automatic,
+            source: .persistedCheckpoint,
+            sessionID: "session-shared",
+            thoughtFoldChecksum: "fold-anchor-target"
+        )
+        let closerButWrongFold = makeLineage(
+            checkpointID: "fold-closer",
+            createdAt: Date(timeIntervalSince1970: 20),
+            mode: .quick,
+            approvalState: .automatic,
+            source: .persistedCheckpoint,
+            sessionID: "session-shared",
+            thoughtFoldChecksum: "fold-other"
+        )
+        let inventory = DecisionEvolutionControlSurfaceInventory(
+            pendingReviewQueue: [],
+            persistedLineages: [checksumTarget, closerButWrongFold],
+            activeCheckpoint: nil,
+            restorableCheckpointIDs: []
+        )
+        let context = DecisionTestingCheckpointSelectionContext(
+            mode: .quick,
+            source: .liveRuntime,
+            referenceDate: Date(timeIntervalSince1970: 21),
+            thoughtFoldChecksum: "fold-anchor-target",
+            sessionID: "session-shared"
+        )
+
+        #expect(
+            inventory.latestPersistedLineage(matching: context)?.checkpointID == "fold-target"
+        )
+    }
+
+    @Test
+    func inventoryPrefersStructuredAnchorMetadataOverCloserTimestampWhenFoldAndSessionTie() {
+        let target = makeLineage(
+            checkpointID: "metadata-target",
+            createdAt: Date(timeIntervalSince1970: 10),
+            mode: .quick,
+            approvalState: .automatic,
+            source: .persistedCheckpoint,
+            sessionID: "session-shared",
+            thoughtFoldChecksum: "fold-shared",
+            riskLevel: "high",
+            permitMode: "delay",
+            hostGatePercent: 77,
+            reviewDirectiveLine: "Review memory write: Keep the parser-only correction local."
+        )
+        let closerButWrongMetadata = makeLineage(
+            checkpointID: "metadata-closer",
+            createdAt: Date(timeIntervalSince1970: 20),
+            mode: .quick,
+            approvalState: .automatic,
+            source: .persistedCheckpoint,
+            sessionID: "session-shared",
+            thoughtFoldChecksum: "fold-shared",
+            riskLevel: "medium",
+            permitMode: "compare",
+            hostGatePercent: 61,
+            reviewDirectiveLine: "Review reflection draft: broaden the guidance."
+        )
+        let inventory = DecisionEvolutionControlSurfaceInventory(
+            pendingReviewQueue: [],
+            persistedLineages: [target, closerButWrongMetadata],
+            activeCheckpoint: nil,
+            restorableCheckpointIDs: []
+        )
+        let context = DecisionTestingCheckpointSelectionContext(
+            mode: .quick,
+            source: nil,
+            referenceDate: Date(timeIntervalSince1970: 21),
+            thoughtFoldChecksum: "fold-shared",
+            sessionID: "session-shared",
+            riskLevel: "high",
+            permitMode: "delay",
+            hostGatePercent: 77,
+            reviewDirectiveLine: "Review memory write: Keep the parser-only correction local."
+        )
+
+        #expect(
+            inventory.latestPersistedLineage(matching: context)?.checkpointID == "metadata-target"
+        )
+    }
+
+    @Test
     func inventorySurfaceBuildPreservesPendingQueueAndRollbackFacts() {
         let review = DecisionReviewCheckpointSnapshot(
             checkpointID: "review-1",
@@ -412,7 +536,13 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
         createdAt: Date,
         mode: DecisionMode,
         approvalState: DecisionEvolutionApprovalState,
-        source: DeveloperDecisionReplayEBrainSource
+        source: DeveloperDecisionReplayEBrainSource,
+        sessionID: String? = nil,
+        thoughtFoldChecksum: String? = nil,
+        riskLevel: String = "high",
+        permitMode: String = "delay",
+        hostGatePercent: Int = 75,
+        reviewDirectiveLine: String? = nil
     ) -> DecisionEvolutionLineageSnapshot {
         DecisionEvolutionLineageSnapshot(
             checkpointID: checkpointID,
@@ -426,7 +556,13 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
             eBrain: makeReplaySummary(
                 checkpointID: checkpointID,
                 recordedAt: createdAt,
-                source: source
+                source: source,
+                sessionID: sessionID,
+                thoughtFoldChecksum: thoughtFoldChecksum,
+                riskLevel: riskLevel,
+                permitMode: permitMode,
+                hostGatePercent: hostGatePercent,
+                reviewDirectiveLine: reviewDirectiveLine
             )
         )
     }
@@ -434,17 +570,24 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
     private func makeReplaySummary(
         checkpointID: String,
         recordedAt: Date,
-        source: DeveloperDecisionReplayEBrainSource
+        source: DeveloperDecisionReplayEBrainSource,
+        sessionID: String? = nil,
+        thoughtFoldChecksum: String? = nil,
+        riskLevel: String = "high",
+        permitMode: String = "delay",
+        hostGatePercent: Int = 75,
+        reviewDirectiveLine: String? = nil
     ) -> DeveloperDecisionReplayEBrainSummary {
         DeveloperDecisionReplayEBrainSummary(lineageSummary: BASEvolutionLineageSummary(
             recordedAt: recordedAt,
-            sessionID: "session-\(checkpointID)",
+            sessionID: sessionID ?? "session-\(checkpointID)",
             taskType: source == .liveRuntime ? "decision-live" : "decision-persisted",
-            riskLevel: "high",
-            permitMode: "delay",
-            hostGatePercent: 75,
-            thoughtFoldChecksum: "fold-\(checkpointID)",
+            riskLevel: riskLevel,
+            permitMode: permitMode,
+            hostGatePercent: hostGatePercent,
+            thoughtFoldChecksum: thoughtFoldChecksum ?? "fold-\(checkpointID)",
             updateTicketSummaries: ["ticket-\(checkpointID)"],
+            reviewDirectiveLine: reviewDirectiveLine,
             guardrailFindings: [],
             recommendedKillSwitches: []
         ))

@@ -158,34 +158,36 @@ enum DecisionEvolutionReleaseSummaryActionSupport {
         surfaceContract: DecisionEvolutionSurfaceContract,
         navigationOptions: DecisionEvolutionNavigationSurfaceOptions
     ) -> DecisionEvolutionReleaseSummaryActionPresentation {
-        let allowsLocalMutationActions = !surfaceContract.routesMutationsToControlCenter
-        let rollbackIntent = DecisionEvolutionMutationIntentFactory.rollbackActiveCheckpoint(
+        let allowsLocalMutationActions = surfaceContract.allowsMutations
+        let policy = DecisionEvolutionPolicyEngine.evaluate(
+            DecisionEvolutionPolicyEngine.input(
+                controlSurface: controlSurface,
+                releaseSummary: nil,
+                activeKillSwitches: controlSurface.activeKillSwitches,
+                recommendedKillSwitches: controlSurface.queueKillSwitches,
+                canRestoreActiveCheckpoint: controlSurface.activePresentation?.applyReady == true,
+                canRollbackActiveCheckpoint: controlSurface.canRollbackActiveCheckpoint,
+                allowsLocalMutationActions: allowsLocalMutationActions
+            )
+        )
+        let actionPlan = policy.surfaceActionPlan(
+            navigationOptions: navigationOptions,
+            routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter
+        )
+        let actionBundle = DecisionEvolutionWorkspaceMutationActionBundle.build(
             controlSurface: controlSurface
         )
-        let approveQueueIntent = DecisionEvolutionMutationIntentFactory.approvePendingCheckpoints(
-            controlSurface: controlSurface
-        )
-        let clearReviewLineageIntent = DecisionEvolutionMutationIntentFactory.clearPendingReviewLineage(
-            controlSurface: controlSurface
-        )
-        let showsAnyActionRow = if allowsLocalMutationActions {
-            rollbackIntent != nil || approveQueueIntent != nil || clearReviewLineageIntent != nil
-        } else {
-            navigationOptions.showsAnyShortcut
-        }
 
         return DecisionEvolutionReleaseSummaryActionPresentation(
-            allowsLocalMutationActions: allowsLocalMutationActions,
-            showsAnyActionRow: showsAnyActionRow,
-            quickActionsTitle: allowsLocalMutationActions && showsAnyActionRow
-                ? DecisionEvolutionMutationHubPresentationSupport.quickActionsTitle
-                : nil,
+            allowsLocalMutationActions: actionPlan.allowsLocalMutationActions,
+            showsAnyActionRow: actionPlan.showsAnyActionRow,
+            quickActionsTitle: actionPlan.quickActionsTitle,
             rollbackTitle: DecisionEvolutionMutationActionLexiconSupport.rollbackActiveTitle,
             approveQueueTitle: DecisionEvolutionMutationHubPresentationSupport.approveQueueTitle,
             clearReviewLineageTitle: DecisionEvolutionMutationActionLexiconSupport.clearReviewLineageTitle,
-            rollbackIntent: rollbackIntent,
-            approveQueueIntent: approveQueueIntent,
-            clearReviewLineageIntent: clearReviewLineageIntent
+            rollbackIntent: actionBundle.rollbackActiveIntent,
+            approveQueueIntent: actionBundle.approveQueueIntent,
+            clearReviewLineageIntent: actionBundle.clearReviewLineageIntent
         )
     }
 }
@@ -199,6 +201,10 @@ enum DecisionEvolutionReleaseSummaryBuilder {
         recommendedKillSwitchesHint: [String]
     ) -> DecisionSystemReleaseControlSummary {
         let blockerSignals = eBrainSummary?.source == .persistedCheckpoint ? [] : dominantBlockers
+        let reviewAuditFindings = orderedUnique(
+            evolutionControlSurface.reviewAuditFindings
+            + runtimeHorizonAuditFindings(from: eBrainSummary)
+        )
         let resolvedActiveKillSwitches = orderedUnique(
             activeKillSwitches
             + runtimeActiveKillSwitches(
@@ -206,7 +212,6 @@ enum DecisionEvolutionReleaseSummaryBuilder {
                 controlSurface: evolutionControlSurface
             )
         )
-        let queueAuditFindings = evolutionControlSurface.queueAuditFindings
         let queueKillSwitches = evolutionControlSurface.queueKillSwitches
         let recommendedKillSwitches = orderedUnique(
             recommendedKillSwitchesHint
@@ -217,25 +222,19 @@ enum DecisionEvolutionReleaseSummaryBuilder {
         )
         let canRestoreActiveCheckpoint = evolutionControlSurface.activePresentation?.applyReady == true
         let canRollbackActiveCheckpoint = evolutionControlSurface.canRollbackActiveCheckpoint
-        let primaryBlocker = DecisionEvolutionPrimaryBlockerEvaluator.evaluate(
-            DecisionEvolutionPrimaryBlockerContext(
+        let policy = DecisionEvolutionPolicyEngine.evaluate(
+            DecisionEvolutionPolicyEngine.input(
+                controlSurface: evolutionControlSurface,
+                releaseSummary: nil,
                 activeKillSwitches: resolvedActiveKillSwitches,
                 recommendedKillSwitches: recommendedKillSwitches,
-                runtimeBlockers: blockerSignals,
-                hasActiveCheckpoint: evolutionControlSurface.activePresentation != nil,
+                reviewAuditFindings: reviewAuditFindings,
+                runtimeBlockerSignals: blockerSignals,
                 canRestoreActiveCheckpoint: canRestoreActiveCheckpoint,
-                pendingReviewCount: evolutionControlSurface.pendingReviewCount,
-                reviewAuditFindings: evolutionControlSurface.reviewAuditFindings,
                 canRollbackActiveCheckpoint: canRollbackActiveCheckpoint
             )
         )
-        let guidance = DecisionEvolutionPrimaryBlockerPresentationSupport.releaseGuidance(
-            blocker: primaryBlocker,
-            blockerSignals: blockerSignals,
-            controlSurface: evolutionControlSurface,
-            queueAuditFindings: queueAuditFindings,
-            queueKillSwitches: queueKillSwitches
-        )
+        let guidance = policy.releaseGuidance
 
         return DecisionSystemReleaseControlSummary(
             state: guidance.state,
@@ -250,7 +249,8 @@ enum DecisionEvolutionReleaseSummaryBuilder {
             canRollbackActiveCheckpoint: canRollbackActiveCheckpoint,
             activeCheckpointID: evolutionControlSurface.activePresentation?.checkpointID,
             activeCheckpointSource: evolutionControlSurface.activeCheckpointSource,
-            reviewCheckpointID: evolutionControlSurface.reviewPresentation?.checkpointID
+            reviewCheckpointID: evolutionControlSurface.reviewPresentation?.checkpointID,
+            primaryBlocker: policy.primaryBlocker
         )
     }
 
@@ -268,6 +268,30 @@ enum DecisionEvolutionReleaseSummaryBuilder {
         }
 
         return controlSurface.activeCheckpoint?.activeKillSwitches ?? []
+    }
+
+    private static func runtimeHorizonAuditFindings(
+        from eBrainSummary: DecisionSystemEBrainSummary?
+    ) -> [String] {
+        guard eBrainSummary?.source == .liveRuntime else {
+            return []
+        }
+
+        return orderedUnique(
+            [
+                eBrainSummary?.riskFactorsLine,
+                eBrainSummary?.reasonCodesLine,
+                eBrainSummary?.sovereignVerdictLine,
+                eBrainSummary?.sovereignAuthorityLine,
+                eBrainSummary?.sovereignAuditLine
+            ].compactMap { value in
+                guard let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !trimmedValue.isEmpty else {
+                    return nil
+                }
+                return trimmedValue
+            }
+        )
     }
 
     private static func orderedUnique(_ values: [String]) -> [String] {

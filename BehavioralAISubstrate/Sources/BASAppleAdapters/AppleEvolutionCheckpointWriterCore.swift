@@ -164,6 +164,69 @@ public enum BASAppleEvolutionCheckpointWriter {
         }
     }
 
+    public static func revokeCheckpoints<Checkpoint: BASAppleEvolutionCheckpointEntity>(
+        for request: BASForgetRequest,
+        in context: ModelContext,
+        onSaveError: ((Error) -> Void)? = nil
+    ) -> BASAppleEvolutionCheckpointWriteResult<Checkpoint> {
+        let existing = fetchCheckpoints(in: context) as [Checkpoint]
+        let ordered = canonicalOrder(existing)
+
+        guard forgetRequestTargetsCheckpoints(request) else {
+            return BASAppleEvolutionCheckpointWriteResult(
+                orderedCheckpoints: ordered,
+                currentState: BASEvolutionCheckpointPlanner.currentState(
+                    from: ordered.map(\.basSnapshot)
+                ),
+                wroteCheckpoint: false
+            )
+        }
+
+        let revokedIDs = Set(
+            ordered
+                .map(\.basSnapshot)
+                .filter { matchesForgetRequest(request, checkpoint: $0) }
+                .map(\.id)
+        )
+
+        guard revokedIDs.isEmpty == false else {
+            return BASAppleEvolutionCheckpointWriteResult(
+                orderedCheckpoints: ordered,
+                currentState: BASEvolutionCheckpointPlanner.currentState(
+                    from: ordered.map(\.basSnapshot)
+                ),
+                wroteCheckpoint: false
+            )
+        }
+
+        let survivingSnapshots = relinkedSnapshots(
+            from: ordered.map(\.basSnapshot).filter { !revokedIDs.contains($0.id) }
+        )
+
+        for checkpoint in existing {
+            context.delete(checkpoint)
+        }
+        let replacements = survivingSnapshots.map(Checkpoint.basMake(from:))
+        for checkpoint in replacements {
+            context.insert(checkpoint)
+        }
+
+        do {
+            try context.save()
+        } catch {
+            onSaveError?(error)
+        }
+
+        let updatedOrder = canonicalOrder(replacements)
+        return BASAppleEvolutionCheckpointWriteResult(
+            orderedCheckpoints: updatedOrder,
+            currentState: BASEvolutionCheckpointPlanner.currentState(
+                from: updatedOrder.map(\.basSnapshot)
+            ),
+            wroteCheckpoint: false
+        )
+    }
+
     private static func fetchCheckpoints<Checkpoint: BASAppleEvolutionCheckpointEntity>(
         in context: ModelContext
     ) -> [Checkpoint] {
@@ -234,5 +297,136 @@ public enum BASAppleEvolutionCheckpointWriter {
             ),
             wroteCheckpoint: false
         )
+    }
+
+    private static func forgetRequestTargetsCheckpoints(
+        _ request: BASForgetRequest
+    ) -> Bool {
+        request.executedSteps.contains("checkpoint_exports_revoked")
+            || request.cascadeScope.contains("checkpoints")
+    }
+
+    private static func matchesForgetRequest(
+        _ request: BASForgetRequest,
+        checkpoint: BASEvolutionCheckpointStoredFields
+    ) -> Bool {
+        let targetRefs = Set(
+            request.targetRefs
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        )
+        guard targetRefs.isEmpty == false else {
+            return false
+        }
+
+        return targetRefs.isDisjoint(with: checkpointReferences(for: checkpoint)) == false
+    }
+
+    private static func checkpointReferences(
+        for checkpoint: BASEvolutionCheckpointStoredFields
+    ) -> Set<String> {
+        var refs = Set<String>()
+        refs.insert(checkpoint.id)
+        refs.insert(checkpoint.sourceID)
+        refs.insert(checkpoint.fingerprint)
+        if let previousCheckpointID = checkpoint.previousCheckpointID,
+           previousCheckpointID.isEmpty == false {
+            refs.insert(previousCheckpointID)
+        }
+        if let lineageSummary = checkpoint.lineageSummary {
+            refs.formUnion(lineageReferences(for: lineageSummary))
+        }
+        return refs
+    }
+
+    private static func lineageReferences(
+        for lineageSummary: BASEvolutionLineageSummary
+    ) -> Set<String> {
+        var refs = Set<String>()
+        refs.insert(lineageSummary.sessionID)
+        refs.insert(lineageSummary.thoughtFoldChecksum)
+        refs.formUnion(lineageSummary.updateTicketSummaries.filter { !$0.isEmpty })
+        if let foldedLungSummary = lineageSummary.foldedLungSummary {
+            refs.formUnion(foldedLungReferences(for: foldedLungSummary))
+        }
+        return refs
+    }
+
+    private static func foldedLungReferences(
+        for foldedLungSummary: BASEvolutionFoldedLungSummary
+    ) -> Set<String> {
+        var refs: Set<String> = [
+            foldedLungSummary.resumeID,
+            foldedLungSummary.sourceFoldID,
+            foldedLungSummary.rollbackAnchorID,
+            foldedLungSummary.safeSnapshotRef,
+            foldedLungSummary.integrityHash
+        ]
+        if let morphGraphID = foldedLungSummary.morphGraphID,
+           morphGraphID.isEmpty == false {
+            refs.insert(morphGraphID)
+        }
+        if let hotColdMapID = foldedLungSummary.hotColdMapID,
+           hotColdMapID.isEmpty == false {
+            refs.insert(hotColdMapID)
+        }
+        if let precisionProfileID = foldedLungSummary.precisionProfileID,
+           precisionProfileID.isEmpty == false {
+            refs.insert(precisionProfileID)
+        }
+        if let lungStateRef = foldedLungSummary.lungStateRef,
+           lungStateRef.isEmpty == false {
+            refs.insert(lungStateRef)
+        }
+        if let breathSchedulerID = foldedLungSummary.breathSchedulerID,
+           breathSchedulerID.isEmpty == false {
+            refs.insert(breathSchedulerID)
+        }
+        if let hostVersionRef = foldedLungSummary.hostVersionRef,
+           hostVersionRef.isEmpty == false {
+            refs.insert(hostVersionRef)
+        }
+        if let cacheStateRef = foldedLungSummary.cacheStateRef,
+           cacheStateRef.isEmpty == false {
+            refs.insert(cacheStateRef)
+        }
+        refs.formUnion(foldedLungSummary.foldRefs.filter { !$0.isEmpty })
+        refs.formUnion(foldedLungSummary.invalidatedResumeFrameIDs.filter { !$0.isEmpty })
+        refs.formUnion(foldedLungSummary.invalidatedCacheRefs.filter { !$0.isEmpty })
+        refs.formUnion(foldedLungSummary.invalidatedFoldRefs.filter { !$0.isEmpty })
+        refs.formUnion(foldedLungSummary.quarantinedFoldRefs.filter { !$0.isEmpty })
+        return refs
+    }
+
+    private static func relinkedSnapshots(
+        from snapshots: [BASEvolutionCheckpointStoredFields]
+    ) -> [BASEvolutionCheckpointStoredFields] {
+        let orderedOldestFirst = snapshots.sorted { lhs, rhs in
+            if lhs.createdAt == rhs.createdAt {
+                return lhs.id < rhs.id
+            }
+            return lhs.createdAt < rhs.createdAt
+        }
+
+        var previousCheckpointID: String?
+        return orderedOldestFirst.map { checkpoint in
+            defer { previousCheckpointID = checkpoint.id }
+            return BASEvolutionCheckpointStoredFields(
+                id: checkpoint.id,
+                createdAt: checkpoint.createdAt,
+                fingerprint: checkpoint.fingerprint,
+                previousCheckpointID: previousCheckpointID,
+                modeName: checkpoint.modeName,
+                sourceID: checkpoint.sourceID,
+                identityRole: checkpoint.identityRole,
+                boundaryMode: checkpoint.boundaryMode,
+                calibrationStatus: checkpoint.calibrationStatus,
+                diffSummary: checkpoint.diffSummary,
+                approvalState: checkpoint.approvalState,
+                rollbackReady: checkpoint.rollbackReady,
+                brainStateSnapshot: checkpoint.brainStateSnapshot,
+                lineageSummary: checkpoint.lineageSummary
+            )
+        }
     }
 }

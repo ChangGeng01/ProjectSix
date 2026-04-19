@@ -863,6 +863,59 @@ final class DecisionEvolutionEngineTests: XCTestCase {
     }
 
     @MainActor
+    func testBeforeAppModelControlSurfaceRetainsRecoveredHostGateParity() throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+
+        let container = try makeCheckpointApplyContainer()
+        let context = container.mainContext
+
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-host-gate-parity",
+                createdAt: localDate(year: 2026, month: 4, day: 11, hour: 6, minute: 0),
+                fingerprint: "fingerprint-host-gate-parity",
+                previousCheckpointID: nil,
+                mode: .quick,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyAdvisory,
+                calibrationStatus: .stable,
+                diffSummary: ["Recovered host gate should stay visible across substrate facts."],
+                approvalState: .automatic,
+                rollbackReady: true,
+                brainStateSnapshot: nil,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: localDate(year: 2026, month: 4, day: 11, hour: 6, minute: 0),
+                    sessionID: "session-host-gate-parity",
+                    taskType: "summary",
+                    riskLevel: "low",
+                    permitMode: "answer",
+                    hostGatePercent: 37,
+                    thoughtFoldChecksum: "fold-host-gate-parity",
+                    updateTicketSummaries: ["Preserve host gate posture."],
+                    guardrailFindings: [],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+        try context.save()
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+        let controlSurface = app.makeEvolutionControlSurface()
+
+        XCTAssertEqual(controlSurface.activePresentation?.checkpointID, "checkpoint-host-gate-parity")
+        XCTAssertEqual(controlSurface.activePresentation?.lineageHostGatePercent, 37)
+        XCTAssertEqual(
+            controlSurface.activePresentation?.metadataText,
+            "Session session-host-gate-parity • Host gate 37% • Fold fold-host-gate-parity"
+        )
+        XCTAssertEqual(controlSurface.activePresentation?.summaryText, "LOW → ANSWER")
+    }
+
+    @MainActor
     func testBeforeAppModelEvolutionControlSurfaceKeepsReviewSuggestedCurrentCheckpointOutOfActiveSlot() throws {
         ActiveDecisionWorkspaceStore.clear()
         DecisionTaskGraphStore.clear()
@@ -1688,15 +1741,16 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         try context.save()
 
         let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
-        let preview = try XCTUnwrap(
+        let intent = try XCTUnwrap(
             DecisionEvolutionMutationIntentFactory.applyCheckpoint(
                 checkpointID: "checkpoint-review-preview",
                 controlSurface: app.makeEvolutionControlSurface()
-            )?.preview
+            )
         )
+        let preview = intent.preview
 
-        app.applyEvolutionCheckpoint(
-            checkpointID: "checkpoint-review-preview",
+        app.performEvolutionMutation(
+            intent,
             now: localDate(year: 2026, month: 4, day: 11, hour: 9, minute: 30)
         )
 
@@ -1785,13 +1839,14 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         try context.save()
 
         let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
-        let preview = try XCTUnwrap(
+        let intent = try XCTUnwrap(
             DecisionEvolutionMutationIntentFactory.approvePendingCheckpoints(
                 controlSurface: app.makeEvolutionControlSurface()
-            )?.preview
+            )
         )
+        let preview = intent.preview
 
-        app.approvePendingEvolutionCheckpoints()
+        app.performEvolutionMutation(intent)
 
         let controlSurface = app.makeEvolutionControlSurface()
         XCTAssertEqual(controlSurface.activeCheckpoint?.checkpointID, preview.projectedActiveCheckpointID)
@@ -1845,13 +1900,14 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         try context.save()
 
         let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
-        let preview = try XCTUnwrap(
+        let intent = try XCTUnwrap(
             DecisionEvolutionMutationIntentFactory.clearPendingReviewLineage(
                 controlSurface: app.makeEvolutionControlSurface()
-            )?.preview
+            )
         )
+        let preview = intent.preview
 
-        app.clearPendingEvolutionCheckpointLineages()
+        app.performEvolutionMutation(intent)
 
         let controlSurface = app.makeEvolutionControlSurface()
         XCTAssertEqual(controlSurface.activeCheckpoint?.checkpointID, preview.projectedActiveCheckpointID)
@@ -2009,15 +2065,16 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
         let preMutationFlightDeck = await app.systemFlightDeck()
         let preMutationControlSurface = preMutationFlightDeck.evolutionControlSurface
-        let preview = try XCTUnwrap(
+        let intent = try XCTUnwrap(
             DecisionEvolutionMutationIntentFactory.approveSelectedCheckpoints(
                 presentations: preMutationControlSurface.pendingReviewPresentations.filter {
                     $0.checkpointID == "checkpoint-review-tail-sync"
                 },
                 controlSurface: preMutationControlSurface
-            )?.preview
+            )
         )
-        app.approveEvolutionCheckpoints(checkpointIDs: ["checkpoint-review-tail-sync"])
+        let preview = intent.preview
+        app.performEvolutionMutation(intent)
 
         let synchronizedFlightDeck = await app.systemFlightDeck()
         let synchronizedControlSurface = synchronizedFlightDeck.evolutionControlSurface
@@ -2133,14 +2190,15 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         try context.save()
 
         let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
-        let preview = try XCTUnwrap(
+        let intent = try XCTUnwrap(
             DecisionEvolutionMutationIntentFactory.approveCheckpoint(
                 checkpointID: "checkpoint-review-head",
                 controlSurface: app.makeEvolutionControlSurface()
-            )?.preview
+            )
         )
+        let preview = intent.preview
 
-        app.approveEvolutionCheckpoint(checkpointID: "checkpoint-review-head")
+        app.performEvolutionMutation(intent)
 
         let controlSurface = app.makeEvolutionControlSurface()
         XCTAssertEqual(controlSurface.activeCheckpoint?.checkpointID, preview.projectedActiveCheckpointID)
@@ -2424,13 +2482,17 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         )
 
         app.applyEvolutionCheckpoint(checkpointID: secondCheckpointID, now: secondDate.addingTimeInterval(30))
-        let preview = try XCTUnwrap(
+        let intent = try XCTUnwrap(
             DecisionEvolutionMutationIntentFactory.rollbackActiveCheckpoint(
                 controlSurface: app.makeEvolutionControlSurface()
-            )?.preview
+            )
         )
+        let preview = intent.preview
 
-        app.rollbackActiveEvolutionCheckpoint(now: secondDate.addingTimeInterval(60))
+        app.performEvolutionMutation(
+            intent,
+            now: secondDate.addingTimeInterval(60)
+        )
 
         let controlSurface = app.makeEvolutionControlSurface()
         XCTAssertEqual(controlSurface.activeCheckpoint?.checkpointID, preview.projectedActiveCheckpointID)
@@ -2872,8 +2934,9 @@ final class DecisionEvolutionEngineTests: XCTestCase {
     ) {
         let snapshot = WidgetSnapshotStore.load()
         let evolution = snapshot.evolution
-        let controlSurface = app.makeEvolutionControlSurface()
-        let attentionSignal = app.makeEvolutionSurfaceState(contract: .home).attentionSignal
+        let surfaceState = app.makeEvolutionSurfaceState(contract: .home)
+        let controlSurface = surfaceState.controlSurface
+        let attentionSignal = surfaceState.attentionSignal
         let activeKillSwitchCount = app.activeEvolutionKillSwitches.count
         let recommendedKillSwitchCount = max(
             0,
@@ -2881,8 +2944,21 @@ final class DecisionEvolutionEngineTests: XCTestCase {
                 !app.activeEvolutionKillSwitches.map(\.rawValue).contains($0)
             }.count
         )
+        let expectedControlEntryKind = surfaceState.policy.widgetControlEntryKind
+        let expectedControlEntry = surfaceState.policy.widgetControlEntryPresentation(
+            prompt: attentionSignal.headline,
+            triggerReason: attentionSignal.resolvedTriggerReason(
+                fallback: surfaceState.operatorSnapshot.primaryReason
+            )
+        )
+        let expectedPrimaryActionKind: DecisionEvolutionWidgetPrimaryActionKind =
+            expectedControlEntry == nil ? .quick : .evolutionControl
 
-        XCTAssertEqual(evolution?.activeCheckpointSourceID, controlSurface.activeCheckpointSource.rawValue, file: file, line: line)
+        XCTAssertEqual(evolution?.releaseStateID, surfaceState.policy.releaseGuidance.state.rawValue, file: file, line: line)
+        XCTAssertEqual(evolution?.activeCheckpointSourceID, surfaceState.policy.input.activeCheckpointSource.rawValue, file: file, line: line)
+        XCTAssertEqual(evolution?.controlEntryKindID, expectedControlEntryKind?.rawValue, file: file, line: line)
+        XCTAssertEqual(evolution?.storedControlEntry, expectedControlEntry, file: file, line: line)
+        XCTAssertEqual(snapshot.primaryActionPresentation.kind, expectedPrimaryActionKind, file: file, line: line)
         XCTAssertEqual(evolution?.hasActiveCheckpoint, controlSurface.activePresentation != nil, file: file, line: line)
         XCTAssertEqual(evolution?.hasReviewCheckpoint, controlSurface.reviewPresentation != nil, file: file, line: line)
         XCTAssertEqual(evolution?.pendingReviewCount, controlSurface.pendingReviewCount, file: file, line: line)
@@ -2893,6 +2969,18 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         XCTAssertEqual(evolution?.attentionBadgeValue, attentionSignal.badgeValue, file: file, line: line)
         XCTAssertEqual(evolution?.attentionHeadline, attentionSignal.headline, file: file, line: line)
         XCTAssertEqual(evolution?.attentionDetail, attentionSignal.detail, file: file, line: line)
+        XCTAssertEqual(
+            evolution?.surfacePresentation.controlEntry?.title,
+            expectedControlEntry?.title,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            snapshot.primaryActionPresentation.prompt,
+            expectedControlEntry?.prompt,
+            file: file,
+            line: line
+        )
     }
 
     @MainActor

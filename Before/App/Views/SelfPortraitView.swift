@@ -5,7 +5,7 @@ struct SelfPortraitView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @State private var systemFlightDeck: DecisionSystemFlightDeck?
     @State private var substrateConsoleSnapshot: BASHostConsoleSnapshot?
-    @State private var substrateEBrainTurn: BASEBrainTurnResult?
+    @State private var substrateEBrainPresentationFrame: DecisionEBrainPresentationFrame?
     @State private var substrateReplayPresentations: [DecisionEvolutionReplayEntryPresentation] = []
     @State private var isLoadingSystemFlightDeck = false
     private let evolutionSurfaceContract = DecisionEvolutionSurfaceContract.portrait
@@ -49,7 +49,7 @@ struct SelfPortraitView: View {
                         sessionEngineCard
                         localModelLibraryCard
                         substrateConsoleCard(substrateConsoleSnapshot)
-                        eBrainTurnCard(substrateEBrainTurn)
+                        eBrainTurnCard(substrateEBrainPresentationFrame)
                         replayLineageCard(substrateReplayPresentations)
                         currentBrainCard(panel.currentBrainState)
                         boundaryCard(panel.currentBrainState)
@@ -135,32 +135,19 @@ struct SelfPortraitView: View {
                         }
                     }
 
-                    if let eBrain = flightDeck.eBrainSummary {
-                        let presentation = eBrain.presentation
+                    if let presentation = flightDeck.eBrainDigestPresentation {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("13-layer path")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
 
-                            sourceBadge(presentation.sourceDescriptor)
+                            sourceBadge(presentation.digest.sourceDescriptor)
 
-                            Text(presentation.statusLine)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-
-                            Text(presentation.routeLine)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-
-                            if let pressureLine = presentation.pressureLine {
-                                Text(pressureLine)
-                                    .font(.caption2)
+                            ForEach(Array(presentation.detailLines.enumerated()), id: \.offset) { index, line in
+                                Text(line)
+                                    .font(index == 0 ? .caption : .caption2)
                                     .foregroundStyle(.secondary)
                             }
-
-                            Text(presentation.hostLine)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
 
                             DecisionEvolutionReleaseSummaryView(
                                 releaseSummary: flightDeck.releaseControlSummary,
@@ -170,12 +157,8 @@ struct SelfPortraitView: View {
                                 navigationOptions: checkpointNavigationOptions
                             )
 
-                            Text(presentation.inspectionHeadline)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-
-                            if let primaryGuardrailText = presentation.primaryGuardrailText {
-                                Text(primaryGuardrailText)
+                            if let alertLine = presentation.alertLine {
+                                Text(alertLine)
                                     .font(.caption2)
                                     .foregroundStyle(BeforeTheme.ember)
                             }
@@ -282,70 +265,74 @@ struct SelfPortraitView: View {
     }
 
     @ViewBuilder
-    private func eBrainTurnCard(_ turn: BASEBrainTurnResult?) -> some View {
+    private func eBrainTurnCard(_ presentationFrame: DecisionEBrainPresentationFrame?) -> some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
                 Text("13-layer turn")
                     .font(.headline)
 
-                if let turn {
-                    let diagnostics = turn.diagnosticsPresentation
-
-                    sourceBadge(diagnostics.sourceDescriptor)
+                if let presentationFrame {
+                    sourceBadge(presentationFrame.sourceDescriptor)
 
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(diagnostics.runModeTitle)
+                            Text(presentationFrame.runModeTitle)
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            Text(diagnostics.taskTitle)
+                            Text(presentationFrame.taskTitle)
                                 .font(.subheadline.bold())
                                 .foregroundStyle(BeforeTheme.ink)
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 4) {
-                            Text(diagnostics.riskTitle)
+                            Text(presentationFrame.riskTitle)
                                 .font(.caption.weight(.bold))
-                                .foregroundStyle(healthColor(health(from: turn.riskCard.riskLevel)))
-                            Text(diagnostics.permitTitle)
+                                .foregroundStyle(healthColor(health(fromRiskLevelID: presentationFrame.riskLevelID)))
+                            Text(presentationFrame.permitTitle)
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.secondary)
                         }
                     }
 
-                    Text(diagnostics.mirrorText)
+                    Text(presentationFrame.mirrorText)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
-                    Text(diagnostics.routeText)
+                    Text(presentationFrame.routeText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    Text(diagnostics.hostText)
+                    Text(presentationFrame.hostText)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
 
-                    Text(diagnostics.replayText)
+                    Text(presentationFrame.replayText)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
 
-                    if !diagnostics.auditLines.isEmpty {
+                    if !presentationFrame.layerStackLines.isEmpty {
+                        DecisionLayerStackView(
+                            lines: presentationFrame.layerStackLines
+                        )
+                    }
+
+                    if !presentationFrame.auditLines.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Runtime audit")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            ForEach(diagnostics.auditLines, id: \.self) { line in
+                            ForEach(presentationFrame.auditLines, id: \.self) { line in
                                 Text(line)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
-                            if let activeKillSwitchesLine = diagnostics.activeKillSwitchesLine {
+                            if let activeKillSwitchesLine = presentationFrame.activeKillSwitchesLine {
                                 Text(activeKillSwitchesLine)
                                     .font(.caption2)
                                     .foregroundStyle(BeforeTheme.ember)
                             }
-                            if let recommendedKillSwitchesLine = diagnostics.recommendedKillSwitchesLine {
+                            if let recommendedKillSwitchesLine = presentationFrame.recommendedKillSwitchesLine {
                                 Text(recommendedKillSwitchesLine)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
@@ -353,12 +340,12 @@ struct SelfPortraitView: View {
                         }
                     }
 
-                    if !diagnostics.candidateTitles.isEmpty {
+                    if !presentationFrame.candidateTitles.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Candidates")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            ForEach(diagnostics.candidateTitles, id: \.self) { title in
+                            ForEach(presentationFrame.candidateTitles, id: \.self) { title in
                                 Text("• \(title)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -366,12 +353,12 @@ struct SelfPortraitView: View {
                         }
                     }
 
-                    if !diagnostics.memorySummaries.isEmpty {
+                    if !presentationFrame.memorySummaries.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Retrieved memory")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            ForEach(diagnostics.memorySummaries, id: \.self) { summary in
+                            ForEach(presentationFrame.memorySummaries, id: \.self) { summary in
                                 Text("• \(summary)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -379,12 +366,12 @@ struct SelfPortraitView: View {
                         }
                     }
 
-                    if !diagnostics.triScoreLines.isEmpty {
+                    if !presentationFrame.triScoreLines.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Tri-self scores")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            ForEach(diagnostics.triScoreLines, id: \.self) { line in
+                            ForEach(presentationFrame.triScoreLines, id: \.self) { line in
                                 Text(line)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -392,17 +379,17 @@ struct SelfPortraitView: View {
                         }
                     }
 
-                    if diagnostics.riskFactorsLine != nil || diagnostics.reasonCodesLine != nil {
+                    if presentationFrame.riskFactorsLine != nil || presentationFrame.reasonCodesLine != nil {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Risk gate")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            if let riskFactorsLine = diagnostics.riskFactorsLine {
+                            if let riskFactorsLine = presentationFrame.riskFactorsLine {
                                 Text(riskFactorsLine)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
-                            if let reasonCodesLine = diagnostics.reasonCodesLine {
+                            if let reasonCodesLine = presentationFrame.reasonCodesLine {
                                 Text(reasonCodesLine)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
@@ -410,12 +397,12 @@ struct SelfPortraitView: View {
                         }
                     }
 
-                    if !diagnostics.alternativeActions.isEmpty {
+                    if !presentationFrame.alternativeActions.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Safer next moves")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            ForEach(diagnostics.alternativeActions, id: \.self) { action in
+                            ForEach(presentationFrame.alternativeActions, id: \.self) { action in
                                 Text("• \(action)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -423,12 +410,12 @@ struct SelfPortraitView: View {
                         }
                     }
 
-                    if !diagnostics.thoughtFoldLines.isEmpty {
+                    if !presentationFrame.thoughtFoldLines.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Thought fold")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            ForEach(diagnostics.thoughtFoldLines, id: \.self) { line in
+                            ForEach(presentationFrame.thoughtFoldLines, id: \.self) { line in
                                 Text(line)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
@@ -436,12 +423,12 @@ struct SelfPortraitView: View {
                         }
                     }
 
-                    if !diagnostics.replayTraceLines.isEmpty {
+                    if !presentationFrame.replayTraceLines.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Replay trace")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
-                            ForEach(diagnostics.replayTraceLines, id: \.self) { line in
+                            ForEach(presentationFrame.replayTraceLines, id: \.self) { line in
                                 Text(line)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
@@ -449,8 +436,68 @@ struct SelfPortraitView: View {
                         }
                     }
 
-                    if let ticketSummary = diagnostics.ticketSummary {
+                    if let ticketSummary = presentationFrame.ticketSummary {
                         Text("Ticket: \(ticketSummary)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let executionCapabilityLine = presentationFrame.executionCapabilityLine {
+                        Text(executionCapabilityLine)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let horizonLine = presentationFrame.horizonLine {
+                        Text(horizonLine)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let temporalLine = presentationFrame.temporalLine {
+                        Text(temporalLine)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let evidenceLine = presentationFrame.evidenceLine {
+                        Text(evidenceLine)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let sovereignVerdictLine = presentationFrame.sovereignVerdictLine {
+                        Text(sovereignVerdictLine)
+                            .font(.caption2)
+                            .foregroundStyle(BeforeTheme.ember)
+                    }
+
+                    if let sovereignAuthorityLine = presentationFrame.sovereignAuthorityLine {
+                        Text(sovereignAuthorityLine)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let sovereignAuditLine = presentationFrame.sovereignAuditLine {
+                        Text(sovereignAuditLine)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let policyLine = presentationFrame.policyLine {
+                        Text(policyLine)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let recoveryLine = presentationFrame.recoveryLine {
+                        Text(recoveryLine)
+                            .font(.caption2)
+                            .foregroundStyle(BeforeTheme.ember)
+                    }
+
+                    if let sovereignExecutionLine = presentationFrame.sovereignExecutionLine {
+                        Text(sovereignExecutionLine)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -881,6 +928,14 @@ struct SelfPortraitView: View {
         }
     }
 
+    private func health(fromRiskLevelID riskLevelID: String) -> DecisionSystemLayerHealth {
+        guard let riskLevel = BASBrainRiskLevel(rawValue: riskLevelID) else {
+            return .watch
+        }
+
+        return health(from: riskLevel)
+    }
+
     @ViewBuilder
     private func sourceBadge(_ descriptor: DecisionEvolutionSourceDescriptor) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -912,7 +967,7 @@ struct SelfPortraitView: View {
         let inspection = await appModel.substrateInspectionSnapshot()
         systemFlightDeck = inspection.flightDeck
         substrateConsoleSnapshot = inspection.consoleSnapshot(currentBrainState: appModel.currentBrainState)
-        substrateEBrainTurn = inspection.eBrainTurn
+        substrateEBrainPresentationFrame = inspection.liveEBrainPresentationFrame
         substrateReplayPresentations = await appModel.recentReplayDiagnosticsPresentations(limit: 3)
         isLoadingSystemFlightDeck = false
     }

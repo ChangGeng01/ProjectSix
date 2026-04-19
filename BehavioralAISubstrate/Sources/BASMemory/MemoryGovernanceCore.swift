@@ -99,6 +99,22 @@ public struct BASMemoryLifecycleReviewInput: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASPreparedMemoryGovernanceDraft: Equatable, Sendable {
+    public let draft: BASMemoryGovernanceDraftInput
+    public let assessment: BASMemoryGovernanceAssessment
+    public let horizonDescriptor: BASMemoryHorizonClaimDescriptor
+
+    public init(
+        draft: BASMemoryGovernanceDraftInput,
+        assessment: BASMemoryGovernanceAssessment,
+        horizonDescriptor: BASMemoryHorizonClaimDescriptor
+    ) {
+        self.draft = draft
+        self.assessment = assessment
+        self.horizonDescriptor = horizonDescriptor
+    }
+}
+
 public extension BASDraftPromotionPolicy {
     var isImmediate: Bool {
         if case .immediate = self {
@@ -120,18 +136,132 @@ public extension BASMemoryGovernance {
         draft: BASMemoryGovernanceDraftInput,
         behavior: BASMemoryTrustBehavior = .generic
     ) -> BASMemoryGovernanceAssessment {
-        let continuityProtected =
-            draft.typeID == "goal" ||
-            draft.typeID == "identity" ||
-            draft.promotionPolicy.isImmediate
+        baselineAssessment(
+            draft: draft,
+            behavior: behavior
+        )
+    }
 
-        let trustProfile = BASMemoryTrustEngine.profile(
+    static func assess(
+        draft: BASMemoryGovernanceDraftInput,
+        behavior: BASMemoryTrustBehavior = .generic,
+        persistencePolicy: BASMemoryHorizonPersistencePolicy
+    ) -> BASMemoryGovernanceAssessment {
+        prepare(
+            draft: draft,
+            behavior: behavior,
+            persistencePolicy: persistencePolicy
+        ).assessment
+    }
+
+    static func prepare(
+        draft: BASMemoryGovernanceDraftInput,
+        behavior: BASMemoryTrustBehavior = .generic,
+        persistencePolicy: BASMemoryHorizonPersistencePolicy = .unrestricted
+    ) -> BASPreparedMemoryGovernanceDraft {
+        let continuityProtected = isContinuityProtected(draft)
+        let trustProfile = trustProfile(
+            for: draft,
+            behavior: behavior
+        )
+        let horizonDescriptor = persistencePolicy.classify(
+            draft,
+            continuityProtected: continuityProtected,
+            provenanceRisk: trustProfile.provenanceRisk
+        )
+        let shouldStageVolatileClaim = horizonDescriptor.requiresExternalRefresh
+        let shouldQuarantineProvenance = horizonDescriptor.contaminationState == .quarantined
+        let shouldRequireEvidenceCorroboration = horizonDescriptor.evidenceState == .caveated
+
+        guard shouldStageVolatileClaim || shouldQuarantineProvenance || shouldRequireEvidenceCorroboration else {
+            return BASPreparedMemoryGovernanceDraft(
+                draft: draft,
+                assessment: baselineAssessment(
+                    draft: draft,
+                    behavior: behavior
+                ),
+                horizonDescriptor: horizonDescriptor
+            )
+        }
+
+        var retrievalTags = draft.retrievalTags
+        var provenanceSummary = draft.provenanceSummary
+        var adjustedDecayPolicy = draft.decayPolicy
+        var adjustedTierID = draft.tierID
+
+        if shouldStageVolatileClaim {
+            retrievalTags.append(contentsOf: persistencePolicy.volatileClaimRetrievalTags)
+            provenanceSummary = appendHorizonNote(
+                "External refresh required before durable admission.",
+                to: provenanceSummary
+            )
+            adjustedDecayPolicy = .fast
+            adjustedTierID = persistencePolicy.volatileTierID
+        }
+
+        if shouldQuarantineProvenance {
+            retrievalTags.append(contentsOf: persistencePolicy.quarantineRetrievalTags)
+            provenanceSummary = appendHorizonNote(
+                "Tool-shaped provenance quarantined as observation-only.",
+                to: provenanceSummary
+            )
+            adjustedDecayPolicy = .fast
+            adjustedTierID = persistencePolicy.volatileTierID
+        }
+
+        if shouldRequireEvidenceCorroboration {
+            retrievalTags.append(contentsOf: persistencePolicy.evidencePendingRetrievalTags)
+            provenanceSummary = appendHorizonNote(
+                "Evidence caveat requires at least \(horizonDescriptor.minimumDurableEvidenceCount) corroborating signals before durable admission.",
+                to: provenanceSummary
+            )
+        }
+
+        let adjustedDraft = BASMemoryGovernanceDraftInput(
+            id: draft.id,
+            typeID: draft.typeID,
+            topic: draft.topic,
+            headline: draft.headline,
+            value: draft.value,
+            confidence: draft.confidence,
+            priority: draft.priority,
             source: draft.source,
+            lastConfirmedAt: draft.lastConfirmedAt,
+            decayPolicy: adjustedDecayPolicy,
+            retrievalTags: retrievalTags,
             evidenceCount: draft.evidenceCount,
-            decayPolicy: draft.decayPolicy,
-            governanceStatus: .pending,
-            isPending: draft.promotionPolicy.isCandidateOnly || draft.typeID == "situational",
-            provenanceSummary: draft.provenanceSummary,
+            provenanceSummary: provenanceSummary,
+            promotionPolicy: .candidateOnly,
+            tierID: adjustedTierID
+        )
+
+        let reasonPrefix = shouldQuarantineProvenance
+            ? "Claim remains quarantined until "
+            : "Claim remains staged until "
+        let reason = if horizonDescriptor.releaseRequirements.isEmpty {
+            reasonPrefix + "corroborating evidence is available."
+        } else {
+            reasonPrefix + horizonDescriptor.releaseRequirements.joined(separator: " and ") + "."
+        }
+
+        return BASPreparedMemoryGovernanceDraft(
+            draft: adjustedDraft,
+            assessment: BASMemoryGovernanceAssessment(
+                decision: .deferred,
+                reason: reason
+            ),
+            horizonDescriptor: horizonDescriptor
+        )
+    }
+
+    static func baselineAssessment(
+        draft: BASMemoryGovernanceDraftInput,
+        behavior: BASMemoryTrustBehavior = .generic
+    ) -> BASMemoryGovernanceAssessment {
+        let continuityProtected = isContinuityProtected(draft)
+
+        let trustProfile = trustProfile(
+            for: draft,
             behavior: behavior
         )
 
@@ -201,6 +331,13 @@ public extension BASMemoryGovernance {
         )
     }
 
+    static func isContinuityProtected(
+        _ draft: BASMemoryGovernanceDraftInput
+    ) -> Bool {
+        draft.typeID == "goal" ||
+            draft.typeID == "identity"
+    }
+
     static func shouldPromote(
         policy: BASDraftPromotionPolicy,
         confirmationCount: Int,
@@ -249,5 +386,33 @@ public extension BASMemoryGovernance {
         case .fast:
             return ageInDays >= fastRetireDays ? .retired : (ageInDays >= fastAgingDays ? .aging : .active)
         }
+    }
+
+    private static func trustProfile(
+        for draft: BASMemoryGovernanceDraftInput,
+        behavior: BASMemoryTrustBehavior
+    ) -> BASMemoryTrustProfile {
+        BASMemoryTrustEngine.profile(
+            source: draft.source,
+            evidenceCount: draft.evidenceCount,
+            decayPolicy: draft.decayPolicy,
+            governanceStatus: .pending,
+            isPending: draft.promotionPolicy.isCandidateOnly || draft.typeID == "situational",
+            provenanceSummary: draft.provenanceSummary,
+            behavior: behavior
+        )
+    }
+
+    private static func appendHorizonNote(
+        _ note: String,
+        to provenanceSummary: String
+    ) -> String {
+        if provenanceSummary.localizedCaseInsensitiveContains(note) {
+            return provenanceSummary
+        }
+        if provenanceSummary.isEmpty {
+            return note
+        }
+        return "\(provenanceSummary) Horizon: \(note)"
     }
 }

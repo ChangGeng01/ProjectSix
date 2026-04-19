@@ -65,6 +65,9 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
             performPresent: { plan in
                 calls.append("open:\(plan.preferredModeID ?? "nil"):\(plan.shouldSelectBoxTab)")
             },
+            performRoutedInput: { plan in
+                calls.append("route:\(plan.promptSeed)")
+            },
             performPredictiveIntervention: { suggestion in
                 calls.append("predict:\(suggestion?.title ?? "nil")")
             },
@@ -103,6 +106,9 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
             performPresent: { _ in
                 calls.append("open")
             },
+            performRoutedInput: { _ in
+                calls.append("route")
+            },
             performPredictiveIntervention: { suggestion in
                 calls.append("predict:\(suggestion?.preferredModeID ?? "nil")")
             },
@@ -117,6 +123,47 @@ struct BASAppleEntryIntentOutcomeBuilderTests {
         #expect(calls == [
             "predict:reflective",
             "refresh:watchHandoff"
+        ])
+    }
+
+    @Test("entry intent runtime executor routes shared routed-input intents then refreshes current brain")
+    func entryIntentRuntimeExecutorRoutesSharedRoutedInput() {
+        var calls: [String] = []
+
+        BASAppleEntryIntentRuntimeExecutor.execute(
+            input: BASAppleEntryIntentRuntimeInput(
+                kindID: "routedInput",
+                surfaceID: "app",
+                preferredModeID: nil,
+                scenarioID: nil,
+                promptSeed: "Route this shared prompt.",
+                riskLevelID: nil,
+                triggerReason: nil,
+                expiresAt: .distantFuture
+            ),
+            performCapture: { _ in
+                calls.append("capture")
+            },
+            performPresent: { _ in
+                calls.append("present")
+            },
+            performRoutedInput: { plan in
+                calls.append("route:\(plan.promptSeed)")
+            },
+            performPredictiveIntervention: { _ in
+                calls.append("predict")
+            },
+            performRestore: {
+                calls.append("restore")
+            },
+            refreshCurrentBrain: { triggerID in
+                calls.append("refresh:\(triggerID)")
+            }
+        )
+
+        #expect(calls == [
+            "route:Route this shared prompt.",
+            "refresh:explicitRefresh"
         ])
     }
 }

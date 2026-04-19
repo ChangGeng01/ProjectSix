@@ -7,19 +7,22 @@ public struct BASAppleMemoryPersistenceRequest: Codable, Equatable, Sendable {
     public var existingCandidates: [BASExistingCandidateMemorySnapshot]
     public var reviewNow: Date
     public var memoryTrustBehavior: BASMemoryTrustBehavior
+    public var persistencePolicy: BASMemoryHorizonPersistencePolicy
 
     public init(
         drafts: [BASDerivedMemoryDraft],
         existingRecords: [BASExistingGovernedMemorySnapshot],
         existingCandidates: [BASExistingCandidateMemorySnapshot],
         reviewNow: Date,
-        memoryTrustBehavior: BASMemoryTrustBehavior = .generic
+        memoryTrustBehavior: BASMemoryTrustBehavior = .generic,
+        persistencePolicy: BASMemoryHorizonPersistencePolicy = .unrestricted
     ) {
         self.drafts = drafts
         self.existingRecords = existingRecords
         self.existingCandidates = existingCandidates
         self.reviewNow = reviewNow
         self.memoryTrustBehavior = memoryTrustBehavior
+        self.persistencePolicy = persistencePolicy
     }
 }
 
@@ -84,7 +87,8 @@ public enum BASAppleMemoryPersistenceAdapter {
                 existingRecords: request.existingRecords,
                 existingCandidates: request.existingCandidates,
                 reviewNow: request.reviewNow,
-                memoryTrustBehavior: request.memoryTrustBehavior
+                memoryTrustBehavior: request.memoryTrustBehavior,
+                persistencePolicy: request.persistencePolicy
             )
         )
 

@@ -486,6 +486,135 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
         )
     }
 
+    func testBuilderPromotesLiveHorizonDiagnosticsToWatchingAuditFindings() {
+        let active = makeSnapshot(
+            checkpointID: "active-horizon",
+            createdAt: Date(timeIntervalSince1970: 10),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: nil,
+            pendingReviewQueue: [],
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: ["previous-active-horizon"]
+        )
+        let eBrainSummary = DecisionSystemEBrainSummary(
+            source: .liveRuntime,
+            runMode: "guarded",
+            taskType: "high_pressure",
+            riskLevel: "high",
+            permitMode: "delay",
+            deviceRoute: "guarded",
+            loopCount: 1,
+            cacheHitRate: 0,
+            hostGatePercent: 37,
+            pressureLine: nil,
+            riskFactorsLine: "Factors: evidence_caveat_load",
+            reasonCodesLine: "Reason codes: evidence.caveat",
+            foldChecksum: "checksum-horizon",
+            updateTicketCount: 1,
+            auditFindingCount: 1,
+            activeKillSwitches: [],
+            recommendedKillSwitches: [],
+            killSwitches: [],
+            sovereignVerdictLine: nil,
+            sovereignAuthorityLine: nil,
+            sovereignAuditLine: nil,
+            inspectionHeadline: "Horizon diagnostics active.",
+            blockers: [],
+            layerStackLines: [],
+            checkpointID: nil,
+            checkpointApprovalState: nil,
+            checkpointRollbackReady: nil,
+            checkpointApplyReady: nil
+        )
+
+        let summary = DecisionEvolutionReleaseSummaryBuilder.build(
+            evolutionControlSurface: controlSurface,
+            eBrainSummary: eBrainSummary,
+            dominantBlockers: [],
+            activeKillSwitches: [],
+            recommendedKillSwitchesHint: []
+        )
+
+        XCTAssertEqual(summary.state, .watch)
+        XCTAssertEqual(
+            summary.headline,
+            DecisionEvolutionReleaseStagePresentationSupport.watchingAuditFindingsHeadline
+        )
+        XCTAssertEqual(summary.primaryBlocker, .auditFindings)
+        XCTAssertTrue(summary.reasons.contains("Factors: evidence_caveat_load"))
+        XCTAssertTrue(summary.reasons.contains("Reason codes: evidence.caveat"))
+    }
+
+    func testBuilderPromotesLiveSovereignSignalsToWatchingAuditFindings() {
+        let active = makeSnapshot(
+            checkpointID: "active-sovereign",
+            createdAt: Date(timeIntervalSince1970: 10),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: nil,
+            pendingReviewQueue: [],
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: ["previous-active-sovereign"]
+        )
+        let eBrainSummary = DecisionSystemEBrainSummary(
+            source: .liveRuntime,
+            runMode: "guarded",
+            taskType: "high_pressure",
+            riskLevel: "high",
+            permitMode: "delay",
+            deviceRoute: "guarded",
+            loopCount: 1,
+            cacheHitRate: 0,
+            hostGatePercent: 37,
+            pressureLine: nil,
+            riskFactorsLine: nil,
+            reasonCodesLine: nil,
+            foldChecksum: "checksum-sovereign",
+            updateTicketCount: 1,
+            auditFindingCount: 1,
+            activeKillSwitches: [],
+            recommendedKillSwitches: [],
+            killSwitches: [],
+            sovereignVerdictLine: "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
+            sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • lock session • quarantine session",
+            sovereignAuditLine: "Sovereign audit • BR-SOV-004 • ref audit.session-l14",
+            inspectionHeadline: "Sovereign posture active.",
+            blockers: [],
+            layerStackLines: [],
+            checkpointID: nil,
+            checkpointApprovalState: nil,
+            checkpointRollbackReady: nil,
+            checkpointApplyReady: nil
+        )
+
+        let summary = DecisionEvolutionReleaseSummaryBuilder.build(
+            evolutionControlSurface: controlSurface,
+            eBrainSummary: eBrainSummary,
+            dominantBlockers: [],
+            activeKillSwitches: [],
+            recommendedKillSwitchesHint: []
+        )
+
+        XCTAssertEqual(summary.state, .watch)
+        XCTAssertEqual(
+            summary.headline,
+            DecisionEvolutionReleaseStagePresentationSupport.watchingAuditFindingsHeadline
+        )
+        XCTAssertEqual(summary.primaryBlocker, .auditFindings)
+        XCTAssertTrue(summary.reasons.contains("Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine"))
+        XCTAssertTrue(summary.reasons.contains("Sovereign authority • tokens memoryWrite • lock session • quarantine session"))
+        XCTAssertTrue(summary.reasons.contains("Sovereign audit • BR-SOV-004 • ref audit.session-l14"))
+    }
+
     func testPresentationBuildCarriesCheckpointAndKillSwitchCopy() {
         let active = makeSnapshot(
             checkpointID: "active-1",
@@ -747,6 +876,100 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
         XCTAssertEqual(actionPresentation.rollbackIntent?.kind, .rollbackActiveCheckpoint)
         XCTAssertEqual(actionPresentation.approveQueueIntent?.kind, .approvePendingCheckpoints)
         XCTAssertEqual(actionPresentation.clearReviewLineageIntent?.kind, .clearPendingReviewLineage)
+    }
+
+    func testActionSupportDoesNotOpenQuickActionsForRestoreOnlyMutationSurface() {
+        let active = makeSnapshot(
+            checkpointID: "active-restore-only",
+            createdAt: Date(timeIntervalSince1970: 10),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: nil,
+            pendingReviewQueue: [],
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: []
+        )
+
+        let actionPresentation = DecisionEvolutionReleaseSummaryActionSupport.build(
+            controlSurface: controlSurface,
+            surfaceContract: .controlCenter,
+            navigationOptions: DecisionEvolutionSurfaceContract.controlCenter.navigationSurfaceOptions()
+        )
+
+        XCTAssertTrue(actionPresentation.allowsLocalMutationActions)
+        XCTAssertFalse(actionPresentation.showsAnyActionRow)
+        XCTAssertNil(actionPresentation.quickActionsTitle)
+        XCTAssertNil(actionPresentation.rollbackIntent)
+        XCTAssertNil(actionPresentation.approveQueueIntent)
+        XCTAssertNil(actionPresentation.clearReviewLineageIntent)
+    }
+
+    func testActionSupportMatchesSharedSurfaceActionPlanContractAcrossSurfaceModes() {
+        let active = makeSnapshot(
+            checkpointID: "active-policy-contract",
+            createdAt: Date(timeIntervalSince1970: 10),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let review = makeSnapshot(
+            checkpointID: "review-policy-contract",
+            createdAt: Date(timeIntervalSince1970: 20),
+            approvalState: .reviewSuggested,
+            hasLineage: true,
+            killSwitches: ["external-tools"]
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: review,
+            pendingReviewQueue: [review],
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: ["previous-active-policy-contract"]
+        )
+
+        for surfaceContract in [DecisionEvolutionSurfaceContract.controlCenter, .home] {
+            let navigationOptions = surfaceContract.navigationSurfaceOptions()
+            let actionPresentation = DecisionEvolutionReleaseSummaryActionSupport.build(
+                controlSurface: controlSurface,
+                surfaceContract: surfaceContract,
+                navigationOptions: navigationOptions
+            )
+            let policy = DecisionEvolutionPolicyEngine.evaluate(
+                DecisionEvolutionPolicyEngine.input(
+                    controlSurface: controlSurface,
+                    releaseSummary: nil,
+                    activeKillSwitches: controlSurface.activeKillSwitches,
+                    recommendedKillSwitches: controlSurface.queueKillSwitches,
+                    canRestoreActiveCheckpoint: controlSurface.activePresentation?.applyReady == true,
+                    canRollbackActiveCheckpoint: controlSurface.canRollbackActiveCheckpoint,
+                    allowsLocalMutationActions: surfaceContract.allowsMutations
+                )
+            )
+            let actionPlan = policy.surfaceActionPlan(
+                navigationOptions: navigationOptions,
+                routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter
+            )
+
+            XCTAssertEqual(
+                actionPresentation.allowsLocalMutationActions,
+                actionPlan.allowsLocalMutationActions,
+                "Release-summary action availability drifted for \(surfaceContract.kind)."
+            )
+            XCTAssertEqual(
+                actionPresentation.showsAnyActionRow,
+                actionPlan.showsAnyActionRow,
+                "Release-summary action-row visibility drifted for \(surfaceContract.kind)."
+            )
+            XCTAssertEqual(
+                actionPresentation.quickActionsTitle,
+                actionPlan.quickActionsTitle,
+                "Release-summary quick-actions title drifted for \(surfaceContract.kind)."
+            )
+        }
     }
 
     func testKillSwitchPresentationSupportFormatsSharedActiveAndRecommendedLines() {

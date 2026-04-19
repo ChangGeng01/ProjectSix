@@ -48,7 +48,8 @@ public enum BASAppleMemoryReconciliationWriter {
                 existingRecords: existingRecords.map(\.basSnapshot),
                 existingCandidates: existingCandidates.map(\.basSnapshot),
                 reviewNow: request.reviewNow,
-                memoryTrustBehavior: request.memoryTrustBehavior
+                memoryTrustBehavior: request.memoryTrustBehavior,
+                persistencePolicy: request.persistencePolicy
             )
         )
 

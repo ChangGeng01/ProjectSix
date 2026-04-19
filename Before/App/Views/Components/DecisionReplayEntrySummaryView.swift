@@ -1,24 +1,24 @@
 import SwiftUI
 
 struct DecisionReplayEntrySummaryView<Header: View, Supplementary: View, Footer: View>: View {
-    let title: String
-    let secondaryLine: String?
+    let cardCopy: DecisionEvolutionReplayCardCopy
     let presentation: DecisionEvolutionReplayEntryPresentation?
+    let showsDiagnostics: Bool
     @ViewBuilder let header: () -> Header
     @ViewBuilder let supplementary: () -> Supplementary
     @ViewBuilder let footer: () -> Footer
 
     init(
-        title: String,
-        secondaryLine: String? = nil,
+        cardCopy: DecisionEvolutionReplayCardCopy,
         presentation: DecisionEvolutionReplayEntryPresentation?,
+        showsDiagnostics: Bool = true,
         @ViewBuilder header: @escaping () -> Header,
         @ViewBuilder supplementary: @escaping () -> Supplementary = { EmptyView() },
         @ViewBuilder footer: @escaping () -> Footer = { EmptyView() }
     ) {
-        self.title = title
-        self.secondaryLine = secondaryLine
+        self.cardCopy = cardCopy
         self.presentation = presentation
+        self.showsDiagnostics = showsDiagnostics
         self.header = header
         self.supplementary = supplementary
         self.footer = footer
@@ -28,24 +28,41 @@ struct DecisionReplayEntrySummaryView<Header: View, Supplementary: View, Footer:
         VStack(alignment: .leading, spacing: 10) {
             header()
 
-            Text(title)
+            if let digestHeadlineLine = presentation?.digestHeadlineLine {
+                Text(digestHeadlineLine)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(BeforeTheme.ember)
+                    .multilineTextAlignment(.leading)
+            }
+
+            Text(cardCopy.titleLine)
                 .font(.headline)
                 .foregroundStyle(BeforeTheme.ink)
                 .multilineTextAlignment(.leading)
 
-            if let secondaryLine, !secondaryLine.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if let secondaryLine = cardCopy.secondaryLine {
                 Text(secondaryLine)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.leading)
             }
 
+            if let supplementaryLine = cardCopy.supplementaryLine {
+                Text(supplementaryLine)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(BeforeTheme.ember)
+                    .multilineTextAlignment(.leading)
+            }
+
             supplementary()
 
-            DecisionReplayDiagnosticsBlockView(
-                presentation: presentation
-            )
-            .padding(.top, 2)
+            if showsDiagnostics {
+                DecisionReplayDiagnosticsBlockView(
+                    presentation: presentation,
+                    layout: .compact
+                )
+                .padding(.top, 2)
+            }
 
             footer()
         }

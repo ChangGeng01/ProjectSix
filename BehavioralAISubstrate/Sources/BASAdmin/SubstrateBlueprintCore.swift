@@ -224,6 +224,7 @@ public enum BASSubstrateArchitectureBuilder {
             uniqueKeysWithValues: snapshot.reports.map { ($0.kind, $0) }
         )
         let capabilityCoverage = snapshot.capabilityCoverage
+        let runtimeEvidence = snapshot.displayRuntimeSummary
 
         let stackLayers: [BASSubstrateStackLayer] = [
             BASSubstrateStackLayer(
@@ -267,7 +268,7 @@ public enum BASSubstrateArchitectureBuilder {
                 summary: "Capability-first runtime picks the cheapest safe route, keeps mobile budgets bounded, and lets the generative lane stay replaceable.",
                 evidence: compact([
                     reportsByKind[.runtime]?.summary,
-                    snapshot.runtimeSummary,
+                    runtimeEvidence,
                     capabilitySummary(for: .runtime, in: capabilityCoverage)
                 ])
             ),
@@ -279,7 +280,7 @@ public enum BASSubstrateArchitectureBuilder {
                     : "System layer can switch between local and hybrid conditions without changing the upper substrate contracts.",
                 evidence: compact([
                     snapshot.isPureLocal ? "Pure local closed loop is currently active." : "Hybrid seams are available.",
-                    snapshot.runtimeSummary
+                    runtimeEvidence
                 ])
             )
         ]

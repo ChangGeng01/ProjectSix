@@ -104,6 +104,61 @@ final class DecisionSessionEngineHealthSummaryTests: XCTestCase {
         XCTAssertTrue(healthSummary?.detail.contains("Recovered") == true)
     }
 
+    func testGlobalSummaryReturnsHorizonDiagnosticsWhenCheckpointFactsCarryCaveatSignals() {
+        let inspection = DecisionSessionRuntimeInspectionSession(
+            sessionID: "sess-horizon",
+            title: "policy refresh",
+            status: .active,
+            updatedAt: Date(timeIntervalSince1970: 180),
+            headBranchID: "branch-main",
+            latestCheckpointID: "ckpt-12",
+            latestCheckpointSeq: 12,
+            latestCheckpointGoal: "refresh volatile facts",
+            latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
+                sessionID: "sess-horizon",
+                thoughtFoldChecksum: "fold12abc",
+                riskLevel: "guarded",
+                permitMode: "replace",
+                hostGatePercent: 58,
+                riskFactorsLine: "Factors: evidence_caveat_load",
+                reasonCodesLine: "Reason codes: evidence.caveat"
+            ),
+            latestEventID: "evt-12",
+            latestEventSeq: 12,
+            latestEventType: .assistantMessage,
+            latestEventDetail: "Stable checkpoint preserved.",
+            openStepCount: 0,
+            openStepStatus: nil,
+            stalledStepCount: 0,
+            branchCount: 1,
+            recoveryCount: 0,
+            latestRecoveryAt: nil
+        )
+        let summary = DecisionSystemSessionEngineSummary(
+            layerPlacement: .foldedLung,
+            sessions: 1,
+            activeSessions: 1,
+            stalledSessions: 0,
+            branches: 1,
+            checkpoints: 1,
+            events: 12,
+            steps: 0,
+            activeSession: inspection,
+            recentSessions: [inspection],
+            headline: "Session Engine L3.folded_lung protects edits, checkpoints, and recovery.",
+            signals: []
+        )
+
+        let healthSummary = DecisionSessionEngineHealthSummary.summary(from: summary)
+
+        XCTAssertEqual(healthSummary?.severity, .watch)
+        XCTAssertEqual(healthSummary?.title, "Horizon diagnostics active")
+        XCTAssertEqual(
+            healthSummary?.detail,
+            "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+        )
+    }
+
     func testSessionSummaryReturnsRecoveryReadyForStalledSession() {
         let inspection = DecisionSessionRuntimeInspectionSession(
             sessionID: "sess-stalled",
@@ -133,5 +188,49 @@ final class DecisionSessionEngineHealthSummaryTests: XCTestCase {
 
         XCTAssertEqual(healthSummary?.severity, .watch)
         XCTAssertEqual(healthSummary?.title, "Recovery ready")
+    }
+
+    func testSessionSummaryReturnsHorizonDiagnosticsForCheckpointCaveats() {
+        let inspection = DecisionSessionRuntimeInspectionSession(
+            sessionID: "sess-caveat",
+            title: "latest policy review",
+            status: .active,
+            updatedAt: Date(timeIntervalSince1970: 220),
+            headBranchID: "branch-main",
+            latestCheckpointID: "ckpt-14",
+            latestCheckpointSeq: 14,
+            latestCheckpointGoal: "preserve stable facts only",
+            latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
+                sessionID: "sess-caveat",
+                thoughtFoldChecksum: "fold14abc",
+                riskLevel: "guarded",
+                permitMode: "delay",
+                hostGatePercent: 44,
+                riskFactorsLine: "Factors: evidence_caveat_load",
+                reasonCodesLine: "Reason codes: evidence.caveat"
+            ),
+            latestEventID: "evt-14",
+            latestEventSeq: 14,
+            latestEventType: .assistantMessage,
+            latestEventDetail: "Checkpoint remains stable.",
+            openStepCount: 0,
+            openStepStatus: nil,
+            stalledStepCount: 0,
+            branchCount: 1,
+            recoveryCount: 0,
+            latestRecoveryAt: nil
+        )
+
+        let healthSummary = DecisionSessionEngineHealthSummary.summary(
+            sessionStatus: .active,
+            inspection: inspection
+        )
+
+        XCTAssertEqual(healthSummary?.severity, .watch)
+        XCTAssertEqual(healthSummary?.title, "Horizon diagnostics active")
+        XCTAssertEqual(
+            healthSummary?.detail,
+            "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+        )
     }
 }

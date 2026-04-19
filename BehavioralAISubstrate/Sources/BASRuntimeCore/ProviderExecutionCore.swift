@@ -41,6 +41,8 @@ public struct BASProviderRequestPlanSummary: Codable, Equatable, Sendable {
     public var compatibleProviderIDs: [String]
     public var incompatibleProviderIDs: [String]
     public var suspendedProviderIDs: [String]
+    public var appliedRoutingPolicyVersion: String?
+    public var appliedRoutingRegistryVersion: String?
     public var usedTestingOverride: Bool
     public var providerSelectionDurationMs: Int
 
@@ -52,6 +54,8 @@ public struct BASProviderRequestPlanSummary: Codable, Equatable, Sendable {
         compatibleProviderIDs: [String],
         incompatibleProviderIDs: [String],
         suspendedProviderIDs: [String],
+        appliedRoutingPolicyVersion: String? = nil,
+        appliedRoutingRegistryVersion: String? = nil,
         usedTestingOverride: Bool,
         providerSelectionDurationMs: Int
     ) {
@@ -62,6 +66,8 @@ public struct BASProviderRequestPlanSummary: Codable, Equatable, Sendable {
         self.compatibleProviderIDs = compatibleProviderIDs
         self.incompatibleProviderIDs = incompatibleProviderIDs
         self.suspendedProviderIDs = suspendedProviderIDs
+        self.appliedRoutingPolicyVersion = appliedRoutingPolicyVersion
+        self.appliedRoutingRegistryVersion = appliedRoutingRegistryVersion
         self.usedTestingOverride = usedTestingOverride
         self.providerSelectionDurationMs = providerSelectionDurationMs
     }
@@ -249,6 +255,8 @@ public enum BASExecutableProviderPlanner {
         allowFallbacks: Bool,
         deterministicProviderID: String,
         preferenceOrderings: [BASProviderPreferenceOrdering],
+        appliedRoutingPolicyVersion: String? = nil,
+        appliedRoutingRegistryVersion: String? = nil,
         suspendedProviderIDs: Set<String> = [],
         strategy: BASAdaptiveTaskStrategy? = nil,
         descriptors: [BASProviderDescriptor],
@@ -263,6 +271,8 @@ public enum BASExecutableProviderPlanner {
             allowFallbacks: allowFallbacks,
             deterministicProviderID: deterministicProviderID,
             preferenceOrderings: preferenceOrderings,
+            appliedRoutingPolicyVersion: appliedRoutingPolicyVersion,
+            appliedRoutingRegistryVersion: appliedRoutingRegistryVersion,
             suspendedProviderIDs: suspendedProviderIDs,
             strategy: strategy,
             descriptors: descriptors
@@ -357,6 +367,8 @@ public enum BASProviderRequestRunner {
         allowFallbacks: Bool,
         deterministicProviderID: String,
         preferenceOrderings: [BASProviderPreferenceOrdering],
+        appliedRoutingPolicyVersion: String? = nil,
+        appliedRoutingRegistryVersion: String? = nil,
         suspendedProviderIDs: Set<String> = [],
         strategy: BASAdaptiveTaskStrategy? = nil,
         descriptors: [BASProviderDescriptor],
@@ -388,6 +400,8 @@ public enum BASProviderRequestRunner {
             allowFallbacks: allowFallbacks,
             deterministicProviderID: deterministicProviderID,
             preferenceOrderings: preferenceOrderings,
+            appliedRoutingPolicyVersion: appliedRoutingPolicyVersion,
+            appliedRoutingRegistryVersion: appliedRoutingRegistryVersion,
             suspendedProviderIDs: suspendedProviderIDs,
             strategy: strategy,
             descriptors: descriptors,
@@ -479,6 +493,8 @@ public enum BASProviderRequestRunner {
         allowFallbacks: Bool,
         deterministicProviderID: String,
         preferenceOrderings: [BASProviderPreferenceOrdering],
+        appliedRoutingPolicyVersion: String? = nil,
+        appliedRoutingRegistryVersion: String? = nil,
         suspendedProviderIDs: Set<String> = [],
         strategy: BASAdaptiveTaskStrategy? = nil,
         descriptors: [BASProviderDescriptor],
@@ -514,6 +530,8 @@ public enum BASProviderRequestRunner {
             allowFallbacks: allowFallbacks,
             deterministicProviderID: deterministicProviderID,
             preferenceOrderings: preferenceOrderings,
+            appliedRoutingPolicyVersion: appliedRoutingPolicyVersion,
+            appliedRoutingRegistryVersion: appliedRoutingRegistryVersion,
             suspendedProviderIDs: suspendedProviderIDs,
             strategy: strategy,
             descriptors: descriptors,
@@ -530,6 +548,8 @@ public enum BASProviderRequestRunner {
             compatibleProviderIDs: planning.plan.compatibleProviderIDs,
             incompatibleProviderIDs: planning.plan.incompatibleProviderIDs,
             suspendedProviderIDs: suspendedProviderIDs.sorted(),
+            appliedRoutingPolicyVersion: planning.plan.appliedRoutingPolicyVersion,
+            appliedRoutingRegistryVersion: planning.plan.appliedRoutingRegistryVersion,
             usedTestingOverride: planning.usedTestingOverride,
             providerSelectionDurationMs: elapsedMilliseconds(since: selectionStart, clock: clock)
         )

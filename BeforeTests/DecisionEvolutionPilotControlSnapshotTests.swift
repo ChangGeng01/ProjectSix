@@ -5,6 +5,78 @@ import BASHostKit
 
 struct DecisionEvolutionPilotControlSnapshotTests {
     @Test
+    func guidedActionMatchesSharedSurfaceActionPlanContract() throws {
+        let controlSurface = makeControlSurface(
+            active: makeCheckpoint(
+                checkpointID: "active-action-plan",
+                createdAt: Date(timeIntervalSince1970: 10),
+                approvalState: .automatic,
+                hasLineage: true
+            ),
+            pendingReview: [
+                makeCheckpoint(
+                    checkpointID: "review-action-plan",
+                    createdAt: Date(timeIntervalSince1970: 20),
+                    approvalState: .reviewSuggested,
+                    hasLineage: true
+                )
+            ],
+            restorableCheckpointIDs: ["active-action-plan-prior"]
+        )
+        let releaseSummary = makeReleaseSummary(
+            headline: "Pending review is blocking release.",
+            reasons: ["Review queue must be cleared first."],
+            pendingReviewCount: 1,
+            activeKillSwitches: [],
+            recommendedKillSwitches: ["external-tools"],
+            killSwitches: ["external-tools"],
+            canRestoreActiveCheckpoint: true,
+            activeCheckpointID: "active-action-plan",
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpointID: "review-action-plan"
+        )
+        let surfaceContract = DecisionEvolutionSurfaceContract.controlCenter
+        let navigationOptions = surfaceContract.navigationSurfaceOptions()
+
+        let snapshot = DecisionEvolutionPilotControlSnapshot.build(
+            controlSurface: controlSurface,
+            releaseSummary: releaseSummary,
+            surfaceContract: surfaceContract,
+            navigationOptions: navigationOptions
+        )
+        let policy = DecisionEvolutionPolicyEngine.evaluate(
+            DecisionEvolutionPolicyEngine.input(
+                controlSurface: controlSurface,
+                releaseSummary: releaseSummary,
+                activeKillSwitches: releaseSummary.activeKillSwitches,
+                recommendedKillSwitches: releaseSummary.recommendedKillSwitches,
+                canRestoreActiveCheckpoint: releaseSummary.canRestoreActiveCheckpoint,
+                canRollbackActiveCheckpoint: releaseSummary.canRollbackActiveCheckpoint,
+                allowsLocalMutationActions: surfaceContract.allowsMutations
+            )
+        )
+        let actionPlan = policy.surfaceActionPlan(
+            navigationOptions: navigationOptions,
+            routesMutationsToControlCenter: surfaceContract.routesMutationsToControlCenter
+        )
+
+        let guidedAction = try #require(snapshot.guidedAction)
+        let expectedGuidedAction = try #require(actionPlan.guidedAction)
+
+        #expect(snapshot.allowsLocalMutationActions == actionPlan.allowsLocalMutationActions)
+        #expect(guidedAction.title == expectedGuidedAction.title)
+        #expect(guidedAction.detail == expectedGuidedAction.detail)
+        #expect(guidedAction.actionTitle == expectedGuidedAction.actionTitle)
+
+        if case let .mutation(intent) = guidedAction.route {
+            #expect(expectedGuidedAction.route == .approvePendingQueue)
+            #expect(intent.kind == .approvePendingCheckpoints)
+        } else {
+            Issue.record("Expected pilot guided action to stay aligned with the shared approve-pending route.")
+        }
+    }
+
+    @Test
     func guidedActionNavigationMatrixMatchesSurfaceModeAndPreferredDestination() {
         let localMutationSnapshot = DecisionEvolutionPilotControlSnapshot.build(
             controlSurface: makeControlSurface(

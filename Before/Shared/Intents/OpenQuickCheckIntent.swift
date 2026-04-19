@@ -1,19 +1,6 @@
 import AppIntents
 import Foundation
 
-private func sourceSurface(for entrySource: EntrySource) -> DecisionIntentSourceSurface {
-    switch entrySource {
-    case .watch:
-        .watch
-    case .homeWidgetSmall, .homeWidgetMedium, .lockScreenWidget:
-        .widget
-    case .siri:
-        .siri
-    case .shortcut, .spotlight, .app:
-        .shortcut
-    }
-}
-
 struct OpenQuickCheckIntent: AppIntent {
     static let title: LocalizedStringResource = "Open Before Quick Check"
     static let description = IntentDescription("Open the quick judgment flow in Before.")
@@ -36,11 +23,8 @@ struct OpenQuickCheckIntent: AppIntent {
 
     func perform() async throws -> some IntentResult {
         DecisionIntentEnvelopeStore.enqueue(
-            DecisionIntentEnvelope(
-                kind: .quickCapture,
-                sourceSurface: sourceSurface(for: entrySource),
+            .quickCapture(
                 entrySource: entrySource,
-                preferredMode: .quick,
                 scenario: scenario,
                 riskLevel: .low
             )
@@ -76,14 +60,11 @@ struct OpenDecisionModeIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult {
-        let cleanedPrompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines)
         DecisionIntentEnvelopeStore.enqueue(
-            DecisionIntentEnvelope(
-                kind: .openMode,
-                sourceSurface: sourceSurface(for: entrySource),
+            .openMode(
                 entrySource: entrySource,
-                preferredMode: mode,
-                promptSeed: cleanedPrompt?.isEmpty == true ? nil : cleanedPrompt
+                mode: mode,
+                promptSeed: prompt
             )
         )
         return .result()
@@ -101,27 +82,49 @@ struct OpenEvolutionControlIntent: AppIntent {
     @Parameter(title: "Headline")
     var prompt: String?
 
+    @Parameter(title: "Trigger Reason")
+    var triggerReason: String?
+
     init() {
         entrySource = .shortcut
         prompt = nil
+        triggerReason = nil
     }
 
-    init(entrySource: EntrySource, prompt: String? = nil) {
+    init(entrySource: EntrySource, prompt: String? = nil, triggerReason: String? = nil) {
         self.entrySource = entrySource
         self.prompt = prompt
+        self.triggerReason = triggerReason
+    }
+
+    init(
+        entrySource: EntrySource,
+        controlEntry: DecisionEvolutionWidgetControlEntryPresentation
+    ) {
+        self.init(
+            entrySource: entrySource,
+            prompt: controlEntry.prompt,
+            triggerReason: controlEntry.triggerReason
+        )
+    }
+
+    init(
+        entrySource: EntrySource,
+        primaryAction: DecisionEvolutionWidgetPrimaryActionPresentation
+    ) {
+        self.init(
+            entrySource: entrySource,
+            prompt: primaryAction.prompt,
+            triggerReason: primaryAction.triggerReason
+        )
     }
 
     func perform() async throws -> some IntentResult {
-        let cleanedPrompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines)
         DecisionIntentEnvelopeStore.enqueue(
-            DecisionIntentEnvelope(
-                kind: .openEvolutionControl,
-                sourceSurface: sourceSurface(for: entrySource),
+            .openEvolutionControl(
                 entrySource: entrySource,
-                preferredMode: .mirror,
-                promptSeed: cleanedPrompt?.isEmpty == true ? nil : cleanedPrompt,
-                riskLevel: .medium,
-                triggerReason: "Open Evolution Control from \(entrySource.label)."
+                promptSeed: prompt,
+                triggerReason: triggerReason
             )
         )
         return .result()

@@ -7,6 +7,80 @@ import BASHostKit
 @MainActor
 struct BehavioralAISubstrateBridgeTests {
     @Test
+    func lineageSummaryRoundTripsExtendedCheckpointFabricFacts() throws {
+        let summary = BASEvolutionLineageSummary(
+            recordedAt: date("2026-04-16T11:20:00Z"),
+            sessionID: "session-fabric",
+            runMode: .guard,
+            taskType: "high_pressure",
+            riskLevel: "high",
+            permitMode: "delay",
+            hostGatePercent: 84,
+            thoughtFoldChecksum: "fold-fabric",
+            updateTicketSummaries: ["Hold before promote"],
+            reviewDirectiveLine: "Review host drift",
+            activeKillSwitches: ["force_guard_mode"],
+            guardrailFindings: ["protective boundary held"],
+            recommendedKillSwitches: ["disableHighRiskAutoAction"],
+            neuralMorphID: "morph.guard",
+            activeOrganIDs: ["stubCore", "riskSpine", "permitKnot"],
+            headGuarantees: ["permit", "rollback"],
+            frontierWidth: 3,
+            bindingCount: 2,
+            degradedReasonCodes: ["thermal_guard"],
+            foldedLungSummary: BASEvolutionFoldedLungSummary(
+                morphGraphID: "morph.guard",
+                precisionProfileID: "precision.guard",
+                lungStateRef: "lung.guard",
+                breathMode: "guard",
+                breathPhase: "exchange",
+                thermalPressure: 77,
+                cachePressure: 41,
+                restoreReadinessPercent: 84,
+                resumeID: "resume.guard",
+                sourceFoldID: "fold-fabric",
+                resumeDepth: 2,
+                requiredOrganIDs: ["stubCore", "riskSpine", "permitKnot"],
+                consistencyChecks: ["fold_checksum", "risk_permit", "host_gate"],
+                fallbackMode: "rollbackAnchor",
+                rollbackAnchorID: "anchor.guard",
+                safeSnapshotRef: "snapshot.guard",
+                foldRefs: ["fold-fabric"],
+                hostVersionRef: "host.v4",
+                cacheStateRef: "cache.guard",
+                integrityHash: "integrity.guard",
+                sovereignActuationKinds: [.rollback, .memoryFreeze],
+                invalidatedResumeFrameIDs: ["resume.guard"],
+                invalidatedCacheRefs: ["cache.guard", "memory-write:session-fabric"],
+                invalidatedFoldRefs: ["fold-fabric"],
+                quarantinedFoldRefs: [],
+                resultingBreathMode: "guard",
+                preservedReadOnlyRecovery: true,
+                sovereignBridgeSummary: "Sovereign bridge • rollback, memoryFreeze • mode guard"
+            )
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .secondsSince1970
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+
+        let encoded = try encoder.encode(summary)
+        let decoded = try decoder.decode(BASEvolutionLineageSummary.self, from: encoded)
+
+        #expect(decoded.neuralMorphID == "morph.guard")
+        #expect(decoded.activeOrganIDs == ["stubCore", "riskSpine", "permitKnot"])
+        #expect(decoded.headGuarantees == ["permit", "rollback"])
+        #expect(decoded.frontierWidth == 3)
+        #expect(decoded.bindingCount == 2)
+        #expect(decoded.degradedReasonCodes == ["thermal_guard"])
+        #expect(decoded.foldedLungSummary?.breathMode == "guard")
+        #expect(decoded.foldedLungSummary?.rollbackAnchorID == "anchor.guard")
+        #expect(decoded.foldedLungSummary?.invalidatedCacheRefs == ["cache.guard", "memory-write:session-fabric"])
+        #expect(decoded.foldedLungSummary?.preservedReadOnlyRecovery == true)
+    }
+
+    @Test
     func consoleSnapshotPackagesRuntimeFlightDeckAndBrainState() async throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -65,14 +139,10 @@ struct BehavioralAISubstrateBridgeTests {
         #expect(substrateBrain?.activeConstraints == brainState.activeConstraints)
 
         let intentEnvelope = BehavioralAISubstrateBridge.entryIntentEnvelope(
-            from: DecisionIntentEnvelope(
-                kind: .quickCapture,
-                sourceSurface: .watch,
+            from: .quickCapture(
                 entrySource: .watch,
-                preferredMode: .quick,
                 promptSeed: "Hold this until morning.",
-                riskLevel: .medium,
-                triggerReason: "watch_capture"
+                riskLevel: .medium
             )
         )
         #expect(intentEnvelope.kind == .capture)
@@ -81,8 +151,7 @@ struct BehavioralAISubstrateBridgeTests {
         #expect(intentEnvelope.riskLevel == .medium)
 
         let intentSummary = BehavioralAISubstrateBridge.entryIntentSummary(
-            from: DecisionIntentEnvelope(
-                kind: .resumeCurrentDecision,
+            from: .resumeCurrentDecision(
                 sourceSurface: .notification,
                 entrySource: .app,
                 preferredMode: .balance,
@@ -95,11 +164,8 @@ struct BehavioralAISubstrateBridgeTests {
         #expect(intentSummary.headline.contains("Notification"))
 
         let handoffSummary = BehavioralAISubstrateBridge.handoffSummary(
-            from: DecisionIntentEnvelope(
-                kind: .quickCapture,
-                sourceSurface: .watch,
+            from: .quickCapture(
                 entrySource: .watch,
-                preferredMode: .quick,
                 promptSeed: "Save this for tomorrow morning.",
                 riskLevel: .medium
             )
@@ -177,6 +243,7 @@ struct BehavioralAISubstrateBridgeTests {
             currentBrainState: nil
         )
         let runtimeContext = BehavioralAISubstrateBridge.runtimeContext(from: export)
+        let dataReport = try #require(snapshot.reports.first(where: { $0.layer == .data }))
 
         #expect(export.effectiveEBrainSource == .persistedCheckpoint)
         #expect(snapshot.inspectionBundle != nil)
@@ -185,6 +252,14 @@ struct BehavioralAISubstrateBridgeTests {
         #expect(snapshot.brainSummary?.contains("session before.quick.lineage") == true)
         #expect(snapshot.brainSummary?.contains("host gate 82%") == true)
         #expect(snapshot.brainSummary?.contains("1 tickets") == true)
+        #expect(snapshot.effectiveLayerStackLines == persistedLineage.factsBundle.layerStackLines)
+        #expect(snapshot.effectiveLayerStackLines.first?.hasPrefix("L1 power clock") == true)
+        #expect(snapshot.runtimeSummary?.contains("L6 context") != true)
+        #expect(snapshot.runtimeSummary?.contains("L1 power clock") != true)
+        #expect(snapshot.runtimeSummary?.contains("L13 evolution") != true)
+        #expect(dataReport.summary.contains("L6 context") != true)
+        #expect(dataReport.summary.contains("L1 power clock") != true)
+        #expect(dataReport.summary.contains("L13 evolution") != true)
         #expect(snapshot.blockerSummary.contains("Checkpoint recovery pending review"))
         #expect(snapshot.inspectionBundle?.trace.selectedRoute.preferredModelID == "persisted.checkpoint.quick")
         #expect(snapshot.inspectionBundle?.releaseDecision.kind == .requireConfirmation)
@@ -208,15 +283,217 @@ struct BehavioralAISubstrateBridgeTests {
             cache: DecisionIntelligenceResponseCache(limit: 2),
             circuitBreaker: DecisionIntelligenceCircuitBreaker()
         )
+        let turn = makeProtectiveTurn()
 
         let snapshot = BehavioralAISubstrateBridge.consoleSnapshot(
             from: export,
             currentBrainState: nil,
-            eBrainTurn: makeProtectiveTurn()
+            eBrainTurn: turn
         )
+        let attachedExport = export.attaching(eBrainTurn: turn)
+        let dataReport = try #require(snapshot.reports.first(where: { $0.layer == .data }))
 
         #expect(snapshot.runtimeSummary?.contains("Pressure latency 3/1400ms") == true)
         #expect(snapshot.runtimeSummary?.contains("thermal cool") == true)
+        #expect(snapshot.effectiveLayerStackLines == attachedExport.effectiveLayerStackLines)
+        #expect(snapshot.effectiveLayerStackLines.first?.hasPrefix("L1 power clock") == true)
+        #expect(snapshot.runtimeSummary?.contains("L6 context") != true)
+        #expect(snapshot.runtimeSummary?.contains("L1 power clock") != true)
+        #expect(snapshot.runtimeSummary?.contains("L13 evolution") != true)
+        #expect(dataReport.summary.contains("L6 context") != true)
+        #expect(dataReport.summary.contains("L1 power clock") != true)
+        #expect(dataReport.summary.contains("L13 evolution") != true)
+    }
+
+    @Test
+    func inspectionSnapshotExposesEffectiveFactsAndLayerStackForLiveTurn() async throws {
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            debugStore: DecisionIntelligenceDebugStore(),
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+        let turn = makeProtectiveTurn()
+        let inspection = DecisionTestingSubstrateInspectionSnapshot(
+            export: export,
+            eBrainTurn: turn
+        )
+        let foldedLung = DecisionFoldedLungCoordinator.snapshot(for: turn)
+
+        #expect(inspection.effectiveEBrainSource == .liveRuntime)
+        #expect(inspection.effectiveEBrainSummary == inspection.synchronizedExport.effectiveEBrainSummary)
+        #expect(inspection.effectiveEBrainFactsBundle == inspection.synchronizedExport.effectiveEBrainFactsBundle)
+        #expect(inspection.effectiveLayerStackLines == inspection.synchronizedExport.effectiveLayerStackLines)
+        #expect(inspection.effectiveLayerStackLines == turn.layerStackLines)
+        #expect(inspection.liveEBrainKernelFrame?.runModeID == turn.budgetFrame.runMode.rawValue)
+        #expect(inspection.liveEBrainKernelFrame?.wakeIntentLevelID == turn.wakeIntent.intentLevel.rawValue)
+        #expect(inspection.liveEBrainKernelFrame?.leaseID == turn.runLease?.leaseID)
+        #expect(inspection.liveEBrainKernelFrame?.diagnosticsPresentation == turn.diagnosticsPresentation)
+        #expect(inspection.liveEBrainKernelFrame?.policyBundleVersion == turn.policyLineage?.bundleVersion)
+        #expect(
+            inspection.liveEBrainKernelFrame?.sovereignVerdictLevelID
+                == turn.sovereignVerdict?.verdictLevel.rawValue
+        )
+        #expect(
+            inspection.liveEBrainKernelFrame?.sovereignReasonCodes
+                == (turn.sovereignVerdict?.reasonCodes ?? [])
+        )
+        #expect(
+            inspection.liveEBrainKernelFrame?.sovereignCommitScopeIDs
+                == turn.sovereignCommitTokens.map(\.scope.rawValue)
+        )
+        #expect(
+            inspection.liveEBrainKernelFrame?.sovereignLockScopeID
+                == turn.sovereignLock?.scope.rawValue
+        )
+        #expect(
+            inspection.liveEBrainKernelFrame?.sovereignQuarantineZoneIDs
+                == turn.quarantineRecords.map(\.zone.rawValue)
+        )
+        #expect(
+            inspection.liveEBrainKernelFrame?.sovereignAuditRuleIDs
+                == (turn.sovereignAuditEntry?.ruleIDs ?? [])
+        )
+        #expect(
+            inspection.liveEBrainKernelFrame?.sovereignAuditRef
+                == (turn.sovereignAuditEntry?.auditID ?? turn.sovereignVerdict?.auditRef)
+        )
+        #expect(
+            inspection.liveEBrainKernelFrame?.policyDecisionIDs
+                == (turn.policyLineage.map {
+                    [$0.providerRoutingPolicyID, $0.runtimeTuningPolicyID]
+                } ?? [])
+        )
+        #expect(
+            inspection.liveEBrainKernelFrame?.sovereignExecutionKinds
+                == turn.sovereignExecutionReceipts.map(\.kind.rawValue)
+        )
+        #expect(inspection.liveEBrainKernelFrame?.lungState == foldedLung.lungState)
+        #expect(inspection.liveEBrainKernelFrame?.resumeFrame == foldedLung.resumeFrame)
+        #expect(inspection.liveEBrainKernelFrame?.rollbackAnchor == foldedLung.rollbackAnchor)
+        #expect(inspection.liveEBrainKernelFrame?.sovereignBridgeResult == foldedLung.sovereignBridgeResult)
+        #expect(
+            inspection.liveEBrainPresentationFrame?.runModeTitle
+                == turn.diagnosticsPresentation.runModeTitle
+        )
+        #expect(
+            inspection.liveEBrainPresentationFrame?.layerStackLines
+                == turn.diagnosticsPresentation.layerStackLines
+        )
+        #expect(inspection.liveEBrainPresentationFrame?.lungLine == foldedLung.lungLine)
+        #expect(inspection.liveEBrainPresentationFrame?.resumeLine == foldedLung.resumeLine)
+        #expect(inspection.liveEBrainPresentationFrame?.rollbackLine == foldedLung.rollbackLine)
+        #expect(inspection.liveEBrainPresentationFrame?.sovereignBridgeLine == foldedLung.sovereignBridgeLine)
+        if let verdictLevel = turn.sovereignVerdict?.verdictLevel.rawValue {
+            #expect(
+                inspection.liveEBrainPresentationFrame?.sovereignVerdictLine?.contains(verdictLevel)
+                    == true
+            )
+        }
+        if let lockScope = turn.sovereignLock?.scope.rawValue {
+            #expect(
+                inspection.liveEBrainPresentationFrame?.sovereignAuthorityLine?.contains(lockScope)
+                    == true
+            )
+        }
+        if let firstAuditRule = turn.sovereignAuditEntry?.ruleIDs.first {
+            #expect(
+                inspection.liveEBrainPresentationFrame?.sovereignAuditLine?.contains(firstAuditRule)
+                    == true
+            )
+        }
+    }
+
+    @Test
+    func inspectionSnapshotExposesEffectiveFactsAndLayerStackForPersistedCheckpoint() async throws {
+        let persistedLineage = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-layer-stack",
+            createdAt: date("2026-04-10T07:16:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            diffSummary: ["Checkpoint recovery pending review"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T07:15:00.000Z"),
+                    sessionID: "before.quick.lineage",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 82,
+                    thoughtFoldChecksum: "fold-checkpoint",
+                    updateTicketSummaries: ["review after cooldown"],
+                    guardrailFindings: ["Checkpoint guardrail matched"],
+                    recommendedKillSwitches: ["host-write"]
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            persistedCheckpointLineages: [persistedLineage],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+        let inspection = DecisionTestingSubstrateInspectionSnapshot(
+            export: export,
+            eBrainTurn: nil
+        )
+
+        #expect(inspection.effectiveEBrainSource == .persistedCheckpoint)
+        #expect(inspection.effectiveEBrainSummary == export.effectiveEBrainSummary)
+        #expect(inspection.effectiveEBrainFactsBundle == export.effectiveEBrainFactsBundle)
+        #expect(inspection.effectiveLayerStackLines == export.effectiveLayerStackLines)
+        #expect(inspection.effectiveLayerStackLines == persistedLineage.factsBundle.layerStackLines)
+    }
+
+    @Test
+    func inspectionSnapshotExposesLatestStructuredPersistenceIssue() async throws {
+        PersistenceIssueRecorder.clear()
+        defer { PersistenceIssueRecorder.clear() }
+
+        let recorded = PersistenceIssueRecorder.record(
+            category: .brainBootstrapFallback,
+            severity: .warning,
+            operation: "bootstrapping current brain state from projection",
+            summary: "Before entered a degraded current-brain fallback while bootstrapping current brain state from projection.",
+            detail: "Synthetic compiler failure",
+            remediation: "Inspect the current brain compiler and keep the session in review/watch mode."
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            debugStore: DecisionIntelligenceDebugStore(),
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+        let inspection = DecisionTestingSubstrateInspectionSnapshot(
+            export: export,
+            eBrainTurn: nil
+        )
+
+        #expect(inspection.latestPersistenceIssue == recorded)
+        #expect(inspection.latestPersistenceNotice == recorded.displayMessage)
+        #expect(inspection.latestPersistenceRemediationSnapshot?.isDegraded == true)
+        #expect(inspection.latestPersistenceRemediationSnapshot?.summary == recorded.summary)
+        #expect(inspection.latestPersistenceRemediationSnapshot?.remediation == recorded.remediation)
+        #expect(inspection.runtimePolicyLineage == export.runtimeSnapshot.runtimePolicyLineage)
+        #expect(inspection.runtimePolicyIssues == export.runtimeSnapshot.runtimePolicyIssues)
     }
 
     @Test
@@ -233,8 +510,7 @@ struct BehavioralAISubstrateBridgeTests {
             mode: .quick,
             prompt: "Should I send this tonight?",
             source: .launch,
-            envelope: DecisionIntentEnvelope(
-                kind: .resumeCurrentDecision,
+            envelope: .resumeCurrentDecision(
                 sourceSurface: .notification,
                 entrySource: .app,
                 preferredMode: .quick,
@@ -261,6 +537,88 @@ struct BehavioralAISubstrateBridgeTests {
         #expect(updates.first?.fingerprint == current.verificationSnapshot.fingerprint)
         #expect(current.identityProfile.role == .predictiveSentinel)
         #expect(current.boundaryPolicy.riskLevel == .high)
+    }
+
+    @Test
+    func bridgeBootstrapCurrentBrainStateAppliesHorizonAwarePendingScreening() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        context.insert(
+            DecisionMemoryCandidateRecord(
+                id: "situational.market.latest",
+                type: .situational,
+                topic: "market_latest",
+                headline: "Tonight's market move",
+                value: "volatile market signal",
+                confidence: 0.79,
+                priority: 0.76,
+                source: .reflection,
+                firstObservedAt: date("2026-04-09T20:00:00Z"),
+                lastObservedAt: date("2026-04-09T20:00:00Z"),
+                decayPolicy: .medium,
+                retrievalTags: ["latest", "market", "night"],
+                evidenceCount: 2,
+                confirmationCount: 1,
+                lastObservationFingerprint: "market-fp",
+                status: .pending,
+                provenanceSummary: "Fresh reflection from tonight.",
+                lastWriteOperation: .noop,
+                lastGovernanceDecision: .deferred,
+                governanceReason: "Awaiting confirmation."
+            )
+        )
+        try context.save()
+
+        let now = date("2026-04-09T23:10:00Z")
+        let projection = DecisionMemorySystem.refreshProjection(in: context, now: now)
+        let stableFrame = DecisionEBrainExecutionCapabilityFrame(
+            activeProvider: .foundationModels,
+            preferredProvider: .foundationModels,
+            fallbackProvider: .gemmaE4B,
+            providerTrack: .builtInSystem,
+            executionTier: .systemManaged,
+            foundationTier: .systemManaged,
+            reasonCodes: []
+        )
+        let volatileFrame = DecisionEBrainExecutionCapabilityFrame(
+            activeProvider: .openModel,
+            preferredProvider: .openModel,
+            fallbackProvider: .template,
+            providerTrack: .builtInOpenModel,
+            executionTier: .balancedGemma,
+            foundationTier: .openModelHeuristic,
+            reasonCodes: []
+        )
+
+        let stableCurrent = BehavioralAISubstrateBridge.bootstrapCurrentBrainState(
+            mode: .quick,
+            prompt: "Help me decide whether to cook at home tonight.",
+            source: .launch,
+            taskGraph: nil,
+            context: context,
+            projection: projection,
+            retrievalMode: .filtered,
+            now: now,
+            executionCapabilityFrame: stableFrame
+        )
+        let volatileCurrent = BehavioralAISubstrateBridge.bootstrapCurrentBrainState(
+            mode: .quick,
+            prompt: "Help me decide whether to cook at home tonight.",
+            source: .launch,
+            taskGraph: nil,
+            context: context,
+            projection: projection,
+            retrievalMode: .filtered,
+            now: now,
+            executionCapabilityFrame: volatileFrame
+        )
+
+        #expect(stableCurrent.brainState.memoryGovernance.loadedPendingMemoryCount == 1)
+        #expect(volatileCurrent.brainState.memoryGovernance.loadedPendingMemoryCount == 0)
+        #expect(
+            volatileCurrent.brainState.memoryGovernance.screenedOutReasonCounts[.externalRefreshNoOverlap] == 1
+        )
     }
 
     private func makeProtectiveTurn() -> BASEBrainTurnResult {
@@ -440,6 +798,21 @@ struct BehavioralAISubstrateBridgeTests {
         return BASEBrainTurnResult(
             deviceState: deviceState,
             budgetFrame: budgetFrame,
+            wakeIntent: BASWakeIntent(
+                intentLevel: .guard,
+                estimatedValue: 0.72,
+                estimatedRisk: 0.91,
+                estimatedCost: 0.24,
+                preferredMode: budgetFrame.runMode
+            ),
+            vitalState: BASVitalState(
+                wakeState: budgetFrame.runMode,
+                survivalMargin: 0.76,
+                thermalMargin: 0.88,
+                powerMargin: 0.74,
+                continuityScore: 0.81,
+                stabilityScore: 0.86
+            ),
             hostContext: hostContext,
             contextFrame: contextFrame,
             decomposeFrame: decomposeFrame,
@@ -476,8 +849,7 @@ struct BehavioralAISubstrateBridgeTests {
             mode: .quick,
             prompt: "Should I send this tonight?",
             source: .notification,
-            envelope: DecisionIntentEnvelope(
-                kind: .resumeCurrentDecision,
+            envelope: .resumeCurrentDecision(
                 sourceSurface: .notification,
                 entrySource: .app,
                 preferredMode: .quick,
@@ -726,14 +1098,12 @@ struct BehavioralAISubstrateBridgeTests {
 
     @Test
     func bridgeConsumeDecisionIntentEnvelopeRoutesOpenModeAndRefreshesBrain() {
-        let envelope = DecisionIntentEnvelope(
-            kind: .reopenTomorrowItem,
+        let envelope = DecisionIntentEnvelope.reopenTomorrowItem(
             sourceSurface: .notification,
             entrySource: .app,
-            preferredMode: .balance,
-            promptSeed: "Resume with more space.",
+            title: "Resume with more space.",
             riskLevel: .medium,
-            triggerReason: "prediction"
+            preferredMode: .balance
         )
 
         var openedMode: DecisionMode?
@@ -749,6 +1119,9 @@ struct BehavioralAISubstrateBridgeTests {
                 openedMode = mode
                 selectedBoxTab = shouldSelectBoxTab
                 #expect(prompt == "Resume with more space.")
+            },
+            performRoutedInput: { _, _ in
+                Issue.record("Expected open-mode path, not routed input")
             },
             performPredictiveIntervention: { _ in
                 Issue.record("Expected open-mode path, not predictive intervention")
@@ -771,14 +1144,12 @@ struct BehavioralAISubstrateBridgeTests {
 
     @Test
     func bridgeConsumeLifecycleEntrySourcesPrefersHandoffAndRefreshesBrain() {
-        let envelope = DecisionIntentEnvelope(
-            kind: .reopenTomorrowItem,
+        let envelope = DecisionIntentEnvelope.reopenTomorrowItem(
             sourceSurface: .notification,
             entrySource: .app,
-            preferredMode: .balance,
-            promptSeed: "Resume with more space.",
+            title: "Resume with more space.",
             riskLevel: .medium,
-            triggerReason: "prediction"
+            preferredMode: .balance
         )
 
         var openedMode: DecisionMode?
@@ -787,7 +1158,7 @@ struct BehavioralAISubstrateBridgeTests {
 
         BehavioralAISubstrateBridge.consumeLifecycleEntrySourcesIfNeeded(
             consumeHandoff: { envelope },
-            consumePendingRequest: { nil },
+            consumeDeferredEnvelope: { nil },
             performCapture: { _, _, _ in
                 Issue.record("Expected open-mode handoff path")
             },
@@ -830,7 +1201,7 @@ struct BehavioralAISubstrateBridgeTests {
             },
             presentPendingReflection: { actions.append("reflection") },
             consumeHandoff: { nil },
-            consumePendingRequest: { nil },
+            consumeDeferredEnvelope: { nil },
             performCapture: { _, _, _ in actions.append("quick") },
             performPresent: { _, _, _ in actions.append("open") },
             performRoutedInput: { _, _ in actions.append("route") },
@@ -852,13 +1223,9 @@ struct BehavioralAISubstrateBridgeTests {
 
     @Test
     func bridgeConsumeDecisionIntentEnvelopeCanOpenEvolutionControlFromWatch() {
-        let envelope = DecisionIntentEnvelope(
-            kind: .openEvolutionControl,
-            sourceSurface: .watch,
+        let envelope = DecisionIntentEnvelope.openEvolutionControl(
             entrySource: .watch,
-            preferredMode: .mirror,
             promptSeed: "Watch the pending review queue",
-            riskLevel: .medium,
             triggerReason: "Watch requested evolution review."
         )
 
@@ -872,6 +1239,9 @@ struct BehavioralAISubstrateBridgeTests {
             },
             performPresent: { _, _, _, _ in
                 Issue.record("Expected control-surface handoff, not decision presentation")
+            },
+            performRoutedInput: { _, _ in
+                Issue.record("Expected control-surface handoff, not routed input")
             },
             performPredictiveIntervention: { _ in
                 Issue.record("Expected control-surface handoff, not predictive intervention")
@@ -889,6 +1259,94 @@ struct BehavioralAISubstrateBridgeTests {
 
         #expect(openedControlCenter)
         #expect(refreshedSource == .watchHandoff)
+    }
+
+    @Test
+    func bridgeConsumeDecisionIntentEnvelopeRoutesSharedRoutedInputAndRefreshesBrain() {
+        let envelope = DecisionIntentEnvelope.routedInput(
+            entrySource: .shortcut,
+            promptSeed: "  Route this shared intent.  "
+        )
+
+        var routedPrompt: String?
+        var routedEntrySource: EntrySource?
+        var refreshedSource: BrainStateUpdateSource?
+
+        BehavioralAISubstrateBridge.consumeDecisionIntentEnvelope(
+            envelope,
+            performCapture: { _, _, _ in
+                Issue.record("Expected routed-input path, not capture")
+            },
+            performPresent: { _, _, _, _ in
+                Issue.record("Expected routed-input path, not present")
+            },
+            performRoutedInput: { envelope, prompt in
+                routedPrompt = prompt
+                routedEntrySource = envelope.entrySource
+            },
+            performPredictiveIntervention: { _ in
+                Issue.record("Expected routed-input path, not predictive intervention")
+            },
+            performRestore: {
+                Issue.record("Expected routed-input path, not restore")
+            },
+            performOpenEvolutionControl: {
+                Issue.record("Expected routed-input path, not Evolution Control")
+            },
+            refreshCurrentBrain: { source in
+                refreshedSource = source
+            }
+        )
+
+        #expect(routedPrompt == "Route this shared intent.")
+        #expect(routedEntrySource == .shortcut)
+        #expect(refreshedSource == .explicitRefresh)
+    }
+
+    @Test
+    func bridgeConsumeLifecycleEntrySourcesRoutesPendingRequestThroughSharedIntentContract() {
+        let request = PendingLaunchRequest.routedPrompt(
+            entrySource: .shortcut,
+            prompt: "  Route the pending request.  "
+        )
+
+        var routedPrompt: String?
+        var routedEntrySource: EntrySource?
+        var refreshedSource: BrainStateUpdateSource?
+
+        BehavioralAISubstrateBridge.consumeLifecycleEntrySourcesIfNeeded(
+            consumeHandoff: { nil },
+            consumeDeferredEnvelope: { request.decisionIntentEnvelope },
+            performCapture: { _, _, _ in
+                Issue.record("Expected pending routed-input path")
+            },
+            performPresent: { _, _, _ in
+                Issue.record("Expected pending routed-input path")
+            },
+            performRoutedInput: { prompt, entrySource in
+                routedPrompt = prompt
+                routedEntrySource = entrySource
+            },
+            selectBoxTab: {
+                Issue.record("Expected pending routed-input path")
+            },
+            performPredictiveIntervention: { _ in
+                Issue.record("Expected pending routed-input path")
+            },
+            performRestore: {
+                Issue.record("Expected pending routed-input path")
+            },
+            performOpenEvolutionControl: {
+                Issue.record("Expected pending routed-input path")
+            },
+            refreshCurrentBrain: { source in
+                refreshedSource = source
+            }
+        )
+
+        #expect(routedPrompt == "Route the pending request.")
+        #expect(routedEntrySource == .shortcut)
+        #expect(refreshedSource == .explicitRefresh)
     }
 
     @Test

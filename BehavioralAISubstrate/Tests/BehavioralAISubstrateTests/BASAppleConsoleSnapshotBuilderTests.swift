@@ -41,6 +41,10 @@ struct BASAppleConsoleSnapshotBuilderTests {
                 runtimeGearID: "balanced",
                 totalRequests: 12,
                 totalProviderAttempts: 14,
+                layerStackLines: [
+                    "L6 context • task conflict • pressure 3/1400ms",
+                    "L13 evolution • review parser rollback"
+                ],
                 roleName: "Stability Guide",
                 boundaryModeID: "localOnlyAdvisory",
                 calibrationStatusID: "stable",
@@ -50,11 +54,17 @@ struct BASAppleConsoleSnapshotBuilderTests {
 
         #expect(snapshot.isPureLocal)
         #expect(snapshot.runtimeSummary == "Route Foundation Models • gear balanced • requests 12 • attempts 14")
+        #expect(snapshot.effectiveLayerStackLines == [
+            "L6 context • task conflict • pressure 3/1400ms",
+            "L13 evolution • review parser rollback"
+        ])
         #expect(snapshot.brainSummary == "Stability Guide • localOnlyAdvisory • stable • fingerprint brain_fp")
         #expect(snapshot.reports.first(where: { $0.kind == .runtime })?.summary == "Runtime layer is stable.")
         #expect(snapshot.reports.first(where: { $0.kind == .memory })?.blockers == ["Cold archive is not fully compacted."])
         #expect(snapshot.programExecutionBlueprint != nil)
-        #expect(snapshot.currentProgramExecutionBlueprint.layers.count == 13)
+        #expect(snapshot.currentProgramExecutionBlueprint.title == BASProgramExecutionBlueprintBuilder.latest.title)
+        #expect(snapshot.currentProgramExecutionBlueprint.layers.count == 14)
+        #expect(snapshot.currentProgramExecutionBlueprint.layers.last?.kind == .sovereign)
         #expect(snapshot.currentProgramExecutionBlueprint.workPackages.count == 19)
     }
 }

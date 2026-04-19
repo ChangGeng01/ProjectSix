@@ -167,11 +167,133 @@ public struct BASCapabilitySection: Codable, Sendable, Equatable, Identifiable {
     }
 }
 
+public struct BASHorizonCoverageSnapshot: Codable, Sendable, Equatable {
+    public var worldPriorID: String
+    public var worldPriorPostureID: String
+    public var worldBoundaryID: String
+    public var hostIsolationID: String
+    public var sessionIsolationID: String
+    public var toolTruthModeID: String
+    public var temporalKnowledgeTierID: String
+    public var temporalRefreshRequirementID: String
+    public var temporalDecayPolicyID: String
+    public var temporalTimeScopeID: String
+    public var evidenceGradientID: String
+    public var evidenceClaimTypeID: String
+    public var requiresCaveat: Bool
+    public var requiresExternalRefresh: Bool
+    public var volatileClaimWriteModeID: String
+    public var contaminatedWriteModeID: String
+    public var minimumDurableEvidenceCount: Int
+    public var forceStageNonContinuityDrafts: Bool
+    public var evidencePendingTagIDs: [String]
+
+    public init(
+        worldPriorID: String,
+        worldPriorPostureID: String,
+        worldBoundaryID: String,
+        hostIsolationID: String,
+        sessionIsolationID: String,
+        toolTruthModeID: String,
+        temporalKnowledgeTierID: String,
+        temporalRefreshRequirementID: String,
+        temporalDecayPolicyID: String,
+        temporalTimeScopeID: String,
+        evidenceGradientID: String,
+        evidenceClaimTypeID: String,
+        requiresCaveat: Bool,
+        requiresExternalRefresh: Bool,
+        volatileClaimWriteModeID: String = BASMemoryVolatileClaimWriteMode.admitDirectly.rawValue,
+        contaminatedWriteModeID: String = BASMemoryContaminatedWriteMode.reject.rawValue,
+        minimumDurableEvidenceCount: Int = 0,
+        forceStageNonContinuityDrafts: Bool = false,
+        evidencePendingTagIDs: [String] = []
+    ) {
+        self.worldPriorID = worldPriorID
+        self.worldPriorPostureID = worldPriorPostureID
+        self.worldBoundaryID = worldBoundaryID
+        self.hostIsolationID = hostIsolationID
+        self.sessionIsolationID = sessionIsolationID
+        self.toolTruthModeID = toolTruthModeID
+        self.temporalKnowledgeTierID = temporalKnowledgeTierID
+        self.temporalRefreshRequirementID = temporalRefreshRequirementID
+        self.temporalDecayPolicyID = temporalDecayPolicyID
+        self.temporalTimeScopeID = temporalTimeScopeID
+        self.evidenceGradientID = evidenceGradientID
+        self.evidenceClaimTypeID = evidenceClaimTypeID
+        self.requiresCaveat = requiresCaveat
+        self.requiresExternalRefresh = requiresExternalRefresh
+        self.volatileClaimWriteModeID = volatileClaimWriteModeID
+        self.contaminatedWriteModeID = contaminatedWriteModeID
+        self.minimumDurableEvidenceCount = minimumDurableEvidenceCount
+        self.forceStageNonContinuityDrafts = forceStageNonContinuityDrafts
+        self.evidencePendingTagIDs = evidencePendingTagIDs
+    }
+
+    public var worldLine: String {
+        [
+            "World \(worldPriorID)",
+            "Posture \(worldPriorPostureID)",
+            "Boundary \(worldBoundaryID)",
+            "Host \(hostIsolationID)",
+            "Session \(sessionIsolationID)",
+            "Tool \(toolTruthModeID)"
+        ].joined(separator: " • ")
+    }
+
+    public var temporalLine: String {
+        [
+            "Temporal \(temporalKnowledgeTierID)",
+            "Refresh \(temporalRefreshRequirementID)",
+            "Decay \(temporalDecayPolicyID)",
+            "Scope \(temporalTimeScopeID)"
+        ].joined(separator: " • ")
+    }
+
+    public var evidenceLine: String {
+        [
+            "Evidence \(evidenceGradientID)",
+            "Claim \(evidenceClaimTypeID)",
+            "Caveat \(requiresCaveat ? "yes" : "no")",
+            "External refresh \(requiresExternalRefresh ? "yes" : "no")"
+        ].joined(separator: " • ")
+    }
+
+    public var persistenceLine: String {
+        let pendingTags = evidencePendingTagIDs.isEmpty
+            ? "none"
+            : evidencePendingTagIDs.joined(separator: ",")
+
+        return [
+            "Persistence volatile \(volatileClaimWriteModeID)",
+            "contaminated \(contaminatedWriteModeID)",
+            "min durable evidence \(minimumDurableEvidenceCount)",
+            "force stage \(forceStageNonContinuityDrafts ? "yes" : "no")",
+            "pending tags \(pendingTags)"
+        ].joined(separator: " • ")
+    }
+
+    public var summaryLines: [String] {
+        [worldLine, temporalLine, evidenceLine, persistenceLine]
+    }
+}
+
 public struct BASCapabilityCoverageReport: Codable, Sendable, Equatable {
     public var sections: [BASCapabilitySection]
+    public var executionTierID: String?
+    public var foundationTierID: String?
+    public var horizonCoverage: BASHorizonCoverageSnapshot?
 
-    public init(sections: [BASCapabilitySection]) {
+    public init(
+        sections: [BASCapabilitySection],
+        executionTierID: String? = nil,
+        foundationTierID: String? = nil,
+        horizonCoverage: BASHorizonCoverageSnapshot? = nil
+    ) {
         self.sections = sections
+        self.executionTierID = executionTierID
+        self.foundationTierID = foundationTierID
+        self.horizonCoverage = horizonCoverage
     }
 
     public var overallScore: Int {
@@ -191,12 +313,20 @@ public struct BASCapabilityCoverageReport: Codable, Sendable, Equatable {
 
 public enum BASCapabilityCoverageBuilder {
     public static func build(
-        sections: [BASCapabilitySection]
+        sections: [BASCapabilitySection],
+        executionTierID: String? = nil,
+        foundationTierID: String? = nil,
+        horizonCoverage: BASHorizonCoverageSnapshot? = nil
     ) -> BASCapabilityCoverageReport {
         let ordered = BASCapabilityDomain.allCases.compactMap { domain in
             sections.first(where: { $0.domain == domain })
         }
-        return BASCapabilityCoverageReport(sections: ordered)
+        return BASCapabilityCoverageReport(
+            sections: ordered,
+            executionTierID: executionTierID,
+            foundationTierID: foundationTierID,
+            horizonCoverage: horizonCoverage
+        )
     }
 }
 
@@ -224,9 +354,24 @@ public struct BASLayerReport: Codable, Sendable, Equatable, Identifiable {
 }
 
 public struct BASConsoleSnapshot: Codable, Sendable, Equatable {
+    private static let layerStackMarkers = [
+        "L1 power clock",
+        "L2 neural core",
+        "L3 compression runtime",
+        "L4 foundation",
+        "L5 host profile",
+        "L6 context",
+        "L7-L9 cognition",
+        "L10-L12 adjudication",
+        "L13 evolution",
+        "L14 sovereign"
+    ]
+    private static let layerStackTrimCharacters = CharacterSet(charactersIn: " •").union(.whitespacesAndNewlines)
+
     public var generatedAt: Date
     public var overallSummary: String
     public var runtimeSummary: String?
+    public var layerStackLines: [String]?
     public var brainSummary: String?
     public var reports: [BASLayerReport]
     public var blockerSummary: [String]
@@ -239,17 +384,19 @@ public struct BASConsoleSnapshot: Codable, Sendable, Equatable {
         generatedAt: Date = .now,
         overallSummary: String,
         runtimeSummary: String? = nil,
+        layerStackLines: [String]? = nil,
         brainSummary: String? = nil,
         reports: [BASLayerReport],
         blockerSummary: [String] = [],
         isPureLocal: Bool = true,
         capabilityCoverage: BASCapabilityCoverageReport? = nil,
         inspectionBundle: BASInspectionBundle? = nil,
-        programExecutionBlueprint: BASProgramExecutionBlueprint? = BASProgramExecutionBlueprintBuilder.v12
+        programExecutionBlueprint: BASProgramExecutionBlueprint? = BASProgramExecutionBlueprintBuilder.latest
     ) {
         self.generatedAt = generatedAt
         self.overallSummary = overallSummary
         self.runtimeSummary = runtimeSummary
+        self.layerStackLines = layerStackLines
         self.brainSummary = brainSummary
         self.reports = reports
         self.blockerSummary = blockerSummary
@@ -277,6 +424,33 @@ public struct BASConsoleSnapshot: Codable, Sendable, Equatable {
         return .healthy
     }
 
+    public var effectiveLayerStackLines: [String] {
+        if let layerStackLines, !layerStackLines.isEmpty {
+            return layerStackLines
+        }
+
+        return Self.legacyLayerStackLines(from: runtimeSummary)
+    }
+
+    public var displayRuntimeSummary: String? {
+        guard let runtimeSummary else {
+            return nil
+        }
+
+        let cleanupLayerStackLines = Self.uniqueLayerStackLines(
+            effectiveLayerStackLines + Self.legacyLayerStackLines(from: runtimeSummary)
+        )
+        let cleaned = Self.cleanedRuntimeSummary(
+            runtimeSummary,
+            layerStackLines: cleanupLayerStackLines
+        )
+        return cleaned.isEmpty ? nil : cleaned
+    }
+
+    public var layerStackTitle: String {
+        Self.layerStackTitle(for: effectiveLayerStackLines)
+    }
+
     public static func eightLayerSnapshot(summary: String) -> BASConsoleSnapshot {
         BASFlightDeckBuilder().build(
             from: BASFlightDeckInput(
@@ -289,7 +463,132 @@ public struct BASConsoleSnapshot: Codable, Sendable, Equatable {
     }
 
     public var currentProgramExecutionBlueprint: BASProgramExecutionBlueprint {
-        programExecutionBlueprint ?? BASProgramExecutionBlueprintBuilder.v12
+        programExecutionBlueprint ?? BASProgramExecutionBlueprintBuilder.latest
+    }
+
+    private static func legacyLayerStackLines(from runtimeSummary: String?) -> [String] {
+        guard let runtimeSummary, !runtimeSummary.isEmpty else {
+            return []
+        }
+
+        guard let startIndex = layerStackMarkers
+            .compactMap({ marker in runtimeSummary.range(of: marker)?.lowerBound })
+            .min() else {
+            return []
+        }
+
+        let suffix = runtimeSummary[startIndex...]
+        return suffix
+            .components(separatedBy: " | ")
+            .map {
+                let trimmed = $0.trimmingCharacters(in: layerStackTrimCharacters)
+                guard let killRange = trimmed.range(of: " • kill ") else {
+                    return trimmed
+                }
+
+                return String(trimmed[..<killRange.lowerBound])
+                    .trimmingCharacters(in: layerStackTrimCharacters)
+            }
+            .filter { line in
+                layerStackMarkers.contains { marker in
+                    line.hasPrefix(marker)
+                }
+            }
+    }
+
+    private static func cleanedRuntimeSummary(
+        _ runtimeSummary: String,
+        layerStackLines: [String]
+    ) -> String {
+        let normalizedLayerStackLines = layerStackLines
+            .map { $0.trimmingCharacters(in: layerStackTrimCharacters) }
+            .filter { !$0.isEmpty }
+
+        guard !normalizedLayerStackLines.isEmpty else {
+            return normalizedSummarySegments(from: runtimeSummary).joined(separator: " | ")
+        }
+
+        var cleanedSummary = runtimeSummary
+        for line in normalizedLayerStackLines.sorted(by: { $0.count > $1.count }) {
+            cleanedSummary = cleanedSummary.replacingOccurrences(of: line, with: "")
+        }
+
+        return mergedSummarySegments(normalizedSummarySegments(from: cleanedSummary))
+            .joined(separator: " | ")
+    }
+
+    private static func uniqueLayerStackLines(_ lines: [String]) -> [String] {
+        lines.reduce(into: [String]()) { uniqueValues, value in
+            guard !uniqueValues.contains(value) else { return }
+            uniqueValues.append(value)
+        }
+    }
+
+    private static func layerStackTitle(for lines: [String]) -> String {
+        guard let firstRange = layerRange(for: lines.first),
+              let lastRange = layerRange(for: lines.last) else {
+            return "Layer stack"
+        }
+
+        let start = firstRange.lowerBound
+        let end = lastRange.upperBound
+        if start == end {
+            return "Layer \(start)"
+        }
+
+        return "Layers \(start)-\(end)"
+    }
+
+    private static func layerRange(for line: String?) -> ClosedRange<Int>? {
+        guard let line else { return nil }
+        let prefix = line.components(separatedBy: " • ").first ?? line
+        let pattern = #"^L(\d+)(?:-L?(\d+))?"#
+
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return nil
+        }
+
+        let nsRange = NSRange(prefix.startIndex..<prefix.endIndex, in: prefix)
+        guard let match = regex.firstMatch(in: prefix, options: [], range: nsRange),
+              let startRange = Range(match.range(at: 1), in: prefix),
+              let start = Int(prefix[startRange]) else {
+            return nil
+        }
+
+        if let endRange = Range(match.range(at: 2), in: prefix),
+           let end = Int(prefix[endRange]) {
+            return start...end
+        }
+
+        return start...start
+    }
+
+    private static func normalizedSummarySegments(from summary: String) -> [String] {
+        summary
+            .components(separatedBy: "|")
+            .compactMap { segment in
+                let normalized = segment
+                    .components(separatedBy: "•")
+                    .map { $0.trimmingCharacters(in: layerStackTrimCharacters) }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " • ")
+
+                return normalized.isEmpty ? nil : normalized
+            }
+    }
+
+    private static func mergedSummarySegments(_ segments: [String]) -> [String] {
+        var merged: [String] = []
+
+        for segment in segments {
+            if segment.hasPrefix("kill "), !merged.isEmpty {
+                merged[merged.count - 1] += " • " + segment
+            } else {
+                merged.append(segment)
+            }
+        }
+
+        return merged
     }
 }
 
@@ -316,6 +615,7 @@ public struct BASFlightDeckMetrics: Codable, Sendable, Equatable {
     public var generatedAt: Date
     public var layerInputs: [BASLayerAssessmentInput]
     public var runtimeSummary: String?
+    public var layerStackLines: [String]?
     public var brainSummary: String?
     public var isPureLocal: Bool
     public var capabilityCoverage: BASCapabilityCoverageReport?
@@ -326,15 +626,17 @@ public struct BASFlightDeckMetrics: Codable, Sendable, Equatable {
         generatedAt: Date = .now,
         layerInputs: [BASLayerAssessmentInput],
         runtimeSummary: String? = nil,
+        layerStackLines: [String]? = nil,
         brainSummary: String? = nil,
         isPureLocal: Bool = true,
         capabilityCoverage: BASCapabilityCoverageReport? = nil,
         inspectionBundle: BASInspectionBundle? = nil,
-        programExecutionBlueprint: BASProgramExecutionBlueprint? = BASProgramExecutionBlueprintBuilder.v12
+        programExecutionBlueprint: BASProgramExecutionBlueprint? = BASProgramExecutionBlueprintBuilder.latest
     ) {
         self.generatedAt = generatedAt
         self.layerInputs = layerInputs
         self.runtimeSummary = runtimeSummary
+        self.layerStackLines = layerStackLines
         self.brainSummary = brainSummary
         self.isPureLocal = isPureLocal
         self.capabilityCoverage = capabilityCoverage
@@ -373,6 +675,7 @@ public enum BASConsoleSnapshotBuilder {
             generatedAt: metrics.generatedAt,
             overallSummary: "Behavioral substrate score \(overallScore)/100 across \(reports.count) layers.",
             runtimeSummary: metrics.runtimeSummary,
+            layerStackLines: metrics.layerStackLines,
             brainSummary: metrics.brainSummary,
             reports: reports,
             blockerSummary: reports
@@ -384,7 +687,7 @@ public enum BASConsoleSnapshotBuilder {
             isPureLocal: metrics.isPureLocal,
             capabilityCoverage: metrics.capabilityCoverage,
             inspectionBundle: metrics.inspectionBundle,
-            programExecutionBlueprint: metrics.programExecutionBlueprint ?? BASProgramExecutionBlueprintBuilder.v12
+            programExecutionBlueprint: metrics.programExecutionBlueprint ?? BASProgramExecutionBlueprintBuilder.latest
         )
     }
 
@@ -426,6 +729,7 @@ public struct BASFlightDeckInput: Codable, Sendable, Equatable {
     public var generatedAt: Date
     public var overallSummary: String
     public var runtimeSummary: String?
+    public var layerStackLines: [String]?
     public var brainSummary: String?
     public var layerMetrics: [BASFlightDeckLayerMetric]
     public var isPureLocal: Bool
@@ -437,16 +741,18 @@ public struct BASFlightDeckInput: Codable, Sendable, Equatable {
         generatedAt: Date = .now,
         overallSummary: String,
         runtimeSummary: String? = nil,
+        layerStackLines: [String]? = nil,
         brainSummary: String? = nil,
         layerMetrics: [BASFlightDeckLayerMetric] = [],
         isPureLocal: Bool = true,
         capabilityCoverage: BASCapabilityCoverageReport? = nil,
         inspectionBundle: BASInspectionBundle? = nil,
-        programExecutionBlueprint: BASProgramExecutionBlueprint? = BASProgramExecutionBlueprintBuilder.v12
+        programExecutionBlueprint: BASProgramExecutionBlueprint? = BASProgramExecutionBlueprintBuilder.latest
     ) {
         self.generatedAt = generatedAt
         self.overallSummary = overallSummary
         self.runtimeSummary = runtimeSummary
+        self.layerStackLines = layerStackLines
         self.brainSummary = brainSummary
         self.layerMetrics = layerMetrics
         self.isPureLocal = isPureLocal
@@ -487,13 +793,14 @@ public struct BASFlightDeckBuilder: Sendable {
             generatedAt: input.generatedAt,
             overallSummary: input.overallSummary,
             runtimeSummary: input.runtimeSummary,
+            layerStackLines: input.layerStackLines,
             brainSummary: input.brainSummary,
             reports: reports,
             blockerSummary: blockerSummary,
             isPureLocal: input.isPureLocal,
             capabilityCoverage: input.capabilityCoverage,
             inspectionBundle: input.inspectionBundle,
-            programExecutionBlueprint: input.programExecutionBlueprint ?? BASProgramExecutionBlueprintBuilder.v12
+            programExecutionBlueprint: input.programExecutionBlueprint ?? BASProgramExecutionBlueprintBuilder.latest
         )
     }
 }
@@ -572,7 +879,7 @@ public struct BASConsoleView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            if let runtimeSummary = snapshot.runtimeSummary {
+            if let runtimeSummary = snapshot.displayRuntimeSummary {
                 Text(runtimeSummary)
                     .font(.subheadline.weight(.medium))
 
@@ -580,6 +887,18 @@ public struct BASConsoleView: View {
                     Text("Kill switches: \(killSwitchSummary)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                }
+            }
+
+            if !snapshot.effectiveLayerStackLines.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(snapshot.layerStackTitle)
+                        .font(.caption.weight(.semibold))
+                    ForEach(snapshot.effectiveLayerStackLines, id: \.self) { line in
+                        Text(line)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
@@ -634,6 +953,28 @@ public struct BASConsoleView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
+                Text(
+                    inspectionBundle.replayDisposition.isAvailable
+                    ? "Replay available"
+                    : "Replay blocked • \(inspectionBundle.replayDisposition.reason ?? "revoked")"
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+                if !inspectionBundle.replayDisposition.vaultOutOfSyncDeviceIDs.isEmpty {
+                    Text(
+                        "Vault out-of-sync devices • \(inspectionBundle.replayDisposition.vaultOutOfSyncDeviceIDs.joined(separator: ", "))"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+
+                if let migrationTarget = inspectionBundle.replayDisposition.vaultMigrationTargetDeviceID {
+                    Text("Vault migration target • \(migrationTarget)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
                 if let calibration = inspectionBundle.calibration {
                     Text("Calibration \(calibration.status) • alerts \(calibration.alertCount)")
                         .font(.caption2)
@@ -662,6 +1003,19 @@ public struct BASConsoleView: View {
                 Text("Coverage score \(capabilityCoverage.overallScore)/100")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+
+                if let horizonCoverage = capabilityCoverage.horizonCoverage {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Horizon coverage")
+                            .font(.caption2.weight(.medium))
+
+                        ForEach(horizonCoverage.summaryLines, id: \.self) { line in
+                            Text(line)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
 
                 ForEach(capabilityCoverage.sections) { section in
                     VStack(alignment: .leading, spacing: 4) {

@@ -67,18 +67,111 @@ struct DecisionSystemEBrainSummary: Equatable, Sendable {
     let cacheHitRate: Int
     let hostGatePercent: Int
     let pressureLine: String?
+    let riskFactorsLine: String?
+    let reasonCodesLine: String?
     let foldChecksum: String
     let updateTicketCount: Int
     let auditFindingCount: Int
     let activeKillSwitches: [String]
     let recommendedKillSwitches: [String]
     let killSwitches: [String]
+    let sovereignVerdictLine: String?
+    let sovereignAuthorityLine: String?
+    let sovereignAuditLine: String?
     let inspectionHeadline: String
     let blockers: [String]
+    let layerStackLines: [String]
     let checkpointID: String?
     let checkpointApprovalState: String?
     let checkpointRollbackReady: Bool?
     let checkpointApplyReady: Bool?
+    let executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame?
+    let morphGraph: BASMorphGraph?
+    let hotColdMap: BASHotColdMap?
+    let precisionProfile: BASPrecisionProfile?
+    let lungState: BASLungState?
+    let breathScheduler: BASBreathSchedulerFrame?
+    let resumeFrame: BASResumeFrame?
+    let rollbackAnchor: BASRollbackAnchor?
+    let sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult?
+
+    init(
+        source: DecisionTestingEBrainSource,
+        runMode: String,
+        taskType: String,
+        riskLevel: String,
+        permitMode: String,
+        deviceRoute: String,
+        loopCount: Int,
+        cacheHitRate: Int,
+        hostGatePercent: Int,
+        pressureLine: String?,
+        riskFactorsLine: String? = nil,
+        reasonCodesLine: String? = nil,
+        foldChecksum: String,
+        updateTicketCount: Int,
+        auditFindingCount: Int,
+        activeKillSwitches: [String],
+        recommendedKillSwitches: [String],
+        killSwitches: [String],
+        sovereignVerdictLine: String? = nil,
+        sovereignAuthorityLine: String? = nil,
+        sovereignAuditLine: String? = nil,
+        inspectionHeadline: String,
+        blockers: [String],
+        layerStackLines: [String],
+        checkpointID: String?,
+        checkpointApprovalState: String?,
+        checkpointRollbackReady: Bool?,
+        checkpointApplyReady: Bool?,
+        executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame? = nil,
+        morphGraph: BASMorphGraph? = nil,
+        hotColdMap: BASHotColdMap? = nil,
+        precisionProfile: BASPrecisionProfile? = nil,
+        lungState: BASLungState? = nil,
+        breathScheduler: BASBreathSchedulerFrame? = nil,
+        resumeFrame: BASResumeFrame? = nil,
+        rollbackAnchor: BASRollbackAnchor? = nil,
+        sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult? = nil
+    ) {
+        self.source = source
+        self.runMode = runMode
+        self.taskType = taskType
+        self.riskLevel = riskLevel
+        self.permitMode = permitMode
+        self.deviceRoute = deviceRoute
+        self.loopCount = loopCount
+        self.cacheHitRate = cacheHitRate
+        self.hostGatePercent = hostGatePercent
+        self.pressureLine = pressureLine
+        self.riskFactorsLine = riskFactorsLine
+        self.reasonCodesLine = reasonCodesLine
+        self.foldChecksum = foldChecksum
+        self.updateTicketCount = updateTicketCount
+        self.auditFindingCount = auditFindingCount
+        self.activeKillSwitches = activeKillSwitches
+        self.recommendedKillSwitches = recommendedKillSwitches
+        self.killSwitches = killSwitches
+        self.sovereignVerdictLine = sovereignVerdictLine
+        self.sovereignAuthorityLine = sovereignAuthorityLine
+        self.sovereignAuditLine = sovereignAuditLine
+        self.inspectionHeadline = inspectionHeadline
+        self.blockers = blockers
+        self.layerStackLines = layerStackLines
+        self.checkpointID = checkpointID
+        self.checkpointApprovalState = checkpointApprovalState
+        self.checkpointRollbackReady = checkpointRollbackReady
+        self.checkpointApplyReady = checkpointApplyReady
+        self.executionCapabilityFrame = executionCapabilityFrame
+        self.morphGraph = morphGraph
+        self.hotColdMap = hotColdMap
+        self.precisionProfile = precisionProfile
+        self.lungState = lungState
+        self.breathScheduler = breathScheduler
+        self.resumeFrame = resumeFrame
+        self.rollbackAnchor = rollbackAnchor
+        self.sovereignBridgeResult = sovereignBridgeResult
+    }
 }
 
 struct DecisionSystemEBrainSummaryPresentation: Equatable, Sendable {
@@ -86,33 +179,315 @@ struct DecisionSystemEBrainSummaryPresentation: Equatable, Sendable {
     let statusLine: String
     let routeLine: String
     let pressureLine: String?
+    let riskFactorsLine: String?
+    let reasonCodesLine: String?
+    let hostLine: String
+    let sovereignVerdictLine: String?
+    let sovereignAuthorityLine: String?
+    let sovereignAuditLine: String?
+    let inspectionHeadline: String
+    let primaryGuardrailText: String?
+    let detailLines: [String]
+    let alertLine: String?
+    let layerStackLines: [String]
+    let executionCapabilityLine: String?
+    let horizonLine: String?
+    let temporalLine: String?
+    let evidenceLine: String?
+    let worldPriorContract: DecisionEBrainWorldPriorContract?
+    let temporalKnowledgeContract: DecisionEBrainTemporalKnowledgeContract?
+    let evidenceContract: DecisionEBrainEvidenceContract?
+    let persistenceLine: String?
+    let persistenceContract: DecisionEBrainPersistenceContract?
+
+    init(
+        sourceDescriptor: DecisionEvolutionSourceDescriptor,
+        statusLine: String,
+        routeLine: String,
+        pressureLine: String?,
+        riskFactorsLine: String? = nil,
+        reasonCodesLine: String? = nil,
+        hostLine: String,
+        sovereignVerdictLine: String? = nil,
+        sovereignAuthorityLine: String? = nil,
+        sovereignAuditLine: String? = nil,
+        inspectionHeadline: String,
+        primaryGuardrailText: String?,
+        detailLines: [String],
+        alertLine: String?,
+        layerStackLines: [String] = [],
+        executionCapabilityLine: String? = nil,
+        horizonLine: String? = nil,
+        temporalLine: String? = nil,
+        evidenceLine: String? = nil,
+        worldPriorContract: DecisionEBrainWorldPriorContract? = nil,
+        temporalKnowledgeContract: DecisionEBrainTemporalKnowledgeContract? = nil,
+        evidenceContract: DecisionEBrainEvidenceContract? = nil,
+        persistenceLine: String? = nil,
+        persistenceContract: DecisionEBrainPersistenceContract? = nil
+    ) {
+        self.sourceDescriptor = sourceDescriptor
+        self.statusLine = statusLine
+        self.routeLine = routeLine
+        self.pressureLine = pressureLine
+        self.riskFactorsLine = riskFactorsLine
+        self.reasonCodesLine = reasonCodesLine
+        self.hostLine = hostLine
+        self.sovereignVerdictLine = sovereignVerdictLine
+        self.sovereignAuthorityLine = sovereignAuthorityLine
+        self.sovereignAuditLine = sovereignAuditLine
+        self.inspectionHeadline = inspectionHeadline
+        self.primaryGuardrailText = primaryGuardrailText
+        self.detailLines = detailLines
+        self.alertLine = alertLine
+        self.layerStackLines = layerStackLines
+        self.executionCapabilityLine = executionCapabilityLine
+        self.horizonLine = horizonLine
+        self.temporalLine = temporalLine
+        self.evidenceLine = evidenceLine
+        self.worldPriorContract = worldPriorContract
+        self.temporalKnowledgeContract = temporalKnowledgeContract
+        self.evidenceContract = evidenceContract
+        self.persistenceLine = persistenceLine
+        self.persistenceContract = persistenceContract
+    }
+}
+
+struct DecisionEvolutionEBrainDigestPresentation: Equatable, Sendable {
+    let sourceDescriptor: DecisionEvolutionSourceDescriptor
+    let compactStatusLine: String
+    let taskTitle: String
+    let operationsLine: String
+}
+
+struct DecisionSystemFlightDeckEBrainDigestPresentation: Equatable, Sendable {
+    let digest: DecisionEvolutionEBrainDigestPresentation
+    let statusLine: String
+    let routeLine: String
+    let pressureLine: String?
     let hostLine: String
     let inspectionHeadline: String
     let primaryGuardrailText: String?
+    let detailLines: [String]
+    let summaryLines: [String]
+    let alertLine: String?
+    let layerStackLines: [String]
+}
+
+extension DecisionSystemFlightDeckEBrainDigestPresentation {
+    fileprivate static func uniqueLines(_ values: [String?]) -> [String] {
+        values.reduce(into: [String]()) { uniqueValues, value in
+            guard let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !trimmedValue.isEmpty,
+                  !uniqueValues.contains(trimmedValue) else {
+                return
+            }
+            uniqueValues.append(trimmedValue)
+        }
+    }
 }
 
 extension DecisionSystemEBrainSummary {
-    var presentation: DecisionSystemEBrainSummaryPresentation {
-        DecisionSystemEBrainSummaryPresentation(
+    private static func uniqueLines(_ values: [String?]) -> [String] {
+        values.reduce(into: [String]()) { uniqueValues, value in
+            guard let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !trimmedValue.isEmpty,
+                  !uniqueValues.contains(trimmedValue) else {
+                return
+            }
+            uniqueValues.append(trimmedValue)
+        }
+    }
+
+    var compactStatusLine: String {
+        "\(runMode.uppercased()) • \(riskLevel.uppercased()) → \(permitMode.uppercased())"
+    }
+
+    var taskTitle: String {
+        DecisionEvolutionEBrainPresentationSupport.taskTitle(taskType)
+    }
+
+    var digestPresentation: DecisionEvolutionEBrainDigestPresentation {
+        DecisionEvolutionEBrainDigestPresentation(
             sourceDescriptor: sourceDescriptor,
-            statusLine: "\(runMode.uppercased()) • \(taskType.replacingOccurrences(of: "_", with: " ")) • \(DecisionEvolutionEBrainPresentationSupport.riskPermitLine(riskLevel: riskLevel, permitMode: permitMode))",
-            routeLine: "Route \(deviceRoute) • Loops \(loopCount) • Cache \(cacheHitRate)% • Tickets \(updateTicketCount)",
-            pressureLine: pressureLine,
-            hostLine: "\(DecisionEvolutionEBrainPresentationSupport.hostFoldLine(hostGatePercent: hostGatePercent, foldChecksum: foldChecksum)) • Audit \(auditFindingCount)",
-            inspectionHeadline: inspectionHeadline,
-            primaryGuardrailText: blockers.first.map { "Guardrail: \($0)" }
+            compactStatusLine: compactStatusLine,
+            taskTitle: taskTitle,
+            operationsLine: "Audit \(auditFindingCount) • Active kill switches \(activeKillSwitches.count) • Recommended \(recommendedKillSwitches.count) • Host gate \(hostGatePercent)%"
         )
+    }
+
+    private var horizonDiagnosticsDetail: String? {
+        let detail = DecisionEvolutionNarrativeFormattingSupport.joined(
+            [riskFactorsLine, reasonCodesLine].compactMap { $0 }
+        )
+        return detail.isEmpty ? nil : detail
+    }
+
+    private var horizonAlertLine: String? {
+        guard horizonDiagnosticsDetail != nil else {
+            return nil
+        }
+        return "Horizon diagnostics active"
+    }
+
+    var presentation: DecisionSystemEBrainSummaryPresentation {
+        let statusLine = "\(runMode.uppercased()) • \(taskTitle) • \(DecisionEvolutionEBrainPresentationSupport.riskPermitLine(riskLevel: riskLevel, permitMode: permitMode))"
+        let routeLine = "Route \(deviceRoute) • Loops \(loopCount) • Cache \(cacheHitRate)% • Tickets \(updateTicketCount)"
+        let executionCapabilityLine = executionCapabilityFrame?.detailLine
+        let horizonLine = executionCapabilityFrame?.horizonLine
+        let temporalLine = executionCapabilityFrame?.temporalLine
+        let evidenceLine = executionCapabilityFrame?.evidenceLine
+        let persistenceLine = executionCapabilityFrame?.persistenceLine
+        let worldPriorContract = executionCapabilityFrame?.worldPriorContract
+        let temporalKnowledgeContract = executionCapabilityFrame?.temporalKnowledgeContract
+        let evidenceContract = executionCapabilityFrame?.evidenceContract
+        let persistenceContract = executionCapabilityFrame?.persistenceContract
+        let hostLine = "\(DecisionEvolutionEBrainPresentationSupport.hostFoldLine(hostGatePercent: hostGatePercent, foldChecksum: foldChecksum)) • Audit \(auditFindingCount)"
+        let guardrailAlertLine = blockers.first.map { "Guardrail: \($0)" }
+        let alertLine = guardrailAlertLine ?? horizonAlertLine
+
+        return DecisionSystemEBrainSummaryPresentation(
+            sourceDescriptor: sourceDescriptor,
+            statusLine: statusLine,
+            routeLine: routeLine,
+            pressureLine: pressureLine,
+            riskFactorsLine: riskFactorsLine,
+            reasonCodesLine: reasonCodesLine,
+            hostLine: hostLine,
+            sovereignVerdictLine: sovereignVerdictLine,
+            sovereignAuthorityLine: sovereignAuthorityLine,
+            sovereignAuditLine: sovereignAuditLine,
+            inspectionHeadline: inspectionHeadline,
+            primaryGuardrailText: alertLine,
+            detailLines: Self.uniqueLines([
+                statusLine,
+                routeLine,
+                riskFactorsLine,
+                reasonCodesLine,
+                executionCapabilityLine,
+                horizonLine,
+                temporalLine,
+                evidenceLine,
+                persistenceLine,
+                pressureLine,
+                hostLine,
+                sovereignVerdictLine,
+                sovereignAuthorityLine,
+                sovereignAuditLine,
+                inspectionHeadline,
+                morphLine,
+                hotColdLine,
+                precisionLine,
+                lungLine,
+                schedulerLine,
+                resumeLine,
+                rollbackLine
+            ] + sovereignBridgeDetailLines.map(Optional.some)),
+            alertLine: alertLine,
+            layerStackLines: layerStackLines,
+            executionCapabilityLine: executionCapabilityLine,
+            horizonLine: horizonLine,
+            temporalLine: temporalLine,
+            evidenceLine: evidenceLine,
+            worldPriorContract: worldPriorContract,
+            temporalKnowledgeContract: temporalKnowledgeContract,
+            evidenceContract: evidenceContract,
+            persistenceLine: persistenceLine,
+            persistenceContract: persistenceContract
+        )
+    }
+
+    func applying(
+        executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame?
+    ) -> DecisionSystemEBrainSummary {
+        DecisionSystemEBrainSummary(
+            source: source,
+            runMode: runMode,
+            taskType: taskType,
+            riskLevel: riskLevel,
+            permitMode: permitMode,
+            deviceRoute: deviceRoute,
+            loopCount: loopCount,
+            cacheHitRate: cacheHitRate,
+            hostGatePercent: hostGatePercent,
+            pressureLine: pressureLine,
+            riskFactorsLine: riskFactorsLine,
+            reasonCodesLine: reasonCodesLine,
+            foldChecksum: foldChecksum,
+            updateTicketCount: updateTicketCount,
+            auditFindingCount: auditFindingCount,
+            activeKillSwitches: activeKillSwitches,
+            recommendedKillSwitches: recommendedKillSwitches,
+            killSwitches: killSwitches,
+            sovereignVerdictLine: sovereignVerdictLine,
+            sovereignAuthorityLine: sovereignAuthorityLine,
+            sovereignAuditLine: sovereignAuditLine,
+            inspectionHeadline: inspectionHeadline,
+            blockers: blockers,
+            layerStackLines: layerStackLines,
+            checkpointID: checkpointID,
+            checkpointApprovalState: checkpointApprovalState,
+            checkpointRollbackReady: checkpointRollbackReady,
+            checkpointApplyReady: checkpointApplyReady,
+            executionCapabilityFrame: executionCapabilityFrame,
+            morphGraph: morphGraph,
+            hotColdMap: hotColdMap,
+            precisionProfile: precisionProfile,
+            lungState: lungState,
+            breathScheduler: breathScheduler,
+            resumeFrame: resumeFrame,
+            rollbackAnchor: rollbackAnchor,
+            sovereignBridgeResult: sovereignBridgeResult
+        )
+    }
+
+    private var lungLine: String? {
+        lungState?.decisionLungLine
+    }
+
+    private var morphLine: String? {
+        morphGraph?.decisionMorphLine
+    }
+
+    private var hotColdLine: String? {
+        hotColdMap?.decisionHotColdLine
+    }
+
+    private var precisionLine: String? {
+        precisionProfile?.decisionPrecisionLine
+    }
+
+    private var schedulerLine: String? {
+        breathScheduler?.decisionSchedulerLine
+    }
+
+    private var resumeLine: String? {
+        resumeFrame?.decisionResumeLine
+    }
+
+    private var rollbackLine: String? {
+        rollbackAnchor?.decisionRollbackLine
+    }
+
+    private var sovereignBridgeLine: String? {
+        sovereignBridgeResult?.primaryLine
+    }
+
+    private var sovereignBridgeDetailLines: [String] {
+        sovereignBridgeResult?.detailLines ?? []
     }
 }
 
 extension BASEBrainTurnResult {
     var systemFlightDeckSummary: DecisionSystemEBrainSummary {
         let inspection = BASEBrainConsoleSupport.inspectionBundle(for: self)
-        let factsBundle = DeveloperDecisionReplayEBrainSummary(turn: self).factsBundle()
+        let replaySummary = DeveloperDecisionReplayEBrainSummary(turn: self)
+        let factsBundle = replaySummary.factsBundle()
+        let foldedLung = DecisionFoldedLungCoordinator.snapshot(for: self)
 
         return DecisionSystemEBrainSummary(
             source: .liveRuntime,
-            runMode: budgetFrame.runMode.rawValue,
+            runMode: budgetFrame.runMode.displayTitle,
             taskType: contextFrame.taskType.rawValue,
             riskLevel: riskCard.riskLevel.rawValue,
             permitMode: actionPermit.mode.rawValue,
@@ -121,6 +496,8 @@ extension BASEBrainTurnResult {
             cacheHitRate: Int((runtimeTrace.cacheHitRate * 100).rounded()),
             hostGatePercent: Int((hostGateValue * 100).rounded()),
             pressureLine: factsBundle.pressureLine,
+            riskFactorsLine: factsBundle.riskFactorsLine,
+            reasonCodesLine: factsBundle.reasonCodesLine,
             foldChecksum: String(thoughtFold.checksum.prefix(12)),
             updateTicketCount: updateTickets.count,
             auditFindingCount: runtimeTrace.guardrailFindings.count,
@@ -130,12 +507,24 @@ extension BASEBrainTurnResult {
                 runtimeTrace.activeKillSwitches.map(\.rawValue)
                 + runtimeTrace.recommendedKillSwitches.map(\.rawValue)
             ),
+            sovereignVerdictLine: replaySummary.sovereignVerdictLine,
+            sovereignAuthorityLine: replaySummary.sovereignAuthorityLine,
+            sovereignAuditLine: replaySummary.sovereignAuditLine,
             inspectionHeadline: inspection.summary,
             blockers: inspection.blockerSummary,
+            layerStackLines: factsBundle.layerStackLines,
             checkpointID: nil,
             checkpointApprovalState: nil,
             checkpointRollbackReady: nil,
-            checkpointApplyReady: nil
+            checkpointApplyReady: nil,
+            morphGraph: foldedLung.morphGraph,
+            hotColdMap: foldedLung.hotColdMap,
+            precisionProfile: foldedLung.precisionProfile,
+            lungState: foldedLung.lungState,
+            breathScheduler: foldedLung.breathScheduler,
+            resumeFrame: foldedLung.resumeFrame,
+            rollbackAnchor: foldedLung.rollbackAnchor,
+            sovereignBridgeResult: foldedLung.sovereignBridgeResult
         )
     }
 }
@@ -155,6 +544,8 @@ extension DecisionEvolutionLineageSnapshot {
             cacheHitRate: 0,
             hostGatePercent: eBrain.hostGatePercent,
             pressureLine: factsBundle.pressureLine,
+            riskFactorsLine: factsBundle.riskFactorsLine,
+            reasonCodesLine: factsBundle.reasonCodesLine,
             foldChecksum: eBrain.thoughtFoldChecksum,
             updateTicketCount: eBrain.updateTicketSummaries.count,
             auditFindingCount: eBrain.guardrailFindings.count,
@@ -163,12 +554,25 @@ extension DecisionEvolutionLineageSnapshot {
                 !eBrain.activeKillSwitches.contains($0)
             },
             killSwitches: eBrain.killSwitches,
+            sovereignVerdictLine: eBrain.sovereignVerdictLine,
+            sovereignAuthorityLine: eBrain.sovereignAuthorityLine,
+            sovereignAuditLine: eBrain.sovereignAuditLine,
             inspectionHeadline: "\(factsBundle.runtimeSummaryLine) • \(approvalState.rawValue)",
             blockers: diffSummary,
+            layerStackLines: factsBundle.layerStackLines,
             checkpointID: checkpointID,
             checkpointApprovalState: approvalState.rawValue,
             checkpointRollbackReady: rollbackReady,
-            checkpointApplyReady: hasBrainStateSnapshot
+            checkpointApplyReady: hasBrainStateSnapshot,
+            executionCapabilityFrame: eBrain.executionCapability?.executionCapabilityFrame,
+            morphGraph: eBrain.morphGraph,
+            hotColdMap: eBrain.hotColdMap,
+            precisionProfile: eBrain.precisionProfile,
+            lungState: eBrain.lungState,
+            breathScheduler: eBrain.breathScheduler,
+            resumeFrame: eBrain.resumeFrame,
+            rollbackAnchor: eBrain.rollbackAnchor,
+            sovereignBridgeResult: eBrain.sovereignBridgeResult
         )
     }
 }
@@ -537,6 +941,39 @@ struct DecisionSystemReleaseControlSummary: Equatable, Sendable {
     let activeCheckpointID: String?
     let activeCheckpointSource: DecisionEvolutionActiveCheckpointSource
     let reviewCheckpointID: String?
+    let primaryBlocker: DecisionEvolutionPrimaryBlocker?
+
+    init(
+        state: DecisionSystemReleaseState,
+        headline: String,
+        reasons: [String],
+        activeKillSwitches: [String],
+        recommendedKillSwitches: [String],
+        killSwitches: [String],
+        pendingReviewCount: Int,
+        rollbackReadyCount: Int,
+        canRestoreActiveCheckpoint: Bool,
+        canRollbackActiveCheckpoint: Bool,
+        activeCheckpointID: String?,
+        activeCheckpointSource: DecisionEvolutionActiveCheckpointSource,
+        reviewCheckpointID: String?,
+        primaryBlocker: DecisionEvolutionPrimaryBlocker? = nil
+    ) {
+        self.state = state
+        self.headline = headline
+        self.reasons = reasons
+        self.activeKillSwitches = activeKillSwitches
+        self.recommendedKillSwitches = recommendedKillSwitches
+        self.killSwitches = killSwitches
+        self.pendingReviewCount = pendingReviewCount
+        self.rollbackReadyCount = rollbackReadyCount
+        self.canRestoreActiveCheckpoint = canRestoreActiveCheckpoint
+        self.canRollbackActiveCheckpoint = canRollbackActiveCheckpoint
+        self.activeCheckpointID = activeCheckpointID
+        self.activeCheckpointSource = activeCheckpointSource
+        self.reviewCheckpointID = reviewCheckpointID
+        self.primaryBlocker = primaryBlocker
+    }
 }
 
 struct DecisionSystemFlightDeck: Equatable, Sendable {
@@ -556,6 +993,41 @@ struct DecisionSystemFlightDeck: Equatable, Sendable {
 
     var sessionEnginePresentation: DecisionSessionEnginePresentation {
         DecisionSessionEnginePresentation.build(from: sessionEngineSummary)
+    }
+
+    var eBrainDigestPresentation: DecisionSystemFlightDeckEBrainDigestPresentation? {
+        guard let eBrainSummary else {
+            return nil
+        }
+
+        let summaryPresentation = eBrainSummary.presentation
+        let digestPresentation = eBrainSummary.digestPresentation
+        let operationsLine = "Audit \(eBrainSummary.auditFindingCount) • Active kill switches \(releaseControlSummary.activeKillSwitches.count) • Recommended \(releaseControlSummary.recommendedKillSwitches.count) • Host gate \(eBrainSummary.hostGatePercent)%"
+        let summaryLines = DecisionSystemFlightDeckBuilder.removingLayerStackSignals(
+            from: DecisionSystemFlightDeckEBrainDigestPresentation.uniqueLines(
+                [operationsLine]
+                + Array(summaryPresentation.detailLines.dropFirst()).map(Optional.some)
+            ),
+            layerStackLines: summaryPresentation.layerStackLines
+        )
+        return DecisionSystemFlightDeckEBrainDigestPresentation(
+            digest: DecisionEvolutionEBrainDigestPresentation(
+                sourceDescriptor: digestPresentation.sourceDescriptor,
+                compactStatusLine: digestPresentation.compactStatusLine,
+                taskTitle: digestPresentation.taskTitle,
+                operationsLine: operationsLine
+            ),
+            statusLine: summaryPresentation.statusLine,
+            routeLine: summaryPresentation.routeLine,
+            pressureLine: summaryPresentation.pressureLine,
+            hostLine: summaryPresentation.hostLine,
+            inspectionHeadline: summaryPresentation.inspectionHeadline,
+            primaryGuardrailText: summaryPresentation.primaryGuardrailText,
+            detailLines: summaryPresentation.detailLines,
+            summaryLines: summaryLines,
+            alertLine: summaryPresentation.alertLine,
+            layerStackLines: summaryPresentation.layerStackLines
+        )
     }
 }
 
@@ -596,9 +1068,32 @@ enum DecisionSystemFlightDeckBuilder {
         let evolutionControlSurface = export.evolutionControlSurface
         let resolvedSummary = resolvedTurn.map(summary(from:))
             ?? evolutionControlSurface.latestPersistedLineage.map(summary(from:))
+        let surfacedSummary = resolvedSummary.map { summary in
+            let resolvedExecutionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame? =
+                summary.executionCapabilityFrame
+                ?? {
+                    if resolvedTurn != nil, summary.source == .liveRuntime {
+                        return export.executionCapabilityFrame
+                    }
+
+                    if let persistedSessionCheckpointExecutionCapabilityFrame = export.persistedSessionCheckpointExecutionCapabilityFrame {
+                        return persistedSessionCheckpointExecutionCapabilityFrame
+                    }
+
+                    return export.executionCapabilityFrame
+                }()
+
+            guard let resolvedExecutionCapabilityFrame else {
+                return summary
+            }
+
+            return summary.applying(
+                executionCapabilityFrame: resolvedExecutionCapabilityFrame
+            )
+        }
         let releaseControlSummary = DecisionEvolutionReleaseSummaryBuilder.build(
             evolutionControlSurface: evolutionControlSurface,
-            eBrainSummary: resolvedSummary,
+            eBrainSummary: surfacedSummary,
             dominantBlockers: compilation.dominantBlockers,
             activeKillSwitches: evolutionRuntimeFacts.effectiveActiveKillSwitches,
             recommendedKillSwitchesHint: evolutionRuntimeFacts.recommendedKillSwitches
@@ -613,7 +1108,7 @@ enum DecisionSystemFlightDeckBuilder {
             localModelLibrarySummary: localModelLibrarySummary,
             isPureLocalClosedLoop: compilation.isPureLocalClosedLoop,
             dominantBlockers: compilation.dominantBlockers,
-            eBrainSummary: resolvedSummary,
+            eBrainSummary: surfacedSummary,
             releaseControlSummary: releaseControlSummary,
             evolutionControlSurface: evolutionControlSurface,
             pendingReviewCheckpointCount: evolutionControlSurface.pendingReviewCount,
@@ -682,7 +1177,10 @@ enum DecisionSystemFlightDeckBuilder {
                     score: report.score,
                     health: report.health,
                     headline: report.headline,
-                    signals: orderedUnique(report.signals + dataSignals),
+                    signals: removingLayerStackSignals(
+                        from: report.signals + dataSignals,
+                        layerStackLines: effectiveEBrainFactsBundle?.layerStackLines ?? []
+                    ),
                     blockers: report.blockers
                 )
             case .delivery:
@@ -706,6 +1204,40 @@ enum DecisionSystemFlightDeckBuilder {
             guard !uniqueValues.contains(value) else { return }
             uniqueValues.append(value)
         }
+    }
+
+    static func removingLayerStackSignals(
+        from values: [String],
+        layerStackLines: [String]
+    ) -> [String] {
+        let normalizedValues = values.compactMap(normalizedSignal)
+        let normalizedLayerStackLines = layerStackLines.compactMap(normalizedSignal)
+        guard !normalizedLayerStackLines.isEmpty else {
+            return orderedUnique(normalizedValues)
+        }
+
+        let exactLayerSignals = Set(normalizedLayerStackLines)
+        let joinedLayerSignal = normalizedLayerStackLines.joined(separator: " | ")
+        let layerPrefixes = Set(
+            normalizedLayerStackLines.compactMap { line in
+                line.components(separatedBy: " • ").first
+            }
+        )
+
+        return orderedUnique(
+            normalizedValues.filter { signal in
+                if exactLayerSignals.contains(signal) || signal == joinedLayerSignal {
+                    return false
+                }
+
+                return !layerPrefixes.contains(where: { signal.hasPrefix($0) })
+            }
+        )
+    }
+
+    private static func normalizedSignal(_ value: String) -> String? {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedValue.isEmpty ? nil : trimmedValue
     }
 
 }

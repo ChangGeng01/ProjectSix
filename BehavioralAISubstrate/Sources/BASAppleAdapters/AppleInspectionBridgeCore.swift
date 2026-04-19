@@ -89,6 +89,9 @@ public struct BASAppleBrainSnapshotSourceInput: Codable, Equatable, Sendable {
     public var recentFailurePatternIDs: [String]
     public var retrievalTags: [String]
     public var verificationSnapshot: String
+    public var constitutionVersion: String?
+    public var constitutionPhase: String?
+    public var constitutionValueAxisCount: Int?
 
     public init(
         mode: String,
@@ -101,7 +104,10 @@ public struct BASAppleBrainSnapshotSourceInput: Codable, Equatable, Sendable {
         activeTemplateIDs: [String],
         recentFailurePatternIDs: [String],
         retrievalTags: [String],
-        verificationSnapshot: String
+        verificationSnapshot: String,
+        constitutionVersion: String? = nil,
+        constitutionPhase: String? = nil,
+        constitutionValueAxisCount: Int? = nil
     ) {
         self.mode = mode
         self.dominantGoals = dominantGoals
@@ -114,6 +120,9 @@ public struct BASAppleBrainSnapshotSourceInput: Codable, Equatable, Sendable {
         self.recentFailurePatternIDs = recentFailurePatternIDs
         self.retrievalTags = retrievalTags
         self.verificationSnapshot = verificationSnapshot
+        self.constitutionVersion = constitutionVersion
+        self.constitutionPhase = constitutionPhase
+        self.constitutionValueAxisCount = constitutionValueAxisCount
     }
 }
 
@@ -123,6 +132,7 @@ public struct BASAppleConsoleBridgeSourceInput: Codable, Equatable, Sendable {
     public var activeProviderTitle: String
     public var totalRequests: Int
     public var totalProviderAttempts: Int
+    public var layerStackLines: [String]?
     public var runtimeContext: BASRuntimeContext
     public var roleProfile: BASRoleProfile?
     public var boundaryModeID: String?
@@ -137,6 +147,7 @@ public struct BASAppleConsoleBridgeSourceInput: Codable, Equatable, Sendable {
         activeProviderTitle: String,
         totalRequests: Int,
         totalProviderAttempts: Int,
+        layerStackLines: [String]? = nil,
         runtimeContext: BASRuntimeContext,
         roleProfile: BASRoleProfile?,
         boundaryModeID: String? = nil,
@@ -150,6 +161,7 @@ public struct BASAppleConsoleBridgeSourceInput: Codable, Equatable, Sendable {
         self.activeProviderTitle = activeProviderTitle
         self.totalRequests = totalRequests
         self.totalProviderAttempts = totalProviderAttempts
+        self.layerStackLines = layerStackLines
         self.runtimeContext = runtimeContext
         self.roleProfile = roleProfile
         self.boundaryModeID = boundaryModeID
@@ -267,6 +279,16 @@ public enum BASAppleInspectionBridgeBuilder {
         from input: BASAppleBrainSnapshotSourceInput?
     ) -> BASCurrentBrainState? {
         guard let input else { return nil }
+        let constitutionRetrievalTags = constitutionMarkers(
+            version: input.constitutionVersion,
+            phase: input.constitutionPhase,
+            valueAxisCount: input.constitutionValueAxisCount
+        )
+        let verificationSnapshot = constitutionVerificationSnapshot(
+            base: input.verificationSnapshot,
+            version: input.constitutionVersion,
+            phase: input.constitutionPhase
+        )
         return BASCurrentBrainState(
             mode: input.mode,
             dominantGoals: input.dominantGoals,
@@ -279,8 +301,8 @@ public enum BASAppleInspectionBridgeBuilder {
             ),
             activeTemplateIDs: input.activeTemplateIDs.compactMap(UUID.init(uuidString:)),
             recentFailurePatternIDs: input.recentFailurePatternIDs.compactMap(UUID.init(uuidString:)),
-            retrievalTags: input.retrievalTags,
-            verificationSnapshot: input.verificationSnapshot
+            retrievalTags: (input.retrievalTags + constitutionRetrievalTags).uniqued(),
+            verificationSnapshot: verificationSnapshot
         )
     }
 
@@ -295,6 +317,7 @@ public enum BASAppleInspectionBridgeBuilder {
                 runtimeGearID: input.runtimeContext.gear.rawValue,
                 totalRequests: input.totalRequests,
                 totalProviderAttempts: input.totalProviderAttempts,
+                layerStackLines: input.layerStackLines,
                 roleName: input.roleProfile?.name,
                 boundaryModeID: input.boundaryModeID,
                 calibrationStatusID: input.calibrationStatusID,
@@ -353,5 +376,52 @@ public enum BASAppleInspectionBridgeBuilder {
         default:
             .balanced
         }
+    }
+
+    private static func constitutionMarkers(
+        version: String?,
+        phase: String?,
+        valueAxisCount: Int?
+    ) -> [String] {
+        var markers: [String] = []
+        if let version, !version.isEmpty {
+            markers.append("constitution:\(version)")
+        }
+        if let phase, !phase.isEmpty {
+            markers.append("constitution_phase:\(phase)")
+        }
+        if let valueAxisCount {
+            markers.append("constitution_value_axes:\(valueAxisCount)")
+        }
+        return markers
+    }
+
+    private static func constitutionVerificationSnapshot(
+        base: String,
+        version: String?,
+        phase: String?
+    ) -> String {
+        (
+            [base]
+            + constitutionMarkers(version: version, phase: phase, valueAxisCount: nil).map { marker in
+                switch marker {
+                case let value where value.hasPrefix("constitution:"):
+                    return value
+                case let value where value.hasPrefix("constitution_phase:"):
+                    return "phase:\(String(value.dropFirst("constitution_phase:".count)))"
+                default:
+                    return marker
+                }
+            }
+        )
+        .uniqued()
+        .joined(separator: "|")
+    }
+}
+
+private extension Sequence where Element == String {
+    func uniqued() -> [String] {
+        var seen = Set<String>()
+        return filter { seen.insert($0).inserted }
     }
 }

@@ -113,7 +113,10 @@ struct BASAppleInspectionBridgeTests {
                     "B8D79B8C-10D5-4F4F-BC72-666666666666"
                 ],
                 retrievalTags: ["sleep", "night"],
-                verificationSnapshot: "brain-fingerprint"
+                verificationSnapshot: "brain-fingerprint",
+                constitutionVersion: "constitution.v12",
+                constitutionPhase: "stabilization",
+                constitutionValueAxisCount: 3
             )
         )
 
@@ -122,7 +125,12 @@ struct BASAppleInspectionBridgeTests {
         #expect(brain?.mode == BASDecisionMode.primaryID)
         #expect(brain?.dominantGoals == ["Protect sleep"])
         #expect(brain?.activeTemplateIDs.count == 1)
-        #expect(brain?.verificationSnapshot == "brain-fingerprint")
+        #expect(brain?.retrievalTags.contains("constitution:constitution.v12") == true)
+        #expect(brain?.retrievalTags.contains("constitution_phase:stabilization") == true)
+        #expect(brain?.retrievalTags.contains("constitution_value_axes:3") == true)
+        #expect(brain?.verificationSnapshot.contains("brain-fingerprint") == true)
+        #expect(brain?.verificationSnapshot.contains("constitution:constitution.v12") == true)
+        #expect(brain?.verificationSnapshot.contains("phase:stabilization") == true)
     }
 
     @Test("console snapshot builder packages runtime and brain summaries")
@@ -164,7 +172,10 @@ struct BASAppleInspectionBridgeTests {
                 activeTemplateIDs: [],
                 recentFailurePatternIDs: [],
                 retrievalTags: ["reflective"],
-                verificationSnapshot: "fp-123"
+                verificationSnapshot: "fp-123",
+                constitutionVersion: "constitution.v6",
+                constitutionPhase: "stewardship",
+                constitutionValueAxisCount: 2
             )
         )
         let snapshot = BASAppleInspectionBridgeBuilder.consoleSnapshot(
@@ -210,6 +221,8 @@ struct BASAppleInspectionBridgeTests {
         #expect(snapshot.runtimeSummary?.contains("Gemma Local") == true)
         #expect(snapshot.runtimeSummary?.contains("gear balanced") == true)
         #expect(snapshot.brainSummary?.contains("Reflective Coach") == true)
+        #expect(snapshot.brainSummary?.contains("constitution constitution.v6") == true)
+        #expect(snapshot.brainSummary?.contains("phase stewardship") == true)
         #expect(snapshot.brainSummary?.contains("fp-123") == true)
     }
 }

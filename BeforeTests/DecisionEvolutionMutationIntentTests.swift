@@ -406,10 +406,14 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
             restorableCheckpointIDs: ["checkpoint-active", "checkpoint-previous"]
         )
 
+        let bundle = DecisionEvolutionWorkspaceMutationActionBundle.build(
+            controlSurface: controlSurface
+        )
         let intents = DecisionEvolutionMutationIntentFactory.pilotMutationIntents(
             controlSurface: controlSurface
         )
 
+        XCTAssertEqual(bundle.mutationIntents, intents)
         XCTAssertEqual(intents.map(\.kind), [
             .restoreActiveCheckpoint,
             .rollbackActiveCheckpoint,
@@ -422,6 +426,10 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
             .reviewQueue,
             .reviewQueue
         ])
+        XCTAssertEqual(
+            bundle.mutationIntent(for: .approvePendingQueue)?.kind,
+            .approvePendingCheckpoints
+        )
     }
 
     func testPilotMutationIntentsCollapseWhenNoActionIsAvailable() {
@@ -443,10 +451,18 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
             latestPersistedLineage: nil
         )
 
+        let bundle = DecisionEvolutionWorkspaceMutationActionBundle.build(
+            controlSurface: controlSurface
+        )
         let intents = DecisionEvolutionMutationIntentFactory.pilotMutationIntents(
             controlSurface: controlSurface
         )
 
+        XCTAssertEqual(bundle.mutationIntents, intents)
+        XCTAssertNil(bundle.restoreActiveIntent)
+        XCTAssertNil(bundle.rollbackActiveIntent)
+        XCTAssertNil(bundle.approveQueueIntent)
+        XCTAssertNil(bundle.clearReviewLineageIntent)
         XCTAssertTrue(intents.isEmpty)
     }
 
@@ -483,7 +499,7 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
         )
     }
 
-    func testApplyCheckpointPreviewKeepsAutomaticActiveSlotWhenTargetIsReviewSuggested() {
+    func testApplyCheckpointPreviewKeepsAutomaticActiveSlotWhenTargetIsReviewSuggested() throws {
         let now = Date()
         let controlSurface = DecisionEvolutionControlSurface(
             activeCheckpoint: DecisionReviewCheckpointSnapshot(
@@ -527,14 +543,22 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
             controlSurface: controlSurface
         )
 
-        XCTAssertEqual(intent?.preview.scope, .checkpoint)
-        XCTAssertEqual(intent?.preview.currentActiveCheckpointID, "checkpoint-active")
-        XCTAssertEqual(intent?.preview.projectedActiveCheckpointID, "checkpoint-active")
-        XCTAssertEqual(intent?.preview.currentReviewCheckpointID, "checkpoint-review")
-        XCTAssertEqual(intent?.preview.projectedReviewCheckpointID, "checkpoint-review")
+        let preview = try XCTUnwrap(intent?.preview)
+        let targetPresentation = try XCTUnwrap(
+            controlSurface.presentation(for: "checkpoint-review")
+        )
+        let expectedPreviewState = DecisionEvolutionPolicyEngine.applyCheckpointPreviewState(
+            targetCheckpointID: "checkpoint-review",
+            targetPresentation: targetPresentation,
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID
+        )
+
+        XCTAssertEqual(preview.scope, .checkpoint)
+        assertPreviewState(preview, matches: expectedPreviewState)
     }
 
-    func testApprovePendingPreviewPromotesMostRecentCheckpointWhenActiveSlotIsAutomaticFallback() {
+    func testApprovePendingPreviewPromotesMostRecentCheckpointWhenActiveSlotIsAutomaticFallback() throws {
         let now = Date()
         let controlSurface = DecisionEvolutionControlSurface(
             activeCheckpoint: DecisionReviewCheckpointSnapshot(
@@ -574,15 +598,22 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
             controlSurface: controlSurface
         )
 
-        XCTAssertEqual(intent?.preview.currentActiveCheckpointID, "checkpoint-active")
-        XCTAssertEqual(intent?.preview.projectedActiveCheckpointID, "checkpoint-review-b")
+        let preview = try XCTUnwrap(intent?.preview)
+        let expectedPreviewState = DecisionEvolutionPolicyEngine.approvePendingQueuePreviewState(
+            activeCheckpointSource: controlSurface.activeCheckpointSource,
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
+            projectedAutomaticCheckpointID: controlSurface.projectedAutomaticCheckpointIDAfterApprovingPendingQueue
+        )
+
+        assertPreviewState(preview, matches: expectedPreviewState)
         XCTAssertEqual(
-            intent?.preview.summary,
+            preview.summary,
             "Empty the review queue and let the automatic active slot advance to the most recent approved checkpoint."
         )
     }
 
-    func testApprovePendingPreviewKeepsPinnedActiveCheckpointStable() {
+    func testApprovePendingPreviewKeepsPinnedActiveCheckpointStable() throws {
         let now = Date()
         let controlSurface = DecisionEvolutionControlSurface(
             activeCheckpoint: DecisionReviewCheckpointSnapshot(
@@ -626,14 +657,21 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
             controlSurface: controlSurface
         )
 
-        XCTAssertEqual(intent?.preview.currentActiveCheckpointID, "checkpoint-active")
-        XCTAssertEqual(intent?.preview.projectedActiveCheckpointID, "checkpoint-active")
+        let preview = try XCTUnwrap(intent?.preview)
+        let expectedPreviewState = DecisionEvolutionPolicyEngine.approvePendingQueuePreviewState(
+            activeCheckpointSource: controlSurface.activeCheckpointSource,
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
+            projectedAutomaticCheckpointID: controlSurface.projectedAutomaticCheckpointIDAfterApprovingPendingQueue
+        )
+
+        assertPreviewState(preview, matches: expectedPreviewState)
         XCTAssertEqual(
-            intent?.preview.summary,
+            preview.summary,
             "Empty the review queue without restoring or rewriting the active brain state."
         )
         XCTAssertTrue(
-            intent?.preview.retainedHighlights.contains(
+            preview.retainedHighlights.contains(
                 DecisionEvolutionLineagePresentationSupport.retainedPendingReviewFactsLine(
                     lineageBackedCount: 1
                 )!
@@ -641,7 +679,62 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
         )
     }
 
-    func testMarkReviewPreviewBreaksTimestampTiesUsingCheckpointIDOrdering() {
+    func testClearPendingReviewLineagePreviewKeepsControlSurfaceProjectionStable() throws {
+        let now = Date()
+        let reviewHead = DecisionReviewCheckpointSnapshot(
+            checkpointID: "checkpoint-review-head",
+            previousCheckpointID: nil,
+            createdAt: now,
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Review head"],
+            eBrain: replaySummary(
+                sessionID: "review-head",
+                riskLevel: "high",
+                permitMode: "delay",
+                updateTicketSummaries: ["hold response"],
+                guardrailFindings: ["guardrail"],
+                killSwitches: ["disableHighRiskAutoAction"]
+            )
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: DecisionReviewCheckpointSnapshot(
+                checkpointID: "checkpoint-active",
+                previousCheckpointID: nil,
+                createdAt: now.addingTimeInterval(-60),
+                mode: .quick,
+                approvalState: .automatic,
+                rollbackReady: true,
+                hasBrainStateSnapshot: true,
+                diffSummary: ["Active"],
+                eBrain: replaySummary(
+                    sessionID: "active",
+                    riskLevel: "low",
+                    permitMode: "answer"
+                )
+            ),
+            reviewCheckpoint: reviewHead,
+            pendingReviewQueue: [reviewHead],
+            latestPersistedLineage: nil
+        )
+
+        let intent = DecisionEvolutionMutationIntentFactory.clearPendingReviewLineage(
+            controlSurface: controlSurface
+        )
+
+        let preview = try XCTUnwrap(intent?.preview)
+        let expectedPreviewState = DecisionEvolutionPolicyEngine.stablePreviewState(
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID
+        )
+
+        XCTAssertEqual(preview.scope, .reviewQueue)
+        assertPreviewState(preview, matches: expectedPreviewState)
+    }
+
+    func testMarkReviewPreviewBreaksTimestampTiesUsingCheckpointIDOrdering() throws {
         let now = Date()
         let controlSurface = DecisionEvolutionControlSurface(
             activeCheckpoint: DecisionReviewCheckpointSnapshot(
@@ -699,13 +792,21 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
             controlSurface: controlSurface
         )
 
-        XCTAssertEqual(intent?.preview.scope, .checkpoint)
-        XCTAssertEqual(intent?.preview.currentActiveCheckpointID, "checkpoint-review-z")
-        XCTAssertEqual(intent?.preview.currentReviewCheckpointID, "checkpoint-review-a")
-        XCTAssertEqual(intent?.preview.projectedReviewCheckpointID, "checkpoint-review-z")
+        let preview = try XCTUnwrap(intent?.preview)
+        let targetPresentation = try XCTUnwrap(
+            controlSurface.presentation(for: "checkpoint-review-z")
+        )
+        let expectedPreviewState = DecisionEvolutionPolicyEngine.markCheckpointForReviewPreviewState(
+            targetPresentation: targetPresentation,
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewPresentation: controlSurface.reviewPresentation
+        )
+
+        XCTAssertEqual(preview.scope, .checkpoint)
+        assertPreviewState(preview, matches: expectedPreviewState)
     }
 
-    func testApproveSelectedCheckpointsKeepsUntouchedReviewHead() {
+    func testApproveSelectedCheckpointsKeepsUntouchedReviewHead() throws {
         let now = Date()
         let reviewHead = DecisionReviewCheckpointSnapshot(
             checkpointID: "checkpoint-review-head",
@@ -763,13 +864,19 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
             controlSurface: controlSurface
         )
 
+        let preview = try XCTUnwrap(intent?.preview)
+        let expectedPreviewState = DecisionEvolutionPolicyEngine.approveSelectedCheckpointsPreviewState(
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID,
+            remainingReviewQueue: [reviewHead.presentation]
+        )
+
         XCTAssertEqual(intent?.kind, .approveSelectedCheckpoints)
-        XCTAssertEqual(intent?.preview.scope, .selection)
-        XCTAssertEqual(intent?.preview.targetCheckpointIDs, ["checkpoint-review-tail"])
-        XCTAssertEqual(intent?.preview.currentReviewCheckpointID, "checkpoint-review-head")
-        XCTAssertEqual(intent?.preview.projectedReviewCheckpointID, "checkpoint-review-head")
+        XCTAssertEqual(preview.scope, .selection)
+        XCTAssertEqual(preview.targetCheckpointIDs, ["checkpoint-review-tail"])
+        assertPreviewState(preview, matches: expectedPreviewState)
         XCTAssertTrue(
-            intent?.preview.retainedHighlights.contains(
+            preview.retainedHighlights.contains(
                 DecisionEvolutionLineagePresentationSupport.retainedSelectedFactsAfterApprovalLine(
                     lineageBackedCount: 1
                 )!
@@ -777,7 +884,7 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
         )
     }
 
-    func testMarkSelectedCheckpointsForReviewDropsAutomaticActiveWhenSelected() {
+    func testMarkSelectedCheckpointsForReviewDropsAutomaticActiveWhenSelected() throws {
         let now = Date()
         let active = DecisionReviewCheckpointSnapshot(
             checkpointID: "checkpoint-active",
@@ -806,12 +913,17 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
             controlSurface: controlSurface
         )
 
+        let preview = try XCTUnwrap(intent?.preview)
+        let expectedPreviewState = DecisionEvolutionPolicyEngine.markSelectedCheckpointsForReviewPreviewState(
+            targetPresentations: [active.presentation],
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewPresentation: controlSurface.reviewPresentation
+        )
+
         XCTAssertEqual(intent?.kind, .markSelectedCheckpointsForReview)
-        XCTAssertEqual(intent?.preview.scope, .selection)
-        XCTAssertEqual(intent?.preview.targetCheckpointIDs, ["checkpoint-active"])
-        XCTAssertEqual(intent?.preview.currentActiveCheckpointID, "checkpoint-active")
-        XCTAssertNil(intent?.preview.projectedActiveCheckpointID)
-        XCTAssertEqual(intent?.preview.projectedReviewCheckpointID, "checkpoint-active")
+        XCTAssertEqual(preview.scope, .selection)
+        XCTAssertEqual(preview.targetCheckpointIDs, ["checkpoint-active"])
+        assertPreviewState(preview, matches: expectedPreviewState)
     }
 
     func testApproveSelectedCheckpointsCountsOnlyTargetedLineageBackedSelections() {
@@ -875,7 +987,7 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
         )
     }
 
-    func testClearSelectedCheckpointLineagesSkipsLineageLessSelections() {
+    func testClearSelectedCheckpointLineagesSkipsLineageLessSelections() throws {
         let now = Date()
         let lineageBacked = DecisionReviewCheckpointSnapshot(
             checkpointID: "checkpoint-lineage",
@@ -916,8 +1028,15 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
             controlSurface: controlSurface
         )
 
+        let preview = try XCTUnwrap(intent?.preview)
+        let expectedPreviewState = DecisionEvolutionPolicyEngine.stablePreviewState(
+            currentActiveCheckpointID: controlSurface.activePresentation?.checkpointID,
+            currentReviewCheckpointID: controlSurface.reviewPresentation?.checkpointID
+        )
+
         XCTAssertEqual(intent?.kind, .clearSelectedCheckpointLineages)
-        XCTAssertEqual(intent?.preview.targetCheckpointIDs, ["checkpoint-lineage"])
+        XCTAssertEqual(preview.targetCheckpointIDs, ["checkpoint-lineage"])
+        assertPreviewState(preview, matches: expectedPreviewState)
     }
 
     private func replaySummary(
@@ -941,6 +1060,38 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
                 guardrailFindings: guardrailFindings,
                 recommendedKillSwitches: killSwitches
             )
+        )
+    }
+
+    private func assertPreviewState(
+        _ preview: DecisionEvolutionMutationPreview,
+        matches expected: DecisionEvolutionPolicyPreviewState,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(
+            preview.currentActiveCheckpointID,
+            expected.currentActiveCheckpointID,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            preview.projectedActiveCheckpointID,
+            expected.projectedActiveCheckpointID,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            preview.currentReviewCheckpointID,
+            expected.currentReviewCheckpointID,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            preview.projectedReviewCheckpointID,
+            expected.projectedReviewCheckpointID,
+            file: file,
+            line: line
         )
     }
 }

@@ -257,6 +257,137 @@ struct BASObservabilityCoreTests {
         #expect(bundle.blockerSummary.contains("blocked by boundary"))
     }
 
+    @Test("inspection bundle blocks replay when a verified forget gate revokes replay artifacts")
+    func inspectionBundleBlocksReplayWhenForgetGateRevokesReplayArtifacts() {
+        let replayBundle = makeReplayBundle()
+        let blockedBrainState = BASCurrentBrainState(
+            mode: replayBundle.brainState.mode,
+            dominantGoals: replayBundle.brainState.dominantGoals,
+            activeConstraints: replayBundle.brainState.activeConstraints,
+            reactionWeights: replayBundle.brainState.reactionWeights,
+            activeTemplateIDs: replayBundle.brainState.activeTemplateIDs,
+            recentFailurePatternIDs: replayBundle.brainState.recentFailurePatternIDs,
+            retrievalTags: replayBundle.brainState.retrievalTags + [
+                "forget_request:forget.guard.anchor",
+                "forget_verified:true",
+                "forget_checkpoints_revoked:true",
+                "forget_sync_exports_revoked:true"
+            ],
+            verificationSnapshot: [
+                replayBundle.brainState.verificationSnapshot,
+                "forget:forget.guard.anchor",
+                "forget_verified:true",
+                "forget_checkpoints_revoked:true",
+                "forget_sync_exports_revoked:true"
+            ].joined(separator: "|")
+        )
+
+        let bundle = BASObservabilityInspector.inspectionBundle(
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_456),
+            trace: replayBundle.trace,
+            brainState: blockedBrainState,
+            runtimeContext: replayBundle.runtimeContext,
+            policyDecision: replayBundle.policyDecision
+        )
+
+        #expect(bundle.replayDisposition.isAvailable == false)
+        #expect(bundle.replayDisposition.forgetRequestID == "forget.guard.anchor")
+        #expect(bundle.replayDisposition.checkpointsRevoked == true)
+        #expect(bundle.replayDisposition.syncExportsRevoked == true)
+        #expect(bundle.blockerSummary.contains(where: { $0.contains("forget.guard.anchor") }))
+        #expect(bundle.summary.contains("replay blocked"))
+        #expect(bundle.anomalySignals.contains(where: { $0.kind == "replay_revoked" }))
+    }
+
+    @Test("inspection bundle blocks replay when vault consistency is pending revocation propagation")
+    func inspectionBundleBlocksReplayWhenVaultConsistencyIsPending() {
+        let replayBundle = makeReplayBundle()
+        let blockedBrainState = BASCurrentBrainState(
+            mode: replayBundle.brainState.mode,
+            dominantGoals: replayBundle.brainState.dominantGoals,
+            activeConstraints: replayBundle.brainState.activeConstraints,
+            reactionWeights: replayBundle.brainState.reactionWeights,
+            activeTemplateIDs: replayBundle.brainState.activeTemplateIDs,
+            recentFailurePatternIDs: replayBundle.brainState.recentFailurePatternIDs,
+            retrievalTags: replayBundle.brainState.retrievalTags + [
+                "vault_signature:abcd1234efgh5678",
+                "vault_consistency:revocation_pending",
+                "vault_sync_revocations:2",
+                "vault_deletion_manifest:forget.private_notes",
+                "vault_requires_approval:true"
+            ],
+            verificationSnapshot: [
+                replayBundle.brainState.verificationSnapshot,
+                "vault_signature:abcd1234efgh5678",
+                "vault_consistency:revocation_pending",
+                "vault_sync_revocations:2",
+                "vault_deletion_manifest:forget.private_notes",
+                "vault_requires_approval:true"
+            ].joined(separator: "|")
+        )
+
+        let bundle = BASObservabilityInspector.inspectionBundle(
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_789),
+            trace: replayBundle.trace,
+            brainState: blockedBrainState,
+            runtimeContext: replayBundle.runtimeContext,
+            policyDecision: replayBundle.policyDecision
+        )
+
+        #expect(bundle.replayDisposition.isAvailable == false)
+        #expect(bundle.replayDisposition.vaultConsistencyState == "revocation_pending")
+        #expect(bundle.replayDisposition.vaultDeletionManifestID == "forget.private_notes")
+        #expect(bundle.replayDisposition.vaultSyncRevocationCount == 2)
+        #expect(bundle.replayDisposition.vaultRequiresApproval == true)
+        #expect(bundle.blockerSummary.contains(where: { $0.contains("forget.private_notes") }))
+        #expect(bundle.summary.contains("replay blocked"))
+        #expect(bundle.anomalySignals.contains(where: { $0.kind == "vault_consistency_risk" }))
+    }
+
+    @Test("inspection bundle surfaces device-level vault migration blockers")
+    func inspectionBundleSurfacesDeviceLevelVaultMigrationBlockers() {
+        let replayBundle = makeReplayBundle()
+        let blockedBrainState = BASCurrentBrainState(
+            mode: replayBundle.brainState.mode,
+            dominantGoals: replayBundle.brainState.dominantGoals,
+            activeConstraints: replayBundle.brainState.activeConstraints,
+            reactionWeights: replayBundle.brainState.reactionWeights,
+            activeTemplateIDs: replayBundle.brainState.activeTemplateIDs,
+            recentFailurePatternIDs: replayBundle.brainState.recentFailurePatternIDs,
+            retrievalTags: replayBundle.brainState.retrievalTags + [
+                "vault_consistency:out_of_sync",
+                "vault_out_of_sync_devices:2",
+                "vault_out_of_sync_list:device.secondary,device.tablet",
+                "vault_migration_target:device.secondary"
+            ],
+            verificationSnapshot: [
+                replayBundle.brainState.verificationSnapshot,
+                "vault_consistency:out_of_sync",
+                "vault_out_of_sync_devices:2",
+                "vault_out_of_sync_list:device.secondary,device.tablet",
+                "vault_migration_target:device.secondary"
+            ].joined(separator: "|")
+        )
+
+        let bundle = BASObservabilityInspector.inspectionBundle(
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_790),
+            trace: replayBundle.trace,
+            brainState: blockedBrainState,
+            runtimeContext: replayBundle.runtimeContext,
+            policyDecision: replayBundle.policyDecision
+        )
+
+        #expect(bundle.replayDisposition.isAvailable == false)
+        #expect(bundle.replayDisposition.vaultConsistencyState == "out_of_sync")
+        #expect(bundle.replayDisposition.vaultOutOfSyncDeviceIDs == ["device.secondary", "device.tablet"])
+        #expect(bundle.replayDisposition.vaultMigrationTargetDeviceID == "device.secondary")
+        #expect(bundle.replayDisposition.reason?.contains("device.secondary") == true)
+        #expect(bundle.replayDisposition.reason?.contains("device.tablet") == true)
+        #expect(bundle.summary.contains("device.secondary"))
+        #expect(bundle.summary.contains("device.tablet"))
+        #expect(bundle.summary.contains("migration target"))
+    }
+
     @Test("lifecycle summary compiler tracks rebuilds and evidence compaction")
     func lifecycleSummaryCompilerTracksRebuildsAndCompaction() {
         let summary = BASLifecycleSummaryBuilder.build(

@@ -197,4 +197,126 @@ final class DecisionSessionEngineReviewDigestBuilderTests: XCTestCase {
         XCTAssertTrue(reviewLines[0].detail.contains("Bundle draft-session.json"))
         XCTAssertEqual(reviewLines[0].severity, DecisionSessionEngineHealthSeverity.stable)
     }
+
+    func testBuildIncludesHorizonDiagnosticsWhenCheckpointCarriesCaveatSignals() {
+        let session = DecisionSessionRuntimeInspectionSession(
+            sessionID: "sess-horizon",
+            title: "evidence review",
+            status: .active,
+            updatedAt: Date(timeIntervalSince1970: 240),
+            headBranchID: "branch-main",
+            latestCheckpointID: "ckpt-horizon",
+            latestCheckpointSeq: 4,
+            latestCheckpointGoal: "preserve uncertainty",
+            latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
+                sessionID: "sess-horizon",
+                thoughtFoldChecksum: "fold-horizon",
+                riskLevel: "guarded",
+                permitMode: "replace",
+                hostGatePercent: 58,
+                reviewDirectiveLine: "Review evidence caveat before promotion.",
+                riskFactorsLine: "Factors: evidence_caveat_load",
+                reasonCodesLine: "Reason codes: evidence.caveat"
+            ),
+            latestEventID: "evt-5",
+            latestEventSeq: 5,
+            latestEventType: .assistantMessage,
+            latestEventDetail: "Caveated checkpoint recorded.",
+            openStepCount: 0,
+            openStepStatus: nil,
+            stalledStepCount: 0,
+            branchCount: 1,
+            recoveryCount: 0,
+            latestRecoveryAt: nil
+        )
+        let summary = DecisionSystemSessionEngineSummary(
+            layerPlacement: .foldedLung,
+            sessions: 1,
+            activeSessions: 1,
+            stalledSessions: 0,
+            mergeReadySessions: 0,
+            mergeableBranches: 0,
+            branches: 1,
+            checkpoints: 1,
+            events: 5,
+            steps: 0,
+            activeSession: session,
+            recentSessions: [session],
+            headline: "Session Engine folded_lung protects edits, checkpoints, and recovery.",
+            signals: []
+        )
+
+        let reviewLines = DecisionSessionEngineReviewDigestBuilder.build(from: summary)
+
+        XCTAssertEqual(reviewLines.map(\.title), [
+            "Replay anchor ready",
+            "Horizon diagnostics"
+        ])
+        XCTAssertEqual(
+            reviewLines.last?.detail,
+            "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+        )
+        XCTAssertEqual(reviewLines.last?.severity, .watch)
+    }
+
+    func testBuildIncludesSovereignPostureWhenCheckpointCarriesStructuredSovereignLines() {
+        let session = DecisionSessionRuntimeInspectionSession(
+            sessionID: "sess-sovereign",
+            title: "quarantine review",
+            status: .active,
+            updatedAt: Date(timeIntervalSince1970: 260),
+            headBranchID: "branch-main",
+            latestCheckpointID: "ckpt-sovereign",
+            latestCheckpointSeq: 7,
+            latestCheckpointGoal: "preserve safe continuity",
+            latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
+                sessionID: "sess-sovereign",
+                thoughtFoldChecksum: "fold-sovereign",
+                riskLevel: "guarded",
+                permitMode: "replace",
+                hostGatePercent: 63,
+                sovereignVerdictLine: "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
+                sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • lock session • quarantine session",
+                sovereignAuditLine: "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+            ),
+            latestEventID: "evt-8",
+            latestEventSeq: 8,
+            latestEventType: .assistantMessage,
+            latestEventDetail: "Quarantine facts preserved.",
+            openStepCount: 0,
+            openStepStatus: nil,
+            stalledStepCount: 0,
+            branchCount: 1,
+            recoveryCount: 0,
+            latestRecoveryAt: nil
+        )
+        let summary = DecisionSystemSessionEngineSummary(
+            layerPlacement: .foldedLung,
+            sessions: 1,
+            activeSessions: 1,
+            stalledSessions: 0,
+            mergeReadySessions: 0,
+            mergeableBranches: 0,
+            branches: 1,
+            checkpoints: 1,
+            events: 8,
+            steps: 0,
+            activeSession: session,
+            recentSessions: [session],
+            headline: "Session Engine folded_lung protects edits, checkpoints, and recovery.",
+            signals: []
+        )
+
+        let reviewLines = DecisionSessionEngineReviewDigestBuilder.build(from: summary)
+
+        XCTAssertEqual(reviewLines.map(\.title), [
+            "Replay anchor ready",
+            "Sovereign posture"
+        ])
+        XCTAssertEqual(
+            reviewLines[1].detail,
+            "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine • Sovereign authority • tokens memoryWrite • lock session • quarantine session • Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+        )
+        XCTAssertEqual(reviewLines[1].severity, .watch)
+    }
 }

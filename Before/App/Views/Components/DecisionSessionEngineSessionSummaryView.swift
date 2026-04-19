@@ -8,9 +8,20 @@ struct DecisionSessionEngineSessionSummaryView<Header: View, Footer: View>: View
     let checkpointDecisionLine: String?
     let checkpointTaskLine: String?
     let checkpointPressureLine: String?
+    let checkpointRiskFactorsLine: String?
+    let checkpointReasonCodesLine: String?
     let checkpointAuditLine: String?
+    let checkpointSovereignVerdictLine: String?
+    let checkpointSovereignAuthorityLine: String?
+    let checkpointSovereignAuditLine: String?
     let checkpointKillSwitchesLine: String?
     let checkpointActionLine: String?
+    let checkpointLungLine: String?
+    let checkpointHotColdLine: String?
+    let checkpointResumeLine: String?
+    let checkpointRollbackLine: String?
+    let checkpointSovereignBridgeLine: String?
+    let checkpointSovereignBridgeDetailLines: [String]
     let activityLine: String?
     let branchLine: String
     let mergeReviewLine: String?
@@ -30,9 +41,20 @@ struct DecisionSessionEngineSessionSummaryView<Header: View, Footer: View>: View
         checkpointDecisionLine: String? = nil,
         checkpointTaskLine: String? = nil,
         checkpointPressureLine: String? = nil,
+        checkpointRiskFactorsLine: String? = nil,
+        checkpointReasonCodesLine: String? = nil,
         checkpointAuditLine: String? = nil,
+        checkpointSovereignVerdictLine: String? = nil,
+        checkpointSovereignAuthorityLine: String? = nil,
+        checkpointSovereignAuditLine: String? = nil,
         checkpointKillSwitchesLine: String? = nil,
         checkpointActionLine: String? = nil,
+        checkpointLungLine: String? = nil,
+        checkpointHotColdLine: String? = nil,
+        checkpointResumeLine: String? = nil,
+        checkpointRollbackLine: String? = nil,
+        checkpointSovereignBridgeLine: String? = nil,
+        checkpointSovereignBridgeDetailLines: [String] = [],
         activityLine: String? = nil,
         branchLine: String,
         mergeReviewLine: String? = nil,
@@ -51,9 +73,20 @@ struct DecisionSessionEngineSessionSummaryView<Header: View, Footer: View>: View
         self.checkpointDecisionLine = checkpointDecisionLine
         self.checkpointTaskLine = checkpointTaskLine
         self.checkpointPressureLine = checkpointPressureLine
+        self.checkpointRiskFactorsLine = checkpointRiskFactorsLine
+        self.checkpointReasonCodesLine = checkpointReasonCodesLine
         self.checkpointAuditLine = checkpointAuditLine
+        self.checkpointSovereignVerdictLine = checkpointSovereignVerdictLine
+        self.checkpointSovereignAuthorityLine = checkpointSovereignAuthorityLine
+        self.checkpointSovereignAuditLine = checkpointSovereignAuditLine
         self.checkpointKillSwitchesLine = checkpointKillSwitchesLine
         self.checkpointActionLine = checkpointActionLine
+        self.checkpointLungLine = checkpointLungLine
+        self.checkpointHotColdLine = checkpointHotColdLine
+        self.checkpointResumeLine = checkpointResumeLine
+        self.checkpointRollbackLine = checkpointRollbackLine
+        self.checkpointSovereignBridgeLine = checkpointSovereignBridgeLine
+        self.checkpointSovereignBridgeDetailLines = checkpointSovereignBridgeDetailLines
         self.activityLine = activityLine
         self.branchLine = branchLine
         self.mergeReviewLine = mergeReviewLine
@@ -81,9 +114,20 @@ struct DecisionSessionEngineSessionSummaryView<Header: View, Footer: View>: View
                 checkpointDecisionLine: checkpointDecisionLine,
                 checkpointTaskLine: checkpointTaskLine,
                 checkpointPressureLine: checkpointPressureLine,
+                checkpointRiskFactorsLine: checkpointRiskFactorsLine,
+                checkpointReasonCodesLine: checkpointReasonCodesLine,
                 checkpointAuditLine: checkpointAuditLine,
+                checkpointSovereignVerdictLine: checkpointSovereignVerdictLine,
+                checkpointSovereignAuthorityLine: checkpointSovereignAuthorityLine,
+                checkpointSovereignAuditLine: checkpointSovereignAuditLine,
                 checkpointKillSwitchesLine: checkpointKillSwitchesLine,
                 checkpointActionLine: checkpointActionLine,
+                checkpointLungLine: checkpointLungLine,
+                checkpointHotColdLine: checkpointHotColdLine,
+                checkpointResumeLine: checkpointResumeLine,
+                checkpointRollbackLine: checkpointRollbackLine,
+                checkpointSovereignBridgeLine: checkpointSovereignBridgeLine,
+                checkpointSovereignBridgeDetailLines: checkpointSovereignBridgeDetailLines,
                 activityLine: activityLine,
                 branchLine: branchLine,
                 mergeReviewLine: mergeReviewLine,

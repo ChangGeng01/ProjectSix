@@ -21,6 +21,11 @@ private struct DecisionSessionEngineEvaluationContext {
     let stepID: String?
 }
 
+private struct BeforeAppRuntimeContext {
+    let runtimeSnapshot: DecisionTestingRuntimeSnapshot
+    let hostRuntime: BASHostRuntime
+}
+
 struct DecisionSessionEnginePendingImportDraft: Identifiable, Sendable {
     let sourceFileName: String
     let bundleData: Data
@@ -37,6 +42,8 @@ struct DecisionSessionEnginePendingImportDraft: Identifiable, Sendable {
 
 @MainActor
 final class BeforeAppModel: ObservableObject {
+    private static var deferredSessionEngineTasks: [UUID: Task<Void, Never>] = [:]
+
     @Published var selectedTab: AppTab = .home
     @Published var activeQuickSession: QuickCheckSession?
     @Published var activeBalanceSession: BalanceBoardSession?
@@ -64,7 +71,9 @@ final class BeforeAppModel: ObservableObject {
     let modelContainer: ModelContainer
     let supportInbox: SupportInboxStore
     let sharedLifeStore: SharedLifeStore
-    private let hostRuntime = BeforeProductCompatibility.makeHostRuntime()
+    private var hostRuntime: BASHostRuntime {
+        resolvedRuntimeContext().hostRuntime
+    }
     private var memoryProjection: DecisionMemorySystem.BrainStateProjection?
     private var isMemoryProjectionDirty = true
     private var shouldPromptReflectionAfterBackground = false
@@ -88,45 +97,49 @@ final class BeforeAppModel: ObservableObject {
         restorePendingReflectionState()
     }
 
+    static func drainDeferredSessionEngineTasksForTesting() async {
+        while deferredSessionEngineTasks.isEmpty == false {
+            let tasks = Array(deferredSessionEngineTasks.values)
+            for task in tasks {
+                _ = await task.result
+            }
+        }
+    }
+
+    var runtimeSnapshot: DecisionTestingRuntimeSnapshot {
+        DecisionTestingInterface.runtimeSnapshot(preferences: preferences)
+    }
+
     var intelligenceRuntimeStatus: DecisionModelRuntimeStatus {
-        DecisionIntelligenceCoordinator.runtimeStatus(preferences: preferences)
+        runtimeSnapshot.runtimeStatus
     }
 
     var foundationModelStatus: DecisionModelProviderStatus {
-        FoundationModelsIntelligenceService.availabilityStatus
+        runtimeSnapshot.foundationStatus
     }
 
     var gemmaModelStatus: DecisionModelProviderStatus {
-        GemmaE4BIntelligenceService.availabilityStatus
+        runtimeSnapshot.gemmaProviderStatus
     }
 
     var openModelStatus: DecisionModelProviderStatus {
-        DecisionIntelligenceProviderRegistry.shared.statusesByKind()[.openModel] ?? DecisionModelProviderStatus(
-            kind: .openModel,
-            isAvailable: false,
-            title: "Unavailable",
-            detail: "No open-model runtime is registered."
-        )
+        runtimeSnapshot.openModelProviderStatus
     }
 
     var registeredProviderDescriptors: [DecisionModelProviderDescriptor] {
-        DecisionIntelligenceProviderRegistry.shared.descriptors()
+        runtimeSnapshot.registeredProviders
     }
 
     var preferredProviderDescriptor: DecisionModelProviderDescriptor? {
-        DecisionIntelligenceProviderRegistry.shared.descriptor(
-            for: preferences.preferredIntelligenceProvider.kind
-        )
+        registeredProviderDescriptors.first(where: { $0.kind == preferences.preferredIntelligenceProvider.kind })
     }
 
     var activeProviderDescriptor: DecisionModelProviderDescriptor? {
-        DecisionIntelligenceProviderRegistry.shared.descriptor(
-            for: intelligenceRuntimeStatus.active
-        )
+        registeredProviderDescriptors.first(where: { $0.kind == intelligenceRuntimeStatus.active })
     }
 
     var openModelProviderDescriptor: DecisionModelProviderDescriptor? {
-        DecisionIntelligenceProviderRegistry.shared.descriptor(for: .openModel)
+        registeredProviderDescriptors.first(where: { $0.kind == .openModel })
     }
 
     var activeDecisionSessionEngineSessionID: String? {
@@ -140,17 +153,7 @@ final class BeforeAppModel: ObservableObject {
     }
 
     var localModelLibrarySnapshot: DecisionLocalModelLibrarySnapshot {
-        DecisionLocalModelLibrarySnapshot.current(
-            preferredProvider: preferences.preferredIntelligenceProvider,
-            preferredGemmaAssetID: preferences.preferredGemmaAssetID,
-            preferredGemmaAsset: gemmaPreferredAsset,
-            importedGemmaAssets: gemmaImportedAssets,
-            bundledGemmaAsset: gemmaBundledAsset,
-            preferredOpenModelAssetID: preferences.preferredOpenModelAssetID,
-            preferredOpenModelAsset: openModelPreferredAsset,
-            importedOpenModelAssets: openModelImportedAssets,
-            openModelDescriptor: openModelProviderDescriptor
-        )
+        runtimeSnapshot.localModelLibrary
     }
 
     var localModelLibraryPresentation: DecisionLocalModelLibraryPresentation {
@@ -559,10 +562,16 @@ final class BeforeAppModel: ObservableObject {
                 shouldPromptReflectionAfterBackground = true
                 persistPendingReflectionState()
             }
-            persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
+            persistActiveWorkspaceState(
+                trackSessionEngineLifecycle: true,
+                eBrainTurn: activeEvaluationEBrainTurn()
+            )
             schedulePredictiveInterventionIfNeeded()
         case .inactive:
-            persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
+            persistActiveWorkspaceState(
+                trackSessionEngineLifecycle: true,
+                eBrainTurn: activeEvaluationEBrainTurn()
+            )
         default:
             break
         }
@@ -602,6 +611,9 @@ final class BeforeAppModel: ObservableObject {
                             prompt: prompt
                         )
                     },
+                    performRoutedInput: { envelope, prompt in
+                        _ = routeDecision(prompt: prompt, entrySource: envelope.entrySource)
+                    },
                     performPredictiveIntervention: { suggestion in
                         interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
                     },
@@ -614,30 +626,39 @@ final class BeforeAppModel: ObservableObject {
                     }
                 )
             },
-            consumePendingRequest: { PendingLaunchRequestStore.consume() },
-            handlePendingRequest: { request in
-                BASApplePendingLaunchRuntimeExecutor.execute(
-                    input: BASApplePendingLaunchRuntimeInput(
-                        preferredModeID: DecisionMode.fromSubstrateModeID(request.preferredModeRaw)?.substrateModeID ?? request.preferredModeRaw,
-                        scenarioID: request.scenarioRaw,
-                        promptSeed: request.prompt
-                    ),
-                    performCapture: { plan in
+            consumePendingRequest: { PendingLaunchRequestStore.consumeEnvelope() },
+            handlePendingRequest: { envelope in
+                BehavioralAISubstrateBridge.consumeDecisionIntentEnvelope(
+                    envelope,
+                    performCapture: { envelope, scenario, prompt in
                         startQuickCheck(
-                            entrySource: request.entrySource,
-                            scenario: plan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
-                            prompt: plan.promptSeed
+                            entrySource: envelope.entrySource,
+                            scenario: scenario,
+                            prompt: prompt
                         )
                     },
-                    performPresent: { plan in
+                    performPresent: { envelope, mode, shouldSelectBoxTab, prompt in
+                        if shouldSelectBoxTab {
+                            selectedTab = .box
+                        }
                         startDecisionMode(
-                            DecisionMode.fromSubstrateModeID(plan.preferredModeID) ?? .quick,
-                            entrySource: request.entrySource,
-                            prompt: plan.promptSeed
+                            mode,
+                            entrySource: envelope.entrySource,
+                            prompt: prompt
                         )
                     },
-                    performRoutedInput: { plan in
-                        _ = routeDecision(prompt: plan.promptSeed, entrySource: request.entrySource)
+                    performRoutedInput: { envelope, prompt in
+                        _ = routeDecision(prompt: prompt, entrySource: envelope.entrySource)
+                    },
+                    performPredictiveIntervention: { suggestion in
+                        interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
+                    },
+                    performRestore: { restoreActiveWorkspaceIfNeeded() },
+                    performOpenEvolutionControl: {
+                        presentEvolutionControlCenter()
+                    },
+                    refreshCurrentBrain: { source in
+                        refreshGlobalBrainState(source: source)
                     }
                 )
             },
@@ -696,9 +717,12 @@ final class BeforeAppModel: ObservableObject {
             break
         }
 
-        recordCurrentEBrainReplayTurn(now: event.createdAt)
-        let eBrainTurn = currentLiveEBrainTurn(
+        let eBrainTurn = session.lastEvaluationEBrainTurn ?? currentLiveEBrainTurn(
             persistLineage: false,
+            now: event.createdAt
+        )
+        recordCurrentEBrainReplayTurn(
+            eBrainTurn: eBrainTurn,
             now: event.createdAt
         )
 
@@ -720,7 +744,10 @@ final class BeforeAppModel: ObservableObject {
             now: event.createdAt
         )
         activeQuickSession = nil
-        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
+        persistActiveWorkspaceState(
+            trackSessionEngineLifecycle: true,
+            eBrainTurn: eBrainTurn
+        )
     }
 
     func saveBalanceBoard(_ session: BalanceBoardSession) {
@@ -740,13 +767,16 @@ final class BeforeAppModel: ObservableObject {
         )
         context.insert(record)
         persistContext(context, operation: "saving the balance board")
-        recordCurrentEBrainReplayTurn(now: record.updatedAt)
-        let eBrainTurn = currentLiveEBrainTurn(
+        let eBrainTurn = session.lastEvaluationEBrainTurn ?? currentLiveEBrainTurn(
             persistLineage: false,
             now: record.updatedAt
         )
-        Task { @MainActor in
-            await recordBalanceSessionEngineAction(
+        recordCurrentEBrainReplayTurn(
+            eBrainTurn: eBrainTurn,
+            now: record.updatedAt
+        )
+        scheduleDeferredSessionEngineTask {
+            await self.recordBalanceSessionEngineAction(
                 session,
                 result: result,
                 actionSummary: "saved balance board",
@@ -761,7 +791,10 @@ final class BeforeAppModel: ObservableObject {
         }
         activeBalanceSession = nil
         presentLetGo( LetGoCopyLibrary.savedBalanceContext(for: record) )
-        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
+        persistActiveWorkspaceState(
+            trackSessionEngineLifecycle: true,
+            eBrainTurn: eBrainTurn
+        )
     }
 
     func moveBalanceBoardToTomorrow(_ session: BalanceBoardSession) {
@@ -771,12 +804,12 @@ final class BeforeAppModel: ObservableObject {
         let tomorrowItem = TomorrowBoxItemFactory.makeBalanceItem(from: session, result: result)
         context.insert(tomorrowItem)
         persistContext(context, operation: "moving the balance board into Tomorrow Box")
-        let eBrainTurn = currentLiveEBrainTurn(
+        let eBrainTurn = session.lastEvaluationEBrainTurn ?? currentLiveEBrainTurn(
             persistLineage: false,
             now: tomorrowItem.createdAt
         )
-        Task { @MainActor in
-            await recordBalanceSessionEngineAction(
+        scheduleDeferredSessionEngineTask {
+            await self.recordBalanceSessionEngineAction(
                 session,
                 result: result,
                 actionSummary: "moved balance board to Tomorrow Box",
@@ -791,7 +824,10 @@ final class BeforeAppModel: ObservableObject {
         }
         activeBalanceSession = nil
         presentLetGo(for: tomorrowItem)
-        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
+        persistActiveWorkspaceState(
+            trackSessionEngineLifecycle: true,
+            eBrainTurn: eBrainTurn
+        )
     }
 
     func saveMirrorWorkspace(_ session: MirrorWorkspaceSession) {
@@ -812,13 +848,16 @@ final class BeforeAppModel: ObservableObject {
         )
         context.insert(record)
         persistContext(context, operation: "saving the mirror workspace")
-        recordCurrentEBrainReplayTurn(now: record.updatedAt)
-        let eBrainTurn = currentLiveEBrainTurn(
+        let eBrainTurn = session.lastEvaluationEBrainTurn ?? currentLiveEBrainTurn(
             persistLineage: false,
             now: record.updatedAt
         )
-        Task { @MainActor in
-            await recordMirrorSessionEngineAction(
+        recordCurrentEBrainReplayTurn(
+            eBrainTurn: eBrainTurn,
+            now: record.updatedAt
+        )
+        scheduleDeferredSessionEngineTask {
+            await self.recordMirrorSessionEngineAction(
                 session,
                 result: result,
                 actionSummary: "saved mirror workspace",
@@ -833,7 +872,10 @@ final class BeforeAppModel: ObservableObject {
         }
         activeMirrorSession = nil
         presentLetGo( LetGoCopyLibrary.savedMirrorContext(for: record) )
-        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
+        persistActiveWorkspaceState(
+            trackSessionEngineLifecycle: true,
+            eBrainTurn: eBrainTurn
+        )
     }
 
     func moveMirrorWorkspaceToTomorrow(_ session: MirrorWorkspaceSession) {
@@ -843,12 +885,12 @@ final class BeforeAppModel: ObservableObject {
         let tomorrowItem = TomorrowBoxItemFactory.makeMirrorItem(from: session, result: result)
         context.insert(tomorrowItem)
         persistContext(context, operation: "moving the mirror workspace into Tomorrow Box")
-        let eBrainTurn = currentLiveEBrainTurn(
+        let eBrainTurn = session.lastEvaluationEBrainTurn ?? currentLiveEBrainTurn(
             persistLineage: false,
             now: tomorrowItem.createdAt
         )
-        Task { @MainActor in
-            await recordMirrorSessionEngineAction(
+        scheduleDeferredSessionEngineTask {
+            await self.recordMirrorSessionEngineAction(
                 session,
                 result: result,
                 actionSummary: "moved mirror workspace to Tomorrow Box",
@@ -863,7 +905,10 @@ final class BeforeAppModel: ObservableObject {
         }
         activeMirrorSession = nil
         presentLetGo(for: tomorrowItem)
-        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
+        persistActiveWorkspaceState(
+            trackSessionEngineLifecycle: true,
+            eBrainTurn: eBrainTurn
+        )
     }
 
     func reopenTomorrowBoxItem(_ item: TomorrowBoxItem) {
@@ -932,10 +977,15 @@ final class BeforeAppModel: ObservableObject {
         guard session.canEvaluate else { return }
         refreshQuickBrainState(session)
         let sessionEngineContext = await beginQuickSessionEngineEvaluation(session)
-        let turn = currentLiveEBrainTurn(now: .now)
+        let runtimeContext = resolvedRuntimeContext()
+        let turn = currentLiveEBrainTurn(
+            runtimeSnapshot: runtimeContext.runtimeSnapshot,
+            now: .now
+        )
         await session.evaluateWithIntelligence(
             preferences: preferences,
-            eBrainTurn: turn
+            eBrainTurn: turn,
+            runtimePolicyResolution: runtimeContext.runtimeSnapshot.runtimePolicyResolution
         )
         await finalizeQuickSessionEngineEvaluation(
             session,
@@ -948,10 +998,15 @@ final class BeforeAppModel: ObservableObject {
         guard session.canEvaluate else { return }
         refreshBalanceBrainState(session)
         let sessionEngineContext = await beginBalanceSessionEngineEvaluation(session)
-        let turn = currentLiveEBrainTurn(now: .now)
+        let runtimeContext = resolvedRuntimeContext()
+        let turn = currentLiveEBrainTurn(
+            runtimeSnapshot: runtimeContext.runtimeSnapshot,
+            now: .now
+        )
         await session.evaluateWithIntelligence(
             preferences: preferences,
-            eBrainTurn: turn
+            eBrainTurn: turn,
+            runtimePolicyResolution: runtimeContext.runtimeSnapshot.runtimePolicyResolution
         )
         await finalizeBalanceSessionEngineEvaluation(
             session,
@@ -964,10 +1019,15 @@ final class BeforeAppModel: ObservableObject {
         guard session.canEvaluate else { return }
         refreshMirrorBrainState(session)
         let sessionEngineContext = await beginMirrorSessionEngineEvaluation(session)
-        let turn = currentLiveEBrainTurn(now: .now)
+        let runtimeContext = resolvedRuntimeContext()
+        let turn = currentLiveEBrainTurn(
+            runtimeSnapshot: runtimeContext.runtimeSnapshot,
+            now: .now
+        )
         await session.evaluateWithIntelligence(
             preferences: preferences,
-            eBrainTurn: turn
+            eBrainTurn: turn,
+            runtimePolicyResolution: runtimeContext.runtimeSnapshot.runtimePolicyResolution
         )
         await finalizeMirrorSessionEngineEvaluation(
             session,
@@ -1499,6 +1559,46 @@ final class BeforeAppModel: ObservableObject {
     }
 
     @MainActor
+    func performEvolutionMutation(
+        _ intent: DecisionEvolutionMutationIntent,
+        now: Date = .now
+    ) {
+        let targetCheckpointID = intent.preview.targetCheckpointIDs.first
+        let targetCheckpointIDs = intent.preview.targetCheckpointIDs
+
+        switch intent.kind {
+        case .applyCheckpoint, .restoreActiveCheckpoint:
+            guard let targetCheckpointID else { return }
+            applyEvolutionCheckpoint(checkpointID: targetCheckpointID, now: now)
+        case .approveCheckpoint:
+            guard let targetCheckpointID else { return }
+            approveEvolutionCheckpoint(checkpointID: targetCheckpointID)
+        case .markCheckpointForReview:
+            guard let targetCheckpointID else { return }
+            markEvolutionCheckpointForReview(checkpointID: targetCheckpointID)
+        case .clearCheckpointLineage:
+            guard let targetCheckpointID else { return }
+            clearEvolutionCheckpointLineage(checkpointID: targetCheckpointID)
+        case .approveSelectedCheckpoints:
+            approveEvolutionCheckpoints(checkpointIDs: targetCheckpointIDs)
+        case .markSelectedCheckpointsForReview:
+            markEvolutionCheckpointsForReview(checkpointIDs: targetCheckpointIDs)
+        case .clearSelectedCheckpointLineages:
+            clearEvolutionCheckpointLineages(checkpointIDs: targetCheckpointIDs)
+        case .rollbackActiveCheckpoint:
+            rollbackActiveEvolutionCheckpoint(to: targetCheckpointID, now: now)
+        case .approvePendingCheckpoints:
+            approvePendingEvolutionCheckpoints(
+                checkpointIDs: targetCheckpointIDs.isEmpty ? nil : targetCheckpointIDs
+            )
+        case .clearPendingReviewLineage:
+            clearPendingEvolutionCheckpointLineages(
+                checkpointIDs: targetCheckpointIDs.isEmpty ? nil : targetCheckpointIDs
+            )
+        }
+    }
+
+    @MainActor
     func approvePendingEvolutionCheckpoints(checkpointIDs explicitCheckpointIDs: [String]? = nil) {
         let checkpointIDs = resolvedPendingReviewCheckpointIDs(
             explicitCheckpointIDs: explicitCheckpointIDs
@@ -1697,6 +1797,12 @@ final class BeforeAppModel: ObservableObject {
         let recommendedKillSwitchCount = workspaceFacts.recommendedKillSwitches.filter {
             !activeKillSwitchIDs.contains($0)
         }.count
+        let widgetControlEntry = evolutionSurfaceState.policy.widgetControlEntryPresentation(
+            prompt: attentionSignal.headline,
+            triggerReason: attentionSignal.resolvedTriggerReason(
+                fallback: evolutionSurfaceState.operatorSnapshot.primaryReason
+            )
+        )
         let snapshot = WidgetSnapshot(
             safeMessage: WidgetSafeCopy.message(
                 for: latest?.scenario,
@@ -1705,12 +1811,10 @@ final class BeforeAppModel: ObservableObject {
             latestVerdict: latest?.verdict,
             latestScenario: latest?.scenario,
             evolution: WidgetEvolutionSnapshot(
-                releaseStateID: widgetEvolutionReleaseStateID(
-                    workspace: workspace,
-                    activeKillSwitchCount: activeKillSwitchIDs.count,
-                    recommendedKillSwitchCount: recommendedKillSwitchCount
-                ),
-                activeCheckpointSourceID: controlSurface.activeCheckpointSource.rawValue,
+                releaseStateID: evolutionSurfaceState.policy.releaseGuidance.state.rawValue,
+                activeCheckpointSourceID: evolutionSurfaceState.policy.input.activeCheckpointSource.rawValue,
+                controlEntryKindID: evolutionSurfaceState.policy.widgetControlEntryKind?.rawValue,
+                storedControlEntry: widgetControlEntry,
                 headline: evolutionSurfaceState.operatorSnapshot.headline,
                 primaryReason: evolutionSurfaceState.operatorSnapshot.primaryReason,
                 attentionSeverityID: attentionSignal.severity.rawValue,
@@ -2403,11 +2507,64 @@ final class BeforeAppModel: ObservableObject {
     }
 
     @MainActor
+    func substrateEBrainKernelFrame() async -> DecisionEBrainKernelFrame? {
+        let inspection = await substrateInspectionSnapshot()
+        return inspection.liveEBrainKernelFrame
+    }
+
+    @MainActor
+    func substrateEBrainPresentationFrame() async -> DecisionEBrainPresentationFrame? {
+        let inspection = await substrateInspectionSnapshot()
+        return inspection.liveEBrainPresentationFrame
+    }
+
+    @MainActor
+    func substrateEBrainFactsBundle() async -> DecisionEvolutionEBrainFactsBundle? {
+        let inspection = await substrateInspectionSnapshot()
+        return inspection.effectiveEBrainFactsBundle
+    }
+
+    @MainActor
+    func substrateLayerStackLines() async -> [String] {
+        let inspection = await substrateInspectionSnapshot()
+        return inspection.effectiveLayerStackLines
+    }
+
+    @MainActor
+    func substrateLatestPersistenceIssue() async -> PersistenceIssueRecord? {
+        let inspection = await substrateInspectionSnapshot()
+        return inspection.latestPersistenceIssue
+    }
+
+    @MainActor
+    func substrateLatestPersistenceRemediationSnapshot() async -> PersistenceRemediationSnapshot? {
+        let inspection = await substrateInspectionSnapshot()
+        return inspection.latestPersistenceRemediationSnapshot
+    }
+
+    @MainActor
+    func substrateRuntimePolicyLineage() async -> BeforeRuntimePolicyLineage {
+        let inspection = await substrateInspectionSnapshot()
+        return inspection.runtimePolicyLineage
+    }
+
+    @MainActor
+    func substrateRuntimePolicyIssues() async -> [BeforeRuntimePolicyIssue] {
+        let inspection = await substrateInspectionSnapshot()
+        return inspection.runtimePolicyIssues
+    }
+
+    @MainActor
     func substrateInspectionSnapshot() async -> DecisionTestingSubstrateInspectionSnapshot {
-        let inspectionBrain = inspectionBrainSnapshot(now: .now)
-        let runtimeSnapshot = DecisionTestingInterface.runtimeSnapshot(preferences: preferences)
+        let inspectionReferenceDate =
+            currentBrainState?.evolutionState.latestCheckpoint?.createdAt
+            ?? EBrainTurnDebugStore.shared.turns.first?.runtimeTrace.recordedAt
+            ?? .now
+        let inspectionBrain = inspectionBrainSnapshot(now: inspectionReferenceDate)
+        let runtimeContext = resolvedRuntimeContext()
+        let runtimeSnapshot = runtimeContext.runtimeSnapshot
         let turn = BehavioralAISubstrateBridge.eBrainTurn(
-            hostRuntime: hostRuntime,
+            hostRuntime: runtimeContext.hostRuntime,
             activeQuickSession: activeQuickSession,
             activeBalanceSession: activeBalanceSession,
             activeMirrorSession: activeMirrorSession,
@@ -2489,7 +2646,10 @@ final class BeforeAppModel: ObservableObject {
         activeQuickSession = nil
         supportSurface = .buddy
         selectedTab = .support
-        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
+        persistActiveWorkspaceState(
+            trackSessionEngineLifecycle: true,
+            eBrainTurn: session.lastEvaluationEBrainTurn
+        )
     }
 
     @MainActor
@@ -2499,7 +2659,10 @@ final class BeforeAppModel: ObservableObject {
         activeBalanceSession = nil
         supportSurface = .buddy
         selectedTab = .support
-        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
+        persistActiveWorkspaceState(
+            trackSessionEngineLifecycle: true,
+            eBrainTurn: session.lastEvaluationEBrainTurn
+        )
     }
 
     @MainActor
@@ -2509,7 +2672,10 @@ final class BeforeAppModel: ObservableObject {
         activeMirrorSession = nil
         supportSurface = .buddy
         selectedTab = .support
-        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
+        persistActiveWorkspaceState(
+            trackSessionEngineLifecycle: true,
+            eBrainTurn: session.lastEvaluationEBrainTurn
+        )
     }
 
     func reopenSupportRequest(_ request: SupportRequest) {
@@ -2556,7 +2722,10 @@ final class BeforeAppModel: ObservableObject {
         activeQuickSession = nil
         supportSurface = .sharedLife
         selectedTab = .support
-        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
+        persistActiveWorkspaceState(
+            trackSessionEngineLifecycle: true,
+            eBrainTurn: session.lastEvaluationEBrainTurn
+        )
     }
 
     @MainActor
@@ -2565,7 +2734,10 @@ final class BeforeAppModel: ObservableObject {
         activeBalanceSession = nil
         supportSurface = .sharedLife
         selectedTab = .support
-        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
+        persistActiveWorkspaceState(
+            trackSessionEngineLifecycle: true,
+            eBrainTurn: session.lastEvaluationEBrainTurn
+        )
     }
 
     @MainActor
@@ -2574,7 +2746,10 @@ final class BeforeAppModel: ObservableObject {
         activeMirrorSession = nil
         supportSurface = .sharedLife
         selectedTab = .support
-        persistActiveWorkspaceState(trackSessionEngineLifecycle: true)
+        persistActiveWorkspaceState(
+            trackSessionEngineLifecycle: true,
+            eBrainTurn: session.lastEvaluationEBrainTurn
+        )
     }
 
     func reopenSharedLifeItem(_ item: SharedLifeBoxItem) {
@@ -2743,20 +2918,31 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func persistActiveWorkspaceState(
-        trackSessionEngineLifecycle: Bool = false
+        trackSessionEngineLifecycle: Bool = false,
+        eBrainTurn: BASEBrainTurnResult? = nil
     ) {
-        let state = capturedActiveWorkspaceState()
+        var state = capturedActiveWorkspaceState()
         let previousState = trackSessionEngineLifecycle ? ActiveDecisionWorkspaceStore.load() : nil
+
+        if let eBrainTurn {
+            state?.eBrainTurn = eBrainTurn
+        }
 
         if let state {
             ActiveDecisionWorkspaceStore.save(state)
             if trackSessionEngineLifecycle {
-                recordActiveWorkspacePersistenceLifecycle(state)
+                recordActiveWorkspacePersistenceLifecycle(
+                    state,
+                    eBrainTurn: eBrainTurn ?? state.eBrainTurn
+                )
             }
         } else {
             ActiveDecisionWorkspaceStore.clear()
             if trackSessionEngineLifecycle, let previousState {
-                recordActiveWorkspaceClearLifecycle(previousState)
+                recordActiveWorkspaceClearLifecycle(
+                    previousState,
+                    eBrainTurn: eBrainTurn ?? previousState.eBrainTurn
+                )
             }
         }
 
@@ -2774,6 +2960,12 @@ final class BeforeAppModel: ObservableObject {
             return ActiveDecisionWorkspaceState.capture(from: session)
         }
         return nil
+    }
+
+    private func activeEvaluationEBrainTurn() -> BASEBrainTurnResult? {
+        activeQuickSession?.lastEvaluationEBrainTurn
+            ?? activeBalanceSession?.lastEvaluationEBrainTurn
+            ?? activeMirrorSession?.lastEvaluationEBrainTurn
     }
 
     private func trimmed(_ value: String) -> String {
@@ -3527,35 +3719,41 @@ final class BeforeAppModel: ObservableObject {
     }
 
     private func recordActiveWorkspacePersistenceLifecycle(
-        _ state: ActiveDecisionWorkspaceState
+        _ state: ActiveDecisionWorkspaceState,
+        eBrainTurn: BASEBrainTurnResult? = nil
     ) {
         recordActiveWorkspaceLifecycle(
             state,
             tool: "persist_active_workspace_state",
             actionSummary: "persisted active \(workspaceLifecycleModeLabel(state)) workspace state",
-            now: state.savedAt
+            now: state.savedAt,
+            eBrainTurn: eBrainTurn
         )
     }
 
     private func recordActiveWorkspaceRestoreLifecycle(
-        _ state: ActiveDecisionWorkspaceState
+        _ state: ActiveDecisionWorkspaceState,
+        eBrainTurn: BASEBrainTurnResult? = nil
     ) {
         recordActiveWorkspaceLifecycle(
             state,
             tool: "restore_active_workspace_state",
             actionSummary: "restored active \(workspaceLifecycleModeLabel(state)) workspace state",
-            now: .now
+            now: .now,
+            eBrainTurn: eBrainTurn ?? state.eBrainTurn
         )
     }
 
     private func recordActiveWorkspaceClearLifecycle(
-        _ state: ActiveDecisionWorkspaceState
+        _ state: ActiveDecisionWorkspaceState,
+        eBrainTurn: BASEBrainTurnResult? = nil
     ) {
         recordActiveWorkspaceLifecycle(
             state,
             tool: "clear_active_workspace_state",
             actionSummary: "cleared active \(workspaceLifecycleModeLabel(state)) workspace state",
-            now: .now
+            now: .now,
+            eBrainTurn: eBrainTurn ?? state.eBrainTurn
         )
     }
 
@@ -3563,7 +3761,8 @@ final class BeforeAppModel: ObservableObject {
         _ state: ActiveDecisionWorkspaceState,
         tool: String,
         actionSummary: String,
-        now: Date
+        now: Date,
+        eBrainTurn: BASEBrainTurnResult? = nil
     ) {
         guard let rawSessionID = state.sessionEngineSessionID,
               !rawSessionID.isEmpty else {
@@ -3572,34 +3771,45 @@ final class BeforeAppModel: ObservableObject {
 
         let argsPreview = workspaceLifecycleArgsPreview(for: state)
 
-        Task { @MainActor in
+        scheduleDeferredSessionEngineTask {
             guard let sessionEngine = DecisionSessionEngine.shared,
-                  let sessionID = await trackedSessionEngineLifecycleSessionID(
+                  let sessionID = await self.trackedSessionEngineLifecycleSessionID(
                     rawSessionID,
                     sessionEngine: sessionEngine
                   ) else {
                 return
             }
 
-            let eBrainTurn = currentLiveEBrainTurn(
+            let resolvedTurn = eBrainTurn ?? self.currentLiveEBrainTurn(
                 persistLineage: false,
                 now: now
             )
-            let checkpointDraft = sessionEngineCheckpointDraft(
-                workspaceStateCheckpointDraft(state),
+            let checkpointDraft = self.sessionEngineCheckpointDraft(
+                self.workspaceStateCheckpointDraft(state),
                 actionSummary: actionSummary,
-                eBrainTurn: eBrainTurn
+                eBrainTurn: resolvedTurn
             )
 
-            await recordSessionEngineToolLifecycle(
+            await self.recordSessionEngineToolLifecycle(
                 sessionID: sessionID,
                 tool: tool,
                 argsPreview: argsPreview,
-                resultSummary: sessionEngineActionResultSummary(actionSummary),
+                resultSummary: self.sessionEngineActionResultSummary(actionSummary),
                 checkpointDraft: checkpointDraft,
                 now: now
             )
         }
+    }
+
+    private func scheduleDeferredSessionEngineTask(
+        _ operation: @escaping @MainActor () async -> Void
+    ) {
+        let taskID = UUID()
+        let task = Task { @MainActor in
+            defer { Self.deferredSessionEngineTasks[taskID] = nil }
+            await operation()
+        }
+        Self.deferredSessionEngineTasks[taskID] = task
     }
 
     private func workspaceLifecycleArgsPreview(
@@ -3687,7 +3897,14 @@ final class BeforeAppModel: ObservableObject {
             return draft
         }
 
-        return eBrainTurn.sessionCheckpointFacts.applied(to: draft)
+        let executionCapability = DecisionSessionCheckpointExecutionCapability(
+            frame: self.runtimeSnapshot.executionCapabilityFrame
+        )
+
+        return eBrainTurn.sessionCheckpointFacts.applied(
+            to: draft,
+            executionCapability: executionCapability
+        )
     }
 
     private func sessionEngineActionResultSummary(_ actionSummary: String) -> String {
@@ -3966,6 +4183,7 @@ final class BeforeAppModel: ObservableObject {
         currentBrainOverride: CurrentBrainState? = nil
     ) async -> DecisionTestingRuntimeExport {
         let context = modelContainer.mainContext
+        let resolvedRuntimeSnapshot = runtimeSnapshot ?? self.runtimeSnapshot
         let resolvedCurrentBrain = currentBrainOverride ?? currentBrainState
         let sessionEngineSnapshot: DecisionSessionRuntimeSnapshot?
         if let sessionEngine = DecisionSessionEngine.shared {
@@ -3991,7 +4209,7 @@ final class BeforeAppModel: ObservableObject {
             balance: DecisionMemorySystem.fetchBalanceRecords(in: context),
             mirror: DecisionMemorySystem.fetchMirrorRecords(in: context),
             preferences: preferences,
-            runtimeSnapshot: runtimeSnapshot,
+            runtimeSnapshot: resolvedRuntimeSnapshot,
             sessionEngineSnapshot: sessionEngineSnapshot,
             pendingSessionEngineImportPreview: pendingSessionEngineImportPreview,
             activeKillSwitches: activeEvolutionKillSwitches.map(\.rawValue),
@@ -4179,8 +4397,26 @@ final class BeforeAppModel: ObservableObject {
 
     @MainActor
     private func recordCurrentEBrainReplayTurn(now: Date = .now) {
+        recordCurrentEBrainReplayTurn(
+            eBrainTurn: nil,
+            runtimeSnapshot: self.runtimeSnapshot,
+            now: now
+        )
+    }
+
+    @MainActor
+    private func recordCurrentEBrainReplayTurn(
+        eBrainTurn: BASEBrainTurnResult?,
+        runtimeSnapshot: DecisionTestingRuntimeSnapshot? = nil,
+        now: Date = .now
+    ) {
+        if let eBrainTurn {
+            _ = recordEBrainTurn(eBrainTurn, persistLineage: true)
+            return
+        }
+
         _ = currentLiveEBrainTurn(
-            runtimeSnapshot: DecisionTestingInterface.runtimeSnapshot(preferences: preferences),
+            runtimeSnapshot: runtimeSnapshot,
             persistLineage: true,
             now: now
         )
@@ -4192,28 +4428,40 @@ final class BeforeAppModel: ObservableObject {
         persistLineage: Bool = true,
         now: Date = .now
     ) -> BASEBrainTurnResult? {
+        let runtimeContext = resolvedRuntimeContext(runtimeSnapshot: runtimeSnapshot)
         if memoryProjection == nil || isMemoryProjectionDirty {
             refreshDecisionMemoryStore()
         }
         if currentBrainState == nil {
-            refreshGlobalBrainState(source: .explicitRefresh)
+            refreshGlobalBrainState(
+                source: .explicitRefresh,
+                hostRuntime: runtimeContext.hostRuntime
+            )
         }
 
-        let resolvedRuntimeSnapshot = runtimeSnapshot ?? DecisionTestingInterface.runtimeSnapshot(preferences: preferences)
         guard let turn = BehavioralAISubstrateBridge.eBrainTurn(
-            hostRuntime: hostRuntime,
+            hostRuntime: runtimeContext.hostRuntime,
             activeQuickSession: activeQuickSession,
             activeBalanceSession: activeBalanceSession,
             activeMirrorSession: activeMirrorSession,
             currentBrainState: currentBrainState,
             projection: memoryProjection,
             activeKillSwitches: activeEvolutionKillSwitches,
-            runtimeSnapshot: resolvedRuntimeSnapshot,
+            runtimeSnapshot: runtimeContext.runtimeSnapshot,
             now: now
         ) else {
             return nil
         }
 
+        return recordEBrainTurn(turn, persistLineage: persistLineage)
+    }
+
+    @MainActor
+    @discardableResult
+    private func recordEBrainTurn(
+        _ turn: BASEBrainTurnResult,
+        persistLineage: Bool
+    ) -> BASEBrainTurnResult {
         EBrainTurnDebugStore.shared.record(turn)
 
         let loadedCheckpointID = currentBrainState?.evolutionState.latestCheckpoint?.id
@@ -4233,8 +4481,23 @@ final class BeforeAppModel: ObservableObject {
         return turn
     }
 
-    private func refreshGlobalBrainState(source: BrainStateUpdateSource) {
-        hostRuntime.resolveCurrentBrainProjection(
+    @MainActor
+    private func resolvedRuntimeContext(
+        runtimeSnapshot: DecisionTestingRuntimeSnapshot? = nil
+    ) -> BeforeAppRuntimeContext {
+        let resolvedRuntimeSnapshot = runtimeSnapshot ?? self.runtimeSnapshot
+        return BeforeAppRuntimeContext(
+            runtimeSnapshot: resolvedRuntimeSnapshot,
+            hostRuntime: resolvedRuntimeSnapshot.hostRuntime
+        )
+    }
+
+    private func refreshGlobalBrainState(
+        source: BrainStateUpdateSource,
+        hostRuntime: BASHostRuntime? = nil
+    ) {
+        let resolvedHostRuntime = hostRuntime ?? self.hostRuntime
+        resolvedHostRuntime.resolveCurrentBrainProjection(
             using: {
                 BehavioralAISubstrateBridge.refreshCurrentBrainState(
                     activeQuickSession: activeQuickSession,
@@ -4489,31 +4752,6 @@ final class BeforeAppModel: ObservableObject {
     private func advanceEvolutionControlMutationEpoch() {
         evolutionControlMutationEpoch &+= 1
         refreshWidgetSurfaces()
-    }
-
-    private func widgetEvolutionReleaseStateID(
-        workspace: DecisionEvolutionWorkspaceSnapshot,
-        activeKillSwitchCount: Int,
-        recommendedKillSwitchCount: Int
-    ) -> String {
-        let workspaceFacts = workspace.facts
-
-        if activeKillSwitchCount > 0 {
-            return "blocked"
-        }
-
-        if workspaceFacts.pendingReviewCount > 0
-            || recommendedKillSwitchCount > 0
-            || workspace.reviewPresentation != nil
-        {
-            return "watch"
-        }
-
-        if workspace.activePresentation != nil {
-            return workspaceFacts.canRollbackActiveCheckpoint ? "ready" : "watch"
-        }
-
-        return "watch"
     }
 
     private func publishEvolutionMutationOutcome(

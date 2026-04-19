@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import BASMemory
 
 public enum BASAppleMemoryProjectionSelectionAdapter {
     public static func governanceSnapshot<
@@ -23,13 +24,29 @@ public enum BASAppleMemoryProjectionSelectionAdapter {
         records: [Governed],
         candidates: [Candidate]
     ) -> BASAppleProjectionGovernanceSnapshot {
-        BASAppleProjectionGovernanceSnapshot(
+        let candidateDescriptors: [BASMemoryHorizonClaimDescriptor] = candidates.map { candidate in
+            descriptor(
+                retrievalTags: candidate.basRetrievalTags,
+                evidenceCount: candidate.basEvidenceCount
+            )
+        }
+
+        return BASAppleProjectionGovernanceSnapshot(
             totalRecordCount: records.count,
             totalCandidateCount: candidates.count,
             pendingCandidateCount: candidates.filter { $0.basStatus == .pending }.count,
             promotedCandidateCount: candidates.filter { $0.basStatus == .promoted }.count,
             deferredCandidateCount: candidates.filter { $0.basLastGovernanceDecision == .deferred }.count,
-            admittedCandidateCount: candidates.filter { $0.basLastGovernanceDecision == .admit }.count
+            admittedCandidateCount: candidates.filter { $0.basLastGovernanceDecision == .admit }.count,
+            externallyRefreshedCandidateCount: candidateDescriptors.filter {
+                $0.requiresExternalRefresh
+            }.count,
+            quarantinedObservationCount: candidateDescriptors.filter {
+                $0.contaminationState == BASMemoryHorizonClaimContaminationState.quarantined
+            }.count,
+            evidenceCaveatedCandidateCount: candidateDescriptors.filter {
+                $0.evidenceState == BASMemoryHorizonClaimEvidenceState.caveated
+            }.count
         )
     }
 
@@ -127,6 +144,57 @@ public enum BASAppleMemoryProjectionSelectionAdapter {
             entryType: reflectiveType,
             limit: limit,
             timestamp: { $0.basReflectiveMemoryInput.updatedAt }
+        )
+    }
+
+    private static func descriptor(
+        retrievalTags: [String],
+        evidenceCount: Int
+    ) -> BASMemoryHorizonClaimDescriptor {
+        let horizonPolicy = BASMemoryHorizonPersistencePolicy.unrestricted
+        let normalizedTags = Set(retrievalTags.map { $0.lowercased() })
+        let volatileTags = Set(horizonPolicy.volatileClaimRetrievalTags.map { $0.lowercased() })
+        let quarantineTags = Set(horizonPolicy.quarantineRetrievalTags.map { $0.lowercased() })
+        let evidencePendingTags = Set(horizonPolicy.evidencePendingRetrievalTags.map { $0.lowercased() })
+
+        let requiresExternalRefresh = normalizedTags.isDisjoint(with: volatileTags) == false
+        let contaminationState: BASMemoryHorizonClaimContaminationState =
+            normalizedTags.isDisjoint(with: quarantineTags)
+            ? .isolated
+            : .quarantined
+        let evidenceState: BASMemoryHorizonClaimEvidenceState =
+            normalizedTags.isDisjoint(with: evidencePendingTags)
+            ? .durable
+            : .caveated
+        let stability: BASMemoryHorizonClaimStability =
+            requiresExternalRefresh || contaminationState == .quarantined
+            ? .volatile
+            : .semiStable
+
+        var releaseRequirements: [String] = []
+        if requiresExternalRefresh {
+            releaseRequirements.append("external refresh completes")
+        }
+        if contaminationState == .quarantined {
+            releaseRequirements.append("the quarantined observation receives non-tool evidence")
+        }
+        if evidenceState == .caveated {
+            let threshold = max(horizonPolicy.minimumDurableEvidenceCount, evidenceCount + 1)
+            releaseRequirements.append(
+                "at least \(threshold) corroborating evidence signals are available"
+            )
+        }
+
+        return BASMemoryHorizonClaimDescriptor(
+            stabilityTierID: stability == .volatile ? horizonPolicy.volatileTierID : "warm",
+            stability: stability,
+            requiresExternalRefresh: requiresExternalRefresh,
+            contaminationState: contaminationState,
+            evidenceState: evidenceState,
+            minimumDurableEvidenceCount: evidenceState == .caveated
+                ? max(horizonPolicy.minimumDurableEvidenceCount, evidenceCount + 1)
+                : 0,
+            releaseRequirements: releaseRequirements
         )
     }
 }

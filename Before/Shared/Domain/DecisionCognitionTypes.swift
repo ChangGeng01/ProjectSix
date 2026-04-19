@@ -3,6 +3,7 @@ import Foundation
 enum DecisionIntentKind: String, Codable, Sendable {
     case quickCapture
     case openMode
+    case routedInput
     case openEvolutionControl
     case reopenTomorrowItem
     case predictiveIntervention
@@ -49,6 +50,7 @@ enum DecisionMemoryTier: String, CaseIterable, Codable, Sendable {
     case hot
     case warm
     case cold
+    case volatile
 }
 
 struct DecisionIntentEnvelope: Codable, Equatable, Identifiable, Sendable {
@@ -111,5 +113,201 @@ struct DecisionIntentEnvelope: Codable, Equatable, Identifiable, Sendable {
 
     var riskLevel: InterventionRiskLevel? {
         riskLevelRaw.flatMap(InterventionRiskLevel.init(rawValue:))
+    }
+
+    var sanitizedPromptSeed: String {
+        Self.cleanedSeed(promptSeed) ?? ""
+    }
+
+    private static func cleanedSeed(_ text: String?) -> String? {
+        let cleanedText = text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleanedText?.isEmpty == true ? nil : cleanedText
+    }
+
+    static func quickCapture(
+        entrySource: EntrySource,
+        scenario: ScenarioType? = nil,
+        promptSeed: String? = nil,
+        riskLevel: InterventionRiskLevel = .low,
+        requestedAt: Date = .now,
+        expiresAt: Date? = nil
+    ) -> DecisionIntentEnvelope {
+        return DecisionIntentEnvelope(
+            kind: .quickCapture,
+            sourceSurface: entrySource.intentSourceSurface,
+            entrySource: entrySource,
+            preferredMode: .quick,
+            scenario: scenario,
+            promptSeed: cleanedSeed(promptSeed),
+            riskLevel: riskLevel,
+            requestedAt: requestedAt,
+            expiresAt: expiresAt
+        )
+    }
+
+    static func openMode(
+        entrySource: EntrySource,
+        mode: DecisionMode,
+        promptSeed: String? = nil,
+        requestedAt: Date = .now,
+        expiresAt: Date? = nil
+    ) -> DecisionIntentEnvelope {
+        return DecisionIntentEnvelope(
+            kind: .openMode,
+            sourceSurface: entrySource.intentSourceSurface,
+            entrySource: entrySource,
+            preferredMode: mode,
+            promptSeed: cleanedSeed(promptSeed),
+            requestedAt: requestedAt,
+            expiresAt: expiresAt
+        )
+    }
+
+    static func routedInput(
+        entrySource: EntrySource,
+        promptSeed: String? = nil,
+        requestedAt: Date = .now,
+        expiresAt: Date? = nil
+    ) -> DecisionIntentEnvelope {
+        DecisionIntentEnvelope(
+            kind: .routedInput,
+            sourceSurface: entrySource.intentSourceSurface,
+            entrySource: entrySource,
+            promptSeed: cleanedSeed(promptSeed),
+            requestedAt: requestedAt,
+            expiresAt: expiresAt
+        )
+    }
+
+    static func openEvolutionControl(
+        entrySource: EntrySource,
+        promptSeed: String? = nil,
+        triggerReason: String? = nil,
+        requestedAt: Date = .now,
+        expiresAt: Date? = nil
+    ) -> DecisionIntentEnvelope {
+        let cleanedTriggerReason = cleanedSeed(triggerReason)
+        return DecisionIntentEnvelope(
+            kind: .openEvolutionControl,
+            sourceSurface: entrySource.intentSourceSurface,
+            entrySource: entrySource,
+            preferredMode: .mirror,
+            promptSeed: cleanedSeed(promptSeed),
+            riskLevel: .medium,
+            triggerReason: cleanedTriggerReason?.isEmpty == false
+                ? cleanedTriggerReason
+                : entrySource.defaultEvolutionControlTriggerReason,
+            requestedAt: requestedAt,
+            expiresAt: expiresAt
+        )
+    }
+
+    static func reopenTomorrowItem(
+        sourceSurface: DecisionIntentSourceSurface? = nil,
+        entrySource: EntrySource,
+        title: String,
+        riskLevel: InterventionRiskLevel,
+        preferredMode: DecisionMode,
+        requestedAt: Date = .now,
+        expiresAt: Date? = nil
+    ) -> DecisionIntentEnvelope {
+        return DecisionIntentEnvelope(
+            kind: .reopenTomorrowItem,
+            sourceSurface: sourceSurface ?? entrySource.intentSourceSurface,
+            entrySource: entrySource,
+            preferredMode: preferredMode,
+            promptSeed: cleanedSeed(title),
+            riskLevel: riskLevel,
+            requestedAt: requestedAt,
+            expiresAt: expiresAt
+        )
+    }
+
+    static func predictiveIntervention(
+        sourceSurface: DecisionIntentSourceSurface = .notification,
+        entrySource: EntrySource = .app,
+        preferredMode: DecisionMode,
+        promptSeed: String? = nil,
+        riskLevel: InterventionRiskLevel,
+        triggerReason: String? = nil,
+        requestedAt: Date = .now,
+        expiresAt: Date? = nil
+    ) -> DecisionIntentEnvelope {
+        DecisionIntentEnvelope(
+            kind: .predictiveIntervention,
+            sourceSurface: sourceSurface,
+            entrySource: entrySource,
+            preferredMode: preferredMode,
+            promptSeed: cleanedSeed(promptSeed),
+            riskLevel: riskLevel,
+            triggerReason: cleanedSeed(triggerReason),
+            requestedAt: requestedAt,
+            expiresAt: expiresAt
+        )
+    }
+
+    static func resumeCurrentDecision(
+        sourceSurface: DecisionIntentSourceSurface,
+        entrySource: EntrySource,
+        preferredMode: DecisionMode,
+        promptSeed: String? = nil,
+        riskLevel: InterventionRiskLevel? = nil,
+        triggerReason: String? = nil,
+        requestedAt: Date = .now,
+        expiresAt: Date? = nil
+    ) -> DecisionIntentEnvelope {
+        DecisionIntentEnvelope(
+            kind: .resumeCurrentDecision,
+            sourceSurface: sourceSurface,
+            entrySource: entrySource,
+            preferredMode: preferredMode,
+            promptSeed: cleanedSeed(promptSeed),
+            riskLevel: riskLevel,
+            triggerReason: cleanedSeed(triggerReason),
+            requestedAt: requestedAt,
+            expiresAt: expiresAt
+        )
+    }
+}
+
+extension DecisionIntentEnvelope {
+    var launchRequestResolution: LaunchRequestResolution {
+        if let scenario {
+            return .quick(scenario: scenario, prompt: sanitizedPromptSeed)
+        }
+
+        if let preferredMode {
+            return .mode(preferredMode, prompt: sanitizedPromptSeed)
+        }
+
+        if !sanitizedPromptSeed.isEmpty {
+            return .routedPrompt(sanitizedPromptSeed)
+        }
+
+        return .quick(scenario: nil, prompt: "")
+    }
+}
+
+extension EntrySource {
+    var intentSourceSurface: DecisionIntentSourceSurface {
+        switch self {
+        case .watch:
+            .watch
+        case .homeWidgetSmall, .homeWidgetMedium, .lockScreenWidget:
+            .widget
+        case .siri:
+            .siri
+        case .shortcut, .spotlight, .app:
+            .shortcut
+        }
+    }
+
+    var defaultEvolutionControlTriggerReason: String {
+        switch self {
+        case .watch:
+            "A watch glance asked the iPhone brain to open Evolution Control."
+        default:
+            "Open Evolution Control from \(label)."
+        }
     }
 }

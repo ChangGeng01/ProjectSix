@@ -8,6 +8,8 @@ public struct BASAppleProviderRequestRuntimeInput<Provider: Sendable>: Sendable 
     public var suspendedProviderIDs: Set<String>
     public var strategy: BASAdaptiveTaskStrategy?
     public var descriptors: [BASProviderDescriptor]
+    public var routingPolicy: BASProviderRoutingPolicy
+    public var routingRegistryVersion: String?
     public var testingOverrideProvider: Provider?
     public var admissionAllowed: Bool
 
@@ -18,6 +20,8 @@ public struct BASAppleProviderRequestRuntimeInput<Provider: Sendable>: Sendable 
         suspendedProviderIDs: Set<String> = [],
         strategy: BASAdaptiveTaskStrategy? = nil,
         descriptors: [BASProviderDescriptor],
+        routingPolicy: BASProviderRoutingPolicy,
+        routingRegistryVersion: String? = nil,
         testingOverrideProvider: Provider? = nil,
         admissionAllowed: Bool
     ) {
@@ -27,6 +31,8 @@ public struct BASAppleProviderRequestRuntimeInput<Provider: Sendable>: Sendable 
         self.suspendedProviderIDs = suspendedProviderIDs
         self.strategy = strategy
         self.descriptors = descriptors
+        self.routingPolicy = routingPolicy
+        self.routingRegistryVersion = routingRegistryVersion
         self.testingOverrideProvider = testingOverrideProvider
         self.admissionAllowed = admissionAllowed
     }
@@ -53,8 +59,10 @@ public enum BASAppleProviderRequestRuntimeExecutor {
             task: input.task,
             preferredProviderID: input.preferredProviderID,
             allowFallbacks: input.allowFallbacks,
-            deterministicProviderID: BASReferenceProviderRuntime.templateProviderID,
-            preferenceOrderings: BASReferenceProviderRuntime.preferenceOrderings,
+            deterministicProviderID: input.routingPolicy.deterministicProviderID,
+            preferenceOrderings: input.routingPolicy.preferenceOrderings,
+            appliedRoutingPolicyVersion: input.routingPolicy.schemaVersion,
+            appliedRoutingRegistryVersion: input.routingRegistryVersion,
             suspendedProviderIDs: input.suspendedProviderIDs,
             strategy: input.strategy,
             descriptors: input.descriptors,

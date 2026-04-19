@@ -14,7 +14,7 @@ enum CurrentBrainStateLoader {
         retrievalMode: DecisionRetrievalMode,
         now: Date = .now
     ) -> CurrentBrainState {
-        BehavioralAISubstrateBridge.bootstrapCurrentBrainState(
+        return BehavioralAISubstrateBridge.bootstrapCurrentBrainState(
             mode: mode,
             prompt: prompt,
             source: source,

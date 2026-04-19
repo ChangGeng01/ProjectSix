@@ -1,5 +1,92 @@
 import SwiftUI
 
+struct DecisionLayerStackView: View {
+    let lines: [String]
+    var title: String? = nil
+    var titleFont: Font = .caption.weight(.semibold)
+    var titleColor: Color = BeforeTheme.ember
+    var lineFont: Font = .caption2
+    var lineColor: Color = .secondary
+    var spacing: CGFloat = 6
+
+    private var displayLines: [String] {
+        DecisionLayerStackPresentationSupport.displayLines(for: lines)
+    }
+
+    private var resolvedTitle: String {
+        title ?? DecisionLayerStackPresentationSupport.title(for: displayLines)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: spacing) {
+            Text(resolvedTitle)
+                .font(titleFont)
+                .foregroundStyle(titleColor)
+
+            ForEach(displayLines, id: \.self) { line in
+                Text(line)
+                    .font(lineFont)
+                    .foregroundStyle(lineColor)
+                    .multilineTextAlignment(.leading)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct DecisionLayerStackCardView: View {
+    let lines: [String]
+    var title: String? = nil
+
+    var body: some View {
+        PanelCard {
+            DecisionLayerStackView(
+                lines: lines,
+                title: title,
+                titleFont: .headline,
+                titleColor: BeforeTheme.ink,
+                lineFont: .caption,
+                spacing: 10
+            )
+        }
+    }
+}
+
+private struct DecisionReplayOverviewCardView: View {
+    let presentation: DecisionEvolutionReplayEntryPresentation
+    var cardTitle: String = "Replay overview"
+
+    private var overviewCardCopy: DecisionEvolutionReplayOverviewCardCopy {
+        presentation.overviewCardCopy
+    }
+
+    var body: some View {
+        return PanelCard {
+            DecisionReplayEntrySummaryView(
+                cardCopy: overviewCardCopy.summaryCardCopy,
+                presentation: nil,
+                showsDiagnostics: false
+            ) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(cardTitle)
+                        .font(.headline)
+                        .foregroundStyle(BeforeTheme.ink)
+
+                    Text(overviewCardCopy.labelLine)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.ember)
+                }
+            } supplementary: {
+                ForEach(overviewCardCopy.remainingDetailLines, id: \.self) { line in
+                    Text(line)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
 struct DecisionReviewDetailSectionView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @State private var replayPresentation: DecisionEvolutionReplayEntryPresentation?
@@ -26,12 +113,26 @@ struct DecisionReviewDetailSectionView: View {
                 }
             }
 
+            if let replayPresentation {
+                DecisionReplayOverviewCardView(
+                    presentation: replayPresentation
+                )
+            }
+
+            if let replayPresentation, !replayPresentation.layerStackLines.isEmpty {
+                DecisionLayerStackCardView(
+                    lines: replayPresentation.layerStackLines
+                )
+            }
+
             DecisionReplayDiagnosticsBlockView(
                 presentation: replayPresentation,
                 title: "Replay diagnostics",
                 isLoading: isLoadingReplay,
                 emptyMessage: "No replay-safe diagnostics have been attached to this history entry yet.",
-                wrapsInPanelCard: true
+                wrapsInPanelCard: true,
+                showsHeader: replayPresentation?.overviewPresentation == nil,
+                excludesOverviewSummary: replayPresentation != nil
             )
 
             DecisionContinuationActions(

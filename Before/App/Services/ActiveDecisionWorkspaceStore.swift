@@ -1,4 +1,5 @@
 import Foundation
+import BASHostKit
 
 struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
     var schemaVersion: Int
@@ -14,9 +15,10 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
     var quickResult: QuickCheckResult?
     var balanceResult: BalanceBoardResult?
     var mirrorResult: MirrorResult?
+    var eBrainTurn: BASEBrainTurnResult?
 
     init(
-        schemaVersion: Int = 3,
+        schemaVersion: Int = 4,
         savedAt: Date = .now,
         mode: DecisionMode,
         entrySource: EntrySource,
@@ -28,7 +30,8 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         isShowingWaitSheet: Bool = false,
         quickResult: QuickCheckResult? = nil,
         balanceResult: BalanceBoardResult? = nil,
-        mirrorResult: MirrorResult? = nil
+        mirrorResult: MirrorResult? = nil,
+        eBrainTurn: BASEBrainTurnResult? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.savedAt = savedAt
@@ -43,11 +46,12 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         self.quickResult = quickResult
         self.balanceResult = balanceResult
         self.mirrorResult = mirrorResult
+        self.eBrainTurn = eBrainTurn
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 2
+        schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 3
         savedAt = try container.decodeIfPresent(Date.self, forKey: .savedAt) ?? .now
         modeRaw = try container.decode(String.self, forKey: .modeRaw)
         entrySourceRaw = try container.decode(String.self, forKey: .entrySourceRaw)
@@ -60,6 +64,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         quickResult = try container.decodeIfPresent(QuickCheckResult.self, forKey: .quickResult)
         balanceResult = try container.decodeIfPresent(BalanceBoardResult.self, forKey: .balanceResult)
         mirrorResult = try container.decodeIfPresent(MirrorResult.self, forKey: .mirrorResult)
+        eBrainTurn = try container.decodeIfPresent(BASEBrainTurnResult.self, forKey: .eBrainTurn)
     }
 
     var mode: DecisionMode? {
@@ -92,7 +97,8 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
             wasEvaluated: session.result != nil,
             selectedAction: session.selectedAction,
             isShowingWaitSheet: session.isShowingWaitSheet,
-            quickResult: session.result
+            quickResult: session.result,
+            eBrainTurn: session.lastEvaluationEBrainTurn
         )
     }
 
@@ -108,7 +114,8 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
             draft: draft,
             intelligenceLifecycle: session.intelligenceLifecycleSnapshot,
             wasEvaluated: session.result != nil,
-            balanceResult: session.result
+            balanceResult: session.result,
+            eBrainTurn: session.lastEvaluationEBrainTurn
         )
     }
 
@@ -124,7 +131,8 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
             draft: draft,
             intelligenceLifecycle: session.intelligenceLifecycleSnapshot,
             wasEvaluated: session.result != nil,
-            mirrorResult: session.result
+            mirrorResult: session.result,
+            eBrainTurn: session.lastEvaluationEBrainTurn
         )
     }
 
@@ -141,6 +149,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         if wasEvaluated {
             session.result = quickResult
         }
+        session.restoreEvaluationEBrainTurn(eBrainTurn)
 
         return session
     }
@@ -156,6 +165,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         if wasEvaluated {
             session.result = balanceResult
         }
+        session.restoreEvaluationEBrainTurn(eBrainTurn)
 
         return session
     }
@@ -171,6 +181,7 @@ struct ActiveDecisionWorkspaceState: Codable, Equatable, Sendable {
         if wasEvaluated {
             session.result = mirrorResult
         }
+        session.restoreEvaluationEBrainTurn(eBrainTurn)
 
         return session
     }

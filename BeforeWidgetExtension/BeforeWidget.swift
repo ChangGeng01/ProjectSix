@@ -56,7 +56,7 @@ struct BeforeWidgetView: View {
                     systemImage: controlEntry.systemImage,
                     intent: OpenEvolutionControlIntent(
                         entrySource: .homeWidgetSmall,
-                        prompt: controlEntry.prompt
+                        controlEntry: controlEntry
                     )
                 )
             }
@@ -132,7 +132,7 @@ struct BeforeWidgetView: View {
                     systemImage: controlEntry.systemImage,
                     intent: OpenEvolutionControlIntent(
                         entrySource: .homeWidgetMedium,
-                        prompt: controlEntry.prompt
+                        controlEntry: controlEntry
                     )
                 )
             }
@@ -148,18 +148,18 @@ struct BeforeWidgetView: View {
     }
 
     private var lockScreen: some View {
-        Button(intent: OpenDecisionModeIntent(mode: .quick, entrySource: .lockScreenWidget)) {
+        widgetPrimaryAction(entrySource: .lockScreenWidget) { title, systemImage in
             HStack {
-                Image(systemName: "pause.circle.fill")
-                Text("Open Before")
+                Image(systemName: systemImage)
+                Text(title)
                     .lineLimit(1)
             }
         }
     }
 
     private var circular: some View {
-        Button(intent: OpenDecisionModeIntent(mode: .quick, entrySource: .lockScreenWidget)) {
-            Image(systemName: "pause.circle.fill")
+        widgetPrimaryAction(entrySource: .lockScreenWidget) { _, systemImage in
+            Image(systemName: systemImage)
                 .font(.title3)
         }
     }
@@ -186,6 +186,36 @@ struct BeforeWidgetView: View {
                 .foregroundStyle(prominent ? BeforeTheme.ink : .white)
         }
         .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func widgetPrimaryAction<LabelContent: View>(
+        entrySource: EntrySource,
+        @ViewBuilder label: (String, String) -> LabelContent
+    ) -> some View {
+        let action = entry.snapshot.primaryActionPresentation
+
+        switch action.kind {
+        case .quick:
+            Button(
+                intent: OpenDecisionModeIntent(
+                    mode: .quick,
+                    prompt: action.prompt,
+                    entrySource: entrySource
+                )
+            ) {
+                label(action.title, action.systemImage)
+            }
+        case .evolutionControl:
+            Button(
+                intent: OpenEvolutionControlIntent(
+                    entrySource: entrySource,
+                    primaryAction: action
+                )
+            ) {
+                label(action.title, action.systemImage)
+            }
+        }
     }
 }
 

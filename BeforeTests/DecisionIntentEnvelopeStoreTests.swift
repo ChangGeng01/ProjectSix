@@ -13,27 +13,23 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
 
     func testEnqueueAndConsumeRoundTripPreservesOrder() {
         let now = Date()
-        let first = DecisionIntentEnvelope(
-            id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
-            kind: .quickCapture,
-            sourceSurface: .watch,
-            entrySource: .watch,
-            preferredMode: .quick,
-            promptSeed: "Pause this purchase",
-            requestedAt: now,
-            expiresAt: now.addingTimeInterval(600)
-        )
-        let second = DecisionIntentEnvelope(
-            id: UUID(uuidString: "FFFFFFFF-1111-2222-3333-444444444444")!,
-            kind: .predictiveIntervention,
-            sourceSurface: .notification,
-            entrySource: .app,
-            preferredMode: .mirror,
-            promptSeed: "Do not send this tonight",
-            riskLevel: .high,
-            requestedAt: now.addingTimeInterval(10),
-            expiresAt: now.addingTimeInterval(900)
-        )
+        let first = DecisionIntentEnvelope
+            .quickCapture(
+                entrySource: .watch,
+                promptSeed: "Pause this purchase",
+                requestedAt: now,
+                expiresAt: now.addingTimeInterval(600)
+            )
+            .withID(UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!)
+        let second = DecisionIntentEnvelope
+            .predictiveIntervention(
+                preferredMode: .mirror,
+                promptSeed: "Do not send this tonight",
+                riskLevel: .high,
+                requestedAt: now.addingTimeInterval(10),
+                expiresAt: now.addingTimeInterval(900)
+            )
+            .withID(UUID(uuidString: "FFFFFFFF-1111-2222-3333-444444444444")!)
 
         DecisionIntentEnvelopeStore.enqueue(first)
         DecisionIntentEnvelopeStore.enqueue(second)
@@ -47,19 +43,15 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
 
     func testLoadQueueDropsExpiredEnvelopesAndRewritesValidState() throws {
         let now = Date(timeIntervalSince1970: 2_000)
-        let expired = DecisionIntentEnvelope(
-            kind: .quickCapture,
-            sourceSurface: .watch,
+        let expired = DecisionIntentEnvelope.quickCapture(
             entrySource: .watch,
             promptSeed: "Expired",
             requestedAt: now.addingTimeInterval(-600),
             expiresAt: now.addingTimeInterval(-10)
         )
-        let valid = DecisionIntentEnvelope(
-            kind: .openMode,
-            sourceSurface: .shortcut,
+        let valid = DecisionIntentEnvelope.openMode(
             entrySource: .shortcut,
-            preferredMode: .balance,
+            mode: .balance,
             promptSeed: "Still valid",
             requestedAt: now
         )
@@ -77,22 +69,17 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
 
     func testEnqueueReplacesExistingEnvelopeWithSameID() {
         let id = UUID(uuidString: "12345678-1234-1234-1234-1234567890AB")!
-        let original = DecisionIntentEnvelope(
-            id: id,
-            kind: .quickCapture,
-            sourceSurface: .app,
-            entrySource: .app,
-            preferredMode: .quick,
-            promptSeed: "old"
-        )
-        let replacement = DecisionIntentEnvelope(
-            id: id,
-            kind: .resumeCurrentDecision,
-            sourceSurface: .notification,
-            entrySource: .app,
-            preferredMode: .mirror,
-            promptSeed: "new"
-        )
+        let original = DecisionIntentEnvelope
+            .quickCapture(entrySource: .app, promptSeed: "old")
+            .withID(id)
+        let replacement = DecisionIntentEnvelope
+            .resumeCurrentDecision(
+                sourceSurface: .notification,
+                entrySource: .app,
+                preferredMode: .mirror,
+                promptSeed: "new"
+            )
+            .withID(id)
 
         DecisionIntentEnvelopeStore.enqueue(original)
         DecisionIntentEnvelopeStore.enqueue(replacement)
@@ -106,11 +93,15 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
 
     func testWatchEvolutionControlHandoffRoundTripsThroughIntentQueue() {
         let now = Date(timeIntervalSince1970: 4_000)
-
-        WatchHandoffCoordinator.enqueueOpenEvolutionControl(
-            headline: "Review the pending queue",
-            reason: "Watch glance requested iPhone review."
+        let controlEntry = DecisionEvolutionWidgetControlEntryPresentation(
+            title: "Review on iPhone",
+            systemImage: "checklist",
+            prompt: "Review the pending queue",
+            instruction: "Continue on iPhone to review pending checkpoints and clear the queue.",
+            triggerReason: "Watch glance requested iPhone review."
         )
+
+        WatchHandoffCoordinator.enqueueOpenEvolutionControl(controlEntry)
 
         let next = DecisionIntentEnvelopeStore.consume(now: now)
 
@@ -122,10 +113,55 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
         XCTAssertEqual(next?.triggerReason, "Watch glance requested iPhone review.")
     }
 
+    func testQuickCheckIntentQueuesShortcutScopedQuickCapture() async throws {
+        let intent = OpenQuickCheckIntent(
+            entrySource: .shortcut,
+            scenario: .other
+        )
+
+        _ = try await intent.perform()
+
+        let next = DecisionIntentEnvelopeStore.consume()
+
+        XCTAssertEqual(next?.kind, .quickCapture)
+        XCTAssertEqual(next?.sourceSurface, .shortcut)
+        XCTAssertEqual(next?.entrySource, .shortcut)
+        XCTAssertEqual(next?.preferredMode, .quick)
+        XCTAssertEqual(next?.scenario, .other)
+        XCTAssertEqual(next?.riskLevel, .low)
+        XCTAssertNil(next?.promptSeed)
+    }
+
+    func testOpenDecisionModeIntentTrimsPromptThroughSharedFactory() async throws {
+        let intent = OpenDecisionModeIntent(
+            mode: .mirror,
+            prompt: "  Bring the real concern into view.  ",
+            entrySource: .shortcut
+        )
+
+        _ = try await intent.perform()
+
+        let next = DecisionIntentEnvelopeStore.consume()
+
+        XCTAssertEqual(next?.kind, .openMode)
+        XCTAssertEqual(next?.sourceSurface, .shortcut)
+        XCTAssertEqual(next?.entrySource, .shortcut)
+        XCTAssertEqual(next?.preferredMode, .mirror)
+        XCTAssertEqual(next?.promptSeed, "Bring the real concern into view.")
+        XCTAssertNil(next?.riskLevel)
+    }
+
     func testWidgetEvolutionControlIntentQueuesWidgetScopedReviewRequest() async throws {
+        let controlEntry = DecisionEvolutionWidgetControlEntryPresentation(
+            title: "Review on iPhone",
+            systemImage: "checklist",
+            prompt: "Review the guarded queue",
+            instruction: "Continue on iPhone to review pending checkpoints and clear the queue.",
+            triggerReason: "Widget surfaced the guarded queue detail."
+        )
         let intent = OpenEvolutionControlIntent(
             entrySource: .homeWidgetMedium,
-            prompt: "Review the guarded queue"
+            controlEntry: controlEntry
         )
 
         _ = try await intent.perform()
@@ -137,6 +173,155 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
         XCTAssertEqual(next?.entrySource, .homeWidgetMedium)
         XCTAssertEqual(next?.preferredMode, .mirror)
         XCTAssertEqual(next?.promptSeed, "Review the guarded queue")
+        XCTAssertEqual(next?.triggerReason, "Widget surfaced the guarded queue detail.")
+        XCTAssertEqual(next?.riskLevel, .medium)
+    }
+
+    func testWidgetEvolutionControlIntentFallsBackToSharedTriggerReason() async throws {
+        let intent = OpenEvolutionControlIntent(
+            entrySource: .homeWidgetSmall,
+            prompt: "Review the compact queue"
+        )
+
+        _ = try await intent.perform()
+
+        let next = DecisionIntentEnvelopeStore.consume()
+
+        XCTAssertEqual(next?.kind, .openEvolutionControl)
+        XCTAssertEqual(next?.sourceSurface, .widget)
+        XCTAssertEqual(next?.entrySource, .homeWidgetSmall)
+        XCTAssertEqual(next?.promptSeed, "Review the compact queue")
+        XCTAssertEqual(
+            next?.triggerReason,
+            EntrySource.homeWidgetSmall.defaultEvolutionControlTriggerReason
+        )
+        XCTAssertEqual(next?.riskLevel, .medium)
+    }
+
+    func testWatchQuickCaptureUsesSharedFactoryAndPreservesScenarioAndRisk() {
+        WatchHandoffCoordinator.enqueueQuickCapture(
+            promptSeed: "Pause before replying",
+            scenario: .scroll,
+            riskLevel: .high
+        )
+
+        let next = DecisionIntentEnvelopeStore.consume()
+
+        XCTAssertEqual(next?.kind, .quickCapture)
+        XCTAssertEqual(next?.sourceSurface, .watch)
+        XCTAssertEqual(next?.entrySource, .watch)
+        XCTAssertEqual(next?.preferredMode, .quick)
+        XCTAssertEqual(next?.promptSeed, "Pause before replying")
+        XCTAssertEqual(next?.scenario, .scroll)
+        XCTAssertEqual(next?.riskLevel, .high)
+    }
+
+    func testWatchReopenTomorrowItemUsesSharedFactoryAndTrimsTitle() {
+        WatchHandoffCoordinator.enqueueReopenTomorrowItem(
+            title: "  Revisit the launch plan  ",
+            riskLevel: .medium,
+            preferredMode: .balance
+        )
+
+        let next = DecisionIntentEnvelopeStore.consume()
+
+        XCTAssertEqual(next?.kind, .reopenTomorrowItem)
+        XCTAssertEqual(next?.sourceSurface, .watch)
+        XCTAssertEqual(next?.entrySource, .watch)
+        XCTAssertEqual(next?.preferredMode, .balance)
+        XCTAssertEqual(next?.promptSeed, "Revisit the launch plan")
+        XCTAssertEqual(next?.riskLevel, .medium)
+    }
+
+    func testResumeCurrentDecisionFactoryTrimsPromptAndTriggerReason() {
+        let envelope = DecisionIntentEnvelope.resumeCurrentDecision(
+            sourceSurface: .notification,
+            entrySource: .app,
+            preferredMode: .quick,
+            promptSeed: "  Resume this carefully.  ",
+            riskLevel: .high,
+            triggerReason: "  prediction  "
+        )
+
+        XCTAssertEqual(envelope.kind, .resumeCurrentDecision)
+        XCTAssertEqual(envelope.sourceSurface, .notification)
+        XCTAssertEqual(envelope.entrySource, .app)
+        XCTAssertEqual(envelope.promptSeed, "Resume this carefully.")
+        XCTAssertEqual(envelope.triggerReason, "prediction")
+        XCTAssertEqual(envelope.riskLevel, .high)
+    }
+
+    func testRoutedInputFactoryTrimsPromptAndUsesEntrySurface() {
+        let envelope = DecisionIntentEnvelope.routedInput(
+            entrySource: .shortcut,
+            promptSeed: "  Route this shared prompt.  "
+        )
+
+        XCTAssertEqual(envelope.kind, .routedInput)
+        XCTAssertEqual(envelope.entrySource, .shortcut)
+        XCTAssertEqual(envelope.sourceSurface, .shortcut)
+        XCTAssertEqual(envelope.promptSeed, "Route this shared prompt.")
+    }
+
+    func testReopenTomorrowItemFactorySupportsExplicitNotificationSurface() {
+        let envelope = DecisionIntentEnvelope.reopenTomorrowItem(
+            sourceSurface: .notification,
+            entrySource: .app,
+            title: "  Resume with more space.  ",
+            riskLevel: .medium,
+            preferredMode: .balance
+        )
+
+        XCTAssertEqual(envelope.kind, .reopenTomorrowItem)
+        XCTAssertEqual(envelope.sourceSurface, .notification)
+        XCTAssertEqual(envelope.entrySource, .app)
+        XCTAssertEqual(envelope.promptSeed, "Resume with more space.")
+        XCTAssertEqual(envelope.riskLevel, .medium)
+        XCTAssertEqual(envelope.preferredMode, .balance)
+    }
+
+    func testLockScreenPrimaryActionIntentQueuesWidgetScopedReviewRequest() async throws {
+        let action = DecisionEvolutionWidgetPrimaryActionPresentation(
+            kind: .evolutionControl,
+            title: "Review on iPhone",
+            systemImage: "checklist",
+            prompt: "Review the accessory queue",
+            triggerReason: "Accessory widget surfaced the guarded queue detail."
+        )
+        let intent = OpenEvolutionControlIntent(
+            entrySource: .lockScreenWidget,
+            primaryAction: action
+        )
+
+        _ = try await intent.perform()
+
+        let next = DecisionIntentEnvelopeStore.consume()
+
+        XCTAssertEqual(next?.kind, .openEvolutionControl)
+        XCTAssertEqual(next?.sourceSurface, .widget)
+        XCTAssertEqual(next?.entrySource, .lockScreenWidget)
+        XCTAssertEqual(next?.preferredMode, .mirror)
+        XCTAssertEqual(next?.promptSeed, "Review the accessory queue")
+        XCTAssertEqual(
+            next?.triggerReason,
+            "Accessory widget surfaced the guarded queue detail."
+        )
+        XCTAssertEqual(next?.riskLevel, .medium)
+    }
+
+    func testWatchEvolutionControlHandoffFallsBackToSharedTriggerReason() {
+        WatchHandoffCoordinator.enqueueOpenEvolutionControl(headline: "Review the watch queue")
+
+        let next = DecisionIntentEnvelopeStore.consume()
+
+        XCTAssertEqual(next?.kind, .openEvolutionControl)
+        XCTAssertEqual(next?.sourceSurface, .watch)
+        XCTAssertEqual(next?.entrySource, .watch)
+        XCTAssertEqual(next?.promptSeed, "Review the watch queue")
+        XCTAssertEqual(
+            next?.triggerReason,
+            EntrySource.watch.defaultEvolutionControlTriggerReason
+        )
         XCTAssertEqual(next?.riskLevel, .medium)
     }
 
@@ -250,15 +435,30 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
         requestedAt: Date,
         expiresAt: Date? = nil
     ) -> DecisionIntentEnvelope {
-        DecisionIntentEnvelope(
-            id: id,
-            kind: .quickCapture,
-            sourceSurface: .watch,
+        .quickCapture(
             entrySource: .watch,
-            preferredMode: .quick,
             promptSeed: promptSeed,
             requestedAt: requestedAt,
             expiresAt: expiresAt ?? requestedAt.addingTimeInterval(600)
+        )
+        .withID(id)
+    }
+}
+
+private extension DecisionIntentEnvelope {
+    func withID(_ id: UUID) -> DecisionIntentEnvelope {
+        DecisionIntentEnvelope(
+            id: id,
+            kind: kind,
+            sourceSurface: sourceSurface,
+            entrySource: entrySource,
+            preferredMode: preferredMode,
+            scenario: scenario,
+            promptSeed: promptSeed,
+            riskLevel: riskLevel,
+            triggerReason: triggerReason,
+            requestedAt: requestedAt,
+            expiresAt: expiresAt
         )
     }
 }

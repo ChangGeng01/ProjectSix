@@ -1,6 +1,303 @@
 import Foundation
 import BASHostKit
 
+struct DecisionEvolutionRuntimeAnchorResolver {
+    static func selectionContext(
+        for turn: BASEBrainTurnResult,
+        explicitCheckpointID: String? = nil
+    ) -> DecisionTestingCheckpointSelectionContext {
+        DecisionTestingCheckpointSelectionContext(
+            mode: turn.replayMode,
+            source: .liveRuntime,
+            referenceDate: turn.runtimeTrace.recordedAt,
+            explicitCheckpointID: explicitCheckpointID?.evolutionTrimmedNonEmpty,
+            thoughtFoldChecksum: turn.thoughtFold.checksum.evolutionTrimmedNonEmpty,
+            sessionID: turn.runtimeTrace.sessionID.evolutionTrimmedNonEmpty,
+            riskLevel: turn.riskCard.riskLevel.rawValue,
+            permitMode: turn.actionPermit.mode.rawValue,
+            hostGatePercent: Int((turn.hostGateValue * 100).rounded()),
+            reviewDirectiveLine: turn.updateTickets.lazy.compactMap(\.reviewDirectiveLine).compactMap(\.evolutionTrimmedNonEmpty).first,
+            rollbackAnchorID: DecisionFoldedLungCoordinator.snapshot(for: turn).rollbackAnchor.anchorID
+        )
+    }
+
+    static func selectionContext(
+        for anchor: DecisionSessionCheckpointEBrainAnchor,
+        referenceDate: Date,
+        mode: DecisionMode? = nil,
+        source: DeveloperDecisionReplayEBrainSource? = nil,
+        explicitCheckpointID: String? = nil
+    ) -> DecisionTestingCheckpointSelectionContext {
+        DecisionTestingCheckpointSelectionContext(
+            mode: mode,
+            source: source,
+            referenceDate: referenceDate,
+            explicitCheckpointID: explicitCheckpointID?.evolutionTrimmedNonEmpty,
+            thoughtFoldChecksum: anchor.thoughtFoldChecksum,
+            sessionID: anchor.sessionID,
+            riskLevel: anchor.riskLevel,
+            permitMode: anchor.permitMode,
+            hostGatePercent: anchor.hostGatePercent,
+            reviewDirectiveLine: anchor.reviewDirectiveLine,
+            rollbackAnchorID: anchor.rollbackAnchor?.anchorID
+        )
+    }
+
+    static func preferredLineage(
+        in lineages: [DecisionEvolutionLineageSnapshot],
+        matching context: DecisionTestingCheckpointSelectionContext
+    ) -> DecisionEvolutionLineageSnapshot? {
+        guard let first = lineages.first else {
+            return nil
+        }
+
+        return lineages.dropFirst().reduce(first) { best, candidate in
+            if isPreferred(candidate, over: best, matching: context) {
+                return candidate
+            }
+
+            if isPreferred(best, over: candidate, matching: context) {
+                return best
+            }
+
+            return candidate.checkpointID > best.checkpointID ? candidate : best
+        }
+    }
+
+    private static func isPreferred(
+        _ lhs: DecisionEvolutionLineageSnapshot,
+        over rhs: DecisionEvolutionLineageSnapshot,
+        matching context: DecisionTestingCheckpointSelectionContext
+    ) -> Bool {
+        if context.hasRuntimeAnchor {
+            return isPreferredUsingRuntimeAnchor(lhs, over: rhs, matching: context)
+        }
+
+        return isPreferredUsingReplayContext(lhs, over: rhs, matching: context)
+    }
+
+    private static func isPreferredUsingRuntimeAnchor(
+        _ lhs: DecisionEvolutionLineageSnapshot,
+        over rhs: DecisionEvolutionLineageSnapshot,
+        matching context: DecisionTestingCheckpointSelectionContext
+    ) -> Bool {
+        let explicitCheckpointID = context.explicitCheckpointID?.evolutionTrimmedNonEmpty
+        let lhsExplicitMatch = lhs.checkpointID == explicitCheckpointID
+        let rhsExplicitMatch = rhs.checkpointID == explicitCheckpointID
+        if lhsExplicitMatch != rhsExplicitMatch {
+            return lhsExplicitMatch
+        }
+
+        let lhsFoldScore = thoughtFoldMatchScore(
+            candidate: lhs.eBrain.thoughtFoldChecksum,
+            anchor: context.thoughtFoldChecksum
+        )
+        let rhsFoldScore = thoughtFoldMatchScore(
+            candidate: rhs.eBrain.thoughtFoldChecksum,
+            anchor: context.thoughtFoldChecksum
+        )
+        let lhsRollbackScore = rollbackAnchorMatchScore(
+            candidate: lhs.eBrain.rollbackAnchor?.anchorID,
+            anchor: context.rollbackAnchorID
+        )
+        let rhsRollbackScore = rollbackAnchorMatchScore(
+            candidate: rhs.eBrain.rollbackAnchor?.anchorID,
+            anchor: context.rollbackAnchorID
+        )
+        if lhsRollbackScore != rhsRollbackScore {
+            return lhsRollbackScore > rhsRollbackScore
+        }
+        if lhsFoldScore != rhsFoldScore {
+            return lhsFoldScore > rhsFoldScore
+        }
+
+        let lhsSessionMatch = lhs.eBrain.sessionID == context.sessionID?.evolutionTrimmedNonEmpty
+        let rhsSessionMatch = rhs.eBrain.sessionID == context.sessionID?.evolutionTrimmedNonEmpty
+        if lhsSessionMatch != rhsSessionMatch {
+            return lhsSessionMatch
+        }
+
+        let lhsReviewDirectiveScore = reviewDirectiveMatchScore(
+            candidate: lhs.eBrain.reviewDirectiveLine,
+            anchor: context.reviewDirectiveLine
+        )
+        let rhsReviewDirectiveScore = reviewDirectiveMatchScore(
+            candidate: rhs.eBrain.reviewDirectiveLine,
+            anchor: context.reviewDirectiveLine
+        )
+        if lhsReviewDirectiveScore != rhsReviewDirectiveScore {
+            return lhsReviewDirectiveScore > rhsReviewDirectiveScore
+        }
+
+        let lhsRiskPermitScore = riskPermitMatchScore(candidate: lhs.eBrain, anchor: context)
+        let rhsRiskPermitScore = riskPermitMatchScore(candidate: rhs.eBrain, anchor: context)
+        if lhsRiskPermitScore != rhsRiskPermitScore {
+            return lhsRiskPermitScore > rhsRiskPermitScore
+        }
+
+        let lhsHostGateScore = hostGateMatchScore(
+            candidate: lhs.eBrain.hostGatePercent,
+            anchor: context.hostGatePercent
+        )
+        let rhsHostGateScore = hostGateMatchScore(
+            candidate: rhs.eBrain.hostGatePercent,
+            anchor: context.hostGatePercent
+        )
+        if lhsHostGateScore != rhsHostGateScore {
+            return lhsHostGateScore > rhsHostGateScore
+        }
+
+        let lhsDistance = abs(lhs.eBrain.recordedAt.timeIntervalSince(context.referenceDate))
+        let rhsDistance = abs(rhs.eBrain.recordedAt.timeIntervalSince(context.referenceDate))
+        if lhsDistance != rhsDistance {
+            return lhsDistance < rhsDistance
+        }
+
+        let lhsModeScore = lhs.mode == context.mode ? 1 : 0
+        let rhsModeScore = rhs.mode == context.mode ? 1 : 0
+        if lhsModeScore != rhsModeScore {
+            return lhsModeScore > rhsModeScore
+        }
+
+        if let contextSource = context.source {
+            let lhsSourceScore = lhs.eBrain.source == contextSource ? 1 : 0
+            let rhsSourceScore = rhs.eBrain.source == contextSource ? 1 : 0
+            if lhsSourceScore != rhsSourceScore {
+                return lhsSourceScore > rhsSourceScore
+            }
+        }
+
+        if lhs.eBrain.recordedAt != rhs.eBrain.recordedAt {
+            return lhs.eBrain.recordedAt > rhs.eBrain.recordedAt
+        }
+
+        if lhs.createdAt != rhs.createdAt {
+            return lhs.createdAt > rhs.createdAt
+        }
+
+        return lhs.checkpointID > rhs.checkpointID
+    }
+
+    private static func isPreferredUsingReplayContext(
+        _ lhs: DecisionEvolutionLineageSnapshot,
+        over rhs: DecisionEvolutionLineageSnapshot,
+        matching context: DecisionTestingCheckpointSelectionContext
+    ) -> Bool {
+        let lhsModeScore = lhs.mode == context.mode ? 1 : 0
+        let rhsModeScore = rhs.mode == context.mode ? 1 : 0
+        if lhsModeScore != rhsModeScore {
+            return lhsModeScore > rhsModeScore
+        }
+
+        if let contextSource = context.source {
+            let lhsSourceScore = lhs.eBrain.source == contextSource ? 1 : 0
+            let rhsSourceScore = rhs.eBrain.source == contextSource ? 1 : 0
+            if lhsSourceScore != rhsSourceScore {
+                return lhsSourceScore > rhsSourceScore
+            }
+        }
+
+        let lhsDistance = abs(lhs.eBrain.recordedAt.timeIntervalSince(context.referenceDate))
+        let rhsDistance = abs(rhs.eBrain.recordedAt.timeIntervalSince(context.referenceDate))
+        if lhsDistance != rhsDistance {
+            return lhsDistance < rhsDistance
+        }
+
+        if lhs.eBrain.recordedAt != rhs.eBrain.recordedAt {
+            return lhs.eBrain.recordedAt > rhs.eBrain.recordedAt
+        }
+
+        return lhs.checkpointID > rhs.checkpointID
+    }
+
+    private static func thoughtFoldMatchScore(
+        candidate: String?,
+        anchor: String?
+    ) -> Int {
+        guard let candidate = candidate?.evolutionTrimmedNonEmpty,
+              let anchor = anchor?.evolutionTrimmedNonEmpty else {
+            return 0
+        }
+
+        if candidate == anchor {
+            return 2
+        }
+
+        if candidate.hasPrefix(anchor) || anchor.hasPrefix(candidate) {
+            return 1
+        }
+
+        return 0
+    }
+
+    private static func reviewDirectiveMatchScore(
+        candidate: String?,
+        anchor: String?
+    ) -> Int {
+        guard let candidate = candidate?.evolutionTrimmedNonEmpty,
+              let anchor = anchor?.evolutionTrimmedNonEmpty else {
+            return 0
+        }
+
+        return candidate == anchor ? 1 : 0
+    }
+
+    private static func rollbackAnchorMatchScore(
+        candidate: String?,
+        anchor: String?
+    ) -> Int {
+        guard let candidate = candidate?.evolutionTrimmedNonEmpty,
+              let anchor = anchor?.evolutionTrimmedNonEmpty else {
+            return 0
+        }
+
+        return candidate == anchor ? 3 : 0
+    }
+
+    private static func riskPermitMatchScore(
+        candidate: DeveloperDecisionReplayEBrainSummary,
+        anchor: DecisionTestingCheckpointSelectionContext
+    ) -> Int {
+        let riskLevel = anchor.riskLevel?.evolutionTrimmedNonEmpty
+        let permitMode = anchor.permitMode?.evolutionTrimmedNonEmpty
+
+        guard riskLevel != nil || permitMode != nil else {
+            return 0
+        }
+
+        let riskMatches = candidate.riskLevel == riskLevel
+        let permitMatches = candidate.permitMode == permitMode
+
+        switch (riskLevel != nil, permitMode != nil) {
+        case (true, true):
+            if riskMatches && permitMatches {
+                return 2
+            }
+            if riskMatches || permitMatches {
+                return 1
+            }
+            return 0
+        case (true, false):
+            return riskMatches ? 1 : 0
+        case (false, true):
+            return permitMatches ? 1 : 0
+        case (false, false):
+            return 0
+        }
+    }
+
+    private static func hostGateMatchScore(
+        candidate: Int,
+        anchor: Int?
+    ) -> Int {
+        guard let anchor else {
+            return 0
+        }
+
+        return candidate == anchor ? 1 : 0
+    }
+}
+
 enum DecisionTestingEBrainSource: String, Equatable, Sendable {
     case liveRuntime = "live_runtime"
     case persistedCheckpoint = "persisted_checkpoint"
@@ -61,6 +358,7 @@ struct DecisionEvolutionEffectiveEBrainContext: Equatable, Sendable {
     let factsBundle: DecisionEvolutionEBrainFactsBundle?
     let thoughtFoldChecksum: String?
     let updateTicketSummaries: [String]
+    let reviewDirectiveLine: String?
     let runtimeAuditFindings: [String]
     let effectiveActiveKillSwitches: [String]
     let recommendedKillSwitches: [String]
@@ -71,6 +369,7 @@ struct DecisionEvolutionEffectiveEBrainContext: Equatable, Sendable {
         factsBundle: nil,
         thoughtFoldChecksum: nil,
         updateTicketSummaries: [],
+        reviewDirectiveLine: nil,
         runtimeAuditFindings: [],
         effectiveActiveKillSwitches: [],
         recommendedKillSwitches: []
@@ -98,7 +397,8 @@ struct DecisionReviewCheckpointSnapshot: Identifiable, Equatable, Sendable {
 
     var primarySummary: String {
         diffSummary.first
-            ?? eBrain?.updateTicketSummaries.first
+            ?? eBrain?.reviewDirectiveLine?.evolutionTrimmedNonEmpty
+            ?? eBrain?.updateTicketSummaries.first?.evolutionTrimmedNonEmpty
             ?? (eBrain == nil
                 ? "This checkpoint predates persisted lineage data but still needs review."
                 : "This checkpoint is ready for review.")
@@ -181,6 +481,97 @@ struct DecisionTestingCheckpointSelectionContext: Equatable, Sendable {
     let mode: DecisionMode?
     let source: DeveloperDecisionReplayEBrainSource?
     let referenceDate: Date
+    let explicitCheckpointID: String?
+    let thoughtFoldChecksum: String?
+    let sessionID: String?
+    let riskLevel: String?
+    let permitMode: String?
+    let hostGatePercent: Int?
+    let reviewDirectiveLine: String?
+    let rollbackAnchorID: String?
+
+    init(
+        mode: DecisionMode?,
+        source: DeveloperDecisionReplayEBrainSource?,
+        referenceDate: Date,
+        explicitCheckpointID: String? = nil,
+        thoughtFoldChecksum: String? = nil,
+        sessionID: String? = nil,
+        riskLevel: String? = nil,
+        permitMode: String? = nil,
+        hostGatePercent: Int? = nil,
+        reviewDirectiveLine: String? = nil,
+        rollbackAnchorID: String? = nil
+    ) {
+        self.mode = mode
+        self.source = source
+        self.referenceDate = referenceDate
+        self.explicitCheckpointID = explicitCheckpointID?.evolutionTrimmedNonEmpty
+        self.thoughtFoldChecksum = thoughtFoldChecksum?.evolutionTrimmedNonEmpty
+        self.sessionID = sessionID?.evolutionTrimmedNonEmpty
+        self.riskLevel = riskLevel?.evolutionTrimmedNonEmpty
+        self.permitMode = permitMode?.evolutionTrimmedNonEmpty
+        self.hostGatePercent = hostGatePercent
+        self.reviewDirectiveLine = reviewDirectiveLine?.evolutionTrimmedNonEmpty
+        self.rollbackAnchorID = rollbackAnchorID?.evolutionTrimmedNonEmpty
+    }
+}
+
+extension DecisionTestingCheckpointSelectionContext {
+    fileprivate func merged(with supplement: DecisionTestingCheckpointSelectionContext?) -> DecisionTestingCheckpointSelectionContext {
+        guard let supplement else {
+            return self
+        }
+
+        return DecisionTestingCheckpointSelectionContext(
+            mode: mode ?? supplement.mode,
+            source: source ?? supplement.source,
+            referenceDate: referenceDate,
+            explicitCheckpointID: explicitCheckpointID ?? supplement.explicitCheckpointID,
+            thoughtFoldChecksum: thoughtFoldChecksum ?? supplement.thoughtFoldChecksum,
+            sessionID: sessionID ?? supplement.sessionID,
+            riskLevel: riskLevel ?? supplement.riskLevel,
+            permitMode: permitMode ?? supplement.permitMode,
+            hostGatePercent: hostGatePercent ?? supplement.hostGatePercent,
+            reviewDirectiveLine: reviewDirectiveLine ?? supplement.reviewDirectiveLine,
+            rollbackAnchorID: rollbackAnchorID ?? supplement.rollbackAnchorID
+        )
+    }
+
+    fileprivate var hasRuntimeAnchor: Bool {
+        explicitCheckpointID?.evolutionTrimmedNonEmpty != nil
+            || thoughtFoldChecksum?.evolutionTrimmedNonEmpty != nil
+            || sessionID?.evolutionTrimmedNonEmpty != nil
+            || riskLevel?.evolutionTrimmedNonEmpty != nil
+            || permitMode?.evolutionTrimmedNonEmpty != nil
+            || hostGatePercent != nil
+            || reviewDirectiveLine?.evolutionTrimmedNonEmpty != nil
+            || rollbackAnchorID?.evolutionTrimmedNonEmpty != nil
+    }
+}
+
+extension BASEBrainTurnResult {
+    var replayMode: DecisionMode? {
+        if let workflow = hostContext.workRoutines.first?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            if let match = DecisionMode.allCases.first(where: {
+                workflow.contains($0.rawValue) || workflow.contains($0.shortTitle.lowercased())
+            }) {
+                return match
+            }
+        }
+
+        if let sessionMode = runtimeTrace.sessionID
+            .split(separator: "|")
+            .first?
+            .split(separator: ".")
+            .last
+            .map(String.init),
+           let match = DecisionMode(rawValue: sessionMode) {
+            return match
+        }
+
+        return nil
+    }
 }
 
 struct DecisionTestingRuntimeExport {
@@ -289,25 +680,30 @@ struct DecisionTestingRuntimeExport {
     var latestCheckpointLineage: DecisionEvolutionLineageSnapshot? {
         evolutionControlSurfaceInventory.latestPersistedLineage(
             matching: preferredCheckpointSelectionContext
-        )
+        )?.applying(anchor: latestSessionCheckpointAnchor)
     }
 
     var latestAutomaticCheckpointLineage: DecisionEvolutionLineageSnapshot? {
         evolutionControlSurfaceInventory.latestAutomaticLineage(
             matching: preferredCheckpointSelectionContext
-        )
+        )?.applying(anchor: latestSessionCheckpointAnchor)
     }
 
     var preferredCheckpointSelectionContext: DecisionTestingCheckpointSelectionContext? {
-        if let preferredReplay = recentReplay.first(where: { !$0.isCheckpointOnlyRecovery }) {
-            return DecisionTestingCheckpointSelectionContext(
-                mode: preferredReplay.mode,
-                source: preferredReplay.eBrain?.source,
-                referenceDate: preferredReplay.timestamp
+        if let eBrainTurn {
+            return DecisionEvolutionRuntimeAnchorResolver.selectionContext(
+                for: eBrainTurn,
+                explicitCheckpointID: activeCheckpointHint?.checkpointID
             )
         }
 
-        return nil
+        if let preferredReplayCheckpointSelectionContext {
+            return preferredReplayCheckpointSelectionContext.merged(
+                with: preferredSessionCheckpointSelectionContext
+            )
+        }
+
+        return preferredSessionCheckpointSelectionContext
     }
 
     func selectedCheckpointLineage(
@@ -315,7 +711,7 @@ struct DecisionTestingRuntimeExport {
     ) -> DecisionEvolutionLineageSnapshot? {
         evolutionControlSurfaceInventory.selectedCheckpointLineage(
             matching: context
-        )
+        )?.applying(anchor: latestSessionCheckpointAnchor)
     }
 
     private func selectedCheckpointLineage(
@@ -325,7 +721,7 @@ struct DecisionTestingRuntimeExport {
         evolutionControlSurfaceInventory.selectedCheckpointLineage(
             in: lineages,
             matching: context
-        )
+        )?.applying(anchor: latestSessionCheckpointAnchor)
     }
 
     var effectiveEBrainSummary: DeveloperDecisionReplayEBrainSummary? {
@@ -338,6 +734,49 @@ struct DecisionTestingRuntimeExport {
 
     var effectiveEBrainFactsBundle: DecisionEvolutionEBrainFactsBundle? {
         evolutionRuntimeFacts(currentBrainState: nil).effectiveEBrainFactsBundle
+    }
+
+    var effectiveLayerStackLines: [String] {
+        evolutionRuntimeFacts(currentBrainState: nil).layerStackLines
+    }
+
+    var runtimePolicyLineage: BeforeRuntimePolicyLineage {
+        runtimeSnapshot.runtimePolicyLineage
+    }
+
+    var runtimePolicyIssues: [BeforeRuntimePolicyIssue] {
+        runtimeSnapshot.runtimePolicyIssues
+    }
+
+    var executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame {
+        if eBrainTurn == nil,
+           let persistedSessionCheckpointExecutionCapabilityFrame {
+            return persistedSessionCheckpointExecutionCapabilityFrame
+        }
+
+        return runtimeSnapshot.executionCapabilityFrame
+    }
+
+    var liveEBrainKernelFrame: DecisionEBrainKernelFrame? {
+        guard let eBrainTurn else {
+            return nil
+        }
+
+        return DecisionEBrainKernelFrame.build(
+            from: eBrainTurn,
+            executionCapabilityFrame: executionCapabilityFrame
+        )
+    }
+
+    var liveEBrainPresentationFrame: DecisionEBrainPresentationFrame? {
+        guard let eBrainTurn else {
+            return nil
+        }
+
+        return DecisionEBrainPresentationFrame.build(
+            from: eBrainTurn,
+            executionCapabilityFrame: executionCapabilityFrame
+        )
     }
 
     var flightDeck: DecisionSystemFlightDeck {
@@ -397,6 +836,7 @@ struct DecisionTestingRuntimeExport {
             effectiveEBrainSummary: effectiveEBrainContext.summary,
             effectiveEBrainSource: effectiveEBrainContext.source,
             effectiveEBrainFactsBundle: effectiveEBrainContext.factsBundle,
+            layerStackLines: effectiveEBrainContext.factsBundle?.layerStackLines ?? [],
             thoughtFoldChecksum: effectiveEBrainContext.thoughtFoldChecksum,
             updateTicketSummaries: effectiveEBrainContext.updateTicketSummaries,
             runtimeAuditFindings: effectiveEBrainContext.runtimeAuditFindings,
@@ -412,9 +852,12 @@ struct DecisionTestingRuntimeExport {
             return DecisionEvolutionEffectiveEBrainContext(
                 summary: summary,
                 source: .liveRuntime,
-                factsBundle: summary.factsBundle(modeTitle: preferredCheckpointSelectionContext?.mode?.shortTitle),
+                factsBundle: summary
+                    .factsBundle(modeTitle: preferredCheckpointSelectionContext?.mode?.shortTitle)
+                    .applying(executionCapabilityFrame: executionCapabilityFrame),
                 thoughtFoldChecksum: String(eBrainTurn.thoughtFold.checksum.prefix(12)),
                 updateTicketSummaries: eBrainTurn.updateTickets.map(\.summary),
+                reviewDirectiveLine: eBrainTurn.updateTickets.lazy.compactMap(\.reviewDirectiveLine).compactMap(\.evolutionTrimmedNonEmpty).first,
                 runtimeAuditFindings: eBrainTurn.runtimeTrace.guardrailFindings.map(\.summary),
                 effectiveActiveKillSwitches: orderedUnique(
                     activeKillSwitches + eBrainTurn.runtimeTrace.activeKillSwitches.map(\.rawValue)
@@ -428,9 +871,12 @@ struct DecisionTestingRuntimeExport {
             return DecisionEvolutionEffectiveEBrainContext(
                 summary: summary,
                 source: .persistedCheckpoint,
-                factsBundle: latestCheckpointLineage.factsBundle,
+                factsBundle: latestCheckpointLineage.factsBundle.applying(
+                    executionCapabilityFrame: persistedSessionCheckpointExecutionCapabilityFrame
+                ),
                 thoughtFoldChecksum: summary.thoughtFoldChecksum,
                 updateTicketSummaries: summary.updateTicketSummaries,
+                reviewDirectiveLine: summary.reviewDirectiveLine?.evolutionTrimmedNonEmpty,
                 runtimeAuditFindings: summary.guardrailFindings,
                 effectiveActiveKillSwitches: activeKillSwitches,
                 recommendedKillSwitches: summary.killSwitches.filter {
@@ -445,6 +891,7 @@ struct DecisionTestingRuntimeExport {
             factsBundle: nil,
             thoughtFoldChecksum: nil,
             updateTicketSummaries: [],
+            reviewDirectiveLine: nil,
             runtimeAuditFindings: [],
             effectiveActiveKillSwitches: activeKillSwitches,
             recommendedKillSwitches: []
@@ -486,6 +933,47 @@ struct DecisionTestingRuntimeExport {
             guard !uniqueValues.contains(value) else { return }
             uniqueValues.append(value)
         }
+    }
+
+    private var preferredReplayCheckpointSelectionContext: DecisionTestingCheckpointSelectionContext? {
+        guard let preferredReplay = recentReplay.first(where: { !$0.isCheckpointOnlyRecovery }) else {
+            return nil
+        }
+
+        return DecisionTestingCheckpointSelectionContext(
+            mode: preferredReplay.mode,
+            source: preferredReplay.eBrain?.source,
+            referenceDate: preferredReplay.timestamp,
+            explicitCheckpointID: preferredReplay.preferredCheckpointID,
+            thoughtFoldChecksum: preferredReplay.eBrain?.thoughtFoldChecksum,
+            sessionID: preferredReplay.eBrain?.sessionID,
+            riskLevel: preferredReplay.eBrain?.riskLevel,
+            permitMode: preferredReplay.eBrain?.permitMode,
+            hostGatePercent: preferredReplay.eBrain?.hostGatePercent,
+            reviewDirectiveLine: preferredReplay.eBrain?.reviewDirectiveLine,
+            rollbackAnchorID: preferredReplay.eBrain?.rollbackAnchor?.anchorID
+        )
+    }
+
+    private var preferredSessionCheckpointSelectionContext: DecisionTestingCheckpointSelectionContext? {
+        sessionEngineSnapshot?.recentSessions.lazy.compactMap { session in
+            guard let anchor = session.latestCheckpointEBrainAnchor else {
+                return nil
+            }
+
+            return DecisionEvolutionRuntimeAnchorResolver.selectionContext(
+                for: anchor,
+                referenceDate: session.updatedAt
+            )
+        }.first
+    }
+
+    var persistedSessionCheckpointExecutionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame? {
+        latestSessionCheckpointAnchor?.executionCapabilityFrame
+    }
+
+    private var latestSessionCheckpointAnchor: DecisionSessionCheckpointEBrainAnchor? {
+        sessionEngineSnapshot?.recentSessions.lazy.compactMap(\.latestCheckpointEBrainAnchor).first
     }
 
     var basLifecycleSummary: BASLifecycleSummary {
@@ -676,8 +1164,48 @@ struct DecisionTestingSubstrateInspectionSnapshot {
         export.attaching(eBrainTurn: eBrainTurn)
     }
 
+    var effectiveEBrainSummary: DeveloperDecisionReplayEBrainSummary? {
+        synchronizedExport.effectiveEBrainSummary
+    }
+
     var effectiveEBrainSource: DecisionTestingEBrainSource? {
         synchronizedExport.effectiveEBrainSource
+    }
+
+    var effectiveEBrainFactsBundle: DecisionEvolutionEBrainFactsBundle? {
+        synchronizedExport.effectiveEBrainFactsBundle
+    }
+
+    var effectiveLayerStackLines: [String] {
+        synchronizedExport.effectiveLayerStackLines
+    }
+
+    var liveEBrainKernelFrame: DecisionEBrainKernelFrame? {
+        synchronizedExport.liveEBrainKernelFrame
+    }
+
+    var liveEBrainPresentationFrame: DecisionEBrainPresentationFrame? {
+        synchronizedExport.liveEBrainPresentationFrame
+    }
+
+    var runtimePolicyLineage: BeforeRuntimePolicyLineage {
+        synchronizedExport.runtimePolicyLineage
+    }
+
+    var runtimePolicyIssues: [BeforeRuntimePolicyIssue] {
+        synchronizedExport.runtimePolicyIssues
+    }
+
+    var latestPersistenceIssue: PersistenceIssueRecord? {
+        PersistenceIssueRecorder.latestIssue()
+    }
+
+    var latestPersistenceRemediationSnapshot: PersistenceRemediationSnapshot? {
+        latestPersistenceIssue?.remediationSnapshot
+    }
+
+    var latestPersistenceNotice: String? {
+        latestPersistenceIssue?.displayMessage
     }
 
     var flightDeck: DecisionSystemFlightDeck {

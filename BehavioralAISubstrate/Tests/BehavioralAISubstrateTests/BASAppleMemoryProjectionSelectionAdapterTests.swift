@@ -280,9 +280,33 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
         let context = try makeContext()
         context.insert(SelectionGovernedFixture(id: "record-1", priority: 0.8, lastConfirmedAt: .now))
         context.insert(SelectionGovernedFixture(id: "record-2", priority: 0.6, lastConfirmedAt: .now.addingTimeInterval(-10)))
-        context.insert(SelectionCandidateFixture(id: "pending-a", priority: 0.9, lastObservedAt: .now, status: .pending, governanceDecision: .deferred))
-        context.insert(SelectionCandidateFixture(id: "pending-b", priority: 0.7, lastObservedAt: .now.addingTimeInterval(-10), status: .pending, governanceDecision: .admit))
-        context.insert(SelectionCandidateFixture(id: "promoted-a", priority: 0.5, lastObservedAt: .now.addingTimeInterval(-20), status: .promoted, governanceDecision: .admit))
+        let pendingRefresh = SelectionCandidateFixture(
+            id: "pending-a",
+            priority: 0.9,
+            lastObservedAt: .now,
+            status: .pending,
+            governanceDecision: .deferred
+        )
+        pendingRefresh.basRetrievalTags = ["pending-a", "external_refresh"]
+        let pendingQuarantined = SelectionCandidateFixture(
+            id: "pending-b",
+            priority: 0.7,
+            lastObservedAt: .now.addingTimeInterval(-10),
+            status: .pending,
+            governanceDecision: .admit
+        )
+        pendingQuarantined.basRetrievalTags = ["pending-b", "tool_observation", "quarantined"]
+        let promotedCaveated = SelectionCandidateFixture(
+            id: "promoted-a",
+            priority: 0.5,
+            lastObservedAt: .now.addingTimeInterval(-20),
+            status: .promoted,
+            governanceDecision: .admit
+        )
+        promotedCaveated.basRetrievalTags = ["promoted-a", "evidence_caveat"]
+        context.insert(pendingRefresh)
+        context.insert(pendingQuarantined)
+        context.insert(promotedCaveated)
         try context.save()
 
         let snapshot = BASAppleMemoryProjectionSelectionAdapter.governanceSnapshot(
@@ -297,6 +321,9 @@ struct BASAppleMemoryProjectionSelectionAdapterTests {
         #expect(snapshot.promotedCandidateCount == 1)
         #expect(snapshot.deferredCandidateCount == 1)
         #expect(snapshot.admittedCandidateCount == 2)
+        #expect(snapshot.externallyRefreshedCandidateCount == 1)
+        #expect(snapshot.quarantinedObservationCount == 1)
+        #expect(snapshot.evidenceCaveatedCandidateCount == 1)
     }
 
     @Test("projection fetch adapters keep canonical record ordering and pending-only candidate ordering")

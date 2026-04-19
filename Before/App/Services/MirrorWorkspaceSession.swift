@@ -41,6 +41,7 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
     @Published var result: MirrorResult?
     @Published var isRefiningWithModel = false
     @Published private(set) var brainState: DecisionBrainState?
+    @Published private(set) var lastEvaluationEBrainTurn: BASEBrainTurnResult?
     private let intelligenceLifecycle: DecisionContextLifecycle
 
     init(entrySource: EntrySource, prompt: String = "") {
@@ -56,6 +57,7 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
 
     func evaluate() {
         guard canEvaluate else { return }
+        lastEvaluationEBrainTurn = nil
         result = DecisionIntelligenceCoordinator.mirrorResult(
             for: MirrorInput(
                 prompt: trimmed(prompt),
@@ -70,9 +72,11 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
 
     func evaluateWithIntelligence(
         preferences: BeforePreferences = BeforePreferencesStore.load(),
-        eBrainTurn: BASEBrainTurnResult? = nil
+        eBrainTurn: BASEBrainTurnResult? = nil,
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy
     ) async {
         guard canEvaluate else { return }
+        lastEvaluationEBrainTurn = eBrainTurn
 
         let input = MirrorInput(
             prompt: trimmed(prompt),
@@ -107,7 +111,8 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
             neuralState: neuralState,
             brainState: brainState,
             eBrainTurn: eBrainTurn,
-            preferences: preferences
+            preferences: preferences,
+            runtimePolicyResolution: runtimePolicyResolution
         ) {
             result = refined
         } else {
@@ -125,6 +130,10 @@ final class MirrorWorkspaceSession: ObservableObject, Identifiable {
 
     func loadBrainState(_ brainState: DecisionBrainState?) {
         self.brainState = brainState
+    }
+
+    func restoreEvaluationEBrainTurn(_ turn: BASEBrainTurnResult?) {
+        lastEvaluationEBrainTurn = turn
     }
 
     var filledLensCount: Int {

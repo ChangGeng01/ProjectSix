@@ -221,7 +221,13 @@ extension DecisionAdaptiveTaskStrategy {
                     screenedOutMemoryCount: brainState?.memoryGovernance.screenedOutMemoryCount ?? 0,
                     lowTrustLoad: brainState?.verificationSnapshot.riskFlags.contains(.lowTrustLoad) == true,
                     retrievalInstability: brainState?.verificationSnapshot.riskFlags.contains(.retrievalInstability) == true,
-                    retrievalTags: brainState?.retrievalTags ?? []
+                    retrievalTags: brainState?.retrievalTags ?? [],
+                    externallyRefreshedCandidateCount: brainState?.memoryGovernance.externallyRefreshedCandidateCount ?? 0,
+                    quarantinedObservationCount: brainState?.memoryGovernance.quarantinedObservationCount ?? 0,
+                    evidenceCaveatedCandidateCount: brainState?.memoryGovernance.evidenceCaveatedCandidateCount ?? 0,
+                    externalRefreshGuardTriggered: brainState?.verificationSnapshot.riskFlags.contains(.externalRefreshGuardTriggered) == true,
+                    observationOnlyQuarantine: brainState?.verificationSnapshot.riskFlags.contains(.observationOnlyQuarantine) == true,
+                    evidenceCaveatLoad: brainState?.verificationSnapshot.riskFlags.contains(.evidenceCaveatLoad) == true
                 )
             ),
             preferredProvider: preferredProvider

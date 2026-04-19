@@ -362,6 +362,148 @@ final class DecisionReviewEngineTests: XCTestCase {
         XCTAssertEqual(presentation.postponeTitle, "Tomorrow Box")
     }
 
+    func testTimelineReplayCardCopyPrefersReplayOverviewLinesWhenAvailable() {
+        let record = MirrorDecisionRecord(
+            updatedAt: Date(timeIntervalSince1970: 400),
+            prompt: "Should I stay in this loop?",
+            emotion: "Tired",
+            relationship: "The boundary keeps getting renegotiated",
+            reality: "The pattern keeps repeating",
+            longTerm: "I keep shrinking",
+            selfLens: "I keep explaining it away",
+            coreTension: "This is about what staying keeps normalizing.",
+            nextActionTitle: "Name the boundary",
+            nextAction: "Write the one limit you will not negotiate again.",
+            entrySource: .app
+        )
+
+        let summary = DecisionReviewEngine.timelineEntryPresentation(for: record)
+        let replayCardCopy = summary.replayCardCopy(
+            replayPresentation: makeReplayPresentation(overviewLines: [
+                "Checkpoint recovered from session fold-13.",
+                "Review memory write: Keep the boundary signal in warm memory."
+            ])
+        )
+
+        XCTAssertEqual(replayCardCopy.titleLine, "Recovered checkpoint")
+        XCTAssertEqual(replayCardCopy.secondaryLine, "Checkpoint recovered from session fold-13.")
+        XCTAssertEqual(
+            replayCardCopy.supplementaryLine,
+            "Review memory write: Keep the boundary signal in warm memory."
+        )
+    }
+
+    func testTimelineReplayCardCopyPrefersUnifiedOverviewCardCopyLinesWhenAvailable() {
+        let record = MirrorDecisionRecord(
+            updatedAt: Date(timeIntervalSince1970: 405),
+            prompt: "Should I stay in this loop?",
+            emotion: "Tired",
+            relationship: "The boundary keeps getting renegotiated",
+            reality: "The pattern keeps repeating",
+            longTerm: "I keep shrinking",
+            selfLens: "I keep explaining it away",
+            coreTension: "This is about what staying keeps normalizing.",
+            nextActionTitle: "Name the boundary",
+            nextAction: "Write the one limit you will not negotiate again.",
+            entrySource: .app
+        )
+
+        let summary = DecisionReviewEngine.timelineEntryPresentation(for: record)
+        let replayCardCopy = summary.replayCardCopy(
+            replayPresentation: makeReplayPresentation(
+                titleLine: "high pressure",
+                summaryLine: "Buy • Wait 90 seconds",
+                overviewLines: [
+                    "Review memory write: Keep the boundary signal in warm memory.",
+                    "Audit 1 • Active kill switches 1 • Recommended 1 • Host gate 37%"
+                ]
+            )
+        )
+
+        XCTAssertEqual(replayCardCopy.titleLine, "high pressure")
+        XCTAssertEqual(replayCardCopy.secondaryLine, "Buy • Wait 90 seconds")
+        XCTAssertEqual(
+            replayCardCopy.supplementaryLine,
+            "Review memory write: Keep the boundary signal in warm memory."
+        )
+    }
+
+    func testTimelineReplayCardCopyFallsBackToLegacyLinesWithoutReplayOverview() {
+        let record = BalanceDecisionRecord(
+            updatedAt: Date(timeIntervalSince1970: 410),
+            prompt: "Should I take the contract?",
+            desire: "Momentum",
+            concern: "Capacity",
+            constraint: "Time",
+            longTerm: "I do not want to burn out",
+            focusTitle: "Capacity pressure",
+            focusSummary: "The real question is whether you still have room.",
+            nextAction: "Cut one commitment before adding another.",
+            entrySource: .app
+        )
+
+        let summary = DecisionReviewEngine.timelineEntryPresentation(for: record)
+        let replayCardCopy = summary.replayCardCopy(replayPresentation: nil)
+
+        XCTAssertEqual(replayCardCopy.titleLine, "Should I take the contract?")
+        XCTAssertEqual(replayCardCopy.secondaryLine, "The real question is whether you still have room.")
+        XCTAssertEqual(replayCardCopy.supplementaryLine, "Cut one commitment before adding another.")
+    }
+
+    func testTimelineReplayCardCopyFallsBackFromWhitespaceAndAvoidsDuplicateSupplementaryLine() {
+        let summary = DecisionReviewTimelineEntryPresentation(
+            title: "Legacy title",
+            secondaryLine: "   ",
+            labelTitle: "Mirror",
+            labelSymbolName: DecisionMode.mirror.symbolName,
+            headerAccentText: "Name the boundary",
+            headerAccentStyle: .accent,
+            supplementaryLine: "Review memory write: Keep the boundary signal in warm memory.",
+            timestamp: Date(timeIntervalSince1970: 415),
+            footerAccentText: nil
+        )
+
+        let replayCardCopy = summary.replayCardCopy(
+            replayPresentation: makeReplayPresentation(
+                titleLine: "Recovered checkpoint",
+                summaryLine: "Recovered checkpoint",
+                overviewLines: [
+                    "Review memory write: Keep the boundary signal in warm memory."
+                ]
+            )
+        )
+
+        XCTAssertEqual(replayCardCopy.titleLine, "Recovered checkpoint")
+        XCTAssertEqual(
+            replayCardCopy.secondaryLine,
+            "Review memory write: Keep the boundary signal in warm memory."
+        )
+        XCTAssertNil(replayCardCopy.supplementaryLine)
+    }
+
+    func testRecentReplayCardCopyFallsBackToLegacyDetailWithoutReplayOverview() {
+        let event = CheckEvent(
+            createdAt: Date(timeIntervalSince1970: 420),
+            scenario: .scroll,
+            motivation: .stressed,
+            expectedOutcome: .regret,
+            controlLevel: .maybe,
+            note: "",
+            currentPerspective: "Pause the spiral",
+            afterPerspective: "Come back after breathing",
+            verdict: .pause,
+            finalAction: .wait90s,
+            entrySource: .app
+        )
+
+        let summary = DecisionReviewEngine.recentEntryPresentation(for: .quick(event))
+        let replayCardCopy = summary.replayCardCopy(replayPresentation: nil)
+
+        XCTAssertEqual(replayCardCopy.titleLine, "Pause the spiral")
+        XCTAssertEqual(replayCardCopy.secondaryLine, "Come back after breathing")
+        XCTAssertNil(replayCardCopy.supplementaryLine)
+    }
+
     func testDetailPresentationForQuickFiltersEmptyOptionalRows() {
         let event = CheckEvent(
             scenario: .scroll,
@@ -467,5 +609,36 @@ final class DecisionReviewEngineTests: XCTestCase {
 
         XCTAssertTrue(entry.matches(matchingRecord))
         XCTAssertFalse(entry.matches(differentRecord))
+    }
+
+    private func makeReplayPresentation(
+        titleLine: String = "Recovered checkpoint",
+        summaryLine: String = "Recovered checkpoint",
+        overviewLines: [String]
+    ) -> DecisionEvolutionReplayEntryPresentation {
+        DecisionEvolutionReplayEntryPresentation(
+            sourceTitle: "Checkpoint recovery",
+            modeTitle: "QUICK",
+            statusTitle: "Recovered",
+            timestamp: Date(timeIntervalSince1970: 500),
+            title: titleLine,
+            summaryLine: summaryLine,
+            digest: nil,
+            overviewPresentation: DecisionEvolutionReplayOverviewPresentation(
+                labelLine: "Checkpoint recovery • QUICK",
+                titleLine: titleLine,
+                detailLines: overviewLines
+            ),
+            layerStackLines: [],
+            budgetLine: nil,
+            pressureLine: nil,
+            eBrainLine: nil,
+            taskLine: nil,
+            actionLine: nil,
+            auditLine: nil,
+            activeKillSwitchesLine: nil,
+            killSwitchesLine: nil,
+            traceLine: nil
+        )
     }
 }

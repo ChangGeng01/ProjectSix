@@ -58,4 +58,22 @@ struct BASAppleEntryIntentPlanBuilderTests {
         #expect(plan.promptSeed.isEmpty)
         #expect(plan.shouldSelectBoxTab == false)
     }
+
+    @Test("shared routed-input intent keeps the prompt and skips box-tab selection")
+    func routedInputPlan() {
+        let plan = BASAppleEntryIntentPlanBuilder.plan(
+            kindID: "routedInput",
+            surfaceID: "shortcut",
+            preferredModeID: nil,
+            scenarioID: nil,
+            promptSeed: "Route this on the shared path.",
+            riskLevelID: nil,
+            triggerReason: nil
+        )
+
+        #expect(plan.actionKind == BASAppleEntryIntentActionKind.routedInput)
+        #expect(plan.promptSeed == "Route this on the shared path.")
+        #expect(plan.shouldSelectBoxTab == false)
+        #expect(plan.refreshTriggerKind == BASAppleBrainRefreshTriggerKind.explicitRefresh)
+    }
 }

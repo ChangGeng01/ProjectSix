@@ -53,6 +53,18 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
             latestCheckpointActiveKillSwitchesLine: "eBrain active kill switches: force_guard_mode",
             latestCheckpointKillSwitchesLine: "eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes",
             latestCheckpointActionLine: "action: restored active quick workspace state",
+            latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
+                sessionID: session.id,
+                thoughtFoldChecksum: "fold1abc",
+                riskLevel: "guarded",
+                permitMode: "delay",
+                hostGatePercent: 40,
+                riskFactorsLine: "Factors: evidence_caveat_load",
+                reasonCodesLine: "Reason codes: evidence.caveat",
+                sovereignVerdictLine: "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
+                sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • lock session • quarantine session",
+                sovereignAuditLine: "Sovereign audit • BR-SOV-004 • ref audit.session-l14",
+            ),
             latestEventID: "evt_9",
             latestEventSeq: 9,
             latestEventType: .sessionError,
@@ -182,10 +194,21 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
         XCTAssertTrue(snapshot.sessions[0].canCorrect)
         XCTAssertEqual(snapshot.reviewItems.map(\.title), [
             "Merge review queue",
-            "Replay anchor ready"
+            "Replay anchor ready",
+            "Sovereign posture",
+            "Horizon diagnostics"
         ])
         XCTAssertTrue(snapshot.reviewItems[0].detail.contains("Merge-ready branches 1"))
         XCTAssertTrue(snapshot.reviewItems[1].detail.contains("Checkpoint ckpt_1"))
+        XCTAssertEqual(
+            snapshot.reviewItems[2].detail,
+            "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine • Sovereign authority • tokens memoryWrite • lock session • quarantine session • Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+        )
+        XCTAssertEqual(snapshot.reviewItems[2].severity, .watch)
+        XCTAssertEqual(
+            snapshot.reviewItems[3].detail,
+            "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+        )
         XCTAssertEqual(
             snapshot.sessions[0].checkpointBudgetLine,
             "eBrain budget: guarded • loops 1 • candidates 1 • decode 128 • thermal watch • eBrain route: cpu • precision low • retrieval 1"
@@ -205,9 +228,23 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
         )
         XCTAssertEqual(snapshot.sessions[0].checkpointAuditLine, "eBrain audit findings: 1")
         XCTAssertEqual(
+            snapshot.sessions[0].checkpointSovereignVerdictLine,
+            "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine"
+        )
+        XCTAssertEqual(
+            snapshot.sessions[0].checkpointSovereignAuthorityLine,
+            "Sovereign authority • tokens memoryWrite • lock session • quarantine session"
+        )
+        XCTAssertEqual(
+            snapshot.sessions[0].checkpointSovereignAuditLine,
+            "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+        )
+        XCTAssertEqual(
             snapshot.sessions[0].checkpointKillSwitchesLine,
             "eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes"
         )
+        XCTAssertEqual(snapshot.sessions[0].checkpointRiskFactorsLine, "Factors: evidence_caveat_load")
+        XCTAssertEqual(snapshot.sessions[0].checkpointReasonCodesLine, "Reason codes: evidence.caveat")
         XCTAssertTrue(snapshot.sessions[0].branchLine.contains("Merge-ready 1"))
         XCTAssertEqual(
             snapshot.sessions[0].mergeReviewLine,

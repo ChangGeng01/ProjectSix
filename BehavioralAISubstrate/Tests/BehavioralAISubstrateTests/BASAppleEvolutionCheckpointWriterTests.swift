@@ -369,4 +369,101 @@ struct BASAppleEvolutionCheckpointWriterTests {
         #expect(checkpoint.basSnapshot.brainStateSnapshot == brainState)
         #expect(checkpoint.basSnapshot.brainStateSnapshot?.boundaryPolicy.riskLevel == .high)
     }
+
+    @Test("writer revokes checkpoint recovery entries when a forget gate targets recovery anchors")
+    func writerRevokesCheckpointRecoveryEntriesForForgetGate() throws {
+        let container = try ModelContainer(
+            for: EvolutionCheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        let baseDate = Date(timeIntervalSince1970: 1_744_100_000)
+
+        let targetedLineage = BASEvolutionLineageSummary(
+            recordedAt: baseDate,
+            sessionID: "session.targeted",
+            taskType: "decision",
+            riskLevel: "high",
+            permitMode: "delay",
+            hostGatePercent: 82,
+            thoughtFoldChecksum: "fold.targeted",
+            updateTicketSummaries: ["targeted checkpoint"],
+            activeKillSwitches: ["force_guard_mode"],
+            guardrailFindings: ["checkpoint carries revocable refs"],
+            recommendedKillSwitches: ["disableHighRiskAutoAction"],
+            foldedLungSummary: BASEvolutionFoldedLungSummary(
+                breathMode: "guard",
+                breathPhase: "exchange",
+                thermalPressure: 54,
+                cachePressure: 40,
+                restoreReadinessPercent: 76,
+                resumeID: "resume.guard",
+                sourceFoldID: "fold.guard",
+                resumeDepth: 2,
+                fallbackMode: "rollbackAnchor",
+                rollbackAnchorID: "anchor.guard",
+                safeSnapshotRef: "snapshot.guard",
+                foldRefs: ["fold.guard"],
+                cacheStateRef: "cache.guard",
+                integrityHash: "hash.guard"
+            )
+        )
+
+        let targeted: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.record(
+                input: BASEvolutionCheckpointInput(
+                    modeName: "reflective",
+                    sourceID: "scene_active",
+                    fingerprint: "fingerprint-targeted",
+                    identityRole: .reflectiveWitness,
+                    boundaryMode: .localOnlyProtective,
+                    calibrationStatus: .stable,
+                    lineageSummary: targetedLineage
+                ),
+                in: context,
+                createdAt: baseDate
+            )
+
+        let stable: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.record(
+                input: BASEvolutionCheckpointInput(
+                    modeName: "primary",
+                    sourceID: "launch",
+                    fingerprint: "fingerprint-stable",
+                    identityRole: .pauseCompanion,
+                    boundaryMode: .localOnlyAdvisory,
+                    calibrationStatus: .stable
+                ),
+                in: context,
+                createdAt: baseDate.addingTimeInterval(60)
+            )
+
+        let forgetRequest = BASForgetRequest(
+            requestID: "forget.guard.anchor",
+            targetRefs: ["anchor.guard", "resume.guard"],
+            cascadeScope: ["checkpoints", "projection_cache"],
+            executedSteps: ["checkpoint_exports_revoked"],
+            verified: false
+        )
+
+        let revoked: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.revokeCheckpoints(
+                for: forgetRequest,
+                in: context
+            )
+
+        let checkpoints = try context.fetch(FetchDescriptor<EvolutionCheckpointFixture>())
+        let stableID = try #require(
+            stable.orderedCheckpoints.first(where: { $0.fingerprint == "fingerprint-stable" })?.id
+        )
+        let targetedID = try #require(
+            targeted.orderedCheckpoints.first(where: { $0.fingerprint == "fingerprint-targeted" })?.id
+        )
+
+        #expect(checkpoints.count == 1)
+        #expect(checkpoints.first?.id == stableID)
+        #expect(!checkpoints.contains(where: { $0.id == targetedID }))
+        #expect(revoked.currentState.checkpointCount == 1)
+        #expect(revoked.currentState.latestCheckpoint?.id == stableID)
+    }
 }

@@ -5,12 +5,14 @@ public enum BASAppleProviderHostBridge {
     public static func orderedProviderIDs(
         preferredProviderID: String,
         allowFallbacks: Bool = true,
-        excluding suspendedProviderIDs: Set<String> = []
+        excluding suspendedProviderIDs: Set<String> = [],
+        routingPolicy: BASProviderRoutingPolicy
     ) -> [String] {
         BASReferenceProviderRuntime.orderedProviderIDs(
             preferredProviderID: preferredProviderID,
             allowFallbacks: allowFallbacks,
-            suspendedProviderIDs: suspendedProviderIDs
+            suspendedProviderIDs: suspendedProviderIDs,
+            routingPolicy: routingPolicy
         )
     }
 

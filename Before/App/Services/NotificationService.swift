@@ -15,6 +15,40 @@ enum BeforeNotificationIdentifier {
     }
 }
 
+struct BeforePredictiveInterventionNotificationPresentation: Equatable, Sendable {
+    let identifier: String
+    let title: String
+    let body: String
+    let timeInterval: TimeInterval
+}
+
+enum BeforePredictiveInterventionNotificationPresentationSupport {
+    static func presentation(
+        for candidate: InterventionPredictionCandidate,
+        now: Date = .now
+    ) -> BeforePredictiveInterventionNotificationPresentation {
+        let fallback = BeforeProductCompatibility.predictiveInterventionPresentation
+        let fallbackTitle = candidate.riskLevel == .high
+            ? fallback.highRiskTitle
+            : fallback.mediumRiskTitle
+        let fallbackDetail = candidate.riskLevel == .high
+            ? fallback.highRiskDetail
+            : fallback.mediumRiskDetail
+
+        return BeforePredictiveInterventionNotificationPresentation(
+            identifier: BeforeNotificationIdentifier.predictiveIntervention(for: candidate.id),
+            title: cleaned(candidate.title) ?? fallbackTitle,
+            body: cleaned(candidate.detail) ?? fallbackDetail,
+            timeInterval: candidate.expiresAt > now ? 90 : 60
+        )
+    }
+
+    private static func cleaned(_ text: String) -> String? {
+        let cleanedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleanedText.isEmpty ? nil : cleanedText
+    }
+}
+
 @MainActor
 final class NotificationService {
     static let shared = NotificationService()
@@ -105,20 +139,21 @@ final class NotificationService {
         guard !notificationsDisabledForTesting else { return }
         await requestAuthorizationIfNeeded()
 
+        let presentation = BeforePredictiveInterventionNotificationPresentationSupport.presentation(
+            for: candidate
+        )
         let content = UNMutableNotificationContent()
-        content.title = candidate.riskLevel == .high
-            ? "Slow this one down"
-            : "Pause before you decide"
-        content.body = candidate.riskLevel == .high
-            ? "Your recent pattern suggests a slower reopen is safer right now."
-            : "A small pause may help this land cleaner."
+        content.title = presentation.title
+        content.body = presentation.body
         content.sound = .default
 
-        let identifier = BeforeNotificationIdentifier.predictiveIntervention(for: candidate.id)
+        let identifier = presentation.identifier
         center.removePendingNotificationRequests(withIdentifiers: [identifier])
 
-        let interval: TimeInterval = max(60, candidate.expiresAt.timeIntervalSinceNow > 0 ? 90 : 60)
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
+        let trigger = UNTimeIntervalNotificationTrigger(
+            timeInterval: presentation.timeInterval,
+            repeats: false
+        )
         let request = UNNotificationRequest(
             identifier: identifier,
             content: content,

@@ -10,9 +10,20 @@ struct DecisionSessionEngineControlSessionPresentation: Identifiable, Equatable,
     let checkpointDecisionLine: String?
     let checkpointTaskLine: String?
     let checkpointPressureLine: String?
+    let checkpointRiskFactorsLine: String?
+    let checkpointReasonCodesLine: String?
     let checkpointAuditLine: String?
+    let checkpointSovereignVerdictLine: String?
+    let checkpointSovereignAuthorityLine: String?
+    let checkpointSovereignAuditLine: String?
     let checkpointKillSwitchesLine: String?
     let checkpointActionLine: String?
+    let checkpointLungLine: String?
+    let checkpointHotColdLine: String?
+    let checkpointResumeLine: String?
+    let checkpointRollbackLine: String?
+    let checkpointSovereignBridgeLine: String?
+    let checkpointSovereignBridgeDetailLines: [String]
     let branchLine: String
     let recoveryLine: String
     let mergeReviewLine: String?

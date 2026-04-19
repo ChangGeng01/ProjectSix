@@ -71,6 +71,54 @@ struct BASCognitionCoreTests {
         #expect(snapshot.riskFlags.contains(.lowTrustLoad))
     }
 
+    @Test("brain state snapshot surfaces horizon refresh and quarantine flags")
+    func brainStateSnapshotSurfacesHorizonFlags() {
+        let state = BASDecisionBrainState(
+            memorySlices: [
+                BASGovernedMemorySlice(
+                    id: "quarantined-observation",
+                    role: .relevant,
+                    type: "situational",
+                    headline: "Observed tool output still needs corroboration",
+                    source: "pattern",
+                    confidence: 0.66,
+                    priority: 0.7,
+                    lifecycleState: "warming",
+                    governanceStatus: .pending,
+                    eligibility: .allowed(.pendingGraceWindow),
+                    sourceTrustScore: 0.54,
+                    sourceTrustTier: .medium,
+                    retrievalTags: ["quarantined", "tool_observation", "evidence_caveat"],
+                    isPending: true,
+                    provenanceSummary: "Observation-only candidate."
+                )
+            ],
+            sessionBiases: [],
+            retrievalTags: [BASDecisionMode.primary.identifier],
+            reactionWeights: .defaults(for: BASDecisionMode.primary.identifier),
+            identityProfile: .default(modeName: BASDecisionMode.primary.identifier),
+            boundaryPolicy: .default(riskLevel: .medium),
+            memoryGovernance: BASMemoryGovernanceState(
+                totalRecordCount: 0,
+                totalCandidateCount: 1,
+                pendingCandidateCount: 1,
+                promotedCandidateCount: 0,
+                loadedPromotedMemoryCount: 0,
+                loadedPendingMemoryCount: 1,
+                quarantinedObservationCount: 1,
+                evidenceCaveatedCandidateCount: 1,
+                screenedOutReasonCounts: [.externalRefreshNoOverlap: 2]
+            ),
+            loadedAt: .now
+        )
+
+        let snapshot = state.verificationSnapshot
+
+        #expect(snapshot.riskFlags.contains(.externalRefreshGuardTriggered))
+        #expect(snapshot.riskFlags.contains(.observationOnlyQuarantine))
+        #expect(snapshot.riskFlags.contains(.evidenceCaveatLoad))
+    }
+
     @Test("identity evaluator switches to predictive sentinel for high-risk notifications")
     func identityEvaluatorSwitchesToPredictiveSentinel() {
         let profile = BASIdentityRoleResolver.resolve(

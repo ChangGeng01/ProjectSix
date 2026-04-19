@@ -74,6 +74,33 @@ public enum BASCurrentBrainBootstrapRequestedTriggerFallbackPolicy: String, Coda
     case reject
 }
 
+public enum BASCurrentBrainBootstrapBehaviorIssueKind: String, Codable, Equatable, Sendable {
+    case unsupportedRequestedModeID
+    case unsupportedRequestedTriggerID
+    case unsupportedRequestedRiskLevelID
+    case unsupportedConfiguredDefaultModeID
+    case unsupportedConfiguredDefaultTriggerID
+    case unsupportedConfiguredDefaultRiskLevelID
+    case unsupportedConfiguredDefaultSourceSurfaceID
+    case unsupportedConfiguredDefaultMemorySourceID
+}
+
+public struct BASCurrentBrainBootstrapBehaviorIssue: Codable, Equatable, Sendable {
+    public var kind: BASCurrentBrainBootstrapBehaviorIssueKind
+    public var identifier: String
+    public var fallbackIdentifier: String?
+
+    public init(
+        kind: BASCurrentBrainBootstrapBehaviorIssueKind,
+        identifier: String,
+        fallbackIdentifier: String? = nil
+    ) {
+        self.kind = kind
+        self.identifier = identifier
+        self.fallbackIdentifier = fallbackIdentifier
+    }
+}
+
 public struct BASCurrentBrainBootstrapBehavior: Codable, Equatable, Sendable {
     public static let generic = BASCurrentBrainBootstrapBehavior(
         defaultModeID: BASDecisionMode.primaryID,
@@ -260,46 +287,98 @@ public struct BASCurrentBrainBootstrapBehavior: Codable, Equatable, Sendable {
     }
 
     public func resolvedMode(from requestedModeID: String) -> BASDecisionMode {
+        var issues: [BASCurrentBrainBootstrapBehaviorIssue] = []
+        return resolvedMode(from: requestedModeID, issues: &issues)
+    }
+
+    public func resolvedMode(
+        from requestedModeID: String,
+        issues: inout [BASCurrentBrainBootstrapBehaviorIssue]
+    ) -> BASDecisionMode {
         if let resolved = BASDecisionMode(identifier: canonicalModeID(for: requestedModeID)) {
             return resolved
         }
 
         switch unknownRequestedModeFallbackPolicy {
         case .useConfiguredDefault:
-            guard let configuredDefault = BASDecisionMode(identifier: defaultModeID) else {
-                preconditionFailure("Unsupported configured default current brain bootstrap mode identifier: \(defaultModeID)")
-            }
+            issues.append(
+                BASCurrentBrainBootstrapBehaviorIssue(
+                    kind: .unsupportedRequestedModeID,
+                    identifier: requestedModeID,
+                    fallbackIdentifier: defaultModeID
+                )
+            )
+            let configuredDefault = resolvedConfiguredDefaultMode(issues: &issues)
             return configuredDefault
         case .reject:
-            preconditionFailure("Unsupported current brain bootstrap mode identifier: \(requestedModeID)")
+            issues.append(
+                BASCurrentBrainBootstrapBehaviorIssue(
+                    kind: .unsupportedRequestedModeID,
+                    identifier: requestedModeID,
+                    fallbackIdentifier: conservativeModeFallback.identifier
+                )
+            )
+            return conservativeModeFallback
         }
     }
 
     public func resolvedTrigger(from requestedTriggerID: String) -> BASCurrentBrainBootstrapTrigger {
+        var issues: [BASCurrentBrainBootstrapBehaviorIssue] = []
+        return resolvedTrigger(from: requestedTriggerID, issues: &issues)
+    }
+
+    public func resolvedTrigger(
+        from requestedTriggerID: String,
+        issues: inout [BASCurrentBrainBootstrapBehaviorIssue]
+    ) -> BASCurrentBrainBootstrapTrigger {
         if let resolved = BASCurrentBrainBootstrapTrigger(identifier: canonicalTriggerID(for: requestedTriggerID)) {
             return resolved
         }
 
         switch unknownRequestedTriggerFallbackPolicy {
         case .useConfiguredDefault:
-            guard let configuredDefault = BASCurrentBrainBootstrapTrigger(identifier: defaultTriggerID) else {
-                preconditionFailure("Unsupported configured default current brain bootstrap trigger identifier: \(defaultTriggerID)")
-            }
+            issues.append(
+                BASCurrentBrainBootstrapBehaviorIssue(
+                    kind: .unsupportedRequestedTriggerID,
+                    identifier: requestedTriggerID,
+                    fallbackIdentifier: defaultTriggerID
+                )
+            )
+            let configuredDefault = resolvedConfiguredDefaultTrigger(issues: &issues)
             return configuredDefault
         case .reject:
-            preconditionFailure("Unsupported current brain bootstrap trigger identifier: \(requestedTriggerID)")
+            issues.append(
+                BASCurrentBrainBootstrapBehaviorIssue(
+                    kind: .unsupportedRequestedTriggerID,
+                    identifier: requestedTriggerID,
+                    fallbackIdentifier: conservativeTriggerFallback.rawValue
+                )
+            )
+            return conservativeTriggerFallback
         }
     }
 
     public func resolvedRiskLevel(from requestedRiskLevelID: String?) -> BASRiskLevel? {
+        var issues: [BASCurrentBrainBootstrapBehaviorIssue] = []
+        return resolvedRiskLevel(from: requestedRiskLevelID, issues: &issues)
+    }
+
+    public func resolvedRiskLevel(
+        from requestedRiskLevelID: String?,
+        issues: inout [BASCurrentBrainBootstrapBehaviorIssue]
+    ) -> BASRiskLevel? {
         guard let requestedRiskLevelID else { return nil }
         if let resolved = BASRiskLevel(rawValue: canonicalRiskLevelID(for: requestedRiskLevelID)) {
             return resolved
         }
-        guard let configuredDefault = BASRiskLevel(rawValue: defaultRiskLevelID) else {
-            preconditionFailure("Unsupported configured default current brain bootstrap risk level identifier: \(defaultRiskLevelID)")
-        }
-        return configuredDefault
+        issues.append(
+            BASCurrentBrainBootstrapBehaviorIssue(
+                kind: .unsupportedRequestedRiskLevelID,
+                identifier: requestedRiskLevelID,
+                fallbackIdentifier: defaultRiskLevelID
+            )
+        )
+        return resolvedConfiguredDefaultRiskLevel(issues: &issues)
     }
 
     public func resolvedTemplateMode(
@@ -312,9 +391,8 @@ public struct BASCurrentBrainBootstrapBehavior: Codable, Equatable, Sendable {
 
         switch unknownTemplateModeFallbackPolicy {
         case .useConfiguredDefault:
-            guard let configuredDefault = BASDecisionMode(identifier: defaultModeID) else {
-                preconditionFailure("Unsupported configured default current brain bootstrap mode identifier: \(defaultModeID)")
-            }
+            var issues: [BASCurrentBrainBootstrapBehaviorIssue] = []
+            let configuredDefault = resolvedConfiguredDefaultMode(issues: &issues)
             return configuredDefault
         case .usePreparationMode:
             return preparationMode
@@ -333,9 +411,8 @@ public struct BASCurrentBrainBootstrapBehavior: Codable, Equatable, Sendable {
 
         switch unknownFailurePatternModeFallbackPolicy {
         case .useConfiguredDefault:
-            guard let configuredDefault = BASDecisionMode(identifier: defaultModeID) else {
-                preconditionFailure("Unsupported configured default current brain bootstrap mode identifier: \(defaultModeID)")
-            }
+            var issues: [BASCurrentBrainBootstrapBehaviorIssue] = []
+            let configuredDefault = resolvedConfiguredDefaultMode(issues: &issues)
             return configuredDefault
         case .usePreparationMode:
             return preparationMode
@@ -354,10 +431,8 @@ public struct BASCurrentBrainBootstrapBehavior: Codable, Equatable, Sendable {
 
         switch unknownTemplateRiskFallbackPolicy {
         case .useConfiguredDefault:
-            guard let configuredDefault = BASRiskLevel(rawValue: defaultRiskLevelID) else {
-                preconditionFailure("Unsupported configured default current brain bootstrap risk level identifier: \(defaultRiskLevelID)")
-            }
-            return configuredDefault
+            var issues: [BASCurrentBrainBootstrapBehaviorIssue] = []
+            return resolvedConfiguredDefaultRiskLevel(issues: &issues)
         case .usePreparationRiskLevel:
             return preparationRiskLevel
         }
@@ -366,6 +441,15 @@ public struct BASCurrentBrainBootstrapBehavior: Codable, Equatable, Sendable {
     public func resolvedSourceSurface(
         for trigger: BASCurrentBrainBootstrapTrigger,
         override: BASInteractionSurface?
+    ) -> BASInteractionSurface {
+        var issues: [BASCurrentBrainBootstrapBehaviorIssue] = []
+        return resolvedSourceSurface(for: trigger, override: override, issues: &issues)
+    }
+
+    public func resolvedSourceSurface(
+        for trigger: BASCurrentBrainBootstrapTrigger,
+        override: BASInteractionSurface?,
+        issues: inout [BASCurrentBrainBootstrapBehaviorIssue]
     ) -> BASInteractionSurface {
         if let enforced = surface(
             in: enforcedSourceSurfaceByTriggerID,
@@ -382,15 +466,21 @@ public struct BASCurrentBrainBootstrapBehavior: Codable, Equatable, Sendable {
         ) {
             return overridden
         }
-        guard let configuredDefault = BASInteractionSurface(rawValue: defaultSourceSurfaceID) else {
-            preconditionFailure("Unsupported configured default current brain bootstrap source surface identifier: \(defaultSourceSurfaceID)")
-        }
-        return configuredDefault
+        return resolvedConfiguredDefaultSourceSurface(issues: &issues)
     }
 
     public func memorySource(
         for trigger: BASCurrentBrainBootstrapTrigger,
         mode: BASDecisionMode
+    ) -> BASMemorySource {
+        var issues: [BASCurrentBrainBootstrapBehaviorIssue] = []
+        return memorySource(for: trigger, mode: mode, issues: &issues)
+    }
+
+    public func memorySource(
+        for trigger: BASCurrentBrainBootstrapTrigger,
+        mode: BASDecisionMode,
+        issues: inout [BASCurrentBrainBootstrapBehaviorIssue]
     ) -> BASMemorySource {
         if let modeMapping = memorySourceOverridesByTriggerAndModeID[trigger.rawValue],
            let source = memorySource(
@@ -411,10 +501,7 @@ public struct BASCurrentBrainBootstrapBehavior: Codable, Equatable, Sendable {
         ) {
             return source
         }
-        guard let configuredDefault = memorySource(rawValue: defaultMemorySourceID) else {
-            preconditionFailure("Unsupported configured default current brain bootstrap memory source identifier: \(defaultMemorySourceID)")
-        }
-        return configuredDefault
+        return resolvedConfiguredDefaultMemorySource(issues: &issues)
     }
 
     public func canonicalModeID(for requestedModeID: String) -> String {
@@ -454,6 +541,106 @@ public struct BASCurrentBrainBootstrapBehavior: Codable, Equatable, Sendable {
 
     private func memorySource(rawValue: String) -> BASMemorySource? {
         BASMemorySource(identifier: canonicalMemorySourceID(for: rawValue))
+    }
+
+    private var conservativeModeFallback: BASDecisionMode {
+        .primary
+    }
+
+    private var conservativeTriggerFallback: BASCurrentBrainBootstrapTrigger {
+        .explicitRefresh
+    }
+
+    private var conservativeRiskFallback: BASRiskLevel {
+        .low
+    }
+
+    private var conservativeSourceSurfaceFallback: BASInteractionSurface {
+        .app
+    }
+
+    private var conservativeMemorySourceFallback: BASMemorySource {
+        .pattern
+    }
+
+    private func resolvedConfiguredDefaultMode(
+        issues: inout [BASCurrentBrainBootstrapBehaviorIssue]
+    ) -> BASDecisionMode {
+        guard let configuredDefault = BASDecisionMode(identifier: defaultModeID) else {
+            issues.append(
+                BASCurrentBrainBootstrapBehaviorIssue(
+                    kind: .unsupportedConfiguredDefaultModeID,
+                    identifier: defaultModeID,
+                    fallbackIdentifier: conservativeModeFallback.identifier
+                )
+            )
+            return conservativeModeFallback
+        }
+        return configuredDefault
+    }
+
+    private func resolvedConfiguredDefaultTrigger(
+        issues: inout [BASCurrentBrainBootstrapBehaviorIssue]
+    ) -> BASCurrentBrainBootstrapTrigger {
+        guard let configuredDefault = BASCurrentBrainBootstrapTrigger(identifier: defaultTriggerID) else {
+            issues.append(
+                BASCurrentBrainBootstrapBehaviorIssue(
+                    kind: .unsupportedConfiguredDefaultTriggerID,
+                    identifier: defaultTriggerID,
+                    fallbackIdentifier: conservativeTriggerFallback.rawValue
+                )
+            )
+            return conservativeTriggerFallback
+        }
+        return configuredDefault
+    }
+
+    private func resolvedConfiguredDefaultRiskLevel(
+        issues: inout [BASCurrentBrainBootstrapBehaviorIssue]
+    ) -> BASRiskLevel {
+        guard let configuredDefault = BASRiskLevel(rawValue: defaultRiskLevelID) else {
+            issues.append(
+                BASCurrentBrainBootstrapBehaviorIssue(
+                    kind: .unsupportedConfiguredDefaultRiskLevelID,
+                    identifier: defaultRiskLevelID,
+                    fallbackIdentifier: conservativeRiskFallback.rawValue
+                )
+            )
+            return conservativeRiskFallback
+        }
+        return configuredDefault
+    }
+
+    private func resolvedConfiguredDefaultSourceSurface(
+        issues: inout [BASCurrentBrainBootstrapBehaviorIssue]
+    ) -> BASInteractionSurface {
+        guard let configuredDefault = BASInteractionSurface(rawValue: defaultSourceSurfaceID) else {
+            issues.append(
+                BASCurrentBrainBootstrapBehaviorIssue(
+                    kind: .unsupportedConfiguredDefaultSourceSurfaceID,
+                    identifier: defaultSourceSurfaceID,
+                    fallbackIdentifier: conservativeSourceSurfaceFallback.rawValue
+                )
+            )
+            return conservativeSourceSurfaceFallback
+        }
+        return configuredDefault
+    }
+
+    private func resolvedConfiguredDefaultMemorySource(
+        issues: inout [BASCurrentBrainBootstrapBehaviorIssue]
+    ) -> BASMemorySource {
+        guard let configuredDefault = memorySource(rawValue: defaultMemorySourceID) else {
+            issues.append(
+                BASCurrentBrainBootstrapBehaviorIssue(
+                    kind: .unsupportedConfiguredDefaultMemorySourceID,
+                    identifier: defaultMemorySourceID,
+                    fallbackIdentifier: conservativeMemorySourceFallback.rawValue
+                )
+            )
+            return conservativeMemorySourceFallback
+        }
+        return configuredDefault
     }
 }
 
@@ -496,7 +683,20 @@ public struct BASCurrentBrainBootstrapPreparation: Codable, Equatable, Sendable 
     public var riskLevel: BASRiskLevel
     public var languageMode: BASLanguageMode
     public var memorySource: BASMemorySource
+    public var issues: [BASCurrentBrainBootstrapBehaviorIssue]
     public var now: Date
+
+    private enum CodingKeys: String, CodingKey {
+        case mode
+        case prompt
+        case trigger
+        case sourceSurface
+        case riskLevel
+        case languageMode
+        case memorySource
+        case issues
+        case now
+    }
 
     public init(
         mode: BASDecisionMode,
@@ -506,6 +706,7 @@ public struct BASCurrentBrainBootstrapPreparation: Codable, Equatable, Sendable 
         riskLevel: BASRiskLevel,
         languageMode: BASLanguageMode,
         memorySource: BASMemorySource,
+        issues: [BASCurrentBrainBootstrapBehaviorIssue] = [],
         now: Date = .now
     ) {
         self.mode = mode
@@ -515,7 +716,70 @@ public struct BASCurrentBrainBootstrapPreparation: Codable, Equatable, Sendable 
         self.riskLevel = riskLevel
         self.languageMode = languageMode
         self.memorySource = memorySource
+        self.issues = issues
         self.now = now
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            mode: try container.decode(BASDecisionMode.self, forKey: .mode),
+            prompt: try container.decode(String.self, forKey: .prompt),
+            trigger: try container.decode(BASCurrentBrainBootstrapTrigger.self, forKey: .trigger),
+            sourceSurface: try container.decode(BASInteractionSurface.self, forKey: .sourceSurface),
+            riskLevel: try container.decode(BASRiskLevel.self, forKey: .riskLevel),
+            languageMode: try container.decode(BASLanguageMode.self, forKey: .languageMode),
+            memorySource: try container.decode(BASMemorySource.self, forKey: .memorySource),
+            issues: try container.decodeIfPresent([BASCurrentBrainBootstrapBehaviorIssue].self, forKey: .issues) ?? [],
+            now: try container.decode(Date.self, forKey: .now)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(mode, forKey: .mode)
+        try container.encode(prompt, forKey: .prompt)
+        try container.encode(trigger, forKey: .trigger)
+        try container.encode(sourceSurface, forKey: .sourceSurface)
+        try container.encode(riskLevel, forKey: .riskLevel)
+        try container.encode(languageMode, forKey: .languageMode)
+        try container.encode(memorySource, forKey: .memorySource)
+        try container.encode(issues, forKey: .issues)
+        try container.encode(now, forKey: .now)
+    }
+}
+
+public extension BASCurrentBrainBootstrapBehaviorIssue {
+    var summaryLine: String {
+        let fallbackText = fallbackIdentifier.map { " -> \($0)" } ?? ""
+        switch kind {
+        case .unsupportedRequestedModeID:
+            return "Requested mode \(identifier) recovered\(fallbackText)"
+        case .unsupportedRequestedTriggerID:
+            return "Requested trigger \(identifier) recovered\(fallbackText)"
+        case .unsupportedRequestedRiskLevelID:
+            return "Requested risk \(identifier) recovered\(fallbackText)"
+        case .unsupportedConfiguredDefaultModeID:
+            return "Configured default mode \(identifier) recovered\(fallbackText)"
+        case .unsupportedConfiguredDefaultTriggerID:
+            return "Configured default trigger \(identifier) recovered\(fallbackText)"
+        case .unsupportedConfiguredDefaultRiskLevelID:
+            return "Configured default risk \(identifier) recovered\(fallbackText)"
+        case .unsupportedConfiguredDefaultSourceSurfaceID:
+            return "Configured source surface \(identifier) recovered\(fallbackText)"
+        case .unsupportedConfiguredDefaultMemorySourceID:
+            return "Configured memory source \(identifier) recovered\(fallbackText)"
+        }
+    }
+}
+
+public extension BASCurrentBrainBootstrapPreparation {
+    var hasRecoverableIssues: Bool {
+        !issues.isEmpty
+    }
+
+    var issueLines: [String] {
+        issues.map(\.summaryLine)
     }
 }
 
@@ -858,9 +1122,11 @@ public enum BASCurrentBrainBootstrapCoordinator {
     public static func prepare(
         request: BASCurrentBrainBootstrapPreparationRequest
     ) -> BASCurrentBrainBootstrapPreparation {
+        var issues: [BASCurrentBrainBootstrapBehaviorIssue] = []
         let sourceSurface = request.behavior.resolvedSourceSurface(
             for: request.trigger,
-            override: request.sourceSurfaceOverride
+            override: request.sourceSurfaceOverride,
+            issues: &issues
         )
         let languageMode = BASLanguageMode.detect(
             preferredLanguages: request.preferredLanguages,
@@ -882,8 +1148,10 @@ public enum BASCurrentBrainBootstrapCoordinator {
             languageMode: languageMode,
             memorySource: request.behavior.memorySource(
                 for: request.trigger,
-                mode: request.mode
+                mode: request.mode,
+                issues: &issues
             ),
+            issues: issues,
             now: request.now
         )
     }

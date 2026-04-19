@@ -111,6 +111,7 @@ public struct BASAppleDeviceProfileSnapshot: Codable, Sendable, Equatable {
 public enum BASAppleEntryIntentActionKind: String, Codable, Sendable {
     case capture
     case present
+    case routedInput
     case predictiveIntervention
     case restore
 }
@@ -183,6 +184,8 @@ public enum BASAppleEntryIntentPlanBuilder {
         switch rawValue {
         case "capture":
             .capture
+        case "route", "routedInput":
+            .routedInput
         case "predictiveIntervention":
             .predictiveIntervention
         case "resume":

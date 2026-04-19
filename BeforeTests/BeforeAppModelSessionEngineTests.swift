@@ -1,5 +1,6 @@
 import XCTest
 import SwiftData
+import BASHostKit
 @testable import Before
 
 final class BeforeAppModelSessionEngineTests: XCTestCase {
@@ -17,11 +18,20 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
 
     @MainActor
     private func resetPersistentState() async throws {
+        await BeforeAppModel.drainDeferredSessionEngineTasksForTesting()
+        await DecisionTestingInterface.resetTransientIntelligenceState()
         ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
         PendingReflectionStore.clear()
         PendingLaunchRequestStore.clear()
+        DecisionIntentEnvelopeStore.clear()
+        DecisionReactionBanditStore.clear()
+        WidgetSnapshotStore.clear()
+        BeforeRuntimePolicyStore.clearOverride()
+        DecisionEvolutionKillSwitchStore.clear()
         ProtectedLocalStateStore.clearQuarantine(key: "before.active.decision.workspace")
         StateStorageIssueRecorder.clear()
+        PersistenceIssueRecorder.clear()
         UserDefaults.standard.removeObject(forKey: "before.active.decision.workspace")
         UserDefaults.standard.removeObject(forKey: "before.preferences")
         try await DecisionSessionEngine.shared?.resetForTesting()
@@ -71,6 +81,72 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
         XCTAssertTrue(latestCheckpoint?.summary.confirmedFacts.contains(where: { $0.hasPrefix("eBrain permit:") }) == true)
         XCTAssertTrue(latestCheckpoint?.summary.confirmedFacts.contains(where: { $0.hasPrefix("eBrain fold:") }) == true)
         XCTAssertTrue(latestCheckpoint?.summary.currentScope.contains("ebrain") == true)
+        XCTAssertEqual(
+            latestCheckpoint?.runtimeState.eBrainAnchor?.sessionID,
+            inspected.latestCheckpointEBrainAnchor?.sessionID
+        )
+        XCTAssertEqual(
+            latestCheckpoint?.runtimeState.eBrainAnchor?.thoughtFoldChecksum,
+            inspected.latestCheckpointEBrainAnchor?.thoughtFoldChecksum
+        )
+        XCTAssertEqual(
+            latestCheckpoint?.runtimeState.eBrainAnchor?.riskLevel,
+            inspected.latestCheckpointEBrainAnchor?.riskLevel
+        )
+        XCTAssertEqual(
+            latestCheckpoint?.runtimeState.eBrainAnchor?.permitMode,
+            inspected.latestCheckpointEBrainAnchor?.permitMode
+        )
+        XCTAssertNotNil(latestCheckpoint?.runtimeState.eBrainAnchor?.riskLevel)
+        XCTAssertNotNil(latestCheckpoint?.runtimeState.eBrainAnchor?.permitMode)
+        XCTAssertNotNil(latestCheckpoint?.runtimeState.eBrainAnchor?.hostGatePercent)
+    }
+
+    @MainActor
+    func testSubstrateInspectionConvenienceAccessorsMirrorInspectionSnapshot() async throws {
+        let app = BeforeAppModel(modelContainer: try makeContainer(), startupNotice: nil)
+        app.startQuickCheck(entrySource: .app, prompt: "Should I send this tonight?")
+
+        let session = try XCTUnwrap(app.activeQuickSession)
+        session.scenario = .other
+        session.motivation = .stressed
+        session.expectedOutcome = .temporaryRelief
+        session.controlLevel = .maybe
+
+        await app.evaluateQuickSessionWithIntelligence(session)
+
+        let inspection = await app.substrateInspectionSnapshot()
+        let kernelFrame = await app.substrateEBrainKernelFrame()
+        let presentationFrame = await app.substrateEBrainPresentationFrame()
+        let factsBundle = await app.substrateEBrainFactsBundle()
+        let layerStackLines = await app.substrateLayerStackLines()
+        let persistenceIssue = await app.substrateLatestPersistenceIssue()
+        let persistenceRemediation = await app.substrateLatestPersistenceRemediationSnapshot()
+        let runtimePolicyLineage = await app.substrateRuntimePolicyLineage()
+        let runtimePolicyIssues = await app.substrateRuntimePolicyIssues()
+
+        XCTAssertEqual(kernelFrame, inspection.liveEBrainKernelFrame)
+        XCTAssertEqual(presentationFrame, inspection.liveEBrainPresentationFrame)
+        XCTAssertEqual(factsBundle, inspection.effectiveEBrainFactsBundle)
+        XCTAssertEqual(layerStackLines, inspection.effectiveLayerStackLines)
+        XCTAssertEqual(persistenceIssue, inspection.latestPersistenceIssue)
+        XCTAssertEqual(persistenceRemediation, inspection.latestPersistenceRemediationSnapshot)
+        XCTAssertEqual(runtimePolicyLineage, inspection.runtimePolicyLineage)
+        XCTAssertEqual(runtimePolicyIssues, inspection.runtimePolicyIssues)
+        XCTAssertNotNil(kernelFrame?.runModeID)
+        XCTAssertNotNil(kernelFrame?.wakeIntentLevelID)
+        XCTAssertNotNil(kernelFrame?.lungState)
+        XCTAssertNotNil(kernelFrame?.resumeFrame)
+        XCTAssertNotNil(kernelFrame?.rollbackAnchor)
+        XCTAssertNotNil(presentationFrame?.runModeTitle)
+        XCTAssertNotNil(presentationFrame?.sourceDescriptor)
+        XCTAssertNotNil(presentationFrame?.lungLine)
+        XCTAssertNotNil(presentationFrame?.resumeLine)
+        XCTAssertNotNil(presentationFrame?.rollbackLine)
+        XCTAssertFalse(layerStackLines.isEmpty)
+        XCTAssertEqual(layerStackLines.count, 10)
+        XCTAssertTrue(layerStackLines.first?.hasPrefix("L1 power clock") == true)
+        XCTAssertTrue(layerStackLines.last?.hasPrefix("L14 sovereign") == true)
     }
 
     @MainActor
@@ -177,8 +253,17 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
         XCTAssertTrue(presentation.countsLine.contains("Sessions"))
         XCTAssertTrue(presentedActiveSession.checkpointBudgetLine?.contains("eBrain budget:") == true)
         XCTAssertTrue(presentedActiveSession.checkpointPressureLine?.contains("eBrain pressure: latency ") == true)
+        XCTAssertTrue(presentedActiveSession.checkpointRiskFactorsLine?.hasPrefix("Factors: ") == true)
+        XCTAssertTrue(presentedActiveSession.checkpointReasonCodesLine?.hasPrefix("Reason codes: ") == true)
         XCTAssertTrue(presentedActiveSession.replayRecoverySummary.budgetLine?.contains("eBrain budget:") == true)
         XCTAssertTrue(presentedActiveSession.replayRecoverySummary.pressureLine?.contains("eBrain pressure: latency ") == true)
+        XCTAssertTrue(presentedActiveSession.replayRecoverySummary.riskFactorsLine?.hasPrefix("Factors: ") == true)
+        XCTAssertTrue(presentedActiveSession.replayRecoverySummary.reasonCodesLine?.hasPrefix("Reason codes: ") == true)
+        XCTAssertTrue(
+            presentedActiveSession.replayRecoverySummary.digestLines.contains {
+                $0.contains("Factors: ") && $0.contains("Reason codes: ")
+            }
+        )
     }
 
     @MainActor
@@ -235,6 +320,63 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
             latestCheckpoint?.summary.confirmedFacts.contains(where: { $0.hasPrefix("eBrain fold:") }) == true
         )
         XCTAssertTrue(latestCheckpoint?.summary.currentScope.contains("ebrain") == true)
+    }
+
+    @MainActor
+    func testQuickCompletionKeepsEvaluationPolicyWhenRuntimeOverrideChangesBeforeAction() async throws {
+        let app = BeforeAppModel(modelContainer: try makeContainer(), startupNotice: nil)
+        app.startQuickCheck(entrySource: .app, prompt: "Should I send this now?")
+
+        let session = try XCTUnwrap(app.activeQuickSession)
+        session.scenario = .other
+        session.motivation = .stressed
+        session.expectedOutcome = .temporaryRelief
+        session.controlLevel = .maybe
+
+        await app.evaluateQuickSessionWithIntelligence(session)
+        let evaluationTurn = try XCTUnwrap(session.lastEvaluationEBrainTurn)
+        let baselineDecodeTokens = evaluationTurn.budgetFrame.maxDecodeTokens
+        let baselineRuntimeTuningPolicyID = evaluationTurn.policyLineage?.runtimeTuningPolicyID
+        XCTAssertEqual(baselineRuntimeTuningPolicyID, "before.host.runtime-synthesis.v1")
+
+        XCTAssertTrue(
+            BeforeRuntimePolicyStore.saveOverride(
+                makeRuntimePolicyBundle(
+                    bundleVersion: "override.v2",
+                    runtimeTuningPolicyID: "override.runtime-tuning.v2"
+                )
+            )
+        )
+        XCTAssertEqual(
+            BeforeProductCompatibility.resolvedRuntimePolicy.lineage.runtimeTuningPolicyID,
+            "override.runtime-tuning.v2"
+        )
+
+        await app.completeCheck(using: session, action: .decideTomorrow)
+
+        let sessionID = try XCTUnwrap(session.sessionEngineSessionID)
+        let engine = try XCTUnwrap(DecisionSessionEngine.shared)
+        let engineSession = try await engine.getSession(sessionID)
+        _ = try await waitForSessionToolLifecycle(
+            engine: engine,
+            sessionID: sessionID,
+            branchID: engineSession.headBranchId,
+            tool: "clear_active_workspace_state"
+        )
+        let latestCheckpoint = try await engine.getLatestCheckpoint(
+            sessionId: sessionID,
+            branchId: engineSession.headBranchId
+        )
+
+        XCTAssertTrue(
+            latestCheckpoint?.summary.acceptedConstraints.contains(where: {
+                $0.hasPrefix("eBrain budget:") && $0.contains("decode \(baselineDecodeTokens)")
+            }) == true
+        )
+        XCTAssertEqual(
+            app.currentBrainState?.evolutionState.latestCheckpoint?.lineageSummary?.policyLineage?.runtimeTuningPolicyID,
+            baselineRuntimeTuningPolicyID
+        )
     }
 
     @MainActor
@@ -359,10 +501,20 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
         XCTAssertEqual(reviewPresentations[reviewEntry.id]?.sourceTitle, historyPresentation?.sourceTitle)
         XCTAssertEqual(reviewPresentations[reviewEntry.id]?.budgetLine, historyPresentation?.budgetLine)
         XCTAssertEqual(reviewPresentations[reviewEntry.id]?.taskLine, historyPresentation?.taskLine)
+        XCTAssertEqual(
+            reviewPresentations[reviewEntry.id]?.layerStackLines,
+            historyPresentation?.layerStackLines
+        )
+        XCTAssertEqual(
+            reviewPresentations[reviewEntry.id]?.overviewPresentation,
+            historyPresentation?.overviewPresentation
+        )
         XCTAssertEqual(recentPresentation.summaryLine, historyPresentation?.summaryLine)
         XCTAssertEqual(recentPresentation.sourceTitle, historyPresentation?.sourceTitle)
         XCTAssertEqual(recentPresentation.budgetLine, historyPresentation?.budgetLine)
         XCTAssertEqual(recentPresentation.taskLine, historyPresentation?.taskLine)
+        XCTAssertEqual(recentPresentation.layerStackLines, historyPresentation?.layerStackLines)
+        XCTAssertEqual(recentPresentation.overviewPresentation, historyPresentation?.overviewPresentation)
     }
 
     @MainActor
@@ -387,6 +539,8 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(presentations.count, 1)
         XCTAssertFalse(quickPresentation.summaryLine.isEmpty)
         XCTAssertNotNil(quickPresentation.sourceTitle)
+        XCTAssertFalse(quickPresentation.overviewPresentation.labelLine.isEmpty)
+        XCTAssertFalse(quickPresentation.overviewPresentation.titleLine.isEmpty)
     }
 
     @MainActor
@@ -477,6 +631,121 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
             latestCheckpoint?.summary.confirmedFacts.contains(where: { $0.hasPrefix("eBrain fold:") }) == true
         )
         XCTAssertTrue(latestCheckpoint?.summary.currentScope.contains("ebrain") == true)
+    }
+
+    @MainActor
+    func testSavingBalanceBoardKeepsEvaluationPolicyWhenRuntimeOverrideChangesBeforeSave() async throws {
+        let app = BeforeAppModel(modelContainer: try makeContainer(), startupNotice: nil)
+        app.startBalanceBoard(entrySource: .app, prompt: "Should I leave this contract?")
+
+        let session = try XCTUnwrap(app.activeBalanceSession)
+        session.desire = "Protect my energy"
+        session.concern = "I might damage the relationship"
+        session.constraint = "I need clarity this week"
+        session.longTerm = "I do not want to repeat this pattern"
+
+        await app.evaluateBalanceSessionWithIntelligence(session)
+        let evaluationTurn = try XCTUnwrap(session.lastEvaluationEBrainTurn)
+        let baselineDecodeTokens = evaluationTurn.budgetFrame.maxDecodeTokens
+        let baselineRuntimeTuningPolicyID = evaluationTurn.policyLineage?.runtimeTuningPolicyID
+        XCTAssertEqual(baselineRuntimeTuningPolicyID, "before.host.runtime-synthesis.v1")
+
+        XCTAssertTrue(
+            BeforeRuntimePolicyStore.saveOverride(
+                makeRuntimePolicyBundle(
+                    bundleVersion: "override.v2",
+                    runtimeTuningPolicyID: "override.runtime-tuning.v2"
+                )
+            )
+        )
+        XCTAssertEqual(
+            BeforeProductCompatibility.resolvedRuntimePolicy.lineage.runtimeTuningPolicyID,
+            "override.runtime-tuning.v2"
+        )
+
+        let sessionID = try XCTUnwrap(session.sessionEngineSessionID)
+        app.saveBalanceBoard(session)
+
+        let engine = try XCTUnwrap(DecisionSessionEngine.shared)
+        let engineSession = try await engine.getSession(sessionID)
+        _ = try await waitForSessionToolLifecycle(
+            engine: engine,
+            sessionID: sessionID,
+            branchID: engineSession.headBranchId,
+            tool: "clear_active_workspace_state"
+        )
+        let latestCheckpoint = try await engine.getLatestCheckpoint(
+            sessionId: sessionID,
+            branchId: engineSession.headBranchId
+        )
+
+        XCTAssertTrue(
+            latestCheckpoint?.summary.acceptedConstraints.contains(where: {
+                $0.hasPrefix("eBrain budget:") && $0.contains("decode \(baselineDecodeTokens)")
+            }) == true
+        )
+        XCTAssertEqual(
+            app.currentBrainState?.evolutionState.latestCheckpoint?.lineageSummary?.policyLineage?.runtimeTuningPolicyID,
+            baselineRuntimeTuningPolicyID
+        )
+    }
+
+    @MainActor
+    func testSavingMirrorWorkspaceKeepsEvaluationPolicyWhenRuntimeOverrideChangesBeforeSave() async throws {
+        let app = BeforeAppModel(modelContainer: try makeContainer(), startupNotice: nil)
+        app.startMirrorWorkspace(entrySource: .app, prompt: "Why do I keep freezing before I send the message?")
+
+        let session = try XCTUnwrap(app.activeMirrorSession)
+        session.emotion = "I draft the text, then stare at it and do nothing."
+        session.relationship = "If I send it, I lose the safety of postponing."
+        session.reality = "I want reassurance before I risk conflict."
+        session.longTerm = "I keep replaying the same loop."
+        session.selfLens = "Part of me still treats delay as protection."
+
+        await app.evaluateMirrorSessionWithIntelligence(session)
+        let evaluationTurn = try XCTUnwrap(session.lastEvaluationEBrainTurn)
+        let baselineDecodeTokens = evaluationTurn.budgetFrame.maxDecodeTokens
+        let baselineRuntimeTuningPolicyID = evaluationTurn.policyLineage?.runtimeTuningPolicyID
+        XCTAssertEqual(baselineRuntimeTuningPolicyID, "before.host.runtime-synthesis.v1")
+
+        XCTAssertTrue(
+            BeforeRuntimePolicyStore.saveOverride(
+                makeRuntimePolicyBundle(
+                    bundleVersion: "override.v2",
+                    runtimeTuningPolicyID: "override.runtime-tuning.v2"
+                )
+            )
+        )
+        XCTAssertEqual(
+            BeforeProductCompatibility.resolvedRuntimePolicy.lineage.runtimeTuningPolicyID,
+            "override.runtime-tuning.v2"
+        )
+
+        let sessionID = try XCTUnwrap(session.sessionEngineSessionID)
+        app.saveMirrorWorkspace(session)
+
+        let engine = try XCTUnwrap(DecisionSessionEngine.shared)
+        let engineSession = try await engine.getSession(sessionID)
+        _ = try await waitForSessionToolLifecycle(
+            engine: engine,
+            sessionID: sessionID,
+            branchID: engineSession.headBranchId,
+            tool: "clear_active_workspace_state"
+        )
+        let latestCheckpoint = try await engine.getLatestCheckpoint(
+            sessionId: sessionID,
+            branchId: engineSession.headBranchId
+        )
+
+        XCTAssertTrue(
+            latestCheckpoint?.summary.acceptedConstraints.contains(where: {
+                $0.hasPrefix("eBrain budget:") && $0.contains("decode \(baselineDecodeTokens)")
+            }) == true
+        )
+        XCTAssertEqual(
+            app.currentBrainState?.evolutionState.latestCheckpoint?.lineageSummary?.policyLineage?.runtimeTuningPolicyID,
+            baselineRuntimeTuningPolicyID
+        )
     }
 
     @MainActor
@@ -611,6 +880,88 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
             restoredFlightDeck.sessionEngineSummary?.signals.contains(where: {
                 $0.contains("action: restored active quick workspace state")
             }) == true
+        )
+    }
+
+    @MainActor
+    func testWorkspaceRestoreKeepsPersistedEvaluationPolicyWhenRuntimeOverrideChangesBeforeRestore() async throws {
+        let app = BeforeAppModel(modelContainer: try makeContainer(), startupNotice: nil)
+        app.startQuickCheck(entrySource: .app, prompt: "Should I keep this draft open?")
+
+        let session = try XCTUnwrap(app.activeQuickSession)
+        session.scenario = .other
+        session.motivation = .stressed
+        session.expectedOutcome = .temporaryRelief
+        session.controlLevel = .maybe
+
+        await app.evaluateQuickSessionWithIntelligence(session)
+        let evaluationTurn = try XCTUnwrap(session.lastEvaluationEBrainTurn)
+        let baselineDecodeTokens = evaluationTurn.budgetFrame.maxDecodeTokens
+        let baselineRuntimeTuningPolicyID = evaluationTurn.policyLineage?.runtimeTuningPolicyID
+        XCTAssertEqual(baselineRuntimeTuningPolicyID, "before.host.runtime-synthesis.v1")
+
+        let sessionID = try XCTUnwrap(session.sessionEngineSessionID)
+        let engine = try XCTUnwrap(DecisionSessionEngine.shared)
+        let engineSession = try await engine.getSession(sessionID)
+
+        app.handleScenePhase(.background)
+        _ = try await waitForSessionToolLifecycle(
+            engine: engine,
+            sessionID: sessionID,
+            branchID: engineSession.headBranchId,
+            tool: "persist_active_workspace_state"
+        )
+
+        XCTAssertTrue(
+            BeforeRuntimePolicyStore.saveOverride(
+                makeRuntimePolicyBundle(
+                    bundleVersion: "override.v2",
+                    runtimeTuningPolicyID: "override.runtime-tuning.v2"
+                )
+            )
+        )
+        XCTAssertEqual(
+            BeforeProductCompatibility.resolvedRuntimePolicy.lineage.runtimeTuningPolicyID,
+            "override.runtime-tuning.v2"
+        )
+
+        let restoredApp = BeforeAppModel(modelContainer: try makeContainer(), startupNotice: nil)
+        restoredApp.handleInitialAppearance()
+        restoredApp.handleScenePhase(.active)
+
+        let restoredSession = try XCTUnwrap(restoredApp.activeQuickSession)
+        XCTAssertEqual(restoredSession.sessionEngineSessionID, sessionID)
+        XCTAssertEqual(
+            restoredSession.lastEvaluationEBrainTurn?.budgetFrame.maxDecodeTokens,
+            baselineDecodeTokens
+        )
+        XCTAssertEqual(
+            restoredSession.lastEvaluationEBrainTurn?.policyLineage?.runtimeTuningPolicyID,
+            baselineRuntimeTuningPolicyID
+        )
+
+        await restoredApp.completeCheck(using: restoredSession, action: .decideTomorrow)
+
+        let updatedSession = try await engine.getSession(sessionID)
+        _ = try await waitForSessionToolLifecycle(
+            engine: engine,
+            sessionID: sessionID,
+            branchID: updatedSession.headBranchId,
+            tool: "clear_active_workspace_state"
+        )
+        let latestCheckpoint = try await engine.getLatestCheckpoint(
+            sessionId: sessionID,
+            branchId: updatedSession.headBranchId
+        )
+
+        XCTAssertTrue(
+            latestCheckpoint?.summary.acceptedConstraints.contains(where: {
+                $0.hasPrefix("eBrain budget:") && $0.contains("decode \(baselineDecodeTokens)")
+            }) == true
+        )
+        XCTAssertEqual(
+            restoredApp.currentBrainState?.evolutionState.latestCheckpoint?.lineageSummary?.policyLineage?.runtimeTuningPolicyID,
+            baselineRuntimeTuningPolicyID
         )
     }
 
@@ -1300,5 +1651,87 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
         default:
             return nil
         }
+    }
+
+    private func makeRuntimePolicyBundle(
+        bundleVersion: String,
+        runtimeTuningPolicyID: String
+    ) -> BeforeRuntimePolicyBundle {
+        let baselineRuntimePolicy = BeforeProductCompatibility.resolvedRuntimePolicyBundle
+            .runtimeTuningRegistry
+            .policiesByID["before.host.runtime-synthesis.v1"]!
+        var overrideBudget = baselineRuntimePolicy.budget
+        overrideBudget.standardDecodeTokens = 180
+        overrideBudget.unstableDecodeTokens = 210
+        overrideBudget.guardedDecodeTokens = 240
+        overrideBudget.maintenanceBatteryFloor = 0.4
+        let providerRegistry = BASProviderRoutingPolicyRegistry(
+            schemaVersion: "before.provider-routing-registry.session-engine-tests.v1",
+            defaultPolicyID: "before.provider-routing.v1",
+            policiesByID: [
+                "before.provider-routing.v1": BASProviderRoutingPolicy(
+                    schemaVersion: "before.provider-routing.v1",
+                    deterministicProviderID: BASReferenceProviderRuntime.templateProviderID,
+                    testingOverrideProviderID: BASReferenceProviderRuntime.testingStubProviderID,
+                    preferenceOrderings: [
+                        BASProviderPreferenceOrdering(
+                            preferredProviderID: BASReferenceProviderRuntime.gemmaE4BProviderID,
+                            orderedProviderIDs: [
+                                BASReferenceProviderRuntime.gemmaE4BProviderID,
+                                BASReferenceProviderRuntime.foundationModelsProviderID
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+        let runtimeRegistry = BASEBrainRuntimeSynthesisPolicyRegistry(
+            schemaVersion: "before.runtime-tuning-registry.session-engine-tests.v1",
+            defaultPolicyID: "before.host.runtime-synthesis.v1",
+            policiesByID: [
+                "before.host.runtime-synthesis.v1": baselineRuntimePolicy,
+                "override.runtime-tuning.v2": BASEBrainRuntimeSynthesisPolicy(
+                    schemaVersion: "override.runtime-tuning.v2",
+                    guardrailPressure: .init(
+                        protectiveBoundaryIncrement: 0.21,
+                        calibrationWatchIncrement: 0.11,
+                        calibrationDriftingIncrement: 0.19,
+                        boundaryConstraintUnit: 0.04,
+                        boundaryConstraintCap: 0.20,
+                        calibrationAlertUnit: 0.04,
+                        calibrationAlertCap: 0.16,
+                        failureGuardUnit: 0.03,
+                        failureGuardCap: 0.13,
+                        riskFlagUnit: 0.04,
+                        riskFlagCap: 0.15,
+                        maximumPressure: 0.68
+                    ),
+                    budget: overrideBudget,
+                    wakeIntent: baselineRuntimePolicy.wakeIntent,
+                    stateTransitions: baselineRuntimePolicy.stateTransitions,
+                    lease: baselineRuntimePolicy.lease,
+                    maintenance: baselineRuntimePolicy.maintenance,
+                    sovereignExecution: baselineRuntimePolicy.sovereignExecution,
+                    hostThresholds: .init(
+                        caution: 0.48,
+                        protective: 0.75,
+                        block: 0.95
+                    ),
+                    context: baselineRuntimePolicy.context,
+                    triSelf: baselineRuntimePolicy.triSelf,
+                    risk: baselineRuntimePolicy.risk
+                )
+            ]
+        )
+
+        return BeforeRuntimePolicyBundle(
+            schemaVersion: "before.runtime-policy-bundle.v1",
+            bundleVersion: bundleVersion,
+            providerRoutingRegistry: providerRegistry,
+            providerRoutingPolicyID: "before.provider-routing.v1",
+            runtimeTuningRegistry: runtimeRegistry,
+            runtimeTuningPolicyID: runtimeTuningPolicyID,
+            updatedAt: Date(timeIntervalSince1970: 1_713_715_200)
+        )
     }
 }

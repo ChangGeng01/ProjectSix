@@ -562,6 +562,16 @@ struct BASAppleObservabilityAdapterTests {
                         loadedEligibilityReasonCounts: [BASMemoryEligibilityReason.goalOverride.rawValue: 1],
                         screenedOutEligibilityReasonCounts: [BASMemoryEligibilityReason.supportPriorityNoOverlap.rawValue: 1],
                         snapshotFingerprint: "brain_fp",
+                        constitutionVersion: "constitution.v11",
+                        constitutionPhase: "migration",
+                        constitutionValueAxisCount: 4,
+                        forgetRequestID: "forget.guard.anchor",
+                        forgetVerified: true,
+                        forgetRevokesCheckpoints: true,
+                        vaultConsistencyState: "out_of_sync",
+                        vaultSyncRevocationCount: 2,
+                        vaultOutOfSyncDeviceIDs: ["device.secondary", "device.tablet"],
+                        vaultMigrationTargetDeviceID: "device.secondary",
                         lowTrustMemoryLoadRate: 0.25,
                         riskFlagIDs: [BASBrainStateRiskFlag.lowTrustLoad.rawValue],
                         identityRoleID: BASIdentityRole.pauseCompanion.rawValue,
@@ -617,11 +627,34 @@ struct BASAppleObservabilityAdapterTests {
         #expect(compilation.runtimeInspectionInput.activeProviderID == "gemmaE4B")
         #expect(compilation.runtimeInspectionInput.strategyByKind["primary"]?.runtimeGear == .balanced)
         #expect(compilation.brainSummary.brainTraceCount == 1)
+        #expect(compilation.brainSummary.latestSnapshotFingerprintByKind["primary"]?.contains("constitution:constitution.v11") == true)
+        #expect(compilation.brainSummary.latestSnapshotFingerprintByKind["primary"]?.contains("phase:migration") == true)
+        #expect(compilation.brainSummary.latestSnapshotFingerprintByKind["primary"]?.contains("value_axes:4") == true)
+        #expect(compilation.brainSummary.latestSnapshotFingerprintByKind["primary"]?.contains("forget:forget.guard.anchor") == true)
+        #expect(compilation.brainSummary.latestSnapshotFingerprintByKind["primary"]?.contains("forget_verified:true") == true)
+        #expect(compilation.brainSummary.latestSnapshotFingerprintByKind["primary"]?.contains("forget_checkpoints_revoked:true") == true)
+        #expect(compilation.brainSummary.latestSnapshotFingerprintByKind["primary"]?.contains("vault_consistency:out_of_sync") == true)
+        #expect(compilation.brainSummary.latestSnapshotFingerprintByKind["primary"]?.contains("vault_sync_revocations:2") == true)
+        #expect(compilation.brainSummary.latestSnapshotFingerprintByKind["primary"]?.contains("vault_out_of_sync_list:device.secondary,device.tablet") == true)
+        #expect(compilation.brainSummary.latestSnapshotFingerprintByKind["primary"]?.contains("vault_migration_target:device.secondary") == true)
         #expect(compilation.runtimeInspectionSummary.consistencyCheckedTraceCount == 1)
     }
 
     @Test("runtime inspection trace source builder owns flat record expansion")
     func runtimeInspectionTraceSourceBuilderExpandsFlatRecord() {
+        let snapshotFingerprint = [
+            "brain_fp",
+            "constitution:constitution.v13",
+            "phase:evolution",
+            "value_axes:5",
+            "forget:forget.guard.anchor",
+            "forget_verified:true",
+            "forget_checkpoints_revoked:true",
+            "vault_consistency:out_of_sync",
+            "vault_sync_revocations:3",
+            "vault_out_of_sync_list:device.secondary,device.tablet",
+            "vault_migration_target:device.secondary"
+        ].joined(separator: "|")
         let source = BASAppleRuntimeInspectionBuilder.traceSource(
             from: BASAppleRuntimeInspectionTraceRecordInput(
                 kind: "primary",
@@ -650,7 +683,17 @@ struct BASAppleObservabilityAdapterTests {
                 screenedOutMemoryCount: 1,
                 loadedEligibilityReasonCounts: [.goalOverride: 1],
                 screenedOutEligibilityReasonCounts: [.supportPriorityNoOverlap: 1],
-                snapshotFingerprint: "brain_fp",
+                snapshotFingerprint: snapshotFingerprint,
+                constitutionVersion: "constitution.v13",
+                constitutionPhase: "evolution",
+                constitutionValueAxisCount: 5,
+                forgetRequestID: "forget.guard.anchor",
+                forgetVerified: true,
+                forgetRevokesCheckpoints: true,
+                vaultConsistencyState: "out_of_sync",
+                vaultSyncRevocationCount: 3,
+                vaultOutOfSyncDeviceIDs: ["device.secondary", "device.tablet"],
+                vaultMigrationTargetDeviceID: "device.secondary",
                 lowTrustMemoryLoadRate: 0.25,
                 riskFlags: [.lowTrustLoad],
                 identityRole: .pauseCompanion,
@@ -689,7 +732,17 @@ struct BASAppleObservabilityAdapterTests {
 
         #expect(source.lifecycle?.generation == 4)
         #expect(source.neural?.suppressedBehaviorCount == 2)
-        #expect(source.brain?.snapshotFingerprint == "brain_fp")
+        #expect(source.brain?.snapshotFingerprint.contains("brain_fp") == true)
+        #expect(source.brain?.snapshotFingerprint.contains("constitution:constitution.v13") == true)
+        #expect(source.brain?.snapshotFingerprint.contains("phase:evolution") == true)
+        #expect(source.brain?.snapshotFingerprint.contains("value_axes:5") == true)
+        #expect(source.brain?.snapshotFingerprint.contains("forget:forget.guard.anchor") == true)
+        #expect(source.brain?.snapshotFingerprint.contains("forget_verified:true") == true)
+        #expect(source.brain?.snapshotFingerprint.contains("forget_checkpoints_revoked:true") == true)
+        #expect(source.brain?.snapshotFingerprint.contains("vault_consistency:out_of_sync") == true)
+        #expect(source.brain?.snapshotFingerprint.contains("vault_sync_revocations:3") == true)
+        #expect(source.brain?.snapshotFingerprint.contains("vault_out_of_sync_list:device.secondary,device.tablet") == true)
+        #expect(source.brain?.snapshotFingerprint.contains("vault_migration_target:device.secondary") == true)
         #expect(source.brain?.calibrationStatus == .watch)
         #expect(source.runtimeInspection.attemptedProviderIDs == ["gemmaE4B", "foundationModels"])
         #expect(source.runtimeInspection.runtimeStrategy?.kind == .primary)

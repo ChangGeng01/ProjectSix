@@ -223,29 +223,8 @@ struct DecisionEvolutionPilotControlPanel: View {
 
     private func presentMutation(_ intent: DecisionEvolutionMutationIntent) {
         pendingMutation = PendingMutation(intent: intent) {
-            performMutation(intent)
+            appModel.performEvolutionMutation(intent)
             afterMutation?()
         }
     }
-
-    private func performMutation(_ intent: DecisionEvolutionMutationIntent) {
-        switch intent.kind {
-        case .restoreActiveCheckpoint:
-            guard let checkpointID = intent.preview.targetCheckpointIDs.first else { return }
-            appModel.applyEvolutionCheckpoint(checkpointID: checkpointID)
-        case .rollbackActiveCheckpoint:
-            appModel.rollbackActiveEvolutionCheckpoint(to: intent.preview.targetCheckpointIDs.first)
-        case .approvePendingCheckpoints:
-            appModel.approvePendingEvolutionCheckpoints(
-                checkpointIDs: intent.preview.targetCheckpointIDs
-            )
-        case .clearPendingReviewLineage:
-            appModel.clearPendingEvolutionCheckpointLineages(
-                checkpointIDs: intent.preview.targetCheckpointIDs
-            )
-        default:
-            break
-        }
-    }
-
 }

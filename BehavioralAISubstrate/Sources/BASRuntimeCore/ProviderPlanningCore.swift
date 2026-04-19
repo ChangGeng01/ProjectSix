@@ -172,6 +172,8 @@ public struct BASProviderSelectionPlan: Codable, Equatable, Sendable {
     public var orderedProviderIDs: [String]
     public var compatibleProviderIDs: [String]
     public var incompatibleProviderIDs: [String]
+    public var appliedRoutingPolicyVersion: String?
+    public var appliedRoutingRegistryVersion: String?
     public var rationale: [String]
 
     public init(
@@ -180,6 +182,8 @@ public struct BASProviderSelectionPlan: Codable, Equatable, Sendable {
         orderedProviderIDs: [String],
         compatibleProviderIDs: [String],
         incompatibleProviderIDs: [String],
+        appliedRoutingPolicyVersion: String? = nil,
+        appliedRoutingRegistryVersion: String? = nil,
         rationale: [String]
     ) {
         self.task = task
@@ -187,6 +191,8 @@ public struct BASProviderSelectionPlan: Codable, Equatable, Sendable {
         self.orderedProviderIDs = orderedProviderIDs
         self.compatibleProviderIDs = compatibleProviderIDs
         self.incompatibleProviderIDs = incompatibleProviderIDs
+        self.appliedRoutingPolicyVersion = appliedRoutingPolicyVersion
+        self.appliedRoutingRegistryVersion = appliedRoutingRegistryVersion
         self.rationale = rationale
     }
 }
@@ -223,6 +229,98 @@ public struct BASProviderPreferenceOrdering: Codable, Equatable, Sendable {
     }
 }
 
+public struct BASProviderRoutingPolicy: Codable, Equatable, Sendable {
+    public var schemaVersion: String
+    public var deterministicProviderID: String
+    public var testingOverrideProviderID: String?
+    public var preferenceOrderings: [BASProviderPreferenceOrdering]
+
+    public init(
+        schemaVersion: String,
+        deterministicProviderID: String,
+        testingOverrideProviderID: String? = nil,
+        preferenceOrderings: [BASProviderPreferenceOrdering]
+    ) {
+        self.schemaVersion = schemaVersion
+        self.deterministicProviderID = deterministicProviderID
+        self.testingOverrideProviderID = testingOverrideProviderID
+        self.preferenceOrderings = preferenceOrderings
+    }
+
+    public static let missing = BASProviderRoutingPolicy(
+        schemaVersion: "provider-routing.missing.v1",
+        deterministicProviderID: BASReferenceProviderRuntime.templateProviderID,
+        preferenceOrderings: []
+    )
+}
+
+public struct BASProviderRoutingPolicyRegistry: Codable, Equatable, Sendable {
+    public var schemaVersion: String
+    public var defaultPolicyID: String
+    public var policiesByID: [String: BASProviderRoutingPolicy]
+
+    public init(
+        schemaVersion: String,
+        defaultPolicyID: String,
+        policiesByID: [String: BASProviderRoutingPolicy]
+    ) {
+        self.schemaVersion = schemaVersion
+        self.defaultPolicyID = defaultPolicyID
+        self.policiesByID = policiesByID
+    }
+
+    public func policyOrMissing(for policyID: String? = nil) -> BASProviderRoutingPolicy {
+        if let policy = policyIfAvailable(for: policyID) {
+            return policy
+        }
+
+        return .missing
+    }
+
+    @available(*, unavailable, renamed: "policyOrMissing(for:)", message: "Use policyIfAvailable(for:) for production code or policyOrMissing(for:) when an explicit missing sentinel is truly intended.")
+    public func policy(for policyID: String? = nil) -> BASProviderRoutingPolicy {
+        policyOrMissing(for: policyID)
+    }
+
+    public func policyIfAvailable(for policyID: String? = nil) -> BASProviderRoutingPolicy? {
+        if let policyID {
+            return policiesByID[policyID]
+        }
+
+        return policiesByID[defaultPolicyID]
+    }
+}
+
+public struct BASProviderRoutingPolicySource: Codable, Equatable, Sendable {
+    public var registry: BASProviderRoutingPolicyRegistry
+    public var policyID: String?
+
+    public init(
+        registry: BASProviderRoutingPolicyRegistry,
+        policyID: String? = nil
+    ) {
+        self.registry = registry
+        self.policyID = policyID
+    }
+
+    public var registryVersion: String {
+        registry.schemaVersion
+    }
+
+    public var resolvedPolicyOrMissing: BASProviderRoutingPolicy {
+        registry.policyOrMissing(for: policyID)
+    }
+
+    public var resolvedPolicyIfAvailable: BASProviderRoutingPolicy? {
+        registry.policyIfAvailable(for: policyID)
+    }
+
+    @available(*, unavailable, renamed: "resolvedPolicyOrMissing", message: "Use resolvedPolicyIfAvailable for production code or resolvedPolicyOrMissing when an explicit missing sentinel is truly intended.")
+    public var resolvedPolicy: BASProviderRoutingPolicy {
+        resolvedPolicyOrMissing
+    }
+}
+
 public enum BASReferenceProviderRuntime {
     public static let gemmaE4BProviderID = "gemmaE4B"
     public static let openModelProviderID = "openModel"
@@ -230,47 +328,162 @@ public enum BASReferenceProviderRuntime {
     public static let testingStubProviderID = "testingStub"
     public static let templateProviderID = "template"
 
-    public static let preferenceOrderings: [BASProviderPreferenceOrdering] = [
-        BASProviderPreferenceOrdering(
-            preferredProviderID: gemmaE4BProviderID,
-            orderedProviderIDs: [
-                gemmaE4BProviderID,
-                foundationModelsProviderID
-            ]
-        ),
-        BASProviderPreferenceOrdering(
-            preferredProviderID: openModelProviderID,
-            orderedProviderIDs: [
-                openModelProviderID,
-                gemmaE4BProviderID,
-                foundationModelsProviderID
-            ]
-        ),
-        BASProviderPreferenceOrdering(
-            preferredProviderID: foundationModelsProviderID,
-            orderedProviderIDs: [
-                foundationModelsProviderID,
-                gemmaE4BProviderID
-            ]
-        ),
-        BASProviderPreferenceOrdering(
-            preferredProviderID: templateProviderID,
-            orderedProviderIDs: [
-                templateProviderID
-            ]
+    public static let fixtureRoutingPolicyID = "reference-provider-policy.v1"
+    public static let fixtureRoutingRegistry = BASProviderRoutingPolicyRegistry(
+        schemaVersion: "reference-provider-registry.v1",
+        defaultPolicyID: fixtureRoutingPolicyID,
+        policiesByID: [
+            fixtureRoutingPolicyID: BASProviderRoutingPolicy(
+                schemaVersion: fixtureRoutingPolicyID,
+                deterministicProviderID: templateProviderID,
+                testingOverrideProviderID: testingStubProviderID,
+                preferenceOrderings: [
+                    BASProviderPreferenceOrdering(
+                        preferredProviderID: gemmaE4BProviderID,
+                        orderedProviderIDs: [
+                            gemmaE4BProviderID,
+                            foundationModelsProviderID
+                        ]
+                    ),
+                    BASProviderPreferenceOrdering(
+                        preferredProviderID: openModelProviderID,
+                        orderedProviderIDs: [
+                            openModelProviderID,
+                            gemmaE4BProviderID,
+                            foundationModelsProviderID
+                        ]
+                    ),
+                    BASProviderPreferenceOrdering(
+                        preferredProviderID: foundationModelsProviderID,
+                        orderedProviderIDs: [
+                            foundationModelsProviderID,
+                            gemmaE4BProviderID
+                        ]
+                    ),
+                    BASProviderPreferenceOrdering(
+                        preferredProviderID: templateProviderID,
+                        orderedProviderIDs: [
+                            templateProviderID
+                        ]
+                    )
+                ]
+            )
+        ]
+    )
+
+    public static var fixtureRoutingPolicy: BASProviderRoutingPolicy {
+        fixtureRoutingRegistry.policyOrMissing()
+    }
+
+    public static var fixtureRoutingSource: BASProviderRoutingPolicySource {
+        BASProviderRoutingPolicySource(
+            registry: fixtureRoutingRegistry,
+            policyID: fixtureRoutingPolicyID
         )
-    ]
+    }
+
+    public static func resolvedRoutingPolicyIfAvailable(
+        policyID: String? = nil,
+        registry: BASProviderRoutingPolicyRegistry
+    ) -> BASProviderRoutingPolicy? {
+        registry.policyIfAvailable(for: policyID)
+    }
+
+    public static func resolvedRoutingPolicyOrMissing(
+        policyID: String? = nil,
+        registry: BASProviderRoutingPolicyRegistry
+    ) -> BASProviderRoutingPolicy {
+        registry.policyOrMissing(for: policyID)
+    }
+
+    @available(*, unavailable, renamed: "resolvedRoutingPolicyOrMissing(policyID:registry:)", message: "Use resolvedRoutingPolicyIfAvailable(policyID:registry:) for production code or resolvedRoutingPolicyOrMissing(policyID:registry:) when an explicit missing sentinel is truly intended.")
+    public static func resolvedRoutingPolicy(
+        policyID: String? = nil,
+        registry: BASProviderRoutingPolicyRegistry
+    ) -> BASProviderRoutingPolicy {
+        resolvedRoutingPolicyOrMissing(policyID: policyID, registry: registry)
+    }
+
+    public static func resolvedRoutingSource(
+        policyID: String? = nil,
+        registry: BASProviderRoutingPolicyRegistry
+    ) -> BASProviderRoutingPolicySource {
+        BASProviderRoutingPolicySource(
+            registry: registry,
+            policyID: policyID
+        )
+    }
+
+    public static var fixturePreferenceOrderings: [BASProviderPreferenceOrdering] {
+        fixtureRoutingPolicy.preferenceOrderings
+    }
+
+    public static func registryUsesFixtureCatalog(
+        _ registry: BASProviderRoutingPolicyRegistry,
+        policyID: String? = nil
+    ) -> Bool {
+        if registry.schemaVersion == fixtureRoutingRegistry.schemaVersion ||
+            registry.defaultPolicyID == fixtureRoutingPolicyID ||
+            policyID == fixtureRoutingPolicyID {
+            return true
+        }
+
+        return registry.policyIfAvailable(for: policyID) == fixtureRoutingPolicy
+    }
+
+    @available(*, unavailable, renamed: "fixtureRoutingPolicyID", message: "Use fixtureRoutingPolicyID only for package fixtures; production code should inject a routing registry.")
+    public static let referenceRoutingPolicyID = fixtureRoutingPolicyID
+
+    @available(*, unavailable, renamed: "fixtureRoutingRegistry", message: "Use fixtureRoutingRegistry only for package fixtures; production code should inject a routing registry.")
+    public static let referenceRoutingRegistry = fixtureRoutingRegistry
+
+    @available(*, unavailable, renamed: "fixtureRoutingPolicy", message: "Use fixtureRoutingPolicy only for package fixtures; production code should inject a routing policy source.")
+    public static var referenceRoutingPolicy: BASProviderRoutingPolicy {
+        fixtureRoutingPolicy
+    }
+
+    @available(*, unavailable, renamed: "fixtureRoutingSource", message: "Use fixtureRoutingSource only for package fixtures; production code should inject a routing policy source.")
+    public static var referenceRoutingSource: BASProviderRoutingPolicySource {
+        fixtureRoutingSource
+    }
+
+    @available(*, unavailable, renamed: "fixturePreferenceOrderings", message: "Use fixturePreferenceOrderings only for package fixtures; production code should inject a routing policy source.")
+    public static var referencePreferenceOrderings: [BASProviderPreferenceOrdering] {
+        fixturePreferenceOrderings
+    }
+
+    @available(*, unavailable, renamed: "fixtureRoutingPolicyID", message: "Use fixtureRoutingPolicyID only for package fixtures; production code should inject a routing registry.")
+    public static let fallbackRoutingPolicyID = fixtureRoutingPolicyID
+
+    @available(*, unavailable, renamed: "fixtureRoutingRegistry", message: "Use fixtureRoutingRegistry only for package fixtures; production code should inject a routing registry.")
+    public static let fallbackRoutingRegistry = fixtureRoutingRegistry
+
+    @available(*, unavailable, renamed: "fixtureRoutingPolicy", message: "Use fixtureRoutingPolicy only for package fixtures; production code should inject a routing policy source.")
+    public static var fallbackRoutingPolicy: BASProviderRoutingPolicy {
+        fixtureRoutingPolicy
+    }
+
+    @available(*, unavailable, renamed: "fixtureRoutingSource", message: "Use fixtureRoutingSource only for package fixtures; production code should inject a routing policy source.")
+    public static var fallbackRoutingSource: BASProviderRoutingPolicySource {
+        fixtureRoutingSource
+    }
+
+    @available(*, unavailable, renamed: "fixturePreferenceOrderings", message: "Use fixturePreferenceOrderings only for package fixtures; production code should inject a routing policy source.")
+    public static var fallbackPreferenceOrderings: [BASProviderPreferenceOrdering] {
+        fixturePreferenceOrderings
+    }
 
     public static func orderedProviderIDs(
         preferredProviderID: String,
         allowFallbacks: Bool = true,
-        suspendedProviderIDs: Set<String> = []
+        suspendedProviderIDs: Set<String> = [],
+        routingPolicy: BASProviderRoutingPolicy
     ) -> [String] {
         BASProviderOrderingResolver.orderedProviderIDs(
             preferredProviderID: preferredProviderID,
             allowFallbacks: allowFallbacks,
-            deterministicProviderID: templateProviderID,
-            preferenceOrderings: preferenceOrderings,
+            deterministicProviderID: routingPolicy.deterministicProviderID,
+            preferenceOrderings: routingPolicy.preferenceOrderings,
             suspendedProviderIDs: suspendedProviderIDs
         )
     }
@@ -282,17 +495,23 @@ public enum BASReferenceProviderRuntime {
         statusesByID: [String: BASProviderStatusRecord],
         suspendedProviderIDs: Set<String> = [],
         testingOverrideEnabled: Bool = false,
-        testingOverrideTitle: String? = nil
+        testingOverrideTitle: String? = nil,
+        routingRegistryVersion: String? = nil,
+        routingPolicy: BASProviderRoutingPolicy
     ) -> BASRuntimeStatusSummary {
         BASRuntimeStatusResolver.resolve(
             preferredProviderID: preferredProviderID,
             allowFallbacks: allowFallbacks,
             runtimeEnabled: runtimeEnabled,
-            deterministicProviderID: templateProviderID,
-            preferenceOrderings: preferenceOrderings,
+            deterministicProviderID: routingPolicy.deterministicProviderID,
+            preferenceOrderings: routingPolicy.preferenceOrderings,
+            appliedRoutingPolicyVersion: routingPolicy.schemaVersion,
+            appliedRoutingRegistryVersion: routingRegistryVersion,
             statusesByID: statusesByID,
             suspendedProviderIDs: suspendedProviderIDs,
-            testingOverrideProviderID: testingOverrideEnabled ? testingStubProviderID : nil,
+            testingOverrideProviderID: testingOverrideEnabled
+                ? (routingPolicy.testingOverrideProviderID ?? testingStubProviderID)
+                : nil,
             testingOverrideTitle: testingOverrideTitle
         )
     }
@@ -360,6 +579,8 @@ public enum BASProviderPlanner {
         task: BASAdaptiveTraceKind,
         preferredProviderID: String,
         baseOrderedProviderIDs: [String],
+        appliedRoutingPolicyVersion: String? = nil,
+        appliedRoutingRegistryVersion: String? = nil,
         strategy: BASAdaptiveTaskStrategy? = nil,
         descriptors: [BASProviderDescriptor]
     ) -> BASProviderSelectionPlan {
@@ -411,6 +632,13 @@ public enum BASProviderPlanner {
         } else {
             rationale.append("Planning \(task.title) without an adaptive strategy override.")
         }
+        if let appliedRoutingPolicyVersion {
+            if let appliedRoutingRegistryVersion {
+                rationale.append("Applied routing policy \(appliedRoutingPolicyVersion) from registry \(appliedRoutingRegistryVersion).")
+            } else {
+                rationale.append("Applied routing policy \(appliedRoutingPolicyVersion).")
+            }
+        }
         if !incompatibleProviderIDs.isEmpty {
             rationale.append("Filtered incompatible providers: \(incompatibleProviderIDs.joined(separator: ", ")).")
         }
@@ -424,6 +652,8 @@ public enum BASProviderPlanner {
             orderedProviderIDs: orderedProviderIDs,
             compatibleProviderIDs: compatibleProviderIDs,
             incompatibleProviderIDs: incompatibleProviderIDs,
+            appliedRoutingPolicyVersion: appliedRoutingPolicyVersion,
+            appliedRoutingRegistryVersion: appliedRoutingRegistryVersion,
             rationale: rationale
         )
     }
@@ -569,6 +799,8 @@ public enum BASProviderRouteResolver {
         allowFallbacks: Bool,
         deterministicProviderID: String,
         preferenceOrderings: [BASProviderPreferenceOrdering],
+        appliedRoutingPolicyVersion: String? = nil,
+        appliedRoutingRegistryVersion: String? = nil,
         suspendedProviderIDs: Set<String> = [],
         strategy: BASAdaptiveTaskStrategy? = nil,
         descriptors: [BASProviderDescriptor]
@@ -595,6 +827,8 @@ public enum BASProviderRouteResolver {
                 orderedProviderIDs: baseOrderedProviderIDs,
                 compatibleProviderIDs: baseOrderedProviderIDs,
                 incompatibleProviderIDs: [],
+                appliedRoutingPolicyVersion: appliedRoutingPolicyVersion,
+                appliedRoutingRegistryVersion: appliedRoutingRegistryVersion,
                 rationale: rationale
             )
         }
@@ -603,6 +837,8 @@ public enum BASProviderRouteResolver {
             task: task,
             preferredProviderID: preferredProviderID,
             baseOrderedProviderIDs: baseOrderedProviderIDs,
+            appliedRoutingPolicyVersion: appliedRoutingPolicyVersion,
+            appliedRoutingRegistryVersion: appliedRoutingRegistryVersion,
             strategy: strategy,
             descriptors: descriptors
         )
@@ -753,6 +989,8 @@ public struct BASRuntimeStatusSummary: Codable, Equatable, Sendable {
     public var preferredProviderID: String
     public var activeProviderID: String
     public var fallbackProviderID: String?
+    public var appliedRoutingPolicyVersion: String?
+    public var appliedRoutingRegistryVersion: String?
     public var detail: String
     public var orderedProviderIDs: [String]
 
@@ -760,12 +998,16 @@ public struct BASRuntimeStatusSummary: Codable, Equatable, Sendable {
         preferredProviderID: String,
         activeProviderID: String,
         fallbackProviderID: String?,
+        appliedRoutingPolicyVersion: String? = nil,
+        appliedRoutingRegistryVersion: String? = nil,
         detail: String,
         orderedProviderIDs: [String]
     ) {
         self.preferredProviderID = preferredProviderID
         self.activeProviderID = activeProviderID
         self.fallbackProviderID = fallbackProviderID
+        self.appliedRoutingPolicyVersion = appliedRoutingPolicyVersion
+        self.appliedRoutingRegistryVersion = appliedRoutingRegistryVersion
         self.detail = detail
         self.orderedProviderIDs = orderedProviderIDs
     }
@@ -778,6 +1020,8 @@ public enum BASRuntimeStatusResolver {
         runtimeEnabled: Bool,
         deterministicProviderID: String,
         preferenceOrderings: [BASProviderPreferenceOrdering],
+        appliedRoutingPolicyVersion: String? = nil,
+        appliedRoutingRegistryVersion: String? = nil,
         statusesByID: [String: BASProviderStatusRecord],
         suspendedProviderIDs: Set<String> = [],
         testingOverrideProviderID: String? = nil,
@@ -811,6 +1055,8 @@ public enum BASRuntimeStatusResolver {
             preferredProviderID: preferredProviderID,
             activeProviderID: plan.activeProviderID,
             fallbackProviderID: plan.fallbackProviderID,
+            appliedRoutingPolicyVersion: appliedRoutingPolicyVersion,
+            appliedRoutingRegistryVersion: appliedRoutingRegistryVersion,
             detail: detail,
             orderedProviderIDs: orderedProviderIDs
         )

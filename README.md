@@ -62,6 +62,9 @@ xcodebuild -project Before.xcodeproj -scheme Before -destination 'platform=iOS S
 - Widget surfaces only use safe generic copy and never show raw user-written reminders.
 - Personal data stays local in this build.
 - The 13-layer execution blueprint, appendices, and completion matrix now live in [docs/EBRAIN_13L_EXECUTION_V12.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_13L_EXECUTION_V12.md), [docs/EBRAIN_13L_APPENDICES_V12.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_13L_APPENDICES_V12.md), and [docs/EBRAIN_13L_COMPLETION_MATRIX.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_13L_COMPLETION_MATRIX.md).
+- The `L6` target-state whitepaper now lives in [docs/EBRAIN_L6_PRESENCE_EYE_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L6_PRESENCE_EYE_TARGET_VINF.md). It is a `target-state whitepaper`, not a claim that the current repository has already implemented that `v∞` presence-eye layer.
+- The `L4` target-state whitepaper now lives in [docs/EBRAIN_L4_HORIZON_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L4_HORIZON_TARGET_VINF.md). It is a `target-state whitepaper`, not a claim that the current repository has already implemented that `v∞` horizon layer.
+- The `L14` black-ring documents now live in [docs/EBRAIN_L14_BLACK_RING_SPEC_V1.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L14_BLACK_RING_SPEC_V1.md) and [docs/EBRAIN_L14_BLACK_RING_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L14_BLACK_RING_TARGET_VINF.md). The first is the `repo-real` execution spec; the second is the `target-state` whitepaper.
 - `BASHostKit` is now the preferred host-facing integration surface for the private substrate SDK.
 - `Before` remains the full reference host, while `SampleHost` proves the minimal façade integration path.
 - The quick verdict engine remains rule-based and intentionally lightweight.

@@ -9,7 +9,8 @@ struct BASAppleProviderHostBridgeTests {
         let ordered = BASAppleProviderHostBridge.orderedProviderIDs(
             preferredProviderID: BASReferenceProviderRuntime.openModelProviderID,
             allowFallbacks: true,
-            excluding: [BASReferenceProviderRuntime.gemmaE4BProviderID]
+            excluding: [BASReferenceProviderRuntime.gemmaE4BProviderID],
+            routingPolicy: BASReferenceProviderRuntime.fixtureRoutingPolicy
         )
 
         #expect(

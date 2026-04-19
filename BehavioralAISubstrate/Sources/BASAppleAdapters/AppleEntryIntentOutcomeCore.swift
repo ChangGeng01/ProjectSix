@@ -173,6 +173,7 @@ public enum BASAppleEntryIntentRuntimeExecutor {
         input: BASAppleEntryIntentRuntimeInput,
         performCapture: (BASAppleEntryIntentActionPlan) -> Void,
         performPresent: (BASAppleEntryIntentActionPlan) -> Void,
+        performRoutedInput: (BASAppleEntryIntentActionPlan) -> Void,
         performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
         performRestore: () -> Void,
         refreshCurrentBrain: (String) -> Void
@@ -191,6 +192,7 @@ public enum BASAppleEntryIntentRuntimeExecutor {
             ),
             performCapture: performCapture,
             performPresent: performPresent,
+            performRoutedInput: performRoutedInput,
             performPredictiveIntervention: performPredictiveIntervention,
             performRestore: performRestore,
             refreshCurrentBrain: refreshCurrentBrain
@@ -203,6 +205,7 @@ public enum BASAppleEntryIntentOutcomeExecutor {
         resolution: BASAppleEntryIntentResolution,
         performCapture: (BASAppleEntryIntentActionPlan) -> Void,
         performPresent: (BASAppleEntryIntentActionPlan) -> Void,
+        performRoutedInput: (BASAppleEntryIntentActionPlan) -> Void,
         performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
         performRestore: () -> Void,
         refreshCurrentBrain: (String) -> Void
@@ -214,6 +217,8 @@ public enum BASAppleEntryIntentOutcomeExecutor {
             performCapture(actionPlan)
         case .present:
             performPresent(actionPlan)
+        case .routedInput:
+            performRoutedInput(actionPlan)
         case .predictiveIntervention:
             performPredictiveIntervention(resolution.predictiveIntervention)
         case .restore:

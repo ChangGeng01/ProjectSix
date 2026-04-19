@@ -18,6 +18,12 @@ public struct BASAppleAdaptiveRuntimeInput: Codable, Equatable, Sendable {
     public var lowTrustLoad: Bool
     public var retrievalInstability: Bool
     public var retrievalTags: [String]
+    public var externallyRefreshedCandidateCount: Int
+    public var quarantinedObservationCount: Int
+    public var evidenceCaveatedCandidateCount: Int
+    public var externalRefreshGuardTriggered: Bool
+    public var observationOnlyQuarantine: Bool
+    public var evidenceCaveatLoad: Bool
 
     public init(
         briefLanguageWeight: Double,
@@ -35,7 +41,13 @@ public struct BASAppleAdaptiveRuntimeInput: Codable, Equatable, Sendable {
         screenedOutMemoryCount: Int,
         lowTrustLoad: Bool,
         retrievalInstability: Bool,
-        retrievalTags: [String]
+        retrievalTags: [String],
+        externallyRefreshedCandidateCount: Int = 0,
+        quarantinedObservationCount: Int = 0,
+        evidenceCaveatedCandidateCount: Int = 0,
+        externalRefreshGuardTriggered: Bool = false,
+        observationOnlyQuarantine: Bool = false,
+        evidenceCaveatLoad: Bool = false
     ) {
         self.briefLanguageWeight = briefLanguageWeight
         self.lowCognitiveLoadWeight = lowCognitiveLoadWeight
@@ -53,6 +65,12 @@ public struct BASAppleAdaptiveRuntimeInput: Codable, Equatable, Sendable {
         self.lowTrustLoad = lowTrustLoad
         self.retrievalInstability = retrievalInstability
         self.retrievalTags = retrievalTags
+        self.externallyRefreshedCandidateCount = externallyRefreshedCandidateCount
+        self.quarantinedObservationCount = quarantinedObservationCount
+        self.evidenceCaveatedCandidateCount = evidenceCaveatedCandidateCount
+        self.externalRefreshGuardTriggered = externalRefreshGuardTriggered
+        self.observationOnlyQuarantine = observationOnlyQuarantine
+        self.evidenceCaveatLoad = evidenceCaveatLoad
     }
 }
 
@@ -171,7 +189,13 @@ public enum BASAppleAdaptiveRuntimeAdapter {
             screenedOutMemoryCount: input.screenedOutMemoryCount,
             lowTrustLoad: input.lowTrustLoad,
             retrievalInstability: input.retrievalInstability,
-            retrievalTags: input.retrievalTags
+            retrievalTags: input.retrievalTags,
+            externallyRefreshedCandidateCount: input.externallyRefreshedCandidateCount,
+            quarantinedObservationCount: input.quarantinedObservationCount,
+            evidenceCaveatedCandidateCount: input.evidenceCaveatedCandidateCount,
+            externalRefreshGuardTriggered: input.externalRefreshGuardTriggered,
+            observationOnlyQuarantine: input.observationOnlyQuarantine,
+            evidenceCaveatLoad: input.evidenceCaveatLoad
         )
     }
 

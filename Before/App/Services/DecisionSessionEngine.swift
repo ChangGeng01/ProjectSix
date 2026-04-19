@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import SQLite3
+import BASHostKit
 
 enum DecisionSessionLayerPlacement: String, Codable, Equatable, Sendable {
     case foldedLung = "L3.folded_lung"
@@ -175,17 +176,351 @@ private extension String {
     }
 }
 
+struct DecisionSessionCheckpointEBrainAnchor: Codable, Equatable, Sendable {
+    var sessionID: String?
+    var thoughtFoldChecksum: String?
+    var riskLevel: String?
+    var permitMode: String?
+    var hostGatePercent: Int?
+    var reviewDirectiveLine: String?
+    var riskFactorsLine: String?
+    var reasonCodesLine: String?
+    var sovereignVerdictLine: String?
+    var sovereignAuthorityLine: String?
+    var sovereignAuditLine: String?
+    var executionCapability: DecisionSessionCheckpointExecutionCapability?
+    var morphGraph: BASMorphGraph?
+    var hotColdMap: BASHotColdMap?
+    var precisionProfile: BASPrecisionProfile?
+    var lungState: BASLungState?
+    var breathScheduler: BASBreathSchedulerFrame?
+    var resumeFrame: BASResumeFrame?
+    var rollbackAnchor: BASRollbackAnchor?
+    var sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult?
+
+    init(
+        sessionID: String? = nil,
+        thoughtFoldChecksum: String? = nil,
+        riskLevel: String? = nil,
+        permitMode: String? = nil,
+        hostGatePercent: Int? = nil,
+        reviewDirectiveLine: String? = nil,
+        riskFactorsLine: String? = nil,
+        reasonCodesLine: String? = nil,
+        sovereignVerdictLine: String? = nil,
+        sovereignAuthorityLine: String? = nil,
+        sovereignAuditLine: String? = nil,
+        executionCapability: DecisionSessionCheckpointExecutionCapability? = nil,
+        morphGraph: BASMorphGraph? = nil,
+        hotColdMap: BASHotColdMap? = nil,
+        precisionProfile: BASPrecisionProfile? = nil,
+        lungState: BASLungState? = nil,
+        breathScheduler: BASBreathSchedulerFrame? = nil,
+        resumeFrame: BASResumeFrame? = nil,
+        rollbackAnchor: BASRollbackAnchor? = nil,
+        sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult? = nil
+    ) {
+        self.sessionID = sessionID?.evolutionTrimmedNonEmpty
+        self.thoughtFoldChecksum = thoughtFoldChecksum?.evolutionTrimmedNonEmpty
+        self.riskLevel = riskLevel?.evolutionTrimmedNonEmpty
+        self.permitMode = permitMode?.evolutionTrimmedNonEmpty
+        self.hostGatePercent = hostGatePercent
+        self.reviewDirectiveLine = reviewDirectiveLine?.evolutionTrimmedNonEmpty
+        self.riskFactorsLine = riskFactorsLine?.evolutionTrimmedNonEmpty
+        self.reasonCodesLine = reasonCodesLine?.evolutionTrimmedNonEmpty
+        self.sovereignVerdictLine = sovereignVerdictLine?.evolutionTrimmedNonEmpty
+        self.sovereignAuthorityLine = sovereignAuthorityLine?.evolutionTrimmedNonEmpty
+        self.sovereignAuditLine = sovereignAuditLine?.evolutionTrimmedNonEmpty
+        self.executionCapability = executionCapability?.normalized
+        self.morphGraph = morphGraph
+        self.hotColdMap = hotColdMap
+        self.precisionProfile = precisionProfile
+        self.lungState = lungState
+        self.breathScheduler = breathScheduler
+        self.resumeFrame = resumeFrame
+        self.rollbackAnchor = rollbackAnchor
+        self.sovereignBridgeResult = sovereignBridgeResult
+    }
+}
+
+struct DecisionSessionCheckpointExecutionCapability: Codable, Equatable, Sendable {
+    let activeProviderID: String
+    let preferredProviderID: String
+    let fallbackProviderID: String?
+    let providerTrackID: String
+    let executionTierID: String
+    let foundationTierID: String
+    let reasonCodes: [String]
+    let worldPriorContract: DecisionEBrainWorldPriorContract?
+    let temporalKnowledgeContract: DecisionEBrainTemporalKnowledgeContract?
+    let evidenceContract: DecisionEBrainEvidenceContract?
+
+    private enum CodingKeys: String, CodingKey {
+        case activeProviderID
+        case preferredProviderID
+        case fallbackProviderID
+        case providerTrackID
+        case executionTierID
+        case foundationTierID
+        case reasonCodes
+        case worldPriorContract
+        case temporalKnowledgeContract
+        case evidenceContract
+    }
+
+    init(
+        activeProviderID: String,
+        preferredProviderID: String,
+        fallbackProviderID: String? = nil,
+        providerTrackID: String,
+        executionTierID: String,
+        foundationTierID: String,
+        reasonCodes: [String] = [],
+        worldPriorContract: DecisionEBrainWorldPriorContract? = nil,
+        temporalKnowledgeContract: DecisionEBrainTemporalKnowledgeContract? = nil,
+        evidenceContract: DecisionEBrainEvidenceContract? = nil
+    ) {
+        self.activeProviderID = activeProviderID
+        self.preferredProviderID = preferredProviderID
+        self.fallbackProviderID = fallbackProviderID?.evolutionTrimmedNonEmpty
+        self.providerTrackID = providerTrackID
+        self.executionTierID = executionTierID
+        self.foundationTierID = foundationTierID
+        self.reasonCodes = Self.orderedUnique(reasonCodes.compactMap(\.evolutionTrimmedNonEmpty))
+        self.worldPriorContract = worldPriorContract
+        self.temporalKnowledgeContract = temporalKnowledgeContract
+        self.evidenceContract = evidenceContract
+    }
+
+    init(frame: DecisionEBrainExecutionCapabilityFrame) {
+        self.init(
+            activeProviderID: frame.activeProviderID,
+            preferredProviderID: frame.preferredProviderID,
+            fallbackProviderID: frame.fallbackProviderID,
+            providerTrackID: frame.providerTrackID,
+            executionTierID: frame.executionTierID,
+            foundationTierID: frame.foundationTierID,
+            reasonCodes: frame.reasonCodes,
+            worldPriorContract: frame.worldPriorContract,
+            temporalKnowledgeContract: frame.temporalKnowledgeContract,
+            evidenceContract: frame.evidenceContract
+        )
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            activeProviderID: try container.decode(String.self, forKey: .activeProviderID),
+            preferredProviderID: try container.decode(String.self, forKey: .preferredProviderID),
+            fallbackProviderID: try container.decodeIfPresent(String.self, forKey: .fallbackProviderID),
+            providerTrackID: try container.decode(String.self, forKey: .providerTrackID),
+            executionTierID: try container.decode(String.self, forKey: .executionTierID),
+            foundationTierID: try container.decode(String.self, forKey: .foundationTierID),
+            reasonCodes: try container.decodeIfPresent([String].self, forKey: .reasonCodes) ?? [],
+            worldPriorContract: try container.decodeIfPresent(DecisionEBrainWorldPriorContract.self, forKey: .worldPriorContract),
+            temporalKnowledgeContract: try container.decodeIfPresent(DecisionEBrainTemporalKnowledgeContract.self, forKey: .temporalKnowledgeContract),
+            evidenceContract: try container.decodeIfPresent(DecisionEBrainEvidenceContract.self, forKey: .evidenceContract)
+        )
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(activeProviderID, forKey: .activeProviderID)
+        try container.encode(preferredProviderID, forKey: .preferredProviderID)
+        try container.encodeIfPresent(fallbackProviderID, forKey: .fallbackProviderID)
+        try container.encode(providerTrackID, forKey: .providerTrackID)
+        try container.encode(executionTierID, forKey: .executionTierID)
+        try container.encode(foundationTierID, forKey: .foundationTierID)
+        try container.encode(reasonCodes, forKey: .reasonCodes)
+        try container.encodeIfPresent(worldPriorContract, forKey: .worldPriorContract)
+        try container.encodeIfPresent(temporalKnowledgeContract, forKey: .temporalKnowledgeContract)
+        try container.encodeIfPresent(evidenceContract, forKey: .evidenceContract)
+    }
+
+    var normalized: DecisionSessionCheckpointExecutionCapability {
+        DecisionSessionCheckpointExecutionCapability(
+            activeProviderID: activeProviderID,
+            preferredProviderID: preferredProviderID,
+            fallbackProviderID: fallbackProviderID,
+            providerTrackID: providerTrackID,
+            executionTierID: executionTierID,
+            foundationTierID: foundationTierID,
+            reasonCodes: reasonCodes,
+            worldPriorContract: worldPriorContract,
+            temporalKnowledgeContract: temporalKnowledgeContract,
+            evidenceContract: evidenceContract
+        )
+    }
+
+    var executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame? {
+        guard
+            let activeProvider = DecisionModelProviderKind(rawValue: activeProviderID),
+            let preferredProvider = DecisionModelProviderPreference(rawValue: preferredProviderID),
+            let providerTrack = DecisionModelProviderTrack(rawValue: providerTrackID),
+            let executionTier = DecisionIntelligenceExecutionTier(rawValue: executionTierID),
+            let foundationTier = DecisionEBrainFoundationTier(rawValue: foundationTierID)
+        else {
+            return nil
+        }
+
+        return DecisionEBrainExecutionCapabilityFrame(
+            activeProvider: activeProvider,
+            preferredProvider: preferredProvider,
+            fallbackProvider: fallbackProviderID.flatMap(DecisionModelProviderKind.init(rawValue:)),
+            providerTrack: providerTrack,
+            executionTier: executionTier,
+            foundationTier: foundationTier,
+            reasonCodes: Self.orderedUnique(reasonCodes.compactMap(\.evolutionTrimmedNonEmpty)),
+            worldPriorContractOverride: worldPriorContract,
+            temporalKnowledgeContractOverride: temporalKnowledgeContract,
+            evidenceContractOverride: evidenceContract
+        )
+    }
+
+    private static func orderedUnique(_ values: [String]) -> [String] {
+        values.reduce(into: [String]()) { uniqueValues, value in
+            guard !uniqueValues.contains(value) else { return }
+            uniqueValues.append(value)
+        }
+    }
+}
+
+extension DecisionSessionCheckpointEBrainAnchor {
+    var executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame? {
+        executionCapability?.executionCapabilityFrame
+    }
+
+    var foldedLungSnapshot: DecisionFoldedLungSnapshot? {
+        DecisionFoldedLungCoordinator.snapshot(from: self)
+    }
+
+    var decisionLine: String? {
+        guard let riskLevel = riskLevel?.evolutionTrimmedNonEmpty,
+              let permitMode = permitMode?.evolutionTrimmedNonEmpty,
+              let hostGatePercent,
+              let thoughtFoldChecksum = thoughtFoldChecksum?.evolutionTrimmedNonEmpty else {
+            return nil
+        }
+
+        return DecisionEvolutionNarrativeFormattingSupport.joined(
+            DecisionEvolutionEBrainPresentationSupport.checkpointDecisionFactLines(
+                riskLevel: riskLevel,
+                permitMode: permitMode,
+                hostGatePercent: hostGatePercent,
+                foldChecksum: thoughtFoldChecksum
+            )
+        ).nilIfEmpty
+    }
+
+    var taskLine: String? {
+        reviewDirectiveLine?.evolutionTrimmedNonEmpty
+    }
+
+    var resolvedRiskFactorsLine: String? {
+        riskFactorsLine?.evolutionTrimmedNonEmpty
+    }
+
+    var resolvedReasonCodesLine: String? {
+        reasonCodesLine?.evolutionTrimmedNonEmpty
+            ?? DecisionEvolutionNarrativeFormattingSupport.labeledLine(
+                prefix: "Reason codes",
+                values: executionCapability?.reasonCodes ?? []
+            )
+    }
+
+    var lungLine: String? {
+        foldedLungSnapshot?.lungLine
+    }
+
+    var morphLine: String? {
+        foldedLungSnapshot?.morphLine
+    }
+
+    var hotColdLine: String? {
+        foldedLungSnapshot?.hotColdLine
+    }
+
+    var precisionLine: String? {
+        foldedLungSnapshot?.precisionLine
+    }
+
+    var schedulerLine: String? {
+        foldedLungSnapshot?.schedulerLine
+    }
+
+    var resumeLine: String? {
+        foldedLungSnapshot?.resumeLine
+    }
+
+    var rollbackLine: String? {
+        foldedLungSnapshot?.rollbackLine
+    }
+
+    var sovereignBridgeLine: String? {
+        foldedLungSnapshot?.sovereignBridgeLine
+    }
+
+    var sovereignBridgeDetailLines: [String] {
+        foldedLungSnapshot?.sovereignBridgeDetailLines ?? []
+    }
+
+    var sovereignBridgeSupplementalLines: [String] {
+        foldedLungSnapshot?.sovereignBridgeSupplementalLines ?? []
+    }
+
+    func merged(with newer: DecisionSessionCheckpointEBrainAnchor) -> DecisionSessionCheckpointEBrainAnchor {
+        DecisionSessionCheckpointEBrainAnchor(
+            sessionID: newer.sessionID ?? sessionID,
+            thoughtFoldChecksum: newer.thoughtFoldChecksum ?? thoughtFoldChecksum,
+            riskLevel: newer.riskLevel ?? riskLevel,
+            permitMode: newer.permitMode ?? permitMode,
+            hostGatePercent: newer.hostGatePercent ?? hostGatePercent,
+            reviewDirectiveLine: newer.reviewDirectiveLine ?? reviewDirectiveLine,
+            riskFactorsLine: newer.riskFactorsLine ?? riskFactorsLine,
+            reasonCodesLine: newer.reasonCodesLine ?? reasonCodesLine,
+            sovereignVerdictLine: newer.sovereignVerdictLine ?? sovereignVerdictLine,
+            sovereignAuthorityLine: newer.sovereignAuthorityLine ?? sovereignAuthorityLine,
+            sovereignAuditLine: newer.sovereignAuditLine ?? sovereignAuditLine,
+            executionCapability: newer.executionCapability ?? executionCapability,
+            morphGraph: newer.morphGraph ?? morphGraph,
+            hotColdMap: newer.hotColdMap ?? hotColdMap,
+            precisionProfile: newer.precisionProfile ?? precisionProfile,
+            lungState: newer.lungState ?? lungState,
+            breathScheduler: newer.breathScheduler ?? breathScheduler,
+            resumeFrame: newer.resumeFrame ?? resumeFrame,
+            rollbackAnchor: newer.rollbackAnchor ?? rollbackAnchor,
+            sovereignBridgeResult: newer.sovereignBridgeResult ?? sovereignBridgeResult
+        )
+    }
+}
+
 struct DecisionSessionCheckpointRuntimeState: Codable, Equatable, Sendable {
     var workspacePath: String?
     var branchName: String?
     var activeFiles: [String]
     var currentMode: DecisionSessionRuntimeMode
+    var eBrainAnchor: DecisionSessionCheckpointEBrainAnchor?
+
+    init(
+        workspacePath: String? = nil,
+        branchName: String? = nil,
+        activeFiles: [String] = [],
+        currentMode: DecisionSessionRuntimeMode = .chat,
+        eBrainAnchor: DecisionSessionCheckpointEBrainAnchor? = nil
+    ) {
+        self.workspacePath = workspacePath
+        self.branchName = branchName
+        self.activeFiles = activeFiles
+        self.currentMode = currentMode
+        self.eBrainAnchor = eBrainAnchor
+    }
 
     static let empty = DecisionSessionCheckpointRuntimeState(
         workspacePath: nil,
         branchName: nil,
         activeFiles: [],
-        currentMode: .chat
+        currentMode: .chat,
+        eBrainAnchor: nil
     )
 }
 
@@ -327,6 +662,7 @@ struct DecisionSessionRuntimeInspectionSession: Equatable, Sendable, Identifiabl
     let latestCheckpointActiveKillSwitchesLine: String?
     let latestCheckpointKillSwitchesLine: String?
     let latestCheckpointActionLine: String?
+    let latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor?
     let latestEventID: String?
     let latestEventSeq: Int?
     let latestEventType: DecisionSessionEventType?
@@ -365,6 +701,7 @@ struct DecisionSessionRuntimeInspectionSession: Equatable, Sendable, Identifiabl
         latestCheckpointActiveKillSwitchesLine: String? = nil,
         latestCheckpointKillSwitchesLine: String? = nil,
         latestCheckpointActionLine: String? = nil,
+        latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor? = nil,
         latestEventID: String?,
         latestEventSeq: Int?,
         latestEventType: DecisionSessionEventType?,
@@ -400,6 +737,7 @@ struct DecisionSessionRuntimeInspectionSession: Equatable, Sendable, Identifiabl
         self.latestCheckpointActiveKillSwitchesLine = latestCheckpointActiveKillSwitchesLine
         self.latestCheckpointKillSwitchesLine = latestCheckpointKillSwitchesLine
         self.latestCheckpointActionLine = latestCheckpointActionLine
+        self.latestCheckpointEBrainAnchor = latestCheckpointEBrainAnchor
         self.latestEventID = latestEventID
         self.latestEventSeq = latestEventSeq
         self.latestEventType = latestEventType
@@ -467,10 +805,13 @@ struct DecisionSessionRuntimeInspectionSession: Equatable, Sendable, Identifiabl
             decisionLine: latestCheckpointDecisionLine,
             taskLine: latestCheckpointTaskLine,
             pressureLine: latestCheckpointPressureLine,
+            riskFactorsLine: latestCheckpointEBrainAnchor?.resolvedRiskFactorsLine,
+            reasonCodesLine: latestCheckpointEBrainAnchor?.resolvedReasonCodesLine,
             auditLine: latestCheckpointAuditLine,
             activeKillSwitchesLine: latestCheckpointActiveKillSwitchesLine,
             killSwitchesLine: latestCheckpointKillSwitchesLine,
-            actionLine: latestCheckpointActionLine
+            actionLine: latestCheckpointActionLine,
+            anchor: latestCheckpointEBrainAnchor
         )
     }
 
@@ -500,10 +841,29 @@ struct DecisionSessionCheckpointPresentationFacts: Equatable, Sendable {
     let decisionLine: String?
     let taskLine: String?
     let pressureLine: String?
+    let riskFactorsLine: String?
+    let reasonCodesLine: String?
     let auditLine: String?
     let activeKillSwitchesLine: String?
     let killSwitchesLine: String?
     let actionLine: String?
+    let anchor: DecisionSessionCheckpointEBrainAnchor?
+
+    private var effectiveDecisionLine: String? {
+        decisionLine ?? anchor?.decisionLine
+    }
+
+    private var effectiveTaskLine: String? {
+        taskLine ?? anchor?.taskLine
+    }
+
+    var resolvedDecisionLine: String? {
+        effectiveDecisionLine
+    }
+
+    var resolvedTaskLine: String? {
+        effectiveTaskLine
+    }
 
     var runtimeLine: String? {
         DecisionEvolutionNarrativeFormattingSupport.joined(
@@ -517,6 +877,54 @@ struct DecisionSessionCheckpointPresentationFacts: Equatable, Sendable {
         ).nilIfEmpty
     }
 
+    var lungLine: String? {
+        anchor?.lungLine
+    }
+
+    var morphLine: String? {
+        anchor?.morphLine
+    }
+
+    var hotColdLine: String? {
+        anchor?.hotColdLine
+    }
+
+    var precisionLine: String? {
+        anchor?.precisionLine
+    }
+
+    var schedulerLine: String? {
+        anchor?.schedulerLine
+    }
+
+    var resumeLine: String? {
+        anchor?.resumeLine
+    }
+
+    var rollbackLine: String? {
+        anchor?.rollbackLine
+    }
+
+    var sovereignBridgeLine: String? {
+        anchor?.sovereignBridgeLine
+    }
+
+    var sovereignBridgeDetailLines: [String] {
+        anchor?.sovereignBridgeSupplementalLines ?? []
+    }
+
+    var sovereignVerdictLine: String? {
+        anchor?.sovereignVerdictLine
+    }
+
+    var sovereignAuthorityLine: String? {
+        anchor?.sovereignAuthorityLine
+    }
+
+    var sovereignAuditLine: String? {
+        anchor?.sovereignAuditLine
+    }
+
     var digestLines: [String] {
         var lines: [String] = []
 
@@ -524,22 +932,72 @@ struct DecisionSessionCheckpointPresentationFacts: Equatable, Sendable {
             lines.append(runtimeLine)
         }
 
-        if let decisionLine {
-            let decisionSegments = [decisionLine, taskLine].compactMap { $0 }
+        if let effectiveDecisionLine {
+            let decisionSegments = [effectiveDecisionLine, effectiveTaskLine].compactMap { $0 }
             lines.append(
                 DecisionEvolutionNarrativeFormattingSupport.joined(decisionSegments)
             )
-        } else if let taskLine {
-            lines.append(taskLine)
+        } else if let effectiveTaskLine {
+            lines.append(effectiveTaskLine)
         }
 
         if let pressureLine {
             lines.append(pressureLine)
         }
 
+        if let riskFactorsLine {
+            lines.append(riskFactorsLine)
+        }
+
+        if let reasonCodesLine {
+            lines.append(reasonCodesLine)
+        }
+
         if let auditPressureLine {
             lines.append(auditPressureLine)
         }
+
+        if let sovereignVerdictLine {
+            lines.append(sovereignVerdictLine)
+        }
+
+        if let sovereignAuthorityLine {
+            lines.append(sovereignAuthorityLine)
+        }
+
+        if let sovereignAuditLine {
+            lines.append(sovereignAuditLine)
+        }
+
+        if let lungLine {
+            lines.append(lungLine)
+        }
+
+        if let morphLine {
+            lines.append(morphLine)
+        }
+
+        if let hotColdLine {
+            lines.append(hotColdLine)
+        }
+
+        if let precisionLine {
+            lines.append(precisionLine)
+        }
+
+        if let schedulerLine {
+            lines.append(schedulerLine)
+        }
+
+        if let resumeLine {
+            lines.append(resumeLine)
+        }
+
+        if let rollbackLine {
+            lines.append(rollbackLine)
+        }
+
+        lines.append(contentsOf: anchor?.sovereignBridgeDetailLines ?? [])
 
         if let actionLine {
             lines.append(actionLine)
@@ -2464,10 +2922,13 @@ actor DecisionSessionEngine {
             nil
         }
         let latestCheckpointGoal = latestCheckpoint?.summary.goal.isEmpty == false ? latestCheckpoint?.summary.goal : nil
+        let latestCheckpointEBrainAnchor = latestCheckpoint?.runtimeState.eBrainAnchor
         let latestCheckpointBudgetLine = latestCheckpoint?.summary.eBrainBudgetLine
         let latestCheckpointRouteLine = latestCheckpoint?.summary.eBrainRouteLine
         let latestCheckpointDecisionLine = latestCheckpoint?.summary.eBrainDecisionLine
+            ?? latestCheckpointEBrainAnchor?.decisionLine
         let latestCheckpointTaskLine = latestCheckpoint?.summary.eBrainTaskLine
+            ?? latestCheckpointEBrainAnchor?.taskLine
         let latestCheckpointPressureLine = latestCheckpoint?.summary.eBrainPressureLine
         let latestCheckpointAuditLine = latestCheckpoint?.summary.eBrainAuditLine
         let latestCheckpointActiveKillSwitchesLine = latestCheckpoint?.summary.eBrainActiveKillSwitchesLine
@@ -2533,6 +2994,7 @@ actor DecisionSessionEngine {
             latestCheckpointActiveKillSwitchesLine: latestCheckpointActiveKillSwitchesLine,
             latestCheckpointKillSwitchesLine: latestCheckpointKillSwitchesLine,
             latestCheckpointActionLine: latestCheckpointActionLine,
+            latestCheckpointEBrainAnchor: latestCheckpointEBrainAnchor,
             latestEventID: latestHeadEvent?.id,
             latestEventSeq: latestHeadEvent?.seq,
             latestEventType: latestHeadEvent?.type,

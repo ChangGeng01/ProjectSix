@@ -4,6 +4,7 @@ struct DecisionEvolutionBatchMutationSelection: Equatable, Sendable {
     let controlSurface: DecisionEvolutionControlSurface
     let selectablePresentations: [DecisionEvolutionCheckpointPresentation]
     let selectedCheckpointIDs: Set<String>
+    let allowsLocalMutationActions: Bool
 
     static func orderedSelectablePresentations(
         activePresentation: DecisionEvolutionCheckpointPresentation?,
@@ -21,12 +22,14 @@ struct DecisionEvolutionBatchMutationSelection: Equatable, Sendable {
     init(
         controlSurface: DecisionEvolutionControlSurface,
         selectablePresentations: [DecisionEvolutionCheckpointPresentation],
-        selectedCheckpointIDs: Set<String>
+        selectedCheckpointIDs: Set<String>,
+        allowsLocalMutationActions: Bool = true
     ) {
         self.controlSurface = controlSurface
         self.selectablePresentations = Self.orderedUnique(selectablePresentations)
         let validCheckpointIDs = Set(self.selectablePresentations.map(\.checkpointID))
         self.selectedCheckpointIDs = selectedCheckpointIDs.intersection(validCheckpointIDs)
+        self.allowsLocalMutationActions = allowsLocalMutationActions
     }
 
     var selectableCheckpointIDs: Set<String> {
@@ -38,23 +41,28 @@ struct DecisionEvolutionBatchMutationSelection: Equatable, Sendable {
     }
 
     var selectedReviewPresentations: [DecisionEvolutionCheckpointPresentation] {
-        selectedPresentations.filter { $0.approvalState == .reviewSuggested }
+        selectedPresentations(
+            matching: selectionEligibility.reviewCheckpointIDs
+        )
     }
 
     var selectedAutomaticPresentations: [DecisionEvolutionCheckpointPresentation] {
-        selectedPresentations.filter { $0.approvalState == .automatic }
+        selectedPresentations(
+            matching: selectionEligibility.automaticCheckpointIDs
+        )
     }
 
     var selectedLineagePresentations: [DecisionEvolutionCheckpointPresentation] {
-        selectedPresentations.filter(\.hasLineage)
+        selectedPresentations(
+            matching: selectionEligibility.lineageCheckpointIDs
+        )
     }
 
     var selectedRestorablePresentation: DecisionEvolutionCheckpointPresentation? {
-        guard selectedPresentations.count == 1 else { return nil }
-        guard let presentation = selectedPresentations.first, presentation.applyReady else {
+        guard let checkpointID = selectionEligibility.restorableCheckpointID else {
             return nil
         }
-        return presentation
+        return selectedPresentations.first { $0.checkpointID == checkpointID }
     }
 
     var selectedCount: Int {
@@ -70,29 +78,32 @@ struct DecisionEvolutionBatchMutationSelection: Equatable, Sendable {
     }
 
     var automaticCheckpointIDs: Set<String> {
-        Set(selectablePresentations.filter { $0.approvalState == .automatic }.map(\.checkpointID))
+        Set(selectableEligibility.automaticCheckpointIDs)
     }
 
     var lineageCheckpointIDs: Set<String> {
-        Set(selectablePresentations.filter(\.hasLineage).map(\.checkpointID))
+        Set(selectableEligibility.lineageCheckpointIDs)
     }
 
     var approveSelectedIntent: DecisionEvolutionMutationIntent? {
-        DecisionEvolutionMutationIntentFactory.approveSelectedCheckpoints(
+        guard selectionEligibility.canApproveCheckpoints else { return nil }
+        return DecisionEvolutionMutationIntentFactory.approveSelectedCheckpoints(
             presentations: selectedReviewPresentations,
             controlSurface: controlSurface
         )
     }
 
     var markSelectedForReviewIntent: DecisionEvolutionMutationIntent? {
-        DecisionEvolutionMutationIntentFactory.markSelectedCheckpointsForReview(
+        guard selectionEligibility.canMarkCheckpointsForReview else { return nil }
+        return DecisionEvolutionMutationIntentFactory.markSelectedCheckpointsForReview(
             presentations: selectedAutomaticPresentations,
             controlSurface: controlSurface
         )
     }
 
     var clearSelectedLineageIntent: DecisionEvolutionMutationIntent? {
-        DecisionEvolutionMutationIntentFactory.clearSelectedCheckpointLineages(
+        guard selectionEligibility.canClearCheckpointLineage else { return nil }
+        return DecisionEvolutionMutationIntentFactory.clearSelectedCheckpointLineages(
             presentations: selectedLineagePresentations,
             controlSurface: controlSurface
         )
@@ -100,6 +111,28 @@ struct DecisionEvolutionBatchMutationSelection: Equatable, Sendable {
 
     func contains(_ checkpointID: String) -> Bool {
         selectedCheckpointIDs.contains(checkpointID)
+    }
+
+    private var selectionEligibility: DecisionEvolutionPolicyCheckpointSetEligibility {
+        DecisionEvolutionPolicyEngine.checkpointSetEligibility(
+            allowsLocalMutationActions: allowsLocalMutationActions,
+            presentations: selectedPresentations
+        )
+    }
+
+    private var selectableEligibility: DecisionEvolutionPolicyCheckpointSetEligibility {
+        DecisionEvolutionPolicyEngine.checkpointSetEligibility(
+            allowsLocalMutationActions: allowsLocalMutationActions,
+            presentations: selectablePresentations
+        )
+    }
+
+    private func selectedPresentations(
+        matching checkpointIDs: [String]
+    ) -> [DecisionEvolutionCheckpointPresentation] {
+        guard !checkpointIDs.isEmpty else { return [] }
+        let checkpointIDSet = Set(checkpointIDs)
+        return selectedPresentations.filter { checkpointIDSet.contains($0.checkpointID) }
     }
 
     private static func orderedUnique(

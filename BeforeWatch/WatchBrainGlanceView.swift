@@ -97,10 +97,7 @@ struct WatchEvolutionStatusSection: View {
                         .foregroundStyle(.secondary)
 
                     Button(controlEntry.title) {
-                        WatchHandoffCoordinator.enqueueOpenEvolutionControl(
-                            headline: controlEntry.prompt,
-                            reason: presentation.detail
-                        )
+                        WatchHandoffCoordinator.enqueueOpenEvolutionControl(controlEntry)
                     }
                     .buttonStyle(.borderedProminent)
                 }

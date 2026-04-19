@@ -7,9 +7,20 @@ struct DecisionSessionEngineSessionDigestView: View {
     let checkpointDecisionLine: String?
     let checkpointTaskLine: String?
     let checkpointPressureLine: String?
+    let checkpointRiskFactorsLine: String?
+    let checkpointReasonCodesLine: String?
     let checkpointAuditLine: String?
+    let checkpointSovereignVerdictLine: String?
+    let checkpointSovereignAuthorityLine: String?
+    let checkpointSovereignAuditLine: String?
     let checkpointKillSwitchesLine: String?
     let checkpointActionLine: String?
+    let checkpointLungLine: String?
+    let checkpointHotColdLine: String?
+    let checkpointResumeLine: String?
+    let checkpointRollbackLine: String?
+    let checkpointSovereignBridgeLine: String?
+    let checkpointSovereignBridgeDetailLines: [String]
     let activityLine: String?
     let branchLine: String
     let mergeReviewLine: String?
@@ -26,9 +37,20 @@ struct DecisionSessionEngineSessionDigestView: View {
         checkpointDecisionLine: String? = nil,
         checkpointTaskLine: String? = nil,
         checkpointPressureLine: String? = nil,
+        checkpointRiskFactorsLine: String? = nil,
+        checkpointReasonCodesLine: String? = nil,
         checkpointAuditLine: String? = nil,
+        checkpointSovereignVerdictLine: String? = nil,
+        checkpointSovereignAuthorityLine: String? = nil,
+        checkpointSovereignAuditLine: String? = nil,
         checkpointKillSwitchesLine: String? = nil,
         checkpointActionLine: String? = nil,
+        checkpointLungLine: String? = nil,
+        checkpointHotColdLine: String? = nil,
+        checkpointResumeLine: String? = nil,
+        checkpointRollbackLine: String? = nil,
+        checkpointSovereignBridgeLine: String? = nil,
+        checkpointSovereignBridgeDetailLines: [String] = [],
         activityLine: String? = nil,
         branchLine: String,
         mergeReviewLine: String? = nil,
@@ -44,9 +66,20 @@ struct DecisionSessionEngineSessionDigestView: View {
         self.checkpointDecisionLine = checkpointDecisionLine
         self.checkpointTaskLine = checkpointTaskLine
         self.checkpointPressureLine = checkpointPressureLine
+        self.checkpointRiskFactorsLine = checkpointRiskFactorsLine
+        self.checkpointReasonCodesLine = checkpointReasonCodesLine
         self.checkpointAuditLine = checkpointAuditLine
+        self.checkpointSovereignVerdictLine = checkpointSovereignVerdictLine
+        self.checkpointSovereignAuthorityLine = checkpointSovereignAuthorityLine
+        self.checkpointSovereignAuditLine = checkpointSovereignAuditLine
         self.checkpointKillSwitchesLine = checkpointKillSwitchesLine
         self.checkpointActionLine = checkpointActionLine
+        self.checkpointLungLine = checkpointLungLine
+        self.checkpointHotColdLine = checkpointHotColdLine
+        self.checkpointResumeLine = checkpointResumeLine
+        self.checkpointRollbackLine = checkpointRollbackLine
+        self.checkpointSovereignBridgeLine = checkpointSovereignBridgeLine
+        self.checkpointSovereignBridgeDetailLines = checkpointSovereignBridgeDetailLines
         self.activityLine = activityLine
         self.branchLine = branchLine
         self.mergeReviewLine = mergeReviewLine
@@ -95,8 +128,43 @@ struct DecisionSessionEngineSessionDigestView: View {
                     .lineLimit(2)
             }
 
+            if let checkpointRiskFactorsLine {
+                Text(checkpointRiskFactorsLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointReasonCodesLine {
+                Text(checkpointReasonCodesLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
             if let checkpointAuditLine {
                 Text(checkpointAuditLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointSovereignVerdictLine {
+                Text(checkpointSovereignVerdictLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointSovereignAuthorityLine {
+                Text(checkpointSovereignAuthorityLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointSovereignAuditLine {
+                Text(checkpointSovereignAuditLine)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -111,6 +179,48 @@ struct DecisionSessionEngineSessionDigestView: View {
 
             if let checkpointActionLine {
                 Text(checkpointActionLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointLungLine {
+                Text(checkpointLungLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointHotColdLine {
+                Text(checkpointHotColdLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointResumeLine {
+                Text(checkpointResumeLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointRollbackLine {
+                Text(checkpointRollbackLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointSovereignBridgeLine {
+                Text(checkpointSovereignBridgeLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            ForEach(checkpointSovereignBridgeDetailLines, id: \.self) { detailLine in
+                Text(detailLine)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)

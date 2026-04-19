@@ -9,6 +9,7 @@ public struct BASAppleConsoleSnapshotSourceInput: Codable, Equatable, Sendable {
     public var runtimeGearID: String
     public var totalRequests: Int
     public var totalProviderAttempts: Int
+    public var layerStackLines: [String]?
     public var roleName: String?
     public var boundaryModeID: String?
     public var calibrationStatusID: String?
@@ -23,6 +24,7 @@ public struct BASAppleConsoleSnapshotSourceInput: Codable, Equatable, Sendable {
         runtimeGearID: String,
         totalRequests: Int,
         totalProviderAttempts: Int,
+        layerStackLines: [String]? = nil,
         roleName: String? = nil,
         boundaryModeID: String? = nil,
         calibrationStatusID: String? = nil,
@@ -36,6 +38,7 @@ public struct BASAppleConsoleSnapshotSourceInput: Codable, Equatable, Sendable {
         self.runtimeGearID = runtimeGearID
         self.totalRequests = totalRequests
         self.totalProviderAttempts = totalProviderAttempts
+        self.layerStackLines = layerStackLines
         self.roleName = roleName
         self.boundaryModeID = boundaryModeID
         self.calibrationStatusID = calibrationStatusID
@@ -61,6 +64,7 @@ public enum BASAppleConsoleSnapshotBuilder {
                     )
                 },
                 runtimeSummary: runtimeSummary(from: input),
+                layerStackLines: input.layerStackLines,
                 brainSummary: brainSummary(from: input),
                 isPureLocal: input.flightDeckCompilation.isPureLocalClosedLoop,
                 capabilityCoverage: input.capabilityCoverage,
@@ -87,7 +91,20 @@ public enum BASAppleConsoleSnapshotBuilder {
             return nil
         }
 
-        return "\(roleName) • \(boundaryModeID) • \(calibrationStatusID) • fingerprint \(verificationSnapshot)"
+        let parsed = parsedVerificationSnapshot(verificationSnapshot)
+        let constitutionSummary = parsed.constitutionVersion.map { "constitution \($0)" }
+        let phaseSummary = parsed.constitutionPhase.map { "phase \($0)" }
+
+        return [
+            roleName,
+            boundaryModeID,
+            calibrationStatusID,
+            constitutionSummary,
+            phaseSummary,
+            "fingerprint \(parsed.baseFingerprint)"
+        ]
+        .compactMap { $0 }
+        .joined(separator: " • ")
     }
 
     private static func layerKind(from layerID: String) -> BASLayerKind {
@@ -111,5 +128,17 @@ public enum BASAppleConsoleSnapshotBuilder {
         default:
             .observability
         }
+    }
+
+    private static func parsedVerificationSnapshot(
+        _ raw: String
+    ) -> (baseFingerprint: String, constitutionVersion: String?, constitutionPhase: String?) {
+        let parts = raw.split(separator: "|").map(String.init)
+        let baseFingerprint = parts.first ?? raw
+        let constitutionVersion = parts.first { $0.hasPrefix("constitution:") }
+            .map { String($0.dropFirst("constitution:".count)) }
+        let constitutionPhase = parts.first { $0.hasPrefix("phase:") }
+            .map { String($0.dropFirst("phase:".count)) }
+        return (baseFingerprint, constitutionVersion, constitutionPhase)
     }
 }

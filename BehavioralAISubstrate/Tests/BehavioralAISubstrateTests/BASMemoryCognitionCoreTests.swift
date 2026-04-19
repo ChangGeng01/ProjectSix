@@ -275,6 +275,45 @@ struct BASMemoryCognitionCoreTests {
         #expect(decision.reason == .lowTrustPending)
     }
 
+    @Test("eligibility judge screens pending candidates without overlap when horizon requires external refresh")
+    func eligibilityJudgeScreensPendingCandidatesWhenExternalRefreshIsRequired() {
+        let candidate = BASMemoryEligibilityCandidate(
+            id: "cand-refresh",
+            role: .relevant,
+            kind: .semantic,
+            headline: "Tonight's price drift",
+            source: .reflection,
+            scope: .user,
+            sensitivity: .medium,
+            confidence: 0.78,
+            priority: 0.72,
+            retrievalTags: ["price", "night", "drift"],
+            lastConfirmedAt: Date(timeIntervalSince1970: 1_700_030_000),
+            decayPolicy: .medium,
+            lifecycleState: "pending",
+            governanceStatus: .pending,
+            isPending: true,
+            provenanceSummary: "fresh reflection",
+            sourceTrustScore: 0.51,
+            sourceTrustTier: .medium,
+            effectiveConfidence: 0.68,
+            provenanceRisk: false
+        )
+
+        let decision = BASMemoryEligibilityJudge.decide(
+            candidate: candidate,
+            mode: .primary,
+            queryTags: ["cook", "home", "dinner"],
+            now: Date(timeIntervalSince1970: 1_700_060_000),
+            behavior: BASBrainCompilationBehavior(
+                requireTagOverlapForPendingCandidatesWhenExternalRefreshRequired: true
+            )
+        )
+
+        #expect(!decision.isAllowed)
+        #expect(decision.reason == .externalRefreshNoOverlap)
+    }
+
     @Test("brain compiler builds a governed state from projection inputs")
     func brainCompilerBuildsGovernedState() {
         let profileRecord = BASGovernedMemory(

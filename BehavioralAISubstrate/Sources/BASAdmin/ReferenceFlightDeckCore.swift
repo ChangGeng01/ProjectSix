@@ -46,17 +46,35 @@ public struct BASReferenceRuntimeLayerInput: Codable, Sendable, Equatable {
 public struct BASReferenceDataLayerInput: Codable, Sendable, Equatable {
     public var traceCount: Int
     public var replayCount: Int
+    public var replayAvailable: Bool?
+    public var replayBlocker: String?
+    public var vaultConsistencyState: String?
+    public var vaultSyncRevocationCount: Int
+    public var vaultOutOfSyncDeviceIDs: [String]
+    public var vaultMigrationTargetDeviceID: String?
     public var contextAwareTraceCount: Int
     public var activeTaskGraphTaskCount: Int
 
     public init(
         traceCount: Int,
         replayCount: Int,
+        replayAvailable: Bool? = nil,
+        replayBlocker: String? = nil,
+        vaultConsistencyState: String? = nil,
+        vaultSyncRevocationCount: Int = 0,
+        vaultOutOfSyncDeviceIDs: [String] = [],
+        vaultMigrationTargetDeviceID: String? = nil,
         contextAwareTraceCount: Int,
         activeTaskGraphTaskCount: Int
     ) {
         self.traceCount = traceCount
         self.replayCount = replayCount
+        self.replayAvailable = replayAvailable
+        self.replayBlocker = replayBlocker
+        self.vaultConsistencyState = vaultConsistencyState
+        self.vaultSyncRevocationCount = vaultSyncRevocationCount
+        self.vaultOutOfSyncDeviceIDs = vaultOutOfSyncDeviceIDs
+        self.vaultMigrationTargetDeviceID = vaultMigrationTargetDeviceID
         self.contextAwareTraceCount = contextAwareTraceCount
         self.activeTaskGraphTaskCount = activeTaskGraphTaskCount
     }
@@ -155,6 +173,12 @@ public struct BASReferenceOrchestrationLayerInput: Codable, Sendable, Equatable 
 public struct BASReferenceObservabilityLayerInput: Codable, Sendable, Equatable {
     public var traceCount: Int
     public var replayCount: Int
+    public var replayAvailable: Bool?
+    public var replayBlocker: String?
+    public var vaultConsistencyState: String?
+    public var vaultSyncRevocationCount: Int
+    public var vaultOutOfSyncDeviceIDs: [String]
+    public var vaultMigrationTargetDeviceID: String?
     public var totalRequests: Int
     public var promptMetricsPresent: Bool
     public var firstPresentableTracked: Bool
@@ -166,6 +190,12 @@ public struct BASReferenceObservabilityLayerInput: Codable, Sendable, Equatable 
     public init(
         traceCount: Int,
         replayCount: Int,
+        replayAvailable: Bool? = nil,
+        replayBlocker: String? = nil,
+        vaultConsistencyState: String? = nil,
+        vaultSyncRevocationCount: Int = 0,
+        vaultOutOfSyncDeviceIDs: [String] = [],
+        vaultMigrationTargetDeviceID: String? = nil,
         totalRequests: Int,
         promptMetricsPresent: Bool,
         firstPresentableTracked: Bool,
@@ -176,6 +206,12 @@ public struct BASReferenceObservabilityLayerInput: Codable, Sendable, Equatable 
     ) {
         self.traceCount = traceCount
         self.replayCount = replayCount
+        self.replayAvailable = replayAvailable
+        self.replayBlocker = replayBlocker
+        self.vaultConsistencyState = vaultConsistencyState
+        self.vaultSyncRevocationCount = vaultSyncRevocationCount
+        self.vaultOutOfSyncDeviceIDs = vaultOutOfSyncDeviceIDs
+        self.vaultMigrationTargetDeviceID = vaultMigrationTargetDeviceID
         self.totalRequests = totalRequests
         self.promptMetricsPresent = promptMetricsPresent
         self.firstPresentableTracked = firstPresentableTracked
@@ -293,6 +329,7 @@ public struct BASReferenceFlightDeckAssemblyInput: Codable, Sendable, Equatable 
     public var fallbackTitle: String?
     public var inspectionSummary: BASRuntimeInspectionSummary
     public var brainSummary: BASBrainSummary
+    public var inspectionBundle: BASInspectionBundle?
 
     public init(
         generatedAt: Date = .now,
@@ -304,7 +341,8 @@ public struct BASReferenceFlightDeckAssemblyInput: Codable, Sendable, Equatable 
         activeRuntimeUsingDeterministicFallback: Bool,
         fallbackTitle: String?,
         inspectionSummary: BASRuntimeInspectionSummary,
-        brainSummary: BASBrainSummary
+        brainSummary: BASBrainSummary,
+        inspectionBundle: BASInspectionBundle? = nil
     ) {
         self.generatedAt = generatedAt
         self.isPureLocalClosedLoop = isPureLocalClosedLoop
@@ -316,6 +354,7 @@ public struct BASReferenceFlightDeckAssemblyInput: Codable, Sendable, Equatable 
         self.fallbackTitle = fallbackTitle
         self.inspectionSummary = inspectionSummary
         self.brainSummary = brainSummary
+        self.inspectionBundle = inspectionBundle
     }
 }
 
@@ -347,6 +386,7 @@ public enum BASReferenceFlightDeckInputBuilder {
         let pendingReviewAverage = average(brain.evolutionPendingReviewCountByKind.values)
         let averageCheckpointCount = average(brain.evolutionCheckpointCountByKind.values)
         let rollbackReadyCount = brain.evolutionRollbackReadyByKind.values.filter { $0 }.count
+        let replayDisposition = input.inspectionBundle?.replayDisposition
 
         return BASReferenceFlightDeckInput(
             generatedAt: input.generatedAt,
@@ -367,6 +407,12 @@ public enum BASReferenceFlightDeckInputBuilder {
             data: BASReferenceDataLayerInput(
                 traceCount: summary.traceCount,
                 replayCount: summary.replayCount,
+                replayAvailable: replayDisposition?.isAvailable,
+                replayBlocker: replayDisposition?.reason,
+                vaultConsistencyState: replayDisposition?.vaultConsistencyState,
+                vaultSyncRevocationCount: replayDisposition?.vaultSyncRevocationCount ?? 0,
+                vaultOutOfSyncDeviceIDs: replayDisposition?.vaultOutOfSyncDeviceIDs ?? [],
+                vaultMigrationTargetDeviceID: replayDisposition?.vaultMigrationTargetDeviceID,
                 contextAwareTraceCount: summary.contextAwareTraceCount,
                 activeTaskGraphTaskCount: input.activeTaskGraphTaskCount
             ),
@@ -402,6 +448,12 @@ public enum BASReferenceFlightDeckInputBuilder {
             observability: BASReferenceObservabilityLayerInput(
                 traceCount: summary.traceCount,
                 replayCount: summary.replayCount,
+                replayAvailable: replayDisposition?.isAvailable,
+                replayBlocker: replayDisposition?.reason,
+                vaultConsistencyState: replayDisposition?.vaultConsistencyState,
+                vaultSyncRevocationCount: replayDisposition?.vaultSyncRevocationCount ?? 0,
+                vaultOutOfSyncDeviceIDs: replayDisposition?.vaultOutOfSyncDeviceIDs ?? [],
+                vaultMigrationTargetDeviceID: replayDisposition?.vaultMigrationTargetDeviceID,
                 totalRequests: summary.totalRequests,
                 promptMetricsPresent: !summary.averagePromptCharactersByKind.isEmpty,
                 firstPresentableTracked: summary.totalRequests == 0 || summary.averageFirstPresentableMs > 0,
@@ -592,10 +644,22 @@ public enum BASReferenceFlightDeckBuilder {
             score -= 25
             blockers.append("No replayable decision ledger is available.")
         }
+        if input.replayAvailable == false, let replayBlocker = input.replayBlocker {
+            score -= 25
+            blockers.append(replayBlocker)
+        }
 
         if input.contextAwareTraceCount == 0 {
             score -= 15
             blockers.append("Context-aware state was not attached to traces.")
+        }
+        if let vaultConsistencyState = input.vaultConsistencyState,
+           ["revocation_pending", "out_of_sync", "migration_pending"].contains(vaultConsistencyState) {
+            score -= 15
+            blockers.append("Host constitution vault consistency is \(vaultConsistencyState).")
+        }
+        if !input.vaultOutOfSyncDeviceIDs.isEmpty {
+            blockers.append("Vault out-of-sync devices: \(input.vaultOutOfSyncDeviceIDs.joined(separator: ", ")).")
         }
 
         return BASReferenceLayerAssessment(
@@ -603,6 +667,11 @@ public enum BASReferenceFlightDeckBuilder {
             score: normalizedScore(score),
             headline: "Facts are being captured as state instead of getting lost in chat.",
             signals: [
+                "Replay status: \(input.replayAvailable == false ? "blocked" : "available")",
+                "Vault consistency: \(input.vaultConsistencyState ?? "stable")",
+                "Vault sync revocations: \(input.vaultSyncRevocationCount)",
+                "Vault out-of-sync devices: \(input.vaultOutOfSyncDeviceIDs.isEmpty ? "none" : input.vaultOutOfSyncDeviceIDs.joined(separator: ", "))",
+                "Vault migration target: \(input.vaultMigrationTargetDeviceID ?? "none")",
                 "Replay entries: \(input.replayCount)",
                 "Traces: \(input.traceCount)",
                 "Context-aware traces: \(input.contextAwareTraceCount)",
@@ -774,6 +843,10 @@ public enum BASReferenceFlightDeckBuilder {
             score -= 20
             blockers.append("Replay coverage is zero.")
         }
+        if input.replayAvailable == false, let replayBlocker = input.replayBlocker {
+            score -= 20
+            blockers.append(replayBlocker)
+        }
 
         if input.totalRequests == 0 {
             score -= 20
@@ -799,6 +872,14 @@ public enum BASReferenceFlightDeckBuilder {
             score -= 10
             blockers.append("Consistency-harness coverage is too shallow across sampled traces.")
         }
+        if let vaultConsistencyState = input.vaultConsistencyState,
+           ["revocation_pending", "out_of_sync", "migration_pending"].contains(vaultConsistencyState) {
+            score -= 15
+            blockers.append("Observability shows host constitution vault consistency as \(vaultConsistencyState).")
+        }
+        if !input.vaultOutOfSyncDeviceIDs.isEmpty {
+            blockers.append("Observability shows out-of-sync vault devices: \(input.vaultOutOfSyncDeviceIDs.joined(separator: ", ")).")
+        }
 
         return BASReferenceLayerAssessment(
             kind: .observability,
@@ -807,6 +888,11 @@ public enum BASReferenceFlightDeckBuilder {
             signals: [
                 "Requests: \(input.totalRequests)",
                 "Traces: \(input.traceCount)",
+                "Replay status: \(input.replayAvailable == false ? "blocked" : "available")",
+                "Vault consistency: \(input.vaultConsistencyState ?? "stable")",
+                "Vault sync revocations: \(input.vaultSyncRevocationCount)",
+                "Vault out-of-sync devices: \(input.vaultOutOfSyncDeviceIDs.isEmpty ? "none" : input.vaultOutOfSyncDeviceIDs.joined(separator: ", "))",
+                "Vault migration target: \(input.vaultMigrationTargetDeviceID ?? "none")",
                 "Replay: \(input.replayCount)",
                 "Cache entries: \(input.totalCacheEntries)",
                 "Avg first presentable: \(Int(input.averageFirstPresentableMs.rounded())) ms",

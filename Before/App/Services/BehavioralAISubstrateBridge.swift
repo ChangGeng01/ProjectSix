@@ -32,9 +32,13 @@ enum BehavioralAISubstrateBridge {
         context: ModelContext,
         projection: DecisionMemorySystem.BrainStateProjection,
         retrievalMode: DecisionRetrievalMode,
-        now: Date = .now
+        now: Date = .now,
+        executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame? = nil
     ) -> CurrentBrainState {
         let taskGraphInput = taskGraphInput(from: taskGraph)
+        let cognitionBehavior = BeforeProductCompatibility.horizonAwareCognitionBehavior(
+            for: executionCapabilityFrame
+        )
         return bootstrapCurrentBrainState(
             input: BASAppleCurrentBrainBootstrapBridgeInputBuilder.build(
                 modeID: mode.substrateModeID,
@@ -51,7 +55,7 @@ enum BehavioralAISubstrateBridge {
                 bootstrapBehavior: BeforeProductCompatibility.currentBrainBootstrapBehavior,
                 reactionWeightSeed: BeforeProductCompatibility.reactionWeights(for: mode),
                 identityProfileOverride: BeforeProductCompatibility.identityProfile(for: mode),
-                cognitionBehavior: BeforeProductCompatibility.substrateCognitionBehavior
+                cognitionBehavior: cognitionBehavior
             ),
             envelope: envelope,
             taskGraph: taskGraph,
@@ -66,9 +70,10 @@ enum BehavioralAISubstrateBridge {
         context: ModelContext,
         projection: DecisionMemorySystem.BrainStateProjection,
         retrievalMode: DecisionRetrievalMode,
-        now: Date = .now
+        now: Date = .now,
+        cognitionBehavior: BASCognitionBehavior = BeforeProductCompatibility.substrateCognitionBehavior
     ) -> CurrentBrainState {
-        BASAppleCurrentBrainRuntimeBridgeExecutor.primeSession(
+        return BASAppleCurrentBrainRuntimeBridgeExecutor.primeSession(
             input: BASAppleCurrentBrainSessionBridgeInput(
                 modeID: mode.substrateModeID,
                 promptFragments: promptFragments,
@@ -77,13 +82,14 @@ enum BehavioralAISubstrateBridge {
                 projection: projection.baseProjection,
                 retrievalMode: retrievalMode.rawValue,
                 bootstrapBehavior: BeforeProductCompatibility.currentBrainBootstrapBehavior,
-                cognitionBehavior: BeforeProductCompatibility.substrateCognitionBehavior
+                cognitionBehavior: cognitionBehavior
             ),
             bootstrapCurrentBrain: { bootstrapInput in
                 var bootstrapInput = bootstrapInput
                 bootstrapInput.embeddingScores = embeddingScores(for: bootstrapInput.prompt)
                 bootstrapInput.reactionWeightSeed = BeforeProductCompatibility.reactionWeights(for: mode)
                 bootstrapInput.identityProfileOverride = BeforeProductCompatibility.identityProfile(for: mode)
+                bootstrapInput.cognitionBehavior = cognitionBehavior
                 return bootstrapCurrentBrainState(
                     input: bootstrapInput,
                     context: context
@@ -102,7 +108,10 @@ enum BehavioralAISubstrateBridge {
         projection: DecisionMemorySystem.BrainStateProjection,
         now: Date = .now
     ) -> CurrentBrainState {
-        primeCurrentBrainState(
+        let cognitionBehavior = BeforeProductCompatibility.horizonAwareCognitionBehavior(
+            for: preferences
+        )
+        return primeCurrentBrainState(
             mode: .quick,
             promptFragments: quickPromptFragments(for: session),
             context: context,
@@ -111,7 +120,8 @@ enum BehavioralAISubstrateBridge {
                 for: .quick,
                 preferences: preferences
             ),
-            now: now
+            now: now,
+            cognitionBehavior: cognitionBehavior
         )
     }
 
@@ -124,10 +134,14 @@ enum BehavioralAISubstrateBridge {
         isProjectionDirty: Bool,
         now: Date = .now
     ) -> CurrentBrainProjectionOutcome {
-        executeCurrentBrainProjection(
+        let executionCapabilityFrame = BeforeProductCompatibility.resolvedExecutionCapabilityFrame(
+            for: preferences
+        )
+        return executeCurrentBrainProjection(
             cachedProjection: cachedProjection,
             isProjectionDirty: isProjectionDirty,
             context: context,
+            executionCapabilityFrame: executionCapabilityFrame,
             now: now
         ) { projection in
             primeQuickSession(
@@ -183,7 +197,10 @@ enum BehavioralAISubstrateBridge {
         projection: DecisionMemorySystem.BrainStateProjection,
         now: Date = .now
     ) -> CurrentBrainState {
-        primeCurrentBrainState(
+        let cognitionBehavior = BeforeProductCompatibility.horizonAwareCognitionBehavior(
+            for: preferences
+        )
+        return primeCurrentBrainState(
             mode: .balance,
             promptFragments: balancePromptFragments(for: session),
             context: context,
@@ -192,7 +209,8 @@ enum BehavioralAISubstrateBridge {
                 for: .balance,
                 preferences: preferences
             ),
-            now: now
+            now: now,
+            cognitionBehavior: cognitionBehavior
         )
     }
 
@@ -205,10 +223,14 @@ enum BehavioralAISubstrateBridge {
         isProjectionDirty: Bool,
         now: Date = .now
     ) -> CurrentBrainProjectionOutcome {
-        executeCurrentBrainProjection(
+        let executionCapabilityFrame = BeforeProductCompatibility.resolvedExecutionCapabilityFrame(
+            for: preferences
+        )
+        return executeCurrentBrainProjection(
             cachedProjection: cachedProjection,
             isProjectionDirty: isProjectionDirty,
             context: context,
+            executionCapabilityFrame: executionCapabilityFrame,
             now: now
         ) { projection in
             primeBalanceSession(
@@ -264,7 +286,10 @@ enum BehavioralAISubstrateBridge {
         projection: DecisionMemorySystem.BrainStateProjection,
         now: Date = .now
     ) -> CurrentBrainState {
-        primeCurrentBrainState(
+        let cognitionBehavior = BeforeProductCompatibility.horizonAwareCognitionBehavior(
+            for: preferences
+        )
+        return primeCurrentBrainState(
             mode: .mirror,
             promptFragments: mirrorPromptFragments(for: session),
             context: context,
@@ -273,7 +298,8 @@ enum BehavioralAISubstrateBridge {
                 for: .mirror,
                 preferences: preferences
             ),
-            now: now
+            now: now,
+            cognitionBehavior: cognitionBehavior
         )
     }
 
@@ -286,10 +312,14 @@ enum BehavioralAISubstrateBridge {
         isProjectionDirty: Bool,
         now: Date = .now
     ) -> CurrentBrainProjectionOutcome {
-        executeCurrentBrainProjection(
+        let executionCapabilityFrame = BeforeProductCompatibility.resolvedExecutionCapabilityFrame(
+            for: preferences
+        )
+        return executeCurrentBrainProjection(
             cachedProjection: cachedProjection,
             isProjectionDirty: isProjectionDirty,
             context: context,
+            executionCapabilityFrame: executionCapabilityFrame,
             now: now
         ) { projection in
             primeMirrorSession(
@@ -345,9 +375,10 @@ enum BehavioralAISubstrateBridge {
         projection: DecisionMemorySystem.BrainStateProjection,
         retrievalModesByModeID: [String: String],
         source: BrainStateUpdateSource,
-        now: Date = .now
+        now: Date = .now,
+        cognitionBehavior: BASCognitionBehavior = BeforeProductCompatibility.substrateCognitionBehavior
     ) -> CurrentBrainState {
-        BASAppleCurrentBrainRuntimeBridgeExecutor.refreshActiveBrain(
+        return BASAppleCurrentBrainRuntimeBridgeExecutor.refreshActiveBrain(
             input: BASAppleCurrentBrainActiveRefreshBridgeInput(
                 promptFragmentsByModeID: promptFragmentsByModeID,
                 modePriority: modePriority,
@@ -361,7 +392,7 @@ enum BehavioralAISubstrateBridge {
                 triggerID: source.rawValue,
                 lifecycleBehavior: BeforeProductCompatibility.lifecycleBootstrapBehavior,
                 bootstrapBehavior: BeforeProductCompatibility.currentBrainBootstrapBehavior,
-                cognitionBehavior: BeforeProductCompatibility.substrateCognitionBehavior
+                cognitionBehavior: cognitionBehavior
             ),
             bootstrapCurrentBrain: { bootstrapInput in
                 var bootstrapInput = bootstrapInput
@@ -370,6 +401,7 @@ enum BehavioralAISubstrateBridge {
                     bootstrapInput.reactionWeightSeed = BeforeProductCompatibility.reactionWeights(for: mode)
                     bootstrapInput.identityProfileOverride = BeforeProductCompatibility.identityProfile(for: mode)
                 }
+                bootstrapInput.cognitionBehavior = cognitionBehavior
                 return bootstrapCurrentBrainState(
                     input: bootstrapInput,
                     taskGraph: taskGraph,
@@ -392,7 +424,10 @@ enum BehavioralAISubstrateBridge {
         source: BrainStateUpdateSource,
         now: Date = .now
     ) -> CurrentBrainState {
-        refreshCurrentBrainState(
+        let cognitionBehavior = BeforeProductCompatibility.horizonAwareCognitionBehavior(
+            for: preferences
+        )
+        return refreshCurrentBrainState(
             promptFragmentsByModeID: promptFragmentsByModeID(
                 activeQuickSession: activeQuickSession,
                 activeBalanceSession: activeBalanceSession,
@@ -406,7 +441,8 @@ enum BehavioralAISubstrateBridge {
                 preferences: preferences
             ),
             source: source,
-            now: now
+            now: now,
+            cognitionBehavior: cognitionBehavior
         )
     }
 
@@ -423,10 +459,14 @@ enum BehavioralAISubstrateBridge {
         source: BrainStateUpdateSource,
         now: Date = .now
     ) -> CurrentBrainProjectionOutcome {
-        executeCurrentBrainProjection(
+        let executionCapabilityFrame = BeforeProductCompatibility.resolvedExecutionCapabilityFrame(
+            for: preferences
+        )
+        return executeCurrentBrainProjection(
             cachedProjection: cachedProjection,
             isProjectionDirty: isProjectionDirty,
             context: context,
+            executionCapabilityFrame: executionCapabilityFrame,
             now: now
         ) { projection in
             refreshCurrentBrainState(
@@ -666,6 +706,7 @@ enum BehavioralAISubstrateBridge {
         strategy: DecisionAdaptiveTaskStrategy?,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy,
         testingStubProfile: DecisionTestingStubProfile?,
         admissionAllowed: Bool,
         observationContext: ProviderObservationContext,
@@ -690,6 +731,8 @@ enum BehavioralAISubstrateBridge {
             ),
             strategy: strategy.map(DecisionIntelligenceTaskRouter.substrateAdaptiveStrategy),
             descriptors: registry.descriptors().map(DecisionIntelligenceTaskRouter.substrateProviderDescriptor),
+            routingPolicy: BeforeProductCompatibility.requireProviderRoutingPolicy(from: runtimePolicyResolution),
+            routingRegistryVersion: runtimePolicyResolution.lineage.providerRoutingRegistryVersion,
             testingOverrideProvider: testingStubProfile.flatMap { profile in
                 guard preference != .template else { return nil }
                 return TestingDecisionIntelligenceProvider(profile: profile) as (any DecisionIntelligenceProviding)
@@ -867,6 +910,7 @@ enum BehavioralAISubstrateBridge {
                 activeProviderTitle: export.runtimeSnapshot.runtimeStatus.active.title,
                 totalRequests: export.basRuntimeInspectionSummary.totalRequests,
                 totalProviderAttempts: export.basRuntimeInspectionSummary.totalProviderAttempts,
+                layerStackLines: synchronizedExport.effectiveLayerStackLines,
                 runtimeContext: runtimeContext,
                 roleProfile: roleProfile,
                 boundaryModeID: currentBrainState?.boundaryPolicy.mode.rawValue,
@@ -891,6 +935,9 @@ enum BehavioralAISubstrateBridge {
                     addition: pressureLine
                 )
             }
+            if !synchronizedExport.effectiveLayerStackLines.isEmpty {
+                mergedSnapshot.layerStackLines = synchronizedExport.effectiveLayerStackLines
+            }
             return mergedSnapshot
         }
 
@@ -900,6 +947,9 @@ enum BehavioralAISubstrateBridge {
 
         let checkpointFacts = checkpointLineage.factsBundle
         var recoveredSnapshot = baseSnapshot
+        if !checkpointFacts.layerStackLines.isEmpty {
+            recoveredSnapshot.layerStackLines = checkpointFacts.layerStackLines
+        }
         recoveredSnapshot.runtimeSummary = appendConsoleSummary(
             base: baseSnapshot.runtimeSummary,
             additions: checkpointFacts.consoleRuntimeSummaryAdditions
@@ -1193,7 +1243,7 @@ enum BehavioralAISubstrateBridge {
     @MainActor
     static func consumeLifecycleEntrySourcesIfNeeded(
         consumeHandoff: () -> DecisionIntentEnvelope?,
-        consumePendingRequest: () -> PendingLaunchRequest?,
+        consumeDeferredEnvelope: () -> DecisionIntentEnvelope?,
         performCapture: (EntrySource, ScenarioType?, String) -> Void,
         performPresent: (DecisionMode, EntrySource, String) -> Void,
         performRoutedInput: (String, EntrySource) -> Void,
@@ -1203,53 +1253,33 @@ enum BehavioralAISubstrateBridge {
         performOpenEvolutionControl: () -> Void,
         refreshCurrentBrain: (BrainStateUpdateSource) -> Void
     ) {
+        let handleDeferredEnvelope: (DecisionIntentEnvelope) -> Void = { envelope in
+            consumeDecisionIntentEnvelope(
+                envelope,
+                performCapture: { envelope, scenario, prompt in
+                    performCapture(envelope.entrySource, scenario, prompt)
+                },
+                performPresent: { envelope, mode, shouldSelectBoxTab, prompt in
+                    if shouldSelectBoxTab {
+                        selectBoxTab()
+                    }
+                    performPresent(mode, envelope.entrySource, prompt)
+                },
+                performRoutedInput: { envelope, prompt in
+                    performRoutedInput(prompt, envelope.entrySource)
+                },
+                performPredictiveIntervention: performPredictiveIntervention,
+                performRestore: performRestore,
+                performOpenEvolutionControl: performOpenEvolutionControl,
+                refreshCurrentBrain: refreshCurrentBrain
+            )
+        }
+
         BASAppleAppLifecycleOrchestrationExecutor.consumeEntriesIfNeeded(
             consumeHandoff: consumeHandoff,
-            handleHandoff: { envelope in
-                consumeDecisionIntentEnvelope(
-                    envelope,
-                    performCapture: { envelope, scenario, prompt in
-                        performCapture(envelope.entrySource, scenario, prompt)
-                    },
-                    performPresent: { envelope, mode, shouldSelectBoxTab, prompt in
-                        if shouldSelectBoxTab {
-                            selectBoxTab()
-                        }
-                        performPresent(mode, envelope.entrySource, prompt)
-                    },
-                    performPredictiveIntervention: performPredictiveIntervention,
-                    performRestore: performRestore,
-                    performOpenEvolutionControl: performOpenEvolutionControl,
-                    refreshCurrentBrain: refreshCurrentBrain
-                )
-            },
-            consumePendingRequest: consumePendingRequest,
-            handlePendingRequest: { request in
-                BASApplePendingLaunchRuntimeExecutor.execute(
-                    input: BASApplePendingLaunchRuntimeInput(
-                        preferredModeID: DecisionMode.fromSubstrateModeID(request.preferredModeRaw)?.substrateModeID ?? request.preferredModeRaw,
-                        scenarioID: request.scenarioRaw,
-                        promptSeed: request.prompt
-                    ),
-                    performCapture: { plan in
-                        performCapture(
-                            request.entrySource,
-                            plan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
-                            plan.promptSeed
-                        )
-                    },
-                    performPresent: { plan in
-                        performPresent(
-                            DecisionMode.fromSubstrateModeID(plan.preferredModeID) ?? .quick,
-                            request.entrySource,
-                            plan.promptSeed
-                        )
-                    },
-                    performRoutedInput: { plan in
-                        performRoutedInput(plan.promptSeed, request.entrySource)
-                    }
-                )
-            }
+            handleHandoff: handleDeferredEnvelope,
+            consumePendingRequest: consumeDeferredEnvelope,
+            handlePendingRequest: handleDeferredEnvelope
         )
     }
 
@@ -1260,7 +1290,7 @@ enum BehavioralAISubstrateBridge {
         refreshCurrentBrain: (BrainStateUpdateSource) -> Void,
         presentPendingReflection: () -> Void,
         consumeHandoff: () -> DecisionIntentEnvelope?,
-        consumePendingRequest: () -> PendingLaunchRequest?,
+        consumeDeferredEnvelope: () -> DecisionIntentEnvelope?,
         performCapture: (EntrySource, ScenarioType?, String) -> Void,
         performPresent: (DecisionMode, EntrySource, String) -> Void,
         performRoutedInput: (String, EntrySource) -> Void,
@@ -1271,6 +1301,28 @@ enum BehavioralAISubstrateBridge {
         refreshPredictedIntervention: () -> Void,
         syncWidgetSnapshot: () -> Void = {}
     ) {
+        let handleDeferredEnvelope: (DecisionIntentEnvelope) -> Void = { envelope in
+            consumeDecisionIntentEnvelope(
+                envelope,
+                performCapture: { envelope, scenario, prompt in
+                    performCapture(envelope.entrySource, scenario, prompt)
+                },
+                performPresent: { envelope, mode, shouldSelectBoxTab, prompt in
+                    if shouldSelectBoxTab {
+                        selectBoxTab()
+                    }
+                    performPresent(mode, envelope.entrySource, prompt)
+                },
+                performRoutedInput: { envelope, prompt in
+                    performRoutedInput(prompt, envelope.entrySource)
+                },
+                performPredictiveIntervention: performPredictiveIntervention,
+                performRestore: performRestore,
+                performOpenEvolutionControl: performOpenEvolutionControl,
+                refreshCurrentBrain: refreshCurrentBrain
+            )
+        }
+
         BASAppleAppLifecycleOrchestrationExecutor.execute(
             phase: phase,
             refreshMemoryProjection: refreshMemoryProjection,
@@ -1281,51 +1333,9 @@ enum BehavioralAISubstrateBridge {
             },
             presentPendingReflection: presentPendingReflection,
             consumeHandoff: consumeHandoff,
-            handleHandoff: { envelope in
-                consumeDecisionIntentEnvelope(
-                    envelope,
-                    performCapture: { envelope, scenario, prompt in
-                        performCapture(envelope.entrySource, scenario, prompt)
-                    },
-                    performPresent: { envelope, mode, shouldSelectBoxTab, prompt in
-                        if shouldSelectBoxTab {
-                            selectBoxTab()
-                        }
-                        performPresent(mode, envelope.entrySource, prompt)
-                    },
-                    performPredictiveIntervention: performPredictiveIntervention,
-                    performRestore: performRestore,
-                    performOpenEvolutionControl: performOpenEvolutionControl,
-                    refreshCurrentBrain: refreshCurrentBrain
-                )
-            },
-            consumePendingRequest: consumePendingRequest,
-            handlePendingRequest: { request in
-                BASApplePendingLaunchRuntimeExecutor.execute(
-                    input: BASApplePendingLaunchRuntimeInput(
-                        preferredModeID: DecisionMode.fromSubstrateModeID(request.preferredModeRaw)?.substrateModeID ?? request.preferredModeRaw,
-                        scenarioID: request.scenarioRaw,
-                        promptSeed: request.prompt
-                    ),
-                    performCapture: { plan in
-                        performCapture(
-                            request.entrySource,
-                            plan.scenarioID.flatMap(ScenarioType.init(rawValue:)),
-                            plan.promptSeed
-                        )
-                    },
-                    performPresent: { plan in
-                        performPresent(
-                            DecisionMode.fromSubstrateModeID(plan.preferredModeID) ?? .quick,
-                            request.entrySource,
-                            plan.promptSeed
-                        )
-                    },
-                    performRoutedInput: { plan in
-                        performRoutedInput(plan.promptSeed, request.entrySource)
-                    }
-                )
-            },
+            handleHandoff: handleDeferredEnvelope,
+            consumePendingRequest: consumeDeferredEnvelope,
+            handlePendingRequest: handleDeferredEnvelope,
             restoreActiveWorkspace: performRestore,
             refreshPredictedIntervention: refreshPredictedIntervention,
             syncWidgetSnapshot: syncWidgetSnapshot
@@ -1337,6 +1347,7 @@ enum BehavioralAISubstrateBridge {
         _ envelope: DecisionIntentEnvelope,
         performCapture: (DecisionIntentEnvelope, ScenarioType?, String) -> Void,
         performPresent: (DecisionIntentEnvelope, DecisionMode, Bool, String) -> Void,
+        performRoutedInput: (DecisionIntentEnvelope, String) -> Void,
         performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
         performRestore: () -> Void,
         performOpenEvolutionControl: () -> Void,
@@ -1379,6 +1390,9 @@ enum BehavioralAISubstrateBridge {
                     actionPlan.shouldSelectBoxTab,
                     actionPlan.promptSeed
                 )
+            },
+            performRoutedInput: { actionPlan in
+                performRoutedInput(envelope, actionPlan.promptSeed)
             },
             performPredictiveIntervention: performPredictiveIntervention,
             performRestore: performRestore,
@@ -1609,6 +1623,7 @@ enum BehavioralAISubstrateBridge {
         cachedProjection: DecisionMemorySystem.BrainStateProjection?,
         isDirty: Bool,
         context: ModelContext,
+        executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame? = nil,
         now: Date = .now
     ) -> MemoryProjectionRefreshOutcome {
         BASAppleCurrentBrainProjectionRuntimeExecutor.resolveProjection(
@@ -1629,7 +1644,11 @@ enum BehavioralAISubstrateBridge {
             refresh: {
                 InterventionTemplateStore.ensureDefaults(in: context)
                 FailurePatternStore.syncFromHistory(in: context)
-                let projection = DecisionMemorySystem.refreshProjection(in: context, now: now)
+                let projection = DecisionMemorySystem.refreshProjection(
+                    in: context,
+                    executionCapabilityFrame: executionCapabilityFrame,
+                    now: now
+                )
                 return MemoryProjectionRefreshOutcome(
                     projection: projection,
                     refreshed: true,
@@ -1647,6 +1666,7 @@ enum BehavioralAISubstrateBridge {
         commitProjection: (DecisionMemorySystem.BrainStateProjection) -> Void,
         setProjectionDirty: (Bool) -> Void,
         publishNotice: (String) -> Void,
+        executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame? = nil,
         now: Date = .now
     ) {
         BASAppleCurrentBrainHostStateExecutor.commitProjectionRefresh(
@@ -1655,6 +1675,7 @@ enum BehavioralAISubstrateBridge {
                 cachedProjection: cachedProjection,
                 isDirty: isProjectionDirty,
                 context: context,
+                executionCapabilityFrame: executionCapabilityFrame,
                 now: now
             ),
             commitProjection: commitProjection,
@@ -1668,6 +1689,7 @@ enum BehavioralAISubstrateBridge {
         cachedProjection: DecisionMemorySystem.BrainStateProjection?,
         isProjectionDirty: Bool,
         context: ModelContext,
+        executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame? = nil,
         now: Date,
         execute: (DecisionMemorySystem.BrainStateProjection) -> CurrentBrainState
     ) -> CurrentBrainProjectionOutcome {
@@ -1692,6 +1714,7 @@ enum BehavioralAISubstrateBridge {
                     cachedProjection: cachedProjection,
                     isDirty: isProjectionDirty,
                     context: context,
+                    executionCapabilityFrame: executionCapabilityFrame,
                     now: now
                 )
             },
@@ -2238,30 +2261,17 @@ enum BehavioralAISubstrateBridge {
         for mode: DecisionMode,
         preferences: BeforePreferences
     ) -> DecisionRetrievalMode {
-        let traceKind = DecisionIntelligenceTraceKind(substrateKindID: mode.substrateModeID) ?? .quick
         return DecisionIntelligenceCoordinator
-            .executionProfile(preferences: preferences)
-            .strategy(for: traceKind)
-            .retrievalMode
+            .runtimeCoordination(preferences: preferences)
+            .retrievalMode(for: mode)
     }
 
     private static func currentBrainRuntimeRetrievalModesByModeID(
         preferences: BeforePreferences
     ) -> [String: String] {
-        [
-            DecisionMode.quick.substrateModeID: currentBrainRuntimeRetrievalMode(
-                for: .quick,
-                preferences: preferences
-            ).rawValue,
-            DecisionMode.balance.substrateModeID: currentBrainRuntimeRetrievalMode(
-                for: .balance,
-                preferences: preferences
-            ).rawValue,
-            DecisionMode.mirror.substrateModeID: currentBrainRuntimeRetrievalMode(
-                for: .mirror,
-                preferences: preferences
-            ).rawValue
-        ]
+        DecisionIntelligenceCoordinator
+            .runtimeCoordination(preferences: preferences)
+            .retrievalModesByModeID
     }
 
     private static var activeModePriority: [String] {

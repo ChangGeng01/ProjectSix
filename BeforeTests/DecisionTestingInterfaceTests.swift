@@ -70,6 +70,131 @@ struct DecisionTestingInterfaceTests {
     }
 
     @Test
+    func runtimeSnapshotCarriesExecutionCapabilityFrameAlignedWithProfileAndStatus() {
+        let snapshot = DecisionTestingInterface.runtimeSnapshot(
+            preferences: .default,
+            environment: [:]
+        )
+
+        #expect(snapshot.executionCapabilityFrame.executionTier == snapshot.executionProfile.tier)
+        #expect(snapshot.executionCapabilityFrame.activeProvider == snapshot.runtimeStatus.active)
+        #expect(snapshot.executionCapabilityFrame.preferredProvider == snapshot.executionProfile.effectiveProviderPreference)
+        #expect(snapshot.executionCapabilityFrame.fallbackProvider == snapshot.runtimeStatus.fallback)
+    }
+
+    @Test
+    func runtimeSnapshotHostRuntimeUsesSnapshotVitalMonitor() throws {
+        let preferences = BeforePreferences(
+            homePromptAction: .autoRoute,
+            quickBufferDuration: .ninetySeconds,
+            restoreInProgressWorkspaces: true,
+            showReviewInsights: true,
+            onDeviceIntelligenceMode: .assistive,
+            preferredIntelligenceProvider: .foundationModels,
+            allowModelFallbacks: true
+        )
+        let snapshot = DecisionTestingInterface.runtimeSnapshot(
+            preferences: preferences,
+            environment: [:]
+        )
+
+        let result = try snapshot.hostRuntime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .primary,
+                surface: .application,
+                prompt: "Use the snapshot-bound vital monitor.",
+                title: "Snapshot vitals",
+                riskLevel: .low
+            )
+        )
+        let turn = try #require(result.eBrainTurn)
+        let expectedBattery = snapshot.deviceCapabilities.isLowPowerModeEnabled ? 0.24 : 0.76
+        let expectedMemoryFreeMB = max(1_024, snapshot.deviceCapabilities.physicalMemoryGB * 768)
+
+        #expect(turn.deviceState.batteryLevel == expectedBattery)
+        #expect(turn.deviceState.memoryFreeMB == expectedMemoryFreeMB)
+        #expect(turn.deviceState.npuAvailable == snapshot.deviceCapabilities.supportsCoreMLAcceleration)
+        #expect(turn.deviceState.networkState == .constrained)
+    }
+
+    @Test
+    func runtimeSnapshotExecutionCapabilityFrameExposesFoundationPostureAndBoundary() {
+        let snapshot = DecisionTestingInterface.runtimeSnapshot(
+            preferences: .default,
+            environment: [:]
+        )
+
+        #expect(snapshot.executionCapabilityFrame.foundationPosture == .trustedProduction)
+        #expect(snapshot.executionCapabilityFrame.worldPriorContract.priorID == "worldPriorFabric")
+        #expect(snapshot.executionCapabilityFrame.worldPriorContract.posture == .trustedProduction)
+        #expect(snapshot.executionCapabilityFrame.worldPriorContract.boundaryID == "externalTraining")
+        #expect(snapshot.executionCapabilityFrame.worldPriorContract.hostIsolationID == "hostIsolated")
+        #expect(snapshot.executionCapabilityFrame.worldPriorContract.sessionIsolationID == "sessionIsolated")
+        #expect(snapshot.executionCapabilityFrame.worldPriorContract.toolTruthModeID == "toolRefreshRequired")
+        #expect(snapshot.executionCapabilityFrame.stabilityTier == .invariant)
+        #expect(snapshot.executionCapabilityFrame.evidenceGradient == .grounded)
+        #expect(snapshot.executionCapabilityFrame.temporalKnowledgeContract.tier == .invariant)
+        #expect(snapshot.executionCapabilityFrame.temporalKnowledgeContract.refreshRequirement == .embedded)
+        #expect(snapshot.executionCapabilityFrame.temporalKnowledgeContract.decayPolicy == .none)
+        #expect(snapshot.executionCapabilityFrame.temporalKnowledgeContract.timeScope == .crossSession)
+        #expect(snapshot.executionCapabilityFrame.evidenceContract.gradient == .grounded)
+        #expect(snapshot.executionCapabilityFrame.evidenceContract.claimType == .worldStructure)
+        #expect(snapshot.executionCapabilityFrame.evidenceContract.requiresCaveat == false)
+        #expect(snapshot.executionCapabilityFrame.evidenceContract.requiresExternalRefresh == false)
+        #expect(snapshot.executionCapabilityFrame.repositoryBoundaryID == "externalTraining")
+        #expect(snapshot.executionCapabilityFrame.hostIsolationID == "hostIsolated")
+        #expect(snapshot.executionCapabilityFrame.sessionIsolationID == "sessionIsolated")
+        #expect(snapshot.executionCapabilityFrame.toolTruthModeID == "toolRefreshRequired")
+        #expect(
+            snapshot.executionCapabilityFrame.horizonLine
+                == "Horizon worldPriorFabric • Stability invariant • Evidence grounded • Host hostIsolated • Session sessionIsolated • Tool toolRefreshRequired"
+        )
+        #expect(
+            snapshot.executionCapabilityFrame.temporalLine
+                == "Temporal invariant • Refresh embedded • Decay none • Scope crossSession"
+        )
+        #expect(
+            snapshot.executionCapabilityFrame.evidenceLine
+                == "Evidence grounded • Claim worldStructure • Caveat no • External refresh no"
+        )
+    }
+
+    @Test
+    func horizonPersistencePolicyFollowsExecutionCapabilityContracts() {
+        let stableFrame = DecisionEBrainExecutionCapabilityFrame(
+            activeProvider: .foundationModels,
+            preferredProvider: .foundationModels,
+            fallbackProvider: .gemmaE4B,
+            providerTrack: .builtInSystem,
+            executionTier: .systemManaged,
+            foundationTier: .systemManaged,
+            reasonCodes: []
+        )
+        let volatileFrame = DecisionEBrainExecutionCapabilityFrame(
+            activeProvider: .openModel,
+            preferredProvider: .openModel,
+            fallbackProvider: .template,
+            providerTrack: .builtInOpenModel,
+            executionTier: .balancedGemma,
+            foundationTier: .openModelHeuristic,
+            reasonCodes: []
+        )
+
+        let stablePolicy = BeforeProductCompatibility.horizonAwareMemoryPersistencePolicy(
+            for: stableFrame
+        )
+        let volatilePolicy = BeforeProductCompatibility.horizonAwareMemoryPersistencePolicy(
+            for: volatileFrame
+        )
+
+        #expect(stablePolicy.volatileClaimWriteMode == .admitDirectly)
+        #expect(stablePolicy.contaminatedWriteMode == .quarantineCandidate)
+        #expect(volatilePolicy.volatileClaimWriteMode == .stageCandidate)
+        #expect(volatilePolicy.contaminatedWriteMode == .quarantineCandidate)
+    }
+
+    @Test
     func runtimeSnapshotIncludesOpenModelStatusAndRegisteredProviders() {
         let snapshot = DecisionTestingInterface.runtimeSnapshot(
             preferences: .default,
@@ -1098,6 +1223,8 @@ struct DecisionTestingInterfaceTests {
         #expect(export.recentReplay.first?.entrySource == .app)
         #expect(export.recentReplay.first?.eBrain?.source == .persistedCheckpoint)
         #expect(export.recentReplay.first?.eBrain?.permitMode == "delay")
+        #expect(export.recentReplay.first?.matchedPersistedCheckpointID == "checkpoint-quick")
+        #expect(export.preferredCheckpointSelectionContext?.explicitCheckpointID == "checkpoint-quick")
         #expect(export.flightDeck.eBrainSummary?.taskType == "conflict")
         #expect(export.flightDeck.eBrainSummary?.source == .persistedCheckpoint)
         #expect(export.flightDeck.eBrainSummary?.permitMode == "delay")
@@ -1223,6 +1350,189 @@ struct DecisionTestingInterfaceTests {
         #expect(export.flightDeck.eBrainSummary?.checkpointID == "checkpoint-quick-newer")
         #expect(export.flightDeck.eBrainSummary?.checkpointApplyReady == true)
         #expect(export.thoughtFoldChecksum == "fold-newer")
+    }
+
+    @Test
+    func runtimeExportUsesSessionCheckpointAnchorWhenReplayContextIsCheckpointOnly() async throws {
+        let targetDirective = "Review memory write: Keep the parser-only correction local."
+        let target = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-session-anchor-target",
+            createdAt: date("2026-04-10T20:20:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            diffSummary: ["Target checkpoint should win on structured anchor metadata"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T20:20:00.000Z"),
+                    sessionID: "before.quick.anchor",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 77,
+                    thoughtFoldChecksum: "fold-shared",
+                    updateTicketSummaries: ["preserve parser-only correction"],
+                    reviewDirectiveLine: targetDirective,
+                    guardrailFindings: ["Anchor-aligned guardrail"],
+                    recommendedKillSwitches: ["host-write"]
+                )
+            )
+        )
+        let closerButWrongMetadata = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-session-anchor-closer",
+            createdAt: date("2026-04-10T20:21:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            diffSummary: ["Closer checkpoint should lose because metadata diverges"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-10T20:21:00.000Z"),
+                    sessionID: "before.quick.anchor",
+                    taskType: "conflict",
+                    riskLevel: "medium",
+                    permitMode: "compare",
+                    hostGatePercent: 61,
+                    thoughtFoldChecksum: "fold-shared",
+                    updateTicketSummaries: ["broaden reflection"],
+                    reviewDirectiveLine: "Review reflection draft: broaden the guidance.",
+                    guardrailFindings: ["Closer-but-misaligned guardrail"],
+                    recommendedKillSwitches: []
+                )
+            )
+        )
+        let sessionEngineSnapshot = DecisionSessionRuntimeSnapshot(
+            layerPlacement: .foldedLung,
+            sessions: 1,
+            activeSessions: 1,
+            stalledSessions: 0,
+            branches: 1,
+            checkpoints: 2,
+            events: 8,
+            steps: 1,
+            recentSessions: [
+                DecisionSessionRuntimeInspectionSession(
+                    sessionID: "sess-anchor",
+                    title: "parser repair",
+                    status: .active,
+                    updatedAt: date("2026-04-10T20:21:30.000Z"),
+                    headBranchID: "branch-main",
+                    latestCheckpointID: "ckpt-42",
+                    latestCheckpointSeq: 42,
+                    latestCheckpointGoal: "repair parser",
+                    latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
+                        sessionID: "before.quick.anchor",
+                        thoughtFoldChecksum: "fold-shared",
+                        riskLevel: "high",
+                        permitMode: "delay",
+                        hostGatePercent: 77,
+                        reviewDirectiveLine: targetDirective,
+                        executionCapability: DecisionSessionCheckpointExecutionCapability(
+                            activeProviderID: DecisionModelProviderKind.foundationModels.rawValue,
+                            preferredProviderID: DecisionModelProviderPreference.foundationModels.rawValue,
+                            fallbackProviderID: DecisionModelProviderKind.gemmaE4B.rawValue,
+                            providerTrackID: DecisionModelProviderTrack.builtInSystem.rawValue,
+                            executionTierID: DecisionIntelligenceExecutionTier.systemManaged.rawValue,
+                            foundationTierID: DecisionEBrainFoundationTier.systemManaged.rawValue,
+                            reasonCodes: [
+                                "tier:\(DecisionIntelligenceExecutionTier.systemManaged.rawValue)",
+                                "active:\(DecisionModelProviderKind.foundationModels.rawValue)",
+                                "preferred:\(DecisionModelProviderPreference.foundationModels.rawValue)"
+                            ]
+                        )
+                    ),
+                    latestEventID: nil,
+                    latestEventSeq: nil,
+                    latestEventType: nil,
+                    latestEventDetail: nil,
+                    openStepCount: 0,
+                    openStepStatus: nil,
+                    stalledStepCount: 0,
+                    branchCount: 1,
+                    recoveryCount: 0,
+                    latestRecoveryAt: nil
+                )
+            ]
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            sessionEngineSnapshot: sessionEngineSnapshot,
+            traceLimit: 0,
+            persistedCheckpointLineages: [target, closerButWrongMetadata],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        #expect(export.eBrainTurn == nil)
+        #expect(export.recentReplay.count == 2)
+        #expect(export.preferredCheckpointSelectionContext?.sessionID == "before.quick.anchor")
+        #expect(export.preferredCheckpointSelectionContext?.thoughtFoldChecksum == "fold-shared")
+        #expect(export.preferredCheckpointSelectionContext?.riskLevel == "high")
+        #expect(export.preferredCheckpointSelectionContext?.permitMode == "delay")
+        #expect(export.preferredCheckpointSelectionContext?.hostGatePercent == 77)
+        #expect(export.preferredCheckpointSelectionContext?.reviewDirectiveLine == targetDirective)
+        #expect(export.latestCheckpointLineage?.checkpointID == "checkpoint-session-anchor-target")
+        #expect(export.flightDeck.eBrainSummary?.checkpointID == "checkpoint-session-anchor-target")
+        #expect(export.flightDeck.eBrainSummary?.riskLevel == "high")
+        #expect(export.flightDeck.eBrainSummary?.hostGatePercent == 77)
+        #expect(export.effectiveEBrainFactsBundle?.taskLine == targetDirective)
+        #expect(
+            export.effectiveEBrainFactsBundle?.executionCapabilityLine
+                == "Capability systemManaged • Foundation systemManaged • Posture trustedProduction • Boundary externalTraining • Active Apple Foundation Model • Preferred Apple Foundation Model • Track builtInSystem • Fallback Gemma 4 E4B"
+        )
+        #expect(
+            export.effectiveEBrainFactsBundle?.horizonLine
+                == "Horizon worldPriorFabric • Stability invariant • Evidence grounded • Host hostIsolated • Session sessionIsolated • Tool toolRefreshRequired"
+        )
+        #expect(
+            export.effectiveEBrainFactsBundle?.temporalLine
+                == "Temporal invariant • Refresh embedded • Decay none • Scope crossSession"
+        )
+        #expect(
+            export.effectiveEBrainFactsBundle?.evidenceLine
+                == "Evidence grounded • Claim worldStructure • Caveat no • External refresh no"
+        )
+        #expect(
+            export.flightDeck.eBrainSummary?.presentation.horizonLine
+                == "Horizon worldPriorFabric • Stability invariant • Evidence grounded • Host hostIsolated • Session sessionIsolated • Tool toolRefreshRequired"
+        )
+        #expect(
+            export.flightDeck.eBrainSummary?.presentation.temporalLine
+                == "Temporal invariant • Refresh embedded • Decay none • Scope crossSession"
+        )
+        #expect(
+            export.flightDeck.eBrainSummary?.presentation.evidenceLine
+                == "Evidence grounded • Claim worldStructure • Caveat no • External refresh no"
+        )
+        #expect(
+            export.flightDeck.eBrainSummary?.presentation.detailLines.contains(
+                "Horizon worldPriorFabric • Stability invariant • Evidence grounded • Host hostIsolated • Session sessionIsolated • Tool toolRefreshRequired"
+            ) == true
+        )
+        #expect(
+            export.flightDeck.eBrainSummary?.presentation.detailLines.contains(
+                "Temporal invariant • Refresh embedded • Decay none • Scope crossSession"
+            ) == true
+        )
+        #expect(
+            export.flightDeck.eBrainSummary?.presentation.detailLines.contains(
+                "Evidence grounded • Claim worldStructure • Caveat no • External refresh no"
+            ) == true
+        )
+        let coverage = DecisionCapabilityCoverageBuilder.build(
+            from: export,
+            currentBrainState: nil
+        )
+        #expect(coverage.executionTierID == export.executionCapabilityFrame.executionTierID)
+        #expect(coverage.foundationTierID == export.executionCapabilityFrame.foundationTierID)
+        #expect(coverage.executionTierID == export.flightDeck.eBrainSummary?.executionCapabilityFrame?.executionTierID)
+        #expect(coverage.foundationTierID == export.flightDeck.eBrainSummary?.executionCapabilityFrame?.foundationTierID)
     }
 
     @Test
@@ -2275,6 +2585,74 @@ struct DecisionTestingInterfaceTests {
         #expect(queueItem.updateTicketSummaries == ["lineage ticket"])
         #expect(queueItem.auditFindings == ["lineage guardrail"])
         #expect(queueItem.killSwitches == ["external-tools"])
+    }
+
+    @Test
+    func checkpointPresentationPrefersReviewDirectiveForPrimarySummaryWhenDiffIsEmpty() {
+        let snapshot = DecisionReviewCheckpointSnapshot(
+            checkpointID: "checkpoint-presentation-review-directive",
+            createdAt: date("2026-04-11T03:30:00.000Z"),
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: [],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-11T03:30:00.000Z"),
+                    sessionID: "before.mirror.review-directive",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 77,
+                    thoughtFoldChecksum: "fold-review-directive",
+                    updateTicketSummaries: ["legacy ticket summary"],
+                    reviewDirectiveLine: "Review memory write: Keep the boundary signal in warm memory.",
+                    guardrailFindings: ["directive guardrail"],
+                    recommendedKillSwitches: ["host-write"]
+                )
+            )
+        )
+
+        let presentation = snapshot.presentation
+
+        #expect(snapshot.primarySummary == "Review memory write: Keep the boundary signal in warm memory.")
+        #expect(presentation.primarySummary == "Review memory write: Keep the boundary signal in warm memory.")
+        #expect(presentation.queueItem.primarySummary == "Review memory write: Keep the boundary signal in warm memory.")
+    }
+
+    @Test
+    func checkpointPresentationFallsBackToTicketSummaryWhenReviewDirectiveIsBlank() {
+        let snapshot = DecisionReviewCheckpointSnapshot(
+            checkpointID: "checkpoint-presentation-blank-review-directive",
+            createdAt: date("2026-04-11T03:45:00.000Z"),
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: [],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-11T03:45:00.000Z"),
+                    sessionID: "before.mirror.blank-review-directive",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 77,
+                    thoughtFoldChecksum: "fold-blank-review-directive",
+                    updateTicketSummaries: ["legacy ticket summary"],
+                    reviewDirectiveLine: "   ",
+                    guardrailFindings: ["directive guardrail"],
+                    recommendedKillSwitches: ["host-write"]
+                )
+            )
+        )
+
+        let presentation = snapshot.presentation
+
+        #expect(snapshot.primarySummary == "legacy ticket summary")
+        #expect(presentation.primarySummary == "legacy ticket summary")
+        #expect(presentation.queueItem.primarySummary == "legacy ticket summary")
     }
 
     @Test

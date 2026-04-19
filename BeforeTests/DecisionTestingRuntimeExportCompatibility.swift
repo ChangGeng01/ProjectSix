@@ -1,4 +1,5 @@
 import Foundation
+import Testing
 import BASHostKit
 @testable import Before
 
@@ -543,4 +544,285 @@ private func mapCircuitReasonDictionary<Value>(
         guard let reason = DecisionIntelligenceCircuitTripReason(rawValue: item.key) else { return }
         partialResult[reason] = item.value
     }
+}
+
+@MainActor
+struct DecisionTestingRuntimeExportCompatibilityTests {
+    @Test
+    func sessionCheckpointExecutionCapabilitySurvivesIntoFlightDeckSummary() async {
+        let capability = DecisionSessionCheckpointExecutionCapability(
+            activeProviderID: DecisionModelProviderKind.foundationModels.rawValue,
+            preferredProviderID: DecisionModelProviderPreference.foundationModels.rawValue,
+            fallbackProviderID: DecisionModelProviderKind.gemmaE4B.rawValue,
+            providerTrackID: DecisionModelProviderTrack.builtInSystem.rawValue,
+            executionTierID: DecisionIntelligenceExecutionTier.systemManaged.rawValue,
+            foundationTierID: DecisionEBrainFoundationTier.systemManaged.rawValue,
+            reasonCodes: [
+                "tier:\(DecisionIntelligenceExecutionTier.systemManaged.rawValue)",
+                "active:\(DecisionModelProviderKind.foundationModels.rawValue)",
+                "preferred:\(DecisionModelProviderPreference.foundationModels.rawValue)",
+                "fallback:\(DecisionModelProviderKind.gemmaE4B.rawValue)",
+                "foundation_available"
+            ]
+        )
+        let sessionEngineSnapshot = DecisionSessionRuntimeSnapshot(
+            layerPlacement: .foldedLung,
+            sessions: 1,
+            activeSessions: 1,
+            stalledSessions: 0,
+            branches: 1,
+            checkpoints: 1,
+            events: 2,
+            steps: 0,
+            recentSessions: [
+                DecisionSessionRuntimeInspectionSession(
+                    sessionID: "sess-capability",
+                    title: "system managed turn",
+                    status: .active,
+                    updatedAt: Date(timeIntervalSince1970: 1_713_120_000),
+                    headBranchID: "branch-main",
+                    latestCheckpointID: "ckpt-capability",
+                    latestCheckpointSeq: 3,
+                    latestCheckpointGoal: "keep the system-managed route visible",
+                    latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
+                        sessionID: "sess-capability",
+                        thoughtFoldChecksum: "fold-capability",
+                        riskLevel: "high",
+                        permitMode: "delay",
+                        hostGatePercent: 61,
+                        reviewDirectiveLine: "Review capability persistence.",
+                        executionCapability: capability
+                    ),
+                    latestEventID: nil,
+                    latestEventSeq: nil,
+                    latestEventType: nil,
+                    latestEventDetail: nil,
+                    openStepCount: 0,
+                    openStepStatus: nil,
+                    stalledStepCount: 0,
+                    branchCount: 1,
+                    recoveryCount: 0,
+                    latestRecoveryAt: nil
+                )
+            ]
+        )
+        let persistedLineage = DecisionEvolutionLineageSnapshot(
+            checkpointID: "ckpt-capability",
+            createdAt: Date(timeIntervalSince1970: 1_713_120_000),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            diffSummary: ["Recovered capability-bearing checkpoint."],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: Date(timeIntervalSince1970: 1_713_120_000),
+                    sessionID: "sess-capability",
+                    taskType: "protective_review",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 61,
+                    thoughtFoldChecksum: "fold-capability",
+                    updateTicketSummaries: ["Review capability persistence."],
+                    reviewDirectiveLine: "Review capability persistence.",
+                    activeKillSwitches: ["force_guard_mode"],
+                    guardrailFindings: ["Capability path audit"],
+                    recommendedKillSwitches: ["require_reviewed_writes"]
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            sessionEngineSnapshot: sessionEngineSnapshot,
+            traceLimit: 0,
+            replayLimit: 0,
+            persistedCheckpointLineages: [persistedLineage],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        #expect(export.executionCapabilityFrame.activeProviderID == DecisionModelProviderKind.foundationModels.rawValue)
+        #expect(export.executionCapabilityFrame.foundationTierID == DecisionEBrainFoundationTier.systemManaged.rawValue)
+        #expect(export.executionCapabilityFrame.fallbackProviderID == DecisionModelProviderKind.gemmaE4B.rawValue)
+        #expect(export.flightDeck.eBrainSummary?.checkpointID == "ckpt-capability")
+        #expect(
+            export.effectiveEBrainFactsBundle?.horizonLine
+                == "Horizon worldPriorFabric • Stability invariant • Evidence grounded • Host hostIsolated • Session sessionIsolated • Tool toolRefreshRequired"
+        )
+        #expect(
+            export.effectiveEBrainFactsBundle?.temporalLine
+                == "Temporal invariant • Refresh embedded • Decay none • Scope crossSession"
+        )
+        #expect(
+            export.effectiveEBrainFactsBundle?.evidenceLine
+                == "Evidence grounded • Claim worldStructure • Caveat no • External refresh no"
+        )
+        #expect(
+            export.effectiveEBrainFactsBundle?.persistenceLine
+                == "Persistence volatile admitDirectly • contaminated quarantineCandidate • min durable evidence 0 • force stage no • pending tags evidence_caveat"
+        )
+        #expect(export.effectiveEBrainFactsBundle?.worldPriorContract == export.executionCapabilityFrame.worldPriorContract)
+        #expect(export.effectiveEBrainFactsBundle?.temporalKnowledgeContract == export.executionCapabilityFrame.temporalKnowledgeContract)
+        #expect(export.effectiveEBrainFactsBundle?.evidenceContract == export.executionCapabilityFrame.evidenceContract)
+        #expect(export.effectiveEBrainFactsBundle?.persistenceContract == export.executionCapabilityFrame.persistenceContract)
+        #expect(export.flightDeck.eBrainSummary?.presentation.worldPriorContract == export.executionCapabilityFrame.worldPriorContract)
+        #expect(export.flightDeck.eBrainSummary?.presentation.temporalKnowledgeContract == export.executionCapabilityFrame.temporalKnowledgeContract)
+        #expect(export.flightDeck.eBrainSummary?.presentation.evidenceContract == export.executionCapabilityFrame.evidenceContract)
+        #expect(export.flightDeck.eBrainSummary?.presentation.persistenceContract == export.executionCapabilityFrame.persistenceContract)
+        #expect(
+            export.flightDeck.eBrainSummary?.presentation.detailLines.contains(export.executionCapabilityFrame.detailLine) == true
+        )
+        #expect(
+            export.flightDeck.eBrainSummary?.presentation.detailLines.contains(
+                "Horizon worldPriorFabric • Stability invariant • Evidence grounded • Host hostIsolated • Session sessionIsolated • Tool toolRefreshRequired"
+            ) == true
+        )
+        #expect(
+            export.flightDeck.eBrainSummary?.presentation.detailLines.contains(
+                "Temporal invariant • Refresh embedded • Decay none • Scope crossSession"
+            ) == true
+        )
+        #expect(
+            export.flightDeck.eBrainSummary?.presentation.detailLines.contains(
+                "Evidence grounded • Claim worldStructure • Caveat no • External refresh no"
+            ) == true
+        )
+        #expect(
+            export.flightDeck.eBrainSummary?.presentation.detailLines.contains(
+                "Persistence volatile admitDirectly • contaminated quarantineCandidate • min durable evidence 0 • force stage no • pending tags evidence_caveat"
+            ) == true
+        )
+    }
+
+    @Test
+    func explicitHorizonFactsDerivedFromExecutionCapabilitySurviveIntoRuntimeExportAndFlightDeckSummary() async {
+        let capability = DecisionSessionCheckpointExecutionCapability(
+            activeProviderID: DecisionModelProviderKind.openModel.rawValue,
+            preferredProviderID: DecisionModelProviderPreference.openModel.rawValue,
+            fallbackProviderID: DecisionModelProviderKind.template.rawValue,
+            providerTrackID: DecisionModelProviderTrack.builtInOpenModel.rawValue,
+            executionTierID: DecisionIntelligenceExecutionTier.balancedGemma.rawValue,
+            foundationTierID: DecisionEBrainFoundationTier.openModelHeuristic.rawValue,
+            reasonCodes: ["external_refresh:yes"]
+        )
+        let sessionEngineSnapshot = DecisionSessionRuntimeSnapshot(
+            layerPlacement: .foldedLung,
+            sessions: 1,
+            activeSessions: 1,
+            stalledSessions: 0,
+            branches: 1,
+            checkpoints: 1,
+            events: 2,
+            steps: 0,
+            recentSessions: [
+                DecisionSessionRuntimeInspectionSession(
+                    sessionID: "sess-explicit-horizon",
+                    title: "volatile horizon",
+                    status: .active,
+                    updatedAt: Date(timeIntervalSince1970: 1_713_120_000),
+                    headBranchID: "branch-main",
+                    latestCheckpointID: "ckpt-explicit-horizon",
+                    latestCheckpointSeq: 3,
+                    latestCheckpointGoal: "keep the explicit horizon visible",
+                    latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
+                        sessionID: "sess-explicit-horizon",
+                        thoughtFoldChecksum: "fold-explicit-horizon",
+                        riskLevel: "high",
+                        permitMode: "delay",
+                        hostGatePercent: 58,
+                        reviewDirectiveLine: "Review explicit horizon persistence.",
+                        executionCapability: capability
+                    ),
+                    latestEventID: nil,
+                    latestEventSeq: nil,
+                    latestEventType: nil,
+                    latestEventDetail: nil,
+                    openStepCount: 0,
+                    openStepStatus: nil,
+                    stalledStepCount: 0,
+                    branchCount: 1,
+                    recoveryCount: 0,
+                    latestRecoveryAt: nil
+                )
+            ]
+        )
+        let persistedLineage = DecisionEvolutionLineageSnapshot(
+            checkpointID: "ckpt-explicit-horizon",
+            createdAt: Date(timeIntervalSince1970: 1_713_120_000),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            diffSummary: ["Recovered explicit horizon checkpoint."],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: Date(timeIntervalSince1970: 1_713_120_000),
+                    sessionID: "sess-explicit-horizon",
+                    taskType: "protective_review",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 58,
+                    thoughtFoldChecksum: "fold-explicit-horizon",
+                    updateTicketSummaries: ["Review explicit horizon persistence."],
+                    reviewDirectiveLine: "Review explicit horizon persistence.",
+                    activeKillSwitches: ["force_guard_mode"],
+                    guardrailFindings: ["Explicit horizon audit"],
+                    recommendedKillSwitches: ["require_reviewed_writes"]
+                )
+            )
+        )
+
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            sessionEngineSnapshot: sessionEngineSnapshot,
+            traceLimit: 0,
+            replayLimit: 0,
+            persistedCheckpointLineages: [persistedLineage],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        #expect(export.executionCapabilityFrame.worldPriorContract.priorID == "worldPriorFabric")
+        #expect(export.executionCapabilityFrame.worldPriorContract.posture == .heuristicPreview)
+        #expect(export.executionCapabilityFrame.worldPriorContract.boundaryID == "externalTraining")
+        #expect(export.executionCapabilityFrame.worldPriorContract.hostIsolationID == "hostIsolated")
+        #expect(export.executionCapabilityFrame.worldPriorContract.sessionIsolationID == "sessionIsolated")
+        #expect(export.executionCapabilityFrame.worldPriorContract.toolTruthModeID == "toolRefreshRequired")
+        #expect(export.executionCapabilityFrame.temporalKnowledgeContract.tier == .volatile)
+        #expect(export.executionCapabilityFrame.temporalKnowledgeContract.refreshRequirement == .perUse)
+        #expect(export.executionCapabilityFrame.temporalKnowledgeContract.decayPolicy == .sessionRecompute)
+        #expect(export.executionCapabilityFrame.temporalKnowledgeContract.timeScope == .runtimeWindow)
+        #expect(export.executionCapabilityFrame.evidenceContract.gradient == .heuristic)
+        #expect(export.executionCapabilityFrame.evidenceContract.claimType == .heuristicEstimate)
+        #expect(export.executionCapabilityFrame.evidenceContract.requiresCaveat)
+        #expect(export.executionCapabilityFrame.evidenceContract.requiresExternalRefresh)
+        #expect(
+            export.effectiveEBrainFactsBundle?.horizonLine
+                == "Horizon worldPriorFabric • Stability volatile • Evidence heuristic • Host hostIsolated • Session sessionIsolated • Tool toolRefreshRequired"
+        )
+        #expect(
+            export.effectiveEBrainFactsBundle?.temporalLine
+                == "Temporal volatile • Refresh perUse • Decay sessionRecompute • Scope runtimeWindow"
+        )
+        #expect(
+            export.effectiveEBrainFactsBundle?.evidenceLine
+                == "Evidence heuristic • Claim heuristicEstimate • Caveat yes • External refresh yes"
+        )
+        #expect(export.flightDeck.eBrainSummary?.presentation.worldPriorContract?.priorID == "worldPriorFabric")
+        #expect(export.flightDeck.eBrainSummary?.presentation.worldPriorContract?.posture == .heuristicPreview)
+        #expect(export.flightDeck.eBrainSummary?.presentation.temporalKnowledgeContract?.tier == .volatile)
+        #expect(export.flightDeck.eBrainSummary?.presentation.temporalKnowledgeContract?.refreshRequirement == .perUse)
+        #expect(export.flightDeck.eBrainSummary?.presentation.evidenceContract?.gradient == .heuristic)
+        #expect(export.flightDeck.eBrainSummary?.presentation.evidenceContract?.requiresExternalRefresh == true)
+    }
+
 }

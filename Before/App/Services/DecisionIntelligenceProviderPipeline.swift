@@ -32,12 +32,14 @@ enum DecisionIntelligenceProviderPipeline {
     static func orderedKinds(
         for preference: DecisionModelProviderPreference,
         allowFallbacks: Bool = true,
-        excluding suspendedKinds: Set<DecisionModelProviderKind> = []
+        excluding suspendedKinds: Set<DecisionModelProviderKind> = [],
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy
     ) -> [DecisionModelProviderKind] {
-        BASAppleProviderHostBridge.orderedProviderIDs(
+        BASReferenceProviderRuntime.orderedProviderIDs(
             preferredProviderID: preference.kind.rawValue,
             allowFallbacks: allowFallbacks,
-            excluding: Set(suspendedKinds.map(\.rawValue))
+            suspendedProviderIDs: Set(suspendedKinds.map(\.rawValue)),
+            routingPolicy: BeforeProductCompatibility.requireProviderRoutingPolicy(from: runtimePolicyResolution)
         )
         .compactMap(DecisionModelProviderKind.init(rawValue:))
     }
@@ -45,35 +47,150 @@ enum DecisionIntelligenceProviderPipeline {
     static func runtimeStatus(
         preferences: BeforePreferences,
         statusesByKind: [DecisionModelProviderKind: DecisionModelProviderStatus] = defaultStatusesByKind(),
+        device: DeviceCapabilitySnapshot = .current,
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) -> DecisionModelRuntimeStatus {
-        let preferred = preferences.preferredIntelligenceProvider.kind
-        let summary = BASAppleProviderRuntimeStatusAdapter.runtimeStatus(
-            from: BASAppleProviderRuntimeStatusInput(
-                preferredProviderID: preferred.rawValue,
-                allowFallbacks: preferences.allowModelFallbacks,
-                runtimeEnabled: preferences.onDeviceIntelligenceMode.isEnabled,
-                statusesByID: BASAppleProviderHostBridge.statusRecords(
-                    statusesByKind,
-                    keyID: \.rawValue,
-                    isAvailable: \.isAvailable,
-                    title: \.title,
-                    detail: \.detail
-                ),
-                testingOverrideEnabled: testingStubProfile != nil,
-                testingOverrideTitle: testingStubProfile?.title
-            )
-        )
-        let active = DecisionModelProviderKind(rawValue: summary.activeProviderID) ?? .template
-        let fallback = summary.fallbackProviderID.flatMap(DecisionModelProviderKind.init(rawValue:))
+        DecisionIntelligenceCoordinator.runtimeCoordination(
+            preferences: preferences,
+            testingStubProfile: testingStubProfile,
+            device: device,
+            runtimePolicyResolution: runtimePolicyResolution,
+            statusesByKind: statusesByKind
+        ).runtimeStatus
+    }
 
-        return DecisionModelRuntimeStatus(
-            preferred: preferred,
-            active: active,
-            fallback: fallback,
-            detail: summary.detail
+    private struct HorizonCachePolicy: Sendable {
+        let blocksReuse: Bool
+        let blocksStore: Bool
+        let quarantinesExistingEntries: Bool
+
+        static let permissive = HorizonCachePolicy(
+            blocksReuse: false,
+            blocksStore: false,
+            quarantinesExistingEntries: false
         )
     }
+
+    private static func horizonCachePolicy(
+        for brainState: DecisionBrainState?
+    ) -> HorizonCachePolicy {
+        guard let brainState else {
+            return .permissive
+        }
+
+        let retrievalTags = Set(brainState.retrievalTags.map { $0.lowercased() })
+        let sessionBiases = Set(brainState.sessionBiases.map { $0.lowercased() })
+        let riskFlags = Set(brainState.verificationSnapshot.riskFlags)
+
+        let requiresExternalRefresh =
+            riskFlags.contains(.externalRefreshGuardTriggered) ||
+            retrievalTags.contains("external_refresh") ||
+            retrievalTags.contains("volatile") ||
+            sessionBiases.contains("horizon-external-refresh")
+
+        let requiresObservationQuarantine =
+            riskFlags.contains(.observationOnlyQuarantine) ||
+            retrievalTags.contains("quarantine") ||
+            retrievalTags.contains("quarantined") ||
+            retrievalTags.contains("tool_observation") ||
+            sessionBiases.contains("horizon-tool-quarantine")
+
+        guard requiresExternalRefresh || requiresObservationQuarantine else {
+            return .permissive
+        }
+
+        return HorizonCachePolicy(
+            blocksReuse: true,
+            blocksStore: true,
+            quarantinesExistingEntries: true
+        )
+    }
+
+    private static func loadCachedResultIfAllowed<Value>(
+        cacheKey: String,
+        policy: HorizonCachePolicy,
+        load: @escaping (String) async -> Value?,
+        quarantine: @escaping (String) async -> Void
+    ) async -> Value? {
+        guard policy.blocksReuse == false else {
+            if policy.quarantinesExistingEntries {
+                await quarantine(cacheKey)
+            }
+            return nil
+        }
+
+        return await load(cacheKey)
+    }
+
+    private static func storeCachedResultIfAllowed<Value>(
+        _ value: Value,
+        cacheKey: String,
+        policy: HorizonCachePolicy,
+        store: @escaping (Value, String) async -> Void,
+        quarantine: @escaping (String) async -> Void
+    ) async {
+        guard policy.blocksStore == false else {
+            if policy.quarantinesExistingEntries {
+                await quarantine(cacheKey)
+            }
+            return
+        }
+
+        await store(value, cacheKey)
+    }
+
+    private static func relevantCacheProviders(
+        for preference: DecisionModelProviderPreference,
+        allowFallbacks: Bool,
+        runtimePolicyResolution: BeforeRuntimePolicyResolution,
+        testingStubProfile: DecisionTestingStubProfile?
+    ) -> [DecisionModelProviderKind] {
+        var providers = orderedKinds(
+            for: preference,
+            allowFallbacks: allowFallbacks,
+            runtimePolicyResolution: runtimePolicyResolution
+        )
+
+        if testingStubProfile != nil, preference != .template {
+            providers.insert(.testingStub, at: 0)
+        }
+
+        var uniqueProviders: [DecisionModelProviderKind] = []
+        for provider in providers where !uniqueProviders.contains(provider) {
+            uniqueProviders.append(provider)
+        }
+
+        return uniqueProviders
+    }
+
+    private static func preemptivelyQuarantineCachesIfNeeded(
+        policy: HorizonCachePolicy,
+        preference: DecisionModelProviderPreference,
+        allowFallbacks: Bool,
+        runtimePolicyResolution: BeforeRuntimePolicyResolution,
+        testingStubProfile: DecisionTestingStubProfile?,
+        envelope: DecisionIntelligencePromptContract.PromptEnvelope,
+        quarantine: @escaping (String) async -> Void
+    ) async {
+        guard policy.quarantinesExistingEntries else {
+            return
+        }
+
+        for provider in relevantCacheProviders(
+            for: preference,
+            allowFallbacks: allowFallbacks,
+            runtimePolicyResolution: runtimePolicyResolution,
+            testingStubProfile: testingStubProfile
+        ) {
+            let cacheKey = DecisionIntelligencePromptContract.cacheFingerprint(
+                provider: provider,
+                envelope: envelope
+            )
+            await quarantine(cacheKey)
+        }
+    }
+
     static func refineQuickResult(
         base: QuickCheckResult,
         input: QuickCheckInput,
@@ -84,6 +201,7 @@ enum DecisionIntelligenceProviderPipeline {
         eBrainTurn: BASEBrainTurnResult? = nil,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> QuickCheckResult? {
         let adjustedStrategy = strategy?.clamped(using: eBrainTurn)
@@ -103,6 +221,7 @@ enum DecisionIntelligenceProviderPipeline {
         let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: envelope)
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: envelope)
         let promptPreparedMs = elapsedMilliseconds(since: requestStart, clock: clock)
+        let cachePolicy = horizonCachePolicy(for: brainState)
         let admissionDecision = testingStubProfile.map {
             _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: envelope)
         } ?? DecisionIntelligenceAdmissionController.decide(for: envelope)
@@ -137,11 +256,23 @@ enum DecisionIntelligenceProviderPipeline {
                 recordsTemplatePinnedTrace: true
             )
         )
+        await preemptivelyQuarantineCachesIfNeeded(
+            policy: cachePolicy,
+            preference: preference,
+            allowFallbacks: allowFallbacks,
+            runtimePolicyResolution: runtimePolicyResolution,
+            testingStubProfile: testingStubProfile,
+            envelope: envelope,
+            quarantine: { cacheKey in
+                await responseCache.quarantineQuickResult(for: cacheKey)
+            }
+        )
         let outcome = await BehavioralAISubstrateBridge.executeObservedProviderRequest(
             task: .quick,
             strategy: adjustedStrategy,
             preference: preference,
             allowFallbacks: allowFallbacks,
+            runtimePolicyResolution: runtimePolicyResolution,
             testingStubProfile: testingStubProfile,
             admissionAllowed: admissionDecision.isAllowed,
             observationContext: observationContext,
@@ -154,7 +285,16 @@ enum DecisionIntelligenceProviderPipeline {
                     provider: provider.kind,
                     envelope: envelope
                 )
-                return await responseCache.quickResult(for: cacheKey)
+                return await loadCachedResultIfAllowed(
+                    cacheKey: cacheKey,
+                    policy: cachePolicy,
+                    load: { cacheKey in
+                        await responseCache.quickResult(for: cacheKey)
+                    },
+                    quarantine: { cacheKey in
+                        await responseCache.quarantineQuickResult(for: cacheKey)
+                    }
+                )
             },
             assessCachedResult: { cached in
                 providerAttemptVerdict(
@@ -194,7 +334,17 @@ enum DecisionIntelligenceProviderPipeline {
                     provider: provider.kind,
                     envelope: envelope
                 )
-                await responseCache.storeQuickResult(refined, for: cacheKey)
+                await storeCachedResultIfAllowed(
+                    refined,
+                    cacheKey: cacheKey,
+                    policy: cachePolicy,
+                    store: { refined, cacheKey in
+                        await responseCache.storeQuickResult(refined, for: cacheKey)
+                    },
+                    quarantine: { cacheKey in
+                        await responseCache.quarantineQuickResult(for: cacheKey)
+                    }
+                )
             }
         )
 
@@ -216,6 +366,7 @@ enum DecisionIntelligenceProviderPipeline {
         eBrainTurn: BASEBrainTurnResult? = nil,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> BalanceBoardResult? {
         let adjustedStrategy = strategy?.clamped(using: eBrainTurn)
@@ -235,6 +386,7 @@ enum DecisionIntelligenceProviderPipeline {
         let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: envelope)
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: envelope)
         let promptPreparedMs = elapsedMilliseconds(since: requestStart, clock: clock)
+        let cachePolicy = horizonCachePolicy(for: brainState)
         let admissionDecision = testingStubProfile.map {
             _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: envelope)
         } ?? DecisionIntelligenceAdmissionController.decide(for: envelope)
@@ -269,11 +421,23 @@ enum DecisionIntelligenceProviderPipeline {
                 recordsTemplatePinnedTrace: true
             )
         )
+        await preemptivelyQuarantineCachesIfNeeded(
+            policy: cachePolicy,
+            preference: preference,
+            allowFallbacks: allowFallbacks,
+            runtimePolicyResolution: runtimePolicyResolution,
+            testingStubProfile: testingStubProfile,
+            envelope: envelope,
+            quarantine: { cacheKey in
+                await responseCache.quarantineBalanceResult(for: cacheKey)
+            }
+        )
         let outcome = await BehavioralAISubstrateBridge.executeObservedProviderRequest(
             task: .balance,
             strategy: adjustedStrategy,
             preference: preference,
             allowFallbacks: allowFallbacks,
+            runtimePolicyResolution: runtimePolicyResolution,
             testingStubProfile: testingStubProfile,
             admissionAllowed: admissionDecision.isAllowed,
             observationContext: observationContext,
@@ -286,7 +450,16 @@ enum DecisionIntelligenceProviderPipeline {
                     provider: provider.kind,
                     envelope: envelope
                 )
-                return await responseCache.balanceResult(for: cacheKey)
+                return await loadCachedResultIfAllowed(
+                    cacheKey: cacheKey,
+                    policy: cachePolicy,
+                    load: { cacheKey in
+                        await responseCache.balanceResult(for: cacheKey)
+                    },
+                    quarantine: { cacheKey in
+                        await responseCache.quarantineBalanceResult(for: cacheKey)
+                    }
+                )
             },
             assessCachedResult: { cached in
                 providerAttemptVerdict(
@@ -326,7 +499,17 @@ enum DecisionIntelligenceProviderPipeline {
                     provider: provider.kind,
                     envelope: envelope
                 )
-                await responseCache.storeBalanceResult(refined, for: cacheKey)
+                await storeCachedResultIfAllowed(
+                    refined,
+                    cacheKey: cacheKey,
+                    policy: cachePolicy,
+                    store: { refined, cacheKey in
+                        await responseCache.storeBalanceResult(refined, for: cacheKey)
+                    },
+                    quarantine: { cacheKey in
+                        await responseCache.quarantineBalanceResult(for: cacheKey)
+                    }
+                )
             }
         )
 
@@ -348,6 +531,7 @@ enum DecisionIntelligenceProviderPipeline {
         eBrainTurn: BASEBrainTurnResult? = nil,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> MirrorResult? {
         let adjustedStrategy = strategy?.clamped(using: eBrainTurn)
@@ -367,6 +551,7 @@ enum DecisionIntelligenceProviderPipeline {
         let semanticPromptFingerprint = DecisionIntelligencePromptContract.semanticFingerprint(for: envelope)
         let stablePrefixFingerprint = DecisionIntelligencePromptContract.stablePrefixFingerprint(for: envelope)
         let promptPreparedMs = elapsedMilliseconds(since: requestStart, clock: clock)
+        let cachePolicy = horizonCachePolicy(for: brainState)
         let admissionDecision = testingStubProfile.map {
             _ in DecisionIntelligenceAdmissionController.testingStubDecision(for: envelope)
         } ?? DecisionIntelligenceAdmissionController.decide(for: envelope)
@@ -401,11 +586,23 @@ enum DecisionIntelligenceProviderPipeline {
                 recordsTemplatePinnedTrace: true
             )
         )
+        await preemptivelyQuarantineCachesIfNeeded(
+            policy: cachePolicy,
+            preference: preference,
+            allowFallbacks: allowFallbacks,
+            runtimePolicyResolution: runtimePolicyResolution,
+            testingStubProfile: testingStubProfile,
+            envelope: envelope,
+            quarantine: { cacheKey in
+                await responseCache.quarantineMirrorResult(for: cacheKey)
+            }
+        )
         let outcome = await BehavioralAISubstrateBridge.executeObservedProviderRequest(
             task: .mirror,
             strategy: adjustedStrategy,
             preference: preference,
             allowFallbacks: allowFallbacks,
+            runtimePolicyResolution: runtimePolicyResolution,
             testingStubProfile: testingStubProfile,
             admissionAllowed: admissionDecision.isAllowed,
             observationContext: observationContext,
@@ -418,7 +615,16 @@ enum DecisionIntelligenceProviderPipeline {
                     provider: provider.kind,
                     envelope: envelope
                 )
-                return await responseCache.mirrorResult(for: cacheKey)
+                return await loadCachedResultIfAllowed(
+                    cacheKey: cacheKey,
+                    policy: cachePolicy,
+                    load: { cacheKey in
+                        await responseCache.mirrorResult(for: cacheKey)
+                    },
+                    quarantine: { cacheKey in
+                        await responseCache.quarantineMirrorResult(for: cacheKey)
+                    }
+                )
             },
             assessCachedResult: { cached in
                 providerAttemptVerdict(
@@ -458,7 +664,17 @@ enum DecisionIntelligenceProviderPipeline {
                     provider: provider.kind,
                     envelope: envelope
                 )
-                await responseCache.storeMirrorResult(refined, for: cacheKey)
+                await storeCachedResultIfAllowed(
+                    refined,
+                    cacheKey: cacheKey,
+                    policy: cachePolicy,
+                    store: { refined, cacheKey in
+                        await responseCache.storeMirrorResult(refined, for: cacheKey)
+                    },
+                    quarantine: { cacheKey in
+                        await responseCache.quarantineMirrorResult(for: cacheKey)
+                    }
+                )
             }
         )
 
@@ -478,6 +694,7 @@ enum DecisionIntelligenceProviderPipeline {
         strategy: DecisionAdaptiveTaskStrategy? = nil,
         preference: DecisionModelProviderPreference,
         allowFallbacks: Bool,
+        runtimePolicyResolution: BeforeRuntimePolicyResolution = BeforeProductCompatibility.resolvedRuntimePolicy,
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> ReminderSelectionCandidate? {
         let clock = ContinuousClock()
@@ -543,6 +760,7 @@ enum DecisionIntelligenceProviderPipeline {
             strategy: strategy,
             preference: preference,
             allowFallbacks: allowFallbacks,
+            runtimePolicyResolution: runtimePolicyResolution,
             testingStubProfile: testingStubProfile,
             admissionAllowed: admissionDecision.isAllowed,
             observationContext: observationContext,
@@ -698,14 +916,15 @@ extension DecisionAdaptiveTaskStrategy {
         guard let eBrainTurn else { return self }
 
         let budget = eBrainTurn.budgetFrame
+        let hasActiveLease = eBrainTurn.runLease?.isActive(asOf: eBrainTurn.runtimeTrace.recordedAt) ?? budget.hasActiveLease(asOf: eBrainTurn.runtimeTrace.recordedAt)
         let gearCap: DecisionRuntimeGear = switch budget.runMode {
-        case .dormant, .sentinel:
+        case .dormant, .pulse, .sentinel, .recovery, .quarantine, .lockdown:
             .low
-        case .engage:
+        case .engage, .reflect:
             .balanced
         case .deepLoop:
-            .high
-        case .guarded:
+            hasActiveLease ? .high : .balanced
+        case .guard:
             .low
         }
 
@@ -713,7 +932,19 @@ extension DecisionAdaptiveTaskStrategy {
         let cappedContextBudget = min(contextBudget, max(40, budget.maxCandidates * 100 + budget.maxLoops * 60))
         let cappedOutputBudget = min(outputCharacterBudget, max(80, budget.maxDecodeTokens * 2))
         let cappedTimeBudget = min(timeBudgetMs, max(250, budget.maxLoops * 320 + budget.retrievalDepth * 120))
-        let cappedToolBudget = min(toolCallBudget, budget.maintenanceAllowed ? toolCallBudget : 1)
+        let toolBudgetCap: Int = switch budget.runMode {
+        case .pulse, .sentinel, .recovery, .quarantine, .lockdown:
+            0
+        case .guard:
+            1
+        case .engage, .reflect:
+            min(toolCallBudget, 1)
+        case .deepLoop:
+            hasActiveLease ? toolCallBudget : 0
+        case .dormant:
+            0
+        }
+        let cappedToolBudget = min(toolCallBudget, toolBudgetCap)
         let cappedRetrievalBudget = min(retrievalItemBudget, max(1, budget.retrievalDepth + max(0, budget.maxCandidates / 2)))
 
         return DecisionAdaptiveTaskStrategy(

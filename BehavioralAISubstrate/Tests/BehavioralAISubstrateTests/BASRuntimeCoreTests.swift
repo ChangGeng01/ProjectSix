@@ -195,6 +195,8 @@ struct BASRuntimeCoreTests {
                     orderedProviderIDs: ["local-fast", "reflective-large", "template"]
                 )
             ],
+            appliedRoutingPolicyVersion: "routing.policy.test.v1",
+            appliedRoutingRegistryVersion: "routing.registry.test.v1",
             strategy: BASAdaptiveTaskStrategy(
                 kind: .reflective,
                 entropy: .high,
@@ -241,6 +243,9 @@ struct BASRuntimeCoreTests {
 
         #expect(plan.orderedProviderIDs.first == "reflective-large")
         #expect(plan.compatibleProviderIDs.contains("reflective-large"))
+        #expect(plan.appliedRoutingPolicyVersion == "routing.policy.test.v1")
+        #expect(plan.appliedRoutingRegistryVersion == "routing.registry.test.v1")
+        #expect(plan.rationale.contains(where: { $0.contains("routing.policy.test.v1") }))
         #expect(plan.rationale.contains(where: { $0.contains("Selected reflective-large ahead of the preferred provider") }))
     }
 
@@ -1222,7 +1227,8 @@ struct BASRuntimeCoreTests {
             BASReferenceProviderRuntime.orderedProviderIDs(
                 preferredProviderID: BASReferenceProviderRuntime.openModelProviderID,
                 allowFallbacks: true,
-                suspendedProviderIDs: [BASReferenceProviderRuntime.openModelProviderID]
+                suspendedProviderIDs: [BASReferenceProviderRuntime.openModelProviderID],
+                routingPolicy: BASReferenceProviderRuntime.fixtureRoutingPolicy
             ) == [
                 BASReferenceProviderRuntime.gemmaE4BProviderID,
                 BASReferenceProviderRuntime.foundationModelsProviderID
@@ -1232,11 +1238,209 @@ struct BASRuntimeCoreTests {
         #expect(
             BASReferenceProviderRuntime.orderedProviderIDs(
                 preferredProviderID: BASReferenceProviderRuntime.foundationModelsProviderID,
-                allowFallbacks: false
+                allowFallbacks: false,
+                routingPolicy: BASReferenceProviderRuntime.fixtureRoutingPolicy
             ) == [
                 BASReferenceProviderRuntime.foundationModelsProviderID
             ]
         )
+    }
+
+    @Test("reference provider runtime can resolve ordering from an injected routing policy")
+    func referenceProviderRuntimeUsesInjectedRoutingPolicy() {
+        let policy = BASProviderRoutingPolicy(
+            schemaVersion: "test.policy.v1",
+            deterministicProviderID: "template",
+            testingOverrideProviderID: "testingStub",
+            preferenceOrderings: [
+                BASProviderPreferenceOrdering(
+                    preferredProviderID: "customLocal",
+                    orderedProviderIDs: ["customLocal", "customFallback", "foundation"]
+                ),
+                BASProviderPreferenceOrdering(
+                    preferredProviderID: "foundation",
+                    orderedProviderIDs: ["foundation", "customFallback"]
+                )
+            ]
+        )
+
+        #expect(
+            BASReferenceProviderRuntime.orderedProviderIDs(
+                preferredProviderID: "customLocal",
+                allowFallbacks: true,
+                suspendedProviderIDs: ["customLocal"],
+                routingPolicy: policy
+            ) == [
+                "customFallback",
+                "foundation"
+            ]
+        )
+
+        let summary = BASReferenceProviderRuntime.runtimeStatusSummary(
+            preferredProviderID: "customLocal",
+            allowFallbacks: true,
+            runtimeEnabled: true,
+            statusesByID: [
+                "customFallback": BASProviderStatusRecord(
+                    providerID: "customFallback",
+                    isAvailable: true,
+                    title: "Custom fallback",
+                    detail: "Fallback is ready."
+                )
+            ],
+            routingPolicy: policy
+        )
+
+        #expect(summary.activeProviderID == "customFallback")
+        #expect(summary.orderedProviderIDs == ["customLocal", "customFallback", "foundation"])
+        #expect(summary.appliedRoutingPolicyVersion == "test.policy.v1")
+        #expect(summary.detail.contains("custom fallback"))
+    }
+
+    @Test("reference provider runtime can resolve routing policies from a versioned registry")
+    func referenceProviderRuntimeResolvesRoutingPoliciesFromRegistry() {
+        let registry = BASProviderRoutingPolicyRegistry(
+            schemaVersion: "registry.v1",
+            defaultPolicyID: "baseline",
+            policiesByID: [
+                "baseline": BASProviderRoutingPolicy(
+                    schemaVersion: "baseline",
+                    deterministicProviderID: "template",
+                    preferenceOrderings: []
+                ),
+                "field-rollout": BASProviderRoutingPolicy(
+                    schemaVersion: "field-rollout",
+                    deterministicProviderID: "template",
+                    testingOverrideProviderID: "testingStub",
+                    preferenceOrderings: [
+                        BASProviderPreferenceOrdering(
+                            preferredProviderID: "fieldPrimary",
+                            orderedProviderIDs: ["fieldPrimary", "fieldFallback"]
+                        )
+                    ]
+                )
+            ]
+        )
+
+        let resolved = BASReferenceProviderRuntime.resolvedRoutingPolicyIfAvailable(
+            policyID: "field-rollout",
+            registry: registry
+        )
+
+        #expect(resolved?.schemaVersion == "field-rollout")
+        #expect(resolved?.testingOverrideProviderID == "testingStub")
+        #expect(resolved?.preferenceOrderings.first?.orderedProviderIDs == ["fieldPrimary", "fieldFallback"])
+    }
+
+    @Test("reference provider runtime can resolve routing sources from a versioned registry")
+    func referenceProviderRuntimeResolvesRoutingSourcesFromRegistry() {
+        let registry = BASProviderRoutingPolicyRegistry(
+            schemaVersion: "registry.v1",
+            defaultPolicyID: "baseline",
+            policiesByID: [
+                "baseline": BASProviderRoutingPolicy(
+                    schemaVersion: "baseline",
+                    deterministicProviderID: "template",
+                    preferenceOrderings: []
+                ),
+                "field-rollout": BASProviderRoutingPolicy(
+                    schemaVersion: "field-rollout",
+                    deterministicProviderID: "template",
+                    testingOverrideProviderID: "testingStub",
+                    preferenceOrderings: [
+                        BASProviderPreferenceOrdering(
+                            preferredProviderID: "fieldPrimary",
+                            orderedProviderIDs: ["fieldPrimary", "fieldFallback"]
+                        )
+                    ]
+                )
+            ]
+        )
+
+        let source = BASReferenceProviderRuntime.resolvedRoutingSource(
+            policyID: "field-rollout",
+            registry: registry
+        )
+
+        #expect(source.registryVersion == "registry.v1")
+        #expect(source.policyID == "field-rollout")
+        #expect(source.resolvedPolicyIfAvailable?.schemaVersion == "field-rollout")
+        #expect(source.resolvedPolicyIfAvailable?.testingOverrideProviderID == "testingStub")
+    }
+
+    @Test("reference provider runtime keeps fixture catalogs explicit")
+    func referenceProviderRuntimeKeepsFixtureCatalogsExplicit() {
+        #expect(
+            BASReferenceProviderRuntime.registryUsesFixtureCatalog(
+                BASReferenceProviderRuntime.fixtureRoutingRegistry,
+                policyID: BASReferenceProviderRuntime.fixtureRoutingPolicyID
+            )
+        )
+
+        let customRegistry = BASProviderRoutingPolicyRegistry(
+            schemaVersion: "custom.registry.v1",
+            defaultPolicyID: "custom",
+            policiesByID: [
+                "custom": BASProviderRoutingPolicy(
+                    schemaVersion: "custom.policy.v1",
+                    deterministicProviderID: "customLocal",
+                    testingOverrideProviderID: "customStub",
+                    preferenceOrderings: [
+                        BASProviderPreferenceOrdering(
+                            preferredProviderID: "customLocal",
+                            orderedProviderIDs: ["customLocal", "customFallback"]
+                        )
+                    ]
+                )
+            ]
+        )
+
+        #expect(
+            BASReferenceProviderRuntime.registryUsesFixtureCatalog(
+                customRegistry,
+                policyID: "custom"
+            ) == false
+        )
+    }
+
+    @Test("provider routing source keeps missing fallback explicit instead of implicit")
+    func providerRoutingSourceKeepsMissingFallbackExplicit() {
+        let registry = BASProviderRoutingPolicyRegistry(
+            schemaVersion: "registry.v1",
+            defaultPolicyID: "missing-default",
+            policiesByID: [:]
+        )
+
+        let source = BASProviderRoutingPolicySource(
+            registry: registry,
+            policyID: "unknown-rollout"
+        )
+
+        #expect(source.resolvedPolicyIfAvailable == nil)
+        #expect(source.resolvedPolicyOrMissing.schemaVersion == "provider-routing.missing.v1")
+    }
+
+    @Test("provider routing source treats an unknown explicit policy as unavailable instead of promoting the registry default")
+    func providerRoutingSourceDoesNotPromoteRegistryDefaultForUnknownExplicitPolicy() {
+        let registry = BASProviderRoutingPolicyRegistry(
+            schemaVersion: "registry.v1",
+            defaultPolicyID: "baseline",
+            policiesByID: [
+                "baseline": BASProviderRoutingPolicy(
+                    schemaVersion: "baseline",
+                    deterministicProviderID: "template",
+                    preferenceOrderings: []
+                )
+            ]
+        )
+
+        let source = BASProviderRoutingPolicySource(
+            registry: registry,
+            policyID: "unknown-rollout"
+        )
+
+        #expect(source.resolvedPolicyIfAvailable == nil)
+        #expect(source.resolvedPolicyOrMissing.schemaVersion == "provider-routing.missing.v1")
     }
 
     @Test("reference provider runtime composes active status with testing override")
@@ -1260,11 +1464,13 @@ struct BASRuntimeCoreTests {
                 )
             ],
             testingOverrideEnabled: true,
-            testingOverrideTitle: "Stub runtime"
+            testingOverrideTitle: "Stub runtime",
+            routingPolicy: BASReferenceProviderRuntime.fixtureRoutingPolicy
         )
 
         #expect(summary.activeProviderID == BASReferenceProviderRuntime.testingStubProviderID)
         #expect(summary.fallbackProviderID == BASReferenceProviderRuntime.testingStubProviderID)
+        #expect(summary.appliedRoutingPolicyVersion == BASReferenceProviderRuntime.fixtureRoutingPolicy.schemaVersion)
         #expect(summary.detail.contains("Stub runtime"))
     }
 

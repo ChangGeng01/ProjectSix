@@ -67,13 +67,44 @@ public enum BASEBrainConsoleSupport {
         let mirror = turn.decomposeFrame.mirrorText.trimmingCharacters(in: .whitespacesAndNewlines)
         let mirrorSummary = mirror.isEmpty ? "mirror unavailable" : mirror
         let goalSummary = turn.hostContext.longTermGoals.prefix(2).joined(separator: " • ").nilIfEmpty ?? "no dominant goals"
+        let constitutionSummary = turn.hostConstitution.map {
+            "constitution \($0.activeVersion) • phase \($0.narrativeLoom.currentPhase)"
+        }
+        let governanceSummary = [
+            turn.hostConstitutionVault.map {
+                [
+                    "vault \($0.versionSignature)",
+                    "consistency \($0.deviceConsistencyReport.consistencyState)",
+                    "out_of_sync \($0.deviceConsistencyReport.outOfSyncDeviceIDs.count)",
+                    $0.deviceConsistencyReport.outOfSyncDeviceIDs.isEmpty
+                        ? nil
+                        : "devices \($0.deviceConsistencyReport.outOfSyncDeviceIDs.joined(separator: ", "))",
+                    $0.migrationContract.map { "target \($0.targetDeviceID)" }
+                ]
+                .compactMap { $0 }
+                .joined(separator: " • ")
+            },
+            turn.hostVersionTree.map {
+                "pending \($0.pendingCandidateIDs.count) • frozen \($0.frozenVersionIDs.count)"
+            },
+            turn.hostForgetRequest.map {
+                "forget \($0.requestID) • verified \($0.verified)"
+            }
+        ]
+        .compactMap { $0 }
+        .joined(separator: " • ")
+        .nilIfEmpty
 
         let eBrainSummary = [
             "Host \(turn.hostContext.hostID)",
             "version \(turn.hostContext.activeVersion)",
+            constitutionSummary,
+            governanceSummary,
             goalSummary,
             mirrorSummary
-        ].joined(separator: " • ")
+        ]
+        .compactMap { $0 }
+        .joined(separator: " • ")
 
         guard let fallback, !fallback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return eBrainSummary
@@ -96,7 +127,33 @@ public enum BASEBrainConsoleSupport {
         case .data:
             let gateValue = String(format: "%.2f", turn.hostGateValue)
             let identitySummary = turn.hostContext.identityTags.prefix(2).joined(separator: " • ")
-            merged.summary = "L5 host \(turn.hostContext.activeVersion) • gate \(gateValue) • identity \(identitySummary)"
+            let constitutionSummary = turn.hostConstitution.map {
+                "constitution \($0.activeVersion) • phase \($0.narrativeLoom.currentPhase)"
+            } ?? "constitution unavailable"
+            let governanceSummary = [
+                turn.hostConstitutionVault.map {
+                    [
+                        "vault \($0.versionSignature)",
+                        "consistency \($0.deviceConsistencyReport.consistencyState)",
+                        "out_of_sync \($0.deviceConsistencyReport.outOfSyncDeviceIDs.count)",
+                        $0.deviceConsistencyReport.outOfSyncDeviceIDs.isEmpty
+                            ? nil
+                            : "devices \($0.deviceConsistencyReport.outOfSyncDeviceIDs.joined(separator: ", "))",
+                        $0.migrationContract.map { "target \($0.targetDeviceID)" }
+                    ]
+                    .compactMap { $0 }
+                    .joined(separator: " • ")
+                },
+                turn.hostVersionTree.map {
+                    "pending \($0.pendingCandidateIDs.count) • frozen \($0.frozenVersionIDs.count)"
+                },
+                turn.hostForgetRequest.map {
+                    "forget \($0.requestID) • verified \($0.verified)"
+                }
+            ]
+            .compactMap { $0 }
+            .joined(separator: " • ")
+            merged.summary = "L5 host \(turn.hostContext.activeVersion) • \(constitutionSummary) • \(governanceSummary.isEmpty ? "no active governance markers" : governanceSummary) • gate \(gateValue) • identity \(identitySummary)"
             merged.blockers = []
             merged.score = adjustedScore(base: report.score, fallback: 0.93)
         case .memory:
@@ -176,15 +233,77 @@ public enum BASEBrainConsoleSupport {
     private static func currentBrainState(
         for turn: BASEBrainTurnResult
     ) -> BASCurrentBrainState {
-        BASCurrentBrainState(
+        let constitutionRetrievalTags = turn.hostConstitution.map {
+            [
+                "constitution:\($0.activeVersion)",
+                "constitution_phase:\($0.narrativeLoom.currentPhase)"
+            ]
+        } ?? []
+        let governanceRetrievalTags = [
+            turn.hostConstitutionVault.map(\.verificationMarkers) ?? [],
+            turn.hostVersionTree.map {
+                [
+                    "constitution_pending:\($0.pendingCandidateIDs.count)",
+                    "constitution_frozen:\($0.frozenVersionIDs.count)"
+                ]
+            } ?? [],
+            turn.hostForgetRequest.map {
+                var markers = [
+                    "forget_request:\($0.requestID)",
+                    "forget_verified:\($0.verified)"
+                ]
+                if $0.executedSteps.contains("checkpoint_exports_revoked") {
+                    markers.append("forget_checkpoints_revoked:true")
+                }
+                if $0.executedSteps.contains("sync_exports_revoked") {
+                    markers.append("forget_sync_exports_revoked:true")
+                }
+                return markers
+            } ?? []
+        ]
+        .flatMap { $0 }
+
+        var verificationSnapshotParts = [turn.hostContext.activeVersion]
+        if let hostConstitution = turn.hostConstitution {
+            verificationSnapshotParts += [
+                "constitution:\(hostConstitution.activeVersion)",
+                "phase:\(hostConstitution.narrativeLoom.currentPhase)"
+            ]
+        }
+        if let hostConstitutionVault = turn.hostConstitutionVault {
+            verificationSnapshotParts += hostConstitutionVault.verificationMarkers
+        }
+        if let hostVersionTree = turn.hostVersionTree {
+            verificationSnapshotParts += [
+                "pending:\(hostVersionTree.pendingCandidateIDs.count)",
+                "frozen:\(hostVersionTree.frozenVersionIDs.count)"
+            ]
+        }
+        if let hostForgetRequest = turn.hostForgetRequest {
+            verificationSnapshotParts += [
+                "forget:\(hostForgetRequest.requestID)",
+                "forget_verified:\(hostForgetRequest.verified)"
+            ]
+            if hostForgetRequest.executedSteps.contains("checkpoint_exports_revoked") {
+                verificationSnapshotParts.append("forget_checkpoints_revoked:true")
+            }
+            if hostForgetRequest.executedSteps.contains("sync_exports_revoked") {
+                verificationSnapshotParts.append("forget_sync_exports_revoked:true")
+            }
+        }
+        let verificationSnapshot = verificationSnapshotParts
+            .uniqued()
+            .joined(separator: "|")
+
+        return BASCurrentBrainState(
             mode: turn.budgetFrame.runMode.rawValue,
             dominantGoals: turn.hostContext.longTermGoals,
             activeConstraints: turn.hostContext.noGoZones,
             reactionWeights: reactionWeights(for: turn.hostContext.tonePreference),
             activeTemplateIDs: [],
             recentFailurePatternIDs: [],
-            retrievalTags: turn.memoryBundle.retrievalTags,
-            verificationSnapshot: turn.hostContext.activeVersion
+            retrievalTags: (turn.memoryBundle.retrievalTags + constitutionRetrievalTags + governanceRetrievalTags).uniqued(),
+            verificationSnapshot: verificationSnapshot
         )
     }
 
@@ -342,11 +461,11 @@ public enum BASEBrainConsoleSupport {
 
     private static func runtimeGear(for runMode: BASEBrainRunMode) -> BASRuntimeGear {
         switch runMode {
-        case .dormant, .sentinel:
+        case .dormant, .pulse, .sentinel, .recovery, .quarantine, .lockdown:
             .low
-        case .engage:
+        case .engage, .reflect:
             .balanced
-        case .deepLoop, .guarded:
+        case .deepLoop, .guard:
             .high
         }
     }

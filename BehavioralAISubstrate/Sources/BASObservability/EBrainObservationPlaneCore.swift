@@ -1,4 +1,5 @@
 import Foundation
+import BASMemory
 import BASPolicy
 import BASRuntimeCore
 
@@ -63,13 +64,14 @@ public struct BASRuntimeAuditFinding: Codable, Equatable, Sendable, Identifiable
 }
 
 public struct BASUpdateTicket: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.0.0"
+    public static let currentSchemaVersion = "1.1.0"
 
     public var schemaVersion: String
     public var ticketID: String
     public var sessionRef: String
     public var summary: String
     public var memoryWriteSuggestion: String?
+    public var hostChangeCandidate: BASHostChangeCandidate?
     public var hostProfileChangeSuggestion: String?
     public var ruleCandidateRef: String?
     public var confidence: Double
@@ -82,6 +84,7 @@ public struct BASUpdateTicket: BASSchemaVersioned {
         sessionRef: String,
         summary: String,
         memoryWriteSuggestion: String? = nil,
+        hostChangeCandidate: BASHostChangeCandidate? = nil,
         hostProfileChangeSuggestion: String? = nil,
         ruleCandidateRef: String? = nil,
         confidence: Double,
@@ -93,11 +96,57 @@ public struct BASUpdateTicket: BASSchemaVersioned {
         self.sessionRef = sessionRef
         self.summary = summary
         self.memoryWriteSuggestion = memoryWriteSuggestion
+        self.hostChangeCandidate = hostChangeCandidate
         self.hostProfileChangeSuggestion = hostProfileChangeSuggestion
         self.ruleCandidateRef = ruleCandidateRef
         self.confidence = min(max(confidence, 0), 1)
         self.conflictFlag = conflictFlag
         self.requiresReview = requiresReview
+    }
+}
+
+public extension BASUpdateTicket {
+    var hasPersistentMutationSuggestion: Bool {
+        let hasMemoryWriteSuggestion = memoryWriteSuggestion?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        let hasLegacyHostSuggestion = hostProfileChangeSuggestion?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        return hasMemoryWriteSuggestion || hostChangeCandidate != nil || hasLegacyHostSuggestion
+    }
+
+    var actionDigestParts: [String] {
+        [
+            ticketID,
+            memoryWriteSuggestion?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
+            hostChangeCandidate?.candidateID ?? "",
+            hostChangeCandidate?.changeType ?? "",
+            hostChangeCandidate?.proposedDelta.joined(separator: ",") ?? "",
+            hostChangeCandidate?.approvalState ?? "",
+            hostChangeCandidate?.previewState ?? "",
+            hostProfileChangeSuggestion?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
+            ruleCandidateRef?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        ]
+    }
+
+    var reviewDirectiveLine: String? {
+        let baseDirective: String?
+
+        if let hostChangeCandidate {
+            let changeFragments = [hostChangeCandidate.changeType]
+                + (hostChangeCandidate.proposedDelta.isEmpty ? [] : [hostChangeCandidate.proposedDelta.joined(separator: ", ")])
+            baseDirective = "Review host change: \(changeFragments.joined(separator: " • "))"
+        } else if let memoryWriteSuggestion, memoryWriteSuggestion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            baseDirective = "Review memory write: \(memoryWriteSuggestion.trimmingCharacters(in: .whitespacesAndNewlines))"
+        } else if let hostProfileChangeSuggestion, hostProfileChangeSuggestion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            baseDirective = "Review host change: \(hostProfileChangeSuggestion.trimmingCharacters(in: .whitespacesAndNewlines))"
+        } else if let ruleCandidateRef, ruleCandidateRef.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            baseDirective = "Review rule candidate: \(ruleCandidateRef.trimmingCharacters(in: .whitespacesAndNewlines))"
+        } else if requiresReview || conflictFlag {
+            baseDirective = "Review ticket before promotion."
+        } else {
+            baseDirective = nil
+        }
+
+        guard let baseDirective else { return nil }
+        return conflictFlag ? "\(baseDirective) • conflict flagged" : baseDirective
     }
 }
 

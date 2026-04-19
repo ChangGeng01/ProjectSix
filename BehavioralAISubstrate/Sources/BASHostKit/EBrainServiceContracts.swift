@@ -23,6 +23,10 @@ public protocol BASPowerClockServicing: Sendable {
     ) -> Bool
 }
 
+public protocol BASVitalMonitorServicing: Sendable {
+    func currentDeviceState(now: Date) -> BASDeviceState
+}
+
 public protocol BASHostProfileServicing: Sendable {
     func resolveHost(
         hostID: String,
@@ -41,6 +45,75 @@ public protocol BASHostProfileServicing: Sendable {
         profile: BASHostProfile,
         to versionID: String
     ) -> BASHostVersion
+}
+
+public protocol BASHostConstitutionServicing: Sendable {
+    func resolveConstitution(
+        hostID: String,
+        contextFrame: BASContextFrame?,
+        riskCard: BASRiskCard?
+    ) -> BASHostConstitution
+
+    func projectProfile(
+        from constitution: BASHostConstitution,
+        riskThresholds: BASHostRiskThresholds
+    ) -> BASHostProfile
+
+    func projectRhythm(
+        from constitution: BASHostConstitution
+    ) -> BASHostRhythmProfile
+
+    func stageChange(
+        candidate: BASHostChangeCandidate,
+        on constitution: BASHostConstitution
+    ) -> BASHostConstitution
+
+    func approve(
+        candidate: BASHostChangeCandidate,
+        on versionTree: BASHostVersionTree
+    ) -> BASHostVersionTree
+
+    func freeze(
+        versionID: String,
+        on versionTree: BASHostVersionTree
+    ) -> BASHostVersionTree
+
+    func thaw(
+        versionID: String,
+        on versionTree: BASHostVersionTree
+    ) -> BASHostVersionTree
+
+    func rollback(
+        versionTree: BASHostVersionTree,
+        to versionID: String
+    ) -> BASHostVersionTree
+
+    func executeForget(
+        request: BASForgetRequest,
+        on constitution: BASHostConstitution
+    ) -> BASForgetRequest
+
+    func applyForget(
+        request: BASForgetRequest,
+        on vault: BASHostConstitutionVault
+    ) -> BASHostConstitutionVault
+
+    func stageMigration(
+        contract: BASHostDeviceMigrationContract,
+        on vault: BASHostConstitutionVault
+    ) -> BASHostConstitutionVault
+
+    func approveMigration(
+        on vault: BASHostConstitutionVault,
+        targetDeviceID: String?
+    ) -> BASHostConstitutionVault
+
+    func synchronizeVault(
+        on vault: BASHostConstitutionVault,
+        deviceID: String,
+        propagatedRequestIDs: [String],
+        synchronizedAt: Date
+    ) -> BASHostConstitutionVault
 }
 
 public protocol BASContextServicing: Sendable {
@@ -81,6 +154,116 @@ public protocol BASMemoryServicing: Sendable {
     ) -> BASPromotionState
 
     func freeze(memoryID: String) -> Bool
+}
+
+public protocol BASNeuralCoreServicing: Sendable {
+    func synthesize(
+        budgetFrame: BASBudgetFrame,
+        contextFrame: BASContextFrame,
+        decomposeFrame: BASDecomposeFrame,
+        memoryBundle: BASMemoryBundle,
+        hostProfile: BASHostProfile,
+        activeKillSwitches: [BASKillSwitchID]
+    ) -> BASNeuralCoreFrame
+
+    func materializeThoughtArtifacts(
+        budgetFrame: BASBudgetFrame,
+        contextFrame: BASContextFrame,
+        decomposeFrame: BASDecomposeFrame,
+        memoryBundle: BASMemoryBundle,
+        hostProfile: BASHostProfile,
+        thoughtFrame: BASThoughtFrame
+    ) -> BASNeuralThoughtMaterialization
+
+    func materializePublicProjection(
+        budgetFrame: BASBudgetFrame,
+        contextFrame: BASContextFrame,
+        hostProfile: BASHostProfile,
+        thoughtFrame: BASThoughtFrame
+    ) -> BASNeuralPublicThoughtProjection
+
+    func materializeRiskBindings(
+        budgetFrame: BASBudgetFrame,
+        contextFrame: BASContextFrame,
+        thoughtFrame: BASThoughtFrame,
+        mergedChoice: BASMergedChoice,
+        riskCard: BASRiskCard,
+        actionPermit: BASActionPermit
+    ) -> [BASRiskPermitBinding]
+
+    func materializeToolIntent(
+        budgetFrame: BASBudgetFrame,
+        thoughtFrame: BASThoughtFrame,
+        mergedChoice: BASMergedChoice,
+        actionPermit: BASActionPermit
+    ) -> BASToolIntentEnvelope?
+}
+
+public extension BASNeuralCoreServicing {
+    func materializeThoughtArtifacts(
+        budgetFrame: BASBudgetFrame,
+        contextFrame: BASContextFrame,
+        decomposeFrame: BASDecomposeFrame,
+        memoryBundle: BASMemoryBundle,
+        hostProfile: BASHostProfile,
+        thoughtFrame: BASThoughtFrame
+    ) -> BASNeuralThoughtMaterialization {
+        BASNeuralMaterializationCompiler.materializeThoughtArtifacts(
+            thoughtFrame: thoughtFrame
+        )
+    }
+
+    func materializePublicProjection(
+        budgetFrame: BASBudgetFrame,
+        contextFrame: BASContextFrame,
+        hostProfile: BASHostProfile,
+        thoughtFrame: BASThoughtFrame
+    ) -> BASNeuralPublicThoughtProjection {
+        BASNeuralMaterializationCompiler.materializePublicProjection(
+            thoughtFrame: thoughtFrame
+        )
+    }
+
+    func materializeRiskBindings(
+        budgetFrame: BASBudgetFrame,
+        contextFrame: BASContextFrame,
+        thoughtFrame: BASThoughtFrame,
+        mergedChoice: BASMergedChoice,
+        riskCard: BASRiskCard,
+        actionPermit: BASActionPermit
+    ) -> [BASRiskPermitBinding] {
+        BASNeuralMaterializationCompiler.materializeRiskBindings(
+            thoughtFrame: thoughtFrame,
+            mergedChoice: mergedChoice,
+            riskCard: riskCard,
+            actionPermit: actionPermit,
+            riskLevelResolver: { score in
+                switch score {
+                case ..<0.35:
+                    return .low
+                case ..<0.60:
+                    return .medium
+                case ..<0.82:
+                    return .high
+                default:
+                    return .extreme
+                }
+            }
+        )
+    }
+
+    func materializeToolIntent(
+        budgetFrame: BASBudgetFrame,
+        thoughtFrame: BASThoughtFrame,
+        mergedChoice: BASMergedChoice,
+        actionPermit: BASActionPermit
+    ) -> BASToolIntentEnvelope? {
+        BASNeuralMaterializationCompiler.materializeToolIntent(
+            thoughtFrame: thoughtFrame,
+            mergedChoice: mergedChoice,
+            actionPermit: actionPermit
+        )
+    }
 }
 
 public protocol BASLoopServicing: Sendable {
@@ -135,6 +318,23 @@ public protocol BASRiskServicing: Sendable {
         triScores: [BASTriSelfScore],
         budget: BASBudgetFrame
     ) -> (BASRiskCard, BASActionPermit)
+
+    func riskLevel(for score: Double) -> BASBrainRiskLevel
+}
+
+public extension BASRiskServicing {
+    func riskLevel(for score: Double) -> BASBrainRiskLevel {
+        switch score {
+        case ..<0.35:
+            return .low
+        case ..<0.60:
+            return .medium
+        case ..<0.82:
+            return .high
+        default:
+            return .extreme
+        }
+    }
 }
 
 public protocol BASActionServicing: Sendable {

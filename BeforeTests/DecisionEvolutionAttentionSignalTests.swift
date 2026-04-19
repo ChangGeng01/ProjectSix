@@ -144,6 +144,23 @@ final class DecisionEvolutionAttentionSignalTests: XCTestCase {
         XCTAssertTrue(signal.rollbackReady)
     }
 
+    func testResolvedTriggerReasonFallsBackWhenDetailIsBlank() {
+        let signal = DecisionEvolutionAttentionSignal(
+            severity: .review,
+            badgeValue: "1",
+            headline: "Review queue needs attention",
+            detail: "   ",
+            pendingReviewCount: 1,
+            killSwitches: [],
+            rollbackReady: false
+        )
+
+        XCTAssertEqual(
+            signal.resolvedTriggerReason(fallback: "Use operator guidance"),
+            "Use operator guidance"
+        )
+    }
+
     func testAttentionSignalSurfacesRuntimeGuardrailsFromReleaseSummary() {
         let active = makeSnapshot(
             checkpointID: "active-1",
@@ -189,6 +206,51 @@ final class DecisionEvolutionAttentionSignalTests: XCTestCase {
             "Thermal guardrail requires cooldown before wider rollout."
         )
         XCTAssertFalse(signal.rollbackReady)
+    }
+
+    func testAttentionSignalSurfacesAuditFindingsFromReleaseSummary() {
+        let active = makeSnapshot(
+            checkpointID: "active-1",
+            createdAt: Date(timeIntervalSince1970: 20),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: active,
+                reviewCheckpoint: nil,
+                pendingReviewQueue: [],
+                latestPersistedLineage: nil
+            ),
+            releaseSummary: DecisionSystemReleaseControlSummary(
+                state: .watch,
+                headline: DecisionEvolutionReleasePathPresentationSupport.watchingAuditFindingsHeadline,
+                reasons: ["Factors: evidence_caveat_load"],
+                activeKillSwitches: [],
+                recommendedKillSwitches: [],
+                killSwitches: [],
+                pendingReviewCount: 0,
+                rollbackReadyCount: 1,
+                canRestoreActiveCheckpoint: true,
+                canRollbackActiveCheckpoint: true,
+                activeCheckpointID: "active-1",
+                activeCheckpointSource: .pinnedHint,
+                reviewCheckpointID: nil,
+                primaryBlocker: .auditFindings
+            )
+        )
+
+        let signal = DecisionEvolutionAttentionSignal.build(workspace: workspace)
+
+        XCTAssertEqual(signal.severity, .review)
+        XCTAssertEqual(signal.badgeValue, "!")
+        XCTAssertEqual(
+            signal.headline,
+            DecisionEvolutionReleaseStagePresentationSupport.watchingAuditFindingsHeadline
+        )
+        XCTAssertEqual(signal.detail, "Factors: evidence_caveat_load")
+        XCTAssertTrue(signal.rollbackReady)
     }
 
     func testAttentionSignalPrefersReleaseSummaryFactsOverRawControlSurface() {

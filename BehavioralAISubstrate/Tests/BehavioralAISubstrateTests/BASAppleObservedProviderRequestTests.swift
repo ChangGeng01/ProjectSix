@@ -68,6 +68,7 @@ struct BASAppleObservedProviderRequestTests {
             preferredProviderID: provider.id,
             allowFallbacks: true,
             descriptors: descriptors,
+            routingPolicy: BASReferenceProviderRuntime.fixtureRoutingPolicy,
             admissionAllowed: true
         )
         let substrateContext = BASAppleProviderObservationContextBuilder.build(
