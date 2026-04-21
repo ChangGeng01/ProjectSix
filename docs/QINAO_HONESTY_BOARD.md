@@ -210,7 +210,7 @@
 
 ---
 
-## 四 · 附 — M20–M40 观测原语波次（additive overlay，2026-04-22）
+## 四 · 附 — M20–M41 观测原语波次（additive overlay，2026-04-22）
 
 > 这一附段**不改**上面任何一行兑现度分数。它记录的是在 M1–M12 完全体骨架已绿的前提下，M20 起**叠加**在 L4 / L6 / L7 / L8 / L9 / L10 / L11 / L12 / L13 之上的"观测原语 + 跨层 reconcile scaffold"工作。兑现度栏目里任何"L14 reconciler 将来把每层观测拉到同一张桌上"的承诺，今天已经由这批代码兑现。
 
@@ -236,12 +236,13 @@
 | M38 | L14 sovereign audit-ledger coverage 投影（9→10 层） | `BASSovereign/BASSovereignAuditCoverage.swift` · `BASRuntimeCore/BASObservationReconciliationCore.swift`（doc 更新） | 9 新 XCTest |
 | M39 | L1 lease-life coverage 投影（10→11 层） | `BASLeaseLife/BASLeaseLifeObservationCoverage.swift` · `BASRuntimeCore/BASObservationReconciliationCore.swift`（doc 更新） | 12 新 XCTest |
 | M40 | L5 host-constitution pipeline coverage 投影（11→12 层） | `BASMemory/BASHostCandidatePipelineObservationCoverage.swift` · `BASRuntimeCore/BASObservationReconciliationCore.swift`（doc 更新） | 10 新 XCTest |
+| M41 | L2 neural-organ registry coverage 投影（12→13 层） | `BASOrgan/BASOrganRegistryObservationCoverage.swift` · `BASRuntimeCore/BASObservationReconciliationCore.swift`（doc 更新） | 15 新 XCTest |
 
-**波次总体性质**：全部 additive — `BASRuntimeCore` 仍是 leaf 模块（`BASObservationReconciliationCore.swift` 不 import 任何观测生产者），`BASSovereign` 的 microkernel 隔离保持（M38/M39 coverage 文件分别只依赖 `BASRuntimeCore`），`BASMemory` leaf 纪律保持（M40 coverage 只依赖 `BASRuntimeCore`）；每个原语都是值类型 + `Sendable` + `Codable`，带独立 budget 表与 ring-actor ledger；invariant（dedup-on-layer，turn/session 同桌）在所有构造路径（init / `appending(_:)` / `init(from:)`）上都被枚举测试钉住。L8（M37）/L14（M38）/L1（M39）/L5（M40）是这批里的"无 bundle / 无内生 turn-key"投影：把 governance sweep 结果 / 审计链快照 / 每轮 lease-life 记录 / 宿主宪法版本前沿绑到调用方指定的 turn/session，和另外 8 层共用同一张 `BASObservationReconciliationReport`。M39 的 `hasCoreSignalCoverage` 语义特别 — `.emergency` guard level 是"L1 spoke but did not sustain core function"的可审计信号。M40 同样特别 — `hasCoreSignalCoverage` 要求 `activeVersion` 非空（L5 已 bootstrap 身份锚），rejection log 单独存在不成立（结构上无意义）。
+**波次总体性质**：全部 additive — `BASRuntimeCore` 仍是 leaf 模块（`BASObservationReconciliationCore.swift` 不 import 任何观测生产者），`BASSovereign` 的 microkernel 隔离保持（M38 coverage 文件只依赖 `BASRuntimeCore`），`BASMemory` leaf 纪律保持（M40 coverage 只依赖 `BASRuntimeCore`），`BASLeaseLife`（M39）/`BASOrgan`（M41）leaf 纪律同样保持（两者 coverage 文件只依赖 `BASRuntimeCore`）；每个原语都是值类型 + `Sendable` + `Codable`，带独立 budget 表与 ring-actor ledger；invariant（dedup-on-layer，turn/session 同桌）在所有构造路径（init / `appending(_:)` / `init(from:)`）上都被枚举测试钉住。L8（M37）/L14（M38）/L1（M39）/L5（M40）/L2（M41）是这批里的"无 bundle / 无内生 turn-key"投影：把 governance sweep 结果 / 审计链快照 / 每轮 lease-life 记录 / 宿主宪法版本前沿 / 神经器官登记簿绑到调用方指定的 turn/session，和另外 8 层共用同一张 `BASObservationReconciliationReport`。M39 的 `hasCoreSignalCoverage` 语义特别 — `.emergency` guard level 是"L1 spoke but did not sustain core function"的可审计信号。M40 同样特别 — `hasCoreSignalCoverage` 要求 `activeVersion` 非空（L5 已 bootstrap 身份锚），rejection log 单独存在不成立（结构上无意义）。M41 再加一条 — `hasCoreSignalCoverage` 要求 registry 同时覆盖 `.scout` AND `.core` 两个角色：单角色 registry 在 L2 是可见但结构不完整（scout-only 无法支撑 L9/L10 deliberation；core-only 在 L1 prefilter 上烧预算）。
 
-**累计覆盖**：14 层认知架构中 **12 层**（**L1**/L4/**L5**/L6/L7/L8/L9/L10/L11/L12/L13/L14）已有 `→ BASObservationCoverageSummary` 投影。剩余 2 层（L2/L3）留到下一波。
+**累计覆盖**：14 层认知架构中 **13 层**（**L1/L2**/L4/L5/L6/L7/L8/L9/L10/L11/L12/L13/L14）已有 `→ BASObservationCoverageSummary` 投影。剩余 1 层（L3 thoughtFold）留到 M42 收口，此波即可达成 14-of-14 全覆盖。
 
-**回归基线**：BAS 655 XCTest + 417 swift-testing + Qinao 162 XCTest = **1234 + 1 OS-gated skip 全绿**。
+**回归基线**：BAS 670 XCTest + 417 swift-testing + Qinao 162 XCTest = **1249 + 1 OS-gated skip 全绿**。
 
 ---
 

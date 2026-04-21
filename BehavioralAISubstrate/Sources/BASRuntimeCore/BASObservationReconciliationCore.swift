@@ -36,11 +36,13 @@ import Foundation
 /// The raw values are stable strings so that reports serialize
 /// deterministically across builds.
 ///
-/// Projection status (M40 wave): 12 of 14 layers carry a
+/// Projection status (M41 wave): 13 of 14 layers carry a
 /// `*ObservationBundle` (or equivalent) →
 /// `BASObservationCoverageSummary` projection — L1 (leaseLife, via
 /// `BASLeaseLifeCoordinator.TurnRecorded.coverageSummary(turnID:
-/// sessionID:)`), L4 (worldPrior), L5 (hostConstitution, via
+/// sessionID:)`), L2 (neuralOrgan, via
+/// `BASOrganRegistry.coverageSummary(turnID:sessionID:emittedAt:)`),
+/// L4 (worldPrior), L5 (hostConstitution, via
 /// `BASHostCandidatePipeline.coverageSummary(turnID:sessionID:
 /// emittedAt:)`), L6 (presenceEye), L7 (mirrorBlade),
 /// L8 (hippocampalWell, via
@@ -48,8 +50,8 @@ import Foundation
 /// sessionID:)`), L9 (dreamLoop), L10 (triSelfTribunal),
 /// L11 (riskClimate), L12 (gentleHand), L13 (evolutionFurnace),
 /// L14 (sovereign, via `BASSovereignAuditLedger.coverageSummary(
-/// turnID:sessionID:emittedAt:)`). The remaining two —
-/// L2, L3 — do not yet emit observation primitives in this
+/// turnID:sessionID:emittedAt:)`). The remaining one —
+/// L3 — does not yet emit observation primitives in this
 /// shape; the reconciler treats a silent layer as either "not
 /// expected" or "expected but silent" based on the caller's
 /// `expected` list. The enum is complete up front so downstream
