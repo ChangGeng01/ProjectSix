@@ -220,6 +220,133 @@ public actor QinaoSovereignControlPlane {
         public var isAcceptable: Bool { parity != .coordinatorLaxer }
     }
 
+    /// Qinao-local mirror of the substrate's brain-state enum. Names
+    /// match 1:1; the indirection is what keeps the substrate type
+    /// name out of the Qinao public surface.
+    public enum SessionMode: String, Sendable, Equatable, Codable {
+        case dormant
+        case pulse
+        case sentinel
+        case engage
+        case reflect
+        case deepLoop
+        case `guard`
+        case recovery
+        case quarantine
+        case lockdown
+    }
+
+    /// Qinao-local mirror of the emergency-brake ladder. The runtime
+    /// raises this when repeated laxer audits or hard-ceiling events
+    /// demand increasingly conservative execution.
+    public enum BrakeLevel: String, Sendable, Equatable, Codable {
+        case none
+        case caution
+        case `guard`
+        case quarantine
+        case lockdown
+    }
+
+    /// Qinao-local mirror of the turn's *intended* operation domain.
+    /// Drives the evidence-insufficient upgrade rule inside the
+    /// audit engine: irreversible operations (`toolWrite`,
+    /// `hostMutate`, `memoryPromote`, `rulePromotion`) are upgraded
+    /// to `toolCut` when `evidenceSufficient == false`.
+    public enum OperationKind: String, Sendable, Equatable, Codable {
+        case pureInference
+        case toolRead
+        case toolWrite
+        case hostMutate
+        case memoryPromote
+        case rulePromotion
+    }
+
+    /// Host-facing mirror of the substrate's turn-observation record.
+    /// Every field is named in plain English and typed with Qinao-local
+    /// mirrors so the host never imports the substrate type directly.
+    /// The runtime's `sendSession` entry point uses this shape.
+    ///
+    /// All the risk-flagging fields default to `false`, all the
+    /// scalar signals default to `0`, `mode` defaults to `.engage`,
+    /// `brake` to `.none`, `operation` to `.pureInference`, and
+    /// `evidenceSufficient` to `true`. That means a caller can build
+    /// a "clean engage turn" with only `sessionID` / `turnID` /
+    /// `snapshotRef` / `policyHash`.
+    public struct TurnObservations: Sendable, Equatable {
+        public let sessionID: String
+        public let turnID: String
+        public let snapshotRef: String
+        public let policyHash: String
+        public let policyLineageMissing: Bool
+        public let auditEntryMissing: Bool
+        public let runtimeUnstableInHighRisk: Bool
+        public let riskPermitHeadConflict: Bool
+        public let externalSideEffectWithoutSCT: Bool
+        public let hostRemovalBypassed: Bool
+        public let unauthorizedSelfMutation: Bool
+        public let memoryOrHostWriteBypass: Bool
+        public let irreversibilityScore: Double
+        public let manipulationStrength: Double
+        public let uncertaintyScore: Double
+        public let gsiScore: Double
+        public let hostGateValue: Double
+        public let quarantineCount: Int
+        public let mode: SessionMode
+        public let brake: BrakeLevel
+        public let operation: OperationKind
+        public let evidenceSufficient: Bool
+
+        public init(
+            sessionID: String,
+            turnID: String,
+            snapshotRef: String,
+            policyHash: String,
+            policyLineageMissing: Bool = false,
+            auditEntryMissing: Bool = false,
+            runtimeUnstableInHighRisk: Bool = false,
+            riskPermitHeadConflict: Bool = false,
+            externalSideEffectWithoutSCT: Bool = false,
+            hostRemovalBypassed: Bool = false,
+            unauthorizedSelfMutation: Bool = false,
+            memoryOrHostWriteBypass: Bool = false,
+            irreversibilityScore: Double = 0,
+            manipulationStrength: Double = 0,
+            uncertaintyScore: Double = 0,
+            gsiScore: Double = 0,
+            hostGateValue: Double = 1,
+            quarantineCount: Int = 0,
+            mode: SessionMode = .engage,
+            brake: BrakeLevel = .none,
+            operation: OperationKind = .pureInference,
+            evidenceSufficient: Bool = true
+        ) {
+            self.sessionID = sessionID
+            self.turnID = turnID
+            self.snapshotRef = snapshotRef
+            self.policyHash = policyHash
+            self.policyLineageMissing = policyLineageMissing
+            self.auditEntryMissing = auditEntryMissing
+            self.runtimeUnstableInHighRisk = runtimeUnstableInHighRisk
+            self.riskPermitHeadConflict = riskPermitHeadConflict
+            self.externalSideEffectWithoutSCT =
+                externalSideEffectWithoutSCT
+            self.hostRemovalBypassed = hostRemovalBypassed
+            self.unauthorizedSelfMutation = unauthorizedSelfMutation
+            self.memoryOrHostWriteBypass = memoryOrHostWriteBypass
+            func clamp(_ v: Double) -> Double { min(max(v, 0), 1) }
+            self.irreversibilityScore = clamp(irreversibilityScore)
+            self.manipulationStrength = clamp(manipulationStrength)
+            self.uncertaintyScore = clamp(uncertaintyScore)
+            self.gsiScore = clamp(gsiScore)
+            self.hostGateValue = clamp(hostGateValue)
+            self.quarantineCount = max(0, quarantineCount)
+            self.mode = mode
+            self.brake = brake
+            self.operation = operation
+            self.evidenceSufficient = evidenceSufficient
+        }
+    }
+
     // MARK: - Internals (never re-exported)
 
     private let coordinator: BASSovereignCleanRebootCoordinator
@@ -228,6 +355,7 @@ public actor QinaoSovereignControlPlane {
     private let warrantTTL: TimeInterval
     private let now: @Sendable () -> Date
     private var haltedSessions: Set<String> = []
+    private var haltReasons: [String: String] = [:]
 
     /// Cache of planID → internal plan, so `verifyRestore` can hand
     /// the coordinator the exact plan it emitted (the plan's
@@ -434,6 +562,29 @@ public actor QinaoSovereignControlPlane {
         haltedSessions.remove(sessionID)
     }
 
+    /// Lightweight "mark this session halted" that does NOT produce
+    /// a rollback plan — used by `QinaoRuntime.sendSession` on a
+    /// fail-closed audit parity or on a severity that demands an
+    /// immediate stop. Full rollback still goes through
+    /// `haltSession(sessionID:fromVersionID:)`; this variant is for
+    /// the case where the runtime just needs to refuse further turns
+    /// on this session before any rollback decision is made. The
+    /// reason code is recorded on the halt marker for audit.
+    public func markSessionHalted(
+        sessionID: String,
+        reason: String
+    ) {
+        haltedSessions.insert(sessionID)
+        haltReasons[sessionID] = reason
+    }
+
+    /// Reason code attached to a halted session, if any. Returns
+    /// `nil` when the session is not halted or was halted without
+    /// a reason.
+    public func haltReason(sessionID: String) -> String? {
+        haltReasons[sessionID]
+    }
+
     // MARK: - Warrant issuance
 
     /// Issue a warrant for a concrete intent. The runtime attaches
@@ -545,6 +696,94 @@ public actor QinaoSovereignControlPlane {
             parity: Self.toAuditParity(report.parity),
             reasonCodes: report.engineVerdict.reasonCodes,
             auditRef: report.engineVerdict.verdictID)
+    }
+
+    /// Qinao-native overload of `auditTurn`. Accepts a
+    /// `TurnObservations` value built from plain flags — no substrate
+    /// types required — and returns the same `AuditReport` shape.
+    /// Used by `QinaoRuntime.sendSession` so the main-path runtime
+    /// can consult the audit without importing the substrate.
+    public func auditTurn(
+        observations: TurnObservations,
+        coordinatorSeverity: AuditSeverity?
+    ) async throws -> AuditReport {
+        let bas = BASSovereignTurnObservations(
+            sessionID: observations.sessionID,
+            turnID: observations.turnID,
+            snapshotRef: observations.snapshotRef,
+            policyHash: observations.policyHash,
+            policyLineageMissing: observations.policyLineageMissing,
+            auditEntryMissing: observations.auditEntryMissing,
+            runtimeUnstableInHighRisk:
+                observations.runtimeUnstableInHighRisk,
+            riskPermitHeadConflict:
+                observations.riskPermitHeadConflict,
+            externalSideEffectWithoutSCT:
+                observations.externalSideEffectWithoutSCT,
+            hostRemovalBypassed: observations.hostRemovalBypassed,
+            unauthorizedSelfMutation:
+                observations.unauthorizedSelfMutation,
+            memoryOrHostWriteBypass:
+                observations.memoryOrHostWriteBypass,
+            irreversibilityScore: observations.irreversibilityScore,
+            manipulationStrength: observations.manipulationStrength,
+            uncertaintyScore: observations.uncertaintyScore,
+            gsiScore: observations.gsiScore,
+            hostGateValue: observations.hostGateValue,
+            quarantineCount: observations.quarantineCount,
+            runMode: Self.toBASRunMode(observations.mode),
+            emergencyBrakeLevel:
+                Self.toBASBrakeLevel(observations.brake),
+            operation:
+                Self.toBASOperationDomain(observations.operation),
+            evidenceSufficient: observations.evidenceSufficient)
+        return try await auditTurn(
+            observations: bas,
+            coordinatorSeverity: coordinatorSeverity)
+    }
+
+    // MARK: - Qinao ↔ BAS enum mirror translators
+
+    private static func toBASRunMode(
+        _ mode: SessionMode
+    ) -> BASEBrainRunMode {
+        switch mode {
+        case .dormant: return .dormant
+        case .pulse: return .pulse
+        case .sentinel: return .sentinel
+        case .engage: return .engage
+        case .reflect: return .reflect
+        case .deepLoop: return .deepLoop
+        case .guard: return .guard
+        case .recovery: return .recovery
+        case .quarantine: return .quarantine
+        case .lockdown: return .lockdown
+        }
+    }
+
+    private static func toBASBrakeLevel(
+        _ level: BrakeLevel
+    ) -> BASEmergencyBrakeLevel {
+        switch level {
+        case .none: return .none
+        case .caution: return .caution
+        case .guard: return .guard
+        case .quarantine: return .quarantine
+        case .lockdown: return .lockdown
+        }
+    }
+
+    private static func toBASOperationDomain(
+        _ op: OperationKind
+    ) -> BASSovereignVerdictEngine.OperationDomain {
+        switch op {
+        case .pureInference: return .pureInference
+        case .toolRead: return .toolRead
+        case .toolWrite: return .toolWrite
+        case .hostMutate: return .hostMutate
+        case .memoryPromote: return .memoryPromote
+        case .rulePromotion: return .rulePromotion
+        }
     }
 
     // MARK: - M9 · Internal mirror translators

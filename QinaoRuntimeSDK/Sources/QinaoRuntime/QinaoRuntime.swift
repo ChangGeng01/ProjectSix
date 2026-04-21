@@ -177,4 +177,111 @@ public actor QinaoRuntime {
                 reason: String(describing: error))
         }
     }
+
+    // MARK: - Turn-level audit
+
+    /// The outcome of a turn audit. Hosts that call `sendSession`
+    /// after every turn receive an `AuditReport`; if `sessionHalted`
+    /// is `true` the runtime has already engaged the halt and the
+    /// host must stop accepting new turns on this session until an
+    /// explicit `sovereign.releaseHaltedSession(...)` call.
+    public struct TurnOutcome: Sendable, Equatable {
+        public let audit: QinaoSovereignControlPlane.AuditReport
+        public let sessionHalted: Bool
+
+        public init(
+            audit: QinaoSovereignControlPlane.AuditReport,
+            sessionHalted: Bool
+        ) {
+            self.audit = audit
+            self.sessionHalted = sessionHalted
+        }
+    }
+
+    public enum TurnError: Error, Equatable, Sendable {
+        /// The session was already halted before this turn started.
+        /// Hosts must release the halt before sending new turns.
+        case sessionAlreadyHalted(id: String)
+        /// The turn audit came back with
+        /// `parity == .coordinatorLaxer` — the coordinator missed
+        /// something the independent engine caught. Fail-closed:
+        /// the runtime has halted the session; the host must not
+        /// accept any further turns until explicit release.
+        case auditParityFailure(
+            sessionID: String,
+            severity: QinaoSovereignControlPlane.AuditSeverity,
+            auditRef: String)
+    }
+
+    /// Main-path turn entry. Runs the completed turn's observations
+    /// through the sovereign audit, returns the report, and — per the
+    /// three-invariant ledger-first discipline — halts the session
+    /// on any unacceptable parity before the caller sees the result.
+    ///
+    /// Callers must:
+    ///
+    /// 1. Build a `QinaoSovereignControlPlane.TurnObservations` once
+    ///    the turn has finished. All fields default to the "clean"
+    ///    values, so a noop `pureInference` turn only needs the four
+    ///    identity fields.
+    /// 2. Pass the coordinator's own severity estimate (if any) so
+    ///    the audit can compute parity.
+    /// 3. Inspect the returned `TurnOutcome.audit.severity` to decide
+    ///    how to respond (throttle / shadowLock / ...). `TurnError`
+    ///    is thrown for hard failures — session halted pre-turn, or
+    ///    parity fail-closed post-turn.
+    ///
+    /// # Why this closes invariant 2 to 100%
+    ///
+    /// Before M15, the three-signature gate only fired on `execute()`.
+    /// A turn could *plan* (memory writes, host candidates, update
+    /// tickets) without ever tripping the audit. `sendSession` makes
+    /// the audit the main-path contract — every turn sees it. That
+    /// elevates "神经不直接掌权" from "side-effect path has three
+    /// signatures" to "every turn has an independent second signature
+    /// on the outcome".
+    public func sendSession(
+        _ observations: QinaoSovereignControlPlane.TurnObservations,
+        coordinatorSeverity: QinaoSovereignControlPlane.AuditSeverity?
+    ) async throws -> TurnOutcome {
+        // Pre-flight: refuse if the session was already halted.
+        if await sovereign.isSessionHalted(observations.sessionID) {
+            throw TurnError.sessionAlreadyHalted(
+                id: observations.sessionID)
+        }
+
+        let report = try await sovereign.auditTurn(
+            observations: observations,
+            coordinatorSeverity: coordinatorSeverity)
+
+        // Fail-closed: the coordinator was laxer than the independent
+        // engine — the coordinator allowed something the engine would
+        // have blocked. Halt the session before returning so the
+        // caller cannot accidentally continue the conversation.
+        if !report.isAcceptable {
+            await sovereign.markSessionHalted(
+                sessionID: observations.sessionID,
+                reason: "audit-parity:coordinator-laxer")
+            throw TurnError.auditParityFailure(
+                sessionID: observations.sessionID,
+                severity: report.severity,
+                auditRef: report.auditRef)
+        }
+
+        // Severity-driven halt path: the audit itself asked for a
+        // hard stop (rollback / deadStop). Halt the session and
+        // return the report so the caller can act on it (rollback
+        // prompt UI, human-intervention banner, etc.).
+        let autoHaltSeverities: Set<
+            QinaoSovereignControlPlane.AuditSeverity
+        > = [.rollback, .deadStop]
+        if autoHaltSeverities.contains(report.severity) {
+            await sovereign.markSessionHalted(
+                sessionID: observations.sessionID,
+                reason: "audit-severity:\(report.severity.rawValue)")
+            return TurnOutcome(audit: report, sessionHalted: true)
+        }
+
+        return TurnOutcome(audit: report, sessionHalted: false)
+    }
 }
