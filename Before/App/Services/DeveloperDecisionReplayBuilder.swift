@@ -216,6 +216,8 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
     let courtLine: String?
     let riskFactorsLine: String?
     let reasonCodesLine: String?
+    let cognitionLine: String?
+    let mirrorCalibrationLine: String?
     let activeKillSwitches: [String]
     let guardrailFindings: [String]
     let killSwitches: [String]
@@ -229,6 +231,7 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
     let checkpointBudgetLine: String?
     let checkpointPressureLine: String?
     let checkpointTaskLine: String?
+    let deliveryFallbackActionLine: String?
     let executionCapability: DecisionSessionCheckpointExecutionCapability?
     let morphGraph: BASMorphGraph?
     let hotColdMap: BASHotColdMap?
@@ -257,6 +260,8 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         courtLine: String? = nil,
         riskFactorsLine: String? = nil,
         reasonCodesLine: String? = nil,
+        cognitionLine: String? = nil,
+        mirrorCalibrationLine: String? = nil,
         activeKillSwitches: [String],
         guardrailFindings: [String],
         killSwitches: [String],
@@ -270,6 +275,7 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         checkpointBudgetLine: String?,
         checkpointPressureLine: String?,
         checkpointTaskLine: String?,
+        deliveryFallbackActionLine: String? = nil,
         executionCapability: DecisionSessionCheckpointExecutionCapability? = nil,
         morphGraph: BASMorphGraph? = nil,
         hotColdMap: BASHotColdMap? = nil,
@@ -297,6 +303,8 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.courtLine = courtLine
         self.riskFactorsLine = riskFactorsLine
         self.reasonCodesLine = reasonCodesLine
+        self.cognitionLine = cognitionLine
+        self.mirrorCalibrationLine = mirrorCalibrationLine
         self.activeKillSwitches = activeKillSwitches
         self.guardrailFindings = guardrailFindings
         self.killSwitches = killSwitches
@@ -310,6 +318,7 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.checkpointBudgetLine = checkpointBudgetLine
         self.checkpointPressureLine = checkpointPressureLine
         self.checkpointTaskLine = checkpointTaskLine
+        self.deliveryFallbackActionLine = deliveryFallbackActionLine
         self.executionCapability = executionCapability
         self.morphGraph = morphGraph
         self.hotColdMap = hotColdMap
@@ -342,6 +351,8 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.courtLine = Self.courtLine(from: turn.mergedChoice)
         self.riskFactorsLine = turn.turnDiagnosticsSupport.riskFactorsLine
         self.reasonCodesLine = turn.turnDiagnosticsSupport.reasonCodesLine
+        self.cognitionLine = turn.turnDiagnosticsSupport.cognitionLine
+        self.mirrorCalibrationLine = turn.turnDiagnosticsSupport.mirrorCalibrationLine
         self.activeKillSwitches = activeKillSwitches
         self.guardrailFindings = turn.runtimeTrace.guardrailFindings.map(\.summary)
         self.killSwitches = Self.orderedUnique(activeKillSwitches + recommendedKillSwitches)
@@ -354,6 +365,9 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.sovereignAuthorityLine = Self.sovereignAuthorityLine(
             tokenScopes: turn.sovereignTokenScopeIDs,
             warrantScopes: turn.sovereignWarrantScopeIDs,
+            warrantPolicyIDs: Self.sovereignWarrantPolicyIDs(from: turn.sovereignWarrants),
+            warrantTTLIDs: Self.sovereignWarrantTTLIDs(from: turn.sovereignWarrants),
+            warrantWitnessCount: Self.sovereignWarrantWitnessCount(from: turn.sovereignWarrants),
             lockScopeID: turn.sovereignLockScopeID,
             quarantineZoneIDs: turn.sovereignQuarantineZoneIDs
         )
@@ -402,6 +416,7 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.checkpointBudgetLine = turn.replayCheckpointBudgetLine
         self.checkpointPressureLine = turn.replayCheckpointPressureLine
         self.checkpointTaskLine = turn.replayCheckpointTaskLine
+        self.deliveryFallbackActionLine = turn.renderedOutput.deliveryFallbackActionLine
         self.executionCapability = nil
         self.morphGraph = foldedLung.morphGraph
         self.hotColdMap = foldedLung.hotColdMap
@@ -429,9 +444,13 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.thoughtFoldChecksum = lineageSummary.thoughtFoldChecksum
         self.updateTicketSummaries = lineageSummary.updateTicketSummaries
         self.reviewDirectiveLine = lineageSummary.reviewDirectiveLine?.evolutionTrimmedNonEmpty
-        self.courtLine = nil
+        self.courtLine = DecisionEvolutionEBrainPresentationSupport.courtLine(
+            from: lineageSummary
+        )
         self.riskFactorsLine = nil
         self.reasonCodesLine = nil
+        self.cognitionLine = nil
+        self.mirrorCalibrationLine = Self.checkpointMirrorCalibrationLine(from: lineageSummary)
         self.activeKillSwitches = lineageSummary.activeKillSwitches
         self.guardrailFindings = lineageSummary.guardrailFindings
         self.killSwitches = Self.orderedUnique(
@@ -446,6 +465,9 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.sovereignAuthorityLine = Self.sovereignAuthorityLine(
             tokenScopes: lineageSummary.sovereignTokenScopeIDs,
             warrantScopes: lineageSummary.sovereignWarrantScopeIDs,
+            warrantPolicyIDs: Self.sovereignWarrantPolicyIDs(from: lineageSummary.sovereignWarrants),
+            warrantTTLIDs: Self.sovereignWarrantTTLIDs(from: lineageSummary.sovereignWarrants),
+            warrantWitnessCount: Self.sovereignWarrantWitnessCount(from: lineageSummary.sovereignWarrants),
             lockScopeID: lineageSummary.sovereignLockScopeID,
             quarantineZoneIDs: lineageSummary.sovereignQuarantineZoneIDs
         )
@@ -465,6 +487,7 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.checkpointPressureLine = nil
         self.checkpointTaskLine = self.reviewDirectiveLine
             ?? lineageSummary.updateTicketSummaries.first?.evolutionTrimmedNonEmpty.map { "Review: \($0)" }
+        self.deliveryFallbackActionLine = nil
         self.executionCapability = nil
         self.morphGraph = foldedLung.morphGraph
         self.hotColdMap = foldedLung.hotColdMap
@@ -562,6 +585,55 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         }
     }
 
+    private static func sovereignWarrantPolicyIDs(
+        from warrants: [BASSovereignWarrant]
+    ) -> [String] {
+        orderedUnique(
+            warrants.compactMap { warrant in
+                compactPolicyID(for: warrant.policyHash)
+            }
+        )
+    }
+
+    private static func sovereignWarrantTTLIDs(
+        from warrants: [BASSovereignWarrant]
+    ) -> [String] {
+        orderedUnique(
+            warrants.compactMap { warrant in
+                compactTTLID(
+                    issuedAt: warrant.issuedAt,
+                    expiresAt: warrant.expiresAt
+                )
+            }
+        )
+    }
+
+    private static func sovereignWarrantWitnessCount(
+        from warrants: [BASSovereignWarrant]
+    ) -> Int {
+        Set(warrants.flatMap(\.witnessRefs)).count
+    }
+
+    private static func compactPolicyID(for policyHash: String) -> String? {
+        let trimmed = policyHash.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else { return nil }
+        guard trimmed.count > 16 else { return trimmed }
+        return String(trimmed.prefix(16))
+    }
+
+    private static func compactTTLID(
+        issuedAt: Date?,
+        expiresAt: Date?
+    ) -> String? {
+        guard let issuedAt, let expiresAt else { return nil }
+        let ttlSeconds = max(0, Int(expiresAt.timeIntervalSince(issuedAt).rounded()))
+        guard ttlSeconds > 0 else { return "0s" }
+        if ttlSeconds % 60 == 0 {
+            return "\(ttlSeconds / 60)m"
+        }
+        return "\(ttlSeconds)s"
+    }
+
     private static func augmentedLayerStackLines(
         _ baseLines: [String],
         temporalField: BASTemporalMemoryField?,
@@ -631,25 +703,20 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
     private static func sovereignAuthorityLine(
         tokenScopes: [String],
         warrantScopes: [String],
+        warrantPolicyIDs: [String],
+        warrantTTLIDs: [String],
+        warrantWitnessCount: Int,
         lockScopeID: String?,
         quarantineZoneIDs: [String]
     ) -> String? {
-        guard
-            tokenScopes.isEmpty == false
-                || warrantScopes.isEmpty == false
-                || lockScopeID != nil
-                || quarantineZoneIDs.isEmpty == false
-        else {
-            return nil
-        }
-
-        return DecisionEvolutionNarrativeFormattingSupport.joined(
-            [
-                tokenScopes.isEmpty ? nil : "tokens \(tokenScopes.joined(separator: ", "))",
-                warrantScopes.isEmpty ? nil : "warrants \(warrantScopes.joined(separator: ", "))",
-                lockScopeID.map { "lock \($0)" },
-                quarantineZoneIDs.isEmpty ? nil : "quarantine \(quarantineZoneIDs.joined(separator: ", "))"
-            ].compactMap { $0 }
+        DecisionEvolutionNarrativeFormattingSupport.sovereignAuthorityLine(
+            tokenScopes: tokenScopes,
+            warrantScopes: warrantScopes,
+            warrantPolicyIDs: warrantPolicyIDs,
+            warrantTTLIDs: warrantTTLIDs,
+            warrantWitnessCount: warrantWitnessCount,
+            lockScopeID: lockScopeID,
+            quarantineZoneIDs: quarantineZoneIDs
         )
     }
 
@@ -1048,6 +1115,21 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
             guard scopes.isEmpty == false else { return nil }
             return "warrants \(Array(scopes.prefix(3)).joined(separator: ", "))"
         }()
+        let sovereignWarrantPolicyLine: String? = {
+            let policyIDs = lineageSummary.sovereignWarrantPolicyIDs
+            guard policyIDs.isEmpty == false else { return nil }
+            return "policy \(Array(policyIDs.prefix(2)).joined(separator: ", "))"
+        }()
+        let sovereignWarrantTTLLine: String? = {
+            let ttlIDs = lineageSummary.sovereignWarrantTTLIDs
+            guard ttlIDs.isEmpty == false else { return nil }
+            return "ttl \(Array(ttlIDs.prefix(2)).joined(separator: ", "))"
+        }()
+        let sovereignWarrantWitnessLine: String? = {
+            let witnessCount = lineageSummary.sovereignWarrantWitnessCount
+            guard witnessCount > 0 else { return nil }
+            return "witnesses \(witnessCount)"
+        }()
         let sovereignLockLine = lineageSummary.sovereignLockScopeID.map { "lock \($0)" }
         let quarantineLine: String? = {
             let zones = lineageSummary.sovereignQuarantineZoneIDs
@@ -1072,10 +1154,27 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
             ])
         }
         let recoveryLine = lineageSummary.recoveryDisposition.map {
-            DecisionEvolutionNarrativeFormattingSupport.joined([
+            let recoveryParts: [String?] = [
                 $0.kind.rawValue,
-                $0.summary
-            ])
+                $0.summary,
+                $0.operatorReviewRequired ? "operator review required" : nil,
+                $0.requiredConfirmations.isEmpty
+                    ? nil
+                    : "confirm \($0.requiredConfirmations.joined(separator: ", "))",
+                $0.allowedActionClasses.isEmpty
+                    ? nil
+                    : "allow \($0.allowedActionClasses.joined(separator: ", "))",
+                $0.blockedActionClasses.isEmpty
+                    ? nil
+                    : "block \($0.blockedActionClasses.joined(separator: ", "))",
+                $0.remediationActions.isEmpty
+                    ? nil
+                    : "remediate \($0.remediationActions.joined(separator: ", "))"
+            ]
+
+            return DecisionEvolutionNarrativeFormattingSupport.joined(
+                recoveryParts.compactMap { $0 }
+            )
         }
         let activeOrganSummary = lineageSummary.activeOrganIDs.isEmpty
             ? "none"
@@ -1100,6 +1199,9 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
                 sovereignVerdictLine,
                 sovereignTokenLine,
                 sovereignWarrantLine,
+                sovereignWarrantPolicyLine,
+                sovereignWarrantTTLLine,
+                sovereignWarrantWitnessLine,
                 sovereignLockLine,
                 quarantineLine,
                 sovereignAuditLine,
@@ -1248,6 +1350,25 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
             forecastCount: cognitionSummary.forecastCount,
             critiqueCount: cognitionSummary.critiqueCount,
             stopReasonID: cognitionSummary.stopReasonID
+        )
+    }
+
+    private static func checkpointMirrorCalibrationLine(
+        from lineageSummary: BASEvolutionLineageSummary
+    ) -> String? {
+        guard let cognitionSummary = lineageSummary.cognitionSummary else {
+            return nil
+        }
+
+        return DecisionEvolutionEBrainPresentationSupport.mirrorCalibrationLine(
+            mirrorModeID: cognitionSummary.mirrorModeID,
+            routeHint: cognitionSummary.routeHint,
+            calibrationPointCount: cognitionSummary.mirrorCalibrationPointCount,
+            omittedSpeculationCount: cognitionSummary.mirrorOmittedSpeculationCount,
+            toneGuard: cognitionSummary.mirrorToneGuard,
+            pressureSummary: cognitionSummary.pressureSummary,
+            manipulationSummary: cognitionSummary.manipulationSummary,
+            boundarySummary: cognitionSummary.boundarySummary
         )
     }
 
@@ -1809,7 +1930,7 @@ extension DecisionEvolutionSourceDescriptor {
     static let liveRuntimeDefault = DecisionEvolutionSourceDescriptor(
         kind: .liveRuntime,
         title: "Live runtime",
-        detail: "Showing the active 13-layer turn synthesized from the current local runtime."
+        detail: "Showing the active 14-layer turn synthesized from the current local runtime."
     )
 
     static let checkpointRecoveryDefault = DecisionEvolutionSourceDescriptor(
@@ -1844,7 +1965,11 @@ struct DecisionEvolutionTurnDiagnosticsPresentation: Equatable, Sendable {
     let triScoreLines: [String]
     let riskFactorsLine: String?
     let reasonCodesLine: String?
+    let courtLine: String?
+    let cognitionLine: String?
+    let mirrorCalibrationLine: String?
     let alternativeActions: [String]
+    let deliveryFallbackGuidance: String?
     let thoughtFoldLines: [String]
     let replayTraceLines: [String]
     let ticketSummary: String?
@@ -1903,6 +2028,9 @@ struct DecisionEvolutionReplayDiagnosticLine: Equatable, Sendable {
         case eBrain
         case riskFactors
         case reasonCodes
+        case court
+        case cognition
+        case mirrorCalibration
         case foldedLung
         case organDelta
         case scheduler
@@ -1937,6 +2065,9 @@ struct DecisionEvolutionReplayEntryPresentation: Equatable, Sendable {
     let eBrainLine: String?
     let riskFactorsLine: String?
     let reasonCodesLine: String?
+    let courtLine: String?
+    let cognitionLine: String?
+    let mirrorCalibrationLine: String?
     let taskLine: String?
     let actionLine: String?
     let auditLine: String?
@@ -1967,6 +2098,9 @@ struct DecisionEvolutionReplayEntryPresentation: Equatable, Sendable {
         eBrainLine: String?,
         riskFactorsLine: String? = nil,
         reasonCodesLine: String? = nil,
+        courtLine: String? = nil,
+        cognitionLine: String? = nil,
+        mirrorCalibrationLine: String? = nil,
         taskLine: String?,
         actionLine: String?,
         auditLine: String?,
@@ -1996,6 +2130,9 @@ struct DecisionEvolutionReplayEntryPresentation: Equatable, Sendable {
         self.eBrainLine = eBrainLine
         self.riskFactorsLine = riskFactorsLine
         self.reasonCodesLine = reasonCodesLine
+        self.courtLine = courtLine
+        self.cognitionLine = cognitionLine
+        self.mirrorCalibrationLine = mirrorCalibrationLine
         self.taskLine = taskLine
         self.actionLine = actionLine
         self.auditLine = auditLine
@@ -2014,6 +2151,36 @@ struct DecisionEvolutionReplayEntryPresentation: Equatable, Sendable {
 }
 
 extension DecisionEvolutionReplayEntryPresentation {
+    var windGateLine: String? {
+        layerStackLines.first(where: { $0.hasPrefix("L11 wind gate") })
+    }
+
+    var dreamLoopLine: String? {
+        layerStackLines.first(where: { $0.hasPrefix("L9 dream loop") })
+    }
+
+    var lineageMetadataText: String? {
+        DecisionEvolutionCheckpointDetailPresentationSupport.combinedMetadataText(
+            base: nil,
+            supplementalLines: [
+                DecisionEvolutionCheckpointDetailPresentationSupport.windGateMetadataLine(
+                    layerStackLines: layerStackLines
+                ),
+                DecisionEvolutionCheckpointDetailPresentationSupport.dreamLoopMetadataLine(
+                    layerStackLines: layerStackLines
+                )
+            ]
+            .compactMap { $0 }
+        )
+    }
+
+    var overviewSupplementaryDetailLines: [String] {
+        overviewCardCopy.remainingDetailLines.filter { line in
+            !line.hasPrefix("L9 dream loop")
+                && !line.hasPrefix("L11 wind gate")
+        }
+    }
+
     var digestHeadlineLine: String? {
         guard let digest else { return nil }
         return "\(digest.sourceDescriptor.title) • \(digest.compactStatusLine)"
@@ -2118,6 +2285,9 @@ extension DecisionEvolutionReplayEntryPresentation {
             diagnosticLine(.eBrain, eBrainLine),
             diagnosticLine(.riskFactors, riskFactorsLine),
             diagnosticLine(.reasonCodes, reasonCodesLine),
+            diagnosticLine(.court, courtLine),
+            diagnosticLine(.cognition, cognitionLine),
+            diagnosticLine(.mirrorCalibration, mirrorCalibrationLine),
             diagnosticLine(.foldedLung, lungLine),
             diagnosticLine(.organDelta, organDeltaLine),
             diagnosticLine(.scheduler, schedulerLine),
@@ -2269,7 +2439,11 @@ extension BASEBrainTurnResult {
             triScoreLines: Array(triScores.prefix(3)).map(triScoreLine),
             riskFactorsLine: support.riskFactorsLine,
             reasonCodesLine: support.reasonCodesLine,
+            courtLine: support.courtLine,
+            cognitionLine: support.cognitionLine,
+            mirrorCalibrationLine: support.mirrorCalibrationLine,
             alternativeActions: renderedOutput.alternativeActions,
+            deliveryFallbackGuidance: renderedOutput.deliveryFallbackGuidance,
             thoughtFoldLines: thoughtFold.compactSlots.keys.sorted().compactMap { key in
                 guard let value = thoughtFold.compactSlots[key], !value.isEmpty else { return nil }
                 return "• \(key): \(value)"
@@ -2388,6 +2562,8 @@ extension DeveloperDecisionReplayEntry {
                 replayRecoverySummary?.detailLine,
                 eBrain?.riskFactorsLine,
                 eBrain?.reasonCodesLine,
+                eBrain?.cognitionLine,
+                eBrain?.mirrorCalibrationLine,
                 eBrain?.courtLine,
                 digest.operationsLine,
                 eBrain?.executionCapabilityLine,
@@ -2420,6 +2596,8 @@ extension DeveloperDecisionReplayEntry {
                 traceLine,
                 eBrain?.riskFactorsLine,
                 eBrain?.reasonCodesLine,
+                eBrain?.cognitionLine,
+                eBrain?.mirrorCalibrationLine,
                 eBrain?.courtLine,
                 eBrain?.executionCapabilityLine,
                 eBrain?.horizonLine,
@@ -2460,6 +2638,9 @@ extension DeveloperDecisionReplayEntry {
             eBrainLine: replayRecoverySummary?.headlineLine,
             riskFactorsLine: eBrain?.riskFactorsLine,
             reasonCodesLine: eBrain?.reasonCodesLine,
+            courtLine: eBrain?.courtLine,
+            cognitionLine: eBrain?.cognitionLine,
+            mirrorCalibrationLine: eBrain?.mirrorCalibrationLine,
             taskLine: replayRecoverySummary?.taskLine,
             actionLine: replayRecoverySummary?.actionLine,
             auditLine: replayRecoverySummary?.auditLine,

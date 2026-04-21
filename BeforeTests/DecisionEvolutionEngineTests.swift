@@ -1003,6 +1003,8 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         XCTAssertEqual(deck.pendingReviewQueue.first?.primarySummary, "Legacy pending review should stay visible on Home.")
         XCTAssertEqual(deck.pendingReviewQueue.first?.applyReady, true)
         XCTAssertNil(deck.pendingReviewQueue.first?.riskLevel)
+        XCTAssertNil(deck.pendingReviewQueue.first?.foldedLungTitle)
+        XCTAssertTrue(deck.pendingReviewQueue.first?.foldedLungLines.isEmpty == true)
     }
 
     @MainActor
@@ -1110,7 +1112,75 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         XCTAssertEqual(controlSurface.activePresentation?.lineageHostGatePercent, 76)
         XCTAssertEqual(
             controlSurface.activePresentation?.metadataText,
-            "Session session-control-surface-wind-gate • Host gate 76% • Fold fold-control-surface-wind-gate • Wind gate primary delay • assert guarded • delay cool_down • substitute draft • sovereign elevated"
+            "Session session-control-surface-wind-gate • Host gate 76% • Fold fold-control-surface-wind-gate • Wind gate primary delay • assert guarded • delay cool down • substitute draft • sovereign elevated"
+        )
+        XCTAssertEqual(controlSurface.activePresentation?.summaryText, "HIGH → DELAY")
+    }
+
+    @MainActor
+    func testBeforeAppModelControlSurfaceCarriesRecoveredDreamLoopMetadata() throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+
+        let container = try makeCheckpointApplyContainer()
+        let context = container.mainContext
+
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-control-surface-dream-loop",
+                createdAt: localDate(year: 2026, month: 4, day: 11, hour: 6, minute: 20),
+                fingerprint: "fingerprint-control-surface-dream-loop",
+                previousCheckpointID: nil,
+                mode: .quick,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyAdvisory,
+                calibrationStatus: .stable,
+                diffSummary: ["Recovered dream loop should stay visible across control surface summaries."],
+                approvalState: .automatic,
+                rollbackReady: true,
+                brainStateSnapshot: nil,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: localDate(year: 2026, month: 4, day: 11, hour: 6, minute: 20),
+                    sessionID: "session-control-surface-dream-loop",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 76,
+                    thoughtFoldChecksum: "fold-control-surface-dream-loop",
+                    updateTicketSummaries: ["Keep the dream-loop checkpoint visible."],
+                    guardrailFindings: ["dream loop guardrail"],
+                    recommendedKillSwitches: ["external-tools"],
+                    governanceSummary: BASEvolutionLineageSummary.GovernanceSummary(
+                        experienceCandidateCount: 0,
+                        shadowTrialCount: 0,
+                        pendingShadowTrialCount: 0,
+                        sealCount: 0,
+                        pendingSealCount: 0,
+                        versionDeltaCount: 0,
+                        retractionOrderCount: 0,
+                        pendingRetractionCount: 0,
+                        dreamLoopStoppingMode: "guardTakeover",
+                        dreamLoopSignalRefs: ["dream_loop:evidence_debt", "dream_loop:breakpoint"],
+                        dreamLoopRemandTargets: ["L9", "L14"],
+                        dreamLoopReservationMode: "delayRight",
+                        dreamLoopMaxEvidenceDebtPercent: 81
+                    )
+                )
+            )
+        )
+        try context.save()
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+        let controlSurface = app.makeEvolutionControlSurface()
+
+        XCTAssertEqual(controlSurface.activePresentation?.checkpointID, "checkpoint-control-surface-dream-loop")
+        XCTAssertEqual(controlSurface.activePresentation?.lineageHostGatePercent, 76)
+        XCTAssertEqual(
+            controlSurface.activePresentation?.metadataText,
+            "Session session-control-surface-dream-loop • Host gate 76% • Fold fold-control-surface-dream-loop • Dream loop stop guard takeover • reserve delay right • remand L9, L14 • debt 81% • signals evidence debt, breakpoint"
         )
         XCTAssertEqual(controlSurface.activePresentation?.summaryText, "HIGH → DELAY")
     }
@@ -3176,6 +3246,56 @@ final class DecisionEvolutionEngineTests: XCTestCase {
             app.evolutionControlEntryContext?.detail,
             "Inspect evolution audit findings from Medium Widget."
         )
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.instructionDetail,
+            "Continue on iPhone to inspect audit findings before widening rollout."
+        )
+    }
+
+    @MainActor
+    func testBeforeAppModelSceneActiveBackfillsLegacyAuditEntryContextFromWidgetEnvelope() throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+        DecisionIntentEnvelopeStore.clear()
+
+        let now = Date()
+        DecisionIntentEnvelopeStore.enqueue(
+            DecisionIntentEnvelope(
+                id: UUID(uuidString: "33333333-4444-5555-6666-777777777777")!,
+                kind: .openEvolutionControl,
+                sourceSurface: .widget,
+                entrySource: .homeWidgetMedium,
+                preferredMode: .mirror,
+                promptSeed: "Inspect the legacy widget audit findings",
+                instructionDetail: nil,
+                triggerReason: nil,
+                controlEntryKindID: DecisionEvolutionWidgetControlEntryKind.audit.rawValue,
+                requestedAt: now,
+                expiresAt: now.addingTimeInterval(BeforePolicy.LaunchRequests.expirationInterval)
+            )
+        )
+
+        let container = try makeCheckpointApplyContainer()
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+
+        app.handleScenePhase(.active)
+
+        XCTAssertTrue(app.isEvolutionControlCenterPresented)
+        XCTAssertEqual(app.evolutionControlEntryContext?.controlEntryKind, .audit)
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.headline,
+            "Inspect the legacy widget audit findings"
+        )
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.detail,
+            "Inspect evolution audit findings from Medium Widget."
+        )
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.instructionDetail,
+            DecisionEvolutionWidgetControlEntryLexiconSupport.auditInstruction
+        )
     }
 
     @MainActor
@@ -3252,6 +3372,13 @@ final class DecisionEvolutionEngineTests: XCTestCase {
             app.evolutionControlEntryContext?.detail,
             "Factors: evidence_caveat_load • Evidence supported/ruleBound"
         )
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.instructionDetail,
+            """
+            Continue on iPhone to inspect audit findings before widening rollout. \
+            Horizon focus: Evidence supported/ruleBound.
+            """
+        )
     }
 
     private func makeCheckpointApplyContainer() throws -> ModelContainer {
@@ -3308,13 +3435,14 @@ final class DecisionEvolutionEngineTests: XCTestCase {
             }.count
         )
         let expectedControlEntryKind = surfaceState.policy.widgetControlEntryKind
+        let expectedHorizonDiagnosticsLines = surfaceState
+            .operatorSnapshot
+            .summaryPresentation
+            .horizonDiagnosticsLines
         let expectedTriggerReason = attentionSignal.resolvedTriggerReason(
             fallback: surfaceState.operatorSnapshot.primaryReason,
             controlEntryKind: expectedControlEntryKind,
-            horizonDiagnosticsLines: surfaceState
-                .operatorSnapshot
-                .summaryPresentation
-                .horizonDiagnosticsLines
+            horizonDiagnosticsLines: expectedHorizonDiagnosticsLines
         )
         let expectedPrimaryReason = expectedControlEntryKind == .audit
             ? expectedTriggerReason
@@ -3324,7 +3452,8 @@ final class DecisionEvolutionEngineTests: XCTestCase {
             : attentionSignal.detail
         let expectedControlEntry = surfaceState.policy.widgetControlEntryPresentation(
             prompt: attentionSignal.headline,
-            triggerReason: expectedTriggerReason
+            triggerReason: expectedTriggerReason,
+            horizonDiagnosticsLines: expectedHorizonDiagnosticsLines
         )
         let expectedPrimaryActionKind: DecisionEvolutionWidgetPrimaryActionKind =
             expectedControlEntry == nil ? .quick : .evolutionControl
@@ -3354,6 +3483,12 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         XCTAssertEqual(
             snapshot.primaryActionPresentation.prompt,
             expectedControlEntry?.prompt,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            snapshot.primaryActionPresentation.instructionDetail,
+            expectedControlEntry?.instruction,
             file: file,
             line: line
         )

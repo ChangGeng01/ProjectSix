@@ -68,6 +68,87 @@ enum DecisionEvolutionHorizonDiagnosticsPresentationSupport {
             || reason.hasPrefix("Temporal ")
             || reason.hasPrefix("Evidence ")
             || reason.hasPrefix("Persistence ")
+            || reason.hasPrefix("Court:")
+    }
+}
+
+enum DecisionEvolutionPresencePresentationSupport {
+    static let title = "Presence field"
+
+    static func lines(
+        from reasons: [String]
+    ) -> [String] {
+        lines(
+            presenceLine: nil,
+            reasons: reasons
+        )
+    }
+
+    static func lines(
+        presenceLine: String?,
+        reasons: [String] = []
+    ) -> [String] {
+        ([presenceLine] + reasons).reduce(into: [String]()) { uniqueLines, candidate in
+            guard let normalizedLine = normalizedPresenceLine(candidate),
+                  !uniqueLines.contains(normalizedLine) else { return }
+            uniqueLines.append(normalizedLine)
+        }
+    }
+
+    static func isPresenceLine(
+        _ line: String
+    ) -> Bool {
+        normalizedPresenceLine(line) != nil
+    }
+
+    private static func normalizedPresenceLine(
+        _ line: String?
+    ) -> String? {
+        guard let trimmedLine = line?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmedLine.isEmpty else {
+            return nil
+        }
+
+        if trimmedLine.hasPrefix("Presence ") || trimmedLine == "Presence" {
+            return trimmedLine
+        }
+
+        if trimmedLine.hasPrefix("eBrain presence:") {
+            let payload = Self.droppingKnownPrefix(
+                trimmedLine,
+                prefix: "eBrain presence:"
+            )
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return payload.isEmpty ? "Presence" : "Presence \(payload)"
+        }
+
+        guard trimmedLine.hasPrefix("L6 presence") else {
+            return nil
+        }
+
+        let payload = Self.droppingKnownPrefix(
+            Self.droppingKnownPrefix(
+                trimmedLine,
+                prefix: "L6 presence • "
+            ),
+            prefix: "L6 presence"
+        )
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "•"))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return payload.isEmpty ? "Presence" : "Presence \(payload)"
+    }
+
+    private static func droppingKnownPrefix(
+        _ value: String,
+        prefix: String
+    ) -> String {
+        guard value.hasPrefix(prefix) else {
+            return value
+        }
+
+        return String(value.dropFirst(prefix.count))
     }
 }
 
@@ -79,13 +160,16 @@ enum DecisionEvolutionPrimaryReasonPresentationSupport {
         let horizonDiagnosticsLines = DecisionEvolutionHorizonDiagnosticsPresentationSupport.lines(
             from: reasons
         )
-
         return reasons.first(where: {
             !sovereignPostureLines.contains($0)
                 && !horizonDiagnosticsLines.contains($0)
-        }) ?? DecisionEvolutionSovereignPosturePresentationSupport.primaryReason(
-            from: reasons
-        )
+                && !DecisionEvolutionPresencePresentationSupport.isPresenceLine($0)
+        }) ?? reasons.first(where: {
+            !horizonDiagnosticsLines.contains($0)
+                && !DecisionEvolutionPresencePresentationSupport.isPresenceLine($0)
+        }) ?? reasons.first(where: {
+            !DecisionEvolutionPresencePresentationSupport.isPresenceLine($0)
+        })
     }
 }
 
@@ -121,10 +205,18 @@ enum DecisionEvolutionFurnaceContributionPresentationSupport {
 
     static func lines(from reasons: [String]) -> [String] {
         reasons.reduce(into: [String]()) { uniqueLines, reason in
-            guard isFurnaceContributionLine(reason),
-                  !uniqueLines.contains(reason) else { return }
-            uniqueLines.append(reason)
+            guard isFurnaceContributionLine(reason) else { return }
+
+            let presentationLine = presentedContributionLine(reason)
+            guard !uniqueLines.contains(presentationLine) else { return }
+            uniqueLines.append(presentationLine)
         }
+    }
+
+    private static func presentedContributionLine(_ reason: String) -> String {
+        DecisionEvolutionEBrainPresentationSupport.windGateMetadataLine(
+            rawLine: reason
+        ) ?? reason
     }
 
     private static func isFurnaceContributionLine(_ reason: String) -> Bool {
@@ -253,12 +345,54 @@ enum DecisionEvolutionFurnaceNextStepPresentationSupport {
     }
 }
 
+struct DecisionEvolutionFurnaceLinesSectionPresentation: Equatable, Sendable {
+    let title: String
+    let lines: [String]
+}
+
+struct DecisionEvolutionFurnaceNextStepSectionPresentation: Equatable, Sendable {
+    let title: String
+    let detail: String
+    let action: DecisionEvolutionFurnaceNextStepActionPresentation?
+}
+
+struct DecisionEvolutionFurnaceReviewPresentationBundle: Equatable, Sendable {
+    let checklistSection: DecisionEvolutionFurnaceLinesSectionPresentation?
+    let nextStepSection: DecisionEvolutionFurnaceNextStepSectionPresentation?
+    let workbenchPresentation: DecisionEvolutionFurnaceWorkbenchPresentation?
+
+    var checklistLines: [String] {
+        checklistSection?.lines ?? []
+    }
+
+    var nextStepDetail: String? {
+        nextStepSection?.detail
+    }
+
+    var nextStepAction: DecisionEvolutionFurnaceNextStepActionPresentation? {
+        nextStepSection?.action
+    }
+}
+
+struct DecisionEvolutionFurnacePresentationBundle: Equatable, Sendable {
+    let contributionSection: DecisionEvolutionFurnaceLinesSectionPresentation?
+    let review: DecisionEvolutionFurnaceReviewPresentationBundle
+
+    var contributionLines: [String] {
+        contributionSection?.lines ?? []
+    }
+}
+
 struct DecisionEvolutionFurnaceWorkbenchPresentation: Equatable, Sendable {
     let title: String
     let headline: String
     let detail: String
     let availabilityTitle: String
     let availabilityLines: [String]
+    let nextStepAction: DecisionEvolutionFurnaceNextStepActionPresentation?
+    let focusTarget: DecisionEvolutionMutationHubFocusTarget
+    let executionState: DecisionEvolutionFurnaceExecutionStatePresentation
+    let runNowAction: DecisionEvolutionFurnaceRunNowActionPresentation?
 }
 
 enum DecisionEvolutionFurnaceNextStepActionKind: Equatable, Sendable {
@@ -279,6 +413,12 @@ struct DecisionEvolutionFurnaceNextStepActionPresentation: Equatable, Sendable {
 struct DecisionEvolutionFurnaceRunNowActionPresentation: Equatable, Sendable {
     let actionTitle: String
     let intent: DecisionEvolutionMutationIntent
+}
+
+struct DecisionEvolutionFurnaceExecutionStatePresentation: Equatable, Sendable {
+    let title: String
+    let headline: String
+    let lines: [String]
 }
 
 enum DecisionEvolutionFurnaceMutationHubRoutingSupport {
@@ -307,12 +447,18 @@ enum DecisionEvolutionFurnaceWorkbenchPresentationSupport {
 
     static func build(
         detail: String?,
-        controlSurface: DecisionEvolutionControlSurface
+        controlSurface: DecisionEvolutionControlSurface,
+        surfaceContract: DecisionEvolutionSurfaceContract,
+        nextStepAction: DecisionEvolutionFurnaceNextStepActionPresentation? = nil
     ) -> DecisionEvolutionFurnaceWorkbenchPresentation? {
         guard let detail else { return nil }
 
         let focusTarget = DecisionEvolutionFurnaceMutationHubRoutingSupport.focusTarget(
             for: detail
+        )
+        let resolvedNextStepAction = nextStepAction ?? DecisionEvolutionFurnaceNextStepActionSupport.build(
+            detail: detail,
+            surfaceContract: surfaceContract
         )
         let actionBundle = DecisionEvolutionWorkspaceMutationActionBundle.build(
             controlSurface: controlSurface
@@ -341,6 +487,23 @@ enum DecisionEvolutionFurnaceWorkbenchPresentationSupport {
             )
         }
 
+        let runNowAction = DecisionEvolutionFurnaceRunNowActionSupport.build(
+            detail: detail,
+            controlSurface: controlSurface,
+            surfaceContract: surfaceContract
+        )
+        let executionState = DecisionEvolutionFurnaceExecutionStateSupport.build(
+            detail: detail,
+            controlSurface: controlSurface,
+            surfaceContract: surfaceContract,
+            nextStepAction: resolvedNextStepAction,
+            runNowAction: runNowAction
+        ) ?? DecisionEvolutionFurnaceExecutionStatePresentation(
+            title: DecisionEvolutionFurnaceExecutionStateSupport.title,
+            headline: "Direct run-now preview is unavailable.",
+            lines: []
+        )
+
         return DecisionEvolutionFurnaceWorkbenchPresentation(
             title: title,
             headline: DecisionEvolutionPilotControlPresentationSupport.furnaceWorkbenchHeadline(
@@ -350,7 +513,11 @@ enum DecisionEvolutionFurnaceWorkbenchPresentationSupport {
             availabilityTitle: DecisionEvolutionPilotControlPresentationSupport.furnaceWorkbenchAvailabilityTitle(
                 isBlocked: availability.isBlocked
             ),
-            availabilityLines: availability.lines
+            availabilityLines: availability.lines,
+            nextStepAction: resolvedNextStepAction,
+            focusTarget: focusTarget,
+            executionState: executionState,
+            runNowAction: runNowAction
         )
     }
 }
@@ -412,6 +579,152 @@ enum DecisionEvolutionFurnaceRunNowActionSupport {
     }
 }
 
+enum DecisionEvolutionFurnaceExecutionStateSupport {
+    static let title = "Execution state"
+
+    static func build(
+        detail: String?,
+        controlSurface: DecisionEvolutionControlSurface,
+        surfaceContract: DecisionEvolutionSurfaceContract,
+        nextStepAction: DecisionEvolutionFurnaceNextStepActionPresentation? = nil,
+        runNowAction: DecisionEvolutionFurnaceRunNowActionPresentation? = nil
+    ) -> DecisionEvolutionFurnaceExecutionStatePresentation? {
+        guard let detail else { return nil }
+
+        let resolvedRunNowAction = runNowAction ?? DecisionEvolutionFurnaceRunNowActionSupport.build(
+            detail: detail,
+            controlSurface: controlSurface,
+            surfaceContract: surfaceContract
+        )
+        let resolvedNextStepAction = nextStepAction ?? DecisionEvolutionFurnaceNextStepActionSupport.build(
+            detail: detail,
+            surfaceContract: surfaceContract
+        )
+
+        if let resolvedRunNowAction {
+            return readyState(resolvedRunNowAction)
+        }
+
+        let focusTarget = DecisionEvolutionFurnaceMutationHubRoutingSupport.focusTarget(
+            for: detail
+        )
+        if surfaceContract.allowsMutations {
+            return blockedMutationState(
+                focusTarget: focusTarget,
+                controlSurface: controlSurface
+            )
+        }
+
+        return readOnlyState(
+            nextStepAction: resolvedNextStepAction
+        )
+    }
+
+    private static func readyState(
+        _ runNowAction: DecisionEvolutionFurnaceRunNowActionPresentation
+    ) -> DecisionEvolutionFurnaceExecutionStatePresentation {
+        let preview = runNowAction.intent.preview
+        let previewPresentation = runNowAction.intent.previewPresentation
+
+        var lines = [
+            "\(preview.scope.summaryTitle).",
+            preview.summary
+        ]
+        if let targetsLine = previewPresentation.impactTargetsLine(
+            preview.targetCheckpointIDs
+        ) {
+            lines.append(targetsLine)
+        }
+        if let activeTransitionLine = transitionLine(
+            title: previewPresentation.activeTransitionTitle,
+            current: preview.currentActiveCheckpointID,
+            projected: preview.projectedActiveCheckpointID,
+            previewPresentation: previewPresentation
+        ) {
+            lines.append(activeTransitionLine)
+        }
+        if let reviewTransitionLine = transitionLine(
+            title: previewPresentation.reviewTransitionTitle,
+            current: preview.currentReviewCheckpointID,
+            projected: preview.projectedReviewCheckpointID,
+            previewPresentation: previewPresentation
+        ) {
+            lines.append(reviewTransitionLine)
+        }
+        if let warning = preview.warningHighlights.first {
+            lines.append("Watch: \(warning)")
+        } else if let change = preview.changeHighlights.first {
+            lines.append(change)
+        }
+
+        return DecisionEvolutionFurnaceExecutionStatePresentation(
+            title: title,
+            headline: "\(runNowAction.actionTitle) is ready for guarded preview.",
+            lines: lines
+        )
+    }
+
+    private static func transitionLine(
+        title: String,
+        current: String?,
+        projected: String?,
+        previewPresentation: DecisionEvolutionMutationPreviewPresentation
+    ) -> String? {
+        guard current != nil || projected != nil else {
+            return nil
+        }
+
+        return "\(title): \(previewPresentation.transitionLine(current: current, projected: projected))"
+    }
+
+    private static func blockedMutationState(
+        focusTarget: DecisionEvolutionMutationHubFocusTarget,
+        controlSurface: DecisionEvolutionControlSurface
+    ) -> DecisionEvolutionFurnaceExecutionStatePresentation {
+        let actionBundle = DecisionEvolutionWorkspaceMutationActionBundle.build(
+            controlSurface: controlSurface
+        )
+
+        let blockerLine: String
+        switch focusTarget {
+        case .quickActions:
+            blockerLine = DecisionEvolutionPilotControlPresentationSupport.preferredQuickActionExecutionBlockerLine(
+                controlSurface: controlSurface,
+                actionBundle: actionBundle
+            )
+        case .queueLineage:
+            blockerLine = DecisionEvolutionPilotControlPresentationSupport.queueLineageExecutionBlockerLine(
+                controlSurface: controlSurface,
+                clearLineageAvailable: actionBundle.clearReviewLineageIntent != nil
+            )
+        }
+
+        return DecisionEvolutionFurnaceExecutionStatePresentation(
+            title: title,
+            headline: "Direct run-now preview is blocked right now.",
+            lines: [
+                blockerLine,
+                "\(DecisionEvolutionFurnaceMutationHubRoutingSupport.actionTitle(for: focusTarget)) to inspect the holding lane."
+            ]
+        )
+    }
+
+    private static func readOnlyState(
+        nextStepAction: DecisionEvolutionFurnaceNextStepActionPresentation?
+    ) -> DecisionEvolutionFurnaceExecutionStatePresentation {
+        let actionTitle = nextStepAction?.actionTitle ?? "Open control center"
+
+        return DecisionEvolutionFurnaceExecutionStatePresentation(
+            title: title,
+            headline: "Direct run-now preview stays on the writable surface.",
+            lines: [
+                "This surface stays read-first for furnace mutations.",
+                "\(actionTitle) to inspect the current furnace step before mutating the path."
+            ]
+        )
+    }
+}
+
 enum DecisionEvolutionFurnaceNextStepActionSupport {
     static func build(
         detail: String?,
@@ -441,14 +754,106 @@ enum DecisionEvolutionFurnaceNextStepActionSupport {
     }
 }
 
+enum DecisionEvolutionFurnaceReviewPresentationSupport {
+    static func build(
+        reasons: [String],
+        controlSurface: DecisionEvolutionControlSurface,
+        surfaceContract: DecisionEvolutionSurfaceContract
+    ) -> DecisionEvolutionFurnaceReviewPresentationBundle {
+        let checklistLines = DecisionEvolutionFurnaceChecklistPresentationSupport.lines(
+            from: reasons
+        )
+        let checklistSection = checklistLines.isEmpty
+            ? nil
+            : DecisionEvolutionFurnaceLinesSectionPresentation(
+                title: DecisionEvolutionFurnaceChecklistPresentationSupport.title,
+                lines: checklistLines
+            )
+        let nextStepDetail = DecisionEvolutionFurnaceNextStepPresentationSupport.detail(
+            from: checklistLines
+        )
+        let nextStepAction = DecisionEvolutionFurnaceNextStepActionSupport.build(
+            detail: nextStepDetail,
+            surfaceContract: surfaceContract
+        )
+        let nextStepSection = nextStepDetail.map {
+            DecisionEvolutionFurnaceNextStepSectionPresentation(
+                title: DecisionEvolutionFurnaceNextStepPresentationSupport.title,
+                detail: $0,
+                action: nextStepAction
+            )
+        }
+        let workbenchPresentation = DecisionEvolutionFurnaceWorkbenchPresentationSupport.build(
+            detail: nextStepDetail,
+            controlSurface: controlSurface,
+            surfaceContract: surfaceContract,
+            nextStepAction: nextStepAction
+        )
+
+        return DecisionEvolutionFurnaceReviewPresentationBundle(
+            checklistSection: checklistSection,
+            nextStepSection: nextStepSection,
+            workbenchPresentation: workbenchPresentation
+        )
+    }
+
+    static func build(
+        releaseSummary: DecisionSystemReleaseControlSummary,
+        controlSurface: DecisionEvolutionControlSurface,
+        surfaceContract: DecisionEvolutionSurfaceContract
+    ) -> DecisionEvolutionFurnaceReviewPresentationBundle {
+        build(
+            reasons: releaseSummary.reasons,
+            controlSurface: controlSurface,
+            surfaceContract: surfaceContract
+        )
+    }
+}
+
+enum DecisionEvolutionFurnacePresentationSupport {
+    static func build(
+        reasons: [String],
+        controlSurface: DecisionEvolutionControlSurface,
+        surfaceContract: DecisionEvolutionSurfaceContract
+    ) -> DecisionEvolutionFurnacePresentationBundle {
+        let contributionLines = DecisionEvolutionFurnaceContributionPresentationSupport.lines(
+            from: reasons
+        )
+
+        return DecisionEvolutionFurnacePresentationBundle(
+            contributionSection: contributionLines.isEmpty
+                ? nil
+                : DecisionEvolutionFurnaceLinesSectionPresentation(
+                    title: DecisionEvolutionFurnaceContributionPresentationSupport.title,
+                    lines: contributionLines
+                ),
+            review: DecisionEvolutionFurnaceReviewPresentationSupport.build(
+                reasons: reasons,
+                controlSurface: controlSurface,
+                surfaceContract: surfaceContract
+            )
+        )
+    }
+
+    static func build(
+        releaseSummary: DecisionSystemReleaseControlSummary,
+        controlSurface: DecisionEvolutionControlSurface,
+        surfaceContract: DecisionEvolutionSurfaceContract
+    ) -> DecisionEvolutionFurnacePresentationBundle {
+        build(
+            reasons: releaseSummary.reasons,
+            controlSurface: controlSurface,
+            surfaceContract: surfaceContract
+        )
+    }
+}
+
 enum DecisionEvolutionReleaseSummaryPresentationSupport {
     static let activeSourcePrefix = "Active source"
     static let sovereignPostureTitle = DecisionEvolutionSovereignPosturePresentationSupport.title
     static let horizonDiagnosticsTitle = DecisionEvolutionHorizonDiagnosticsPresentationSupport.title
+    static let presenceTitle = DecisionEvolutionPresencePresentationSupport.title
     static let foldedLungTitle = DecisionEvolutionFoldedLungPresentationSupport.title
-    static let furnaceContributionTitle = DecisionEvolutionFurnaceContributionPresentationSupport.title
-    static let furnaceChecklistTitle = DecisionEvolutionFurnaceChecklistPresentationSupport.title
-    static let furnaceNextStepTitle = DecisionEvolutionFurnaceNextStepPresentationSupport.title
 
     static func operatorHeadline(
         for presentationMode: DecisionEvolutionReleaseSummaryPresentationMode
@@ -505,20 +910,27 @@ enum DecisionEvolutionReleaseSummaryPresentationSupport {
     static func build(
         releaseSummary: DecisionSystemReleaseControlSummary,
         controlSurface: DecisionEvolutionControlSurface,
-        presentationMode: DecisionEvolutionReleaseSummaryPresentationMode
+        presentationMode: DecisionEvolutionReleaseSummaryPresentationMode,
+        surfaceContract: DecisionEvolutionSurfaceContract = .home
     ) -> DecisionEvolutionReleaseSummaryPresentation {
         let sovereignPostureLines = sovereignPostureLines(releaseSummary: releaseSummary)
         let horizonDiagnosticsLines = horizonDiagnosticsLines(releaseSummary: releaseSummary)
+        let presenceLines = presenceLines(releaseSummary: releaseSummary)
         let foldedLungLines = foldedLungLines(releaseSummary: releaseSummary)
-        let furnaceContributionLines = furnaceContributionLines(releaseSummary: releaseSummary)
-        let furnaceChecklistLines = furnaceChecklistLines(releaseSummary: releaseSummary)
-        let furnaceNextStepDetail = DecisionEvolutionFurnaceNextStepPresentationSupport.detail(
-            from: furnaceChecklistLines
+        let furnacePresentation = DecisionEvolutionFurnacePresentationSupport.build(
+            releaseSummary: releaseSummary,
+            controlSurface: controlSurface,
+            surfaceContract: surfaceContract
         )
-        let furnaceWorkbenchPresentation = DecisionEvolutionFurnaceWorkbenchPresentationSupport.build(
-            detail: furnaceNextStepDetail,
-            controlSurface: controlSurface
-        )
+        let furnaceContributionSection = furnacePresentation.contributionSection
+        let furnaceContributionLines = furnaceContributionSection?.lines ?? []
+        let furnaceReview = furnacePresentation.review
+        let furnaceChecklistSection = furnaceReview.checklistSection
+        let furnaceChecklistLines = furnaceChecklistSection?.lines ?? []
+        let furnaceNextStepSection = furnaceReview.nextStepSection
+        let furnaceNextStepDetail = furnaceNextStepSection?.detail
+        let furnaceNextStepAction = furnaceNextStepSection?.action
+        let furnaceWorkbenchPresentation = furnaceReview.workbenchPresentation
 
         return DecisionEvolutionReleaseSummaryPresentation(
             state: releaseSummary.state,
@@ -532,14 +944,17 @@ enum DecisionEvolutionReleaseSummaryPresentationSupport {
             sovereignPostureLines: sovereignPostureLines,
             horizonDiagnosticsTitle: horizonDiagnosticsLines.isEmpty ? nil : horizonDiagnosticsTitle,
             horizonDiagnosticsLines: horizonDiagnosticsLines,
+            presenceTitle: presenceLines.isEmpty ? nil : presenceTitle,
+            presenceLines: presenceLines,
             foldedLungTitle: foldedLungLines.isEmpty ? nil : foldedLungTitle,
             foldedLungLines: foldedLungLines,
-            furnaceContributionTitle: furnaceContributionLines.isEmpty ? nil : furnaceContributionTitle,
+            furnaceContributionTitle: furnaceContributionSection?.title,
             furnaceContributionLines: furnaceContributionLines,
-            furnaceChecklistTitle: furnaceChecklistLines.isEmpty ? nil : furnaceChecklistTitle,
+            furnaceChecklistTitle: furnaceChecklistSection?.title,
             furnaceChecklistLines: furnaceChecklistLines,
-            furnaceNextStepTitle: furnaceNextStepDetail == nil ? nil : furnaceNextStepTitle,
+            furnaceNextStepTitle: furnaceNextStepSection?.title,
             furnaceNextStepDetail: furnaceNextStepDetail,
+            furnaceNextStepAction: furnaceNextStepAction,
             furnaceWorkbenchPresentation: furnaceWorkbenchPresentation,
             activeCheckpointHeadline: controlSurface.activePresentation.map {
                 checkpointHeadline(
@@ -616,6 +1031,15 @@ enum DecisionEvolutionReleaseSummaryPresentationSupport {
     ) -> [String] {
         DecisionEvolutionHorizonDiagnosticsPresentationSupport.lines(
             from: releaseSummary.reasons
+        )
+    }
+
+    static func presenceLines(
+        releaseSummary: DecisionSystemReleaseControlSummary
+    ) -> [String] {
+        DecisionEvolutionPresencePresentationSupport.lines(
+            presenceLine: releaseSummary.presenceLine,
+            reasons: releaseSummary.reasons
         )
     }
 
@@ -733,6 +1157,7 @@ enum DecisionEvolutionReleaseSummaryBuilder {
         let guidance = policy.releaseGuidance
         let reasons = orderedUnique(
             guidance.reasons
+                + evolutionControlSurface.queueCourtLines
                 + runtimeFoldedLungLines(
                     from: eBrainSummary,
                     controlSurface: evolutionControlSurface
@@ -757,6 +1182,10 @@ enum DecisionEvolutionReleaseSummaryBuilder {
             activeCheckpointID: evolutionControlSurface.activePresentation?.checkpointID,
             activeCheckpointSource: evolutionControlSurface.activeCheckpointSource,
             reviewCheckpointID: evolutionControlSurface.reviewPresentation?.checkpointID,
+            presenceLine: runtimePresenceLine(
+                from: eBrainSummary,
+                controlSurface: evolutionControlSurface
+            ),
             primaryBlocker: policy.primaryBlocker
         )
     }
@@ -797,6 +1226,26 @@ enum DecisionEvolutionReleaseSummaryBuilder {
         return []
     }
 
+    private static func runtimePresenceLine(
+        from eBrainSummary: DecisionSystemEBrainSummary?,
+        controlSurface: DecisionEvolutionControlSurface
+    ) -> String? {
+        guard let eBrainSummary else {
+            return nil
+        }
+
+        if eBrainSummary.source == .liveRuntime {
+            return eBrainSummary.presenceLine
+        }
+
+        if let activeCheckpointID = controlSurface.activePresentation?.checkpointID,
+           eBrainSummary.checkpointID == activeCheckpointID {
+            return eBrainSummary.presenceLine
+        }
+
+        return nil
+    }
+
     private static func runtimeFoldedLungLines(
         from eBrainSummary: DecisionSystemEBrainSummary?,
         controlSurface: DecisionEvolutionControlSurface
@@ -833,6 +1282,7 @@ enum DecisionEvolutionReleaseSummaryBuilder {
                 eBrainSummary?.executionCapabilityFrame?.persistenceLine,
                 eBrainSummary?.riskFactorsLine,
                 eBrainSummary?.reasonCodesLine,
+                eBrainSummary?.courtLine,
                 eBrainSummary?.versionTreeLine,
                 eBrainSummary?.retractionLine,
                 eBrainSummary?.sovereignVerdictLine,

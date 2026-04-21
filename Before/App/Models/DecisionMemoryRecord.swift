@@ -67,53 +67,73 @@ enum DecisionTemporalSieveDisposition: String, Codable, Sendable {
 struct DecisionTemporalProjection: Codable, Equatable, Sendable {
     var temporalMemoryID: String?
     var sieveDisposition: DecisionTemporalSieveDisposition
+    var normalRetrievalBlocked: Bool
     var temperatureProfileID: String?
     var provenanceSealID: String?
     var sanctumEntryID: String?
+    var sanctumAccessPolicy: String?
+    var sanctumRevealConditions: [String]
+    var sanctumFrozenUntil: Date?
     var episodeArcIDs: [String]
     var conflictClusterIDs: [String]
     var continuityAnchorID: String?
     var replayFrameID: String?
     var quarantineRecordID: String?
+    var forgetExecutionState: String?
     var forgetCascadeIDs: [String]
 
     init(
         temporalMemoryID: String? = nil,
         sieveDisposition: DecisionTemporalSieveDisposition,
+        normalRetrievalBlocked: Bool = false,
         temperatureProfileID: String? = nil,
         provenanceSealID: String? = nil,
         sanctumEntryID: String? = nil,
+        sanctumAccessPolicy: String? = nil,
+        sanctumRevealConditions: [String] = [],
+        sanctumFrozenUntil: Date? = nil,
         episodeArcIDs: [String] = [],
         conflictClusterIDs: [String] = [],
         continuityAnchorID: String? = nil,
         replayFrameID: String? = nil,
         quarantineRecordID: String? = nil,
+        forgetExecutionState: String? = nil,
         forgetCascadeIDs: [String] = []
     ) {
         self.temporalMemoryID = temporalMemoryID
         self.sieveDisposition = sieveDisposition
+        self.normalRetrievalBlocked = normalRetrievalBlocked
         self.temperatureProfileID = temperatureProfileID
         self.provenanceSealID = provenanceSealID
         self.sanctumEntryID = sanctumEntryID
+        self.sanctumAccessPolicy = sanctumAccessPolicy
+        self.sanctumRevealConditions = sanctumRevealConditions
+        self.sanctumFrozenUntil = sanctumFrozenUntil
         self.episodeArcIDs = episodeArcIDs
         self.conflictClusterIDs = conflictClusterIDs
         self.continuityAnchorID = continuityAnchorID
         self.replayFrameID = replayFrameID
         self.quarantineRecordID = quarantineRecordID
+        self.forgetExecutionState = forgetExecutionState
         self.forgetCascadeIDs = forgetCascadeIDs
     }
 
     private enum CodingKeys: String, CodingKey {
         case temporalMemoryID
         case sieveDisposition
+        case normalRetrievalBlocked
         case temperatureProfileID
         case provenanceSealID
         case sanctumEntryID
+        case sanctumAccessPolicy
+        case sanctumRevealConditions
+        case sanctumFrozenUntil
         case episodeArcIDs
         case conflictClusterIDs
         case continuityAnchorID
         case replayFrameID
         case quarantineRecordID
+        case forgetExecutionState
         case forgetCascadeIDs
     }
 
@@ -123,11 +143,18 @@ struct DecisionTemporalProjection: Codable, Equatable, Sendable {
         let temperatureProfileID = try container.decodeIfPresent(String.self, forKey: .temperatureProfileID)
         let provenanceSealID = try container.decodeIfPresent(String.self, forKey: .provenanceSealID)
         let sanctumEntryID = try container.decodeIfPresent(String.self, forKey: .sanctumEntryID)
+        let sanctumAccessPolicy = try container.decodeIfPresent(String.self, forKey: .sanctumAccessPolicy)
+        let sanctumRevealConditions = try container.decodeIfPresent(
+            [String].self,
+            forKey: .sanctumRevealConditions
+        ) ?? []
+        let sanctumFrozenUntil = try container.decodeIfPresent(Date.self, forKey: .sanctumFrozenUntil)
         let episodeArcIDs = try container.decodeIfPresent([String].self, forKey: .episodeArcIDs) ?? []
         let conflictClusterIDs = try container.decodeIfPresent([String].self, forKey: .conflictClusterIDs) ?? []
         let continuityAnchorID = try container.decodeIfPresent(String.self, forKey: .continuityAnchorID)
         let replayFrameID = try container.decodeIfPresent(String.self, forKey: .replayFrameID)
         let quarantineRecordID = try container.decodeIfPresent(String.self, forKey: .quarantineRecordID)
+        let forgetExecutionState = try container.decodeIfPresent(String.self, forKey: .forgetExecutionState)
         let forgetCascadeIDs = try container.decodeIfPresent([String].self, forKey: .forgetCascadeIDs) ?? []
 
         let sieveDisposition = try container.decodeIfPresent(
@@ -138,18 +165,30 @@ struct DecisionTemporalProjection: Codable, Equatable, Sendable {
             conflictClusterIDs: conflictClusterIDs,
             quarantineRecordID: quarantineRecordID
         )
+        let normalRetrievalBlocked = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .normalRetrievalBlocked
+        ) ?? Self.legacyNormalRetrievalBlocked(
+            sanctumEntryID: sanctumEntryID,
+            quarantineRecordID: quarantineRecordID
+        )
 
         self.init(
             temporalMemoryID: temporalMemoryID,
             sieveDisposition: sieveDisposition,
+            normalRetrievalBlocked: normalRetrievalBlocked,
             temperatureProfileID: temperatureProfileID,
             provenanceSealID: provenanceSealID,
             sanctumEntryID: sanctumEntryID,
+            sanctumAccessPolicy: sanctumAccessPolicy,
+            sanctumRevealConditions: sanctumRevealConditions,
+            sanctumFrozenUntil: sanctumFrozenUntil,
             episodeArcIDs: episodeArcIDs,
             conflictClusterIDs: conflictClusterIDs,
             continuityAnchorID: continuityAnchorID,
             replayFrameID: replayFrameID,
             quarantineRecordID: quarantineRecordID,
+            forgetExecutionState: forgetExecutionState,
             forgetCascadeIDs: forgetCascadeIDs
         )
     }
@@ -158,14 +197,19 @@ struct DecisionTemporalProjection: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(temporalMemoryID, forKey: .temporalMemoryID)
         try container.encode(sieveDisposition, forKey: .sieveDisposition)
+        try container.encode(normalRetrievalBlocked, forKey: .normalRetrievalBlocked)
         try container.encodeIfPresent(temperatureProfileID, forKey: .temperatureProfileID)
         try container.encodeIfPresent(provenanceSealID, forKey: .provenanceSealID)
         try container.encodeIfPresent(sanctumEntryID, forKey: .sanctumEntryID)
+        try container.encodeIfPresent(sanctumAccessPolicy, forKey: .sanctumAccessPolicy)
+        try container.encode(sanctumRevealConditions, forKey: .sanctumRevealConditions)
+        try container.encodeIfPresent(sanctumFrozenUntil, forKey: .sanctumFrozenUntil)
         try container.encode(episodeArcIDs, forKey: .episodeArcIDs)
         try container.encode(conflictClusterIDs, forKey: .conflictClusterIDs)
         try container.encodeIfPresent(continuityAnchorID, forKey: .continuityAnchorID)
         try container.encodeIfPresent(replayFrameID, forKey: .replayFrameID)
         try container.encodeIfPresent(quarantineRecordID, forKey: .quarantineRecordID)
+        try container.encodeIfPresent(forgetExecutionState, forKey: .forgetExecutionState)
         try container.encode(forgetCascadeIDs, forKey: .forgetCascadeIDs)
     }
 
@@ -184,6 +228,13 @@ struct DecisionTemporalProjection: Codable, Equatable, Sendable {
             return .admitHotWarm
         }
         return .reject
+    }
+
+    private static func legacyNormalRetrievalBlocked(
+        sanctumEntryID: String?,
+        quarantineRecordID: String?
+    ) -> Bool {
+        sanctumEntryID != nil || quarantineRecordID != nil
     }
 }
 

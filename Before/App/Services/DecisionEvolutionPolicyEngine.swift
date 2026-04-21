@@ -166,12 +166,24 @@ struct DecisionEvolutionPolicyOutput: Equatable, Sendable {
 
     func widgetControlEntryPresentation(
         prompt: String,
-        triggerReason: String? = nil
+        triggerReason: String? = nil,
+        horizonDiagnosticsLines: [String] = []
     ) -> DecisionEvolutionWidgetControlEntryPresentation? {
         guard let widgetControlEntryKind else { return nil }
+        let instruction = if widgetControlEntryKind == .audit {
+            DecisionEvolutionHorizonTriggerReasonSupport.enrichedAuditInstruction(
+                baseInstruction: DecisionEvolutionWidgetControlEntryLexiconSupport.instruction(
+                    for: widgetControlEntryKind
+                ),
+                horizonDiagnosticsLines: horizonDiagnosticsLines
+            )
+        } else {
+            String?.none
+        }
         return DecisionEvolutionWidgetPresentationSupport.controlEntryPresentation(
             kind: widgetControlEntryKind,
             prompt: prompt,
+            instruction: instruction,
             triggerReason: triggerReason
         )
     }

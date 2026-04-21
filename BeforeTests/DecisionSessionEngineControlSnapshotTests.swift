@@ -72,7 +72,7 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
                 anchor.substituteType = "draft"
                 anchor.sovereignHintLevel = "elevated"
                 anchor.sovereignVerdictLine = "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine"
-                anchor.sovereignAuthorityLine = "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session"
+                anchor.sovereignAuthorityLine = "Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session"
                 anchor.sovereignAuditLine = "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
                 return anchor
             }(),
@@ -213,7 +213,7 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
         XCTAssertTrue(snapshot.reviewItems[1].detail.contains("Checkpoint ckpt_1"))
         XCTAssertEqual(
             snapshot.reviewItems[2].detail,
-            "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine • Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session • Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+            "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine • Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session • Sovereign audit • BR-SOV-004 • ref audit.session-l14"
         )
         XCTAssertEqual(
             snapshot.reviewItems[2].severity,
@@ -238,7 +238,7 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.sessions[0].checkpointTaskLine, "Review protective path: delay")
         XCTAssertEqual(
             snapshot.sessions[0].checkpointWindGateLine,
-            "L11 wind gate • primary delay • stacked draftOnly, mirror • assert guarded • allow draft.note, text.delay • block tool.write, memory.write, host.write • delay cool_down • substitute draft • sovereign elevated"
+            "Wind gate primary delay • stacked draft only, mirror • assert guarded • allow draft.note, text.delay • block tool.write, memory.write, host.write • delay cool down • substitute draft • sovereign elevated"
         )
         XCTAssertEqual(
             snapshot.sessions[0].checkpointActionLine,
@@ -251,7 +251,7 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
         )
         XCTAssertEqual(
             snapshot.sessions[0].checkpointSovereignAuthorityLine,
-            "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session"
+            "Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session"
         )
         XCTAssertEqual(
             snapshot.sessions[0].checkpointSovereignAuditLine,

@@ -4,6 +4,10 @@
 >
 > `WP5 / L5` 当前仓库执行口径固定为：`HostProfile / HostVersion / HostRhythmProfile + host gate + 基础删除/冻结/回滚 contract`。
 >
+> `L2 v∞` 目标态固定为：`Neural Organ Fabric / Brain Tissue`。详见 [EBRAIN_L2_BRAIN_TISSUE_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L2_BRAIN_TISSUE_TARGET_VINF.md)。该文档只定义理想完全体白皮书，不改写当前 repo 仍以 `BASNeuralCoreServicing / BASNeuralOrganMap / materialized thought artifacts` 为主的脚手架执行口径。
+>
+> `L3 v∞` 目标态固定为：`Folded Lung / Breath-Fold-Resume Fabric`。详见 [EBRAIN_L3_FOLDED_LUNG_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L3_FOLDED_LUNG_TARGET_VINF.md)。该文档只定义理想完全体白皮书，不改写当前 repo 仍以 `ThoughtFold / DecisionSessionEngine / recoverable anchor / thermal exchange facts / organ delta contract / sovereign bridge` 为主的执行口径。
+>
 > `L5 v∞` 目标态固定为：`Host Constitution Fabric`。详见 [EBRAIN_L5_HOST_CONSTITUTION_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L5_HOST_CONSTITUTION_TARGET_VINF.md) 与 [EBRAIN_L5_HOST_CONSTITUTION_ROADMAP.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L5_HOST_CONSTITUTION_ROADMAP.md)。
 >
 > `L6 v∞` 目标态固定为：`Presence Situation Field / Presence Field Generator`。详见 [EBRAIN_L6_PRESENCE_EYE_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L6_PRESENCE_EYE_TARGET_VINF.md)。该文档只定义理想完全体白皮书，不改写当前 repo 仍以 `ContextFrame` 与 task/manipulation 基线为准的执行口径。

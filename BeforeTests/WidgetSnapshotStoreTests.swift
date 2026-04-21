@@ -329,6 +329,10 @@ final class WidgetSnapshotStoreTests: XCTestCase {
         )
         XCTAssertEqual(snapshot.primaryActionPresentation.title, "Audit on iPhone")
         XCTAssertEqual(snapshot.primaryActionPresentation.systemImage, "exclamationmark.circle")
+        XCTAssertEqual(
+            snapshot.primaryActionPresentation.instructionDetail,
+            DecisionEvolutionWidgetControlEntryLexiconSupport.auditInstruction
+        )
     }
 
     func testWidgetEvolutionSnapshotPrefersStoredControlEntryPresentation() {

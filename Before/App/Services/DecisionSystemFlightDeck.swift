@@ -68,6 +68,7 @@ struct DecisionSystemEBrainSummary: Equatable, Sendable {
     let hostGatePercent: Int
     let presenceLine: String?
     let pressureLine: String?
+    let actionLine: String?
     let riskFactorsLine: String?
     let reasonCodesLine: String?
     let courtLine: String?
@@ -116,6 +117,7 @@ struct DecisionSystemEBrainSummary: Equatable, Sendable {
         hostGatePercent: Int,
         presenceLine: String? = nil,
         pressureLine: String?,
+        actionLine: String? = nil,
         riskFactorsLine: String? = nil,
         reasonCodesLine: String? = nil,
         courtLine: String? = nil,
@@ -163,6 +165,7 @@ struct DecisionSystemEBrainSummary: Equatable, Sendable {
         self.hostGatePercent = hostGatePercent
         self.presenceLine = presenceLine
         self.pressureLine = pressureLine
+        self.actionLine = actionLine
         self.riskFactorsLine = riskFactorsLine
         self.reasonCodesLine = reasonCodesLine
         self.courtLine = courtLine
@@ -207,6 +210,7 @@ struct DecisionSystemEBrainSummaryPresentation: Equatable, Sendable {
     let routeLine: String
     let presenceLine: String?
     let pressureLine: String?
+    let actionLine: String?
     let riskFactorsLine: String?
     let reasonCodesLine: String?
     let courtLine: String?
@@ -236,6 +240,7 @@ struct DecisionSystemEBrainSummaryPresentation: Equatable, Sendable {
         routeLine: String,
         presenceLine: String? = nil,
         pressureLine: String?,
+        actionLine: String? = nil,
         riskFactorsLine: String? = nil,
         reasonCodesLine: String? = nil,
         courtLine: String? = nil,
@@ -264,6 +269,7 @@ struct DecisionSystemEBrainSummaryPresentation: Equatable, Sendable {
         self.routeLine = routeLine
         self.presenceLine = presenceLine
         self.pressureLine = pressureLine
+        self.actionLine = actionLine
         self.riskFactorsLine = riskFactorsLine
         self.reasonCodesLine = reasonCodesLine
         self.courtLine = courtLine
@@ -302,6 +308,7 @@ struct DecisionSystemFlightDeckEBrainDigestPresentation: Equatable, Sendable {
     let routeLine: String
     let presenceLine: String?
     let pressureLine: String?
+    let actionLine: String?
     let hostLine: String
     let inspectionHeadline: String
     let primaryGuardrailText: String?
@@ -385,7 +392,9 @@ extension DecisionSystemEBrainSummary {
             return "Wind gate active"
         }
 
-        let detail = segments.dropFirst().joined(separator: " • ")
+        let detail = DecisionEvolutionEBrainPresentationSupport.humanizedWindGateDetail(
+            segments.dropFirst().joined(separator: " • ")
+        )
         guard detail.isEmpty == false else {
             return "Wind gate active"
         }
@@ -443,6 +452,7 @@ extension DecisionSystemEBrainSummary {
             routeLine: routeLine,
             presenceLine: presenceLine,
             pressureLine: pressureLine,
+            actionLine: actionLine,
             riskFactorsLine: riskFactorsLine,
             reasonCodesLine: reasonCodesLine,
             courtLine: courtLine,
@@ -467,6 +477,7 @@ extension DecisionSystemEBrainSummary {
                 evidenceLine,
                 persistenceLine,
                 pressureLine,
+                actionLine,
                 governanceLine,
                 hostLine,
                 sovereignVerdictLine,
@@ -514,6 +525,7 @@ extension DecisionSystemEBrainSummary {
             hostGatePercent: hostGatePercent,
             presenceLine: presenceLine,
             pressureLine: pressureLine,
+            actionLine: actionLine,
             riskFactorsLine: riskFactorsLine,
             reasonCodesLine: reasonCodesLine,
             courtLine: courtLine,
@@ -634,6 +646,7 @@ extension BASEBrainTurnResult {
             hostGatePercent: Int((hostGateValue * 100).rounded()),
             presenceLine: factsBundle.displayPresenceLine(),
             pressureLine: factsBundle.pressureLine,
+            actionLine: factsBundle.actionLine,
             riskFactorsLine: factsBundle.riskFactorsLine,
             reasonCodesLine: factsBundle.reasonCodesLine,
             courtLine: factsBundle.courtLine,
@@ -691,6 +704,7 @@ extension DecisionEvolutionLineageSnapshot {
             hostGatePercent: eBrain.hostGatePercent,
             presenceLine: factsBundle.displayPresenceLine(),
             pressureLine: factsBundle.pressureLine,
+            actionLine: factsBundle.actionLine,
             riskFactorsLine: factsBundle.riskFactorsLine,
             reasonCodesLine: factsBundle.reasonCodesLine,
             courtLine: factsBundle.courtLine,
@@ -1064,7 +1078,10 @@ struct DecisionSystemCheckpointQueueItem: Identifiable, Equatable, Sendable {
     let summaryText: String
     let usesSecondarySummaryTone: Bool
     let metadataText: String?
+    let foldedLungTitle: String?
+    let foldedLungLines: [String]
     let updateTicketSummaries: [String]
+    let courtLine: String?
     let auditFindings: [String]
     let killSwitches: [String]
 
@@ -1095,6 +1112,7 @@ struct DecisionSystemReleaseControlSummary: Equatable, Sendable {
     let activeCheckpointID: String?
     let activeCheckpointSource: DecisionEvolutionActiveCheckpointSource
     let reviewCheckpointID: String?
+    let presenceLine: String?
     let primaryBlocker: DecisionEvolutionPrimaryBlocker?
 
     init(
@@ -1111,6 +1129,7 @@ struct DecisionSystemReleaseControlSummary: Equatable, Sendable {
         activeCheckpointID: String?,
         activeCheckpointSource: DecisionEvolutionActiveCheckpointSource,
         reviewCheckpointID: String?,
+        presenceLine: String? = nil,
         primaryBlocker: DecisionEvolutionPrimaryBlocker? = nil
     ) {
         self.state = state
@@ -1126,6 +1145,7 @@ struct DecisionSystemReleaseControlSummary: Equatable, Sendable {
         self.activeCheckpointID = activeCheckpointID
         self.activeCheckpointSource = activeCheckpointSource
         self.reviewCheckpointID = reviewCheckpointID
+        self.presenceLine = presenceLine
         self.primaryBlocker = primaryBlocker
     }
 }
@@ -1175,6 +1195,7 @@ struct DecisionSystemFlightDeck: Equatable, Sendable {
             routeLine: summaryPresentation.routeLine,
             presenceLine: summaryPresentation.presenceLine,
             pressureLine: summaryPresentation.pressureLine,
+            actionLine: summaryPresentation.actionLine,
             hostLine: summaryPresentation.hostLine,
             inspectionHeadline: summaryPresentation.inspectionHeadline,
             primaryGuardrailText: summaryPresentation.primaryGuardrailText,

@@ -328,9 +328,21 @@ struct BASEBrainSchemaCoreTests {
             warrantID: "warrant-1",
             scope: .memoryWrite,
             actionDigest: sovereignToken.actionDigest,
+            commitTokenRef: sovereignToken.tokenID,
             jurisdictionRef: "jurisdiction.memoryWrite",
             snapshotRef: "snapshot-1",
             timeLockRef: "timelock.turn-1.memoryWrite.ttl_30000",
+            policyHash: "policy-hash-1",
+            issuedAt: Date(timeIntervalSince1970: 1_705_000_000),
+            expiresAt: Date(timeIntervalSince1970: 1_705_000_030),
+            witnessRefs: [
+                "permit.turn-1.memoryWrite",
+                "integrity.snapshot-1",
+                "continuity.turn-1",
+                "policy.policy-hash-1",
+                "mutation.memory.turn-1",
+                "memory_target.ticket-1"
+            ],
             singleUse: true,
             signature: "warrant-signature-1"
         )
@@ -534,7 +546,12 @@ struct BASEBrainSchemaCoreTests {
             remediationRequired: true,
             restrictedLease: true,
             toolWriteAllowed: false,
-            memoryWriteAllowed: false
+            memoryWriteAllowed: false,
+            operatorReviewRequired: true,
+            requiredConfirmations: ["operator_recovery_review"],
+            allowedActionClasses: ["render_local_guidance", "inspect_state"],
+            blockedActionClasses: ["tool_write", "memory_write"],
+            remediationActions: ["recompile_current_brain_state", "review_bootstrap_diagnostics"]
         )
 
         #expect(device.schemaVersion == BASDeviceState.currentSchemaVersion)
@@ -549,6 +566,9 @@ struct BASEBrainSchemaCoreTests {
         #expect(sovereignVerdict.schemaVersion == BASSovereignVerdict.currentSchemaVersion)
         #expect(sovereignToken.schemaVersion == BASSovereignCommitToken.currentSchemaVersion)
         #expect(sovereignWarrant.schemaVersion == BASSovereignWarrant.currentSchemaVersion)
+        #expect(sovereignWarrant.commitTokenRef == sovereignToken.tokenID)
+        #expect(sovereignWarrant.policyHash == sovereignToken.policyHash)
+        #expect(sovereignWarrant.witnessRefs.contains("mutation.memory.turn-1"))
         #expect(sovereignLock.schemaVersion == BASSovereignLock.currentSchemaVersion)
         #expect(quarantineRecord.schemaVersion == BASQuarantineRecord.currentSchemaVersion)
         #expect(sovereignAuditEntry.schemaVersion == BASSovereignAuditEntry.currentSchemaVersion)
@@ -574,11 +594,40 @@ struct BASEBrainSchemaCoreTests {
         #expect(migrationContract.schemaVersion == BASHostDeviceMigrationContract.currentSchemaVersion)
         #expect(constitutionVault.schemaVersion == BASHostConstitutionVault.currentSchemaVersion)
         #expect(recoveryDisposition.schemaVersion == BASRecoveryDisposition.currentSchemaVersion)
+        #expect(recoveryDisposition.operatorReviewRequired)
+        #expect(recoveryDisposition.requiredConfirmations == ["operator_recovery_review"])
+        #expect(recoveryDisposition.allowedActionClasses == ["render_local_guidance", "inspect_state"])
+        #expect(recoveryDisposition.blockedActionClasses == ["tool_write", "memory_write"])
+        #expect(recoveryDisposition.remediationActions == ["recompile_current_brain_state", "review_bootstrap_diagnostics"])
         #expect(host.schemaVersion == BASHostProfile.currentSchemaVersion)
         #expect(atom.schemaVersion == BASMemoryAtom.currentSchemaVersion)
         #expect(thought.schemaVersion == BASThoughtFrame.currentSchemaVersion)
         #expect(risk.schemaVersion == BASRiskCard.currentSchemaVersion)
         #expect(ticket.schemaVersion == BASUpdateTicket.currentSchemaVersion)
+    }
+
+    @Test("recovery disposition decodes legacy payloads without operator contract fields")
+    func recoveryDispositionBackwardDecodeUsesSafeOperatorContractDefaults() throws {
+        let legacyObject: [String: Any] = [
+            "schemaVersion": "1.0.0",
+            "kind": "recovery",
+            "summary": "Bootstrap fallback forced the turn into recovery.",
+            "reasonCodes": ["runtime.recovery"],
+            "remediationRequired": true,
+            "restrictedLease": true,
+            "toolWriteAllowed": false,
+            "memoryWriteAllowed": false
+        ]
+
+        let data = try JSONSerialization.data(withJSONObject: legacyObject)
+        let decoded = try JSONDecoder().decode(BASRecoveryDisposition.self, from: data)
+
+        #expect(decoded.kind == .recovery)
+        #expect(decoded.operatorReviewRequired)
+        #expect(decoded.requiredConfirmations.isEmpty)
+        #expect(decoded.allowedActionClasses.isEmpty)
+        #expect(decoded.blockedActionClasses.isEmpty)
+        #expect(decoded.remediationActions.isEmpty)
     }
 
     @Test("host constitution safely projects into runtime host profile and rhythm profile")
@@ -1257,7 +1306,7 @@ struct BASEBrainSchemaCoreTests {
 
     @Test("turn result decodes legacy payloads without final kernel fields")
     func turnResultBackwardDecodeUsesFinalKernelDefaults() throws {
-        let runtime = BASHostRuntime(configuration: .generic)
+        let runtime = BASHostRuntime(configuration: .fixtureGeneric)
         let turn = try #require(
             runtime.startSession(
                 BASHostSessionRequest(
@@ -1313,6 +1362,33 @@ struct BASEBrainSchemaCoreTests {
         #expect(decoded.hostConstitutionVault == nil)
         #expect(decoded.hostVersionTree == nil)
         #expect(decoded.hostForgetRequest == nil)
+    }
+
+    @Test("sovereign warrant decodes legacy payloads without witness metadata")
+    func sovereignWarrantDecodesLegacyPayload() throws {
+        let legacyPayload = """
+        {
+          "schemaVersion":"1.0.0",
+          "warrantID":"warrant-legacy",
+          "scope":"memoryWrite",
+          "actionDigest":"digest-legacy",
+          "jurisdictionRef":"jurisdiction.memoryWrite",
+          "snapshotRef":"snapshot-legacy",
+          "timeLockRef":"timelock.turn-legacy.memoryWrite.ttl_30000",
+          "singleUse":true,
+          "signature":"warrant-signature-legacy"
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(BASSovereignWarrant.self, from: legacyPayload)
+
+        #expect(decoded.schemaVersion == "1.0.0")
+        #expect(decoded.commitTokenRef == nil)
+        #expect(decoded.policyHash.isEmpty)
+        #expect(decoded.issuedAt == nil)
+        #expect(decoded.expiresAt == nil)
+        #expect(decoded.witnessRefs == [])
+        #expect(decoded.singleUse)
     }
 
     @Test("protective block action permit encodes the red-line fallback mode")
@@ -3018,7 +3094,7 @@ struct BASEBrainSchemaCoreTests {
         )
         runtimeTuning.wakeIntent.highRiskGuardThreshold = 0.69
         runtimeTuning.stateTransitions.quarantineFailureGuardThreshold = 3
-        runtimeTuning.stateTransitions.runModeRules = runtimeTuning.stateTransitions.resolvedRunModeRules(
+        runtimeTuning.stateTransitions.runModeRules = runtimeTuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: runtimeTuning.wakeIntent
         )
         runtimeTuning.lease.restrictedEnergyQuota = 0.46
@@ -3033,6 +3109,7 @@ struct BASEBrainSchemaCoreTests {
                 runtimeProfileID: "host.runtime.v1",
                 policyProfileID: "host.policy.v1",
                 prefersPureLocal: true,
+                defaultDeviceState: BASHostConfiguration.fixtureDefaultDeviceState,
                 console: .generic,
                 lifecycleBehavior: .generic,
                 workflowBehavior: .generic,
@@ -3071,8 +3148,8 @@ struct BASEBrainSchemaCoreTests {
                 == [lineage.providerRoutingPolicyID, lineage.runtimeTuningPolicyID]
         )
         #expect(turn.recoveryDisposition?.kind == .recovery || turn.recoveryDisposition == nil)
-        #expect(turn.sovereignExecutionReceipts.map(\.kind) == turn.sovereignActuationCommands.map(\.kind))
-        #expect(turn.sovereignExecutionReceipts.allSatisfy { $0.status == .executed })
+        #expect(turn.sovereignExecutionReceipts.map { $0.kind } == turn.sovereignActuationCommands.map { $0.kind })
+        #expect(turn.sovereignExecutionReceipts.allSatisfy { $0.status == BASSovereignExecutionStatus.executed })
         #expect(turn.evolutionLineageSummary.policyLineage == lineage)
         #expect(turn.evolutionLineageSummary.sovereignVerdict == turn.sovereignVerdict)
         #expect(
@@ -3089,8 +3166,8 @@ struct BASEBrainSchemaCoreTests {
                 == turn.sovereignAuditEntry
         )
         #expect(
-            turn.evolutionLineageSummary.sovereignExecutionReceipts.map(\.kind)
-                == turn.sovereignExecutionReceipts.map(\.kind)
+            turn.evolutionLineageSummary.sovereignExecutionReceipts.map { $0.kind }
+                == turn.sovereignExecutionReceipts.map { $0.kind }
         )
     }
 
@@ -3764,7 +3841,7 @@ struct BASEBrainSchemaCoreTests {
 
     @Test("generic host runtime carries dream-loop artifacts into tri-self court and risk outputs")
     func genericHostRuntimeCarriesDreamLoopArtifactsIntoDownstreamOutputs() throws {
-        let runtime = BASHostRuntime(configuration: .generic)
+        let runtime = BASHostRuntime(configuration: .fixtureGeneric)
         let turn = try #require(
             runtime.startSession(
                 BASHostSessionRequest(
@@ -3861,7 +3938,7 @@ struct BASEBrainSchemaCoreTests {
         )
         runtimeTuning.wakeIntent.highRiskGuardThreshold = 0.69
         runtimeTuning.stateTransitions.quarantineFailureGuardThreshold = 3
-        runtimeTuning.stateTransitions.runModeRules = runtimeTuning.stateTransitions.resolvedRunModeRules(
+        runtimeTuning.stateTransitions.runModeRules = runtimeTuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: runtimeTuning.wakeIntent
         )
         runtimeTuning.lease.restrictedEnergyQuota = 0.46
@@ -3885,7 +3962,7 @@ struct BASEBrainSchemaCoreTests {
             }
         }
 
-        var configuration = BASHostConfiguration.generic
+        var configuration = BASHostConfiguration.fixtureGeneric
         configuration.runtimeProfileID = "host.runtime.single-candidate-guard"
         configuration.policyProfileID = "host.policy.single-candidate-guard"
         configuration.runtimeTuning = runtimeTuning
@@ -3998,7 +4075,7 @@ struct BASEBrainSchemaCoreTests {
         )
         runtimeTuning.wakeIntent.highRiskGuardThreshold = 0.69
         runtimeTuning.stateTransitions.quarantineFailureGuardThreshold = 3
-        runtimeTuning.stateTransitions.runModeRules = runtimeTuning.stateTransitions.resolvedRunModeRules(
+        runtimeTuning.stateTransitions.runModeRules = runtimeTuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: runtimeTuning.wakeIntent
         )
         runtimeTuning.lease.restrictedEnergyQuota = 0.46
@@ -4031,7 +4108,7 @@ struct BASEBrainSchemaCoreTests {
             }
         }
 
-        var configuration = BASHostConfiguration.generic
+        var configuration = BASHostConfiguration.fixtureGeneric
         configuration.runtimeProfileID = "host.runtime.single-loop"
         configuration.policyProfileID = "host.policy.single-loop"
         configuration.runtimeTuning = runtimeTuning

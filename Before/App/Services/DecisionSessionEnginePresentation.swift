@@ -1427,7 +1427,9 @@ enum DecisionSessionControlPresentationSupport {
             checkpointBudgetLine: checkpointFacts?.runtimeLine,
             checkpointDecisionLine: checkpointFacts?.decisionLine,
             checkpointTaskLine: checkpointFacts?.taskLine,
-            checkpointWindGateLine: checkpointFacts?.windGateLine,
+            checkpointWindGateLine: DecisionEvolutionEBrainPresentationSupport.windGateMetadataLine(
+                rawLine: checkpointFacts?.windGateLine
+            ),
             checkpointPresenceLine: checkpointFacts?.resolvedPresenceLine,
             checkpointPressureLine: checkpointFacts?.pressureLine,
             checkpointRiskFactorsLine: checkpointFacts?.riskFactorsLine,
@@ -2116,6 +2118,7 @@ struct DecisionSessionEngineReplayRecoverySummary: Equatable, Sendable {
             DecisionEvolutionNarrativeFormattingSupport.joined(
                 [detailLine, killSwitchesLine].compactMap { $0 }
             ).nilIfEmpty,
+            actionLine,
             windGateLine,
             DecisionEvolutionNarrativeFormattingSupport.joined(
                 [riskFactorsLine, reasonCodesLine, courtLine].compactMap { $0 }
@@ -2154,9 +2157,11 @@ extension DeveloperDecisionReplayEBrainSummary {
                 ?? "Recovered lineage remains inspectable.",
             budgetLine: checkpointBudgetLine,
             taskLine: checkpointTaskLine,
-            actionLine: nil,
+            actionLine: deliveryFallbackActionLine,
             pressureLine: checkpointPressureLine,
-            windGateLine: checkpointWindGateLine,
+            windGateLine: DecisionEvolutionEBrainPresentationSupport.windGateMetadataLine(
+                rawLine: checkpointWindGateLine
+            ),
             riskFactorsLine: riskFactorsLine,
             reasonCodesLine: reasonCodesLine,
             courtLine: courtLine,
@@ -2224,7 +2229,9 @@ extension DecisionSessionRuntimeInspectionSession {
             taskLine: checkpointFacts.resolvedTaskLine,
             actionLine: checkpointFacts.actionLine,
             pressureLine: checkpointFacts.pressureLine,
-            windGateLine: checkpointFacts.windGateLine,
+            windGateLine: DecisionEvolutionEBrainPresentationSupport.windGateMetadataLine(
+                rawLine: checkpointFacts.windGateLine
+            ),
             riskFactorsLine: checkpointFacts.riskFactorsLine,
             reasonCodesLine: checkpointFacts.reasonCodesLine,
             courtLine: checkpointFacts.resolvedCourtLine,
@@ -2360,7 +2367,9 @@ struct DecisionSessionEnginePresentation: Equatable, Sendable {
             checkpointBudgetLine: checkpointFacts.runtimeLine,
             checkpointDecisionLine: checkpointFacts.resolvedDecisionLine,
             checkpointTaskLine: checkpointFacts.resolvedTaskLine,
-            checkpointWindGateLine: checkpointFacts.windGateLine,
+            checkpointWindGateLine: DecisionEvolutionEBrainPresentationSupport.windGateMetadataLine(
+                rawLine: checkpointFacts.windGateLine
+            ),
             checkpointPresenceLine: checkpointFacts.resolvedPresenceLine,
             checkpointPressureLine: checkpointFacts.pressureLine,
             checkpointRiskFactorsLine: checkpointFacts.riskFactorsLine,

@@ -65,6 +65,31 @@ enum DecisionEvolutionHorizonTriggerReasonSupport {
         return "\(trimmedBaseReason) • \(preferredHorizonLine)"
     }
 
+    static func enrichedAuditInstruction(
+        baseInstruction: String?,
+        horizonDiagnosticsLines: [String]
+    ) -> String? {
+        let trimmedBaseInstruction = trimmed(baseInstruction)
+        let preferredHorizonLine = preferredLine(
+            from: horizonDiagnosticsLines
+        ).flatMap(trimmed)
+
+        guard let preferredHorizonLine else {
+            return trimmedBaseInstruction
+        }
+
+        let focusInstruction = "Horizon focus: \(preferredHorizonLine)."
+        guard let trimmedBaseInstruction else {
+            return focusInstruction
+        }
+
+        guard !trimmedBaseInstruction.contains(preferredHorizonLine) else {
+            return trimmedBaseInstruction
+        }
+
+        return "\(trimmedBaseInstruction) \(focusInstruction)"
+    }
+
     private static func trimmed(
         _ text: String?
     ) -> String? {

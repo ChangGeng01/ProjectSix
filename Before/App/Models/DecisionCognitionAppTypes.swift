@@ -115,8 +115,39 @@ struct BrainPortraitMemoryItem: Identifiable, Equatable, Sendable {
     let confidence: Double
     let tier: DecisionMemoryTier
     let isPending: Bool
+    let isSealed: Bool
+    let isRevealed: Bool
+    let canReveal: Bool
     let lastConfirmedAt: Date
     let governanceStatus: DecisionGovernedMemoryStatus
+
+    init(
+        id: String,
+        title: String,
+        detail: String,
+        source: DecisionMemorySource,
+        confidence: Double,
+        tier: DecisionMemoryTier,
+        isPending: Bool,
+        isSealed: Bool,
+        isRevealed: Bool,
+        canReveal: Bool,
+        lastConfirmedAt: Date,
+        governanceStatus: DecisionGovernedMemoryStatus
+    ) {
+        self.id = id
+        self.title = title
+        self.detail = detail
+        self.source = source
+        self.confidence = confidence
+        self.tier = tier
+        self.isPending = isPending
+        self.isSealed = isSealed
+        self.isRevealed = isRevealed
+        self.canReveal = canReveal
+        self.lastConfirmedAt = lastConfirmedAt
+        self.governanceStatus = governanceStatus
+    }
 }
 
 struct BrainPortraitTemplateItem: Identifiable, Equatable, Sendable {

@@ -67,6 +67,41 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
         XCTAssertEqual(persisted, [valid])
     }
 
+    func testLoadQueueBackfillsLegacyAuditEvolutionControlEnvelope() throws {
+        let now = Date(timeIntervalSince1970: 2_500)
+        let legacyAuditEnvelope = DecisionIntentEnvelope(
+            id: UUID(uuidString: "99999999-AAAA-BBBB-CCCC-DDDDDDDDDDDD")!,
+            kind: .openEvolutionControl,
+            sourceSurface: .widget,
+            entrySource: .homeWidgetMedium,
+            preferredMode: .mirror,
+            promptSeed: "Inspect the legacy audit findings",
+            instructionDetail: nil,
+            triggerReason: nil,
+            controlEntryKindID: DecisionEvolutionWidgetControlEntryKind.audit.rawValue,
+            requestedAt: now,
+            expiresAt: now.addingTimeInterval(600)
+        )
+
+        XCTAssertTrue(
+            SharedProtectedStateStore.saveData(try JSONEncoder().encode([legacyAuditEnvelope]), key: key)
+        )
+
+        let queue = DecisionIntentEnvelopeStore.loadQueue(now: now)
+
+        XCTAssertEqual(queue.count, 1)
+        XCTAssertEqual(queue.first?.kind, .openEvolutionControl)
+        XCTAssertEqual(queue.first?.entrySource, .homeWidgetMedium)
+        XCTAssertEqual(
+            queue.first?.instructionDetail,
+            DecisionEvolutionWidgetControlEntryLexiconSupport.auditInstruction
+        )
+        XCTAssertEqual(
+            queue.first?.triggerReason,
+            "Inspect evolution audit findings from Medium Widget."
+        )
+    }
+
     func testEnqueueReplacesExistingEnvelopeWithSameID() {
         let id = UUID(uuidString: "12345678-1234-1234-1234-1234567890AB")!
         let original = DecisionIntentEnvelope
@@ -173,6 +208,10 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
         XCTAssertEqual(next?.entrySource, .homeWidgetMedium)
         XCTAssertEqual(next?.preferredMode, .mirror)
         XCTAssertEqual(next?.promptSeed, "Review the guarded queue")
+        XCTAssertEqual(
+            next?.instructionDetail,
+            "Continue on iPhone to review pending checkpoints and clear the queue."
+        )
         XCTAssertEqual(next?.triggerReason, "Widget surfaced the guarded queue detail.")
         XCTAssertEqual(next?.riskLevel, .medium)
     }
@@ -223,6 +262,43 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
         XCTAssertEqual(
             next?.controlEntryKindID,
             DecisionEvolutionWidgetControlEntryKind.audit.rawValue
+        )
+        XCTAssertEqual(
+            next?.instructionDetail,
+            DecisionEvolutionWidgetControlEntryLexiconSupport.auditInstruction
+        )
+        XCTAssertEqual(
+            next?.triggerReason,
+            "Inspect evolution audit findings from Medium Widget."
+        )
+    }
+
+    func testEnqueueLegacyAuditEvolutionControlEnvelopeBackfillsInstructionAndTriggerReason() {
+        let now = Date(timeIntervalSince1970: 4_500)
+        let legacyAuditEnvelope = DecisionIntentEnvelope(
+            id: UUID(uuidString: "12121212-3434-5656-7878-909090909090")!,
+            kind: .openEvolutionControl,
+            sourceSurface: .widget,
+            entrySource: .homeWidgetMedium,
+            preferredMode: .mirror,
+            promptSeed: "Inspect the enqueued legacy audit findings",
+            instructionDetail: nil,
+            triggerReason: nil,
+            controlEntryKindID: DecisionEvolutionWidgetControlEntryKind.audit.rawValue,
+            requestedAt: now,
+            expiresAt: now.addingTimeInterval(600)
+        )
+
+        DecisionIntentEnvelopeStore.enqueue(legacyAuditEnvelope)
+
+        let next = DecisionIntentEnvelopeStore.consume(now: now)
+
+        XCTAssertEqual(next?.kind, .openEvolutionControl)
+        XCTAssertEqual(next?.entrySource, .homeWidgetMedium)
+        XCTAssertEqual(next?.promptSeed, "Inspect the enqueued legacy audit findings")
+        XCTAssertEqual(
+            next?.instructionDetail,
+            DecisionEvolutionWidgetControlEntryLexiconSupport.auditInstruction
         )
         XCTAssertEqual(
             next?.triggerReason,
@@ -380,6 +456,10 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
             DecisionEvolutionWidgetControlEntryKind.audit.rawValue
         )
         XCTAssertEqual(
+            next?.instructionDetail,
+            DecisionEvolutionWidgetControlEntryLexiconSupport.auditInstruction
+        )
+        XCTAssertEqual(
             next?.triggerReason,
             "A watch audit alert asked the iPhone brain to inspect evolution findings."
         )
@@ -411,6 +491,10 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
         XCTAssertEqual(
             next?.controlEntryKindID,
             DecisionEvolutionWidgetControlEntryKind.audit.rawValue
+        )
+        XCTAssertEqual(
+            next?.instructionDetail,
+            DecisionEvolutionWidgetControlEntryLexiconSupport.auditInstruction
         )
         XCTAssertEqual(
             next?.triggerReason,

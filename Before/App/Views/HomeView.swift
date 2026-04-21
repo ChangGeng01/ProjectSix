@@ -130,7 +130,7 @@ struct HomeView: View {
                             VStack(alignment: .leading, spacing: 14) {
                                 HStack(alignment: .firstTextBaseline) {
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text("13-layer runtime")
+                                        Text("14-layer runtime")
                                             .font(.headline)
                                         Text("The active electronic-brain path is now part of the main shell, not just diagnostics.")
                                             .font(.subheadline)
@@ -282,7 +282,7 @@ struct HomeView: View {
                                         }
                                     }
                                 } else {
-                                    Text("No live 13-layer turn is attached yet. Open a decision flow or refresh the runtime card.")
+                                    Text("No live 14-layer turn is attached yet. Open a decision flow or refresh the runtime card.")
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
 

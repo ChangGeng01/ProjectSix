@@ -56,6 +56,7 @@ enum DecisionMemorySystem {
     static func refreshProjection(
         in context: ModelContext,
         executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame? = nil,
+        authorizedRevealIDs: Set<String> = [],
         now: Date = .now
     ) -> BrainStateProjection {
         flushPendingContextChanges(
@@ -95,7 +96,12 @@ enum DecisionMemorySystem {
             }
         )
         let temporalResult = reconcileTemporalFieldStage(in: context, now: now)
-        return filteredProjection(projection, temporalResult: temporalResult)
+        return filteredProjection(
+            projection,
+            temporalResult: temporalResult,
+            authorizedRevealIDs: authorizedRevealIDs,
+            now: now
+        )
     }
 
     static func temporalField(
@@ -114,12 +120,292 @@ enum DecisionMemorySystem {
         return result.field
     }
 
+    @discardableResult
+    static func applyHostDeleteAction(
+        id: String,
+        in context: ModelContext,
+        now: Date = .now
+    ) -> Bool {
+        var didMutate = false
+
+        if let record = fetchAllMemoryRecords(in: context).first(where: { $0.id == id }) {
+            record.lifecycleStateRaw = DecisionMemoryLifecycleState.retired.rawValue
+            record.priority = 0
+            record.confidence = max(0.1, record.confidence - 0.35)
+            record.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(
+                orderedUnique(record.retrievalTags + ["deleted", "host_delete"])
+            )
+            record.provenanceSummary = appendedTemporalGovernanceMarker(
+                "host_delete_requested",
+                to: record.provenanceSummary
+            )
+            record.lastReviewedAt = now
+            didMutate = true
+        }
+
+        if let candidate = fetchAllCandidateRecords(in: context).first(where: { $0.id == id }) {
+            candidate.priority = 0
+            candidate.confidence = max(0.1, candidate.confidence - 0.25)
+            candidate.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(
+                orderedUnique(candidate.retrievalTags + ["deleted", "host_delete"])
+            )
+            candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation.delete.rawValue
+            candidate.governanceReason = "host_delete_requested"
+            candidate.provenanceSummary = appendedTemporalGovernanceMarker(
+                "host_delete_requested",
+                to: candidate.provenanceSummary
+            )
+            candidate.lastObservedAt = now
+            didMutate = true
+        }
+
+        return didMutate
+    }
+
+    @discardableResult
+    static func applyHostDowngradeAction(
+        id: String,
+        in context: ModelContext,
+        now: Date = .now
+    ) -> Bool {
+        var didMutate = false
+
+        if let record = fetchAllMemoryRecords(in: context).first(where: { $0.id == id }) {
+            record.confidence = max(0.2, record.confidence - 0.2)
+            record.priority = max(0.2, record.priority - 0.2)
+            record.lifecycleStateRaw = DecisionMemoryLifecycleState.aging.rawValue
+            record.tierRaw = downgradedTier(from: record.tier).rawValue
+            record.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(
+                orderedUnique(record.retrievalTags + ["downgraded"])
+            )
+            record.provenanceSummary = appendedTemporalGovernanceMarker(
+                "host_downgraded",
+                to: record.provenanceSummary
+            )
+            record.lastReviewedAt = now
+            didMutate = true
+        }
+
+        if let candidate = fetchAllCandidateRecords(in: context).first(where: { $0.id == id }) {
+            candidate.confidence = max(0.2, candidate.confidence - 0.2)
+            candidate.priority = max(0.2, candidate.priority - 0.2)
+            candidate.tierRaw = downgradedTier(from: candidate.tier).rawValue
+            candidate.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(
+                orderedUnique(candidate.retrievalTags + ["downgraded"])
+            )
+            candidate.lastWriteOperationRaw = DecisionMemoryWriteOperation.update.rawValue
+            candidate.governanceReason = "host_downgraded"
+            candidate.provenanceSummary = appendedTemporalGovernanceMarker(
+                "host_downgraded",
+                to: candidate.provenanceSummary
+            )
+            candidate.lastObservedAt = now
+            didMutate = true
+        }
+
+        return didMutate
+    }
+
+    @discardableResult
+    static func applyHostNotMeAction(
+        id: String,
+        in context: ModelContext,
+        now: Date = .now
+    ) -> Bool {
+        var didMutate = false
+
+        if let record = fetchAllMemoryRecords(in: context).first(where: { $0.id == id }) {
+            record.lifecycleStateRaw = DecisionMemoryLifecycleState.retired.rawValue
+            record.priority = 0
+            record.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(
+                orderedUnique(record.retrievalTags + ["not_me", "host_revoked"])
+            )
+            record.provenanceSummary = appendedTemporalGovernanceMarker(
+                "host_not_me",
+                to: record.provenanceSummary
+            )
+            record.lastReviewedAt = now
+            didMutate = true
+        }
+
+        if let candidate = fetchAllCandidateRecords(in: context).first(where: { $0.id == id }) {
+            candidate.priority = 0
+            candidate.retrievalTagsBlob = DecisionMemoryRecord.encodeTags(
+                orderedUnique(candidate.retrievalTags + ["not_me", "host_revoked"])
+            )
+            candidate.governanceReason = "host_revoked"
+            candidate.provenanceSummary = appendedTemporalGovernanceMarker(
+                "host_not_me",
+                to: candidate.provenanceSummary
+            )
+            candidate.lastObservedAt = now
+            didMutate = true
+        }
+
+        return didMutate
+    }
+
+    static func shouldSurfaceInPortrait(_ record: DecisionMemoryRecord) -> Bool {
+        if record.temporalProjection?.sieveDisposition == .quarantine {
+            return false
+        }
+
+        if hidesFromPortrait(forgetExecutionState: record.temporalProjection?.forgetExecutionState) {
+            return false
+        }
+
+        if record.lifecycleState == .retired {
+            let tags = Set(record.retrievalTags.map { $0.lowercased() })
+            if tags.contains("deleted") || tags.contains("not_me") || tags.contains("host_revoked") {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    static func shouldSurfaceInPortrait(_ candidate: DecisionMemoryCandidateRecord) -> Bool {
+        if candidate.temporalProjection?.sieveDisposition == .quarantine {
+            return false
+        }
+
+        if hidesFromPortrait(forgetExecutionState: candidate.temporalProjection?.forgetExecutionState) {
+            return false
+        }
+
+        let tags = Set(candidate.retrievalTags.map { $0.lowercased() })
+        if candidate.lastWriteOperation == .delete
+            || tags.contains("deleted")
+            || tags.contains("not_me")
+            || tags.contains("host_revoked") {
+            return false
+        }
+
+        return true
+    }
+
+    static func isSealedInSanctum(
+        _ temporalProjection: DecisionTemporalProjection?
+    ) -> Bool {
+        temporalProjection?.sanctumEntryID != nil
+    }
+
+    static func sanctumAccessPolicy(
+        _ temporalProjection: DecisionTemporalProjection?
+    ) -> String? {
+        if let accessPolicy = temporalProjection?.sanctumAccessPolicy {
+            return accessPolicy
+        }
+
+        guard isSealedInSanctum(temporalProjection) else {
+            return nil
+        }
+
+        return "revealed_only_by_policy"
+    }
+
+    static func sanctumRevealConditions(
+        _ temporalProjection: DecisionTemporalProjection?
+    ) -> [String] {
+        let conditions = temporalProjection?.sanctumRevealConditions ?? []
+        guard conditions.isEmpty else {
+            return conditions
+        }
+
+        guard isSealedInSanctum(temporalProjection) else {
+            return []
+        }
+
+        return ["host_authorized_recall", "l12_gentle_hand", "l14_policy_override"]
+    }
+
+    static func sanctumFrozenUntil(
+        _ temporalProjection: DecisionTemporalProjection?
+    ) -> Date? {
+        temporalProjection?.sanctumFrozenUntil
+    }
+
+    static func canHostRevealSanctum(
+        _ temporalProjection: DecisionTemporalProjection?,
+        now: Date = .now
+    ) -> Bool {
+        guard isSealedInSanctum(temporalProjection) else {
+            return false
+        }
+
+        if let frozenUntil = sanctumFrozenUntil(temporalProjection),
+           frozenUntil > now {
+            return false
+        }
+
+        return sanctumRevealConditions(temporalProjection).contains("host_authorized_recall")
+    }
+
+    static func sanctumProtectionSummary(
+        _ temporalProjection: DecisionTemporalProjection?,
+        now: Date = .now
+    ) -> String {
+        guard isSealedInSanctum(temporalProjection) else {
+            return "Protected in sanctum."
+        }
+
+        if let frozenUntil = sanctumFrozenUntil(temporalProjection),
+           frozenUntil > now {
+            let policyLine = sanctumPolicyDisplayName(sanctumAccessPolicy(temporalProjection))
+            return "Protected in sanctum. Host recall is frozen until \(frozenUntil.formatted(date: .abbreviated, time: .shortened)) under \(policyLine)."
+        }
+
+        if canHostRevealSanctum(temporalProjection, now: now) {
+            return "Protected in sanctum. Reveal requires host-authorized recall."
+        }
+
+        let policyLine = sanctumPolicyDisplayName(sanctumAccessPolicy(temporalProjection))
+        return "Protected in sanctum. Reveal requires \(policyLine)."
+    }
+
+    static func sanctumPolicyDisplayName(
+        _ accessPolicy: String?
+    ) -> String {
+        switch accessPolicy {
+        case "l14_policy_override_only":
+            return "L14 policy override"
+        case "l12_gentle_hand_only":
+            return "L12 gentle-hand recall"
+        case "revealed_only_by_policy":
+            return "policy-governed host recall"
+        default:
+            return "higher-order policy override"
+        }
+    }
+
+    static func isAuthorizedSanctumReveal(
+        id: String,
+        temporalProjection: DecisionTemporalProjection?,
+        authorizedRevealIDs: Set<String>,
+        now: Date = .now
+    ) -> Bool {
+        guard canHostRevealSanctum(temporalProjection, now: now) else {
+            return false
+        }
+
+        if authorizedRevealIDs.contains(id) {
+            return true
+        }
+
+        guard let revealedUUID = UUID(uuidString: id) else {
+            return false
+        }
+
+        return authorizedRevealIDs.contains { stableProjectionUUID(for: $0) == revealedUUID }
+    }
+
     static func loadBrainState(
         mode: DecisionMode,
         prompt: String,
         context: ModelContext,
         retrievalMode: DecisionRetrievalMode = .filtered,
         executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame? = nil,
+        authorizedRevealIDs: Set<String> = [],
         now: Date = .now
     ) -> DecisionBrainState {
         loadBrainState(
@@ -128,6 +414,7 @@ enum DecisionMemorySystem {
             projection: refreshProjection(
                 in: context,
                 executionCapabilityFrame: executionCapabilityFrame,
+                authorizedRevealIDs: authorizedRevealIDs,
                 now: now
             ),
             retrievalMode: retrievalMode,
@@ -258,6 +545,7 @@ enum DecisionMemorySystem {
             let checkpointDiffSummary = orderedUnique(
                 diffSummary + fallbackOperatorContractDiffSummary(
                     requiredConfirmations: requiredConfirmations,
+                    allowedActionClasses: allowedActionClasses,
                     blockedActionClasses: blockedActionClasses
                 )
             )
@@ -270,7 +558,11 @@ enum DecisionMemorySystem {
                         shouldQuarantine: shouldQuarantine,
                         requiredConfirmations: requiredConfirmations,
                         allowedActionClasses: allowedActionClasses,
-                        blockedActionClasses: blockedActionClasses
+                        blockedActionClasses: blockedActionClasses,
+                        remediationActions: fallbackRemediationActions(
+                            shouldQuarantine: shouldQuarantine,
+                            requiredConfirmations: requiredConfirmations
+                        )
                     )
                 ),
                 sessionBiases: orderedUnique(
@@ -303,6 +595,7 @@ enum DecisionMemorySystem {
                         retrievalTags: retrievalTags,
                         restrictionTags: restrictionTags,
                         requiredConfirmations: requiredConfirmations,
+                        allowedActionClasses: allowedActionClasses,
                         blockedActionClasses: blockedActionClasses,
                         diffSummary: checkpointDiffSummary
                     ),
@@ -389,7 +682,8 @@ enum DecisionMemorySystem {
         shouldQuarantine: Bool,
         requiredConfirmations: [String],
         allowedActionClasses: [String],
-        blockedActionClasses: [String]
+        blockedActionClasses: [String],
+        remediationActions: [String]
     ) -> [String] {
         let issueSummary = shouldQuarantine
             ? contract.quarantineIssueSummary
@@ -407,6 +701,9 @@ enum DecisionMemorySystem {
         }
         if allowedActionClasses.isEmpty == false {
             memories.append("Allowed actions: \(allowedActionClasses.joined(separator: ", "))")
+        }
+        if remediationActions.isEmpty == false {
+            memories.append("Remediation actions: \(remediationActions.joined(separator: ", "))")
         }
         return memories
     }
@@ -431,11 +728,15 @@ enum DecisionMemorySystem {
 
     private static func fallbackOperatorContractDiffSummary(
         requiredConfirmations: [String],
+        allowedActionClasses: [String],
         blockedActionClasses: [String]
     ) -> [String] {
         var summary: [String] = []
         if requiredConfirmations.isEmpty == false {
             summary.append("Operator confirmations required before release: \(requiredConfirmations.joined(separator: ", "))")
+        }
+        if allowedActionClasses.isEmpty == false {
+            summary.append("Allowed action classes remain bounded: \(allowedActionClasses.joined(separator: ", "))")
         }
         if blockedActionClasses.isEmpty == false {
             summary.append("Blocked action classes remain frozen: \(blockedActionClasses.joined(separator: ", "))")
@@ -452,6 +753,7 @@ enum DecisionMemorySystem {
         retrievalTags: [String],
         restrictionTags: [String],
         requiredConfirmations: [String],
+        allowedActionClasses: [String],
         blockedActionClasses: [String],
         diffSummary: [String]
     ) -> BASEvolutionCheckpointSummary {
@@ -459,7 +761,13 @@ enum DecisionMemorySystem {
             shouldQuarantine: shouldQuarantine,
             issueSummary: issueSummary,
             restrictionTags: restrictionTags,
-            requiredConfirmations: requiredConfirmations
+            requiredConfirmations: requiredConfirmations,
+            allowedActionClasses: allowedActionClasses,
+            blockedActionClasses: blockedActionClasses,
+            remediationActions: fallbackRemediationActions(
+                shouldQuarantine: shouldQuarantine,
+                requiredConfirmations: requiredConfirmations
+            )
         )
         let lineageSummary = BASEvolutionLineageSummary(
             recordedAt: loadedAt,
@@ -504,7 +812,10 @@ enum DecisionMemorySystem {
         shouldQuarantine: Bool,
         issueSummary: String,
         restrictionTags: [String],
-        requiredConfirmations: [String]
+        requiredConfirmations: [String],
+        allowedActionClasses: [String],
+        blockedActionClasses: [String],
+        remediationActions: [String]
     ) -> BASRecoveryDisposition {
         let restrictionTagSet = Set(restrictionTags)
         let kind: BASRecoveryDispositionKind = shouldQuarantine ? .quarantine : .recovery
@@ -520,7 +831,27 @@ enum DecisionMemorySystem {
             remediationRequired: true,
             restrictedLease: restrictionTagSet.contains("restricted-lease"),
             toolWriteAllowed: restrictionTagSet.contains("tool-write-blocked") == false,
-            memoryWriteAllowed: restrictionTagSet.contains("memory-write-blocked") == false
+            memoryWriteAllowed: restrictionTagSet.contains("memory-write-blocked") == false,
+            operatorReviewRequired: requiredConfirmations.isEmpty == false,
+            requiredConfirmations: orderedUnique(requiredConfirmations),
+            allowedActionClasses: orderedUnique(allowedActionClasses),
+            blockedActionClasses: orderedUnique(blockedActionClasses),
+            remediationActions: orderedUnique(remediationActions)
+        )
+    }
+
+    private static func fallbackRemediationActions(
+        shouldQuarantine: Bool,
+        requiredConfirmations: [String]
+    ) -> [String] {
+        orderedUnique(
+            [
+                "recompile_current_brain_state",
+                "review_bootstrap_diagnostics",
+                "preserve_restricted_lease"
+            ]
+            + (shouldQuarantine ? ["preserve_quarantine_evidence"] : [])
+            + requiredConfirmations.map { "collect_confirmation:\($0)" }
         )
     }
 
@@ -638,6 +969,12 @@ enum DecisionMemorySystem {
         )
     }
 
+    static func fetchAllMemoryRecords(
+        in context: ModelContext
+    ) -> [DecisionMemoryRecord] {
+        (try? context.fetch(FetchDescriptor<DecisionMemoryRecord>())) ?? []
+    }
+
     static func fetchCandidateRecords(
         in context: ModelContext,
         limit: Int? = nil
@@ -653,7 +990,7 @@ enum DecisionMemorySystem {
         in context: ModelContext,
         limit: Int? = nil
     ) -> [DecisionMemoryCandidateRecord] {
-        let candidates = (try? context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())) ?? []
+        let candidates = fetchAllCandidateRecords(in: context)
         let ordered = candidates.sorted { lhs, rhs in
             if lhs.lastObservedAt == rhs.lastObservedAt {
                 if lhs.priority == rhs.priority {
@@ -665,6 +1002,12 @@ enum DecisionMemorySystem {
         }
         guard let limit else { return ordered }
         return Array(ordered.prefix(limit))
+    }
+
+    static func fetchAllCandidateRecords(
+        in context: ModelContext
+    ) -> [DecisionMemoryCandidateRecord] {
+        (try? context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())) ?? []
     }
 
     static func fetchCheckEvents(
@@ -777,7 +1120,9 @@ extension DecisionMemorySystem {
 
     static func filteredProjection(
         _ projection: BrainStateProjection,
-        temporalResult: TemporalFieldBuildResult
+        temporalResult: TemporalFieldBuildResult,
+        authorizedRevealIDs: Set<String> = [],
+        now: Date = .now
     ) -> BrainStateProjection {
         var filtered = projection
         let screenedOutRecords = projection.baseProjection.records.filter { record in
@@ -785,26 +1130,42 @@ extension DecisionMemorySystem {
                 for: record,
                 projectionsByID: temporalResult.projectionsByID
             )
-            return temporalProjection?.sieveDisposition == .quarantine
-                || temporalProjection?.sanctumEntryID != nil
+            return isBlockedFromNormalProjection(
+                id: record.id.uuidString,
+                temporalProjection: temporalProjection,
+                authorizedRevealIDs: authorizedRevealIDs,
+                now: now
+            )
         }
         let screenedOutCandidates = projection.baseProjection.candidates.filter { candidate in
             let temporalProjection = temporalResult.projectionsByID[candidate.id]
-            return temporalProjection?.sieveDisposition == .quarantine
-                || temporalProjection?.sanctumEntryID != nil
+            return isBlockedFromNormalProjection(
+                id: candidate.id,
+                temporalProjection: temporalProjection,
+                authorizedRevealIDs: authorizedRevealIDs,
+                now: now
+            )
         }
         filtered.baseProjection.records = projection.baseProjection.records.filter { record in
             let temporalProjection = temporalProjection(
                 for: record,
                 projectionsByID: temporalResult.projectionsByID
             )
-            return temporalProjection?.sieveDisposition != .quarantine
-                && temporalProjection?.sanctumEntryID == nil
+            return !isBlockedFromNormalProjection(
+                id: record.id.uuidString,
+                temporalProjection: temporalProjection,
+                authorizedRevealIDs: authorizedRevealIDs,
+                now: now
+            )
         }
         filtered.baseProjection.candidates = projection.baseProjection.candidates.filter { candidate in
             let temporalProjection = temporalResult.projectionsByID[candidate.id]
-            return temporalProjection?.sieveDisposition != .quarantine
-                && temporalProjection?.sanctumEntryID == nil
+            return !isBlockedFromNormalProjection(
+                id: candidate.id,
+                temporalProjection: temporalProjection,
+                authorizedRevealIDs: authorizedRevealIDs,
+                now: now
+            )
         }
 
         if !screenedOutRecords.isEmpty || !screenedOutCandidates.isEmpty {
@@ -843,6 +1204,29 @@ extension DecisionMemorySystem {
         return projectionsByID.first { projectionID, _ in
             stableProjectionUUID(for: projectionID) == record.id
         }?.value
+    }
+
+    static func isBlockedFromNormalProjection(
+        id: String,
+        temporalProjection: DecisionTemporalProjection?,
+        authorizedRevealIDs: Set<String>,
+        now: Date = .now
+    ) -> Bool {
+        guard let temporalProjection,
+              temporalProjection.normalRetrievalBlocked else {
+            return false
+        }
+
+        if isAuthorizedSanctumReveal(
+            id: id,
+            temporalProjection: temporalProjection,
+            authorizedRevealIDs: authorizedRevealIDs,
+            now: now
+        ) {
+            return false
+        }
+
+        return true
     }
 
     private static func stableProjectionUUID(
@@ -1018,6 +1402,9 @@ extension DecisionMemorySystem {
             let sealID = structuredProvenance ? "seal.\(observation.id.temporalIdentifierComponent)" : nil
             let quarantineID = quarantined ? "quarantine.\(observation.id.temporalIdentifierComponent)" : nil
             let sanctumID = sealed ? "sanctum.\(observation.id.temporalIdentifierComponent)" : nil
+            let sanctumAccessPolicy = sealed ? Self.sanctumAccessPolicy(for: observation) : nil
+            let sanctumRevealConditions = sealed ? Self.sanctumRevealConditions(for: observation) : []
+            let sanctumFrozenUntil = sealed ? Self.sanctumFrozenUntil(for: observation) : nil
             let conflictIDs = conflictClusterIDsByMemoryID[observation.id] ?? []
             let arcIDs = episodeArcIDsByMemoryID[observation.id] ?? []
             let forgetState = forgetCascadeExecutionState(for: observation)
@@ -1036,6 +1423,9 @@ extension DecisionMemorySystem {
             } else {
                 disposition = .admitHotWarm
             }
+            let normalRetrievalBlocked = quarantined
+                || sealed
+                || blocksNormalRetrieval(forgetExecutionState: forgetState)
 
             if let profileID {
                 let band = quarantined
@@ -1075,12 +1465,9 @@ extension DecisionMemorySystem {
                     BASMemorySanctumEntry(
                         entryID: sanctumID,
                         memoryRef: observation.id,
-                        accessPolicy: "revealed_only_by_policy",
-                        revealConditions: [
-                            "host_authorized_recall",
-                            "l12_gentle_hand",
-                            "l14_policy_override"
-                        ]
+                        accessPolicy: sanctumAccessPolicy ?? "revealed_only_by_policy",
+                        revealConditions: sanctumRevealConditions,
+                        frozenUntil: sanctumFrozenUntil
                     )
                 )
             }
@@ -1166,14 +1553,19 @@ extension DecisionMemorySystem {
             projectionsByID[observation.id] = DecisionTemporalProjection(
                 temporalMemoryID: canEnterField ? observation.id : nil,
                 sieveDisposition: disposition,
+                normalRetrievalBlocked: normalRetrievalBlocked,
                 temperatureProfileID: profileID,
                 provenanceSealID: sealID,
                 sanctumEntryID: sanctumID,
+                sanctumAccessPolicy: sanctumAccessPolicy,
+                sanctumRevealConditions: sanctumRevealConditions,
+                sanctumFrozenUntil: sanctumFrozenUntil,
                 episodeArcIDs: arcIDs,
                 conflictClusterIDs: conflictIDs,
                 continuityAnchorID: canEnterField ? continuityAnchor?.anchorID : nil,
                 replayFrameID: replayID,
                 quarantineRecordID: quarantineID,
+                forgetExecutionState: forgetState,
                 forgetCascadeIDs: forgetCascadeID.map { [$0] } ?? []
             )
         }
@@ -1356,18 +1748,71 @@ extension DecisionMemorySystem {
             "private",
             "high_sensitivity",
             "vault_only",
-            "frozen"
+            "frozen",
+            "policy_override_only",
+            "frozen_hold"
         ]
         let provenanceSignals = [
             "sealed",
             "sensitive",
             "private",
             "vault-only",
-            "frozen"
+            "frozen",
+            "policy override only",
+            "frozen hold"
         ]
 
         return sealSignals.contains(where: tags.contains)
             || provenanceSignals.contains(where: normalizedProvenance.contains)
+    }
+
+    static func sanctumAccessPolicy(
+        for observation: TemporalObservation
+    ) -> String {
+        let tags = Set(observation.retrievalTags.map { $0.lowercased() })
+
+        if tags.contains("policy_override_only") {
+            return "l14_policy_override_only"
+        }
+
+        if tags.contains("gentle_hand_only") {
+            return "l12_gentle_hand_only"
+        }
+
+        return "revealed_only_by_policy"
+    }
+
+    static func sanctumRevealConditions(
+        for observation: TemporalObservation
+    ) -> [String] {
+        let tags = Set(observation.retrievalTags.map { $0.lowercased() })
+        var conditions = ["l14_policy_override"]
+
+        if !tags.contains("policy_override_only") && !tags.contains("gentle_hand_only") {
+            conditions.append("host_authorized_recall")
+        }
+
+        if !tags.contains("l14_only") {
+            conditions.append("l12_gentle_hand")
+        }
+
+        return orderedUnique(conditions)
+    }
+
+    static func sanctumFrozenUntil(
+        for observation: TemporalObservation
+    ) -> Date? {
+        let tags = Set(observation.retrievalTags.map { $0.lowercased() })
+
+        if tags.contains("frozen_hold") {
+            return observation.timestamp.addingTimeInterval(60 * 60 * 24)
+        }
+
+        if tags.contains("review_cooldown") {
+            return observation.timestamp.addingTimeInterval(60 * 60 * 6)
+        }
+
+        return nil
     }
 
     static func quarantineReasonCodes(for observation: TemporalObservation) -> [String] {
@@ -1515,6 +1960,61 @@ extension DecisionMemorySystem {
         case .hot, .warm:
             ["default_recall"]
         }
+    }
+
+    static func blocksNormalRetrieval(
+        forgetExecutionState: String?
+    ) -> Bool {
+        switch forgetExecutionState {
+        case "delete_requested",
+            "delete_pending",
+            "host_revoked",
+            "retired",
+            "freeze_pending",
+            "rejected_candidate":
+            true
+        default:
+            false
+        }
+    }
+
+    static func hidesFromPortrait(
+        forgetExecutionState: String?
+    ) -> Bool {
+        switch forgetExecutionState {
+        case "delete_requested",
+            "delete_pending",
+            "host_revoked",
+            "retired":
+            true
+        default:
+            false
+        }
+    }
+
+    static func downgradedTier(
+        from tier: DecisionMemoryTier
+    ) -> DecisionMemoryTier {
+        switch tier {
+        case .cold:
+            .warm
+        default:
+            tier
+        }
+    }
+
+    static func appendedTemporalGovernanceMarker(
+        _ marker: String,
+        to provenanceSummary: String
+    ) -> String {
+        let trimmed = provenanceSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.lowercased().contains(marker.lowercased()) {
+            return trimmed
+        }
+        if trimmed.isEmpty {
+            return marker
+        }
+        return "\(trimmed) | \(marker)"
     }
 }
 

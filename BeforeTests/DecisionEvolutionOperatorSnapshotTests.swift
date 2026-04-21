@@ -113,6 +113,50 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
         )
     }
 
+    func testOperatorSummaryPresentationSurfacesPresenceFieldFromReleaseSummary() {
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: nil,
+                reviewCheckpoint: nil,
+                pendingReviewQueue: [],
+                latestPersistedLineage: nil
+            ),
+            releaseSummary: DecisionSystemReleaseControlSummary(
+                state: .watch,
+                headline: "Watching audit findings before wider rollout",
+                reasons: [
+                    "Factors: evidence_caveat_load"
+                ],
+                activeKillSwitches: [],
+                recommendedKillSwitches: [],
+                killSwitches: [],
+                pendingReviewCount: 0,
+                rollbackReadyCount: 0,
+                canRestoreActiveCheckpoint: false,
+                canRollbackActiveCheckpoint: false,
+                activeCheckpointID: nil,
+                activeCheckpointSource: .none,
+                reviewCheckpointID: nil,
+                presenceLine: "Presence scene high pressure conflict • role manager • power external over host 82% • urgency 84% • route guarded • guard on • continuity highPressureConflict:manager"
+            )
+        )
+
+        let snapshot = DecisionEvolutionOperatorSnapshot.build(
+            surfaceKind: .controlCenter,
+            workspace: workspace,
+            contract: .controlCenter
+        )
+
+        XCTAssertEqual(snapshot.primaryReason, "Factors: evidence_caveat_load")
+        XCTAssertEqual(snapshot.summaryPresentation.presenceTitle, "Presence field")
+        XCTAssertEqual(
+            snapshot.summaryPresentation.presenceLines,
+            [
+                "Presence scene high pressure conflict • role manager • power external over host 82% • urgency 84% • route guarded • guard on • continuity highPressureConflict:manager"
+            ]
+        )
+    }
+
     func testOperatorSnapshotFallsBackToControlSurfaceSignalsWithoutReleaseSummary() {
         let review = makeSnapshot(
             checkpointID: "review-1",
@@ -435,7 +479,7 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
                 reasons: [
                     "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
                     "Factors: evidence_caveat_load",
-                    "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session",
+                    "Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session",
                     "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
                 ],
                 activeKillSwitches: [],
@@ -494,6 +538,7 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
                     executionCapabilityFrame.temporalLine,
                     executionCapabilityFrame.evidenceLine,
                     executionCapabilityFrame.persistenceLine,
+                    "Court: agency delay right • remand L9",
                     "Factors: evidence_caveat_load"
                 ],
                 activeKillSwitches: [],
@@ -528,8 +573,69 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
                 executionCapabilityFrame.horizonLine,
                 executionCapabilityFrame.temporalLine,
                 executionCapabilityFrame.evidenceLine,
-                executionCapabilityFrame.persistenceLine
+                executionCapabilityFrame.persistenceLine,
+                "Court: agency delay right • remand L9"
             ]
+        )
+    }
+
+    func testOperatorSnapshotSummaryPresentationCarriesQueueCourtLineFromBuiltReleaseSummary() {
+        let governanceSummary = BASEvolutionLineageSummary.GovernanceSummary(
+            experienceCandidateCount: 0,
+            shadowTrialCount: 0,
+            pendingShadowTrialCount: 0,
+            sealCount: 0,
+            pendingSealCount: 0,
+            versionDeltaCount: 0,
+            retractionOrderCount: 0,
+            pendingRetractionCount: 0,
+            dreamLoopRemandTargets: ["L9"],
+            dreamLoopReservationMode: "delayRight"
+        )
+        let active = makeSnapshot(
+            checkpointID: "active-court",
+            createdAt: Date(timeIntervalSince1970: 40),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let review = makeSnapshot(
+            checkpointID: "review-court",
+            createdAt: Date(timeIntervalSince1970: 30),
+            approvalState: .reviewSuggested,
+            hasLineage: true,
+            recommendedKillSwitches: ["external-tools"],
+            governanceSummary: governanceSummary
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: review,
+            pendingReviewQueue: [review],
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: ["previous-active-court", "previous-review-court"]
+        )
+        let releaseSummary = DecisionEvolutionReleaseSummaryBuilder.build(
+            evolutionControlSurface: controlSurface,
+            eBrainSummary: nil,
+            dominantBlockers: [],
+            activeKillSwitches: [],
+            recommendedKillSwitchesHint: ["external-tools"]
+        )
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: controlSurface,
+            releaseSummary: releaseSummary
+        )
+
+        let snapshot = DecisionEvolutionOperatorSnapshot.build(
+            surfaceKind: .controlCenter,
+            workspace: workspace,
+            contract: .controlCenter
+        )
+
+        XCTAssertTrue(
+            snapshot.summaryPresentation.horizonDiagnosticsLines.contains(
+                "Court: agency delay right • remand L9"
+            )
         )
     }
 
@@ -555,7 +661,9 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
                 reasons: [
                     "Factors: evidence_caveat_load",
                     "L8 temporal field • records 1 • arcs 1 • conflicts 1",
+                    "L9 dream loop • stop guard takeover • reserve delay right • remand L9, L14 • debt 81% • signals evidence debt, breakpoint",
                     "L10-L12 adjudication • tri 1 scored/0 veto • HIGH → DELAY • GSI 68% • alternatives 1",
+                    "L11 wind gate • primary delay • assert guarded • delay cool_down • substitute draft • sovereign elevated",
                     "L13 governance • candidates 1 • shadow 1 pending/1 • seal 1 pending/1 • version 1 • retract 1 pending/1 • gate hold",
                     "L13 version tree • rule rule.ready • rollback rollback.rule.ready",
                     "L13 retraction • pending rule.pending • reason evolution.shadow_trial_pending",
@@ -586,7 +694,9 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
             snapshot.summaryPresentation.furnaceContributionLines,
             [
                 "L8 temporal field • records 1 • arcs 1 • conflicts 1",
+                "L9 dream loop • stop guard takeover • reserve delay right • remand L9, L14 • debt 81% • signals evidence debt, breakpoint",
                 "L10-L12 adjudication • tri 1 scored/0 veto • HIGH → DELAY • GSI 68% • alternatives 1",
+                "Wind gate primary delay • assert guarded • delay cool down • substitute draft • sovereign elevated",
                 "L13 governance • candidates 1 • shadow 1 pending/1 • seal 1 pending/1 • version 1 • retract 1 pending/1 • gate hold",
                 "L13 version tree • rule rule.ready • rollback rollback.rule.ready",
                 "L13 retraction • pending rule.pending • reason evolution.shadow_trial_pending"
@@ -669,6 +779,31 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
                 "Clear queue lineage is waiting for lineage-backed review checkpoints."
             ]
         )
+        XCTAssertEqual(snapshot.furnaceWorkbenchPresentation?.focusTarget, .queueLineage)
+        XCTAssertEqual(
+            snapshot.summaryPresentation.furnaceNextStepAction?.actionTitle,
+            "Inspect queue lineage"
+        )
+        XCTAssertEqual(
+            snapshot.summaryPresentation.furnaceNextStepAction?.kind,
+            .focusMutationHub(.queueLineage)
+        )
+        XCTAssertEqual(
+            snapshot.furnaceWorkbenchPresentation?.nextStepAction,
+            snapshot.summaryPresentation.furnaceNextStepAction
+        )
+        XCTAssertEqual(
+            snapshot.furnaceWorkbenchPresentation?.executionState.headline,
+            "Direct run-now preview is blocked right now."
+        )
+        XCTAssertEqual(
+            snapshot.furnaceWorkbenchPresentation?.executionState.lines,
+            [
+                "Clear queue lineage is waiting for lineage-backed review checkpoints.",
+                "Inspect queue lineage to inspect the holding lane."
+            ]
+        )
+        XCTAssertNil(snapshot.furnaceWorkbenchPresentation?.runNowAction)
     }
 
     func testOperatorSummaryPresentationSupportFormatsSharedSurfaceAndCountCopy() {
@@ -715,13 +850,15 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
         createdAt: Date,
         approvalState: DecisionEvolutionApprovalState,
         hasLineage: Bool,
-        recommendedKillSwitches: [String]? = nil
+        recommendedKillSwitches: [String]? = nil,
+        governanceSummary: BASEvolutionLineageSummary.GovernanceSummary? = nil
     ) -> DecisionReviewCheckpointSnapshot {
         let summary = hasLineage
             ? makeLineageSummary(
                 checkpointID: checkpointID,
                 recordedAt: createdAt,
-                recommendedKillSwitches: recommendedKillSwitches ?? ["kill-\(checkpointID)"]
+                recommendedKillSwitches: recommendedKillSwitches ?? ["kill-\(checkpointID)"],
+                governanceSummary: governanceSummary
             )
             : nil
         return DecisionReviewCheckpointSnapshot(
@@ -742,7 +879,8 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
     private func makeLineageSummary(
         checkpointID: String,
         recordedAt: Date,
-        recommendedKillSwitches: [String]
+        recommendedKillSwitches: [String],
+        governanceSummary: BASEvolutionLineageSummary.GovernanceSummary? = nil
     ) -> BASEvolutionLineageSummary {
         BASEvolutionLineageSummary(
             recordedAt: recordedAt,
@@ -754,7 +892,8 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
             thoughtFoldChecksum: "fold-\(checkpointID)",
             updateTicketSummaries: ["ticket-\(checkpointID)"],
             guardrailFindings: ["audit-\(checkpointID)"],
-            recommendedKillSwitches: recommendedKillSwitches
+            recommendedKillSwitches: recommendedKillSwitches,
+            governanceSummary: governanceSummary
         )
     }
 }

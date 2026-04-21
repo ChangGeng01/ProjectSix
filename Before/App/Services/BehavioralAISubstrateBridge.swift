@@ -132,16 +132,18 @@ enum BehavioralAISubstrateBridge {
         context: ModelContext,
         cachedProjection: DecisionMemorySystem.BrainStateProjection?,
         isProjectionDirty: Bool,
+        authorizedRevealIDs: Set<String> = [],
         now: Date = .now
     ) -> CurrentBrainProjectionOutcome {
         let executionCapabilityFrame = BeforeProductCompatibility.resolvedExecutionCapabilityFrame(
             for: preferences
         )
-        return executeCurrentBrainProjection(
+        return Self.executeCurrentBrainProjection(
             cachedProjection: cachedProjection,
             isProjectionDirty: isProjectionDirty,
             context: context,
             executionCapabilityFrame: executionCapabilityFrame,
+            authorizedRevealIDs: authorizedRevealIDs,
             now: now
         ) { projection in
             primeQuickSession(
@@ -161,6 +163,7 @@ enum BehavioralAISubstrateBridge {
         context: ModelContext,
         cachedProjection: DecisionMemorySystem.BrainStateProjection?,
         isProjectionDirty: Bool,
+        authorizedRevealIDs: Set<String> = [],
         loadBrainState: (QuickCheckSession, CurrentBrainState) -> Void,
         commitProjection: (DecisionMemorySystem.BrainStateProjection) -> Void,
         setProjectionDirty: (Bool) -> Void,
@@ -177,6 +180,7 @@ enum BehavioralAISubstrateBridge {
                 context: context,
                 cachedProjection: cachedProjection,
                 isProjectionDirty: isProjectionDirty,
+                authorizedRevealIDs: authorizedRevealIDs,
                 now: now
             ),
             loadBrainState: loadBrainState,
@@ -221,16 +225,18 @@ enum BehavioralAISubstrateBridge {
         context: ModelContext,
         cachedProjection: DecisionMemorySystem.BrainStateProjection?,
         isProjectionDirty: Bool,
+        authorizedRevealIDs: Set<String> = [],
         now: Date = .now
     ) -> CurrentBrainProjectionOutcome {
         let executionCapabilityFrame = BeforeProductCompatibility.resolvedExecutionCapabilityFrame(
             for: preferences
         )
-        return executeCurrentBrainProjection(
+        return Self.executeCurrentBrainProjection(
             cachedProjection: cachedProjection,
             isProjectionDirty: isProjectionDirty,
             context: context,
             executionCapabilityFrame: executionCapabilityFrame,
+            authorizedRevealIDs: authorizedRevealIDs,
             now: now
         ) { projection in
             primeBalanceSession(
@@ -250,6 +256,7 @@ enum BehavioralAISubstrateBridge {
         context: ModelContext,
         cachedProjection: DecisionMemorySystem.BrainStateProjection?,
         isProjectionDirty: Bool,
+        authorizedRevealIDs: Set<String> = [],
         loadBrainState: (BalanceBoardSession, CurrentBrainState) -> Void,
         commitProjection: (DecisionMemorySystem.BrainStateProjection) -> Void,
         setProjectionDirty: (Bool) -> Void,
@@ -266,6 +273,7 @@ enum BehavioralAISubstrateBridge {
                 context: context,
                 cachedProjection: cachedProjection,
                 isProjectionDirty: isProjectionDirty,
+                authorizedRevealIDs: authorizedRevealIDs,
                 now: now
             ),
             loadBrainState: loadBrainState,
@@ -310,16 +318,18 @@ enum BehavioralAISubstrateBridge {
         context: ModelContext,
         cachedProjection: DecisionMemorySystem.BrainStateProjection?,
         isProjectionDirty: Bool,
+        authorizedRevealIDs: Set<String> = [],
         now: Date = .now
     ) -> CurrentBrainProjectionOutcome {
         let executionCapabilityFrame = BeforeProductCompatibility.resolvedExecutionCapabilityFrame(
             for: preferences
         )
-        return executeCurrentBrainProjection(
+        return Self.executeCurrentBrainProjection(
             cachedProjection: cachedProjection,
             isProjectionDirty: isProjectionDirty,
             context: context,
             executionCapabilityFrame: executionCapabilityFrame,
+            authorizedRevealIDs: authorizedRevealIDs,
             now: now
         ) { projection in
             primeMirrorSession(
@@ -339,6 +349,7 @@ enum BehavioralAISubstrateBridge {
         context: ModelContext,
         cachedProjection: DecisionMemorySystem.BrainStateProjection?,
         isProjectionDirty: Bool,
+        authorizedRevealIDs: Set<String> = [],
         loadBrainState: (MirrorWorkspaceSession, CurrentBrainState) -> Void,
         commitProjection: (DecisionMemorySystem.BrainStateProjection) -> Void,
         setProjectionDirty: (Bool) -> Void,
@@ -355,6 +366,7 @@ enum BehavioralAISubstrateBridge {
                 context: context,
                 cachedProjection: cachedProjection,
                 isProjectionDirty: isProjectionDirty,
+                authorizedRevealIDs: authorizedRevealIDs,
                 now: now
             ),
             loadBrainState: loadBrainState,
@@ -457,16 +469,18 @@ enum BehavioralAISubstrateBridge {
         cachedProjection: DecisionMemorySystem.BrainStateProjection?,
         isProjectionDirty: Bool,
         source: BrainStateUpdateSource,
+        authorizedRevealIDs: Set<String> = [],
         now: Date = .now
     ) -> CurrentBrainProjectionOutcome {
         let executionCapabilityFrame = BeforeProductCompatibility.resolvedExecutionCapabilityFrame(
             for: preferences
         )
-        return executeCurrentBrainProjection(
+        return Self.executeCurrentBrainProjection(
             cachedProjection: cachedProjection,
             isProjectionDirty: isProjectionDirty,
             context: context,
             executionCapabilityFrame: executionCapabilityFrame,
+            authorizedRevealIDs: authorizedRevealIDs,
             now: now
         ) { projection in
             refreshCurrentBrainState(
@@ -494,6 +508,7 @@ enum BehavioralAISubstrateBridge {
         cachedProjection: DecisionMemorySystem.BrainStateProjection?,
         isProjectionDirty: Bool,
         source: BrainStateUpdateSource,
+        authorizedRevealIDs: Set<String> = [],
         commitProjection: (DecisionMemorySystem.BrainStateProjection) -> Void,
         setProjectionDirty: (Bool) -> Void,
         publishNotice: (String) -> Void,
@@ -511,6 +526,7 @@ enum BehavioralAISubstrateBridge {
                 cachedProjection: cachedProjection,
                 isProjectionDirty: isProjectionDirty,
                 source: source,
+                authorizedRevealIDs: authorizedRevealIDs,
                 now: now
             ),
             commitProjection: commitProjection,
@@ -1715,6 +1731,7 @@ enum BehavioralAISubstrateBridge {
         isDirty: Bool,
         context: ModelContext,
         executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame? = nil,
+        authorizedRevealIDs: Set<String> = [],
         now: Date = .now
     ) -> MemoryProjectionRefreshOutcome {
         BASAppleCurrentBrainProjectionRuntimeExecutor.resolveProjection(
@@ -1738,6 +1755,7 @@ enum BehavioralAISubstrateBridge {
                 let projection = DecisionMemorySystem.refreshProjection(
                     in: context,
                     executionCapabilityFrame: executionCapabilityFrame,
+                    authorizedRevealIDs: authorizedRevealIDs,
                     now: now
                 )
                 return MemoryProjectionRefreshOutcome(
@@ -1758,6 +1776,7 @@ enum BehavioralAISubstrateBridge {
         setProjectionDirty: (Bool) -> Void,
         publishNotice: (String) -> Void,
         executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame? = nil,
+        authorizedRevealIDs: Set<String> = [],
         now: Date = .now
     ) {
         BASAppleCurrentBrainHostStateExecutor.commitProjectionRefresh(
@@ -1767,6 +1786,7 @@ enum BehavioralAISubstrateBridge {
                 isDirty: isProjectionDirty,
                 context: context,
                 executionCapabilityFrame: executionCapabilityFrame,
+                authorizedRevealIDs: authorizedRevealIDs,
                 now: now
             ),
             commitProjection: commitProjection,
@@ -1781,6 +1801,7 @@ enum BehavioralAISubstrateBridge {
         isProjectionDirty: Bool,
         context: ModelContext,
         executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame? = nil,
+        authorizedRevealIDs: Set<String> = [],
         now: Date,
         execute: (DecisionMemorySystem.BrainStateProjection) -> CurrentBrainState
     ) -> CurrentBrainProjectionOutcome {
@@ -1806,6 +1827,7 @@ enum BehavioralAISubstrateBridge {
                     isDirty: isProjectionDirty,
                     context: context,
                     executionCapabilityFrame: executionCapabilityFrame,
+                    authorizedRevealIDs: authorizedRevealIDs,
                     now: now
                 )
             },

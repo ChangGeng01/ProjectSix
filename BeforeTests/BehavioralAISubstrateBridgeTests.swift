@@ -293,17 +293,79 @@ struct BehavioralAISubstrateBridgeTests {
         )
         let attachedExport = export.attaching(eBrainTurn: turn)
         let dataReport = try #require(snapshot.reports.first(where: { $0.layer == .data }))
+        let expectedWindGateLine = try #require(
+            attachedExport.effectiveLayerStackLines.first(where: { $0.hasPrefix("L11 wind gate") })
+        )
 
         #expect(snapshot.runtimeSummary?.contains("Pressure latency 3/1400ms") == true)
         #expect(snapshot.runtimeSummary?.contains("thermal cool") == true)
+        #expect(snapshot.runtimeSummary?.contains(expectedWindGateLine) == true)
         #expect(snapshot.effectiveLayerStackLines == attachedExport.effectiveLayerStackLines)
         #expect(snapshot.effectiveLayerStackLines.first?.hasPrefix("L1 power clock") == true)
         #expect(snapshot.runtimeSummary?.contains("L6 context") != true)
         #expect(snapshot.runtimeSummary?.contains("L1 power clock") != true)
         #expect(snapshot.runtimeSummary?.contains("L13 evolution") != true)
+        #expect(dataReport.summary.contains("L11 wind gate") != true)
         #expect(dataReport.summary.contains("L6 context") != true)
         #expect(dataReport.summary.contains("L1 power clock") != true)
         #expect(dataReport.summary.contains("L13 evolution") != true)
+    }
+
+    @Test
+    func consoleSnapshotRecoversWindGateRuntimeSummaryFromPersistedCheckpointProjection() async throws {
+        let lineageSummary = BASEvolutionLineageSummary(
+            recordedAt: date("2026-04-10T07:15:00.000Z"),
+            sessionID: "before.quick.wind-gate",
+            taskType: "conflict",
+            riskLevel: "high",
+            permitMode: "delay",
+            hostGatePercent: 82,
+            thoughtFoldChecksum: "fold-wind-gate",
+            updateTicketSummaries: ["review after cooldown"],
+            reviewDirectiveLine: "review after cooldown",
+            guardrailFindings: ["Checkpoint guardrail matched"],
+            recommendedKillSwitches: ["host-write"],
+            stackedModes: ["draftOnly", "mirror"],
+            assertionCeiling: "guarded",
+            allowedDomains: ["draft.note", "text.delay"],
+            blockedDomains: ["tool.write", "memory.write", "host.write"],
+            delayType: "cool_down",
+            substituteType: "draft",
+            sovereignHintLevel: "elevated"
+        )
+        let persistedLineage = DecisionEvolutionLineageSnapshot(
+            checkpointID: "checkpoint-wind-gate",
+            createdAt: date("2026-04-10T07:16:00.000Z"),
+            mode: .quick,
+            approvalState: .automatic,
+            rollbackReady: true,
+            diffSummary: ["Checkpoint recovery pending review"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(lineageSummary: lineageSummary)
+        )
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            persistedCheckpointLineages: [persistedLineage],
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+
+        let snapshot = BehavioralAISubstrateBridge.consoleSnapshot(
+            from: export,
+            currentBrainState: nil
+        )
+        let expectedWindGateLine =
+            "L11 wind gate • primary delay • assert guarded • delay cool_down • substitute draft • sovereign elevated"
+
+        #expect(export.effectiveEBrainSource == .persistedCheckpoint)
+        #expect(snapshot.runtimeSummary?.contains("Recovered from checkpoint") == true)
+        #expect(snapshot.runtimeSummary?.contains(expectedWindGateLine) == true)
+        #expect(snapshot.effectiveLayerStackLines.contains(expectedWindGateLine))
+        #expect(snapshot.brainSummary?.contains("Checkpoint recovery") == true)
     }
 
     @Test
@@ -447,6 +509,10 @@ struct BehavioralAISubstrateBridgeTests {
             inspection.liveEBrainPresentationFrame?.layerStackLines
                 == turn.diagnosticsPresentation.layerStackLines
         )
+        #expect(
+            inspection.liveEBrainPresentationFrame?.courtLine
+                == DecisionEvolutionEBrainPresentationSupport.courtLine(from: turn.mergedChoice)
+        )
         #expect(inspection.liveEBrainPresentationFrame?.lungLine == foldedLung.lungLine)
         #expect(inspection.liveEBrainPresentationFrame?.organPackageLine == foldedLung.organPackageLine)
         #expect(inspection.liveEBrainPresentationFrame?.resumeLine == foldedLung.resumeLine)
@@ -464,6 +530,22 @@ struct BehavioralAISubstrateBridgeTests {
                     == true
             )
         }
+        #expect(
+            inspection.liveEBrainPresentationFrame?.sovereignAuthorityLine?.contains("warrants memoryWrite")
+                == true
+        )
+        #expect(
+            inspection.liveEBrainPresentationFrame?.sovereignAuthorityLine?.contains("policy policy-hash.sess")
+                == true
+        )
+        #expect(
+            inspection.liveEBrainPresentationFrame?.sovereignAuthorityLine?.contains("ttl 30s")
+                == true
+        )
+        #expect(
+            inspection.liveEBrainPresentationFrame?.sovereignAuthorityLine?.contains("witnesses 4")
+                == true
+        )
         if let firstAuditRule = turn.sovereignAuditEntry?.ruleIDs.first {
             #expect(
                 inspection.liveEBrainPresentationFrame?.sovereignAuditLine?.contains(firstAuditRule)
@@ -857,6 +939,62 @@ struct BehavioralAISubstrateBridgeTests {
             ],
             recommendedKillSwitches: [.requireReviewedWrites]
         )
+        let sovereignVerdict = BASSovereignVerdict(
+            verdictID: "verdict.session-l14",
+            verdictLevel: .quarantine,
+            latched: true,
+            forcedMode: .quarantine,
+            reasonCodes: ["runtime.quarantine"],
+            revokedPermissions: [.toolWrite, .memoryWriteCold],
+            quarantineRefs: ["session-1", "fold-1"],
+            rollbackRef: "snapshot.session-l14",
+            userStubMode: .minimalReceipt,
+            auditRef: "audit.session-l14",
+            policyHash: "policy-hash.session-l14"
+        )
+        let sovereignCommitToken = BASSovereignCommitToken(
+            tokenID: "token.session-l14.memory",
+            sessionID: "session-1",
+            turnID: "turn-l14",
+            scope: .memoryWrite,
+            allowedTargets: ["ticket-1"],
+            actionDigest: "digest-l14",
+            snapshotRef: "snapshot.session-l14",
+            policyHash: "policy-hash.session-l14",
+            ttlMs: 30_000,
+            nonce: "nonce-l14",
+            singleUse: true,
+            signature: "signature-l14"
+        )
+        let sovereignLock = BASSovereignLock(
+            lockID: "lock.session-l14",
+            scope: .session,
+            lockLevel: .quarantine,
+            createdAt: Date(timeIntervalSince1970: 1_776_150_001),
+            releaseCondition: "manual_review"
+        )
+        let quarantineRecord = BASQuarantineRecord(
+            quarantineID: "quarantine.session-l14",
+            zone: .session,
+            sourceRef: "session-1",
+            reasonCodes: ["runtime.quarantine"],
+            isolatedAt: Date(timeIntervalSince1970: 1_776_150_002),
+            releasePolicy: "manual_review",
+            reviewState: .held
+        )
+        let sovereignAuditEntry = BASSovereignAuditEntry(
+            auditID: "audit.session-l14",
+            sessionID: "session-1",
+            turnID: "turn-l14",
+            verdictRef: "verdict.session-l14",
+            ruleIDs: ["BR-SOV-004"],
+            signalRefs: ["runtime.quarantine"],
+            actionRefs: ["quarantine.session-l14"],
+            snapshotRef: "snapshot.session-l14",
+            actor: .system,
+            signature: "signature.audit.session-l14",
+            appendedAt: Date(timeIntervalSince1970: 1_776_150_003)
+        )
 
         return BASEBrainTurnResult(
             deviceState: deviceState,
@@ -876,6 +1014,36 @@ struct BehavioralAISubstrateBridgeTests {
                 continuityScore: 0.81,
                 stabilityScore: 0.86
             ),
+            sovereignVerdict: sovereignVerdict,
+            sovereignCommitTokens: [sovereignCommitToken],
+            sovereignWarrants: [
+                {
+                    var warrant = BASSovereignWarrant(
+                        warrantID: "warrant.session-l14.memory",
+                        scope: .memoryWrite,
+                        actionDigest: sovereignCommitToken.actionDigest,
+                        commitTokenRef: sovereignCommitToken.tokenID,
+                        jurisdictionRef: "jurisdiction.memoryWrite",
+                        snapshotRef: sovereignCommitToken.snapshotRef,
+                        timeLockRef: "timelock.turn-l14.memoryWrite.ttl_30000",
+                        policyHash: sovereignCommitToken.policyHash,
+                        witnessRefs: [
+                            "permit.turn-l14.memoryWrite",
+                            "integrity.snapshot.session-l14",
+                            "continuity.turn-l14",
+                            "policy.policy-hash.session-l14"
+                        ],
+                        singleUse: true,
+                        signature: "signature.warrant-l14"
+                    )
+                    warrant.issuedAt = Date(timeIntervalSince1970: 1_776_150_000)
+                    warrant.expiresAt = Date(timeIntervalSince1970: 1_776_150_030)
+                    return warrant
+                }()
+            ],
+            sovereignLock: sovereignLock,
+            quarantineRecords: [quarantineRecord],
+            sovereignAuditEntry: sovereignAuditEntry,
             hostContext: hostContext,
             contextFrame: contextFrame,
             decomposeFrame: decomposeFrame,

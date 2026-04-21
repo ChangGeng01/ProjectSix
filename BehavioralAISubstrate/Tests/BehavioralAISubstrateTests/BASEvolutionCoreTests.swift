@@ -326,11 +326,19 @@ final class BASEvolutionCoreTests: XCTestCase {
                 goalCount: 2,
                 unknownCount: 1,
                 contradictionCount: 0,
+                pressureSummary: "time, urgency",
+                manipulationSummary: "coercive_urgency, forced-now",
+                boundarySummary: "host:approach",
+                mirrorModeID: "soft",
+                routeHint: "clarify_unknowns",
                 memoryAtomCount: 3,
                 candidateCount: 2,
                 forecastCount: 2,
                 critiqueCount: 1,
-                stopReasonID: "candidate_stable"
+                stopReasonID: "candidate_stable",
+                mirrorCalibrationPointCount: 2,
+                mirrorOmittedSpeculationCount: 1,
+                mirrorToneGuard: "calibration_only"
             ),
             adjudicationSummary: BASEvolutionLineageSummary.AdjudicationSummary(
                 triScoreCount: 3,
@@ -497,7 +505,15 @@ final class BASEvolutionCoreTests: XCTestCase {
         XCTAssertEqual(decoded.contextSummary?.relationPattern, "self")
         XCTAssertEqual(decoded.contextSummary?.manipulationHintCount, 1)
         XCTAssertEqual(decoded.cognitionSummary?.factCount, 4)
+        XCTAssertEqual(decoded.cognitionSummary?.pressureSummary, "time, urgency")
+        XCTAssertEqual(decoded.cognitionSummary?.manipulationSummary, "coercive_urgency, forced-now")
+        XCTAssertEqual(decoded.cognitionSummary?.boundarySummary, "host:approach")
+        XCTAssertEqual(decoded.cognitionSummary?.mirrorModeID, "soft")
+        XCTAssertEqual(decoded.cognitionSummary?.routeHint, "clarify_unknowns")
         XCTAssertEqual(decoded.cognitionSummary?.stopReasonID, "candidate_stable")
+        XCTAssertEqual(decoded.cognitionSummary?.mirrorCalibrationPointCount, 2)
+        XCTAssertEqual(decoded.cognitionSummary?.mirrorOmittedSpeculationCount, 1)
+        XCTAssertEqual(decoded.cognitionSummary?.mirrorToneGuard, "calibration_only")
         XCTAssertEqual(decoded.adjudicationSummary?.vetoCount, 1)
         XCTAssertEqual(decoded.adjudicationSummary?.emergencyBrakeLevelID, "cooldown")
         XCTAssertEqual(decoded.foldedLungSummary?.breathMode, "guard")

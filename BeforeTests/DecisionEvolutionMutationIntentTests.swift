@@ -558,6 +558,71 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
         assertPreviewState(preview, matches: expectedPreviewState)
     }
 
+    func testApplyCheckpointPreviewRetainsFoldedLungHighlights() throws {
+        let now = Date()
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: DecisionReviewCheckpointSnapshot(
+                checkpointID: "checkpoint-active",
+                previousCheckpointID: nil,
+                createdAt: now,
+                mode: .quick,
+                approvalState: .automatic,
+                rollbackReady: true,
+                hasBrainStateSnapshot: true,
+                diffSummary: ["Automatic active checkpoint"],
+                eBrain: replaySummary(
+                    sessionID: "active",
+                    riskLevel: "low",
+                    permitMode: "answer"
+                )
+            ),
+            reviewCheckpoint: nil,
+            pendingReviewQueue: [
+                DecisionReviewCheckpointSnapshot(
+                    checkpointID: "checkpoint-review",
+                    previousCheckpointID: nil,
+                    createdAt: now.addingTimeInterval(-60),
+                    mode: .mirror,
+                    approvalState: .reviewSuggested,
+                    rollbackReady: true,
+                    hasBrainStateSnapshot: true,
+                    diffSummary: ["Review checkpoint"],
+                    eBrain: replaySummary(
+                        sessionID: "review",
+                        riskLevel: "high",
+                        permitMode: "delay",
+                        foldedLungSummary: sampleFoldedLungSummary(
+                            checkpointID: "checkpoint-review"
+                        )
+                    )
+                )
+            ],
+            latestPersistedLineage: nil
+        )
+
+        let intent = try XCTUnwrap(
+            DecisionEvolutionMutationIntentFactory.applyCheckpoint(
+                checkpointID: "checkpoint-review",
+                controlSurface: controlSurface
+            )
+        )
+        let targetPresentation = try XCTUnwrap(
+            controlSurface.presentation(for: "checkpoint-review")
+        )
+
+        XCTAssertTrue(
+            intent.preview.retainedHighlights.contains(
+                "Folded lung remains visible: Breath guard • Phase exchange • Restore 84%"
+            )
+        )
+        XCTAssertTrue(
+            intent.preview.retainedHighlights.contains(
+                "Folded lung remains visible: Rollback anchor rollback-checkpoint-review • snapshot snapshot-checkpoint-review"
+            )
+        )
+        XCTAssertEqual(targetPresentation.foldedLungTitle, "Folded lung")
+    }
+
     func testApprovePendingPreviewPromotesMostRecentCheckpointWhenActiveSlotIsAutomaticFallback() throws {
         let now = Date()
         let controlSurface = DecisionEvolutionControlSurface(
@@ -732,6 +797,109 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
 
         XCTAssertEqual(preview.scope, .reviewQueue)
         assertPreviewState(preview, matches: expectedPreviewState)
+    }
+
+    func testClearPendingReviewLineagePreviewWarnsWhenFoldedLungFactsWillBeRemoved() throws {
+        let now = Date()
+        let reviewHead = DecisionReviewCheckpointSnapshot(
+            checkpointID: "checkpoint-review-head",
+            previousCheckpointID: nil,
+            createdAt: now,
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Review head"],
+            eBrain: replaySummary(
+                sessionID: "review-head",
+                riskLevel: "high",
+                permitMode: "delay",
+                updateTicketSummaries: ["hold response"],
+                foldedLungSummary: sampleFoldedLungSummary(
+                    checkpointID: "checkpoint-review-head"
+                )
+            )
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: DecisionReviewCheckpointSnapshot(
+                checkpointID: "checkpoint-active",
+                previousCheckpointID: nil,
+                createdAt: now.addingTimeInterval(-60),
+                mode: .quick,
+                approvalState: .automatic,
+                rollbackReady: true,
+                hasBrainStateSnapshot: true,
+                diffSummary: ["Active"],
+                eBrain: replaySummary(
+                    sessionID: "active",
+                    riskLevel: "low",
+                    permitMode: "answer"
+                )
+            ),
+            reviewCheckpoint: reviewHead,
+            pendingReviewQueue: [reviewHead],
+            latestPersistedLineage: nil
+        )
+
+        let intent = try XCTUnwrap(
+            DecisionEvolutionMutationIntentFactory.clearPendingReviewLineage(
+                controlSurface: controlSurface
+            )
+        )
+        let targetPresentation = try XCTUnwrap(
+            controlSurface.presentation(for: "checkpoint-review-head")
+        )
+
+        XCTAssertTrue(
+            intent.preview.warningHighlights.contains(
+                "\(targetPresentation.foldedLungLines.count) folded-lung fact line(s) will be removed from review previews."
+            )
+        )
+    }
+
+    func testClearCheckpointLineageWarnsWhenFoldedLungFactsWillBeRemoved() throws {
+        let now = Date()
+        let target = DecisionReviewCheckpointSnapshot(
+            checkpointID: "checkpoint-lineage",
+            previousCheckpointID: nil,
+            createdAt: now,
+            mode: .mirror,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Lineage"],
+            eBrain: replaySummary(
+                sessionID: "lineage",
+                riskLevel: "high",
+                permitMode: "delay",
+                updateTicketSummaries: ["ticket"],
+                foldedLungSummary: sampleFoldedLungSummary(
+                    checkpointID: "checkpoint-lineage"
+                )
+            )
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: target,
+            reviewCheckpoint: nil,
+            pendingReviewQueue: [target],
+            latestPersistedLineage: nil
+        )
+
+        let intent = try XCTUnwrap(
+            DecisionEvolutionMutationIntentFactory.clearCheckpointLineage(
+                checkpointID: "checkpoint-lineage",
+                controlSurface: controlSurface
+            )
+        )
+        let targetPresentation = try XCTUnwrap(
+            controlSurface.presentation(for: "checkpoint-lineage")
+        )
+
+        XCTAssertTrue(
+            intent.preview.warningHighlights.contains(
+                "\(targetPresentation.foldedLungLines.count) folded-lung fact line(s) will be removed from the checkpoint preview."
+            )
+        )
     }
 
     func testMarkReviewPreviewBreaksTimestampTiesUsingCheckpointIDOrdering() throws {
@@ -1045,7 +1213,8 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
         permitMode: String,
         updateTicketSummaries: [String] = [],
         guardrailFindings: [String] = [],
-        killSwitches: [String] = []
+        killSwitches: [String] = [],
+        foldedLungSummary: BASEvolutionFoldedLungSummary? = nil
     ) -> DeveloperDecisionReplayEBrainSummary {
         DeveloperDecisionReplayEBrainSummary(
             lineageSummary: BASEvolutionLineageSummary(
@@ -1058,8 +1227,50 @@ final class DecisionEvolutionMutationIntentTests: XCTestCase {
                 thoughtFoldChecksum: "fold-\(sessionID)",
                 updateTicketSummaries: updateTicketSummaries,
                 guardrailFindings: guardrailFindings,
-                recommendedKillSwitches: killSwitches
+                recommendedKillSwitches: killSwitches,
+                foldedLungSummary: foldedLungSummary
             )
+        )
+    }
+
+    private func sampleFoldedLungSummary(
+        checkpointID: String
+    ) -> BASEvolutionFoldedLungSummary {
+        BASEvolutionFoldedLungSummary(
+            morphGraphID: "morph-\(checkpointID)",
+            hotColdMapID: "hotcold-\(checkpointID)",
+            precisionProfileID: "precision-\(checkpointID)",
+            lungStateRef: "lung-\(checkpointID)",
+            integrityWeaveID: "integrity-\(checkpointID)",
+            breathMode: "guard",
+            breathPhase: "exchange",
+            thermalPressure: 63,
+            cachePressure: 48,
+            restoreReadinessPercent: 84,
+            resumeID: "resume-\(checkpointID)",
+            sourceFoldID: "fold-\(checkpointID)",
+            resumeDepth: 1,
+            fallbackMode: "rollbackAnchor",
+            rollbackAnchorID: "rollback-\(checkpointID)",
+            safeSnapshotRef: "snapshot-\(checkpointID)",
+            foldRefs: ["fold-\(checkpointID)"],
+            integrityHash: "abc123def456",
+            morphActiveOrganIDs: ["riskSpine", "stubCore"],
+            morphExecutionOrder: ["riskSpine", "stubCore"],
+            morphDeviceRouteMap: ["riskSpine": "ane"],
+            morphThermalProfile: ["guarded"],
+            hotOrganIDs: ["stubCore"],
+            warmOrganIDs: ["riskSpine"],
+            coldOrganIDs: ["simuRing"],
+            thermalExchangeMode: "predictive_guard",
+            thermalPredictedBand: "warm",
+            thermalCoolingActions: ["trim_batch"],
+            integrityRequiredChecks: ["fold_checksum"],
+            integrityCompletedChecks: ["fold_checksum"],
+            integrityPurityState: "verified",
+            integrityVerificationHash: "abc123def456",
+            precisionDegradationOrder: ["fp16", "int8"],
+            precisionGuardSafeFloorID: "int8"
         )
     }
 

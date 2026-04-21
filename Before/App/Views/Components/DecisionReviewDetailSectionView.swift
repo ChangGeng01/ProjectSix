@@ -77,7 +77,13 @@ private struct DecisionReplayOverviewCardView: View {
                         .foregroundStyle(BeforeTheme.ember)
                 }
             } supplementary: {
-                ForEach(overviewCardCopy.remainingDetailLines, id: \.self) { line in
+                if let lineageMetadataText = presentation.lineageMetadataText {
+                    Text(lineageMetadataText)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+
+                ForEach(presentation.overviewSupplementaryDetailLines, id: \.self) { line in
                     Text(line)
                         .font(.caption2)
                         .foregroundStyle(.secondary)

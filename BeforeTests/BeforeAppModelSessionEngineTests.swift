@@ -38,6 +38,112 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
     }
 
     @MainActor
+    func testPortraitPanelCanRevealAndHideSealedMemory() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        context.insert(
+            DecisionMemoryRecord(
+                id: "record.portrait.sealed",
+                type: .semantic,
+                topic: "portrait_sealed_topic",
+                headline: "Keep this portrait memory private.",
+                value: "portrait_private_memory",
+                confidence: 0.86,
+                priority: 0.68,
+                source: .history,
+                lastConfirmedAt: ISO8601DateFormatter().date(from: "2026-04-09T22:15:00Z") ?? .distantPast,
+                decayPolicy: .slow,
+                retrievalTags: ["sealed", "private", "sensitive"],
+                evidenceCount: 3,
+                observationCount: 2,
+                provenanceSummary: "Structured private portrait memory.",
+                lifecycleState: .active,
+                tier: .warm
+            )
+        )
+        try context.save()
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+
+        let hiddenItem = try XCTUnwrap(
+            app.portraitPanelState().memories.first(where: { $0.id == "record.portrait.sealed" })
+        )
+        XCTAssertTrue(hiddenItem.isSealed)
+        XCTAssertFalse(hiddenItem.isRevealed)
+        XCTAssertTrue(hiddenItem.canReveal)
+        XCTAssertEqual(hiddenItem.title, "Sealed memory")
+
+        app.revealBrainPortraitMemory(id: "record.portrait.sealed")
+
+        let revealedItem = try XCTUnwrap(
+            app.portraitPanelState().memories.first(where: { $0.id == "record.portrait.sealed" })
+        )
+        XCTAssertTrue(revealedItem.isSealed)
+        XCTAssertTrue(revealedItem.isRevealed)
+        XCTAssertTrue(revealedItem.canReveal)
+        XCTAssertEqual(revealedItem.title, "Keep this portrait memory private.")
+
+        app.hideBrainPortraitMemory(id: "record.portrait.sealed")
+
+        let hiddenAgain = try XCTUnwrap(
+            app.portraitPanelState().memories.first(where: { $0.id == "record.portrait.sealed" })
+        )
+        XCTAssertTrue(hiddenAgain.isSealed)
+        XCTAssertFalse(hiddenAgain.isRevealed)
+        XCTAssertTrue(hiddenAgain.canReveal)
+        XCTAssertEqual(hiddenAgain.title, "Sealed memory")
+    }
+
+    @MainActor
+    func testPortraitPanelKeepsPolicyLockedSealedMemoryHidden() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let lockedRecordedAt = Date.now.addingTimeInterval(-300)
+        context.insert(
+            DecisionMemoryRecord(
+                id: "record.portrait.locked",
+                type: .semantic,
+                topic: "portrait_locked_topic",
+                headline: "This portrait memory stays policy locked.",
+                value: "portrait_locked_memory",
+                confidence: 0.82,
+                priority: 0.66,
+                source: .history,
+                lastConfirmedAt: lockedRecordedAt,
+                decayPolicy: .slow,
+                retrievalTags: ["sealed", "policy_override_only", "frozen_hold"],
+                evidenceCount: 3,
+                observationCount: 2,
+                provenanceSummary: "Structured private portrait memory with override-only reveal policy.",
+                lifecycleState: .active,
+                tier: .warm
+            )
+        )
+        try context.save()
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+
+        let hiddenItem = try XCTUnwrap(
+            app.portraitPanelState().memories.first(where: { $0.id == "record.portrait.locked" })
+        )
+        XCTAssertTrue(hiddenItem.isSealed)
+        XCTAssertFalse(hiddenItem.isRevealed)
+        XCTAssertFalse(hiddenItem.canReveal)
+        XCTAssertEqual(hiddenItem.title, "Sealed memory")
+        XCTAssertTrue(hiddenItem.detail.contains("Host recall is frozen until"))
+
+        app.revealBrainPortraitMemory(id: "record.portrait.locked")
+
+        let stillHiddenItem = try XCTUnwrap(
+            app.portraitPanelState().memories.first(where: { $0.id == "record.portrait.locked" })
+        )
+        XCTAssertTrue(stillHiddenItem.isSealed)
+        XCTAssertFalse(stillHiddenItem.isRevealed)
+        XCTAssertFalse(stillHiddenItem.canReveal)
+        XCTAssertEqual(stillHiddenItem.title, "Sealed memory")
+    }
+
+    @MainActor
     func testQuickEvaluationWritesSessionEngineEventsAndCheckpoint() async throws {
         let app = BeforeAppModel(modelContainer: try makeContainer(), startupNotice: nil)
         app.startQuickCheck(entrySource: .app, prompt: "Should I send this tonight?")
@@ -152,6 +258,7 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
         XCTAssertEqual(layerStackLines.count, 13)
         XCTAssertTrue(layerStackLines.first?.hasPrefix("L1 power clock") == true)
         XCTAssertTrue(layerStackLines.last?.hasPrefix("L14 sovereign") == true)
+        XCTAssertTrue(layerStackLines.contains(where: { $0.hasPrefix("L9 dream loop") }))
     }
 
     @MainActor

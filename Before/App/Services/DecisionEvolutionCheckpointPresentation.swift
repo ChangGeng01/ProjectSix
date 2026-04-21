@@ -62,6 +62,7 @@ enum DecisionEvolutionCheckpointRecoverySupport {
 enum DecisionEvolutionCheckpointDetailPresentationSupport {
     static let emptyLineageMessage = "No persisted checkpoint lineage is available yet."
     static let lineagePendingSummaryText = "Lineage pending • review details stay available, but recovered risk facts are not attached yet."
+    static let presenceTitle = DecisionEvolutionPresencePresentationSupport.title
     static let foldedLungTitle = DecisionEvolutionFoldedLungPresentationSupport.title
     static let ticketsPrefix = "Tickets"
     static let auditPrefix = "Audit"
@@ -170,35 +171,35 @@ enum DecisionEvolutionCheckpointDetailPresentationSupport {
     }
 
     static func windGateMetadataLine(layerStackLines: [String]) -> String? {
-        guard let rawLine = layerStackLines.first(where: { $0.hasPrefix("L11 wind gate") })?
-            .evolutionTrimmedNonEmpty
-        else {
-            return nil
-        }
+        metadataLayerLine(
+            layerPrefix: "L11 wind gate",
+            displayPrefix: "Wind gate",
+            activeFallback: "Wind gate active",
+            layerStackLines: layerStackLines
+        )
+    }
 
-        let components = rawLine.components(separatedBy: " • ")
-        guard components.count > 1 else {
-            return "Wind gate active"
-        }
-
-        let detail = components.dropFirst().joined(separator: " • ").evolutionTrimmedNonEmpty
-        return detail.map { "Wind gate \($0)" } ?? "Wind gate active"
+    static func dreamLoopMetadataLine(layerStackLines: [String]) -> String? {
+        metadataLayerLine(
+            layerPrefix: "L9 dream loop",
+            displayPrefix: "Dream loop",
+            activeFallback: "Dream loop active",
+            layerStackLines: layerStackLines
+        )
     }
 
     static func combinedMetadataText(
         base: String?,
-        windGateLine: String?
+        supplementalLines: [String]
     ) -> String? {
-        switch (base?.evolutionTrimmedNonEmpty, windGateLine?.evolutionTrimmedNonEmpty) {
-        case let (base?, windGateLine?):
-            return DecisionEvolutionNarrativeFormattingSupport.joined([base, windGateLine])
-        case let (base?, nil):
-            return base
-        case let (nil, windGateLine?):
-            return windGateLine
-        case (nil, nil):
+        let parts = ([base?.evolutionTrimmedNonEmpty] + supplementalLines.map(\.evolutionTrimmedNonEmpty))
+            .compactMap { $0 }
+
+        guard parts.isEmpty == false else {
             return nil
         }
+
+        return DecisionEvolutionNarrativeFormattingSupport.joined(parts)
     }
 
     static func foldedLungLines(
@@ -235,6 +236,21 @@ enum DecisionEvolutionCheckpointDetailPresentationSupport {
         return Array(allLines.prefix(3))
     }
 
+    static func presenceLines(
+        eBrain: DeveloperDecisionReplayEBrainSummary?
+    ) -> [String] {
+        let presenceLine = eBrain?.layerStackLines
+            .first(where: { $0.hasPrefix("L6 presence") })
+            .map { Self.droppingKnownPrefix($0, prefix: "L6 presence • ") }
+            .flatMap(\.evolutionTrimmedNonEmpty)
+            .map { "Presence \($0)" }
+
+        return DecisionEvolutionPresencePresentationSupport.lines(
+            presenceLine: presenceLine,
+            reasons: []
+        )
+    }
+
     private static func orderedUnique(
         _ values: [String]
     ) -> [String] {
@@ -242,6 +258,43 @@ enum DecisionEvolutionCheckpointDetailPresentationSupport {
             guard uniqueValues.contains(value) == false else { return }
             uniqueValues.append(value)
         }
+    }
+
+    private static func metadataLayerLine(
+        layerPrefix: String,
+        displayPrefix: String,
+        activeFallback: String,
+        layerStackLines: [String]
+    ) -> String? {
+        guard let rawLine = layerStackLines.first(where: { $0.hasPrefix(layerPrefix) })?
+            .evolutionTrimmedNonEmpty
+        else {
+            return nil
+        }
+
+        let components = rawLine.components(separatedBy: " • ")
+        guard components.count > 1 else {
+            return activeFallback
+        }
+
+        let rawDetail = components.dropFirst().joined(separator: " • ").evolutionTrimmedNonEmpty
+        let detail = rawDetail.map { detail in
+            layerPrefix == "L11 wind gate"
+                ? DecisionEvolutionEBrainPresentationSupport.humanizedWindGateDetail(detail)
+                : detail
+        }
+        return detail.map { "\(displayPrefix) \($0)" } ?? activeFallback
+    }
+
+    private static func droppingKnownPrefix(
+        _ value: String,
+        prefix: String
+    ) -> String {
+        guard value.hasPrefix(prefix) else {
+            return value
+        }
+
+        return String(value.dropFirst(prefix.count))
     }
 }
 
@@ -336,9 +389,12 @@ struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendabl
     let summaryText: String
     let usesSecondarySummaryTone: Bool
     let metadataText: String?
+    let presenceTitle: String?
+    let presenceLines: [String]
     let foldedLungTitle: String?
     let foldedLungLines: [String]
     let updateTicketSummaries: [String]
+    let courtLine: String?
     let auditFindings: [String]
     let killSwitches: [String]
     let diffSummary: [String]
@@ -394,6 +450,10 @@ struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendabl
         )
     }
 
+    var courtSummaryLine: String? {
+        courtLine
+    }
+
     var killSwitchesLine: String? {
         DecisionEvolutionCheckpointDetailPresentationSupport.labeledLine(
             prefix: DecisionEvolutionCheckpointDetailPresentationSupport.killSwitchesPrefix,
@@ -420,8 +480,10 @@ struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendabl
         lineageRiskLevel != nil
             || lineagePermitMode != nil
             || metadataText != nil
+            || !presenceLines.isEmpty
             || !foldedLungLines.isEmpty
             || !updateTicketSummaries.isEmpty
+            || courtLine != nil
             || !auditFindings.isEmpty
             || !killSwitches.isEmpty
     }
@@ -442,7 +504,10 @@ struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendabl
             summaryText: summaryText,
             usesSecondarySummaryTone: usesSecondarySummaryTone,
             metadataText: metadataText,
+            foldedLungTitle: foldedLungTitle,
+            foldedLungLines: foldedLungLines,
             updateTicketSummaries: updateTicketSummaries,
+            courtLine: courtLine,
             auditFindings: auditFindings,
             killSwitches: killSwitches
         )
@@ -468,6 +533,7 @@ struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendabl
         lineagePermitMode = snapshot.permitMode
         lineageHostGatePercent = snapshot.hostGatePercent
         updateTicketSummaries = snapshot.updateTicketSummaries
+        courtLine = snapshot.eBrain?.courtLine
         auditFindings = snapshot.auditFindings
         killSwitches = snapshot.killSwitches
         diffSummary = snapshot.diffSummary
@@ -499,10 +565,22 @@ struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendabl
 
         metadataText = DecisionEvolutionCheckpointDetailPresentationSupport.combinedMetadataText(
             base: baseMetadataText,
-            windGateLine: DecisionEvolutionCheckpointDetailPresentationSupport.windGateMetadataLine(
-                layerStackLines: snapshot.eBrain?.layerStackLines ?? []
-            )
+            supplementalLines: [
+                DecisionEvolutionCheckpointDetailPresentationSupport.windGateMetadataLine(
+                    layerStackLines: snapshot.eBrain?.layerStackLines ?? []
+                ),
+                DecisionEvolutionCheckpointDetailPresentationSupport.dreamLoopMetadataLine(
+                    layerStackLines: snapshot.eBrain?.layerStackLines ?? []
+                )
+            ]
+            .compactMap { $0 }
         )
+        presenceLines = DecisionEvolutionCheckpointDetailPresentationSupport.presenceLines(
+            eBrain: snapshot.eBrain
+        )
+        presenceTitle = presenceLines.isEmpty
+            ? nil
+            : DecisionEvolutionCheckpointDetailPresentationSupport.presenceTitle
         foldedLungLines = DecisionEvolutionCheckpointDetailPresentationSupport.foldedLungLines(
             eBrain: snapshot.eBrain
         )

@@ -1,4 +1,5 @@
 import XCTest
+import BASHostKit
 @testable import SampleHost
 
 @MainActor
@@ -38,5 +39,32 @@ final class SampleHostTests: XCTestCase {
         XCTAssertNotNil(model.result.interventionSuggestion)
         XCTAssertEqual(model.result.interventionSuggestion?.title, "Reopen with more structure")
         XCTAssertTrue(model.result.notices.contains("Use a cooling template before acting."))
+    }
+
+    func testWindGatePresentationSupportHumanizesInternalIdentifiers() {
+        XCTAssertEqual(
+            SampleHostWindGatePresentationSupport.modeLabel(.draftOnly),
+            "draft only"
+        )
+        XCTAssertEqual(
+            SampleHostWindGatePresentationSupport.modeLabels([.draftOnly, .localOnly, .mirror]),
+            "draft only • local only • mirror"
+        )
+        XCTAssertEqual(
+            SampleHostWindGatePresentationSupport.domainList([
+                "bounded_reply",
+                "tool_commit",
+                "memory_commit"
+            ]),
+            "bounded reply • tool commit • memory commit"
+        )
+        XCTAssertEqual(
+            SampleHostWindGatePresentationSupport.humanizedToken("cool_down"),
+            "cool down"
+        )
+        XCTAssertEqual(
+            SampleHostWindGatePresentationSupport.humanizedToken("local_only_action"),
+            "local only action"
+        )
     }
 }

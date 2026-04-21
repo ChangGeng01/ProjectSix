@@ -241,6 +241,22 @@ extension DecisionReviewCheckpointSnapshot {
     var killSwitches: [String] {
         eBrain?.killSwitches ?? []
     }
+
+    var courtLine: String? {
+        eBrain?.courtLine
+    }
+}
+
+extension DecisionEvolutionControlSurface {
+    var reviewCourtLine: String? {
+        reviewCheckpoint?.courtLine
+    }
+
+    var queueCourtLines: [String] {
+        Self.orderedUnique(
+            pendingReviewQueue.compactMap(\.courtLine)
+        )
+    }
 }
 
 extension DecisionEvolutionControlSurface {

@@ -138,7 +138,8 @@ enum DecisionEvolutionPendingReviewPresentationSupport {
 
     static func guidanceReasonLines(
         auditFindings: [String],
-        killSwitches: [String]
+        killSwitches: [String],
+        courtLines: [String] = []
     ) -> [String] {
         var reasons: [String] = []
 
@@ -156,6 +157,11 @@ enum DecisionEvolutionPendingReviewPresentationSupport {
                     auditFindings: auditFindings
                 )
             )
+        }
+
+        courtLines.forEach { courtLine in
+            guard !reasons.contains(courtLine) else { return }
+            reasons.append(courtLine)
         }
 
         return reasons
@@ -711,7 +717,8 @@ enum DecisionEvolutionPrimaryBlockerPresentationSupport {
             return [DecisionEvolutionReviewPathPresentationSupport.recommendedKillSwitchesReleaseReason]
                 + DecisionEvolutionPendingReviewPresentationSupport.guidanceReasonLines(
                     auditFindings: queueAuditFindings,
-                    killSwitches: queueKillSwitches
+                    killSwitches: queueKillSwitches,
+                    courtLines: controlSurface.queueCourtLines
                 )
         case .runtimeGuardrails:
             return blockerSignals
@@ -731,7 +738,8 @@ enum DecisionEvolutionPrimaryBlockerPresentationSupport {
                 )
             ] + DecisionEvolutionPendingReviewPresentationSupport.guidanceReasonLines(
                 auditFindings: queueAuditFindings,
-                killSwitches: queueKillSwitches
+                killSwitches: queueKillSwitches,
+                courtLines: controlSurface.queueCourtLines
             )
         case .auditFindings:
             return DecisionEvolutionReleaseStagePresentationSupport.auditReasonLines(
@@ -785,7 +793,8 @@ enum DecisionEvolutionPrimaryBlockerPresentationSupport {
             reasons.append(
                 contentsOf: DecisionEvolutionPendingReviewPresentationSupport.guidanceReasonLines(
                     auditFindings: queueAuditFindings,
-                    killSwitches: queueKillSwitches
+                    killSwitches: queueKillSwitches,
+                    courtLines: controlSurface.queueCourtLines
                 )
             )
         }
@@ -848,6 +857,8 @@ struct DecisionEvolutionOperatorSummaryPresentation: Equatable, Sendable {
     let sovereignPostureLines: [String]
     let horizonDiagnosticsTitle: String?
     let horizonDiagnosticsLines: [String]
+    let presenceTitle: String?
+    let presenceLines: [String]
     let foldedLungTitle: String?
     let foldedLungLines: [String]
     let furnaceContributionTitle: String?
@@ -856,6 +867,7 @@ struct DecisionEvolutionOperatorSummaryPresentation: Equatable, Sendable {
     let furnaceChecklistLines: [String]
     let furnaceNextStepTitle: String?
     let furnaceNextStepDetail: String?
+    let furnaceNextStepAction: DecisionEvolutionFurnaceNextStepActionPresentation?
     let furnaceWorkbenchPresentation: DecisionEvolutionFurnaceWorkbenchPresentation?
     let modeLine: String
     let countsLine: String
@@ -874,8 +886,13 @@ struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
     let activeCheckpointSource: DecisionEvolutionActiveCheckpointSource
     let reviewCheckpointID: String?
     let killSwitches: [String]
+    let presenceLine: String?
     let summaryReasons: [String]
-    let furnaceWorkbenchPresentation: DecisionEvolutionFurnaceWorkbenchPresentation?
+    let furnacePresentationBundle: DecisionEvolutionFurnacePresentationBundle?
+
+    var furnaceWorkbenchPresentation: DecisionEvolutionFurnaceWorkbenchPresentation? {
+        furnacePresentationBundle?.review.workbenchPresentation
+    }
 
     var surfaceTitle: String {
         DecisionEvolutionOperatorSummaryPresentationSupport.surfaceTitle(
@@ -898,18 +915,57 @@ struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
         let horizonDiagnosticsLines = DecisionEvolutionHorizonDiagnosticsPresentationSupport.lines(
             from: summaryReasons
         )
+        let presenceLines = DecisionEvolutionPresencePresentationSupport.lines(
+            presenceLine: presenceLine,
+            reasons: summaryReasons
+        )
         let foldedLungLines = DecisionEvolutionFoldedLungPresentationSupport.lines(
             from: summaryReasons
         )
-        let furnaceContributionLines = DecisionEvolutionFurnaceContributionPresentationSupport.lines(
-            from: summaryReasons
-        )
-        let furnaceChecklistLines = DecisionEvolutionFurnaceChecklistPresentationSupport.lines(
-            from: summaryReasons
-        )
-        let furnaceNextStepDetail = DecisionEvolutionFurnaceNextStepPresentationSupport.detail(
-            from: furnaceChecklistLines
-        )
+        let furnaceContributionSection = furnacePresentationBundle?.contributionSection
+            ?? {
+                let lines = DecisionEvolutionFurnaceContributionPresentationSupport.lines(
+                    from: summaryReasons
+                )
+                return lines.isEmpty
+                    ? nil
+                    : DecisionEvolutionFurnaceLinesSectionPresentation(
+                        title: DecisionEvolutionFurnaceContributionPresentationSupport.title,
+                        lines: lines
+                    )
+            }()
+        let furnaceChecklistSection = furnacePresentationBundle?.review.checklistSection
+            ?? {
+                let lines = DecisionEvolutionFurnaceChecklistPresentationSupport.lines(
+                    from: summaryReasons
+                )
+                return lines.isEmpty
+                    ? nil
+                    : DecisionEvolutionFurnaceLinesSectionPresentation(
+                        title: DecisionEvolutionFurnaceChecklistPresentationSupport.title,
+                        lines: lines
+                    )
+            }()
+        let furnaceNextStepSection = furnacePresentationBundle?.review.nextStepSection
+            ?? {
+                let detail = furnaceWorkbenchPresentation?.detail
+                    ?? DecisionEvolutionFurnaceNextStepPresentationSupport.detail(
+                        from: furnaceChecklistSection?.lines ?? []
+                    )
+                let action = furnaceWorkbenchPresentation?.nextStepAction
+
+                return detail.map {
+                    DecisionEvolutionFurnaceNextStepSectionPresentation(
+                        title: DecisionEvolutionFurnaceNextStepPresentationSupport.title,
+                        detail: $0,
+                        action: action
+                    )
+                }
+            }()
+        let furnaceContributionLines = furnaceContributionSection?.lines ?? []
+        let furnaceChecklistLines = furnaceChecklistSection?.lines ?? []
+        let furnaceNextStepDetail = furnaceNextStepSection?.detail
+        let furnaceNextStepAction = furnaceNextStepSection?.action
 
         return DecisionEvolutionOperatorSummaryPresentation(
             headline: headline,
@@ -922,22 +978,21 @@ struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
                 ? nil
                 : DecisionEvolutionHorizonDiagnosticsPresentationSupport.title,
             horizonDiagnosticsLines: horizonDiagnosticsLines,
+            presenceTitle: presenceLines.isEmpty
+                ? nil
+                : DecisionEvolutionPresencePresentationSupport.title,
+            presenceLines: presenceLines,
             foldedLungTitle: foldedLungLines.isEmpty
                 ? nil
                 : DecisionEvolutionFoldedLungPresentationSupport.title,
             foldedLungLines: foldedLungLines,
-            furnaceContributionTitle: furnaceContributionLines.isEmpty
-                ? nil
-                : DecisionEvolutionFurnaceContributionPresentationSupport.title,
+            furnaceContributionTitle: furnaceContributionSection?.title,
             furnaceContributionLines: furnaceContributionLines,
-            furnaceChecklistTitle: furnaceChecklistLines.isEmpty
-                ? nil
-                : DecisionEvolutionFurnaceChecklistPresentationSupport.title,
+            furnaceChecklistTitle: furnaceChecklistSection?.title,
             furnaceChecklistLines: furnaceChecklistLines,
-            furnaceNextStepTitle: furnaceNextStepDetail == nil
-                ? nil
-                : DecisionEvolutionFurnaceNextStepPresentationSupport.title,
+            furnaceNextStepTitle: furnaceNextStepSection?.title,
             furnaceNextStepDetail: furnaceNextStepDetail,
+            furnaceNextStepAction: furnaceNextStepAction,
             furnaceWorkbenchPresentation: furnaceWorkbenchPresentation,
             modeLine: DecisionEvolutionOperatorSummaryPresentationSupport.modeLine(
                 surfaceKind: surfaceKind,
@@ -976,16 +1031,11 @@ struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
     ) -> DecisionEvolutionOperatorSnapshot {
         let releaseSummary = workspace.releaseSummary
         let operatorGuidance = policy.operatorGuidance(contract: contract)
-        let furnaceWorkbenchPresentation = releaseSummary.flatMap { releaseSummary in
-            let furnaceChecklistLines = DecisionEvolutionFurnaceChecklistPresentationSupport.lines(
-                from: releaseSummary.reasons
-            )
-            let furnaceNextStepDetail = DecisionEvolutionFurnaceNextStepPresentationSupport.detail(
-                from: furnaceChecklistLines
-            )
-            return DecisionEvolutionFurnaceWorkbenchPresentationSupport.build(
-                detail: furnaceNextStepDetail,
-                controlSurface: workspace.controlSurface
+        let furnacePresentationBundle = releaseSummary.map { releaseSummary in
+            DecisionEvolutionFurnacePresentationSupport.build(
+                releaseSummary: releaseSummary,
+                controlSurface: workspace.controlSurface,
+                surfaceContract: contract
             )
         }
 
@@ -1005,8 +1055,9 @@ struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
             activeCheckpointSource: workspace.controlSurface.activeCheckpointSource,
             reviewCheckpointID: workspace.reviewPresentation?.checkpointID,
             killSwitches: workspace.facts.killSwitches,
+            presenceLine: releaseSummary?.presenceLine,
             summaryReasons: releaseSummary?.reasons ?? [],
-            furnaceWorkbenchPresentation: furnaceWorkbenchPresentation
+            furnacePresentationBundle: furnacePresentationBundle
         )
     }
 }

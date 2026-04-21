@@ -3,6 +3,9 @@ import BASHostKit
 @testable import Before
 
 final class BeforeProductCompatibilityTests: XCTestCase {
+    private typealias RunModeTransitionRule = BASEBrainRuntimeSynthesisPolicy.StateTransitionTuning.RunModeTransitionRule
+    private typealias RunModeBudgetProfile = BASEBrainRuntimeSynthesisPolicy.BudgetTuning.RunModeBudgetProfile
+
     override func setUp() {
         super.setUp()
         BeforeRuntimePolicyStore.clearOverride()
@@ -11,6 +14,203 @@ final class BeforeProductCompatibilityTests: XCTestCase {
     override func tearDown() {
         BeforeRuntimePolicyStore.clearOverride()
         super.tearDown()
+    }
+
+    private func explicitRunModeRules(
+        for transitions: BASEBrainRuntimeSynthesisPolicy.StateTransitionTuning,
+        wakeIntent: BASEBrainRuntimeSynthesisPolicy.WakeIntentTuning
+    ) -> [RunModeTransitionRule] {
+        var rulesByID: [String: RunModeTransitionRule] = [:]
+
+        func setRule(_ rule: RunModeTransitionRule) {
+            rulesByID[rule.ruleID] = rule
+        }
+
+        setRule(
+            .init(
+                ruleID: "thermal.critical",
+                resultMode: transitions.criticalThermalMode,
+                thermalLevels: [.critical]
+            )
+        )
+        setRule(
+            .init(
+                ruleID: "state.quarantine",
+                resultMode: transitions.quarantineMode,
+                requiresQuarantine: true
+            )
+        )
+        setRule(
+            .init(
+                ruleID: "state.recovery",
+                resultMode: transitions.recoveryMode,
+                requiresRecovery: true
+            )
+        )
+
+        if transitions.backgroundPulseEnabled {
+            setRule(
+                .init(
+                    ruleID: "risk.low.background_pulse",
+                    resultMode: transitions.lowRiskBackgroundMode,
+                    riskLevels: [.low],
+                    foregroundStates: [.background, .suspended],
+                    urgencyDetected: false,
+                    minimumBatteryLevel: wakeIntent.pulseBatteryFloor
+                )
+            )
+        }
+
+        setRule(
+            .init(
+                ruleID: "risk.low.protected",
+                resultMode: transitions.lowRiskProtectedMode,
+                riskLevels: [.low],
+                requiresGuardedBudget: true
+            )
+        )
+        setRule(
+            .init(
+                ruleID: "risk.low.urgent",
+                resultMode: transitions.lowRiskUrgentMode,
+                riskLevels: [.low],
+                requiresGuardedBudget: false,
+                urgencyDetected: true
+            )
+        )
+        setRule(
+            .init(
+                ruleID: "risk.low.default",
+                resultMode: transitions.lowRiskDefaultMode,
+                riskLevels: [.low],
+                requiresGuardedBudget: false,
+                urgencyDetected: false
+            )
+        )
+
+        if transitions.deepLoopOnProtectedBoundary {
+            setRule(
+                .init(
+                    ruleID: "risk.medium.protected_deep_loop",
+                    resultMode: transitions.mediumRiskProtectedDeepLoopMode,
+                    riskLevels: [.medium],
+                    requiresGuardedBudget: true,
+                    deepLoopCueDetected: true
+                )
+            )
+        }
+
+        setRule(
+            .init(
+                ruleID: "risk.medium.reflective_cue",
+                resultMode: transitions.mediumRiskReflectiveMode,
+                riskLevels: [.medium],
+                reflectiveCueDetected: true
+            )
+        )
+
+        if transitions.reflectOnTrustDrift {
+            setRule(
+                .init(
+                    ruleID: "risk.medium.guarded_reflect",
+                    resultMode: transitions.mediumRiskReflectiveMode,
+                    riskLevels: [.medium],
+                    requiresGuardedBudget: true
+                )
+            )
+        }
+
+        setRule(
+            .init(
+                ruleID: "risk.medium.default",
+                resultMode: transitions.mediumRiskDefaultMode,
+                riskLevels: [.medium]
+            )
+        )
+        setRule(
+            .init(
+                ruleID: "risk.high.default",
+                resultMode: transitions.highRiskMode,
+                riskLevels: [.high]
+            )
+        )
+        setRule(
+            .init(
+                ruleID: "risk.extreme.default",
+                resultMode: transitions.extremeRiskMode,
+                riskLevels: [.extreme]
+            )
+        )
+
+        let orderedRuleIDs = [
+            "thermal.critical",
+            "state.quarantine",
+            "state.recovery",
+            "risk.low.background_pulse",
+            "risk.low.protected",
+            "risk.low.urgent",
+            "risk.low.default",
+            "risk.medium.protected_deep_loop",
+            "risk.medium.reflective_cue",
+            "risk.medium.guarded_reflect",
+            "risk.medium.default",
+            "risk.high.default",
+            "risk.extreme.default"
+        ]
+
+        return orderedRuleIDs.compactMap { rulesByID[$0] }
+    }
+
+    private func explicitRunModeProfiles(
+        for budget: BASEBrainRuntimeSynthesisPolicy.BudgetTuning,
+        maintenance: BASEBrainRuntimeSynthesisPolicy.MaintenanceTuning
+    ) -> [String: RunModeBudgetProfile] {
+        var profiles = budget.runModeProfilesByID
+            ?? BeforeProductCompatibility.runtimeTuningSource.resolvedPolicy.budget.runModeProfilesByID
+            ?? [:]
+
+        func update(
+            _ modes: [BASEBrainRunMode],
+            maintenanceSupported: Bool,
+            maintenanceBatteryFloor: Double,
+            scheduledMaintenanceClass: BASMaintenanceClass,
+            deferredMaintenanceClass: BASMaintenanceClass
+        ) {
+            for mode in modes {
+                guard var profile = profiles[mode.rawValue] else {
+                    continue
+                }
+                profile.maintenanceSupported = maintenanceSupported
+                profile.maintenanceBatteryFloor = maintenanceBatteryFloor
+                profile.scheduledMaintenanceClass = scheduledMaintenanceClass
+                profile.deferredMaintenanceClass = deferredMaintenanceClass
+                profiles[mode.rawValue] = profile
+            }
+        }
+
+        update(
+            [.pulse, .sentinel],
+            maintenanceSupported: true,
+            maintenanceBatteryFloor: maintenance.lightBatteryFloor,
+            scheduledMaintenanceClass: maintenance.lightweightAllowedClass,
+            deferredMaintenanceClass: maintenance.lightweightDeferredClass
+        )
+        update(
+            [.dormant, .engage, .reflect, .deepLoop],
+            maintenanceSupported: true,
+            maintenanceBatteryFloor: maintenance.standardBatteryFloor,
+            scheduledMaintenanceClass: maintenance.activeRunModeClass,
+            deferredMaintenanceClass: maintenance.activeRunModeClass
+        )
+        update(
+            [.guard, .recovery, .quarantine, .lockdown],
+            maintenanceSupported: false,
+            maintenanceBatteryFloor: budget.maintenanceBatteryFloor,
+            scheduledMaintenanceClass: maintenance.restrictedRunModeClass,
+            deferredMaintenanceClass: maintenance.restrictedRunModeClass
+        )
+
+        return profiles
     }
 
     func testLegacyIdentifiersNormalizeIntoGenericSubstrateVocabulary() {
@@ -228,14 +428,15 @@ final class BeforeProductCompatibilityTests: XCTestCase {
         var tuning = configuration.runtimeTuning
         tuning.stateTransitions.backgroundPulseEnabled = false
         tuning.stateTransitions.lowRiskDefaultMode = .engage
-        tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = explicitRunModeRules(
+            for: tuning.stateTransitions,
             wakeIntent: tuning.wakeIntent
         )
         tuning.maintenance.allowedThermalLevels = [.nominal, .warm]
         tuning.maintenance.blockedForegroundStates = []
         tuning.maintenance.activeRunModeClass = .standard
-        tuning.budget.runModeProfilesByID = tuning.budget.resolvedRunModeProfilesByID(
+        tuning.budget.runModeProfilesByID = explicitRunModeProfiles(
+            for: tuning.budget,
             maintenance: tuning.maintenance
         )
         configuration.runtimeTuning = tuning
@@ -272,13 +473,15 @@ final class BeforeProductCompatibilityTests: XCTestCase {
         var configuration = BeforeProductCompatibility.hostConfiguration(for: resolution)
         var tuning = configuration.runtimeTuning
         tuning.stateTransitions.lowRiskDefaultMode = .engage
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = explicitRunModeRules(
+            for: tuning.stateTransitions,
             wakeIntent: tuning.wakeIntent
         )
         tuning.maintenance.allowedThermalLevels = [.nominal]
         tuning.maintenance.blockedForegroundStates = [.background]
         tuning.maintenance.activeRunModeClass = .standard
-        tuning.budget.runModeProfilesByID = tuning.budget.resolvedRunModeProfilesByID(
+        tuning.budget.runModeProfilesByID = explicitRunModeProfiles(
+            for: tuning.budget,
             maintenance: tuning.maintenance
         )
         configuration.runtimeTuning = tuning
@@ -317,8 +520,8 @@ final class BeforeProductCompatibilityTests: XCTestCase {
         var tuning = configuration.runtimeTuning
         tuning.stateTransitions.backgroundPulseEnabled = false
         tuning.stateTransitions.lowRiskDefaultMode = .engage
-        tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = explicitRunModeRules(
+            for: tuning.stateTransitions,
             wakeIntent: tuning.wakeIntent
         )
         var engageProfile = try XCTUnwrap(
@@ -399,8 +602,8 @@ final class BeforeProductCompatibilityTests: XCTestCase {
         var configuration = BeforeProductCompatibility.hostConfiguration(for: resolution)
         var tuning = configuration.runtimeTuning
         tuning.stateTransitions.highRiskMode = .engage
-        tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = explicitRunModeRules(
+            for: tuning.stateTransitions,
             wakeIntent: tuning.wakeIntent
         )
         tuning.budget.unstableBudgetCalibrationStatuses = [.watch, .drifting]
@@ -454,8 +657,8 @@ final class BeforeProductCompatibilityTests: XCTestCase {
         var tuning = configuration.runtimeTuning
         tuning.stateTransitions.lowRiskDefaultMode = .engage
         tuning.stateTransitions.backgroundPulseEnabled = false
-        tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = explicitRunModeRules(
+            for: tuning.stateTransitions,
             wakeIntent: tuning.wakeIntent
         )
         let budget = tuning.budget
@@ -559,8 +762,8 @@ final class BeforeProductCompatibilityTests: XCTestCase {
         var tuning = configuration.runtimeTuning
         tuning.stateTransitions.lowRiskDefaultMode = .engage
         tuning.stateTransitions.backgroundPulseEnabled = false
-        tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = explicitRunModeRules(
+            for: tuning.stateTransitions,
             wakeIntent: tuning.wakeIntent
         )
         tuning.budget.protectedFloorBoundaryModes = []
@@ -626,8 +829,8 @@ final class BeforeProductCompatibilityTests: XCTestCase {
         tuning.stateTransitions.guardedBudgetCalibrationStatuses = []
         tuning.stateTransitions.guardedBudgetRiskFlags = []
         tuning.stateTransitions.guardedBudgetRetrievalTags = ["evidence_caveat"]
-        tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = explicitRunModeRules(
+            for: tuning.stateTransitions,
             wakeIntent: tuning.wakeIntent
         )
         configuration.runtimeTuning = tuning
@@ -673,8 +876,8 @@ final class BeforeProductCompatibilityTests: XCTestCase {
         var tuning = configuration.runtimeTuning
         tuning.stateTransitions.lowRiskUrgentMode = .guard
         tuning.stateTransitions.lowRiskDefaultMode = .sentinel
-        tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = explicitRunModeRules(
+            for: tuning.stateTransitions,
             wakeIntent: tuning.wakeIntent
         )
         configuration.runtimeTuning = tuning

@@ -143,6 +143,7 @@ private struct PendingLaunchRequestEnvelope: Codable, Equatable {
     var entrySource: EntrySource
     var preferredModeRaw: String?
     var scenarioRaw: String?
+    var instructionDetail: String?
     var triggerReason: String?
     var controlEntryKindID: String?
     var requestedAt: Date
@@ -156,6 +157,7 @@ private struct PendingLaunchRequestEnvelope: Codable, Equatable {
         self.entrySource = request.entrySource
         self.preferredModeRaw = request.preferredModeRaw
         self.scenarioRaw = request.scenarioRaw
+        self.instructionDetail = nil
         self.triggerReason = nil
         self.controlEntryKindID = nil
         self.requestedAt = request.requestedAt
@@ -170,6 +172,7 @@ private struct PendingLaunchRequestEnvelope: Codable, Equatable {
         self.entrySource = envelope.entrySource
         self.preferredModeRaw = envelope.preferredModeRaw
         self.scenarioRaw = envelope.scenarioRaw
+        self.instructionDetail = envelope.instructionDetail
         self.triggerReason = envelope.triggerReason
         self.controlEntryKindID = envelope.controlEntryKindID
         self.requestedAt = envelope.requestedAt
@@ -296,7 +299,9 @@ enum PendingLaunchRequestStore {
         case .success(let queue):
             stored = queue
         case .unreadable:
-            quarantineUnreadableQueuePayload(storedData!)
+            if let payload = storedData {
+                quarantineUnreadableQueuePayload(payload)
+            }
             return []
         }
 
@@ -400,6 +405,19 @@ enum PendingLaunchRequestStore {
             kind = .routedInput
         }
 
+        if kind == .openEvolutionControl {
+            return .openEvolutionControl(
+                id: envelope.id,
+                entrySource: envelope.entrySource,
+                promptSeed: protectedPrompt(for: envelope),
+                instructionDetail: envelope.instructionDetail,
+                triggerReason: envelope.triggerReason,
+                controlEntryKindID: envelope.controlEntryKindID,
+                requestedAt: envelope.requestedAt,
+                expiresAt: envelope.expiresAt
+            )
+        }
+
         return DecisionIntentEnvelope(
             id: envelope.id,
             kind: kind,
@@ -408,6 +426,7 @@ enum PendingLaunchRequestStore {
             preferredMode: envelope.preferredMode,
             scenario: envelope.scenario,
             promptSeed: protectedPrompt(for: envelope),
+            instructionDetail: envelope.instructionDetail,
             triggerReason: envelope.triggerReason,
             controlEntryKindID: envelope.controlEntryKindID,
             requestedAt: envelope.requestedAt,

@@ -83,21 +83,6 @@ struct DecisionEvolutionControlCenterView: View {
         operatorSnapshot.summaryPresentation
     }
 
-    private var furnaceNextStepActionPresentation: DecisionEvolutionFurnaceNextStepActionPresentation? {
-        DecisionEvolutionFurnaceNextStepActionSupport.build(
-            detail: operatorSummaryPresentation.furnaceNextStepDetail,
-            surfaceContract: evolutionSurfaceContract
-        )
-    }
-
-    private var furnaceWorkbenchRunNowActionPresentation: DecisionEvolutionFurnaceRunNowActionPresentation? {
-        DecisionEvolutionFurnaceRunNowActionSupport.build(
-            detail: operatorSummaryPresentation.furnaceWorkbenchPresentation?.detail,
-            controlSurface: controlSurface,
-            surfaceContract: evolutionSurfaceContract
-        )
-    }
-
     private var headerPresentation: DecisionEvolutionControlCenterHeaderPresentation {
         DecisionEvolutionSectionPresentationSupport.controlCenterHeader()
     }
@@ -222,6 +207,22 @@ struct DecisionEvolutionControlCenterView: View {
                                     }
                                 }
 
+                                if let presenceTitle = operatorSummaryPresentation.presenceTitle,
+                                   !operatorSummaryPresentation.presenceLines.isEmpty {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(presenceTitle)
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.orange)
+
+                                        ForEach(operatorSummaryPresentation.presenceLines, id: \.self) { line in
+                                            Text(line)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(3)
+                                        }
+                                    }
+                                }
+
                                 if let foldedLungTitle = operatorSummaryPresentation.foldedLungTitle,
                                    !operatorSummaryPresentation.foldedLungLines.isEmpty {
                                     VStack(alignment: .leading, spacing: 4) {
@@ -282,7 +283,7 @@ struct DecisionEvolutionControlCenterView: View {
                                             .foregroundStyle(.secondary)
                                             .lineLimit(3)
 
-                                        if let furnaceNextStepActionPresentation {
+                                        if let furnaceNextStepActionPresentation = operatorSummaryPresentation.furnaceNextStepAction {
                                             BeforeActionButton(
                                                 furnaceNextStepActionPresentation.actionTitle,
                                                 style: .secondary
@@ -327,7 +328,22 @@ struct DecisionEvolutionControlCenterView: View {
                                                 .lineLimit(3)
                                         }
 
-                                        if let furnaceWorkbenchRunNowActionPresentation {
+                                        Text(furnaceWorkbenchPresentation.executionState.title)
+                                            .font(.caption2.weight(.semibold))
+                                            .foregroundStyle(BeforeTheme.ember)
+
+                                        Text(furnaceWorkbenchPresentation.executionState.headline)
+                                            .font(.caption2.weight(.semibold))
+                                            .foregroundStyle(BeforeTheme.ink)
+
+                                        ForEach(furnaceWorkbenchPresentation.executionState.lines, id: \.self) { line in
+                                            Text(line)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(3)
+                                        }
+
+                                        if let furnaceWorkbenchRunNowActionPresentation = furnaceWorkbenchPresentation.runNowAction {
                                             HStack(spacing: 10) {
                                                 BeforeActionButton(
                                                     furnaceWorkbenchRunNowActionPresentation.actionTitle,
@@ -336,7 +352,7 @@ struct DecisionEvolutionControlCenterView: View {
                                                     presentMutation(furnaceWorkbenchRunNowActionPresentation.intent)
                                                 }
 
-                                                if let furnaceNextStepActionPresentation {
+                                                if let furnaceNextStepActionPresentation = furnaceWorkbenchPresentation.nextStepAction {
                                                     BeforeActionButton(
                                                         furnaceNextStepActionPresentation.actionTitle,
                                                         style: .secondary
@@ -348,7 +364,7 @@ struct DecisionEvolutionControlCenterView: View {
                                                     }
                                                 }
                                             }
-                                        } else if let furnaceNextStepActionPresentation {
+                                        } else if let furnaceNextStepActionPresentation = furnaceWorkbenchPresentation.nextStepAction {
                                             BeforeActionButton(
                                                 furnaceNextStepActionPresentation.actionTitle,
                                                 style: .secondary
@@ -730,6 +746,13 @@ struct DecisionEvolutionControlCenterView: View {
                 Text(detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            if let instructionDetail = entryContext.instructionDetail,
+               entryContext.controlEntryKind == .audit || entryContext.detail == nil {
+                Text(instructionDetail)
+                    .font(.caption2)
+                    .foregroundStyle(BeforeTheme.ember)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

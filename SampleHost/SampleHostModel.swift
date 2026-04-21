@@ -333,7 +333,7 @@ final class SampleHostModel: ObservableObject {
         )
         tuning.wakeIntent.highRiskGuardThreshold = 0.69
         tuning.stateTransitions.quarantineFailureGuardThreshold = 3
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
         tuning.lease.restrictedEnergyQuota = 0.46
@@ -351,7 +351,7 @@ final class SampleHostModel: ObservableObject {
                 runtimeProfileID: "samplehost.default-runtime",
                 policyProfileID: "samplehost.default-policy",
                 prefersPureLocal: true,
-                defaultDeviceState: BASHostConfiguration.genericDefaultDeviceState,
+                defaultDeviceState: BASHostConfiguration.fixtureDefaultDeviceState,
                 console: .generic,
                 lifecycleBehavior: SampleHostModel.lifecycleBehavior,
                 workflowBehavior: SampleHostModel.workflowBehavior,

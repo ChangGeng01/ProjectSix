@@ -4,9 +4,12 @@ struct DecisionEvolutionCheckpointLineageDetailsView: View {
     let summaryText: String
     let summaryColor: Color
     let metadataText: String?
+    let presenceTitle: String?
+    let presenceLines: [String]
     let foldedLungTitle: String?
     let foldedLungLines: [String]
     let ticketsLine: String?
+    let courtLine: String?
     let auditLine: String?
     let killSwitchesLine: String?
 
@@ -14,18 +17,24 @@ struct DecisionEvolutionCheckpointLineageDetailsView: View {
         summaryText: String,
         summaryColor: Color = BeforeTheme.ember,
         metadataText: String? = nil,
+        presenceTitle: String? = nil,
+        presenceLines: [String] = [],
         foldedLungTitle: String? = nil,
         foldedLungLines: [String] = [],
         ticketsLine: String? = nil,
+        courtLine: String? = nil,
         auditLine: String? = nil,
         killSwitchesLine: String? = nil
     ) {
         self.summaryText = summaryText
         self.summaryColor = summaryColor
         self.metadataText = metadataText
+        self.presenceTitle = presenceTitle
+        self.presenceLines = presenceLines
         self.foldedLungTitle = foldedLungTitle
         self.foldedLungLines = foldedLungLines
         self.ticketsLine = ticketsLine
+        self.courtLine = courtLine
         self.auditLine = auditLine
         self.killSwitchesLine = killSwitchesLine
     }
@@ -40,6 +49,22 @@ struct DecisionEvolutionCheckpointLineageDetailsView: View {
                 Text(metadataText)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+            }
+
+            if let presenceTitle,
+               !presenceLines.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(presenceTitle)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.orange)
+
+                    ForEach(presenceLines, id: \.self) { line in
+                        Text(line)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
             }
 
             if let foldedLungTitle,
@@ -60,6 +85,12 @@ struct DecisionEvolutionCheckpointLineageDetailsView: View {
 
             if let ticketsLine {
                 Text(ticketsLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let courtLine {
+                Text(courtLine)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

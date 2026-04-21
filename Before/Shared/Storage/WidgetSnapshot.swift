@@ -210,6 +210,7 @@ struct DecisionEvolutionWidgetPrimaryActionPresentation: Equatable, Sendable {
     let title: String
     let systemImage: String
     let prompt: String?
+    let instructionDetail: String?
     let triggerReason: String?
 
     init(
@@ -218,6 +219,7 @@ struct DecisionEvolutionWidgetPrimaryActionPresentation: Equatable, Sendable {
         title: String,
         systemImage: String,
         prompt: String?,
+        instructionDetail: String? = nil,
         triggerReason: String?
     ) {
         self.kind = kind
@@ -225,6 +227,7 @@ struct DecisionEvolutionWidgetPrimaryActionPresentation: Equatable, Sendable {
         self.title = title
         self.systemImage = systemImage
         self.prompt = prompt
+        self.instructionDetail = instructionDetail
         self.triggerReason = triggerReason
     }
 }
@@ -245,6 +248,7 @@ enum DecisionEvolutionWidgetPresentationSupport {
         title: "Open Before",
         systemImage: "pause.circle.fill",
         prompt: nil,
+        instructionDetail: nil,
         triggerReason: nil
     )
 
@@ -381,6 +385,7 @@ enum DecisionEvolutionWidgetPresentationSupport {
     static func controlEntryPresentation(
         kind: DecisionEvolutionWidgetControlEntryKind,
         prompt: String,
+        instruction: String? = nil,
         triggerReason: String? = nil
     ) -> DecisionEvolutionWidgetControlEntryPresentation {
         DecisionEvolutionWidgetControlEntryPresentation(
@@ -388,7 +393,7 @@ enum DecisionEvolutionWidgetPresentationSupport {
             title: controlEntryTitle(kind: kind),
             systemImage: controlEntrySystemImage(kind: kind),
             prompt: prompt,
-            instruction: attentionInstruction(kind: kind),
+            instruction: instruction ?? attentionInstruction(kind: kind),
             triggerReason: triggerReason
         )
     }
@@ -686,6 +691,7 @@ struct WidgetSnapshot: Codable, Sendable {
                 title: controlEntry.title,
                 systemImage: controlEntry.systemImage,
                 prompt: controlEntry.prompt,
+                instructionDetail: controlEntry.instruction,
                 triggerReason: controlEntry.triggerReason
             )
         }

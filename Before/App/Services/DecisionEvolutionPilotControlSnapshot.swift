@@ -42,6 +42,17 @@ enum DecisionEvolutionPilotControlPresentationSupport {
         )
     }
 
+    static func reviewCourtLine(
+        courtLine: String?,
+        queueCourtLines: [String]
+    ) -> String? {
+        if let courtLine {
+            return courtLine
+        }
+
+        return queueCourtLines.first
+    }
+
     static func recommendedKillSwitchesLine(
         killSwitches: [String]
     ) -> String? {
@@ -98,6 +109,40 @@ enum DecisionEvolutionPilotControlPresentationSupport {
                     ? "\(clearQueueLineageTitle) is waiting for lineage-backed review checkpoints."
                     : "\(clearQueueLineageTitle) is not currently available."
         ]
+    }
+
+    static func preferredQuickActionExecutionBlockerLine(
+        controlSurface: DecisionEvolutionControlSurface,
+        actionBundle: DecisionEvolutionWorkspaceMutationActionBundle
+    ) -> String {
+        if actionBundle.approveQueueIntent == nil {
+            return approveQueueAvailabilityLine(
+                controlSurface: controlSurface,
+                isAvailable: false
+            )
+        }
+
+        if actionBundle.rollbackActiveIntent == nil {
+            return rollbackActionAvailabilityLine(
+                controlSurface: controlSurface,
+                isAvailable: false
+            )
+        }
+
+        return restoreActionAvailabilityLine(
+            controlSurface: controlSurface,
+            isAvailable: false
+        )
+    }
+
+    static func queueLineageExecutionBlockerLine(
+        controlSurface: DecisionEvolutionControlSurface,
+        clearLineageAvailable: Bool
+    ) -> String {
+        queueLineageAvailabilityLines(
+            controlSurface: controlSurface,
+            clearLineageAvailable: clearLineageAvailable
+        ).first ?? "\(clearQueueLineageTitle) is not currently available."
     }
 
     private static func restoreActionAvailabilityLine(
@@ -178,6 +223,7 @@ struct DecisionEvolutionPilotFurnaceWorkbenchGuidance: Equatable, Sendable {
     let detail: String
     let availabilityTitle: String
     let availabilityLines: [String]
+    let executionState: DecisionEvolutionFurnaceExecutionStatePresentation
     let runNowActionTitle: String?
     let runNowIntent: DecisionEvolutionMutationIntent?
     let actionTitle: String
@@ -207,6 +253,8 @@ struct DecisionEvolutionPilotControlSnapshot: Equatable, Sendable {
     let headerDetail: String
     let guidedActionSectionTitle: String
     let furnaceWorkbenchSectionTitle: String?
+    let presenceTitle: String?
+    let presenceLines: [String]
     let foldedLungTitle: String?
     let foldedLungLines: [String]
     let restoreActiveTitle: String
@@ -216,6 +264,7 @@ struct DecisionEvolutionPilotControlSnapshot: Equatable, Sendable {
     let embeddedReleaseSummaryMode: DecisionEvolutionReleaseSummaryPresentationMode?
     let pendingReviewLineageNotice: String?
     let reviewAuditLine: String?
+    let reviewCourtLine: String?
     let recommendedKillSwitchesLine: String?
     let mutationIntents: [DecisionEvolutionMutationIntent]
     let restoreActiveIntent: DecisionEvolutionMutationIntent?
@@ -266,9 +315,14 @@ struct DecisionEvolutionPilotControlSnapshot: Equatable, Sendable {
         let furnaceWorkbenchGuidance = furnaceWorkbenchGuidance(
             controlSurface: controlSurface,
             releaseSummary: releaseSummary,
-            surfaceContract: surfaceContract,
-            actionBundle: actionBundle
+            surfaceContract: surfaceContract
         )
+        let presenceLines = releaseSummary.map {
+            DecisionEvolutionPresencePresentationSupport.lines(
+                presenceLine: $0.presenceLine,
+                reasons: $0.reasons
+            )
+        } ?? []
         let foldedLungLines = releaseSummary.map {
             DecisionEvolutionFoldedLungPresentationSupport.lines(from: $0.reasons)
         } ?? []
@@ -292,6 +346,10 @@ struct DecisionEvolutionPilotControlSnapshot: Equatable, Sendable {
             furnaceWorkbenchSectionTitle: furnaceWorkbenchGuidance == nil
                 ? nil
                 : DecisionEvolutionPilotControlPresentationSupport.furnaceWorkbenchSectionTitle,
+            presenceTitle: presenceLines.isEmpty
+                ? nil
+                : DecisionEvolutionPresencePresentationSupport.title,
+            presenceLines: presenceLines,
             foldedLungTitle: foldedLungLines.isEmpty
                 ? nil
                 : DecisionEvolutionPilotControlPresentationSupport.foldedLungSectionTitle,
@@ -311,6 +369,10 @@ struct DecisionEvolutionPilotControlSnapshot: Equatable, Sendable {
             ),
             reviewAuditLine: DecisionEvolutionPilotControlPresentationSupport.reviewAuditLine(
                 auditFindings: controlSurface.reviewAuditFindings
+            ),
+            reviewCourtLine: DecisionEvolutionPilotControlPresentationSupport.reviewCourtLine(
+                courtLine: controlSurface.reviewCourtLine,
+                queueCourtLines: controlSurface.queueCourtLines
             ),
             recommendedKillSwitchesLine: DecisionEvolutionPilotControlPresentationSupport.recommendedKillSwitchesLine(
                 killSwitches: resolvedRecommendedKillSwitches
@@ -333,67 +395,31 @@ struct DecisionEvolutionPilotControlSnapshot: Equatable, Sendable {
     private static func furnaceWorkbenchGuidance(
         controlSurface: DecisionEvolutionControlSurface,
         releaseSummary: DecisionSystemReleaseControlSummary?,
-        surfaceContract: DecisionEvolutionSurfaceContract,
-        actionBundle: DecisionEvolutionWorkspaceMutationActionBundle
+        surfaceContract: DecisionEvolutionSurfaceContract
     ) -> DecisionEvolutionPilotFurnaceWorkbenchGuidance? {
         guard surfaceContract.allowsMutations,
               let releaseSummary else { return nil }
 
-        let checklistLines = DecisionEvolutionReleaseSummaryPresentationSupport.furnaceChecklistLines(
-            releaseSummary: releaseSummary
-        )
-        guard let detail = DecisionEvolutionFurnaceNextStepPresentationSupport.detail(
-            from: checklistLines
-        ), let action = DecisionEvolutionFurnaceNextStepActionSupport.build(
-            detail: detail,
+        guard let workbenchPresentation = DecisionEvolutionFurnaceReviewPresentationSupport.build(
+            releaseSummary: releaseSummary,
+            controlSurface: controlSurface,
             surfaceContract: surfaceContract
-        ), case let .focusMutationHub(focusTarget) = action.kind else {
+        ).workbenchPresentation,
+           let action = workbenchPresentation.nextStepAction,
+           case .focusMutationHub = action.kind else {
             return nil
         }
 
-        let availabilityLines: [String]
-        let isBlocked: Bool
-        let runNowAction: DecisionEvolutionFurnaceRunNowActionPresentation?
-        switch focusTarget {
-        case .quickActions:
-            let hasAvailableQuickAction = actionBundle.restoreActiveIntent != nil
-                || actionBundle.rollbackActiveIntent != nil
-                || actionBundle.approveQueueIntent != nil
-            availabilityLines = DecisionEvolutionPilotControlPresentationSupport.quickActionAvailabilityLines(
-                controlSurface: controlSurface,
-                actionBundle: actionBundle
-            )
-            isBlocked = hasAvailableQuickAction == false
-            runNowAction = DecisionEvolutionFurnaceRunNowActionSupport.preferredQuickAction(
-                actionBundle: actionBundle
-            )
-        case .queueLineage:
-            let canClearLineage = actionBundle.clearReviewLineageIntent != nil
-            availabilityLines = DecisionEvolutionPilotControlPresentationSupport.queueLineageAvailabilityLines(
-                controlSurface: controlSurface,
-                clearLineageAvailable: canClearLineage
-            )
-            isBlocked = canClearLineage == false
-            runNowAction = DecisionEvolutionFurnaceRunNowActionSupport.build(
-                detail: detail,
-                controlSurface: controlSurface,
-                surfaceContract: surfaceContract
-            )
-        }
-
         return DecisionEvolutionPilotFurnaceWorkbenchGuidance(
-            title: DecisionEvolutionPilotControlPresentationSupport.furnaceWorkbenchHeadline(
-                for: focusTarget
-            ),
-            detail: detail,
-            availabilityTitle: DecisionEvolutionPilotControlPresentationSupport.furnaceWorkbenchAvailabilityTitle(
-                isBlocked: isBlocked
-            ),
-            availabilityLines: availabilityLines,
-            runNowActionTitle: runNowAction?.actionTitle,
-            runNowIntent: runNowAction?.intent,
+            title: workbenchPresentation.headline,
+            detail: workbenchPresentation.detail,
+            availabilityTitle: workbenchPresentation.availabilityTitle,
+            availabilityLines: workbenchPresentation.availabilityLines,
+            executionState: workbenchPresentation.executionState,
+            runNowActionTitle: workbenchPresentation.runNowAction?.actionTitle,
+            runNowIntent: workbenchPresentation.runNowAction?.intent,
             actionTitle: action.actionTitle,
-            focusTarget: focusTarget
+            focusTarget: workbenchPresentation.focusTarget
         )
     }
 

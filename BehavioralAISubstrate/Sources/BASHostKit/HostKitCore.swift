@@ -1602,10 +1602,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             ]
         }
 
-        public func resolvedRunModeProfilesByID(
+        public func synthesizedRunModeProfilesByID(
             maintenance: BASEBrainRuntimeSynthesisPolicy.MaintenanceTuning = .generic
         ) -> [String: RunModeBudgetProfile] {
-            let synthesizedProfiles = Self.synthesizedRunModeProfiles(
+            Self.synthesizedRunModeProfiles(
                 lowRiskLoops: lowRiskLoops,
                 mediumRiskLoops: mediumRiskLoops,
                 highRiskLoops: highRiskLoops,
@@ -1649,68 +1649,39 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                 activeRunModeClass: maintenance.activeRunModeClass,
                 restrictedRunModeClass: maintenance.restrictedRunModeClass
             )
-            guard let runModeProfilesByID else {
-                return synthesizedProfiles
-            }
+        }
 
-            return synthesizedProfiles.merging(runModeProfilesByID) { fallback, explicit in
-                explicit.merged(with: fallback)
-            }
+        @available(
+            *,
+            unavailable,
+            renamed: "synthesizedRunModeProfilesByID(maintenance:)",
+            message: "Use synthesizedRunModeProfilesByID(maintenance:) only for fixtures or explicit legacy compatibility; production code should provide explicit runModeProfilesByID."
+        )
+        public func resolvedRunModeProfilesByID(
+            maintenance: BASEBrainRuntimeSynthesisPolicy.MaintenanceTuning = .generic
+        ) -> [String: RunModeBudgetProfile] {
+            synthesizedRunModeProfilesByID(maintenance: maintenance)
         }
 
         public func runModeProfile(
             for runMode: BASEBrainRunMode,
             maintenance: BASEBrainRuntimeSynthesisPolicy.MaintenanceTuning = .generic
         ) -> RunModeBudgetProfile {
-            let resolvedProfiles = resolvedRunModeProfilesByID(maintenance: maintenance)
-            if let explicitProfile = resolvedProfiles[runMode.rawValue] {
+            let synthesizedProfiles = synthesizedRunModeProfilesByID(maintenance: maintenance)
+            if let explicitProfile = runModeProfilesByID?[runMode.rawValue],
+               let fallbackProfile = synthesizedProfiles[runMode.rawValue] {
+                return explicitProfile.merged(with: fallbackProfile)
+            }
+
+            if let explicitProfile = runModeProfilesByID?[runMode.rawValue] {
                 return explicitProfile
             }
 
-            return Self.synthesizedRunModeProfiles(
-                lowRiskLoops: lowRiskLoops,
-                mediumRiskLoops: mediumRiskLoops,
-                highRiskLoops: highRiskLoops,
-                extremeRiskLoops: extremeRiskLoops,
-                lowRiskCandidates: lowRiskCandidates,
-                mediumRiskCandidates: mediumRiskCandidates,
-                highRiskCandidates: highRiskCandidates,
-                extremeRiskCandidates: extremeRiskCandidates,
-                standardDecodeTokens: standardDecodeTokens,
-                unstableDecodeTokens: unstableDecodeTokens,
-                guardedDecodeTokens: guardedDecodeTokens,
-                lowRiskPrecisionProfile: lowRiskPrecisionProfile,
-                mediumRiskPrecisionProfile: mediumRiskPrecisionProfile,
-                highRiskPrecisionProfile: highRiskPrecisionProfile,
-                extremeRiskPrecisionProfile: extremeRiskPrecisionProfile,
-                pulseRetrievalDepth: pulseRetrievalDepth,
-                sentinelRetrievalDepth: sentinelRetrievalDepth,
-                engageRetrievalDepth: engageRetrievalDepth,
-                reflectRetrievalDepth: reflectRetrievalDepth,
-                deepLoopRetrievalDepth: deepLoopRetrievalDepth,
-                guardRetrievalDepth: guardRetrievalDepth,
-                recoveryRetrievalDepth: recoveryRetrievalDepth,
-                quarantineRetrievalDepth: quarantineRetrievalDepth,
-                lockdownRetrievalDepth: lockdownRetrievalDepth,
-                dormantRetrievalDepth: dormantRetrievalDepth,
-                standardLoopFloor: standardLoopFloor,
-                protectedLoopFloor: protectedLoopFloor,
-                standardCandidateFloor: standardCandidateFloor,
-                protectedCandidateFloor: protectedCandidateFloor,
-                candidateCountCap: maxCandidateCount,
-                unstableLoopIncrement: unstableLoopIncrement,
-                unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels,
-                throttleLoopPenalty: throttleLoopPenalty,
-                throttleCandidatePenalty: throttleCandidatePenalty,
-                throttlePenaltyThermalLevels: throttlePenaltyThermalLevels,
-                lightweightMaintenanceBatteryFloor: maintenance.lightBatteryFloor,
-                standardMaintenanceBatteryFloor: maintenance.standardBatteryFloor,
-                restrictedMaintenanceBatteryFloor: maintenanceBatteryFloor,
-                lightweightAllowedClass: maintenance.lightweightAllowedClass,
-                lightweightDeferredClass: maintenance.lightweightDeferredClass,
-                activeRunModeClass: maintenance.activeRunModeClass,
-                restrictedRunModeClass: maintenance.restrictedRunModeClass
-            )[runMode.rawValue] ?? .init(
+            if let synthesizedProfile = synthesizedProfiles[runMode.rawValue] {
+                return synthesizedProfile
+            }
+
+            return RunModeBudgetProfile(
                 maxLoops: lowRiskLoops,
                 maxCandidates: lowRiskCandidates,
                 retrievalDepth: lowRiskRetrievalDepth,
@@ -2290,10 +2261,22 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             return requiredRunModeRuleIDs.subtracting(declaredRuleIDs).sorted()
         }
 
+        public func synthesizedRunModeRules(
+            wakeIntent: WakeIntentTuning
+        ) -> [RunModeTransitionRule] {
+            makeSynthesizedRunModeRules(wakeIntent: wakeIntent)
+        }
+
+        @available(
+            *,
+            unavailable,
+            renamed: "synthesizedRunModeRules(wakeIntent:)",
+            message: "Use synthesizedRunModeRules(wakeIntent:) only for fixtures or explicit legacy compatibility; production code should provide explicit runModeRules."
+        )
         public func resolvedRunModeRules(
             wakeIntent: WakeIntentTuning
         ) -> [RunModeTransitionRule] {
-            runModeRules ?? synthesizedRunModeRules(wakeIntent: wakeIntent)
+            synthesizedRunModeRules(wakeIntent: wakeIntent)
         }
 
         public func requiresGuardedBudget(
@@ -2320,14 +2303,15 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             for context: BASRunModeTransitionContext,
             wakeIntent: WakeIntentTuning
         ) -> BASEBrainRunMode {
-            if let matchedRule = resolvedRunModeRules(wakeIntent: wakeIntent).first(where: { $0.matches(context) }) {
+            let rules = runModeRules ?? makeSynthesizedRunModeRules(wakeIntent: wakeIntent)
+            if let matchedRule = rules.first(where: { $0.matches(context) }) {
                 return matchedRule.resultMode
             }
 
             return quarantineMode
         }
 
-        private func synthesizedRunModeRules(
+        private func makeSynthesizedRunModeRules(
             wakeIntent: WakeIntentTuning
         ) -> [RunModeTransitionRule] {
             var rules: [RunModeTransitionRule] = [
@@ -3003,7 +2987,7 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                 unstableDecodeTokens: 192,
                 guardedDecodeTokens: 220,
                 maintenanceBatteryFloor: 0.35
-            ).resolvedRunModeProfilesByID()
+            ).synthesizedRunModeProfilesByID()
         ),
         wakeIntent: .generic,
         stateTransitions: .generic,
@@ -3136,15 +3120,15 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
         runtimeProfileID: String,
         policyProfileID: String,
         prefersPureLocal: Bool,
-        defaultDeviceState: BASDeviceState = BASHostConfiguration.genericDefaultDeviceState,
+        defaultDeviceState: BASDeviceState,
         console: BASHostConsoleConfiguration,
         lifecycleBehavior: BASHostLifecycleBehaviorConfiguration,
         workflowBehavior: BASHostWorkflowBehaviorConfiguration,
         cognitionBehavior: BASHostCognitionBehaviorConfiguration,
         presentation: BASHostPresentationConfiguration,
-        runtimeTuning: BASEBrainRuntimeSynthesisPolicy = .generic,
+        runtimeTuning: BASEBrainRuntimeSynthesisPolicy,
         runtimePolicyLineage: BASRuntimePolicyLineage? = nil,
-        hostRhythmProfile: BASHostRhythmProfile = .generic,
+        hostRhythmProfile: BASHostRhythmProfile,
         hostConstitution: BASHostConstitution? = nil,
         hostConstitutionVault: BASHostConstitutionVault? = nil,
         hostVersionTree: BASHostVersionTree? = nil,
@@ -3224,7 +3208,7 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
         if runtimePolicyLineage == nil {
             issues.append(.missingRuntimePolicyLineage)
         }
-        if runtimePolicyLineage == nil && defaultDeviceState == BASHostConfiguration.genericDefaultDeviceState {
+        if runtimePolicyLineage == nil && defaultDeviceState == BASHostConfiguration.fixtureDefaultDeviceState {
             issues.append(.compiledDefaultDeviceState)
         }
         if runtimeTuning.usesCompiledFallbackEnvelope {
@@ -3256,7 +3240,7 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
         controlPlaneIssues.map { "control_plane.\($0.rawValue)" }
     }
 
-    public static let genericDefaultDeviceState = BASDeviceState(
+    public static let fixtureDefaultDeviceState = BASDeviceState(
         batteryLevel: 0.78,
         thermalLevel: .nominal,
         memoryFreeMB: 3_072,
@@ -3268,11 +3252,11 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
         latencyBudgetMs: 1_200
     )
 
-    public static let generic = BASHostConfiguration(
+    public static let fixtureGeneric = BASHostConfiguration(
         runtimeProfileID: "host.default-runtime",
         policyProfileID: "host.default-policy",
         prefersPureLocal: true,
-        defaultDeviceState: genericDefaultDeviceState,
+        defaultDeviceState: fixtureDefaultDeviceState,
         console: .generic,
         lifecycleBehavior: .generic,
         workflowBehavior: .generic,
@@ -3286,6 +3270,12 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
         hostVersionTree: nil,
         hostForgetRequest: nil
     )
+
+    @available(*, unavailable, renamed: "fixtureDefaultDeviceState", message: "Use fixtureDefaultDeviceState only for fixtures or legacy compatibility; production code should supply an explicit host-owned default device state.")
+    public static let genericDefaultDeviceState = fixtureDefaultDeviceState
+
+    @available(*, unavailable, renamed: "fixtureGeneric", message: "Use fixtureGeneric only for fixtures or legacy compatibility; production code should supply an explicit host-owned configuration.")
+    public static let generic = fixtureGeneric
 }
 
 public struct BASHostDependencySet: Codable, Equatable, Sendable {
@@ -4226,6 +4216,24 @@ public struct BASHostRuntime: Sendable {
         forgetRequest: BASForgetRequest?
     ) -> BASHostCurrentBrain {
         var updated = currentBrain
+        if let constitution {
+            updated.dominantGoals = constitutionAwareDominantGoals(
+                base: currentBrain.dominantGoals,
+                constitution: constitution
+            )
+            updated.relationshipBoundary = constitutionAwareRelationshipBoundary(
+                base: currentBrain.relationshipBoundary,
+                constitution: constitution
+            )
+            updated.boundaryHeadline = constitutionAwareBoundaryHeadline(
+                base: currentBrain.boundaryHeadline,
+                constitution: constitution
+            )
+            updated.activeConstraints = constitutionAwareActiveConstraints(
+                base: currentBrain.activeConstraints,
+                constitution: constitution
+            )
+        }
         updated.retrievalTags = constitutionAwareRetrievalTags(
             base: currentBrain.retrievalTags,
             constitution: constitution,
@@ -4241,6 +4249,82 @@ public struct BASHostRuntime: Sendable {
             forgetRequest: forgetRequest
         )
         return updated
+    }
+
+    private func constitutionAwareDominantGoals(
+        base: [String],
+        constitution: BASHostConstitution
+    ) -> [String] {
+        constitutionAwareOrderedUnique(
+            constitution.goalSpine.priorityOrder
+                + constitution.goalSpine.goals
+                + base
+        )
+    }
+
+    private func constitutionAwareRelationshipBoundary(
+        base: String,
+        constitution: BASHostConstitution
+    ) -> String {
+        firstNonEmpty(
+            constitution.relationGravity.highConsequenceLinks.first,
+            constitution.relationGravity.nodes.first,
+            base
+        ) ?? base
+    }
+
+    private func constitutionAwareBoundaryHeadline(
+        base: String,
+        constitution: BASHostConstitution
+    ) -> String {
+        let segments = constitutionAwareOrderedUnique(
+            [
+                constitution.identityLattice.stableCenter.isEmpty
+                    ? nil
+                    : "stable center \(constitution.identityLattice.stableCenter)",
+                constitution.boundaryVeil.confirmRequired.first.map { "confirm \($0)" },
+                constitution.boundaryVeil.hardNoGo.first.map { "no-go \($0)" }
+            ].compactMap { $0 }
+        )
+        guard segments.isEmpty == false else {
+            return base
+        }
+        return segments.joined(separator: " • ")
+    }
+
+    private func constitutionAwareActiveConstraints(
+        base: [String],
+        constitution: BASHostConstitution
+    ) -> [String] {
+        constitutionAwareOrderedUnique(
+            base
+                + constitution.goalSpine.priorityOrder.map { "constitution_goal:\($0)" }
+                + constitution.boundaryVeil.confirmRequired.map { "constitution_confirm_required:\($0)" }
+                + constitution.boundaryVeil.hardNoGo.map { "constitution_no_go:\($0)" }
+                + constitution.relationGravity.highConsequenceLinks.map { "constitution_relation:\($0)" }
+                + [
+                    constitution.narrativeLoom.currentPhase.isEmpty
+                        ? nil
+                        : "constitution_phase:\(constitution.narrativeLoom.currentPhase)",
+                    constitution.consentLattice.memoryPromotionScope.isEmpty
+                        ? nil
+                        : "constitution_memory_promotion:\(constitution.consentLattice.memoryPromotionScope)",
+                    constitution.consentLattice.toolWriteScope.isEmpty
+                        ? nil
+                        : "constitution_tool_write_scope:\(constitution.consentLattice.toolWriteScope)"
+                ].compactMap { $0 }
+        )
+    }
+
+    private func firstNonEmpty(_ values: String?...) -> String? {
+        for value in values {
+            guard let value else { continue }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty == false {
+                return trimmed
+            }
+        }
+        return nil
     }
 
     private func resolvedHostConstitutionVault(

@@ -3,7 +3,11 @@
 这是仓库内的执行版总纲。它把 `13 层电子脑`、`WP0-WP18`、主调用链、接口对象、训练阶段、里程碑、红线与附录要求统一到可执行工程语言中。
 
 > 口径说明
-> 本文继续作为当前仓库 `L1-L13` 的执行真相源。若需查看 `L4 地平线层` 的理想完全体定义，请参考 [EBRAIN_L4_HORIZON_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L4_HORIZON_TARGET_VINF.md)。该文档是 `target-state reference`，不改变本文对 `L4` 现状的执行口径。
+> 本文继续作为当前仓库 `L1-L13` 的执行真相源。若需查看 `L2 脑肉层` 的理想完全体定义，请参考 [EBRAIN_L2_BRAIN_TISSUE_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L2_BRAIN_TISSUE_TARGET_VINF.md)。该文档是 `target-state whitepaper`，用于描述 `Neural Organ Fabric / Brain Tissue` 的目标态，不改变本文对当前 `NeuralCoreService / organ-map scaffold / materialized thought artifacts` 执行口径的表述。
+>
+> 若需查看 `L1 灯芯层` 的理想完全体定义，请参考 [EBRAIN_L1_WICK_LAYER_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L1_WICK_LAYER_TARGET_VINF.md)。该文档是 `target-state whitepaper`，用于描述 `生命控制层 / 脑干内核 / 主权执行臂` 的目标态，不改变本文对当前 `L1` 现实执行口径的表述。
+>
+> 若需查看 `L4 地平线层` 的理想完全体定义，请参考 [EBRAIN_L4_HORIZON_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L4_HORIZON_TARGET_VINF.md)。该文档是 `target-state reference`，不改变本文对 `L4` 现状的执行口径。
 >
 > 若需查看 `L5 宿纹层` 的理想完全体定义与总路线，请参考 [EBRAIN_L5_HOST_CONSTITUTION_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L5_HOST_CONSTITUTION_TARGET_VINF.md) 与 [EBRAIN_L5_HOST_CONSTITUTION_ROADMAP.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L5_HOST_CONSTITUTION_ROADMAP.md)。这两份文档分别是 `target-state whitepaper` 与 `roadmap reference`，不改变本文对 `L5` 当前 Alpha 实现的执行口径。
 >
@@ -20,6 +24,8 @@
 > 若需查看 `L12 柔手层` 的理想完全体定义与 repo-real 演进路线，请参考 [EBRAIN_L12_GENTLE_HAND_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L12_GENTLE_HAND_TARGET_VINF.md) 与 [EBRAIN_L12_GENTLE_HAND_ROADMAP.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L12_GENTLE_HAND_ROADMAP.md)。这两份文档分别是 `target-state whitepaper` 与 `roadmap reference`，不改变本文对当前 `BASRenderedOutput / BASActionPermitMode / five-mode protective rendering scaffold` 执行口径的表述。
 >
 > 若需查看 `L13 蜕变炉` 的理想完全体定义、完整工程规范与 repo-real 路线，请参考 [EBRAIN_L13_EVOLUTION_FURNACE_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L13_EVOLUTION_FURNACE_TARGET_VINF.md)、[EBRAIN_L13_EVOLUTION_FURNACE_FULL_BODY_MASTER_SPEC.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L13_EVOLUTION_FURNACE_FULL_BODY_MASTER_SPEC.md) 与 [EBRAIN_L13_EVOLUTION_FURNACE_FULL_BODY_ROADMAP.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L13_EVOLUTION_FURNACE_FULL_BODY_ROADMAP.md)。三者分别是 `target-state whitepaper`、`full-body master spec` 与 `roadmap reference`；另外，`Stage 1` 的已交付治理骨架由 [2026-04-19-l13-evolution-governance-spine-stage-1-design.md](/Users/changgeng/Project/Project06/Project06/docs/superpowers/specs/2026-04-19-l13-evolution-governance-spine-stage-1-design.md) 和 [2026-04-19-l13-evolution-governance-spine-stage-1.md](/Users/changgeng/Project/Project06/Project06/docs/superpowers/plans/2026-04-19-l13-evolution-governance-spine-stage-1.md) 这两份 shipped `Stage 1` design/plan artifacts 支撑。它们只用于区分目标态、完整规范、演进路径与已交付治理骨架，不改变本文对当前 `UpdateTicket / governed candidate spine / checkpoint lineage / review-gated promotion` 执行口径的表述，也不改写当前仓库已经落地的 `Stage 1 governance spine` 事实。
+>
+> 若需查看 `L3 折叠肺` 的理想完全体定义，请参考 [EBRAIN_L3_FOLDED_LUNG_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L3_FOLDED_LUNG_TARGET_VINF.md)。该文档是 `target-state whitepaper`，用于描述 `Morph Compiler / ThoughtFold Chamber / Thermal Exchanger / Organ Delta Loader / Sovereign Rollback Lung` 的目标态，不改变本文对 `L3` 当前执行口径的表述。
 >
 > `L3` 的仓库内第二阶段骨架已经单独沉淀为 [EBRAIN_L3_FOLDED_LUNG_V2.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L3_FOLDED_LUNG_V2.md)。该文档描述的是当前仓库已经落地的 `Breath-Fold-Resume + Sovereign rollback bridge` 范围，不替代本文的总纲口径。
 >
@@ -184,7 +190,7 @@ DeviceState
 
 - `WP3 / WP8 / WP10 / WP13`
 
-其中 `WP3` 的仓库内第二阶段骨架请参考 [EBRAIN_L3_FOLDED_LUNG_V2.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L3_FOLDED_LUNG_V2.md)。当前已补到 `contract + 最小状态机 + 主权桥 + recoverable anchor + thermal exchange + organ delta loader contract`，但不假装已经完成端侧图编译与工业量化 runtime。
+其中 `WP3` 的目标态白皮书请参考 [EBRAIN_L3_FOLDED_LUNG_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L3_FOLDED_LUNG_TARGET_VINF.md)，仓库内第二阶段骨架请参考 [EBRAIN_L3_FOLDED_LUNG_V2.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L3_FOLDED_LUNG_V2.md)。当前已补到 `contract + 最小状态机 + 主权桥 + recoverable anchor + thermal exchange + organ delta loader contract`，但不假装已经完成端侧图编译与工业量化 runtime。
 
 ### 第三批做强
 

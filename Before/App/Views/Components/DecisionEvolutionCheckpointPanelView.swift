@@ -86,9 +86,12 @@ struct DecisionEvolutionCheckpointPanelView: View {
                     summaryText: checkpoint.summaryText,
                     summaryColor: checkpoint.usesSecondarySummaryTone ? .secondary : BeforeTheme.ember,
                     metadataText: checkpoint.metadataText,
+                    presenceTitle: checkpoint.presenceTitle,
+                    presenceLines: checkpoint.presenceLines,
                     foldedLungTitle: checkpoint.foldedLungTitle,
                     foldedLungLines: checkpoint.foldedLungLines,
                     ticketsLine: checkpoint.ticketsLine,
+                    courtLine: checkpoint.courtSummaryLine,
                     auditLine: checkpoint.auditLine,
                     killSwitchesLine: checkpoint.killSwitchesLine
                 )

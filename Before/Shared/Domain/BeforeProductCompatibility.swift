@@ -415,7 +415,7 @@ enum BeforeRuntimePolicyFallbacks {
         resolvedBudget.protectedFloorBoundaryModes = [.localOnlyProtective]
         resolvedBudget.protectedFloorCalibrationStatuses = []
         resolvedBudget.unstableBudgetCalibrationStatuses = [.watch, .drifting]
-        resolvedBudget.runModeProfilesByID = baseBudget.resolvedRunModeProfilesByID(
+        resolvedBudget.runModeProfilesByID = baseBudget.synthesizedRunModeProfilesByID(
             maintenance: runtimeMaintenance
         )
         return resolvedBudget
@@ -462,7 +462,7 @@ enum BeforeRuntimePolicyFallbacks {
             recoveryMode: .recovery,
             quarantineMode: .quarantine
         )
-        tuning.runModeRules = tuning.resolvedRunModeRules(wakeIntent: runtimeWakeIntent)
+        tuning.runModeRules = tuning.synthesizedRunModeRules(wakeIntent: runtimeWakeIntent)
         return tuning
     }()
     static let runtimeLease = BASEBrainRuntimeSynthesisPolicy.LeaseTuning(
@@ -620,12 +620,12 @@ enum BeforeRuntimePolicyFallbacks {
 
     static func emergencyBundle() -> BeforeRuntimePolicyBundle {
         var explicitBudget = runtimeBudget
-        explicitBudget.runModeProfilesByID = explicitBudget.resolvedRunModeProfilesByID(
+        explicitBudget.runModeProfilesByID = explicitBudget.synthesizedRunModeProfilesByID(
             maintenance: runtimeMaintenance
         )
 
         var explicitTransitions = runtimeStateTransitions
-        explicitTransitions.runModeRules = explicitTransitions.resolvedRunModeRules(
+        explicitTransitions.runModeRules = explicitTransitions.synthesizedRunModeRules(
             wakeIntent: runtimeWakeIntent
         )
 

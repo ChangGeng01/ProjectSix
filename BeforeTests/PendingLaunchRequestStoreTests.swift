@@ -203,6 +203,49 @@ final class PendingLaunchRequestStoreTests: XCTestCase {
             DecisionEvolutionWidgetControlEntryKind.audit.rawValue
         )
         XCTAssertEqual(
+            restored?.instructionDetail,
+            DecisionEvolutionWidgetControlEntryLexiconSupport.auditInstruction
+        )
+        XCTAssertEqual(
+            restored?.triggerReason,
+            "Inspect evolution audit findings from Medium Widget."
+        )
+    }
+
+    func testEnqueueLegacyAuditEnvelopeBackfillsInstructionAndTriggerReasonAcrossSharedProtectedQueue() {
+        PendingLaunchRequestStore.clear()
+
+        let now = Date()
+        let envelope = DecisionIntentEnvelope(
+            id: UUID(uuidString: "22222222-3333-4444-5555-666666666666")!,
+            kind: .openEvolutionControl,
+            sourceSurface: .widget,
+            entrySource: .homeWidgetMedium,
+            preferredMode: .mirror,
+            promptSeed: "Inspect the legacy audit findings",
+            instructionDetail: nil,
+            triggerReason: nil,
+            controlEntryKindID: DecisionEvolutionWidgetControlEntryKind.audit.rawValue,
+            requestedAt: now,
+            expiresAt: now.addingTimeInterval(BeforePolicy.LaunchRequests.expirationInterval)
+        )
+
+        PendingLaunchRequestStore.enqueue(envelope)
+
+        let restored = PendingLaunchRequestStore.consumeEnvelope()
+
+        XCTAssertEqual(restored?.kind, .openEvolutionControl)
+        XCTAssertEqual(restored?.entrySource, .homeWidgetMedium)
+        XCTAssertEqual(restored?.promptSeed, "Inspect the legacy audit findings")
+        XCTAssertEqual(
+            restored?.controlEntryKindID,
+            DecisionEvolutionWidgetControlEntryKind.audit.rawValue
+        )
+        XCTAssertEqual(
+            restored?.instructionDetail,
+            DecisionEvolutionWidgetControlEntryLexiconSupport.auditInstruction
+        )
+        XCTAssertEqual(
             restored?.triggerReason,
             "Inspect evolution audit findings from Medium Widget."
         )

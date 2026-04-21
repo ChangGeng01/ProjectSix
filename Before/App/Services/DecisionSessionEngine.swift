@@ -186,6 +186,8 @@ struct DecisionSessionCheckpointEBrainAnchor: Codable, Equatable, Sendable {
     var presenceLine: String?
     var riskFactorsLine: String?
     var reasonCodesLine: String?
+    var cognitionLine: String?
+    var mirrorCalibrationLine: String?
     var courtLine: String?
     var versionTreeLine: String?
     var retractionLine: String?
@@ -223,6 +225,8 @@ struct DecisionSessionCheckpointEBrainAnchor: Codable, Equatable, Sendable {
         case presenceLine
         case riskFactorsLine
         case reasonCodesLine
+        case cognitionLine
+        case mirrorCalibrationLine
         case courtLine
         case versionTreeLine
         case retractionLine
@@ -261,6 +265,8 @@ struct DecisionSessionCheckpointEBrainAnchor: Codable, Equatable, Sendable {
         presenceLine: String? = nil,
         riskFactorsLine: String? = nil,
         reasonCodesLine: String? = nil,
+        cognitionLine: String? = nil,
+        mirrorCalibrationLine: String? = nil,
         courtLine: String? = nil,
         versionTreeLine: String? = nil,
         retractionLine: String? = nil,
@@ -297,6 +303,8 @@ struct DecisionSessionCheckpointEBrainAnchor: Codable, Equatable, Sendable {
         self.presenceLine = presenceLine?.evolutionTrimmedNonEmpty
         self.riskFactorsLine = riskFactorsLine?.evolutionTrimmedNonEmpty
         self.reasonCodesLine = reasonCodesLine?.evolutionTrimmedNonEmpty
+        self.cognitionLine = cognitionLine?.evolutionTrimmedNonEmpty
+        self.mirrorCalibrationLine = mirrorCalibrationLine?.evolutionTrimmedNonEmpty
         self.courtLine = courtLine?.evolutionTrimmedNonEmpty
         self.versionTreeLine = versionTreeLine?.evolutionTrimmedNonEmpty
         self.retractionLine = retractionLine?.evolutionTrimmedNonEmpty
@@ -337,6 +345,8 @@ struct DecisionSessionCheckpointEBrainAnchor: Codable, Equatable, Sendable {
             presenceLine: try container.decodeIfPresent(String.self, forKey: .presenceLine),
             riskFactorsLine: try container.decodeIfPresent(String.self, forKey: .riskFactorsLine),
             reasonCodesLine: try container.decodeIfPresent(String.self, forKey: .reasonCodesLine),
+            cognitionLine: try container.decodeIfPresent(String.self, forKey: .cognitionLine),
+            mirrorCalibrationLine: try container.decodeIfPresent(String.self, forKey: .mirrorCalibrationLine),
             courtLine: try container.decodeIfPresent(String.self, forKey: .courtLine),
             versionTreeLine: try container.decodeIfPresent(String.self, forKey: .versionTreeLine),
             retractionLine: try container.decodeIfPresent(String.self, forKey: .retractionLine),
@@ -377,6 +387,8 @@ struct DecisionSessionCheckpointEBrainAnchor: Codable, Equatable, Sendable {
         try container.encodeIfPresent(presenceLine, forKey: .presenceLine)
         try container.encodeIfPresent(riskFactorsLine, forKey: .riskFactorsLine)
         try container.encodeIfPresent(reasonCodesLine, forKey: .reasonCodesLine)
+        try container.encodeIfPresent(cognitionLine, forKey: .cognitionLine)
+        try container.encodeIfPresent(mirrorCalibrationLine, forKey: .mirrorCalibrationLine)
         try container.encodeIfPresent(courtLine, forKey: .courtLine)
         try container.encodeIfPresent(versionTreeLine, forKey: .versionTreeLine)
         try container.encodeIfPresent(retractionLine, forKey: .retractionLine)
@@ -595,6 +607,14 @@ extension DecisionSessionCheckpointEBrainAnchor {
         presenceLine?.evolutionTrimmedNonEmpty
     }
 
+    var resolvedCognitionLine: String? {
+        cognitionLine?.evolutionTrimmedNonEmpty
+    }
+
+    var resolvedMirrorCalibrationLine: String? {
+        mirrorCalibrationLine?.evolutionTrimmedNonEmpty
+    }
+
     var windGateLine: String? {
         guard let permitMode = permitMode?.evolutionTrimmedNonEmpty else {
             return nil
@@ -696,6 +716,8 @@ extension DecisionSessionCheckpointEBrainAnchor {
             presenceLine: newer.presenceLine ?? presenceLine,
             riskFactorsLine: newer.riskFactorsLine ?? riskFactorsLine,
             reasonCodesLine: newer.reasonCodesLine ?? reasonCodesLine,
+            cognitionLine: newer.cognitionLine ?? cognitionLine,
+            mirrorCalibrationLine: newer.mirrorCalibrationLine ?? mirrorCalibrationLine,
             courtLine: newer.courtLine ?? courtLine,
             versionTreeLine: newer.versionTreeLine ?? versionTreeLine,
             retractionLine: newer.retractionLine ?? retractionLine,
@@ -1040,6 +1062,8 @@ struct DecisionSessionRuntimeInspectionSession: Equatable, Sendable, Identifiabl
             presenceLine: latestCheckpointEBrainAnchor?.resolvedPresenceLine,
             riskFactorsLine: latestCheckpointEBrainAnchor?.resolvedRiskFactorsLine,
             reasonCodesLine: latestCheckpointEBrainAnchor?.resolvedReasonCodesLine,
+            cognitionLine: latestCheckpointEBrainAnchor?.resolvedCognitionLine,
+            mirrorCalibrationLine: latestCheckpointEBrainAnchor?.resolvedMirrorCalibrationLine,
             courtLine: latestCheckpointEBrainAnchor?.resolvedCourtLine,
             auditLine: latestCheckpointAuditLine,
             activeKillSwitchesLine: latestCheckpointActiveKillSwitchesLine,
@@ -1078,12 +1102,50 @@ struct DecisionSessionCheckpointPresentationFacts: Equatable, Sendable {
     let presenceLine: String?
     let riskFactorsLine: String?
     let reasonCodesLine: String?
+    let cognitionLine: String?
+    let mirrorCalibrationLine: String?
     let courtLine: String?
     let auditLine: String?
     let activeKillSwitchesLine: String?
     let killSwitchesLine: String?
     let actionLine: String?
     let anchor: DecisionSessionCheckpointEBrainAnchor?
+
+    init(
+        budgetLine: String?,
+        routeLine: String?,
+        decisionLine: String?,
+        taskLine: String?,
+        pressureLine: String?,
+        presenceLine: String?,
+        riskFactorsLine: String?,
+        reasonCodesLine: String?,
+        cognitionLine: String? = nil,
+        mirrorCalibrationLine: String? = nil,
+        courtLine: String?,
+        auditLine: String?,
+        activeKillSwitchesLine: String?,
+        killSwitchesLine: String?,
+        actionLine: String?,
+        anchor: DecisionSessionCheckpointEBrainAnchor?
+    ) {
+        self.budgetLine = budgetLine
+        self.routeLine = routeLine
+        self.decisionLine = decisionLine
+        self.taskLine = taskLine
+        self.pressureLine = pressureLine
+        self.presenceLine = presenceLine
+        self.riskFactorsLine = riskFactorsLine
+        self.reasonCodesLine = reasonCodesLine
+        self.cognitionLine = cognitionLine
+        self.mirrorCalibrationLine = mirrorCalibrationLine
+        self.courtLine = courtLine
+        self.auditLine = auditLine
+        self.activeKillSwitchesLine = activeKillSwitchesLine
+        self.killSwitchesLine = killSwitchesLine
+        self.actionLine = actionLine
+        self.anchor = anchor
+    }
 
     private var effectiveDecisionLine: String? {
         decisionLine ?? anchor?.decisionLine
@@ -1095,6 +1157,14 @@ struct DecisionSessionCheckpointPresentationFacts: Equatable, Sendable {
 
     private var effectivePresenceLine: String? {
         presenceLine ?? anchor?.resolvedPresenceLine
+    }
+
+    private var effectiveCognitionLine: String? {
+        cognitionLine ?? anchor?.resolvedCognitionLine
+    }
+
+    private var effectiveMirrorCalibrationLine: String? {
+        mirrorCalibrationLine ?? anchor?.resolvedMirrorCalibrationLine
     }
 
     private var effectiveCourtLine: String? {
@@ -1227,6 +1297,14 @@ struct DecisionSessionCheckpointPresentationFacts: Equatable, Sendable {
 
         if let effectivePresenceLine {
             lines.append(effectivePresenceLine)
+        }
+
+        if let effectiveCognitionLine {
+            lines.append(effectiveCognitionLine)
+        }
+
+        if let effectiveMirrorCalibrationLine {
+            lines.append(effectiveMirrorCalibrationLine)
         }
 
         if let pressureLine {

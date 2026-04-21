@@ -415,6 +415,39 @@ final class DecisionEvolutionPolicyEngineTests: XCTestCase {
         )
     }
 
+    func testWidgetControlEntryEnrichesAuditInstructionWithPreferredHorizonLine() {
+        let auditPolicy = DecisionEvolutionPolicyEngine.evaluate(
+            DecisionEvolutionPolicyEngine.input(
+                DecisionEvolutionPrimaryBlockerContext(
+                    activeKillSwitches: [],
+                    recommendedKillSwitches: [],
+                    runtimeBlockers: [],
+                    hasActiveCheckpoint: true,
+                    canRestoreActiveCheckpoint: true,
+                    pendingReviewCount: 0,
+                    reviewAuditFindings: ["Factors: evidence_caveat_load"],
+                    canRollbackActiveCheckpoint: false
+                )
+            )
+        )
+
+        XCTAssertEqual(
+            auditPolicy.widgetControlEntryPresentation(
+                prompt: "Watching audit findings before wider rollout",
+                triggerReason: "Factors: evidence_caveat_load",
+                horizonDiagnosticsLines: [
+                    "Capability compatiblePreview",
+                    "Evidence supported/ruleBound",
+                    "Temporal volatile"
+                ]
+            )?.instruction,
+            """
+            Continue on iPhone to inspect audit findings before widening rollout. \
+            Horizon focus: Evidence supported/ruleBound.
+            """
+        )
+    }
+
     func testSurfaceActionPlanPrefersApproveQueueForLocalMutationSurfaces() {
         let policy = DecisionEvolutionPolicyEngine.evaluate(
             DecisionEvolutionPolicyEngine.input(

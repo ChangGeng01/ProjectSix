@@ -581,6 +581,12 @@ final class DecisionMemorySystemTests: XCTestCase {
         XCTAssertEqual(sealedProfile.currentBand, .sealed)
         XCTAssertEqual(sanctumEntry.memoryRef, sealedRecord.id)
         XCTAssertNotNil(sealedProjection.sanctumEntryID)
+        XCTAssertEqual(sealedProjection.sanctumAccessPolicy, "revealed_only_by_policy")
+        XCTAssertTrue(sealedProjection.sanctumRevealConditions.contains("host_authorized_recall"))
+        XCTAssertNil(sealedProjection.sanctumFrozenUntil)
+        XCTAssertEqual(sanctumEntry.accessPolicy, "revealed_only_by_policy")
+        XCTAssertTrue(sanctumEntry.revealConditions.contains("host_authorized_recall"))
+        XCTAssertNil(sanctumEntry.frozenUntil)
         XCTAssertFalse(
             projection.baseProjection.records.contains(where: { $0.content == "Keep this boundary private." })
         )
@@ -588,8 +594,318 @@ final class DecisionMemorySystemTests: XCTestCase {
         XCTAssertEqual(forgetCascade.rootTargets, [forgetCandidate.id])
         XCTAssertEqual(forgetCascade.executionState, "delete_requested")
         XCTAssertFalse(forgetProjection.forgetCascadeIDs.isEmpty)
-        XCTAssertTrue(
+        XCTAssertEqual(forgetProjection.forgetExecutionState, "delete_requested")
+        XCTAssertTrue(forgetProjection.normalRetrievalBlocked)
+        XCTAssertFalse(
             projection.baseProjection.candidates.contains(where: { $0.id == forgetCandidate.id })
+        )
+    }
+
+    @MainActor
+    func testRefreshProjectionAllowsAuthorizedRevealForSealedMemory() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let stableNow = date("2026-04-10T03:00:00Z")
+
+        context.insert(
+            DecisionMemoryRecord(
+                id: "record.sealed.reveal",
+                type: .semantic,
+                topic: "sealed_reveal_topic",
+                headline: "Keep this sanctum memory available only by policy.",
+                value: "revealed_only_by_policy",
+                confidence: 0.83,
+                priority: 0.69,
+                source: .history,
+                lastConfirmedAt: date("2026-04-09T22:00:00Z"),
+                decayPolicy: .slow,
+                retrievalTags: ["private", "sealed", "frozen"],
+                evidenceCount: 3,
+                observationCount: 2,
+                provenanceSummary: "Structured private memory retained in sanctum.",
+                lifecycleState: .active,
+                tier: .warm
+            )
+        )
+        try context.save()
+
+        let blockedProjection = DecisionMemorySystem.refreshProjection(
+            in: context,
+            now: stableNow
+        )
+        let revealedProjection = DecisionMemorySystem.refreshProjection(
+            in: context,
+            authorizedRevealIDs: ["record.sealed.reveal"],
+            now: stableNow
+        )
+        let storedRecord = try XCTUnwrap(
+            try context.fetch(FetchDescriptor<DecisionMemoryRecord>())
+                .first(where: { $0.id == "record.sealed.reveal" })
+        )
+        let temporalProjection = try XCTUnwrap(storedRecord.temporalProjection)
+
+        XCTAssertTrue(DecisionMemorySystem.isSealedInSanctum(temporalProjection))
+        XCTAssertTrue(temporalProjection.normalRetrievalBlocked)
+        XCTAssertFalse(
+            blockedProjection.baseProjection.records.contains(where: { $0.content == storedRecord.headline })
+        )
+        XCTAssertTrue(
+            revealedProjection.baseProjection.records.contains(where: { $0.content == storedRecord.headline })
+        )
+    }
+
+    @MainActor
+    func testRefreshProjectionKeepsPolicyLockedFrozenSanctumMemoryBlockedDespiteAuthorizedReveal() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let stableNow = date("2026-04-09T23:10:00Z")
+
+        context.insert(
+            DecisionMemoryRecord(
+                id: "record.sealed.locked",
+                type: .semantic,
+                topic: "sealed_locked_topic",
+                headline: "This sealed memory remains policy locked.",
+                value: "l14_policy_override_only",
+                confidence: 0.89,
+                priority: 0.7,
+                source: .history,
+                lastConfirmedAt: date("2026-04-09T21:30:00Z"),
+                decayPolicy: .slow,
+                retrievalTags: ["sealed", "policy_override_only", "frozen_hold"],
+                evidenceCount: 4,
+                observationCount: 2,
+                provenanceSummary: "Structured private memory with override-only sanctum policy.",
+                lifecycleState: .active,
+                tier: .warm
+            )
+        )
+        try context.save()
+
+        let projection = DecisionMemorySystem.refreshProjection(
+            in: context,
+            authorizedRevealIDs: ["record.sealed.locked"],
+            now: stableNow
+        )
+        let field = DecisionMemorySystem.temporalField(
+            in: context,
+            now: stableNow
+        )
+        let storedRecord = try XCTUnwrap(
+            try context.fetch(FetchDescriptor<DecisionMemoryRecord>())
+                .first(where: { $0.id == "record.sealed.locked" })
+        )
+        let temporalProjection = try XCTUnwrap(storedRecord.temporalProjection)
+        let sanctumEntry = try XCTUnwrap(
+            field.sanctumEntries.first(where: { $0.entryID == temporalProjection.sanctumEntryID })
+        )
+
+        XCTAssertEqual(temporalProjection.sanctumAccessPolicy, "l14_policy_override_only")
+        XCTAssertFalse(temporalProjection.sanctumRevealConditions.contains("host_authorized_recall"))
+        XCTAssertNotNil(temporalProjection.sanctumFrozenUntil)
+        XCTAssertFalse(
+            DecisionMemorySystem.canHostRevealSanctum(
+                temporalProjection,
+                now: stableNow
+            )
+        )
+        XCTAssertEqual(sanctumEntry.accessPolicy, "l14_policy_override_only")
+        XCTAssertFalse(sanctumEntry.revealConditions.contains("host_authorized_recall"))
+        XCTAssertNotNil(sanctumEntry.frozenUntil)
+        XCTAssertFalse(
+            projection.baseProjection.records.contains(where: { $0.content == storedRecord.headline })
+        )
+    }
+
+    @MainActor
+    func testHostDeleteActionStagesForgetCascadeAndBlocksNormalProjection() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let stableNow = date("2026-04-10T01:20:00Z")
+
+        context.insert(
+            DecisionMemoryRecord(
+                id: "record.delete.host",
+                type: .semantic,
+                topic: "host_delete_topic",
+                headline: "This memory should leave the active portrait.",
+                value: "delete_this_memory",
+                confidence: 0.84,
+                priority: 0.78,
+                source: .history,
+                lastConfirmedAt: date("2026-04-09T20:00:00Z"),
+                decayPolicy: .slow,
+                retrievalTags: ["boundary"],
+                evidenceCount: 3,
+                observationCount: 2,
+                provenanceSummary: "Structured host-authored boundary memory.",
+                lifecycleState: .active,
+                tier: .warm
+            )
+        )
+        try context.save()
+
+        XCTAssertTrue(
+            DecisionMemorySystem.applyHostDeleteAction(
+                id: "record.delete.host",
+                in: context,
+                now: stableNow
+            )
+        )
+
+        let projection = DecisionMemorySystem.refreshProjection(
+            in: context,
+            now: stableNow
+        )
+        let field = DecisionMemorySystem.temporalField(
+            in: context,
+            now: stableNow
+        )
+        let storedRecord = try XCTUnwrap(
+            try context.fetch(FetchDescriptor<DecisionMemoryRecord>())
+                .first(where: { $0.id == "record.delete.host" })
+        )
+        let temporalProjection = try XCTUnwrap(storedRecord.temporalProjection)
+        let forgetCascade = try XCTUnwrap(
+            field.forgetCascades.first(where: { $0.cascadeID == temporalProjection.forgetCascadeIDs.first })
+        )
+
+        XCTAssertEqual(storedRecord.lifecycleState, .retired)
+        XCTAssertTrue(storedRecord.retrievalTags.contains("deleted"))
+        XCTAssertEqual(temporalProjection.forgetExecutionState, "delete_pending")
+        XCTAssertTrue(temporalProjection.normalRetrievalBlocked)
+        XCTAssertFalse(DecisionMemorySystem.shouldSurfaceInPortrait(storedRecord))
+        XCTAssertEqual(forgetCascade.executionState, "delete_pending")
+        XCTAssertFalse(
+            projection.baseProjection.records.contains(where: { $0.content == storedRecord.headline })
+        )
+    }
+
+    @MainActor
+    func testHostNotMeActionStagesRevocationAndBlocksNormalProjection() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let stableNow = date("2026-04-10T01:45:00Z")
+
+        context.insert(
+            DecisionMemoryRecord(
+                id: "record.notme.host",
+                type: .identity,
+                topic: "identity_topic",
+                headline: "This pattern is not me anymore.",
+                value: "no_longer_me",
+                confidence: 0.88,
+                priority: 0.71,
+                source: .history,
+                lastConfirmedAt: date("2026-04-09T18:00:00Z"),
+                decayPolicy: .slow,
+                retrievalTags: ["identity"],
+                evidenceCount: 4,
+                observationCount: 3,
+                provenanceSummary: "Structured host identity memory.",
+                lifecycleState: .active,
+                tier: .cold
+            )
+        )
+        try context.save()
+
+        XCTAssertTrue(
+            DecisionMemorySystem.applyHostNotMeAction(
+                id: "record.notme.host",
+                in: context,
+                now: stableNow
+            )
+        )
+
+        let projection = DecisionMemorySystem.refreshProjection(
+            in: context,
+            now: stableNow
+        )
+        let field = DecisionMemorySystem.temporalField(
+            in: context,
+            now: stableNow
+        )
+        let storedRecord = try XCTUnwrap(
+            try context.fetch(FetchDescriptor<DecisionMemoryRecord>())
+                .first(where: { $0.id == "record.notme.host" })
+        )
+        let temporalProjection = try XCTUnwrap(storedRecord.temporalProjection)
+        let forgetCascade = try XCTUnwrap(
+            field.forgetCascades.first(where: { $0.cascadeID == temporalProjection.forgetCascadeIDs.first })
+        )
+
+        XCTAssertEqual(storedRecord.lifecycleState, .retired)
+        XCTAssertTrue(storedRecord.retrievalTags.contains("not_me"))
+        XCTAssertEqual(temporalProjection.forgetExecutionState, "host_revoked")
+        XCTAssertTrue(temporalProjection.normalRetrievalBlocked)
+        XCTAssertFalse(DecisionMemorySystem.shouldSurfaceInPortrait(storedRecord))
+        XCTAssertEqual(forgetCascade.executionState, "host_revoked")
+        XCTAssertFalse(
+            projection.baseProjection.records.contains(where: { $0.content == storedRecord.headline })
+        )
+    }
+
+    @MainActor
+    func testHostDowngradeActionWarmsColdMemoryWithoutBlockingNormalProjection() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let stableNow = date("2026-04-10T02:10:00Z")
+
+        context.insert(
+            DecisionMemoryRecord(
+                id: "record.downgrade.host",
+                type: .semantic,
+                topic: "downgrade_topic",
+                headline: "This memory should stay but lose permanence.",
+                value: "downgrade_this_memory",
+                confidence: 0.91,
+                priority: 0.82,
+                source: .history,
+                lastConfirmedAt: date("2026-04-09T17:00:00Z"),
+                decayPolicy: .slow,
+                retrievalTags: ["reviewed"],
+                evidenceCount: 4,
+                observationCount: 4,
+                provenanceSummary: "Structured reviewed long-term memory.",
+                lifecycleState: .active,
+                tier: .cold
+            )
+        )
+        try context.save()
+
+        XCTAssertTrue(
+            DecisionMemorySystem.applyHostDowngradeAction(
+                id: "record.downgrade.host",
+                in: context,
+                now: stableNow
+            )
+        )
+
+        let projection = DecisionMemorySystem.refreshProjection(
+            in: context,
+            now: stableNow
+        )
+        let field = DecisionMemorySystem.temporalField(
+            in: context,
+            now: stableNow
+        )
+        let storedRecord = try XCTUnwrap(
+            try context.fetch(FetchDescriptor<DecisionMemoryRecord>())
+                .first(where: { $0.id == "record.downgrade.host" })
+        )
+        let temporalProjection = try XCTUnwrap(storedRecord.temporalProjection)
+        let temperatureProfile = try XCTUnwrap(
+            field.temperatureProfiles.first(where: { $0.profileID == temporalProjection.temperatureProfileID })
+        )
+
+        XCTAssertEqual(storedRecord.lifecycleState, .aging)
+        XCTAssertEqual(storedRecord.tier, .warm)
+        XCTAssertTrue(storedRecord.retrievalTags.contains("downgraded"))
+        XCTAssertFalse(temporalProjection.normalRetrievalBlocked)
+        XCTAssertTrue(DecisionMemorySystem.shouldSurfaceInPortrait(storedRecord))
+        XCTAssertEqual(temperatureProfile.currentBand, .warm)
+        XCTAssertTrue(
+            projection.baseProjection.records.contains(where: { $0.content == storedRecord.headline })
         )
     }
 
@@ -1176,6 +1492,28 @@ final class DecisionMemorySystemTests: XCTestCase {
         XCTAssertEqual(recoveryLineage.recoveryDisposition?.restrictedLease, true)
         XCTAssertEqual(recoveryLineage.recoveryDisposition?.toolWriteAllowed, false)
         XCTAssertEqual(recoveryLineage.recoveryDisposition?.memoryWriteAllowed, false)
+        XCTAssertEqual(recoveryLineage.recoveryDisposition?.operatorReviewRequired, true)
+        XCTAssertEqual(
+            recoveryLineage.recoveryDisposition?.requiredConfirmations,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.recoveryRequiredConfirmations
+        )
+        XCTAssertEqual(
+            recoveryLineage.recoveryDisposition?.allowedActionClasses,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.recoveryAllowedActionClasses
+        )
+        XCTAssertEqual(
+            recoveryLineage.recoveryDisposition?.blockedActionClasses,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.recoveryBlockedActionClasses
+        )
+        XCTAssertEqual(
+            recoveryLineage.recoveryDisposition?.remediationActions,
+            [
+                "recompile_current_brain_state",
+                "review_bootstrap_diagnostics",
+                "preserve_restricted_lease",
+                "collect_confirmation:operator_recovery_review"
+            ]
+        )
         XCTAssertEqual(
             recoveryLineage.recoveryDisposition?.summary,
             BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.recoveryIssueSummary
@@ -1338,6 +1676,30 @@ final class DecisionMemorySystemTests: XCTestCase {
         XCTAssertEqual(quarantineLineage.recoveryDisposition?.restrictedLease, true)
         XCTAssertEqual(quarantineLineage.recoveryDisposition?.toolWriteAllowed, false)
         XCTAssertEqual(quarantineLineage.recoveryDisposition?.memoryWriteAllowed, false)
+        XCTAssertEqual(quarantineLineage.recoveryDisposition?.operatorReviewRequired, true)
+        XCTAssertEqual(
+            quarantineLineage.recoveryDisposition?.requiredConfirmations,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.quarantineRequiredConfirmations
+        )
+        XCTAssertEqual(
+            quarantineLineage.recoveryDisposition?.allowedActionClasses,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.quarantineAllowedActionClasses
+        )
+        XCTAssertEqual(
+            quarantineLineage.recoveryDisposition?.blockedActionClasses,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.quarantineBlockedActionClasses
+        )
+        XCTAssertEqual(
+            quarantineLineage.recoveryDisposition?.remediationActions,
+            [
+                "recompile_current_brain_state",
+                "review_bootstrap_diagnostics",
+                "preserve_restricted_lease",
+                "preserve_quarantine_evidence",
+                "collect_confirmation:operator_recovery_review",
+                "collect_confirmation:operator_quarantine_release"
+            ]
+        )
         XCTAssertEqual(
             quarantineLineage.recoveryDisposition?.summary,
             BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.quarantineIssueSummary

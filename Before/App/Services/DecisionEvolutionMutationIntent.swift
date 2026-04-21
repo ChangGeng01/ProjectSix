@@ -1047,12 +1047,16 @@ enum DecisionEvolutionMutationIntentFactory {
         guard !targets.isEmpty else { return nil }
 
         let ticketCount = targets.reduce(0) { $0 + $1.updateTicketSummaries.count }
+        let foldedLungLineCount = targets.reduce(0) { $0 + $1.foldedLungLines.count }
         let auditCount = targets.reduce(0) { $0 + $1.auditFindings.count }
         let killSwitchCount = targets.reduce(0) { $0 + $1.killSwitches.count }
 
         var warnings: [String] = []
         if ticketCount > 0 {
             warnings.append("\(ticketCount) recovered ticket summary entry/entries will be removed from review previews.")
+        }
+        if foldedLungLineCount > 0 {
+            warnings.append("\(foldedLungLineCount) folded-lung fact line(s) will be removed from review previews.")
         }
         if auditCount > 0 {
             warnings.append("\(auditCount) audit finding(s) will no longer be recoverable from those checkpoints.")
@@ -1356,6 +1360,7 @@ enum DecisionEvolutionMutationIntentFactory {
         if presentation.hasLineage {
             highlights.append("Recovered lineage remains available: \(presentation.summaryText)")
         }
+        highlights.append(contentsOf: retainedFoldedLungHighlights(for: presentation))
         if !presentation.updateTicketSummaries.isEmpty {
             highlights.append("\(presentation.updateTicketSummaries.count) update ticket summary/ies remain attached.")
         }
@@ -1393,6 +1398,9 @@ enum DecisionEvolutionMutationIntentFactory {
         if !presentation.updateTicketSummaries.isEmpty {
             warnings.append("\(presentation.updateTicketSummaries.count) update ticket summary/ies will be removed from recovered lineage.")
         }
+        if !presentation.foldedLungLines.isEmpty {
+            warnings.append("\(presentation.foldedLungLines.count) folded-lung fact line(s) will be removed from the checkpoint preview.")
+        }
         if !presentation.auditFindings.isEmpty {
             warnings.append("\(presentation.auditFindings.count) audit finding(s) will be removed from the checkpoint preview.")
         }
@@ -1400,6 +1408,21 @@ enum DecisionEvolutionMutationIntentFactory {
             warnings.append("\(presentation.killSwitches.count) suggested kill-switch recommendation(s) will be removed.")
         }
         return warnings
+    }
+
+    private static func retainedFoldedLungHighlights(
+        for presentation: DecisionEvolutionCheckpointPresentation
+    ) -> [String] {
+        let prioritizedLines = retainedFoldedLungPriorityPrefixes.compactMap { prefix in
+            presentation.foldedLungLines.first { $0.hasPrefix(prefix) }
+        }
+        let candidateLines = prioritizedLines.isEmpty
+            ? presentation.foldedLungLines
+            : prioritizedLines
+
+        return orderedUniqueStrings(candidateLines)
+            .prefix(2)
+            .map { "Folded lung remains visible: \($0)" }
     }
 
     private static func checkpointToken(_ checkpointID: String?) -> String {
@@ -1425,5 +1448,27 @@ enum DecisionEvolutionMutationIntentFactory {
             uniquePresentations.append(presentation)
         }
     }
+
+    private static func orderedUniqueStrings(
+        _ values: [String]
+    ) -> [String] {
+        values.reduce(into: [String]()) { uniqueValues, value in
+            guard !uniqueValues.contains(value) else { return }
+            uniqueValues.append(value)
+        }
+    }
+
+    private static let retainedFoldedLungPriorityPrefixes = [
+        "Breath ",
+        "Rollback anchor",
+        "Resume frame",
+        "Integrity weave",
+        "Thermal exchanger",
+        "Organ delta",
+        "Morph graph",
+        "Hot pack",
+        "Precision profile",
+        "L3 compression runtime"
+    ]
 
 }

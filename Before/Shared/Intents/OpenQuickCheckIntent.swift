@@ -82,6 +82,9 @@ struct OpenEvolutionControlIntent: AppIntent {
     @Parameter(title: "Headline")
     var prompt: String?
 
+    @Parameter(title: "Instruction")
+    var instructionDetail: String?
+
     @Parameter(title: "Trigger Reason")
     var triggerReason: String?
 
@@ -91,6 +94,7 @@ struct OpenEvolutionControlIntent: AppIntent {
     init() {
         entrySource = .shortcut
         prompt = nil
+        instructionDetail = nil
         triggerReason = nil
         controlEntryKindID = nil
     }
@@ -98,11 +102,13 @@ struct OpenEvolutionControlIntent: AppIntent {
     init(
         entrySource: EntrySource,
         prompt: String? = nil,
+        instructionDetail: String? = nil,
         triggerReason: String? = nil,
         controlEntryKindID: String? = nil
     ) {
         self.entrySource = entrySource
         self.prompt = prompt
+        self.instructionDetail = instructionDetail
         self.triggerReason = triggerReason
         self.controlEntryKindID = controlEntryKindID
     }
@@ -114,6 +120,7 @@ struct OpenEvolutionControlIntent: AppIntent {
         self.init(
             entrySource: entrySource,
             prompt: controlEntry.prompt,
+            instructionDetail: controlEntry.instruction,
             triggerReason: controlEntry.triggerReason,
             controlEntryKindID: controlEntry.kindID
         )
@@ -126,6 +133,7 @@ struct OpenEvolutionControlIntent: AppIntent {
         self.init(
             entrySource: entrySource,
             prompt: primaryAction.prompt,
+            instructionDetail: primaryAction.instructionDetail,
             triggerReason: primaryAction.triggerReason,
             controlEntryKindID: primaryAction.controlEntryKindID
         )
@@ -136,6 +144,7 @@ struct OpenEvolutionControlIntent: AppIntent {
             .openEvolutionControl(
                 entrySource: entrySource,
                 promptSeed: prompt,
+                instructionDetail: instructionDetail,
                 triggerReason: triggerReason,
                 controlEntryKindID: controlEntryKindID
             )

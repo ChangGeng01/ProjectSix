@@ -61,6 +61,7 @@ struct DecisionIntentEnvelope: Codable, Equatable, Identifiable, Sendable {
     let preferredModeRaw: String?
     let scenarioRaw: String?
     let promptSeed: String?
+    let instructionDetail: String?
     let riskLevelRaw: String?
     let triggerReason: String?
     let controlEntryKindID: String?
@@ -76,6 +77,7 @@ struct DecisionIntentEnvelope: Codable, Equatable, Identifiable, Sendable {
         preferredMode: DecisionMode? = nil,
         scenario: ScenarioType? = nil,
         promptSeed: String? = nil,
+        instructionDetail: String? = nil,
         riskLevel: InterventionRiskLevel? = nil,
         triggerReason: String? = nil,
         controlEntryKindID: String? = nil,
@@ -90,6 +92,7 @@ struct DecisionIntentEnvelope: Codable, Equatable, Identifiable, Sendable {
         self.preferredModeRaw = preferredMode?.rawValue
         self.scenarioRaw = scenario?.rawValue
         self.promptSeed = promptSeed
+        self.instructionDetail = instructionDetail
         self.riskLevelRaw = riskLevel?.rawValue
         self.triggerReason = triggerReason
         self.controlEntryKindID = controlEntryKindID
@@ -187,21 +190,28 @@ struct DecisionIntentEnvelope: Codable, Equatable, Identifiable, Sendable {
     }
 
     static func openEvolutionControl(
+        id: UUID = UUID(),
         entrySource: EntrySource,
         promptSeed: String? = nil,
+        instructionDetail: String? = nil,
         triggerReason: String? = nil,
         controlEntryKindID: String? = nil,
         requestedAt: Date = .now,
         expiresAt: Date? = nil
     ) -> DecisionIntentEnvelope {
         let cleanedTriggerReason = cleanedSeed(triggerReason)
+        let cleanedInstructionDetail = cleanedSeed(instructionDetail)
         let controlEntryKind = controlEntryKindID.flatMap(DecisionEvolutionWidgetControlEntryKind.init(rawValue:))
         return DecisionIntentEnvelope(
+            id: id,
             kind: .openEvolutionControl,
             sourceSurface: entrySource.intentSourceSurface,
             entrySource: entrySource,
             preferredMode: .mirror,
             promptSeed: cleanedSeed(promptSeed),
+            instructionDetail: cleanedInstructionDetail?.isEmpty == false
+                ? cleanedInstructionDetail
+                : controlEntryKind.map(DecisionEvolutionWidgetControlEntryLexiconSupport.instruction(for:)),
             riskLevel: .medium,
             triggerReason: cleanedTriggerReason?.isEmpty == false
                 ? cleanedTriggerReason
@@ -210,6 +220,30 @@ struct DecisionIntentEnvelope: Codable, Equatable, Identifiable, Sendable {
             requestedAt: requestedAt,
             expiresAt: expiresAt
         )
+    }
+
+    var resolvedEvolutionControlInstructionDetail: String? {
+        guard kind == .openEvolutionControl else {
+            return Self.cleanedSeed(instructionDetail)
+        }
+
+        if let cleanedInstructionDetail = Self.cleanedSeed(instructionDetail) {
+            return cleanedInstructionDetail
+        }
+
+        return controlEntryKind.map(DecisionEvolutionWidgetControlEntryLexiconSupport.instruction(for:))
+    }
+
+    var resolvedEvolutionControlTriggerReason: String? {
+        guard kind == .openEvolutionControl else {
+            return Self.cleanedSeed(triggerReason)
+        }
+
+        if let cleanedTriggerReason = Self.cleanedSeed(triggerReason) {
+            return cleanedTriggerReason
+        }
+
+        return entrySource.defaultEvolutionControlTriggerReason(for: controlEntryKind)
     }
 
     static func reopenTomorrowItem(
@@ -249,6 +283,7 @@ struct DecisionIntentEnvelope: Codable, Equatable, Identifiable, Sendable {
             entrySource: entrySource,
             preferredMode: preferredMode,
             promptSeed: cleanedSeed(promptSeed),
+            instructionDetail: nil,
             riskLevel: riskLevel,
             triggerReason: cleanedSeed(triggerReason),
             requestedAt: requestedAt,
@@ -272,6 +307,7 @@ struct DecisionIntentEnvelope: Codable, Equatable, Identifiable, Sendable {
             entrySource: entrySource,
             preferredMode: preferredMode,
             promptSeed: cleanedSeed(promptSeed),
+            instructionDetail: nil,
             riskLevel: riskLevel,
             triggerReason: cleanedSeed(triggerReason),
             requestedAt: requestedAt,

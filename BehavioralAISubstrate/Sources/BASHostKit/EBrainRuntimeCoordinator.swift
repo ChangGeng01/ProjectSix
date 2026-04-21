@@ -635,7 +635,14 @@ public extension BASEBrainTurnResult {
                 candidateCount: thoughtFrame.candidates.count,
                 forecastCount: thoughtFrame.forecasts.count,
                 critiqueCount: thoughtFrame.critiques.count,
-                stopReasonID: thoughtFrame.stopReason?.rawValue
+                stopReasonID: thoughtFrame.stopReason?.rawValue,
+                mirrorCalibrationPointCount: decomposeFrame.mirrorDraft?.calibrationPoints.isEmpty == false
+                    ? decomposeFrame.mirrorDraft?.calibrationPoints.count
+                    : nil,
+                mirrorOmittedSpeculationCount: decomposeFrame.mirrorDraft?.omittedSpeculations.isEmpty == false
+                    ? decomposeFrame.mirrorDraft?.omittedSpeculations.count
+                    : nil,
+                mirrorToneGuard: decomposeFrame.mirrorDraft?.toneGuard
             ),
             adjudicationSummary: BASEvolutionLineageSummary.AdjudicationSummary(
                 triScoreCount: triScores.count,
@@ -2207,6 +2214,7 @@ public struct BASEBrainRuntimeCoordinator {
         )
         let sovereignWarrants = buildSovereignWarrants(
             sovereignCommitTokens: sovereignCommitTokens,
+            sovereignVerdict: sovereignVerdict,
             runtimeTrace: runtimeTrace
         )
         let sovereignLock = buildSovereignLock(
@@ -4299,11 +4307,13 @@ public struct BASEBrainRuntimeCoordinator {
 
     private func buildSovereignWarrants(
         sovereignCommitTokens: [BASSovereignCommitToken],
+        sovereignVerdict: BASSovereignVerdict,
         runtimeTrace: BASRuntimeTrace
     ) -> [BASSovereignWarrant] {
         sovereignCommitTokens.map { token in
             makeSovereignWarrant(
                 from: token,
+                sovereignVerdict: sovereignVerdict,
                 runtimeTrace: runtimeTrace
             )
         }
@@ -4358,34 +4368,86 @@ public struct BASEBrainRuntimeCoordinator {
 
     private func makeSovereignWarrant(
         from token: BASSovereignCommitToken,
+        sovereignVerdict: BASSovereignVerdict,
         runtimeTrace: BASRuntimeTrace
     ) -> BASSovereignWarrant {
         let jurisdictionRef = "jurisdiction.\(token.scope.rawValue)"
         let timeLockRef = "timelock.\(token.turnID).\(token.scope.rawValue).ttl_\(token.ttlMs)"
         let warrantID = "warrant.\(token.scope.rawValue).\(runtimeTrace.sessionID).\(abs(token.actionDigest.hashValue))"
+        let issuedAt = runtimeTrace.recordedAt
+        let expiresAt = issuedAt.addingTimeInterval(Double(token.ttlMs) / 1_000)
+        let witnessRefs = sovereignWarrantWitnessRefs(
+            token: token,
+            sovereignVerdict: sovereignVerdict
+        )
         let signature = sovereignDigestHex(
             [
                 warrantID,
                 token.scope.rawValue,
                 token.actionDigest,
+                token.tokenID,
                 jurisdictionRef,
                 token.snapshotRef,
                 timeLockRef,
+                token.policyHash,
+                String(issuedAt.timeIntervalSinceReferenceDate),
+                String(expiresAt.timeIntervalSinceReferenceDate),
                 String(token.singleUse),
                 token.signature
-            ]
+            ] + witnessRefs
         )
 
         return BASSovereignWarrant(
             warrantID: warrantID,
             scope: token.scope,
             actionDigest: token.actionDigest,
+            commitTokenRef: token.tokenID,
             jurisdictionRef: jurisdictionRef,
             snapshotRef: token.snapshotRef,
             timeLockRef: timeLockRef,
+            policyHash: token.policyHash,
+            issuedAt: issuedAt,
+            expiresAt: expiresAt,
+            witnessRefs: witnessRefs,
             singleUse: token.singleUse,
             signature: signature
         )
+    }
+
+    private func sovereignWarrantWitnessRefs(
+        token: BASSovereignCommitToken,
+        sovereignVerdict: BASSovereignVerdict
+    ) -> [String] {
+        let baseWitnesses = [
+            "permit.\(token.turnID).\(token.scope.rawValue)",
+            "integrity.\(token.snapshotRef)",
+            "continuity.\(token.turnID)",
+            "policy.\(token.policyHash)"
+        ]
+
+        let scopeWitnesses: [String] = switch token.scope {
+        case .checkpointCommit:
+            [
+                "checkpoint.\(token.snapshotRef)",
+                "render_mode.\(token.allowedTargets.first ?? "unknown")"
+            ]
+        case .memoryWrite:
+            ["mutation.memory.\(token.turnID)"] + token.allowedTargets.prefix(2).map { "memory_target.\($0)" }
+        case .renderHighRisk:
+            [
+                "render.second_check.\(token.turnID)",
+                "render_target.\(token.allowedTargets.first ?? "unknown")"
+            ]
+        case .toolRead:
+            ["tool.read.\(token.allowedTargets.first ?? "local")"]
+        case .toolWrite:
+            ["tool.write.\(token.allowedTargets.first ?? "local")"]
+        case .hostMutate:
+            ["mutation.host.\(token.turnID)"]
+        }
+
+        let verdictWitnesses = sovereignVerdict.reasonCodes.prefix(2).map { "verdict.\($0)" }
+        return orderedReasonCodes(baseWitnesses + scopeWitnesses + verdictWitnesses)
     }
 
     private func buildSovereignLock(
@@ -4464,7 +4526,9 @@ public struct BASEBrainRuntimeCoordinator {
                 "fold:\(thoughtFold.foldID)",
                 thoughtFold.checksum.isEmpty ? nil : "fold_checksum:\(thoughtFold.checksum)",
                 sovereignVerdict.forcedMode.map { "forced_mode:\($0.rawValue)" }
-            ].compactMap { $0 } + sovereignVerdict.reasonCodes
+            ].compactMap { $0 }
+                + sovereignVerdict.reasonCodes
+                + sovereignWarrants.flatMap(\.witnessRefs)
         )
         let ruleIDs = sovereignRuleIDs(for: sovereignVerdict)
         let signature = sovereignDigestHex(
@@ -4622,35 +4686,87 @@ public struct BASEBrainRuntimeCoordinator {
         emergencyBrake: BASEmergencyBrake,
         sovereignVerdict: BASSovereignVerdict?
     ) -> BASRecoveryDisposition? {
+        func contract(
+            kind: BASRecoveryDispositionKind,
+            summary: String,
+            reasonCodes: [String],
+            toolWriteAllowed: Bool,
+            memoryWriteAllowed: Bool
+        ) -> BASRecoveryDisposition {
+            var blockedActionClasses: [String] = []
+            if toolWriteAllowed == false {
+                blockedActionClasses.append("tool_write")
+            }
+            if memoryWriteAllowed == false {
+                blockedActionClasses.append("memory_write")
+            }
+
+            let remediationActions: [String]
+            let requiredConfirmations: [String]
+            switch kind {
+            case .recovery:
+                remediationActions = [
+                    "review_runtime_diagnostics",
+                    "rebuild_trusted_state",
+                    "collect_confirmation:operator_recovery_review"
+                ]
+                requiredConfirmations = ["operator_recovery_review"]
+            case .quarantine:
+                remediationActions = [
+                    "review_runtime_diagnostics",
+                    "preserve_quarantine_evidence",
+                    "rebuild_trusted_state",
+                    "collect_confirmation:operator_quarantine_release"
+                ]
+                requiredConfirmations = ["operator_quarantine_release"]
+            case .lockdown:
+                remediationActions = [
+                    "review_runtime_diagnostics",
+                    "preserve_dead_stop_evidence",
+                    "require_operator_release"
+                ]
+                requiredConfirmations = ["operator_lockdown_release"]
+            }
+
+            return BASRecoveryDisposition(
+                kind: kind,
+                summary: summary,
+                reasonCodes: reasonCodes,
+                remediationRequired: true,
+                restrictedLease: true,
+                toolWriteAllowed: toolWriteAllowed,
+                memoryWriteAllowed: memoryWriteAllowed,
+                operatorReviewRequired: true,
+                requiredConfirmations: requiredConfirmations,
+                allowedActionClasses: ["render_local_guidance", "load_governed_memory"],
+                blockedActionClasses: blockedActionClasses,
+                remediationActions: remediationActions
+            )
+        }
+
         if let sovereignVerdict {
             switch sovereignVerdict.verdictLevel {
             case .deadStop:
-                return BASRecoveryDisposition(
+                return contract(
                     kind: .lockdown,
                     summary: "The turn entered lockdown after a sovereign dead-stop verdict revoked execution authority.",
                     reasonCodes: orderedReasonCodes(sovereignVerdict.reasonCodes + emergencyBrake.reasonCodes + ["runtime.lockdown"]),
-                    remediationRequired: true,
-                    restrictedLease: true,
                     toolWriteAllowed: false,
                     memoryWriteAllowed: false
                 )
             case .quarantine:
-                return BASRecoveryDisposition(
+                return contract(
                     kind: .quarantine,
                     summary: "The turn entered quarantine after the sovereign verdict flagged runtime or continuity trust loss.",
                     reasonCodes: orderedReasonCodes(sovereignVerdict.reasonCodes + emergencyBrake.reasonCodes + ["runtime.quarantine"]),
-                    remediationRequired: true,
-                    restrictedLease: true,
                     toolWriteAllowed: false,
                     memoryWriteAllowed: false
                 )
             case .rollback, .shadowLock:
-                return BASRecoveryDisposition(
+                return contract(
                     kind: .recovery,
                     summary: "The turn entered recovery because the sovereign verdict requires a verified policy or state reset before normal execution resumes.",
                     reasonCodes: orderedReasonCodes(sovereignVerdict.reasonCodes + emergencyBrake.reasonCodes + ["runtime.recovery"]),
-                    remediationRequired: true,
-                    restrictedLease: true,
                     toolWriteAllowed: sovereignVerdict.verdictLevel < .toolCut,
                     memoryWriteAllowed: sovereignVerdict.verdictLevel < .memoryFreeze
                 )
@@ -4661,32 +4777,26 @@ public struct BASEBrainRuntimeCoordinator {
 
         switch budgetFrame.runMode {
         case .recovery:
-            return BASRecoveryDisposition(
+            return contract(
                 kind: .recovery,
                 summary: "The turn entered recovery so bootstrap or state repair can finish before deeper execution resumes.",
                 reasonCodes: orderedReasonCodes(emergencyBrake.reasonCodes + ["runtime.recovery"]),
-                remediationRequired: true,
-                restrictedLease: true,
                 toolWriteAllowed: false,
                 memoryWriteAllowed: false
             )
         case .quarantine:
-            return BASRecoveryDisposition(
+            return contract(
                 kind: .quarantine,
                 summary: "The turn entered quarantine after repeated recovery pressure or consistency failure.",
                 reasonCodes: orderedReasonCodes(emergencyBrake.reasonCodes + ["runtime.quarantine"]),
-                remediationRequired: true,
-                restrictedLease: true,
                 toolWriteAllowed: false,
                 memoryWriteAllowed: false
             )
         case .lockdown:
-            return BASRecoveryDisposition(
+            return contract(
                 kind: .lockdown,
                 summary: "The turn entered lockdown after a sovereign hard stop and cannot resume higher-order execution yet.",
                 reasonCodes: orderedReasonCodes(emergencyBrake.reasonCodes + ["runtime.lockdown"]),
-                remediationRequired: true,
-                restrictedLease: true,
                 toolWriteAllowed: false,
                 memoryWriteAllowed: false
             )
@@ -4916,6 +5026,10 @@ public struct BASEBrainRuntimeCoordinator {
                     layerID: "L5",
                     event: "host_context",
                     detail: {
+                        let modulationSummary = hostModulationSummary(
+                            hostContext: hostContext,
+                            hostConstitution: hostConstitution
+                        )
                         let vaultSummary = hostConstitutionVault.map {
                             [
                                 "vault \($0.versionSignature)",
@@ -4933,6 +5047,7 @@ public struct BASEBrainRuntimeCoordinator {
                         if let hostConstitution {
                             return [
                                 "Host version \(hostContext.activeVersion) resolved from constitution \(hostConstitution.activeVersion) phase \(hostConstitution.narrativeLoom.currentPhase) with \(hostConstitution.valueAxes.axes.count) value axes and \(hostConstitution.relationGravity.nodes.count) relation nodes.",
+                                modulationSummary.map { "modulation \($0)." },
                                 vaultSummary,
                                 hostVersionTree.map {
                                     "pending \($0.pendingCandidateIDs.count) • frozen \($0.frozenVersionIDs.count)"
@@ -4946,6 +5061,7 @@ public struct BASEBrainRuntimeCoordinator {
                         }
                         return [
                             "Host version \(hostContext.activeVersion) resolved with \(hostContext.styleConstraints.count) style constraints.",
+                            modulationSummary.map { "modulation \($0)." },
                             vaultSummary,
                             hostVersionTree.map {
                                 "pending \($0.pendingCandidateIDs.count) • frozen \($0.frozenVersionIDs.count)"
@@ -5119,6 +5235,12 @@ public struct BASEBrainRuntimeCoordinator {
             compactSlots["constitution_version"] = hostConstitution.activeVersion
             compactSlots["constitution_phase"] = hostConstitution.narrativeLoom.currentPhase
         }
+        if let hostModulation = hostModulationSummary(
+            hostContext: hostContext,
+            hostConstitution: hostConstitution
+        ) {
+            compactSlots["host_mod"] = condensed(hostModulation, limit: 96)
+        }
         if let hostConstitutionVault {
             compactSlots["vault_signature"] = hostConstitutionVault.versionSignature
             compactSlots["vault_sync_revocations"] = String(hostConstitutionVault.syncRevocationLedger.revokedRequestIDs.count)
@@ -5234,7 +5356,10 @@ public struct BASEBrainRuntimeCoordinator {
             compactSlots: compactSlots,
             candidateSignatures: candidateSignatures,
             riskSnapshot: riskCard,
-            hostEffectSummary: condensed(hostContext.styleConstraints.joined(separator: " • "), limit: 120),
+            hostEffectSummary: hostModulationSummary(
+                hostContext: hostContext,
+                hostConstitution: hostConstitution
+            ).map { condensed($0, limit: 120) } ?? condensed(hostContext.styleConstraints.joined(separator: " • "), limit: 120),
             restorePointer: restorePointer,
             checksum: fingerprint(for: checksumSeed),
             morphID: thoughtFrame.organMap?.morph.rawValue,
@@ -5264,6 +5389,50 @@ public struct BASEBrainRuntimeCoordinator {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > limit else { return trimmed }
         return String(trimmed.prefix(limit)) + "..."
+    }
+
+    private func hostModulationSummary(
+        hostContext: BASHostProfile,
+        hostConstitution: BASHostConstitution?
+    ) -> String? {
+        var segments: [String] = []
+        if hostContext.tonePreference.isEmpty == false {
+            segments.append("tone:\(hostContext.tonePreference)")
+        }
+        guard let hostConstitution else {
+            return segments.isEmpty ? nil : segments.joined(separator: " • ")
+        }
+
+        if hostConstitution.narrativeLoom.currentPhase.isEmpty == false {
+            segments.append("phase:\(hostConstitution.narrativeLoom.currentPhase)")
+        }
+        if let primaryGoal = firstNonEmpty(
+            hostConstitution.goalSpine.priorityOrder.first,
+            hostConstitution.goalSpine.goals.first
+        ) {
+            segments.append("goal:\(primaryGoal)")
+        }
+        if let primaryRelation = firstNonEmpty(
+            hostConstitution.relationGravity.highConsequenceLinks.first,
+            hostConstitution.relationGravity.nodes.first
+        ) {
+            segments.append("relation:\(primaryRelation)")
+        }
+        if hostConstitution.consentLattice.memoryPromotionScope.isEmpty == false {
+            segments.append("memory:\(hostConstitution.consentLattice.memoryPromotionScope)")
+        }
+        return segments.isEmpty ? nil : segments.joined(separator: " • ")
+    }
+
+    private func firstNonEmpty(_ values: String?...) -> String? {
+        for value in values {
+            guard let value else { continue }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty == false {
+                return trimmed
+            }
+        }
+        return nil
     }
 
     private func runtimeThoughtFoldBreathMode(

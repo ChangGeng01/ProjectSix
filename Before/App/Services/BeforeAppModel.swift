@@ -45,6 +45,7 @@ struct DecisionEvolutionControlEntryContext: Equatable, Sendable {
     let controlEntryKindID: String?
     let headline: String
     let detail: String?
+    let instructionDetail: String?
 
     var controlEntryKind: DecisionEvolutionWidgetControlEntryKind? {
         controlEntryKindID.flatMap(DecisionEvolutionWidgetControlEntryKind.init(rawValue:))
@@ -64,12 +65,14 @@ struct DecisionEvolutionControlEntryContext: Equatable, Sendable {
         entrySource: EntrySource,
         controlEntryKindID: String?,
         headline: String,
-        detail: String?
+        detail: String?,
+        instructionDetail: String?
     ) {
         self.entrySource = entrySource
         self.controlEntryKindID = controlEntryKindID
         self.headline = headline
         self.detail = detail
+        self.instructionDetail = instructionDetail
     }
 
     init?(envelope: DecisionIntentEnvelope) {
@@ -80,7 +83,8 @@ struct DecisionEvolutionControlEntryContext: Equatable, Sendable {
         self.entrySource = envelope.entrySource
         self.controlEntryKindID = controlEntryKind?.rawValue
         self.headline = envelope.promptSeed ?? fallbackHeadline
-        self.detail = envelope.triggerReason
+        self.detail = envelope.resolvedEvolutionControlTriggerReason
+        self.instructionDetail = envelope.resolvedEvolutionControlInstructionDetail
     }
 }
 
@@ -111,6 +115,7 @@ final class BeforeAppModel: ObservableObject {
     @Published private(set) var isDownloadingOpenModel = false
     @Published private(set) var pendingSessionEngineImportDraft: DecisionSessionEnginePendingImportDraft?
     @Published private(set) var sessionEngineBundleIssue: String?
+    @Published private(set) var authorizedSanctumRevealIDs: Set<String> = []
     @AppStorage("before.hasSeenOnboarding") var hasSeenOnboarding = false
 
     let modelContainer: ModelContainer
@@ -1873,7 +1878,8 @@ final class BeforeAppModel: ObservableObject {
             : evolutionSurfaceState.operatorSnapshot.primaryReason
         let widgetControlEntry = evolutionSurfaceState.policy.widgetControlEntryPresentation(
             prompt: attentionSignal.headline,
-            triggerReason: widgetTriggerReason
+            triggerReason: widgetTriggerReason,
+            horizonDiagnosticsLines: horizonDiagnosticsLines
         )
         let snapshot = WidgetSnapshot(
             safeMessage: WidgetSafeCopy.message(
@@ -1929,35 +1935,16 @@ final class BeforeAppModel: ObservableObject {
 
     func portraitPanelState() -> BrainPortraitPanelState {
         let context = modelContainer.mainContext
-        let records = DecisionMemorySystem.fetchMemoryRecords(in: context)
-        let candidates = DecisionMemorySystem.fetchCandidateRecords(in: context)
+        _ = DecisionMemorySystem.reconcileTemporalFieldStage(in: context, now: .now)
+        let records = DecisionMemorySystem.fetchAllMemoryRecords(in: context)
+        let candidates = DecisionMemorySystem.fetchAllCandidateRecords(in: context)
         let memories =
-            records.map {
-                BrainPortraitMemoryItem(
-                    id: $0.id,
-                    title: $0.headline,
-                    detail: $0.provenanceSummary,
-                    source: $0.source,
-                    confidence: $0.confidence,
-                    tier: $0.tier,
-                    isPending: false,
-                    lastConfirmedAt: $0.lastConfirmedAt,
-                    governanceStatus: .admitted
-                )
-            } +
-            candidates.map {
-                BrainPortraitMemoryItem(
-                    id: $0.id,
-                    title: $0.headline,
-                    detail: $0.provenanceSummary,
-                    source: $0.source,
-                    confidence: $0.confidence,
-                    tier: $0.tier,
-                    isPending: true,
-                    lastConfirmedAt: $0.lastObservedAt,
-                    governanceStatus: $0.lastGovernanceDecision == .deferred ? .deferred : .pending
-                )
-            }
+            records
+            .filter(DecisionMemorySystem.shouldSurfaceInPortrait)
+            .map(portraitMemoryItem(from:)) +
+            candidates
+            .filter(DecisionMemorySystem.shouldSurfaceInPortrait)
+            .map(portraitMemoryItem(from:))
 
         return BrainPortraitPanelState(
             currentBrainState: currentBrainState,
@@ -1996,6 +1983,123 @@ final class BeforeAppModel: ObservableObject {
                 )
             },
             generatedAt: .now
+        )
+    }
+
+    private func portraitMemoryItem(
+        from record: DecisionMemoryRecord
+    ) -> BrainPortraitMemoryItem {
+        let now = Date.now
+        let isRevealed = DecisionMemorySystem.isAuthorizedSanctumReveal(
+            id: record.id,
+            temporalProjection: record.temporalProjection,
+            authorizedRevealIDs: authorizedSanctumRevealIDs,
+            now: now
+        )
+        let isSealed = DecisionMemorySystem.isSealedInSanctum(record.temporalProjection)
+        let canReveal = DecisionMemorySystem.canHostRevealSanctum(
+            record.temporalProjection,
+            now: now
+        )
+
+        return BrainPortraitMemoryItem(
+            id: record.id,
+            title: portraitMemoryTitle(
+                rawTitle: record.headline,
+                isSealed: isSealed,
+                isRevealed: isRevealed
+            ),
+            detail: portraitMemoryDetail(
+                rawDetail: record.provenanceSummary,
+                temporalProjection: record.temporalProjection,
+                canReveal: canReveal,
+                isSealed: isSealed,
+                isRevealed: isRevealed,
+                now: now
+            ),
+            source: record.source,
+            confidence: record.confidence,
+            tier: record.tier,
+            isPending: false,
+            isSealed: isSealed,
+            isRevealed: isRevealed,
+            canReveal: canReveal,
+            lastConfirmedAt: record.lastConfirmedAt,
+            governanceStatus: .admitted
+        )
+    }
+
+    private func portraitMemoryItem(
+        from candidate: DecisionMemoryCandidateRecord
+    ) -> BrainPortraitMemoryItem {
+        let now = Date.now
+        let isRevealed = DecisionMemorySystem.isAuthorizedSanctumReveal(
+            id: candidate.id,
+            temporalProjection: candidate.temporalProjection,
+            authorizedRevealIDs: authorizedSanctumRevealIDs,
+            now: now
+        )
+        let isSealed = DecisionMemorySystem.isSealedInSanctum(candidate.temporalProjection)
+        let canReveal = DecisionMemorySystem.canHostRevealSanctum(
+            candidate.temporalProjection,
+            now: now
+        )
+
+        return BrainPortraitMemoryItem(
+            id: candidate.id,
+            title: portraitMemoryTitle(
+                rawTitle: candidate.headline,
+                isSealed: isSealed,
+                isRevealed: isRevealed
+            ),
+            detail: portraitMemoryDetail(
+                rawDetail: candidate.provenanceSummary,
+                temporalProjection: candidate.temporalProjection,
+                canReveal: canReveal,
+                isSealed: isSealed,
+                isRevealed: isRevealed,
+                now: now
+            ),
+            source: candidate.source,
+            confidence: candidate.confidence,
+            tier: candidate.tier,
+            isPending: true,
+            isSealed: isSealed,
+            isRevealed: isRevealed,
+            canReveal: canReveal,
+            lastConfirmedAt: candidate.lastObservedAt,
+            governanceStatus: candidate.lastGovernanceDecision == .deferred ? .deferred : .pending
+        )
+    }
+
+    private func portraitMemoryTitle(
+        rawTitle: String,
+        isSealed: Bool,
+        isRevealed: Bool
+    ) -> String {
+        guard isSealed, !isRevealed else {
+            return rawTitle
+        }
+        return "Sealed memory"
+    }
+
+    private func portraitMemoryDetail(
+        rawDetail: String,
+        temporalProjection: DecisionTemporalProjection?,
+        canReveal: Bool,
+        isSealed: Bool,
+        isRevealed: Bool,
+        now: Date
+    ) -> String {
+        guard isSealed, !isRevealed else {
+            return rawDetail
+        }
+        if canReveal {
+            return "Protected in sanctum. Reveal is available with host-authorized recall."
+        }
+        return DecisionMemorySystem.sanctumProtectionSummary(
+            temporalProjection,
+            now: now
         )
     }
 
@@ -2091,7 +2195,11 @@ final class BeforeAppModel: ObservableObject {
         )
         guard let controlEntry = surfaceState.policy.widgetControlEntryPresentation(
             prompt: surfaceState.attentionSignal.headline,
-            triggerReason: triggerReason
+            triggerReason: triggerReason,
+            horizonDiagnosticsLines: surfaceState
+                .operatorSnapshot
+                .summaryPresentation
+                .horizonDiagnosticsLines
         ) else {
             return nil
         }
@@ -2103,7 +2211,8 @@ final class BeforeAppModel: ObservableObject {
             detail: controlEntry.triggerReason
                 ?? EntrySource.app.defaultEvolutionControlTriggerReason(
                     for: surfaceState.policy.widgetControlEntryKind
-                )
+                ),
+            instructionDetail: controlEntry.instruction
         )
     }
 
@@ -2741,25 +2850,18 @@ final class BeforeAppModel: ObservableObject {
 
     func deleteBrainPortraitMemory(id: String) {
         let context = modelContainer.mainContext
-        if let record = DecisionMemorySystem.fetchMemoryRecords(in: context).first(where: { $0.id == id }) {
-            context.delete(record)
+        guard DecisionMemorySystem.applyHostDeleteAction(id: id, in: context) else {
+            return
         }
-        if let candidate = DecisionMemorySystem.fetchCandidateRecords(in: context).first(where: { $0.id == id }) {
-            context.delete(candidate)
-        }
+        authorizedSanctumRevealIDs.remove(id)
         persistContext(context, operation: "deleting portrait memory", refreshMemoryProjection: true)
         refreshGlobalBrainState(source: .explicitRefresh)
     }
 
     func downgradeBrainPortraitMemory(id: String) {
         let context = modelContainer.mainContext
-        if let record = DecisionMemorySystem.fetchMemoryRecords(in: context).first(where: { $0.id == id }) {
-            record.confidence = max(0.2, record.confidence - 0.2)
-            record.priority = max(0.2, record.priority - 0.2)
-            record.lifecycleStateRaw = DecisionMemoryLifecycleState.aging.rawValue
-        }
-        if let candidate = DecisionMemorySystem.fetchCandidateRecords(in: context).first(where: { $0.id == id }) {
-            candidate.confidence = max(0.2, candidate.confidence - 0.2)
+        guard DecisionMemorySystem.applyHostDowngradeAction(id: id, in: context) else {
+            return
         }
         persistContext(context, operation: "downgrading portrait memory", refreshMemoryProjection: true)
         refreshGlobalBrainState(source: .explicitRefresh)
@@ -2767,14 +2869,55 @@ final class BeforeAppModel: ObservableObject {
 
     func markBrainPortraitMemoryAsNotMe(id: String) {
         let context = modelContainer.mainContext
-        if let record = DecisionMemorySystem.fetchMemoryRecords(in: context).first(where: { $0.id == id }) {
-            record.lifecycleStateRaw = DecisionMemoryLifecycleState.retired.rawValue
-            record.priority = 0
+        guard DecisionMemorySystem.applyHostNotMeAction(id: id, in: context) else {
+            return
         }
-        if let candidate = DecisionMemorySystem.fetchCandidateRecords(in: context).first(where: { $0.id == id }) {
-            context.delete(candidate)
-        }
+        authorizedSanctumRevealIDs.remove(id)
         persistContext(context, operation: "retiring portrait memory", refreshMemoryProjection: true)
+        refreshGlobalBrainState(source: .explicitRefresh)
+    }
+
+    func revealBrainPortraitMemory(id: String) {
+        let context = modelContainer.mainContext
+        _ = DecisionMemorySystem.reconcileTemporalFieldStage(in: context, now: .now)
+        let recordProjection = DecisionMemorySystem.fetchAllMemoryRecords(in: context)
+            .first(where: { $0.id == id })?
+            .temporalProjection
+        let candidateProjection = DecisionMemorySystem.fetchAllCandidateRecords(in: context)
+            .first(where: { $0.id == id })?
+            .temporalProjection
+        let temporalProjection = recordProjection ?? candidateProjection
+
+        guard DecisionMemorySystem.isSealedInSanctum(temporalProjection) else {
+            return
+        }
+
+        guard DecisionMemorySystem.canHostRevealSanctum(temporalProjection, now: .now) else {
+            publishStartupNotice(
+                DecisionMemorySystem.sanctumProtectionSummary(
+                    temporalProjection,
+                    now: .now
+                )
+            )
+            return
+        }
+
+        guard authorizedSanctumRevealIDs.insert(id).inserted else {
+            return
+        }
+
+        isMemoryProjectionDirty = true
+        refreshDecisionMemoryStore(force: true)
+        refreshGlobalBrainState(source: .explicitRefresh)
+    }
+
+    func hideBrainPortraitMemory(id: String) {
+        guard authorizedSanctumRevealIDs.remove(id) != nil else {
+            return
+        }
+
+        isMemoryProjectionDirty = true
+        refreshDecisionMemoryStore(force: true)
         refreshGlobalBrainState(source: .explicitRefresh)
     }
 
@@ -3168,7 +3311,8 @@ final class BeforeAppModel: ObservableObject {
                     force: force,
                     cachedProjection: memoryProjection,
                     isDirty: isMemoryProjectionDirty,
-                    context: modelContainer.mainContext
+                    context: modelContainer.mainContext,
+                    authorizedRevealIDs: authorizedSanctumRevealIDs
                 )
             },
             commitProjection: { memoryProjection = $0 },
@@ -3187,6 +3331,7 @@ final class BeforeAppModel: ObservableObject {
                     context: modelContainer.mainContext,
                     cachedProjection: memoryProjection,
                     isProjectionDirty: isMemoryProjectionDirty,
+                    authorizedRevealIDs: authorizedSanctumRevealIDs,
                     now: .now
                 )
             },
@@ -3212,6 +3357,7 @@ final class BeforeAppModel: ObservableObject {
                     context: modelContainer.mainContext,
                     cachedProjection: memoryProjection,
                     isProjectionDirty: isMemoryProjectionDirty,
+                    authorizedRevealIDs: authorizedSanctumRevealIDs,
                     now: .now
                 )
             },
@@ -3237,6 +3383,7 @@ final class BeforeAppModel: ObservableObject {
                     context: modelContainer.mainContext,
                     cachedProjection: memoryProjection,
                     isProjectionDirty: isMemoryProjectionDirty,
+                    authorizedRevealIDs: authorizedSanctumRevealIDs,
                     now: .now
                 )
             },
@@ -4661,7 +4808,8 @@ final class BeforeAppModel: ObservableObject {
                     context: modelContainer.mainContext,
                     cachedProjection: memoryProjection,
                     isProjectionDirty: isMemoryProjectionDirty,
-                    source: source
+                    source: source,
+                    authorizedRevealIDs: authorizedSanctumRevealIDs
                 )
             },
             commitProjection: { memoryProjection = $0 },

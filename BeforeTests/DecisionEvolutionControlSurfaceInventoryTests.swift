@@ -386,6 +386,22 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
                 updateTicketSummaries: ["ticket-checkpoint-detail"],
                 guardrailFindings: ["guardrail-checkpoint-detail"],
                 recommendedKillSwitches: ["kill-checkpoint-detail"],
+                contextSummary: BASEvolutionLineageSummary.ContextSummary(
+                    emotionalLoadPercent: 81,
+                    timePressurePercent: 84,
+                    relationPattern: "manager-host",
+                    ambiguityPercent: 22,
+                    consequencePercent: 87,
+                    manipulationHintCount: 2,
+                    sceneType: "highPressureConflict",
+                    roleRelationClass: "manager",
+                    powerDirection: "external over host",
+                    powerStrengthPercent: 82,
+                    urgencyPercent: 84,
+                    routeMode: "guarded",
+                    guardRequired: true,
+                    continuityArc: "highPressureConflict:manager"
+                ),
                 foldedLungSummary: BASEvolutionFoldedLungSummary(
                     morphGraphID: "morph-checkpoint-detail",
                     hotColdMapID: "hotcold-checkpoint-detail",
@@ -421,6 +437,18 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
                     integrityVerificationHash: "abc123def456",
                     precisionDegradationOrder: ["fp16", "int8"],
                     precisionGuardSafeFloorID: "int8"
+                ),
+                governanceSummary: BASEvolutionLineageSummary.GovernanceSummary(
+                    experienceCandidateCount: 0,
+                    shadowTrialCount: 0,
+                    pendingShadowTrialCount: 0,
+                    sealCount: 0,
+                    pendingSealCount: 0,
+                    versionDeltaCount: 0,
+                    retractionOrderCount: 0,
+                    pendingRetractionCount: 0,
+                    dreamLoopRemandTargets: ["L9", "L14"],
+                    dreamLoopReservationMode: "delayRight"
                 )
             )),
             fallbackRiskLevel: "high",
@@ -430,7 +458,9 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
         let presentation = DecisionEvolutionCheckpointPresentation(snapshot: snapshot)
         let selectedAction = presentation.selectionActionPresentation(isSelected: true)
         let unselectedAction = presentation.selectionActionPresentation(isSelected: false)
-        let summaryBadges = presentation.summaryBadgePresentations(activeSource: .automaticFallback)
+        let summaryBadges = presentation.summaryBadgePresentations(
+            activeSource: DecisionEvolutionActiveCheckpointSource.automaticFallback
+        )
 
         #expect(presentation.approvalStateTitle == "Review suggested")
         #expect(presentation.rollbackStateTitle == "Rollback ready")
@@ -446,8 +476,16 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
                 == "Lineage pending • review details stay available, but recovered risk facts are not attached yet."
         )
         #expect(presentation.ticketsLine == "Tickets: ticket-checkpoint-detail")
+        #expect(presentation.courtSummaryLine == "Court: agency delay right • remand L9, L14")
         #expect(presentation.auditLine == "Audit: guardrail-checkpoint-detail")
         #expect(presentation.killSwitchesLine == "Kill switches: kill-checkpoint-detail")
+        #expect(presentation.presenceTitle == "Presence field")
+        #expect(
+            presentation.presenceLines
+                == [
+                    "Presence scene high pressure conflict • role manager • power external over host 82% • urgency 84% • route guarded • guard on • continuity highPressureConflict:manager"
+                ]
+        )
         #expect(presentation.foldedLungTitle == "Folded lung")
         #expect(
             presentation.foldedLungLines
@@ -501,6 +539,8 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
                 == DecisionEvolutionCheckpointDetailPresentationSupport.lineagePendingSummaryText
         )
         #expect(presentation.usesSecondarySummaryTone == true)
+        #expect(presentation.presenceTitle == nil)
+        #expect(presentation.presenceLines.isEmpty)
         #expect(presentation.foldedLungTitle == nil)
         #expect(presentation.foldedLungLines.isEmpty)
     }
@@ -625,7 +665,8 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
         riskLevel: String = "high",
         permitMode: String = "delay",
         hostGatePercent: Int = 75,
-        reviewDirectiveLine: String? = nil
+        reviewDirectiveLine: String? = nil,
+        governanceSummary: BASEvolutionLineageSummary.GovernanceSummary? = nil
     ) -> DeveloperDecisionReplayEBrainSummary {
         DeveloperDecisionReplayEBrainSummary(lineageSummary: BASEvolutionLineageSummary(
             recordedAt: recordedAt,
@@ -638,7 +679,8 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
             updateTicketSummaries: ["ticket-\(checkpointID)"],
             reviewDirectiveLine: reviewDirectiveLine,
             guardrailFindings: [],
-            recommendedKillSwitches: []
+            recommendedKillSwitches: [],
+            governanceSummary: governanceSummary
         ))
     }
 }

@@ -1875,13 +1875,14 @@ private struct BASHostRuntimeEBrainMemoryService: BASMemoryServicing {
         }
 
         let profiles = atoms.map { atom in
-            BASMemoryTemperatureProfile(
+            let band = runtimeTemperatureBand(for: atom)
+            return BASMemoryTemperatureProfile(
                 profileID: "temp.\(atom.memoryID)",
-                currentBand: temperatureBand(for: atom.contentType),
-                halfLifeHours: halfLifeHours(for: atom.contentType),
-                promotionRules: atom.contentType == .cold ? ["review_gated_cold_only"] : ["default_projection"],
-                decayRules: atom.contentType == .hot ? ["rapid_decay"] : ["stage_decay"],
-                accessRules: atom.frozen ? ["policy_revealed_only"] : ["default_recall"],
+                currentBand: band,
+                halfLifeHours: runtimeHalfLifeHours(for: band, contentType: atom.contentType),
+                promotionRules: runtimePromotionRules(for: atom, band: band),
+                decayRules: runtimeDecayRules(for: atom, band: band),
+                accessRules: runtimeAccessRules(for: atom, band: band),
                 lastShiftAt: atom.timestamp
             )
         }
@@ -1891,8 +1892,8 @@ private struct BASHostRuntimeEBrainMemoryService: BASMemoryServicing {
                 sealID: "seal.\(atom.memoryID)",
                 sourceClass: atom.source,
                 consentRef: "host.memory.default",
-                riskStateRef: atom.frozen ? "risk.protective" : "risk.standard",
-                sovereignStateRef: atom.frozen ? "guarded" : "standard",
+                riskStateRef: runtimeRiskStateRef(for: atom),
+                sovereignStateRef: runtimeSovereignStateRef(for: atom),
                 creationTurnRef: "turn.\(atom.memoryID)",
                 verificationState: atom.confidence >= 0.75 ? .verified : .pending
             )
@@ -1910,9 +1911,9 @@ private struct BASHostRuntimeEBrainMemoryService: BASMemoryServicing {
                 evidenceStrength: min(1, atom.hostRelevance + 0.25),
                 emotionalWeight: atom.emotionalWeight,
                 hostScope: "host.runtime",
-                sovereignScope: atom.frozen ? "guarded" : "standard",
+                sovereignScope: runtimeSovereignStateRef(for: atom),
                 sanctumFlag: atom.frozen,
-                quarantineFlag: false,
+                quarantineFlag: atom.promotionState == .retired,
                 lineageRefs: ["runtime.\(index)"],
                 temperatureProfileRef: profiles[index].profileID,
                 provenanceSealRef: seals[index].sealID
@@ -1931,13 +1932,13 @@ private struct BASHostRuntimeEBrainMemoryService: BASMemoryServicing {
         )
 
         let conflicts = atoms
-            .filter(\.frozen)
+            .filter { $0.frozen || $0.promotionState == .retired }
             .map {
                 BASMemoryConflictCluster(
                     clusterID: "conflict.\($0.memoryID)",
                     memoryRefs: [$0.memoryID],
                     conflictType: .authorization,
-                    severity: 0.65,
+                    severity: $0.promotionState == .retired ? 0.72 : 0.65,
                     preferredRef: $0.memoryID,
                     unresolved: true
                 )
@@ -1952,13 +1953,95 @@ private struct BASHostRuntimeEBrainMemoryService: BASMemoryServicing {
             samenessWeight: min(0.95, 0.5 + (Double(atoms.count) * 0.05))
         )
 
-        let replay = BASMemoryReplayFrame(
+        var replayFrames = [
+            BASMemoryReplayFrame(
             replayID: "replay.runtime.current",
             targetRefs: atoms.map(\.memoryID),
             replayScope: .arc,
             timeline: atoms.map { "retrieved:\($0.memoryID)" },
             integrityHash: "replay.runtime.current"
         )
+        ]
+
+        let sanctumEntries = atoms
+            .filter(\.frozen)
+            .map { atom in
+                BASMemorySanctumEntry(
+                    entryID: "sanctum.\(atom.memoryID)",
+                    memoryRef: atom.memoryID,
+                    accessPolicy: "revealed_only_by_policy",
+                    revealConditions: [
+                        "host_authorized_recall",
+                        "l12_gentle_hand",
+                        "l14_policy_override"
+                    ]
+                )
+            }
+
+        let quarantineRecords = atoms
+            .filter { $0.promotionState == .retired }
+            .map { atom in
+                BASMemoryQuarantineRecord(
+                    quarantineID: "quarantine.\(atom.memoryID)",
+                    memoryRef: atom.memoryID,
+                    reasonCodes: ["runtime_retired_projection"],
+                    lineageCutRef: "cut.\(atom.memoryID)",
+                    releaseConditions: ["manual_review", "host_reauthorize"]
+                )
+            }
+
+        let forgetCascades = atoms.compactMap { atom -> BASMemoryForgetCascade? in
+            let executionState: String?
+            if atom.frozen {
+                executionState = "freeze_active"
+            } else if atom.promotionState == .retired {
+                executionState = "retired_runtime"
+            } else {
+                executionState = nil
+            }
+
+            guard let executionState else {
+                return nil
+            }
+
+            let replayID: String?
+            if atom.promotionState == .retired {
+                let generatedReplayID = "replay.forget.\(atom.memoryID)"
+                replayFrames.append(
+                    BASMemoryReplayFrame(
+                        replayID: generatedReplayID,
+                        targetRefs: [atom.memoryID],
+                        replayScope: .deletion,
+                        timeline: [
+                            "runtime-retired:\(atom.memoryID)",
+                            "execution:\(executionState)"
+                        ],
+                        integrityHash: generatedReplayID
+                    )
+                )
+                replayID = generatedReplayID
+            } else {
+                replayID = nil
+            }
+
+            return BASMemoryForgetCascade(
+                cascadeID: "forget.\(atom.memoryID)",
+                rootTargets: [atom.memoryID],
+                dependentRefs: orderedUnique(
+                    [
+                        "temp.\(atom.memoryID)",
+                        "seal.\(atom.memoryID)",
+                        atom.frozen ? "sanctum.\(atom.memoryID)" : nil,
+                        atom.promotionState == .retired ? "quarantine.\(atom.memoryID)" : nil,
+                        replayID
+                    ].compactMap { $0 }
+                ),
+                cacheRefs: ["runtime.memory_bundle"],
+                foldRefs: ["fold.runtime.current"],
+                syncRefs: ["host.runtime", hostVersion ?? "host.runtime"],
+                executionState: executionState
+            )
+        }
 
         return BASTemporalMemoryField(
             records: records,
@@ -1967,8 +2050,23 @@ private struct BASHostRuntimeEBrainMemoryService: BASMemoryServicing {
             episodeArcs: [arc],
             conflictClusters: conflicts,
             continuityAnchors: [continuity],
-            replayFrames: [replay]
+            replayFrames: replayFrames,
+            quarantineRecords: quarantineRecords,
+            sanctumEntries: sanctumEntries,
+            forgetCascades: forgetCascades
         )
+    }
+
+    private func runtimeTemperatureBand(
+        for atom: BASMemoryAtom
+    ) -> BASMemoryTemperatureBand {
+        if atom.promotionState == .retired {
+            return .quarantine
+        }
+        if atom.frozen {
+            return .sealed
+        }
+        return temperatureBand(for: atom.contentType)
     }
 
     private func temperatureBand(
@@ -1984,6 +2082,20 @@ private struct BASHostRuntimeEBrainMemoryService: BASMemoryServicing {
         }
     }
 
+    private func runtimeHalfLifeHours(
+        for band: BASMemoryTemperatureBand,
+        contentType: BASMemoryAtomContentType
+    ) -> Double {
+        switch band {
+        case .sealed:
+            1_440
+        case .quarantine:
+            240
+        case .hot, .warm, .cold:
+            halfLifeHours(for: contentType)
+        }
+    }
+
     private func halfLifeHours(
         for contentType: BASMemoryAtomContentType
     ) -> Double {
@@ -1995,6 +2107,77 @@ private struct BASHostRuntimeEBrainMemoryService: BASMemoryServicing {
         case .cold, .rule:
             720
         }
+    }
+
+    private func runtimePromotionRules(
+        for atom: BASMemoryAtom,
+        band: BASMemoryTemperatureBand
+    ) -> [String] {
+        var rules = [atom.contentType == .cold ? "review_gated_cold_only" : "default_projection"]
+        if atom.frozen {
+            rules.append("sealed_runtime_projection")
+        }
+        if atom.promotionState == .retired {
+            rules.append("retired_projection_blocked")
+        }
+        if band == .cold {
+            rules.append("require_provenance_seal")
+        }
+        return orderedUnique(rules)
+    }
+
+    private func runtimeDecayRules(
+        for atom: BASMemoryAtom,
+        band: BASMemoryTemperatureBand
+    ) -> [String] {
+        switch band {
+        case .sealed:
+            ["frozen_until_revealed"]
+        case .quarantine:
+            ["blocked_until_review"]
+        case .hot:
+            ["rapid_decay"]
+        case .warm, .cold:
+            atom.contentType == .hot ? ["rapid_decay"] : ["stage_decay"]
+        }
+    }
+
+    private func runtimeAccessRules(
+        for atom: BASMemoryAtom,
+        band: BASMemoryTemperatureBand
+    ) -> [String] {
+        switch band {
+        case .sealed:
+            ["revealed_only_by_policy"]
+        case .quarantine:
+            ["blocked_from_normal_retrieval"]
+        case .hot, .warm, .cold:
+            atom.frozen ? ["revealed_only_by_policy"] : ["default_recall"]
+        }
+    }
+
+    private func runtimeRiskStateRef(
+        for atom: BASMemoryAtom
+    ) -> String {
+        if atom.promotionState == .retired {
+            return "risk.quarantine"
+        }
+        if atom.frozen {
+            return "risk.protective"
+        }
+        return "risk.standard"
+    }
+
+    private func runtimeSovereignStateRef(
+        for atom: BASMemoryAtom
+    ) -> String {
+        if atom.promotionState == .retired {
+            return "quarantined"
+        }
+        if atom.frozen {
+            return "guarded"
+        }
+        return "standard"
     }
 
     private func temporalMemoryType(

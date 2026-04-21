@@ -418,6 +418,18 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
     }
 
     func testBuilderUsesSharedQueueSignalCopy() {
+        let governanceSummary = BASEvolutionLineageSummary.GovernanceSummary(
+            experienceCandidateCount: 0,
+            shadowTrialCount: 0,
+            pendingShadowTrialCount: 0,
+            sealCount: 0,
+            pendingSealCount: 0,
+            versionDeltaCount: 0,
+            retractionOrderCount: 0,
+            pendingRetractionCount: 0,
+            dreamLoopRemandTargets: ["L9"],
+            dreamLoopReservationMode: "delayRight"
+        )
         let active = makeSnapshot(
             checkpointID: "active-1",
             createdAt: Date(timeIntervalSince1970: 10),
@@ -429,7 +441,8 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
             createdAt: Date(timeIntervalSince1970: 20),
             approvalState: .reviewSuggested,
             hasLineage: true,
-            killSwitches: ["external-tools", "host-write"]
+            killSwitches: ["external-tools", "host-write"],
+            governanceSummary: governanceSummary
         )
         let controlSurface = DecisionEvolutionControlSurface(
             activeCheckpoint: active,
@@ -462,10 +475,12 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
                 )
             )
         )
+        XCTAssertTrue(summary.reasons.contains("Court: agency delay right • remand L9"))
         XCTAssertEqual(
             DecisionEvolutionPendingReviewPresentationSupport.guidanceReasonLines(
                 auditFindings: ["guardrail-review-1"],
-                killSwitches: ["external-tools", "host-write"]
+                killSwitches: ["external-tools", "host-write"],
+                courtLines: ["Court: agency delay right • remand L9"]
             ),
             [
                 DecisionEvolutionReviewPathPresentationSupport.queueKillSwitchReasonLine(
@@ -473,7 +488,8 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
                 ),
                 DecisionEvolutionReviewPathPresentationSupport.queueAuditFindingsReasonLine(
                     auditFindings: ["guardrail-review-1"]
-                )
+                ),
+                "Court: agency delay right • remand L9"
             ]
         )
     }
@@ -515,6 +531,7 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
             pressureLine: nil,
             riskFactorsLine: "Factors: evidence_caveat_load",
             reasonCodesLine: "Reason codes: evidence.caveat",
+            courtLine: "Court: agency delay right • remand L9",
             foldChecksum: "checksum-horizon",
             updateTicketCount: 1,
             auditFindingCount: 1,
@@ -549,6 +566,116 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
         XCTAssertEqual(summary.primaryBlocker, .auditFindings)
         XCTAssertTrue(summary.reasons.contains("Factors: evidence_caveat_load"))
         XCTAssertTrue(summary.reasons.contains("Reason codes: evidence.caveat"))
+        XCTAssertTrue(summary.reasons.contains("Court: agency delay right • remand L9"))
+    }
+
+    func testBuilderCarriesLivePresenceLineSeparatelyFromReleaseReasons() {
+        let active = makeSnapshot(
+            checkpointID: "active-presence-live",
+            createdAt: Date(timeIntervalSince1970: 10),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: nil,
+            pendingReviewQueue: [],
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: ["previous-active-presence-live"]
+        )
+        let presenceLine = "Presence scene high pressure conflict • role manager • power external over host 82% • urgency 84% • route guarded • guard on • continuity highPressureConflict:manager"
+        let eBrainSummary = DecisionSystemEBrainSummary(
+            source: .liveRuntime,
+            runMode: "guarded",
+            taskType: "high_pressure",
+            riskLevel: "high",
+            permitMode: "delay",
+            deviceRoute: "guarded",
+            loopCount: 1,
+            cacheHitRate: 0,
+            hostGatePercent: 37,
+            presenceLine: presenceLine,
+            pressureLine: nil,
+            foldChecksum: "checksum-presence-live",
+            updateTicketCount: 1,
+            auditFindingCount: 0,
+            activeKillSwitches: [],
+            recommendedKillSwitches: [],
+            killSwitches: [],
+            inspectionHeadline: "Presence field active.",
+            blockers: [],
+            layerStackLines: [],
+            checkpointID: nil,
+            checkpointApprovalState: nil,
+            checkpointRollbackReady: nil,
+            checkpointApplyReady: nil
+        )
+
+        let summary = DecisionEvolutionReleaseSummaryBuilder.build(
+            evolutionControlSurface: controlSurface,
+            eBrainSummary: eBrainSummary,
+            dominantBlockers: [],
+            activeKillSwitches: [],
+            recommendedKillSwitchesHint: []
+        )
+
+        XCTAssertEqual(summary.presenceLine, presenceLine)
+        XCTAssertFalse(summary.reasons.contains(presenceLine))
+    }
+
+    func testBuilderCarriesPersistedPresenceLineWhenCheckpointMatchesActivePath() {
+        let active = makeSnapshot(
+            checkpointID: "active-presence-persisted",
+            createdAt: Date(timeIntervalSince1970: 10),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: nil,
+            pendingReviewQueue: [],
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: ["previous-active-presence-persisted"]
+        )
+        let presenceLine = "Presence scene high pressure conflict • role manager • power external over host 82% • urgency 84% • route guarded • guard on • continuity highPressureConflict:manager"
+        let eBrainSummary = DecisionSystemEBrainSummary(
+            source: .persistedCheckpoint,
+            runMode: "guarded",
+            taskType: "high_pressure",
+            riskLevel: "high",
+            permitMode: "delay",
+            deviceRoute: "guarded",
+            loopCount: 1,
+            cacheHitRate: 0,
+            hostGatePercent: 37,
+            presenceLine: presenceLine,
+            pressureLine: nil,
+            foldChecksum: "checksum-presence-persisted",
+            updateTicketCount: 1,
+            auditFindingCount: 0,
+            activeKillSwitches: [],
+            recommendedKillSwitches: [],
+            killSwitches: [],
+            inspectionHeadline: "Persisted presence field active.",
+            blockers: [],
+            layerStackLines: [],
+            checkpointID: "active-presence-persisted",
+            checkpointApprovalState: "Automatic",
+            checkpointRollbackReady: true,
+            checkpointApplyReady: true
+        )
+
+        let summary = DecisionEvolutionReleaseSummaryBuilder.build(
+            evolutionControlSurface: controlSurface,
+            eBrainSummary: eBrainSummary,
+            dominantBlockers: [],
+            activeKillSwitches: [],
+            recommendedKillSwitchesHint: []
+        )
+
+        XCTAssertEqual(summary.presenceLine, presenceLine)
     }
 
     func testBuilderPromotesLiveExecutionCapabilityAndHorizonLinesToWatchingAuditFindings() {
@@ -657,7 +784,7 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
             recommendedKillSwitches: [],
             killSwitches: [],
             sovereignVerdictLine: "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
-            sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session",
+            sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session",
             sovereignAuditLine: "Sovereign audit • BR-SOV-004 • ref audit.session-l14",
             inspectionHeadline: "Sovereign posture active.",
             blockers: [],
@@ -683,7 +810,7 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
         )
         XCTAssertEqual(summary.primaryBlocker, .auditFindings)
         XCTAssertTrue(summary.reasons.contains("Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine"))
-        XCTAssertTrue(summary.reasons.contains("Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session"))
+        XCTAssertTrue(summary.reasons.contains("Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session"))
         XCTAssertTrue(summary.reasons.contains("Sovereign audit • BR-SOV-004 • ref audit.session-l14"))
     }
 
@@ -1135,7 +1262,7 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
             reasons: [
                 "Factors: evidence_caveat_load",
                 "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
-                "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session",
+                "Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session",
                 "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
             ],
             activeKillSwitches: [],
@@ -1169,7 +1296,7 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
             presentation.sovereignPostureLines,
             [
                 "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
-                "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session",
+                "Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session",
                 "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
             ]
         )
@@ -1194,6 +1321,7 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
                 executionCapabilityFrame.temporalLine,
                 executionCapabilityFrame.evidenceLine,
                 executionCapabilityFrame.persistenceLine,
+                "Court: agency delay right • remand L9",
                 "Factors: evidence_caveat_load"
             ],
             activeKillSwitches: [],
@@ -1228,7 +1356,49 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
                 executionCapabilityFrame.horizonLine,
                 executionCapabilityFrame.temporalLine,
                 executionCapabilityFrame.evidenceLine,
-                executionCapabilityFrame.persistenceLine
+                executionCapabilityFrame.persistenceLine,
+                "Court: agency delay right • remand L9"
+            ]
+        )
+    }
+
+    func testPresentationBuildSurfacesPresenceFieldWithoutStealingPrimaryReason() {
+        let summary = DecisionSystemReleaseControlSummary(
+            state: .watch,
+            headline: "Watching audit findings before wider rollout",
+            reasons: [
+                "Factors: evidence_caveat_load"
+            ],
+            activeKillSwitches: [],
+            recommendedKillSwitches: [],
+            killSwitches: [],
+            pendingReviewCount: 0,
+            rollbackReadyCount: 0,
+            canRestoreActiveCheckpoint: false,
+            canRollbackActiveCheckpoint: false,
+            activeCheckpointID: nil,
+            activeCheckpointSource: .none,
+            reviewCheckpointID: nil,
+            presenceLine: "Presence scene high pressure conflict • role manager • power external over host 82% • urgency 84% • route guarded • guard on • continuity highPressureConflict:manager"
+        )
+
+        let presentation = DecisionEvolutionReleaseSummaryPresentation.build(
+            releaseSummary: summary,
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: nil,
+                reviewCheckpoint: nil,
+                pendingReviewQueue: [],
+                latestPersistedLineage: nil
+            ),
+            presentationMode: .surface
+        )
+
+        XCTAssertEqual(presentation.primaryReason, "Factors: evidence_caveat_load")
+        XCTAssertEqual(presentation.presenceTitle, "Presence field")
+        XCTAssertEqual(
+            presentation.presenceLines,
+            [
+                "Presence scene high pressure conflict • role manager • power external over host 82% • urgency 84% • route guarded • guard on • continuity highPressureConflict:manager"
             ]
         )
     }
@@ -1242,6 +1412,7 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
                 "L8 temporal field • records 1 • arcs 1 • conflicts 1",
                 "L7-L9 cognition • facts 1 • goals 1 • memory 1 • candidates 1/forecasts 1/critiques 1",
                 "L9 dream loop • stop sovereign cut • reserve no auto merge • remand L14 • debt 81% • signals breakpoint",
+                "L11 wind gate • primary delay • assert guarded • delay cool_down • substitute draft • sovereign elevated",
                 "L13 governance • candidates 1 • shadow 1 pending/1 • seal 1 pending/1 • version 1 • retract 1 pending/1 • gate hold",
                 "L13 version tree • rule rule.ready • rollback rollback.rule.ready",
                 "L13 retraction • pending rule.pending • reason evolution.shadow_trial_pending",
@@ -1278,6 +1449,7 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
                 "L8 temporal field • records 1 • arcs 1 • conflicts 1",
                 "L7-L9 cognition • facts 1 • goals 1 • memory 1 • candidates 1/forecasts 1/critiques 1",
                 "L9 dream loop • stop sovereign cut • reserve no auto merge • remand L14 • debt 81% • signals breakpoint",
+                "Wind gate primary delay • assert guarded • delay cool down • substitute draft • sovereign elevated",
                 "L13 governance • candidates 1 • shadow 1 pending/1 • seal 1 pending/1 • version 1 • retract 1 pending/1 • gate hold",
                 "L13 version tree • rule rule.ready • rollback rollback.rule.ready",
                 "L13 retraction • pending rule.pending • reason evolution.shadow_trial_pending"
@@ -1431,12 +1603,10 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
         let presentation = DecisionEvolutionReleaseSummaryPresentation.build(
             releaseSummary: summary,
             controlSurface: controlSurface,
-            presentationMode: .surface
+            presentationMode: .surface,
+            surfaceContract: .controlCenter
         )
-        let furnaceWorkbenchPresentation = DecisionEvolutionFurnaceWorkbenchPresentationSupport.build(
-            detail: presentation.furnaceNextStepDetail,
-            controlSurface: controlSurface
-        )
+        let furnaceWorkbenchPresentation = presentation.furnaceWorkbenchPresentation
 
         XCTAssertEqual(presentation.furnaceContributionTitle, "Furnace fabric")
         XCTAssertEqual(
@@ -1459,6 +1629,14 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
         )
         XCTAssertEqual(presentation.furnaceNextStepTitle, "Recommended next step")
         XCTAssertEqual(presentation.furnaceNextStepDetail, "Review the pending shadow trial before promotion or approval.")
+        XCTAssertEqual(
+            presentation.furnaceNextStepAction?.actionTitle,
+            "Inspect quick actions"
+        )
+        XCTAssertEqual(
+            presentation.furnaceNextStepAction?.kind,
+            .focusMutationHub(.quickActions)
+        )
         XCTAssertEqual(furnaceWorkbenchPresentation?.title, "Furnace workbench")
         XCTAssertEqual(
             furnaceWorkbenchPresentation?.headline,
@@ -1479,6 +1657,31 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
                 "Rollback active path is waiting for a restorable previous checkpoint.",
                 "Approve review queue is waiting for pending review checkpoints."
             ]
+        )
+        XCTAssertEqual(furnaceWorkbenchPresentation?.focusTarget, .quickActions)
+        XCTAssertEqual(
+            furnaceWorkbenchPresentation?.nextStepAction,
+            presentation.furnaceNextStepAction
+        )
+        XCTAssertEqual(
+            furnaceWorkbenchPresentation?.executionState.headline,
+            "Restore active path is ready for guarded preview."
+        )
+        XCTAssertTrue(
+            furnaceWorkbenchPresentation?.executionState.lines.contains("Targets: active-workbench") == true
+        )
+        XCTAssertTrue(
+            furnaceWorkbenchPresentation?.executionState.lines.contains(
+                "Active: active-workbench → active-workbench"
+            ) == true
+        )
+        XCTAssertEqual(
+            furnaceWorkbenchPresentation?.runNowAction?.actionTitle,
+            DecisionEvolutionMutationHubPresentationSupport.restoreActivePathTitle
+        )
+        XCTAssertEqual(
+            furnaceWorkbenchPresentation?.runNowAction?.intent.kind,
+            .restoreActiveCheckpoint
         )
     }
 
@@ -1575,6 +1778,119 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
         XCTAssertEqual(action?.kind, .focusMutationHub(.quickActions))
     }
 
+    func testFurnaceReviewPresentationSupportBuildsSharedBundle() {
+        let active = makeSnapshot(
+            checkpointID: "active-bundle",
+            createdAt: Date(timeIntervalSince1970: 10),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: nil,
+            pendingReviewQueue: [],
+            latestPersistedLineage: nil
+        )
+
+        let bundle = DecisionEvolutionFurnaceReviewPresentationSupport.build(
+            reasons: [
+                "L13 governance • candidates 1 • shadow 1 pending/1 • seal 1 pending/1 • version 1 • retract 1 pending/1 • gate hold",
+                "L13 version tree • rule rule.ready • rollback rollback.rule.ready",
+                "L13 retraction • pending rule.pending • reason evolution.shadow_trial_pending"
+            ],
+            controlSurface: controlSurface,
+            surfaceContract: .controlCenter
+        )
+
+        XCTAssertEqual(
+            bundle.checklistLines,
+            [
+                "Review the pending shadow trial before promotion or approval.",
+                "Review the pending evolution seal before promotion or approval.",
+                "Inspect the version tree delta and rollback pointer before wider rollout.",
+                "Clear the pending retraction order before wider rollout."
+            ]
+        )
+        XCTAssertEqual(
+            bundle.nextStepDetail,
+            "Review the pending shadow trial before promotion or approval."
+        )
+        XCTAssertEqual(
+            bundle.nextStepAction,
+            DecisionEvolutionFurnaceNextStepActionPresentation(
+                actionTitle: "Inspect quick actions",
+                kind: .focusMutationHub(.quickActions)
+            )
+        )
+        XCTAssertEqual(
+            bundle.workbenchPresentation?.detail,
+            bundle.nextStepDetail
+        )
+        XCTAssertEqual(
+            bundle.workbenchPresentation?.nextStepAction,
+            bundle.nextStepAction
+        )
+    }
+
+    func testFurnacePresentationSupportBuildsContributionAndReviewBundle() {
+        let active = makeSnapshot(
+            checkpointID: "active-furnace-bundle",
+            createdAt: Date(timeIntervalSince1970: 10),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: nil,
+            pendingReviewQueue: [],
+            latestPersistedLineage: nil
+        )
+
+        let bundle = DecisionEvolutionFurnacePresentationSupport.build(
+            reasons: [
+                "L8 temporal field • records 1 • arcs 1 • conflicts 1",
+                "L13 governance • candidates 1 • shadow 1 pending/1 • seal 1 pending/1 • version 1 • retract 1 pending/1 • gate hold",
+                "L13 version tree • rule rule.ready • rollback rollback.rule.ready",
+                "L13 retraction • pending rule.pending • reason evolution.shadow_trial_pending"
+            ],
+            controlSurface: controlSurface,
+            surfaceContract: .controlCenter
+        )
+
+        XCTAssertEqual(
+            bundle.contributionLines,
+            [
+                "L8 temporal field • records 1 • arcs 1 • conflicts 1",
+                "L13 governance • candidates 1 • shadow 1 pending/1 • seal 1 pending/1 • version 1 • retract 1 pending/1 • gate hold",
+                "L13 version tree • rule rule.ready • rollback rollback.rule.ready",
+                "L13 retraction • pending rule.pending • reason evolution.shadow_trial_pending"
+            ]
+        )
+        XCTAssertEqual(bundle.contributionSection?.title, "Furnace fabric")
+        XCTAssertEqual(
+            bundle.review.checklistSection?.title,
+            "Furnace review checklist"
+        )
+        XCTAssertEqual(
+            bundle.review.nextStepSection?.title,
+            "Recommended next step"
+        )
+        XCTAssertEqual(
+            bundle.review.nextStepDetail,
+            "Review the pending shadow trial before promotion or approval."
+        )
+        XCTAssertEqual(
+            bundle.review.nextStepSection?.action?.actionTitle,
+            "Inspect quick actions"
+        )
+        XCTAssertEqual(
+            bundle.review.workbenchPresentation?.detail,
+            bundle.review.nextStepDetail
+        )
+    }
+
     func testFurnaceRunNowActionSupportPrefersApproveQueueForQuickActionWorkbench() {
         let active = makeSnapshot(
             checkpointID: "active-run-now",
@@ -1658,6 +1974,117 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
         )
 
         XCTAssertNil(action)
+    }
+
+    func testFurnaceExecutionStateSupportBuildsReadyPreviewForQuickActionWorkbench() {
+        let active = makeSnapshot(
+            checkpointID: "active-execution-state",
+            createdAt: Date(timeIntervalSince1970: 10),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let review = makeSnapshot(
+            checkpointID: "review-execution-state",
+            createdAt: Date(timeIntervalSince1970: 20),
+            approvalState: .reviewSuggested,
+            hasLineage: true
+        )
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: active,
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: review,
+            pendingReviewQueue: [review],
+            latestPersistedLineage: nil,
+            restorableCheckpointIDs: ["active-execution-state-prior"]
+        )
+
+        let executionState = DecisionEvolutionFurnaceExecutionStateSupport.build(
+            detail: "Review the pending shadow trial before promotion or approval.",
+            controlSurface: controlSurface,
+            surfaceContract: .controlCenter
+        )
+
+        XCTAssertEqual(executionState?.title, "Execution state")
+        XCTAssertEqual(
+            executionState?.headline,
+            "Approve review queue is ready for guarded preview."
+        )
+        XCTAssertEqual(
+            executionState?.lines,
+            [
+                "Review-queue mutation.",
+                "Empty the review queue without restoring or rewriting the active brain state.",
+                "Targets: review-execution-state",
+                "Active: active-execution-state → active-execution-state",
+                "Review: review-execution-state → none",
+                "Watch: Approval does not clear kill-switch recommendations or lineage facts."
+            ]
+        )
+    }
+
+    func testFurnaceExecutionStateSupportBuildsBlockedPreviewForMutationSurface() {
+        let executionState = DecisionEvolutionFurnaceExecutionStateSupport.build(
+            detail: "Review the pending shadow trial before promotion or approval.",
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: nil,
+                reviewCheckpoint: nil,
+                pendingReviewQueue: [],
+                latestPersistedLineage: nil
+            ),
+            surfaceContract: .controlCenter
+        )
+
+        XCTAssertEqual(executionState?.title, "Execution state")
+        XCTAssertEqual(
+            executionState?.headline,
+            "Direct run-now preview is blocked right now."
+        )
+        XCTAssertEqual(
+            executionState?.lines,
+            [
+                "Approve review queue is waiting for pending review checkpoints.",
+                "Inspect quick actions to inspect the holding lane."
+            ]
+        )
+    }
+
+    func testFurnaceExecutionStateSupportBuildsReadOnlyPreviewForReadFirstSurface() {
+        let controlSurface = DecisionEvolutionControlSurface(
+            activeCheckpoint: makeSnapshot(
+                checkpointID: "active-read-only-execution-state",
+                createdAt: Date(timeIntervalSince1970: 10),
+                approvalState: .automatic,
+                hasLineage: true
+            ),
+            activeCheckpointSource: .pinnedHint,
+            reviewCheckpoint: makeSnapshot(
+                checkpointID: "review-read-only-execution-state",
+                createdAt: Date(timeIntervalSince1970: 20),
+                approvalState: .reviewSuggested,
+                hasLineage: true
+            ),
+            pendingReviewQueue: [],
+            latestPersistedLineage: nil
+        )
+
+        let executionState = DecisionEvolutionFurnaceExecutionStateSupport.build(
+            detail: "Review the pending shadow trial before promotion or approval.",
+            controlSurface: controlSurface,
+            surfaceContract: .home
+        )
+
+        XCTAssertEqual(executionState?.title, "Execution state")
+        XCTAssertEqual(
+            executionState?.headline,
+            "Direct run-now preview stays on the writable surface."
+        )
+        XCTAssertEqual(
+            executionState?.lines,
+            [
+                "This surface stays read-first for furnace mutations.",
+                "Open control center to inspect the current furnace step before mutating the path."
+            ]
+        )
     }
 
     func testActionSupportUsesMutationHubQuickActionsWhenLocalMutationsAreAllowed() {
@@ -1859,7 +2286,8 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
         createdAt: Date,
         approvalState: DecisionEvolutionApprovalState,
         hasLineage: Bool,
-        killSwitches: [String] = []
+        killSwitches: [String] = [],
+        governanceSummary: BASEvolutionLineageSummary.GovernanceSummary? = nil
     ) -> DecisionReviewCheckpointSnapshot {
         let eBrainSummary: DeveloperDecisionReplayEBrainSummary? = if hasLineage {
             DeveloperDecisionReplayEBrainSummary(
@@ -1874,7 +2302,8 @@ final class DecisionEvolutionReleaseSummaryBuilderTests: XCTestCase {
                     updateTicketSummaries: ["ticket-\(checkpointID)"],
                     activeKillSwitches: [],
                     guardrailFindings: ["guardrail-\(checkpointID)"],
-                    recommendedKillSwitches: killSwitches
+                    recommendedKillSwitches: killSwitches,
+                    governanceSummary: governanceSummary
                 )
             )
         } else {

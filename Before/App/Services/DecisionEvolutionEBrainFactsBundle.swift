@@ -102,6 +102,8 @@ struct DecisionEvolutionEBrainFactsBundle: Equatable, Sendable {
     let brainSummaryLine: String
     let riskFactorsLine: String?
     let reasonCodesLine: String?
+    let cognitionLine: String?
+    let mirrorCalibrationLine: String?
     let courtLine: String?
     let executionCapabilityLine: String?
     let horizonLine: String?
@@ -115,6 +117,7 @@ struct DecisionEvolutionEBrainFactsBundle: Equatable, Sendable {
     let budgetLine: String?
     let pressureLine: String?
     let taskLine: String?
+    let actionLine: String?
     let auditLine: String?
     let sovereignVerdictLine: String?
     let sovereignAuthorityLine: String?
@@ -143,10 +146,17 @@ struct DecisionEvolutionEBrainFactsBundle: Equatable, Sendable {
     }
 }
 
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
+}
+
 struct DecisionEvolutionReplayCheckpointFacts: Equatable, Sendable {
     let budgetLine: String
     let pressureLine: String
     let taskLine: String?
+    let actionLine: String?
     let windGateLine: String?
     let layerStackLines: [String]
 }
@@ -155,12 +165,15 @@ struct DecisionEvolutionSessionCheckpointFacts: Equatable, Sendable {
     let budgetConstraintLine: String
     let routeConstraintLine: String
     let decisionFactLines: [String]
+    let cognitionFactLine: String?
+    let mirrorCalibrationFactLine: String?
     let pressureFactLine: String?
     let riskFactorsLine: String?
     let reasonCodesLine: String?
     let auditFactLine: String?
     let activeKillSwitchesFactLine: String?
     let recommendedKillSwitchesFactLine: String?
+    let actionFactLine: String?
     let openTaskLines: [String]
     let currentScope: [String]
     let shouldUseReviewMode: Bool
@@ -219,11 +232,92 @@ enum DecisionEvolutionEBrainPresentationSupport {
             .lowercased()
     }
 
+    static func humanizedWindGateDetail(_ detail: String) -> String {
+        detail
+            .components(separatedBy: " • ")
+            .map(humanizedWindGateSegment)
+            .joined(separator: " • ")
+    }
+
+    static func windGateMetadataLine(
+        rawLine: String?,
+        displayPrefix: String = "Wind gate",
+        activeFallback: String = "Wind gate active"
+    ) -> String? {
+        guard let rawLine = rawLine?.evolutionTrimmedNonEmpty else {
+            return nil
+        }
+
+        guard rawLine.hasPrefix("L11 wind gate") else {
+            return rawLine
+        }
+
+        let components = rawLine.components(separatedBy: " • ")
+        guard components.count > 1 else {
+            return activeFallback
+        }
+
+        let detail = humanizedWindGateDetail(
+            components.dropFirst().joined(separator: " • ")
+        ).evolutionTrimmedNonEmpty
+
+        return detail.map { "\(displayPrefix) \($0)" } ?? activeFallback
+    }
+
+    private static func humanizedWindGateSegment(_ segment: String) -> String {
+        let trimmedSegment = segment.evolutionTrimmedNonEmpty ?? segment
+        let prefixes = ["primary ", "stacked ", "allow ", "block ", "delay ", "substitute "]
+
+        guard let prefix = prefixes.first(where: { trimmedSegment.hasPrefix($0) }) else {
+            return trimmedSegment
+        }
+
+        let rawValues = String(trimmedSegment.dropFirst(prefix.count))
+        let humanizedValues = rawValues
+            .split(separator: ",", omittingEmptySubsequences: false)
+            .map { token in
+                taskTitle(String(token))
+            }
+            .joined(separator: ", ")
+            .evolutionTrimmedNonEmpty ?? rawValues
+
+        return "\(prefix)\(humanizedValues)"
+    }
+
+    static func titledSegment(
+        _ label: String,
+        rawValue: String?
+    ) -> String? {
+        guard let rawValue = rawValue?.evolutionTrimmedNonEmpty else {
+            return nil
+        }
+
+        return "\(label) \(taskTitle(rawValue))"
+    }
+
     static func riskPermitLine(
         riskLevel: String,
         permitMode: String
     ) -> String {
         "\(displayToken(riskLevel)) → \(displayToken(permitMode))"
+    }
+
+    static func courtLine(from mergedChoice: BASMergedChoice) -> String? {
+        let summary = courtSummary(
+            vetoApplied: mergedChoice.vetoApplied,
+            vetoReasonCodes: mergedChoice.vetoReasonCodes,
+            agencyReservation: mergedChoice.agencyReservation,
+            remandOrders: mergedChoice.remandOrders,
+            courtDecisionDraft: mergedChoice.courtDecisionDraft
+        )
+        guard let summary else { return nil }
+        return "Court: \(summary)"
+    }
+
+    static func courtLine(from lineageSummary: BASEvolutionLineageSummary) -> String? {
+        let summary = checkpointCourtSummary(from: lineageSummary.governanceSummary)
+        guard let summary else { return nil }
+        return "Court: \(summary)"
     }
 
     static func furnaceContributionLines(
@@ -309,6 +403,101 @@ enum DecisionEvolutionEBrainPresentationSupport {
             }
             uniqueValues.append(trimmedValue)
         }
+    }
+
+    private static func courtSummary(
+        vetoApplied: Bool,
+        vetoReasonCodes: [String],
+        agencyReservation: BASAgencyReservation?,
+        remandOrders: [BASRemandOrder]?,
+        courtDecisionDraft: BASCourtDecisionDraft?
+    ) -> String? {
+        var segments: [String] = []
+        if vetoApplied {
+            let vetoSummary = vetoReasonSummary(reasonCodes: vetoReasonCodes)
+            segments.append(vetoSummary.isEmpty ? "veto" : "veto \(vetoSummary)")
+        }
+        if let agencyReservation {
+            segments.append(
+                "agency \(agencyReservation.mode.rawValue.replacingOccurrences(of: "([A-Z])", with: " $1", options: .regularExpression).lowercased())"
+            )
+        }
+        if let remandOrders,
+           remandOrders.isEmpty == false {
+            segments.append(
+                "remand \(remandOrders.map(\.targetLayer).joined(separator: ", "))"
+            )
+        }
+        if let disclosure = courtSummarySnippet(courtDecisionDraft?.requiredDisclosures.first) {
+            segments.append("disclose \(disclosure)")
+        }
+        if let unresolvedCost = courtSummarySnippet(courtDecisionDraft?.unresolvedCosts.first) {
+            segments.append("cost \(unresolvedCost)")
+        }
+        guard segments.isEmpty == false else { return nil }
+        return segments.joined(separator: " • ")
+    }
+
+    private static func checkpointCourtSummary(
+        from governanceSummary: BASEvolutionLineageSummary.GovernanceSummary?
+    ) -> String? {
+        guard let governanceSummary else {
+            return nil
+        }
+
+        var segments: [String] = []
+        if let reservationMode = humanizedCourtMode(governanceSummary.dreamLoopReservationMode) {
+            segments.append("agency \(reservationMode)")
+        }
+
+        let remandTargets = orderedUniqueNonEmpty(
+            governanceSummary.dreamLoopRemandTargets.map(Optional.some)
+        )
+        if remandTargets.isEmpty == false {
+            segments.append("remand \(remandTargets.joined(separator: ", "))")
+        }
+
+        guard segments.isEmpty == false else {
+            return nil
+        }
+
+        return segments.joined(separator: " • ")
+    }
+
+    private static func vetoReasonSummary(reasonCodes: [String]) -> String {
+        let details = reasonCodes.compactMap { code -> String? in
+            switch code {
+            case "triself.superego_veto":
+                nil
+            case "triself.high_risk_direct_path":
+                "high-risk direct path"
+            case "triself.protective_boundary":
+                "protective boundary"
+            case "triself.calibration_drifting":
+                "calibration drifting"
+            default:
+                code
+            }
+        }
+        return details.joined(separator: ", ")
+    }
+
+    private static func courtSummarySnippet(_ text: String?) -> String? {
+        guard let text = text?.evolutionTrimmedNonEmpty else { return nil }
+        let trimmed = text.count > 52 ? "\(text.prefix(49))..." : text
+        return trimmed.replacingOccurrences(of: "\n", with: " ")
+    }
+
+    private static func humanizedCourtMode(_ rawValue: String?) -> String? {
+        rawValue?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(
+                of: "([A-Z])",
+                with: " $1",
+                options: .regularExpression
+            )
+            .lowercased()
+            .evolutionTrimmedNonEmpty
     }
 
     private static func firstLayerStackLine(
@@ -448,26 +637,164 @@ enum DecisionEvolutionEBrainPresentationSupport {
         critiqueCount: Int,
         stopReasonID: String?
     ) -> String {
-        DecisionEvolutionNarrativeFormattingSupport.joined([
+        let pressureSegment = pressureSummary?.evolutionTrimmedNonEmpty.map {
+            "pressures \(taskTitle($0))"
+        }
+        let manipulationSegment = manipulationSummary?.evolutionTrimmedNonEmpty.map {
+            "manipulation \(taskTitle($0))"
+        }
+        let boundarySegment = boundarySummary?.evolutionTrimmedNonEmpty.map {
+            "boundaries \(taskTitle($0))"
+        }
+        let mirrorSegment = mirrorModeID?.evolutionTrimmedNonEmpty.map {
+            "mirror \(taskTitle($0))"
+        }
+        let routeSegment = routeHint?.evolutionTrimmedNonEmpty.map {
+            "route \(taskTitle($0))"
+        }
+        let stopSegment = stopReasonID.map { "stop \($0)" }
+
+        return DecisionEvolutionNarrativeFormattingSupport.joined([
             "L7-L9 cognition",
             "facts \(factCount)",
             "goals \(goalCount)",
             claimCount.map { "claims \($0)" },
             "unknowns \(unknownCount)",
             "contradictions \(contradictionCount)",
-            pressureSummary?.evolutionTrimmedNonEmpty.map { "pressures \(taskTitle($0))" },
-            manipulationSummary?.evolutionTrimmedNonEmpty.map { "manipulation \(taskTitle($0))" },
-            boundarySummary?.evolutionTrimmedNonEmpty.map { "boundaries \(taskTitle($0))" },
-            mirrorModeID?.evolutionTrimmedNonEmpty.map { "mirror \(taskTitle($0))" },
-            routeHint?.evolutionTrimmedNonEmpty.map { "route \(taskTitle($0))" },
+            pressureSegment,
+            manipulationSegment,
+            boundarySegment,
+            mirrorSegment,
+            routeSegment,
             "memory \(memoryAtomCount)",
             "candidates \(candidateCount)/forecasts \(forecastCount)/critiques \(critiqueCount)",
-            stopReasonID.map { "stop \($0)" }
+            stopSegment
         ].compactMap { $0 })
     }
 
     static func fallbackCognitionLayerStackLine() -> String {
         "L7-L9 cognition • recovered checkpoint lineage"
+    }
+
+    static func cognitionDetailLine(
+        decomposeFrame: BASDecomposeFrame
+    ) -> String? {
+        let goalSpine = decomposeFrame.goalSpineLocal
+        let surfaceGoal = goalSpine?.surfaceGoals.first?.evolutionTrimmedNonEmpty
+        let midGoal = goalSpine?.midGoals.first?.evolutionTrimmedNonEmpty
+        let deepGoal = goalSpine?.deepGoals.first?.evolutionTrimmedNonEmpty
+        let blockingUnknownCount = decomposeFrame.unknownRecords.filter(\.blocking).count
+        let contradictionKinds = orderedUniqueNonEmpty(
+            decomposeFrame.contradictionRecords.map { taskTitle($0.kind.rawValue) }
+        )
+        let contradictionSummary = Array(contradictionKinds.prefix(2))
+            .joined(separator: ", ")
+            .evolutionTrimmedNonEmpty
+        let line = DecisionEvolutionNarrativeFormattingSupport.joined([
+            "L7 mirror blade",
+            surfaceGoal.map { "surface \(Self.condensedSnippet($0, limit: 32))" },
+            midGoal == nil || midGoal == surfaceGoal ? nil : midGoal.map {
+                "mid \(Self.condensedSnippet($0, limit: 32))"
+            },
+            deepGoal == nil || deepGoal == midGoal || deepGoal == surfaceGoal ? nil : deepGoal.map {
+                "deep \(Self.condensedSnippet($0, limit: 32))"
+            },
+            goalSpine.map { "align \(Int(($0.hostAlignmentScore * 100).rounded()))%" },
+            goalSpine?.conflicts.first?.evolutionTrimmedNonEmpty.map {
+                "conflict \(Self.condensedSnippet($0, limit: 28))"
+            },
+            decomposeFrame.claimShards.isEmpty ? nil : "claims \(decomposeFrame.claimShards.count)",
+            blockingUnknownCount > 0 ? "blocking \(blockingUnknownCount)" : nil,
+            contradictionSummary.map { "contradictions \($0)" }
+        ].compactMap { $0 })
+        return line.evolutionTrimmedNonEmpty
+    }
+
+    static func mirrorCalibrationLine(
+        mirrorModeID: String?,
+        routeHint: String?,
+        calibrationPointCount: Int? = nil,
+        omittedSpeculationCount: Int? = nil,
+        toneGuard: String? = nil,
+        pressureSummary: String? = nil,
+        manipulationSummary: String? = nil,
+        boundarySummary: String? = nil
+    ) -> String? {
+        var segments = ["L7 calibration"]
+        if let mirrorSegment = titledSegment("mirror", rawValue: mirrorModeID) {
+            segments.append(mirrorSegment)
+        }
+        if let routeSegment = titledSegment("route", rawValue: routeHint) {
+            segments.append(routeSegment)
+        }
+        if let count = calibrationPointCount, count > 0 {
+            segments.append("points \(count)")
+        }
+        if let count = omittedSpeculationCount, count > 0 {
+            segments.append("omitted \(count)")
+        }
+        if let toneSegment = titledSegment("tone", rawValue: toneGuard) {
+            segments.append(toneSegment)
+        }
+        if let pressureSegment = titledSegment("pressures", rawValue: pressureSummary) {
+            segments.append(pressureSegment)
+        }
+        if let manipulationSegment = titledSegment("watch", rawValue: manipulationSummary) {
+            segments.append(manipulationSegment)
+        }
+        if let boundarySegment = titledSegment("boundaries", rawValue: boundarySummary) {
+            segments.append(boundarySegment)
+        }
+        let line = DecisionEvolutionNarrativeFormattingSupport.joined(segments)
+        return line.evolutionTrimmedNonEmpty
+    }
+
+    static func mirrorCalibrationLine(
+        decomposeFrame: BASDecomposeFrame
+    ) -> String? {
+        let mirrorDraft = decomposeFrame.mirrorDraft
+        let canonicalFrame = decomposeFrame.canonicalFrame
+        let pressureTokens = decomposeFrame.pressureVectors.isEmpty
+            ? (canonicalFrame?.keyPressures ?? [])
+            : decomposeFrame.pressureVectors.map { $0.kind.rawValue }
+        let manipulationTokens = decomposeFrame.manipulationPatterns.isEmpty
+            ? (canonicalFrame?.manipulationWatch ?? [])
+            : decomposeFrame.manipulationPatterns.map { $0.kind.rawValue }
+        let boundaryTokens = decomposeFrame.boundaryTouches.isEmpty
+            ? (canonicalFrame?.boundaryWatch ?? [])
+            : decomposeFrame.boundaryTouches.map { "\($0.domain.rawValue):\($0.level.rawValue)" }
+        let pressureSummary = orderedUniqueNonEmpty(
+            pressureTokens.map(taskTitle(_:))
+        )
+        let manipulationSummary = orderedUniqueNonEmpty(
+            manipulationTokens.map(taskTitle(_:))
+        )
+        let boundarySummary = orderedUniqueNonEmpty(
+            boundaryTokens.map(taskTitle(_:))
+        )
+        let pressurePreview = Array(pressureSummary.prefix(2))
+            .joined(separator: ", ")
+            .evolutionTrimmedNonEmpty
+        let manipulationPreview = Array(manipulationSummary.prefix(2))
+            .joined(separator: ", ")
+            .evolutionTrimmedNonEmpty
+        let boundaryPreview = Array(boundarySummary.prefix(2))
+            .joined(separator: ", ")
+            .evolutionTrimmedNonEmpty
+        return mirrorCalibrationLine(
+            mirrorModeID: mirrorDraft?.mode.rawValue,
+            routeHint: canonicalFrame?.routeHint,
+            calibrationPointCount: mirrorDraft?.calibrationPoints.isEmpty == false
+                ? mirrorDraft?.calibrationPoints.count
+                : nil,
+            omittedSpeculationCount: mirrorDraft?.omittedSpeculations.isEmpty == false
+                ? mirrorDraft?.omittedSpeculations.count
+                : nil,
+            toneGuard: mirrorDraft?.toneGuard,
+            pressureSummary: pressurePreview,
+            manipulationSummary: manipulationPreview,
+            boundarySummary: boundaryPreview
+        )
     }
 
     static func neuralProjectionSummary(
@@ -767,6 +1094,9 @@ struct DecisionEvolutionTurnDiagnosticsSupport: Equatable, Sendable {
     let layerStackLines: [String]
     let riskFactorsLine: String?
     let reasonCodesLine: String?
+    let courtLine: String?
+    let cognitionLine: String?
+    let mirrorCalibrationLine: String?
     let ticketSummary: String?
 }
 
@@ -781,6 +1111,8 @@ extension DecisionEvolutionEBrainFactsBundle {
             brainSummaryLine: brainSummaryLine,
             riskFactorsLine: riskFactorsLine,
             reasonCodesLine: reasonCodesLine,
+            cognitionLine: cognitionLine,
+            mirrorCalibrationLine: mirrorCalibrationLine,
             courtLine: courtLine,
             executionCapabilityLine: executionCapabilityLine ?? executionCapabilityFrame?.detailLine,
             horizonLine: horizonLine ?? executionCapabilityFrame?.horizonLine,
@@ -794,6 +1126,7 @@ extension DecisionEvolutionEBrainFactsBundle {
             budgetLine: budgetLine,
             pressureLine: pressureLine,
             taskLine: taskLine,
+            actionLine: actionLine,
             auditLine: auditLine,
             sovereignVerdictLine: sovereignVerdictLine,
             sovereignAuthorityLine: sovereignAuthorityLine,
@@ -838,10 +1171,54 @@ extension DecisionEvolutionEBrainFactsBundle {
         return "\(prefix) \(presencePayload)"
     }
 
+    func displayCognitionLine(prefix: String = "Cognition") -> String? {
+        guard let payload = cognitionLine?
+            .droppingKnownPrefix("L7 mirror blade • ")
+            .droppingKnownPrefix("L7 mirror blade")
+            .evolutionTrimmedNonEmpty else {
+            return nil
+        }
+        return "\(prefix) \(payload)"
+    }
+
+    func sessionCheckpointCognitionFactLine(prefix: String = "eBrain cognition:") -> String? {
+        guard let payload = cognitionLine?
+            .droppingKnownPrefix("L7 mirror blade • ")
+            .droppingKnownPrefix("L7 mirror blade")
+            .evolutionTrimmedNonEmpty else {
+            return nil
+        }
+        return "\(prefix) \(payload)"
+    }
+
+    func displayMirrorCalibrationLine(prefix: String = "Calibration") -> String? {
+        guard let payload = mirrorCalibrationLine?
+            .droppingKnownPrefix("L7 calibration • ")
+            .droppingKnownPrefix("L7 calibration")
+            .evolutionTrimmedNonEmpty else {
+            return nil
+        }
+        return "\(prefix) \(payload)"
+    }
+
+    func sessionCheckpointMirrorCalibrationFactLine(
+        prefix: String = "eBrain calibration:"
+    ) -> String? {
+        guard let payload = mirrorCalibrationLine?
+            .droppingKnownPrefix("L7 calibration • ")
+            .droppingKnownPrefix("L7 calibration")
+            .evolutionTrimmedNonEmpty else {
+            return nil
+        }
+        return "\(prefix) \(payload)"
+    }
+
     var consoleRuntimeSummaryAdditions: [String] {
         DecisionEvolutionEBrainPresentationSupport.orderedUniqueNonEmpty(
             [
             runtimeSummaryLine,
+            cognitionLine,
+            mirrorCalibrationLine,
             riskFactorsLine,
             reasonCodesLine,
             courtLine,
@@ -851,6 +1228,7 @@ extension DecisionEvolutionEBrainFactsBundle {
             evidenceLine,
             persistenceLine,
             pressureLine,
+            actionLine,
             governanceLine,
             versionTreeLine,
             retractionLine
@@ -867,8 +1245,11 @@ extension DecisionEvolutionEBrainFactsBundle {
             summaryLine,
             budgetLine,
             displayPresenceLine(),
+            displayCognitionLine(),
+            displayMirrorCalibrationLine(),
             pressureLine,
             taskLine,
+            actionLine,
             governanceLine,
             versionTreeLine,
             retractionLine,
@@ -1002,6 +1383,13 @@ extension BASEBrainTurnResult {
             reasonCodesLine: DecisionEvolutionNarrativeFormattingSupport.labeledLine(
                 prefix: "Reason codes",
                 values: renderedOutput.explanationCodes
+            ),
+            courtLine: DecisionEvolutionEBrainPresentationSupport.courtLine(from: mergedChoice),
+            cognitionLine: DecisionEvolutionEBrainPresentationSupport.cognitionDetailLine(
+                decomposeFrame: decomposeFrame
+            ),
+            mirrorCalibrationLine: DecisionEvolutionEBrainPresentationSupport.mirrorCalibrationLine(
+                decomposeFrame: decomposeFrame
             ),
             ticketSummary: primaryReviewDirectiveLine ?? updateTickets.first?.summary.evolutionTrimmedNonEmpty
         )
@@ -1222,7 +1610,9 @@ extension BASEBrainTurnResult {
         let verdictDetail = sovereignVerdictLevelID.map { "verdict \($0)" }
         let tokenScopes = sovereignTokenScopeIDs
         let warrantScopes = sovereignWarrantScopeIDs
-        let lockDetail = sovereignLockScopeID.map { "lock \($0)" }
+        let warrantPolicies = sovereignWarrantPolicyIDs
+        let warrantTTLs = sovereignWarrantTTLIDs
+        let warrantWitnessCount = sovereignWarrantWitnessCount
         let quarantineZones = sovereignQuarantineZoneIDs
         let auditDetail = (sovereignAuditRuleIDs.first ?? sovereignAuditEntryID).map {
             "audit \($0)"
@@ -1233,14 +1623,24 @@ extension BASEBrainTurnResult {
         }
         let activeKills = runtimeTrace.activeKillSwitches.map(\.rawValue)
         let recommendedKills = runtimeTrace.recommendedKillSwitches.map(\.rawValue)
+        let authorityDetails = DecisionEvolutionNarrativeFormattingSupport.sovereignAuthorityValues(
+            tokenScopes: tokenScopes,
+            warrantScopes: warrantScopes,
+            warrantPolicyIDs: warrantPolicies,
+            warrantTTLIDs: warrantTTLs,
+            warrantWitnessCount: warrantWitnessCount,
+            lockScopeID: sovereignLockScopeID,
+            quarantineZoneIDs: quarantineZones,
+            tokenScopeLimit: 3,
+            warrantScopeLimit: 3,
+            warrantPolicyLimit: 2,
+            warrantTTLLimit: 2,
+            quarantineZoneLimit: 2
+        )
 
         let details = [
             constraints.isEmpty ? nil : "constraints \(Array(constraints.prefix(3)).joined(separator: ", "))",
             verdictDetail,
-            tokenScopes.isEmpty ? nil : "tokens \(Array(tokenScopes.prefix(3)).joined(separator: ", "))",
-            warrantScopes.isEmpty ? nil : "warrants \(Array(warrantScopes.prefix(3)).joined(separator: ", "))",
-            lockDetail,
-            quarantineZones.isEmpty ? nil : "quarantine \(Array(quarantineZones.prefix(2)).joined(separator: ", "))",
             auditDetail,
             commandKinds.isEmpty ? nil : "commands \(Array(commandKinds.prefix(3)).joined(separator: ", "))",
             receiptKinds.isEmpty ? nil : "executed \(Array(receiptKinds.prefix(2)).joined(separator: ", "))",
@@ -1248,13 +1648,16 @@ extension BASEBrainTurnResult {
             recommendedKills.isEmpty ? nil : "recommended \(Array(recommendedKills.prefix(3)).joined(separator: ", "))"
         ]
         .compactMap { $0 }
+        var sovereignDetails = Array(details.prefix(2))
+        sovereignDetails.append(contentsOf: authorityDetails)
+        sovereignDetails.append(contentsOf: details.dropFirst(2))
 
-        guard details.isEmpty == false else {
+        guard sovereignDetails.isEmpty == false else {
             return nil
         }
 
         return DecisionEvolutionNarrativeFormattingSupport.joined(
-            ["L14 sovereign"] + details
+            ["L14 sovereign"] + sovereignDetails
         )
     }
 
@@ -1297,6 +1700,7 @@ extension BASEBrainTurnResult {
             budgetLine: replayCheckpointBudgetLine,
             pressureLine: factsBundle.pressureLine ?? replayCheckpointPressureLine,
             taskLine: replayCheckpointTaskLine,
+            actionLine: factsBundle.actionLine ?? renderedOutput.deliveryFallbackActionLine,
             windGateLine: factsBundle.windGateLine ?? replayCheckpointWindGateLine,
             layerStackLines: factsBundle.layerStackLines
         )
@@ -1365,6 +1769,8 @@ extension BASEBrainTurnResult {
             sovereignBridgeResult: foldedLung.sovereignBridgeResult
         )
         eBrainAnchor.presenceLine = factsBundle.sessionCheckpointPresenceFactLine()
+        eBrainAnchor.cognitionLine = factsBundle.sessionCheckpointCognitionFactLine()
+        eBrainAnchor.mirrorCalibrationLine = factsBundle.sessionCheckpointMirrorCalibrationFactLine()
 
         return DecisionEvolutionSessionCheckpointFacts(
             budgetConstraintLine: DecisionEvolutionEBrainPresentationSupport.checkpointBudgetConstraintLine(
@@ -1385,6 +1791,8 @@ extension BASEBrainTurnResult {
                 hostGatePercent: Int((hostGateValue * 100).rounded()),
                 foldChecksum: String(thoughtFold.checksum.prefix(12))
             ),
+            cognitionFactLine: factsBundle.sessionCheckpointCognitionFactLine(),
+            mirrorCalibrationFactLine: factsBundle.sessionCheckpointMirrorCalibrationFactLine(),
             pressureFactLine: factsBundle.sessionCheckpointPressureFactLine(),
             riskFactorsLine: factsBundle.riskFactorsLine,
             reasonCodesLine: factsBundle.reasonCodesLine,
@@ -1401,6 +1809,7 @@ extension BASEBrainTurnResult {
                 prefix: DecisionEvolutionEBrainPresentationSupport.checkpointRecommendedKillSwitchesPrefix,
                 values: recommendedKillSwitches
             ),
+            actionFactLine: factsBundle.actionLine ?? renderedOutput.deliveryFallbackActionLine,
             openTaskLines: openTaskLines,
             currentScope: [
                 "ebrain",
@@ -1435,6 +1844,12 @@ extension DecisionEvolutionSessionCheckpointFacts {
         decisionFactLines.forEach {
             appendUnique($0, to: &summary.confirmedFacts)
         }
+        if let cognitionFactLine {
+            appendUnique(cognitionFactLine, to: &summary.confirmedFacts)
+        }
+        if let mirrorCalibrationFactLine {
+            appendUnique(mirrorCalibrationFactLine, to: &summary.confirmedFacts)
+        }
         if let pressureFactLine {
             appendUnique(pressureFactLine, to: &summary.confirmedFacts)
         }
@@ -1446,6 +1861,9 @@ extension DecisionEvolutionSessionCheckpointFacts {
         }
         if let recommendedKillSwitchesFactLine {
             appendUnique(recommendedKillSwitchesFactLine, to: &summary.confirmedFacts)
+        }
+        if let actionFactLine {
+            appendUnique(actionFactLine, to: &summary.confirmedFacts)
         }
         openTaskLines.forEach {
             appendUnique($0, to: &summary.openTasks)
@@ -1507,6 +1925,8 @@ extension DeveloperDecisionReplayEBrainSummary {
             brainSummaryLine: brainSummaryLine,
             riskFactorsLine: riskFactorsLine,
             reasonCodesLine: reasonCodesLine,
+            cognitionLine: self.cognitionLine,
+            mirrorCalibrationLine: self.mirrorCalibrationLine,
             courtLine: courtLine,
             executionCapabilityLine: executionCapabilityLine,
             horizonLine: horizonLine,
@@ -1520,6 +1940,7 @@ extension DeveloperDecisionReplayEBrainSummary {
             budgetLine: replaySummary.budgetLine,
             pressureLine: replaySummary.pressureLine,
             taskLine: replaySummary.taskLine,
+            actionLine: replaySummary.actionLine,
             auditLine: replaySummary.auditLine,
             sovereignVerdictLine: replaySummary.sovereignVerdictLine,
             sovereignAuthorityLine: replaySummary.sovereignAuthorityLine,
@@ -1552,9 +1973,21 @@ extension DecisionEvolutionLineageSnapshot {
     }
 }
 
-private extension String {
+extension String {
     func droppingKnownPrefix(_ prefix: String) -> String {
         guard hasPrefix(prefix) else { return self }
         return String(dropFirst(prefix.count))
+    }
+}
+
+private extension DecisionEvolutionEBrainPresentationSupport {
+    static func condensedSnippet(_ text: String, limit: Int) -> String {
+        let normalized = text
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalized.count > limit else {
+            return normalized
+        }
+        return String(normalized.prefix(max(0, limit - 1))).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
     }
 }

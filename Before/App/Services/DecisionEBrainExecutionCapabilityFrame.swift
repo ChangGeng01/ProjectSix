@@ -265,6 +265,11 @@ struct DecisionEBrainKernelFrame: Equatable, Sendable {
     let policyDecisionIDs: [String]
     let recoveryDispositionKindID: String?
     let recoveryDispositionSummary: String?
+    let recoveryOperatorReviewRequired: Bool
+    let recoveryRequiredConfirmationIDs: [String]
+    let recoveryAllowedActionClassIDs: [String]
+    let recoveryBlockedActionClassIDs: [String]
+    let recoveryRemediationActionIDs: [String]
     let diagnosticsPresentation: DecisionEvolutionTurnDiagnosticsPresentation
     let executionCapabilityFrame: DecisionEBrainExecutionCapabilityFrame?
     let morphGraph: BASMorphGraph?
@@ -305,7 +310,9 @@ struct DecisionEBrainPresentationFrame: Equatable, Sendable {
     let triScoreLines: [String]
     let riskFactorsLine: String?
     let reasonCodesLine: String?
+    let courtLine: String?
     let alternativeActions: [String]
+    let deliveryFallbackGuidance: String?
     let thoughtFoldLines: [String]
     let replayTraceLines: [String]
     let ticketSummary: String?
@@ -374,6 +381,11 @@ extension DecisionEBrainKernelFrame {
             policyDecisionIDs: turn.policyLineage?.policyDecisionIDs ?? turn.budgetFrame.policyDecisionIDs,
             recoveryDispositionKindID: turn.recoveryDisposition?.kind.rawValue,
             recoveryDispositionSummary: turn.recoveryDisposition?.summary,
+            recoveryOperatorReviewRequired: turn.recoveryDisposition?.operatorReviewRequired ?? false,
+            recoveryRequiredConfirmationIDs: turn.recoveryDisposition?.requiredConfirmations ?? [],
+            recoveryAllowedActionClassIDs: turn.recoveryDisposition?.allowedActionClasses ?? [],
+            recoveryBlockedActionClassIDs: turn.recoveryDisposition?.blockedActionClasses ?? [],
+            recoveryRemediationActionIDs: turn.recoveryDisposition?.remediationActions ?? [],
             diagnosticsPresentation: turn.diagnosticsPresentation,
             executionCapabilityFrame: executionCapabilityFrame,
             morphGraph: foldedLung.morphGraph,
@@ -420,7 +432,9 @@ extension DecisionEBrainPresentationFrame {
             triScoreLines: diagnostics.triScoreLines,
             riskFactorsLine: diagnostics.riskFactorsLine,
             reasonCodesLine: diagnostics.reasonCodesLine,
+            courtLine: diagnostics.courtLine,
             alternativeActions: diagnostics.alternativeActions,
+            deliveryFallbackGuidance: diagnostics.deliveryFallbackGuidance,
             thoughtFoldLines: diagnostics.thoughtFoldLines,
             replayTraceLines: diagnostics.replayTraceLines,
             ticketSummary: diagnostics.ticketSummary,
@@ -488,23 +502,14 @@ extension DecisionEBrainPresentationFrame {
     }
 
     private static func sovereignAuthorityLine(from turn: BASEBrainTurnResult) -> String? {
-        let tokenScopeSummary = turn.sovereignCommitTokens.map(\.scope.rawValue)
-        let quarantineZones = turn.quarantineRecords.map(\.zone.rawValue)
-
-        guard
-            tokenScopeSummary.isEmpty == false
-                || turn.sovereignLock != nil
-                || quarantineZones.isEmpty == false
-        else {
-            return nil
-        }
-
-        return DecisionEvolutionNarrativeFormattingSupport.joined(
-            [
-                tokenScopeSummary.isEmpty ? nil : "tokens \(tokenScopeSummary.joined(separator: ", "))",
-                turn.sovereignLock.map { "lock \($0.scope.rawValue)" },
-                quarantineZones.isEmpty ? nil : "quarantine \(quarantineZones.joined(separator: ", "))"
-            ].compactMap { $0 }
+        DecisionEvolutionNarrativeFormattingSupport.sovereignAuthorityLine(
+            tokenScopes: turn.sovereignTokenScopeIDs,
+            warrantScopes: turn.sovereignWarrantScopeIDs,
+            warrantPolicyIDs: turn.sovereignWarrantPolicyIDs,
+            warrantTTLIDs: turn.sovereignWarrantTTLIDs,
+            warrantWitnessCount: turn.sovereignWarrantWitnessCount,
+            lockScopeID: turn.sovereignLock?.scope.rawValue,
+            quarantineZoneIDs: turn.sovereignQuarantineZoneIDs
         )
     }
 
@@ -531,10 +536,27 @@ extension DecisionEBrainPresentationFrame {
             return nil
         }
 
-        return DecisionEvolutionNarrativeFormattingSupport.joined([
+        let details: [String?] = [
             recoveryDisposition.kind.rawValue.uppercased(),
-            recoveryDisposition.summary
-        ])
+            recoveryDisposition.summary,
+            recoveryDisposition.operatorReviewRequired ? "operator review required" : nil,
+            recoveryDisposition.requiredConfirmations.isEmpty
+                ? nil
+                : "confirm \(recoveryDisposition.requiredConfirmations.joined(separator: ", "))",
+            recoveryDisposition.allowedActionClasses.isEmpty
+                ? nil
+                : "allow \(recoveryDisposition.allowedActionClasses.joined(separator: ", "))",
+            recoveryDisposition.blockedActionClasses.isEmpty
+                ? nil
+                : "block \(recoveryDisposition.blockedActionClasses.joined(separator: ", "))",
+            recoveryDisposition.remediationActions.isEmpty
+                ? nil
+                : "remediate \(recoveryDisposition.remediationActions.joined(separator: ", "))"
+        ]
+
+        return DecisionEvolutionNarrativeFormattingSupport.joined(
+            details.compactMap { $0 }
+        )
     }
 
     private static func sovereignExecutionLine(from turn: BASEBrainTurnResult) -> String? {

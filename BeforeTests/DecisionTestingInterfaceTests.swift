@@ -1718,7 +1718,10 @@ struct DecisionTestingInterfaceTests {
                     thoughtFoldChecksum: "fold-review-4",
                     updateTicketSummaries: ["review ticket 4"],
                     guardrailFindings: ["Review guardrail 4"],
-                    recommendedKillSwitches: ["external-tools"]
+                    recommendedKillSwitches: ["external-tools"],
+                    foldedLungSummary: Self.sampleFoldedLungSummary(
+                        checkpointID: "checkpoint-review-4"
+                    )
                 )
             )
         )
@@ -1743,7 +1746,7 @@ struct DecisionTestingInterfaceTests {
         )
 
         #expect(export.pendingReviewCheckpointCount == 4)
-        #expect(export.pendingReviewCheckpointLineages.map(\.checkpointID) == [
+        #expect(export.pendingReviewCheckpointLineages.map { $0.checkpointID } == [
             "checkpoint-review-4",
             "checkpoint-review-3",
             "checkpoint-review-2",
@@ -1767,7 +1770,7 @@ struct DecisionTestingInterfaceTests {
             "host-write"
         ])
         #expect(export.flightDeck.pendingReviewCheckpointCount == 4)
-        #expect(export.flightDeck.pendingReviewQueue.map(\.checkpointID) == [
+        #expect(export.flightDeck.pendingReviewQueue.map { $0.checkpointID } == [
             "checkpoint-review-4",
             "checkpoint-review-3",
             "checkpoint-review-2"
@@ -1778,6 +1781,16 @@ struct DecisionTestingInterfaceTests {
         #expect(export.flightDeck.pendingReviewQueue.first?.applyReady == false)
         #expect(export.flightDeck.pendingReviewQueue.last?.applyReady == true)
         #expect(export.flightDeck.pendingReviewQueue.first?.permitMode == "block")
+        #expect(export.flightDeck.pendingReviewQueue.first?.foldedLungTitle == "Folded lung")
+        #expect(
+            export.flightDeck.pendingReviewQueue.first?.foldedLungLines == [
+                "L3 compression runtime • breath guard • phase exchange • anchor rollback-checkpoint-review-4",
+                "Breath guard • Phase exchange • Restore 84%",
+                "Morph graph morph-checkpoint-review-4 • organs riskSpine, stubCore • route ane • thermal guarded",
+                "Integrity weave verified • checks 1/1 • hash abc123def456",
+                "Rollback anchor rollback-checkpoint-review-4 • snapshot snapshot-checkpoint-review-4"
+            ]
+        )
     }
 
     @Test
@@ -2373,6 +2386,8 @@ struct DecisionTestingInterfaceTests {
         #expect(export.flightDeck.pendingReviewQueue.first?.primarySummary == "Legacy review checkpoint without lineage")
         #expect(export.flightDeck.pendingReviewQueue.first?.applyReady == true)
         #expect(export.flightDeck.pendingReviewQueue.first?.riskLevel == nil)
+        #expect(export.flightDeck.pendingReviewQueue.first?.foldedLungTitle == nil)
+        #expect(export.flightDeck.pendingReviewQueue.first?.foldedLungLines.isEmpty == true)
         #expect(export.flightDeck.evolutionControlSurface == export.evolutionControlSurface)
     }
 
@@ -2560,7 +2575,22 @@ struct DecisionTestingInterfaceTests {
                     thoughtFoldChecksum: "fold-lineage",
                     updateTicketSummaries: ["lineage ticket"],
                     guardrailFindings: ["lineage guardrail"],
-                    recommendedKillSwitches: ["external-tools"]
+                    recommendedKillSwitches: ["external-tools"],
+                    foldedLungSummary: Self.sampleFoldedLungSummary(
+                        checkpointID: "checkpoint-presentation-lineage"
+                    ),
+                    governanceSummary: BASEvolutionLineageSummary.GovernanceSummary(
+                        experienceCandidateCount: 0,
+                        shadowTrialCount: 0,
+                        pendingShadowTrialCount: 0,
+                        sealCount: 0,
+                        pendingSealCount: 0,
+                        versionDeltaCount: 0,
+                        retractionOrderCount: 0,
+                        pendingRetractionCount: 0,
+                        dreamLoopRemandTargets: ["L9"],
+                        dreamLoopReservationMode: "delayRight"
+                    )
                 )
             ),
             fallbackRiskLevel: "watch",
@@ -2575,16 +2605,28 @@ struct DecisionTestingInterfaceTests {
         #expect(presentation.hasLineage == true)
         #expect(presentation.summaryText == "HIGH → DELAY")
         #expect(presentation.metadataText == "Session before.quick.presentation-lineage • Host gate 82% • Fold fold-lineage")
+        #expect(presentation.courtSummaryLine == "Court: agency delay right • remand L9")
         #expect(queueItem.hasLineage == true)
         #expect(queueItem.primarySummary == presentation.primarySummary)
         #expect(queueItem.summaryText == presentation.summaryText)
         #expect(queueItem.metadataText == presentation.metadataText)
+        #expect(queueItem.courtLine == "Court: agency delay right • remand L9")
         #expect(queueItem.riskLevel == "high")
         #expect(queueItem.permitMode == "delay")
         #expect(queueItem.hostGatePercent == 82)
         #expect(queueItem.updateTicketSummaries == ["lineage ticket"])
         #expect(queueItem.auditFindings == ["lineage guardrail"])
         #expect(queueItem.killSwitches == ["external-tools"])
+        #expect(queueItem.foldedLungTitle == "Folded lung")
+        #expect(
+            queueItem.foldedLungLines == [
+                "L3 compression runtime • breath guard • phase exchange • anchor rollback-checkpoint-presentation-lineage",
+                "Breath guard • Phase exchange • Restore 84%",
+                "Morph graph morph-checkpoint-presentation-lineage • organs riskSpine, stubCore • route ane • thermal guarded",
+                "Integrity weave verified • checks 1/1 • hash abc123def456",
+                "Rollback anchor rollback-checkpoint-presentation-lineage • snapshot snapshot-checkpoint-presentation-lineage"
+            ]
+        )
     }
 
     @Test
@@ -2624,7 +2666,60 @@ struct DecisionTestingInterfaceTests {
 
         #expect(
             presentation.metadataText
-                == "Session before.quick.wind-gate-lineage • Host gate 76% • Fold fold-wind-gate • Wind gate primary delay • assert guarded • delay cool_down • substitute draft • sovereign elevated"
+                == "Session before.quick.wind-gate-lineage • Host gate 76% • Fold fold-wind-gate • Wind gate primary delay • assert guarded • delay cool down • substitute draft • sovereign elevated"
+        )
+        #expect(queueItem.metadataText == presentation.metadataText)
+    }
+
+    @Test
+    func checkpointPresentationAppendsDreamLoopMetadataWhenLineageCarriesL9Facts() {
+        let snapshot = DecisionReviewCheckpointSnapshot(
+            checkpointID: "checkpoint-presentation-dream-loop",
+            createdAt: date("2026-04-11T03:10:00.000Z"),
+            mode: .quick,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Dream-loop review checkpoint"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-11T03:10:00.000Z"),
+                    sessionID: "before.quick.dream-loop-lineage",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 76,
+                    thoughtFoldChecksum: "fold-dream-loop",
+                    updateTicketSummaries: ["dream loop ticket"],
+                    guardrailFindings: ["dream loop guardrail"],
+                    recommendedKillSwitches: ["external-tools"],
+                    governanceSummary: BASEvolutionLineageSummary.GovernanceSummary(
+                        experienceCandidateCount: 0,
+                        shadowTrialCount: 0,
+                        pendingShadowTrialCount: 0,
+                        sealCount: 0,
+                        pendingSealCount: 0,
+                        versionDeltaCount: 0,
+                        retractionOrderCount: 0,
+                        pendingRetractionCount: 0,
+                        dreamLoopStoppingMode: "guardTakeover",
+                        dreamLoopSignalRefs: ["dream_loop:evidence_debt", "dream_loop:breakpoint"],
+                        dreamLoopRemandTargets: ["L9", "L14"],
+                        dreamLoopReservationMode: "delayRight",
+                        dreamLoopMaxEvidenceDebtPercent: 81
+                    )
+                )
+            ),
+            fallbackRiskLevel: "watch",
+            fallbackPermitMode: "local_only_protective"
+        )
+
+        let presentation = snapshot.presentation
+        let queueItem = presentation.queueItem
+
+        #expect(
+            presentation.metadataText
+                == "Session before.quick.dream-loop-lineage • Host gate 76% • Fold fold-dream-loop • Dream loop stop guard takeover • reserve delay right • remand L9, L14 • debt 81% • signals evidence debt, breakpoint"
         )
         #expect(queueItem.metadataText == presentation.metadataText)
     }
@@ -2747,6 +2842,47 @@ struct DecisionTestingInterfaceTests {
             TomorrowBoxItem.self,
             DecisionEvolutionCheckpoint.self,
             configurations: configuration
+        )
+    }
+
+    private static func sampleFoldedLungSummary(
+        checkpointID: String
+    ) -> BASEvolutionFoldedLungSummary {
+        BASEvolutionFoldedLungSummary(
+            morphGraphID: "morph-\(checkpointID)",
+            hotColdMapID: "hotcold-\(checkpointID)",
+            precisionProfileID: "precision-\(checkpointID)",
+            lungStateRef: "lung-\(checkpointID)",
+            integrityWeaveID: "integrity-\(checkpointID)",
+            breathMode: "guard",
+            breathPhase: "exchange",
+            thermalPressure: 63,
+            cachePressure: 48,
+            restoreReadinessPercent: 84,
+            resumeID: "resume-\(checkpointID)",
+            sourceFoldID: "fold-\(checkpointID)",
+            resumeDepth: 1,
+            fallbackMode: "rollbackAnchor",
+            rollbackAnchorID: "rollback-\(checkpointID)",
+            safeSnapshotRef: "snapshot-\(checkpointID)",
+            foldRefs: ["fold-\(checkpointID)"],
+            integrityHash: "abc123def456",
+            morphActiveOrganIDs: ["riskSpine", "stubCore"],
+            morphExecutionOrder: ["riskSpine", "stubCore"],
+            morphDeviceRouteMap: ["riskSpine": "ane"],
+            morphThermalProfile: ["guarded"],
+            hotOrganIDs: ["stubCore"],
+            warmOrganIDs: ["riskSpine"],
+            coldOrganIDs: ["simuRing"],
+            thermalExchangeMode: "predictive_guard",
+            thermalPredictedBand: "warm",
+            thermalCoolingActions: ["trim_batch"],
+            integrityRequiredChecks: ["fold_checksum"],
+            integrityCompletedChecks: ["fold_checksum"],
+            integrityPurityState: "verified",
+            integrityVerificationHash: "abc123def456",
+            precisionDegradationOrder: ["fp16", "int8"],
+            precisionGuardSafeFloorID: "int8"
         )
     }
 

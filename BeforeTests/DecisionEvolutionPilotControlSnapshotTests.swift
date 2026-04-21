@@ -253,6 +253,18 @@ struct DecisionEvolutionPilotControlSnapshotTests {
 
     @Test
     func localMutationSurfacePrefersApproveQueueGuidanceWhenReviewIsPending() {
+        let governanceSummary = BASEvolutionLineageSummary.GovernanceSummary(
+            experienceCandidateCount: 0,
+            shadowTrialCount: 0,
+            pendingShadowTrialCount: 0,
+            sealCount: 0,
+            pendingSealCount: 0,
+            versionDeltaCount: 0,
+            retractionOrderCount: 0,
+            pendingRetractionCount: 0,
+            dreamLoopRemandTargets: ["L9"],
+            dreamLoopReservationMode: "delayRight"
+        )
         let controlSurface = makeControlSurface(
             active: makeCheckpoint(
                 checkpointID: "active-control",
@@ -265,7 +277,8 @@ struct DecisionEvolutionPilotControlSnapshotTests {
                     checkpointID: "review-queue",
                     createdAt: Date(timeIntervalSince1970: 20),
                     approvalState: .reviewSuggested,
-                    hasLineage: true
+                    hasLineage: true,
+                    governanceSummary: governanceSummary
                 )
             ],
             restorableCheckpointIDs: ["active-control-prior"]
@@ -336,6 +349,7 @@ struct DecisionEvolutionPilotControlSnapshotTests {
                 )
         )
         #expect(snapshot.reviewAuditLine == "Review audit: guardrail-review-queue")
+        #expect(snapshot.reviewCourtLine == "Court: agency delay right • remand L9")
         #expect(snapshot.recommendedKillSwitchesLine == "Suggested kill switches: external-tools")
 
         if case let .mutation(intent)? = snapshot.guidedAction?.route {
@@ -345,8 +359,45 @@ struct DecisionEvolutionPilotControlSnapshotTests {
         }
 
         #expect(snapshot.recommendedKillSwitches == ["external-tools"])
+        #expect(snapshot.presenceTitle == nil)
+        #expect(snapshot.presenceLines.isEmpty)
         #expect(snapshot.foldedLungTitle == nil)
         #expect(snapshot.foldedLungLines.isEmpty)
+    }
+
+    @Test
+    func pilotSnapshotSurfacesPresenceFieldFromReleaseSummary() {
+        let snapshot = DecisionEvolutionPilotControlSnapshot.build(
+            controlSurface: makeControlSurface(
+                active: makeCheckpoint(
+                    checkpointID: "active-presence",
+                    createdAt: Date(timeIntervalSince1970: 10),
+                    approvalState: .automatic,
+                    hasLineage: true
+                )
+            ),
+            releaseSummary: makeReleaseSummary(
+                headline: "Presence should remain visible in pilot controls.",
+                reasons: [
+                    "Factors: evidence_caveat_load"
+                ],
+                pendingReviewCount: 0,
+                canRestoreActiveCheckpoint: true,
+                activeCheckpointID: "active-presence",
+                activeCheckpointSource: .pinnedHint,
+                presenceLine: "Presence scene high pressure conflict • role manager • power external over host 82% • urgency 84% • route guarded • guard on • continuity highPressureConflict:manager"
+            ),
+            surfaceContract: .controlCenter,
+            navigationOptions: DecisionEvolutionSurfaceContract.controlCenter.navigationSurfaceOptions()
+        )
+
+        #expect(snapshot.presenceTitle == "Presence field")
+        #expect(
+            snapshot.presenceLines
+                == [
+                    "Presence scene high pressure conflict • role manager • power external over host 82% • urgency 84% • route guarded • guard on • continuity highPressureConflict:manager"
+                ]
+        )
     }
 
     @Test
@@ -380,6 +431,8 @@ struct DecisionEvolutionPilotControlSnapshotTests {
             navigationOptions: DecisionEvolutionSurfaceContract.controlCenter.navigationSurfaceOptions()
         )
 
+        #expect(snapshot.presenceTitle == nil)
+        #expect(snapshot.presenceLines.isEmpty)
         #expect(snapshot.foldedLungTitle == "Folded lung")
         #expect(
             snapshot.foldedLungLines
@@ -411,6 +464,8 @@ struct DecisionEvolutionPilotControlSnapshotTests {
             navigationOptions: DecisionEvolutionSurfaceContract.controlCenter.navigationSurfaceOptions()
         )
 
+        #expect(snapshot.presenceTitle == nil)
+        #expect(snapshot.presenceLines.isEmpty)
         #expect(snapshot.foldedLungTitle == nil)
         #expect(snapshot.foldedLungLines.isEmpty)
     }
@@ -444,6 +499,20 @@ struct DecisionEvolutionPilotControlSnapshotTests {
         let guidance = try #require(snapshot.furnaceWorkbenchGuidance)
         #expect(guidance.title == "Quick actions are holding the next furnace review step")
         #expect(guidance.detail == "Review the pending shadow trial before promotion or approval.")
+        #expect(guidance.executionState.title == "Execution state")
+        #expect(guidance.executionState.headline == "Restore active path is ready for guarded preview.")
+        #expect(guidance.executionState.lines.contains("Active-path mutation."))
+        #expect(
+            guidance.executionState.lines.contains(
+                "Re-apply the current active checkpoint as the live brain state."
+            )
+        )
+        #expect(guidance.executionState.lines.contains("Targets: active-furnace-quick"))
+        #expect(
+            guidance.executionState.lines.contains(
+                "Active: active-furnace-quick → active-furnace-quick"
+            )
+        )
         #expect(guidance.runNowActionTitle == DecisionEvolutionPilotControlPresentationSupport.restoreActiveTitle)
         #expect(guidance.runNowIntent?.kind == .restoreActiveCheckpoint)
         #expect(guidance.actionTitle == "Inspect quick actions")
@@ -488,6 +557,26 @@ struct DecisionEvolutionPilotControlSnapshotTests {
         let guidance = try #require(snapshot.furnaceWorkbenchGuidance)
         #expect(guidance.title == "Queue lineage is holding the next furnace review step")
         #expect(guidance.detail == "Clear the pending retraction order before wider rollout.")
+        #expect(guidance.executionState.title == "Execution state")
+        #expect(guidance.executionState.headline == "Clear queue lineage is ready for guarded preview.")
+        #expect(guidance.executionState.lines.contains("Review-queue mutation."))
+        #expect(
+            guidance.executionState.lines.contains(
+                "This preserves the review queue but removes recovered lineage payloads from lineage-backed entries."
+            )
+        )
+        #expect(guidance.executionState.lines.contains("Targets: review-furnace-lineage"))
+        #expect(
+            guidance.executionState.lines.contains(
+                "Active: active-furnace-lineage → active-furnace-lineage"
+            )
+        )
+        #expect(
+            guidance.executionState.lines.contains(
+                "Review: review-furnace-lineage → review-furnace-lineage"
+            )
+        )
+        #expect(guidance.executionState.lines.count >= 5)
         #expect(guidance.runNowActionTitle == DecisionEvolutionPilotControlPresentationSupport.clearQueueLineageTitle)
         #expect(guidance.runNowIntent?.kind == .clearPendingReviewLineage)
         #expect(guidance.actionTitle == "Inspect queue lineage")
@@ -604,6 +693,15 @@ struct DecisionEvolutionPilotControlSnapshotTests {
 
         let guidance = try #require(snapshot.furnaceWorkbenchGuidance)
         #expect(guidance.focusTarget == .quickActions)
+        #expect(guidance.executionState.title == "Execution state")
+        #expect(guidance.executionState.headline == "Direct run-now preview is blocked right now.")
+        #expect(
+            guidance.executionState.lines
+                == [
+                    "Approve review queue is waiting for pending review checkpoints.",
+                    "Inspect quick actions to inspect the holding lane."
+                ]
+        )
         #expect(guidance.runNowActionTitle == nil)
         #expect(guidance.runNowIntent == nil)
         #expect(guidance.availabilityTitle == "Blocked")
@@ -858,7 +956,8 @@ struct DecisionEvolutionPilotControlSnapshotTests {
         createdAt: Date,
         approvalState: DecisionEvolutionApprovalState,
         hasLineage: Bool,
-        killSwitches: [String] = []
+        killSwitches: [String] = [],
+        governanceSummary: BASEvolutionLineageSummary.GovernanceSummary? = nil
     ) -> DecisionReviewCheckpointSnapshot {
         DecisionReviewCheckpointSnapshot(
             checkpointID: checkpointID,
@@ -872,7 +971,8 @@ struct DecisionEvolutionPilotControlSnapshotTests {
             eBrain: hasLineage ? makeReplaySummary(
                 checkpointID: checkpointID,
                 recordedAt: createdAt,
-                killSwitches: killSwitches
+                killSwitches: killSwitches,
+                governanceSummary: governanceSummary
             ) : nil,
             fallbackRiskLevel: "watch",
             fallbackPermitMode: "delay"
@@ -890,7 +990,8 @@ struct DecisionEvolutionPilotControlSnapshotTests {
         canRollbackActiveCheckpoint: Bool = false,
         activeCheckpointID: String? = nil,
         activeCheckpointSource: DecisionEvolutionActiveCheckpointSource = .none,
-        reviewCheckpointID: String? = nil
+        reviewCheckpointID: String? = nil,
+        presenceLine: String? = nil
     ) -> DecisionSystemReleaseControlSummary {
         DecisionSystemReleaseControlSummary(
             state: pendingReviewCount > 0 ? .watch : (activeKillSwitches.isEmpty ? .ready : .blocked),
@@ -905,14 +1006,16 @@ struct DecisionEvolutionPilotControlSnapshotTests {
             canRollbackActiveCheckpoint: canRollbackActiveCheckpoint,
             activeCheckpointID: activeCheckpointID,
             activeCheckpointSource: activeCheckpointSource,
-            reviewCheckpointID: reviewCheckpointID
+            reviewCheckpointID: reviewCheckpointID,
+            presenceLine: presenceLine
         )
     }
 
     private func makeReplaySummary(
         checkpointID: String,
         recordedAt: Date,
-        killSwitches: [String]
+        killSwitches: [String],
+        governanceSummary: BASEvolutionLineageSummary.GovernanceSummary? = nil
     ) -> DeveloperDecisionReplayEBrainSummary {
         DeveloperDecisionReplayEBrainSummary(
             lineageSummary: BASEvolutionLineageSummary(
@@ -926,7 +1029,8 @@ struct DecisionEvolutionPilotControlSnapshotTests {
                 updateTicketSummaries: ["ticket-\(checkpointID)"],
                 activeKillSwitches: killSwitches,
                 guardrailFindings: ["guardrail-\(checkpointID)"],
-                recommendedKillSwitches: killSwitches
+                recommendedKillSwitches: killSwitches,
+                governanceSummary: governanceSummary
             )
         )
     }

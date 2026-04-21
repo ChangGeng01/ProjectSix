@@ -898,7 +898,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         XCTAssertNil(controlPresentation.checkpointTaskLine)
         XCTAssertEqual(
             controlPresentation.checkpointWindGateLine,
-            "L11 wind gate • primary delay • stacked draftOnly, mirror • assert guarded • allow draft.note, text.delay • block tool.write, memory.write, host.write • delay cool_down • substitute draft • sovereign elevated"
+            "Wind gate primary delay • stacked draft only, mirror • assert guarded • allow draft.note, text.delay • block tool.write, memory.write, host.write • delay cool down • substitute draft • sovereign elevated"
         )
         XCTAssertNil(controlPresentation.checkpointPressureLine)
         XCTAssertNil(controlPresentation.checkpointRiskFactorsLine)
@@ -1718,7 +1718,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         )
         XCTAssertEqual(
             presentation.activeSession?.checkpointWindGateLine,
-            "L11 wind gate • primary replace • stacked localOnly • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local_only_action • sovereign elevated"
+            "Wind gate primary replace • stacked local only • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local only action • sovereign elevated"
         )
         XCTAssertEqual(
             presentation.activeSession?.checkpointRiskFactorsLine,
@@ -1751,7 +1751,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             courtLine: "Court: agency delay right • remand L9",
             auditLine: "eBrain audit findings: 2",
             sovereignVerdictLine: "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
-            sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session",
+            sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session",
             sovereignAuditLine: "Sovereign audit • BR-SOV-004 • ref audit.session-l14",
             activeKillSwitchesLine: "eBrain active kill switches: force_guard_mode",
             killSwitchesLine: "eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes",
@@ -1766,10 +1766,11 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             [
                 "Checkpoint recovery • Replay session sess-active • Head branch-main • Recovered \(shortenedTime(Date(timeIntervalSince1970: 36_000))) • latest stable checkpoint remains replayable.",
                 "Checkpoint ckpt-9 • repair parser • eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes",
+                "action: restored active quick workspace state",
                 "L11 wind gate • primary replace • stacked localOnly • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local_only_action • sovereign elevated",
                 "Factors: evidence_caveat_load • Reason codes: evidence.caveat • Court: agency delay right • remand L9",
                 "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
-                "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session",
+                "Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session",
                 "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
             ]
         )
@@ -1971,7 +1972,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             anchor.substituteType = "local_only_action"
             anchor.sovereignHintLevel = "elevated"
             anchor.sovereignVerdictLine = "Sovereign verdict quarantine • latched • mode quarantine • reason runtime.quarantine"
-            anchor.sovereignAuthorityLine = "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session"
+            anchor.sovereignAuthorityLine = "Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session"
             anchor.sovereignAuditLine = "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
             anchor.lungState = BASLungState(
                 breathMode: .guard,
@@ -2107,7 +2108,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         XCTAssertTrue(presentation.reviewItems[1].detail.contains("Checkpoint ckpt-9"))
         XCTAssertEqual(
             presentation.reviewItems[2].detail,
-            "Sovereign verdict quarantine • latched • mode quarantine • reason runtime.quarantine • Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session • Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+            "Sovereign verdict quarantine • latched • mode quarantine • reason runtime.quarantine • Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session • Sovereign audit • BR-SOV-004 • ref audit.session-l14"
         )
         XCTAssertEqual(
             presentation.reviewItems[2].severity,
@@ -2136,7 +2137,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         )
         XCTAssertEqual(
             presentation.activeSession?.checkpointSovereignAuthorityLine,
-            "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session"
+            "Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session"
         )
         XCTAssertEqual(
             presentation.activeSession?.checkpointSovereignAuditLine,
@@ -2160,7 +2161,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         )
         XCTAssertEqual(
             presentation.activeSession?.replayRecoverySummary.sovereignAuthorityLine,
-            "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session"
+            "Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session"
         )
         XCTAssertEqual(
             presentation.activeSession?.replayRecoverySummary.sovereignAuditLine,
@@ -2193,7 +2194,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         )
         XCTAssertEqual(
             presentation.activeSession?.checkpointWindGateLine,
-            "L11 wind gate • primary replace • stacked localOnly • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local_only_action • sovereign elevated"
+            "Wind gate primary replace • stacked local only • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local only action • sovereign elevated"
         )
         XCTAssertEqual(
             presentation.activeSession?.checkpointActionLine,
@@ -2229,7 +2230,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         )
         XCTAssertEqual(
             presentation.activeSession?.replayRecoverySummary.windGateLine,
-            "L11 wind gate • primary replace • stacked localOnly • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local_only_action • sovereign elevated"
+            "Wind gate primary replace • stacked local only • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local only action • sovereign elevated"
         )
         XCTAssertTrue(
             presentation.activeSession?.replayRecoverySummary.digestLines.contains(
@@ -2238,7 +2239,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         )
         XCTAssertTrue(
             presentation.activeSession?.replayRecoverySummary.digestLines.contains(
-                "L11 wind gate • primary replace • stacked localOnly • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local_only_action • sovereign elevated"
+                "Wind gate primary replace • stacked local only • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local only action • sovereign elevated"
             ) == true
         )
         XCTAssertTrue(
@@ -2248,7 +2249,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         )
         XCTAssertTrue(
             presentation.activeSession?.replayRecoverySummary.digestLines.contains(
-                "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session"
+                "Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session"
             ) == true
         )
         XCTAssertTrue(

@@ -1,6 +1,26 @@
 import SwiftUI
 import BASHostKit
 
+enum SampleHostWindGatePresentationSupport {
+    static func modeLabel(_ mode: BASActionPermitMode) -> String {
+        humanizedToken(mode.rawValue)
+    }
+
+    static func modeLabels(_ modes: [BASActionPermitMode]) -> String {
+        modes.map(modeLabel).joined(separator: " • ")
+    }
+
+    static func domainList(_ domains: [String], limit: Int = 3) -> String {
+        Array(domains.prefix(limit)).map(humanizedToken).joined(separator: " • ")
+    }
+
+    static func humanizedToken(_ token: String) -> String {
+        token
+            .replacingOccurrences(of: "_", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 struct SampleHostView: View {
     @ObservedObject var model: SampleHostModel
 
@@ -65,11 +85,11 @@ struct SampleHostView: View {
                                 title: "Live runtime",
                                 detail: "SampleHost is currently rendering the active 13-layer runtime turn returned by BASHostKit."
                             )
-                            Text("Mode \(turn.budgetFrame.runMode.rawValue) • task \(turn.contextFrame.taskType.rawValue) • risk \(turn.riskCard.riskLevel.rawValue) • permit \(turn.actionPermit.mode.rawValue)")
+                            Text("Mode \(turn.budgetFrame.runMode.rawValue) • task \(turn.contextFrame.taskType.rawValue) • risk \(turn.riskCard.riskLevel.rawValue) • permit \(SampleHostWindGatePresentationSupport.modeLabel(turn.actionPermit.mode))")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             if !turn.actionPermit.stackedModes.isEmpty {
-                                Text("Stacked: \(turn.actionPermit.stackedModes.map(\.rawValue).joined(separator: " • "))")
+                                Text("Stacked: \(SampleHostWindGatePresentationSupport.modeLabels(turn.actionPermit.stackedModes))")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
@@ -77,27 +97,27 @@ struct SampleHostView: View {
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                             if !turn.actionPermit.allowedDomains.isEmpty {
-                                Text("Allowed: \(Array(turn.actionPermit.allowedDomains.prefix(3)).joined(separator: " • "))")
+                                Text("Allowed: \(SampleHostWindGatePresentationSupport.domainList(turn.actionPermit.allowedDomains))")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
                             if !turn.actionPermit.blockedDomains.isEmpty {
-                                Text("Blocked: \(Array(turn.actionPermit.blockedDomains.prefix(3)).joined(separator: " • "))")
+                                Text("Blocked: \(SampleHostWindGatePresentationSupport.domainList(turn.actionPermit.blockedDomains))")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
                             if let delayType = turn.riskDecisionPackage?.delayReservation?.delayType ?? turn.actionPermit.delayWindow {
-                                Text("Delay: \(delayType)")
+                                Text("Delay: \(SampleHostWindGatePresentationSupport.humanizedToken(delayType))")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
                             if let substituteType = turn.riskDecisionPackage?.protectiveSubstitute?.substituteType ?? turn.riskCard.substituteType {
-                                Text("Protective substitute: \(substituteType)")
+                                Text("Protective substitute: \(SampleHostWindGatePresentationSupport.humanizedToken(substituteType))")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
                             if let sovereignHint = turn.riskDecisionPackage?.sovereignEscalationHint?.urgency ?? turn.riskCard.sovereignHintLevel ?? turn.actionPermit.escalationHintRef {
-                                Text("Sovereign hint: \(sovereignHint)")
+                                Text("Sovereign hint: \(SampleHostWindGatePresentationSupport.humanizedToken(sovereignHint))")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }

@@ -73,6 +73,27 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         )
     }
 
+    func testFactsBundleSurfacesStructuredMirrorBladeDetailLines() {
+        let factsBundle = DeveloperDecisionReplayEBrainSummary(turn: makeProtectiveTurn()).factsBundle()
+
+        XCTAssertEqual(
+            factsBundle.cognitionLine,
+            "L7 mirror blade • surface Keep the boundary • align 74% • blocking 1"
+        )
+        XCTAssertEqual(
+            factsBundle.mirrorCalibrationLine,
+            "L7 calibration • mirror soft • route clarify unknowns • omitted 1 • tone calibration only • pressures time • watch coercive urgency"
+        )
+        XCTAssertEqual(
+            factsBundle.displayCognitionLine(),
+            "Cognition surface Keep the boundary • align 74% • blocking 1"
+        )
+        XCTAssertEqual(
+            factsBundle.displayMirrorCalibrationLine(),
+            "Calibration mirror soft • route clarify unknowns • omitted 1 • tone calibration only • pressures time • watch coercive urgency"
+        )
+    }
+
     func testReplaySurfacesMemoryAtomSummariesWhenBundleCarriesRetrievedAtoms() throws {
         var turn = makeProtectiveTurn()
         turn.memoryBundle = BASMemoryBundle(
@@ -439,6 +460,32 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
                 persisted.layerStackLines.first(where: { $0.hasPrefix(prefix) })
             )
         }
+    }
+
+    func testLiveAndPersistedSummariesShareStructuredL7CalibrationLine() throws {
+        let turn = makeProtectiveTurn()
+        let live = DeveloperDecisionReplayEBrainSummary(turn: turn)
+        let persisted = DeveloperDecisionReplayEBrainSummary(lineageSummary: turn.evolutionLineageSummary)
+        let expectedCalibrationLine = try XCTUnwrap(live.mirrorCalibrationLine)
+
+        XCTAssertEqual(
+            persisted.mirrorCalibrationLine,
+            expectedCalibrationLine
+        )
+        XCTAssertEqual(
+            persisted.factsBundle().mirrorCalibrationLine,
+            expectedCalibrationLine
+        )
+        guard let expectedDisplayCalibrationLine = persisted.factsBundle()
+            .displayMirrorCalibrationLine() else {
+            XCTFail("Expected persisted facts bundle to expose a display calibration line.")
+            return
+        }
+        XCTAssertTrue(
+            persisted.factsBundle().dataLayerSignals.contains(
+                expectedDisplayCalibrationLine
+            )
+        )
     }
 
     func testLiveAndPersistedSummariesExposeStructuredL6PresenceLine() {
@@ -833,16 +880,29 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
                 )
             ],
             sovereignWarrants: [
-                BASSovereignWarrant(
-                    warrantID: "warrant.session-l14.memory",
-                    scope: .memoryWrite,
-                    actionDigest: "digest-l14",
-                    jurisdictionRef: "jurisdiction.memoryWrite",
-                    snapshotRef: "snapshot.session-l14",
-                    timeLockRef: "timelock.turn-l14.memoryWrite.ttl_30000",
-                    singleUse: true,
-                    signature: "signature.warrant-l14"
-                )
+                {
+                    var warrant = BASSovereignWarrant(
+                        warrantID: "warrant.session-l14.memory",
+                        scope: .memoryWrite,
+                        actionDigest: "digest-l14",
+                        commitTokenRef: "token.session-l14.memory",
+                        jurisdictionRef: "jurisdiction.memoryWrite",
+                        snapshotRef: "snapshot.session-l14",
+                        timeLockRef: "timelock.turn-l14.memoryWrite.ttl_30000",
+                        policyHash: "policy-hash.session-l14",
+                        witnessRefs: [
+                            "permit.turn-l14.memoryWrite",
+                            "integrity.snapshot.session-l14",
+                            "continuity.turn-l14",
+                            "policy.policy-hash.session-l14"
+                        ],
+                        singleUse: true,
+                        signature: "signature.warrant-l14"
+                    )
+                    warrant.issuedAt = Date(timeIntervalSince1970: 1_776_150_000)
+                    warrant.expiresAt = Date(timeIntervalSince1970: 1_776_150_030)
+                    return warrant
+                }()
             ],
             sovereignLock: BASSovereignLock(
                 lockID: "lock.session-l14",
@@ -881,7 +941,7 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
 
         XCTAssertEqual(
             replaySummary.layerStackLines.last,
-            "L14 sovereign • verdict quarantine • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session • audit BR-SOV-004"
+            "L14 sovereign • verdict quarantine • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session • audit BR-SOV-004"
         )
     }
 
@@ -1014,7 +1074,7 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         let summary = makeSystemEBrainSummary(
             source: .persistedCheckpoint,
             sovereignVerdictLine: "Sovereign verdict quarantine • latched • mode quarantine • reasons runtime.quarantine",
-            sovereignAuthorityLine: "tokens memoryWrite • warrants memoryWrite • lock session • quarantine session",
+            sovereignAuthorityLine: "tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session",
             sovereignAuditLine: "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
         )
 
@@ -1026,7 +1086,7 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         )
         XCTAssertEqual(
             presentation.sovereignAuthorityLine,
-            "tokens memoryWrite • warrants memoryWrite • lock session • quarantine session"
+            "tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session"
         )
         XCTAssertEqual(
             presentation.sovereignAuditLine,
@@ -1037,7 +1097,7 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
             expectedProtectivePresentationDetailLines(
                 sovereignLines: [
                     "Sovereign verdict quarantine • latched • mode quarantine • reasons runtime.quarantine",
-                    "tokens memoryWrite • warrants memoryWrite • lock session • quarantine session",
+                    "tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session",
                     "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
                 ]
             )
@@ -1443,7 +1503,7 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
     func testDecisionSystemFlightDeckDigestPresentationCarriesWindGateSummaryWithoutReplayingRawLayerStackLine() throws {
         let summary = makeProtectiveTurn().systemFlightDeckSummary
         let rawWindGateLine = "L11 wind gate • primary delay • stacked draft_only • assert guarded • tool bounded • memory standard • second check • allow bounded_reply • block tool_commit, memory_commit • delay cool_down • substitute draft • sovereign elevated"
-        let windGateSummaryLine = "Wind gate: primary delay • stacked draft_only • assert guarded • tool bounded • memory standard • second check • allow bounded_reply • block tool_commit, memory_commit • delay cool_down • substitute draft • sovereign elevated"
+        let windGateSummaryLine = "Wind gate: primary delay • stacked draft only • assert guarded • tool bounded • memory standard • second check • allow bounded reply • block tool commit, memory commit • delay cool down • substitute draft • sovereign elevated"
         let flightDeck = DecisionSystemFlightDeck(
             generatedAt: .now,
             overallScore: 92,
@@ -1539,7 +1599,7 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         )
         XCTAssertEqual(
             summary.sovereignAuthorityLine,
-            "tokens memoryWrite • warrants memoryWrite • lock session • quarantine session"
+            "Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session"
         )
         XCTAssertEqual(
             summary.sovereignAuditLine,
@@ -1591,7 +1651,7 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
     }
 
     @MainActor
-    func testRuntimeExportAttachedLiveEBrainSummaryCarriesPressureLine() async {
+    func testRuntimeExportAttachedLiveEBrainSummaryCarriesPressureLine() async throws {
         let export = await DecisionTestingInterface.runtimeExport(
             quick: [],
             balance: [],
@@ -1607,6 +1667,9 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         )
 
         let attached = export.attaching(eBrainTurn: makeProtectiveTurn())
+        let expectedWindGateLine = try XCTUnwrap(
+            expectedProtectiveLayerStackLines().first(where: { $0.hasPrefix("L11 wind gate") })
+        )
 
         XCTAssertEqual(attached.flightDeck.eBrainSummary?.source, .liveRuntime)
         XCTAssertEqual(
@@ -1628,6 +1691,12 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         XCTAssertEqual(
             attached.effectiveLayerStackLines,
             expectedProtectiveLayerStackLines()
+        )
+        XCTAssertEqual(attached.effectiveEBrainFactsBundle?.windGateLine, expectedWindGateLine)
+        XCTAssertTrue(
+            attached.effectiveEBrainFactsBundle?.consoleRuntimeSummaryAdditions.contains(
+                expectedWindGateLine
+            ) == true
         )
         XCTAssertTrue(
             attached.flightDeck.layerReports.first(where: { $0.layer == .data })?.signals.contains(where: {
@@ -2380,6 +2449,12 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         XCTAssertTrue(applied.summary.confirmedFacts.contains("parser isolated"))
         XCTAssertTrue(applied.summary.confirmedFacts.contains("eBrain risk: high"))
         XCTAssertTrue(applied.summary.confirmedFacts.contains("eBrain permit: delay"))
+        if let cognitionFactLine = checkpointFacts.cognitionFactLine {
+            XCTAssertTrue(applied.summary.confirmedFacts.contains(cognitionFactLine))
+        }
+        if let mirrorCalibrationFactLine = checkpointFacts.mirrorCalibrationFactLine {
+            XCTAssertTrue(applied.summary.confirmedFacts.contains(mirrorCalibrationFactLine))
+        }
         XCTAssertTrue(applied.summary.confirmedFacts.contains(where: { $0.hasPrefix("eBrain pressure:") }))
         XCTAssertTrue(applied.summary.confirmedFacts.contains("eBrain audit findings: 1"))
         XCTAssertTrue(applied.summary.confirmedFacts.contains("eBrain active kill switches: force_guard_mode"))
@@ -2426,6 +2501,25 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         )
     }
 
+    func testBaseBrainTurnReplayCheckpointFactsCarryFallbackActionLineWhenAlternativesAreEmpty() {
+        var turn = makeProtectiveTurn()
+        turn.renderedOutput = BASRenderedOutput(
+            mode: turn.renderedOutput.mode,
+            headline: turn.renderedOutput.headline,
+            body: turn.renderedOutput.body,
+            alternativeActions: [],
+            explanationCodes: turn.renderedOutput.explanationCodes,
+            surfaceGuide: turn.renderedOutput.surfaceGuide
+        )
+
+        let replayCheckpointFacts = turn.replayCheckpointFacts
+
+        XCTAssertEqual(
+            replayCheckpointFacts.actionLine,
+            "action: Draft but do not send yet."
+        )
+    }
+
     func testFactsBundleBuildsOrderedDataLayerSignals() {
         let turn = makeProtectiveTurn()
         let factsBundle = DeveloperDecisionReplayEBrainSummary(turn: turn).factsBundle()
@@ -2442,6 +2536,8 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
                 factsBundle.summaryLine,
                 turn.replayCheckpointFacts.budgetLine,
                 factsBundle.displayPresenceLine(),
+                factsBundle.displayCognitionLine(),
+                factsBundle.displayMirrorCalibrationLine(),
                 turn.replayCheckpointFacts.pressureLine,
                 turn.replayCheckpointFacts.taskLine,
                 factsBundle.riskFactorsLine,
@@ -2505,6 +2601,8 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
                 factsBundle.summaryLine,
                 turn.replayCheckpointFacts.budgetLine,
                 factsBundle.displayPresenceLine(),
+                factsBundle.displayCognitionLine(),
+                factsBundle.displayMirrorCalibrationLine(),
                 turn.replayCheckpointFacts.pressureLine,
                 turn.replayCheckpointFacts.taskLine,
                 factsBundle.riskFactorsLine,
@@ -2654,7 +2752,7 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         XCTAssertTrue(factsBundle.dataLayerSignals.contains(expectedResolvedRetractionLine()))
     }
 
-    func testPersistedCheckpointLayerStackCarriesWindGateSummaryWhenLineageIncludesL11Projection() {
+    func testPersistedCheckpointLayerStackCarriesWindGateSummaryWhenLineageIncludesL11Projection() throws {
         let lineageSummary = BASEvolutionLineageSummary(
             recordedAt: Date(timeIntervalSince1970: 1_776_610_000),
             sessionID: "session-wind-gate",
@@ -2676,6 +2774,11 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
             sovereignHintLevel: "elevated"
         )
         let summary = DeveloperDecisionReplayEBrainSummary(lineageSummary: lineageSummary)
+        let expectedRecoveryWindGateLine = try XCTUnwrap(
+            DecisionEvolutionEBrainPresentationSupport.windGateMetadataLine(
+                rawLine: summary.checkpointWindGateLine
+            )
+        )
 
         XCTAssertTrue(
             summary.layerStackLines.contains(
@@ -2697,11 +2800,11 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         )
         XCTAssertEqual(
             summary.replayRecoverySummary.windGateLine,
-            "L11 wind gate • primary delay • assert guarded • delay cool_down • substitute draft • sovereign elevated"
+            expectedRecoveryWindGateLine
         )
         XCTAssertTrue(
             summary.replayRecoverySummary.digestLines.contains(
-                "L11 wind gate • primary delay • assert guarded • delay cool_down • substitute draft • sovereign elevated"
+                expectedRecoveryWindGateLine
             )
         )
     }
@@ -2894,6 +2997,9 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
                     && $0.text == "Reason codes: risk.high • gsi.elevated • evidence.caveat"
             }
         )
+        XCTAssertFalse(
+            presentation.diagnosticsLines.contains { $0.kind == .court }
+        )
     }
 
     @MainActor
@@ -2965,6 +3071,12 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         let exportedCourtLine = export.effectiveEBrainFactsBundle?.consoleRuntimeSummaryAdditions.first {
             $0.hasPrefix("Court:")
         }
+        let entry = DeveloperDecisionReplayEntry(
+            record: .quick(makeQuickEvent(createdAt: .now, title: "Court-aware quick")),
+            trace: nil,
+            eBrain: summary
+        )
+        let presentation = entry.diagnosticsPresentation
 
         XCTAssertEqual(factsBundleCourtLine, expectedCourtLine)
         XCTAssertTrue(factsBundle.consoleRuntimeSummaryAdditions.contains(expectedCourtLine))
@@ -2972,6 +3084,58 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         XCTAssertEqual(exportedCourtLine, expectedCourtLine)
         XCTAssertTrue(
             export.flightDeck.eBrainSummary?.presentation.detailLines.contains(expectedCourtLine) == true
+        )
+        XCTAssertTrue(presentation.overviewPresentation.detailLines.contains(expectedCourtLine))
+        XCTAssertEqual(presentation.courtLine, expectedCourtLine)
+        XCTAssertTrue(
+            presentation.diagnosticsLines.contains {
+                $0.kind == .court && $0.text == expectedCourtLine
+            }
+        )
+    }
+
+    @MainActor
+    func testFactsBundleAndFlightDeckCarryFallbackActionLineWhenAlternativesAreEmpty() async {
+        var turn = makeProtectiveTurn()
+        turn.renderedOutput = BASRenderedOutput(
+            mode: turn.renderedOutput.mode,
+            headline: turn.renderedOutput.headline,
+            body: turn.renderedOutput.body,
+            alternativeActions: [],
+            explanationCodes: turn.renderedOutput.explanationCodes,
+            surfaceGuide: turn.renderedOutput.surfaceGuide
+        )
+
+        let summary = DeveloperDecisionReplayEBrainSummary(turn: turn)
+        let factsBundle = summary.factsBundle()
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            replayLimit: 0,
+            debugStore: DecisionIntelligenceDebugStore(),
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        ).attaching(eBrainTurn: turn)
+        let expectedActionLine = "action: Draft but do not send yet."
+
+        XCTAssertEqual(factsBundle.actionLine, expectedActionLine)
+        XCTAssertTrue(factsBundle.consoleRuntimeSummaryAdditions.contains(expectedActionLine))
+        XCTAssertTrue(factsBundle.dataLayerSignals.contains(expectedActionLine))
+        XCTAssertEqual(export.effectiveEBrainFactsBundle?.actionLine, expectedActionLine)
+        XCTAssertTrue(
+            export.flightDeck.eBrainSummary?.presentation.detailLines.contains(expectedActionLine) == true
+        )
+        XCTAssertTrue(
+            export.flightDeck.eBrainDigestPresentation?.summaryLines.contains(expectedActionLine) == true
+        )
+        XCTAssertTrue(
+            export.flightDeck.layerReports.first(where: { $0.layer == .data })?.signals.contains(
+                expectedActionLine
+            ) == true
         )
     }
 
@@ -2991,6 +3155,49 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         )
         XCTAssertEqual(checkpointSummary.sourceDescriptor.kind, .checkpointRecovery)
         XCTAssertEqual(checkpointSummary.sourceDescriptor.title, "Checkpoint recovery")
+    }
+
+    func testPersistedLineageSynthesizesCourtLineForCheckpointPresentations() {
+        let governanceSummary = BASEvolutionLineageSummary.GovernanceSummary(
+            experienceCandidateCount: 0,
+            shadowTrialCount: 0,
+            pendingShadowTrialCount: 0,
+            sealCount: 0,
+            pendingSealCount: 0,
+            versionDeltaCount: 0,
+            retractionOrderCount: 0,
+            pendingRetractionCount: 0,
+            dreamLoopRemandTargets: ["L9", "L14"],
+            dreamLoopReservationMode: "delayRight"
+        )
+        let summary = DeveloperDecisionReplayEBrainSummary(
+            lineageSummary: makeLineageSummary(
+                sessionID: "lineage-court",
+                riskLevel: "high",
+                permitMode: "delay",
+                activeKillSwitches: ["force_guard_mode"],
+                recommendedKillSwitches: ["require_reviewed_writes"],
+                governanceSummary: governanceSummary
+            )
+        )
+        let snapshot = DecisionReviewCheckpointSnapshot(
+            checkpointID: "checkpoint-lineage-court",
+            createdAt: .now,
+            mode: .quick,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Recovered court-aware lineage"],
+            eBrain: summary,
+            fallbackRiskLevel: "watch",
+            fallbackPermitMode: "local_only_protective"
+        )
+
+        let presentation = DecisionEvolutionCheckpointPresentation(snapshot: snapshot)
+
+        XCTAssertEqual(summary.courtLine, "Court: agency delay right • remand L9, L14")
+        XCTAssertEqual(presentation.courtSummaryLine, summary.courtLine)
+        XCTAssertEqual(presentation.queueItem.courtLine, summary.courtLine)
     }
 
     func testReplayRecoverySummaryDerivesSharedLinesFromReplayEBrainSummary() {
@@ -3022,7 +3229,9 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         )
         XCTAssertEqual(
             livePresentation.windGateLine,
-            expectedProtectiveLayerStackLines().first(where: { $0.hasPrefix("L11 wind gate") })
+            DecisionEvolutionEBrainPresentationSupport.windGateMetadataLine(
+                rawLine: expectedProtectiveLayerStackLines().first(where: { $0.hasPrefix("L11 wind gate") })
+            )
         )
         XCTAssertNil(livePresentation.actionLine)
         XCTAssertEqual(
@@ -3195,6 +3404,9 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         )
         XCTAssertEqual(presentation.riskFactorsLine, support.riskFactorsLine)
         XCTAssertEqual(presentation.reasonCodesLine, support.reasonCodesLine)
+        XCTAssertEqual(presentation.courtLine, support.courtLine)
+        XCTAssertEqual(presentation.cognitionLine, support.cognitionLine)
+        XCTAssertEqual(presentation.mirrorCalibrationLine, support.mirrorCalibrationLine)
         XCTAssertEqual(presentation.thoughtFoldLines, ["• body: Mirror body", "• headline: Pause first"])
         XCTAssertEqual(presentation.replayTraceLines, ["• L11 gate: Protective short-circuited refinement."])
         XCTAssertEqual(presentation.auditLines, support.auditLines)
@@ -3202,6 +3414,76 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
             presentation.triScoreLines,
             ["• cand-1: id 42 / ego 81 / superego 91"]
         )
+    }
+
+    func testBaseBrainTurnDiagnosticsPresentationFallsBackToSurfaceGuidanceWhenAlternativesAreEmpty() {
+        var turn = makeProtectiveTurn()
+        turn.renderedOutput = BASRenderedOutput(
+            mode: turn.renderedOutput.mode,
+            headline: turn.renderedOutput.headline,
+            body: turn.renderedOutput.body,
+            alternativeActions: [],
+            explanationCodes: turn.renderedOutput.explanationCodes,
+            surfaceGuide: turn.renderedOutput.surfaceGuide
+        )
+
+        let presentation = turn.diagnosticsPresentation
+
+        XCTAssertEqual(presentation.alternativeActions, [])
+        XCTAssertEqual(presentation.deliveryFallbackGuidance, "Draft but do not send yet.")
+    }
+
+    func testDecisionEBrainPresentationFrameCarriesFallbackGuidanceWhenAlternativesAreEmpty() {
+        var turn = makeProtectiveTurn()
+        turn.renderedOutput = BASRenderedOutput(
+            mode: turn.renderedOutput.mode,
+            headline: turn.renderedOutput.headline,
+            body: turn.renderedOutput.body,
+            alternativeActions: [],
+            explanationCodes: turn.renderedOutput.explanationCodes,
+            surfaceGuide: turn.renderedOutput.surfaceGuide
+        )
+
+        let presentationFrame = DecisionEBrainPresentationFrame.build(from: turn)
+
+        XCTAssertEqual(presentationFrame.alternativeActions, [])
+        XCTAssertEqual(presentationFrame.deliveryFallbackGuidance, "Draft but do not send yet.")
+    }
+
+    func testReplayRecoverySummaryFallsBackToSurfaceActionLineWhenAlternativesAreEmpty() {
+        var turn = makeProtectiveTurn()
+        turn.renderedOutput = BASRenderedOutput(
+            mode: turn.renderedOutput.mode,
+            headline: turn.renderedOutput.headline,
+            body: turn.renderedOutput.body,
+            alternativeActions: [],
+            explanationCodes: turn.renderedOutput.explanationCodes,
+            surfaceGuide: turn.renderedOutput.surfaceGuide
+        )
+
+        let replaySummary = DeveloperDecisionReplayEBrainSummary(turn: turn).replayRecoverySummary
+
+        XCTAssertEqual(replaySummary.actionLine, "action: Draft but do not send yet.")
+        XCTAssertTrue(replaySummary.digestLines.contains("action: Draft but do not send yet."))
+    }
+
+    func testSessionCheckpointFactsApplyFallbackActionLineWhenAlternativesAreEmpty() {
+        var turn = makeProtectiveTurn()
+        turn.renderedOutput = BASRenderedOutput(
+            mode: turn.renderedOutput.mode,
+            headline: turn.renderedOutput.headline,
+            body: turn.renderedOutput.body,
+            alternativeActions: [],
+            explanationCodes: turn.renderedOutput.explanationCodes,
+            surfaceGuide: turn.renderedOutput.surfaceGuide
+        )
+
+        let checkpointFacts = turn.sessionCheckpointFacts
+        let applied = checkpointFacts.applied(to: .empty)
+
+        XCTAssertEqual(checkpointFacts.actionFactLine, "action: Draft but do not send yet.")
+        XCTAssertEqual(applied.summary.actionLine, "action: Draft but do not send yet.")
+        XCTAssertTrue(applied.summary.confirmedFacts.contains("action: Draft but do not send yet."))
     }
 
     func testBaseBrainTurnDiagnosticsPresentationPrioritizesCrossLayerReplayTraceLines() {
@@ -3376,6 +3658,7 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
                 values: ["risk.high", "gsi.elevated"]
             )
         )
+        XCTAssertNil(support.courtLine)
         XCTAssertEqual(
             support.ticketSummary,
             "Review memory write: Keep the boundary signal in warm memory."
@@ -3562,12 +3845,12 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         XCTAssertTrue(tracePresentation.compactDiagnosticsLines.isEmpty)
     }
 
-    func testReplayEntryDiagnosticsPresentationCarriesLiveBudgetAndTaskLines() {
+    func testReplayEntryDiagnosticsPresentationCarriesLiveBudgetAndTaskLines() throws {
         let protectiveTurn = makeProtectiveTurn()
         let eBrain = DeveloperDecisionReplayEBrainSummary(turn: protectiveTurn)
-        let organPackageLine = eBrain.organPackageLine
-        let organDeltaLine = eBrain.organDeltaLine
-        let schedulerLine = eBrain.schedulerLine
+        let schedulerLine = try XCTUnwrap(eBrain.schedulerLine)
+        let cognitionLine = try XCTUnwrap(eBrain.cognitionLine)
+        let mirrorCalibrationLine = try XCTUnwrap(eBrain.mirrorCalibrationLine)
         let entry = DeveloperDecisionReplayEntry(
             record: .quick(makeQuickEvent(createdAt: .now, title: "Quick")),
             trace: nil,
@@ -3596,26 +3879,30 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
             presentation.digestHeadlineLine,
             "Live runtime • QUICK • HIGH → DELAY"
         )
-        XCTAssertEqual(
-            presentation.overviewPresentation,
-            DecisionEvolutionReplayOverviewPresentation(
-                labelLine: "Live runtime • QUICK • HIGH → DELAY",
-                titleLine: "high pressure",
-                detailLines: [
-                    "Review memory write: Keep the boundary signal in warm memory.",
-                    "Factors: pressure • uncertainty",
-                    "Reason codes: risk.high • gsi.elevated",
-                    "Audit 1 • Active kill switches 1 • Recommended 1 • Host gate 37%",
-                    "Breath guard • Phase exchange • Restore 84%",
-                    organPackageLine,
-                    organDeltaLine,
-                    schedulerLine,
-                    "Hot pack stubCore, riskSpine, permitKnot, consistencyLattice • Warm coreCortex, criticBlade, tissueRouter, memoryCodecRidge, hostModulationMesh, toolIntentMesh • Cold 2 • preload guard_preload • eviction protective_retain",
-                    "Resume frame resume.session-1.fold-1 • source fold-1 • depth 1 • organs coreCortex, criticBlade, riskSpine, permitKnot, consistencyLattice, stubCore, tissueRouter",
-                    "Rollback anchor rollback.session-1.fold-1 • snapshot snapshot.session-1.fold-1 • cache cache.session-1.precision.session-1.fold-1"
-                ].compactMap { $0 }
+        XCTAssertEqual(presentation.overviewPresentation.labelLine, "Live runtime • QUICK • HIGH → DELAY")
+        XCTAssertEqual(presentation.overviewPresentation.titleLine, "high pressure")
+        XCTAssertTrue(
+            presentation.overviewPresentation.detailLines.contains(
+                "Review memory write: Keep the boundary signal in warm memory."
             )
         )
+        XCTAssertTrue(presentation.overviewPresentation.detailLines.contains("Factors: pressure • uncertainty"))
+        XCTAssertTrue(presentation.overviewPresentation.detailLines.contains("Reason codes: risk.high • gsi.elevated"))
+        XCTAssertTrue(presentation.overviewPresentation.detailLines.contains(cognitionLine))
+        XCTAssertTrue(presentation.overviewPresentation.detailLines.contains(mirrorCalibrationLine))
+        XCTAssertNil(presentation.courtLine)
+        XCTAssertFalse(presentation.overviewPresentation.detailLines.contains { $0.hasPrefix("Court:") })
+        XCTAssertTrue(
+            presentation.overviewPresentation.detailLines.contains(
+                "Audit 1 • Active kill switches 1 • Recommended 1 • Host gate 37%"
+            )
+        )
+        XCTAssertTrue(
+            presentation.overviewPresentation.detailLines.contains(
+                "Breath guard • Phase exchange • Restore 84%"
+            )
+        )
+        XCTAssertTrue(presentation.overviewPresentation.detailLines.contains(schedulerLine))
         XCTAssertEqual(
             presentation.replayCardCopy,
             DecisionEvolutionReplayCardCopy(
@@ -3624,27 +3911,8 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
                 supplementaryLine: "Review memory write: Keep the boundary signal in warm memory."
             )
         )
-        XCTAssertEqual(
-            presentation.overviewCardCopy,
-            DecisionEvolutionReplayOverviewCardCopy(
-                labelLine: "Live runtime • QUICK • HIGH → DELAY",
-                titleLine: "high pressure",
-                detailLines: [
-                    "Buy • Wait 90 seconds",
-                    "Review memory write: Keep the boundary signal in warm memory.",
-                    "Factors: pressure • uncertainty",
-                    "Reason codes: risk.high • gsi.elevated",
-                    "Audit 1 • Active kill switches 1 • Recommended 1 • Host gate 37%",
-                    "Breath guard • Phase exchange • Restore 84%",
-                    organPackageLine,
-                    organDeltaLine,
-                    schedulerLine,
-                    "Hot pack stubCore, riskSpine, permitKnot, consistencyLattice • Warm coreCortex, criticBlade, tissueRouter, memoryCodecRidge, hostModulationMesh, toolIntentMesh • Cold 2 • preload guard_preload • eviction protective_retain",
-                    "Resume frame resume.session-1.fold-1 • source fold-1 • depth 1 • organs coreCortex, criticBlade, riskSpine, permitKnot, consistencyLattice, stubCore, tissueRouter",
-                    "Rollback anchor rollback.session-1.fold-1 • snapshot snapshot.session-1.fold-1 • cache cache.session-1.precision.session-1.fold-1"
-                ].compactMap { $0 }
-            )
-        )
+        XCTAssertEqual(presentation.overviewCardCopy.labelLine, "Live runtime • QUICK • HIGH → DELAY")
+        XCTAssertEqual(presentation.overviewCardCopy.titleLine, "high pressure")
         XCTAssertEqual(
             presentation.overviewCardCopy.primaryDetailLine,
             "Buy • Wait 90 seconds"
@@ -3653,21 +3921,22 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
             presentation.overviewCardCopy.secondaryDetailLine,
             "Review memory write: Keep the boundary signal in warm memory."
         )
-        XCTAssertEqual(
-            presentation.overviewCardCopy.remainingDetailLines,
-            [
-                "Factors: pressure • uncertainty",
-                "Reason codes: risk.high • gsi.elevated",
-                "Audit 1 • Active kill switches 1 • Recommended 1 • Host gate 37%",
-                "Breath guard • Phase exchange • Restore 84%",
-                organPackageLine,
-                organDeltaLine,
-                schedulerLine,
-                "Hot pack stubCore, riskSpine, permitKnot, consistencyLattice • Warm coreCortex, criticBlade, tissueRouter, memoryCodecRidge, hostModulationMesh, toolIntentMesh • Cold 2 • preload guard_preload • eviction protective_retain",
-                "Resume frame resume.session-1.fold-1 • source fold-1 • depth 1 • organs coreCortex, criticBlade, riskSpine, permitKnot, consistencyLattice, stubCore, tissueRouter",
-                "Rollback anchor rollback.session-1.fold-1 • snapshot snapshot.session-1.fold-1 • cache cache.session-1.precision.session-1.fold-1"
-            ].compactMap { $0 }
+        XCTAssertTrue(presentation.overviewCardCopy.remainingDetailLines.contains("Factors: pressure • uncertainty"))
+        XCTAssertTrue(presentation.overviewCardCopy.remainingDetailLines.contains("Reason codes: risk.high • gsi.elevated"))
+        XCTAssertFalse(presentation.overviewCardCopy.remainingDetailLines.contains { $0.hasPrefix("Court:") })
+        XCTAssertTrue(presentation.overviewCardCopy.remainingDetailLines.contains(cognitionLine))
+        XCTAssertTrue(presentation.overviewCardCopy.remainingDetailLines.contains(mirrorCalibrationLine))
+        XCTAssertTrue(
+            presentation.overviewCardCopy.remainingDetailLines.contains(
+                "Audit 1 • Active kill switches 1 • Recommended 1 • Host gate 37%"
+            )
         )
+        XCTAssertTrue(
+            presentation.overviewCardCopy.remainingDetailLines.contains(
+                "Breath guard • Phase exchange • Restore 84%"
+            )
+        )
+        XCTAssertTrue(presentation.overviewCardCopy.remainingDetailLines.contains(schedulerLine))
         XCTAssertEqual(
             presentation.diagnosticsHeaderCopy,
             DecisionEvolutionReplayDiagnosticsHeaderCopy(
@@ -3707,6 +3976,7 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
                 $0.text == "Rollback anchor rollback.session-1.fold-1 • snapshot snapshot.session-1.fold-1 • cache cache.session-1.precision.session-1.fold-1"
             }
         )
+        XCTAssertFalse(presentation.compactDiagnosticsLines.contains { $0.kind == .court })
         XCTAssertFalse(
             presentation.fullDiagnosticsLines(excludingHeaderSummary: true).contains {
                 $0.text == "Audit 1 • Active kill switches 1 • Recommended 1 • Host gate 37%"
@@ -3846,6 +4116,82 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
 
         XCTAssertTrue(presentation.overviewPresentation.detailLines.contains(expectedCourtLine))
         XCTAssertTrue(presentation.overviewCardCopy.remainingDetailLines.contains(expectedCourtLine))
+    }
+
+    func testReplayEntryDiagnosticsPresentationCondensesDreamLoopAndWindGateIntoLineageMetadata() throws {
+        var turn = makeProtectiveTurn()
+        turn.thoughtFrame.convergenceCertificate = BASConvergenceCertificate(
+            certID: "cert-dream-loop-overview",
+            frontierID: "frontier-dream-loop-overview",
+            stabilityScore: 0.82,
+            stoppingMode: .guardTakeover,
+            recommendedNextStep: "Keep the safer branch active."
+        )
+        turn.thoughtFrame.agencyReservation = BASAgencyReservation(
+            mode: .delayRight,
+            reasons: ["wait_for_host"],
+            expiresWith: "lease-1"
+        )
+        turn.thoughtFrame.remandOrders = [
+            BASRemandOrder(
+                targetLayer: "L9",
+                requiredWork: ["keep guard branch"],
+                reasonCodes: ["dream_loop.guard_takeover"]
+            ),
+            BASRemandOrder(
+                targetLayer: "L14",
+                requiredWork: ["preserve sovereign boundary"],
+                reasonCodes: ["dream_loop.breakpoint"]
+            )
+        ]
+        turn.thoughtFrame.evidenceDebts = [
+            BASEvidenceDebt(
+                debtID: "debt-dream-loop-overview",
+                candidateID: "cand-1",
+                missingEvidence: ["host_readiness"],
+                validationActions: ["wait"],
+                debtWeight: 0.81
+            )
+        ]
+        turn.updateTickets[0].governanceRefs = [
+            "dream_loop:guardTakeover",
+            "dream_loop:evidence_debt",
+            "dream_loop:breakpoint"
+        ]
+
+        let eBrain = DeveloperDecisionReplayEBrainSummary(turn: turn)
+        let entry = DeveloperDecisionReplayEntry(
+            record: .quick(makeQuickEvent(createdAt: .now, title: "Quick")),
+            trace: nil,
+            eBrain: eBrain
+        )
+        let presentation = entry.diagnosticsPresentation
+        let expectedDreamLoopLine =
+            "L9 dream loop • stop guard takeover • reserve delay right • remand L9, L14 • debt 81% • signals evidence debt, breakpoint"
+        let expectedWindGateLine = try XCTUnwrap(
+            eBrain.layerStackLines.first(where: { $0.hasPrefix("L11 wind gate") })
+        )
+        let expectedMetadataText = DecisionEvolutionCheckpointDetailPresentationSupport.combinedMetadataText(
+            base: nil,
+            supplementalLines: [
+                DecisionEvolutionCheckpointDetailPresentationSupport.windGateMetadataLine(
+                    layerStackLines: eBrain.layerStackLines
+                ),
+                DecisionEvolutionCheckpointDetailPresentationSupport.dreamLoopMetadataLine(
+                    layerStackLines: eBrain.layerStackLines
+                )
+            ]
+            .compactMap { $0 }
+        )
+
+        XCTAssertEqual(presentation.windGateLine, expectedWindGateLine)
+        XCTAssertEqual(presentation.dreamLoopLine, expectedDreamLoopLine)
+        XCTAssertEqual(presentation.lineageMetadataText, expectedMetadataText)
+        XCTAssertTrue(presentation.overviewCardCopy.remainingDetailLines.contains(expectedDreamLoopLine))
+        XCTAssertFalse(presentation.overviewSupplementaryDetailLines.contains(expectedDreamLoopLine))
+        XCTAssertTrue(
+            presentation.overviewSupplementaryDetailLines.contains("Factors: pressure • uncertainty")
+        )
     }
 
     func testDiagnosticsHeaderCopyDoesNotRepeatSummaryWhenItMatchesTaskTitle() throws {
@@ -4018,7 +4364,7 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
             "L10-L12 adjudication • tri 1 scored/0 veto • HIGH → DELAY • GSI 68% • alternatives 2",
             "L11 wind gate • primary delay • stacked draft_only • assert guarded • tool bounded • memory standard • second check • allow bounded_reply • block tool_commit, memory_commit • delay cool_down • substitute draft • sovereign elevated",
             "L13 evolution • 1 tickets • Review memory write: Keep the boundary signal in warm memory.",
-            "L14 sovereign • constraints tool_cut, memory_freeze • verdict quarantine • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session • audit BR-SOV-004 • active force_guard_mode • recommended require_reviewed_writes"
+            "L14 sovereign • constraints tool_cut, memory_freeze • verdict quarantine • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session • audit BR-SOV-004 • active force_guard_mode • recommended require_reviewed_writes"
         ]
     }
 
@@ -4031,7 +4377,7 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
     }
 
     private func expectedProtectiveWindGateSummaryLine() -> String {
-        "Wind gate: primary delay • stacked draft_only • assert guarded • tool bounded • memory standard • second check • allow bounded_reply • block tool_commit, memory_commit • delay cool_down • substitute draft • sovereign elevated"
+        "Wind gate: primary delay • stacked draft only • assert guarded • tool bounded • memory standard • second check • allow bounded reply • block tool commit, memory commit • delay cool down • substitute draft • sovereign elevated"
     }
 
     private func expectedProtectiveRollbackRetainLine() -> String {
@@ -4182,7 +4528,8 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
         permitMode: String,
         activeKillSwitches: [String],
         recommendedKillSwitches: [String],
-        reviewDirectiveLine: String? = nil
+        reviewDirectiveLine: String? = nil,
+        governanceSummary: BASEvolutionLineageSummary.GovernanceSummary? = nil
     ) -> BASEvolutionLineageSummary {
         BASEvolutionLineageSummary(
             recordedAt: .now,
@@ -4205,7 +4552,8 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
             projectionLeadCandidateID: "cand-1",
             projectionCandidateCount: 1,
             projectionForecastCount: 1,
-            projectionCritiqueCount: 1
+            projectionCritiqueCount: 1,
+            governanceSummary: governanceSummary
         )
     }
 
@@ -4563,16 +4911,29 @@ final class DeveloperDecisionReplayBuilderTests: XCTestCase {
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: [sovereignCommitToken],
             sovereignWarrants: [
-                BASSovereignWarrant(
-                    warrantID: "warrant.session-l14.memory",
-                    scope: .memoryWrite,
-                    actionDigest: sovereignCommitToken.actionDigest,
-                    jurisdictionRef: "jurisdiction.memoryWrite",
-                    snapshotRef: sovereignCommitToken.snapshotRef,
-                    timeLockRef: "timelock.turn-l14.memoryWrite.ttl_30000",
-                    singleUse: true,
-                    signature: "signature.warrant-l14"
-                )
+                {
+                    var warrant = BASSovereignWarrant(
+                        warrantID: "warrant.session-l14.memory",
+                        scope: .memoryWrite,
+                        actionDigest: sovereignCommitToken.actionDigest,
+                        commitTokenRef: sovereignCommitToken.tokenID,
+                        jurisdictionRef: "jurisdiction.memoryWrite",
+                        snapshotRef: sovereignCommitToken.snapshotRef,
+                        timeLockRef: "timelock.turn-l14.memoryWrite.ttl_30000",
+                        policyHash: sovereignCommitToken.policyHash,
+                        witnessRefs: [
+                            "permit.turn-l14.memoryWrite",
+                            "integrity.snapshot.session-l14",
+                            "continuity.turn-l14",
+                            "policy.policy-hash.session-l14"
+                        ],
+                        singleUse: true,
+                        signature: "signature.warrant-l14"
+                    )
+                    warrant.issuedAt = Date(timeIntervalSince1970: 1_776_150_000)
+                    warrant.expiresAt = Date(timeIntervalSince1970: 1_776_150_030)
+                    return warrant
+                }()
             ],
             sovereignLock: sovereignLock,
             quarantineRecords: [quarantineRecord],

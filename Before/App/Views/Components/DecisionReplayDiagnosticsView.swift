@@ -67,11 +67,11 @@ struct DecisionReplayDiagnosticsView: View {
             Text(line.text)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-        case .pressure, .action, .audit, .killSwitches, .trace, .riskFactors, .reasonCodes:
+        case .pressure, .action, .audit, .killSwitches, .trace, .riskFactors, .reasonCodes, .court:
             Text(line.text)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-        case .eBrain, .foldedLung, .organDelta, .scheduler, .hotCold, .resume, .rollback, .sovereignBridge:
+        case .eBrain, .cognition, .mirrorCalibration, .foldedLung, .organDelta, .scheduler, .hotCold, .resume, .rollback, .sovereignBridge:
             Text(line.text)
                 .font(.caption)
                 .foregroundStyle(.secondary)

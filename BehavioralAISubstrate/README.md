@@ -23,7 +23,7 @@ Product language stays in the host. The substrate exposes generic workflow and l
 ```swift
 import BASHostKit
 
-var configuration = BASHostConfiguration.generic
+var configuration = BASHostConfiguration.fixtureGeneric
 configuration.workflowBehavior = BASHostWorkflowBehaviorConfiguration(
     hostNamespace: "host"
 )

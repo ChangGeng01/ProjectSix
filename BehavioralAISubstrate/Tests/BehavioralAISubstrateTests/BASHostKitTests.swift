@@ -33,7 +33,7 @@ final class BASHostKitTests: XCTestCase {
         var tuning = BASEBrainRuntimeSynthesisPolicy.generic.withSchemaVersion(schemaVersion)
         tuning.wakeIntent.highRiskGuardThreshold = 0.69
         tuning.stateTransitions.quarantineFailureGuardThreshold = 3
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
         tuning.lease.restrictedEnergyQuota = 0.46
@@ -53,7 +53,7 @@ final class BASHostKitTests: XCTestCase {
         runtimeProfileID: String = "host.default-runtime",
         policyProfileID: String = "host.default-policy",
         prefersPureLocal: Bool = true,
-        defaultDeviceState: BASDeviceState = BASHostConfiguration.genericDefaultDeviceState,
+        defaultDeviceState: BASDeviceState = BASHostConfiguration.fixtureDefaultDeviceState,
         console: BASHostConsoleConfiguration = .generic,
         lifecycleBehavior: BASHostLifecycleBehaviorConfiguration = .generic,
         workflowBehavior: BASHostWorkflowBehaviorConfiguration = .generic,
@@ -644,6 +644,11 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertTrue(result.eBrainTurn?.hostContext.styleConstraints.contains("structure_bias:0.97") == true)
         XCTAssertEqual(result.eBrainTurn?.thoughtFold.compactSlots["constitution_version"], "constitution.v9")
         XCTAssertEqual(result.eBrainTurn?.thoughtFold.compactSlots["constitution_phase"], "evolution")
+        XCTAssertTrue(result.eBrainTurn?.thoughtFold.compactSlots["host_mod"]?.contains("tone:warm_high") == true)
+        XCTAssertTrue(result.eBrainTurn?.thoughtFold.compactSlots["host_mod"]?.contains("phase:evolution") == true)
+        XCTAssertTrue(result.eBrainTurn?.thoughtFold.compactSlots["host_mod"]?.contains("goal:stay_bounded") == true)
+        XCTAssertTrue(result.eBrainTurn?.thoughtFold.compactSlots["host_mod"]?.contains("relation:partner") == true)
+        XCTAssertTrue(result.eBrainTurn?.thoughtFold.compactSlots["host_mod"]?.contains("memory:review_required") == true)
         XCTAssertEqual(result.eBrainTurn?.thoughtFold.compactSlots["vault_signature"], vault.versionSignature)
         XCTAssertEqual(result.eBrainTurn?.thoughtFold.compactSlots["vault_sync_revocations"], "1")
         XCTAssertEqual(result.eBrainTurn?.thoughtFold.compactSlots["vault_consistency_state"], "revocation_pending")
@@ -676,6 +681,18 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertTrue(result.currentBrain.retrievalTags.contains("forget_verified:false"))
         XCTAssertTrue(result.currentBrain.retrievalTags.contains("forget_checkpoints_revoked:true"))
         XCTAssertTrue(result.currentBrain.retrievalTags.contains("forget_sync_exports_revoked:true"))
+        XCTAssertEqual(Array(result.currentBrain.dominantGoals.prefix(2)), ["stay_bounded", "evolve_l5"])
+        XCTAssertEqual(result.currentBrain.relationshipBoundary, "partner")
+        XCTAssertTrue(result.currentBrain.boundaryHeadline.contains("stable center protect long-term agency"))
+        XCTAssertTrue(result.currentBrain.boundaryHeadline.contains("confirm remote_write"))
+        XCTAssertTrue(result.currentBrain.boundaryHeadline.contains("no-go unsafe_override"))
+        XCTAssertTrue(result.currentBrain.activeConstraints.contains("constitution_goal:stay_bounded"))
+        XCTAssertTrue(result.currentBrain.activeConstraints.contains("constitution_confirm_required:remote_write"))
+        XCTAssertTrue(result.currentBrain.activeConstraints.contains("constitution_no_go:unsafe_override"))
+        XCTAssertTrue(result.currentBrain.activeConstraints.contains("constitution_relation:partner"))
+        XCTAssertTrue(result.currentBrain.activeConstraints.contains("constitution_phase:evolution"))
+        XCTAssertTrue(result.currentBrain.activeConstraints.contains("constitution_memory_promotion:review_required"))
+        XCTAssertTrue(result.currentBrain.activeConstraints.contains("constitution_tool_write_scope:manual_confirm"))
         XCTAssertTrue(result.currentBrain.verificationSummary.contains("constitution:constitution.v9"))
         XCTAssertTrue(result.currentBrain.verificationSummary.contains("phase:evolution"))
         XCTAssertTrue(result.currentBrain.verificationSummary.contains("vault_signature:\(vault.versionSignature)"))
@@ -689,14 +706,26 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertTrue(result.currentBrain.verificationSummary.contains("forget:forget.private_notes"))
         XCTAssertTrue(result.currentBrain.verificationSummary.contains("forget_checkpoints_revoked:true"))
         XCTAssertTrue(result.currentBrain.verificationSummary.contains("forget_sync_exports_revoked:true"))
+        XCTAssertTrue(result.eBrainTurn?.thoughtFold.hostEffectSummary.contains("phase:evolution") == true)
+        XCTAssertTrue(result.eBrainTurn?.thoughtFold.hostEffectSummary.contains("goal:stay_bounded") == true)
+        XCTAssertTrue(result.eBrainTurn?.thoughtFold.hostEffectSummary.contains("relation:partner") == true)
+        XCTAssertTrue(result.eBrainTurn?.thoughtFold.hostEffectSummary.contains("memory:review_required") == true)
         XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("phase evolution") == true)
         XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("constitution constitution.v9") == true)
+        XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("modulation tone:warm_high") == true)
+        XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("goal:stay_bounded") == true)
         XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("vault \(vault.versionSignature)") == true)
         XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("consistency revocation_pending") == true)
         XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("target device.review") == true)
         XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("pending 1") == true)
         XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("frozen 1") == true)
         XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("forget forget.private_notes") == true)
+        XCTAssertTrue(
+            result.consoleSnapshot.reports.first(where: { $0.kind == .data })?.summary.contains("modulation tone:warm_high") == true
+        )
+        XCTAssertTrue(
+            result.consoleSnapshot.reports.first(where: { $0.kind == .data })?.summary.contains("goal:stay_bounded") == true
+        )
         XCTAssertTrue(result.consoleSnapshot.inspectionBundle?.trace.auditEvents.contains(where: {
             $0.category == "L5" && $0.message.contains("constitution constitution.v9")
         }) ?? false)
@@ -711,6 +740,18 @@ final class BASHostKitTests: XCTestCase {
         }) ?? false)
         XCTAssertTrue(result.eBrainTurn?.runtimeTrace.layerEvents.contains(where: {
             $0.layerID == "L5" && $0.detail.contains("vault \(vault.versionSignature)")
+        }) ?? false)
+        XCTAssertTrue(result.eBrainTurn?.runtimeTrace.layerEvents.contains(where: {
+            $0.layerID == "L5" && $0.detail.contains("modulation tone:warm_high")
+        }) ?? false)
+        XCTAssertTrue(result.eBrainTurn?.runtimeTrace.layerEvents.contains(where: {
+            $0.layerID == "L5" && $0.detail.contains("phase:evolution")
+        }) ?? false)
+        XCTAssertTrue(result.eBrainTurn?.runtimeTrace.layerEvents.contains(where: {
+            $0.layerID == "L5" && $0.detail.contains("goal:stay_bounded")
+        }) ?? false)
+        XCTAssertTrue(result.eBrainTurn?.runtimeTrace.layerEvents.contains(where: {
+            $0.layerID == "L5" && $0.detail.contains("relation:partner")
         }) ?? false)
         XCTAssertTrue(result.eBrainTurn?.runtimeTrace.layerEvents.contains(where: {
             $0.layerID == "L5" && $0.detail.contains("target device.review")
@@ -1070,6 +1111,100 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertTrue(directForecast.worstCase.contains("partner"))
     }
 
+    func testRuntimeMemoryBundleTemporalFieldProjectsSealedAndRetiredStructures() throws {
+        let runtime = BASHostRuntime(configuration: makeConfiguration())
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .primary,
+            surface: .application,
+            prompt: "Keep the retrieval bounded.",
+            title: "Runtime temporal memory field",
+            riskLevel: .low
+        )
+        let session = try runtime.startSession(request)
+        let archivedID = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEE1")!
+        let retiredID = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEE2")!
+        let anchoredNow = Date(timeIntervalSince1970: 1_776_200_600)
+
+        let turn = runtime.buildEBrainTurn(
+            request: request,
+            currentBrain: session.currentBrain,
+            projection: BASBrainProjection(
+                records: [
+                    BASGovernedMemory(
+                        id: archivedID,
+                        kind: .profile,
+                        content: "Keep the partner boundary private.",
+                        scope: .user,
+                        sensitivity: .high,
+                        tier: .cold,
+                        confidence: 0.91,
+                        sourceType: "history",
+                        lastConfirmedAt: anchoredNow.addingTimeInterval(-600),
+                        governanceStatus: .archived,
+                        provenanceSummary: "Reviewed private boundary retained for guarded recall."
+                    ),
+                    BASGovernedMemory(
+                        id: retiredID,
+                        kind: .semantic,
+                        content: "Discard the contaminated tool memory.",
+                        scope: .session,
+                        sensitivity: .medium,
+                        tier: .warm,
+                        confidence: 0.63,
+                        sourceType: "tool",
+                        lastConfirmedAt: anchoredNow.addingTimeInterval(-300),
+                        governanceStatus: .quarantined,
+                        provenanceSummary: "Quarantined during runtime review after contamination."
+                    )
+                ],
+                candidates: [],
+                recentEvents: []
+            ),
+            now: anchoredNow
+        )
+
+        let field = try XCTUnwrap(turn.memoryBundle.temporalField)
+        let archivedRef = archivedID.uuidString
+        let retiredRef = retiredID.uuidString
+        let archivedProfile = try XCTUnwrap(
+            field.temperatureProfiles.first(where: { $0.profileID == "temp.\(archivedRef)" })
+        )
+        let retiredProfile = try XCTUnwrap(
+            field.temperatureProfiles.first(where: { $0.profileID == "temp.\(retiredRef)" })
+        )
+
+        XCTAssertEqual(field.sanctumEntries.map(\.memoryRef), [archivedRef])
+        XCTAssertEqual(field.quarantineRecords.map(\.memoryRef), [retiredRef])
+        XCTAssertEqual(archivedProfile.currentBand, .sealed)
+        XCTAssertEqual(retiredProfile.currentBand, .quarantine)
+        XCTAssertTrue(
+            field.forgetCascades.contains(where: {
+                $0.rootTargets == [archivedRef] && $0.executionState == "freeze_active"
+            })
+        )
+        XCTAssertTrue(
+            field.forgetCascades.contains(where: {
+                $0.rootTargets == [retiredRef] && $0.executionState == "retired_runtime"
+            })
+        )
+        XCTAssertTrue(
+            field.replayFrames.contains(where: {
+                $0.replayScope == .deletion && $0.targetRefs == [retiredRef]
+            })
+        )
+        XCTAssertTrue(
+            field.records.contains(where: {
+                $0.memoryID == archivedRef && $0.sanctumFlag && !$0.quarantineFlag
+            })
+        )
+        XCTAssertTrue(
+            field.records.contains(where: {
+                $0.memoryID == retiredRef && !$0.sanctumFlag && $0.quarantineFlag
+            })
+        )
+    }
+
     func testConstitutionFacetsRestrictToolIntentDomainsAndRequireSecondCheck() throws {
         var tuning = makePolicyOwnedRuntimeTuning(
             schemaVersion: "host.runtime-synthesis.constitution-tool-intent.v1"
@@ -1078,7 +1213,7 @@ final class BASHostKitTests: XCTestCase {
         tuning.stateTransitions.lowRiskDefaultMode = .deepLoop
         tuning.stateTransitions.lowRiskUrgentMode = .deepLoop
         tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
 
@@ -1329,7 +1464,7 @@ final class BASHostKitTests: XCTestCase {
     }
 
     func testGenericHostConfigurationSurfacesCompiledControlPlaneFallbackIssues() {
-        let configuration = BASHostConfiguration.generic
+        let configuration = BASHostConfiguration.fixtureGeneric
 
         XCTAssertEqual(
             configuration.controlPlaneIssues,
@@ -1347,7 +1482,7 @@ final class BASHostKitTests: XCTestCase {
             runtimeProfileID: "before.local-cognition",
             policyProfileID: "before.product-policy",
             prefersPureLocal: true,
-            defaultDeviceState: BASHostConfiguration.genericDefaultDeviceState,
+            defaultDeviceState: BASHostConfiguration.fixtureDefaultDeviceState,
             console: .generic,
             lifecycleBehavior: .generic,
             workflowBehavior: .generic,
@@ -1373,7 +1508,7 @@ final class BASHostKitTests: XCTestCase {
             runtimeProfileID: "before.local-cognition",
             policyProfileID: "before.product-policy",
             prefersPureLocal: true,
-            defaultDeviceState: BASHostConfiguration.genericDefaultDeviceState,
+            defaultDeviceState: BASHostConfiguration.fixtureDefaultDeviceState,
             console: .generic,
             lifecycleBehavior: .generic,
             workflowBehavior: .generic,
@@ -1405,7 +1540,7 @@ final class BASHostKitTests: XCTestCase {
             runtimeProfileID: "before.local-cognition",
             policyProfileID: "before.product-policy",
             prefersPureLocal: true,
-            defaultDeviceState: BASHostConfiguration.genericDefaultDeviceState,
+            defaultDeviceState: BASHostConfiguration.fixtureDefaultDeviceState,
             console: .generic,
             lifecycleBehavior: .generic,
             workflowBehavior: .generic,
@@ -1476,7 +1611,7 @@ final class BASHostKitTests: XCTestCase {
                 runtimeProfileID: "before.local-cognition",
                 policyProfileID: "before.product-policy",
                 prefersPureLocal: true,
-                defaultDeviceState: BASHostConfiguration.genericDefaultDeviceState,
+                defaultDeviceState: BASHostConfiguration.fixtureDefaultDeviceState,
                 console: .generic,
                 lifecycleBehavior: .generic,
                 workflowBehavior: .generic,
@@ -1512,7 +1647,7 @@ final class BASHostKitTests: XCTestCase {
                 runtimeProfileID: "before.local-cognition",
                 policyProfileID: "before.product-policy",
                 prefersPureLocal: true,
-                defaultDeviceState: BASHostConfiguration.genericDefaultDeviceState,
+                defaultDeviceState: BASHostConfiguration.fixtureDefaultDeviceState,
                 console: .generic,
                 lifecycleBehavior: .generic,
                 workflowBehavior: .generic,
@@ -1548,7 +1683,7 @@ final class BASHostKitTests: XCTestCase {
                 runtimeProfileID: "before.local-cognition",
                 policyProfileID: "before.product-policy",
                 prefersPureLocal: true,
-                defaultDeviceState: BASHostConfiguration.genericDefaultDeviceState,
+                defaultDeviceState: BASHostConfiguration.fixtureDefaultDeviceState,
                 console: .generic,
                 lifecycleBehavior: .generic,
                 workflowBehavior: .generic,
@@ -1579,7 +1714,7 @@ final class BASHostKitTests: XCTestCase {
     }
 
     func testDecodingLegacyHostConfigurationWithoutPolicyLineageRejectsMissingDefaultDeviceState() throws {
-        let encoded = try JSONEncoder().encode(BASHostConfiguration.generic)
+        let encoded = try JSONEncoder().encode(BASHostConfiguration.fixtureGeneric)
         let withoutDeviceState = try removingKey("defaultDeviceState", fromEncodedJSONObject: encoded)
         let withoutRuntimeTuning = try removingKey("runtimeTuning", fromEncodedJSONObject: withoutDeviceState)
         let legacyData = try removingKey("hostRhythmProfile", fromEncodedJSONObject: withoutRuntimeTuning)
@@ -1600,7 +1735,7 @@ final class BASHostKitTests: XCTestCase {
                 runtimeProfileID: "before.local-cognition.v2",
                 policyProfileID: "before.product-policy.v2",
                 prefersPureLocal: true,
-                defaultDeviceState: BASHostConfiguration.genericDefaultDeviceState,
+                defaultDeviceState: BASHostConfiguration.fixtureDefaultDeviceState,
                 console: .generic,
                 lifecycleBehavior: .generic,
                 workflowBehavior: .generic,
@@ -1629,7 +1764,7 @@ final class BASHostKitTests: XCTestCase {
                 runtimeProfileID: "before.local-cognition.v2",
                 policyProfileID: "before.product-policy.v2",
                 prefersPureLocal: true,
-                defaultDeviceState: BASHostConfiguration.genericDefaultDeviceState,
+                defaultDeviceState: BASHostConfiguration.fixtureDefaultDeviceState,
                 console: .generic,
                 lifecycleBehavior: .generic,
                 workflowBehavior: .generic,
@@ -1658,7 +1793,7 @@ final class BASHostKitTests: XCTestCase {
                 runtimeProfileID: "before.local-cognition.v2",
                 policyProfileID: "before.product-policy.v2",
                 prefersPureLocal: true,
-                defaultDeviceState: BASHostConfiguration.genericDefaultDeviceState,
+                defaultDeviceState: BASHostConfiguration.fixtureDefaultDeviceState,
                 console: .generic,
                 lifecycleBehavior: .generic,
                 workflowBehavior: .generic,
@@ -1855,7 +1990,7 @@ final class BASHostKitTests: XCTestCase {
     }
 
     func testGenericHostRuntimeFallsIntoQuarantineRestrictedLane() throws {
-        let runtime = BASHostRuntime(configuration: .generic)
+        let runtime = BASHostRuntime(configuration: .fixtureGeneric)
 
         let result = try runtime.startSession(
             BASHostSessionRequest(
@@ -1874,6 +2009,22 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(turn.recoveryDisposition?.restrictedLease, true)
         XCTAssertEqual(turn.recoveryDisposition?.toolWriteAllowed, false)
         XCTAssertEqual(turn.recoveryDisposition?.memoryWriteAllowed, false)
+        XCTAssertEqual(turn.recoveryDisposition?.operatorReviewRequired, true)
+        XCTAssertEqual(turn.recoveryDisposition?.requiredConfirmations, ["operator_quarantine_release"])
+        XCTAssertEqual(
+            turn.recoveryDisposition?.allowedActionClasses,
+            ["render_local_guidance", "load_governed_memory"]
+        )
+        XCTAssertEqual(turn.recoveryDisposition?.blockedActionClasses, ["tool_write", "memory_write"])
+        XCTAssertEqual(
+            turn.recoveryDisposition?.remediationActions,
+            [
+                "review_runtime_diagnostics",
+                "preserve_quarantine_evidence",
+                "rebuild_trusted_state",
+                "collect_confirmation:operator_quarantine_release"
+            ]
+        )
     }
 
     func testCustomHostRuntimeMissingLineageFallsIntoRecoveryRestrictedLane() throws {
@@ -1932,6 +2083,21 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(turn.recoveryDisposition?.restrictedLease, true)
         XCTAssertEqual(turn.recoveryDisposition?.toolWriteAllowed, false)
         XCTAssertEqual(turn.recoveryDisposition?.memoryWriteAllowed, false)
+        XCTAssertEqual(turn.recoveryDisposition?.operatorReviewRequired, true)
+        XCTAssertEqual(turn.recoveryDisposition?.requiredConfirmations, ["operator_recovery_review"])
+        XCTAssertEqual(
+            turn.recoveryDisposition?.allowedActionClasses,
+            ["render_local_guidance", "load_governed_memory"]
+        )
+        XCTAssertEqual(turn.recoveryDisposition?.blockedActionClasses, ["tool_write", "memory_write"])
+        XCTAssertEqual(
+            turn.recoveryDisposition?.remediationActions,
+            [
+                "review_runtime_diagnostics",
+                "rebuild_trusted_state",
+                "collect_confirmation:operator_recovery_review"
+            ]
+        )
     }
 
     func testHostRuntimeWithExplicitLineageButCompiledGenericTuningFallsIntoQuarantineRestrictedLane() throws {
@@ -1940,7 +2106,7 @@ final class BASHostKitTests: XCTestCase {
                 runtimeProfileID: "before.local-cognition",
                 policyProfileID: "before.product-policy",
                 prefersPureLocal: true,
-                defaultDeviceState: BASHostConfiguration.genericDefaultDeviceState,
+                defaultDeviceState: BASHostConfiguration.fixtureDefaultDeviceState,
                 console: .generic,
                 lifecycleBehavior: .generic,
                 workflowBehavior: .generic,
@@ -1987,7 +2153,7 @@ final class BASHostKitTests: XCTestCase {
                 runtimeProfileID: "before.local-cognition",
                 policyProfileID: "before.product-policy",
                 prefersPureLocal: true,
-                defaultDeviceState: BASHostConfiguration.genericDefaultDeviceState,
+                defaultDeviceState: BASHostConfiguration.fixtureDefaultDeviceState,
                 console: .generic,
                 lifecycleBehavior: .generic,
                 workflowBehavior: .generic,
@@ -2106,7 +2272,7 @@ final class BASHostKitTests: XCTestCase {
     }
 
     func testQuarantineRestrictedLaneEmitsLatchedSovereignKernelArtifacts() throws {
-        let runtime = BASHostRuntime(configuration: .generic)
+        let runtime = BASHostRuntime(configuration: .fixtureGeneric)
 
         let turn = try XCTUnwrap(
             runtime.startSession(
@@ -2184,9 +2350,42 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertTrue(
             zip(turn.sovereignWarrants, turn.sovereignCommitTokens).allSatisfy { warrant, token in
                 warrant.jurisdictionRef == "jurisdiction.\(token.scope.rawValue)"
+                    && warrant.commitTokenRef == token.tokenID
                     && warrant.snapshotRef == token.snapshotRef
+                    && warrant.policyHash == token.policyHash
                     && warrant.timeLockRef.contains(token.turnID)
                     && warrant.timeLockRef.contains("ttl_\(token.ttlMs)")
+                    && warrant.witnessRefs.contains("permit.\(token.turnID).\(token.scope.rawValue)")
+                    && warrant.witnessRefs.contains("integrity.\(token.snapshotRef)")
+                    && warrant.witnessRefs.contains("continuity.\(token.turnID)")
+                    && warrant.witnessRefs.contains("policy.\(token.policyHash)")
+            }
+        )
+        XCTAssertTrue(
+            zip(turn.sovereignWarrants, turn.sovereignCommitTokens).allSatisfy { warrant, token in
+                guard let issuedAt = warrant.issuedAt,
+                      let expiresAt = warrant.expiresAt else {
+                    return false
+                }
+
+                let ttlSeconds = Double(token.ttlMs) / 1_000
+                let scopeSpecificWitness: String = switch token.scope {
+                case .checkpointCommit:
+                    "checkpoint.\(token.snapshotRef)"
+                case .renderHighRisk:
+                    "render.second_check.\(token.turnID)"
+                case .memoryWrite:
+                    "mutation.memory.\(token.turnID)"
+                case .toolRead:
+                    "tool.read.\(token.allowedTargets.first ?? "local")"
+                case .toolWrite:
+                    "tool.write.\(token.allowedTargets.first ?? "local")"
+                case .hostMutate:
+                    "mutation.host.\(token.turnID)"
+                }
+
+                return abs(expiresAt.timeIntervalSince(issuedAt) - ttlSeconds) < 0.001
+                    && warrant.witnessRefs.contains(scopeSpecificWitness)
             }
         )
         XCTAssertEqual(turn.evolutionLineageSummary.sovereignCommitTokens, turn.sovereignCommitTokens)
@@ -2287,7 +2486,7 @@ final class BASHostKitTests: XCTestCase {
             recoveryMode: .recovery,
             quarantineMode: .quarantine
         )
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
         let runtime = BASHostRuntime(
@@ -2349,7 +2548,7 @@ final class BASHostKitTests: XCTestCase {
         tuning.stateTransitions.guardedBudgetCalibrationStatuses = []
         tuning.stateTransitions.guardedBudgetRiskFlags = []
         tuning.stateTransitions.guardedBudgetRetrievalTags = ["evidence_caveat"]
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
         let runtime = BASHostRuntime(
@@ -2392,7 +2591,7 @@ final class BASHostKitTests: XCTestCase {
         tuning.stateTransitions.lowRiskUrgentMode = .guard
         tuning.stateTransitions.lowRiskDefaultMode = .sentinel
         tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
 
@@ -2501,7 +2700,7 @@ final class BASHostKitTests: XCTestCase {
         tuning.budget.unstablePrecisionProfile = .protected
         tuning.budget.guardedPrecisionProfile = .full
         tuning.budget.runModeProfilesByID = nil
-        tuning.budget.runModeProfilesByID = tuning.budget.resolvedRunModeProfilesByID(
+        tuning.budget.runModeProfilesByID = tuning.budget.synthesizedRunModeProfilesByID(
             maintenance: tuning.maintenance
         )
         tuning.hostThresholds = .init(
@@ -2596,11 +2795,11 @@ final class BASHostKitTests: XCTestCase {
             activeRunModeClass: .standard,
             restrictedRunModeClass: .none
         )
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
         tuning.budget.runModeProfilesByID = nil
-        tuning.budget.runModeProfilesByID = tuning.budget.resolvedRunModeProfilesByID(
+        tuning.budget.runModeProfilesByID = tuning.budget.synthesizedRunModeProfilesByID(
             maintenance: tuning.maintenance
         )
         tuning.hostThresholds = .init(
@@ -2636,13 +2835,13 @@ final class BASHostKitTests: XCTestCase {
         )
         tuning.stateTransitions.lowRiskDefaultMode = .engage
         tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
         tuning.maintenance.allowedThermalLevels = [.nominal, .warm]
         tuning.maintenance.blockedForegroundStates = []
         tuning.budget.runModeProfilesByID = nil
-        tuning.budget.runModeProfilesByID = tuning.budget.resolvedRunModeProfilesByID(
+        tuning.budget.runModeProfilesByID = tuning.budget.synthesizedRunModeProfilesByID(
             maintenance: tuning.maintenance
         )
 
@@ -2699,12 +2898,12 @@ final class BASHostKitTests: XCTestCase {
             schemaVersion: "host.runtime-synthesis.maintenance-foreground.v1"
         )
         tuning.stateTransitions.lowRiskDefaultMode = .engage
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
         tuning.maintenance.allowedThermalLevels = [.nominal]
         tuning.maintenance.blockedForegroundStates = [.background]
-        tuning.budget.runModeProfilesByID = tuning.budget.resolvedRunModeProfilesByID(
+        tuning.budget.runModeProfilesByID = tuning.budget.synthesizedRunModeProfilesByID(
             maintenance: tuning.maintenance
         )
 
@@ -2788,7 +2987,7 @@ final class BASHostKitTests: XCTestCase {
         )
         tuning.stateTransitions.lowRiskDefaultMode = .engage
         tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
         tuning.budget.maxCandidateCount = 6
@@ -2879,7 +3078,7 @@ final class BASHostKitTests: XCTestCase {
         )
         tuning.stateTransitions.lowRiskProtectedMode = .engage
         tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
         tuning.maintenance.blockedForegroundStates = []
@@ -2983,7 +3182,7 @@ final class BASHostKitTests: XCTestCase {
         tuning.stateTransitions.backgroundPulseEnabled = false
         tuning.stateTransitions.lowRiskDefaultMode = .engage
         tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
         tuning.maintenance.blockedForegroundStates = []
@@ -3089,7 +3288,7 @@ final class BASHostKitTests: XCTestCase {
         tuning.stateTransitions.backgroundPulseEnabled = false
         tuning.stateTransitions.lowRiskDefaultMode = .engage
         tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
         tuning.maintenance.blockedForegroundStates = []
@@ -3189,7 +3388,7 @@ final class BASHostKitTests: XCTestCase {
         tuning.stateTransitions.backgroundPulseEnabled = false
         tuning.stateTransitions.lowRiskDefaultMode = .engage
         tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
 
@@ -3233,7 +3432,7 @@ final class BASHostKitTests: XCTestCase {
         )
         tuning.stateTransitions.highRiskMode = .engage
         tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
         tuning.maintenance.blockedForegroundStates = []
@@ -3335,7 +3534,7 @@ final class BASHostKitTests: XCTestCase {
         tuning.stateTransitions.lowRiskDefaultMode = .engage
         tuning.stateTransitions.backgroundPulseEnabled = false
         tuning.stateTransitions.runModeRules = nil
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
         tuning.maintenance.blockedForegroundStates = []
@@ -3456,7 +3655,7 @@ final class BASHostKitTests: XCTestCase {
             recoveryMode: .recovery,
             quarantineMode: .quarantine
         )
-        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.synthesizedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
 
@@ -4597,7 +4796,9 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(result.currentBrain.identityInitiative, .guided)
         XCTAssertEqual(result.currentBrain.confidenceCeiling, 0.52, accuracy: 0.0001)
         XCTAssertEqual(result.currentBrain.relationshipBoundary, "Host high-risk relationship.")
-        XCTAssertEqual(result.currentBrain.boundaryHeadline, "Host protective.")
+        XCTAssertTrue(result.currentBrain.boundaryHeadline.contains("Host protective."))
+        XCTAssertTrue(result.currentBrain.boundaryHeadline.contains("confirm high_risk_confirmation"))
+        XCTAssertTrue(result.currentBrain.boundaryHeadline.contains("no-go private-sdk"))
         XCTAssertEqual(result.currentBrain.boundaryMode, .localOnlyProtective)
         XCTAssertTrue(result.currentBrain.boundaryConstraints.contains(.notificationRequiresEvidence))
         XCTAssertTrue(result.currentBrain.calibrationAlerts.isEmpty || result.currentBrain.calibrationStatus != .stable || !result.currentBrain.riskFlags.isEmpty)
@@ -4855,6 +5056,61 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(
             output.deliveryFallbackGuidance,
             "Take a cool-down window before deciding."
+        )
+    }
+
+    func testRenderedOutputDeliveryFallbackActionLineUsesSurfaceGuideWhenAlternativesAreEmpty() {
+        let output = BASRenderedOutput(
+            mode: .delay,
+            headline: "Pause first",
+            body: "Mirror body",
+            alternativeActions: [],
+            explanationCodes: ["risk.high"],
+            surfaceGuide: BASRenderedSurfaceGuide(
+                stackedModes: [.draftOnly],
+                tonePolicy: "clear_firm",
+                templatePolicy: "protective_alternative",
+                outputLengthCap: 120,
+                boundary: BASRenderedBoundaryGuide(
+                    allowedDomains: ["draft.note"],
+                    blockedDomains: ["host.write"],
+                    toolScope: "bounded",
+                    memoryScope: "standard",
+                    escalationHintRef: nil
+                ),
+                agency: BASRenderedAgencyGuide(
+                    requiresCompare: false,
+                    requiresSecondCheck: true,
+                    delayAvailable: true,
+                    chooseLaterAllowed: true,
+                    prefersDraftOnly: true,
+                    localOnlyPreferred: false,
+                    reservationMode: nil
+                ),
+                disclosure: BASRenderedDisclosureGuide(
+                    assertionCeiling: "guarded",
+                    explanationCodes: ["risk.high"],
+                    uncertaintyVisible: true,
+                    requiredDisclosures: nil,
+                    unresolvedCosts: nil,
+                    remandTargets: nil
+                ),
+                delayWindow: nil,
+                delayReservation: nil,
+                protectiveSubstitute: BASProtectiveSubstitute(
+                    substituteID: "substitute.surface.only",
+                    sourceCandidateRef: "cand-1",
+                    substituteType: "draft",
+                    description: "Draft but do not send yet.",
+                    safetyGain: 0.82
+                ),
+                sovereignEscalationHint: nil
+            )
+        )
+
+        XCTAssertEqual(
+            output.deliveryFallbackActionLine,
+            "action: Draft but do not send yet."
         )
     }
 

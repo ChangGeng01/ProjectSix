@@ -1687,6 +1687,9 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
         public let forecastCount: Int
         public let critiqueCount: Int
         public let stopReasonID: String?
+        public let mirrorCalibrationPointCount: Int?
+        public let mirrorOmittedSpeculationCount: Int?
+        public let mirrorToneGuard: String?
 
         public init(
             factCount: Int,
@@ -1703,7 +1706,10 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
             candidateCount: Int,
             forecastCount: Int,
             critiqueCount: Int,
-            stopReasonID: String? = nil
+            stopReasonID: String? = nil,
+            mirrorCalibrationPointCount: Int? = nil,
+            mirrorOmittedSpeculationCount: Int? = nil,
+            mirrorToneGuard: String? = nil
         ) {
             self.factCount = factCount
             self.goalCount = goalCount
@@ -1720,6 +1726,9 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
             self.forecastCount = forecastCount
             self.critiqueCount = critiqueCount
             self.stopReasonID = stopReasonID
+            self.mirrorCalibrationPointCount = mirrorCalibrationPointCount
+            self.mirrorOmittedSpeculationCount = mirrorOmittedSpeculationCount
+            self.mirrorToneGuard = mirrorToneGuard
         }
     }
 

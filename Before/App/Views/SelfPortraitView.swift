@@ -137,7 +137,7 @@ struct SelfPortraitView: View {
 
                     if let presentation = flightDeck.eBrainDigestPresentation {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("13-layer path")
+                            Text("14-layer path")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(BeforeTheme.ember)
 
@@ -268,7 +268,7 @@ struct SelfPortraitView: View {
     private func eBrainTurnCard(_ presentationFrame: DecisionEBrainPresentationFrame?) -> some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text("13-layer turn")
+                Text("14-layer turn")
                     .font(.headline)
 
                 if let presentationFrame {
@@ -379,7 +379,9 @@ struct SelfPortraitView: View {
                         }
                     }
 
-                    if presentationFrame.riskFactorsLine != nil || presentationFrame.reasonCodesLine != nil {
+                    if presentationFrame.riskFactorsLine != nil
+                        || presentationFrame.reasonCodesLine != nil
+                        || presentationFrame.courtLine != nil {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Risk gate")
                                 .font(.caption.weight(.semibold))
@@ -391,6 +393,11 @@ struct SelfPortraitView: View {
                             }
                             if let reasonCodesLine = presentationFrame.reasonCodesLine {
                                 Text(reasonCodesLine)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let courtLine = presentationFrame.courtLine {
+                                Text(courtLine)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
@@ -407,6 +414,15 @@ struct SelfPortraitView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
+                        }
+                    } else if let guidance = presentationFrame.deliveryFallbackGuidance {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Safer next moves")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(BeforeTheme.ember)
+                            Text("• \(guidance)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
 
@@ -502,7 +518,7 @@ struct SelfPortraitView: View {
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    Text("No 13-layer turn has been synthesized for the current brain yet.")
+                    Text("No 14-layer turn has been synthesized for the current brain yet.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -860,7 +876,10 @@ struct SelfPortraitView: View {
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing, spacing: 4) {
-                                    Text(memory.tier.rawValue.uppercased())
+                                    Text(memory.isSealed
+                                        ? (memory.isRevealed ? "REVEALED" : "SEALED")
+                                        : memory.tier.rawValue.uppercased()
+                                    )
                                         .font(.caption2.weight(.bold))
                                         .foregroundStyle(BeforeTheme.ember)
                                     Text("\(Int((memory.confidence * 100).rounded()))%")
@@ -874,14 +893,29 @@ struct SelfPortraitView: View {
                                 .foregroundStyle(.secondary)
 
                             HStack(spacing: 10) {
-                                BeforeActionButton("Downgrade", style: .secondary) {
-                                    appModel.downgradeBrainPortraitMemory(id: memory.id)
-                                }
-                                BeforeActionButton("Not me", style: .secondary) {
-                                    appModel.markBrainPortraitMemoryAsNotMe(id: memory.id)
-                                }
-                                BeforeActionButton("Delete", style: .tertiary) {
-                                    appModel.deleteBrainPortraitMemory(id: memory.id)
+                                if memory.isSealed && !memory.isRevealed {
+                                    BeforeActionButton(
+                                        memory.canReveal ? "Reveal" : "Reveal locked",
+                                        style: .secondary,
+                                        isEnabled: memory.canReveal
+                                    ) {
+                                        appModel.revealBrainPortraitMemory(id: memory.id)
+                                    }
+                                } else {
+                                    if memory.isSealed {
+                                        BeforeActionButton("Hide", style: .secondary) {
+                                            appModel.hideBrainPortraitMemory(id: memory.id)
+                                        }
+                                    }
+                                    BeforeActionButton("Downgrade", style: .secondary) {
+                                        appModel.downgradeBrainPortraitMemory(id: memory.id)
+                                    }
+                                    BeforeActionButton("Not me", style: .secondary) {
+                                        appModel.markBrainPortraitMemoryAsNotMe(id: memory.id)
+                                    }
+                                    BeforeActionButton("Delete", style: .tertiary) {
+                                        appModel.deleteBrainPortraitMemory(id: memory.id)
+                                    }
                                 }
                             }
                         }

@@ -97,6 +97,23 @@ struct DecisionEvolutionPilotControlPanel: View {
                 }
 
                 if (releaseSummary == nil || showEmbeddedReleaseSummary == false),
+                   let presenceTitle = pilotSnapshot.presenceTitle,
+                   !pilotSnapshot.presenceLines.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(presenceTitle)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+
+                        ForEach(pilotSnapshot.presenceLines, id: \.self) { line in
+                            Text(line)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(3)
+                        }
+                    }
+                }
+
+                if (releaseSummary == nil || showEmbeddedReleaseSummary == false),
                    let foldedLungTitle = pilotSnapshot.foldedLungTitle,
                    !pilotSnapshot.foldedLungLines.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
@@ -201,6 +218,12 @@ struct DecisionEvolutionPilotControlPanel: View {
                         .foregroundStyle(.secondary)
                 }
 
+                if let reviewCourtLine = pilotSnapshot.reviewCourtLine {
+                    Text(reviewCourtLine)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
                 if let recommendedKillSwitchesLine = pilotSnapshot.recommendedKillSwitchesLine {
                     Text(recommendedKillSwitchesLine)
                         .font(.caption2)
@@ -280,6 +303,20 @@ struct DecisionEvolutionPilotControlPanel: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            Text(guidance.executionState.title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(BeforeTheme.ember)
+
+            Text(guidance.executionState.headline)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(BeforeTheme.ink)
+
+            ForEach(Array(guidance.executionState.lines.enumerated()), id: \.offset) { _, line in
+                Text(line)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
 
             if let runNowActionTitle = guidance.runNowActionTitle,

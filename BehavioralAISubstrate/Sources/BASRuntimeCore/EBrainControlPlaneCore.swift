@@ -363,7 +363,7 @@ public enum BASRecoveryDispositionKind: String, Codable, CaseIterable, Sendable 
 }
 
 public struct BASRecoveryDisposition: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.0.0"
+    public static let currentSchemaVersion = "1.1.0"
 
     public var schemaVersion: String
     public var kind: BASRecoveryDispositionKind
@@ -373,6 +373,11 @@ public struct BASRecoveryDisposition: BASSchemaVersioned {
     public var restrictedLease: Bool
     public var toolWriteAllowed: Bool
     public var memoryWriteAllowed: Bool
+    public var operatorReviewRequired: Bool
+    public var requiredConfirmations: [String]
+    public var allowedActionClasses: [String]
+    public var blockedActionClasses: [String]
+    public var remediationActions: [String]
 
     public init(
         schemaVersion: String = BASRecoveryDisposition.currentSchemaVersion,
@@ -382,7 +387,12 @@ public struct BASRecoveryDisposition: BASSchemaVersioned {
         remediationRequired: Bool,
         restrictedLease: Bool,
         toolWriteAllowed: Bool,
-        memoryWriteAllowed: Bool
+        memoryWriteAllowed: Bool,
+        operatorReviewRequired: Bool = false,
+        requiredConfirmations: [String] = [],
+        allowedActionClasses: [String] = [],
+        blockedActionClasses: [String] = [],
+        remediationActions: [String] = []
     ) {
         self.schemaVersion = schemaVersion
         self.kind = kind
@@ -392,6 +402,63 @@ public struct BASRecoveryDisposition: BASSchemaVersioned {
         self.restrictedLease = restrictedLease
         self.toolWriteAllowed = toolWriteAllowed
         self.memoryWriteAllowed = memoryWriteAllowed
+        self.operatorReviewRequired = operatorReviewRequired
+        self.requiredConfirmations = requiredConfirmations
+        self.allowedActionClasses = allowedActionClasses
+        self.blockedActionClasses = blockedActionClasses
+        self.remediationActions = remediationActions
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case kind
+        case summary
+        case reasonCodes
+        case remediationRequired
+        case restrictedLease
+        case toolWriteAllowed
+        case memoryWriteAllowed
+        case operatorReviewRequired
+        case requiredConfirmations
+        case allowedActionClasses
+        case blockedActionClasses
+        case remediationActions
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decodeIfPresent(String.self, forKey: .schemaVersion)
+            ?? BASRecoveryDisposition.currentSchemaVersion
+        kind = try container.decode(BASRecoveryDispositionKind.self, forKey: .kind)
+        summary = try container.decode(String.self, forKey: .summary)
+        reasonCodes = try container.decodeIfPresent([String].self, forKey: .reasonCodes) ?? []
+        remediationRequired = try container.decode(Bool.self, forKey: .remediationRequired)
+        restrictedLease = try container.decode(Bool.self, forKey: .restrictedLease)
+        toolWriteAllowed = try container.decode(Bool.self, forKey: .toolWriteAllowed)
+        memoryWriteAllowed = try container.decode(Bool.self, forKey: .memoryWriteAllowed)
+        operatorReviewRequired = try container.decodeIfPresent(Bool.self, forKey: .operatorReviewRequired)
+            ?? remediationRequired
+        requiredConfirmations = try container.decodeIfPresent([String].self, forKey: .requiredConfirmations) ?? []
+        allowedActionClasses = try container.decodeIfPresent([String].self, forKey: .allowedActionClasses) ?? []
+        blockedActionClasses = try container.decodeIfPresent([String].self, forKey: .blockedActionClasses) ?? []
+        remediationActions = try container.decodeIfPresent([String].self, forKey: .remediationActions) ?? []
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(kind, forKey: .kind)
+        try container.encode(summary, forKey: .summary)
+        try container.encode(reasonCodes, forKey: .reasonCodes)
+        try container.encode(remediationRequired, forKey: .remediationRequired)
+        try container.encode(restrictedLease, forKey: .restrictedLease)
+        try container.encode(toolWriteAllowed, forKey: .toolWriteAllowed)
+        try container.encode(memoryWriteAllowed, forKey: .memoryWriteAllowed)
+        try container.encode(operatorReviewRequired, forKey: .operatorReviewRequired)
+        try container.encode(requiredConfirmations, forKey: .requiredConfirmations)
+        try container.encode(allowedActionClasses, forKey: .allowedActionClasses)
+        try container.encode(blockedActionClasses, forKey: .blockedActionClasses)
+        try container.encode(remediationActions, forKey: .remediationActions)
     }
 }
 
@@ -636,15 +703,20 @@ public struct BASSovereignCommitToken: BASSchemaVersioned {
 }
 
 public struct BASSovereignWarrant: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.0.0"
+    public static let currentSchemaVersion = "1.1.0"
 
     public var schemaVersion: String
     public var warrantID: String
     public var scope: BASSovereignCommitScope
     public var actionDigest: String
+    public var commitTokenRef: String?
     public var jurisdictionRef: String
     public var snapshotRef: String
     public var timeLockRef: String
+    public var policyHash: String
+    public var issuedAt: Date?
+    public var expiresAt: Date?
+    public var witnessRefs: [String]
     public var singleUse: Bool
     public var signature: String
 
@@ -653,9 +725,14 @@ public struct BASSovereignWarrant: BASSchemaVersioned {
         warrantID: String,
         scope: BASSovereignCommitScope,
         actionDigest: String,
+        commitTokenRef: String? = nil,
         jurisdictionRef: String,
         snapshotRef: String,
         timeLockRef: String,
+        policyHash: String = "",
+        issuedAt: Date? = nil,
+        expiresAt: Date? = nil,
+        witnessRefs: [String] = [],
         singleUse: Bool = true,
         signature: String
     ) {
@@ -663,11 +740,69 @@ public struct BASSovereignWarrant: BASSchemaVersioned {
         self.warrantID = warrantID
         self.scope = scope
         self.actionDigest = actionDigest
+        self.commitTokenRef = commitTokenRef
         self.jurisdictionRef = jurisdictionRef
         self.snapshotRef = snapshotRef
         self.timeLockRef = timeLockRef
+        self.policyHash = policyHash
+        self.issuedAt = issuedAt
+        self.expiresAt = expiresAt
+        self.witnessRefs = witnessRefs
         self.singleUse = singleUse
         self.signature = signature
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case warrantID
+        case scope
+        case actionDigest
+        case commitTokenRef
+        case jurisdictionRef
+        case snapshotRef
+        case timeLockRef
+        case policyHash
+        case issuedAt
+        case expiresAt
+        case witnessRefs
+        case singleUse
+        case signature
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decodeIfPresent(String.self, forKey: .schemaVersion) ?? "1.0.0"
+        warrantID = try container.decode(String.self, forKey: .warrantID)
+        scope = try container.decode(BASSovereignCommitScope.self, forKey: .scope)
+        actionDigest = try container.decode(String.self, forKey: .actionDigest)
+        commitTokenRef = try container.decodeIfPresent(String.self, forKey: .commitTokenRef)
+        jurisdictionRef = try container.decode(String.self, forKey: .jurisdictionRef)
+        snapshotRef = try container.decode(String.self, forKey: .snapshotRef)
+        timeLockRef = try container.decode(String.self, forKey: .timeLockRef)
+        policyHash = try container.decodeIfPresent(String.self, forKey: .policyHash) ?? ""
+        issuedAt = try container.decodeIfPresent(Date.self, forKey: .issuedAt)
+        expiresAt = try container.decodeIfPresent(Date.self, forKey: .expiresAt)
+        witnessRefs = try container.decodeIfPresent([String].self, forKey: .witnessRefs) ?? []
+        singleUse = try container.decodeIfPresent(Bool.self, forKey: .singleUse) ?? true
+        signature = try container.decode(String.self, forKey: .signature)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(warrantID, forKey: .warrantID)
+        try container.encode(scope, forKey: .scope)
+        try container.encode(actionDigest, forKey: .actionDigest)
+        try container.encodeIfPresent(commitTokenRef, forKey: .commitTokenRef)
+        try container.encode(jurisdictionRef, forKey: .jurisdictionRef)
+        try container.encode(snapshotRef, forKey: .snapshotRef)
+        try container.encode(timeLockRef, forKey: .timeLockRef)
+        try container.encode(policyHash, forKey: .policyHash)
+        try container.encodeIfPresent(issuedAt, forKey: .issuedAt)
+        try container.encodeIfPresent(expiresAt, forKey: .expiresAt)
+        try container.encode(witnessRefs, forKey: .witnessRefs)
+        try container.encode(singleUse, forKey: .singleUse)
+        try container.encode(signature, forKey: .signature)
     }
 }
 

@@ -8,7 +8,7 @@ import BASRuntimeCore
 
 public extension BASRenderedOutput {
     var deliveryFallbackGuidance: String? {
-        if let action = alternativeActions.first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+        if let action = primaryAlternativeAction {
             return action
         }
         if let substitute = surfaceGuide?.protectiveSubstitute?.description,
@@ -25,6 +25,20 @@ public extension BASRenderedOutput {
             return "Keep the move in draft until the boundary is re-checked."
         }
         return nil
+    }
+
+    var deliveryFallbackActionLine: String? {
+        guard primaryAlternativeAction == nil else {
+            return nil
+        }
+        guard let guidance = deliveryFallbackGuidance else {
+            return nil
+        }
+        return "action: \(guidance)"
+    }
+
+    private var primaryAlternativeAction: String? {
+        alternativeActions.first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
     }
 
     private func deliveryFallbackDelayGuidance(for delayType: String) -> String {
@@ -106,6 +120,7 @@ public enum BASEBrainConsoleSupport {
         let constitutionSummary = turn.hostConstitution.map {
             "constitution \($0.activeVersion) • phase \($0.narrativeLoom.currentPhase)"
         }
+        let modulationSummary = hostModulationSummary(for: turn).map { "modulation \($0)" }
         let governanceSummary = [
             turn.hostConstitutionVault.map {
                 [
@@ -136,6 +151,7 @@ public enum BASEBrainConsoleSupport {
             "Host \(turn.hostContext.hostID)",
             "version \(turn.hostContext.activeVersion)",
             constitutionSummary,
+            modulationSummary,
             governanceSummary,
             dreamLoopBrainSummary(for: turn),
             goalSummary,
@@ -168,6 +184,7 @@ public enum BASEBrainConsoleSupport {
             let constitutionSummary = turn.hostConstitution.map {
                 "constitution \($0.activeVersion) • phase \($0.narrativeLoom.currentPhase)"
             } ?? "constitution unavailable"
+            let modulationSummary = hostModulationSummary(for: turn).map { "modulation \($0)" }
             let governanceSummary = [
                 turn.hostConstitutionVault.map {
                     [
@@ -192,7 +209,16 @@ public enum BASEBrainConsoleSupport {
             ]
             .compactMap { $0 }
             .joined(separator: " • ")
-            merged.summary = "L5 host \(turn.hostContext.activeVersion) • \(constitutionSummary) • \(governanceSummary.isEmpty ? "no active governance markers" : governanceSummary) • gate \(gateValue) • identity \(identitySummary)"
+            merged.summary = [
+                "L5 host \(turn.hostContext.activeVersion)",
+                constitutionSummary,
+                modulationSummary,
+                governanceSummary.isEmpty ? "no active governance markers" : governanceSummary,
+                "gate \(gateValue)",
+                "identity \(identitySummary)"
+            ]
+            .compactMap { $0 }
+            .joined(separator: " • ")
             merged.blockers = []
             merged.score = adjustedScore(base: report.score, fallback: 0.93)
         case .memory:
@@ -265,6 +291,61 @@ public enum BASEBrainConsoleSupport {
 
         merged.health = BASLayerReport.health(forScore: merged.score, blockers: merged.blockers)
         return merged
+    }
+
+    private static func hostModulationSummary(
+        for turn: BASEBrainTurnResult
+    ) -> String? {
+        turn.thoughtFold.compactSlots["host_mod"]?.nilIfEmpty
+            ?? turn.thoughtFold.hostEffectSummary.nilIfEmpty
+            ?? hostModulationProfileSummary(
+                hostContext: turn.hostContext,
+                hostConstitution: turn.hostConstitution
+            )
+    }
+
+    private static func hostModulationProfileSummary(
+        hostContext: BASHostProfile,
+        hostConstitution: BASHostConstitution?
+    ) -> String? {
+        var segments: [String] = []
+        if hostContext.tonePreference.isEmpty == false {
+            segments.append("tone:\(hostContext.tonePreference)")
+        }
+        guard let hostConstitution else {
+            return segments.isEmpty ? nil : segments.joined(separator: " • ")
+        }
+
+        if hostConstitution.narrativeLoom.currentPhase.isEmpty == false {
+            segments.append("phase:\(hostConstitution.narrativeLoom.currentPhase)")
+        }
+        if let primaryGoal = firstNonEmpty(
+            hostConstitution.goalSpine.priorityOrder.first,
+            hostConstitution.goalSpine.goals.first
+        ) {
+            segments.append("goal:\(primaryGoal)")
+        }
+        if let primaryRelation = firstNonEmpty(
+            hostConstitution.relationGravity.highConsequenceLinks.first,
+            hostConstitution.relationGravity.nodes.first
+        ) {
+            segments.append("relation:\(primaryRelation)")
+        }
+        if hostConstitution.consentLattice.memoryPromotionScope.isEmpty == false {
+            segments.append("memory:\(hostConstitution.consentLattice.memoryPromotionScope)")
+        }
+        return segments.isEmpty ? nil : segments.joined(separator: " • ")
+    }
+
+    private static func firstNonEmpty(_ values: String?...) -> String? {
+        for value in values {
+            guard let value else { continue }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty == false {
+                return trimmed
+            }
+        }
+        return nil
     }
 
     private static func evolutionGovernanceSummary(
@@ -537,6 +618,7 @@ public enum BASEBrainConsoleSupport {
             } ?? []
         ]
         .flatMap { $0 }
+        let modulationRetrievalTags = hostModulationMarkers(for: turn)
 
         var verificationSnapshotParts = [turn.hostContext.activeVersion]
         if let hostConstitution = turn.hostConstitution {
@@ -566,6 +648,7 @@ public enum BASEBrainConsoleSupport {
                 verificationSnapshotParts.append("forget_sync_exports_revoked:true")
             }
         }
+        verificationSnapshotParts += modulationRetrievalTags
         let verificationSnapshot = verificationSnapshotParts
             .basOrderedUniqueStrings()
             .joined(separator: "|")
@@ -577,9 +660,23 @@ public enum BASEBrainConsoleSupport {
             reactionWeights: reactionWeights(for: turn.hostContext.tonePreference),
             activeTemplateIDs: [],
             recentFailurePatternIDs: [],
-            retrievalTags: (turn.memoryBundle.retrievalTags + constitutionRetrievalTags + governanceRetrievalTags).basOrderedUniqueStrings(),
+            retrievalTags: (turn.memoryBundle.retrievalTags + constitutionRetrievalTags + governanceRetrievalTags + modulationRetrievalTags).basOrderedUniqueStrings(),
             verificationSnapshot: verificationSnapshot
         )
+    }
+
+    private static func hostModulationMarkers(
+        for turn: BASEBrainTurnResult
+    ) -> [String] {
+        guard let modulationSummary = hostModulationSummary(for: turn) else {
+            return []
+        }
+
+        return modulationSummary
+            .components(separatedBy: "•")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .map { "host_mod_\($0)" }
     }
 
     private static func runtimeContext(

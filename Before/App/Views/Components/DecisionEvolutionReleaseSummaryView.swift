@@ -12,6 +12,8 @@ struct DecisionEvolutionReleaseSummaryPresentation: Equatable, Sendable {
     let sovereignPostureLines: [String]
     let horizonDiagnosticsTitle: String?
     let horizonDiagnosticsLines: [String]
+    let presenceTitle: String?
+    let presenceLines: [String]
     let foldedLungTitle: String?
     let foldedLungLines: [String]
     let furnaceContributionTitle: String?
@@ -20,6 +22,7 @@ struct DecisionEvolutionReleaseSummaryPresentation: Equatable, Sendable {
     let furnaceChecklistLines: [String]
     let furnaceNextStepTitle: String?
     let furnaceNextStepDetail: String?
+    let furnaceNextStepAction: DecisionEvolutionFurnaceNextStepActionPresentation?
     let furnaceWorkbenchPresentation: DecisionEvolutionFurnaceWorkbenchPresentation?
     let activeCheckpointHeadline: String?
     let reviewCheckpointHeadline: String?
@@ -32,12 +35,14 @@ struct DecisionEvolutionReleaseSummaryPresentation: Equatable, Sendable {
     static func build(
         releaseSummary: DecisionSystemReleaseControlSummary,
         controlSurface: DecisionEvolutionControlSurface,
-        presentationMode: DecisionEvolutionReleaseSummaryPresentationMode
+        presentationMode: DecisionEvolutionReleaseSummaryPresentationMode,
+        surfaceContract: DecisionEvolutionSurfaceContract = .home
     ) -> DecisionEvolutionReleaseSummaryPresentation {
         DecisionEvolutionReleaseSummaryPresentationSupport.build(
             releaseSummary: releaseSummary,
             controlSurface: controlSurface,
-            presentationMode: presentationMode
+            presentationMode: presentationMode,
+            surfaceContract: surfaceContract
         )
     }
 }
@@ -97,7 +102,8 @@ struct DecisionEvolutionReleaseSummaryView: View {
         DecisionEvolutionReleaseSummaryPresentation.build(
             releaseSummary: releaseSummary,
             controlSurface: controlSurface,
-            presentationMode: presentationMode
+            presentationMode: presentationMode,
+            surfaceContract: surfaceContract
         )
     }
 
@@ -106,21 +112,6 @@ struct DecisionEvolutionReleaseSummaryView: View {
             controlSurface: controlSurface,
             surfaceContract: surfaceContract,
             navigationOptions: navigationOptions
-        )
-    }
-
-    private var furnaceNextStepActionPresentation: DecisionEvolutionFurnaceNextStepActionPresentation? {
-        DecisionEvolutionFurnaceNextStepActionSupport.build(
-            detail: presentation.furnaceNextStepDetail,
-            surfaceContract: surfaceContract
-        )
-    }
-
-    private var furnaceWorkbenchRunNowActionPresentation: DecisionEvolutionFurnaceRunNowActionPresentation? {
-        DecisionEvolutionFurnaceRunNowActionSupport.build(
-            detail: presentation.furnaceWorkbenchPresentation?.detail,
-            controlSurface: controlSurface,
-            surfaceContract: surfaceContract
         )
     }
 
@@ -167,6 +158,22 @@ struct DecisionEvolutionReleaseSummaryView: View {
                         .foregroundStyle(BeforeTheme.ink)
 
                     ForEach(presentation.horizonDiagnosticsLines, id: \.self) { line in
+                        Text(line)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+                }
+            }
+
+            if let presenceTitle = presentation.presenceTitle,
+               !presentation.presenceLines.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(presenceTitle)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.orange)
+
+                    ForEach(presentation.presenceLines, id: \.self) { line in
                         Text(line)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
@@ -235,7 +242,7 @@ struct DecisionEvolutionReleaseSummaryView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
 
-                    if let furnaceNextStepActionPresentation {
+                    if let furnaceNextStepActionPresentation = presentation.furnaceNextStepAction {
                         BeforeActionButton(
                             furnaceNextStepActionPresentation.actionTitle,
                             style: surfaceContract.routesMutationsToControlCenter ? .primary : .secondary
@@ -277,7 +284,22 @@ struct DecisionEvolutionReleaseSummaryView: View {
                             .lineLimit(3)
                     }
 
-                    if let furnaceWorkbenchRunNowActionPresentation {
+                    Text(furnaceWorkbenchPresentation.executionState.title)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.ember)
+
+                    Text(furnaceWorkbenchPresentation.executionState.headline)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.ink)
+
+                    ForEach(furnaceWorkbenchPresentation.executionState.lines, id: \.self) { line in
+                        Text(line)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+
+                    if let furnaceWorkbenchRunNowActionPresentation = furnaceWorkbenchPresentation.runNowAction {
                         HStack(spacing: 10) {
                             BeforeActionButton(
                                 furnaceWorkbenchRunNowActionPresentation.actionTitle,
@@ -286,7 +308,7 @@ struct DecisionEvolutionReleaseSummaryView: View {
                                 presentMutation(furnaceWorkbenchRunNowActionPresentation.intent)
                             }
 
-                            if let furnaceNextStepActionPresentation {
+                            if let furnaceNextStepActionPresentation = furnaceWorkbenchPresentation.nextStepAction {
                                 BeforeActionButton(
                                     furnaceNextStepActionPresentation.actionTitle,
                                     style: .secondary
@@ -295,7 +317,7 @@ struct DecisionEvolutionReleaseSummaryView: View {
                                 }
                             }
                         }
-                    } else if let furnaceNextStepActionPresentation {
+                    } else if let furnaceNextStepActionPresentation = furnaceWorkbenchPresentation.nextStepAction {
                         BeforeActionButton(
                             furnaceNextStepActionPresentation.actionTitle,
                             style: .secondary

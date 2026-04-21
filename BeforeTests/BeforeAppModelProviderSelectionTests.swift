@@ -423,7 +423,7 @@ final class BeforeAppModelProviderSelectionTests: XCTestCase {
         overrideBudget.guardedDecodeTokens = 240
         overrideBudget.maintenanceBatteryFloor = 0.4
         overrideBudget.runModeProfilesByID = nil
-        overrideBudget.runModeProfilesByID = overrideBudget.resolvedRunModeProfilesByID(
+        overrideBudget.runModeProfilesByID = overrideBudget.synthesizedRunModeProfilesByID(
             maintenance: baselineRuntimePolicy.maintenance
         )
         let providerRegistry = BASProviderRoutingPolicyRegistry(

@@ -277,7 +277,7 @@ final class DecisionSessionEngineReviewDigestBuilderTests: XCTestCase {
                 permitMode: "replace",
                 hostGatePercent: 63,
                 sovereignVerdictLine: "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
-                sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session",
+                sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session",
                 sovereignAuditLine: "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
             ),
             latestEventID: "evt-8",
@@ -316,7 +316,7 @@ final class DecisionSessionEngineReviewDigestBuilderTests: XCTestCase {
         ])
         XCTAssertEqual(
             reviewLines[1].detail,
-            "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine • Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session • Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+            "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine • Sovereign authority • tokens memoryWrite • warrants memoryWrite • policy policy-hash.sess • ttl 30s • witnesses 4 • lock session • quarantine session • Sovereign audit • BR-SOV-004 • ref audit.session-l14"
         )
         XCTAssertEqual(reviewLines[1].severity, .watch)
     }

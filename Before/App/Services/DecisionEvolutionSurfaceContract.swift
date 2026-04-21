@@ -35,6 +35,73 @@ enum DecisionEvolutionNarrativeFormattingSupport {
     ) -> String {
         "\(count) checkpoint(s) \(suffix)"
     }
+
+    static func sovereignAuthorityValues(
+        tokenScopes: [String],
+        warrantScopes: [String],
+        warrantPolicyIDs: [String],
+        warrantTTLIDs: [String],
+        warrantWitnessCount: Int,
+        lockScopeID: String?,
+        quarantineZoneIDs: [String],
+        tokenScopeLimit: Int? = nil,
+        warrantScopeLimit: Int? = nil,
+        warrantPolicyLimit: Int? = nil,
+        warrantTTLLimit: Int? = nil,
+        quarantineZoneLimit: Int? = nil
+    ) -> [String] {
+        let summarizedTokenScopes = summarize(tokenScopes, limit: tokenScopeLimit)
+        let summarizedWarrantScopes = summarize(warrantScopes, limit: warrantScopeLimit)
+        let summarizedWarrantPolicies = summarize(warrantPolicyIDs, limit: warrantPolicyLimit)
+        let summarizedWarrantTTLs = summarize(warrantTTLIDs, limit: warrantTTLLimit)
+        let summarizedQuarantineZones = summarize(quarantineZoneIDs, limit: quarantineZoneLimit)
+
+        return [
+            summarizedTokenScopes.isEmpty ? nil : "tokens \(summarizedTokenScopes.joined(separator: ", "))",
+            summarizedWarrantScopes.isEmpty ? nil : "warrants \(summarizedWarrantScopes.joined(separator: ", "))",
+            summarizedWarrantPolicies.isEmpty ? nil : "policy \(summarizedWarrantPolicies.joined(separator: ", "))",
+            summarizedWarrantTTLs.isEmpty ? nil : "ttl \(summarizedWarrantTTLs.joined(separator: ", "))",
+            warrantWitnessCount > 0 ? "witnesses \(warrantWitnessCount)" : nil,
+            lockScopeID.map { "lock \($0)" },
+            summarizedQuarantineZones.isEmpty ? nil : "quarantine \(summarizedQuarantineZones.joined(separator: ", "))"
+        ]
+        .compactMap { $0 }
+    }
+
+    static func sovereignAuthorityLine(
+        tokenScopes: [String],
+        warrantScopes: [String],
+        warrantPolicyIDs: [String],
+        warrantTTLIDs: [String],
+        warrantWitnessCount: Int,
+        lockScopeID: String?,
+        quarantineZoneIDs: [String],
+        prefix: String = "Sovereign authority"
+    ) -> String? {
+        prefixedLine(
+            prefix: prefix,
+            separatorAfterPrefix: separator,
+            values: sovereignAuthorityValues(
+                tokenScopes: tokenScopes,
+                warrantScopes: warrantScopes,
+                warrantPolicyIDs: warrantPolicyIDs,
+                warrantTTLIDs: warrantTTLIDs,
+                warrantWitnessCount: warrantWitnessCount,
+                lockScopeID: lockScopeID,
+                quarantineZoneIDs: quarantineZoneIDs
+            )
+        )
+    }
+
+    private static func summarize(
+        _ values: [String],
+        limit: Int?
+    ) -> [String] {
+        guard let limit, limit >= 0 else {
+            return values
+        }
+        return Array(values.prefix(limit))
+    }
 }
 
 enum DecisionEvolutionControlSurfaceLexiconSupport {
