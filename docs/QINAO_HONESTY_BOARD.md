@@ -210,7 +210,7 @@
 
 ---
 
-## 四 · 附 — M20–M38 观测原语波次（additive overlay，2026-04-22）
+## 四 · 附 — M20–M39 观测原语波次（additive overlay，2026-04-22）
 
 > 这一附段**不改**上面任何一行兑现度分数。它记录的是在 M1–M12 完全体骨架已绿的前提下，M20 起**叠加**在 L4 / L6 / L7 / L8 / L9 / L10 / L11 / L12 / L13 之上的"观测原语 + 跨层 reconcile scaffold"工作。兑现度栏目里任何"L14 reconciler 将来把每层观测拉到同一张桌上"的承诺，今天已经由这批代码兑现。
 
@@ -234,12 +234,13 @@
 | M36 | 9 份 per-layer roadmap 加 overlay 附段 | `docs/EBRAIN_L2/L3/L6/L7/L8/L9/L10/L12/L13_*_ROADMAP.md` | — |
 | M37 | L8 tier reconciler coverage 投影（8→9 层） | `BASMemory/BASMemoryTieringObservationCoverage.swift` · `BASRuntimeCore/BASObservationReconciliationCore.swift`（doc 更新） | 4 新 XCTest |
 | M38 | L14 sovereign audit-ledger coverage 投影（9→10 层） | `BASSovereign/BASSovereignAuditCoverage.swift` · `BASRuntimeCore/BASObservationReconciliationCore.swift`（doc 更新） | 9 新 XCTest |
+| M39 | L1 lease-life coverage 投影（10→11 层） | `BASLeaseLife/BASLeaseLifeObservationCoverage.swift` · `BASRuntimeCore/BASObservationReconciliationCore.swift`（doc 更新） | 12 新 XCTest |
 
-**波次总体性质**：全部 additive — `BASRuntimeCore` 仍是 leaf 模块（`BASObservationReconciliationCore.swift` 不 import 任何观测生产者），`BASSovereign` 的 microkernel 隔离保持（新 M38 coverage 文件只依赖 `BASRuntimeCore`）；每个原语都是值类型 + `Sendable` + `Codable`，带独立 budget 表与 ring-actor ledger；invariant（dedup-on-layer，turn/session 同桌）在所有构造路径（init / `appending(_:)` / `init(from:)`）上都被枚举测试钉住。L8（M37）/L14（M38）是这批里的"无 bundle"投影：把 governance sweep 结果 / 审计链快照绑到调用方指定的 turn/session，和另外 8 层共用同一张 `BASObservationReconciliationReport`。
+**波次总体性质**：全部 additive — `BASRuntimeCore` 仍是 leaf 模块（`BASObservationReconciliationCore.swift` 不 import 任何观测生产者），`BASSovereign` 的 microkernel 隔离保持（M38/M39 coverage 文件分别只依赖 `BASRuntimeCore`）；每个原语都是值类型 + `Sendable` + `Codable`，带独立 budget 表与 ring-actor ledger；invariant（dedup-on-layer，turn/session 同桌）在所有构造路径（init / `appending(_:)` / `init(from:)`）上都被枚举测试钉住。L8（M37）/L14（M38）/L1（M39）是这批里的"无 bundle / 无内生 turn-key"投影：把 governance sweep 结果 / 审计链快照 / 每轮 lease-life 记录绑到调用方指定的 turn/session，和另外 8 层共用同一张 `BASObservationReconciliationReport`。M39 的 `hasCoreSignalCoverage` 语义特别 — `.emergency` guard level 是"L1 spoke but did not sustain core function"的可审计信号，不是单纯 silence。
 
-**累计覆盖**：14 层认知架构中 **10 层**（L4/L6/L7/**L8**/L9/L10/L11/L12/L13/**L14**）已有 `→ BASObservationCoverageSummary` 投影。剩余 4 层（L1/L2/L3/L5）留到下一波。
+**累计覆盖**：14 层认知架构中 **11 层**（**L1**/L4/L6/L7/L8/L9/L10/L11/L12/L13/L14）已有 `→ BASObservationCoverageSummary` 投影。剩余 3 层（L2/L3/L5）留到下一波。
 
-**回归基线**：BAS 633 XCTest + 417 swift-testing + Qinao 162 XCTest = **1212 + 1 OS-gated skip 全绿**。
+**回归基线**：BAS 645 XCTest + 417 swift-testing + Qinao 162 XCTest = **1224 + 1 OS-gated skip 全绿**。
 
 ---
 
