@@ -6,7 +6,8 @@
 #
 # Rules:
 #   1. Qinao module sources may import: Foundation, CryptoKit, SwiftUI,
-#      BAS*, and sibling Qinao* modules.
+#      Combine, Observation, os, BackgroundTasks (for L1 maintenance
+#      bridge — wrapped in canImport), BAS*, and sibling Qinao* modules.
 #   2. Qinao module sources must NOT import host-level packages
 #      (Before, SampleHost, etc.) — façades flow downward only.
 #   3. Qinao tests may use @testable import Qinao* and may import BAS*
@@ -32,8 +33,8 @@ if [[ ! -d "$SOURCES_DIR" ]]; then
   exit 1
 fi
 
-ALLOWED_SOURCE_IMPORT_REGEX='^import (Foundation|CryptoKit|SwiftUI|Combine|Observation|os|BAS[A-Za-z]+|Qinao[A-Za-z]+)$'
-ALLOWED_TEST_IMPORT_REGEX='^(@testable )?import (XCTest|Foundation|CryptoKit|SwiftUI|BAS[A-Za-z]+|Qinao[A-Za-z]+)$'
+ALLOWED_SOURCE_IMPORT_REGEX='^import (Foundation|CryptoKit|SwiftUI|Combine|Observation|os|BackgroundTasks|BAS[A-Za-z]+|Qinao[A-Za-z]+)$'
+ALLOWED_TEST_IMPORT_REGEX='^(@testable )?import (XCTest|Foundation|CryptoKit|SwiftUI|BackgroundTasks|BAS[A-Za-z]+|Qinao[A-Za-z]+)$'
 FORBIDDEN_HOST_PACKAGES_REGEX='^import (Before|SampleHost|BeforeWatch|BeforeWidgetExtension)[A-Za-z]*$'
 
 violations=0
