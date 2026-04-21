@@ -47,13 +47,16 @@
 | M26 | L11 风闸 per-dimension risk observation primitives（additive，不动 `BASActionPermit / BASRiskVector`） | 100% | `BASRiskObservation` | `BASRiskObservationTests` |
 | M27 | L12 柔手 per-mode soft-hand observation primitives（additive，附带 selectedMode + renderedAsSelected 健康检查） | 100% | `BASSoftHandObservation` | `BASSoftHandObservationTests` |
 | M28 | L13 per-ticket shadow-trial observation primitives（additive，附带 netPromotionScore + regressionDetected 启发式） | 100% | `BASShadowTrialObservation` | `BASShadowTrialObservationTests` |
+| M30 | L4 per-template world-prior observation primitives（additive，附带 evidence-level 传播 + priorContradiction 启发式） | 100% | `BASWorldPriorObservation` | `BASWorldPriorObservationTests` |
+| M31 | Cross-layer 观察协调支架（`BASCognitiveLayer` + `BASObservationCoverageSummary` + `BASObservationReconciliationReport`）— pure 在 `BASRuntimeCore`，零上游耦合 | 100% | `BASObservationReconciliationCore` | `BASObservationReconciliationTests` |
+| M32 | 8 层 bundle → coverage summary 边缘投影（L4/L6/L7/L9/L10/L11/L12/L13）；tribunal `allVoicesSpoke` 映射为 core coverage；end-to-end 8 层协调报告测试 | 100% | `BAS*ObservationCoverage.swift`, `BASObservationCoverageProjections.swift` | `BASObservationCoverageProjectionTests` |
 
 ### 关键层完成度映射（SDK 视角，2026-04-22 acceleration wave 后）
 
-| 层 | 之前（plan §0.1 体检） | 现在（M1-M16 + M20-M28 之后） | 依据 |
+| 层 | 之前（plan §0.1 体检） | 现在（M1-M16 + M20-M32 之后） | 依据 |
 | --- | --- | --- | --- |
 | L1 Lease & Life | 60% | **85%** | M16 BGTaskScheduler 真实接入；M8 loop 呼吸调度 |
-| L4 World Prior | 5% | **70%** | M13 L11 吃 causal template + 证据/同意逻辑 |
+| L4 World Prior | 5% | **75%** | M13 L11 吃 causal template + 证据/同意逻辑；M30 per-template world-prior primitives + evidence-level 传播 + priorContradiction 启发式 |
 | L5 Host Constitution | 80% | **95%** | M11 候选流水线 + projection parity |
 | L6 Presence Eye | 50% | **60%** | M22 per-channel observation primitives + budget + ledger；ContextFrame 主链尚未接线 |
 | L7 Mirror Blade | 50% | **60%** | M23 per-signal decomposition primitives + budget + ledger；DecomposeFrame 主链尚未接线 |
@@ -63,11 +66,13 @@
 | L11 Risk Climate | 60% | **87%** | M13 world-prior fold + M26 per-dimension risk primitives + 三支柱 coverage |
 | L12 Gentle Hand | 50% | **58%** | M27 per-mode soft-hand primitives + renderedAsSelected 健康检查；五模式 surface matrix 仍缺 |
 | L13 Evolution Furnace | 40% | **73%** | M14 triple-gate 离线导出 + M28 per-ticket shadow-trial primitives |
-| L14 Sovereign Microkernel | 10% | **90%** | M1-M2 九模块 + M7/M9 双审计 + M15 主路径 turn audit |
+| L14 Sovereign Microkernel | 10% | **92%** | M1-M2 九模块 + M7/M9 双审计 + M15 主路径 turn audit；M31 cross-layer 协调支架 + M32 8 层投影提供"一次读完所有层观察"形状 |
 
-### M20-M28 共享语义
+### M20-M32 共享语义
 
-M20-M28 的 9 个里程碑共享同一套 additive-only 观察原语形态：每一层都落下 `Signal kind enum + Observation value + Bundle (per-kind/per-subject filter + core coverage check) + Budget table + append-only Ledger actor`。这让 `L14` 将来在接一套统一 reconciler（"观察 ledger vs 最终 frame/permit/decision"）时，只需要一套形状，不需要七套。每一条都不 mutate 既有主链对象，所以它们随时可以被独立接入或回滚。
+M20-M28 + M30 的 10 个观察-原语里程碑共享同一套 additive-only 形态：每一层都落下 `Signal kind enum + subject-addressable Observation + Bundle (per-kind/per-subject filter + core coverage check + first-seen subject IDs) + Budget table (clamped totalCost) + append-only Ledger actor`。
+
+M31 在 `BASRuntimeCore` 里合上这条曲线：`BASCognitiveLayer` 枚举 + 中立的 `BASObservationCoverageSummary` 值类型 + `BASObservationReconciliationReport` 聚合器；M32 在每一层的家里追加 `coverageSummary` 边缘投影扩展，把 8 个 bundle（L4/L6/L7/L9/L10/L11/L12/L13）都映射到统一形状。所有这些都不 mutate 既有主链对象；`BASSovereign` 微内核的隔离不动。到此 L14 reconciler 读一套形状就能覆盖 8 层观察，不需要 8 套代码路径。
 
 ## L1-L13
 
