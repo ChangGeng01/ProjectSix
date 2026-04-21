@@ -36,19 +36,21 @@ import Foundation
 /// The raw values are stable strings so that reports serialize
 /// deterministically across builds.
 ///
-/// Projection status (M37 wave): 9 of 14 layers carry a
-/// `*ObservationBundle` → `BASObservationCoverageSummary`
-/// projection — L4 (worldPrior), L6 (presenceEye), L7 (mirrorBlade),
-/// L8 (hippocampalWell, via
+/// Projection status (M38 wave): 10 of 14 layers carry a
+/// `*ObservationBundle` (or equivalent) →
+/// `BASObservationCoverageSummary` projection — L4 (worldPrior),
+/// L6 (presenceEye), L7 (mirrorBlade), L8 (hippocampalWell, via
 /// `BASMemoryTieringReconciliationOutcome.coverageSummary(turnID:
 /// sessionID:)`), L9 (dreamLoop), L10 (triSelfTribunal),
-/// L11 (riskClimate), L12 (gentleHand), L13 (evolutionFurnace).
-/// The remaining five — L1, L2, L3, L5, L14 — do not yet emit
-/// observation primitives in this shape; the reconciler treats a
-/// silent layer as either "not expected" or "expected but silent"
-/// based on the caller's `expected` list. The enum is complete up
-/// front so downstream observation primitives can extend coverage
-/// without a breaking change.
+/// L11 (riskClimate), L12 (gentleHand), L13 (evolutionFurnace),
+/// L14 (sovereign, via `BASSovereignAuditLedger.coverageSummary(
+/// turnID:sessionID:emittedAt:)`). The remaining four —
+/// L1, L2, L3, L5 — do not yet emit observation primitives in this
+/// shape; the reconciler treats a silent layer as either "not
+/// expected" or "expected but silent" based on the caller's
+/// `expected` list. The enum is complete up front so downstream
+/// observation primitives can extend coverage without a breaking
+/// change.
 public enum BASCognitiveLayer: String, Sendable, Codable, CaseIterable {
     /// L1 — Lease & Life kernel.
     case leaseLife = "L1"
