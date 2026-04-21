@@ -10,6 +10,9 @@ struct DecisionEvolutionPilotControlPanel: View {
     let showsHeader: Bool
     let showEmbeddedReleaseSummary: Bool
     let navigationOptions: DecisionEvolutionNavigationSurfaceOptions
+    let quickActionsAnchorID: DecisionEvolutionMutationHubFocusTarget?
+    let queueLineageAnchorID: DecisionEvolutionMutationHubFocusTarget?
+    let onFocusMutationHubTarget: ((DecisionEvolutionMutationHubFocusTarget) -> Void)?
     let pilotSnapshot: DecisionEvolutionPilotControlSnapshot
     let afterMutation: (() -> Void)?
 
@@ -25,6 +28,9 @@ struct DecisionEvolutionPilotControlPanel: View {
         showsHeader: Bool = true,
         showEmbeddedReleaseSummary: Bool = true,
         navigationOptions: DecisionEvolutionNavigationSurfaceOptions? = nil,
+        quickActionsAnchorID: DecisionEvolutionMutationHubFocusTarget? = nil,
+        queueLineageAnchorID: DecisionEvolutionMutationHubFocusTarget? = nil,
+        onFocusMutationHubTarget: ((DecisionEvolutionMutationHubFocusTarget) -> Void)? = nil,
         afterMutation: (() -> Void)? = nil
     ) {
         self.controlSurface = controlSurface
@@ -34,6 +40,9 @@ struct DecisionEvolutionPilotControlPanel: View {
         self.showEmbeddedReleaseSummary = showEmbeddedReleaseSummary
         let resolvedNavigationOptions = navigationOptions ?? surfaceContract.navigationSurfaceOptions()
         self.navigationOptions = resolvedNavigationOptions
+        self.quickActionsAnchorID = quickActionsAnchorID
+        self.queueLineageAnchorID = queueLineageAnchorID
+        self.onFocusMutationHubTarget = onFocusMutationHubTarget
         self.pilotSnapshot = DecisionEvolutionPilotControlSnapshot.build(
             controlSurface: controlSurface,
             releaseSummary: releaseSummary,
@@ -87,10 +96,35 @@ struct DecisionEvolutionPilotControlPanel: View {
                     }
                 }
 
+                if (releaseSummary == nil || showEmbeddedReleaseSummary == false),
+                   let foldedLungTitle = pilotSnapshot.foldedLungTitle,
+                   !pilotSnapshot.foldedLungLines.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(foldedLungTitle)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.blue)
+
+                        ForEach(pilotSnapshot.foldedLungLines, id: \.self) { line in
+                            Text(line)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(3)
+                        }
+                    }
+                }
+
                 DecisionEvolutionPilotImpactStripView(intents: pilotSnapshot.mutationIntents)
 
                 if let guidedAction = pilotSnapshot.guidedAction {
                     guidedActionCallout(guidedAction)
+                }
+
+                if let furnaceWorkbenchSectionTitle = pilotSnapshot.furnaceWorkbenchSectionTitle,
+                   let furnaceWorkbenchGuidance = pilotSnapshot.furnaceWorkbenchGuidance {
+                    furnaceWorkbenchCallout(
+                        sectionTitle: furnaceWorkbenchSectionTitle,
+                        guidance: furnaceWorkbenchGuidance
+                    )
                 }
 
                 if !allowsLocalMutationActions {
@@ -137,6 +171,7 @@ struct DecisionEvolutionPilotControlPanel: View {
                             presentMutation(intent)
                         }
                     }
+                    .id(quickActionsAnchorID)
 
                     HStack(spacing: 10) {
                         BeforeActionButton(
@@ -148,6 +183,7 @@ struct DecisionEvolutionPilotControlPanel: View {
                             presentMutation(intent)
                         }
                     }
+                    .id(queueLineageAnchorID)
                 }
 
                 if allowsLocalMutationActions {
@@ -209,6 +245,72 @@ struct DecisionEvolutionPilotControlPanel: View {
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(BeforeTheme.ember.opacity(0.08))
+        )
+    }
+
+    @ViewBuilder
+    private func furnaceWorkbenchCallout(
+        sectionTitle: String,
+        guidance: DecisionEvolutionPilotFurnaceWorkbenchGuidance
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(sectionTitle)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(BeforeTheme.moss)
+
+            Text(guidance.title)
+                .font(.subheadline.bold())
+                .foregroundStyle(BeforeTheme.ink)
+
+            Text(guidance.detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(guidance.availabilityTitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(
+                        guidance.availabilityTitle == "Blocked"
+                            ? BeforeTheme.ember
+                            : BeforeTheme.moss
+                    )
+
+                ForEach(Array(guidance.availabilityLines.enumerated()), id: \.offset) { _, line in
+                    Text(line)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let runNowActionTitle = guidance.runNowActionTitle,
+               let runNowIntent = guidance.runNowIntent {
+                HStack(spacing: 10) {
+                    BeforeActionButton(runNowActionTitle, style: .primary) {
+                        presentMutation(runNowIntent)
+                    }
+
+                    BeforeActionButton(
+                        guidance.actionTitle,
+                        style: .secondary,
+                        isEnabled: onFocusMutationHubTarget != nil
+                    ) {
+                        onFocusMutationHubTarget?(guidance.focusTarget)
+                    }
+                }
+            } else {
+                BeforeActionButton(
+                    guidance.actionTitle,
+                    style: .secondary,
+                    isEnabled: onFocusMutationHubTarget != nil
+                ) {
+                    onFocusMutationHubTarget?(guidance.focusTarget)
+                }
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(BeforeTheme.moss.opacity(0.08))
         )
     }
 

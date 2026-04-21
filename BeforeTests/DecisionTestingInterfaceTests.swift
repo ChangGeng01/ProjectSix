@@ -2588,6 +2588,48 @@ struct DecisionTestingInterfaceTests {
     }
 
     @Test
+    func checkpointPresentationAppendsWindGateMetadataWhenLineageCarriesL11Facts() {
+        let snapshot = DecisionReviewCheckpointSnapshot(
+            checkpointID: "checkpoint-presentation-wind-gate",
+            createdAt: date("2026-04-11T03:05:00.000Z"),
+            mode: .quick,
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            hasBrainStateSnapshot: true,
+            diffSummary: ["Wind-gated review checkpoint"],
+            eBrain: DeveloperDecisionReplayEBrainSummary(
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: date("2026-04-11T03:05:00.000Z"),
+                    sessionID: "before.quick.wind-gate-lineage",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 76,
+                    thoughtFoldChecksum: "fold-wind-gate",
+                    updateTicketSummaries: ["wind gate ticket"],
+                    guardrailFindings: ["wind gate guardrail"],
+                    recommendedKillSwitches: ["external-tools"],
+                    assertionCeiling: "guarded",
+                    delayType: "cool_down",
+                    substituteType: "draft",
+                    sovereignHintLevel: "elevated"
+                )
+            ),
+            fallbackRiskLevel: "watch",
+            fallbackPermitMode: "local_only_protective"
+        )
+
+        let presentation = snapshot.presentation
+        let queueItem = presentation.queueItem
+
+        #expect(
+            presentation.metadataText
+                == "Session before.quick.wind-gate-lineage • Host gate 76% • Fold fold-wind-gate • Wind gate primary delay • assert guarded • delay cool_down • substitute draft • sovereign elevated"
+        )
+        #expect(queueItem.metadataText == presentation.metadataText)
+    }
+
+    @Test
     func checkpointPresentationPrefersReviewDirectiveForPrimarySummaryWhenDiffIsEmpty() {
         let snapshot = DecisionReviewCheckpointSnapshot(
             checkpointID: "checkpoint-presentation-review-directive",

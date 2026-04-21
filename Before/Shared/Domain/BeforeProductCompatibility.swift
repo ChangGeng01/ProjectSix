@@ -10,6 +10,7 @@ enum BeforeRuntimePolicyResolutionSource: String, Codable, Equatable, Sendable {
 enum BeforeRuntimePolicyIssueKind: String, Codable, Equatable, Sendable {
     case overrideDecodeFailed = "override_decode_failed"
     case bundledDecodeFailed = "bundled_decode_failed"
+    case fallbackFactoryRejected = "fallback_factory_rejected"
     case unknownProviderRoutingPolicyID = "unknown_provider_routing_policy_id"
     case unknownRuntimeTuningPolicyID = "unknown_runtime_tuning_policy_id"
     case providerRoutingRegistryRejected = "provider_routing_registry_rejected"
@@ -380,9 +381,18 @@ enum BeforeRuntimePolicyFallbacks {
             standardCandidateFloor: 1,
             protectedCandidateFloor: 2,
             maxCandidateCount: 4,
+            protectedFloorBoundaryModes: [.localOnlyProtective],
+            protectedFloorCalibrationStatuses: [],
             unstableLoopIncrement: 1,
+            unstableLoopIncrementRiskLevels: [.low, .medium],
+            unstableBudgetCalibrationStatuses: [.watch, .drifting],
+            nominalThermalGuardLevel: .nominal,
+            warmThermalGuardLevel: .watch,
+            hotThermalGuardLevel: .throttle,
+            criticalThermalGuardLevel: .emergency,
             throttleLoopPenalty: 1,
             throttleCandidatePenalty: 1,
+            throttlePenaltyThermalLevels: [.hot],
             defaultPrecisionProfile: .balanced,
             unstablePrecisionProfile: .protected,
             guardedPrecisionProfile: .protected,
@@ -402,6 +412,9 @@ enum BeforeRuntimePolicyFallbacks {
             dormantRetrievalDepth: 2
         )
         var resolvedBudget = baseBudget
+        resolvedBudget.protectedFloorBoundaryModes = [.localOnlyProtective]
+        resolvedBudget.protectedFloorCalibrationStatuses = []
+        resolvedBudget.unstableBudgetCalibrationStatuses = [.watch, .drifting]
         resolvedBudget.runModeProfilesByID = baseBudget.resolvedRunModeProfilesByID(
             maintenance: runtimeMaintenance
         )
@@ -413,7 +426,10 @@ enum BeforeRuntimePolicyFallbacks {
         engageUrgencyIncrement: 0.18,
         reflectCueIncrement: 0.16,
         deepLoopCueIncrement: 0.26,
-        highRiskGuardThreshold: 0.68
+        highRiskGuardThreshold: 0.68,
+        urgencyCuePhrases: ["now", "immediately", "urgent", "asap", "tonight", "must"],
+        reflectiveCuePhrases: ["think", "reflect", "consider", "unclear", "confused", "compare"],
+        deepLoopCuePhrases: ["plan", "strategy", "multi-step", "tradeoff", "pros and cons", "simulate"]
     )
     static let runtimeStateTransitions: BASEBrainRuntimeSynthesisPolicy.StateTransitionTuning = {
         var tuning = BASEBrainRuntimeSynthesisPolicy.StateTransitionTuning(
@@ -421,6 +437,16 @@ enum BeforeRuntimePolicyFallbacks {
             recoveryOnCriticalThermal: true,
             reflectOnTrustDrift: true,
             deepLoopOnProtectedBoundary: true,
+            guardedBudgetBoundaryModes: [.localOnlyProtective],
+            guardedBudgetCalibrationStatuses: [],
+            guardedBudgetRiskFlags: [
+                .lowTrustLoad,
+                .retrievalInstability,
+                .externalRefreshGuardTriggered,
+                .observationOnlyQuarantine,
+                .evidenceCaveatLoad
+            ],
+            guardedBudgetRetrievalTags: ["evidence_caveat"],
             lockdownOnExtremeBlockedPermit: true,
             quarantineFailureGuardThreshold: 3,
             criticalThermalMode: .recovery,
@@ -591,6 +617,51 @@ enum BeforeRuntimePolicyFallbacks {
         hostProfile: hostProfile,
         brainBootstrapRecovery: brainBootstrapRecovery
     )
+
+    static func emergencyBundle() -> BeforeRuntimePolicyBundle {
+        var explicitBudget = runtimeBudget
+        explicitBudget.runModeProfilesByID = explicitBudget.resolvedRunModeProfilesByID(
+            maintenance: runtimeMaintenance
+        )
+
+        var explicitTransitions = runtimeStateTransitions
+        explicitTransitions.runModeRules = explicitTransitions.resolvedRunModeRules(
+            wakeIntent: runtimeWakeIntent
+        )
+
+        let explicitPolicy = BASEBrainRuntimeSynthesisPolicy(
+            schemaVersion: runtimeTuningPolicy.schemaVersion,
+            guardrailPressure: runtimeGuardrailPressure,
+            budget: explicitBudget,
+            wakeIntent: runtimeWakeIntent,
+            stateTransitions: explicitTransitions,
+            lease: runtimeLease,
+            maintenance: runtimeMaintenance,
+            sovereignExecution: runtimeSovereignExecution,
+            hostThresholds: runtimeHostThresholds,
+            context: runtimeContext,
+            triSelf: runtimeTriSelf,
+            risk: runtimeRisk
+        )
+
+        return BeforeRuntimePolicyBundle(
+            schemaVersion: bundle.schemaVersion,
+            bundleVersion: "\(bundle.bundleVersion).emergency",
+            providerRoutingRegistry: providerRoutingRegistry,
+            providerRoutingPolicyID: providerRoutingPolicyID,
+            runtimeTuningRegistry: BASEBrainRuntimeSynthesisPolicyRegistry(
+                schemaVersion: runtimeTuningRegistry.schemaVersion,
+                defaultPolicyID: runtimeTuningPolicyID,
+                policiesByID: [
+                    runtimeTuningPolicyID: explicitPolicy
+                ]
+            ),
+            runtimeTuningPolicyID: runtimeTuningPolicyID,
+            updatedAt: bundle.updatedAt,
+            hostProfile: hostProfile,
+            brainBootstrapRecovery: brainBootstrapRecovery
+        )
+    }
 }
 
 enum BeforeRuntimePolicyStore {
@@ -616,7 +687,9 @@ enum BeforeRuntimePolicyStore {
     static func resolve(
         overrideKey: String = overrideKey,
         bundle: Bundle = .main,
-        bundledData: Data? = nil
+        bundledData: Data? = nil,
+        fallbackBundleOverride: BeforeRuntimePolicyBundle? = nil,
+        emergencyBundleOverride: BeforeRuntimePolicyBundle? = nil
     ) -> BeforeRuntimePolicyResolution {
         var issues: [BeforeRuntimePolicyIssue] = []
 
@@ -634,15 +707,16 @@ enum BeforeRuntimePolicyStore {
                 case .rejected(let validationIssues):
                     issues.append(contentsOf: validationIssues)
                 }
-            }
-            issues.append(
-                BeforeRuntimePolicyIssue(
-                    kind: .overrideDecodeFailed,
-                    summary: "Local runtime policy override was quarantined and the app fell back to a safer policy source.",
-                    requestedIdentifier: nil,
-                    fallbackIdentifier: nil
+            } else {
+                issues.append(
+                    BeforeRuntimePolicyIssue(
+                        kind: .overrideDecodeFailed,
+                        summary: "Local runtime policy override was quarantined and the app fell back to a safer policy source.",
+                        requestedIdentifier: nil,
+                        fallbackIdentifier: nil
+                    )
                 )
-            )
+            }
         }
 
         if let bundledData = bundledData ?? loadBundledData(from: bundle) {
@@ -658,19 +732,19 @@ enum BeforeRuntimePolicyStore {
                 case .rejected(let validationIssues):
                     issues.append(contentsOf: validationIssues)
                 }
-            }
-
-            issues.append(
-                BeforeRuntimePolicyIssue(
-                    kind: .bundledDecodeFailed,
-                    summary: "Bundled runtime policy JSON could not be decoded, so the app fell back to its last-resort policy factory.",
-                    requestedIdentifier: nil,
-                    fallbackIdentifier: nil
+            } else {
+                issues.append(
+                    BeforeRuntimePolicyIssue(
+                        kind: .bundledDecodeFailed,
+                        summary: "Bundled runtime policy JSON could not be decoded, so the app fell back to its last-resort policy factory.",
+                        requestedIdentifier: nil,
+                        fallbackIdentifier: nil
+                    )
                 )
-            )
+            }
         }
 
-        let fallbackBundle = BeforeRuntimePolicyFallbacks.bundle
+        let fallbackBundle = fallbackBundleOverride ?? BeforeRuntimePolicyFallbacks.bundle
         let fallbackValidation = validated(fallbackBundle, source: .fallbackFactory)
         switch fallbackValidation {
         case .accepted(let validatedBundle, let validationIssues):
@@ -680,11 +754,28 @@ enum BeforeRuntimePolicyStore {
                 seedIssues: issues + validationIssues
             )
         case .rejected(let validationIssues):
-            return makeResolution(
-                from: fallbackBundle,
-                source: .fallbackFactory,
-                seedIssues: issues + validationIssues
+            let emergencyIssue = BeforeRuntimePolicyIssue(
+                kind: .fallbackFactoryRejected,
+                summary: "Fallback runtime policy factory drifted out of its explicit contract, so the app replaced it with a regenerated emergency bundle rather than continuing on a distorted control-plane bundle.",
+                requestedIdentifier: fallbackBundle.runtimeTuningPolicyID,
+                fallbackIdentifier: BeforeRuntimePolicyFallbacks.runtimeTuningPolicyID
             )
+            let emergencyBundle = emergencyBundleOverride ?? BeforeRuntimePolicyFallbacks.emergencyBundle()
+            let emergencyValidation = validated(emergencyBundle, source: .fallbackFactory)
+            switch emergencyValidation {
+            case .accepted(let validatedBundle, let emergencyIssues):
+                return makeResolution(
+                    from: validatedBundle,
+                    source: .fallbackFactory,
+                    seedIssues: issues + validationIssues + [emergencyIssue] + emergencyIssues
+                )
+            case .rejected(let emergencyIssues):
+                return makeResolution(
+                    from: emergencyBundle,
+                    source: .fallbackFactory,
+                    seedIssues: issues + validationIssues + [emergencyIssue] + emergencyIssues
+                )
+            }
         }
     }
 
@@ -934,8 +1025,10 @@ enum BeforeRuntimePolicyStore {
                     profile.standardCandidateFloor == nil ||
                     profile.protectedCandidateFloor == nil ||
                     profile.unstableLoopIncrement == nil ||
+                    profile.unstableLoopIncrementRiskLevels == nil ||
                     profile.throttleLoopPenalty == nil ||
                     profile.throttleCandidatePenalty == nil ||
+                    profile.throttlePenaltyThermalLevels == nil ||
                     profile.maintenanceSupported == nil ||
                     profile.maintenanceBatteryFloor == nil ||
                     profile.scheduledMaintenanceClass == nil ||

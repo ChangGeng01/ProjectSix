@@ -68,6 +68,39 @@ struct SampleHostView: View {
                             Text("Mode \(turn.budgetFrame.runMode.rawValue) • task \(turn.contextFrame.taskType.rawValue) • risk \(turn.riskCard.riskLevel.rawValue) • permit \(turn.actionPermit.mode.rawValue)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            if !turn.actionPermit.stackedModes.isEmpty {
+                                Text("Stacked: \(turn.actionPermit.stackedModes.map(\.rawValue).joined(separator: " • "))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text("Assertion \(turn.actionPermit.assertionCeiling) • tool \(turn.actionPermit.toolScope) • memory \(turn.actionPermit.memoryScope)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            if !turn.actionPermit.allowedDomains.isEmpty {
+                                Text("Allowed: \(Array(turn.actionPermit.allowedDomains.prefix(3)).joined(separator: " • "))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !turn.actionPermit.blockedDomains.isEmpty {
+                                Text("Blocked: \(Array(turn.actionPermit.blockedDomains.prefix(3)).joined(separator: " • "))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let delayType = turn.riskDecisionPackage?.delayReservation?.delayType ?? turn.actionPermit.delayWindow {
+                                Text("Delay: \(delayType)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let substituteType = turn.riskDecisionPackage?.protectiveSubstitute?.substituteType ?? turn.riskCard.substituteType {
+                                Text("Protective substitute: \(substituteType)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let sovereignHint = turn.riskDecisionPackage?.sovereignEscalationHint?.urgency ?? turn.riskCard.sovereignHintLevel ?? turn.actionPermit.escalationHintRef {
+                                Text("Sovereign hint: \(sovereignHint)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
                             Text("Fold \(turn.thoughtFold.checksum.prefix(12)) • gate \(Int((turn.hostGateValue * 100).rounded()))% • route \(turn.runtimeTrace.modelRoute)")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -95,6 +128,10 @@ struct SampleHostView: View {
                             }
                             if !turn.renderedOutput.alternativeActions.isEmpty {
                                 Text("Alternatives: \(turn.renderedOutput.alternativeActions.joined(separator: " • "))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else if let guidance = turn.renderedOutput.deliveryFallbackGuidance {
+                                Text("Guidance: \(guidance)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }

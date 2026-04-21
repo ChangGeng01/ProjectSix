@@ -8,7 +8,7 @@
 >
 > 本文是 `v∞` 目标态白皮书，只定义理想完全体的 `L14`，不代表当前仓库已实现，也不覆盖当前完成度矩阵、WBS、里程碑或运行时 contract 的现实表述。
 >
-> 文中出现的 `SovereignFrame`、`ContinuitySeal`、`SovereignWarrant`、`Lineage Cut`、`Clean Reboot` 等对象，均为 `documentation-only`、`not shipped runtime schema`、`not authoritative over current repo contracts` 的目标态概念接口。
+> 文中出现的 `SovereignFrame`、`ContinuitySeal`、`Lineage Cut`、`Clean Reboot` 等对象，均为 `documentation-only`、`not shipped runtime schema`、`not authoritative over current repo contracts` 的目标态概念接口。`SovereignWarrant` 现已在 repo 中以 `minimal shipped contract` 形式落地；本文中关于三印提交、四证变更、跨端共主权与治理法庭的其余扩展，仍然属于目标态描述。
 
 一句话定义：
 

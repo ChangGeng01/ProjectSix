@@ -71,8 +71,12 @@ struct HomeView: View {
         )
     }
 
+    private var isHostedUnitTest: Bool {
+        DecisionTestingInterface.runtimeTestingContextDetected()
+    }
+
     private var shouldAutoRefreshSystemFlightDeck: Bool {
-        !DecisionTestingInterface.runtimeTestingContextDetected()
+        !isHostedUnitTest
     }
 
     var body: some View {
@@ -298,13 +302,25 @@ struct HomeView: View {
                         }
 
                         PanelCard {
-                            DecisionSessionEngineSurfaceView(
-                                presentation: sessionEnginePresentation,
-                                showsTitle: true,
-                                maxRecentSessions: 1,
-                                correctionPlaceholder: "Describe the correction you want to branch from the active recovery line.",
-                                correctionReason: "home session engine correction branch"
-                            )
+                            if isHostedUnitTest {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Session engine")
+                                        .font(.headline)
+                                    Text(
+                                        "Hosted test runtime hides the interactive session engine surface so launch stays deterministic."
+                                    )
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                }
+                            } else {
+                                DecisionSessionEngineSurfaceView(
+                                    presentation: sessionEnginePresentation,
+                                    showsTitle: true,
+                                    maxRecentSessions: 1,
+                                    correctionPlaceholder: "Describe the correction you want to branch from the active recovery line.",
+                                    correctionReason: "home session engine correction branch"
+                                )
+                            }
                         }
 
                         if let deck = systemFlightDeck {

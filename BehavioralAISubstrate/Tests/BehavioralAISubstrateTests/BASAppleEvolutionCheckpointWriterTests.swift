@@ -335,6 +335,105 @@ struct BASAppleEvolutionCheckpointWriterTests {
         #expect(attached.currentState.latestCheckpoint?.id == newerID)
     }
 
+    @Test("writer revokes checkpoints when a forget gate targets dream-loop lineage refs")
+    func writerRevokesCheckpointRecoveryEntriesForDreamLoopRefs() throws {
+        let container = try ModelContainer(
+            for: EvolutionCheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        let baseDate = Date(timeIntervalSince1970: 1_744_100_090)
+
+        let targetedLineage = BASEvolutionLineageSummary(
+            recordedAt: baseDate,
+            sessionID: "session.dream-loop",
+            taskType: "decision",
+            riskLevel: "high",
+            permitMode: "delay",
+            hostGatePercent: 86,
+            thoughtFoldChecksum: "fold.dream-loop",
+            updateTicketSummaries: ["dream loop checkpoint"],
+            activeKillSwitches: ["force_guard_mode"],
+            guardrailFindings: ["checkpoint carries dream-loop refs"],
+            recommendedKillSwitches: ["disableHighRiskAutoAction"],
+            governanceSummary: BASEvolutionLineageSummary.GovernanceSummary(
+                experienceCandidateCount: 1,
+                shadowTrialCount: 0,
+                pendingShadowTrialCount: 0,
+                sealCount: 0,
+                pendingSealCount: 0,
+                versionDeltaCount: 0,
+                retractionOrderCount: 0,
+                pendingRetractionCount: 0,
+                dreamLoopStoppingMode: "sovereignCut",
+                dreamLoopSignalRefs: ["dream_loop:sovereignCut", "dream_loop:breakpoint"],
+                dreamLoopRemandTargets: ["L14"],
+                dreamLoopReservationMode: "noAutoMerge",
+                dreamLoopMaxEvidenceDebtPercent: 81
+            )
+        )
+
+        let targeted: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.record(
+                input: BASEvolutionCheckpointInput(
+                    modeName: "reflective",
+                    sourceID: "scene_active",
+                    fingerprint: "fingerprint-dream-loop",
+                    identityRole: .reflectiveWitness,
+                    boundaryMode: .localOnlyProtective,
+                    calibrationStatus: .stable,
+                    lineageSummary: targetedLineage
+                ),
+                in: context,
+                createdAt: baseDate
+            )
+
+        let stable: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.record(
+                input: BASEvolutionCheckpointInput(
+                    modeName: "primary",
+                    sourceID: "launch",
+                    fingerprint: "fingerprint-stable-dream-loop",
+                    identityRole: .pauseCompanion,
+                    boundaryMode: .localOnlyAdvisory,
+                    calibrationStatus: .stable
+                ),
+                in: context,
+                createdAt: baseDate.addingTimeInterval(60)
+            )
+
+        let forgetRequest = BASForgetRequest(
+            requestID: "forget.dream-loop.refs",
+            targetRefs: [
+                "dream_loop_stop:sovereignCut",
+                "dream_loop:breakpoint"
+            ],
+            cascadeScope: ["checkpoints", "projection_cache"],
+            executedSteps: ["checkpoint_exports_revoked"],
+            verified: false
+        )
+
+        let revoked: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.revokeCheckpoints(
+                for: forgetRequest,
+                in: context
+            )
+
+        let checkpoints = try context.fetch(FetchDescriptor<EvolutionCheckpointFixture>())
+        let stableID = try #require(
+            stable.orderedCheckpoints.first(where: { $0.fingerprint == "fingerprint-stable-dream-loop" })?.id
+        )
+        let targetedID = try #require(
+            targeted.orderedCheckpoints.first(where: { $0.fingerprint == "fingerprint-dream-loop" })?.id
+        )
+
+        #expect(checkpoints.count == 1)
+        #expect(checkpoints.first?.id == stableID)
+        #expect(!checkpoints.contains(where: { $0.id == targetedID }))
+        #expect(revoked.currentState.checkpointCount == 1)
+        #expect(revoked.currentState.latestCheckpoint?.id == stableID)
+    }
+
     @Test("checkpoint input carries a restorable brain snapshot")
     func writerPersistsBrainSnapshot() throws {
         let container = try ModelContainer(
@@ -458,6 +557,123 @@ struct BASAppleEvolutionCheckpointWriterTests {
         )
         let targetedID = try #require(
             targeted.orderedCheckpoints.first(where: { $0.fingerprint == "fingerprint-targeted" })?.id
+        )
+
+        #expect(checkpoints.count == 1)
+        #expect(checkpoints.first?.id == stableID)
+        #expect(!checkpoints.contains(where: { $0.id == targetedID }))
+        #expect(revoked.currentState.checkpointCount == 1)
+        #expect(revoked.currentState.latestCheckpoint?.id == stableID)
+    }
+
+    @Test("writer revokes checkpoints when a forget gate targets organ-delta folded-lung refs")
+    func writerRevokesCheckpointRecoveryEntriesForOrganDeltaRefs() throws {
+        let container = try ModelContainer(
+            for: EvolutionCheckpointFixture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        let baseDate = Date(timeIntervalSince1970: 1_744_100_120)
+
+        let targetedLineage = BASEvolutionLineageSummary(
+            recordedAt: baseDate,
+            sessionID: "session.organ-delta",
+            taskType: "decision",
+            riskLevel: "high",
+            permitMode: "delay",
+            hostGatePercent: 88,
+            thoughtFoldChecksum: "fold.organ-delta",
+            updateTicketSummaries: ["organ delta refs"],
+            activeKillSwitches: ["force_guard_mode"],
+            guardrailFindings: ["checkpoint carries organ-delta refs"],
+            recommendedKillSwitches: ["disableHighRiskAutoAction"],
+            foldedLungSummary: BASEvolutionFoldedLungSummary(
+                organDeltaPlanID: "organ-plan.guard",
+                breathMode: "guard",
+                breathPhase: "exchange",
+                thermalPressure: 61,
+                cachePressure: 43,
+                restoreReadinessPercent: 72,
+                resumeID: "resume.organ-delta",
+                sourceFoldID: "fold.organ-delta",
+                resumeDepth: 2,
+                fallbackMode: "rollbackAnchor",
+                rollbackAnchorID: "anchor.organ-delta",
+                safeSnapshotRef: "snapshot.organ-delta",
+                foldRefs: ["fold.organ-delta"],
+                cacheStateRef: "cache.organ-delta",
+                integrityHash: "hash.organ-delta",
+                organPackageRecords: [
+                    BASEvolutionFoldedLungSummary.OrganPackageRecord(
+                        packageID: "package.guard.stub",
+                        organID: "stubCore",
+                        sizeMB: 12,
+                        loadTimeMs: 18,
+                        thermalCost: 4,
+                        sovereignClass: "guard"
+                    )
+                ],
+                organDeltaActivatePackageIDs: ["package.guard.stub"],
+                organDeltaPreloadPackageIDs: ["package.guard.preload"],
+                organDeltaEvictPackageIDs: ["package.guard.evict"],
+                organDeltaRetainPackageIDs: ["package.guard.retain"],
+                organDeltaRollbackSafePackageIDs: ["package.guard.rollback-safe"]
+            )
+        )
+
+        let targeted: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.record(
+                input: BASEvolutionCheckpointInput(
+                    modeName: "reflective",
+                    sourceID: "scene_active",
+                    fingerprint: "fingerprint-organ-delta",
+                    identityRole: .reflectiveWitness,
+                    boundaryMode: .localOnlyProtective,
+                    calibrationStatus: .stable,
+                    lineageSummary: targetedLineage
+                ),
+                in: context,
+                createdAt: baseDate
+            )
+
+        let stable: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.record(
+                input: BASEvolutionCheckpointInput(
+                    modeName: "primary",
+                    sourceID: "launch",
+                    fingerprint: "fingerprint-stable-organ-delta",
+                    identityRole: .pauseCompanion,
+                    boundaryMode: .localOnlyAdvisory,
+                    calibrationStatus: .stable
+                ),
+                in: context,
+                createdAt: baseDate.addingTimeInterval(60)
+            )
+
+        let forgetRequest = BASForgetRequest(
+            requestID: "forget.organ-delta.refs",
+            targetRefs: [
+                "organ-plan.guard",
+                "package.guard.preload",
+                "package.guard.rollback-safe"
+            ],
+            cascadeScope: ["checkpoints", "projection_cache"],
+            executedSteps: ["checkpoint_exports_revoked"],
+            verified: false
+        )
+
+        let revoked: BASAppleEvolutionCheckpointWriteResult<EvolutionCheckpointFixture> =
+            BASAppleEvolutionCheckpointWriter.revokeCheckpoints(
+                for: forgetRequest,
+                in: context
+            )
+
+        let checkpoints = try context.fetch(FetchDescriptor<EvolutionCheckpointFixture>())
+        let stableID = try #require(
+            stable.orderedCheckpoints.first(where: { $0.fingerprint == "fingerprint-stable-organ-delta" })?.id
+        )
+        let targetedID = try #require(
+            targeted.orderedCheckpoints.first(where: { $0.fingerprint == "fingerprint-organ-delta" })?.id
         )
 
         #expect(checkpoints.count == 1)

@@ -1,6 +1,8 @@
 import Foundation
 import Testing
 @testable import BASHostKit
+@testable import BASObservability
+@testable import BASMemory
 @testable import BASOrchestration
 @testable import BASOrchestration
 
@@ -15,6 +17,8 @@ struct BASEBrainSchemaCoreTests {
             evidenceRefs: ["calibration:drifting"],
             cooldownUntil: Date(timeIntervalSince1970: 1_700_000_123),
             confidence: 0.84,
+            hostVersionRef: "host.v3",
+            rollbackRef: "host.v2",
             previewState: "review_only",
             approvalState: "pending"
         )
@@ -25,17 +29,22 @@ struct BASEBrainSchemaCoreTests {
             memoryWriteSuggestion: "Persist as warm memory.",
             hostChangeCandidate: candidate,
             hostProfileChangeSuggestion: "Always use the hardest tone.",
+            derivedCandidateRefs: ["experience.ticket-host-change", "candidate.host_gate"],
+            governanceRefs: ["trial.host_gate", "seal.host_gate"],
             confidence: 0.84,
             conflictFlag: true
         )
 
         #expect(ticket.hasPersistentMutationSuggestion)
+        #expect(ticket.resolvedHostChangeCandidate == candidate)
         #expect(
             ticket.reviewDirectiveLine
-            == "Review host change: review_host_gate_strength • host_gate_strength • conflict flagged"
+            == "Review constitution change: review_host_gate_strength • host_gate_strength • conflict flagged"
         )
         #expect(ticket.actionDigestParts.contains("candidate.host_gate"))
         #expect(ticket.actionDigestParts.contains("review_host_gate_strength"))
+        #expect(ticket.actionDigestParts.contains("experience.ticket-host-change"))
+        #expect(ticket.actionDigestParts.contains("seal.host_gate"))
 
         let legacyPayload = """
         {
@@ -55,7 +64,141 @@ struct BASEBrainSchemaCoreTests {
         let decoded = try JSONDecoder().decode(BASUpdateTicket.self, from: legacyPayload)
         #expect(decoded.hostChangeCandidate == nil)
         #expect(decoded.hostProfileChangeSuggestion == "Always use the hardest tone.")
-        #expect(decoded.reviewDirectiveLine == "Review host change: Always use the hardest tone.")
+        #expect(
+            decoded.resolvedHostChangeCandidate
+            == BASHostChangeCandidate(
+                candidateID: "legacy.ticket-legacy.host-mutation",
+                changeType: "review_legacy_host_mutation",
+                proposedDelta: ["legacy_host_profile_suggestion"],
+                evidenceRefs: ["legacy:Always use the hardest tone."],
+                cooldownUntil: Date(timeIntervalSince1970: 0),
+                confidence: 0.73,
+                conflictRefs: [],
+                previewState: "legacy_bridge",
+                approvalState: "pending_legacy_review"
+            )
+        )
+        #expect(decoded.derivedCandidateRefs == [])
+        #expect(decoded.governanceRefs == [])
+        #expect(decoded.actionDigestParts.contains("legacy.ticket-legacy.host-mutation"))
+        #expect(decoded.actionDigestParts.contains("review_legacy_host_mutation"))
+        #expect(
+            decoded.reviewDirectiveLine
+            == "Review constitution change: review_legacy_host_mutation • legacy_host_profile_suggestion"
+        )
+    }
+
+    @Test("rule candidate and host change candidate round trip governance metadata")
+    func ruleCandidateAndHostChangeCandidateRoundTripGovernanceMetadata() throws {
+        let ruleCandidate = BASRuleCandidate(
+            ruleID: "rule.guard.block",
+            summary: "Promote the bounded protective block pattern only after shadow trial.",
+            sourceTicketIDs: ["ticket.guard.block"],
+            scope: "protective_response",
+            positiveCases: ["high_pressure.block"],
+            negativeCases: ["low_risk.answer"],
+            conflictRefs: ["triself.superego_veto"],
+            outOfScope: ["routine chit-chat"],
+            confidence: 0.78,
+            shadowTrialState: "pending",
+            rollbackRef: "checkpoint.previous",
+            approvalState: .candidate
+        )
+        let changeCandidate = BASHostChangeCandidate(
+            candidateID: "candidate.host.style",
+            changeType: "preview_style_shift",
+            proposedDelta: ["style:clearer_boundaries"],
+            evidenceRefs: ["ticket.guard.block"],
+            cooldownUntil: Date(timeIntervalSince1970: 1_701_000_000),
+            confidence: 0.66,
+            conflictRefs: ["style_conflict"],
+            hostVersionRef: "host.v4",
+            rollbackRef: "host.v3",
+            previewState: "review_only",
+            approvalState: "pending"
+        )
+
+        let ruleData = try JSONEncoder().encode(ruleCandidate)
+        let changeData = try JSONEncoder().encode(changeCandidate)
+        let decodedRule = try JSONDecoder().decode(BASRuleCandidate.self, from: ruleData)
+        let decodedChange = try JSONDecoder().decode(BASHostChangeCandidate.self, from: changeData)
+
+        #expect(decodedRule.outOfScope == ["routine chit-chat"])
+        #expect(decodedRule.shadowTrialState == "pending")
+        #expect(decodedRule.rollbackRef == "checkpoint.previous")
+        #expect(decodedChange.hostVersionRef == "host.v4")
+        #expect(decodedChange.rollbackRef == "host.v3")
+    }
+
+    @Test("stage-2 nursery schemas round trip with risk-pattern coverage")
+    func stageTwoNurserySchemasRoundTrip() throws {
+        let workflow = BASWorkflowCandidate(
+            workflowID: "workflow.compare.review",
+            taskDomain: "compare",
+            steps: ["capture", "compare", "hold"],
+            observedGain: 0.71,
+            safetyNotes: ["host confirmation before send"],
+            hostSpecific: true,
+            shadowTrialState: "pending"
+        )
+        let guardTemplate = BASGuardTemplateCandidate(
+            templateID: "guard.boundary.delay",
+            sceneType: "high_pressure",
+            boundaryScriptRef: "boundary.delay.v1",
+            delayPacketRef: "delay.packet.v2",
+            substituteRef: "substitute.compare.v1",
+            protectiveGain: 0.82,
+            overreachRisk: 0.24
+        )
+        let biasRecord = BASBiasRecord(
+            biasID: "bias.soft_overreach",
+            biasType: "soft_overreach",
+            sourceRefs: ["turn.1", "turn.2"],
+            severity: 0.63,
+            recurrenceScore: 0.58,
+            affectedLayers: ["L10", "L12", "L13"]
+        )
+        let exportBundle = BASLearningExportBundle(
+            bundleID: "bundle.l13.1",
+            candidateRefs: ["candidate.guard.1", "candidate.workflow.1"],
+            scrubbed: true,
+            privacySafe: true,
+            sovereignSafe: true,
+            evaluationTags: ["l13", "shadow_trial"]
+        )
+        let riskPattern = BASRiskPatternCandidate(
+            patternID: "risk.pattern.high_pressure",
+            sourceRefs: ["turn.1"],
+            riskDomain: "high_pressure",
+            triggerSignals: ["manipulation", "delay"],
+            severity: 0.81,
+            recurrenceScore: 0.52,
+            sovereignReviewRequired: true,
+            shadowTrialState: "pending"
+        )
+
+        let workflowData = try JSONEncoder().encode(workflow)
+        let guardTemplateData = try JSONEncoder().encode(guardTemplate)
+        let biasRecordData = try JSONEncoder().encode(biasRecord)
+        let exportBundleData = try JSONEncoder().encode(exportBundle)
+        let riskPatternData = try JSONEncoder().encode(riskPattern)
+
+        let decodedWorkflow = try JSONDecoder().decode(BASWorkflowCandidate.self, from: workflowData)
+        let decodedGuardTemplate = try JSONDecoder().decode(BASGuardTemplateCandidate.self, from: guardTemplateData)
+        let decodedBiasRecord = try JSONDecoder().decode(BASBiasRecord.self, from: biasRecordData)
+        let decodedExportBundle = try JSONDecoder().decode(BASLearningExportBundle.self, from: exportBundleData)
+        let decodedRiskPattern = try JSONDecoder().decode(BASRiskPatternCandidate.self, from: riskPatternData)
+
+        #expect(decodedWorkflow.shadowTrialState == "pending")
+        #expect(decodedWorkflow.hostSpecific)
+        #expect(decodedGuardTemplate.substituteRef == "substitute.compare.v1")
+        #expect(decodedBiasRecord.affectedLayers == ["L10", "L12", "L13"])
+        #expect(decodedExportBundle.scrubbed)
+        #expect(decodedExportBundle.privacySafe)
+        #expect(decodedExportBundle.sovereignSafe)
+        #expect(decodedRiskPattern.riskDomain == "high_pressure")
+        #expect(decodedRiskPattern.sovereignReviewRequired)
+        #expect(decodedRiskPattern.shadowTrialState == "pending")
     }
 
     @Test("new control, knowledge, cognition, and observation schemas publish stable current versions")
@@ -180,6 +323,16 @@ struct BASEBrainSchemaCoreTests {
             nonce: "nonce-1",
             singleUse: true,
             signature: "signature-1"
+        )
+        let sovereignWarrant = BASSovereignWarrant(
+            warrantID: "warrant-1",
+            scope: .memoryWrite,
+            actionDigest: sovereignToken.actionDigest,
+            jurisdictionRef: "jurisdiction.memoryWrite",
+            snapshotRef: "snapshot-1",
+            timeLockRef: "timelock.turn-1.memoryWrite.ttl_30000",
+            singleUse: true,
+            signature: "warrant-signature-1"
         )
         let sovereignLock = BASSovereignLock(
             lockID: "lock-1",
@@ -395,6 +548,7 @@ struct BASEBrainSchemaCoreTests {
         #expect(policyLineage.schemaVersion == BASRuntimePolicyLineage.currentSchemaVersion)
         #expect(sovereignVerdict.schemaVersion == BASSovereignVerdict.currentSchemaVersion)
         #expect(sovereignToken.schemaVersion == BASSovereignCommitToken.currentSchemaVersion)
+        #expect(sovereignWarrant.schemaVersion == BASSovereignWarrant.currentSchemaVersion)
         #expect(sovereignLock.schemaVersion == BASSovereignLock.currentSchemaVersion)
         #expect(quarantineRecord.schemaVersion == BASQuarantineRecord.currentSchemaVersion)
         #expect(sovereignAuditEntry.schemaVersion == BASSovereignAuditEntry.currentSchemaVersion)
@@ -565,7 +719,9 @@ struct BASEBrainSchemaCoreTests {
             dominanceOrder: ["c-1", "c-2"],
             reversiblePaths: ["c-1"],
             guardPaths: ["c-2"],
-            frontierWidth: 2
+            frontierWidth: 2,
+            diversityScore: 0.58,
+            delayedPaths: ["c-2"]
         )
         let counterfactual = BASCounterfactualBundle(
             candidateID: "c-1",
@@ -574,6 +730,42 @@ struct BASEBrainSchemaCoreTests {
             worstCase: "Temporary friction remains.",
             uncertainty: 0.28,
             affectedDomains: ["relationship", "energy"]
+        )
+        let uncertaintyLedger = BASUncertaintyLedger(
+            ledgerID: "uncertainty-1",
+            unresolvedUnknowns: ["timing.confirmation"],
+            weakPredictions: ["c-2"],
+            highSensitivityPoints: ["c-1"],
+            confidenceFloor: 0.44
+        )
+        let evidenceDebt = BASEvidenceDebt(
+            debtID: "debt-1",
+            candidateID: "c-1",
+            missingEvidence: ["timing.confirmation"],
+            validationActions: ["Validate: timing.confirmation"],
+            debtWeight: 0.52
+        )
+        let convergence = BASConvergenceCertificate(
+            certID: "cert-1",
+            frontierID: "frontier.step-1",
+            stabilityScore: 0.73,
+            stoppingMode: .converged,
+            recommendedNextStep: "Use the bounded path."
+        )
+        let loopLeaseReceipt = BASLoopLeaseReceipt(
+            receiptID: "loop-receipt-1",
+            leaseID: "lease-1",
+            loopsUsed: 2,
+            candidatesUsed: 2,
+            projectionsUsed: 1,
+            degraded: false
+        )
+        let sovereignBreakpointHint = BASSovereignBreakpointHint(
+            hintID: "hint-1",
+            sourceRef: "candidate.c-1",
+            reasonCodes: ["boundary_conflict", "tool_cut"],
+            affectedCandidates: ["c-1"],
+            suggestedAction: .cut
         )
         let critiqueBundle = BASCritiqueBundle(
             candidateID: "c-1",
@@ -626,10 +818,217 @@ struct BASEBrainSchemaCoreTests {
         #expect(organMap.schemaVersion == BASNeuralOrganMap.currentSchemaVersion)
         #expect(frontier.schemaVersion == BASCandidateFrontier.currentSchemaVersion)
         #expect(counterfactual.schemaVersion == BASCounterfactualBundle.currentSchemaVersion)
+        #expect(uncertaintyLedger.schemaVersion == BASUncertaintyLedger.currentSchemaVersion)
+        #expect(evidenceDebt.schemaVersion == BASEvidenceDebt.currentSchemaVersion)
+        #expect(convergence.schemaVersion == BASConvergenceCertificate.currentSchemaVersion)
+        #expect(loopLeaseReceipt.schemaVersion == BASLoopLeaseReceipt.currentSchemaVersion)
+        #expect(sovereignBreakpointHint.schemaVersion == BASSovereignBreakpointHint.currentSchemaVersion)
         #expect(critiqueBundle.schemaVersion == BASCritiqueBundle.currentSchemaVersion)
         #expect(binding.schemaVersion == BASRiskPermitBinding.currentSchemaVersion)
         #expect(toolIntent.schemaVersion == BASToolIntentEnvelope.currentSchemaVersion)
         #expect(leaseReceipt.schemaVersion == BASNeuralLeaseReceipt.currentSchemaVersion)
+    }
+
+    @Test("risk climate schemas publish stable current versions")
+    func riskClimateSchemasExposeStableCurrentVersion() {
+        let hazardVector = BASHazardVector(
+            harmSeverity: 0.74,
+            harmScope: 0.63,
+            irreversibility: 0.66,
+            uncertainty: 0.48,
+            evidenceDebt: 0.41,
+            manipulationIntensity: 0.58,
+            pressureAuthenticity: 0.22,
+            vulnerabilityCoupling: 0.52,
+            sideEffectScope: 0.61
+        )
+        let harmRadius = BASHarmRadiusMap(
+            radiusID: "radius-1",
+            privateImpact: 0.44,
+            relationImpact: 0.78,
+            workflowImpact: 0.32,
+            publicImpact: 0.09,
+            longTermTrace: 0.69
+        )
+        let reversibility = BASReversibilityProfile(
+            profileID: "rev-1",
+            reversible: false,
+            rollbackCost: 0.83,
+            confirmNodes: ["external_send"],
+            draftSafe: true,
+            smallStepPossible: true
+        )
+        let evidence = BASEvidenceSufficiency(
+            sufficiencyID: "evidence-1",
+            supportLevel: 0.38,
+            missingEvidence: ["timeline.confirmation"],
+            allowedAssertionLevel: "guarded",
+            allowedActionLevel: "draft_only"
+        )
+        let gsiTrace = BASGSITrace(
+            traceID: "gsi-1",
+            gaslightSignals: ["urgency.masked"],
+            coerciveUrgency: 0.72,
+            shamePressure: 0.34,
+            authorityMask: 0.28,
+            relationLeverage: 0.62,
+            susceptibilityBand: "elevated"
+        )
+        let vulnerability = BASVulnerabilityCoupling(
+            couplingID: "vulnerability-1",
+            touchedBoundaries: ["relationship"],
+            lowEnergyResonance: 0.55,
+            sensitivityWindow: 0.71,
+            protectionBias: 0.68
+        )
+        let escalation = BASSovereignEscalationHint(
+            hintID: "hint-1",
+            sourceRefs: ["candidate.direct"],
+            reasonCodes: ["l11.high_irreversibility"],
+            urgency: "high",
+            suggestedScope: "tool"
+        )
+        let riskField = BASRiskField(
+            fieldID: "field-1",
+            candidateRef: "candidate.direct",
+            hazardVector: hazardVector,
+            harmRadius: harmRadius,
+            reversibilityProfile: reversibility,
+            evidenceSufficiency: evidence,
+            gsiTrace: gsiTrace,
+            vulnerabilityCoupling: vulnerability,
+            confidenceBand: "guarded"
+        )
+        let substitute = BASProtectiveSubstitute(
+            substituteID: "sub-1",
+            sourceCandidateRef: "candidate.direct",
+            substituteType: "draft",
+            description: "Keep the response in draft form.",
+            safetyGain: 0.61
+        )
+        let delayReservation = BASDelayReservation(
+            reservationID: "delay-1",
+            delayType: "cool_down",
+            minDelay: 900,
+            maxDelay: 3600,
+            allowedIntermediateActions: ["compare", "draft_only"]
+        )
+        let modeDecision = BASActionModeDecision(
+            decisionID: "mode-1",
+            primaryMode: .delay,
+            stackedModes: [.draftOnly],
+            reasonCodes: ["risk.high", "irreversible"],
+            confidence: 0.82
+        )
+        let permit = BASActionPermit(
+            mode: .delay,
+            stackedModes: [.draftOnly],
+            reasonCodes: ["risk.high"],
+            allowedDomains: ["bounded_reply", "draft_workspace"],
+            blockedDomains: ["tool_commit", "memory_commit"],
+            assertionCeiling: "guarded",
+            toolScope: "read_only",
+            memoryScope: "review_required",
+            requireMirror: true,
+            requireCompare: true,
+            requireSecondCheck: true,
+            outputLengthCap: 160,
+            tonePolicy: "calm_protective",
+            templatePolicy: "delay_with_draft",
+            delayWindow: "cool_down",
+            substituteRequired: true,
+            escalationHintRef: escalation.hintID
+        )
+        let riskCard = BASRiskCard(
+            totalRisk: 0.81,
+            riskLevel: .high,
+            factors: ["risk.high", "gsi.elevated"],
+            uncertainty: 0.48,
+            irreversibility: 0.66,
+            manipulationStrength: 0.58,
+            gsiScore: 0.74,
+            recommendedMode: .delay,
+            stackedModes: [.draftOnly],
+            assertionCeiling: "guarded",
+            delayType: "cool_down",
+            substituteType: "draft",
+            sovereignHintLevel: "high"
+        )
+        let package = BASRiskDecisionPackage(
+            packageID: "package-1",
+            riskCard: riskCard,
+            riskField: riskField,
+            actionModeDecision: modeDecision,
+            actionPermit: permit,
+            delayReservation: delayReservation,
+            protectiveSubstitute: substitute,
+            sovereignEscalationHint: escalation
+        )
+
+        #expect(hazardVector.schemaVersion == BASHazardVector.currentSchemaVersion)
+        #expect(harmRadius.schemaVersion == BASHarmRadiusMap.currentSchemaVersion)
+        #expect(reversibility.schemaVersion == BASReversibilityProfile.currentSchemaVersion)
+        #expect(evidence.schemaVersion == BASEvidenceSufficiency.currentSchemaVersion)
+        #expect(gsiTrace.schemaVersion == BASGSITrace.currentSchemaVersion)
+        #expect(vulnerability.schemaVersion == BASVulnerabilityCoupling.currentSchemaVersion)
+        #expect(riskField.schemaVersion == BASRiskField.currentSchemaVersion)
+        #expect(modeDecision.schemaVersion == BASActionModeDecision.currentSchemaVersion)
+        #expect(delayReservation.schemaVersion == BASDelayReservation.currentSchemaVersion)
+        #expect(substitute.schemaVersion == BASProtectiveSubstitute.currentSchemaVersion)
+        #expect(escalation.schemaVersion == BASSovereignEscalationHint.currentSchemaVersion)
+        #expect(package.schemaVersion == BASRiskDecisionPackage.currentSchemaVersion)
+        #expect(permit.stackedModes == [.draftOnly])
+        #expect(riskCard.stackedModes == [.draftOnly])
+    }
+
+    @Test("risk permit schemas decode legacy payloads into safe defaults")
+    func riskPermitSchemasDecodeLegacyPayloadsIntoSafeDefaults() throws {
+        let legacyPermitPayload = """
+        {
+          "schemaVersion":"1.0.0",
+          "mode":"delay",
+          "reasonCodes":["risk.high"],
+          "requireSecondCheck":true,
+          "outputLengthCap":180,
+          "tonePolicy":"calm_protective",
+          "templatePolicy":"delay_with_alternative"
+        }
+        """.data(using: .utf8)!
+
+        let legacyRiskCardPayload = """
+        {
+          "schemaVersion":"1.0.0",
+          "totalRisk":0.82,
+          "riskLevel":"high",
+          "factors":["risk.high"],
+          "uncertainty":0.44,
+          "irreversibility":0.71,
+          "manipulationStrength":0.55,
+          "gsiScore":0.69,
+          "recommendedMode":"delay"
+        }
+        """.data(using: .utf8)!
+
+        let decodedPermit = try JSONDecoder().decode(BASActionPermit.self, from: legacyPermitPayload)
+        let decodedRiskCard = try JSONDecoder().decode(BASRiskCard.self, from: legacyRiskCardPayload)
+
+        #expect(decodedPermit.stackedModes.isEmpty)
+        #expect(decodedPermit.allowedDomains.isEmpty)
+        #expect(decodedPermit.blockedDomains.isEmpty)
+        #expect(decodedPermit.assertionCeiling == "guarded")
+        #expect(decodedPermit.toolScope == "bounded")
+        #expect(decodedPermit.memoryScope == "standard")
+        #expect(decodedPermit.requireMirror == false)
+        #expect(decodedPermit.requireCompare == false)
+        #expect(decodedPermit.delayWindow == nil)
+        #expect(decodedPermit.substituteRequired == false)
+        #expect(decodedPermit.escalationHintRef == nil)
+
+        #expect(decodedRiskCard.stackedModes.isEmpty)
+        #expect(decodedRiskCard.assertionCeiling == "standard")
+        #expect(decodedRiskCard.delayType == nil)
+        #expect(decodedRiskCard.substituteType == nil)
+        #expect(decodedRiskCard.sovereignHintLevel == nil)
     }
 
     @Test("folded lung v2 schemas publish stable current versions")
@@ -692,12 +1091,26 @@ struct BASEBrainSchemaCoreTests {
             restoreReadiness: 0.91,
             rollbackAnchorRef: rollbackAnchor.anchorID
         )
+        let thermalExchange = BASThermalExchangeFrame(
+            exchangeID: "thermal.guard",
+            exchangeMode: "protective_exchange",
+            predictedThermalBand: "hot",
+            coolingActions: ["delay_cold_organs", "trim_noncritical_precision"],
+            suppressedOrgans: [.criticBlade, .simuRing],
+            reroutedOrgans: [.permitKnot],
+            rerouteTargets: ["permitKnot": "scoutCPU"],
+            precisionDowngradePlan: [
+                BASNeuralOrganPrecision(organ: .hostModulationMesh, tier: .balanced)
+            ],
+            exchangeReasonCodes: ["thermal.hot", "guard.watch"]
+        )
         #expect(morphGraph.schemaVersion == BASMorphGraph.currentSchemaVersion)
         #expect(hotColdMap.schemaVersion == BASHotColdMap.currentSchemaVersion)
         #expect(precisionProfile.schemaVersion == BASPrecisionProfile.currentSchemaVersion)
         #expect(resumeFrame.schemaVersion == BASResumeFrame.currentSchemaVersion)
         #expect(rollbackAnchor.schemaVersion == BASRollbackAnchor.currentSchemaVersion)
         #expect(lungState.schemaVersion == BASLungState.currentSchemaVersion)
+        #expect(thermalExchange.schemaVersion == BASThermalExchangeFrame.currentSchemaVersion)
     }
 
     @Test("thought frame and fold decode legacy payloads without neural fabric fields")
@@ -754,6 +1167,8 @@ struct BASEBrainSchemaCoreTests {
         #expect(decodedFold.precisionProfileRef == nil)
         #expect(decodedFold.lungStateRef == nil)
         #expect(decodedFold.breathSchedulerRef == nil)
+        #expect(decodedFold.thermalExchangeRef == nil)
+        #expect(decodedFold.integrityWeaveRef == nil)
     }
 
     @Test("decompose frame decodes legacy payloads and backfills structured mirror-blade fields")
@@ -1450,7 +1865,7 @@ struct BASEBrainSchemaCoreTests {
         #expect(result.runtimeTrace.recommendedKillSwitches.contains(.requireReviewedWrites))
         #expect(result.runtimeTrace.layerEvents.contains(where: {
             $0.layerID == "L13"
-            && $0.detail.contains("host changes 1")
+            && $0.detail.contains("constitution changes 1")
             && $0.detail.contains("review_tone_hardening")
         }))
         #expect(result.emergencyBrake.brakeLevel == .lockdown)
@@ -2678,4 +3093,1396 @@ struct BASEBrainSchemaCoreTests {
                 == turn.sovereignExecutionReceipts.map(\.kind)
         )
     }
+
+    @Test("runtime coordinator carries the expanded L11 mode lattice through the turn result")
+    func runtimeCoordinatorCarriesExpandedL11ModeLattice() {
+        let scenarios: [L11Scenario] = [
+            L11Scenario(
+                name: "compare+mirror",
+                package: makeL11RiskDecisionPackage(
+                    primaryMode: .compare,
+                    stackedModes: [.mirror],
+                    riskLevel: .medium,
+                    totalRisk: 0.44,
+                    blockedDomains: ["tool_commit"]
+                )
+            ),
+            L11Scenario(
+                name: "delay+draftOnly",
+                package: makeL11RiskDecisionPackage(
+                    primaryMode: .delay,
+                    stackedModes: [.draftOnly],
+                    riskLevel: .high,
+                    totalRisk: 0.74,
+                    blockedDomains: ["tool_commit", "memory_commit"],
+                    delayReservation: BASDelayReservation(
+                        reservationID: "delay.c1",
+                        delayType: "cool_down",
+                        minDelay: 15,
+                        maxDelay: 1_440,
+                        allowedIntermediateActions: ["compare", "draft_only"]
+                    )
+                )
+            ),
+            L11Scenario(
+                name: "replace+localOnly",
+                package: makeL11RiskDecisionPackage(
+                    primaryMode: .replace,
+                    stackedModes: [.localOnly],
+                    riskLevel: .high,
+                    totalRisk: 0.79,
+                    blockedDomains: ["tool_commit", "memory_commit", "host_commit"],
+                    protectiveSubstitute: BASProtectiveSubstitute(
+                        substituteID: "substitute.c1",
+                        sourceCandidateRef: "c1",
+                        substituteType: "local_only_action",
+                        description: "Keep the action local and reversible first.",
+                        safetyGain: 0.82
+                    )
+                )
+            ),
+            L11Scenario(
+                name: "block+escalate",
+                package: makeL11RiskDecisionPackage(
+                    primaryMode: .block,
+                    stackedModes: [.escalate],
+                    riskLevel: .extreme,
+                    totalRisk: 0.96,
+                    blockedDomains: ["tool_commit", "memory_commit", "host_commit", "high_consequence_decode"],
+                    sovereignEscalationHint: BASSovereignEscalationHint(
+                        hintID: "hint.c1",
+                        sourceRefs: ["risk-field.c1"],
+                        reasonCodes: ["risk.sovereign_boundary"],
+                        urgency: "high",
+                        suggestedScope: "tool"
+                    )
+                )
+            )
+        ]
+
+        for scenario in scenarios {
+            let coordinator = BASEBrainRuntimeCoordinator(
+                powerClockService: L11PowerClock(),
+                hostProfileService: L11Host(),
+                contextService: L11Context(),
+                decomposeService: L11Decompose(),
+                memoryService: L11Memory(),
+                loopService: L11Loop(),
+                triSelfService: L11TriSelf(),
+                riskService: L11Risk(package: scenario.package),
+                actionService: L11Action(),
+                evolutionService: L11Evolution()
+            )
+
+            let result = coordinator.runTurn(
+                BASEBrainTurnRequest(
+                    userInput: "Stress-test \(scenario.name).",
+                    deviceState: BASDeviceState(
+                        batteryLevel: 0.61,
+                        thermalLevel: .nominal,
+                        memoryFreeMB: 2_048,
+                        networkState: .online,
+                        foregroundState: .foreground,
+                        cpuLoad: 0.18,
+                        gpuLoad: 0.06,
+                        npuAvailable: true,
+                        latencyBudgetMs: 1_200
+                    ),
+                    hostID: "host.l11"
+                )
+            )
+
+            let package = try! #require(result.riskDecisionPackage)
+            #expect(result.actionPermit.mode == scenario.package.actionPermit.mode)
+            #expect(result.actionPermit.stackedModes == scenario.package.actionPermit.stackedModes)
+            #expect(result.renderedOutput.mode == scenario.package.actionPermit.mode)
+            #expect(result.thoughtFrame.riskDecisionPackage?.actionPermit.mode == scenario.package.actionPermit.mode)
+            #expect(package.actionModeDecision.primaryMode == scenario.package.actionModeDecision.primaryMode)
+            #expect(package.actionModeDecision.stackedModes == scenario.package.actionModeDecision.stackedModes)
+            #expect(result.thoughtFrame.riskBindings?.first?.stackedModes == scenario.package.actionPermit.stackedModes)
+
+            switch scenario.name {
+            case "delay+draftOnly":
+                #expect(package.delayReservation?.delayType == "cool_down")
+                #expect(package.delayReservation?.allowedIntermediateActions.contains("draft_only") == true)
+            case "replace+localOnly":
+                #expect(package.protectiveSubstitute?.substituteType == "local_only_action")
+                #expect(result.actionPermit.stackedModes.contains(.localOnly))
+            case "block+escalate":
+                #expect(package.sovereignEscalationHint?.urgency == "high")
+                #expect(result.actionPermit.stackedModes.contains(.escalate))
+            default:
+                #expect(package.delayReservation == nil)
+            }
+        }
+    }
+
+    @Test("runtime coordinator projects L11 package controls into rendered surface metadata")
+    func runtimeCoordinatorProjectsL11PackageControlsIntoRenderedSurfaceMetadata() {
+        let scenarios: [L11Scenario] = [
+            L11Scenario(
+                name: "delay+draftOnly",
+                package: makeL11RiskDecisionPackage(
+                    primaryMode: .delay,
+                    stackedModes: [.draftOnly],
+                    riskLevel: .high,
+                    totalRisk: 0.74,
+                    blockedDomains: ["tool_commit", "memory_commit"],
+                    delayReservation: BASDelayReservation(
+                        reservationID: "delay.surface",
+                        delayType: "cool_down",
+                        minDelay: 15,
+                        maxDelay: 1_440,
+                        allowedIntermediateActions: ["compare", "draft_only"]
+                    )
+                )
+            ),
+            L11Scenario(
+                name: "replace+localOnly",
+                package: makeL11RiskDecisionPackage(
+                    primaryMode: .replace,
+                    stackedModes: [.localOnly],
+                    riskLevel: .high,
+                    totalRisk: 0.79,
+                    blockedDomains: ["tool_commit", "memory_commit", "host_commit"],
+                    protectiveSubstitute: BASProtectiveSubstitute(
+                        substituteID: "substitute.surface",
+                        sourceCandidateRef: "c1",
+                        substituteType: "local_only_action",
+                        description: "Keep the action local and reversible first.",
+                        safetyGain: 0.82
+                    )
+                )
+            ),
+            L11Scenario(
+                name: "block+escalate",
+                package: makeL11RiskDecisionPackage(
+                    primaryMode: .block,
+                    stackedModes: [.escalate],
+                    riskLevel: .extreme,
+                    totalRisk: 0.96,
+                    blockedDomains: ["tool_commit", "memory_commit", "host_commit", "high_consequence_decode"],
+                    sovereignEscalationHint: BASSovereignEscalationHint(
+                        hintID: "hint.surface",
+                        sourceRefs: ["risk-field.c1"],
+                        reasonCodes: ["risk.sovereign_boundary"],
+                        urgency: "high",
+                        suggestedScope: "tool"
+                    )
+                )
+            )
+        ]
+
+        for scenario in scenarios {
+            let coordinator = BASEBrainRuntimeCoordinator(
+                powerClockService: L11PowerClock(),
+                hostProfileService: L11Host(),
+                contextService: L11Context(),
+                decomposeService: L11Decompose(),
+                memoryService: L11Memory(),
+                loopService: L11Loop(),
+                triSelfService: L11TriSelf(),
+                riskService: L11Risk(package: scenario.package),
+                actionService: L11Action(),
+                evolutionService: L11Evolution()
+            )
+
+            let result = coordinator.runTurn(
+                BASEBrainTurnRequest(
+                    userInput: "Surface-test \(scenario.name).",
+                    deviceState: BASDeviceState(
+                        batteryLevel: 0.61,
+                        thermalLevel: .nominal,
+                        memoryFreeMB: 2_048,
+                        networkState: .online,
+                        foregroundState: .foreground,
+                        cpuLoad: 0.18,
+                        gpuLoad: 0.06,
+                        npuAvailable: true,
+                        latencyBudgetMs: 1_200
+                    ),
+                    hostID: "host.surface"
+                )
+            )
+
+            let surface = try! #require(result.renderedOutput.surfaceGuide)
+            #expect(surface.stackedModes == result.actionPermit.stackedModes)
+            #expect(surface.tonePolicy == result.actionPermit.tonePolicy)
+            #expect(surface.templatePolicy == result.actionPermit.templatePolicy)
+            #expect(surface.outputLengthCap == result.actionPermit.outputLengthCap)
+            #expect(surface.boundary.allowedDomains == result.actionPermit.allowedDomains)
+            #expect(surface.boundary.blockedDomains == result.actionPermit.blockedDomains)
+            #expect(surface.boundary.toolScope == result.actionPermit.toolScope)
+            #expect(surface.boundary.memoryScope == result.actionPermit.memoryScope)
+            #expect(surface.boundary.escalationHintRef == result.actionPermit.escalationHintRef)
+            #expect(surface.agency.requiresCompare == result.actionPermit.requireCompare)
+            #expect(surface.agency.requiresSecondCheck == result.actionPermit.requireSecondCheck)
+            #expect(surface.disclosure.assertionCeiling == result.actionPermit.assertionCeiling)
+            #expect(surface.disclosure.explanationCodes == result.renderedOutput.explanationCodes)
+
+            switch scenario.name {
+            case "delay+draftOnly":
+                #expect(surface.agency.delayAvailable)
+                #expect(surface.agency.chooseLaterAllowed)
+                #expect(surface.agency.prefersDraftOnly)
+                #expect(surface.delayReservation?.reservationID == "delay.surface")
+                #expect(surface.delayReservation?.allowedIntermediateActions.contains("draft_only") == true)
+                #expect(surface.protectiveSubstitute == nil)
+                #expect(surface.sovereignEscalationHint == nil)
+            case "replace+localOnly":
+                #expect(surface.agency.localOnlyPreferred)
+                #expect(surface.agency.chooseLaterAllowed)
+                #expect(surface.protectiveSubstitute?.substituteID == "substitute.surface")
+                #expect(surface.protectiveSubstitute?.description == "Keep the action local and reversible first.")
+                #expect(surface.delayReservation == nil)
+                #expect(surface.sovereignEscalationHint == nil)
+            case "block+escalate":
+                #expect(surface.agency.chooseLaterAllowed)
+                #expect(surface.sovereignEscalationHint?.hintID == "hint.surface")
+                #expect(surface.sovereignEscalationHint?.urgency == "high")
+                #expect(surface.delayReservation == nil)
+                #expect(surface.protectiveSubstitute == nil)
+            default:
+                Issue.record("Unhandled L11 scenario \(scenario.name)")
+            }
+        }
+    }
+
+    @Test("risk bindings keep tool, memory, and host domains independently gated")
+    func riskBindingsKeepDomainsIndependentlyGated() {
+        let thoughtFrame = BASThoughtFrame(
+            stepIndex: 1,
+            decomposeRef: "decomp-l11",
+            candidates: [
+                BASCandidatePath(
+                    candidateID: "c1",
+                    title: "Primary path",
+                    actionSummary: "Use a bounded next step.",
+                    expectedBenefit: 0.6,
+                    expectedCost: 0.2,
+                    reversibility: 0.8,
+                    confidence: 0.72
+                )
+            ],
+            forecasts: [
+                BASForecastItem(
+                    candidateID: "c1",
+                    shortTermOutcome: "Contained move",
+                    midTermOutcome: "Lower fallout",
+                    worstCase: "Small delay",
+                    uncertainty: 0.22
+                )
+            ],
+            critiques: [
+                BASCritiqueItem(
+                    candidateID: "c1",
+                    critiqueType: .boundaryConflict,
+                    critiqueText: "Needs bounded release.",
+                    severity: 0.4
+                )
+            ],
+            organMap: BASNeuralOrganMap(
+                morph: .deepLoop,
+                activeOrgans: [.toolIntentMesh, .riskSpine, .permitKnot, .stubCore],
+                precisionMap: [],
+                routingPolicy: .deepLoopConvergence,
+                sovereignConstraints: [],
+                headGuarantees: ["tool_intent"]
+            )
+        )
+        let mergedChoice = BASMergedChoice(candidateID: "c1", title: "Primary path", actionSummary: "Use a bounded next step.")
+        let compareRisk = BASRiskCard(
+            totalRisk: 0.41,
+            riskLevel: .medium,
+            factors: ["risk.medium"],
+            uncertainty: 0.18,
+            irreversibility: 0.24,
+            manipulationStrength: 0.12,
+            gsiScore: 0.16,
+            recommendedMode: .compare
+        )
+        let comparePermit = BASActionPermit(
+            mode: .compare,
+            stackedModes: [.mirror],
+            reasonCodes: ["risk.medium"],
+            allowedDomains: ["bounded_reply", "comparison"],
+            blockedDomains: ["tool_commit"],
+            assertionCeiling: "guarded",
+            toolScope: "none",
+            memoryScope: "standard",
+            requireMirror: true,
+            requireCompare: true,
+            requireSecondCheck: false,
+            outputLengthCap: 220,
+            tonePolicy: "structured_compare",
+            templatePolicy: "two_path_compare"
+        )
+        let compareBindings = BASNeuralMaterializationCompiler.materializeRiskBindings(
+            thoughtFrame: thoughtFrame,
+            mergedChoice: mergedChoice,
+            riskCard: compareRisk,
+            actionPermit: comparePermit,
+            riskLevelResolver: { _ in .medium }
+        )
+        let compareBinding = try! #require(compareBindings.first)
+        #expect(compareBinding.allowedDomains.contains("comparison"))
+        #expect(compareBinding.forbiddenDomains.contains("tool_commit"))
+        #expect(compareBinding.forbiddenDomains.contains("memory_commit") == false)
+        #expect(compareBinding.forbiddenDomains.contains("host_commit") == false)
+
+        let localOnlyPermit = BASActionPermit(
+            mode: .localOnly,
+            stackedModes: [.replace],
+            reasonCodes: ["risk.high"],
+            allowedDomains: ["bounded_reply", "local_action"],
+            blockedDomains: ["memory_commit", "host_commit", "public_release"],
+            assertionCeiling: "guarded",
+            toolScope: "local_only",
+            memoryScope: "review_only",
+            requireMirror: true,
+            requireCompare: true,
+            requireSecondCheck: true,
+            outputLengthCap: 180,
+            tonePolicy: "clear_firm",
+            templatePolicy: "local_only_action",
+            substituteRequired: true
+        )
+        let localBindings = BASNeuralMaterializationCompiler.materializeRiskBindings(
+            thoughtFrame: thoughtFrame,
+            mergedChoice: mergedChoice,
+            riskCard: compareRisk,
+            actionPermit: localOnlyPermit,
+            riskLevelResolver: { _ in .high }
+        )
+        let localBinding = try! #require(localBindings.first)
+        #expect(localBinding.allowedDomains.contains("local_action"))
+        #expect(localBinding.forbiddenDomains.contains("memory_commit"))
+        #expect(localBinding.forbiddenDomains.contains("host_commit"))
+        #expect(localBinding.forbiddenDomains.contains("public_release"))
+        #expect(localBinding.forbiddenDomains.contains("tool_commit") == false)
+
+        let toolIntent = BASNeuralMaterializationCompiler.materializeToolIntent(
+            thoughtFrame: thoughtFrame,
+            mergedChoice: mergedChoice,
+            actionPermit: localOnlyPermit
+        )
+        #expect(toolIntent?.blockedDomains.contains("memory_commit") == true)
+        #expect(toolIntent?.blockedDomains.contains("host_commit") == true)
+        #expect(toolIntent?.blockedDomains.contains("public_release") == true)
+    }
+
+    @Test("neural materialization derives phase1 dream-loop artifacts")
+    func neuralMaterializationDerivesPhase1DreamLoopArtifacts() {
+        let thoughtFrame = BASThoughtFrame(
+            stepIndex: 2,
+            decomposeRef: "decomp-l9-phase1",
+            candidates: [
+                BASCandidatePath(
+                    candidateID: "c1",
+                    title: "Reply with a bounded next step",
+                    actionSummary: "Send a short bounded reply.",
+                    requiredEvidence: ["Confirm the scope of the ask."],
+                    expectedBenefit: 0.68,
+                    expectedCost: 0.22,
+                    reversibility: 0.82,
+                    confidence: 0.76
+                ),
+                BASCandidatePath(
+                    candidateID: "c2",
+                    title: "Pause and gather one fact",
+                    actionSummary: "Wait briefly and verify one missing fact.",
+                    requiredEvidence: ["Need reply evidence."],
+                    expectedBenefit: 0.55,
+                    expectedCost: 0.16,
+                    reversibility: 0.91,
+                    confidence: 0.58
+                )
+            ],
+            forecasts: [
+                BASForecastItem(
+                    candidateID: "c1",
+                    shortTermOutcome: "Short-term calming.",
+                    midTermOutcome: "Lower fallout.",
+                    worstCase: "Small friction remains.",
+                    uncertainty: 0.18
+                ),
+                BASForecastItem(
+                    candidateID: "c2",
+                    shortTermOutcome: "More certainty later.",
+                    midTermOutcome: "Better timing.",
+                    worstCase: "Delay discomfort.",
+                    uncertainty: 0.61
+                )
+            ],
+            critiques: [
+                BASCritiqueItem(
+                    candidateID: "c1",
+                    critiqueType: .boundaryConflict,
+                    critiqueText: "Needs tighter release radius.",
+                    severity: 0.81
+                ),
+                BASCritiqueItem(
+                    candidateID: "c2",
+                    critiqueType: .evidenceGap,
+                    critiqueText: "Still missing one key fact.",
+                    severity: 0.67
+                )
+            ],
+            organMap: BASNeuralOrganMap(
+                morph: .deepLoop,
+                activeOrgans: [.criticBlade, .riskSpine, .permitKnot, .tissueRouter],
+                precisionMap: [],
+                routingPolicy: .deepLoopConvergence,
+                leaseRef: "lease-l9-phase1",
+                sovereignConstraints: ["tool_cut"],
+                headGuarantees: ["phase1_l9"]
+            ),
+            stabilityScore: 0.76,
+            stopReason: .candidateStable
+        )
+
+        let artifacts = BASNeuralMaterializationCompiler.materializeThoughtArtifacts(
+            thoughtFrame: thoughtFrame
+        )
+
+        let frontier = try! #require(artifacts.candidateFrontier)
+        #expect(frontier.frontierWidth == 2)
+        #expect(frontier.dominanceOrder == ["c1", "c2"])
+        #expect(frontier.reversiblePaths == ["c1", "c2"])
+        #expect(frontier.guardPaths == ["c1", "c2"])
+        #expect(frontier.diversityScore > 0.40)
+        #expect(frontier.delayedPaths == ["c2"])
+
+        let counterfactualBundles = try! #require(artifacts.counterfactualBundles)
+        #expect(counterfactualBundles.count == 2)
+        let secondaryCounterfactual = counterfactualBundles.first(where: { $0.candidateID == "c2" })
+        #expect(secondaryCounterfactual?.uncertainty == 0.61)
+
+        let critiqueBundles = try! #require(artifacts.critiqueBundles)
+        #expect(critiqueBundles.count == 2)
+        let containsPrimaryCritique = critiqueBundles.contains { bundle in
+            bundle.candidateID == "c1"
+                && bundle.boundaryConflict == 0.81
+                && bundle.critiqueStrength == 0.81
+        }
+        let containsSecondaryCritique = critiqueBundles.contains { bundle in
+            bundle.candidateID == "c2"
+                && bundle.evidenceGap == 0.67
+                && bundle.critiqueStrength == 0.67
+        }
+        #expect(containsPrimaryCritique)
+        #expect(containsSecondaryCritique)
+
+        let uncertaintyLedger = try! #require(artifacts.uncertaintyLedger)
+        #expect(uncertaintyLedger.weakPredictions.contains("c2"))
+        #expect(uncertaintyLedger.confidenceFloor < 0.76)
+
+        let evidenceDebts = try! #require(artifacts.evidenceDebts)
+        #expect(evidenceDebts.count == 2)
+        #expect(
+            evidenceDebts.contains(where: {
+                $0.candidateID == "c2" && $0.missingEvidence.contains("Need reply evidence.")
+            })
+        )
+
+        let convergence = try! #require(artifacts.convergenceCertificate)
+        #expect(convergence.stoppingMode == .converged)
+        #expect(convergence.frontierID == "frontier.step-2")
+
+        let loopLeaseReceipt = try! #require(artifacts.loopLeaseReceipt)
+        #expect(loopLeaseReceipt.leaseID == "lease-l9-phase1")
+        #expect(loopLeaseReceipt.candidatesUsed == 2)
+        #expect(loopLeaseReceipt.projectionsUsed == 2)
+
+        let breakpointHints = try! #require(artifacts.sovereignBreakpointHints)
+        #expect(breakpointHints.count == 1)
+        #expect(breakpointHints.first?.reasonCodes.contains("boundary_conflict") == true)
+        #expect(breakpointHints.first?.suggestedAction == .cut)
+    }
+
+    @Test("convergence certificates preserve explicit guard-takeover stop reasons")
+    func convergenceCertificatesPreserveGuardTakeoverStopReasons() {
+        let thoughtFrame = BASThoughtFrame(
+            stepIndex: 1,
+            decomposeRef: "decomp-l9-guard",
+            candidates: [
+                BASCandidatePath(
+                    candidateID: "guard-1",
+                    title: "Delay and hold the boundary",
+                    actionSummary: "Keep the next move reversible while the guard branch leads.",
+                    requiredEvidence: ["Confirm one missing fact."],
+                    expectedBenefit: 0.72,
+                    expectedCost: 0.28,
+                    reversibility: 0.92,
+                    confidence: 0.74
+                )
+            ],
+            forecasts: [
+                BASForecastItem(
+                    candidateID: "guard-1",
+                    shortTermOutcome: "Protection stays intact.",
+                    midTermOutcome: "The safer lane remains open.",
+                    worstCase: "The decision stays delayed longer than wanted.",
+                    uncertainty: 0.33
+                )
+            ],
+            critiques: [
+                BASCritiqueItem(
+                    candidateID: "guard-1",
+                    critiqueType: .evidenceGap,
+                    critiqueText: "One fact is still missing.",
+                    severity: 0.52
+                )
+            ],
+            stabilityScore: 0.69,
+            stopReason: .guardTakeover
+        )
+
+        let frontier = BASNeuralMaterializationCompiler.buildCandidateFrontier(
+            from: thoughtFrame
+        )
+        let critiqueBundles = BASNeuralMaterializationCompiler.buildCritiqueBundles(
+            from: thoughtFrame.critiques,
+            candidates: thoughtFrame.candidates
+        )
+        let convergence = BASNeuralMaterializationCompiler.buildConvergenceCertificate(
+            from: thoughtFrame,
+            frontier: frontier,
+            critiqueBundles: critiqueBundles
+        )
+
+        #expect(convergence?.stoppingMode == .guardTakeover)
+    }
+
+    @Test("convergence certificates preserve explicit lease-end stop reasons")
+    func convergenceCertificatesPreserveLeaseEndStopReasons() {
+        let thoughtFrame = BASThoughtFrame(
+            stepIndex: 2,
+            decomposeRef: "decomp-l9-lease",
+            candidates: [
+                BASCandidatePath(
+                    candidateID: "lease-1",
+                    title: "Wait for one more loop",
+                    actionSummary: "Keep the path open until the next loop would add value.",
+                    requiredEvidence: ["Need one more checkpoint."],
+                    expectedBenefit: 0.63,
+                    expectedCost: 0.31,
+                    reversibility: 0.88,
+                    confidence: 0.68
+                )
+            ],
+            forecasts: [
+                BASForecastItem(
+                    candidateID: "lease-1",
+                    shortTermOutcome: "A little more time.",
+                    midTermOutcome: "Potentially cleaner decision.",
+                    worstCase: "Lease expires before certainty improves.",
+                    uncertainty: 0.41
+                )
+            ],
+            critiques: [
+                BASCritiqueItem(
+                    candidateID: "lease-1",
+                    critiqueType: .evidenceGap,
+                    critiqueText: "The next loop still needs one checkpoint.",
+                    severity: 0.49
+                )
+            ],
+            stabilityScore: 0.61,
+            stopReason: .maxLoopsReached
+        )
+
+        let frontier = BASNeuralMaterializationCompiler.buildCandidateFrontier(
+            from: thoughtFrame
+        )
+        let critiqueBundles = BASNeuralMaterializationCompiler.buildCritiqueBundles(
+            from: thoughtFrame.critiques,
+            candidates: thoughtFrame.candidates
+        )
+        let convergence = BASNeuralMaterializationCompiler.buildConvergenceCertificate(
+            from: thoughtFrame,
+            frontier: frontier,
+            critiqueBundles: critiqueBundles
+        )
+
+        #expect(convergence?.stoppingMode == .leaseEnd)
+    }
+
+    @Test("convergence certificates preserve explicit sovereign-cut stop reasons")
+    func convergenceCertificatesPreserveSovereignCutStopReasons() {
+        let thoughtFrame = BASThoughtFrame(
+            stepIndex: 1,
+            decomposeRef: "decomp-l9-cut",
+            candidates: [
+                BASCandidatePath(
+                    candidateID: "cut-1",
+                    title: "Direct release into a blocked zone",
+                    actionSummary: "Push the direct path even though the sovereign cut has fired.",
+                    requiredEvidence: ["Blocked domain review."],
+                    expectedBenefit: 0.52,
+                    expectedCost: 0.66,
+                    reversibility: 0.34,
+                    confidence: 0.42
+                )
+            ],
+            forecasts: [
+                BASForecastItem(
+                    candidateID: "cut-1",
+                    shortTermOutcome: "Fast movement.",
+                    midTermOutcome: "Boundary debt rises.",
+                    worstCase: "The path should not continue.",
+                    uncertainty: 0.55
+                )
+            ],
+            critiques: [
+                BASCritiqueItem(
+                    candidateID: "cut-1",
+                    critiqueType: .boundaryConflict,
+                    critiqueText: "This path no longer has sovereign clearance.",
+                    severity: 0.91
+                )
+            ],
+            stabilityScore: 0.44,
+            stopReason: .blocked
+        )
+
+        let frontier = BASNeuralMaterializationCompiler.buildCandidateFrontier(
+            from: thoughtFrame
+        )
+        let critiqueBundles = BASNeuralMaterializationCompiler.buildCritiqueBundles(
+            from: thoughtFrame.critiques,
+            candidates: thoughtFrame.candidates
+        )
+        let convergence = BASNeuralMaterializationCompiler.buildConvergenceCertificate(
+            from: thoughtFrame,
+            frontier: frontier,
+            critiqueBundles: critiqueBundles
+        )
+
+        #expect(convergence?.stoppingMode == .sovereignCut)
+    }
+
+    @Test("generic host runtime carries dream-loop artifacts into tri-self court and risk outputs")
+    func genericHostRuntimeCarriesDreamLoopArtifactsIntoDownstreamOutputs() throws {
+        let runtime = BASHostRuntime(configuration: .generic)
+        let turn = try #require(
+            runtime.startSession(
+                BASHostSessionRequest(
+                    kind: .interactive,
+                    workflowProfile: .reflective,
+                    surface: .application,
+                    prompt: "I want to send a harsh message tonight.",
+                    riskLevel: .high
+                )
+            ).eBrainTurn
+        )
+
+        let frontier = try #require(turn.thoughtFrame.candidateFrontier)
+        let uncertaintyLedger = try #require(turn.thoughtFrame.uncertaintyLedger)
+        let evidenceDebts = try #require(turn.thoughtFrame.evidenceDebts)
+        let convergence = try #require(turn.thoughtFrame.convergenceCertificate)
+        let agencyReservation = try #require(turn.mergedChoice.agencyReservation)
+        let remandOrders = try #require(turn.mergedChoice.remandOrders)
+        let courtDecisionDraft = try #require(turn.mergedChoice.courtDecisionDraft)
+        let riskPackage = try #require(turn.riskDecisionPackage)
+        let updateTicket = try #require(turn.updateTickets.first)
+        let loopTrace = try #require(turn.runtimeTrace.layerEvents.first(where: { $0.layerID == "L9" }))
+        let renderTrace = try #require(turn.runtimeTrace.layerEvents.first(where: { $0.layerID == "L12" }))
+        let evolutionTrace = try #require(turn.runtimeTrace.layerEvents.first(where: { $0.layerID == "L13" }))
+
+        let selectedCandidateID = turn.mergedChoice.candidateID
+        let selectedEvidenceDebt = try #require(
+            evidenceDebts.first(where: { $0.candidateID == selectedCandidateID })
+        )
+        let l9Remand = try #require(
+            remandOrders.first(where: { $0.targetLayer == "L9" })
+        )
+        let selectedMissingEvidence = try #require(selectedEvidenceDebt.missingEvidence.first)
+
+        #expect(frontier.frontierWidth == turn.thoughtFrame.candidates.count)
+        #expect(uncertaintyLedger.unresolvedUnknowns.isEmpty == false)
+        #expect(selectedEvidenceDebt.debtWeight >= 0.5)
+        #expect(agencyReservation.mode == .delayRight)
+        #expect(agencyReservation.expiresWith == "guard_release")
+        #expect(l9Remand.reasonCodes.contains("court.evidence_debt"))
+        #expect(l9Remand.requiredWork.contains("Expand the guard branch before acting."))
+        #expect(l9Remand.requiredWork.contains(selectedMissingEvidence))
+        #expect(
+            l9Remand.requiredWork.contains(where: { $0.contains("Validate:") })
+        )
+        #expect(convergence.stoppingMode == .guardTakeover)
+        #expect(courtDecisionDraft.preferredCandidateID == selectedCandidateID)
+        #expect(courtDecisionDraft.agencyMode == .delayRight)
+        #expect(courtDecisionDraft.readinessLevel == "remand_pending")
+        #expect(
+            courtDecisionDraft.requiredDisclosures.contains(where: { disclosure in
+                disclosure == selectedMissingEvidence
+                    || disclosure.contains("delay-preferring")
+            })
+        )
+        #expect(
+            courtDecisionDraft.unresolvedCosts.contains("A guard branch took over the convergence path.")
+        )
+        #expect(riskPackage.riskField.candidateRef == selectedCandidateID)
+        #expect(riskPackage.riskField.evidenceSufficiency.missingEvidence.contains(selectedMissingEvidence))
+        #expect(
+            riskPackage.riskField.hazardVector.evidenceDebt >= selectedEvidenceDebt.debtWeight
+        )
+        #expect(
+            riskPackage.riskField.evidenceSufficiency.allowedActionLevel
+                == turn.actionPermit.mode.rawValue
+        )
+        #expect(turn.actionPermit.reasonCodes.contains("dream_loop.guard_takeover"))
+        #expect(turn.renderedOutput.headline == "Let the guard branch lead before release")
+        #expect(
+            turn.renderedOutput.body.contains(
+                "The dream loop stopped because the guard branch became the safer lead."
+            )
+        )
+        #expect(
+            turn.renderedOutput.alternativeActions.first
+                == "Follow the guard branch and keep the move reversible."
+        )
+        #expect(updateTicket.governanceRefs.contains("dream_loop:guardTakeover"))
+        #expect(updateTicket.governanceRefs.contains("dream_loop:evidence_debt"))
+        #expect(updateTicket.governanceRefs.contains("dream_loop:delay_branch"))
+        #expect(loopTrace.detail.contains("convergence guardTakeover"))
+        #expect(loopTrace.detail.contains("weak predictions 1"))
+        #expect(renderTrace.detail.contains("dream loop guardTakeover"))
+        #expect(renderTrace.detail.contains("agency delayRight"))
+        #expect(evolutionTrace.detail.contains("dream loop guardTakeover"))
+        #expect(evolutionTrace.detail.contains("evidence_debt"))
+    }
+
+    @Test("generic host runtime carries dream-loop sovereign cuts into tri-self court and risk outputs")
+    func genericHostRuntimeCarriesDreamLoopSovereignCutsIntoDownstreamOutputs() throws {
+        var runtimeTuning = BASEBrainRuntimeSynthesisPolicy.generic.withSchemaVersion(
+            "host.runtime-synthesis.policy-owned.single-candidate.v1"
+        )
+        runtimeTuning.wakeIntent.highRiskGuardThreshold = 0.69
+        runtimeTuning.stateTransitions.quarantineFailureGuardThreshold = 3
+        runtimeTuning.stateTransitions.runModeRules = runtimeTuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: runtimeTuning.wakeIntent
+        )
+        runtimeTuning.lease.restrictedEnergyQuota = 0.46
+        runtimeTuning.maintenance.standardBatteryFloor = 0.36
+        runtimeTuning.sovereignExecution.deadStopOnExtremeBlockedPermit = false
+        runtimeTuning.context.emotionalLoadDriftingIncrement = 0.09
+        runtimeTuning.triSelf.directPathSuperegoPenalty = 0.46
+        runtimeTuning.risk.defaultForecastUncertainty = 0.24
+        runtimeTuning.budget.highRiskCandidates = 1
+        runtimeTuning.budget.extremeRiskCandidates = 1
+        runtimeTuning.budget.maxCandidateCount = 1
+        runtimeTuning.budget.standardCandidateFloor = 1
+        runtimeTuning.budget.protectedCandidateFloor = 1
+        for mode in [BASEBrainRunMode.guard, .reflect, .engage, .deepLoop] {
+            if var modeProfile = runtimeTuning.budget.runModeProfilesByID?[mode.rawValue] {
+                modeProfile.maxCandidates = 1
+                modeProfile.candidateCountCap = 1
+                modeProfile.standardCandidateFloor = 1
+                modeProfile.protectedCandidateFloor = 1
+                runtimeTuning.budget.runModeProfilesByID?[mode.rawValue] = modeProfile
+            }
+        }
+
+        var configuration = BASHostConfiguration.generic
+        configuration.runtimeProfileID = "host.runtime.single-candidate-guard"
+        configuration.policyProfileID = "host.policy.single-candidate-guard"
+        configuration.runtimeTuning = runtimeTuning
+        configuration.runtimePolicyLineage = BASRuntimePolicyLineage(
+            bundleVersion: "policy.bundle.v1",
+            providerRoutingRegistryVersion: "provider.registry.v1",
+            providerRoutingPolicyID: "provider.rollout",
+            runtimeTuningRegistryVersion: "runtime.registry.v1",
+            runtimeTuningPolicyID: "runtime.single-candidate-guard",
+            resolutionSourceID: "bundled_default"
+        )
+        configuration.hostRhythmProfile = BASHostRhythmProfile(
+            activeWindows: ["focus_window"],
+            highFocusWindows: ["deep_work"],
+            lowEnergyWindows: ["sleep_window"],
+            preferredInteractionStyle: "bounded_reflective",
+            sensitivityPeriods: ["late_night"]
+        )
+        configuration.hostConstitution = BASHostConstitution(
+            hostID: "host.runtime",
+            goalSpine: BASGoalSpine(
+                goals: ["Protect long-term trust."],
+                priorityOrder: ["Protect before speed."]
+            ),
+            boundaryVeil: BASBoundaryVeil(
+                hardNoGo: ["Do not send under coercion."],
+                confirmRequired: ["Pause before high-consequence replies."]
+            ),
+            relationGravity: BASRelationGravityMap(
+                nodes: ["relationship.partner"],
+                highConsequenceLinks: ["relationship.partner"]
+            )
+        )
+
+        let runtime = BASHostRuntime(configuration: configuration)
+        let turn = try #require(
+            runtime.startSession(
+                BASHostSessionRequest(
+                    kind: .interactive,
+                    workflowProfile: .reflective,
+                    surface: .application,
+                    prompt: "I want to send a harsh message tonight.",
+                    riskLevel: .high
+                )
+            ).eBrainTurn
+        )
+
+        let frontier = try #require(turn.thoughtFrame.candidateFrontier)
+        let convergence = try #require(turn.thoughtFrame.convergenceCertificate)
+        let agencyReservation = try #require(turn.mergedChoice.agencyReservation)
+        let remandOrders = try #require(turn.mergedChoice.remandOrders)
+        let courtDecisionDraft = try #require(turn.mergedChoice.courtDecisionDraft)
+        let riskPackage = try #require(turn.riskDecisionPackage)
+        let breakpointHint = try #require(turn.thoughtFrame.sovereignBreakpointHints?.first)
+        let updateTicket = try #require(turn.updateTickets.first)
+        let loopTrace = try #require(turn.runtimeTrace.layerEvents.first(where: { $0.layerID == "L9" }))
+        let renderTrace = try #require(turn.runtimeTrace.layerEvents.first(where: { $0.layerID == "L12" }))
+        let evolutionTrace = try #require(turn.runtimeTrace.layerEvents.first(where: { $0.layerID == "L13" }))
+
+        #expect(frontier.frontierWidth == 1)
+        #expect(turn.mergedChoice.candidateID == "path.direct")
+        #expect(turn.thoughtFrame.stopReason == .blocked)
+        #expect(breakpointHint.suggestedAction == .cut)
+        #expect(breakpointHint.reasonCodes.contains("boundary_conflict"))
+        #expect(convergence.stoppingMode == .sovereignCut)
+        #expect(agencyReservation.mode == .noAutoMerge)
+        #expect(agencyReservation.expiresWith == "sovereign_clearance")
+        #expect(
+            agencyReservation.reasons.contains(
+                "A sovereign breakpoint invalidated the leading path before merge."
+            )
+        )
+        let sovereignRemand = remandOrders.first(where: { $0.targetLayer == "L14" })
+        #expect(sovereignRemand != nil)
+        #expect(sovereignRemand?.reasonCodes.contains("court.sovereign_breakpoint") == true)
+        #expect(sovereignRemand?.reasonCodes.contains("boundary_conflict") == true)
+        #expect(courtDecisionDraft.readinessLevel == "remand_pending")
+        #expect(
+            courtDecisionDraft.unresolvedCosts.contains(
+                "A sovereign breakpoint interrupted the convergence path."
+            )
+        )
+        #expect(riskPackage.riskField.candidateRef == "path.direct")
+        #expect(turn.actionPermit.reasonCodes.contains("dream_loop.sovereign_cut"))
+        #expect(turn.actionPermit.reasonCodes.contains("dream_loop.sovereign_breakpoint"))
+        #expect(turn.renderedOutput.headline == "Stop the move and honor the sovereign cut")
+        #expect(
+            turn.renderedOutput.body.contains(
+                "The dream loop stopped because a sovereign breakpoint cut the lead path."
+            )
+        )
+        #expect(
+            turn.renderedOutput.alternativeActions.first
+                == "Do not resume this path until sovereign clearance is restored."
+        )
+        #expect(updateTicket.governanceRefs.contains("dream_loop:sovereignCut"))
+        #expect(updateTicket.governanceRefs.contains("dream_loop:breakpoint"))
+        #expect(loopTrace.detail.contains("convergence sovereignCut"))
+        #expect(loopTrace.detail.contains("breakpoints 1"))
+        #expect(renderTrace.detail.contains("dream loop sovereignCut"))
+        #expect(renderTrace.detail.contains("agency noAutoMerge"))
+        #expect(evolutionTrace.detail.contains("dream loop sovereignCut"))
+        #expect(evolutionTrace.detail.contains("breakpoint"))
+    }
+
+    @Test("policy-owned host runtime carries dream-loop lease endings into tri-self court and risk outputs")
+    func policyOwnedHostRuntimeCarriesDreamLoopLeaseEndingsIntoDownstreamOutputs() throws {
+        var runtimeTuning = BASEBrainRuntimeSynthesisPolicy.generic.withSchemaVersion(
+            "host.runtime-synthesis.policy-owned.single-loop.v1"
+        )
+        runtimeTuning.wakeIntent.highRiskGuardThreshold = 0.69
+        runtimeTuning.stateTransitions.quarantineFailureGuardThreshold = 3
+        runtimeTuning.stateTransitions.runModeRules = runtimeTuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: runtimeTuning.wakeIntent
+        )
+        runtimeTuning.lease.restrictedEnergyQuota = 0.46
+        runtimeTuning.maintenance.standardBatteryFloor = 0.36
+        runtimeTuning.sovereignExecution.deadStopOnExtremeBlockedPermit = false
+        runtimeTuning.context.emotionalLoadDriftingIncrement = 0.09
+        runtimeTuning.triSelf.directPathSuperegoPenalty = 0.46
+        runtimeTuning.risk.defaultForecastUncertainty = 0.24
+        runtimeTuning.budget.lowRiskLoops = 1
+        runtimeTuning.budget.mediumRiskLoops = 1
+        runtimeTuning.budget.highRiskLoops = 1
+        runtimeTuning.budget.extremeRiskLoops = 1
+        runtimeTuning.budget.unstableLoopIncrement = 0
+        runtimeTuning.budget.standardLoopFloor = 1
+        runtimeTuning.budget.protectedLoopFloor = 1
+        for mode in [
+            BASEBrainRunMode.guard,
+            .reflect,
+            .engage,
+            .deepLoop,
+            .recovery,
+            .quarantine
+        ] {
+            if var modeProfile = runtimeTuning.budget.runModeProfilesByID?[mode.rawValue] {
+                modeProfile.maxLoops = 1
+                modeProfile.unstableLoopIncrement = 0
+                modeProfile.standardLoopFloor = 1
+                modeProfile.protectedLoopFloor = 1
+                runtimeTuning.budget.runModeProfilesByID?[mode.rawValue] = modeProfile
+            }
+        }
+
+        var configuration = BASHostConfiguration.generic
+        configuration.runtimeProfileID = "host.runtime.single-loop"
+        configuration.policyProfileID = "host.policy.single-loop"
+        configuration.runtimeTuning = runtimeTuning
+        configuration.runtimePolicyLineage = BASRuntimePolicyLineage(
+            bundleVersion: "policy.bundle.v1",
+            providerRoutingRegistryVersion: "provider.registry.v1",
+            providerRoutingPolicyID: "provider.rollout",
+            runtimeTuningRegistryVersion: "runtime.registry.v1",
+            runtimeTuningPolicyID: "runtime.single-loop",
+            resolutionSourceID: "bundled_default"
+        )
+        configuration.hostRhythmProfile = BASHostRhythmProfile(
+            activeWindows: ["focus_window"],
+            highFocusWindows: ["deep_work"],
+            lowEnergyWindows: ["sleep_window"],
+            preferredInteractionStyle: "bounded_reflective",
+            sensitivityPeriods: ["late_night"]
+        )
+
+        let runtime = BASHostRuntime(configuration: configuration)
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .reflective,
+            surface: .application,
+            prompt: "Keep this bounded while I cool down.",
+            riskLevel: .low
+        )
+        let seed = try runtime.startSession(request)
+        var currentBrain = seed.currentBrain
+        currentBrain.calibrationStatus = .watch
+
+        let turn = runtime.buildEBrainTurn(
+            request: request,
+            currentBrain: currentBrain,
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+            deviceStateOverride: BASDeviceState(
+                batteryLevel: 0.74,
+                thermalLevel: .nominal,
+                memoryFreeMB: 2_048,
+                networkState: .online,
+                foregroundState: .foreground,
+                cpuLoad: 0.14,
+                gpuLoad: 0.08,
+                npuAvailable: true,
+                latencyBudgetMs: 1_000
+            )
+        )
+
+        let convergence = try #require(turn.thoughtFrame.convergenceCertificate)
+        let agencyReservation = try #require(turn.mergedChoice.agencyReservation)
+        let remandOrders = try #require(turn.mergedChoice.remandOrders)
+        let leaseRemand = remandOrders.first(where: { $0.targetLayer == "L1" })
+        let updateTicket = try #require(turn.updateTickets.first)
+        let loopTrace = try #require(turn.runtimeTrace.layerEvents.first(where: { $0.layerID == "L9" }))
+        let renderTrace = try #require(turn.runtimeTrace.layerEvents.first(where: { $0.layerID == "L12" }))
+        let evolutionTrace = try #require(turn.runtimeTrace.layerEvents.first(where: { $0.layerID == "L13" }))
+
+        #expect(turn.budgetFrame.maxLoops == 2)
+        #expect(turn.thoughtFrame.stepIndex == turn.budgetFrame.maxLoops)
+        #expect(turn.thoughtFrame.stopReason == .maxLoopsReached)
+        #expect(convergence.stoppingMode == .leaseEnd)
+        #expect(agencyReservation.mode == .noAutoMerge)
+        #expect(agencyReservation.expiresWith == "fresh_lease")
+        #expect(
+            agencyReservation.reasons.contains(
+                "The dream loop lease ended before the leading path stabilized enough for auto-merge."
+            )
+        )
+        #expect(leaseRemand != nil)
+        #expect(leaseRemand?.reasonCodes.contains("court.lease_end") == true)
+        #expect(turn.actionPermit.reasonCodes.contains("dream_loop.lease_end"))
+        #expect(
+            turn.mergedChoice.courtDecisionDraft?.unresolvedCosts.contains(
+                "The loop lease ended before full convergence."
+            ) == true
+        )
+        #expect(turn.renderedOutput.headline == "Hold the move until a fresh loop lease is available")
+        #expect(
+            turn.renderedOutput.body.contains(
+                "The dream loop stopped because the current lease ended before the lead path stabilized."
+            )
+        )
+        #expect(
+            turn.renderedOutput.alternativeActions.first
+                == "Get a fresh loop lease before trying to merge this path."
+        )
+        #expect(updateTicket.governanceRefs.contains("dream_loop:leaseEnd"))
+        #expect(loopTrace.detail.contains("convergence leaseEnd"))
+        #expect(renderTrace.detail.contains("dream loop leaseEnd"))
+        #expect(renderTrace.detail.contains("agency noAutoMerge"))
+        #expect(evolutionTrace.detail.contains("dream loop leaseEnd"))
+    }
+
+    @Test("risk decision packages can raise sovereign escalation hints without replacing the primary permit")
+    func riskDecisionPackagesRaiseSovereignHintsWithoutReplacingPrimaryPermit() {
+        let package = makeL11RiskDecisionPackage(
+            primaryMode: .block,
+            stackedModes: [.escalate],
+            riskLevel: .extreme,
+            totalRisk: 0.98,
+            blockedDomains: ["tool_commit", "memory_commit", "host_commit", "high_consequence_decode"],
+            sovereignEscalationHint: BASSovereignEscalationHint(
+                hintID: "hint.sovereign",
+                sourceRefs: ["risk-field.c1"],
+                reasonCodes: ["risk.sovereign_boundary"],
+                urgency: "high",
+                suggestedScope: "host"
+            )
+        )
+        let coordinator = BASEBrainRuntimeCoordinator(
+            powerClockService: L11PowerClock(),
+            hostProfileService: L11Host(),
+            contextService: L11Context(),
+            decomposeService: L11Decompose(),
+            memoryService: L11Memory(),
+            loopService: L11Loop(),
+            triSelfService: L11TriSelf(),
+            riskService: L11Risk(package: package),
+            actionService: L11Action(),
+            evolutionService: L11Evolution()
+        )
+
+        let result = coordinator.runTurn(
+            BASEBrainTurnRequest(
+                userInput: "Push into an irreversible public move.",
+                deviceState: BASDeviceState(
+                    batteryLevel: 0.58,
+                    thermalLevel: .nominal,
+                    memoryFreeMB: 2_048,
+                    networkState: .online,
+                    foregroundState: .foreground,
+                    cpuLoad: 0.22,
+                    gpuLoad: 0.08,
+                    npuAvailable: true,
+                    latencyBudgetMs: 1_100
+                ),
+                hostID: "host.sovereign"
+            )
+        )
+
+        let resolvedPackage = try! #require(result.riskDecisionPackage)
+        #expect(resolvedPackage.actionPermit.mode == .block)
+        #expect(resolvedPackage.actionPermit.stackedModes == [.escalate])
+        #expect(resolvedPackage.sovereignEscalationHint?.urgency == "high")
+        #expect(resolvedPackage.sovereignEscalationHint?.suggestedScope == "host")
+        #expect(result.actionPermit.mode == .block)
+        #expect(result.actionPermit.stackedModes.contains(.escalate))
+    }
+}
+
+private struct L11Scenario {
+    let name: String
+    let package: BASRiskDecisionPackage
+}
+
+private struct L11PowerClock: BASPowerClockServicing {
+    func planBudget(deviceState: BASDeviceState, taskPing: String, riskHint: BASBrainRiskLevel?) -> BASBudgetFrame {
+        BASBudgetFrame(
+            runMode: .deepLoop,
+            maxLoops: 2,
+            maxCandidates: 2,
+            maxDecodeTokens: 240,
+            retrievalDepth: 2,
+            precisionProfile: .full,
+            deviceRoute: .coreNPU,
+            thermalGuardLevel: .nominal,
+            maintenanceAllowed: false
+        )
+    }
+
+    func routeDevice(deviceState: BASDeviceState, budget: BASBudgetFrame) -> BASDeviceRoute { budget.deviceRoute }
+    func scheduleMaintenance(deviceState: BASDeviceState, budget: BASBudgetFrame) -> Bool { false }
+}
+
+private struct L11Host: BASHostProfileServicing {
+    func resolveHost(hostID: String, contextFrame: BASContextFrame?, riskCard: BASRiskCard?) -> BASHostProfile {
+        BASHostProfile(hostID: hostID, longTermGoals: ["Stay bounded"], noGoZones: ["host_commit"])
+    }
+
+    func applyHostGate(profile: BASHostProfile, taskType: BASContextTaskType, riskCard: BASRiskCard?, confidence: Double) -> Double {
+        confidence
+    }
+
+    func rollbackHostVersion(profile: BASHostProfile, to versionID: String) -> BASHostVersion {
+        BASHostVersion(versionID: versionID, changedFields: [], reason: "rollback", approvedByPolicy: true)
+    }
+}
+
+private struct L11Context: BASContextServicing {
+    func analyzeContext(userInput: String, hostContext: BASHostProfile, budget: BASBudgetFrame) -> BASContextFrame {
+        BASContextFrame(
+            utterance: userInput,
+            taskType: .task,
+            emotionalLoad: 0.34,
+            timePressure: 0.41,
+            relationPattern: "peer",
+            ambiguityScore: 0.22,
+            consequenceLevel: 0.54,
+            manipulationHints: [],
+            hostRelevance: 0.68
+        )
+    }
+}
+
+private struct L11Decompose: BASDecomposeServicing {
+    func decompose(contextFrame: BASContextFrame, memoryHints: [String]) -> BASDecomposeFrame {
+        BASDecomposeFrame(
+            facts: ["A bounded next step is needed."],
+            goals: ["Preserve reversibility"],
+            emotions: ["concern"],
+            unknowns: ["Need one more fact"],
+            contradictions: [],
+            pressureSignals: [],
+            manipulationSignals: [],
+            mirrorText: "Slow the move down before it leaves the room."
+        )
+    }
+
+    func mirror(contextFrame: BASContextFrame, decomposeFrame: BASDecomposeFrame) -> String {
+        decomposeFrame.mirrorText
+    }
+
+    func checkContradiction(contextFrame: BASContextFrame, decomposeFrame: BASDecomposeFrame) -> [String] {
+        []
+    }
+}
+
+private struct L11Memory: BASMemoryServicing {
+    func retrieve(decomposeFrame: BASDecomposeFrame, hostContext: BASHostProfile, budget: BASBudgetFrame) -> BASMemoryBundle {
+        BASMemoryBundle(
+            atoms: [
+                BASMemoryAtom(
+                    memoryID: "m-l11",
+                    summary: "Bounded steps outperform impulsive release.",
+                    contentType: .warm,
+                    source: "ticket",
+                    confidence: 0.8,
+                    conflictFingerprint: "m-l11"
+                )
+            ],
+            retrievalTags: ["l11"],
+            activeHostVersion: hostContext.activeVersion
+        )
+    }
+
+    func promote(atom: BASMemoryAtom, hostContext: BASHostProfile) -> BASPromotionState { .candidate }
+    func freeze(memoryID: String) -> Bool { true }
+}
+
+private struct L11Loop: BASLoopServicing {
+    func proposePaths(decomposeFrame: BASDecomposeFrame, memoryBundle: BASMemoryBundle, budget: BASBudgetFrame) -> [BASCandidatePath] {
+        [
+            BASCandidatePath(candidateID: "c1", title: "Primary path", actionSummary: "Use a bounded next step.", expectedBenefit: 0.6, expectedCost: 0.2, reversibility: 0.84, confidence: 0.74),
+            BASCandidatePath(candidateID: "c2", title: "Fallback path", actionSummary: "Wait and gather one more fact.", expectedBenefit: 0.55, expectedCost: 0.18, reversibility: 0.92, confidence: 0.69)
+        ]
+    }
+
+    func forecast(candidates: [BASCandidatePath], decomposeFrame: BASDecomposeFrame, memoryBundle: BASMemoryBundle) -> [BASForecastItem] {
+        [
+            BASForecastItem(candidateID: "c1", shortTermOutcome: "Bounded move", midTermOutcome: "Less fallout", worstCase: "Small delay", uncertainty: 0.24),
+            BASForecastItem(candidateID: "c2", shortTermOutcome: "More evidence", midTermOutcome: "Better timing", worstCase: "Delay discomfort", uncertainty: 0.18)
+        ]
+    }
+
+    func critique(candidates: [BASCandidatePath], forecasts: [BASForecastItem], hostContext: BASHostProfile) -> [BASCritiqueItem] {
+        [
+            BASCritiqueItem(candidateID: "c1", critiqueType: .boundaryConflict, critiqueText: "Needs a bounded release radius.", severity: 0.32),
+            BASCritiqueItem(candidateID: "c2", critiqueType: .evidenceGap, critiqueText: "One more fact would help.", severity: 0.24)
+        ]
+    }
+
+    func iterate(decomposeFrame: BASDecomposeFrame, memoryBundle: BASMemoryBundle, budget: BASBudgetFrame) -> BASThoughtFrame {
+        BASThoughtFrame(
+            stepIndex: 2,
+            decomposeRef: "decomp-l11",
+            memoryRefs: memoryBundle.atoms.map(\.memoryID),
+            candidates: proposePaths(decomposeFrame: decomposeFrame, memoryBundle: memoryBundle, budget: budget),
+            forecasts: forecast(candidates: [], decomposeFrame: decomposeFrame, memoryBundle: memoryBundle),
+            critiques: critique(candidates: [], forecasts: [], hostContext: BASHostProfile(hostID: "unused")),
+            stabilityScore: 0.72,
+            stopReason: .candidateStable
+        )
+    }
+}
+
+private struct L11TriSelf: BASTriSelfServicing {
+    func mergeChoice(thoughtFrame: BASThoughtFrame, hostContext: BASHostProfile) -> ([BASTriSelfScore], BASMergedChoice) {
+        (
+            [
+                BASTriSelfScore(candidateID: "c1", idScore: 0.48, egoScore: 0.72, superegoScore: 0.86, mergedScore: 0.76, veto: false),
+                BASTriSelfScore(candidateID: "c2", idScore: 0.31, egoScore: 0.61, superegoScore: 0.82, mergedScore: 0.67, veto: false)
+            ],
+            BASMergedChoice(candidateID: "c1", title: "Primary path", actionSummary: "Use a bounded next step.")
+        )
+    }
+}
+
+private struct L11Risk: BASRiskServicing {
+    let package: BASRiskDecisionPackage
+
+    func calibrateRisk(contextFrame: BASContextFrame, thoughtFrame: BASThoughtFrame, triScores: [BASTriSelfScore], budget: BASBudgetFrame) -> BASRiskCard {
+        package.riskCard
+    }
+
+    func computeGSI(contextFrame: BASContextFrame, thoughtFrame: BASThoughtFrame) -> Double {
+        package.riskCard.gsiScore
+    }
+
+    func gateAction(contextFrame: BASContextFrame, thoughtFrame: BASThoughtFrame, triScores: [BASTriSelfScore], budget: BASBudgetFrame) -> (BASRiskCard, BASActionPermit) {
+        (package.riskCard, package.actionPermit)
+    }
+
+    func buildRiskDecisionPackage(contextFrame: BASContextFrame, thoughtFrame: BASThoughtFrame, triScores: [BASTriSelfScore], budget: BASBudgetFrame) -> BASRiskDecisionPackage {
+        package
+    }
+
+    func riskLevel(for score: Double) -> BASBrainRiskLevel {
+        package.riskCard.riskLevel
+    }
+}
+
+private struct L11Action: BASActionServicing {
+    func render(choice: BASMergedChoice, riskCard: BASRiskCard, permit: BASActionPermit, hostContext: BASHostProfile) -> BASRenderedOutput {
+        BASRenderedOutput(
+            mode: permit.mode,
+            headline: choice.title,
+            body: choice.actionSummary,
+            alternativeActions: ["Use the bounded next step."],
+            explanationCodes: permit.reasonCodes
+        )
+    }
+}
+
+private struct L11Evolution: BASEvolutionServicing {
+    func buildTickets(thoughtFrame: BASThoughtFrame, output: BASRenderedOutput, feedbackEvent: BASFeedbackEvent?) -> [BASUpdateTicket] {
+        []
+    }
+}
+
+private func makeL11RiskDecisionPackage(
+    primaryMode: BASActionPermitMode,
+    stackedModes: [BASActionPermitMode],
+    riskLevel: BASBrainRiskLevel,
+    totalRisk: Double,
+    blockedDomains: [String],
+    delayReservation: BASDelayReservation? = nil,
+    protectiveSubstitute: BASProtectiveSubstitute? = nil,
+    sovereignEscalationHint: BASSovereignEscalationHint? = nil
+) -> BASRiskDecisionPackage {
+    let riskCard = BASRiskCard(
+        totalRisk: totalRisk,
+        riskLevel: riskLevel,
+        factors: ["risk.\(riskLevel.rawValue)"],
+        uncertainty: riskLevel >= .high ? 0.42 : 0.24,
+        irreversibility: riskLevel >= .high ? 0.81 : 0.32,
+        manipulationStrength: riskLevel == .extreme ? 0.72 : 0.18,
+        gsiScore: riskLevel == .extreme ? 0.84 : 0.26,
+        recommendedMode: primaryMode,
+        stackedModes: stackedModes,
+        assertionCeiling: riskLevel >= .high ? "guarded" : "standard",
+        delayType: delayReservation?.delayType,
+        substituteType: protectiveSubstitute?.substituteType,
+        sovereignHintLevel: sovereignEscalationHint?.urgency
+    )
+    let permit = BASActionPermit(
+        mode: primaryMode,
+        stackedModes: stackedModes,
+        reasonCodes: ["risk.\(riskLevel.rawValue)"],
+        allowedDomains: primaryMode == .compare ? ["bounded_reply", "comparison"] : ["bounded_reply", "local_action"],
+        blockedDomains: blockedDomains,
+        assertionCeiling: riskCard.assertionCeiling,
+        toolScope: primaryMode == .localOnly ? "local_only" : "none",
+        memoryScope: riskLevel >= .high ? "review_only" : "standard",
+        requireMirror: stackedModes.contains(.mirror),
+        requireCompare: primaryMode == .compare || stackedModes.contains(.mirror),
+        requireSecondCheck: riskLevel >= .high,
+        outputLengthCap: 220,
+        tonePolicy: "l11_test",
+        templatePolicy: "l11_test",
+        delayWindow: delayReservation?.delayType,
+        substituteRequired: protectiveSubstitute != nil,
+        escalationHintRef: sovereignEscalationHint?.hintID
+    )
+    return BASRiskDecisionPackage(
+        packageID: "risk-package.c1.\(primaryMode.rawValue)",
+        riskCard: riskCard,
+        riskField: BASRiskField(
+            fieldID: "risk-field.c1.\(primaryMode.rawValue)",
+            candidateRef: "c1",
+            hazardVector: BASHazardVector(
+                harmSeverity: totalRisk,
+                harmScope: totalRisk,
+                irreversibility: riskCard.irreversibility,
+                uncertainty: riskCard.uncertainty,
+                evidenceDebt: riskCard.uncertainty,
+                manipulationIntensity: riskCard.manipulationStrength,
+                pressureAuthenticity: 0.5,
+                vulnerabilityCoupling: 0.5,
+                sideEffectScope: totalRisk
+            ),
+            harmRadius: BASHarmRadiusMap(
+                radiusID: "harm-radius.c1.\(primaryMode.rawValue)",
+                privateImpact: 0.4,
+                relationImpact: 0.5,
+                workflowImpact: 0.3,
+                publicImpact: 0.2,
+                longTermTrace: riskCard.irreversibility
+            ),
+            reversibilityProfile: BASReversibilityProfile(
+                profileID: "reversibility.c1.\(primaryMode.rawValue)",
+                reversible: riskCard.irreversibility < 0.5,
+                rollbackCost: riskCard.irreversibility,
+                confirmNodes: riskLevel >= .high ? ["second_check"] : [],
+                draftSafe: true,
+                smallStepPossible: riskLevel < .extreme
+            ),
+            evidenceSufficiency: BASEvidenceSufficiency(
+                sufficiencyID: "evidence.c1.\(primaryMode.rawValue)",
+                supportLevel: 0.74,
+                missingEvidence: riskLevel >= .high ? ["follow_up_evidence"] : [],
+                allowedAssertionLevel: riskCard.assertionCeiling,
+                allowedActionLevel: primaryMode.rawValue
+            ),
+            gsiTrace: BASGSITrace(
+                traceID: "gsi.c1.\(primaryMode.rawValue)",
+                gaslightSignals: [],
+                coerciveUrgency: 0.2,
+                shamePressure: 0,
+                authorityMask: 0,
+                relationLeverage: 0.1,
+                susceptibilityBand: riskLevel >= .high ? "guarded" : "stable"
+            ),
+            vulnerabilityCoupling: BASVulnerabilityCoupling(
+                couplingID: "vulnerability.c1.\(primaryMode.rawValue)",
+                touchedBoundaries: [],
+                lowEnergyResonance: 0.2,
+                sensitivityWindow: 0.3,
+                protectionBias: riskLevel >= .high ? 0.8 : 0.3
+            ),
+            confidenceBand: riskLevel >= .high ? "guarded" : "open"
+        ),
+        actionModeDecision: BASActionModeDecision(
+            decisionID: "mode.c1.\(primaryMode.rawValue)",
+            primaryMode: primaryMode,
+            stackedModes: stackedModes,
+            reasonCodes: ["risk.\(riskLevel.rawValue)"],
+            confidence: 0.81
+        ),
+        actionPermit: permit,
+        delayReservation: delayReservation,
+        protectiveSubstitute: protectiveSubstitute,
+        sovereignEscalationHint: sovereignEscalationHint
+    )
 }

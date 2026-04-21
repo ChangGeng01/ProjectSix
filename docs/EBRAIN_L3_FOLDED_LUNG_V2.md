@@ -18,12 +18,17 @@
 
 - additive 扩展 `BASThoughtFold`
 - 新增 `BASMorphGraph`
+- 新增 `BASHotColdMap`
 - 新增 `BASPrecisionProfile`
 - 新增 `BASResumeFrame`
 - 新增 `BASRollbackAnchor`
 - 新增 `BASLungState`
+- 新增 `BASThermalExchangeFrame`
+- 新增 `BASBreathSchedulerFrame`
+- 新增 `BASOrganPackage`
+- 新增 `BASOrganDeltaPlan`
 - 在 `Before` 侧新增 `DecisionFoldedLungCoordinator`
-- 在 checkpoint anchor 中持久化 `lungState / resumeFrame / rollbackAnchor`
+- 在 checkpoint anchor 中持久化 `morph / hot-cold / precision / integrity / organ package / organ delta / lungState / resumeFrame / rollbackAnchor`
 - 在 substrate `EvolutionLineageSummary` 中原生持久化 `foldedLungSummary`
 - 把 `BASSovereignActuationCommand` 映射为 `L3 sovereign bridge` 的真实动作结果
 - 让 `runtime export / flight deck / control center / replay diagnostics` 共享同一套 `L3 v2` 事实
@@ -33,9 +38,11 @@
 当前仓库已经把以下对象推进到真实代码与治理链：
 
 - `BASThoughtFold`
-  新增可选字段：`tissueSignature`、`snapshotRef`、`resumeFrameRef`、`rollbackAnchorRef`、`morphGraphRef`、`precisionProfileRef`、`lungStateRef`
+  新增可选字段：`tissueSignature`、`snapshotRef`、`resumeFrameRef`、`rollbackAnchorRef`、`morphGraphRef`、`hotColdMapRef`、`precisionProfileRef`、`lungStateRef`、`breathSchedulerRef`、`thermalExchangeRef`
 - `BASMorphGraph`
   承载当前激活器官、执行顺序、精度图、设备路由、热画像、主权约束
+- `BASHotColdMap`
+  承载当前热包、温包、冷包、预载策略与驱逐策略
 - `BASPrecisionProfile`
   承载器官级精度地图、锁定精度、降级顺序、安全下限
 - `BASResumeFrame`
@@ -44,6 +51,14 @@
   承载安全快照引用、关联 fold、宿主版本引用、缓存状态引用、完整性哈希
 - `BASLungState`
   承载 `breathMode + breathPhase + thermalPressure + cachePressure + restoreReadiness + rollbackAnchorRef`
+- `BASThermalExchangeFrame`
+  承载热带预测、冷却动作、抑制器官、重路由目标与精度降档计划
+- `BASBreathSchedulerFrame`
+  承载 checkpoint cadence、micro-sleep window、maintenance window 与 resume policy
+- `BASOrganPackage`
+  承载器官包的 `packageID / organType / precisionOptions / loadTime / thermalCost / sovereignClass`
+- `BASOrganDeltaPlan`
+  承载当前 `activate / preload / evict / retain / rollback-safe retained` 包计划，以及与主权 actuation 对齐的原因码
 
 这些对象已经进入：
 
@@ -83,6 +98,19 @@
 - `guardShift / throttle`
   只改变肺态与恢复权限，不破坏安全锚
 
+现在这条桥还会把主权动作进一步落成包级 receipt：
+
+- `toolCut`
+  失效工具意向包
+- `memoryFreeze`
+  失效写入向的记忆包
+- `quarantine`
+  隔离本轮被驱逐的可疑包
+- `rollback`
+  明确回井保留哪些 `rollback-safe` 包
+- `deadStop`
+  明确降到哪组 `minimal hot` 包
+
 这条桥当前已经进入：
 
 - `DecisionSessionEngine`
@@ -97,6 +125,10 @@
 当前统一读取的核心字段包括：
 
 - `lungState`
+- `hotColdMap`
+- `thermalExchange`
+- `breathScheduler`
+- `organDeltaPlan`
 - `resumeFrame`
 - `rollbackAnchor`
 - `sovereignBridgeResult`
@@ -108,7 +140,7 @@
 - imported paused session
 - replay lineage
 
-其中最新补完点是：persisted checkpoint lineage 不再只依赖 app-side `DecisionSessionCheckpointEBrainAnchor` 补洞，而是由 substrate `BASEvolutionLineageSummary.foldedLungSummary` 原生携带 `breath / resume / rollback / sovereign bridge` 事实，再由 `DeveloperDecisionReplayBuilder` 直接还原成 shared replay/runtime 视图中的 `BASLungState / BASResumeFrame / BASRollbackAnchor / sovereignBridgeResult`。
+其中最新补完点是：persisted checkpoint lineage 不再只依赖 app-side `DecisionSessionCheckpointEBrainAnchor` 补洞，而是由 substrate `BASEvolutionLineageSummary.foldedLungSummary` 原生携带 `breath / hot-cold / organ package / organ delta / thermal exchange / scheduler / resume / rollback / sovereign bridge` 事实，再由 `DeveloperDecisionReplayBuilder` 直接还原成 shared replay/runtime 视图中的 `BASLungState / BASHotColdMap / BASOrganPackage / BASOrganDeltaPlan / BASThermalExchangeFrame / BASBreathSchedulerFrame / BASResumeFrame / BASRollbackAnchor / sovereignBridgeResult`。
 
 ## 本阶段不承诺的内容
 
@@ -127,8 +159,9 @@
 `L3 v2` 下一阶段的仓库内目标应继续围绕三件事推进：
 
 - 把 `breath scheduler` 和 checkpoint cadence 做得更稳定
+- 把 `thermal exchange` 从共享事实面继续推向更强的 runtime policy
 - 把 rollback / quarantine 的事实继续下沉到更多恢复路径
-- 在不破坏 additive compatibility 的前提下，把 `MorphGraph / PrecisionProfile` 从 metadata 向真实 runtime policy 靠拢
+- 在不破坏 additive compatibility 的前提下，把 `MorphGraph / HotColdMap / PrecisionProfile` 从 metadata 向真实 runtime policy 靠拢
 
 ## 关联文档
 

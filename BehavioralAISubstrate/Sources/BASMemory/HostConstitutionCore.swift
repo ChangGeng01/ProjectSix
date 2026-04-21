@@ -354,7 +354,7 @@ public struct BASHostConstitution: BASSchemaVersioned {
 }
 
 public struct BASHostChangeCandidate: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.0.0"
+    public static let currentSchemaVersion = "1.1.0"
 
     public var schemaVersion: String
     public var candidateID: String
@@ -366,6 +366,8 @@ public struct BASHostChangeCandidate: BASSchemaVersioned {
     public var conflictRefs: [String]
     public var previewState: String
     public var approvalState: String
+    public var hostVersionRef: String?
+    public var rollbackRef: String?
 
     public init(
         schemaVersion: String = BASHostChangeCandidate.currentSchemaVersion,
@@ -376,6 +378,8 @@ public struct BASHostChangeCandidate: BASSchemaVersioned {
         cooldownUntil: Date = .now,
         confidence: Double = 0,
         conflictRefs: [String] = [],
+        hostVersionRef: String? = nil,
+        rollbackRef: String? = nil,
         previewState: String = "idle",
         approvalState: String = "pending"
     ) {
@@ -389,6 +393,56 @@ public struct BASHostChangeCandidate: BASSchemaVersioned {
         self.conflictRefs = conflictRefs
         self.previewState = previewState
         self.approvalState = approvalState
+        self.hostVersionRef = hostVersionRef
+        self.rollbackRef = rollbackRef
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case candidateID
+        case changeType
+        case proposedDelta
+        case evidenceRefs
+        case cooldownUntil
+        case confidence
+        case conflictRefs
+        case previewState
+        case approvalState
+        case hostVersionRef
+        case rollbackRef
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decodeIfPresent(String.self, forKey: .schemaVersion)
+            ?? BASHostChangeCandidate.currentSchemaVersion
+        candidateID = try container.decode(String.self, forKey: .candidateID)
+        changeType = try container.decode(String.self, forKey: .changeType)
+        proposedDelta = try container.decodeIfPresent([String].self, forKey: .proposedDelta) ?? []
+        evidenceRefs = try container.decodeIfPresent([String].self, forKey: .evidenceRefs) ?? []
+        cooldownUntil = try container.decodeIfPresent(Date.self, forKey: .cooldownUntil) ?? .now
+        confidence = try container.decodeIfPresent(Double.self, forKey: .confidence) ?? 0
+        conflictRefs = try container.decodeIfPresent([String].self, forKey: .conflictRefs) ?? []
+        previewState = try container.decodeIfPresent(String.self, forKey: .previewState) ?? "idle"
+        approvalState = try container.decodeIfPresent(String.self, forKey: .approvalState) ?? "pending"
+        hostVersionRef = try container.decodeIfPresent(String.self, forKey: .hostVersionRef)
+        rollbackRef = try container.decodeIfPresent(String.self, forKey: .rollbackRef)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(candidateID, forKey: .candidateID)
+        try container.encode(changeType, forKey: .changeType)
+        try container.encode(proposedDelta, forKey: .proposedDelta)
+        try container.encode(evidenceRefs, forKey: .evidenceRefs)
+        try container.encode(cooldownUntil, forKey: .cooldownUntil)
+        try container.encode(confidence, forKey: .confidence)
+        try container.encode(conflictRefs, forKey: .conflictRefs)
+        try container.encode(previewState, forKey: .previewState)
+        try container.encode(approvalState, forKey: .approvalState)
+        try container.encodeIfPresent(hostVersionRef, forKey: .hostVersionRef)
+        try container.encodeIfPresent(rollbackRef, forKey: .rollbackRef)
     }
 }
 

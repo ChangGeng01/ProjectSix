@@ -64,7 +64,7 @@ public struct BASRuntimeAuditFinding: Codable, Equatable, Sendable, Identifiable
 }
 
 public struct BASUpdateTicket: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.1.0"
+    public static let currentSchemaVersion = "1.2.0"
 
     public var schemaVersion: String
     public var ticketID: String
@@ -77,6 +77,8 @@ public struct BASUpdateTicket: BASSchemaVersioned {
     public var confidence: Double
     public var conflictFlag: Bool
     public var requiresReview: Bool
+    public var derivedCandidateRefs: [String]
+    public var governanceRefs: [String]
 
     public init(
         schemaVersion: String = BASUpdateTicket.currentSchemaVersion,
@@ -87,6 +89,8 @@ public struct BASUpdateTicket: BASSchemaVersioned {
         hostChangeCandidate: BASHostChangeCandidate? = nil,
         hostProfileChangeSuggestion: String? = nil,
         ruleCandidateRef: String? = nil,
+        derivedCandidateRefs: [String] = [],
+        governanceRefs: [String] = [],
         confidence: Double,
         conflictFlag: Bool = false,
         requiresReview: Bool = true
@@ -102,41 +106,123 @@ public struct BASUpdateTicket: BASSchemaVersioned {
         self.confidence = min(max(confidence, 0), 1)
         self.conflictFlag = conflictFlag
         self.requiresReview = requiresReview
+        self.derivedCandidateRefs = derivedCandidateRefs
+        self.governanceRefs = governanceRefs
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case ticketID
+        case sessionRef
+        case summary
+        case memoryWriteSuggestion
+        case hostChangeCandidate
+        case hostProfileChangeSuggestion
+        case ruleCandidateRef
+        case confidence
+        case conflictFlag
+        case requiresReview
+        case derivedCandidateRefs
+        case governanceRefs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decodeIfPresent(String.self, forKey: .schemaVersion)
+            ?? BASUpdateTicket.currentSchemaVersion
+        ticketID = try container.decode(String.self, forKey: .ticketID)
+        sessionRef = try container.decode(String.self, forKey: .sessionRef)
+        summary = try container.decode(String.self, forKey: .summary)
+        memoryWriteSuggestion = try container.decodeIfPresent(String.self, forKey: .memoryWriteSuggestion)
+        hostChangeCandidate = try container.decodeIfPresent(BASHostChangeCandidate.self, forKey: .hostChangeCandidate)
+        hostProfileChangeSuggestion = try container.decodeIfPresent(
+            String.self,
+            forKey: .hostProfileChangeSuggestion
+        )
+        ruleCandidateRef = try container.decodeIfPresent(String.self, forKey: .ruleCandidateRef)
+        confidence = min(
+            max(try container.decodeIfPresent(Double.self, forKey: .confidence) ?? 0, 0),
+            1
+        )
+        conflictFlag = try container.decodeIfPresent(Bool.self, forKey: .conflictFlag) ?? false
+        requiresReview = try container.decodeIfPresent(Bool.self, forKey: .requiresReview) ?? true
+        derivedCandidateRefs = try container.decodeIfPresent([String].self, forKey: .derivedCandidateRefs) ?? []
+        governanceRefs = try container.decodeIfPresent([String].self, forKey: .governanceRefs) ?? []
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(ticketID, forKey: .ticketID)
+        try container.encode(sessionRef, forKey: .sessionRef)
+        try container.encode(summary, forKey: .summary)
+        try container.encodeIfPresent(memoryWriteSuggestion, forKey: .memoryWriteSuggestion)
+        try container.encodeIfPresent(hostChangeCandidate, forKey: .hostChangeCandidate)
+        try container.encodeIfPresent(hostProfileChangeSuggestion, forKey: .hostProfileChangeSuggestion)
+        try container.encodeIfPresent(ruleCandidateRef, forKey: .ruleCandidateRef)
+        try container.encode(confidence, forKey: .confidence)
+        try container.encode(conflictFlag, forKey: .conflictFlag)
+        try container.encode(requiresReview, forKey: .requiresReview)
+        try container.encode(derivedCandidateRefs, forKey: .derivedCandidateRefs)
+        try container.encode(governanceRefs, forKey: .governanceRefs)
     }
 }
 
 public extension BASUpdateTicket {
+    private var normalizedLegacyHostProfileChangeSuggestion: String? {
+        let normalized = hostProfileChangeSuggestion?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let normalized, normalized.isEmpty == false else { return nil }
+        return normalized
+    }
+
+    var resolvedHostChangeCandidate: BASHostChangeCandidate? {
+        if let hostChangeCandidate {
+            return hostChangeCandidate
+        }
+
+        guard let legacySuggestion = normalizedLegacyHostProfileChangeSuggestion else { return nil }
+        return BASHostChangeCandidate(
+            candidateID: "legacy.\(ticketID).host-mutation",
+            changeType: "review_legacy_host_mutation",
+            proposedDelta: ["legacy_host_profile_suggestion"],
+            evidenceRefs: ["legacy:\(legacySuggestion)"],
+            cooldownUntil: Date(timeIntervalSince1970: 0),
+            confidence: confidence,
+            conflictRefs: conflictFlag ? ["legacy_host_profile_conflict"] : [],
+            previewState: "legacy_bridge",
+            approvalState: requiresReview ? "pending_legacy_review" : "pending"
+        )
+    }
+
     var hasPersistentMutationSuggestion: Bool {
         let hasMemoryWriteSuggestion = memoryWriteSuggestion?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-        let hasLegacyHostSuggestion = hostProfileChangeSuggestion?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-        return hasMemoryWriteSuggestion || hostChangeCandidate != nil || hasLegacyHostSuggestion
+        return hasMemoryWriteSuggestion || resolvedHostChangeCandidate != nil
     }
 
     var actionDigestParts: [String] {
-        [
+        let resolvedHostChangeCandidate = resolvedHostChangeCandidate
+        return [
             ticketID,
             memoryWriteSuggestion?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
-            hostChangeCandidate?.candidateID ?? "",
-            hostChangeCandidate?.changeType ?? "",
-            hostChangeCandidate?.proposedDelta.joined(separator: ",") ?? "",
-            hostChangeCandidate?.approvalState ?? "",
-            hostChangeCandidate?.previewState ?? "",
-            hostProfileChangeSuggestion?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
+            resolvedHostChangeCandidate?.candidateID ?? "",
+            resolvedHostChangeCandidate?.changeType ?? "",
+            resolvedHostChangeCandidate?.proposedDelta.joined(separator: ",") ?? "",
+            resolvedHostChangeCandidate?.approvalState ?? "",
+            resolvedHostChangeCandidate?.previewState ?? "",
+            normalizedLegacyHostProfileChangeSuggestion ?? "",
             ruleCandidateRef?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        ]
+        ] + derivedCandidateRefs + governanceRefs
     }
 
     var reviewDirectiveLine: String? {
         let baseDirective: String?
 
-        if let hostChangeCandidate {
-            let changeFragments = [hostChangeCandidate.changeType]
-                + (hostChangeCandidate.proposedDelta.isEmpty ? [] : [hostChangeCandidate.proposedDelta.joined(separator: ", ")])
-            baseDirective = "Review host change: \(changeFragments.joined(separator: " • "))"
+        if let resolvedHostChangeCandidate {
+            let changeFragments = [resolvedHostChangeCandidate.changeType]
+                + (resolvedHostChangeCandidate.proposedDelta.isEmpty ? [] : [resolvedHostChangeCandidate.proposedDelta.joined(separator: ", ")])
+            baseDirective = "Review constitution change: \(changeFragments.joined(separator: " • "))"
         } else if let memoryWriteSuggestion, memoryWriteSuggestion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
             baseDirective = "Review memory write: \(memoryWriteSuggestion.trimmingCharacters(in: .whitespacesAndNewlines))"
-        } else if let hostProfileChangeSuggestion, hostProfileChangeSuggestion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
-            baseDirective = "Review host change: \(hostProfileChangeSuggestion.trimmingCharacters(in: .whitespacesAndNewlines))"
         } else if let ruleCandidateRef, ruleCandidateRef.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
             baseDirective = "Review rule candidate: \(ruleCandidateRef.trimmingCharacters(in: .whitespacesAndNewlines))"
         } else if requiresReview || conflictFlag {

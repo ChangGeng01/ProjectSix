@@ -46,6 +46,18 @@ struct DecisionReplayDiagnosticsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+
+        if !presentation.furnaceContributionLines.isEmpty {
+            Text("Furnace fabric")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(BeforeTheme.moss)
+
+            ForEach(presentation.furnaceContributionLines, id: \.self) { line in
+                Text(line)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     @ViewBuilder
@@ -59,7 +71,7 @@ struct DecisionReplayDiagnosticsView: View {
             Text(line.text)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-        case .eBrain, .foldedLung, .scheduler, .hotCold, .resume, .rollback, .sovereignBridge:
+        case .eBrain, .foldedLung, .organDelta, .scheduler, .hotCold, .resume, .rollback, .sovereignBridge:
             Text(line.text)
                 .font(.caption)
                 .foregroundStyle(.secondary)

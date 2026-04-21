@@ -1,5 +1,7 @@
 import XCTest
 import BASHostKit
+import BASOrchestration
+import BASPolicy
 @testable import Before
 
 final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
@@ -964,6 +966,105 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
     }
 
     @MainActor
+    func testQuickRefinementUsesSurfaceGuideDelayWhenModeAloneLooksPermissive() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .goAhead,
+            primaryAction: .continueMindfully,
+            secondaryActions: [.continueMindfully]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "I want to act now."
+        )
+        let turn = protectiveTurn(
+            mode: .answer,
+            headline: "Pause the release",
+            body: "A fast answer is available, but the safer move is to cool this down first.",
+            alternativeActions: [],
+            surfaceGuide: protectiveSurfaceGuide(
+                delayReservation: BASDelayReservation(
+                    reservationID: "delay.quick",
+                    delayType: "cool_down",
+                    minDelay: 15,
+                    maxDelay: 120,
+                    allowedIntermediateActions: ["compare", "draft_only"]
+                ),
+                delayAvailable: true,
+                requiresSecondCheck: true
+            )
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertEqual(refined?.verdict, .pause)
+        XCTAssertEqual(refined?.primaryAction, .wait90s)
+        XCTAssertEqual(refined?.secondaryActions, [.decideTomorrow, .continueMindfully])
+        XCTAssertEqual(refined?.currentPerspective, turn.renderedOutput.headline)
+        XCTAssertEqual(refined?.afterPerspective, turn.renderedOutput.body)
+    }
+
+    @MainActor
+    func testBalanceRefinementUsesSurfaceGuideSubstituteWhenAlternativesAreEmpty() async {
+        let base = BalanceBoardResult(
+            headline: "Base headline",
+            summary: "Base summary",
+            focusTitle: "Base focus",
+            focusDescription: "Base description",
+            nextAction: "Base next action"
+        )
+        let input = BalanceBoardInput(
+            prompt: "Should I send it now?",
+            desire: "Relief",
+            concern: "Regret",
+            constraint: "The situation feels hot.",
+            longTerm: "I want cleaner boundaries."
+        )
+        let turn = protectiveTurn(
+            mode: .replace,
+            headline: "Use the safer step",
+            body: "The direct move is not the one to take tonight.",
+            alternativeActions: [],
+            surfaceGuide: protectiveSurfaceGuide(
+                protectiveSubstitute: BASProtectiveSubstitute(
+                    substituteID: "substitute.balance",
+                    sourceCandidateRef: "cand-1",
+                    substituteType: "local_only_action",
+                    description: "Keep the action local and reversible first.",
+                    safetyGain: 0.82
+                ),
+                chooseLaterAllowed: true,
+                prefersDraftOnly: false,
+                localOnlyPreferred: true
+            )
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertEqual(refined?.headline, turn.renderedOutput.headline)
+        XCTAssertEqual(refined?.summary, turn.renderedOutput.body)
+        XCTAssertEqual(refined?.nextAction, "Keep the action local and reversible first.")
+    }
+
+    @MainActor
     func testMirrorRefinementUsesProtectiveEBrianTurnWithoutInvokingProvider() async {
         let base = MirrorResult(
             headline: "Base headline",
@@ -1003,6 +1104,79 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         let snapshot = await DecisionIntelligenceTelemetryStore.shared.snapshot()
         XCTAssertNil(snapshot.requestCountByKind[.mirror])
         XCTAssertNil(snapshot.outcomeCount[.providerSuccess])
+    }
+
+    @MainActor
+    func testMirrorRefinementUsesSurfaceGuideAgencyTitleWhenAvailable() async {
+        let base = MirrorResult(
+            headline: "Base headline",
+            coreTension: "Base tension",
+            nextActionTitle: "Base next action title",
+            nextAction: "Base next action"
+        )
+        let input = MirrorInput(
+            prompt: "Should I respond tonight?",
+            emotion: "I feel flooded.",
+            relationship: "The conversation is already tense.",
+            reality: "Anything I send now will land hot.",
+            longTerm: "I want to keep dignity in the room.",
+            selfLens: "I know I am not settled enough yet."
+        )
+        let turn = protectiveTurn(
+            mode: .answer,
+            headline: "Keep the move in draft",
+            body: "The response can be shaped, but it should stay at draft pressure for now.",
+            alternativeActions: [],
+            surfaceGuide: protectiveSurfaceGuide(
+                chooseLaterAllowed: true,
+                prefersDraftOnly: true,
+                localOnlyPreferred: false,
+                requiresSecondCheck: true
+            )
+        )
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineMirrorResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: nil
+        )
+
+        XCTAssertEqual(refined?.headline, turn.renderedOutput.headline)
+        XCTAssertEqual(refined?.coreTension, turn.renderedOutput.body)
+        XCTAssertEqual(refined?.nextActionTitle, "Keep it in draft")
+        XCTAssertEqual(refined?.nextAction, "Keep the move in draft until the boundary is re-checked.")
+    }
+
+    func testTurnProtectiveSurfaceModeFallsBackToRenderedDelayWhenPermitModeIsAnswer() {
+        var turn = protectiveTurn(
+            mode: .answer,
+            headline: "Pause the release",
+            body: "A fast answer exists, but the safer move is to cool this down first.",
+            alternativeActions: [],
+            surfaceGuide: protectiveSurfaceGuide(
+                delayReservation: BASDelayReservation(
+                    reservationID: "delay.answer.surface",
+                    delayType: "cool_down",
+                    minDelay: 15,
+                    maxDelay: 1_440,
+                    allowedIntermediateActions: ["draft_only"]
+                ),
+                delayAvailable: true
+            )
+        )
+        turn.actionPermit = BASActionPermit(
+            mode: .answer,
+            reasonCodes: ["risk.high"],
+            outputLengthCap: 120,
+            tonePolicy: "clear_firm",
+            templatePolicy: "protective_alternative"
+        )
+
+        XCTAssertEqual(turn.protectiveSurfaceMode, .delay)
+        XCTAssertTrue(turn.hasProtectiveSurfaceGuidance)
     }
 
     @MainActor
@@ -1253,7 +1427,8 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         mode: BASActionPermitMode,
         headline: String,
         body: String,
-        alternativeActions: [String]
+        alternativeActions: [String],
+        surfaceGuide: BASRenderedSurfaceGuide? = nil
     ) -> BASEBrainTurnResult {
         let deviceState = BASDeviceState(
             batteryLevel: 0.66,
@@ -1448,10 +1623,53 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
                 headline: headline,
                 body: body,
                 alternativeActions: alternativeActions,
-                explanationCodes: ["risk.high", "gsi.elevated"]
+                explanationCodes: ["risk.high", "gsi.elevated"],
+                surfaceGuide: surfaceGuide
             ),
             updateTickets: [updateTicket],
             runtimeTrace: runtimeTrace
+        )
+    }
+
+    private func protectiveSurfaceGuide(
+        delayReservation: BASDelayReservation? = nil,
+        protectiveSubstitute: BASProtectiveSubstitute? = nil,
+        sovereignEscalationHint: BASSovereignEscalationHint? = nil,
+        delayAvailable: Bool = false,
+        chooseLaterAllowed: Bool = false,
+        prefersDraftOnly: Bool = false,
+        localOnlyPreferred: Bool = false,
+        requiresCompare: Bool = false,
+        requiresSecondCheck: Bool = false
+    ) -> BASRenderedSurfaceGuide {
+        BASRenderedSurfaceGuide(
+            stackedModes: [],
+            tonePolicy: "clear_firm",
+            templatePolicy: "protective_alternative",
+            outputLengthCap: 120,
+            boundary: BASRenderedBoundaryGuide(
+                allowedDomains: ["bounded_reply"],
+                blockedDomains: ["unsafe"],
+                toolScope: "none",
+                memoryScope: "review_only"
+            ),
+            agency: BASRenderedAgencyGuide(
+                requiresCompare: requiresCompare,
+                requiresSecondCheck: requiresSecondCheck,
+                delayAvailable: delayAvailable,
+                chooseLaterAllowed: chooseLaterAllowed,
+                prefersDraftOnly: prefersDraftOnly,
+                localOnlyPreferred: localOnlyPreferred
+            ),
+            disclosure: BASRenderedDisclosureGuide(
+                assertionCeiling: "guarded",
+                explanationCodes: ["risk.high", "gsi.elevated"],
+                uncertaintyVisible: true
+            ),
+            delayWindow: delayReservation?.delayType,
+            delayReservation: delayReservation,
+            protectiveSubstitute: protectiveSubstitute,
+            sovereignEscalationHint: sovereignEscalationHint
         )
     }
 

@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import BASHostKit
+import BASMemory
 
 enum DecisionMemoryType: String, Codable, Sendable {
     case identity
@@ -56,6 +57,136 @@ enum DecisionMemorySourceType: String, Codable, Sendable {
     case externalRetrieval
 }
 
+enum DecisionTemporalSieveDisposition: String, Codable, Sendable {
+    case reject
+    case admitHotWarm
+    case conflictCluster
+    case quarantine
+}
+
+struct DecisionTemporalProjection: Codable, Equatable, Sendable {
+    var temporalMemoryID: String?
+    var sieveDisposition: DecisionTemporalSieveDisposition
+    var temperatureProfileID: String?
+    var provenanceSealID: String?
+    var sanctumEntryID: String?
+    var episodeArcIDs: [String]
+    var conflictClusterIDs: [String]
+    var continuityAnchorID: String?
+    var replayFrameID: String?
+    var quarantineRecordID: String?
+    var forgetCascadeIDs: [String]
+
+    init(
+        temporalMemoryID: String? = nil,
+        sieveDisposition: DecisionTemporalSieveDisposition,
+        temperatureProfileID: String? = nil,
+        provenanceSealID: String? = nil,
+        sanctumEntryID: String? = nil,
+        episodeArcIDs: [String] = [],
+        conflictClusterIDs: [String] = [],
+        continuityAnchorID: String? = nil,
+        replayFrameID: String? = nil,
+        quarantineRecordID: String? = nil,
+        forgetCascadeIDs: [String] = []
+    ) {
+        self.temporalMemoryID = temporalMemoryID
+        self.sieveDisposition = sieveDisposition
+        self.temperatureProfileID = temperatureProfileID
+        self.provenanceSealID = provenanceSealID
+        self.sanctumEntryID = sanctumEntryID
+        self.episodeArcIDs = episodeArcIDs
+        self.conflictClusterIDs = conflictClusterIDs
+        self.continuityAnchorID = continuityAnchorID
+        self.replayFrameID = replayFrameID
+        self.quarantineRecordID = quarantineRecordID
+        self.forgetCascadeIDs = forgetCascadeIDs
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case temporalMemoryID
+        case sieveDisposition
+        case temperatureProfileID
+        case provenanceSealID
+        case sanctumEntryID
+        case episodeArcIDs
+        case conflictClusterIDs
+        case continuityAnchorID
+        case replayFrameID
+        case quarantineRecordID
+        case forgetCascadeIDs
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let temporalMemoryID = try container.decodeIfPresent(String.self, forKey: .temporalMemoryID)
+        let temperatureProfileID = try container.decodeIfPresent(String.self, forKey: .temperatureProfileID)
+        let provenanceSealID = try container.decodeIfPresent(String.self, forKey: .provenanceSealID)
+        let sanctumEntryID = try container.decodeIfPresent(String.self, forKey: .sanctumEntryID)
+        let episodeArcIDs = try container.decodeIfPresent([String].self, forKey: .episodeArcIDs) ?? []
+        let conflictClusterIDs = try container.decodeIfPresent([String].self, forKey: .conflictClusterIDs) ?? []
+        let continuityAnchorID = try container.decodeIfPresent(String.self, forKey: .continuityAnchorID)
+        let replayFrameID = try container.decodeIfPresent(String.self, forKey: .replayFrameID)
+        let quarantineRecordID = try container.decodeIfPresent(String.self, forKey: .quarantineRecordID)
+        let forgetCascadeIDs = try container.decodeIfPresent([String].self, forKey: .forgetCascadeIDs) ?? []
+
+        let sieveDisposition = try container.decodeIfPresent(
+            DecisionTemporalSieveDisposition.self,
+            forKey: .sieveDisposition
+        ) ?? Self.legacyDisposition(
+            temporalMemoryID: temporalMemoryID,
+            conflictClusterIDs: conflictClusterIDs,
+            quarantineRecordID: quarantineRecordID
+        )
+
+        self.init(
+            temporalMemoryID: temporalMemoryID,
+            sieveDisposition: sieveDisposition,
+            temperatureProfileID: temperatureProfileID,
+            provenanceSealID: provenanceSealID,
+            sanctumEntryID: sanctumEntryID,
+            episodeArcIDs: episodeArcIDs,
+            conflictClusterIDs: conflictClusterIDs,
+            continuityAnchorID: continuityAnchorID,
+            replayFrameID: replayFrameID,
+            quarantineRecordID: quarantineRecordID,
+            forgetCascadeIDs: forgetCascadeIDs
+        )
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(temporalMemoryID, forKey: .temporalMemoryID)
+        try container.encode(sieveDisposition, forKey: .sieveDisposition)
+        try container.encodeIfPresent(temperatureProfileID, forKey: .temperatureProfileID)
+        try container.encodeIfPresent(provenanceSealID, forKey: .provenanceSealID)
+        try container.encodeIfPresent(sanctumEntryID, forKey: .sanctumEntryID)
+        try container.encode(episodeArcIDs, forKey: .episodeArcIDs)
+        try container.encode(conflictClusterIDs, forKey: .conflictClusterIDs)
+        try container.encodeIfPresent(continuityAnchorID, forKey: .continuityAnchorID)
+        try container.encodeIfPresent(replayFrameID, forKey: .replayFrameID)
+        try container.encodeIfPresent(quarantineRecordID, forKey: .quarantineRecordID)
+        try container.encode(forgetCascadeIDs, forKey: .forgetCascadeIDs)
+    }
+
+    private static func legacyDisposition(
+        temporalMemoryID: String?,
+        conflictClusterIDs: [String],
+        quarantineRecordID: String?
+    ) -> DecisionTemporalSieveDisposition {
+        if quarantineRecordID != nil {
+            return .quarantine
+        }
+        if conflictClusterIDs.isEmpty == false {
+            return .conflictCluster
+        }
+        if temporalMemoryID != nil {
+            return .admitHotWarm
+        }
+        return .reject
+    }
+}
+
 @Model
 final class DecisionMemoryRecord {
     @Attribute(.unique) var id: String
@@ -75,6 +206,7 @@ final class DecisionMemoryRecord {
     var lifecycleStateRaw: String?
     var lastReviewedAt: Date?
     var tierRaw: String?
+    var temporalProjectionBlob: String?
 
     init(
         id: String,
@@ -93,7 +225,8 @@ final class DecisionMemoryRecord {
         provenanceSummary: String,
         lifecycleState: DecisionMemoryLifecycleState = .active,
         lastReviewedAt: Date? = nil,
-        tier: DecisionMemoryTier = .warm
+        tier: DecisionMemoryTier = .warm,
+        temporalProjection: DecisionTemporalProjection? = nil
     ) {
         self.id = id
         self.typeRaw = type.rawValue
@@ -112,6 +245,7 @@ final class DecisionMemoryRecord {
         self.lifecycleStateRaw = lifecycleState.rawValue
         self.lastReviewedAt = lastReviewedAt ?? lastConfirmedAt
         self.tierRaw = tier.rawValue
+        self.temporalProjectionBlob = Self.encodeTemporalProjection(temporalProjection)
     }
 }
 
@@ -138,6 +272,7 @@ final class DecisionMemoryCandidateRecord {
     var lastGovernanceDecisionRaw: String
     var governanceReason: String
     var tierRaw: String?
+    var temporalProjectionBlob: String?
 
     init(
         id: String,
@@ -160,7 +295,8 @@ final class DecisionMemoryCandidateRecord {
         lastWriteOperation: DecisionMemoryWriteOperation,
         lastGovernanceDecision: DecisionMemoryGovernanceDecision,
         governanceReason: String,
-        tier: DecisionMemoryTier = .warm
+        tier: DecisionMemoryTier = .warm,
+        temporalProjection: DecisionTemporalProjection? = nil
     ) {
         self.id = id
         self.typeRaw = type.rawValue
@@ -183,6 +319,7 @@ final class DecisionMemoryCandidateRecord {
         self.lastGovernanceDecisionRaw = lastGovernanceDecision.rawValue
         self.governanceReason = governanceReason
         self.tierRaw = tier.rawValue
+        self.temporalProjectionBlob = DecisionMemoryRecord.encodeTemporalProjection(temporalProjection)
     }
 }
 
@@ -217,6 +354,11 @@ extension DecisionMemoryRecord {
         lastReviewedAt ?? lastConfirmedAt
     }
 
+    var temporalProjection: DecisionTemporalProjection? {
+        get { Self.decodeTemporalProjection(temporalProjectionBlob) }
+        set { temporalProjectionBlob = Self.encodeTemporalProjection(newValue) }
+    }
+
     static func encodeTags(_ tags: [String]) -> String {
         let payload = Array(Set(tags.map { $0.lowercased() })).sorted()
         guard let data = try? JSONEncoder().encode(payload),
@@ -232,6 +374,23 @@ extension DecisionMemoryRecord {
             return []
         }
         return tags
+    }
+
+    static func encodeTemporalProjection(_ projection: DecisionTemporalProjection?) -> String? {
+        guard let projection,
+              let data = try? JSONEncoder().encode(projection),
+              let blob = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return blob
+    }
+
+    static func decodeTemporalProjection(_ blob: String?) -> DecisionTemporalProjection? {
+        guard let blob,
+              let data = blob.data(using: .utf8) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(DecisionTemporalProjection.self, from: data)
     }
 }
 
@@ -268,6 +427,11 @@ extension DecisionMemoryCandidateRecord {
 
     var tier: DecisionMemoryTier {
         DecisionMemoryTier(rawValue: tierRaw ?? "") ?? .warm
+    }
+
+    var temporalProjection: DecisionTemporalProjection? {
+        get { DecisionMemoryRecord.decodeTemporalProjection(temporalProjectionBlob) }
+        set { temporalProjectionBlob = DecisionMemoryRecord.encodeTemporalProjection(newValue) }
     }
 }
 

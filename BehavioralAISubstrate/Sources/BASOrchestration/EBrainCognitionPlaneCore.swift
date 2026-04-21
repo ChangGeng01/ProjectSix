@@ -1337,7 +1337,7 @@ public struct BASNeuralOrganMap: BASSchemaVersioned {
 }
 
 public struct BASCandidateFrontier: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.0.0"
+    public static let currentSchemaVersion = "1.1.0"
 
     public var schemaVersion: String
     public var candidateIDs: [String]
@@ -1345,6 +1345,19 @@ public struct BASCandidateFrontier: BASSchemaVersioned {
     public var reversiblePaths: [String]
     public var guardPaths: [String]
     public var frontierWidth: Int
+    public var diversityScore: Double
+    public var delayedPaths: [String]
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case candidateIDs
+        case dominanceOrder
+        case reversiblePaths
+        case guardPaths
+        case frontierWidth
+        case diversityScore
+        case delayedPaths
+    }
 
     public init(
         schemaVersion: String = BASCandidateFrontier.currentSchemaVersion,
@@ -1352,7 +1365,9 @@ public struct BASCandidateFrontier: BASSchemaVersioned {
         dominanceOrder: [String],
         reversiblePaths: [String] = [],
         guardPaths: [String] = [],
-        frontierWidth: Int
+        frontierWidth: Int,
+        diversityScore: Double = 0,
+        delayedPaths: [String] = []
     ) {
         self.schemaVersion = schemaVersion
         self.candidateIDs = candidateIDs
@@ -1360,6 +1375,37 @@ public struct BASCandidateFrontier: BASSchemaVersioned {
         self.reversiblePaths = reversiblePaths
         self.guardPaths = guardPaths
         self.frontierWidth = max(0, frontierWidth)
+        self.diversityScore = min(max(diversityScore, 0), 1)
+        self.delayedPaths = delayedPaths
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let candidateIDs = try container.decodeIfPresent([String].self, forKey: .candidateIDs) ?? []
+
+        self.init(
+            schemaVersion: try container.decodeIfPresent(String.self, forKey: .schemaVersion)
+                ?? "1.0.0",
+            candidateIDs: candidateIDs,
+            dominanceOrder: try container.decodeIfPresent([String].self, forKey: .dominanceOrder) ?? [],
+            reversiblePaths: try container.decodeIfPresent([String].self, forKey: .reversiblePaths) ?? [],
+            guardPaths: try container.decodeIfPresent([String].self, forKey: .guardPaths) ?? [],
+            frontierWidth: try container.decodeIfPresent(Int.self, forKey: .frontierWidth) ?? candidateIDs.count,
+            diversityScore: try container.decodeIfPresent(Double.self, forKey: .diversityScore) ?? 0,
+            delayedPaths: try container.decodeIfPresent([String].self, forKey: .delayedPaths) ?? []
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(candidateIDs, forKey: .candidateIDs)
+        try container.encode(dominanceOrder, forKey: .dominanceOrder)
+        try container.encode(reversiblePaths, forKey: .reversiblePaths)
+        try container.encode(guardPaths, forKey: .guardPaths)
+        try container.encode(frontierWidth, forKey: .frontierWidth)
+        try container.encode(diversityScore, forKey: .diversityScore)
+        try container.encode(delayedPaths, forKey: .delayedPaths)
     }
 }
 
@@ -1423,8 +1469,160 @@ public struct BASCritiqueBundle: BASSchemaVersioned {
     }
 }
 
-public struct BASToolIntentEnvelope: BASSchemaVersioned {
+public struct BASUncertaintyLedger: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var ledgerID: String
+    public var unresolvedUnknowns: [String]
+    public var weakPredictions: [String]
+    public var highSensitivityPoints: [String]
+    public var confidenceFloor: Double
+
+    public init(
+        schemaVersion: String = BASUncertaintyLedger.currentSchemaVersion,
+        ledgerID: String,
+        unresolvedUnknowns: [String] = [],
+        weakPredictions: [String] = [],
+        highSensitivityPoints: [String] = [],
+        confidenceFloor: Double
+    ) {
+        self.schemaVersion = schemaVersion
+        self.ledgerID = ledgerID.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.unresolvedUnknowns = unresolvedUnknowns
+        self.weakPredictions = weakPredictions
+        self.highSensitivityPoints = highSensitivityPoints
+        self.confidenceFloor = min(max(confidenceFloor, 0), 1)
+    }
+}
+
+public struct BASEvidenceDebt: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var debtID: String
+    public var candidateID: String
+    public var missingEvidence: [String]
+    public var validationActions: [String]
+    public var debtWeight: Double
+
+    public init(
+        schemaVersion: String = BASEvidenceDebt.currentSchemaVersion,
+        debtID: String,
+        candidateID: String,
+        missingEvidence: [String] = [],
+        validationActions: [String] = [],
+        debtWeight: Double
+    ) {
+        self.schemaVersion = schemaVersion
+        self.debtID = debtID.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.candidateID = candidateID
+        self.missingEvidence = missingEvidence
+        self.validationActions = validationActions
+        self.debtWeight = min(max(debtWeight, 0), 1)
+    }
+}
+
+public enum BASConvergenceStoppingMode: String, Codable, CaseIterable, Sendable {
+    case converged
+    case leaseEnd
+    case sovereignCut
+    case guardTakeover
+}
+
+public struct BASConvergenceCertificate: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var certID: String
+    public var frontierID: String
+    public var stabilityScore: Double
+    public var stoppingMode: BASConvergenceStoppingMode
+    public var recommendedNextStep: String
+
+    public init(
+        schemaVersion: String = BASConvergenceCertificate.currentSchemaVersion,
+        certID: String,
+        frontierID: String,
+        stabilityScore: Double,
+        stoppingMode: BASConvergenceStoppingMode,
+        recommendedNextStep: String
+    ) {
+        self.schemaVersion = schemaVersion
+        self.certID = certID.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.frontierID = frontierID.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.stabilityScore = min(max(stabilityScore, 0), 1)
+        self.stoppingMode = stoppingMode
+        self.recommendedNextStep = recommendedNextStep.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+public struct BASLoopLeaseReceipt: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var receiptID: String
+    public var leaseID: String
+    public var loopsUsed: Int
+    public var candidatesUsed: Int
+    public var projectionsUsed: Int
+    public var degraded: Bool
+
+    public init(
+        schemaVersion: String = BASLoopLeaseReceipt.currentSchemaVersion,
+        receiptID: String,
+        leaseID: String,
+        loopsUsed: Int,
+        candidatesUsed: Int,
+        projectionsUsed: Int,
+        degraded: Bool
+    ) {
+        self.schemaVersion = schemaVersion
+        self.receiptID = receiptID.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.leaseID = leaseID.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.loopsUsed = max(0, loopsUsed)
+        self.candidatesUsed = max(0, candidatesUsed)
+        self.projectionsUsed = max(0, projectionsUsed)
+        self.degraded = degraded
+    }
+}
+
+public enum BASSovereignBreakpointSuggestedAction: String, Codable, CaseIterable, Sendable {
+    case shrink
+    case cut
+    case freeze
+    case stop
+}
+
+public struct BASSovereignBreakpointHint: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var hintID: String
+    public var sourceRef: String
+    public var reasonCodes: [String]
+    public var affectedCandidates: [String]
+    public var suggestedAction: BASSovereignBreakpointSuggestedAction
+
+    public init(
+        schemaVersion: String = BASSovereignBreakpointHint.currentSchemaVersion,
+        hintID: String,
+        sourceRef: String,
+        reasonCodes: [String] = [],
+        affectedCandidates: [String] = [],
+        suggestedAction: BASSovereignBreakpointSuggestedAction
+    ) {
+        self.schemaVersion = schemaVersion
+        self.hintID = hintID.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.sourceRef = sourceRef.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.reasonCodes = reasonCodes
+        self.affectedCandidates = affectedCandidates
+        self.suggestedAction = suggestedAction
+    }
+}
+
+public struct BASToolIntentEnvelope: BASSchemaVersioned {
+    public static let currentSchemaVersion = "2.0.0"
 
     public var schemaVersion: String
     public var intentID: String
@@ -1433,10 +1631,17 @@ public struct BASToolIntentEnvelope: BASSchemaVersioned {
     public var summary: String
     public var requestedDomains: [String]
     public var blockedDomains: [String]
+    public var stackedModes: [BASActionPermitMode]
+    public var assertionCeiling: String?
+    public var toolScope: String?
+    public var memoryScope: String?
     public var requireSecondCheck: Bool
     public var tonePolicy: String
     public var templatePolicy: String
     public var reasonCodes: [String]
+    public var delayType: String?
+    public var substituteType: String?
+    public var sovereignHintLevel: String?
     public var sovereignBound: Bool
 
     public init(
@@ -1447,10 +1652,17 @@ public struct BASToolIntentEnvelope: BASSchemaVersioned {
         summary: String,
         requestedDomains: [String] = [],
         blockedDomains: [String] = [],
+        stackedModes: [BASActionPermitMode] = [],
+        assertionCeiling: String? = nil,
+        toolScope: String? = nil,
+        memoryScope: String? = nil,
         requireSecondCheck: Bool,
         tonePolicy: String,
         templatePolicy: String,
         reasonCodes: [String] = [],
+        delayType: String? = nil,
+        substituteType: String? = nil,
+        sovereignHintLevel: String? = nil,
         sovereignBound: Bool
     ) {
         self.schemaVersion = schemaVersion
@@ -1460,16 +1672,94 @@ public struct BASToolIntentEnvelope: BASSchemaVersioned {
         self.summary = summary
         self.requestedDomains = requestedDomains
         self.blockedDomains = blockedDomains
+        self.stackedModes = stackedModes.filter { $0 != permitMode }
+        self.assertionCeiling = assertionCeiling?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.toolScope = toolScope?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.memoryScope = memoryScope?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.requireSecondCheck = requireSecondCheck
         self.tonePolicy = tonePolicy
         self.templatePolicy = templatePolicy
         self.reasonCodes = reasonCodes
+        self.delayType = delayType?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.substituteType = substituteType?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.sovereignHintLevel = sovereignHintLevel?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.sovereignBound = sovereignBound
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case intentID
+        case candidateID
+        case permitMode
+        case summary
+        case requestedDomains
+        case blockedDomains
+        case stackedModes
+        case assertionCeiling
+        case toolScope
+        case memoryScope
+        case requireSecondCheck
+        case tonePolicy
+        case templatePolicy
+        case reasonCodes
+        case delayType
+        case substituteType
+        case sovereignHintLevel
+        case sovereignBound
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            schemaVersion: try container.decodeIfPresent(String.self, forKey: .schemaVersion)
+                ?? "1.0.0",
+            intentID: try container.decode(String.self, forKey: .intentID),
+            candidateID: try container.decode(String.self, forKey: .candidateID),
+            permitMode: try container.decode(BASActionPermitMode.self, forKey: .permitMode),
+            summary: try container.decode(String.self, forKey: .summary),
+            requestedDomains: try container.decodeIfPresent([String].self, forKey: .requestedDomains) ?? [],
+            blockedDomains: try container.decodeIfPresent([String].self, forKey: .blockedDomains) ?? [],
+            stackedModes: try container.decodeIfPresent([BASActionPermitMode].self, forKey: .stackedModes) ?? [],
+            assertionCeiling: try container.decodeIfPresent(String.self, forKey: .assertionCeiling),
+            toolScope: try container.decodeIfPresent(String.self, forKey: .toolScope),
+            memoryScope: try container.decodeIfPresent(String.self, forKey: .memoryScope),
+            requireSecondCheck: try container.decodeIfPresent(Bool.self, forKey: .requireSecondCheck) ?? false,
+            tonePolicy: try container.decodeIfPresent(String.self, forKey: .tonePolicy) ?? "grounded_clear",
+            templatePolicy: try container.decodeIfPresent(String.self, forKey: .templatePolicy) ?? "default",
+            reasonCodes: try container.decodeIfPresent([String].self, forKey: .reasonCodes) ?? [],
+            delayType: try container.decodeIfPresent(String.self, forKey: .delayType),
+            substituteType: try container.decodeIfPresent(String.self, forKey: .substituteType),
+            sovereignHintLevel: try container.decodeIfPresent(String.self, forKey: .sovereignHintLevel),
+            sovereignBound: try container.decodeIfPresent(Bool.self, forKey: .sovereignBound) ?? false
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(intentID, forKey: .intentID)
+        try container.encode(candidateID, forKey: .candidateID)
+        try container.encode(permitMode, forKey: .permitMode)
+        try container.encode(summary, forKey: .summary)
+        try container.encode(requestedDomains, forKey: .requestedDomains)
+        try container.encode(blockedDomains, forKey: .blockedDomains)
+        try container.encode(stackedModes, forKey: .stackedModes)
+        try container.encodeIfPresent(assertionCeiling, forKey: .assertionCeiling)
+        try container.encodeIfPresent(toolScope, forKey: .toolScope)
+        try container.encodeIfPresent(memoryScope, forKey: .memoryScope)
+        try container.encode(requireSecondCheck, forKey: .requireSecondCheck)
+        try container.encode(tonePolicy, forKey: .tonePolicy)
+        try container.encode(templatePolicy, forKey: .templatePolicy)
+        try container.encode(reasonCodes, forKey: .reasonCodes)
+        try container.encodeIfPresent(delayType, forKey: .delayType)
+        try container.encodeIfPresent(substituteType, forKey: .substituteType)
+        try container.encodeIfPresent(sovereignHintLevel, forKey: .sovereignHintLevel)
+        try container.encode(sovereignBound, forKey: .sovereignBound)
     }
 }
 
 public struct BASRiskPermitBinding: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.0.0"
+    public static let currentSchemaVersion = "2.0.0"
 
     public var schemaVersion: String
     public var candidateID: String
@@ -1481,6 +1771,10 @@ public struct BASRiskPermitBinding: BASSchemaVersioned {
     public var gsiScore: Double
     public var recommendedMode: BASActionPermitMode
     public var permitMode: BASActionPermitMode
+    public var stackedModes: [BASActionPermitMode]
+    public var assertionCeiling: String?
+    public var toolScope: String?
+    public var memoryScope: String?
     public var requireSecondCheck: Bool
     public var outputLengthCap: Int
     public var tonePolicy: String
@@ -1488,6 +1782,9 @@ public struct BASRiskPermitBinding: BASSchemaVersioned {
     public var reasonCodes: [String]
     public var allowedDomains: [String]
     public var forbiddenDomains: [String]
+    public var delayType: String?
+    public var substituteType: String?
+    public var sovereignHintLevel: String?
 
     public init(
         schemaVersion: String = BASRiskPermitBinding.currentSchemaVersion,
@@ -1500,13 +1797,20 @@ public struct BASRiskPermitBinding: BASSchemaVersioned {
         gsiScore: Double,
         recommendedMode: BASActionPermitMode,
         permitMode: BASActionPermitMode,
+        stackedModes: [BASActionPermitMode] = [],
+        assertionCeiling: String? = nil,
+        toolScope: String? = nil,
+        memoryScope: String? = nil,
         requireSecondCheck: Bool,
         outputLengthCap: Int,
         tonePolicy: String,
         templatePolicy: String,
         reasonCodes: [String] = [],
         allowedDomains: [String] = [],
-        forbiddenDomains: [String] = []
+        forbiddenDomains: [String] = [],
+        delayType: String? = nil,
+        substituteType: String? = nil,
+        sovereignHintLevel: String? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.candidateID = candidateID
@@ -1518,6 +1822,10 @@ public struct BASRiskPermitBinding: BASSchemaVersioned {
         self.gsiScore = min(max(gsiScore, 0), 1)
         self.recommendedMode = recommendedMode
         self.permitMode = permitMode
+        self.stackedModes = stackedModes.filter { $0 != permitMode }
+        self.assertionCeiling = assertionCeiling?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.toolScope = toolScope?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.memoryScope = memoryScope?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.requireSecondCheck = requireSecondCheck
         self.outputLengthCap = max(0, outputLengthCap)
         self.tonePolicy = tonePolicy
@@ -1525,6 +1833,95 @@ public struct BASRiskPermitBinding: BASSchemaVersioned {
         self.reasonCodes = reasonCodes
         self.allowedDomains = allowedDomains
         self.forbiddenDomains = forbiddenDomains
+        self.delayType = delayType?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.substituteType = substituteType?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.sovereignHintLevel = sovereignHintLevel?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case candidateID
+        case riskLevel
+        case totalRisk
+        case uncertainty
+        case irreversibility
+        case manipulationStrength
+        case gsiScore
+        case recommendedMode
+        case permitMode
+        case stackedModes
+        case assertionCeiling
+        case toolScope
+        case memoryScope
+        case requireSecondCheck
+        case outputLengthCap
+        case tonePolicy
+        case templatePolicy
+        case reasonCodes
+        case allowedDomains
+        case forbiddenDomains
+        case delayType
+        case substituteType
+        case sovereignHintLevel
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            schemaVersion: try container.decodeIfPresent(String.self, forKey: .schemaVersion)
+                ?? "1.0.0",
+            candidateID: try container.decode(String.self, forKey: .candidateID),
+            riskLevel: try container.decode(BASBrainRiskLevel.self, forKey: .riskLevel),
+            totalRisk: try container.decode(Double.self, forKey: .totalRisk),
+            uncertainty: try container.decode(Double.self, forKey: .uncertainty),
+            irreversibility: try container.decode(Double.self, forKey: .irreversibility),
+            manipulationStrength: try container.decode(Double.self, forKey: .manipulationStrength),
+            gsiScore: try container.decode(Double.self, forKey: .gsiScore),
+            recommendedMode: try container.decode(BASActionPermitMode.self, forKey: .recommendedMode),
+            permitMode: try container.decode(BASActionPermitMode.self, forKey: .permitMode),
+            stackedModes: try container.decodeIfPresent([BASActionPermitMode].self, forKey: .stackedModes) ?? [],
+            assertionCeiling: try container.decodeIfPresent(String.self, forKey: .assertionCeiling),
+            toolScope: try container.decodeIfPresent(String.self, forKey: .toolScope),
+            memoryScope: try container.decodeIfPresent(String.self, forKey: .memoryScope),
+            requireSecondCheck: try container.decodeIfPresent(Bool.self, forKey: .requireSecondCheck) ?? false,
+            outputLengthCap: try container.decodeIfPresent(Int.self, forKey: .outputLengthCap) ?? 0,
+            tonePolicy: try container.decodeIfPresent(String.self, forKey: .tonePolicy) ?? "grounded_clear",
+            templatePolicy: try container.decodeIfPresent(String.self, forKey: .templatePolicy) ?? "default",
+            reasonCodes: try container.decodeIfPresent([String].self, forKey: .reasonCodes) ?? [],
+            allowedDomains: try container.decodeIfPresent([String].self, forKey: .allowedDomains) ?? [],
+            forbiddenDomains: try container.decodeIfPresent([String].self, forKey: .forbiddenDomains) ?? [],
+            delayType: try container.decodeIfPresent(String.self, forKey: .delayType),
+            substituteType: try container.decodeIfPresent(String.self, forKey: .substituteType),
+            sovereignHintLevel: try container.decodeIfPresent(String.self, forKey: .sovereignHintLevel)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(candidateID, forKey: .candidateID)
+        try container.encode(riskLevel, forKey: .riskLevel)
+        try container.encode(totalRisk, forKey: .totalRisk)
+        try container.encode(uncertainty, forKey: .uncertainty)
+        try container.encode(irreversibility, forKey: .irreversibility)
+        try container.encode(manipulationStrength, forKey: .manipulationStrength)
+        try container.encode(gsiScore, forKey: .gsiScore)
+        try container.encode(recommendedMode, forKey: .recommendedMode)
+        try container.encode(permitMode, forKey: .permitMode)
+        try container.encode(stackedModes, forKey: .stackedModes)
+        try container.encodeIfPresent(assertionCeiling, forKey: .assertionCeiling)
+        try container.encodeIfPresent(toolScope, forKey: .toolScope)
+        try container.encodeIfPresent(memoryScope, forKey: .memoryScope)
+        try container.encode(requireSecondCheck, forKey: .requireSecondCheck)
+        try container.encode(outputLengthCap, forKey: .outputLengthCap)
+        try container.encode(tonePolicy, forKey: .tonePolicy)
+        try container.encode(templatePolicy, forKey: .templatePolicy)
+        try container.encode(reasonCodes, forKey: .reasonCodes)
+        try container.encode(allowedDomains, forKey: .allowedDomains)
+        try container.encode(forbiddenDomains, forKey: .forbiddenDomains)
+        try container.encodeIfPresent(delayType, forKey: .delayType)
+        try container.encodeIfPresent(substituteType, forKey: .substituteType)
+        try container.encodeIfPresent(sovereignHintLevel, forKey: .sovereignHintLevel)
     }
 }
 
@@ -1532,11 +1929,22 @@ public extension BASRiskPermitBinding {
     var actionPermit: BASActionPermit {
         BASActionPermit(
             mode: permitMode,
+            stackedModes: stackedModes,
             reasonCodes: reasonCodes,
+            allowedDomains: allowedDomains,
+            blockedDomains: forbiddenDomains,
+            assertionCeiling: assertionCeiling ?? "guarded",
+            toolScope: toolScope ?? "bounded",
+            memoryScope: memoryScope ?? "standard",
+            requireMirror: stackedModes.contains(.mirror),
+            requireCompare: stackedModes.contains(.compare),
             requireSecondCheck: requireSecondCheck,
             outputLengthCap: outputLengthCap,
             tonePolicy: tonePolicy,
-            templatePolicy: templatePolicy
+            templatePolicy: templatePolicy,
+            delayWindow: delayType,
+            substituteRequired: substituteType != nil,
+            escalationHintRef: sovereignHintLevel
         )
     }
 
@@ -1549,7 +1957,12 @@ public extension BASRiskPermitBinding {
             irreversibility: irreversibility,
             manipulationStrength: manipulationStrength,
             gsiScore: gsiScore,
-            recommendedMode: recommendedMode
+            recommendedMode: recommendedMode,
+            stackedModes: stackedModes,
+            assertionCeiling: assertionCeiling ?? "standard",
+            delayType: delayType,
+            substituteType: substituteType,
+            sovereignHintLevel: sovereignHintLevel
         )
     }
 }
@@ -1907,8 +2320,150 @@ public struct BASTriSelfScore: BASSchemaVersioned {
     }
 }
 
-public struct BASMergedChoice: BASSchemaVersioned {
+public enum BASCourtVetoType: String, Codable, CaseIterable, Sendable {
+    case boundary
+    case dignity
+    case hostConstitution
+    case irreversibility
+    case sovereignPrecondition
+    case calibration
+}
+
+public struct BASVetoMark: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var candidateID: String
+    public var vetoType: BASCourtVetoType
+    public var reasonCodes: [String]
+    public var compensable: Bool
+
+    public init(
+        schemaVersion: String = BASVetoMark.currentSchemaVersion,
+        candidateID: String,
+        vetoType: BASCourtVetoType,
+        reasonCodes: [String] = [],
+        compensable: Bool
+    ) {
+        self.schemaVersion = schemaVersion
+        self.candidateID = candidateID
+        self.vetoType = vetoType
+        self.reasonCodes = reasonCodes
+        self.compensable = compensable
+    }
+}
+
+public struct BASTradeoffLedger: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var candidateID: String
+    public var gains: [String]
+    public var costs: [String]
+    public var sacrifices: [String]
+    public var unresolvedTensions: [String]
+
+    public init(
+        schemaVersion: String = BASTradeoffLedger.currentSchemaVersion,
+        candidateID: String,
+        gains: [String] = [],
+        costs: [String] = [],
+        sacrifices: [String] = [],
+        unresolvedTensions: [String] = []
+    ) {
+        self.schemaVersion = schemaVersion
+        self.candidateID = candidateID
+        self.gains = gains
+        self.costs = costs
+        self.sacrifices = sacrifices
+        self.unresolvedTensions = unresolvedTensions
+    }
+}
+
+public enum BASAgencyReservationMode: String, Codable, CaseIterable, Sendable {
+    case retainChoice
+    case compareOnly
+    case delayRight
+    case noAutoMerge
+}
+
+public struct BASAgencyReservation: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var mode: BASAgencyReservationMode
+    public var reasons: [String]
+    public var expiresWith: String?
+
+    public init(
+        schemaVersion: String = BASAgencyReservation.currentSchemaVersion,
+        mode: BASAgencyReservationMode,
+        reasons: [String] = [],
+        expiresWith: String? = nil
+    ) {
+        self.schemaVersion = schemaVersion
+        self.mode = mode
+        self.reasons = reasons
+        self.expiresWith = expiresWith?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+public struct BASRemandOrder: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var targetLayer: String
+    public var requiredWork: [String]
+    public var reasonCodes: [String]
+
+    public init(
+        schemaVersion: String = BASRemandOrder.currentSchemaVersion,
+        targetLayer: String,
+        requiredWork: [String] = [],
+        reasonCodes: [String] = []
+    ) {
+        self.schemaVersion = schemaVersion
+        self.targetLayer = targetLayer.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.requiredWork = requiredWork
+        self.reasonCodes = reasonCodes
+    }
+}
+
+public struct BASCourtDecisionDraft: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var preferredCandidateID: String
+    public var fallbackCandidateIDs: [String]
+    public var guardCandidateID: String?
+    public var requiredDisclosures: [String]
+    public var unresolvedCosts: [String]
+    public var agencyMode: BASAgencyReservationMode?
+    public var readinessLevel: String
+
+    public init(
+        schemaVersion: String = BASCourtDecisionDraft.currentSchemaVersion,
+        preferredCandidateID: String,
+        fallbackCandidateIDs: [String] = [],
+        guardCandidateID: String? = nil,
+        requiredDisclosures: [String] = [],
+        unresolvedCosts: [String] = [],
+        agencyMode: BASAgencyReservationMode? = nil,
+        readinessLevel: String
+    ) {
+        self.schemaVersion = schemaVersion
+        self.preferredCandidateID = preferredCandidateID
+        self.fallbackCandidateIDs = fallbackCandidateIDs
+        self.guardCandidateID = guardCandidateID?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.requiredDisclosures = requiredDisclosures
+        self.unresolvedCosts = unresolvedCosts
+        self.agencyMode = agencyMode
+        self.readinessLevel = readinessLevel.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+public struct BASMergedChoice: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.1.0"
 
     public var schemaVersion: String
     public var candidateID: String
@@ -1916,6 +2471,11 @@ public struct BASMergedChoice: BASSchemaVersioned {
     public var actionSummary: String
     public var vetoApplied: Bool
     public var vetoReasonCodes: [String]
+    public var vetoMarks: [BASVetoMark]?
+    public var tradeoffLedgers: [BASTradeoffLedger]?
+    public var agencyReservation: BASAgencyReservation?
+    public var remandOrders: [BASRemandOrder]?
+    public var courtDecisionDraft: BASCourtDecisionDraft?
 
     public init(
         schemaVersion: String = BASMergedChoice.currentSchemaVersion,
@@ -1923,7 +2483,12 @@ public struct BASMergedChoice: BASSchemaVersioned {
         title: String,
         actionSummary: String,
         vetoApplied: Bool = false,
-        vetoReasonCodes: [String] = []
+        vetoReasonCodes: [String] = [],
+        vetoMarks: [BASVetoMark]? = nil,
+        tradeoffLedgers: [BASTradeoffLedger]? = nil,
+        agencyReservation: BASAgencyReservation? = nil,
+        remandOrders: [BASRemandOrder]? = nil,
+        courtDecisionDraft: BASCourtDecisionDraft? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.candidateID = candidateID
@@ -1931,6 +2496,11 @@ public struct BASMergedChoice: BASSchemaVersioned {
         self.actionSummary = actionSummary
         self.vetoApplied = vetoApplied
         self.vetoReasonCodes = vetoReasonCodes
+        self.vetoMarks = vetoMarks
+        self.tradeoffLedgers = tradeoffLedgers
+        self.agencyReservation = agencyReservation
+        self.remandOrders = remandOrders
+        self.courtDecisionDraft = courtDecisionDraft
     }
 }
 
@@ -1941,10 +2511,11 @@ public enum BASThoughtStopReason: String, Codable, CaseIterable, Sendable {
     case maxLoopsReached
     case blocked
     case replaced
+    case guardTakeover
 }
 
 public struct BASThoughtFrame: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.2.0"
+    public static let currentSchemaVersion = "1.4.0"
 
     public var schemaVersion: String
     public var stepIndex: Int
@@ -1960,7 +2531,18 @@ public struct BASThoughtFrame: BASSchemaVersioned {
     public var candidateFrontier: BASCandidateFrontier?
     public var counterfactualBundles: [BASCounterfactualBundle]?
     public var critiqueBundles: [BASCritiqueBundle]?
+    public var uncertaintyLedger: BASUncertaintyLedger?
+    public var evidenceDebts: [BASEvidenceDebt]?
+    public var convergenceCertificate: BASConvergenceCertificate?
+    public var loopLeaseReceipt: BASLoopLeaseReceipt?
+    public var sovereignBreakpointHints: [BASSovereignBreakpointHint]?
+    public var vetoMarks: [BASVetoMark]?
+    public var tradeoffLedgers: [BASTradeoffLedger]?
+    public var agencyReservation: BASAgencyReservation?
+    public var remandOrders: [BASRemandOrder]?
+    public var courtDecisionDraft: BASCourtDecisionDraft?
     public var riskBindings: [BASRiskPermitBinding]?
+    public var riskDecisionPackage: BASRiskDecisionPackage?
     public var toolIntentEnvelope: BASToolIntentEnvelope?
     public var neuralLeaseReceipt: BASNeuralLeaseReceipt?
     public var stabilityScore: Double
@@ -1981,7 +2563,18 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         candidateFrontier: BASCandidateFrontier? = nil,
         counterfactualBundles: [BASCounterfactualBundle]? = nil,
         critiqueBundles: [BASCritiqueBundle]? = nil,
+        uncertaintyLedger: BASUncertaintyLedger? = nil,
+        evidenceDebts: [BASEvidenceDebt]? = nil,
+        convergenceCertificate: BASConvergenceCertificate? = nil,
+        loopLeaseReceipt: BASLoopLeaseReceipt? = nil,
+        sovereignBreakpointHints: [BASSovereignBreakpointHint]? = nil,
+        vetoMarks: [BASVetoMark]? = nil,
+        tradeoffLedgers: [BASTradeoffLedger]? = nil,
+        agencyReservation: BASAgencyReservation? = nil,
+        remandOrders: [BASRemandOrder]? = nil,
+        courtDecisionDraft: BASCourtDecisionDraft? = nil,
         riskBindings: [BASRiskPermitBinding]? = nil,
+        riskDecisionPackage: BASRiskDecisionPackage? = nil,
         toolIntentEnvelope: BASToolIntentEnvelope? = nil,
         neuralLeaseReceipt: BASNeuralLeaseReceipt? = nil,
         stabilityScore: Double = 0,
@@ -2001,7 +2594,18 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         self.candidateFrontier = candidateFrontier
         self.counterfactualBundles = counterfactualBundles
         self.critiqueBundles = critiqueBundles
+        self.uncertaintyLedger = uncertaintyLedger
+        self.evidenceDebts = evidenceDebts
+        self.convergenceCertificate = convergenceCertificate
+        self.loopLeaseReceipt = loopLeaseReceipt
+        self.sovereignBreakpointHints = sovereignBreakpointHints
+        self.vetoMarks = vetoMarks
+        self.tradeoffLedgers = tradeoffLedgers
+        self.agencyReservation = agencyReservation
+        self.remandOrders = remandOrders
+        self.courtDecisionDraft = courtDecisionDraft
         self.riskBindings = riskBindings
+        self.riskDecisionPackage = riskDecisionPackage
         self.toolIntentEnvelope = toolIntentEnvelope
         self.neuralLeaseReceipt = neuralLeaseReceipt
         self.stabilityScore = min(max(stabilityScore, 0), 1)
@@ -2009,8 +2613,231 @@ public struct BASThoughtFrame: BASSchemaVersioned {
     }
 }
 
+public struct BASThermalExchangeFrame: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var exchangeID: String
+    public var exchangeMode: String
+    public var predictedThermalBand: String
+    public var coolingActions: [String]
+    public var suppressedOrgans: [BASNeuralOrgan]
+    public var reroutedOrgans: [BASNeuralOrgan]
+    public var rerouteTargets: [String: String]
+    public var precisionDowngradePlan: [BASNeuralOrganPrecision]
+    public var exchangeReasonCodes: [String]
+
+    public init(
+        schemaVersion: String = BASThermalExchangeFrame.currentSchemaVersion,
+        exchangeID: String,
+        exchangeMode: String,
+        predictedThermalBand: String,
+        coolingActions: [String] = [],
+        suppressedOrgans: [BASNeuralOrgan] = [],
+        reroutedOrgans: [BASNeuralOrgan] = [],
+        rerouteTargets: [String: String] = [:],
+        precisionDowngradePlan: [BASNeuralOrganPrecision] = [],
+        exchangeReasonCodes: [String] = []
+    ) {
+        self.schemaVersion = schemaVersion
+        self.exchangeID = exchangeID.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.exchangeMode = exchangeMode.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.predictedThermalBand = predictedThermalBand.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.coolingActions = coolingActions
+        self.suppressedOrgans = suppressedOrgans
+        self.reroutedOrgans = reroutedOrgans
+        self.rerouteTargets = rerouteTargets.reduce(into: [:]) { result, entry in
+            let key = entry.key.trimmingCharacters(in: .whitespacesAndNewlines)
+            let value = entry.value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard key.isEmpty == false, value.isEmpty == false else { return }
+            result[key] = value
+        }
+        self.precisionDowngradePlan = precisionDowngradePlan
+        self.exchangeReasonCodes = exchangeReasonCodes
+    }
+}
+
+public struct BASIntegrityWeaveFrame: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var weaveID: String
+    public var foldChecksum: String
+    public var rollbackIntegrityHash: String
+    public var requiredChecks: [String]
+    public var completedChecks: [String]
+    public var failedChecks: [String]
+    public var purityState: String
+    public var contaminationRefs: [String]
+    public var trustedSnapshotRef: String?
+    public var verificationHash: String
+
+    public init(
+        schemaVersion: String = BASIntegrityWeaveFrame.currentSchemaVersion,
+        weaveID: String,
+        foldChecksum: String,
+        rollbackIntegrityHash: String,
+        requiredChecks: [String] = [],
+        completedChecks: [String] = [],
+        failedChecks: [String] = [],
+        purityState: String,
+        contaminationRefs: [String] = [],
+        trustedSnapshotRef: String? = nil,
+        verificationHash: String
+    ) {
+        self.schemaVersion = schemaVersion
+        self.weaveID = weaveID.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.foldChecksum = foldChecksum.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.rollbackIntegrityHash = rollbackIntegrityHash.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.requiredChecks = requiredChecks
+        self.completedChecks = completedChecks
+        self.failedChecks = failedChecks
+        self.purityState = purityState.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.contaminationRefs = contaminationRefs
+        self.trustedSnapshotRef = trustedSnapshotRef?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.verificationHash = verificationHash.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+public struct BASOrganPackage: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var packageID: String
+    public var organType: BASNeuralOrgan
+    public var sizeMB: Int
+    public var precisionOptions: [BASNeuralPrecisionTier]
+    public var loadTimeMs: Int
+    public var thermalCost: Int
+    public var sovereignClass: String
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case packageID
+        case organType
+        case sizeMB
+        case precisionOptions
+        case loadTimeMs
+        case thermalCost
+        case sovereignClass
+    }
+
+    public init(
+        schemaVersion: String = BASOrganPackage.currentSchemaVersion,
+        packageID: String,
+        organType: BASNeuralOrgan,
+        sizeMB: Int,
+        precisionOptions: [BASNeuralPrecisionTier] = [],
+        loadTimeMs: Int,
+        thermalCost: Int,
+        sovereignClass: String
+    ) {
+        self.schemaVersion = schemaVersion
+        self.packageID = packageID.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.organType = organType
+        self.sizeMB = max(0, sizeMB)
+        self.precisionOptions = precisionOptions
+        self.loadTimeMs = max(0, loadTimeMs)
+        self.thermalCost = max(0, thermalCost)
+        self.sovereignClass = sovereignClass.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decodeIfPresent(String.self, forKey: .schemaVersion)
+            ?? BASOrganPackage.currentSchemaVersion
+        packageID = try container.decode(String.self, forKey: .packageID)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        organType = try container.decode(BASNeuralOrgan.self, forKey: .organType)
+        sizeMB = max(0, try container.decodeIfPresent(Int.self, forKey: .sizeMB) ?? 0)
+        precisionOptions = try container.decodeIfPresent(
+            [BASNeuralPrecisionTier].self,
+            forKey: .precisionOptions
+        ) ?? []
+        loadTimeMs = max(0, try container.decodeIfPresent(Int.self, forKey: .loadTimeMs) ?? 0)
+        thermalCost = max(0, try container.decodeIfPresent(Int.self, forKey: .thermalCost) ?? 0)
+        sovereignClass = try container.decodeIfPresent(String.self, forKey: .sovereignClass)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+}
+
+public struct BASOrganDeltaPlan: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var planID: String
+    public var deltaMode: String
+    public var activatePackageIDs: [String]
+    public var preloadPackageIDs: [String]
+    public var evictPackageIDs: [String]
+    public var retainPackageIDs: [String]
+    public var rollbackSafeRetainedPackageIDs: [String]
+    public var triggeredActuationKinds: [BASSovereignActuationKind]
+    public var reasonCodes: [String]
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case planID
+        case deltaMode
+        case activatePackageIDs
+        case preloadPackageIDs
+        case evictPackageIDs
+        case retainPackageIDs
+        case rollbackSafeRetainedPackageIDs
+        case triggeredActuationKinds
+        case reasonCodes
+    }
+
+    public init(
+        schemaVersion: String = BASOrganDeltaPlan.currentSchemaVersion,
+        planID: String,
+        deltaMode: String,
+        activatePackageIDs: [String] = [],
+        preloadPackageIDs: [String] = [],
+        evictPackageIDs: [String] = [],
+        retainPackageIDs: [String] = [],
+        rollbackSafeRetainedPackageIDs: [String] = [],
+        triggeredActuationKinds: [BASSovereignActuationKind] = [],
+        reasonCodes: [String] = []
+    ) {
+        self.schemaVersion = schemaVersion
+        self.planID = planID.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.deltaMode = deltaMode.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.activatePackageIDs = activatePackageIDs
+        self.preloadPackageIDs = preloadPackageIDs
+        self.evictPackageIDs = evictPackageIDs
+        self.retainPackageIDs = retainPackageIDs
+        self.rollbackSafeRetainedPackageIDs = rollbackSafeRetainedPackageIDs
+        self.triggeredActuationKinds = triggeredActuationKinds
+        self.reasonCodes = reasonCodes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decodeIfPresent(String.self, forKey: .schemaVersion)
+            ?? BASOrganDeltaPlan.currentSchemaVersion
+        planID = try container.decode(String.self, forKey: .planID)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        deltaMode = try container.decodeIfPresent(String.self, forKey: .deltaMode)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        activatePackageIDs = try container.decodeIfPresent([String].self, forKey: .activatePackageIDs) ?? []
+        preloadPackageIDs = try container.decodeIfPresent([String].self, forKey: .preloadPackageIDs) ?? []
+        evictPackageIDs = try container.decodeIfPresent([String].self, forKey: .evictPackageIDs) ?? []
+        retainPackageIDs = try container.decodeIfPresent([String].self, forKey: .retainPackageIDs) ?? []
+        rollbackSafeRetainedPackageIDs = try container.decodeIfPresent(
+            [String].self,
+            forKey: .rollbackSafeRetainedPackageIDs
+        ) ?? []
+        triggeredActuationKinds = try container.decodeIfPresent(
+            [BASSovereignActuationKind].self,
+            forKey: .triggeredActuationKinds
+        ) ?? []
+        reasonCodes = try container.decodeIfPresent([String].self, forKey: .reasonCodes) ?? []
+    }
+}
+
 public struct BASThoughtFold: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.4.0"
+    public static let currentSchemaVersion = "1.7.0"
 
     public var schemaVersion: String
     public var foldID: String
@@ -2034,6 +2861,10 @@ public struct BASThoughtFold: BASSchemaVersioned {
     public var precisionProfileRef: String?
     public var lungStateRef: String?
     public var breathSchedulerRef: String?
+    public var thermalExchangeRef: String?
+    public var integrityWeaveRef: String?
+    public var organPackageRefs: [String]
+    public var organDeltaPlanRef: String?
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion
@@ -2058,6 +2889,10 @@ public struct BASThoughtFold: BASSchemaVersioned {
         case precisionProfileRef
         case lungStateRef
         case breathSchedulerRef
+        case thermalExchangeRef
+        case integrityWeaveRef
+        case organPackageRefs
+        case organDeltaPlanRef
     }
 
     public init(
@@ -2082,7 +2917,11 @@ public struct BASThoughtFold: BASSchemaVersioned {
         hotColdMapRef: String? = nil,
         precisionProfileRef: String? = nil,
         lungStateRef: String? = nil,
-        breathSchedulerRef: String? = nil
+        breathSchedulerRef: String? = nil,
+        thermalExchangeRef: String? = nil,
+        integrityWeaveRef: String? = nil,
+        organPackageRefs: [String] = [],
+        organDeltaPlanRef: String? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.foldID = foldID
@@ -2106,6 +2945,12 @@ public struct BASThoughtFold: BASSchemaVersioned {
         self.precisionProfileRef = precisionProfileRef?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.lungStateRef = lungStateRef?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.breathSchedulerRef = breathSchedulerRef?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.thermalExchangeRef = thermalExchangeRef?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.integrityWeaveRef = integrityWeaveRef?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.organPackageRefs = organPackageRefs
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        self.organDeltaPlanRef = organDeltaPlanRef?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     public init(from decoder: Decoder) throws {
@@ -2133,6 +2978,10 @@ public struct BASThoughtFold: BASSchemaVersioned {
         precisionProfileRef = try container.decodeIfPresent(String.self, forKey: .precisionProfileRef)
         lungStateRef = try container.decodeIfPresent(String.self, forKey: .lungStateRef)
         breathSchedulerRef = try container.decodeIfPresent(String.self, forKey: .breathSchedulerRef)
+        thermalExchangeRef = try container.decodeIfPresent(String.self, forKey: .thermalExchangeRef)
+        integrityWeaveRef = try container.decodeIfPresent(String.self, forKey: .integrityWeaveRef)
+        organPackageRefs = try container.decodeIfPresent([String].self, forKey: .organPackageRefs) ?? []
+        organDeltaPlanRef = try container.decodeIfPresent(String.self, forKey: .organDeltaPlanRef)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -2159,11 +3008,133 @@ public struct BASThoughtFold: BASSchemaVersioned {
         try container.encodeIfPresent(precisionProfileRef, forKey: .precisionProfileRef)
         try container.encodeIfPresent(lungStateRef, forKey: .lungStateRef)
         try container.encodeIfPresent(breathSchedulerRef, forKey: .breathSchedulerRef)
+        try container.encodeIfPresent(thermalExchangeRef, forKey: .thermalExchangeRef)
+        try container.encodeIfPresent(integrityWeaveRef, forKey: .integrityWeaveRef)
+        try container.encode(organPackageRefs, forKey: .organPackageRefs)
+        try container.encodeIfPresent(organDeltaPlanRef, forKey: .organDeltaPlanRef)
+    }
+}
+
+public struct BASRenderedBoundaryGuide: Codable, Equatable, Sendable {
+    public var allowedDomains: [String]
+    public var blockedDomains: [String]
+    public var toolScope: String
+    public var memoryScope: String
+    public var escalationHintRef: String?
+
+    public init(
+        allowedDomains: [String] = [],
+        blockedDomains: [String] = [],
+        toolScope: String,
+        memoryScope: String,
+        escalationHintRef: String? = nil
+    ) {
+        self.allowedDomains = allowedDomains
+        self.blockedDomains = blockedDomains
+        self.toolScope = toolScope
+        self.memoryScope = memoryScope
+        self.escalationHintRef = escalationHintRef
+    }
+}
+
+public struct BASRenderedAgencyGuide: Codable, Equatable, Sendable {
+    public var requiresCompare: Bool
+    public var requiresSecondCheck: Bool
+    public var delayAvailable: Bool
+    public var chooseLaterAllowed: Bool
+    public var prefersDraftOnly: Bool
+    public var localOnlyPreferred: Bool
+    public var reservationMode: BASAgencyReservationMode?
+    public var reservationReasons: [String]?
+
+    public init(
+        requiresCompare: Bool,
+        requiresSecondCheck: Bool,
+        delayAvailable: Bool,
+        chooseLaterAllowed: Bool,
+        prefersDraftOnly: Bool,
+        localOnlyPreferred: Bool,
+        reservationMode: BASAgencyReservationMode? = nil,
+        reservationReasons: [String]? = nil
+    ) {
+        self.requiresCompare = requiresCompare
+        self.requiresSecondCheck = requiresSecondCheck
+        self.delayAvailable = delayAvailable
+        self.chooseLaterAllowed = chooseLaterAllowed
+        self.prefersDraftOnly = prefersDraftOnly
+        self.localOnlyPreferred = localOnlyPreferred
+        self.reservationMode = reservationMode
+        self.reservationReasons = reservationReasons
+    }
+}
+
+public struct BASRenderedDisclosureGuide: Codable, Equatable, Sendable {
+    public var assertionCeiling: String
+    public var explanationCodes: [String]
+    public var uncertaintyVisible: Bool
+    public var requiredDisclosures: [String]?
+    public var unresolvedCosts: [String]?
+    public var remandTargets: [String]?
+
+    public init(
+        assertionCeiling: String,
+        explanationCodes: [String] = [],
+        uncertaintyVisible: Bool,
+        requiredDisclosures: [String]? = nil,
+        unresolvedCosts: [String]? = nil,
+        remandTargets: [String]? = nil
+    ) {
+        self.assertionCeiling = assertionCeiling
+        self.explanationCodes = explanationCodes
+        self.uncertaintyVisible = uncertaintyVisible
+        self.requiredDisclosures = requiredDisclosures
+        self.unresolvedCosts = unresolvedCosts
+        self.remandTargets = remandTargets
+    }
+}
+
+public struct BASRenderedSurfaceGuide: Codable, Equatable, Sendable {
+    public var stackedModes: [BASActionPermitMode]
+    public var tonePolicy: String
+    public var templatePolicy: String
+    public var outputLengthCap: Int
+    public var boundary: BASRenderedBoundaryGuide
+    public var agency: BASRenderedAgencyGuide
+    public var disclosure: BASRenderedDisclosureGuide
+    public var delayWindow: String?
+    public var delayReservation: BASDelayReservation?
+    public var protectiveSubstitute: BASProtectiveSubstitute?
+    public var sovereignEscalationHint: BASSovereignEscalationHint?
+
+    public init(
+        stackedModes: [BASActionPermitMode] = [],
+        tonePolicy: String,
+        templatePolicy: String,
+        outputLengthCap: Int,
+        boundary: BASRenderedBoundaryGuide,
+        agency: BASRenderedAgencyGuide,
+        disclosure: BASRenderedDisclosureGuide,
+        delayWindow: String? = nil,
+        delayReservation: BASDelayReservation? = nil,
+        protectiveSubstitute: BASProtectiveSubstitute? = nil,
+        sovereignEscalationHint: BASSovereignEscalationHint? = nil
+    ) {
+        self.stackedModes = stackedModes
+        self.tonePolicy = tonePolicy
+        self.templatePolicy = templatePolicy
+        self.outputLengthCap = max(0, outputLengthCap)
+        self.boundary = boundary
+        self.agency = agency
+        self.disclosure = disclosure
+        self.delayWindow = delayWindow
+        self.delayReservation = delayReservation
+        self.protectiveSubstitute = protectiveSubstitute
+        self.sovereignEscalationHint = sovereignEscalationHint
     }
 }
 
 public struct BASRenderedOutput: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.0.0"
+    public static let currentSchemaVersion = "1.1.0"
 
     public var schemaVersion: String
     public var mode: BASActionPermitMode
@@ -2171,6 +3142,7 @@ public struct BASRenderedOutput: BASSchemaVersioned {
     public var body: String
     public var alternativeActions: [String]
     public var explanationCodes: [String]
+    public var surfaceGuide: BASRenderedSurfaceGuide?
 
     public init(
         schemaVersion: String = BASRenderedOutput.currentSchemaVersion,
@@ -2178,7 +3150,8 @@ public struct BASRenderedOutput: BASSchemaVersioned {
         headline: String,
         body: String,
         alternativeActions: [String] = [],
-        explanationCodes: [String] = []
+        explanationCodes: [String] = [],
+        surfaceGuide: BASRenderedSurfaceGuide? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.mode = mode
@@ -2186,5 +3159,6 @@ public struct BASRenderedOutput: BASSchemaVersioned {
         self.body = body
         self.alternativeActions = alternativeActions
         self.explanationCodes = explanationCodes
+        self.surfaceGuide = surfaceGuide
     }
 }

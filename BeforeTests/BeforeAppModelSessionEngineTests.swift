@@ -140,11 +140,16 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
         XCTAssertNotNil(kernelFrame?.rollbackAnchor)
         XCTAssertNotNil(presentationFrame?.runModeTitle)
         XCTAssertNotNil(presentationFrame?.sourceDescriptor)
+        XCTAssertNotNil(presentationFrame?.morphLine)
+        XCTAssertNotNil(presentationFrame?.precisionLine)
+        XCTAssertNotNil(presentationFrame?.organDeltaLine)
+        XCTAssertNotNil(presentationFrame?.schedulerLine)
+        XCTAssertNotNil(presentationFrame?.integrityWeaveLine)
         XCTAssertNotNil(presentationFrame?.lungLine)
         XCTAssertNotNil(presentationFrame?.resumeLine)
         XCTAssertNotNil(presentationFrame?.rollbackLine)
         XCTAssertFalse(layerStackLines.isEmpty)
-        XCTAssertEqual(layerStackLines.count, 10)
+        XCTAssertEqual(layerStackLines.count, 13)
         XCTAssertTrue(layerStackLines.first?.hasPrefix("L1 power clock") == true)
         XCTAssertTrue(layerStackLines.last?.hasPrefix("L14 sovereign") == true)
     }
@@ -177,7 +182,16 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
             primaryActionTitle: "Home",
             primaryTarget: .home
         )
-        app.isEvolutionControlCenterPresented = true
+        app.presentEvolutionControlCenter(
+            entryContext: DecisionEvolutionControlEntryContext(
+                envelope: .openEvolutionControl(
+                    entrySource: .watch,
+                    promptSeed: "Inspect the watch audit findings",
+                    triggerReason: "A watch audit alert asked the iPhone brain to inspect evolution findings.",
+                    controlEntryKindID: DecisionEvolutionWidgetControlEntryKind.audit.rawValue
+                )
+            )!
+        )
         app.isSessionEngineControlCenterPresented = true
         app.presentSessionEngineBundleIssue("Import issue")
 
@@ -189,6 +203,7 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
         XCTAssertNil(app.reflectionContext)
         XCTAssertNil(app.letGoContext)
         XCTAssertFalse(app.isEvolutionControlCenterPresented)
+        XCTAssertNil(app.evolutionControlEntryContext)
         XCTAssertFalse(app.isSessionEngineControlCenterPresented)
         XCTAssertNil(app.sessionEngineBundleIssue)
         XCTAssertTrue(app.hasSeenOnboarding)
@@ -252,16 +267,19 @@ final class BeforeAppModelSessionEngineTests: XCTestCase {
         XCTAssertEqual(presentedActiveSession.sessionID, sessionID)
         XCTAssertTrue(presentation.countsLine.contains("Sessions"))
         XCTAssertTrue(presentedActiveSession.checkpointBudgetLine?.contains("eBrain budget:") == true)
+        XCTAssertTrue(presentedActiveSession.checkpointPresenceLine?.hasPrefix("eBrain presence: scene ") == true)
         XCTAssertTrue(presentedActiveSession.checkpointPressureLine?.contains("eBrain pressure: latency ") == true)
         XCTAssertTrue(presentedActiveSession.checkpointRiskFactorsLine?.hasPrefix("Factors: ") == true)
         XCTAssertTrue(presentedActiveSession.checkpointReasonCodesLine?.hasPrefix("Reason codes: ") == true)
+        XCTAssertTrue(presentedActiveSession.checkpointCourtLine?.hasPrefix("Court: ") == true)
         XCTAssertTrue(presentedActiveSession.replayRecoverySummary.budgetLine?.contains("eBrain budget:") == true)
         XCTAssertTrue(presentedActiveSession.replayRecoverySummary.pressureLine?.contains("eBrain pressure: latency ") == true)
         XCTAssertTrue(presentedActiveSession.replayRecoverySummary.riskFactorsLine?.hasPrefix("Factors: ") == true)
         XCTAssertTrue(presentedActiveSession.replayRecoverySummary.reasonCodesLine?.hasPrefix("Reason codes: ") == true)
+        XCTAssertTrue(presentedActiveSession.replayRecoverySummary.courtLine?.hasPrefix("Court: ") == true)
         XCTAssertTrue(
             presentedActiveSession.replayRecoverySummary.digestLines.contains {
-                $0.contains("Factors: ") && $0.contains("Reason codes: ")
+                $0.contains("Factors: ") && $0.contains("Reason codes: ") && $0.contains("Court: ")
             }
         )
     }

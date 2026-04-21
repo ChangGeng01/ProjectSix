@@ -271,7 +271,11 @@ struct DecisionEBrainKernelFrame: Equatable, Sendable {
     let hotColdMap: BASHotColdMap?
     let precisionProfile: BASPrecisionProfile?
     let lungState: BASLungState?
+    let thermalExchange: BASThermalExchangeFrame?
     let breathScheduler: BASBreathSchedulerFrame?
+    let integrityWeave: BASIntegrityWeaveFrame?
+    let organPackages: [BASOrganPackage]
+    let organDeltaPlan: BASOrganDeltaPlan?
     let resumeFrame: BASResumeFrame?
     let rollbackAnchor: BASRollbackAnchor?
     let sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult?
@@ -324,8 +328,12 @@ struct DecisionEBrainPresentationFrame: Equatable, Sendable {
     let morphLine: String?
     let hotColdLine: String?
     let precisionLine: String?
+    let organPackageLine: String?
     let lungLine: String?
+    let organDeltaLine: String?
+    let thermalExchangeLine: String?
     let schedulerLine: String?
+    let integrityWeaveLine: String?
     let resumeLine: String?
     let rollbackLine: String?
     let sovereignBridgeLine: String?
@@ -372,7 +380,11 @@ extension DecisionEBrainKernelFrame {
             hotColdMap: foldedLung.hotColdMap,
             precisionProfile: foldedLung.precisionProfile,
             lungState: foldedLung.lungState,
+            thermalExchange: foldedLung.thermalExchange,
             breathScheduler: foldedLung.breathScheduler,
+            integrityWeave: foldedLung.integrityWeave,
+            organPackages: foldedLung.organPackages,
+            organDeltaPlan: foldedLung.organDeltaPlan,
             resumeFrame: foldedLung.resumeFrame,
             rollbackAnchor: foldedLung.rollbackAnchor,
             sovereignBridgeResult: foldedLung.sovereignBridgeResult
@@ -431,8 +443,12 @@ extension DecisionEBrainPresentationFrame {
             morphLine: foldedLung.morphLine,
             hotColdLine: foldedLung.hotColdLine,
             precisionLine: foldedLung.precisionLine,
+            organPackageLine: foldedLung.organPackageLine,
             lungLine: foldedLung.breathLine,
+            organDeltaLine: foldedLung.organDeltaLine,
+            thermalExchangeLine: foldedLung.thermalExchangeLine,
             schedulerLine: foldedLung.schedulerLine,
+            integrityWeaveLine: foldedLung.integrityWeaveLine,
             resumeLine: foldedLung.resumeLine,
             rollbackLine: foldedLung.rollbackLine,
             sovereignBridgeLine: foldedLung.sovereignBridgeLine,

@@ -63,6 +63,7 @@ struct DecisionIntentEnvelope: Codable, Equatable, Identifiable, Sendable {
     let promptSeed: String?
     let riskLevelRaw: String?
     let triggerReason: String?
+    let controlEntryKindID: String?
     let brainFingerprint: String?
     let requestedAt: Date
     let expiresAt: Date
@@ -77,6 +78,7 @@ struct DecisionIntentEnvelope: Codable, Equatable, Identifiable, Sendable {
         promptSeed: String? = nil,
         riskLevel: InterventionRiskLevel? = nil,
         triggerReason: String? = nil,
+        controlEntryKindID: String? = nil,
         brainFingerprint: String? = nil,
         requestedAt: Date = .now,
         expiresAt: Date? = nil
@@ -90,6 +92,7 @@ struct DecisionIntentEnvelope: Codable, Equatable, Identifiable, Sendable {
         self.promptSeed = promptSeed
         self.riskLevelRaw = riskLevel?.rawValue
         self.triggerReason = triggerReason
+        self.controlEntryKindID = controlEntryKindID
         self.brainFingerprint = brainFingerprint
         self.requestedAt = requestedAt
         self.expiresAt = expiresAt ?? requestedAt.addingTimeInterval(BeforePolicy.LaunchRequests.expirationInterval)
@@ -113,6 +116,10 @@ struct DecisionIntentEnvelope: Codable, Equatable, Identifiable, Sendable {
 
     var riskLevel: InterventionRiskLevel? {
         riskLevelRaw.flatMap(InterventionRiskLevel.init(rawValue:))
+    }
+
+    var controlEntryKind: DecisionEvolutionWidgetControlEntryKind? {
+        controlEntryKindID.flatMap(DecisionEvolutionWidgetControlEntryKind.init(rawValue:))
     }
 
     var sanitizedPromptSeed: String {
@@ -183,10 +190,12 @@ struct DecisionIntentEnvelope: Codable, Equatable, Identifiable, Sendable {
         entrySource: EntrySource,
         promptSeed: String? = nil,
         triggerReason: String? = nil,
+        controlEntryKindID: String? = nil,
         requestedAt: Date = .now,
         expiresAt: Date? = nil
     ) -> DecisionIntentEnvelope {
         let cleanedTriggerReason = cleanedSeed(triggerReason)
+        let controlEntryKind = controlEntryKindID.flatMap(DecisionEvolutionWidgetControlEntryKind.init(rawValue:))
         return DecisionIntentEnvelope(
             kind: .openEvolutionControl,
             sourceSurface: entrySource.intentSourceSurface,
@@ -196,7 +205,8 @@ struct DecisionIntentEnvelope: Codable, Equatable, Identifiable, Sendable {
             riskLevel: .medium,
             triggerReason: cleanedTriggerReason?.isEmpty == false
                 ? cleanedTriggerReason
-                : entrySource.defaultEvolutionControlTriggerReason,
+                : entrySource.defaultEvolutionControlTriggerReason(for: controlEntryKind),
+            controlEntryKindID: controlEntryKind?.rawValue,
             requestedAt: requestedAt,
             expiresAt: expiresAt
         )
@@ -303,11 +313,34 @@ extension EntrySource {
     }
 
     var defaultEvolutionControlTriggerReason: String {
-        switch self {
-        case .watch:
+        defaultEvolutionControlTriggerReason(for: nil)
+    }
+
+    func defaultEvolutionControlTriggerReason(
+        for controlEntryKind: DecisionEvolutionWidgetControlEntryKind?
+    ) -> String {
+        switch (self, controlEntryKind) {
+        case (.watch, .some(.audit)):
+            "A watch audit alert asked the iPhone brain to inspect evolution findings."
+        case (.watch, .some(.review)):
+            "A watch glance asked the iPhone brain to review pending evolution checkpoints."
+        case (.watch, .some(.control)):
+            "A watch control alert asked the iPhone brain to inspect evolution guardrails."
+        case (.watch, .some(.rollback)):
+            "A watch rollback alert asked the iPhone brain to restore the rollback-ready checkpoint."
+        case (_, .some(.audit)):
+            "Inspect evolution audit findings from \(label)."
+        case (_, .some(.review)):
+            "Review pending evolution checkpoints from \(label)."
+        case (_, .some(.control)):
+            "Inspect evolution guardrails from \(label)."
+        case (_, .some(.rollback)):
+            "Restore rollback-ready evolution state from \(label)."
+        case (.watch, _):
             "A watch glance asked the iPhone brain to open Evolution Control."
         default:
             "Open Evolution Control from \(label)."
         }
     }
+
 }

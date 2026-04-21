@@ -10,7 +10,15 @@
 >
 > `L7 v∞` 目标态固定为：`Cognitive Dissection Field / MirrorDraft / Canonical Cognitive Frame`。详见 [EBRAIN_L7_MIRROR_BLADE_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L7_MIRROR_BLADE_TARGET_VINF.md)。该文档只定义理想完全体白皮书，不改写当前 repo 仍以 `BASDecomposeFrame / DecomposeFrame` 与 mirror/decompose Alpha 基线为准的执行口径。
 >
+> `L9 v∞` 目标态固定为：`Finite Dream Orbit Field / 有限认知环流场`。详见 [EBRAIN_L9_DREAM_LOOP_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L9_DREAM_LOOP_TARGET_VINF.md) 与 [EBRAIN_L9_DREAM_LOOP_ROADMAP.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L9_DREAM_LOOP_ROADMAP.md)。这两份文档分别用于定义 `L9` 的理想完全体白皮书与 repo-real 路线，不改写当前 repo 仍以 `BASThoughtFrame / BASCandidateFrontier / BASCounterfactualBundle` 为主的 `Alpha` 执行口径。
+>
+> `L10 v∞` 目标态固定为：`Tri-Self Constitutional Court / 可承担选择法庭`。详见 [EBRAIN_L10_TRI_SELF_COURT_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L10_TRI_SELF_COURT_TARGET_VINF.md) 与 [EBRAIN_L10_TRI_SELF_COURT_ROADMAP.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L10_TRI_SELF_COURT_ROADMAP.md)。这两份文档分别用于定义 `L10` 的理想完全体白皮书与 repo-real 路线，不改写当前 repo 仍以 `BASTriSelfScore / BASMergedChoice / lightweight tri-self scoring scaffold` 为主的脚手架执行口径。
+>
+> `L13 v∞` 目标态固定为：`Evolution Furnace Field / 受主权约束的进化熔炉场`。详见 [EBRAIN_L13_EVOLUTION_FURNACE_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L13_EVOLUTION_FURNACE_TARGET_VINF.md)、[EBRAIN_L13_EVOLUTION_FURNACE_FULL_BODY_MASTER_SPEC.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L13_EVOLUTION_FURNACE_FULL_BODY_MASTER_SPEC.md) 与 [EBRAIN_L13_EVOLUTION_FURNACE_FULL_BODY_ROADMAP.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L13_EVOLUTION_FURNACE_FULL_BODY_ROADMAP.md)。前三者分别对应目标态白皮书、完整工程规范与 repo-real 路线图；另有 [2026-04-19-l13-evolution-governance-spine-stage-1-design.md](/Users/changgeng/Project/Project06/Project06/docs/superpowers/specs/2026-04-19-l13-evolution-governance-spine-stage-1-design.md) 与 [2026-04-19-l13-evolution-governance-spine-stage-1.md](/Users/changgeng/Project/Project06/Project06/docs/superpowers/plans/2026-04-19-l13-evolution-governance-spine-stage-1.md) 这两份 shipped `Stage 1` design/plan artifacts 共同支撑当前已交付治理骨架。它们一起构成 L13 的四段式入口 taxonomy：`target-state whitepaper`、`full-body master spec`、`full-body roadmap`、`shipped Stage 1 design/plan docs`，且不改写当前 repo 仍以 `UpdateTicket / governed candidate spine / checkpoint lineage / promotion gate` 为主、并已落地 `Stage 1 governance spine` 的执行口径。
+>
 > `L14` 的 `v1` 执行规范与 `v∞` 目标态白皮书，详见 [EBRAIN_L14_BLACK_RING_SPEC_V1.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L14_BLACK_RING_SPEC_V1.md) 与 [EBRAIN_L14_BLACK_RING_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L14_BLACK_RING_TARGET_VINF.md)。这两份文档分别用于约束主权绝断层的当前工程规范与理想完全体目标态。
+
+当前仓库继续采用 `L1-L13` 作为公开主执行栈命名；`L14` 保留为隐藏 sovereign layer / 外覆主权层，不作为普通并列主层参与公开 13 层计数。
 
 ## 附录A：关键路径排期表
 
@@ -25,12 +33,12 @@
 | `WP6` | 3周 | `WP0`, `WP1` | `WP7`, `WP11` | 操控误报 | `M2` | `ContextFrame` 与 task/manipulation 基线达标 |
 | `WP7` | 4周 | `WP6` | `WP8`, `WP9` | unknowns 诚实性 | `M2` | `DecomposeFrame`、镜像、矛盾检测稳定 |
 | `WP9` | 5周 | `WP1`, `WP7` | `WP10`, `WP11` | 死循环/绕圈 | `M2-M3` | 至少 2 路候选，收敛/停止条件稳定 |
-| `WP11` | 5周 | `WP6`, `WP7`, `WP9` | `WP10`, `WP16` | GSI 精度与校准 | `M2-M3` | `RiskCard`、`ActionPermit`、block/delay/replace 主链稳定 |
-| `WP12` | 3周 | `WP5`, `WP9`, `WP11` | `WP18` | 阻断后的替代动作设计 | `M2-M3` | 五种输出模式可切换且不削弱边界 |
+| `WP11` | 5周 | `WP6`, `WP7`, `WP9` | `WP10`, `WP16` | GSI 精度与校准 | `M2-M3` | `RiskCard / ActionPermit` 兼容主链稳定，`RiskField / RiskDecisionPackage` 与动作模态晶格并行投影进入 runtime |
+| `WP12` | 3周 | `WP5`, `WP9`, `WP11` | `WP18` | 阻断后的替代动作设计 | `M2-M3` | 五模式 protective rendering scaffold 可切换且不削弱边界 |
 | `WP3` | 5周 | `WP1`, `WP2` | `WP8`, `WP17` | ThoughtFold 恢复率、主权回滚锚一致性 | `M4-M6` | 热启动、状态折页、`Breath-Fold-Resume` 锚稳定 |
 | `WP8` | 5周 | `WP5`, `WP7` | `WP3`, `WP13` | 记忆冲突与晋升 | `M4` | 热/温/冷、冲突引擎与审计回放可用 |
 | `WP10` | 4周 | `WP5`, `WP9` | `WP11`, `WP12` | 过度保守 | `M4` | TriSelf 融合与 veto 原因码稳定 |
-| `WP13` | 4周 | `WP5`, `WP8`, `WP11` | `WP15` | 在线学习失控 | `M4-M7` | `UpdateTicket`、写入闸门、离线导出可用 |
+| `WP13` | 4周 | `WP5`, `WP8`, `WP11` | `WP15` | 在线学习失控 | `M4-M7` | governed candidate spine、`shadow trial / seal / retraction` 闸门、离线导出桥可用 |
 | `WP4` | 8周 | `WP0`, `WP14` | `WP2`, `WP15` | 过拒率与语言退化 | `M1-M5` | 基座结构/反事实/边界课程收益明确 |
 | `WP14` | 6周 | `WP0` | `WP4`, `WP15`, `WP16` | hard negatives 质量 | `M0-M3` | 数据规范、煤气灯集、冲突集齐备 |
 | `WP15` | 8周 | `WP2`, `WP4`, `WP13`, `WP14` | `WP16` | 蒸馏保真度 | `M5-M6` | 教师编排、蒸馏、QAT 路线打通 |
@@ -85,6 +93,7 @@
 - `HostProfile`
 - `HostRhythmProfile`
 - `RiskCard`
+- `RiskDecisionPackage`
 - `ActionPermit`
 - `UpdateTicket`
 
@@ -100,6 +109,15 @@
 - `MemoryAtom`
 - `MemoryBundle`
 - `RuleCandidate`
+- `ExperienceCandidate`
+- `ShadowTrialRecord`
+- `VersionDelta`
+- `WorkflowCandidate`
+- `GuardTemplateCandidate`
+- `BiasRecord`
+- `RetractionOrder`
+- `LearningExportBundle`
+- `EvolutionSeal`
 - `ContextFrame`
 - `DecomposeFrame`
 - `CandidatePath`
@@ -109,12 +127,26 @@
 - `ThoughtFold`
 - `MorphGraph`
 - `PrecisionProfile`
+- `OrganPackage`
+- `OrganDeltaPlan`
 - `ResumeFrame`
 - `RollbackAnchor`
 - `LungState`
 - `TriSelfScore`
 - `MergedChoice`
 - `RenderedOutput`
+- `HazardVector`
+- `HarmRadiusMap`
+- `ReversibilityProfile`
+- `EvidenceSufficiency`
+- `GSITrace`
+- `VulnerabilityCoupling`
+- `ActionModeDecision`
+- `DelayReservation`
+- `ProtectiveSubstitute`
+- `SovereignEscalationHint`
+- `RiskField`
+- `RiskDecisionPackage`
 - `RiskCard`
 - `ActionPermit`
 - `UpdateTicket`
@@ -133,7 +165,7 @@
   当前版测试、向后兼容测试、迁移测试、回滚测试。
 - 生产回滚时，必须能把最新快照恢复到上一稳定 schema，而不破坏回放能力。
 
-当前 registry 已治理 `44` 个对象。下面这张表保留的是高风险主链对象的最低测试要求；其余对象继续按 registry 中定义的 `current / backward / rollback` 约束执行。
+当前 registry 已治理 `121` 个对象。下面这张表保留的是高风险主链对象的最低测试要求；其余对象继续按 registry 中定义的 `current / backward / rollback` 约束执行。
 
 需要特别区分：
 
@@ -143,7 +175,7 @@
 对应的全量治理哨兵已经在 `BASEBrainSchemaGovernanceRegistryTests` 中落地，负责锁定：
 
 - registry 唯一性
-- `44` 个治理对象的完整覆盖
+- `121` 个治理对象的完整覆盖
 - compatibility / deprecation / rollback 元数据
 - 所有治理对象与真实 `currentSchemaVersion` 的版本对齐
 
@@ -154,6 +186,8 @@
 | 对象 | 当前版测试 | 向后兼容测试 | 回滚测试 |
 | --- | --- | --- | --- |
 | `ContextFrame` | `schema.context.current` | `schema.context.backward` | `schema.context.rollback` |
+| `RiskField` | `schema.risk_field.current` | `schema.risk_field.backward` | `schema.risk_field.rollback` |
+| `RiskDecisionPackage` | `schema.risk_decision_package.current` | `schema.risk_decision_package.backward` | `schema.risk_decision_package.rollback` |
 | `RiskCard` | `schema.risk.current` | `schema.risk.backward` | `schema.risk.rollback` |
 | `ActionPermit` | `schema.permit.current` | `schema.permit.backward` | `schema.permit.rollback` |
 | `HostProfile` | `schema.host.current` | `schema.host.backward` | `schema.host.rollback` |
@@ -166,6 +200,15 @@
 | `RollbackAnchor` | `schema.rollback_anchor.current` | `schema.rollback_anchor.backward` | `schema.rollback_anchor.rollback` |
 | `LungState` | `schema.lung_state.current` | `schema.lung_state.backward` | `schema.lung_state.rollback` |
 | `UpdateTicket` | `schema.ticket.current` | `schema.ticket.backward` | `schema.ticket.rollback` |
+| `ExperienceCandidate` | `schema.experience_candidate.current` | `schema.experience_candidate.backward` | `schema.experience_candidate.rollback` |
+| `ShadowTrialRecord` | `schema.shadow_trial.current` | `schema.shadow_trial.backward` | `schema.shadow_trial.rollback` |
+| `VersionDelta` | `schema.version_delta.current` | `schema.version_delta.backward` | `schema.version_delta.rollback` |
+| `WorkflowCandidate` | `schema.workflow_candidate.current` | `schema.workflow_candidate.backward` | `schema.workflow_candidate.rollback` |
+| `GuardTemplateCandidate` | `schema.guard_template_candidate.current` | `schema.guard_template_candidate.backward` | `schema.guard_template_candidate.rollback` |
+| `BiasRecord` | `schema.bias_record.current` | `schema.bias_record.backward` | `schema.bias_record.rollback` |
+| `RetractionOrder` | `schema.retraction_order.current` | `schema.retraction_order.backward` | `schema.retraction_order.rollback` |
+| `LearningExportBundle` | `schema.learning_export_bundle.current` | `schema.learning_export_bundle.backward` | `schema.learning_export_bundle.rollback` |
+| `EvolutionSeal` | `schema.evolution_seal.current` | `schema.evolution_seal.backward` | `schema.evolution_seal.rollback` |
 
 ## 附录D：安全、隐私与回退预案
 
@@ -241,15 +284,15 @@
 | --- | --- | --- | --- | --- |
 | `WP1 灯芯层` | `DeviceState`, `BudgetFrame`, `WakeIntent`, `VitalState`, `RunLease` | `BASHostKitTests`, `BASEBrainSchemaCoreTests`, 真机热/低电量构建回归 | Runtime Lead | 高风险 turn 不会越预算，lease / recovery 不绕开风闸 |
 | `WP2 脑肉层` | `Scout/Core`, `ThoughtFrame`, 多头输出 | `DecisionIntelligenceCoordinatorTests`, `OnDeviceIntelligenceSessionTests` | Model Lead | 前哨误分流可测，结构头输出稳定 |
-| `WP3 折叠肺` | `ThoughtFold`, `MorphGraph`, `PrecisionProfile`, `ResumeFrame`, `RollbackAnchor`, `LungState`, `EvolutionFoldedLungSummary`, 热启动, cache | `BASEBrainSchemaCoreTests`, `BASEBrainSchemaGovernanceRegistryTests`, `BASEBrainProgramBlueprintTests`, `DecisionSessionEngineTests`, `DecisionTestingInterfaceTests`, `DeveloperDecisionReplayBuilderTests`, `DecisionFoldedLungTests` | Compression Lead | 恢复一致性、热启动、写入链、`Breath-Fold-Resume` 与主权桥稳定 |
+| `WP3 折叠肺` | `ThoughtFold`, `MorphGraph`, `PrecisionProfile`, `OrganPackage`, `OrganDeltaPlan`, `ResumeFrame`, `RollbackAnchor`, `LungState`, `EvolutionFoldedLungSummary`, 热启动, cache | `BASEBrainSchemaCoreTests`, `BASEBrainSchemaGovernanceRegistryTests`, `BASEBrainProgramBlueprintTests`, `DecisionSessionEngineTests`, `DecisionTestingInterfaceTests`, `DeveloperDecisionReplayBuilderTests`, `DecisionFoldedLungTests` | Compression Lead | 恢复一致性、热启动、写入链、`Breath-Fold-Resume`、器官增量装载 contract 与主权桥稳定 |
 | `WP5 宿纹层` | `HostProfile`, `HostVersion`, `HostRhythmProfile` | `BeforeProductCompatibilityTests`, `DecisionEvolutionEngineTests` | Host & Memory Lead | 当前 repo 的版本、删除、冻结、回滚、宿主隔离可验证；`Host Constitution Fabric` 另走 target-state 路线 |
 | `WP6-L7` | `ContextFrame`, `DecomposeFrame` | `DecisionTestingInterfaceTests`, `DecisionCapabilityCoverageBuilderTests` | Loop Lead | 情境/镜像/矛盾检测能进入统一 export |
 | `WP8 海马井` | `MemoryAtom`, `MemoryBundle` | `DecisionEvolutionEngineTests`, `BASEvolutionCoreTests` | Host & Memory Lead | 热温冷/冲突/回放不漂移 |
 | `WP9 梦环层` | `ThoughtFrame`, `CandidatePath`, `ForecastItem`, `CritiqueItem` | `DecisionTestingInterfaceTests`, `DecisionEvolutionMutationIntentTests` | Loop Lead | 收敛、停止条件、候选排序稳定 |
 | `WP10 三我庭` | `TriSelfScore`, `MergedChoice` | `DecisionEvolutionMutationIntentTests`, `DecisionCapabilityCoverageBuilderTests` | Loop Lead | veto 与融合逻辑可解释、可回归 |
-| `WP11 风闸层` | `RiskCard`, `ActionPermit`, `GSI` | `BehavioralAISubstrateBridgeTests`, `DecisionEvolutionKillSwitchStoreTests`, 风险专项回归 | Risk Lead | block / delay / replace 不可被宿主绕过 |
-| `WP12 柔手层` | `RenderedOutput` | `DecisionTestingInterfaceTests`, `DecisionEvolutionOperatorSnapshotTests` | Product Lead | 输出模式切换稳定，边界与语气协同 |
-| `WP13 蜕变炉` | `UpdateTicket`, `RuleCandidate`, lineage | `DecisionEvolutionEngineTests`, `BASAppleEvolutionCheckpointWriterTests`, `BASEvolutionCoreTests` | Host & Memory Lead | 长期写入只能经票据链和 checkpoint |
+| `WP11 风闸层` | `RiskField`, `RiskDecisionPackage`, `RiskCard`, `ActionPermit`, `GSITrace` | `BehavioralAISubstrateBridgeTests`, `DecisionEvolutionKillSwitchStoreTests`, `BASEBrainSchemaCoreTests`, 风险专项回归 | Risk Lead | `compare / delay / replace / block + escalate` 晶格、四域权限拆分、主权升级提示都不可被宿主绕过 |
+| `WP12 柔手层` | `RenderedOutput` | `DecisionTestingInterfaceTests`, `DecisionEvolutionOperatorSnapshotTests` | Product Lead | 五模式 protective rendering 稳定，边界与语气协同 |
+| `WP13 蜕变炉` | `UpdateTicket`, `ExperienceCandidate`, `ShadowTrialRecord`, `VersionDelta`, `RetractionOrder`, `EvolutionSeal`, lineage | `DecisionEvolutionEngineTests`, `BASAppleEvolutionCheckpointWriterTests`, `BASEvolutionCoreTests`, `DeveloperDecisionReplayBuilderTests`, `BehavioralAISubstrateBridgeTests` | Host & Memory Lead | 长期写入与晋升只能经票据链、影子试演、主权封印与 checkpoint gate |
 | `WP16 评测红队` | `RuntimeTrace`, `EvalSample`, release gates | `BASEBrainProgramBlueprintTests`, `BASEBrainSchemaGovernanceRegistryTests`, 长会话/真机矩阵 | Evaluation Lead | 指标、红队、回放门禁可审计 |
 | `WP17 SDK/集成` | `DecisionTestingRuntimeExport`, `DecisionSystemFlightDeck`, watch/widget handoff | `BehavioralAISubstrateBridgeTests`, `DecisionIntentEnvelopeStoreTests`, `WidgetSnapshotStoreTests` | SDK Lead | 多 surface 共享同一事实源，不同屏不漂移 |
 | `Schema governance sentinel` | `BASSchemaGovernanceEntry`, `BASEBrainSchemaGovernanceRegistry` | `BASEBrainSchemaGovernanceRegistryTests`, `BASEBrainSchemaCoreTests`, `BASEBrainProgramBlueprintTests` | Chief Architect + Evaluation Lead | unknown object lookup、registry uniqueness、compatibility / migration / rollback 元数据、全量版本对齐全部可回归 |

@@ -8,6 +8,19 @@ struct DecisionEvolutionReleaseSummaryPresentation: Equatable, Sendable {
     let rollbackReadyCount: Int
     let headline: String
     let primaryReason: String?
+    let sovereignPostureTitle: String?
+    let sovereignPostureLines: [String]
+    let horizonDiagnosticsTitle: String?
+    let horizonDiagnosticsLines: [String]
+    let foldedLungTitle: String?
+    let foldedLungLines: [String]
+    let furnaceContributionTitle: String?
+    let furnaceContributionLines: [String]
+    let furnaceChecklistTitle: String?
+    let furnaceChecklistLines: [String]
+    let furnaceNextStepTitle: String?
+    let furnaceNextStepDetail: String?
+    let furnaceWorkbenchPresentation: DecisionEvolutionFurnaceWorkbenchPresentation?
     let activeCheckpointHeadline: String?
     let reviewCheckpointHeadline: String?
     let activeSourceText: String?
@@ -53,6 +66,7 @@ struct DecisionEvolutionReleaseSummaryView: View {
     let surfaceContract: DecisionEvolutionSurfaceContract
     let presentationMode: DecisionEvolutionReleaseSummaryPresentationMode
     let navigationOptions: DecisionEvolutionNavigationSurfaceOptions
+    let onFocusMutationHub: ((DecisionEvolutionMutationHubFocusTarget) -> Void)?
     let afterMutation: (() -> Void)?
 
     private struct PendingMutation: Identifiable {
@@ -67,6 +81,7 @@ struct DecisionEvolutionReleaseSummaryView: View {
         surfaceContract: DecisionEvolutionSurfaceContract,
         presentationMode: DecisionEvolutionReleaseSummaryPresentationMode = .surface,
         navigationOptions: DecisionEvolutionNavigationSurfaceOptions? = nil,
+        onFocusMutationHub: ((DecisionEvolutionMutationHubFocusTarget) -> Void)? = nil,
         afterMutation: (() -> Void)? = nil
     ) {
         self.releaseSummary = releaseSummary
@@ -74,6 +89,7 @@ struct DecisionEvolutionReleaseSummaryView: View {
         self.surfaceContract = surfaceContract
         self.presentationMode = presentationMode
         self.navigationOptions = navigationOptions ?? surfaceContract.navigationSurfaceOptions()
+        self.onFocusMutationHub = onFocusMutationHub
         self.afterMutation = afterMutation
     }
 
@@ -90,6 +106,21 @@ struct DecisionEvolutionReleaseSummaryView: View {
             controlSurface: controlSurface,
             surfaceContract: surfaceContract,
             navigationOptions: navigationOptions
+        )
+    }
+
+    private var furnaceNextStepActionPresentation: DecisionEvolutionFurnaceNextStepActionPresentation? {
+        DecisionEvolutionFurnaceNextStepActionSupport.build(
+            detail: presentation.furnaceNextStepDetail,
+            surfaceContract: surfaceContract
+        )
+    }
+
+    private var furnaceWorkbenchRunNowActionPresentation: DecisionEvolutionFurnaceRunNowActionPresentation? {
+        DecisionEvolutionFurnaceRunNowActionSupport.build(
+            detail: presentation.furnaceWorkbenchPresentation?.detail,
+            controlSurface: controlSurface,
+            surfaceContract: surfaceContract
         )
     }
 
@@ -110,6 +141,174 @@ struct DecisionEvolutionReleaseSummaryView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
+            }
+
+            if let sovereignPostureTitle = presentation.sovereignPostureTitle,
+               !presentation.sovereignPostureLines.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(sovereignPostureTitle)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.ember)
+
+                    ForEach(presentation.sovereignPostureLines, id: \.self) { line in
+                        Text(line)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+                }
+            }
+
+            if let horizonDiagnosticsTitle = presentation.horizonDiagnosticsTitle,
+               !presentation.horizonDiagnosticsLines.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(horizonDiagnosticsTitle)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.ink)
+
+                    ForEach(presentation.horizonDiagnosticsLines, id: \.self) { line in
+                        Text(line)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+                }
+            }
+
+            if let foldedLungTitle = presentation.foldedLungTitle,
+               !presentation.foldedLungLines.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(foldedLungTitle)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.blue)
+
+                    ForEach(presentation.foldedLungLines, id: \.self) { line in
+                        Text(line)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+                }
+            }
+
+            if let furnaceContributionTitle = presentation.furnaceContributionTitle,
+               !presentation.furnaceContributionLines.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(furnaceContributionTitle)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.moss)
+
+                    ForEach(presentation.furnaceContributionLines, id: \.self) { line in
+                        Text(line)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+                }
+            }
+
+            if let furnaceChecklistTitle = presentation.furnaceChecklistTitle,
+               !presentation.furnaceChecklistLines.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(furnaceChecklistTitle)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.ember)
+
+                    ForEach(presentation.furnaceChecklistLines, id: \.self) { line in
+                        Text(line)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+                }
+            }
+
+            if let furnaceNextStepTitle = presentation.furnaceNextStepTitle,
+               let furnaceNextStepDetail = presentation.furnaceNextStepDetail {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(furnaceNextStepTitle)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.ember)
+
+                    Text(furnaceNextStepDetail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+
+                    if let furnaceNextStepActionPresentation {
+                        BeforeActionButton(
+                            furnaceNextStepActionPresentation.actionTitle,
+                            style: surfaceContract.routesMutationsToControlCenter ? .primary : .secondary
+                        ) {
+                            performFurnaceNextStepAction(furnaceNextStepActionPresentation)
+                        }
+                    }
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(BeforeTheme.ember.opacity(0.08))
+                )
+            }
+
+            if let furnaceWorkbenchPresentation = presentation.furnaceWorkbenchPresentation {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(furnaceWorkbenchPresentation.title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.moss)
+
+                    Text(furnaceWorkbenchPresentation.headline)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.ink)
+
+                    Text(furnaceWorkbenchPresentation.detail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+
+                    Text(furnaceWorkbenchPresentation.availabilityTitle)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    ForEach(furnaceWorkbenchPresentation.availabilityLines, id: \.self) { line in
+                        Text(line)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+
+                    if let furnaceWorkbenchRunNowActionPresentation {
+                        HStack(spacing: 10) {
+                            BeforeActionButton(
+                                furnaceWorkbenchRunNowActionPresentation.actionTitle,
+                                style: .primary
+                            ) {
+                                presentMutation(furnaceWorkbenchRunNowActionPresentation.intent)
+                            }
+
+                            if let furnaceNextStepActionPresentation {
+                                BeforeActionButton(
+                                    furnaceNextStepActionPresentation.actionTitle,
+                                    style: .secondary
+                                ) {
+                                    performFurnaceNextStepAction(furnaceNextStepActionPresentation)
+                                }
+                            }
+                        }
+                    } else if let furnaceNextStepActionPresentation {
+                        BeforeActionButton(
+                            furnaceNextStepActionPresentation.actionTitle,
+                            style: .secondary
+                        ) {
+                            performFurnaceNextStepAction(furnaceNextStepActionPresentation)
+                        }
+                    }
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(BeforeTheme.moss.opacity(0.08))
+                )
             }
 
             if presentationMode.showsCheckpointHeadlines {
@@ -249,6 +448,17 @@ struct DecisionEvolutionReleaseSummaryView: View {
         pendingMutation = PendingMutation(intent: intent) {
             appModel.performEvolutionMutation(intent)
             afterMutation?()
+        }
+    }
+
+    private func performFurnaceNextStepAction(
+        _ action: DecisionEvolutionFurnaceNextStepActionPresentation
+    ) {
+        switch action.kind {
+        case .navigate(let destination):
+            destination.perform(using: appModel)
+        case .focusMutationHub(let focusTarget):
+            onFocusMutationHub?(focusTarget)
         }
     }
 }

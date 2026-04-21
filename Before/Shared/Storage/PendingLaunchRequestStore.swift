@@ -139,9 +139,12 @@ struct PendingLaunchRequest: Codable, Sendable, Equatable {
 
 private struct PendingLaunchRequestEnvelope: Codable, Equatable {
     var id: UUID
+    var kindRaw: String?
     var entrySource: EntrySource
     var preferredModeRaw: String?
     var scenarioRaw: String?
+    var triggerReason: String?
+    var controlEntryKindID: String?
     var requestedAt: Date
     var expiresAt: Date
     var schemaVersion: Int
@@ -149,9 +152,12 @@ private struct PendingLaunchRequestEnvelope: Codable, Equatable {
 
     init(request: PendingLaunchRequest, preservingProtectedPayload: Bool = true) {
         self.id = request.id
+        self.kindRaw = nil
         self.entrySource = request.entrySource
         self.preferredModeRaw = request.preferredModeRaw
         self.scenarioRaw = request.scenarioRaw
+        self.triggerReason = nil
+        self.controlEntryKindID = nil
         self.requestedAt = request.requestedAt
         self.expiresAt = request.expiresAt
         self.schemaVersion = request.schemaVersion
@@ -160,9 +166,12 @@ private struct PendingLaunchRequestEnvelope: Codable, Equatable {
 
     init(envelope: DecisionIntentEnvelope, preservingProtectedPayload: Bool = true) {
         self.id = envelope.id
+        self.kindRaw = envelope.kind.rawValue
         self.entrySource = envelope.entrySource
         self.preferredModeRaw = envelope.preferredModeRaw
         self.scenarioRaw = envelope.scenarioRaw
+        self.triggerReason = envelope.triggerReason
+        self.controlEntryKindID = envelope.controlEntryKindID
         self.requestedAt = envelope.requestedAt
         self.expiresAt = envelope.expiresAt
         self.schemaVersion = BeforePolicy.LaunchRequests.schemaVersion
@@ -381,7 +390,9 @@ enum PendingLaunchRequestStore {
         _ envelope: PendingLaunchRequestEnvelope
     ) -> DecisionIntentEnvelope {
         let kind: DecisionIntentKind
-        if envelope.scenario != nil {
+        if let storedKind = envelope.kindRaw.flatMap(DecisionIntentKind.init(rawValue:)) {
+            kind = storedKind
+        } else if envelope.scenario != nil {
             kind = .quickCapture
         } else if envelope.preferredMode != nil {
             kind = .openMode
@@ -397,6 +408,8 @@ enum PendingLaunchRequestStore {
             preferredMode: envelope.preferredMode,
             scenario: envelope.scenario,
             promptSeed: protectedPrompt(for: envelope),
+            triggerReason: envelope.triggerReason,
+            controlEntryKindID: envelope.controlEntryKindID,
             requestedAt: envelope.requestedAt,
             expiresAt: envelope.expiresAt
         )

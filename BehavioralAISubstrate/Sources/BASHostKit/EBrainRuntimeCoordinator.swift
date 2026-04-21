@@ -43,6 +43,7 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
     public var emergencyBrake: BASEmergencyBrake
     public var sovereignVerdict: BASSovereignVerdict?
     public var sovereignCommitTokens: [BASSovereignCommitToken]
+    public var sovereignWarrants: [BASSovereignWarrant]
     public var sovereignLock: BASSovereignLock?
     public var quarantineRecords: [BASQuarantineRecord]
     public var sovereignAuditEntry: BASSovereignAuditEntry?
@@ -64,9 +65,20 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
     public var mergedChoice: BASMergedChoice
     public var riskCard: BASRiskCard
     public var actionPermit: BASActionPermit
+    public var riskDecisionPackage: BASRiskDecisionPackage?
     public var hostGateValue: Double
     public var renderedOutput: BASRenderedOutput
     public var updateTickets: [BASUpdateTicket]
+    public var experienceCandidates: [BASExperienceCandidate]
+    public var workflowCandidates: [BASWorkflowCandidate]
+    public var guardTemplateCandidates: [BASGuardTemplateCandidate]
+    public var biasRecords: [BASBiasRecord]
+    public var riskPatternCandidates: [BASRiskPatternCandidate]
+    public var learningExportBundles: [BASLearningExportBundle]
+    public var shadowTrialRecords: [BASShadowTrialRecord]
+    public var versionDeltas: [BASVersionDelta]
+    public var retractionOrders: [BASRetractionOrder]
+    public var evolutionSeals: [BASEvolutionSeal]
     public var runtimeTrace: BASRuntimeTrace
 
     public init(
@@ -81,6 +93,7 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         ),
         sovereignVerdict: BASSovereignVerdict? = nil,
         sovereignCommitTokens: [BASSovereignCommitToken] = [],
+        sovereignWarrants: [BASSovereignWarrant] = [],
         sovereignLock: BASSovereignLock? = nil,
         quarantineRecords: [BASQuarantineRecord] = [],
         sovereignAuditEntry: BASSovereignAuditEntry? = nil,
@@ -102,9 +115,20 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         mergedChoice: BASMergedChoice,
         riskCard: BASRiskCard,
         actionPermit: BASActionPermit,
+        riskDecisionPackage: BASRiskDecisionPackage? = nil,
         hostGateValue: Double,
         renderedOutput: BASRenderedOutput,
         updateTickets: [BASUpdateTicket],
+        experienceCandidates: [BASExperienceCandidate] = [],
+        workflowCandidates: [BASWorkflowCandidate] = [],
+        guardTemplateCandidates: [BASGuardTemplateCandidate] = [],
+        biasRecords: [BASBiasRecord] = [],
+        riskPatternCandidates: [BASRiskPatternCandidate] = [],
+        learningExportBundles: [BASLearningExportBundle] = [],
+        shadowTrialRecords: [BASShadowTrialRecord] = [],
+        versionDeltas: [BASVersionDelta] = [],
+        retractionOrders: [BASRetractionOrder] = [],
+        evolutionSeals: [BASEvolutionSeal] = [],
         runtimeTrace: BASRuntimeTrace
     ) {
         self.deviceState = deviceState
@@ -115,6 +139,7 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         self.emergencyBrake = emergencyBrake
         self.sovereignVerdict = sovereignVerdict
         self.sovereignCommitTokens = sovereignCommitTokens
+        self.sovereignWarrants = sovereignWarrants
         self.sovereignLock = sovereignLock
         self.quarantineRecords = quarantineRecords
         self.sovereignAuditEntry = sovereignAuditEntry
@@ -136,9 +161,20 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         self.mergedChoice = mergedChoice
         self.riskCard = riskCard
         self.actionPermit = actionPermit
+        self.riskDecisionPackage = riskDecisionPackage
         self.hostGateValue = hostGateValue
         self.renderedOutput = renderedOutput
         self.updateTickets = updateTickets
+        self.experienceCandidates = experienceCandidates
+        self.workflowCandidates = workflowCandidates
+        self.guardTemplateCandidates = guardTemplateCandidates
+        self.biasRecords = biasRecords
+        self.riskPatternCandidates = riskPatternCandidates
+        self.learningExportBundles = learningExportBundles
+        self.shadowTrialRecords = shadowTrialRecords
+        self.versionDeltas = versionDeltas
+        self.retractionOrders = retractionOrders
+        self.evolutionSeals = evolutionSeals
         self.runtimeTrace = runtimeTrace
     }
 
@@ -151,6 +187,7 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         case emergencyBrake
         case sovereignVerdict
         case sovereignCommitTokens
+        case sovereignWarrants
         case sovereignLock
         case quarantineRecords
         case sovereignAuditEntry
@@ -172,9 +209,20 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         case mergedChoice
         case riskCard
         case actionPermit
+        case riskDecisionPackage
         case hostGateValue
         case renderedOutput
         case updateTickets
+        case experienceCandidates
+        case workflowCandidates
+        case guardTemplateCandidates
+        case biasRecords
+        case riskPatternCandidates
+        case learningExportBundles
+        case shadowTrialRecords
+        case versionDeltas
+        case retractionOrders
+        case evolutionSeals
         case runtimeTrace
     }
 
@@ -192,9 +240,53 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         mergedChoice = try container.decode(BASMergedChoice.self, forKey: .mergedChoice)
         riskCard = try container.decode(BASRiskCard.self, forKey: .riskCard)
         actionPermit = try container.decode(BASActionPermit.self, forKey: .actionPermit)
+        riskDecisionPackage = try container.decodeIfPresent(
+            BASRiskDecisionPackage.self,
+            forKey: .riskDecisionPackage
+        )
         hostGateValue = try container.decode(Double.self, forKey: .hostGateValue)
         renderedOutput = try container.decode(BASRenderedOutput.self, forKey: .renderedOutput)
         updateTickets = try container.decode([BASUpdateTicket].self, forKey: .updateTickets)
+        experienceCandidates = try container.decodeIfPresent(
+            [BASExperienceCandidate].self,
+            forKey: .experienceCandidates
+        ) ?? []
+        workflowCandidates = try container.decodeIfPresent(
+            [BASWorkflowCandidate].self,
+            forKey: .workflowCandidates
+        ) ?? []
+        guardTemplateCandidates = try container.decodeIfPresent(
+            [BASGuardTemplateCandidate].self,
+            forKey: .guardTemplateCandidates
+        ) ?? []
+        biasRecords = try container.decodeIfPresent(
+            [BASBiasRecord].self,
+            forKey: .biasRecords
+        ) ?? []
+        riskPatternCandidates = try container.decodeIfPresent(
+            [BASRiskPatternCandidate].self,
+            forKey: .riskPatternCandidates
+        ) ?? []
+        learningExportBundles = try container.decodeIfPresent(
+            [BASLearningExportBundle].self,
+            forKey: .learningExportBundles
+        ) ?? []
+        shadowTrialRecords = try container.decodeIfPresent(
+            [BASShadowTrialRecord].self,
+            forKey: .shadowTrialRecords
+        ) ?? []
+        versionDeltas = try container.decodeIfPresent(
+            [BASVersionDelta].self,
+            forKey: .versionDeltas
+        ) ?? []
+        retractionOrders = try container.decodeIfPresent(
+            [BASRetractionOrder].self,
+            forKey: .retractionOrders
+        ) ?? []
+        evolutionSeals = try container.decodeIfPresent(
+            [BASEvolutionSeal].self,
+            forKey: .evolutionSeals
+        ) ?? []
         runtimeTrace = try container.decode(BASRuntimeTrace.self, forKey: .runtimeTrace)
         wakeIntent = try container.decodeIfPresent(BASWakeIntent.self, forKey: .wakeIntent)
             ?? BASEBrainTurnResult.defaultWakeIntent(for: budgetFrame)
@@ -213,6 +305,10 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         sovereignCommitTokens = try container.decodeIfPresent(
             [BASSovereignCommitToken].self,
             forKey: .sovereignCommitTokens
+        ) ?? []
+        sovereignWarrants = try container.decodeIfPresent(
+            [BASSovereignWarrant].self,
+            forKey: .sovereignWarrants
         ) ?? []
         sovereignLock = try container.decodeIfPresent(
             BASSovereignLock.self,
@@ -270,6 +366,7 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         try container.encode(emergencyBrake, forKey: .emergencyBrake)
         try container.encodeIfPresent(sovereignVerdict, forKey: .sovereignVerdict)
         try container.encode(sovereignCommitTokens, forKey: .sovereignCommitTokens)
+        try container.encode(sovereignWarrants, forKey: .sovereignWarrants)
         try container.encodeIfPresent(sovereignLock, forKey: .sovereignLock)
         try container.encode(quarantineRecords, forKey: .quarantineRecords)
         try container.encodeIfPresent(sovereignAuditEntry, forKey: .sovereignAuditEntry)
@@ -291,9 +388,20 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         try container.encode(mergedChoice, forKey: .mergedChoice)
         try container.encode(riskCard, forKey: .riskCard)
         try container.encode(actionPermit, forKey: .actionPermit)
+        try container.encodeIfPresent(riskDecisionPackage, forKey: .riskDecisionPackage)
         try container.encode(hostGateValue, forKey: .hostGateValue)
         try container.encode(renderedOutput, forKey: .renderedOutput)
         try container.encode(updateTickets, forKey: .updateTickets)
+        try container.encode(experienceCandidates, forKey: .experienceCandidates)
+        try container.encode(workflowCandidates, forKey: .workflowCandidates)
+        try container.encode(guardTemplateCandidates, forKey: .guardTemplateCandidates)
+        try container.encode(biasRecords, forKey: .biasRecords)
+        try container.encode(riskPatternCandidates, forKey: .riskPatternCandidates)
+        try container.encode(learningExportBundles, forKey: .learningExportBundles)
+        try container.encode(shadowTrialRecords, forKey: .shadowTrialRecords)
+        try container.encode(versionDeltas, forKey: .versionDeltas)
+        try container.encode(retractionOrders, forKey: .retractionOrders)
+        try container.encode(evolutionSeals, forKey: .evolutionSeals)
         try container.encode(runtimeTrace, forKey: .runtimeTrace)
     }
 
@@ -354,8 +462,93 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
 }
 
 public extension BASEBrainTurnResult {
+    private func lineageSummaryTokens(
+        _ values: [String],
+        limit: Int = 4
+    ) -> String {
+        var seen = Set<String>()
+        let uniqueValues = values.filter { !$0.isEmpty && seen.insert($0).inserted }
+        guard uniqueValues.isEmpty == false else { return "no signals" }
+
+        let head = Array(uniqueValues.prefix(limit))
+        let remainingCount = uniqueValues.count - head.count
+        if remainingCount > 0 {
+            return head.joined(separator: ", ") + ", +\(remainingCount) more"
+        }
+        return head.joined(separator: ", ")
+    }
+
+    private func fingerprint(for value: String) -> String {
+        SHA256.hash(data: Data(value.utf8))
+            .compactMap { String(format: "%02x", $0) }
+            .joined()
+    }
+
     var evolutionLineageSummary: BASEvolutionLineageSummary {
-        let hostChangeCandidates = updateTickets.compactMap(\.hostChangeCandidate)
+        let hostChangeCandidates = updateTickets.compactMap(\.resolvedHostChangeCandidate)
+        let candidateTypeCounts = experienceCandidates.reduce(into: [String: Int]()) { counts, candidate in
+            counts[candidate.candidateType.rawValue, default: 0] += 1
+        }
+        let passedShadowTrialCount = shadowTrialRecords.filter(\.isPassed).count
+        let failedShadowTrialCount = shadowTrialRecords.filter(\.isFailed).count
+        let pendingShadowTrialCount = shadowTrialRecords.filter(\.isPending).count
+        let deniedSealCount = evolutionSeals.filter(\.isDenied).count
+        let pendingSealCount = evolutionSeals.filter(\.isPending).count
+        let pendingRetractionCount = retractionOrders.filter {
+            $0.executionState != "completed" && $0.executionState != "cleared"
+        }.count
+        let versionDeltaHighlights = Array(versionDeltas.prefix(2)).map { delta in
+            let targetRef = delta.afterRef
+            return [
+                "\(delta.targetType) \(targetRef)",
+                delta.rollbackRef.map { "rollback \($0)" }
+            ]
+            .compactMap { $0 }
+            .joined(separator: " • ")
+        }
+        let retractionOrderHighlights = Array(retractionOrders.prefix(2)).map { order in
+            let status = order.executionState.replacingOccurrences(of: "_", with: " ")
+            let targetRef = order.targetRefs.first ?? order.cascadeRefs.first ?? order.orderID
+            return [
+                "\(status) \(targetRef)",
+                order.reasonCodes.first.map { "reason \($0)" }
+            ]
+            .compactMap { $0 }
+            .joined(separator: " • ")
+        }
+        let pendingNurseryCandidateCount =
+            workflowCandidates.filter { $0.shadowTrialState == "pending" }.count
+            + guardTemplateCandidates.count
+            + biasRecords.count
+            + riskPatternCandidates.filter { $0.shadowTrialState == "pending" }.count
+        var blockedPromotionReasonCodes: [String] = []
+        if failedShadowTrialCount > 0 {
+            blockedPromotionReasonCodes.append("evolution.shadow_trial_failed")
+        }
+        if pendingShadowTrialCount > 0 {
+            blockedPromotionReasonCodes.append("evolution.shadow_trial_pending")
+        }
+        if deniedSealCount > 0 {
+            blockedPromotionReasonCodes.append("evolution.seal_denied")
+        }
+        if pendingSealCount > 0 {
+            blockedPromotionReasonCodes.append("evolution.seal_pending")
+        }
+        if pendingRetractionCount > 0 {
+            blockedPromotionReasonCodes.append("evolution.retraction_pending")
+        }
+        let dreamLoopSignalRefs = updateTickets
+            .flatMap(\.governanceRefs)
+            .filter { $0.hasPrefix("dream_loop:") }
+            .runtimeOrderedUniqueStrings()
+        let dreamLoopRemandTargets = (thoughtFrame.remandOrders ?? [])
+            .map(\.targetLayer)
+            .runtimeOrderedUniqueStrings()
+        let dreamLoopStoppingMode = thoughtFrame.convergenceCertificate?.stoppingMode.rawValue
+        let dreamLoopReservationMode = thoughtFrame.agencyReservation?.mode.rawValue
+        let dreamLoopMaxEvidenceDebtPercent = thoughtFrame.evidenceDebts?.map(\.debtWeight).max().map {
+            Int(($0 * 100).rounded())
+        }
         return BASEvolutionLineageSummary(
             recordedAt: runtimeTrace.recordedAt,
             sessionID: runtimeTrace.sessionID,
@@ -372,12 +565,20 @@ public extension BASEBrainTurnResult {
             activeKillSwitches: Array(runtimeTrace.activeKillSwitches.map(\.rawValue).prefix(4)),
             guardrailFindings: Array(runtimeTrace.guardrailFindings.map(\.summary).prefix(3)),
             recommendedKillSwitches: Array(runtimeTrace.recommendedKillSwitches.map(\.rawValue).prefix(3)),
+            stackedModes: Array((riskDecisionPackage?.actionModeDecision.stackedModes ?? actionPermit.stackedModes).map(\.rawValue).prefix(4)),
+            assertionCeiling: riskDecisionPackage?.actionPermit.assertionCeiling ?? actionPermit.assertionCeiling,
+            allowedDomains: Array((riskDecisionPackage?.actionPermit.allowedDomains ?? actionPermit.allowedDomains).prefix(6)),
+            blockedDomains: Array((riskDecisionPackage?.actionPermit.blockedDomains ?? actionPermit.blockedDomains).prefix(6)),
+            delayType: riskDecisionPackage?.delayReservation?.delayType ?? actionPermit.delayWindow ?? riskCard.delayType,
+            substituteType: riskDecisionPackage?.protectiveSubstitute?.substituteType ?? riskCard.substituteType,
+            sovereignHintLevel: riskDecisionPackage?.sovereignEscalationHint?.urgency ?? actionPermit.escalationHintRef ?? riskCard.sovereignHintLevel,
             wakeIntent: wakeIntent,
             vitalState: vitalState,
             runLease: runLease,
             emergencyBrake: emergencyBrake,
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,
+            sovereignWarrants: sovereignWarrants,
             sovereignLock: sovereignLock,
             quarantineRecords: quarantineRecords,
             sovereignAuditEntry: sovereignAuditEntry,
@@ -401,13 +602,35 @@ public extension BASEBrainTurnResult {
                 relationPattern: contextFrame.relationPattern,
                 ambiguityPercent: Int((contextFrame.ambiguityScore * 100).rounded()),
                 consequencePercent: Int((contextFrame.consequenceLevel * 100).rounded()),
-                manipulationHintCount: contextFrame.manipulationHints.count
+                manipulationHintCount: contextFrame.manipulationHints.count,
+                sceneType: contextFrame.sceneType.rawValue,
+                roleRelationClass: contextFrame.roleGeometry?.relationClass,
+                powerDirection: contextFrame.powerGradient?.direction,
+                powerStrengthPercent: contextFrame.powerGradient.map { Int(($0.strength * 100).rounded()) },
+                urgencyPercent: contextFrame.urgencyTruth.map { Int(($0.statedUrgency * 100).rounded()) },
+                routeMode: contextFrame.routeHint?.preferredMode,
+                guardRequired: contextFrame.routeHint?.needGuard,
+                continuityArc: contextFrame.continuityAnchor?.sceneArc
             ),
             cognitionSummary: BASEvolutionLineageSummary.CognitionSummary(
                 factCount: decomposeFrame.facts.count,
                 goalCount: decomposeFrame.goals.count,
+                claimCount: decomposeFrame.claimShards.isEmpty ? nil : decomposeFrame.claimShards.count,
                 unknownCount: decomposeFrame.unknowns.count,
                 contradictionCount: decomposeFrame.contradictions.count,
+                pressureSummary: decomposeFrame.pressureVectors.isEmpty
+                    ? nil
+                    : lineageSummaryTokens(decomposeFrame.pressureVectors.map { $0.kind.rawValue }),
+                manipulationSummary: decomposeFrame.manipulationPatterns.isEmpty
+                    ? nil
+                    : lineageSummaryTokens(decomposeFrame.manipulationPatterns.map { $0.kind.rawValue }),
+                boundarySummary: decomposeFrame.boundaryTouches.isEmpty
+                    ? nil
+                    : lineageSummaryTokens(
+                        decomposeFrame.boundaryTouches.map { "\($0.domain.rawValue):\($0.level.rawValue)" }
+                    ),
+                mirrorModeID: decomposeFrame.mirrorDraft?.mode.rawValue,
+                routeHint: decomposeFrame.canonicalFrame?.routeHint,
                 memoryAtomCount: memoryBundle.atoms.count,
                 candidateCount: thoughtFrame.candidates.count,
                 forecastCount: thoughtFrame.forecasts.count,
@@ -421,8 +644,52 @@ public extension BASEBrainTurnResult {
                 alternativeActionCount: renderedOutput.alternativeActions.count,
                 emergencyBrakeLevelID: emergencyBrake.brakeLevel == .none ? nil : emergencyBrake.brakeLevel.rawValue
             ),
-            foldedLungSummary: evolutionFoldedLungSummary
+            foldedLungSummary: evolutionFoldedLungSummary,
+            governanceSummary: BASEvolutionLineageSummary.GovernanceSummary(
+                experienceCandidateCount: experienceCandidates.count,
+                experienceCandidateTypeCounts: candidateTypeCounts,
+                workflowCandidateCount: workflowCandidates.count,
+                guardTemplateCandidateCount: guardTemplateCandidates.count,
+                biasRecordCount: biasRecords.count,
+                riskPatternCandidateCount: riskPatternCandidates.count,
+                learningExportBundleCount: learningExportBundles.count,
+                pendingNurseryCandidateCount: pendingNurseryCandidateCount,
+                passedShadowTrialCount: passedShadowTrialCount,
+                failedShadowTrialCount: failedShadowTrialCount,
+                shadowTrialCount: shadowTrialRecords.count,
+                pendingShadowTrialCount: pendingShadowTrialCount,
+                sealCount: evolutionSeals.count,
+                deniedSealCount: deniedSealCount,
+                pendingSealCount: pendingSealCount,
+                versionDeltaCount: versionDeltas.count,
+                versionDeltaHighlights: versionDeltaHighlights,
+                retractionOrderCount: retractionOrders.count,
+                retractionOrderHighlights: retractionOrderHighlights,
+                pendingRetractionCount: pendingRetractionCount,
+                blockedPromotionReasonCodes: blockedPromotionReasonCodes,
+                dreamLoopStoppingMode: dreamLoopStoppingMode,
+                dreamLoopSignalRefs: dreamLoopSignalRefs,
+                dreamLoopRemandTargets: dreamLoopRemandTargets,
+                dreamLoopReservationMode: dreamLoopReservationMode,
+                dreamLoopMaxEvidenceDebtPercent: dreamLoopMaxEvidenceDebtPercent
+            )
         )
+    }
+
+    private func summarizedTokens(
+        _ values: [String],
+        limit: Int = 4
+    ) -> String {
+        var seen = Set<String>()
+        let uniqueValues = values.filter { !$0.isEmpty && seen.insert($0).inserted }
+        guard uniqueValues.isEmpty == false else { return "no signals" }
+
+        let head = Array(uniqueValues.prefix(limit))
+        let remainingCount = uniqueValues.count - head.count
+        if remainingCount > 0 {
+            return head.joined(separator: ", ") + ", +\(remainingCount) more"
+        }
+        return head.joined(separator: ", ")
     }
 
     private var evolutionFoldedLungSummary: BASEvolutionFoldedLungSummary {
@@ -442,6 +709,10 @@ public extension BASEBrainTurnResult {
             ?? "lung.\(runtimeTrace.sessionID).\(thoughtFold.foldID)"
         let breathSchedulerID = thoughtFold.breathSchedulerRef?.trimmedNonEmpty
             ?? "scheduler.\(runtimeTrace.sessionID).\(thoughtFold.foldID)"
+        let thermalExchangeID = thoughtFold.thermalExchangeRef?.trimmedNonEmpty
+            ?? "thermal.\(runtimeTrace.sessionID).\(thoughtFold.foldID)"
+        let integrityWeaveID = thoughtFold.integrityWeaveRef?.trimmedNonEmpty
+            ?? "integrity.\(runtimeTrace.sessionID).\(thoughtFold.foldID)"
         let activeOrgans = thoughtFrame.organMap?.activeOrgans ?? [.stubCore]
         let requiredOrganIDs = activeOrgans.map(\.rawValue)
         let executionOrder = activeOrgans.map(\.rawValue)
@@ -450,6 +721,8 @@ public extension BASEBrainTurnResult {
         let fallbackMode = breathMode == "lockdown" ? "lockdownShell" : "rollbackAnchor"
         let cacheStateRef = "cache.\(runtimeTrace.sessionID).\(precisionProfileID)"
         let rollbackFoldRefs = evolutionOrderedUnique([thoughtFold.foldID])
+        let safeSnapshotRef = thoughtFold.snapshotRef?.trimmedNonEmpty
+            ?? "snapshot.\(runtimeTrace.sessionID).\(thoughtFold.foldID)"
         let lockedPrecisionOrganIDs = evolutionOrderedUnique(
             precisionMap.compactMap { precision in
                 switch precision.organ {
@@ -476,13 +749,55 @@ public extension BASEBrainTurnResult {
             currentBreathPhase: breathPhase,
             restoreReadinessPercent: evolutionRestoreReadinessPercent
         )
-
+        let thermalExchange = evolutionThermalExchangeFrame(
+            exchangeID: thermalExchangeID,
+            currentBreathMode: sovereignBridge.resultingBreathMode ?? breathMode,
+            activeOrgans: activeOrgans,
+            hotColdMap: hotColdMap,
+            precisionMap: precisionMap
+        )
+        let integrityRequiredChecks = evolutionIntegrityRequiredChecks(
+            hasRiskBindings: thoughtFrame.riskBindings?.isEmpty == false,
+            hasBindingChecksum: thoughtFold.bindingChecksum != nil
+        )
+        let integrityFailedChecks = evolutionIntegrityFailedChecks(
+            sovereignBridge: sovereignBridge
+        )
+        let integrityCompletedChecks = evolutionIntegrityCompletedChecks(
+            requiredChecks: integrityRequiredChecks,
+            failedChecks: integrityFailedChecks
+        )
+        let integrityContaminationRefs = evolutionIntegrityContaminationRefs(
+            sovereignBridge: sovereignBridge
+        )
+        let integrityPurityState = evolutionIntegrityPurityState(
+            sovereignBridge: sovereignBridge,
+            contaminationRefs: integrityContaminationRefs
+        )
+        let integrityVerificationSeed = (
+            [
+                integrityWeaveID,
+                thoughtFold.checksum,
+                rollbackAnchorID,
+                safeSnapshotRef,
+                integrityPurityState
+            ]
+            + integrityRequiredChecks
+            + integrityCompletedChecks
+            + integrityFailedChecks
+            + integrityContaminationRefs
+        ).joined(separator: "||")
+        let integrityVerificationHash = SHA256.hash(data: Data(integrityVerificationSeed.utf8))
+            .compactMap { String(format: "%02x", $0) }
+            .joined()
         return BASEvolutionFoldedLungSummary(
             morphGraphID: morphGraphID,
             hotColdMapID: hotColdMapID,
             precisionProfileID: precisionProfileID,
             lungStateRef: lungStateRef,
             breathSchedulerID: breathSchedulerID,
+            thermalExchangeID: thermalExchange.exchangeID,
+            integrityWeaveID: integrityWeaveID,
             breathMode: sovereignBridge.resultingBreathMode ?? breathMode,
             breathPhase: breathPhase,
             thermalPressure: evolutionThermalPressure,
@@ -500,8 +815,7 @@ public extension BASEBrainTurnResult {
             ].compactMap { $0 }),
             fallbackMode: fallbackMode,
             rollbackAnchorID: rollbackAnchorID,
-            safeSnapshotRef: thoughtFold.snapshotRef?.trimmedNonEmpty
-                ?? "snapshot.\(runtimeTrace.sessionID).\(thoughtFold.foldID)",
+            safeSnapshotRef: safeSnapshotRef,
             foldRefs: rollbackFoldRefs,
             hostVersionRef: hostContext.activeVersion,
             cacheStateRef: cacheStateRef,
@@ -538,6 +852,21 @@ public extension BASEBrainTurnResult {
             schedulerAllowsMicroSleep: breathScheduler.allowsMicroSleep,
             schedulerResumeBudgetClass: breathScheduler.resumeBudgetClass,
             schedulerReasonCodes: breathScheduler.schedulerReasonCodes,
+            thermalExchangeMode: thermalExchange.exchangeMode,
+            thermalPredictedBand: thermalExchange.predictedThermalBand,
+            thermalCoolingActions: thermalExchange.coolingActions,
+            thermalSuppressedOrganIDs: thermalExchange.suppressedOrgans.map(\.rawValue),
+            thermalReroutedOrganIDs: thermalExchange.reroutedOrgans.map(\.rawValue),
+            thermalRerouteTargets: thermalExchange.rerouteTargets,
+            thermalPrecisionDowngradeRecords: thermalExchange.precisionDowngradePlan.map(evolutionPrecisionRecord(for:)),
+            thermalExchangeReasonCodes: thermalExchange.exchangeReasonCodes,
+            integrityRequiredChecks: integrityRequiredChecks,
+            integrityCompletedChecks: integrityCompletedChecks,
+            integrityFailedChecks: integrityFailedChecks,
+            integrityPurityState: integrityPurityState,
+            integrityContaminationRefs: integrityContaminationRefs,
+            integrityTrustedSnapshotRef: safeSnapshotRef,
+            integrityVerificationHash: integrityVerificationHash,
             precisionOrganPrecisionRecords: precisionRecords,
             precisionLockedOrganIDs: lockedPrecisionOrganIDs,
             precisionDegradationOrder: evolutionPrecisionDegradationOrder(),
@@ -553,6 +882,38 @@ public extension BASEBrainTurnResult {
             organID: precision.organ.rawValue,
             tierID: tier.rawValue
         )
+    }
+
+    private func evolutionPrecisionOptions(
+        for organ: BASNeuralOrgan,
+        primaryTier: BASNeuralPrecisionTier
+    ) -> [BASNeuralPrecisionTier] {
+        let fallbackTier: BASNeuralPrecisionTier = switch organ {
+        case .stubCore, .riskSpine, .permitKnot:
+            .protected
+        case .memoryCodecRidge, .hostModulationMesh, .toolIntentMesh:
+            .balanced
+        default:
+            .minimal
+        }
+        return evolutionOrderedUnique([primaryTier, fallbackTier, .minimal])
+    }
+
+    private func evolutionOrganSovereignClass(
+        for organ: BASNeuralOrgan
+    ) -> String {
+        switch organ {
+        case .stubCore, .riskSpine, .permitKnot:
+            return "protected_core"
+        case .memoryCodecRidge, .consistencyLattice:
+            return "checkpoint_recovery"
+        case .hostModulationMesh:
+            return "host_modulation"
+        case .toolIntentMesh:
+            return "tool_intent"
+        default:
+            return "general"
+        }
     }
 
     private func evolutionPrecisionMap(
@@ -643,6 +1004,207 @@ public extension BASEBrainTurnResult {
                 recoveryDisposition?.kind.rawValue
             ].compactMap { $0 })
         )
+    }
+
+    private func evolutionThermalExchangeFrame(
+        exchangeID: String,
+        currentBreathMode: String,
+        activeOrgans: [BASNeuralOrgan],
+        hotColdMap: BASHotColdMap,
+        precisionMap: [BASNeuralOrganPrecision]
+    ) -> BASThermalExchangeFrame {
+        let predictedBand = evolutionPredictedThermalBand()
+        let coolingActions = evolutionThermalCoolingActions(
+            predictedBand: predictedBand,
+            currentBreathMode: currentBreathMode
+        )
+        let suppressedOrgans = evolutionSuppressedThermalOrgans(
+            predictedBand: predictedBand,
+            hotColdMap: hotColdMap
+        )
+        let rerouteTargets = evolutionThermalRerouteTargets(
+            predictedBand: predictedBand,
+            activeOrgans: activeOrgans
+        )
+        let reroutedOrgans = evolutionOrderedUniqueOrgans(
+            rerouteTargets.keys.compactMap(BASNeuralOrgan.init(rawValue:))
+        )
+        let precisionDowngradePlan = evolutionThermalPrecisionDowngradePlan(
+            predictedBand: predictedBand,
+            activeOrgans: activeOrgans,
+            hotColdMap: hotColdMap,
+            precisionMap: precisionMap
+        )
+
+        return BASThermalExchangeFrame(
+            exchangeID: exchangeID,
+            exchangeMode: evolutionThermalExchangeMode(
+                predictedBand: predictedBand,
+                currentBreathMode: currentBreathMode
+            ),
+            predictedThermalBand: predictedBand,
+            coolingActions: coolingActions,
+            suppressedOrgans: suppressedOrgans,
+            reroutedOrgans: reroutedOrgans,
+            rerouteTargets: rerouteTargets,
+            precisionDowngradePlan: precisionDowngradePlan,
+            exchangeReasonCodes: evolutionOrderedUnique(
+                [
+                    "mode.\(currentBreathMode)",
+                    "thermal.\(deviceState.thermalLevel.rawValue)",
+                    "guard.\(budgetFrame.thermalGuardLevel.rawValue)",
+                    "band.\(predictedBand)",
+                    hotColdMap.hotOrgans.count > 2 ? "hot_pack.\(hotColdMap.hotOrgans.count)" : nil
+                ]
+                .compactMap { $0 }
+            )
+        )
+    }
+
+    private func evolutionThermalExchangeMode(
+        predictedBand: String,
+        currentBreathMode: String
+    ) -> String {
+        if currentBreathMode == "lockdown" || currentBreathMode == "quarantine" {
+            return "containment_exchange"
+        }
+
+        switch predictedBand {
+        case "critical":
+            return "emergency_exchange"
+        case "hot":
+            return "protective_exchange"
+        case "warm":
+            return "balanced_exchange"
+        default:
+            return currentBreathMode == "deepExchange"
+                ? "deep_exchange"
+                : "steady_exchange"
+        }
+    }
+
+    private func evolutionPredictedThermalBand() -> String {
+        switch (deviceState.thermalLevel, budgetFrame.thermalGuardLevel) {
+        case (.critical, _), (_, .emergency):
+            return "critical"
+        case (.hot, _), (_, .throttle):
+            return "hot"
+        case (.warm, _), (_, .watch):
+            return "warm"
+        default:
+            return "nominal"
+        }
+    }
+
+    private func evolutionThermalCoolingActions(
+        predictedBand: String,
+        currentBreathMode: String
+    ) -> [String] {
+        switch predictedBand {
+        case "critical":
+            var criticalActions = [
+                "delay_cold_organs",
+                "trim_noncritical_precision",
+                "pause_background_maintenance"
+            ]
+            criticalActions.append(
+                currentBreathMode == "lockdown" ? "preserve_stub_shell" : "force_guard_shell"
+            )
+            return evolutionOrderedUnique(criticalActions)
+        case "hot":
+            var hotActions = [
+                "delay_cold_organs",
+                "trim_noncritical_precision"
+            ]
+            if budgetFrame.thermalGuardLevel == .throttle {
+                hotActions.append("split_execution_graph")
+            }
+            return evolutionOrderedUnique(hotActions)
+        case "warm":
+            return ["delay_cold_organs"]
+        default:
+            return currentBreathMode == "deepExchange"
+                ? ["preheat_hot_path"]
+                : ["hold_hot_path"]
+        }
+    }
+
+    private func evolutionSuppressedThermalOrgans(
+        predictedBand: String,
+        hotColdMap: BASHotColdMap
+    ) -> [BASNeuralOrgan] {
+        let preferredOrder: [BASNeuralOrgan] = [
+            .criticBlade,
+            .simuRing,
+            .scoutStrip,
+            .toolIntentMesh,
+            .memoryCodecRidge
+        ]
+        let suppressionPool = evolutionOrderedUniqueOrgans(
+            preferredOrder.filter { hotColdMap.coldOrgans.contains($0) || hotColdMap.warmOrgans.contains($0) }
+                + hotColdMap.coldOrgans
+        )
+
+        let limit: Int = switch predictedBand {
+        case "critical":
+            3
+        case "hot":
+            2
+        case "warm":
+            1
+        default:
+            0
+        }
+
+        return Array(suppressionPool.prefix(limit))
+    }
+
+    private func evolutionThermalRerouteTargets(
+        predictedBand: String,
+        activeOrgans: [BASNeuralOrgan]
+    ) -> [String: String] {
+        guard predictedBand == "hot" || predictedBand == "critical" else {
+            return [:]
+        }
+
+        let targetRoute = predictedBand == "critical" ? BASDeviceRoute.hybridLocal.rawValue : BASDeviceRoute.scoutCPU.rawValue
+        var targets: [String: String] = [:]
+
+        if activeOrgans.contains(.permitKnot) {
+            targets[BASNeuralOrgan.permitKnot.rawValue] = targetRoute
+        }
+        if activeOrgans.contains(.memoryCodecRidge) {
+            targets[BASNeuralOrgan.memoryCodecRidge.rawValue] = targetRoute
+        }
+
+        return targets
+    }
+
+    private func evolutionThermalPrecisionDowngradePlan(
+        predictedBand: String,
+        activeOrgans: [BASNeuralOrgan],
+        hotColdMap: BASHotColdMap,
+        precisionMap: [BASNeuralOrganPrecision]
+    ) -> [BASNeuralOrganPrecision] {
+        guard predictedBand == "hot" || predictedBand == "critical" else {
+            return []
+        }
+
+        let protectedOrgans: Set<BASNeuralOrgan> = [.stubCore, .riskSpine, .permitKnot]
+        let candidateOrgans = evolutionOrderedUniqueOrgans(
+            activeOrgans
+                + hotColdMap.warmOrgans
+                + hotColdMap.coldOrgans.filter { $0 == .hostModulationMesh || $0 == .toolIntentMesh }
+        )
+        let downgradeTier: BASNeuralPrecisionTier = predictedBand == "critical" ? .minimal : .balanced
+        let currentTiers = Dictionary(uniqueKeysWithValues: precisionMap.map { ($0.organ, $0.tier) })
+
+        return candidateOrgans.compactMap { organ in
+            guard protectedOrgans.contains(organ) == false else { return nil }
+            let currentTier = currentTiers[organ]
+            guard currentTier != downgradeTier else { return nil }
+            return BASNeuralOrganPrecision(organ: organ, tier: downgradeTier)
+        }
     }
 
     private func evolutionSchedulerCadenceTag(
@@ -906,6 +1468,62 @@ public extension BASEBrainTurnResult {
         }
     }
 
+    private func evolutionIntegrityRequiredChecks(
+        hasRiskBindings: Bool,
+        hasBindingChecksum: Bool
+    ) -> [String] {
+        evolutionOrderedUnique([
+            "fold_checksum",
+            hasRiskBindings ? "risk_permit" : nil,
+            "host_gate",
+            "rollback_anchor",
+            hasBindingChecksum ? "binding_checksum" : nil
+        ].compactMap { $0 })
+    }
+
+    private func evolutionIntegrityFailedChecks(
+        sovereignBridge: EvolutionSovereignBridgeProjection
+    ) -> [String] {
+        var failedChecks: [String] = []
+        if sovereignBridge.quarantinedFoldRefs.isEmpty == false {
+            failedChecks.append("contamination_scan")
+        }
+        return evolutionOrderedUnique(failedChecks)
+    }
+
+    private func evolutionIntegrityCompletedChecks(
+        requiredChecks: [String],
+        failedChecks: [String]
+    ) -> [String] {
+        evolutionOrderedUnique(requiredChecks.filter { failedChecks.contains($0) == false })
+    }
+
+    private func evolutionIntegrityContaminationRefs(
+        sovereignBridge: EvolutionSovereignBridgeProjection
+    ) -> [String] {
+        evolutionOrderedUnique(
+            sovereignBridge.quarantinedFoldRefs
+            + sovereignBridge.invalidatedFoldRefs
+            + sovereignBridge.invalidatedCacheRefs
+        )
+    }
+
+    private func evolutionIntegrityPurityState(
+        sovereignBridge: EvolutionSovereignBridgeProjection,
+        contaminationRefs: [String]
+    ) -> String {
+        if sovereignBridge.quarantinedFoldRefs.isEmpty == false {
+            return "quarantined"
+        }
+        if sovereignBridge.invalidatedFoldRefs.isEmpty == false {
+            return "recovered"
+        }
+        if contaminationRefs.isEmpty == false || sovereignBridge.preservedReadOnlyRecovery == true {
+            return "sealed"
+        }
+        return "verified"
+    }
+
     private var evolutionBreathMode: String {
         if sovereignActuationCommands.contains(where: { $0.kind == .deadStop })
             || emergencyBrake.brakeLevel == .lockdown
@@ -1119,10 +1737,12 @@ private struct EvolutionSovereignBridgeProjection {
 private extension BASActionPermitMode {
     var isProtective: Bool {
         switch self {
-        case .delay, .block, .replace:
-            return true
-        case .answer, .compare:
+        case .mirror, .compare:
             return false
+        case .answer:
+            return false
+        case .delay, .draftOnly, .localOnly, .block, .replace, .escalate:
+            return true
         }
     }
 }
@@ -1131,6 +1751,13 @@ private extension String {
     var trimmedNonEmpty: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+private extension Sequence where Element == String {
+    func runtimeOrderedUniqueStrings() -> [String] {
+        var seen = Set<String>()
+        return filter { seen.insert($0).inserted }
     }
 }
 
@@ -1336,6 +1963,11 @@ public struct BASEBrainRuntimeCoordinator {
         thoughtFrame.candidateFrontier = thoughtArtifacts.candidateFrontier
         thoughtFrame.counterfactualBundles = thoughtArtifacts.counterfactualBundles
         thoughtFrame.critiqueBundles = thoughtArtifacts.critiqueBundles
+        thoughtFrame.uncertaintyLedger = thoughtArtifacts.uncertaintyLedger
+        thoughtFrame.evidenceDebts = thoughtArtifacts.evidenceDebts
+        thoughtFrame.convergenceCertificate = thoughtArtifacts.convergenceCertificate
+        thoughtFrame.loopLeaseReceipt = thoughtArtifacts.loopLeaseReceipt
+        thoughtFrame.sovereignBreakpointHints = thoughtArtifacts.sovereignBreakpointHints
         let publicProjection = neuralCoreService?.materializePublicProjection(
             budgetFrame: routedBudget,
             contextFrame: contextFrame,
@@ -1354,24 +1986,53 @@ public struct BASEBrainRuntimeCoordinator {
             thoughtFrame.critiques = projectedCritiques
         }
 
-        let (triScores, mergedChoice) = triSelfService.mergeChoice(
+        var (triScores, mergedChoice) = triSelfService.mergeChoice(
             thoughtFrame: thoughtFrame,
             hostContext: hostContext
         )
         thoughtFrame.triScores = triScores
+        thoughtFrame.vetoMarks = mergedChoice.vetoMarks
+        thoughtFrame.tradeoffLedgers = mergedChoice.tradeoffLedgers
+        thoughtFrame.agencyReservation = mergedChoice.agencyReservation
+        thoughtFrame.remandOrders = mergedChoice.remandOrders
+        thoughtFrame.courtDecisionDraft = mergedChoice.courtDecisionDraft
+        let reconciledThoughtFrame = reconcileDreamLoopConvergence(
+            thoughtFrame: thoughtFrame,
+            mergedChoice: mergedChoice
+        )
+        if reconciledThoughtFrame.stopReason != thoughtFrame.stopReason {
+            thoughtFrame = reconciledThoughtFrame
+            (triScores, mergedChoice) = triSelfService.mergeChoice(
+                thoughtFrame: thoughtFrame,
+                hostContext: hostContext
+            )
+            thoughtFrame.triScores = triScores
+            thoughtFrame.vetoMarks = mergedChoice.vetoMarks
+            thoughtFrame.tradeoffLedgers = mergedChoice.tradeoffLedgers
+            thoughtFrame.agencyReservation = mergedChoice.agencyReservation
+            thoughtFrame.remandOrders = mergedChoice.remandOrders
+            thoughtFrame.courtDecisionDraft = mergedChoice.courtDecisionDraft
+        }
 
         let riskService = self.riskService
-        let (rawRiskCard, rawActionPermit) = riskService.gateAction(
+        let rawRiskDecisionPackage = riskService.buildRiskDecisionPackage(
             contextFrame: contextFrame,
             thoughtFrame: thoughtFrame,
             triScores: triScores,
             budget: routedBudget
         )
+        let rawRiskCard = rawRiskDecisionPackage.riskCard
+        let rawActionPermit = rawRiskDecisionPackage.actionPermit
         let (riskCard, actionPermit, riskFindings) = normalizeRiskDecision(
             riskCard: rawRiskCard,
             actionPermit: rawActionPermit,
             budget: routedBudget,
             activeKillSwitches: request.activeKillSwitches
+        )
+        var normalizedRiskDecisionPackage = projectedRiskDecisionPackage(
+            from: rawRiskDecisionPackage,
+            riskCard: riskCard,
+            actionPermit: actionPermit
         )
         let resolvedRiskService = riskService
         let bindings = neuralCoreService?.materializeRiskBindings(
@@ -1397,9 +2058,16 @@ public struct BASEBrainRuntimeCoordinator {
         )
         let boundRiskCard = primaryBinding?.riskCard ?? riskCard
         let boundActionPermit = primaryBinding?.actionPermit ?? actionPermit
+        normalizedRiskDecisionPackage = projectedRiskDecisionPackage(
+            from: normalizedRiskDecisionPackage,
+            riskCard: boundRiskCard,
+            actionPermit: boundActionPermit,
+            binding: primaryBinding
+        )
         thoughtFrame.riskBindings = bindings.isEmpty ? nil : bindings
         thoughtFrame.riskCard = boundRiskCard
         thoughtFrame.actionPermit = boundActionPermit
+        thoughtFrame.riskDecisionPackage = normalizedRiskDecisionPackage
 
         let hostGateValue = hostProfileService.applyHostGate(
             profile: hostContext,
@@ -1433,22 +2101,39 @@ public struct BASEBrainRuntimeCoordinator {
             degradedReasonCodes: neuralDegradedReasonCodes
         )
 
-        let renderedOutput = actionService.render(
+        let baseRenderedOutput = actionService.render(
             choice: mergedChoice,
             riskCard: boundRiskCard,
             permit: boundActionPermit,
             hostContext: hostContext
+        )
+        let renderedOutput = self.projectedRenderedOutput(
+            from: baseRenderedOutput,
+            mergedChoice: mergedChoice,
+            riskCard: boundRiskCard,
+            actionPermit: boundActionPermit,
+            riskDecisionPackage: normalizedRiskDecisionPackage
         )
         let rawTickets = evolutionService.buildTickets(
             thoughtFrame: thoughtFrame,
             output: renderedOutput,
             feedbackEvent: request.feedbackEvent
         )
-        let (updateTickets, evolutionFindings) = normalizeUpdateTickets(
+        let (normalizedTickets, evolutionFindings) = normalizeUpdateTickets(
             rawTickets,
             riskCard: boundRiskCard,
             activeKillSwitches: request.activeKillSwitches
         )
+        let evolutionGovernance = buildEvolutionGovernanceArtifacts(
+            request: request,
+            contextFrame: contextFrame,
+            decomposeFrame: decomposeFrame,
+            thoughtFrame: thoughtFrame,
+            output: renderedOutput,
+            riskCard: boundRiskCard,
+            updateTickets: normalizedTickets
+        )
+        let updateTickets = evolutionGovernance.updateTickets
         let auditFindings = budgetFindings + memoryFindings + loopFindings + riskFindings + evolutionFindings
         let killSwitches = recommendedKillSwitches(for: auditFindings)
         let thoughtFold = buildThoughtFold(
@@ -1520,6 +2205,10 @@ public struct BASEBrainRuntimeCoordinator {
             updateTickets: updateTickets,
             renderedOutput: renderedOutput
         )
+        let sovereignWarrants = buildSovereignWarrants(
+            sovereignCommitTokens: sovereignCommitTokens,
+            runtimeTrace: runtimeTrace
+        )
         let sovereignLock = buildSovereignLock(
             sovereignVerdict: sovereignVerdict,
             runtimeTrace: runtimeTrace
@@ -1532,6 +2221,7 @@ public struct BASEBrainRuntimeCoordinator {
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,
+            sovereignWarrants: sovereignWarrants,
             quarantineRecords: quarantineRecords,
             runtimeTrace: runtimeTrace,
             thoughtFold: thoughtFold,
@@ -1592,6 +2282,7 @@ public struct BASEBrainRuntimeCoordinator {
             emergencyBrake: emergencyBrake,
             sovereignVerdict: finalSovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,
+            sovereignWarrants: sovereignWarrants,
             sovereignLock: sovereignLock,
             quarantineRecords: quarantineRecords,
             sovereignAuditEntry: sovereignAuditEntry,
@@ -1613,9 +2304,20 @@ public struct BASEBrainRuntimeCoordinator {
             mergedChoice: mergedChoice,
             riskCard: boundRiskCard,
             actionPermit: boundActionPermit,
+            riskDecisionPackage: normalizedRiskDecisionPackage,
             hostGateValue: hostGateValue,
             renderedOutput: renderedOutput,
             updateTickets: updateTickets,
+            experienceCandidates: evolutionGovernance.experienceCandidates,
+            workflowCandidates: evolutionGovernance.workflowCandidates,
+            guardTemplateCandidates: evolutionGovernance.guardTemplateCandidates,
+            biasRecords: evolutionGovernance.biasRecords,
+            riskPatternCandidates: evolutionGovernance.riskPatternCandidates,
+            learningExportBundles: evolutionGovernance.learningExportBundles,
+            shadowTrialRecords: evolutionGovernance.shadowTrialRecords,
+            versionDeltas: evolutionGovernance.versionDeltas,
+            retractionOrders: evolutionGovernance.retractionOrders,
+            evolutionSeals: evolutionGovernance.evolutionSeals,
             runtimeTrace: finalizedRuntimeTrace
         )
     }
@@ -1789,6 +2491,67 @@ public struct BASEBrainRuntimeCoordinator {
         return (normalized, findings)
     }
 
+    private func reconcileDreamLoopConvergence(
+        thoughtFrame: BASThoughtFrame,
+        mergedChoice: BASMergedChoice
+    ) -> BASThoughtFrame {
+        guard let resolvedStopReason = derivedDreamLoopStopReason(
+            thoughtFrame: thoughtFrame,
+            mergedChoice: mergedChoice
+        ), resolvedStopReason != thoughtFrame.stopReason else {
+            return thoughtFrame
+        }
+
+        var reconciled = thoughtFrame
+        reconciled.stopReason = resolvedStopReason
+        if let updatedConvergence = BASNeuralMaterializationCompiler.buildConvergenceCertificate(
+            from: reconciled,
+            frontier: reconciled.candidateFrontier,
+            critiqueBundles: reconciled.critiqueBundles
+        ) {
+            reconciled.convergenceCertificate = updatedConvergence
+        }
+        return reconciled
+    }
+
+    private func derivedDreamLoopStopReason(
+        thoughtFrame: BASThoughtFrame,
+        mergedChoice: BASMergedChoice
+    ) -> BASThoughtStopReason? {
+        switch thoughtFrame.stopReason {
+        case .maxLoopsReached, .blocked, .replaced, .guardTakeover:
+            return thoughtFrame.stopReason
+        case .candidateStable, .riskConverged, .uncertaintyBelowThreshold, .none:
+            break
+        }
+
+        let selectedCandidateID = mergedChoice.candidateID
+        if let breakpointHint = thoughtFrame.sovereignBreakpointHints?.first(where: {
+            $0.affectedCandidates.contains(selectedCandidateID)
+                || $0.sourceRef.hasSuffix(selectedCandidateID)
+        }) {
+            switch breakpointHint.suggestedAction {
+            case .cut, .stop:
+                return .blocked
+            case .freeze, .shrink:
+                break
+            }
+        }
+
+        let guardPathSelected = thoughtFrame.candidateFrontier?.guardPaths.contains(selectedCandidateID) == true
+        let delayedPathSelected = thoughtFrame.candidateFrontier?.delayedPaths.contains(selectedCandidateID) == true
+        let weakPrediction = thoughtFrame.uncertaintyLedger?.weakPredictions.contains(selectedCandidateID) == true
+        let highSensitivity = thoughtFrame.uncertaintyLedger?.highSensitivityPoints.contains(selectedCandidateID) == true
+        let evidenceDebt = thoughtFrame.evidenceDebts?.first(where: { $0.candidateID == selectedCandidateID })?.debtWeight ?? 0
+        let delayReserved = mergedChoice.agencyReservation?.mode == .delayRight
+
+        if guardPathSelected && (delayedPathSelected || weakPrediction || highSensitivity || evidenceDebt >= 0.5 || delayReserved) {
+            return .guardTakeover
+        }
+
+        return thoughtFrame.stopReason
+    }
+
     private func normalizeRiskDecision(
         riskCard: BASRiskCard,
         actionPermit: BASActionPermit,
@@ -1889,6 +2652,150 @@ public struct BASEBrainRuntimeCoordinator {
         return (riskCard, normalizedPermit, findings)
     }
 
+    private func projectedRiskDecisionPackage(
+        from package: BASRiskDecisionPackage,
+        riskCard: BASRiskCard,
+        actionPermit: BASActionPermit,
+        binding: BASRiskPermitBinding? = nil
+    ) -> BASRiskDecisionPackage {
+        let actionModeDecision = BASActionModeDecision(
+            schemaVersion: package.actionModeDecision.schemaVersion,
+            decisionID: package.actionModeDecision.decisionID,
+            primaryMode: actionPermit.mode,
+            stackedModes: actionPermit.stackedModes,
+            reasonCodes: actionPermit.reasonCodes,
+            confidence: package.actionModeDecision.confidence
+        )
+        let delayReservation: BASDelayReservation? = if let existing = package.delayReservation {
+            existing
+        } else if let delayType = binding?.delayType ?? riskCard.delayType ?? actionPermit.delayWindow {
+            BASDelayReservation(
+                reservationID: "delay.\(package.packageID)",
+                delayType: delayType,
+                minDelay: actionPermit.mode == .delay ? 15 : 5,
+                maxDelay: actionPermit.mode == .delay ? 1_440 : 120,
+                allowedIntermediateActions: ["compare", "draft_only"]
+            )
+        } else {
+            nil
+        }
+        let protectiveSubstitute = package.protectiveSubstitute ?? {
+            guard actionPermit.substituteRequired || binding?.substituteType != nil || riskCard.substituteType != nil else {
+                return nil
+            }
+            return BASProtectiveSubstitute(
+                substituteID: "substitute.\(package.packageID)",
+                sourceCandidateRef: package.riskField.candidateRef,
+                substituteType: binding?.substituteType ?? riskCard.substituteType ?? "draft",
+                description: "Use the safer, more bounded substitute path before any direct release.",
+                safetyGain: riskCard.riskLevel >= .high ? 0.82 : 0.48
+            )
+        }()
+        let sovereignEscalationHint = package.sovereignEscalationHint ?? {
+            guard actionPermit.allModes.contains(.escalate)
+                || binding?.sovereignHintLevel != nil
+                || riskCard.sovereignHintLevel == "high" else {
+                return nil
+            }
+            return BASSovereignEscalationHint(
+                hintID: "sovereign.\(package.packageID)",
+                sourceRefs: [package.riskField.fieldID],
+                reasonCodes: actionPermit.reasonCodes,
+                urgency: binding?.sovereignHintLevel ?? riskCard.sovereignHintLevel ?? "high",
+                suggestedScope: actionPermit.blockedDomains.contains("host.write") ? "host" : "tool"
+            )
+        }()
+
+        return BASRiskDecisionPackage(
+            schemaVersion: package.schemaVersion,
+            packageID: package.packageID,
+            riskCard: riskCard,
+            riskField: package.riskField,
+            actionModeDecision: actionModeDecision,
+            actionPermit: actionPermit,
+            delayReservation: delayReservation,
+            protectiveSubstitute: protectiveSubstitute,
+            sovereignEscalationHint: sovereignEscalationHint
+        )
+    }
+
+    private func projectedRenderedOutput(
+        from output: BASRenderedOutput,
+        mergedChoice: BASMergedChoice,
+        riskCard: BASRiskCard,
+        actionPermit: BASActionPermit,
+        riskDecisionPackage: BASRiskDecisionPackage?
+    ) -> BASRenderedOutput {
+        let prefersDraftOnly = actionPermit.mode == .draftOnly
+            || actionPermit.stackedModes.contains(.draftOnly)
+        let localOnlyPreferred = actionPermit.mode == .localOnly
+            || actionPermit.stackedModes.contains(.localOnly)
+        let delayAvailable = actionPermit.mode == .delay
+            || actionPermit.stackedModes.contains(.delay)
+            || actionPermit.delayWindow != nil
+            || riskDecisionPackage?.delayReservation != nil
+        let chooseLaterAllowed = actionPermit.requireCompare
+            || delayAvailable
+            || actionPermit.requireSecondCheck
+            || prefersDraftOnly
+            || localOnlyPreferred
+            || actionPermit.mode == .replace
+            || actionPermit.mode == .block
+            || actionPermit.mode == .escalate
+        let uncertaintyVisible = riskCard.uncertainty >= 0.35
+            || output.explanationCodes.contains(where: { $0.hasPrefix("evidence.") || $0.hasPrefix("uncertainty.") })
+        let agencyReservation = mergedChoice.agencyReservation
+        let courtDecisionDraft = mergedChoice.courtDecisionDraft
+        let remandTargets = optionalNonEmptyStrings(
+            mergedChoice.remandOrders?.map(\.targetLayer) ?? []
+        )
+
+        var projected = output
+        projected.surfaceGuide = BASRenderedSurfaceGuide(
+            stackedModes: actionPermit.stackedModes,
+            tonePolicy: actionPermit.tonePolicy,
+            templatePolicy: actionPermit.templatePolicy,
+            outputLengthCap: actionPermit.outputLengthCap,
+            boundary: BASRenderedBoundaryGuide(
+                allowedDomains: actionPermit.allowedDomains,
+                blockedDomains: actionPermit.blockedDomains,
+                toolScope: actionPermit.toolScope,
+                memoryScope: actionPermit.memoryScope,
+                escalationHintRef: actionPermit.escalationHintRef
+            ),
+            agency: BASRenderedAgencyGuide(
+                requiresCompare: actionPermit.requireCompare,
+                requiresSecondCheck: actionPermit.requireSecondCheck,
+                delayAvailable: delayAvailable,
+                chooseLaterAllowed: chooseLaterAllowed,
+                prefersDraftOnly: prefersDraftOnly,
+                localOnlyPreferred: localOnlyPreferred,
+                reservationMode: agencyReservation?.mode,
+                reservationReasons: optionalNonEmptyStrings(agencyReservation?.reasons ?? [])
+            ),
+            disclosure: BASRenderedDisclosureGuide(
+                assertionCeiling: actionPermit.assertionCeiling,
+                explanationCodes: output.explanationCodes,
+                uncertaintyVisible: uncertaintyVisible,
+                requiredDisclosures: optionalNonEmptyStrings(courtDecisionDraft?.requiredDisclosures ?? []),
+                unresolvedCosts: optionalNonEmptyStrings(courtDecisionDraft?.unresolvedCosts ?? []),
+                remandTargets: remandTargets
+            ),
+            delayWindow: actionPermit.delayWindow,
+            delayReservation: riskDecisionPackage?.delayReservation,
+            protectiveSubstitute: riskDecisionPackage?.protectiveSubstitute,
+            sovereignEscalationHint: riskDecisionPackage?.sovereignEscalationHint
+        )
+        return projected
+    }
+
+    private func optionalNonEmptyStrings(_ values: [String]) -> [String]? {
+        let filtered = values.map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
+        }.filter { !$0.isEmpty }
+        return filtered.isEmpty ? nil : filtered
+    }
+
     private func normalizeUpdateTickets(
         _ tickets: [BASUpdateTicket],
         riskCard: BASRiskCard,
@@ -1948,6 +2855,375 @@ public struct BASEBrainRuntimeCoordinator {
         }
 
         return (normalized, findings)
+    }
+
+    private struct BASEvolutionGovernanceArtifacts {
+        let updateTickets: [BASUpdateTicket]
+        let experienceCandidates: [BASExperienceCandidate]
+        let workflowCandidates: [BASWorkflowCandidate]
+        let guardTemplateCandidates: [BASGuardTemplateCandidate]
+        let biasRecords: [BASBiasRecord]
+        let riskPatternCandidates: [BASRiskPatternCandidate]
+        let learningExportBundles: [BASLearningExportBundle]
+        let shadowTrialRecords: [BASShadowTrialRecord]
+        let versionDeltas: [BASVersionDelta]
+        let retractionOrders: [BASRetractionOrder]
+        let evolutionSeals: [BASEvolutionSeal]
+    }
+
+    private func buildEvolutionGovernanceArtifacts(
+        request: BASEBrainTurnRequest,
+        contextFrame: BASContextFrame,
+        decomposeFrame: BASDecomposeFrame,
+        thoughtFrame: BASThoughtFrame,
+        output: BASRenderedOutput,
+        riskCard: BASRiskCard,
+        updateTickets: [BASUpdateTicket]
+    ) -> BASEvolutionGovernanceArtifacts {
+        let requiresGovernedTrial = riskCard.riskLevel >= .high
+            || updateTickets.contains(where: {
+                $0.conflictFlag
+                    || $0.resolvedHostChangeCandidate != nil
+                    || $0.ruleCandidateRef?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            })
+        let timestampToken = Int(request.recordedAt.timeIntervalSince1970)
+        let trialScope = thoughtFrame.stopReason?.rawValue ?? output.mode.rawValue
+        let lowOrMediumRisk = riskCard.riskLevel == .low || riskCard.riskLevel == .medium
+        let isProtectiveMode = output.mode == .delay || output.mode == .block || output.mode == .replace
+        let hasConflictPressure = updateTickets.contains(where: \.conflictFlag)
+        let hasAmbientGuardSignals = contextFrame.manipulationHints.isEmpty == false
+            || decomposeFrame.boundaryTouches.isEmpty == false
+            || contextFrame.routeHint?.needGuard == true
+        let hasGuardSignals = hasAmbientGuardSignals || isProtectiveMode
+        let hasRiskPatternSignals = contextFrame.manipulationHints.isEmpty == false
+            || (thoughtFrame.riskDecisionPackage?.sovereignEscalationHint != nil)
+            || (thoughtFrame.riskDecisionPackage?.actionPermit.blockedDomains.isEmpty == false)
+            || (thoughtFrame.actionPermit?.blockedDomains.isEmpty == false)
+
+        var experienceCandidates: [BASExperienceCandidate] = []
+        var workflowCandidates: [BASWorkflowCandidate] = []
+        var guardTemplateCandidates: [BASGuardTemplateCandidate] = []
+        var biasRecords: [BASBiasRecord] = []
+        var riskPatternCandidates: [BASRiskPatternCandidate] = []
+        var learningExportBundles: [BASLearningExportBundle] = []
+        var shadowTrialRecords: [BASShadowTrialRecord] = []
+        var versionDeltas: [BASVersionDelta] = []
+        var retractionOrders: [BASRetractionOrder] = []
+        var evolutionSeals: [BASEvolutionSeal] = []
+
+        let governedTickets = updateTickets.enumerated().map { index, ticket in
+            let resolvedHostChangeCandidate = ticket.resolvedHostChangeCandidate
+            let candidateType: BASExperienceCandidateType = {
+                if resolvedHostChangeCandidate != nil {
+                    return .host
+                }
+                if ticket.ruleCandidateRef?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+                    return .rule
+                }
+                if ticket.conflictFlag {
+                    return .failure
+                }
+                if ticket.memoryWriteSuggestion?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+                    return .guardPattern
+                }
+                return .success
+            }()
+
+            let candidateID = "exp.\(timestampToken).\(index)"
+            experienceCandidates.append(
+                BASExperienceCandidate(
+                    candidateID: candidateID,
+                    sourceRefs: [ticket.ticketID, ticket.sessionRef],
+                    candidateType: candidateType,
+                    summary: ticket.summary,
+                    stabilitySignal: requiresGovernedTrial ? 0.54 : 0.82,
+                    contaminationRisk: requiresGovernedTrial ? 0.44 : 0.12,
+                    hostScope: request.hostID,
+                    sovereignScope: requiresGovernedTrial ? "l14_review_required" : "l14_clear"
+                )
+            )
+
+            var governanceRefs: [String] = []
+            let needsTrial = requiresGovernedTrial && candidateType != .success
+
+            if needsTrial {
+                let trialID = "trial.\(timestampToken).\(index)"
+                let trialScopeMode: String = {
+                    if resolvedHostChangeCandidate != nil {
+                        return "host_preview:\(output.mode.rawValue)"
+                    }
+                    if ticket.ruleCandidateRef?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+                        return "compare_only:\(output.mode.rawValue)"
+                    }
+                    if isProtectiveMode {
+                        return "single_domain:\(output.mode.rawValue)"
+                    }
+                    return "draft_only:\(output.mode.rawValue)"
+                }()
+                let trialCompletionState: String
+                let promotionRecommendation: String?
+                let observedEffects: [String]
+                let failConditions: [String]
+                let trialEndAt: Date?
+
+                if resolvedHostChangeCandidate != nil {
+                    trialCompletionState = "pending"
+                    promotionRecommendation = nil
+                    observedEffects = []
+                    failConditions = ["host_gate_regression", "scope_expansion", "preview_mismatch"]
+                    trialEndAt = nil
+                } else if (isProtectiveMode || riskCard.riskLevel >= .high) && hasGuardSignals {
+                    trialCompletionState = "passed"
+                    promotionRecommendation = "eligible_with_seal_review"
+                    observedEffects = [
+                        "protective mode \(output.mode.rawValue) held",
+                        "bounded trial stayed inside \(request.hostID)"
+                    ]
+                    failConditions = ["host_gate_regression", "scope_expansion"]
+                    trialEndAt = request.recordedAt
+                } else if hasConflictPressure {
+                    trialCompletionState = "failed"
+                    promotionRecommendation = "reject"
+                    observedEffects = ["conflict pressure persisted through bounded trial"]
+                    failConditions = ["review_conflict", "boundary_regression"]
+                    trialEndAt = request.recordedAt
+                } else {
+                    trialCompletionState = "pending"
+                    promotionRecommendation = nil
+                    observedEffects = []
+                    failConditions = ["host_gate_regression", "sovereign_scope_expansion"]
+                    trialEndAt = nil
+                }
+
+                shadowTrialRecords.append(
+                    BASShadowTrialRecord(
+                        trialID: trialID,
+                        candidateRef: candidateID,
+                        trialScope: trialScopeMode,
+                        startAt: request.recordedAt,
+                        endAt: trialEndAt,
+                        observedEffects: observedEffects,
+                        failConditions: failConditions,
+                        promotionRecommendation: promotionRecommendation,
+                        completionState: trialCompletionState
+                    )
+                )
+                governanceRefs.append(trialID)
+            }
+
+            if resolvedHostChangeCandidate != nil
+                || ticket.ruleCandidateRef?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                || needsTrial {
+                let deltaID = "delta.\(timestampToken).\(index)"
+                let rollbackRef = resolvedHostChangeCandidate?.rollbackRef
+                    ?? (ticket.ruleCandidateRef.map { "rollback.\($0)" })
+                versionDeltas.append(
+                    BASVersionDelta(
+                        deltaID: deltaID,
+                        targetType: resolvedHostChangeCandidate != nil ? "host" : "rule",
+                        beforeRef: resolvedHostChangeCandidate?.hostVersionRef,
+                        afterRef: resolvedHostChangeCandidate?.candidateID ?? ticket.ruleCandidateRef ?? candidateID,
+                        reason: ticket.reviewDirectiveLine ?? ticket.summary,
+                        impactScope: output.mode.rawValue,
+                        rollbackRef: rollbackRef
+                    )
+                )
+                governanceRefs.append(deltaID)
+            }
+
+            if needsTrial || ticket.conflictFlag {
+                let trialState = shadowTrialRecords.last?.completionState
+                let orderID = "retract.\(timestampToken).\(index)"
+                retractionOrders.append(
+                    BASRetractionOrder(
+                        orderID: orderID,
+                        targetRefs: [ticket.ticketID, candidateID],
+                        cascadeRefs: ticket.ruleCandidateRef.map { [$0] } ?? [],
+                        reasonCodes: {
+                            if trialState == "failed" {
+                                return ["shadow_trial_failed", "cleanup_before_retain"]
+                            }
+                            if trialState == "passed" {
+                                return ["seal_review"]
+                            }
+                            return ticket.conflictFlag
+                                ? ["review_conflict", "await_shadow_trial"]
+                                : ["await_shadow_trial"]
+                        }(),
+                        executionState: trialState == "passed" ? "cleared" : "pending_cleanup"
+                    )
+                )
+                governanceRefs.append(orderID)
+            }
+
+            let sealID = "seal.\(timestampToken).\(index)"
+            let latestTrialState = shadowTrialRecords.last?.completionState
+            evolutionSeals.append(
+                BASEvolutionSeal(
+                    sealID: sealID,
+                    candidateRef: candidateID,
+                    allowedScope: request.hostID,
+                    trialRequired: needsTrial,
+                    approvalRequirements: {
+                        guard needsTrial else { return ["lineage_recorded"] }
+                        switch latestTrialState {
+                        case "passed":
+                            return ["trial_passed", "l14_review"]
+                        case "failed":
+                            return ["shadow_trial_failed", "cleanup_before_retain"]
+                        default:
+                            return ["shadow_trial", "l14_review"]
+                        }
+                    }(),
+                    signature: {
+                        guard needsTrial else { return "l14.bridge.sealed" }
+                        switch latestTrialState {
+                        case "passed":
+                            return "l14.bridge.awaiting_review"
+                        case "failed":
+                            return "l14.bridge.denied"
+                        default:
+                            return "l14.bridge.pending"
+                        }
+                    }(),
+                    approvalState: {
+                        guard needsTrial else { return "sealed" }
+                        switch latestTrialState {
+                        case "passed":
+                            return "pending_review"
+                        case "failed":
+                            return "denied"
+                        default:
+                            return "pending_review"
+                        }
+                    }()
+                )
+            )
+            governanceRefs.append(sealID)
+
+            var adjusted = ticket
+            adjusted.derivedCandidateRefs = Array(
+                ([ticket.derivedCandidateRefs, [candidateID]])
+                    .flatMap { $0 }
+                    .runtimeOrderedUniqueStrings()
+            )
+            adjusted.governanceRefs = Array(
+                ([ticket.governanceRefs, governanceRefs])
+                    .flatMap { $0 }
+                    .runtimeOrderedUniqueStrings()
+            )
+            if var hostChangeCandidate = adjusted.resolvedHostChangeCandidate {
+                if hostChangeCandidate.hostVersionRef == nil {
+                    hostChangeCandidate.hostVersionRef = "host.\(request.hostID).candidate"
+                }
+                if hostChangeCandidate.rollbackRef == nil {
+                    hostChangeCandidate.rollbackRef = "rollback.\(hostChangeCandidate.candidateID)"
+                }
+                adjusted.hostChangeCandidate = hostChangeCandidate
+            }
+            return adjusted
+        }
+
+        let passedShadowTrialCount = shadowTrialRecords.filter(\.isPassed).count
+        let failedShadowTrialCount = shadowTrialRecords.filter(\.isFailed).count
+        let pendingShadowTrialCount = shadowTrialRecords.filter(\.isPending).count
+        let deniedSealCount = evolutionSeals.filter(\.isDenied).count
+        let pendingSealCount = evolutionSeals.filter(\.isPending).count
+        let pendingRetractionCount = retractionOrders.filter {
+            $0.executionState != "completed" && $0.executionState != "cleared"
+        }.count
+        let hasReusablePath = output.alternativeActions.isEmpty == false
+            || output.mode == .compare
+            || output.mode == .answer
+        let candidateRefs = experienceCandidates.map(\.candidateID)
+        let gateClean = pendingShadowTrialCount == 0
+            && failedShadowTrialCount == 0
+            && pendingSealCount == 0
+            && deniedSealCount == 0
+            && pendingRetractionCount == 0
+
+        if lowOrMediumRisk && hasConflictPressure == false && hasReusablePath {
+            workflowCandidates.append(
+                BASWorkflowCandidate(
+                    workflowID: "workflow.\(timestampToken).0",
+                    taskDomain: output.mode.rawValue,
+                    steps: output.alternativeActions.isEmpty ? ["observe", output.mode.rawValue, "review"] : output.alternativeActions,
+                    observedGain: 0.74,
+                    safetyNotes: ["governed nursery candidate"],
+                    hostSpecific: true,
+                    shadowTrialState: pendingShadowTrialCount > 0 ? "pending" : (failedShadowTrialCount > 0 ? "failed" : (passedShadowTrialCount > 0 ? "passed" : "not_required"))
+                )
+            )
+        }
+
+        if (isProtectiveMode && hasAmbientGuardSignals) || (riskCard.riskLevel >= .high && hasGuardSignals) {
+            guardTemplateCandidates.append(
+                BASGuardTemplateCandidate(
+                    templateID: "guard.\(timestampToken).0",
+                    sceneType: contextFrame.sceneType.rawValue,
+                    boundaryScriptRef: decomposeFrame.boundaryTouches.isEmpty ? nil : "boundary.\(contextFrame.sceneType.rawValue)",
+                    delayPacketRef: output.mode == .delay ? "delay.\(trialScope)" : nil,
+                    substituteRef: isProtectiveMode ? "substitute.\(output.mode.rawValue)" : nil,
+                    protectiveGain: isProtectiveMode ? 0.82 : 0.61,
+                    overreachRisk: hasConflictPressure ? 0.42 : 0.18
+                )
+            )
+        }
+
+        if hasConflictPressure || pendingRetractionCount > 0 || pendingShadowTrialCount > 0 {
+            biasRecords.append(
+                BASBiasRecord(
+                    biasID: "bias.\(timestampToken).0",
+                    biasType: hasConflictPressure ? "review_conflict" : "guard_drift_watch",
+                    sourceRefs: governedTickets.map(\.ticketID),
+                    severity: hasConflictPressure ? 0.72 : 0.54,
+                    recurrenceScore: pendingRetractionCount > 0 ? 0.68 : 0.43,
+                    affectedLayers: ["L11", "L12", "L13"]
+                )
+            )
+        }
+
+        if riskCard.riskLevel >= .high || ((isProtectiveMode && hasAmbientGuardSignals) && hasRiskPatternSignals) {
+            riskPatternCandidates.append(
+                BASRiskPatternCandidate(
+                    patternID: "risk.\(timestampToken).0",
+                    sourceRefs: governedTickets.map(\.ticketID),
+                    riskDomain: contextFrame.sceneType.rawValue,
+                    triggerSignals: Array((contextFrame.manipulationHints + output.explanationCodes).prefix(4)),
+                    severity: riskCard.totalRisk,
+                    recurrenceScore: hasConflictPressure ? 0.63 : 0.41,
+                    sovereignReviewRequired: riskCard.riskLevel >= .high,
+                    shadowTrialState: pendingShadowTrialCount > 0 ? "pending" : (failedShadowTrialCount > 0 ? "failed" : (passedShadowTrialCount > 0 ? "passed" : "not_required"))
+                )
+            )
+        }
+
+        if gateClean && candidateRefs.isEmpty == false {
+            learningExportBundles.append(
+                BASLearningExportBundle(
+                    bundleID: "export.\(timestampToken).0",
+                    candidateRefs: candidateRefs,
+                    scrubbed: true,
+                    privacySafe: true,
+                    sovereignSafe: true,
+                    evaluationTags: ["l13", "nursery", output.mode.rawValue]
+                )
+            )
+        }
+
+        return BASEvolutionGovernanceArtifacts(
+            updateTickets: governedTickets,
+            experienceCandidates: experienceCandidates,
+            workflowCandidates: workflowCandidates,
+            guardTemplateCandidates: guardTemplateCandidates,
+            biasRecords: biasRecords,
+            riskPatternCandidates: riskPatternCandidates,
+            learningExportBundles: learningExportBundles,
+            shadowTrialRecords: shadowTrialRecords,
+            versionDeltas: versionDeltas,
+            retractionOrders: retractionOrders,
+            evolutionSeals: evolutionSeals
+        )
     }
 
     private func defaultNeuralCoreFrame(
@@ -2491,17 +3767,51 @@ public struct BASEBrainRuntimeCoordinator {
             return BASActionPermit(
                 schemaVersion: permit.schemaVersion,
                 mode: .answer,
+                stackedModes: permit.stackedModes,
                 reasonCodes: reasonCodes,
+                allowedDomains: allowedDomains(for: .answer),
+                blockedDomains: forbiddenDomains(for: .answer),
+                assertionCeiling: "standard",
+                toolScope: "bounded",
+                memoryScope: permit.memoryScope,
+                requireMirror: permit.stackedModes.contains(.mirror),
+                requireCompare: permit.stackedModes.contains(.compare),
                 requireSecondCheck: permit.requireSecondCheck,
                 outputLengthCap: permit.outputLengthCap,
                 tonePolicy: permit.tonePolicy,
                 templatePolicy: permit.templatePolicy
             )
+        case .mirror:
+            return BASActionPermit(
+                schemaVersion: permit.schemaVersion,
+                mode: .mirror,
+                stackedModes: [.compare],
+                reasonCodes: reasonCodes,
+                allowedDomains: allowedDomains(for: .mirror),
+                blockedDomains: forbiddenDomains(for: .mirror),
+                assertionCeiling: "guarded",
+                toolScope: "none",
+                memoryScope: "standard",
+                requireMirror: true,
+                requireCompare: true,
+                requireSecondCheck: false,
+                outputLengthCap: min(permit.outputLengthCap, 220),
+                tonePolicy: "mirrored_grounded",
+                templatePolicy: "mirror_before_commit"
+            )
         case .compare:
             return BASActionPermit(
                 schemaVersion: permit.schemaVersion,
                 mode: .compare,
+                stackedModes: permit.stackedModes,
                 reasonCodes: reasonCodes,
+                allowedDomains: allowedDomains(for: .compare),
+                blockedDomains: forbiddenDomains(for: .compare),
+                assertionCeiling: "guarded",
+                toolScope: "bounded",
+                memoryScope: "standard",
+                requireMirror: permit.stackedModes.contains(.mirror),
+                requireCompare: true,
                 requireSecondCheck: false,
                 outputLengthCap: min(permit.outputLengthCap, 220),
                 tonePolicy: "grounded_compare",
@@ -2511,11 +3821,58 @@ public struct BASEBrainRuntimeCoordinator {
             return BASActionPermit(
                 schemaVersion: permit.schemaVersion,
                 mode: .delay,
+                stackedModes: [.draftOnly],
                 reasonCodes: reasonCodes,
+                allowedDomains: allowedDomains(for: .delay),
+                blockedDomains: forbiddenDomains(for: .delay),
+                assertionCeiling: "guarded",
+                toolScope: "none",
+                memoryScope: "review_only",
+                requireMirror: true,
+                requireCompare: true,
                 requireSecondCheck: true,
                 outputLengthCap: min(permit.outputLengthCap, 160),
                 tonePolicy: "calm_guarded",
-                templatePolicy: "delay_with_alternative"
+                templatePolicy: "delay_with_alternative",
+                delayWindow: permit.delayWindow ?? "cool_down"
+            )
+        case .draftOnly:
+            return BASActionPermit(
+                schemaVersion: permit.schemaVersion,
+                mode: .draftOnly,
+                stackedModes: [.delay],
+                reasonCodes: reasonCodes,
+                allowedDomains: allowedDomains(for: .draftOnly),
+                blockedDomains: forbiddenDomains(for: .draftOnly),
+                assertionCeiling: "guarded",
+                toolScope: "none",
+                memoryScope: "review_only",
+                requireMirror: true,
+                requireCompare: true,
+                requireSecondCheck: true,
+                outputLengthCap: min(permit.outputLengthCap, 160),
+                tonePolicy: "calm_guarded",
+                templatePolicy: "draft_only_guarded",
+                delayWindow: permit.delayWindow ?? "cool_down"
+            )
+        case .localOnly:
+            return BASActionPermit(
+                schemaVersion: permit.schemaVersion,
+                mode: .localOnly,
+                stackedModes: [.replace],
+                reasonCodes: reasonCodes,
+                allowedDomains: allowedDomains(for: .localOnly),
+                blockedDomains: forbiddenDomains(for: .localOnly),
+                assertionCeiling: "guarded",
+                toolScope: "local_only",
+                memoryScope: "review_only",
+                requireMirror: true,
+                requireCompare: true,
+                requireSecondCheck: true,
+                outputLengthCap: min(permit.outputLengthCap, 180),
+                tonePolicy: "clear_firm",
+                templatePolicy: "local_only_action",
+                substituteRequired: true
             )
         case .block:
             return BASActionPermit.protectiveBlock(reasonCodes: reasonCodes)
@@ -2523,11 +3880,40 @@ public struct BASEBrainRuntimeCoordinator {
             return BASActionPermit(
                 schemaVersion: permit.schemaVersion,
                 mode: .replace,
+                stackedModes: [.localOnly],
                 reasonCodes: reasonCodes,
+                allowedDomains: allowedDomains(for: .replace),
+                blockedDomains: forbiddenDomains(for: .replace),
+                assertionCeiling: "guarded",
+                toolScope: "bounded",
+                memoryScope: "review_only",
+                requireMirror: true,
+                requireCompare: true,
                 requireSecondCheck: false,
                 outputLengthCap: min(permit.outputLengthCap, 180),
                 tonePolicy: "clear_firm",
-                templatePolicy: "protective_alternative"
+                templatePolicy: "protective_alternative",
+                substituteRequired: true
+            )
+        case .escalate:
+            return BASActionPermit(
+                schemaVersion: permit.schemaVersion,
+                mode: .escalate,
+                stackedModes: [.block],
+                reasonCodes: reasonCodes,
+                allowedDomains: allowedDomains(for: .escalate),
+                blockedDomains: forbiddenDomains(for: .escalate),
+                assertionCeiling: "minimal",
+                toolScope: "none",
+                memoryScope: "frozen",
+                requireMirror: true,
+                requireCompare: true,
+                requireSecondCheck: true,
+                outputLengthCap: min(permit.outputLengthCap, 140),
+                tonePolicy: "calm_guarded",
+                templatePolicy: "escalate_to_sovereign",
+                substituteRequired: true,
+                escalationHintRef: "sovereign.high"
             )
         }
     }
@@ -2841,7 +4227,7 @@ public struct BASEBrainRuntimeCoordinator {
         updateTickets: [BASUpdateTicket],
         renderedOutput: BASRenderedOutput
     ) -> [BASSovereignCommitToken] {
-        guard sovereignVerdict.verdictLevel < .toolCut else {
+        guard sovereignVerdict.verdictLevel < .quarantine else {
             return []
         }
 
@@ -2911,6 +4297,18 @@ public struct BASEBrainRuntimeCoordinator {
         return tokens
     }
 
+    private func buildSovereignWarrants(
+        sovereignCommitTokens: [BASSovereignCommitToken],
+        runtimeTrace: BASRuntimeTrace
+    ) -> [BASSovereignWarrant] {
+        sovereignCommitTokens.map { token in
+            makeSovereignWarrant(
+                from: token,
+                runtimeTrace: runtimeTrace
+            )
+        }
+    }
+
     private func makeCommitToken(
         sessionID: String,
         turnID: String,
@@ -2954,6 +4352,38 @@ public struct BASEBrainRuntimeCoordinator {
             ttlMs: ttlMs,
             nonce: nonce,
             singleUse: true,
+            signature: signature
+        )
+    }
+
+    private func makeSovereignWarrant(
+        from token: BASSovereignCommitToken,
+        runtimeTrace: BASRuntimeTrace
+    ) -> BASSovereignWarrant {
+        let jurisdictionRef = "jurisdiction.\(token.scope.rawValue)"
+        let timeLockRef = "timelock.\(token.turnID).\(token.scope.rawValue).ttl_\(token.ttlMs)"
+        let warrantID = "warrant.\(token.scope.rawValue).\(runtimeTrace.sessionID).\(abs(token.actionDigest.hashValue))"
+        let signature = sovereignDigestHex(
+            [
+                warrantID,
+                token.scope.rawValue,
+                token.actionDigest,
+                jurisdictionRef,
+                token.snapshotRef,
+                timeLockRef,
+                String(token.singleUse),
+                token.signature
+            ]
+        )
+
+        return BASSovereignWarrant(
+            warrantID: warrantID,
+            scope: token.scope,
+            actionDigest: token.actionDigest,
+            jurisdictionRef: jurisdictionRef,
+            snapshotRef: token.snapshotRef,
+            timeLockRef: timeLockRef,
+            singleUse: token.singleUse,
             signature: signature
         )
     }
@@ -3013,6 +4443,7 @@ public struct BASEBrainRuntimeCoordinator {
     private func buildSovereignAuditEntry(
         sovereignVerdict: BASSovereignVerdict,
         sovereignCommitTokens: [BASSovereignCommitToken],
+        sovereignWarrants: [BASSovereignWarrant],
         quarantineRecords: [BASQuarantineRecord],
         runtimeTrace: BASRuntimeTrace,
         thoughtFold: BASThoughtFold,
@@ -3022,7 +4453,10 @@ public struct BASEBrainRuntimeCoordinator {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
         let auditID = "audit.\(runtimeTrace.sessionID).\(sovereignVerdict.verdictLevel.rawValue)"
-        let actionRefs = sovereignCommitTokens.map(\.tokenID) + quarantineRecords.map(\.quarantineID)
+        let actionRefs =
+            sovereignCommitTokens.map(\.tokenID)
+            + sovereignWarrants.map(\.warrantID)
+            + quarantineRecords.map(\.quarantineID)
         let signalRefs = orderedReasonCodes(
             [
                 "risk:\(riskCard.riskLevel.rawValue)",
@@ -3546,7 +4980,10 @@ public struct BASEBrainRuntimeCoordinator {
                 BASRuntimeTraceEvent(
                     layerID: "L9",
                     event: "loop",
-                    detail: "Loop converged after \(loopCount) rounds with stop reason \((thoughtFrame.stopReason ?? .candidateStable).rawValue)."
+                    detail: dreamLoopTraceDetail(
+                        thoughtFrame: thoughtFrame,
+                        loopCount: loopCount
+                    )
                 ),
                 BASRuntimeTraceEvent(
                     layerID: "L10",
@@ -3568,12 +5005,19 @@ public struct BASEBrainRuntimeCoordinator {
                 BASRuntimeTraceEvent(
                     layerID: "L12",
                     event: "render",
-                    detail: "Rendered \(actionPermit.mode.rawValue) output."
+                    detail: renderTraceDetail(
+                        renderedOutput: renderedOutput,
+                        mergedChoice: mergedChoice,
+                        thoughtFrame: thoughtFrame
+                    )
                 ),
                 BASRuntimeTraceEvent(
                     layerID: "L13",
                     event: "evolution",
-                    detail: evolutionTraceDetail(updateTickets: updateTickets)
+                    detail: evolutionTraceDetail(
+                        updateTickets: updateTickets,
+                        thoughtFrame: thoughtFrame
+                    )
                 )
             ],
             latencyBreakdownMs: [
@@ -3740,7 +5184,8 @@ public struct BASEBrainRuntimeCoordinator {
                     + frontier.dominanceOrder
                     + frontier.reversiblePaths
                     + frontier.guardPaths
-                    + [String(frontier.frontierWidth)]
+                    + frontier.delayedPaths
+                    + [String(frontier.frontierWidth), String(format: "%.2f", frontier.diversityScore)]
                 ).joined(separator: "||")
             )
         }
@@ -3763,7 +5208,27 @@ public struct BASEBrainRuntimeCoordinator {
             + candidateSignatures
             + [restorePointer, organChecksum ?? "", frontierChecksum ?? "", bindingChecksum ?? ""]
         ).joined(separator: "||")
-
+        let activeOrgans = thoughtFrame.organMap?.activeOrgans ?? [.stubCore]
+        let currentBreathMode = runtimeThoughtFoldBreathMode(
+            contextFrame: contextFrame,
+            thoughtFrame: thoughtFrame,
+            riskCard: riskCard
+        )
+        let thoughtFoldHotColdMap = runtimeThoughtFoldHotColdMap(
+            currentBreathMode: currentBreathMode,
+            activeOrgans: activeOrgans
+        )
+        let organPackageRefs = activeOrgans.map { organ in
+            let packageClass: String
+            if thoughtFoldHotColdMap.hotOrgans.contains(organ) {
+                packageClass = "hot"
+            } else if thoughtFoldHotColdMap.warmOrgans.contains(organ) {
+                packageClass = "warm"
+            } else {
+                packageClass = "cold"
+            }
+            return "package.\(organ.rawValue.lowercased()).\(packageClass)"
+        }
         return BASThoughtFold(
             foldID: "\(request.hostID).\(thoughtFrame.stepIndex)",
             compactSlots: compactSlots,
@@ -3787,7 +5252,11 @@ public struct BASEBrainRuntimeCoordinator {
             hotColdMapRef: "hotcold.\(request.hostID).\(thoughtFrame.stepIndex)",
             precisionProfileRef: "precision.\(request.hostID).\(thoughtFrame.stepIndex)",
             lungStateRef: "lung.\(request.hostID).\(thoughtFrame.stepIndex)",
-            breathSchedulerRef: "scheduler.\(request.hostID).\(thoughtFrame.stepIndex)"
+            breathSchedulerRef: "scheduler.\(request.hostID).\(thoughtFrame.stepIndex)",
+            thermalExchangeRef: "thermal.\(request.hostID).\(thoughtFrame.stepIndex)",
+            integrityWeaveRef: "integrity.\(request.hostID).\(thoughtFrame.stepIndex)",
+            organPackageRefs: organPackageRefs,
+            organDeltaPlanRef: "delta.\(request.hostID).\(thoughtFrame.stepIndex)"
         )
     }
 
@@ -3795,6 +5264,149 @@ public struct BASEBrainRuntimeCoordinator {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > limit else { return trimmed }
         return String(trimmed.prefix(limit)) + "..."
+    }
+
+    private func runtimeThoughtFoldBreathMode(
+        contextFrame: BASContextFrame,
+        thoughtFrame: BASThoughtFrame,
+        riskCard: BASRiskCard
+    ) -> String {
+        if riskCard.riskLevel == .extreme {
+            return "lockdown"
+        }
+        if riskCard.riskLevel == .high || thoughtFrame.actionPermit?.mode.isProtective == true {
+            return "guard"
+        }
+        if thoughtFrame.candidates.count > 1 || thoughtFrame.stepIndex > 1 {
+            return "deepExchange"
+        }
+        if contextFrame.taskType == .choice
+            || contextFrame.taskType == .conflict
+            || thoughtFrame.candidateFrontier?.frontierWidth ?? 0 > 0 {
+            return "structured"
+        }
+        return "light"
+    }
+
+    private func runtimeThoughtFoldHotColdMap(
+        currentBreathMode: String,
+        activeOrgans: [BASNeuralOrgan]
+    ) -> BASHotColdMap {
+        let hotPriority = runtimeThoughtFoldHotPriority(for: currentBreathMode)
+        let warmPriority = runtimeThoughtFoldWarmPriority(for: currentBreathMode)
+        let hotOrgans = (hotPriority.filter { activeOrgans.contains($0) }
+            + (activeOrgans.contains(.stubCore) ? [.stubCore] : []))
+            .reduce(into: [BASNeuralOrgan]()) { result, organ in
+                guard result.contains(organ) == false else { return }
+                result.append(organ)
+            }
+        let normalizedHotOrgans = hotOrgans.isEmpty ? [.stubCore] : hotOrgans
+        let warmOrgans = (activeOrgans + warmPriority).reduce(into: [BASNeuralOrgan]()) { result, organ in
+            guard normalizedHotOrgans.contains(organ) == false, result.contains(organ) == false else { return }
+            result.append(organ)
+        }
+        let coldOrgans = BASNeuralOrgan.allCases.filter {
+            normalizedHotOrgans.contains($0) == false && warmOrgans.contains($0) == false
+        }
+
+        return BASHotColdMap(
+            hotOrgans: normalizedHotOrgans,
+            warmOrgans: warmOrgans,
+            coldOrgans: coldOrgans,
+            preloadPolicy: runtimeThoughtFoldPreloadPolicy(for: currentBreathMode),
+            evictionPolicy: runtimeThoughtFoldEvictionPolicy(for: currentBreathMode)
+        )
+    }
+
+    private func runtimeThoughtFoldOrganPackageID(
+        for organ: BASNeuralOrgan,
+        hotColdMap: BASHotColdMap
+    ) -> String {
+        let packageClass: String
+        if hotColdMap.hotOrgans.contains(organ) {
+            packageClass = "hot"
+        } else if hotColdMap.warmOrgans.contains(organ) {
+            packageClass = "warm"
+        } else {
+            packageClass = "cold"
+        }
+        return "package.\(organ.rawValue.lowercased()).\(packageClass)"
+    }
+
+    private func runtimeThoughtFoldHotPriority(
+        for currentBreathMode: String
+    ) -> [BASNeuralOrgan] {
+        switch currentBreathMode {
+        case "guard":
+            return [.stubCore, .riskSpine, .permitKnot, .consistencyLattice]
+        case "quarantine":
+            return [.stubCore, .riskSpine, .permitKnot, .consistencyLattice, .tissueRouter]
+        case "lockdown":
+            return [.stubCore, .riskSpine, .permitKnot]
+        case "deepExchange":
+            return [.stubCore, .coreCortex, .riskSpine, .permitKnot, .simuRing, .criticBlade]
+        case "structured":
+            return [.stubCore, .coreCortex, .riskSpine, .permitKnot]
+        default:
+            return [.stubCore, .scoutStrip, .coreCortex]
+        }
+    }
+
+    private func runtimeThoughtFoldWarmPriority(
+        for currentBreathMode: String
+    ) -> [BASNeuralOrgan] {
+        switch currentBreathMode {
+        case "guard":
+            return [.memoryCodecRidge, .hostModulationMesh, .toolIntentMesh]
+        case "quarantine":
+            return [.memoryCodecRidge, .hostModulationMesh]
+        case "lockdown":
+            return [.memoryCodecRidge]
+        case "deepExchange":
+            return [.consistencyLattice, .memoryCodecRidge, .hostModulationMesh, .toolIntentMesh]
+        case "structured":
+            return [.simuRing, .criticBlade, .consistencyLattice, .memoryCodecRidge]
+        default:
+            return [.riskSpine, .permitKnot, .memoryCodecRidge]
+        }
+    }
+
+    private func runtimeThoughtFoldPreloadPolicy(
+        for currentBreathMode: String
+    ) -> String {
+        switch currentBreathMode {
+        case "guard":
+            return "guard_preload"
+        case "quarantine":
+            return "quarantine_rehydrate"
+        case "lockdown":
+            return "lockdown_stub_only"
+        case "deepExchange":
+            return "deep_exchange_prefetch"
+        case "structured":
+            return "structured_preload"
+        default:
+            return "light_preload"
+        }
+    }
+
+    private func runtimeThoughtFoldEvictionPolicy(
+        for currentBreathMode: String
+    ) -> String {
+        switch currentBreathMode {
+        case "guard":
+            return "protective_retain"
+        case "quarantine":
+            return "quarantine_protective"
+        case "lockdown":
+            return "lockdown_evict_all"
+        case "deepExchange":
+            return "thermal_trim"
+        case "structured":
+            return "balanced_trim"
+        default:
+            return "latency_bias"
+        }
     }
 
     private func goalSpineSummary(
@@ -3844,11 +5456,18 @@ public struct BASEBrainRuntimeCoordinator {
         mergedChoice: BASMergedChoice
     ) -> String {
         let scoreCount = thoughtFrame.triScores.count
+        let courtFragments = [
+            mergedChoice.agencyReservation.map { "agency \($0.mode.rawValue)" },
+            mergedChoice.remandOrders?.isEmpty == false
+                ? "remand \(summarizedTokens(mergedChoice.remandOrders?.map(\.targetLayer) ?? []))"
+                : nil
+        ].compactMap { $0 }
+        let courtSuffix = courtFragments.isEmpty ? "" : " with \(courtFragments.joined(separator: ", "))."
         guard mergedChoice.vetoApplied else {
-            return "Merged \(scoreCount) tri-self scores and selected \(mergedChoice.candidateID) without veto."
+            return "Merged \(scoreCount) tri-self scores and selected \(mergedChoice.candidateID) without veto\(courtSuffix)"
         }
 
-        return "Merged \(scoreCount) tri-self scores and selected \(mergedChoice.candidateID) after veto \(summarizedTokens(mergedChoice.vetoReasonCodes))."
+        return "Merged \(scoreCount) tri-self scores and selected \(mergedChoice.candidateID) after veto \(summarizedTokens(mergedChoice.vetoReasonCodes))\(courtSuffix)"
     }
 
     private func riskGateTraceDetail(
@@ -3859,21 +5478,62 @@ public struct BASEBrainRuntimeCoordinator {
         "Risk \(riskCard.riskLevel.rawValue) with GSI \(Int((riskCard.gsiScore * 100).rounded())) produced permit \(actionPermit.mode.rawValue) via \(summarizedTokens(renderedOutput.explanationCodes))."
     }
 
+    private func dreamLoopTraceDetail(
+        thoughtFrame: BASThoughtFrame,
+        loopCount: Int
+    ) -> String {
+        let stopReason = (thoughtFrame.stopReason ?? .candidateStable).rawValue
+        let convergence = thoughtFrame.convergenceCertificate?.stoppingMode.rawValue ?? "none"
+        let frontierWidth = thoughtFrame.candidateFrontier?.frontierWidth ?? thoughtFrame.candidates.count
+        let weakPredictionCount = thoughtFrame.uncertaintyLedger?.weakPredictions.count ?? 0
+        let breakpointCount = thoughtFrame.sovereignBreakpointHints?.count ?? 0
+        let maxEvidenceDebt = thoughtFrame.evidenceDebts?.map(\.debtWeight).max() ?? 0
+        let debtPercent = Int((maxEvidenceDebt * 100).rounded())
+
+        return "Loop converged after \(loopCount) rounds with stop reason \(stopReason), convergence \(convergence), frontier \(frontierWidth), weak predictions \(weakPredictionCount), max debt \(debtPercent)%, breakpoints \(breakpointCount)."
+    }
+
+    private func renderTraceDetail(
+        renderedOutput: BASRenderedOutput,
+        mergedChoice: BASMergedChoice,
+        thoughtFrame: BASThoughtFrame
+    ) -> String {
+        let dreamLoopState = thoughtFrame.convergenceCertificate?.stoppingMode.rawValue ?? "none"
+        let agencyMode = mergedChoice.agencyReservation?.mode.rawValue ?? "none"
+        let disclosureCount = mergedChoice.courtDecisionDraft?.requiredDisclosures.count ?? 0
+        return "Rendered \(renderedOutput.mode.rawValue) output with dream loop \(dreamLoopState), agency \(agencyMode), disclosures \(disclosureCount)."
+    }
+
     private func evolutionTraceDetail(
-        updateTickets: [BASUpdateTicket]
+        updateTickets: [BASUpdateTicket],
+        thoughtFrame: BASThoughtFrame
     ) -> String {
         let reviewCount = updateTickets.filter(\.requiresReview).count
         let conflictCount = updateTickets.filter(\.conflictFlag).count
         let ruleRefs = updateTickets.compactMap(\.ruleCandidateRef)
-        let hostChangeTypes = updateTickets.compactMap { $0.hostChangeCandidate?.changeType }
+        let hostChangeTypes = updateTickets.compactMap { $0.resolvedHostChangeCandidate?.changeType }
+        let dreamLoopSignals = unique(
+            updateTickets
+                .flatMap(\.governanceRefs)
+                .filter { $0.hasPrefix("dream_loop:") }
+                .map { $0.replacingOccurrences(of: "dream_loop:", with: "") }
+        )
         let ruleSummary = ruleRefs.isEmpty
             ? "no rule candidates"
             : "rule refs \(summarizedTokens(ruleRefs))"
         let hostChangeSummary = hostChangeTypes.isEmpty
-            ? "host changes 0"
-            : "host changes \(hostChangeTypes.count) via \(summarizedTokens(hostChangeTypes))"
+            ? "constitution changes 0"
+            : "constitution changes \(hostChangeTypes.count) via \(summarizedTokens(hostChangeTypes))"
+        let dreamLoopSummary: String
+        if dreamLoopSignals.isEmpty == false {
+            dreamLoopSummary = "dream loop \(summarizedTokens(dreamLoopSignals))"
+        } else if let stoppingMode = thoughtFrame.convergenceCertificate?.stoppingMode.rawValue {
+            dreamLoopSummary = "dream loop \(stoppingMode)"
+        } else {
+            dreamLoopSummary = "dream loop none"
+        }
 
-        return "Generated \(updateTickets.count) update tickets, review \(reviewCount), conflicts \(conflictCount), \(ruleSummary), \(hostChangeSummary)."
+        return "Generated \(updateTickets.count) update tickets, review \(reviewCount), conflicts \(conflictCount), \(ruleSummary), \(hostChangeSummary), \(dreamLoopSummary)."
     }
 
     private func appendingSovereignTraceEvent(
@@ -3977,14 +5637,22 @@ public struct BASEBrainRuntimeCoordinator {
         switch mode {
         case .answer:
             return 0
-        case .compare:
+        case .mirror:
             return 1
-        case .delay:
+        case .compare:
             return 2
-        case .replace:
+        case .delay:
             return 3
-        case .block:
+        case .draftOnly:
             return 4
+        case .localOnly:
+            return 5
+        case .replace:
+            return 6
+        case .block:
+            return 7
+        case .escalate:
+            return 8
         }
     }
 
@@ -3994,14 +5662,22 @@ public struct BASEBrainRuntimeCoordinator {
         switch mode {
         case .answer:
             return ["bounded_reply", "plain_language"]
+        case .mirror:
+            return ["bounded_reply", "mirror"]
         case .compare:
             return ["bounded_reply", "comparison"]
         case .delay:
             return ["bounded_reply"]
+        case .draftOnly:
+            return ["bounded_reply", "draft"]
+        case .localOnly:
+            return ["bounded_reply", "local_action"]
         case .replace:
             return ["bounded_reply", "protective_alternative"]
         case .block:
             return ["protective_receipt"]
+        case .escalate:
+            return ["protective_receipt", "sovereign_alert"]
         }
     }
 
@@ -4011,14 +5687,22 @@ public struct BASEBrainRuntimeCoordinator {
         switch mode {
         case .answer:
             return []
+        case .mirror:
+            return ["tool_commit", "memory_commit", "host_commit"]
         case .compare:
             return ["tool_commit"]
         case .delay:
             return ["tool_commit", "memory_commit"]
+        case .draftOnly:
+            return ["tool_commit", "memory_commit", "host_commit"]
+        case .localOnly:
+            return ["memory_commit", "host_commit", "public_release"]
         case .replace:
             return ["tool_commit", "memory_commit", "host_commit"]
         case .block:
             return ["tool_commit", "memory_commit", "host_commit", "high_consequence_decode"]
+        case .escalate:
+            return ["tool_commit", "memory_commit", "host_commit", "public_release", "high_consequence_decode"]
         }
     }
 

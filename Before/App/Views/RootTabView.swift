@@ -187,7 +187,7 @@ struct RootTabView: View {
         case .reflection:
             appModel.reflectionContext = nil
         case .evolutionControl:
-            appModel.isEvolutionControlCenterPresented = false
+            appModel.dismissEvolutionControlCenter()
         case .sessionEngineControl:
             appModel.isSessionEngineControlCenterPresented = false
         }

@@ -811,48 +811,59 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             latestCheckpointSeq: 42,
             latestCheckpointGoal: "repair parser",
             latestCheckpointActionLine: "action: restored parser workspace",
-            latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
-                sessionID: "sess-control",
-                thoughtFoldChecksum: "fold-control",
-                riskLevel: "high",
-                permitMode: "delay",
-                hostGatePercent: 74,
-                reviewDirectiveLine: "Review guarded resume path",
-                lungState: BASLungState(
+            latestCheckpointEBrainAnchor: {
+                var anchor = DecisionSessionCheckpointEBrainAnchor(
+                    sessionID: "sess-control",
+                    thoughtFoldChecksum: "fold-control",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 74,
+                    reviewDirectiveLine: "Review guarded resume path"
+                )
+                anchor.stackedModes = ["draftOnly", "mirror"]
+                anchor.assertionCeiling = "guarded"
+                anchor.allowedDomains = ["draft.note", "text.delay"]
+                anchor.blockedDomains = ["tool.write", "memory.write", "host.write"]
+                anchor.delayType = "cool_down"
+                anchor.substituteType = "draft"
+                anchor.sovereignHintLevel = "elevated"
+                anchor.lungState = BASLungState(
                     breathMode: .guard,
                     breathPhase: .resume,
                     thermalPressure: 71,
                     cachePressure: 49,
                     restoreReadiness: 0.91,
                     rollbackAnchorRef: "anchor-control"
-                ),
-                resumeFrame: BASResumeFrame(
+                )
+                anchor.resumeFrame = BASResumeFrame(
                     resumeID: "resume-control",
                     sourceFoldID: "fold-control",
                     resumeDepth: 1,
                     requiredOrgans: [.riskSpine, .stubCore],
                     consistencyChecks: ["fold_checksum"],
                     fallbackMode: .rollbackAnchor
-                ),
-                rollbackAnchor: BASRollbackAnchor(
+                )
+                anchor.rollbackAnchor = BASRollbackAnchor(
                     anchorID: "anchor-control",
                     safeSnapshotRef: "snapshot-control",
                     foldRefs: ["fold-control"],
                     hostVersionRef: "host.v3",
                     cacheStateRef: "cache-control",
                     integrityHash: "hash-control"
-                ),
-                sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult(
+                )
+                anchor.sovereignBridgeResult = DecisionFoldedLungSovereignBridgeResult(
                     actuationKinds: [.quarantine],
                     invalidatedResumeFrameIDs: [],
                     invalidatedCacheRefs: [],
                     invalidatedFoldRefs: [],
+                    invalidatedPackageIDs: [],
                     quarantinedFoldRefs: ["fold-control"],
                     resultingBreathMode: .quarantine,
                     preservedReadOnlyRecovery: true,
                     summary: "quarantine -> fold-control"
                 )
-            ),
+                return anchor
+            }(),
             latestEventID: "evt-43",
             latestEventSeq: 43,
             latestEventType: .stepStalled,
@@ -865,60 +876,119 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             recoveryCount: 2,
             latestRecoveryAt: Date(timeIntervalSince1970: 210)
         )
+        let controlPresentation = DecisionSessionControlPresentationSupport.sessionPresentation(
+            session: controlSession,
+            inspection: controlInspection,
+            isSelected: true
+        )
+        XCTAssertEqual(controlPresentation.sessionID, "sess-control")
+        XCTAssertEqual(controlPresentation.title, "Parser repair")
+        XCTAssertEqual(controlPresentation.statusLine, "Stalled • step stalled")
         XCTAssertEqual(
-            DecisionSessionControlPresentationSupport.sessionPresentation(
-                session: controlSession,
-                inspection: controlInspection,
-                isSelected: true
-            ),
-            DecisionSessionEngineControlSessionPresentation(
-                sessionID: "sess-control",
-                title: "Parser repair",
-                statusLine: "Stalled • step stalled",
-                healthSummary: DecisionSessionEngineHealthSummary(
-                    severity: .watch,
-                    title: "Recovery ready",
-                    detail: "A stalled step was detected. Recovery should stay available from the last stable checkpoint."
-                ),
-                checkpointLine: "Checkpoint ckpt-9 • repair parser",
-                checkpointBudgetLine: nil,
-                checkpointDecisionLine: nil,
-                checkpointTaskLine: nil,
-                checkpointPressureLine: nil,
-                checkpointRiskFactorsLine: nil,
-                checkpointReasonCodesLine: nil,
-                checkpointAuditLine: nil,
-                checkpointSovereignVerdictLine: nil,
-                checkpointSovereignAuthorityLine: nil,
-                checkpointSovereignAuditLine: nil,
-                checkpointKillSwitchesLine: nil,
-                checkpointActionLine: "action: restored parser workspace",
-                checkpointLungLine: "Breath guard • Phase resume • Restore 91%",
-                checkpointHotColdLine: "Hot pack stubCore, riskSpine • Warm memoryCodecRidge, hostModulationMesh, toolIntentMesh • Cold 7 • preload guard_preload • eviction protective_retain",
-                checkpointResumeLine: "Resume frame resume-control • source fold-control • depth 1 • organs riskSpine, stubCore",
-                checkpointRollbackLine: "Rollback anchor anchor-control • snapshot snapshot-control • cache cache-control",
-                checkpointSovereignBridgeLine: "quarantine -> fold-control",
-                checkpointSovereignBridgeDetailLines: [
-                    "Sovereign quarantined fold fold-control",
-                    "Sovereign readonly recovery",
-                    "Sovereign mode quarantine"
-                ],
-                branchLine: "Head branch-main • Branches 2 • Merge-ready 1",
-                recoveryLine: "Recoveries 2 • latest \(shortenedTime(Date(timeIntervalSince1970: 210)))",
-                mergeReviewLine: "Merge review 1 active correction branch can append back onto head without rewriting history.",
-                faultLine: "Fault line • A stalled step was detected. Recovery should stay available from the last stable checkpoint.",
-                stepFreshnessLine: "Step stalled • awaiting first heartbeat",
-                stepAlertLine: "A stalled step was detected. Recovery should stay available from the last stable checkpoint.",
-                detailLine: "ckpt ckpt-9 • evt 43 • steps 1 • stalled • Step stalled • awaiting first heartbeat • recoveries 2",
-                updatedAt: Date(timeIntervalSince1970: 200),
-                canPause: false,
-                canResume: false,
-                canRecover: true,
-                canArchive: true,
-                canCorrect: true,
-                isSelected: true
+            controlPresentation.healthSummary,
+            DecisionSessionEngineHealthSummary(
+                severity: .watch,
+                title: "Recovery ready",
+                detail: "A stalled step was detected. Recovery should stay available from the last stable checkpoint."
             )
         )
+        XCTAssertEqual(controlPresentation.checkpointLine, "Checkpoint ckpt-9 • repair parser")
+        XCTAssertNil(controlPresentation.checkpointBudgetLine)
+        XCTAssertNil(controlPresentation.checkpointDecisionLine)
+        XCTAssertNil(controlPresentation.checkpointTaskLine)
+        XCTAssertEqual(
+            controlPresentation.checkpointWindGateLine,
+            "L11 wind gate • primary delay • stacked draftOnly, mirror • assert guarded • allow draft.note, text.delay • block tool.write, memory.write, host.write • delay cool_down • substitute draft • sovereign elevated"
+        )
+        XCTAssertNil(controlPresentation.checkpointPressureLine)
+        XCTAssertNil(controlPresentation.checkpointRiskFactorsLine)
+        XCTAssertNil(controlPresentation.checkpointReasonCodesLine)
+        XCTAssertNil(controlPresentation.checkpointAuditLine)
+        XCTAssertNil(controlPresentation.checkpointSovereignVerdictLine)
+        XCTAssertNil(controlPresentation.checkpointSovereignAuthorityLine)
+        XCTAssertNil(controlPresentation.checkpointSovereignAuditLine)
+        XCTAssertNil(controlPresentation.checkpointKillSwitchesLine)
+        XCTAssertEqual(controlPresentation.checkpointActionLine, "action: restored parser workspace")
+        XCTAssertEqual(
+            controlPresentation.checkpointMorphLine,
+            "Morph graph morph.sess-control.fold-control • organs riskSpine, stubCore • route checkpoint • thermal checkpoint-recovery"
+        )
+        XCTAssertEqual(controlPresentation.checkpointLungLine, "Breath guard • Phase resume • Restore 91%")
+        XCTAssertEqual(
+            controlPresentation.checkpointHotColdLine,
+            "Hot pack stubCore, riskSpine • Warm memoryCodecRidge, hostModulationMesh, toolIntentMesh • Cold 7 • preload guard_preload • eviction protective_retain"
+        )
+        XCTAssertEqual(
+            controlPresentation.checkpointPrecisionLine,
+            "Precision profile full -> protected -> balanced -> minimal • floor protected • locked riskSpine, stubCore"
+        )
+        XCTAssertEqual(
+            controlPresentation.checkpointOrganPackageLine,
+            "Organ packages 12 • hot 2 • warm 3 • cold 7 • protected 3 • recovery 2"
+        )
+        XCTAssertEqual(
+            controlPresentation.checkpointOrganDeltaLine,
+            "Organ delta quarantine_swap • activate package.stubcore.hot, package.riskspine.hot • preload package.memorycodecridge.warm, package.hostmodulationmesh.warm, package.toolintentmesh.warm • evict package.criticblade.cold • rollback-safe package.stubcore.hot, package.riskspine.hot, package.memorycodecridge.warm, package.permitknot.cold, package.consistencylattice.cold • sovereign quarantine"
+        )
+        XCTAssertEqual(
+            controlPresentation.checkpointSchedulerLine,
+            "Breath scheduler guard_resume • checkpoint anchor_each_turn • micro-sleep 203ms • maintenance 0ms • resume rollback_hot"
+        )
+        XCTAssertEqual(
+            controlPresentation.checkpointThermalExchangeLine,
+            "Thermal exchanger balanced_exchange • band warm • actions delay_cold_organs • suppress criticBlade"
+        )
+        XCTAssertEqual(
+            controlPresentation.checkpointIntegrityWeaveLine,
+            "Integrity weave quarantined • checks 3/3 • contamination 1 • hash hash-control"
+        )
+        XCTAssertEqual(
+            controlPresentation.checkpointResumeLine,
+            "Resume frame resume-control • source fold-control • depth 1 • organs riskSpine, stubCore"
+        )
+        XCTAssertEqual(
+            controlPresentation.checkpointRollbackLine,
+            "Rollback anchor anchor-control • snapshot snapshot-control • cache cache-control"
+        )
+        XCTAssertEqual(controlPresentation.checkpointSovereignBridgeLine, "quarantine -> fold-control")
+        XCTAssertEqual(
+            controlPresentation.checkpointSovereignBridgeDetailLines,
+            [
+                "Sovereign quarantined fold fold-control",
+                "Sovereign quarantined package package.criticblade.cold",
+                "Sovereign readonly recovery",
+                "Sovereign mode quarantine"
+            ]
+        )
+        XCTAssertEqual(controlPresentation.branchLine, "Head branch-main • Branches 2 • Merge-ready 1")
+        XCTAssertEqual(
+            controlPresentation.recoveryLine,
+            "Recoveries 2 • latest \(shortenedTime(Date(timeIntervalSince1970: 210)))"
+        )
+        XCTAssertEqual(
+            controlPresentation.mergeReviewLine,
+            "Merge review 1 active correction branch can append back onto head without rewriting history."
+        )
+        XCTAssertEqual(
+            controlPresentation.faultLine,
+            "Fault line • A stalled step was detected. Recovery should stay available from the last stable checkpoint."
+        )
+        XCTAssertEqual(controlPresentation.stepFreshnessLine, "Step stalled • awaiting first heartbeat")
+        XCTAssertEqual(
+            controlPresentation.stepAlertLine,
+            "A stalled step was detected. Recovery should stay available from the last stable checkpoint."
+        )
+        XCTAssertEqual(
+            controlPresentation.detailLine,
+            "ckpt ckpt-9 • evt 43 • steps 1 • stalled • Step stalled • awaiting first heartbeat • recoveries 2"
+        )
+        XCTAssertEqual(controlPresentation.updatedAt, Date(timeIntervalSince1970: 200))
+        XCTAssertFalse(controlPresentation.canPause)
+        XCTAssertFalse(controlPresentation.canResume)
+        XCTAssertTrue(controlPresentation.canRecover)
+        XCTAssertTrue(controlPresentation.canArchive)
+        XCTAssertTrue(controlPresentation.canCorrect)
+        XCTAssertTrue(controlPresentation.isSelected)
         XCTAssertEqual(
             DecisionSessionControlPresentationSupport.appendOnlyMergeSummaryTitle,
             "Append-only merge"
@@ -1564,16 +1634,26 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             latestCheckpointActiveKillSwitchesLine: "eBrain active kill switches: force_guard_mode",
             latestCheckpointKillSwitchesLine: "eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes",
             latestCheckpointActionLine: "action: restored active quick workspace state",
-            latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
-                sessionID: "sess-anchor",
-                thoughtFoldChecksum: "fold9abc",
-                riskLevel: "guarded",
-                permitMode: "replace",
-                hostGatePercent: 61,
-                reviewDirectiveLine: "Review update ticket: preserve parser-only correction",
-                riskFactorsLine: "Factors: evidence_caveat_load",
-                reasonCodesLine: "Reason codes: evidence.caveat"
-            ),
+            latestCheckpointEBrainAnchor: {
+                var anchor = DecisionSessionCheckpointEBrainAnchor(
+                    sessionID: "sess-anchor",
+                    thoughtFoldChecksum: "fold9abc",
+                    riskLevel: "guarded",
+                    permitMode: "replace",
+                    hostGatePercent: 61,
+                    reviewDirectiveLine: "Review update ticket: preserve parser-only correction"
+                )
+                anchor.riskFactorsLine = "Factors: evidence_caveat_load"
+                anchor.reasonCodesLine = "Reason codes: evidence.caveat"
+                anchor.courtLine = "Court: agency delay right • remand L9"
+                anchor.stackedModes = ["localOnly"]
+                anchor.assertionCeiling = "guarded"
+                anchor.allowedDomains = ["local.action", "text.replace"]
+                anchor.blockedDomains = ["tool.write", "memory.write", "host.write"]
+                anchor.substituteType = "local_only_action"
+                anchor.sovereignHintLevel = "elevated"
+                return anchor
+            }(),
             latestEventID: "evt-10",
             latestEventSeq: 10,
             latestEventType: .stepRecovered,
@@ -1601,9 +1681,11 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             [
                 "eBrain budget: guarded • loops 2 • candidates 2 • decode 160 • thermal watch • eBrain route: npu • precision mixed • retrieval 3",
                 "eBrain risk: guarded • eBrain permit: replace • eBrain host gate: 61% • eBrain fold: fold9abc • Review update ticket: preserve parser-only correction",
+                "L11 wind gate • primary replace • stacked localOnly • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local_only_action • sovereign elevated",
                 "eBrain pressure: latency 82/1200ms • power 46% • cache 67% • thermal nominal -> watch",
                 "Factors: evidence_caveat_load",
                 "Reason codes: evidence.caveat",
+                "Court: agency delay right • remand L9",
                 "eBrain audit findings: 2 • eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes",
                 "action: restored active quick workspace state"
             ]
@@ -1635,12 +1717,20 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             "Review update ticket: preserve parser-only correction"
         )
         XCTAssertEqual(
+            presentation.activeSession?.checkpointWindGateLine,
+            "L11 wind gate • primary replace • stacked localOnly • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local_only_action • sovereign elevated"
+        )
+        XCTAssertEqual(
             presentation.activeSession?.checkpointRiskFactorsLine,
             "Factors: evidence_caveat_load"
         )
         XCTAssertEqual(
             presentation.activeSession?.checkpointReasonCodesLine,
             "Reason codes: evidence.caveat"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.checkpointCourtLine,
+            "Court: agency delay right • remand L9"
         )
     }
 
@@ -1655,11 +1745,13 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             taskLine: "Review update ticket: preserve parser-only correction",
             actionLine: "action: restored active quick workspace state",
             pressureLine: "eBrain pressure: latency 82/1200ms",
+            windGateLine: "L11 wind gate • primary replace • stacked localOnly • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local_only_action • sovereign elevated",
             riskFactorsLine: "Factors: evidence_caveat_load",
             reasonCodesLine: "Reason codes: evidence.caveat",
+            courtLine: "Court: agency delay right • remand L9",
             auditLine: "eBrain audit findings: 2",
             sovereignVerdictLine: "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
-            sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • lock session • quarantine session",
+            sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session",
             sovereignAuditLine: "Sovereign audit • BR-SOV-004 • ref audit.session-l14",
             activeKillSwitchesLine: "eBrain active kill switches: force_guard_mode",
             killSwitchesLine: "eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes",
@@ -1674,10 +1766,59 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             [
                 "Checkpoint recovery • Replay session sess-active • Head branch-main • Recovered \(shortenedTime(Date(timeIntervalSince1970: 36_000))) • latest stable checkpoint remains replayable.",
                 "Checkpoint ckpt-9 • repair parser • eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes",
-                "Factors: evidence_caveat_load • Reason codes: evidence.caveat",
+                "L11 wind gate • primary replace • stacked localOnly • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local_only_action • sovereign elevated",
+                "Factors: evidence_caveat_load • Reason codes: evidence.caveat • Court: agency delay right • remand L9",
                 "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
-                "Sovereign authority • tokens memoryWrite • lock session • quarantine session",
+                "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session",
                 "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+            ]
+        )
+    }
+
+    func testCheckpointPresentationFactsDigestLinesIncludeWindGateSummary() {
+        let facts = DecisionSessionCheckpointPresentationFacts(
+            budgetLine: nil,
+            routeLine: nil,
+            decisionLine: nil,
+            taskLine: nil,
+            pressureLine: nil,
+            presenceLine: nil,
+            riskFactorsLine: nil,
+            reasonCodesLine: nil,
+            courtLine: nil,
+            auditLine: nil,
+            activeKillSwitchesLine: nil,
+            killSwitchesLine: nil,
+            actionLine: nil,
+            anchor: {
+                var anchor = DecisionSessionCheckpointEBrainAnchor(
+                    sessionID: "sess-l11",
+                    thoughtFoldChecksum: "fold-l11",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 61,
+                    reviewDirectiveLine: "Review guarded resume path"
+                )
+                anchor.stackedModes = ["draftOnly", "mirror"]
+                anchor.assertionCeiling = "guarded"
+                anchor.allowedDomains = ["draft.note", "text.delay"]
+                anchor.blockedDomains = ["tool.write", "memory.write", "host.write"]
+                anchor.delayType = "cool_down"
+                anchor.substituteType = "draft"
+                anchor.sovereignHintLevel = "elevated"
+                return anchor
+            }()
+        )
+
+        XCTAssertEqual(
+            facts.windGateLine,
+            "L11 wind gate • primary delay • stacked draftOnly, mirror • assert guarded • allow draft.note, text.delay • block tool.write, memory.write, host.write • delay cool_down • substitute draft • sovereign elevated"
+        )
+        XCTAssertEqual(
+            facts.digestLines,
+            [
+                "eBrain risk: high • eBrain permit: delay • eBrain host gate: 61% • eBrain fold: fold-l11 • Review guarded resume path",
+                "L11 wind gate • primary delay • stacked draftOnly, mirror • assert guarded • allow draft.note, text.delay • block tool.write, memory.write, host.write • delay cool_down • substitute draft • sovereign elevated"
             ]
         )
     }
@@ -1689,8 +1830,10 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             decisionLine: nil,
             taskLine: nil,
             pressureLine: nil,
+            presenceLine: nil,
             riskFactorsLine: nil,
             reasonCodesLine: nil,
+            courtLine: nil,
             auditLine: nil,
             activeKillSwitchesLine: nil,
             killSwitchesLine: nil,
@@ -1758,6 +1901,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
                     invalidatedResumeFrameIDs: ["resume-safe"],
                     invalidatedCacheRefs: ["cache-safe"],
                     invalidatedFoldRefs: ["fold-capability"],
+                    invalidatedPackageIDs: [],
                     quarantinedFoldRefs: [],
                     resultingBreathMode: .guard,
                     preservedReadOnlyRecovery: true,
@@ -1766,20 +1910,32 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             )
         )
 
+        let expectedOrganDeltaLine = try! XCTUnwrap(facts.anchor?.organDeltaLine)
+
+        XCTAssertEqual(facts.organDeltaLine, expectedOrganDeltaLine)
+        XCTAssertTrue(facts.digestLines.contains(expectedOrganDeltaLine))
+
         XCTAssertEqual(
             facts.digestLines,
             [
                 "eBrain risk: high • eBrain permit: delay • eBrain host gate: 61% • eBrain fold: fold-capability • Review guarded resume path",
+                "L11 wind gate • primary delay",
                 "Breath guard • Phase resume • Restore 91%",
                 "Morph graph morph-capability • organs stubCore, riskSpine, permitKnot • route coreNPU • thermal thermal.hot",
                 "Hot pack stubCore, riskSpine, permitKnot • Warm memoryCodecRidge, hostModulationMesh, toolIntentMesh • Cold 6 • preload guard_preload • eviction protective_retain",
                 "Precision profile full -> protected -> balanced -> minimal • floor protected • locked riskSpine, permitKnot, stubCore",
+                "Organ packages 12 • hot 3 • warm 3 • cold 6 • protected 3 • recovery 2",
+                "Organ delta rollback_retain • activate package.stubcore.hot, package.riskspine.hot, package.permitknot.hot • preload package.memorycodecridge.warm, package.hostmodulationmesh.warm, package.toolintentmesh.warm • evict package.criticblade.cold • rollback-safe package.stubcore.hot, package.riskspine.hot, package.permitknot.hot, package.memorycodecridge.warm, package.consistencylattice.cold • sovereign rollback",
+                "Breath scheduler guard_resume • checkpoint anchor_each_turn • micro-sleep 173ms • maintenance 0ms • resume rollback_hot",
+                "Thermal exchanger balanced_exchange • band warm • actions delay_cold_organs • suppress criticBlade",
+                "Integrity weave recovered • checks 3/3 • contamination 2 • hash hash-safe",
                 "Resume frame resume-safe • source fold-capability • depth 2 • organs riskSpine, permitKnot, stubCore",
                 "Rollback anchor anchor-safe • snapshot snapshot-safe • cache cache-safe",
                 "rollback -> snapshot-safe • guard breath",
                 "Sovereign invalidated resume resume-safe",
                 "Sovereign invalidated cache cache-safe",
                 "Sovereign invalidated fold fold-capability",
+                "Sovereign rollback retain package.stubcore.hot, package.riskspine.hot, package.permitknot.hot, package.memorycodecridge.warm, package.consistencylattice.cold",
                 "Sovereign readonly recovery",
                 "Sovereign mode guard"
             ]
@@ -1796,53 +1952,64 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
     }
 
     func testPresentationCarriesActiveAndRecentSessionInspection() {
-        let checkpointAnchor = DecisionSessionCheckpointEBrainAnchor(
-            sessionID: "sess-active",
-            thoughtFoldChecksum: "fold9abc",
-            riskLevel: "guarded",
-            permitMode: "replace",
-            hostGatePercent: 61,
-            reviewDirectiveLine: "Review update ticket: preserve parser-only correction",
-            riskFactorsLine: "Factors: evidence_caveat_load",
-            reasonCodesLine: "Reason codes: evidence.caveat",
-            sovereignVerdictLine: "Sovereign verdict quarantine • latched • mode quarantine • reason runtime.quarantine",
-            sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • lock session • quarantine session",
-            sovereignAuditLine: "Sovereign audit • BR-SOV-004 • ref audit.session-l14",
-            lungState: BASLungState(
+        let checkpointAnchor: DecisionSessionCheckpointEBrainAnchor = {
+            var anchor = DecisionSessionCheckpointEBrainAnchor(
+                sessionID: "sess-active",
+                thoughtFoldChecksum: "fold9abc",
+                riskLevel: "guarded",
+                permitMode: "replace",
+                hostGatePercent: 61,
+                reviewDirectiveLine: "Review update ticket: preserve parser-only correction"
+            )
+            anchor.riskFactorsLine = "Factors: evidence_caveat_load"
+            anchor.reasonCodesLine = "Reason codes: evidence.caveat"
+            anchor.courtLine = "Court: agency delay right • remand L9"
+            anchor.stackedModes = ["localOnly"]
+            anchor.assertionCeiling = "guarded"
+            anchor.allowedDomains = ["local.action", "text.replace"]
+            anchor.blockedDomains = ["tool.write", "memory.write", "host.write"]
+            anchor.substituteType = "local_only_action"
+            anchor.sovereignHintLevel = "elevated"
+            anchor.sovereignVerdictLine = "Sovereign verdict quarantine • latched • mode quarantine • reason runtime.quarantine"
+            anchor.sovereignAuthorityLine = "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session"
+            anchor.sovereignAuditLine = "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+            anchor.lungState = BASLungState(
                 breathMode: .guard,
                 breathPhase: .resume,
                 thermalPressure: 67,
                 cachePressure: 54,
                 restoreReadiness: 0.82,
                 rollbackAnchorRef: "anchor-active"
-            ),
-            resumeFrame: BASResumeFrame(
+            )
+            anchor.resumeFrame = BASResumeFrame(
                 resumeID: "resume-active",
                 sourceFoldID: "fold9abc",
                 resumeDepth: 2,
                 requiredOrgans: [.riskSpine, .permitKnot, .stubCore],
                 consistencyChecks: ["fold_checksum", "risk_permit"],
                 fallbackMode: .rollbackAnchor
-            ),
-            rollbackAnchor: BASRollbackAnchor(
+            )
+            anchor.rollbackAnchor = BASRollbackAnchor(
                 anchorID: "anchor-active",
                 safeSnapshotRef: "snapshot-active",
                 foldRefs: ["fold9abc"],
                 hostVersionRef: "host.v2",
                 cacheStateRef: "cache-active",
                 integrityHash: "hash-active"
-            ),
-            sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult(
+            )
+            anchor.sovereignBridgeResult = DecisionFoldedLungSovereignBridgeResult(
                 actuationKinds: [.rollback],
                 invalidatedResumeFrameIDs: ["resume-stale"],
                 invalidatedCacheRefs: ["cache-dirty"],
                 invalidatedFoldRefs: ["fold-dirty"],
+                invalidatedPackageIDs: [],
                 quarantinedFoldRefs: [],
                 resultingBreathMode: .guard,
                 preservedReadOnlyRecovery: true,
                 summary: "rollback -> snapshot-active • guard breath"
             )
-        )
+            return anchor
+        }()
 
         let active = DecisionSessionRuntimeInspectionSession(
             sessionID: "sess-active",
@@ -1921,13 +2088,16 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         let presentation = DecisionSessionEnginePresentation.build(from: summary)
 
         XCTAssertEqual(presentation.activeSession?.sessionID, "sess-active")
-        XCTAssertEqual(presentation.recentSessions.map(\.sessionID), ["sess-recent"])
+        XCTAssertEqual(presentation.recentSessions.map { $0.sessionID }, ["sess-recent"])
         XCTAssertTrue(presentation.countsLine.contains("Sessions 2"))
         XCTAssertTrue(presentation.countsLine.contains("Checkpoints 4"))
-        XCTAssertEqual(presentation.healthSummary?.severity, .watch)
+        XCTAssertEqual(
+            presentation.healthSummary?.severity,
+            DecisionSessionEngineHealthSeverity.watch
+        )
         XCTAssertEqual(presentation.healthSummary?.title, "Recovery attention required")
         XCTAssertTrue(presentation.healthLine?.contains("Stalled sessions 1") == true)
-        XCTAssertEqual(presentation.reviewItems.map(\.title), [
+        XCTAssertEqual(presentation.reviewItems.map { $0.title }, [
             "Merge review queue",
             "Replay anchor ready",
             "Sovereign posture",
@@ -1937,12 +2107,15 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         XCTAssertTrue(presentation.reviewItems[1].detail.contains("Checkpoint ckpt-9"))
         XCTAssertEqual(
             presentation.reviewItems[2].detail,
-            "Sovereign verdict quarantine • latched • mode quarantine • reason runtime.quarantine • Sovereign authority • tokens memoryWrite • lock session • quarantine session • Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+            "Sovereign verdict quarantine • latched • mode quarantine • reason runtime.quarantine • Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session • Sovereign audit • BR-SOV-004 • ref audit.session-l14"
         )
-        XCTAssertEqual(presentation.reviewItems[2].severity, .watch)
+        XCTAssertEqual(
+            presentation.reviewItems[2].severity,
+            DecisionSessionEngineHealthSeverity.watch
+        )
         XCTAssertEqual(
             presentation.reviewItems[3].detail,
-            "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+            "Factors: evidence_caveat_load • Reason codes: evidence.caveat • Court: agency delay right • remand L9"
         )
         XCTAssertEqual(presentation.activeSession?.healthSummary?.severity, .stable)
         XCTAssertEqual(presentation.activeSession?.healthSummary?.title, "Recovered checkpoint line")
@@ -1963,7 +2136,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         )
         XCTAssertEqual(
             presentation.activeSession?.checkpointSovereignAuthorityLine,
-            "Sovereign authority • tokens memoryWrite • lock session • quarantine session"
+            "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session"
         )
         XCTAssertEqual(
             presentation.activeSession?.checkpointSovereignAuditLine,
@@ -1987,7 +2160,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         )
         XCTAssertEqual(
             presentation.activeSession?.replayRecoverySummary.sovereignAuthorityLine,
-            "Sovereign authority • tokens memoryWrite • lock session • quarantine session"
+            "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session"
         )
         XCTAssertEqual(
             presentation.activeSession?.replayRecoverySummary.sovereignAuditLine,
@@ -2019,6 +2192,10 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             "Review update ticket: preserve parser-only correction"
         )
         XCTAssertEqual(
+            presentation.activeSession?.checkpointWindGateLine,
+            "L11 wind gate • primary replace • stacked localOnly • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local_only_action • sovereign elevated"
+        )
+        XCTAssertEqual(
             presentation.activeSession?.checkpointActionLine,
             "action: restored active quick workspace state"
         )
@@ -2029,6 +2206,10 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         XCTAssertEqual(
             presentation.activeSession?.checkpointReasonCodesLine,
             "Reason codes: evidence.caveat"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.checkpointCourtLine,
+            "Court: agency delay right • remand L9"
         )
         XCTAssertEqual(
             presentation.activeSession?.replayRecoverySummary.actionLine,
@@ -2042,9 +2223,22 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
             presentation.activeSession?.replayRecoverySummary.reasonCodesLine,
             "Reason codes: evidence.caveat"
         )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.courtLine,
+            "Court: agency delay right • remand L9"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.windGateLine,
+            "L11 wind gate • primary replace • stacked localOnly • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local_only_action • sovereign elevated"
+        )
         XCTAssertTrue(
             presentation.activeSession?.replayRecoverySummary.digestLines.contains(
-                "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+                "Factors: evidence_caveat_load • Reason codes: evidence.caveat • Court: agency delay right • remand L9"
+            ) == true
+        )
+        XCTAssertTrue(
+            presentation.activeSession?.replayRecoverySummary.digestLines.contains(
+                "L11 wind gate • primary replace • stacked localOnly • assert guarded • allow local.action, text.replace • block tool.write, memory.write, host.write • substitute local_only_action • sovereign elevated"
             ) == true
         )
         XCTAssertTrue(
@@ -2054,7 +2248,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         )
         XCTAssertTrue(
             presentation.activeSession?.replayRecoverySummary.digestLines.contains(
-                "Sovereign authority • tokens memoryWrite • lock session • quarantine session"
+                "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session"
             ) == true
         )
         XCTAssertTrue(
@@ -2065,6 +2259,29 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         XCTAssertEqual(
             presentation.activeSession?.lungLine,
             "Breath guard • Phase resume • Restore 82%"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.morphLine,
+            "Morph graph morph.sess-active.fold9abc • organs riskSpine, permitKnot, stubCore • route checkpoint • thermal checkpoint-recovery"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.precisionLine,
+            "Precision profile full -> protected -> balanced -> minimal • floor protected • locked riskSpine, permitKnot, stubCore"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.organPackageLine,
+            "Organ packages 12 • hot 3 • warm 3 • cold 6 • protected 3 • recovery 2"
+        )
+        XCTAssertTrue(
+            presentation.activeSession?.organDeltaLine?.contains("Organ delta rollback_retain") == true
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.schedulerLine,
+            "Breath scheduler guard_resume • checkpoint anchor_each_turn • micro-sleep 166ms • maintenance 0ms • resume rollback_hot"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.integrityWeaveLine,
+            "Integrity weave recovered • checks 3/3 • contamination 2 • hash hash-active"
         )
         XCTAssertEqual(
             presentation.activeSession?.resumeLine,
@@ -2081,6 +2298,29 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         XCTAssertEqual(
             presentation.activeSession?.replayRecoverySummary.lungLine,
             "Breath guard • Phase resume • Restore 82%"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.morphLine,
+            "Morph graph morph.sess-active.fold9abc • organs riskSpine, permitKnot, stubCore • route checkpoint • thermal checkpoint-recovery"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.precisionLine,
+            "Precision profile full -> protected -> balanced -> minimal • floor protected • locked riskSpine, permitKnot, stubCore"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.organPackageLine,
+            "Organ packages 12 • hot 3 • warm 3 • cold 6 • protected 3 • recovery 2"
+        )
+        XCTAssertTrue(
+            presentation.activeSession?.replayRecoverySummary.organDeltaLine?.contains("Organ delta rollback_retain") == true
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.schedulerLine,
+            "Breath scheduler guard_resume • checkpoint anchor_each_turn • micro-sleep 166ms • maintenance 0ms • resume rollback_hot"
+        )
+        XCTAssertEqual(
+            presentation.activeSession?.replayRecoverySummary.integrityWeaveLine,
+            "Integrity weave recovered • checks 3/3 • contamination 2 • hash hash-active"
         )
         XCTAssertEqual(
             presentation.activeSession?.replayRecoverySummary.resumeLine,
@@ -2189,7 +2429,8 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
                 permitMode: "delay",
                 hostGatePercent: 44,
                 riskFactorsLine: "Factors: evidence_caveat_load",
-                reasonCodesLine: "Reason codes: evidence.caveat"
+                reasonCodesLine: "Reason codes: evidence.caveat",
+                courtLine: "Court: agency delay right • remand L9"
             ),
             latestEventID: "evt-14",
             latestEventSeq: 14,
@@ -2219,20 +2460,26 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
 
         let presentation = DecisionSessionEnginePresentation.build(from: summary)
 
-        XCTAssertEqual(presentation.healthSummary?.severity, .watch)
+        XCTAssertEqual(
+            presentation.healthSummary?.severity,
+            DecisionSessionEngineHealthSeverity.watch
+        )
         XCTAssertEqual(presentation.healthSummary?.title, "Horizon diagnostics active")
         XCTAssertEqual(
             presentation.healthLine,
-            "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+            "Factors: evidence_caveat_load • Reason codes: evidence.caveat • Court: agency delay right • remand L9"
         )
-        XCTAssertEqual(presentation.activeSession?.healthSummary?.severity, .watch)
+        XCTAssertEqual(
+            presentation.activeSession?.healthSummary?.severity,
+            DecisionSessionEngineHealthSeverity.watch
+        )
         XCTAssertEqual(presentation.activeSession?.healthSummary?.title, "Horizon diagnostics active")
         XCTAssertEqual(
             presentation.activeSession?.healthSummary?.detail,
-            "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+            "Factors: evidence_caveat_load • Reason codes: evidence.caveat • Court: agency delay right • remand L9"
         )
         XCTAssertEqual(
-            presentation.reviewItems.map(\.title),
+            presentation.reviewItems.map { $0.title },
             [
                 "Replay anchor ready",
                 "Horizon diagnostics"
@@ -2279,7 +2526,10 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
 
         XCTAssertEqual(presentation.pendingImportPreview?.bundleLine, "Bundle parser-session.json")
         XCTAssertEqual(presentation.pendingImportPreview?.importedLine, "Will import as Parser repair (Imported)")
-        XCTAssertEqual(presentation.pendingImportPreview?.unfinishedWorkSummary.severity, .watch)
+        XCTAssertEqual(
+            presentation.pendingImportPreview?.unfinishedWorkSummary.severity,
+            DecisionSessionEngineHealthSeverity.watch
+        )
         XCTAssertEqual(presentation.reviewItems.first?.title, "Pending import draft")
         XCTAssertTrue(presentation.reviewItems.first?.detail.contains("Bundle parser-session.json") == true)
         XCTAssertNil(presentation.activeSession)
@@ -2328,7 +2578,10 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         let presentation = DecisionSessionEnginePresentation.build(from: summary)
 
         XCTAssertTrue(presentation.countsLine.contains("Merge-ready 2"))
-        XCTAssertEqual(presentation.healthSummary?.severity, .watch)
+        XCTAssertEqual(
+            presentation.healthSummary?.severity,
+            DecisionSessionEngineHealthSeverity.watch
+        )
         XCTAssertEqual(presentation.healthSummary?.title, "Merge review pending")
         XCTAssertEqual(
             presentation.healthLine,
@@ -2341,7 +2594,7 @@ final class DecisionSessionEnginePresentationTests: XCTestCase {
         XCTAssertEqual(presentation.activeSession?.replayRecoverySummary.title, "Live runtime")
         XCTAssertTrue(presentation.activeSession?.replayRecoverySummary.replayLine.contains("sess-merge") == true)
         XCTAssertNil(presentation.activeSession?.replayRecoverySummary.killSwitchesLine)
-        XCTAssertEqual(presentation.reviewItems.map(\.title), [
+        XCTAssertEqual(presentation.reviewItems.map { $0.title }, [
             "Merge review queue",
             "Replay anchor ready"
         ])

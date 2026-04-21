@@ -85,16 +85,26 @@ struct OpenEvolutionControlIntent: AppIntent {
     @Parameter(title: "Trigger Reason")
     var triggerReason: String?
 
+    @Parameter(title: "Control Entry Kind")
+    var controlEntryKindID: String?
+
     init() {
         entrySource = .shortcut
         prompt = nil
         triggerReason = nil
+        controlEntryKindID = nil
     }
 
-    init(entrySource: EntrySource, prompt: String? = nil, triggerReason: String? = nil) {
+    init(
+        entrySource: EntrySource,
+        prompt: String? = nil,
+        triggerReason: String? = nil,
+        controlEntryKindID: String? = nil
+    ) {
         self.entrySource = entrySource
         self.prompt = prompt
         self.triggerReason = triggerReason
+        self.controlEntryKindID = controlEntryKindID
     }
 
     init(
@@ -104,7 +114,8 @@ struct OpenEvolutionControlIntent: AppIntent {
         self.init(
             entrySource: entrySource,
             prompt: controlEntry.prompt,
-            triggerReason: controlEntry.triggerReason
+            triggerReason: controlEntry.triggerReason,
+            controlEntryKindID: controlEntry.kindID
         )
     }
 
@@ -115,7 +126,8 @@ struct OpenEvolutionControlIntent: AppIntent {
         self.init(
             entrySource: entrySource,
             prompt: primaryAction.prompt,
-            triggerReason: primaryAction.triggerReason
+            triggerReason: primaryAction.triggerReason,
+            controlEntryKindID: primaryAction.controlEntryKindID
         )
     }
 
@@ -124,7 +136,8 @@ struct OpenEvolutionControlIntent: AppIntent {
             .openEvolutionControl(
                 entrySource: entrySource,
                 promptSeed: prompt,
-                triggerReason: triggerReason
+                triggerReason: triggerReason,
+                controlEntryKindID: controlEntryKindID
             )
         )
         return .result()

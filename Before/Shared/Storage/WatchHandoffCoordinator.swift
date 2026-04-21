@@ -37,13 +37,15 @@ enum WatchHandoffCoordinator {
 
     static func enqueueOpenEvolutionControl(
         headline: String? = nil,
-        reason: String? = nil
+        reason: String? = nil,
+        controlEntryKindID: String? = nil
     ) {
         enqueue(
             .openEvolutionControl(
                 entrySource: .watch,
                 promptSeed: headline,
-                triggerReason: reason
+                triggerReason: reason,
+                controlEntryKindID: controlEntryKindID
             )
         )
     }
@@ -53,7 +55,8 @@ enum WatchHandoffCoordinator {
     ) {
         enqueueOpenEvolutionControl(
             headline: controlEntry.prompt,
-            reason: controlEntry.triggerReason
+            reason: controlEntry.triggerReason,
+            controlEntryKindID: controlEntry.kindID
         )
     }
 

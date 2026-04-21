@@ -25,6 +25,7 @@ struct BASEBrainProgramBlueprintTests {
             blueprint.layers.last?.primaryObjectIDs == [
                 "SovereignVerdict",
                 "SovereignCommitToken",
+                "SovereignWarrant",
                 "SovereignLock",
                 "QuarantineRecord",
                 "SovereignAuditEntry",
@@ -48,6 +49,24 @@ struct BASEBrainProgramBlueprintTests {
         #expect(blueprint.workPackages.first(where: { $0.id == "WP11" })?.ownership.dri == "Risk Lead")
         #expect(blueprint.workPackages.first(where: { $0.id == "WP1" })?.schedule.milestoneIDs.contains("M1") == true)
         #expect(blueprint.workPackages.first(where: { $0.id == "WP9" })?.schedule.milestoneIDs.contains("M3") == true)
+    }
+
+    @Test("WP13 now describes the staged full-body evolution furnace program")
+    func wp13DescribesStagedFullBodyProgram() {
+        let wp13 = BASProgramExecutionBlueprintBuilder.latest.workPackages.first(where: { $0.id == "WP13" })
+
+        #expect(wp13?.title == "蜕变炉")
+        #expect(wp13?.summary.contains("existing Stage 1 governed spine") == true)
+        #expect(
+            wp13?.summary.contains("candidate nurseries") == true
+            || wp13?.summary.contains("shadow-trial theater") == true
+            || wp13?.summary.contains("version/retraction systems") == true
+            || wp13?.summary.contains("cross-layer L8-L14 evolution interfaces") == true
+        )
+        #expect(wp13?.summary.contains("review-gated checkpoint chain") == true)
+        #expect(wp13?.summary.contains("uncontrolled online learning") == true)
+        #expect(wp13?.schedule.exitCriteria.contains("Stage 1 governed spine remains stable") == true)
+        #expect(wp13?.schedule.exitCriteria.contains("Candidate nursery and shadow-trial expansion contract is published") == true)
     }
 
     @Test("schema governance and red lines protect the main contracts")
@@ -87,6 +106,7 @@ struct BASEBrainProgramBlueprintTests {
             "SovereignVerdict",
             "ConsequenceHorizon",
             "SovereignCommitToken",
+            "SovereignWarrant",
             "SovereignLock",
             "QuarantineRecord",
             "SovereignAuditEntry",
@@ -117,18 +137,36 @@ struct BASEBrainProgramBlueprintTests {
             "RecoveryDisposition",
             "HostProfile",
             "HostVersion",
+            "TemporalMemoryField",
+            "TemporalMemoryRecord",
+            "MemoryTemperatureProfile",
+            "MemoryProvenanceSeal",
+            "MemoryEpisodeArc",
+            "MemoryConflictCluster",
+            "MemoryContinuityAnchor",
+            "MemoryReplayFrame",
+            "MemoryQuarantineRecord",
+            "MemorySanctumEntry",
+            "MemoryForgetCascade",
             "MemoryAtom",
             "MemoryBundle",
             "PowerGradient",
             "NeuralOrganMap",
             "CandidateFrontier",
             "CounterfactualBundle",
+            "UncertaintyLedger",
+            "EvidenceDebt",
+            "ConvergenceCertificate",
+            "LoopLeaseReceipt",
+            "SovereignBreakpointHint",
             "RiskPermitBinding",
             "NeuralLeaseReceipt",
             "ToolIntentEnvelope",
             "MorphGraph",
             "HotColdMap",
             "PrecisionProfile",
+            "ThermalExchanger",
+            "IntegrityWeave",
             "ResumeFrame",
             "RollbackAnchor",
             "ContinuityAnchor",
@@ -153,7 +191,29 @@ struct BASEBrainProgramBlueprintTests {
             "RenderedOutput",
             "RiskCard",
             "ActionPermit",
+            "RiskField",
+            "HazardVector",
+            "HarmRadiusMap",
+            "ReversibilityProfile",
+            "EvidenceSufficiency",
+            "GSITrace",
+            "VulnerabilityCoupling",
+            "ActionModeDecision",
+            "DelayReservation",
+            "ProtectiveSubstitute",
+            "SovereignEscalationHint",
+            "RiskDecisionPackage",
             "UpdateTicket",
+            "ExperienceCandidate",
+            "ShadowTrialRecord",
+            "VersionDelta",
+            "WorkflowCandidate",
+            "GuardTemplateCandidate",
+            "BiasRecord",
+            "RiskPatternCandidate",
+            "RetractionOrder",
+            "LearningExportBundle",
+            "EvolutionSeal",
             "EvolutionLineageSummary",
             "EvolutionFoldedLungSummary",
             "RuntimeTrace",
@@ -174,6 +234,7 @@ struct BASEBrainProgramBlueprintTests {
         #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "SovereignExecutionReceipt")?.currentVersion == BASSovereignExecutionReceipt.currentSchemaVersion)
         #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "SovereignVerdict")?.currentVersion == BASSovereignVerdict.currentSchemaVersion)
         #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "SovereignCommitToken")?.currentVersion == BASSovereignCommitToken.currentSchemaVersion)
+        #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "SovereignWarrant")?.currentVersion == BASSovereignWarrant.currentSchemaVersion)
         #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "SovereignLock")?.currentVersion == BASSovereignLock.currentSchemaVersion)
         #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "QuarantineRecord")?.currentVersion == BASQuarantineRecord.currentSchemaVersion)
         #expect(BASEBrainSchemaGovernanceRegistry.entry(for: "SovereignAuditEntry")?.currentVersion == BASSovereignAuditEntry.currentSchemaVersion)

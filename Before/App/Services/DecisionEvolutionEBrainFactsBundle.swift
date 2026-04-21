@@ -102,6 +102,7 @@ struct DecisionEvolutionEBrainFactsBundle: Equatable, Sendable {
     let brainSummaryLine: String
     let riskFactorsLine: String?
     let reasonCodesLine: String?
+    let courtLine: String?
     let executionCapabilityLine: String?
     let horizonLine: String?
     let temporalLine: String?
@@ -118,23 +119,35 @@ struct DecisionEvolutionEBrainFactsBundle: Equatable, Sendable {
     let sovereignVerdictLine: String?
     let sovereignAuthorityLine: String?
     let sovereignAuditLine: String?
+    let governanceLine: String?
+    let versionTreeLine: String?
+    let retractionLine: String?
     let activeKillSwitchesLine: String?
     let killSwitchesLine: String?
     let morphLine: String?
     let hotColdLine: String?
     let precisionLine: String?
+    let organPackageLine: String?
     let lungLine: String?
+    let organDeltaLine: String?
+    let thermalExchangeLine: String?
     let schedulerLine: String?
+    let integrityWeaveLine: String?
     let resumeLine: String?
     let rollbackLine: String?
     let sovereignBridgeLine: String?
     let layerStackLines: [String]
+
+    var windGateLine: String? {
+        layerStackLines.first(where: { $0.hasPrefix("L11 wind gate") })
+    }
 }
 
 struct DecisionEvolutionReplayCheckpointFacts: Equatable, Sendable {
     let budgetLine: String
     let pressureLine: String
     let taskLine: String?
+    let windGateLine: String?
     let layerStackLines: [String]
 }
 
@@ -213,6 +226,102 @@ enum DecisionEvolutionEBrainPresentationSupport {
         "\(displayToken(riskLevel)) → \(displayToken(permitMode))"
     }
 
+    static func furnaceContributionLines(
+        layerStackLines: [String],
+        temporalLine: String? = nil,
+        governanceLine: String? = nil,
+        versionTreeLine: String? = nil,
+        retractionLine: String? = nil,
+        sovereignBridgeLine: String? = nil
+    ) -> [String] {
+        orderedUniqueNonEmpty([
+            firstLayerStackLine(
+                in: layerStackLines,
+                prefixes: ["L8 temporal field"]
+            ) ?? temporalLine,
+            firstLayerStackLine(
+                in: layerStackLines,
+                prefixes: ["L7-L9 cognition"]
+            ),
+            firstLayerStackLine(
+                in: layerStackLines,
+                prefixes: ["L9 dream loop"]
+            ),
+            firstLayerStackLine(
+                in: layerStackLines,
+                prefixes: ["L10-L12 adjudication"]
+            ),
+            firstLayerStackLine(
+                in: layerStackLines,
+                prefixes: ["L11 wind gate"]
+            ),
+            governanceLine,
+            versionTreeLine,
+            retractionLine,
+            firstLayerStackLine(
+                in: layerStackLines,
+                prefixes: ["L14 sovereign"]
+            ),
+            sovereignBridgeLine
+        ])
+    }
+
+    static func foldedLungLines(
+        layerStackLines: [String],
+        lungLine: String? = nil,
+        morphLine: String? = nil,
+        hotColdLine: String? = nil,
+        precisionLine: String? = nil,
+        organPackageLine: String? = nil,
+        organDeltaLine: String? = nil,
+        schedulerLine: String? = nil,
+        thermalExchangeLine: String? = nil,
+        integrityWeaveLine: String? = nil,
+        resumeLine: String? = nil,
+        rollbackLine: String? = nil
+    ) -> [String] {
+        orderedUniqueNonEmpty([
+            firstLayerStackLine(
+                in: layerStackLines,
+                prefixes: ["L3 compression runtime"]
+            ),
+            lungLine,
+            morphLine,
+            hotColdLine,
+            precisionLine,
+            organPackageLine,
+            organDeltaLine,
+            schedulerLine,
+            thermalExchangeLine,
+            integrityWeaveLine,
+            resumeLine,
+            rollbackLine
+        ])
+    }
+
+    static func orderedUniqueNonEmpty(
+        _ values: [String?]
+    ) -> [String] {
+        values.reduce(into: [String]()) { uniqueValues, value in
+            guard let trimmedValue = value?.evolutionTrimmedNonEmpty,
+                  !uniqueValues.contains(trimmedValue) else {
+                return
+            }
+            uniqueValues.append(trimmedValue)
+        }
+    }
+
+    private static func firstLayerStackLine(
+        in layerStackLines: [String],
+        prefixes: [String]
+    ) -> String? {
+        layerStackLines.first { line in
+            prefixes.contains { prefix in
+                line.hasPrefix(prefix)
+            }
+        }
+    }
+
     static func contextLayerStackLine(
         taskType: String,
         emotionalLoadPercent: Int,
@@ -234,6 +343,39 @@ enum DecisionEvolutionEBrainPresentationSupport {
         ])
     }
 
+    static func contextPresenceLayerStackLine(
+        sceneType: String?,
+        roleRelationClass: String?,
+        powerDirection: String?,
+        powerStrengthPercent: Int?,
+        urgencyPercent: Int?,
+        routeMode: String?,
+        guardRequired: Bool?,
+        continuityArc: String?
+    ) -> String? {
+        let segments = [
+            sceneType?.evolutionTrimmedNonEmpty.map { "scene \(taskTitle($0))" },
+            roleRelationClass?.evolutionTrimmedNonEmpty.map { "role \($0)" },
+            formattedPowerSegment(
+                direction: powerDirection,
+                strengthPercent: powerStrengthPercent
+            ),
+            urgencyPercent.map { "urgency \($0)%" },
+            routeMode?.evolutionTrimmedNonEmpty.map { "route \($0)" },
+            guardRequired == true ? "guard on" : nil,
+            continuityArc?.evolutionTrimmedNonEmpty.map { "continuity \($0)" }
+        ]
+        .compactMap { $0 }
+
+        guard segments.isEmpty == false else {
+            return nil
+        }
+
+        return DecisionEvolutionNarrativeFormattingSupport.joined(
+            ["L6 presence"] + segments
+        )
+    }
+
     static func fallbackContextLayerStackLine(
         taskType: String,
         sessionID: String
@@ -245,11 +387,61 @@ enum DecisionEvolutionEBrainPresentationSupport {
         ])
     }
 
+    static func fallbackContextPresenceLayerStackLine(
+        taskType: String
+    ) -> String {
+        DecisionEvolutionNarrativeFormattingSupport.joined([
+            "L6 presence",
+            "scene \(fallbackSceneTitle(taskType: taskType))"
+        ])
+    }
+
+    private static func fallbackSceneTitle(taskType: String) -> String {
+        let normalizedTaskType = taskType
+            .replacingOccurrences(of: "_", with: "")
+            .lowercased()
+
+        switch normalizedTaskType {
+        case "highpressure", "highpressureconflict":
+            return "high pressure conflict"
+        case "highconsequence", "highconsequencedecision":
+            return "high consequence decision"
+        default:
+            return taskTitle(taskType)
+        }
+    }
+
+    private static func formattedPowerSegment(
+        direction: String?,
+        strengthPercent: Int?
+    ) -> String? {
+        let directionText = direction?
+            .replacingOccurrences(of: "_", with: " ")
+            .evolutionTrimmedNonEmpty
+
+        switch (directionText, strengthPercent) {
+        case let (.some(directionText), .some(strengthPercent)):
+            return "power \(directionText) \(strengthPercent)%"
+        case let (.some(directionText), nil):
+            return "power \(directionText)"
+        case let (nil, .some(strengthPercent)):
+            return "power \(strengthPercent)%"
+        default:
+            return nil
+        }
+    }
+
     static func cognitionLayerStackLine(
         factCount: Int,
         goalCount: Int,
+        claimCount: Int? = nil,
         unknownCount: Int,
         contradictionCount: Int,
+        pressureSummary: String? = nil,
+        manipulationSummary: String? = nil,
+        boundarySummary: String? = nil,
+        mirrorModeID: String? = nil,
+        routeHint: String? = nil,
         memoryAtomCount: Int,
         candidateCount: Int,
         forecastCount: Int,
@@ -260,8 +452,14 @@ enum DecisionEvolutionEBrainPresentationSupport {
             "L7-L9 cognition",
             "facts \(factCount)",
             "goals \(goalCount)",
+            claimCount.map { "claims \($0)" },
             "unknowns \(unknownCount)",
             "contradictions \(contradictionCount)",
+            pressureSummary?.evolutionTrimmedNonEmpty.map { "pressures \(taskTitle($0))" },
+            manipulationSummary?.evolutionTrimmedNonEmpty.map { "manipulation \(taskTitle($0))" },
+            boundarySummary?.evolutionTrimmedNonEmpty.map { "boundaries \(taskTitle($0))" },
+            mirrorModeID?.evolutionTrimmedNonEmpty.map { "mirror \(taskTitle($0))" },
+            routeHint?.evolutionTrimmedNonEmpty.map { "route \(taskTitle($0))" },
             "memory \(memoryAtomCount)",
             "candidates \(candidateCount)/forecasts \(forecastCount)/critiques \(critiqueCount)",
             stopReasonID.map { "stop \($0)" }
@@ -583,6 +781,7 @@ extension DecisionEvolutionEBrainFactsBundle {
             brainSummaryLine: brainSummaryLine,
             riskFactorsLine: riskFactorsLine,
             reasonCodesLine: reasonCodesLine,
+            courtLine: courtLine,
             executionCapabilityLine: executionCapabilityLine ?? executionCapabilityFrame?.detailLine,
             horizonLine: horizonLine ?? executionCapabilityFrame?.horizonLine,
             temporalLine: temporalLine ?? executionCapabilityFrame?.temporalLine,
@@ -599,13 +798,20 @@ extension DecisionEvolutionEBrainFactsBundle {
             sovereignVerdictLine: sovereignVerdictLine,
             sovereignAuthorityLine: sovereignAuthorityLine,
             sovereignAuditLine: sovereignAuditLine,
+            governanceLine: governanceLine,
+            versionTreeLine: versionTreeLine,
+            retractionLine: retractionLine,
             activeKillSwitchesLine: activeKillSwitchesLine,
             killSwitchesLine: killSwitchesLine,
             morphLine: morphLine,
             hotColdLine: hotColdLine,
             precisionLine: precisionLine,
+            organPackageLine: organPackageLine,
             lungLine: lungLine,
+            organDeltaLine: organDeltaLine,
+            thermalExchangeLine: thermalExchangeLine,
             schedulerLine: schedulerLine,
+            integrityWeaveLine: integrityWeaveLine,
             resumeLine: resumeLine,
             rollbackLine: rollbackLine,
             sovereignBridgeLine: sovereignBridgeLine,
@@ -618,19 +824,37 @@ extension DecisionEvolutionEBrainFactsBundle {
         return "\(prefix) \(pressureLine.droppingKnownPrefix("Pressure "))"
     }
 
+    func displayPresenceLine(prefix: String = "Presence") -> String? {
+        guard let presencePayload = layerStackPresencePayload else {
+            return nil
+        }
+        return "\(prefix) \(presencePayload)"
+    }
+
+    func sessionCheckpointPresenceFactLine(prefix: String = "eBrain presence:") -> String? {
+        guard let presencePayload = layerStackPresencePayload else {
+            return nil
+        }
+        return "\(prefix) \(presencePayload)"
+    }
+
     var consoleRuntimeSummaryAdditions: [String] {
-        [
+        DecisionEvolutionEBrainPresentationSupport.orderedUniqueNonEmpty(
+            [
             runtimeSummaryLine,
             riskFactorsLine,
             reasonCodesLine,
+            courtLine,
             executionCapabilityLine,
             horizonLine,
             temporalLine,
             evidenceLine,
             persistenceLine,
-            pressureLine
-        ]
-            .compactMap { $0 }
+            pressureLine,
+            governanceLine,
+            versionTreeLine,
+            retractionLine
+        ] + furnaceContributionLines.map(Optional.some))
     }
 
     var consoleBrainSummaryAddition: String {
@@ -638,13 +862,19 @@ extension DecisionEvolutionEBrainFactsBundle {
     }
 
     var dataLayerSignals: [String] {
-        [
+        DecisionEvolutionEBrainPresentationSupport.orderedUniqueNonEmpty(
+            [
             summaryLine,
             budgetLine,
+            displayPresenceLine(),
             pressureLine,
             taskLine,
+            governanceLine,
+            versionTreeLine,
+            retractionLine,
             riskFactorsLine,
             reasonCodesLine,
+            courtLine,
             executionCapabilityLine,
             horizonLine,
             temporalLine,
@@ -657,12 +887,33 @@ extension DecisionEvolutionEBrainFactsBundle {
             morphLine,
             hotColdLine,
             precisionLine,
+            organPackageLine,
+            organDeltaLine,
             resumeLine,
+            thermalExchangeLine,
             schedulerLine,
             rollbackLine,
+            integrityWeaveLine,
             sovereignBridgeLine
-        ]
-        .compactMap { $0 }
+        ] + furnaceContributionLines.map(Optional.some))
+    }
+
+    var furnaceContributionLines: [String] {
+        DecisionEvolutionEBrainPresentationSupport.furnaceContributionLines(
+            layerStackLines: layerStackLines,
+            temporalLine: temporalLine,
+            governanceLine: governanceLine,
+            versionTreeLine: versionTreeLine,
+            retractionLine: retractionLine,
+            sovereignBridgeLine: sovereignBridgeLine
+        )
+    }
+
+    private var layerStackPresencePayload: String? {
+        layerStackLines
+            .first(where: { $0.hasPrefix("L6 presence") })?
+            .droppingKnownPrefix("L6 presence • ")
+            .evolutionTrimmedNonEmpty
     }
 }
 
@@ -697,6 +948,10 @@ extension BASEBrainTurnResult {
             sovereignActuationLine
         ].compactMap { $0 }).evolutionTrimmedNonEmpty
             ?? updateTickets.first?.summary.evolutionTrimmedNonEmpty.map { "Review: \($0)" }
+    }
+
+    var replayCheckpointWindGateLine: String? {
+        layerStackLines.first(where: { $0.hasPrefix("L11 wind gate") })
     }
 
     var primaryReviewDirectiveLine: String? {
@@ -761,8 +1016,10 @@ extension BASEBrainTurnResult {
             foundationLayerStackLine,
             hostProfileLayerStackLine,
             contextLayerStackLine,
+            contextPresenceLayerStackLine,
             cognitionLayerStackLine,
             adjudicationLayerStackLine,
+            riskClimateLayerStackLine,
             evolutionLayerStackLine,
             sovereignLayerStackLine
         ]
@@ -856,12 +1113,37 @@ extension BASEBrainTurnResult {
         )
     }
 
+    private var contextPresenceLayerStackLine: String? {
+        DecisionEvolutionEBrainPresentationSupport.contextPresenceLayerStackLine(
+            sceneType: contextFrame.sceneType.rawValue,
+            roleRelationClass: contextFrame.roleGeometry?.relationClass,
+            powerDirection: contextFrame.powerGradient?.direction,
+            powerStrengthPercent: contextFrame.powerGradient.map { Int(($0.strength * 100).rounded()) },
+            urgencyPercent: contextFrame.urgencyTruth.map { Int(($0.statedUrgency * 100).rounded()) },
+            routeMode: contextFrame.routeHint?.preferredMode,
+            guardRequired: contextFrame.routeHint?.needGuard,
+            continuityArc: contextFrame.continuityAnchor?.sceneArc
+        )
+    }
+
     private var cognitionLayerStackLine: String {
         DecisionEvolutionEBrainPresentationSupport.cognitionLayerStackLine(
             factCount: decomposeFrame.facts.count,
             goalCount: decomposeFrame.goals.count,
+            claimCount: decomposeFrame.claimShards.isEmpty ? nil : decomposeFrame.claimShards.count,
             unknownCount: decomposeFrame.unknowns.count,
             contradictionCount: decomposeFrame.contradictions.count,
+            pressureSummary: decomposeFrame.pressureVectors.isEmpty
+                ? nil
+                : decomposeFrame.pressureVectors.map { $0.kind.rawValue }.joined(separator: ", "),
+            manipulationSummary: decomposeFrame.manipulationPatterns.isEmpty
+                ? nil
+                : decomposeFrame.manipulationPatterns.map { $0.kind.rawValue }.joined(separator: ", "),
+            boundarySummary: decomposeFrame.boundaryTouches.isEmpty
+                ? nil
+                : decomposeFrame.boundaryTouches.map { "\($0.domain.rawValue):\($0.level.rawValue)" }.joined(separator: ", "),
+            mirrorModeID: decomposeFrame.mirrorDraft?.mode.rawValue,
+            routeHint: decomposeFrame.canonicalFrame?.routeHint,
             memoryAtomCount: memoryBundle.atoms.count,
             candidateCount: thoughtFrame.candidates.count,
             forecastCount: thoughtFrame.forecasts.count,
@@ -882,6 +1164,51 @@ extension BASEBrainTurnResult {
         )
     }
 
+    private var riskClimateLayerStackLine: String? {
+        let decisionPackage = riskDecisionPackage
+        let surfaceGuide = renderedOutput.surfaceGuide
+        let stackedModes = decisionPackage?.actionModeDecision.stackedModes
+            ?? surfaceGuide?.stackedModes
+            ?? actionPermit.stackedModes
+        let stackedModeNames = stackedModes.map(\.rawValue)
+        let allowedDomains = decisionPackage?.actionPermit.allowedDomains
+            ?? surfaceGuide?.boundary.allowedDomains
+            ?? actionPermit.allowedDomains
+        let blockedDomains = decisionPackage?.actionPermit.blockedDomains
+            ?? surfaceGuide?.boundary.blockedDomains
+            ?? actionPermit.blockedDomains
+        let toolScope = surfaceGuide?.boundary.toolScope ?? actionPermit.toolScope
+        let memoryScope = surfaceGuide?.boundary.memoryScope ?? actionPermit.memoryScope
+        let delayType = decisionPackage?.delayReservation?.delayType
+            ?? surfaceGuide?.delayReservation?.delayType
+            ?? surfaceGuide?.delayWindow
+            ?? actionPermit.delayWindow
+        let substituteType = decisionPackage?.protectiveSubstitute?.substituteType
+            ?? surfaceGuide?.protectiveSubstitute?.substituteType
+            ?? riskCard.substituteType
+        let sovereignHint = decisionPackage?.sovereignEscalationHint?.urgency
+            ?? surfaceGuide?.sovereignEscalationHint?.urgency
+            ?? riskCard.sovereignHintLevel
+            ?? surfaceGuide?.boundary.escalationHintRef
+            ?? actionPermit.escalationHintRef
+        let assertionCeiling = surfaceGuide?.disclosure.assertionCeiling ?? actionPermit.assertionCeiling
+
+        return DecisionEvolutionNarrativeFormattingSupport.joined([
+            "L11 wind gate",
+            "primary \(actionPermit.mode.rawValue)",
+            stackedModeNames.isEmpty ? nil : "stacked \(Array(stackedModeNames.prefix(3)).joined(separator: ", "))",
+            "assert \(assertionCeiling)",
+            "tool \(toolScope)",
+            "memory \(memoryScope)",
+            surfaceGuide?.agency.requiresSecondCheck == true ? "second check" : nil,
+            allowedDomains.isEmpty ? nil : "allow \(Array(allowedDomains.prefix(3)).joined(separator: ", "))",
+            blockedDomains.isEmpty ? nil : "block \(Array(blockedDomains.prefix(3)).joined(separator: ", "))",
+            delayType.map { "delay \($0)" },
+            substituteType.map { "substitute \($0)" },
+            sovereignHint.map { "sovereign \($0)" }
+        ].compactMap { $0 }).evolutionTrimmedNonEmpty
+    }
+
     private var evolutionLayerStackLine: String {
         DecisionEvolutionNarrativeFormattingSupport.joined([
             "L13 evolution",
@@ -892,12 +1219,13 @@ extension BASEBrainTurnResult {
 
     private var sovereignLayerStackLine: String? {
         let constraints = thoughtFrame.organMap?.sovereignConstraints ?? []
-        let verdictDetail = sovereignVerdict.map { "verdict \($0.verdictLevel.rawValue)" }
-        let tokenScopes = sovereignCommitTokens.map(\.scope.rawValue)
-        let lockDetail = sovereignLock.map { "lock \($0.scope.rawValue)" }
-        let quarantineZones = quarantineRecords.map(\.zone.rawValue)
-        let auditDetail = sovereignAuditEntry.map {
-            "audit \($0.ruleIDs.first ?? $0.auditID)"
+        let verdictDetail = sovereignVerdictLevelID.map { "verdict \($0)" }
+        let tokenScopes = sovereignTokenScopeIDs
+        let warrantScopes = sovereignWarrantScopeIDs
+        let lockDetail = sovereignLockScopeID.map { "lock \($0)" }
+        let quarantineZones = sovereignQuarantineZoneIDs
+        let auditDetail = (sovereignAuditRuleIDs.first ?? sovereignAuditEntryID).map {
+            "audit \($0)"
         }
         let commandKinds = sovereignActuationCommands.map(\.kind.rawValue)
         let receiptKinds = sovereignExecutionReceipts.map {
@@ -910,6 +1238,7 @@ extension BASEBrainTurnResult {
             constraints.isEmpty ? nil : "constraints \(Array(constraints.prefix(3)).joined(separator: ", "))",
             verdictDetail,
             tokenScopes.isEmpty ? nil : "tokens \(Array(tokenScopes.prefix(3)).joined(separator: ", "))",
+            warrantScopes.isEmpty ? nil : "warrants \(Array(warrantScopes.prefix(3)).joined(separator: ", "))",
             lockDetail,
             quarantineZones.isEmpty ? nil : "quarantine \(Array(quarantineZones.prefix(2)).joined(separator: ", "))",
             auditDetail,
@@ -968,6 +1297,7 @@ extension BASEBrainTurnResult {
             budgetLine: replayCheckpointBudgetLine,
             pressureLine: factsBundle.pressureLine ?? replayCheckpointPressureLine,
             taskLine: replayCheckpointTaskLine,
+            windGateLine: factsBundle.windGateLine ?? replayCheckpointWindGateLine,
             layerStackLines: factsBundle.layerStackLines
         )
     }
@@ -975,14 +1305,66 @@ extension BASEBrainTurnResult {
     var sessionCheckpointFacts: DecisionEvolutionSessionCheckpointFacts {
         let factsBundle = DeveloperDecisionReplayEBrainSummary(turn: self).factsBundle()
         let foldedLung = DecisionFoldedLungCoordinator.snapshot(for: self)
+        let decisionPackage = riskDecisionPackage
+        let resolvedProtectiveSurfaceMode = protectiveSurfaceMode?.rawValue ?? actionPermit.mode.rawValue
+        let usesProtectiveSurfaceGuidance = hasProtectiveSurfaceGuidance
         let activeKillSwitches = runtimeTrace.activeKillSwitches.map(\.rawValue)
         let recommendedKillSwitches = runtimeTrace.recommendedKillSwitches.map(\.rawValue)
+        let stackedModes = (decisionPackage?.actionModeDecision.stackedModes ?? actionPermit.stackedModes)
+            .map(\.rawValue)
+        let allowedDomains = decisionPackage?.actionPermit.allowedDomains ?? actionPermit.allowedDomains
+        let blockedDomains = decisionPackage?.actionPermit.blockedDomains ?? actionPermit.blockedDomains
+        let delayType = decisionPackage?.delayReservation?.delayType
+            ?? actionPermit.delayWindow
+            ?? riskCard.delayType
+        let substituteType = decisionPackage?.protectiveSubstitute?.substituteType
+            ?? riskCard.substituteType
+        let sovereignHintLevel = decisionPackage?.sovereignEscalationHint?.urgency
+            ?? actionPermit.escalationHintRef
+            ?? riskCard.sovereignHintLevel
         let openTaskLines = DecisionEvolutionEBrainPresentationSupport.checkpointOpenTaskLines(
             reviewDirectiveLine: primaryReviewDirectiveLine,
             firstTicketSummary: updateTickets.first?.summary.trimmingCharacters(in: .whitespacesAndNewlines),
-            protectivePermitMode: actionPermit.mode.rawValue,
-            isProtective: actionPermit.mode.isProtective
+            protectivePermitMode: resolvedProtectiveSurfaceMode,
+            isProtective: usesProtectiveSurfaceGuidance
         )
+
+        var eBrainAnchor = DecisionSessionCheckpointEBrainAnchor(
+            sessionID: runtimeTrace.sessionID,
+            thoughtFoldChecksum: String(thoughtFold.checksum.prefix(12)),
+            riskLevel: riskCard.riskLevel.rawValue,
+            permitMode: actionPermit.mode.rawValue,
+            hostGatePercent: Int((hostGateValue * 100).rounded()),
+            reviewDirectiveLine: primaryReviewDirectiveLine,
+            riskFactorsLine: factsBundle.riskFactorsLine,
+            reasonCodesLine: factsBundle.reasonCodesLine,
+            courtLine: factsBundle.courtLine,
+            versionTreeLine: factsBundle.versionTreeLine,
+            retractionLine: factsBundle.retractionLine,
+            stackedModes: stackedModes,
+            assertionCeiling: decisionPackage?.actionPermit.assertionCeiling ?? actionPermit.assertionCeiling,
+            allowedDomains: allowedDomains,
+            blockedDomains: blockedDomains,
+            delayType: delayType,
+            substituteType: substituteType,
+            sovereignHintLevel: sovereignHintLevel,
+            sovereignVerdictLine: factsBundle.sovereignVerdictLine,
+            sovereignAuthorityLine: factsBundle.sovereignAuthorityLine,
+            sovereignAuditLine: factsBundle.sovereignAuditLine,
+            morphGraph: foldedLung.morphGraph,
+            hotColdMap: foldedLung.hotColdMap,
+            precisionProfile: foldedLung.precisionProfile,
+            lungState: foldedLung.lungState,
+            thermalExchange: foldedLung.thermalExchange,
+            breathScheduler: foldedLung.breathScheduler,
+            integrityWeave: foldedLung.integrityWeave,
+            organPackages: foldedLung.organPackages,
+            organDeltaPlan: foldedLung.organDeltaPlan,
+            resumeFrame: foldedLung.resumeFrame,
+            rollbackAnchor: foldedLung.rollbackAnchor,
+            sovereignBridgeResult: foldedLung.sovereignBridgeResult
+        )
+        eBrainAnchor.presenceLine = factsBundle.sessionCheckpointPresenceFactLine()
 
         return DecisionEvolutionSessionCheckpointFacts(
             budgetConstraintLine: DecisionEvolutionEBrainPresentationSupport.checkpointBudgetConstraintLine(
@@ -1025,25 +1407,8 @@ extension BASEBrainTurnResult {
                 contextFrame.taskType.rawValue,
                 "run:\(budgetFrame.runMode.rawValue)"
             ],
-            shouldUseReviewMode: actionPermit.mode.isProtective,
-            eBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
-                sessionID: runtimeTrace.sessionID,
-                thoughtFoldChecksum: String(thoughtFold.checksum.prefix(12)),
-                riskLevel: riskCard.riskLevel.rawValue,
-                permitMode: actionPermit.mode.rawValue,
-                hostGatePercent: Int((hostGateValue * 100).rounded()),
-                reviewDirectiveLine: primaryReviewDirectiveLine,
-                riskFactorsLine: factsBundle.riskFactorsLine,
-                reasonCodesLine: factsBundle.reasonCodesLine,
-                sovereignVerdictLine: factsBundle.sovereignVerdictLine,
-                sovereignAuthorityLine: factsBundle.sovereignAuthorityLine,
-                sovereignAuditLine: factsBundle.sovereignAuditLine,
-                lungState: foldedLung.lungState,
-                breathScheduler: foldedLung.breathScheduler,
-                resumeFrame: foldedLung.resumeFrame,
-                rollbackAnchor: foldedLung.rollbackAnchor,
-                sovereignBridgeResult: foldedLung.sovereignBridgeResult
-            )
+            shouldUseReviewMode: usesProtectiveSurfaceGuidance,
+            eBrainAnchor: eBrainAnchor
         )
     }
 
@@ -1142,6 +1507,7 @@ extension DeveloperDecisionReplayEBrainSummary {
             brainSummaryLine: brainSummaryLine,
             riskFactorsLine: riskFactorsLine,
             reasonCodesLine: reasonCodesLine,
+            courtLine: courtLine,
             executionCapabilityLine: executionCapabilityLine,
             horizonLine: horizonLine,
             temporalLine: temporalLine,
@@ -1158,13 +1524,20 @@ extension DeveloperDecisionReplayEBrainSummary {
             sovereignVerdictLine: replaySummary.sovereignVerdictLine,
             sovereignAuthorityLine: replaySummary.sovereignAuthorityLine,
             sovereignAuditLine: replaySummary.sovereignAuditLine,
+            governanceLine: governanceLine,
+            versionTreeLine: replaySummary.versionTreeLine,
+            retractionLine: replaySummary.retractionLine,
             activeKillSwitchesLine: replaySummary.activeKillSwitchesLine,
             killSwitchesLine: replaySummary.killSwitchesLine,
             morphLine: replaySummary.morphLine,
             hotColdLine: replaySummary.hotColdLine,
             precisionLine: replaySummary.precisionLine,
+            organPackageLine: replaySummary.organPackageLine,
             lungLine: replaySummary.lungLine,
+            organDeltaLine: replaySummary.organDeltaLine,
+            thermalExchangeLine: replaySummary.thermalExchangeLine,
             schedulerLine: replaySummary.schedulerLine,
+            integrityWeaveLine: replaySummary.integrityWeaveLine,
             resumeLine: replaySummary.resumeLine,
             rollbackLine: replaySummary.rollbackLine,
             sovereignBridgeLine: replaySummary.sovereignBridgeLine,

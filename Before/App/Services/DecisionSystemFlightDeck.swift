@@ -66,9 +66,12 @@ struct DecisionSystemEBrainSummary: Equatable, Sendable {
     let loopCount: Int
     let cacheHitRate: Int
     let hostGatePercent: Int
+    let presenceLine: String?
     let pressureLine: String?
     let riskFactorsLine: String?
     let reasonCodesLine: String?
+    let courtLine: String?
+    let governanceLine: String?
     let foldChecksum: String
     let updateTicketCount: Int
     let auditFindingCount: Int
@@ -78,6 +81,8 @@ struct DecisionSystemEBrainSummary: Equatable, Sendable {
     let sovereignVerdictLine: String?
     let sovereignAuthorityLine: String?
     let sovereignAuditLine: String?
+    let versionTreeLine: String?
+    let retractionLine: String?
     let inspectionHeadline: String
     let blockers: [String]
     let layerStackLines: [String]
@@ -90,7 +95,11 @@ struct DecisionSystemEBrainSummary: Equatable, Sendable {
     let hotColdMap: BASHotColdMap?
     let precisionProfile: BASPrecisionProfile?
     let lungState: BASLungState?
+    let thermalExchange: BASThermalExchangeFrame?
     let breathScheduler: BASBreathSchedulerFrame?
+    let integrityWeave: BASIntegrityWeaveFrame?
+    let organPackages: [BASOrganPackage]
+    let organDeltaPlan: BASOrganDeltaPlan?
     let resumeFrame: BASResumeFrame?
     let rollbackAnchor: BASRollbackAnchor?
     let sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult?
@@ -105,9 +114,12 @@ struct DecisionSystemEBrainSummary: Equatable, Sendable {
         loopCount: Int,
         cacheHitRate: Int,
         hostGatePercent: Int,
+        presenceLine: String? = nil,
         pressureLine: String?,
         riskFactorsLine: String? = nil,
         reasonCodesLine: String? = nil,
+        courtLine: String? = nil,
+        governanceLine: String? = nil,
         foldChecksum: String,
         updateTicketCount: Int,
         auditFindingCount: Int,
@@ -117,6 +129,8 @@ struct DecisionSystemEBrainSummary: Equatable, Sendable {
         sovereignVerdictLine: String? = nil,
         sovereignAuthorityLine: String? = nil,
         sovereignAuditLine: String? = nil,
+        versionTreeLine: String? = nil,
+        retractionLine: String? = nil,
         inspectionHeadline: String,
         blockers: [String],
         layerStackLines: [String],
@@ -129,7 +143,11 @@ struct DecisionSystemEBrainSummary: Equatable, Sendable {
         hotColdMap: BASHotColdMap? = nil,
         precisionProfile: BASPrecisionProfile? = nil,
         lungState: BASLungState? = nil,
+        thermalExchange: BASThermalExchangeFrame? = nil,
         breathScheduler: BASBreathSchedulerFrame? = nil,
+        integrityWeave: BASIntegrityWeaveFrame? = nil,
+        organPackages: [BASOrganPackage] = [],
+        organDeltaPlan: BASOrganDeltaPlan? = nil,
         resumeFrame: BASResumeFrame? = nil,
         rollbackAnchor: BASRollbackAnchor? = nil,
         sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult? = nil
@@ -143,9 +161,12 @@ struct DecisionSystemEBrainSummary: Equatable, Sendable {
         self.loopCount = loopCount
         self.cacheHitRate = cacheHitRate
         self.hostGatePercent = hostGatePercent
+        self.presenceLine = presenceLine
         self.pressureLine = pressureLine
         self.riskFactorsLine = riskFactorsLine
         self.reasonCodesLine = reasonCodesLine
+        self.courtLine = courtLine
+        self.governanceLine = governanceLine
         self.foldChecksum = foldChecksum
         self.updateTicketCount = updateTicketCount
         self.auditFindingCount = auditFindingCount
@@ -155,6 +176,8 @@ struct DecisionSystemEBrainSummary: Equatable, Sendable {
         self.sovereignVerdictLine = sovereignVerdictLine
         self.sovereignAuthorityLine = sovereignAuthorityLine
         self.sovereignAuditLine = sovereignAuditLine
+        self.versionTreeLine = versionTreeLine
+        self.retractionLine = retractionLine
         self.inspectionHeadline = inspectionHeadline
         self.blockers = blockers
         self.layerStackLines = layerStackLines
@@ -167,7 +190,11 @@ struct DecisionSystemEBrainSummary: Equatable, Sendable {
         self.hotColdMap = hotColdMap
         self.precisionProfile = precisionProfile
         self.lungState = lungState
+        self.thermalExchange = thermalExchange
         self.breathScheduler = breathScheduler
+        self.integrityWeave = integrityWeave
+        self.organPackages = organPackages
+        self.organDeltaPlan = organDeltaPlan
         self.resumeFrame = resumeFrame
         self.rollbackAnchor = rollbackAnchor
         self.sovereignBridgeResult = sovereignBridgeResult
@@ -178,9 +205,12 @@ struct DecisionSystemEBrainSummaryPresentation: Equatable, Sendable {
     let sourceDescriptor: DecisionEvolutionSourceDescriptor
     let statusLine: String
     let routeLine: String
+    let presenceLine: String?
     let pressureLine: String?
     let riskFactorsLine: String?
     let reasonCodesLine: String?
+    let courtLine: String?
+    let governanceLine: String?
     let hostLine: String
     let sovereignVerdictLine: String?
     let sovereignAuthorityLine: String?
@@ -204,9 +234,12 @@ struct DecisionSystemEBrainSummaryPresentation: Equatable, Sendable {
         sourceDescriptor: DecisionEvolutionSourceDescriptor,
         statusLine: String,
         routeLine: String,
+        presenceLine: String? = nil,
         pressureLine: String?,
         riskFactorsLine: String? = nil,
         reasonCodesLine: String? = nil,
+        courtLine: String? = nil,
+        governanceLine: String? = nil,
         hostLine: String,
         sovereignVerdictLine: String? = nil,
         sovereignAuthorityLine: String? = nil,
@@ -229,9 +262,12 @@ struct DecisionSystemEBrainSummaryPresentation: Equatable, Sendable {
         self.sourceDescriptor = sourceDescriptor
         self.statusLine = statusLine
         self.routeLine = routeLine
+        self.presenceLine = presenceLine
         self.pressureLine = pressureLine
         self.riskFactorsLine = riskFactorsLine
         self.reasonCodesLine = reasonCodesLine
+        self.courtLine = courtLine
+        self.governanceLine = governanceLine
         self.hostLine = hostLine
         self.sovereignVerdictLine = sovereignVerdictLine
         self.sovereignAuthorityLine = sovereignAuthorityLine
@@ -264,6 +300,7 @@ struct DecisionSystemFlightDeckEBrainDigestPresentation: Equatable, Sendable {
     let digest: DecisionEvolutionEBrainDigestPresentation
     let statusLine: String
     let routeLine: String
+    let presenceLine: String?
     let pressureLine: String?
     let hostLine: String
     let inspectionHeadline: String
@@ -318,7 +355,7 @@ extension DecisionSystemEBrainSummary {
 
     private var horizonDiagnosticsDetail: String? {
         let detail = DecisionEvolutionNarrativeFormattingSupport.joined(
-            [riskFactorsLine, reasonCodesLine].compactMap { $0 }
+            [riskFactorsLine, reasonCodesLine, courtLine, governanceLine].compactMap { $0 }
         )
         return detail.isEmpty ? nil : detail
     }
@@ -328,6 +365,60 @@ extension DecisionSystemEBrainSummary {
             return nil
         }
         return "Horizon diagnostics active"
+    }
+
+    private var windGateLine: String? {
+        layerStackLines.first { $0.hasPrefix("L11 wind gate") }
+    }
+
+    private var windGateSummaryLine: String? {
+        guard let windGateLine else {
+            return nil
+        }
+
+        let segments = windGateLine
+            .components(separatedBy: " • ")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard segments.count > 1 else {
+            return "Wind gate active"
+        }
+
+        let detail = segments.dropFirst().joined(separator: " • ")
+        guard detail.isEmpty == false else {
+            return "Wind gate active"
+        }
+
+        return "Wind gate: \(detail)"
+    }
+
+    var furnaceContributionLines: [String] {
+        DecisionEvolutionEBrainPresentationSupport.furnaceContributionLines(
+            layerStackLines: layerStackLines,
+            temporalLine: executionCapabilityFrame?.temporalLine,
+            governanceLine: governanceLine,
+            versionTreeLine: versionTreeLine,
+            retractionLine: retractionLine,
+            sovereignBridgeLine: sovereignBridgeLine
+        )
+    }
+
+    var foldedLungLines: [String] {
+        DecisionEvolutionEBrainPresentationSupport.foldedLungLines(
+            layerStackLines: layerStackLines,
+            lungLine: lungLine,
+            morphLine: morphLine,
+            hotColdLine: hotColdLine,
+            precisionLine: precisionLine,
+            organPackageLine: organPackageLine,
+            organDeltaLine: organDeltaLine,
+            schedulerLine: schedulerLine,
+            thermalExchangeLine: thermalExchangeLine,
+            integrityWeaveLine: integrityWeaveLine,
+            resumeLine: resumeLine,
+            rollbackLine: rollbackLine
+        )
     }
 
     var presentation: DecisionSystemEBrainSummaryPresentation {
@@ -350,9 +441,12 @@ extension DecisionSystemEBrainSummary {
             sourceDescriptor: sourceDescriptor,
             statusLine: statusLine,
             routeLine: routeLine,
+            presenceLine: presenceLine,
             pressureLine: pressureLine,
             riskFactorsLine: riskFactorsLine,
             reasonCodesLine: reasonCodesLine,
+            courtLine: courtLine,
+            governanceLine: governanceLine,
             hostLine: hostLine,
             sovereignVerdictLine: sovereignVerdictLine,
             sovereignAuthorityLine: sovereignAuthorityLine,
@@ -362,14 +456,18 @@ extension DecisionSystemEBrainSummary {
             detailLines: Self.uniqueLines([
                 statusLine,
                 routeLine,
+                presenceLine,
                 riskFactorsLine,
                 reasonCodesLine,
+                courtLine,
+                windGateSummaryLine,
                 executionCapabilityLine,
                 horizonLine,
                 temporalLine,
                 evidenceLine,
                 persistenceLine,
                 pressureLine,
+                governanceLine,
                 hostLine,
                 sovereignVerdictLine,
                 sovereignAuthorityLine,
@@ -378,11 +476,15 @@ extension DecisionSystemEBrainSummary {
                 morphLine,
                 hotColdLine,
                 precisionLine,
+                organPackageLine,
                 lungLine,
+                organDeltaLine,
+                thermalExchangeLine,
                 schedulerLine,
+                integrityWeaveLine,
                 resumeLine,
                 rollbackLine
-            ] + sovereignBridgeDetailLines.map(Optional.some)),
+            ] + furnaceContributionLines.map(Optional.some) + sovereignBridgeDetailLines.map(Optional.some)),
             alertLine: alertLine,
             layerStackLines: layerStackLines,
             executionCapabilityLine: executionCapabilityLine,
@@ -410,9 +512,12 @@ extension DecisionSystemEBrainSummary {
             loopCount: loopCount,
             cacheHitRate: cacheHitRate,
             hostGatePercent: hostGatePercent,
+            presenceLine: presenceLine,
             pressureLine: pressureLine,
             riskFactorsLine: riskFactorsLine,
             reasonCodesLine: reasonCodesLine,
+            courtLine: courtLine,
+            governanceLine: governanceLine,
             foldChecksum: foldChecksum,
             updateTicketCount: updateTicketCount,
             auditFindingCount: auditFindingCount,
@@ -422,6 +527,8 @@ extension DecisionSystemEBrainSummary {
             sovereignVerdictLine: sovereignVerdictLine,
             sovereignAuthorityLine: sovereignAuthorityLine,
             sovereignAuditLine: sovereignAuditLine,
+            versionTreeLine: versionTreeLine,
+            retractionLine: retractionLine,
             inspectionHeadline: inspectionHeadline,
             blockers: blockers,
             layerStackLines: layerStackLines,
@@ -434,7 +541,11 @@ extension DecisionSystemEBrainSummary {
             hotColdMap: hotColdMap,
             precisionProfile: precisionProfile,
             lungState: lungState,
+            thermalExchange: thermalExchange,
             breathScheduler: breathScheduler,
+            integrityWeave: integrityWeave,
+            organPackages: organPackages,
+            organDeltaPlan: organDeltaPlan,
             resumeFrame: resumeFrame,
             rollbackAnchor: rollbackAnchor,
             sovereignBridgeResult: sovereignBridgeResult
@@ -443,6 +554,10 @@ extension DecisionSystemEBrainSummary {
 
     private var lungLine: String? {
         lungState?.decisionLungLine
+    }
+
+    private var organDeltaLine: String? {
+        organDeltaPlan?.decisionOrganDeltaLine
     }
 
     private var morphLine: String? {
@@ -457,8 +572,20 @@ extension DecisionSystemEBrainSummary {
         precisionProfile?.decisionPrecisionLine
     }
 
+    private var organPackageLine: String? {
+        organPackages.decisionOrganPackageLine
+    }
+
+    private var thermalExchangeLine: String? {
+        thermalExchange?.decisionThermalExchangeLine
+    }
+
     private var schedulerLine: String? {
         breathScheduler?.decisionSchedulerLine
+    }
+
+    private var integrityWeaveLine: String? {
+        integrityWeave?.decisionIntegrityWeaveLine
     }
 
     private var resumeLine: String? {
@@ -470,11 +597,21 @@ extension DecisionSystemEBrainSummary {
     }
 
     private var sovereignBridgeLine: String? {
-        sovereignBridgeResult?.primaryLine
+        effectiveSovereignBridgeResult?.primaryLine
     }
 
     private var sovereignBridgeDetailLines: [String] {
-        sovereignBridgeResult?.detailLines ?? []
+        effectiveSovereignBridgeResult?.detailLines ?? []
+    }
+
+    private var effectiveSovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult? {
+        guard let sovereignBridgeResult else {
+            return nil
+        }
+        guard let organDeltaPlan else {
+            return sovereignBridgeResult
+        }
+        return sovereignBridgeResult.enriched(organDeltaPlan: organDeltaPlan)
     }
 }
 
@@ -495,9 +632,12 @@ extension BASEBrainTurnResult {
             loopCount: runtimeTrace.loopCount,
             cacheHitRate: Int((runtimeTrace.cacheHitRate * 100).rounded()),
             hostGatePercent: Int((hostGateValue * 100).rounded()),
+            presenceLine: factsBundle.displayPresenceLine(),
             pressureLine: factsBundle.pressureLine,
             riskFactorsLine: factsBundle.riskFactorsLine,
             reasonCodesLine: factsBundle.reasonCodesLine,
+            courtLine: factsBundle.courtLine,
+            governanceLine: factsBundle.governanceLine,
             foldChecksum: String(thoughtFold.checksum.prefix(12)),
             updateTicketCount: updateTickets.count,
             auditFindingCount: runtimeTrace.guardrailFindings.count,
@@ -510,6 +650,8 @@ extension BASEBrainTurnResult {
             sovereignVerdictLine: replaySummary.sovereignVerdictLine,
             sovereignAuthorityLine: replaySummary.sovereignAuthorityLine,
             sovereignAuditLine: replaySummary.sovereignAuditLine,
+            versionTreeLine: replaySummary.versionTreeLine,
+            retractionLine: replaySummary.retractionLine,
             inspectionHeadline: inspection.summary,
             blockers: inspection.blockerSummary,
             layerStackLines: factsBundle.layerStackLines,
@@ -521,7 +663,11 @@ extension BASEBrainTurnResult {
             hotColdMap: foldedLung.hotColdMap,
             precisionProfile: foldedLung.precisionProfile,
             lungState: foldedLung.lungState,
+            thermalExchange: foldedLung.thermalExchange,
             breathScheduler: foldedLung.breathScheduler,
+            integrityWeave: foldedLung.integrityWeave,
+            organPackages: foldedLung.organPackages,
+            organDeltaPlan: foldedLung.organDeltaPlan,
             resumeFrame: foldedLung.resumeFrame,
             rollbackAnchor: foldedLung.rollbackAnchor,
             sovereignBridgeResult: foldedLung.sovereignBridgeResult
@@ -543,9 +689,12 @@ extension DecisionEvolutionLineageSnapshot {
             loopCount: 0,
             cacheHitRate: 0,
             hostGatePercent: eBrain.hostGatePercent,
+            presenceLine: factsBundle.displayPresenceLine(),
             pressureLine: factsBundle.pressureLine,
             riskFactorsLine: factsBundle.riskFactorsLine,
             reasonCodesLine: factsBundle.reasonCodesLine,
+            courtLine: factsBundle.courtLine,
+            governanceLine: factsBundle.governanceLine,
             foldChecksum: eBrain.thoughtFoldChecksum,
             updateTicketCount: eBrain.updateTicketSummaries.count,
             auditFindingCount: eBrain.guardrailFindings.count,
@@ -557,6 +706,8 @@ extension DecisionEvolutionLineageSnapshot {
             sovereignVerdictLine: eBrain.sovereignVerdictLine,
             sovereignAuthorityLine: eBrain.sovereignAuthorityLine,
             sovereignAuditLine: eBrain.sovereignAuditLine,
+            versionTreeLine: factsBundle.versionTreeLine,
+            retractionLine: factsBundle.retractionLine,
             inspectionHeadline: "\(factsBundle.runtimeSummaryLine) • \(approvalState.rawValue)",
             blockers: diffSummary,
             layerStackLines: factsBundle.layerStackLines,
@@ -569,7 +720,10 @@ extension DecisionEvolutionLineageSnapshot {
             hotColdMap: eBrain.hotColdMap,
             precisionProfile: eBrain.precisionProfile,
             lungState: eBrain.lungState,
+            thermalExchange: eBrain.thermalExchange,
             breathScheduler: eBrain.breathScheduler,
+            organPackages: eBrain.organPackages,
+            organDeltaPlan: eBrain.organDeltaPlan,
             resumeFrame: eBrain.resumeFrame,
             rollbackAnchor: eBrain.rollbackAnchor,
             sovereignBridgeResult: eBrain.sovereignBridgeResult
@@ -1019,6 +1173,7 @@ struct DecisionSystemFlightDeck: Equatable, Sendable {
             ),
             statusLine: summaryPresentation.statusLine,
             routeLine: summaryPresentation.routeLine,
+            presenceLine: summaryPresentation.presenceLine,
             pressureLine: summaryPresentation.pressureLine,
             hostLine: summaryPresentation.hostLine,
             inspectionHeadline: summaryPresentation.inspectionHeadline,
@@ -1038,6 +1193,9 @@ extension Optional where Wrapped == DecisionSystemFlightDeck {
 }
 
 enum DecisionSystemFlightDeckBuilder {
+    private static let layerStackTrimCharacters = CharacterSet(charactersIn: " •")
+        .union(.whitespacesAndNewlines)
+
     static func build(
         from export: DecisionTestingRuntimeExport,
         eBrainTurn: BASEBrainTurnResult? = nil
@@ -1218,11 +1376,7 @@ enum DecisionSystemFlightDeckBuilder {
 
         let exactLayerSignals = Set(normalizedLayerStackLines)
         let joinedLayerSignal = normalizedLayerStackLines.joined(separator: " | ")
-        let layerPrefixes = Set(
-            normalizedLayerStackLines.compactMap { line in
-                line.components(separatedBy: " • ").first
-            }
-        )
+        let layerMarkers = Set(normalizedLayerStackLines.compactMap(layerMarker))
 
         return orderedUnique(
             normalizedValues.filter { signal in
@@ -1230,13 +1384,31 @@ enum DecisionSystemFlightDeckBuilder {
                     return false
                 }
 
-                return !layerPrefixes.contains(where: { signal.hasPrefix($0) })
+                return !layerMarkers.contains(where: { marker in
+                    signal == marker
+                        || signal.hasPrefix("\(marker) •")
+                        || signal.hasPrefix("\(marker):")
+                })
             }
         )
     }
 
+    private static func layerMarker(_ value: String) -> String? {
+        guard let normalized = normalizedSignal(value) else {
+            return nil
+        }
+
+        let firstSegment = normalized.components(separatedBy: " • ").first ?? normalized
+        let marker = firstSegment
+            .components(separatedBy: ":")
+            .first?
+            .trimmingCharacters(in: layerStackTrimCharacters)
+
+        return marker?.isEmpty == false ? marker : nil
+    }
+
     private static func normalizedSignal(_ value: String) -> String? {
-        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedValue = value.trimmingCharacters(in: layerStackTrimCharacters)
         return trimmedValue.isEmpty ? nil : trimmedValue
     }
 

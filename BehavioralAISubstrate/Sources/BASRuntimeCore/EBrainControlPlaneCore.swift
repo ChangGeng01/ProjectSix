@@ -635,6 +635,42 @@ public struct BASSovereignCommitToken: BASSchemaVersioned {
     }
 }
 
+public struct BASSovereignWarrant: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var warrantID: String
+    public var scope: BASSovereignCommitScope
+    public var actionDigest: String
+    public var jurisdictionRef: String
+    public var snapshotRef: String
+    public var timeLockRef: String
+    public var singleUse: Bool
+    public var signature: String
+
+    public init(
+        schemaVersion: String = BASSovereignWarrant.currentSchemaVersion,
+        warrantID: String,
+        scope: BASSovereignCommitScope,
+        actionDigest: String,
+        jurisdictionRef: String,
+        snapshotRef: String,
+        timeLockRef: String,
+        singleUse: Bool = true,
+        signature: String
+    ) {
+        self.schemaVersion = schemaVersion
+        self.warrantID = warrantID
+        self.scope = scope
+        self.actionDigest = actionDigest
+        self.jurisdictionRef = jurisdictionRef
+        self.snapshotRef = snapshotRef
+        self.timeLockRef = timeLockRef
+        self.singleUse = singleUse
+        self.signature = signature
+    }
+}
+
 public struct BASQuarantineRecord: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.0.0"
 

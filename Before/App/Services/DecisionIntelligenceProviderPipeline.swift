@@ -205,7 +205,7 @@ enum DecisionIntelligenceProviderPipeline {
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> QuickCheckResult? {
         let adjustedStrategy = strategy?.clamped(using: eBrainTurn)
-        if let eBrainTurn, eBrainTurn.actionPermit.mode.isProtective {
+        if let eBrainTurn, shouldUseProtectiveOverlay(for: eBrainTurn) {
             return protectiveQuickResult(base: base, turn: eBrainTurn)
         }
         let clock = ContinuousClock()
@@ -370,7 +370,7 @@ enum DecisionIntelligenceProviderPipeline {
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> BalanceBoardResult? {
         let adjustedStrategy = strategy?.clamped(using: eBrainTurn)
-        if let eBrainTurn, eBrainTurn.actionPermit.mode.isProtective {
+        if let eBrainTurn, shouldUseProtectiveOverlay(for: eBrainTurn) {
             return protectiveBalanceResult(base: base, turn: eBrainTurn)
         }
         let clock = ContinuousClock()
@@ -535,7 +535,7 @@ enum DecisionIntelligenceProviderPipeline {
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> MirrorResult? {
         let adjustedStrategy = strategy?.clamped(using: eBrainTurn)
-        if let eBrainTurn, eBrainTurn.actionPermit.mode.isProtective {
+        if let eBrainTurn, shouldUseProtectiveOverlay(for: eBrainTurn) {
             return protectiveMirrorResult(base: base, turn: eBrainTurn)
         }
         let clock = ContinuousClock()
@@ -890,11 +890,74 @@ enum DecisionIntelligenceProviderPipeline {
 extension BASActionPermitMode {
     var isProtective: Bool {
         switch self {
-        case .delay, .block, .replace:
+        case .delay, .draftOnly, .localOnly, .block, .replace, .escalate:
             return true
-        case .answer, .compare:
+        case .answer, .mirror, .compare:
             return false
         }
+    }
+}
+
+extension BASRenderedOutput {
+    var protectiveSurfaceMode: BASActionPermitMode? {
+        if mode.isProtective {
+            return mode
+        }
+
+        guard let guide = surfaceGuide else {
+            return nil
+        }
+
+        if let stackedProtective = guide.stackedModes.first(where: { $0.isProtective }) {
+            return stackedProtective
+        }
+        if guide.sovereignEscalationHint != nil {
+            return .escalate
+        }
+        if guide.delayReservation != nil || guide.delayWindow != nil || guide.agency.delayAvailable {
+            return .delay
+        }
+        if guide.agency.prefersDraftOnly {
+            return .draftOnly
+        }
+        if guide.agency.localOnlyPreferred {
+            return .localOnly
+        }
+        if guide.protectiveSubstitute != nil {
+            return .replace
+        }
+
+        return nil
+    }
+
+    var hasProtectiveSurfaceGuidance: Bool {
+        protectiveSurfaceMode != nil
+    }
+}
+
+extension BASEBrainTurnResult {
+    var protectiveSurfaceMode: BASActionPermitMode? {
+        if actionPermit.mode.isProtective {
+            return actionPermit.mode
+        }
+        if let stackedProtective = actionPermit.stackedModes.first(where: { $0.isProtective }) {
+            return stackedProtective
+        }
+        if let renderedProtectiveMode = renderedOutput.protectiveSurfaceMode {
+            return renderedProtectiveMode
+        }
+        if actionPermit.delayWindow != nil {
+            return .delay
+        }
+        if actionPermit.substituteRequired {
+            return .replace
+        }
+
+        return nil
+    }
+
+    var hasProtectiveSurfaceGuidance: Bool {
+        protectiveSurfaceMode != nil
     }
 }
 
@@ -969,39 +1032,20 @@ extension DecisionAdaptiveTaskStrategy {
 }
 
 private extension DecisionIntelligenceProviderPipeline {
+    static func shouldUseProtectiveOverlay(
+        for turn: BASEBrainTurnResult
+    ) -> Bool {
+        turn.hasProtectiveSurfaceGuidance
+    }
+
     static func protectiveQuickResult(
         base: QuickCheckResult,
         turn: BASEBrainTurnResult
     ) -> QuickCheckResult {
         let rendered = turn.renderedOutput
-        let verdict: CheckVerdict = switch rendered.mode {
-        case .delay, .replace:
-            .pause
-        case .block:
-            .notRecommended
-        case .compare, .answer:
-            base.verdict
-        }
-        let primaryAction: CheckAction = switch rendered.mode {
-        case .delay:
-            .wait90s
-        case .block:
-            .leaveStimulus
-        case .replace:
-            .decideTomorrow
-        case .compare, .answer:
-            base.primaryAction
-        }
-        let secondaryActions: [CheckAction] = switch rendered.mode {
-        case .delay:
-            [.decideTomorrow, .continueMindfully]
-        case .block:
-            [.leaveStimulus, .decideTomorrow]
-        case .replace:
-            [.continueMindfully, .decideTomorrow]
-        case .compare, .answer:
-            base.secondaryActions
-        }
+        let verdict = protectiveVerdict(for: rendered, fallback: base.verdict)
+        let primaryAction = protectivePrimaryAction(for: rendered, fallback: base.primaryAction)
+        let secondaryActions = protectiveSecondaryActions(for: rendered, fallback: base.secondaryActions)
 
         return QuickCheckResult(
             currentPerspective: nonEmpty(rendered.headline) ?? base.currentPerspective,
@@ -1017,7 +1061,7 @@ private extension DecisionIntelligenceProviderPipeline {
         turn: BASEBrainTurnResult
     ) -> BalanceBoardResult {
         let rendered = turn.renderedOutput
-        let nextAction = rendered.alternativeActions.lazy.compactMap(nonEmpty).first ?? base.nextAction
+        let nextAction = protectiveGuidanceLine(for: rendered) ?? base.nextAction
         return BalanceBoardResult(
             headline: nonEmpty(rendered.headline) ?? base.headline,
             summary: nonEmpty(rendered.body) ?? base.summary,
@@ -1032,23 +1076,198 @@ private extension DecisionIntelligenceProviderPipeline {
         turn: BASEBrainTurnResult
     ) -> MirrorResult {
         let rendered = turn.renderedOutput
-        let nextAction = rendered.alternativeActions.lazy.compactMap(nonEmpty).first ?? base.nextAction
-        let nextActionTitle: String = switch rendered.mode {
-        case .delay:
-            "Delay the move"
-        case .block:
-            "Hold the boundary"
-        case .replace:
-            "Use the safer step"
-        case .compare, .answer:
-            base.nextActionTitle
-        }
+        let nextAction = protectiveGuidanceLine(for: rendered) ?? base.nextAction
+        let nextActionTitle = protectiveNextActionTitle(for: rendered, fallback: base.nextActionTitle)
         return MirrorResult(
             headline: nonEmpty(rendered.headline) ?? base.headline,
             coreTension: nonEmpty(rendered.body) ?? base.coreTension,
             nextActionTitle: nextActionTitle,
             nextAction: nextAction
         )
+    }
+
+    static func protectiveVerdict(
+        for rendered: BASRenderedOutput,
+        fallback: CheckVerdict
+    ) -> CheckVerdict {
+        if let guide = rendered.surfaceGuide {
+            if guide.sovereignEscalationHint != nil {
+                return .notRecommended
+            }
+            if guide.agency.prefersDraftOnly || guide.agency.localOnlyPreferred || guide.agency.delayAvailable {
+                return .pause
+            }
+        }
+
+        return switch rendered.mode {
+        case .delay, .draftOnly, .localOnly, .replace:
+            .pause
+        case .block, .escalate:
+            .notRecommended
+        case .compare, .mirror, .answer:
+            fallback
+        }
+    }
+
+    static func protectivePrimaryAction(
+        for rendered: BASRenderedOutput,
+        fallback: CheckAction
+    ) -> CheckAction {
+        if let guide = rendered.surfaceGuide {
+            if guide.sovereignEscalationHint != nil {
+                return .leaveStimulus
+            }
+            if guide.agency.prefersDraftOnly {
+                return .decideTomorrow
+            }
+            if guide.agency.localOnlyPreferred {
+                return .continueMindfully
+            }
+            if guide.agency.delayAvailable {
+                return .wait90s
+            }
+        }
+
+        return switch rendered.mode {
+        case .delay:
+            .wait90s
+        case .draftOnly:
+            .decideTomorrow
+        case .localOnly:
+            .continueMindfully
+        case .block:
+            .leaveStimulus
+        case .escalate:
+            .leaveStimulus
+        case .replace:
+            .decideTomorrow
+        case .compare, .mirror, .answer:
+            fallback
+        }
+    }
+
+    static func protectiveSecondaryActions(
+        for rendered: BASRenderedOutput,
+        fallback: [CheckAction]
+    ) -> [CheckAction] {
+        if let guide = rendered.surfaceGuide {
+            var actions: [CheckAction] = []
+            if guide.sovereignEscalationHint != nil {
+                actions += [.leaveStimulus, .wait90s]
+            }
+            if guide.agency.delayAvailable {
+                actions += [.decideTomorrow, .continueMindfully]
+            }
+            if guide.agency.prefersDraftOnly {
+                actions += [.wait90s, .continueMindfully]
+            }
+            if guide.agency.localOnlyPreferred {
+                actions += [.continueMindfully, .decideTomorrow]
+            }
+            if actions.isEmpty == false {
+                return uniqueActions(actions)
+            }
+        }
+
+        return switch rendered.mode {
+        case .delay:
+            [.decideTomorrow, .continueMindfully]
+        case .draftOnly:
+            [.wait90s, .continueMindfully]
+        case .localOnly:
+            [.continueMindfully, .decideTomorrow]
+        case .block:
+            [.leaveStimulus, .decideTomorrow]
+        case .escalate:
+            [.leaveStimulus, .wait90s]
+        case .replace:
+            [.continueMindfully, .decideTomorrow]
+        case .compare, .mirror, .answer:
+            fallback
+        }
+    }
+
+    static func protectiveGuidanceLine(for rendered: BASRenderedOutput) -> String? {
+        if let action = rendered.alternativeActions.lazy.compactMap(nonEmpty).first {
+            return action
+        }
+        if let substituteDescription = nonEmpty(rendered.surfaceGuide?.protectiveSubstitute?.description ?? "") {
+            return substituteDescription
+        }
+        if let delayReservation = rendered.surfaceGuide?.delayReservation {
+            return protectiveDelayGuidance(for: delayReservation)
+        }
+        if rendered.surfaceGuide?.agency.localOnlyPreferred == true {
+            return "Keep the next step local and reversible."
+        }
+        if rendered.surfaceGuide?.agency.prefersDraftOnly == true {
+            return "Keep the move in draft until the boundary is re-checked."
+        }
+        if rendered.surfaceGuide?.sovereignEscalationHint != nil {
+            return "Pause release and escalate the decision boundary."
+        }
+        if rendered.surfaceGuide?.agency.requiresSecondCheck == true {
+            return "Get a second confirmation before acting."
+        }
+        return nil
+    }
+
+    static func protectiveNextActionTitle(
+        for rendered: BASRenderedOutput,
+        fallback: String
+    ) -> String {
+        if let guide = rendered.surfaceGuide {
+            if guide.sovereignEscalationHint != nil {
+                return "Escalate the boundary"
+            }
+            if guide.agency.prefersDraftOnly {
+                return "Keep it in draft"
+            }
+            if guide.agency.localOnlyPreferred {
+                return "Keep it local"
+            }
+            if guide.agency.delayAvailable {
+                return "Delay the move"
+            }
+            if guide.protectiveSubstitute != nil {
+                return "Use the safer step"
+            }
+        }
+
+        return switch rendered.mode {
+        case .delay:
+            "Delay the move"
+        case .draftOnly:
+            "Keep it in draft"
+        case .localOnly:
+            "Keep it local"
+        case .block:
+            "Hold the boundary"
+        case .escalate:
+            "Escalate the boundary"
+        case .replace:
+            "Use the safer step"
+        case .compare, .mirror, .answer:
+            fallback
+        }
+    }
+
+    static func protectiveDelayGuidance(
+        for reservation: BASDelayReservation
+    ) -> String {
+        switch reservation.delayType {
+        case "cool_down":
+            return "Take a cool-down window before deciding."
+        case "evidence_wait":
+            return "Wait for one more piece of evidence before deciding."
+        default:
+            return "Wait before taking the next step."
+        }
+    }
+
+    static func uniqueActions(_ actions: [CheckAction]) -> [CheckAction] {
+        var seen = Set<String>()
+        return actions.filter { seen.insert($0.rawValue).inserted }
     }
 
     static func nonEmpty(_ value: String) -> String? {

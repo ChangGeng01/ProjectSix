@@ -121,7 +121,8 @@ final class DecisionSessionEngineHealthSummaryTests: XCTestCase {
                 permitMode: "replace",
                 hostGatePercent: 58,
                 riskFactorsLine: "Factors: evidence_caveat_load",
-                reasonCodesLine: "Reason codes: evidence.caveat"
+                reasonCodesLine: "Reason codes: evidence.caveat",
+                courtLine: "Court: agency delay right • remand L9"
             ),
             latestEventID: "evt-12",
             latestEventSeq: 12,
@@ -155,7 +156,7 @@ final class DecisionSessionEngineHealthSummaryTests: XCTestCase {
         XCTAssertEqual(healthSummary?.title, "Horizon diagnostics active")
         XCTAssertEqual(
             healthSummary?.detail,
-            "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+            "Factors: evidence_caveat_load • Reason codes: evidence.caveat • Court: agency delay right • remand L9"
         )
     }
 
@@ -207,7 +208,8 @@ final class DecisionSessionEngineHealthSummaryTests: XCTestCase {
                 permitMode: "delay",
                 hostGatePercent: 44,
                 riskFactorsLine: "Factors: evidence_caveat_load",
-                reasonCodesLine: "Reason codes: evidence.caveat"
+                reasonCodesLine: "Reason codes: evidence.caveat",
+                courtLine: "Court: agency delay right • remand L9"
             ),
             latestEventID: "evt-14",
             latestEventSeq: 14,
@@ -230,7 +232,7 @@ final class DecisionSessionEngineHealthSummaryTests: XCTestCase {
         XCTAssertEqual(healthSummary?.title, "Horizon diagnostics active")
         XCTAssertEqual(
             healthSummary?.detail,
-            "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+            "Factors: evidence_caveat_load • Reason codes: evidence.caveat • Court: agency delay right • remand L9"
         )
     }
 }

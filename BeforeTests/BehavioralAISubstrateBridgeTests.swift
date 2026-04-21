@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import Testing
 import BASHostKit
+import BASMemory
 @testable import Before
 
 @MainActor
@@ -306,6 +307,66 @@ struct BehavioralAISubstrateBridgeTests {
     }
 
     @Test
+    func consoleSnapshotSurfacesGovernancePressureForLiveTurn() async throws {
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            debugStore: DecisionIntelligenceDebugStore(),
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+        let turn = makeGovernedProtectiveTurn()
+        let snapshot = BehavioralAISubstrateBridge.consoleSnapshot(
+            from: export,
+            currentBrainState: nil,
+            eBrainTurn: turn
+        )
+        let dataReport = try #require(snapshot.reports.first(where: { $0.layer == .data }))
+        let expectedGovernanceLine = expectedGovernancePressureLine()
+
+        #expect(snapshot.runtimeSummary?.contains(expectedGovernanceLine) == true)
+        #expect(snapshot.runtimeSummary?.contains(expectedVersionTreeLine()) == true)
+        #expect(snapshot.runtimeSummary?.contains(expectedPendingRetractionLine()) == true)
+        #expect(snapshot.runtimeSummary?.contains("L13 evolution") != true)
+        #expect(dataReport.summary.contains(expectedGovernanceLine) != true)
+        #expect(dataReport.summary.contains("L13 evolution") != true)
+    }
+
+    @Test
+    func consoleSnapshotSurfacesResolvedGovernancePressureForLiveTurn() async throws {
+        let export = await DecisionTestingInterface.runtimeExport(
+            quick: [],
+            balance: [],
+            mirror: [],
+            preferences: .default,
+            debugStore: DecisionIntelligenceDebugStore(),
+            eBrainStore: EBrainTurnDebugStore(),
+            telemetryStore: DecisionIntelligenceTelemetryStore(),
+            cache: DecisionIntelligenceResponseCache(limit: 2),
+            circuitBreaker: DecisionIntelligenceCircuitBreaker()
+        )
+        let turn = makeResolvedGovernedProtectiveTurn()
+        let snapshot = BehavioralAISubstrateBridge.consoleSnapshot(
+            from: export,
+            currentBrainState: nil,
+            eBrainTurn: turn
+        )
+        let dataReport = try #require(snapshot.reports.first(where: { $0.layer == .data }))
+        let expectedGovernanceLine = expectedResolvedGovernancePressureLine()
+
+        #expect(snapshot.runtimeSummary?.contains(expectedGovernanceLine) == true)
+        #expect(snapshot.runtimeSummary?.contains(expectedVersionTreeLine()) == true)
+        #expect(snapshot.runtimeSummary?.contains(expectedResolvedRetractionLine()) == true)
+        #expect(snapshot.runtimeSummary?.contains("L13 evolution") != true)
+        #expect(dataReport.summary.contains(expectedGovernanceLine) != true)
+        #expect(dataReport.summary.contains("L13 evolution") != true)
+    }
+
+    @Test
     func inspectionSnapshotExposesEffectiveFactsAndLayerStackForLiveTurn() async throws {
         let export = await DecisionTestingInterface.runtimeExport(
             quick: [],
@@ -374,6 +435,7 @@ struct BehavioralAISubstrateBridgeTests {
                 == turn.sovereignExecutionReceipts.map(\.kind.rawValue)
         )
         #expect(inspection.liveEBrainKernelFrame?.lungState == foldedLung.lungState)
+        #expect(inspection.liveEBrainKernelFrame?.organPackages == foldedLung.organPackages)
         #expect(inspection.liveEBrainKernelFrame?.resumeFrame == foldedLung.resumeFrame)
         #expect(inspection.liveEBrainKernelFrame?.rollbackAnchor == foldedLung.rollbackAnchor)
         #expect(inspection.liveEBrainKernelFrame?.sovereignBridgeResult == foldedLung.sovereignBridgeResult)
@@ -386,6 +448,7 @@ struct BehavioralAISubstrateBridgeTests {
                 == turn.diagnosticsPresentation.layerStackLines
         )
         #expect(inspection.liveEBrainPresentationFrame?.lungLine == foldedLung.lungLine)
+        #expect(inspection.liveEBrainPresentationFrame?.organPackageLine == foldedLung.organPackageLine)
         #expect(inspection.liveEBrainPresentationFrame?.resumeLine == foldedLung.resumeLine)
         #expect(inspection.liveEBrainPresentationFrame?.rollbackLine == foldedLung.rollbackLine)
         #expect(inspection.liveEBrainPresentationFrame?.sovereignBridgeLine == foldedLung.sovereignBridgeLine)
@@ -836,6 +899,160 @@ struct BehavioralAISubstrateBridgeTests {
         )
     }
 
+    private func makeGovernedProtectiveTurn() -> BASEBrainTurnResult {
+        var turn = makeProtectiveTurn()
+        turn.experienceCandidates = [
+            BASExperienceCandidate(
+                candidateID: "candidate-1",
+                sourceRefs: ["ticket-1"],
+                candidateType: .guardPattern,
+                summary: "Guard-first pattern observed.",
+                stabilitySignal: 0.84,
+                contaminationRisk: 0.18,
+                hostScope: "session",
+                sovereignScope: "l14.review"
+            )
+        ]
+        turn.shadowTrialRecords = [
+            BASShadowTrialRecord(
+                trialID: "trial-1",
+                candidateRef: "candidate-1",
+                trialScope: "single-domain",
+                startAt: Date(timeIntervalSince1970: 1_776_150_010),
+                observedEffects: ["guard held"],
+                failConditions: ["drift"],
+                completionState: "pending"
+            )
+        ]
+        turn.versionDeltas = [
+            BASVersionDelta(
+                deltaID: "delta-1",
+                targetType: "rule",
+                beforeRef: "rule-0",
+                afterRef: "rule-1",
+                reason: "Guard template matured.",
+                impactScope: "l13.shadow",
+                rollbackRef: "rollback-1"
+            )
+        ]
+        turn.retractionOrders = [
+            BASRetractionOrder(
+                orderID: "retract-1",
+                targetRefs: ["rule-0"],
+                cascadeRefs: ["template-0"],
+                reasonCodes: ["superseded_by_shadow_trial"],
+                executionState: "pending"
+            )
+        ]
+        turn.evolutionSeals = [
+            BASEvolutionSeal(
+                sealID: "seal-1",
+                candidateRef: "candidate-1",
+                allowedScope: "checkpoint-review",
+                trialRequired: true,
+                approvalRequirements: ["l14.review"],
+                signature: "signature-1",
+                approvalState: "pending_review"
+            )
+        ]
+        turn.workflowCandidates = [
+            BASWorkflowCandidate(
+                workflowID: "workflow-1",
+                taskDomain: "delay_review",
+                steps: ["pause", "mirror", "review"],
+                observedGain: 0.62,
+                safetyNotes: ["review before send"],
+                hostSpecific: true,
+                shadowTrialState: "pending"
+            )
+        ]
+        turn.guardTemplateCandidates = [
+            BASGuardTemplateCandidate(
+                templateID: "guard-1",
+                sceneType: "high_pressure",
+                boundaryScriptRef: "boundary.delay.v1",
+                delayPacketRef: "packet.delay.v1",
+                substituteRef: "compare.v1",
+                protectiveGain: 0.84,
+                overreachRisk: 0.22
+            )
+        ]
+        turn.biasRecords = [
+            BASBiasRecord(
+                biasID: "bias-1",
+                biasType: "overreach_risk",
+                sourceRefs: ["turn-1", "trial-1"],
+                severity: 0.57,
+                recurrenceScore: 0.41,
+                affectedLayers: ["L11", "L12", "L13"]
+            )
+        ]
+        turn.riskPatternCandidates = [
+            BASRiskPatternCandidate(
+                patternID: "risk-1",
+                sourceRefs: ["turn-1", "ticket-1"],
+                riskDomain: "high_pressure",
+                triggerSignals: ["manipulation", "delay"],
+                severity: 0.79,
+                recurrenceScore: 0.48,
+                sovereignReviewRequired: true,
+                shadowTrialState: "pending"
+            )
+        ]
+        turn.learningExportBundles = []
+        return turn
+    }
+
+    private func makeResolvedGovernedProtectiveTurn() -> BASEBrainTurnResult {
+        var turn = makeGovernedProtectiveTurn()
+        turn.shadowTrialRecords = [
+            BASShadowTrialRecord(
+                trialID: "trial-1",
+                candidateRef: "candidate-1",
+                trialScope: "compare_only:block",
+                startAt: Date(timeIntervalSince1970: 1_776_150_010),
+                endAt: Date(timeIntervalSince1970: 1_776_150_011),
+                observedEffects: ["guard held"],
+                failConditions: ["drift"],
+                promotionRecommendation: "eligible_with_seal_review",
+                completionState: "passed"
+            )
+        ]
+        turn.retractionOrders = [
+            BASRetractionOrder(
+                orderID: "retract-1",
+                targetRefs: ["rule-0"],
+                cascadeRefs: ["template-0"],
+                reasonCodes: ["seal_review"],
+                executionState: "cleared"
+            )
+        ]
+        turn.workflowCandidates = [
+            BASWorkflowCandidate(
+                workflowID: "workflow-1",
+                taskDomain: "delay_review",
+                steps: ["pause", "mirror", "review"],
+                observedGain: 0.62,
+                safetyNotes: ["review before send"],
+                hostSpecific: true,
+                shadowTrialState: "passed"
+            )
+        ]
+        turn.riskPatternCandidates = [
+            BASRiskPatternCandidate(
+                patternID: "risk-1",
+                sourceRefs: ["turn-1", "ticket-1"],
+                riskDomain: "high_pressure",
+                triggerSignals: ["manipulation", "delay"],
+                severity: 0.79,
+                recurrenceScore: 0.48,
+                sovereignReviewRequired: true,
+                shadowTrialState: "passed"
+            )
+        ]
+        return turn
+    }
+
     @Test
     func hostKitFacadePreservesHighRiskNotificationSessionSemantics() async throws {
         let container = try makeContainer()
@@ -1129,7 +1346,7 @@ struct BehavioralAISubstrateBridgeTests {
             performRestore: {
                 Issue.record("Expected open-mode path, not workspace restore")
             },
-            performOpenEvolutionControl: {
+            performOpenEvolutionControl: { _ in
                 Issue.record("Expected open-mode path, not Evolution Control")
             },
             refreshCurrentBrain: { source in
@@ -1176,7 +1393,7 @@ struct BehavioralAISubstrateBridgeTests {
             performRestore: {
                 Issue.record("Expected open-mode handoff path")
             },
-            performOpenEvolutionControl: {
+            performOpenEvolutionControl: { _ in
                 Issue.record("Expected open-mode handoff path")
             },
             refreshCurrentBrain: { source in
@@ -1208,7 +1425,7 @@ struct BehavioralAISubstrateBridgeTests {
             selectBoxTab: { actions.append("box") },
             performPredictiveIntervention: { _ in actions.append("prediction") },
             performRestore: { actions.append("restore") },
-            performOpenEvolutionControl: { actions.append("control") },
+            performOpenEvolutionControl: { _ in actions.append("control") },
             refreshPredictedIntervention: { actions.append("refresh_prediction") },
             syncWidgetSnapshot: { actions.append("widget") }
         )
@@ -1226,10 +1443,12 @@ struct BehavioralAISubstrateBridgeTests {
         let envelope = DecisionIntentEnvelope.openEvolutionControl(
             entrySource: .watch,
             promptSeed: "Watch the pending review queue",
-            triggerReason: "Watch requested evolution review."
+            triggerReason: "Watch requested evolution review.",
+            controlEntryKindID: DecisionEvolutionWidgetControlEntryKind.audit.rawValue
         )
 
         var openedControlCenter = false
+        var openedEnvelope: DecisionIntentEnvelope?
         var refreshedSource: BrainStateUpdateSource?
 
         BehavioralAISubstrateBridge.consumeDecisionIntentEnvelope(
@@ -1249,8 +1468,9 @@ struct BehavioralAISubstrateBridgeTests {
             performRestore: {
                 Issue.record("Expected control-surface handoff, not workspace restore")
             },
-            performOpenEvolutionControl: {
+            performOpenEvolutionControl: { envelope in
                 openedControlCenter = true
+                openedEnvelope = envelope
             },
             refreshCurrentBrain: { source in
                 refreshedSource = source
@@ -1258,6 +1478,7 @@ struct BehavioralAISubstrateBridgeTests {
         )
 
         #expect(openedControlCenter)
+        #expect(openedEnvelope?.controlEntryKindID == DecisionEvolutionWidgetControlEntryKind.audit.rawValue)
         #expect(refreshedSource == .watchHandoff)
     }
 
@@ -1290,7 +1511,7 @@ struct BehavioralAISubstrateBridgeTests {
             performRestore: {
                 Issue.record("Expected routed-input path, not restore")
             },
-            performOpenEvolutionControl: {
+            performOpenEvolutionControl: { _ in
                 Issue.record("Expected routed-input path, not Evolution Control")
             },
             refreshCurrentBrain: { source in
@@ -1336,7 +1557,7 @@ struct BehavioralAISubstrateBridgeTests {
             performRestore: {
                 Issue.record("Expected pending routed-input path")
             },
-            performOpenEvolutionControl: {
+            performOpenEvolutionControl: { _ in
                 Issue.record("Expected pending routed-input path")
             },
             refreshCurrentBrain: { source in
@@ -1650,5 +1871,25 @@ struct BehavioralAISubstrateBridgeTests {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter.date(from: value) ?? Date(timeIntervalSince1970: 0)
+    }
+
+    private func expectedGovernancePressureLine() -> String {
+        "L13 governance • candidates 1 • shadow 1 pending/1 • seal 1 pending/1 • version 1 • retract 1 pending/1 • nursery workflow 1 • guard 1 • bias 1 • risk 1 • export 0 • gate hold"
+    }
+
+    private func expectedResolvedGovernancePressureLine() -> String {
+        "L13 governance • candidates 1 • shadow ready 1/1 • seal 1 pending/1 • version 1 • retract cleared 1 • nursery workflow 1 • guard 1 • bias 1 • risk 1 • export 0 • gate hold"
+    }
+
+    private func expectedVersionTreeLine() -> String {
+        "L13 version tree • rule rule-1 • rollback rollback-1"
+    }
+
+    private func expectedPendingRetractionLine() -> String {
+        "L13 retraction • pending rule-0 • reason superseded_by_shadow_trial"
+    }
+
+    private func expectedResolvedRetractionLine() -> String {
+        "L13 retraction • cleared rule-0 • reason seal_review"
     }
 }

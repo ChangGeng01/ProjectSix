@@ -1,5 +1,6 @@
 import Foundation
 import BASHostKit
+import BASMemory
 
 enum DeveloperDecisionReplayRecord: Identifiable {
     case quick(CheckEvent)
@@ -212,6 +213,7 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
     let thoughtFoldChecksum: String
     let updateTicketSummaries: [String]
     let reviewDirectiveLine: String?
+    let courtLine: String?
     let riskFactorsLine: String?
     let reasonCodesLine: String?
     let activeKillSwitches: [String]
@@ -220,6 +222,9 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
     let sovereignVerdictLine: String?
     let sovereignAuthorityLine: String?
     let sovereignAuditLine: String?
+    let governanceLine: String?
+    let versionTreeLine: String?
+    let retractionLine: String?
     let layerStackLines: [String]
     let checkpointBudgetLine: String?
     let checkpointPressureLine: String?
@@ -229,7 +234,11 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
     let hotColdMap: BASHotColdMap?
     let precisionProfile: BASPrecisionProfile?
     let lungState: BASLungState?
+    let thermalExchange: BASThermalExchangeFrame?
     let breathScheduler: BASBreathSchedulerFrame?
+    let integrityWeave: BASIntegrityWeaveFrame?
+    let organPackages: [BASOrganPackage]
+    let organDeltaPlan: BASOrganDeltaPlan?
     let resumeFrame: BASResumeFrame?
     let rollbackAnchor: BASRollbackAnchor?
     let sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult?
@@ -245,6 +254,7 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         thoughtFoldChecksum: String,
         updateTicketSummaries: [String],
         reviewDirectiveLine: String?,
+        courtLine: String? = nil,
         riskFactorsLine: String? = nil,
         reasonCodesLine: String? = nil,
         activeKillSwitches: [String],
@@ -253,6 +263,9 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         sovereignVerdictLine: String? = nil,
         sovereignAuthorityLine: String? = nil,
         sovereignAuditLine: String? = nil,
+        governanceLine: String? = nil,
+        versionTreeLine: String? = nil,
+        retractionLine: String? = nil,
         layerStackLines: [String],
         checkpointBudgetLine: String?,
         checkpointPressureLine: String?,
@@ -262,7 +275,11 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         hotColdMap: BASHotColdMap? = nil,
         precisionProfile: BASPrecisionProfile? = nil,
         lungState: BASLungState? = nil,
+        thermalExchange: BASThermalExchangeFrame? = nil,
         breathScheduler: BASBreathSchedulerFrame? = nil,
+        integrityWeave: BASIntegrityWeaveFrame? = nil,
+        organPackages: [BASOrganPackage] = [],
+        organDeltaPlan: BASOrganDeltaPlan? = nil,
         resumeFrame: BASResumeFrame? = nil,
         rollbackAnchor: BASRollbackAnchor? = nil,
         sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult? = nil
@@ -277,6 +294,7 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.thoughtFoldChecksum = thoughtFoldChecksum
         self.updateTicketSummaries = updateTicketSummaries
         self.reviewDirectiveLine = reviewDirectiveLine
+        self.courtLine = courtLine
         self.riskFactorsLine = riskFactorsLine
         self.reasonCodesLine = reasonCodesLine
         self.activeKillSwitches = activeKillSwitches
@@ -285,6 +303,9 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.sovereignVerdictLine = sovereignVerdictLine
         self.sovereignAuthorityLine = sovereignAuthorityLine
         self.sovereignAuditLine = sovereignAuditLine
+        self.governanceLine = governanceLine
+        self.versionTreeLine = versionTreeLine
+        self.retractionLine = retractionLine
         self.layerStackLines = layerStackLines
         self.checkpointBudgetLine = checkpointBudgetLine
         self.checkpointPressureLine = checkpointPressureLine
@@ -294,7 +315,11 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.hotColdMap = hotColdMap
         self.precisionProfile = precisionProfile
         self.lungState = lungState
+        self.thermalExchange = thermalExchange
         self.breathScheduler = breathScheduler
+        self.integrityWeave = integrityWeave
+        self.organPackages = organPackages
+        self.organDeltaPlan = organDeltaPlan
         self.resumeFrame = resumeFrame
         self.rollbackAnchor = rollbackAnchor
         self.sovereignBridgeResult = sovereignBridgeResult
@@ -314,19 +339,66 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.thoughtFoldChecksum = String(turn.thoughtFold.checksum.prefix(12))
         self.updateTicketSummaries = turn.updateTickets.map(\.summary)
         self.reviewDirectiveLine = turn.updateTickets.lazy.compactMap(\.reviewDirectiveLine).compactMap(\.evolutionTrimmedNonEmpty).first
+        self.courtLine = Self.courtLine(from: turn.mergedChoice)
         self.riskFactorsLine = turn.turnDiagnosticsSupport.riskFactorsLine
         self.reasonCodesLine = turn.turnDiagnosticsSupport.reasonCodesLine
         self.activeKillSwitches = activeKillSwitches
         self.guardrailFindings = turn.runtimeTrace.guardrailFindings.map(\.summary)
         self.killSwitches = Self.orderedUnique(activeKillSwitches + recommendedKillSwitches)
-        self.sovereignVerdictLine = Self.sovereignVerdictLine(from: turn.sovereignVerdict)
-        self.sovereignAuthorityLine = Self.sovereignAuthorityLine(
-            tokens: turn.sovereignCommitTokens,
-            lock: turn.sovereignLock,
-            quarantineRecords: turn.quarantineRecords
+        self.sovereignVerdictLine = Self.sovereignVerdictLine(
+            levelID: turn.sovereignVerdictLevelID,
+            latched: turn.sovereignVerdictLatched,
+            forcedModeID: turn.sovereignForcedModeID,
+            reasonCodes: turn.sovereignVerdictReasonCodes
         )
-        self.sovereignAuditLine = Self.sovereignAuditLine(from: turn.sovereignAuditEntry)
-        self.layerStackLines = turn.layerStackLines
+        self.sovereignAuthorityLine = Self.sovereignAuthorityLine(
+            tokenScopes: turn.sovereignTokenScopeIDs,
+            warrantScopes: turn.sovereignWarrantScopeIDs,
+            lockScopeID: turn.sovereignLockScopeID,
+            quarantineZoneIDs: turn.sovereignQuarantineZoneIDs
+        )
+        self.sovereignAuditLine = Self.sovereignAuditLine(
+            ruleIDs: turn.sovereignAuditRuleIDs,
+            auditID: turn.sovereignAuditEntryID
+        )
+        self.governanceLine = Self.governanceLine(
+            experienceCandidateCount: turn.experienceCandidates.count,
+            workflowCandidateCount: turn.workflowCandidates.count,
+            guardTemplateCandidateCount: turn.guardTemplateCandidates.count,
+            biasRecordCount: turn.biasRecords.count,
+            riskPatternCandidateCount: turn.riskPatternCandidates.count,
+            learningExportBundleCount: turn.learningExportBundles.count,
+            shadowTrialCount: turn.shadowTrialRecords.count,
+            passedShadowTrialCount: turn.shadowTrialRecords.filter(\.isPassed).count,
+            failedShadowTrialCount: turn.shadowTrialRecords.filter(\.isFailed).count,
+            pendingShadowTrialCount: turn.shadowTrialRecords.filter(\.isPending).count,
+            sealCount: turn.evolutionSeals.count,
+            deniedSealCount: turn.evolutionSeals.filter(\.isDenied).count,
+            pendingSealCount: turn.evolutionSeals.filter(\.isPending).count,
+            versionDeltaCount: turn.versionDeltas.count,
+            retractionOrderCount: turn.retractionOrders.count,
+            pendingRetractionCount: turn.retractionOrders.filter {
+                $0.executionState != "completed" && $0.executionState != "cleared"
+            }.count,
+            gateBlocked: turn.shadowTrialRecords.contains(where: \.isPending)
+                || turn.shadowTrialRecords.contains(where: \.isFailed)
+                || turn.evolutionSeals.contains(where: \.isPending)
+                || turn.evolutionSeals.contains(where: \.isDenied)
+                || turn.retractionOrders.contains {
+                $0.executionState != "completed" && $0.executionState != "cleared"
+            }
+        )
+        self.versionTreeLine = Self.versionTreeLine(
+            highlights: Self.versionDeltaHighlights(from: turn.versionDeltas)
+        )
+        self.retractionLine = Self.retractionLine(
+            highlights: Self.retractionOrderHighlights(from: turn.retractionOrders)
+        )
+        self.layerStackLines = Self.augmentedLayerStackLines(
+            turn.layerStackLines,
+            temporalField: turn.memoryBundle.temporalField,
+            dreamLoopLine: Self.dreamLoopLine(from: turn)
+        )
         self.checkpointBudgetLine = turn.replayCheckpointBudgetLine
         self.checkpointPressureLine = turn.replayCheckpointPressureLine
         self.checkpointTaskLine = turn.replayCheckpointTaskLine
@@ -335,7 +407,11 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.hotColdMap = foldedLung.hotColdMap
         self.precisionProfile = foldedLung.precisionProfile
         self.lungState = foldedLung.lungState
+        self.thermalExchange = foldedLung.thermalExchange
         self.breathScheduler = foldedLung.breathScheduler
+        self.integrityWeave = foldedLung.integrityWeave
+        self.organPackages = foldedLung.organPackages
+        self.organDeltaPlan = foldedLung.organDeltaPlan
         self.resumeFrame = foldedLung.resumeFrame
         self.rollbackAnchor = foldedLung.rollbackAnchor
         self.sovereignBridgeResult = foldedLung.sovereignBridgeResult
@@ -353,6 +429,7 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.thoughtFoldChecksum = lineageSummary.thoughtFoldChecksum
         self.updateTicketSummaries = lineageSummary.updateTicketSummaries
         self.reviewDirectiveLine = lineageSummary.reviewDirectiveLine?.evolutionTrimmedNonEmpty
+        self.courtLine = nil
         self.riskFactorsLine = nil
         self.reasonCodesLine = nil
         self.activeKillSwitches = lineageSummary.activeKillSwitches
@@ -360,13 +437,29 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.killSwitches = Self.orderedUnique(
             lineageSummary.activeKillSwitches + lineageSummary.recommendedKillSwitches
         )
-        self.sovereignVerdictLine = Self.sovereignVerdictLine(from: lineageSummary.sovereignVerdict)
-        self.sovereignAuthorityLine = Self.sovereignAuthorityLine(
-            tokens: lineageSummary.sovereignCommitTokens,
-            lock: lineageSummary.sovereignLock,
-            quarantineRecords: lineageSummary.quarantineRecords
+        self.sovereignVerdictLine = Self.sovereignVerdictLine(
+            levelID: lineageSummary.sovereignVerdictLevelID,
+            latched: lineageSummary.sovereignVerdictLatched,
+            forcedModeID: lineageSummary.sovereignForcedModeID,
+            reasonCodes: lineageSummary.sovereignVerdictReasonCodes
         )
-        self.sovereignAuditLine = Self.sovereignAuditLine(from: lineageSummary.sovereignAuditEntry)
+        self.sovereignAuthorityLine = Self.sovereignAuthorityLine(
+            tokenScopes: lineageSummary.sovereignTokenScopeIDs,
+            warrantScopes: lineageSummary.sovereignWarrantScopeIDs,
+            lockScopeID: lineageSummary.sovereignLockScopeID,
+            quarantineZoneIDs: lineageSummary.sovereignQuarantineZoneIDs
+        )
+        self.sovereignAuditLine = Self.sovereignAuditLine(
+            ruleIDs: lineageSummary.sovereignAuditRuleIDs,
+            auditID: lineageSummary.sovereignAuditEntryID
+        )
+        self.governanceLine = Self.governanceLine(from: lineageSummary.governanceSummary)
+        self.versionTreeLine = Self.versionTreeLine(
+            highlights: lineageSummary.governanceSummary?.versionDeltaHighlights ?? []
+        )
+        self.retractionLine = Self.retractionLine(
+            highlights: lineageSummary.governanceSummary?.retractionOrderHighlights ?? []
+        )
         self.layerStackLines = Self.checkpointLayerStackLines(from: lineageSummary)
         self.checkpointBudgetLine = nil
         self.checkpointPressureLine = nil
@@ -377,10 +470,89 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         self.hotColdMap = foldedLung.hotColdMap
         self.precisionProfile = foldedLung.precisionProfile
         self.lungState = foldedLung.lungState
+        self.thermalExchange = foldedLung.thermalExchange
         self.breathScheduler = foldedLung.breathScheduler
+        self.integrityWeave = foldedLung.integrityWeave
+        self.organPackages = foldedLung.organPackages
+        self.organDeltaPlan = foldedLung.organDeltaPlan
         self.resumeFrame = foldedLung.resumeFrame
         self.rollbackAnchor = foldedLung.rollbackAnchor
         self.sovereignBridgeResult = foldedLung.sovereignBridgeResult
+    }
+
+    var checkpointWindGateLine: String? {
+        layerStackLines.first(where: { $0.hasPrefix("L11 wind gate") })
+    }
+
+    private static func courtLine(from mergedChoice: BASMergedChoice) -> String? {
+        let summary = courtSummary(
+            vetoApplied: mergedChoice.vetoApplied,
+            vetoReasonCodes: mergedChoice.vetoReasonCodes,
+            agencyReservation: mergedChoice.agencyReservation,
+            remandOrders: mergedChoice.remandOrders,
+            courtDecisionDraft: mergedChoice.courtDecisionDraft
+        )
+        guard let summary else { return nil }
+        return "Court: \(summary)"
+    }
+
+    private static func courtSummary(
+        vetoApplied: Bool,
+        vetoReasonCodes: [String],
+        agencyReservation: BASAgencyReservation?,
+        remandOrders: [BASRemandOrder]?,
+        courtDecisionDraft: BASCourtDecisionDraft?
+    ) -> String? {
+        var segments: [String] = []
+        if vetoApplied {
+            let vetoSummary = vetoReasonSummary(reasonCodes: vetoReasonCodes)
+            segments.append(vetoSummary.isEmpty ? "veto" : "veto \(vetoSummary)")
+        }
+        if let agencyReservation {
+            segments.append(
+                "agency \(agencyReservation.mode.rawValue.replacingOccurrences(of: "([A-Z])", with: " $1", options: .regularExpression).lowercased())"
+            )
+        }
+        if let remandOrders,
+           remandOrders.isEmpty == false {
+            segments.append("remand \(remandOrders.map(\.targetLayer).joined(separator: ", "))")
+        }
+        if let disclosure = courtSummarySnippet(courtDecisionDraft?.requiredDisclosures.first) {
+            segments.append("disclose \(disclosure)")
+        }
+        if let unresolvedCost = courtSummarySnippet(courtDecisionDraft?.unresolvedCosts.first) {
+            segments.append("cost \(unresolvedCost)")
+        }
+        guard segments.isEmpty == false else { return nil }
+        return segments.joined(separator: " • ")
+    }
+
+    private static func vetoReasonSummary(reasonCodes: [String]) -> String {
+        let details = reasonCodes.compactMap { code -> String? in
+            switch code {
+            case "triself.superego_veto":
+                nil
+            case "triself.high_risk_direct_path":
+                "high-risk direct path"
+            case "triself.protective_boundary":
+                "protective boundary"
+            case "triself.calibration_drifting":
+                "calibration drifting"
+            default:
+                code.replacingOccurrences(of: "triself.", with: "")
+                    .replacingOccurrences(of: "_", with: " ")
+            }
+        }
+
+        return details.joined(separator: ", ")
+    }
+
+    private static func courtSummarySnippet(_ text: String?) -> String? {
+        guard let text else { return nil }
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalized.isEmpty == false else { return nil }
+        guard normalized.count > 72 else { return normalized }
+        return String(normalized.prefix(69)).trimmingCharacters(in: .whitespacesAndNewlines) + "..."
     }
 
     private static func orderedUnique(_ values: [String]) -> [String] {
@@ -390,60 +562,106 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         }
     }
 
+    private static func augmentedLayerStackLines(
+        _ baseLines: [String],
+        temporalField: BASTemporalMemoryField?,
+        dreamLoopLine: String? = nil
+    ) -> [String] {
+        var lines = baseLines
+
+        if let dreamLoopLine = dreamLoopLine?.evolutionTrimmedNonEmpty {
+            lines = insertingDreamLoopLine(
+                dreamLoopLine,
+                into: lines
+            )
+        }
+
+        guard let temporalField else {
+            return lines
+        }
+
+        let temporalLine = "L8 temporal field • records \(temporalField.records.count) • arcs \(temporalField.episodeArcs.count) • conflicts \(temporalField.conflictClusters.count) • sealed \(temporalField.sanctumEntries.count) • cascades \(temporalField.forgetCascades.count)"
+        guard !lines.contains(temporalLine) else {
+            return lines
+        }
+        return lines + [temporalLine]
+    }
+
+    private static func insertingDreamLoopLine(
+        _ dreamLoopLine: String,
+        into baseLines: [String]
+    ) -> [String] {
+        var lines = baseLines.filter { !$0.hasPrefix("L9 dream loop") }
+        if let cognitionIndex = lines.firstIndex(where: { $0.hasPrefix("L7-L9 cognition") }) {
+            lines.insert(dreamLoopLine, at: cognitionIndex + 1)
+            return lines
+        }
+        if let adjudicationIndex = lines.firstIndex(where: { $0.hasPrefix("L10-L12 adjudication") }) {
+            lines.insert(dreamLoopLine, at: adjudicationIndex)
+            return lines
+        }
+        lines.append(dreamLoopLine)
+        return lines
+    }
+
     private static func sovereignVerdictLine(
-        from verdict: BASSovereignVerdict?
+        levelID: String?,
+        latched: Bool,
+        forcedModeID: String?,
+        reasonCodes: [String]
     ) -> String? {
-        guard let verdict else {
+        guard let levelID else {
             return nil
         }
 
-        let reasonSummary = verdict.reasonCodes
+        let reasonSummary = reasonCodes
             .prefix(2)
             .joined(separator: ", ")
 
         return DecisionEvolutionNarrativeFormattingSupport.joined(
             [
-                "Sovereign verdict \(verdict.verdictLevel.rawValue)",
-                verdict.latched ? "latched" : nil,
-                verdict.forcedMode.map { "mode \($0.rawValue)" },
+                "Sovereign verdict \(levelID)",
+                latched ? "latched" : nil,
+                forcedModeID.map { "mode \($0)" },
                 reasonSummary.isEmpty ? nil : "reasons \(reasonSummary)"
             ].compactMap { $0 }
         )
     }
 
     private static func sovereignAuthorityLine(
-        tokens: [BASSovereignCommitToken],
-        lock: BASSovereignLock?,
-        quarantineRecords: [BASQuarantineRecord]
+        tokenScopes: [String],
+        warrantScopes: [String],
+        lockScopeID: String?,
+        quarantineZoneIDs: [String]
     ) -> String? {
-        let tokenScopeSummary = tokens.map(\.scope.rawValue)
-        let quarantineZones = quarantineRecords.map(\.zone.rawValue)
-
         guard
-            tokenScopeSummary.isEmpty == false
-                || lock != nil
-                || quarantineZones.isEmpty == false
+            tokenScopes.isEmpty == false
+                || warrantScopes.isEmpty == false
+                || lockScopeID != nil
+                || quarantineZoneIDs.isEmpty == false
         else {
             return nil
         }
 
         return DecisionEvolutionNarrativeFormattingSupport.joined(
             [
-                tokenScopeSummary.isEmpty ? nil : "tokens \(tokenScopeSummary.joined(separator: ", "))",
-                lock.map { "lock \($0.scope.rawValue)" },
-                quarantineZones.isEmpty ? nil : "quarantine \(quarantineZones.joined(separator: ", "))"
+                tokenScopes.isEmpty ? nil : "tokens \(tokenScopes.joined(separator: ", "))",
+                warrantScopes.isEmpty ? nil : "warrants \(warrantScopes.joined(separator: ", "))",
+                lockScopeID.map { "lock \($0)" },
+                quarantineZoneIDs.isEmpty ? nil : "quarantine \(quarantineZoneIDs.joined(separator: ", "))"
             ].compactMap { $0 }
         )
     }
 
     private static func sovereignAuditLine(
-        from auditEntry: BASSovereignAuditEntry?
+        ruleIDs: [String],
+        auditID: String?
     ) -> String? {
-        guard let auditEntry else {
+        guard ruleIDs.isEmpty == false || auditID != nil else {
             return nil
         }
 
-        let ruleSummary = auditEntry.ruleIDs
+        let ruleSummary = ruleIDs
             .prefix(3)
             .joined(separator: ", ")
 
@@ -451,9 +669,334 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
             [
                 "Sovereign audit",
                 ruleSummary.isEmpty ? nil : ruleSummary,
-                "ref \(auditEntry.auditID)"
+                auditID.map { "ref \($0)" }
             ].compactMap { $0 }
         )
+    }
+
+    private static func governanceLine(
+        from governanceSummary: BASEvolutionLineageSummary.GovernanceSummary?
+    ) -> String? {
+        guard let governanceSummary else {
+            return nil
+        }
+
+        return governanceLine(
+            experienceCandidateCount: governanceSummary.experienceCandidateCount,
+            workflowCandidateCount: governanceSummary.workflowCandidateCount,
+            guardTemplateCandidateCount: governanceSummary.guardTemplateCandidateCount,
+            biasRecordCount: governanceSummary.biasRecordCount,
+            riskPatternCandidateCount: governanceSummary.riskPatternCandidateCount,
+            learningExportBundleCount: governanceSummary.learningExportBundleCount,
+            shadowTrialCount: governanceSummary.shadowTrialCount,
+            passedShadowTrialCount: governanceSummary.passedShadowTrialCount,
+            failedShadowTrialCount: governanceSummary.failedShadowTrialCount,
+            pendingShadowTrialCount: governanceSummary.pendingShadowTrialCount,
+            sealCount: governanceSummary.sealCount,
+            deniedSealCount: governanceSummary.deniedSealCount,
+            pendingSealCount: governanceSummary.pendingSealCount,
+            versionDeltaCount: governanceSummary.versionDeltaCount,
+            retractionOrderCount: governanceSummary.retractionOrderCount,
+            pendingRetractionCount: governanceSummary.pendingRetractionCount,
+            gateBlocked: governanceSummary.blockedPromotionReasonCodes.isEmpty == false
+        )
+    }
+
+    private static func dreamLoopLine(
+        from turn: BASEBrainTurnResult
+    ) -> String? {
+        dreamLoopLine(
+            stoppingMode: turn.thoughtFrame.convergenceCertificate?.stoppingMode.rawValue,
+            reservationMode: turn.thoughtFrame.agencyReservation?.mode.rawValue,
+            remandTargets: turn.thoughtFrame.remandOrders?.map(\.targetLayer) ?? [],
+            signalRefs: turn.updateTickets
+                .flatMap(\.governanceRefs)
+                .filter { $0.hasPrefix("dream_loop:") || $0.hasPrefix("dream_loop_") },
+            maxEvidenceDebtPercent: maxEvidenceDebtPercent(
+                from: turn.thoughtFrame.evidenceDebts
+            )
+        )
+    }
+
+    private static func dreamLoopLine(
+        from governanceSummary: BASEvolutionLineageSummary.GovernanceSummary?
+    ) -> String? {
+        guard let governanceSummary else {
+            return nil
+        }
+
+        return dreamLoopLine(
+            stoppingMode: governanceSummary.dreamLoopStoppingMode,
+            reservationMode: governanceSummary.dreamLoopReservationMode,
+            remandTargets: governanceSummary.dreamLoopRemandTargets,
+            signalRefs: governanceSummary.dreamLoopSignalRefs,
+            maxEvidenceDebtPercent: governanceSummary.dreamLoopMaxEvidenceDebtPercent
+        )
+    }
+
+    private static func dreamLoopLine(
+        stoppingMode: String?,
+        reservationMode: String?,
+        remandTargets: [String],
+        signalRefs: [String],
+        maxEvidenceDebtPercent: Int?
+    ) -> String? {
+        let stopLine = stoppingMode?.evolutionTrimmedNonEmpty.map {
+            "stop \(humanizedDreamLoopToken($0))"
+        }
+        let reservationLine = reservationMode?.evolutionTrimmedNonEmpty.map {
+            "reserve \(humanizedDreamLoopToken($0))"
+        }
+        let remandLine = remandTargets.isEmpty
+            ? nil
+            : "remand \(orderedUnique(remandTargets).prefix(3).joined(separator: ", "))"
+        let evidenceDebtLine = maxEvidenceDebtPercent.map { "debt \($0)%" }
+        let signalLine = dreamLoopSignalLine(
+            signalRefs: signalRefs,
+            stopMode: stoppingMode,
+            reservationMode: reservationMode
+        )
+
+        let details = [
+            stopLine,
+            reservationLine,
+            remandLine,
+            evidenceDebtLine,
+            signalLine
+        ]
+        .compactMap { $0?.evolutionTrimmedNonEmpty }
+
+        guard details.isEmpty == false else {
+            return nil
+        }
+
+        return DecisionEvolutionNarrativeFormattingSupport.joined(
+            ["L9 dream loop"] + details
+        ).evolutionTrimmedNonEmpty
+    }
+
+    private static func dreamLoopSignalLine(
+        signalRefs: [String],
+        stopMode: String?,
+        reservationMode: String?
+    ) -> String? {
+        let normalizedSignals = orderedUnique(
+            signalRefs.compactMap { signalRef in
+                let token = normalizedDreamLoopSignalToken(from: signalRef)
+                guard let token else { return nil }
+
+                let humanizedToken = humanizedDreamLoopToken(token)
+                if humanizedToken == humanizedDreamLoopToken(stopMode) {
+                    return nil
+                }
+                if humanizedToken == humanizedDreamLoopToken(reservationMode) {
+                    return nil
+                }
+                return humanizedToken
+            }
+        )
+
+        guard normalizedSignals.isEmpty == false else {
+            return nil
+        }
+
+        return "signals \(normalizedSignals.prefix(2).joined(separator: ", "))"
+    }
+
+    private static func normalizedDreamLoopSignalToken(
+        from signalRef: String
+    ) -> String? {
+        signalRef
+            .replacingOccurrences(of: "dream_loop_stop:", with: "")
+            .replacingOccurrences(of: "dream_loop_reservation:", with: "")
+            .replacingOccurrences(of: "dream_loop:", with: "")
+            .evolutionTrimmedNonEmpty
+    }
+
+    private static func humanizedDreamLoopToken(
+        _ token: String?
+    ) -> String {
+        guard let token = token?.evolutionTrimmedNonEmpty else {
+            return ""
+        }
+
+        return token
+            .replacingOccurrences(
+                of: "([a-z0-9])([A-Z])",
+                with: "$1 $2",
+                options: .regularExpression
+            )
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .lowercased()
+    }
+
+    private static func maxEvidenceDebtPercent(
+        from evidenceDebts: [BASEvidenceDebt]?
+    ) -> Int? {
+        guard let maxDebtWeight = evidenceDebts?.map(\.debtWeight).max() else {
+            return nil
+        }
+        return Int((maxDebtWeight * 100).rounded())
+    }
+
+    private static func governanceLine(
+        experienceCandidateCount: Int,
+        workflowCandidateCount: Int = 0,
+        guardTemplateCandidateCount: Int = 0,
+        biasRecordCount: Int = 0,
+        riskPatternCandidateCount: Int = 0,
+        learningExportBundleCount: Int = 0,
+        shadowTrialCount: Int,
+        passedShadowTrialCount: Int = 0,
+        failedShadowTrialCount: Int = 0,
+        pendingShadowTrialCount: Int,
+        sealCount: Int,
+        deniedSealCount: Int = 0,
+        pendingSealCount: Int,
+        versionDeltaCount: Int,
+        retractionOrderCount: Int,
+        pendingRetractionCount: Int,
+        gateBlocked: Bool
+    ) -> String? {
+        let hasGovernanceSignals =
+            experienceCandidateCount > 0
+            || workflowCandidateCount > 0
+            || guardTemplateCandidateCount > 0
+            || biasRecordCount > 0
+            || riskPatternCandidateCount > 0
+            || learningExportBundleCount > 0
+            || shadowTrialCount > 0
+            || sealCount > 0
+            || versionDeltaCount > 0
+            || retractionOrderCount > 0
+            || gateBlocked
+
+        guard hasGovernanceSignals else {
+            return nil
+        }
+
+        var details = ["candidates \(experienceCandidateCount)"]
+
+        if shadowTrialCount > 0 || pendingShadowTrialCount > 0 || passedShadowTrialCount > 0 || failedShadowTrialCount > 0 {
+            details.append(
+                pendingShadowTrialCount > 0
+                    ? "shadow \(pendingShadowTrialCount) pending/\(shadowTrialCount)"
+                    : (failedShadowTrialCount > 0
+                        ? "shadow failed \(failedShadowTrialCount)/\(shadowTrialCount)"
+                        : (passedShadowTrialCount > 0
+                            ? "shadow ready \(passedShadowTrialCount)/\(shadowTrialCount)"
+                            : "shadow cleared \(shadowTrialCount)"))
+            )
+        }
+
+        if sealCount > 0 || pendingSealCount > 0 || deniedSealCount > 0 {
+            details.append(
+                pendingSealCount > 0
+                    ? "seal \(pendingSealCount) pending/\(sealCount)"
+                    : (deniedSealCount > 0
+                        ? "seal denied \(deniedSealCount)/\(sealCount)"
+                        : "seal ready \(sealCount)")
+            )
+        }
+
+        if versionDeltaCount > 0 {
+            details.append("version \(versionDeltaCount)")
+        }
+
+        if retractionOrderCount > 0 || pendingRetractionCount > 0 {
+            details.append(
+                pendingRetractionCount > 0
+                    ? "retract \(pendingRetractionCount) pending/\(retractionOrderCount)"
+                    : "retract cleared \(retractionOrderCount)"
+            )
+        }
+
+        if workflowCandidateCount > 0
+            || guardTemplateCandidateCount > 0
+            || biasRecordCount > 0
+            || riskPatternCandidateCount > 0
+            || learningExportBundleCount > 0 {
+            details.append("nursery workflow \(workflowCandidateCount)")
+            details.append("guard \(guardTemplateCandidateCount)")
+            details.append("bias \(biasRecordCount)")
+            details.append("risk \(riskPatternCandidateCount)")
+            details.append("export \(learningExportBundleCount)")
+        }
+
+        if gateBlocked {
+            details.append("gate hold")
+        }
+
+        return DecisionEvolutionNarrativeFormattingSupport.joined(
+            ["L13 governance"] + details
+        ).evolutionTrimmedNonEmpty
+    }
+
+    private static func versionDeltaHighlights(
+        from versionDeltas: [BASVersionDelta]
+    ) -> [String] {
+        Array(versionDeltas.prefix(2)).map { delta in
+            let targetRef = delta.afterRef
+            return [
+                "\(delta.targetType) \(targetRef)",
+                delta.rollbackRef.map { "rollback \($0)" }
+            ]
+            .compactMap { $0 }
+            .joined(separator: " • ")
+        }
+    }
+
+    private static func retractionOrderHighlights(
+        from retractionOrders: [BASRetractionOrder]
+    ) -> [String] {
+        Array(retractionOrders.prefix(2)).map { order in
+            let status = order.executionState.replacingOccurrences(of: "_", with: " ")
+            let targetRef = order.targetRefs.first ?? order.cascadeRefs.first ?? order.orderID
+            return [
+                "\(status) \(targetRef)",
+                order.reasonCodes.first.map { "reason \($0)" }
+            ]
+            .compactMap { $0 }
+            .joined(separator: " • ")
+        }
+    }
+
+    private static func versionTreeLine(
+        highlights: [String]
+    ) -> String? {
+        highlightLine(
+            prefix: "L13 version tree",
+            highlights: highlights
+        )
+    }
+
+    private static func retractionLine(
+        highlights: [String]
+    ) -> String? {
+        highlightLine(
+            prefix: "L13 retraction",
+            highlights: highlights
+        )
+    }
+
+    private static func highlightLine(
+        prefix: String,
+        highlights: [String]
+    ) -> String? {
+        guard let first = highlights.first?.evolutionTrimmedNonEmpty else {
+            return nil
+        }
+
+        let moreCount = highlights.count - 1
+        return DecisionEvolutionNarrativeFormattingSupport.joined(
+            [
+                prefix,
+                first,
+                moreCount > 0 ? "+\(moreCount) more" : nil
+            ]
+            .compactMap { $0 }
+        ).evolutionTrimmedNonEmpty
     }
 
     private static func checkpointLayerStackLines(
@@ -492,25 +1035,27 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
                 "sovereign",
                 lineageSummary.sovereignActuationCommands.map(\.kind.rawValue).joined(separator: ", ")
             ])
-        let sovereignVerdictLine = lineageSummary.sovereignVerdict.map {
-            "verdict \($0.verdictLevel.rawValue)"
+        let sovereignVerdictLine = lineageSummary.sovereignVerdictLevelID.map {
+            "verdict \($0)"
         }
         let sovereignTokenLine: String? = {
-            let scopes = lineageSummary.sovereignCommitTokens.map(\.scope.rawValue)
+            let scopes = lineageSummary.sovereignTokenScopeIDs
             guard scopes.isEmpty == false else { return nil }
             return "tokens \(Array(scopes.prefix(3)).joined(separator: ", "))"
         }()
-        let sovereignLockLine = lineageSummary.sovereignLock.map {
-            "lock \($0.scope.rawValue)"
-        }
+        let sovereignWarrantLine: String? = {
+            let scopes = lineageSummary.sovereignWarrantScopeIDs
+            guard scopes.isEmpty == false else { return nil }
+            return "warrants \(Array(scopes.prefix(3)).joined(separator: ", "))"
+        }()
+        let sovereignLockLine = lineageSummary.sovereignLockScopeID.map { "lock \($0)" }
         let quarantineLine: String? = {
-            let zones = lineageSummary.quarantineRecords.map(\.zone.rawValue)
+            let zones = lineageSummary.sovereignQuarantineZoneIDs
             guard zones.isEmpty == false else { return nil }
             return "quarantine \(Array(zones.prefix(2)).joined(separator: ", "))"
         }()
-        let sovereignAuditLine = lineageSummary.sovereignAuditEntry.map {
-            "audit \($0.ruleIDs.first ?? $0.auditID)"
-        }
+        let sovereignAuditLine = (lineageSummary.sovereignAuditRuleIDs.first ?? lineageSummary.sovereignAuditEntryID)
+            .map { "audit \($0)" }
         let sovereignReceiptLine = lineageSummary.sovereignExecutionReceipts.isEmpty
             ? nil
             : DecisionEvolutionNarrativeFormattingSupport.joined([
@@ -554,6 +1099,7 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
                 sovereignConstraintSummary.isEmpty ? nil : "constraints \(Array(sovereignConstraintSummary.prefix(3)).joined(separator: ", "))",
                 sovereignVerdictLine,
                 sovereignTokenLine,
+                sovereignWarrantLine,
                 sovereignLockLine,
                 quarantineLine,
                 sovereignAuditLine,
@@ -584,12 +1130,14 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
             "L3 compression runtime",
             "fold \(lineageSummary.thoughtFoldChecksum)"
         ])
-        let contextLine = checkpointContextLayerLine(from: lineageSummary)
+        let contextLines = checkpointContextLayerLines(from: lineageSummary)
         let cognitionLine = checkpointCognitionLayerLine(from: lineageSummary)
+        let dreamLoopLine = dreamLoopLine(from: lineageSummary.governanceSummary)
         let adjudicationLine = checkpointAdjudicationLayerLine(
             from: lineageSummary,
             brakeLine: brakeLine
         )
+        let riskClimateLine = checkpointRiskClimateLayerLine(from: lineageSummary)
 
         return [
             DecisionEvolutionNarrativeFormattingSupport.joined([
@@ -623,9 +1171,12 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
                 "session \(lineageSummary.sessionID)",
                 "gate \(lineageSummary.hostGatePercent)%"
             ]),
-            contextLine,
+            contextLines.first,
+            contextLines.dropFirst().first,
             cognitionLine,
+            dreamLoopLine,
             adjudicationLine,
+            riskClimateLine,
             DecisionEvolutionNarrativeFormattingSupport.joined([
                 "L13 evolution",
                 "\(lineageSummary.updateTicketSummaries.count) tickets",
@@ -636,17 +1187,22 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         .compactMap { $0?.evolutionTrimmedNonEmpty }
     }
 
-    private static func checkpointContextLayerLine(
+    private static func checkpointContextLayerLines(
         from lineageSummary: BASEvolutionLineageSummary
-    ) -> String {
+    ) -> [String] {
         guard let contextSummary = lineageSummary.contextSummary else {
-            return DecisionEvolutionEBrainPresentationSupport.fallbackContextLayerStackLine(
-                taskType: lineageSummary.taskType,
-                sessionID: lineageSummary.sessionID
-            )
+            return [
+                DecisionEvolutionEBrainPresentationSupport.fallbackContextLayerStackLine(
+                    taskType: lineageSummary.taskType,
+                    sessionID: lineageSummary.sessionID
+                ),
+                DecisionEvolutionEBrainPresentationSupport.fallbackContextPresenceLayerStackLine(
+                    taskType: lineageSummary.taskType
+                )
+            ]
         }
 
-        return DecisionEvolutionEBrainPresentationSupport.contextLayerStackLine(
+        let primaryLine = DecisionEvolutionEBrainPresentationSupport.contextLayerStackLine(
             taskType: lineageSummary.taskType,
             emotionalLoadPercent: contextSummary.emotionalLoadPercent,
             timePressurePercent: contextSummary.timePressurePercent,
@@ -655,6 +1211,18 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
             consequencePercent: contextSummary.consequencePercent,
             manipulationHintCount: contextSummary.manipulationHintCount
         )
+        let presenceLine = DecisionEvolutionEBrainPresentationSupport.contextPresenceLayerStackLine(
+            sceneType: contextSummary.sceneType,
+            roleRelationClass: contextSummary.roleRelationClass,
+            powerDirection: contextSummary.powerDirection,
+            powerStrengthPercent: contextSummary.powerStrengthPercent,
+            urgencyPercent: contextSummary.urgencyPercent,
+            routeMode: contextSummary.routeMode,
+            guardRequired: contextSummary.guardRequired,
+            continuityArc: contextSummary.continuityArc
+        )
+
+        return [primaryLine, presenceLine].compactMap { $0?.evolutionTrimmedNonEmpty }
     }
 
     private static func checkpointCognitionLayerLine(
@@ -667,8 +1235,14 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         return DecisionEvolutionEBrainPresentationSupport.cognitionLayerStackLine(
             factCount: cognitionSummary.factCount,
             goalCount: cognitionSummary.goalCount,
+            claimCount: cognitionSummary.claimCount,
             unknownCount: cognitionSummary.unknownCount,
             contradictionCount: cognitionSummary.contradictionCount,
+            pressureSummary: cognitionSummary.pressureSummary,
+            manipulationSummary: cognitionSummary.manipulationSummary,
+            boundarySummary: cognitionSummary.boundarySummary,
+            mirrorModeID: cognitionSummary.mirrorModeID,
+            routeHint: cognitionSummary.routeHint,
             memoryAtomCount: cognitionSummary.memoryAtomCount,
             candidateCount: cognitionSummary.candidateCount,
             forecastCount: cognitionSummary.forecastCount,
@@ -701,6 +1275,38 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         )
     }
 
+    private static func checkpointRiskClimateLayerLine(
+        from lineageSummary: BASEvolutionLineageSummary
+    ) -> String? {
+        var details = [String]()
+
+        details.append("primary \(lineageSummary.permitMode)")
+
+        if let assertionCeiling = lineageSummary.assertionCeiling?.evolutionTrimmedNonEmpty {
+            details.append("assert \(assertionCeiling)")
+        }
+
+        if let delayType = lineageSummary.delayType?.evolutionTrimmedNonEmpty {
+            details.append("delay \(delayType)")
+        }
+
+        if let substituteType = lineageSummary.substituteType?.evolutionTrimmedNonEmpty {
+            details.append("substitute \(substituteType)")
+        }
+
+        if let sovereignHintLevel = lineageSummary.sovereignHintLevel?.evolutionTrimmedNonEmpty {
+            details.append("sovereign \(sovereignHintLevel)")
+        }
+
+        guard details.count > 1 else {
+            return nil
+        }
+
+        return DecisionEvolutionNarrativeFormattingSupport.joined(
+            ["L11 wind gate"] + details
+        )
+    }
+
     private static func foldedLungProjection(
         from summary: BASEvolutionFoldedLungSummary?
     ) -> PersistedFoldedLungProjection {
@@ -710,7 +1316,11 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
                 hotColdMap: nil,
                 precisionProfile: nil,
                 lungState: nil,
+                thermalExchange: nil,
                 breathScheduler: nil,
+                integrityWeave: nil,
+                organPackages: [],
+                organDeltaPlan: nil,
                 resumeFrame: nil,
                 rollbackAnchor: nil,
                 sovereignBridgeResult: nil
@@ -721,6 +1331,8 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         let hotColdMap = persistedHotColdMap(from: summary)
         let precisionProfile = persistedPrecisionProfile(from: summary)
         let breathScheduler = persistedBreathScheduler(from: summary)
+        let thermalExchange = persistedThermalExchange(from: summary)
+        let integrityWeave = persistedIntegrityWeave(from: summary)
         let lungState = breathMode(rawValue: summary.breathMode).flatMap { breathMode in
             breathPhase(rawValue: summary.breathPhase).map { breathPhase in
                 BASLungState(
@@ -761,13 +1373,23 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
                 preservedReadOnlyRecovery: summary.preservedReadOnlyRecovery ?? false,
                 summary: summary.sovereignBridgeSummary ?? "Sovereign bridge • mode \(summary.resultingBreathMode ?? summary.breathMode)"
             )
+        let organPackages = persistedOrganPackages(from: summary)
+        let organDeltaPlan = persistedOrganDeltaPlan(
+            from: summary,
+            organPackages: organPackages,
+            sovereignBridgeResult: sovereignBridgeResult
+        )
 
         return PersistedFoldedLungProjection(
             morphGraph: morphGraph,
             hotColdMap: hotColdMap,
             precisionProfile: precisionProfile,
             lungState: lungState,
+            thermalExchange: thermalExchange,
             breathScheduler: breathScheduler,
+            integrityWeave: integrityWeave,
+            organPackages: organPackages,
+            organDeltaPlan: organDeltaPlan,
             resumeFrame: resumeFrame,
             rollbackAnchor: rollbackAnchor,
             sovereignBridgeResult: sovereignBridgeResult
@@ -888,6 +1510,122 @@ struct DeveloperDecisionReplayEBrainSummary: Equatable, Sendable {
         )
     }
 
+    private static func persistedThermalExchange(
+        from summary: BASEvolutionFoldedLungSummary
+    ) -> BASThermalExchangeFrame? {
+        guard
+            summary.thermalExchangeID?.evolutionTrimmedNonEmpty != nil
+                || summary.thermalExchangeMode?.evolutionTrimmedNonEmpty != nil
+                || summary.thermalPredictedBand?.evolutionTrimmedNonEmpty != nil
+                || summary.thermalCoolingActions.isEmpty == false
+                || summary.thermalSuppressedOrganIDs.isEmpty == false
+                || summary.thermalRerouteTargets.isEmpty == false
+                || summary.thermalPrecisionDowngradeRecords.isEmpty == false
+        else {
+            return nil
+        }
+
+        return BASThermalExchangeFrame(
+            exchangeID: summary.thermalExchangeID?.evolutionTrimmedNonEmpty
+                ?? "thermal.persisted.\(summary.sourceFoldID)",
+            exchangeMode: summary.thermalExchangeMode?.evolutionTrimmedNonEmpty ?? "steady_exchange",
+            predictedThermalBand: summary.thermalPredictedBand?.evolutionTrimmedNonEmpty ?? "nominal",
+            coolingActions: summary.thermalCoolingActions,
+            suppressedOrgans: summary.thermalSuppressedOrganIDs.compactMap(BASNeuralOrgan.init(rawValue:)),
+            reroutedOrgans: summary.thermalReroutedOrganIDs.compactMap(BASNeuralOrgan.init(rawValue:)),
+            rerouteTargets: summary.thermalRerouteTargets,
+            precisionDowngradePlan: summary.thermalPrecisionDowngradeRecords.compactMap(persistedPrecisionRecord),
+            exchangeReasonCodes: summary.thermalExchangeReasonCodes
+        )
+    }
+
+    private static func persistedIntegrityWeave(
+        from summary: BASEvolutionFoldedLungSummary
+    ) -> BASIntegrityWeaveFrame? {
+        guard
+            summary.integrityWeaveID?.evolutionTrimmedNonEmpty != nil
+                || summary.integrityPurityState?.evolutionTrimmedNonEmpty != nil
+                || summary.integrityVerificationHash?.evolutionTrimmedNonEmpty != nil
+                || summary.integrityRequiredChecks.isEmpty == false
+                || summary.integrityCompletedChecks.isEmpty == false
+                || summary.integrityFailedChecks.isEmpty == false
+                || summary.integrityContaminationRefs.isEmpty == false
+        else {
+            return nil
+        }
+
+        return BASIntegrityWeaveFrame(
+            weaveID: summary.integrityWeaveID?.evolutionTrimmedNonEmpty
+                ?? "integrity.persisted.\(summary.sourceFoldID)",
+            foldChecksum: summary.integrityHash,
+            rollbackIntegrityHash: summary.integrityHash,
+            requiredChecks: summary.integrityRequiredChecks,
+            completedChecks: summary.integrityCompletedChecks,
+            failedChecks: summary.integrityFailedChecks,
+            purityState: summary.integrityPurityState?.evolutionTrimmedNonEmpty ?? "verified",
+            contaminationRefs: summary.integrityContaminationRefs,
+            trustedSnapshotRef: summary.integrityTrustedSnapshotRef?.evolutionTrimmedNonEmpty
+                ?? summary.safeSnapshotRef,
+            verificationHash: summary.integrityVerificationHash?.evolutionTrimmedNonEmpty
+                ?? summary.integrityHash
+        )
+    }
+
+    private static func persistedOrganPackages(
+        from summary: BASEvolutionFoldedLungSummary
+    ) -> [BASOrganPackage] {
+        summary.organPackageRecords.compactMap { record in
+            guard let organ = BASNeuralOrgan(rawValue: record.organID) else {
+                return nil
+            }
+
+            return BASOrganPackage(
+                packageID: record.packageID,
+                organType: organ,
+                sizeMB: record.sizeMB,
+                precisionOptions: record.precisionOptionIDs.compactMap(BASNeuralPrecisionTier.init(rawValue:)),
+                loadTimeMs: record.loadTimeMs,
+                thermalCost: record.thermalCost,
+                sovereignClass: record.sovereignClass
+            )
+        }
+    }
+
+    private static func persistedOrganDeltaPlan(
+        from summary: BASEvolutionFoldedLungSummary,
+        organPackages: [BASOrganPackage],
+        sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult?
+    ) -> BASOrganDeltaPlan? {
+        guard
+            summary.organDeltaPlanID?.evolutionTrimmedNonEmpty != nil
+                || summary.organDeltaMode?.evolutionTrimmedNonEmpty != nil
+                || summary.organPackageRecords.isEmpty == false
+        else {
+            return nil
+        }
+
+        return BASOrganDeltaPlan(
+            planID: summary.organDeltaPlanID?.evolutionTrimmedNonEmpty
+                ?? "delta.persisted.\(summary.sourceFoldID)",
+            deltaMode: summary.organDeltaMode?.evolutionTrimmedNonEmpty ?? "steady_retention",
+            activatePackageIDs: summary.organDeltaActivatePackageIDs,
+            preloadPackageIDs: summary.organDeltaPreloadPackageIDs,
+            evictPackageIDs: summary.organDeltaEvictPackageIDs,
+            retainPackageIDs: summary.organDeltaRetainPackageIDs.isEmpty
+                ? organPackages
+                    .filter { $0.sovereignClass == "protected_core" || $0.sovereignClass == "checkpoint_recovery" }
+                    .map(\.packageID)
+                : summary.organDeltaRetainPackageIDs,
+            rollbackSafeRetainedPackageIDs: summary.organDeltaRollbackSafePackageIDs,
+            triggeredActuationKinds: summary.organDeltaTriggeredActuationKinds.compactMap(BASSovereignActuationKind.init(rawValue:)),
+            reasonCodes: summary.organDeltaReasonCodes.isEmpty
+                ? (sovereignBridgeResult?.actuationKinds.isEmpty == false
+                    ? ["sovereign.\((sovereignBridgeResult?.actuationKinds ?? []).map(\.rawValue).joined(separator: "+"))"]
+                    : [])
+                : summary.organDeltaReasonCodes
+        )
+    }
+
     private static func persistedPrecisionRecord(
         from record: BASEvolutionFoldedLungSummary.PrecisionRecord
     ) -> BASNeuralOrganPrecision? {
@@ -907,7 +1645,11 @@ private struct PersistedFoldedLungProjection {
     let hotColdMap: BASHotColdMap?
     let precisionProfile: BASPrecisionProfile?
     let lungState: BASLungState?
+    let thermalExchange: BASThermalExchangeFrame?
     let breathScheduler: BASBreathSchedulerFrame?
+    let integrityWeave: BASIntegrityWeaveFrame?
+    let organPackages: [BASOrganPackage]
+    let organDeltaPlan: BASOrganDeltaPlan?
     let resumeFrame: BASResumeFrame?
     let rollbackAnchor: BASRollbackAnchor?
     let sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult?
@@ -926,12 +1668,28 @@ extension DeveloperDecisionReplayEBrainSummary {
         precisionProfile?.decisionPrecisionLine
     }
 
+    var organPackageLine: String? {
+        organPackages.decisionOrganPackageLine
+    }
+
     var lungLine: String? {
         lungState?.decisionLungLine
     }
 
+    var thermalExchangeLine: String? {
+        thermalExchange?.decisionThermalExchangeLine
+    }
+
     var schedulerLine: String? {
         breathScheduler?.decisionSchedulerLine
+    }
+
+    var integrityWeaveLine: String? {
+        integrityWeave?.decisionIntegrityWeaveLine
+    }
+
+    var organDeltaLine: String? {
+        organDeltaPlan?.decisionOrganDeltaLine
     }
 
     var resumeLine: String? {
@@ -943,15 +1701,25 @@ extension DeveloperDecisionReplayEBrainSummary {
     }
 
     var sovereignBridgeLine: String? {
-        sovereignBridgeResult?.primaryLine
+        effectiveSovereignBridgeResult?.primaryLine
     }
 
     var sovereignBridgeDetailLines: [String] {
-        sovereignBridgeResult?.detailLines ?? []
+        effectiveSovereignBridgeResult?.detailLines ?? []
     }
 
     var sovereignBridgeSupplementalLines: [String] {
-        sovereignBridgeResult?.supplementalLines ?? []
+        effectiveSovereignBridgeResult?.supplementalLines ?? []
+    }
+
+    private var effectiveSovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult? {
+        guard let sovereignBridgeResult else {
+            return nil
+        }
+        guard let organDeltaPlan else {
+            return sovereignBridgeResult
+        }
+        return sovereignBridgeResult.enriched(organDeltaPlan: organDeltaPlan)
     }
 
     func applying(anchor: DecisionSessionCheckpointEBrainAnchor?) -> DeveloperDecisionReplayEBrainSummary {
@@ -976,6 +1744,7 @@ extension DeveloperDecisionReplayEBrainSummary {
             thoughtFoldChecksum: thoughtFoldChecksum,
             updateTicketSummaries: updateTicketSummaries,
             reviewDirectiveLine: reviewDirectiveLine,
+            courtLine: courtLine,
             riskFactorsLine: riskFactorsLine,
             reasonCodesLine: reasonCodesLine,
             activeKillSwitches: activeKillSwitches,
@@ -993,7 +1762,11 @@ extension DeveloperDecisionReplayEBrainSummary {
             hotColdMap: anchor.hotColdMap ?? hotColdMap,
             precisionProfile: anchor.precisionProfile ?? precisionProfile,
             lungState: anchor.lungState ?? lungState,
+            thermalExchange: anchor.thermalExchange ?? thermalExchange,
             breathScheduler: anchor.breathScheduler ?? breathScheduler,
+            integrityWeave: anchor.integrityWeave ?? integrityWeave,
+            organPackages: anchoredSnapshot?.organPackages ?? organPackages,
+            organDeltaPlan: anchoredSnapshot?.organDeltaPlan ?? organDeltaPlan,
             resumeFrame: anchor.resumeFrame ?? resumeFrame,
             rollbackAnchor: anchor.rollbackAnchor ?? rollbackAnchor,
             sovereignBridgeResult: anchor.sovereignBridgeResult ?? sovereignBridgeResult
@@ -1131,6 +1904,7 @@ struct DecisionEvolutionReplayDiagnosticLine: Equatable, Sendable {
         case riskFactors
         case reasonCodes
         case foldedLung
+        case organDelta
         case scheduler
         case hotCold
         case resume
@@ -1169,11 +1943,13 @@ struct DecisionEvolutionReplayEntryPresentation: Equatable, Sendable {
     let activeKillSwitchesLine: String?
     let killSwitchesLine: String?
     let lungLine: String?
+    let organDeltaLine: String?
     let schedulerLine: String?
     let hotColdLine: String?
     let resumeLine: String?
     let rollbackLine: String?
     let sovereignBridgeLine: String?
+    let furnaceContributionLines: [String]
     let traceLine: String?
 
     init(
@@ -1197,11 +1973,13 @@ struct DecisionEvolutionReplayEntryPresentation: Equatable, Sendable {
         activeKillSwitchesLine: String?,
         killSwitchesLine: String?,
         lungLine: String? = nil,
+        organDeltaLine: String? = nil,
         schedulerLine: String? = nil,
         hotColdLine: String? = nil,
         resumeLine: String? = nil,
         rollbackLine: String? = nil,
         sovereignBridgeLine: String? = nil,
+        furnaceContributionLines: [String] = [],
         traceLine: String?
     ) {
         self.sourceTitle = sourceTitle
@@ -1224,11 +2002,13 @@ struct DecisionEvolutionReplayEntryPresentation: Equatable, Sendable {
         self.activeKillSwitchesLine = activeKillSwitchesLine
         self.killSwitchesLine = killSwitchesLine
         self.lungLine = lungLine
+        self.organDeltaLine = organDeltaLine
         self.schedulerLine = schedulerLine
         self.hotColdLine = hotColdLine
         self.resumeLine = resumeLine
         self.rollbackLine = rollbackLine
         self.sovereignBridgeLine = sovereignBridgeLine
+        self.furnaceContributionLines = furnaceContributionLines
         self.traceLine = traceLine
     }
 }
@@ -1339,6 +2119,7 @@ extension DecisionEvolutionReplayEntryPresentation {
             diagnosticLine(.riskFactors, riskFactorsLine),
             diagnosticLine(.reasonCodes, reasonCodesLine),
             diagnosticLine(.foldedLung, lungLine),
+            diagnosticLine(.organDelta, organDeltaLine),
             diagnosticLine(.scheduler, schedulerLine),
             diagnosticLine(.hotCold, hotColdLine),
             diagnosticLine(.resume, resumeLine),
@@ -1415,6 +2196,27 @@ extension DeveloperDecisionReplayEBrainSummary {
         executionCapability?.executionCapabilityFrame?.temporalLine
     }
 
+    var temporalMemoryLine: String? {
+        layerStackLines
+            .first(where: { $0.hasPrefix("L8 temporal field") })
+            .map { $0.replacingOccurrences(of: "L8 temporal field", with: "Temporal memory") }
+    }
+
+    var dreamLoopLine: String? {
+        layerStackLines.first(where: { $0.hasPrefix("L9 dream loop") })
+    }
+
+    var furnaceContributionLines: [String] {
+        DecisionEvolutionEBrainPresentationSupport.furnaceContributionLines(
+            layerStackLines: layerStackLines,
+            temporalLine: temporalMemoryLine,
+            governanceLine: governanceLine,
+            versionTreeLine: versionTreeLine,
+            retractionLine: retractionLine,
+            sovereignBridgeLine: sovereignBridgeLine
+        )
+    }
+
     var evidenceLine: String? {
         executionCapability?.executionCapabilityFrame?.evidenceLine
     }
@@ -1482,11 +2284,23 @@ extension BASEBrainTurnResult {
         guard score.veto else { return base }
 
         let vetoSummary = formattedTriSelfVetoSummary(reasonCodes: mergedChoice.vetoReasonCodes)
+        let courtSummary = formattedTriSelfCourtSummary(
+            agencyReservation: mergedChoice.agencyReservation,
+            remandOrders: mergedChoice.remandOrders,
+            courtDecisionDraft: mergedChoice.courtDecisionDraft
+        )
         guard !vetoSummary.isEmpty else {
-            return "\(base) • vetoed"
+            guard !courtSummary.isEmpty else {
+                return "\(base) • vetoed"
+            }
+            return "\(base) • vetoed • \(courtSummary)"
         }
 
-        return "\(base) • vetoed (\(vetoSummary))"
+        guard !courtSummary.isEmpty else {
+            return "\(base) • vetoed (\(vetoSummary))"
+        }
+
+        return "\(base) • vetoed (\(vetoSummary)) • \(courtSummary)"
     }
 
     private func formattedTriSelfVetoSummary(reasonCodes: [String]) -> String {
@@ -1507,6 +2321,42 @@ extension BASEBrainTurnResult {
         }
 
         return details.joined(separator: ", ")
+    }
+
+    private func formattedTriSelfCourtSummary(
+        agencyReservation: BASAgencyReservation?,
+        remandOrders: [BASRemandOrder]?,
+        courtDecisionDraft: BASCourtDecisionDraft?
+    ) -> String {
+        var segments: [String] = []
+        if let agencyReservation {
+            segments.append(
+                "agency \(agencyReservation.mode.rawValue.replacingOccurrences(of: "([A-Z])", with: " $1", options: .regularExpression).lowercased())"
+            )
+        }
+        if let remandOrders,
+           remandOrders.isEmpty == false {
+            segments.append("remand \(remandOrders.map(\.targetLayer).joined(separator: ", "))")
+        }
+        if let disclosure = courtSummarySnippet(
+            courtDecisionDraft?.requiredDisclosures.first
+        ) {
+            segments.append("disclose \(disclosure)")
+        }
+        if let unresolvedCost = courtSummarySnippet(
+            courtDecisionDraft?.unresolvedCosts.first
+        ) {
+            segments.append("cost \(unresolvedCost)")
+        }
+        return segments.joined(separator: " • ")
+    }
+
+    private func courtSummarySnippet(_ text: String?) -> String? {
+        guard let text else { return nil }
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalized.isEmpty == false else { return nil }
+        guard normalized.count > 72 else { return normalized }
+        return String(normalized.prefix(69)).trimmingCharacters(in: .whitespacesAndNewlines) + "..."
     }
 
     private func prioritizedReplayTraceLines() -> [String] {
@@ -1530,52 +2380,67 @@ extension DeveloperDecisionReplayEntry {
         let replayRecoverySummary = eBrain?.replayRecoverySummary
         let digest = eBrain?.digestPresentation(modeTitle: mode.shortTitle)
         let overviewPresentation: DecisionEvolutionReplayOverviewPresentation
+        let furnaceContributionLines = eBrain?.furnaceContributionLines ?? []
         let sovereignBridgeLines = eBrain?.sovereignBridgeDetailLines.map(Optional.some) ?? []
 
         if let digest {
+            let digestDetailLines = [
+                replayRecoverySummary?.detailLine,
+                eBrain?.riskFactorsLine,
+                eBrain?.reasonCodesLine,
+                eBrain?.courtLine,
+                digest.operationsLine,
+                eBrain?.executionCapabilityLine,
+                eBrain?.horizonLine,
+                eBrain?.temporalLine,
+                eBrain?.temporalMemoryLine,
+                eBrain?.dreamLoopLine,
+                eBrain?.evidenceLine,
+                eBrain?.lungLine,
+                eBrain?.organPackageLine,
+                eBrain?.organDeltaLine,
+                eBrain?.schedulerLine,
+                eBrain?.hotColdLine,
+                eBrain?.resumeLine,
+                eBrain?.rollbackLine,
+                eBrain?.governanceLine
+            ]
             overviewPresentation = DecisionEvolutionReplayOverviewPresentation(
                 labelLine: "\(digest.sourceDescriptor.title) • \(digest.compactStatusLine)",
                 titleLine: digest.taskTitle,
                 detailLines: DecisionEvolutionReplayEntryPresentation.uniqueOverviewLines(
-                    [
-                        replayRecoverySummary?.detailLine,
-                        eBrain?.riskFactorsLine,
-                        eBrain?.reasonCodesLine,
-                        digest.operationsLine,
-                        eBrain?.executionCapabilityLine,
-                        eBrain?.horizonLine,
-                        eBrain?.temporalLine,
-                        eBrain?.evidenceLine,
-                        eBrain?.lungLine,
-                        eBrain?.schedulerLine,
-                        eBrain?.hotColdLine,
-                        eBrain?.resumeLine,
-                        eBrain?.rollbackLine
-                    ] + sovereignBridgeLines
+                    digestDetailLines + sovereignBridgeLines
                 )
             )
         } else {
             let traceLine = trace.map {
                 "Trace: \($0.kind.title) • \($0.activeProvider?.title ?? $0.preferredProvider.title)"
             }
+            let fallbackDetailLines = [
+                traceLine,
+                eBrain?.riskFactorsLine,
+                eBrain?.reasonCodesLine,
+                eBrain?.courtLine,
+                eBrain?.executionCapabilityLine,
+                eBrain?.horizonLine,
+                eBrain?.temporalLine,
+                eBrain?.temporalMemoryLine,
+                eBrain?.dreamLoopLine,
+                eBrain?.evidenceLine,
+                eBrain?.lungLine,
+                eBrain?.organPackageLine,
+                eBrain?.organDeltaLine,
+                eBrain?.schedulerLine,
+                eBrain?.hotColdLine,
+                eBrain?.resumeLine,
+                eBrain?.rollbackLine,
+                eBrain?.governanceLine
+            ]
             overviewPresentation = DecisionEvolutionReplayOverviewPresentation(
                 labelLine: replayRecoverySummary?.sourceDescriptor.title ?? "Trace fallback",
                 titleLine: summaryLine,
                 detailLines: DecisionEvolutionReplayEntryPresentation.uniqueOverviewLines(
-                    [
-                        traceLine,
-                        eBrain?.riskFactorsLine,
-                        eBrain?.reasonCodesLine,
-                        eBrain?.executionCapabilityLine,
-                        eBrain?.horizonLine,
-                        eBrain?.temporalLine,
-                        eBrain?.evidenceLine,
-                        eBrain?.lungLine,
-                        eBrain?.schedulerLine,
-                        eBrain?.hotColdLine,
-                        eBrain?.resumeLine,
-                        eBrain?.rollbackLine
-                    ] + sovereignBridgeLines
+                    fallbackDetailLines + sovereignBridgeLines
                 )
             )
         }
@@ -1601,11 +2466,13 @@ extension DeveloperDecisionReplayEntry {
             activeKillSwitchesLine: replayRecoverySummary?.activeKillSwitchesLine,
             killSwitchesLine: replayRecoverySummary?.killSwitchesLine,
             lungLine: eBrain?.lungLine,
+            organDeltaLine: eBrain?.organDeltaLine,
             schedulerLine: eBrain?.schedulerLine,
             hotColdLine: eBrain?.hotColdLine,
             resumeLine: eBrain?.resumeLine,
             rollbackLine: eBrain?.rollbackLine,
             sovereignBridgeLine: eBrain?.sovereignBridgeLine,
+            furnaceContributionLines: furnaceContributionLines,
             traceLine: eBrain == nil ? overviewPresentation.detailLines.first : nil
         )
     }

@@ -280,6 +280,10 @@ final class WidgetSnapshotStoreTests: XCTestCase {
         )
 
         XCTAssertEqual(snapshot.primaryActionPresentation.kind, .evolutionControl)
+        XCTAssertEqual(
+            snapshot.primaryActionPresentation.controlEntryKindID,
+            DecisionEvolutionWidgetControlEntryKind.review.rawValue
+        )
         XCTAssertEqual(snapshot.primaryActionPresentation.title, "Review on iPhone")
         XCTAssertEqual(snapshot.primaryActionPresentation.systemImage, "checklist")
         XCTAssertEqual(snapshot.primaryActionPresentation.prompt, "Evolution review is waiting")
@@ -287,6 +291,44 @@ final class WidgetSnapshotStoreTests: XCTestCase {
             snapshot.primaryActionPresentation.triggerReason,
             "1 checkpoint still needs review before the queue is clear."
         )
+    }
+
+    func testWidgetSnapshotPrimaryActionUsesAuditControlEntryKindWhenAuditAttentionIsPresent() {
+        let snapshot = WidgetSnapshot(
+            safeMessage: WidgetSafeMessage(
+                surface: .publicSafe,
+                headline: "Hold",
+                body: "Audit findings need inspection."
+            ),
+            latestVerdict: .pause,
+            latestScenario: .buy,
+            evolution: WidgetEvolutionSnapshot(
+                releaseStateID: "watch",
+                activeCheckpointSourceID: "recoveredActive",
+                controlEntryKindID: DecisionEvolutionWidgetControlEntryKind.audit.rawValue,
+                headline: "Evolution audit is active",
+                primaryReason: "Evidence caveat load is still elevated.",
+                attentionSeverityID: "none",
+                attentionBadgeValue: "!",
+                attentionHeadline: "Evolution audit is active",
+                attentionDetail: "Evidence caveat load is still elevated.",
+                hasActiveCheckpoint: true,
+                hasReviewCheckpoint: true,
+                pendingReviewCount: 0,
+                rollbackReadyCount: 0,
+                activeKillSwitchCount: 0,
+                recommendedKillSwitchCount: 0
+            ),
+            updatedAt: Date(timeIntervalSince1970: 0)
+        )
+
+        XCTAssertEqual(snapshot.primaryActionPresentation.kind, .evolutionControl)
+        XCTAssertEqual(
+            snapshot.primaryActionPresentation.controlEntryKindID,
+            DecisionEvolutionWidgetControlEntryKind.audit.rawValue
+        )
+        XCTAssertEqual(snapshot.primaryActionPresentation.title, "Audit on iPhone")
+        XCTAssertEqual(snapshot.primaryActionPresentation.systemImage, "exclamationmark.circle")
     }
 
     func testWidgetEvolutionSnapshotPrefersStoredControlEntryPresentation() {

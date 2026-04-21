@@ -61,6 +61,58 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.operatorHeadline, DecisionEvolutionControlInteractionMode.mutationHub.operatorHeadline)
     }
 
+    func testOperatorSummaryPresentationSurfacesFoldedLungLinesFromReleaseReasons() {
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: nil,
+                reviewCheckpoint: nil,
+                pendingReviewQueue: [],
+                latestPersistedLineage: nil
+            ),
+            releaseSummary: DecisionSystemReleaseControlSummary(
+                state: .watch,
+                headline: "Watching audit findings before wider rollout",
+                reasons: [
+                    "Factors: evidence_caveat_load",
+                    "L3 compression runtime • breath guard • phase resume • anchor anchor-release",
+                    "Breath guard • Phase resume • Restore 87%",
+                    "Morph graph morph.release • organs riskSpine, permitKnot, stubCore • route checkpoint • thermal checkpoint-recovery",
+                    "Breath scheduler guard_resume • checkpoint anchor_each_turn • micro-sleep 173ms • maintenance 0ms • resume rollback_hot",
+                    "Integrity weave recovered • checks 3/3 • contamination 2 • hash hash-release",
+                    "L13 governance • candidates 1 • shadow 1 pending/1 • seal 1 pending/1 • version 1 • retract 1 pending/1 • gate hold"
+                ],
+                activeKillSwitches: [],
+                recommendedKillSwitches: [],
+                killSwitches: [],
+                pendingReviewCount: 0,
+                rollbackReadyCount: 0,
+                canRestoreActiveCheckpoint: false,
+                canRollbackActiveCheckpoint: false,
+                activeCheckpointID: nil,
+                activeCheckpointSource: .none,
+                reviewCheckpointID: nil
+            )
+        )
+
+        let snapshot = DecisionEvolutionOperatorSnapshot.build(
+            surfaceKind: .controlCenter,
+            workspace: workspace,
+            contract: .controlCenter
+        )
+
+        XCTAssertEqual(snapshot.summaryPresentation.foldedLungTitle, "Folded lung")
+        XCTAssertEqual(
+            snapshot.summaryPresentation.foldedLungLines,
+            [
+                "L3 compression runtime • breath guard • phase resume • anchor anchor-release",
+                "Breath guard • Phase resume • Restore 87%",
+                "Morph graph morph.release • organs riskSpine, permitKnot, stubCore • route checkpoint • thermal checkpoint-recovery",
+                "Breath scheduler guard_resume • checkpoint anchor_each_turn • micro-sleep 173ms • maintenance 0ms • resume rollback_hot",
+                "Integrity weave recovered • checks 3/3 • contamination 2 • hash hash-release"
+            ]
+        )
+    }
+
     func testOperatorSnapshotFallsBackToControlSurfaceSignalsWithoutReleaseSummary() {
         let review = makeSnapshot(
             checkpointID: "review-1",
@@ -353,6 +405,270 @@ final class DecisionEvolutionOperatorSnapshotTests: XCTestCase {
             "Active active-1 • Review review-1 • Pending 1 • Rollback-ready 2"
         )
         XCTAssertEqual(snapshot.summaryPresentation.killSwitchesLine, "Kill switches: host-write")
+    }
+
+    func testOperatorSnapshotElevatesSovereignPostureLinesOutOfPrimaryReason() {
+        let active = makeSnapshot(
+            checkpointID: "active-sovereign",
+            createdAt: Date(timeIntervalSince1970: 40),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+        let review = makeSnapshot(
+            checkpointID: "review-sovereign",
+            createdAt: Date(timeIntervalSince1970: 30),
+            approvalState: .reviewSuggested,
+            hasLineage: true
+        )
+
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: active,
+                activeCheckpointSource: .pinnedHint,
+                reviewCheckpoint: review,
+                pendingReviewQueue: [review],
+                latestPersistedLineage: nil
+            ),
+            releaseSummary: DecisionSystemReleaseControlSummary(
+                state: .watch,
+                headline: "Watching the pending review queue",
+                reasons: [
+                    "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
+                    "Factors: evidence_caveat_load",
+                    "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session",
+                    "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+                ],
+                activeKillSwitches: [],
+                recommendedKillSwitches: ["host-write"],
+                killSwitches: ["host-write"],
+                pendingReviewCount: 1,
+                rollbackReadyCount: 2,
+                canRestoreActiveCheckpoint: true,
+                canRollbackActiveCheckpoint: true,
+                activeCheckpointID: "active-sovereign",
+                activeCheckpointSource: .pinnedHint,
+                reviewCheckpointID: "review-sovereign"
+            )
+        )
+
+        let snapshot = DecisionEvolutionOperatorSnapshot.build(
+            surfaceKind: .controlCenter,
+            workspace: workspace,
+            contract: .controlCenter
+        )
+
+        XCTAssertEqual(snapshot.primaryReason, "Factors: evidence_caveat_load")
+        XCTAssertEqual(
+            snapshot.summaryPresentation.primaryReason,
+            "Factors: evidence_caveat_load"
+        )
+        XCTAssertEqual(
+            snapshot.summaryPresentation.headline,
+            "Watching the pending review queue"
+        )
+    }
+
+    func testOperatorSnapshotSummaryPresentationSurfacesHorizonDiagnosticsLines() {
+        let executionCapabilityFrame = DecisionEBrainExecutionCapabilityFrame(
+            activeProvider: .foundationModels,
+            preferredProvider: .foundationModels,
+            fallbackProvider: .gemmaE4B,
+            providerTrack: .builtInSystem,
+            executionTier: .systemManaged,
+            foundationTier: .systemManaged,
+            reasonCodes: ["tier:systemManaged", "active:foundationModels"]
+        )
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: nil,
+                reviewCheckpoint: nil,
+                pendingReviewQueue: [],
+                latestPersistedLineage: nil
+            ),
+            releaseSummary: DecisionSystemReleaseControlSummary(
+                state: .watch,
+                headline: "Watching audit findings before wider rollout",
+                reasons: [
+                    executionCapabilityFrame.detailLine,
+                    executionCapabilityFrame.horizonLine,
+                    executionCapabilityFrame.temporalLine,
+                    executionCapabilityFrame.evidenceLine,
+                    executionCapabilityFrame.persistenceLine,
+                    "Factors: evidence_caveat_load"
+                ],
+                activeKillSwitches: [],
+                recommendedKillSwitches: [],
+                killSwitches: [],
+                pendingReviewCount: 0,
+                rollbackReadyCount: 0,
+                canRestoreActiveCheckpoint: false,
+                canRollbackActiveCheckpoint: false,
+                activeCheckpointID: nil,
+                activeCheckpointSource: .none,
+                reviewCheckpointID: nil
+            )
+        )
+
+        let snapshot = DecisionEvolutionOperatorSnapshot.build(
+            surfaceKind: .controlCenter,
+            workspace: workspace,
+            contract: .controlCenter
+        )
+
+        XCTAssertEqual(snapshot.primaryReason, "Factors: evidence_caveat_load")
+        XCTAssertEqual(
+            snapshot.summaryPresentation.primaryReason,
+            "Factors: evidence_caveat_load"
+        )
+        XCTAssertEqual(snapshot.summaryPresentation.horizonDiagnosticsTitle, "Horizon diagnostics")
+        XCTAssertEqual(
+            snapshot.summaryPresentation.horizonDiagnosticsLines,
+            [
+                executionCapabilityFrame.detailLine,
+                executionCapabilityFrame.horizonLine,
+                executionCapabilityFrame.temporalLine,
+                executionCapabilityFrame.evidenceLine,
+                executionCapabilityFrame.persistenceLine
+            ]
+        )
+    }
+
+    func testOperatorSnapshotSummaryPresentationSurfacesFurnaceFabricLines() {
+        let active = makeSnapshot(
+            checkpointID: "active-fabric",
+            createdAt: Date(timeIntervalSince1970: 40),
+            approvalState: .automatic,
+            hasLineage: true
+        )
+
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: active,
+                activeCheckpointSource: .pinnedHint,
+                reviewCheckpoint: nil,
+                pendingReviewQueue: [],
+                latestPersistedLineage: nil
+            ),
+            releaseSummary: DecisionSystemReleaseControlSummary(
+                state: .watch,
+                headline: "Watching audit findings before wider rollout",
+                reasons: [
+                    "Factors: evidence_caveat_load",
+                    "L8 temporal field • records 1 • arcs 1 • conflicts 1",
+                    "L10-L12 adjudication • tri 1 scored/0 veto • HIGH → DELAY • GSI 68% • alternatives 1",
+                    "L13 governance • candidates 1 • shadow 1 pending/1 • seal 1 pending/1 • version 1 • retract 1 pending/1 • gate hold",
+                    "L13 version tree • rule rule.ready • rollback rollback.rule.ready",
+                    "L13 retraction • pending rule.pending • reason evolution.shadow_trial_pending",
+                    "L14 sovereign • constraints tool_cut • verdict quarantine"
+                ],
+                activeKillSwitches: [],
+                recommendedKillSwitches: [],
+                killSwitches: [],
+                pendingReviewCount: 0,
+                rollbackReadyCount: 1,
+                canRestoreActiveCheckpoint: true,
+                canRollbackActiveCheckpoint: true,
+                activeCheckpointID: "active-fabric",
+                activeCheckpointSource: .pinnedHint,
+                reviewCheckpointID: nil
+            )
+        )
+
+        let snapshot = DecisionEvolutionOperatorSnapshot.build(
+            surfaceKind: .controlCenter,
+            workspace: workspace,
+            contract: .controlCenter
+        )
+
+        XCTAssertEqual(snapshot.primaryReason, "Factors: evidence_caveat_load")
+        XCTAssertEqual(snapshot.summaryPresentation.furnaceContributionTitle, "Furnace fabric")
+        XCTAssertEqual(
+            snapshot.summaryPresentation.furnaceContributionLines,
+            [
+                "L8 temporal field • records 1 • arcs 1 • conflicts 1",
+                "L10-L12 adjudication • tri 1 scored/0 veto • HIGH → DELAY • GSI 68% • alternatives 1",
+                "L13 governance • candidates 1 • shadow 1 pending/1 • seal 1 pending/1 • version 1 • retract 1 pending/1 • gate hold",
+                "L13 version tree • rule rule.ready • rollback rollback.rule.ready",
+                "L13 retraction • pending rule.pending • reason evolution.shadow_trial_pending"
+            ]
+        )
+        XCTAssertEqual(snapshot.summaryPresentation.furnaceChecklistTitle, "Furnace review checklist")
+        XCTAssertEqual(
+            snapshot.summaryPresentation.furnaceChecklistLines,
+            [
+                "Review the pending shadow trial before promotion or approval.",
+                "Review the pending evolution seal before promotion or approval.",
+                "Inspect the version tree delta and rollback pointer before wider rollout.",
+                "Clear the pending retraction order before wider rollout."
+            ]
+        )
+        XCTAssertEqual(snapshot.summaryPresentation.furnaceNextStepTitle, "Recommended next step")
+        XCTAssertEqual(
+            snapshot.summaryPresentation.furnaceNextStepDetail,
+            "Review the pending shadow trial before promotion or approval."
+        )
+    }
+
+    func testOperatorSnapshotSummaryPresentationSurfacesQueueLineageWorkbenchPreview() {
+        let review = makeSnapshot(
+            checkpointID: "review-retraction",
+            createdAt: Date(timeIntervalSince1970: 30),
+            approvalState: .reviewSuggested,
+            hasLineage: false
+        )
+
+        let workspace = DecisionEvolutionWorkspaceSnapshot.build(
+            controlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: nil,
+                reviewCheckpoint: review,
+                pendingReviewQueue: [review],
+                latestPersistedLineage: nil
+            ),
+            releaseSummary: DecisionSystemReleaseControlSummary(
+                state: .watch,
+                headline: "Watching audit findings before wider rollout",
+                reasons: [
+                    "Factors: evidence_caveat_load",
+                    "L13 retraction • pending rule.pending • reason evolution.shadow_trial_pending"
+                ],
+                activeKillSwitches: [],
+                recommendedKillSwitches: [],
+                killSwitches: [],
+                pendingReviewCount: 1,
+                rollbackReadyCount: 0,
+                canRestoreActiveCheckpoint: false,
+                canRollbackActiveCheckpoint: false,
+                activeCheckpointID: nil,
+                activeCheckpointSource: .none,
+                reviewCheckpointID: "review-retraction"
+            )
+        )
+
+        let snapshot = DecisionEvolutionOperatorSnapshot.build(
+            surfaceKind: .controlCenter,
+            workspace: workspace,
+            contract: .controlCenter
+        )
+
+        XCTAssertEqual(snapshot.furnaceWorkbenchPresentation?.title, "Furnace workbench")
+        XCTAssertEqual(
+            snapshot.furnaceWorkbenchPresentation?.headline,
+            "Queue lineage is holding the next furnace review step"
+        )
+        XCTAssertEqual(
+            snapshot.furnaceWorkbenchPresentation?.detail,
+            "Clear the pending retraction order before wider rollout."
+        )
+        XCTAssertEqual(
+            snapshot.furnaceWorkbenchPresentation?.availabilityTitle,
+            "Blocked"
+        )
+        XCTAssertEqual(
+            snapshot.furnaceWorkbenchPresentation?.availabilityLines,
+            [
+                "Clear queue lineage is waiting for lineage-backed review checkpoints."
+            ]
+        )
     }
 
     func testOperatorSummaryPresentationSupportFormatsSharedSurfaceAndCountCopy() {

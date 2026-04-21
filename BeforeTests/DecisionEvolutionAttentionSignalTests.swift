@@ -161,6 +161,31 @@ final class DecisionEvolutionAttentionSignalTests: XCTestCase {
         )
     }
 
+    func testResolvedTriggerReasonAppendsPreferredHorizonDiagnosticsForAuditControlEntry() {
+        let signal = DecisionEvolutionAttentionSignal(
+            severity: .review,
+            badgeValue: "!",
+            headline: DecisionEvolutionReleaseStagePresentationSupport.watchingAuditFindingsHeadline,
+            detail: "Factors: evidence_caveat_load",
+            pendingReviewCount: 0,
+            killSwitches: [],
+            rollbackReady: false
+        )
+
+        XCTAssertEqual(
+            signal.resolvedTriggerReason(
+                fallback: nil,
+                controlEntryKind: .audit,
+                horizonDiagnosticsLines: [
+                    "Capability compatiblePreview",
+                    "Temporal volatile",
+                    "Evidence supported/ruleBound"
+                ]
+            ),
+            "Factors: evidence_caveat_load • Evidence supported/ruleBound"
+        )
+    }
+
     func testAttentionSignalSurfacesRuntimeGuardrailsFromReleaseSummary() {
         let active = makeSnapshot(
             checkpointID: "active-1",

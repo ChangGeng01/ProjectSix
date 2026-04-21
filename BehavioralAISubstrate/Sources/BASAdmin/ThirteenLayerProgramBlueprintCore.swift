@@ -268,7 +268,7 @@ public enum BASProgramExecutionBlueprintBuilder {
         layers: [
             layer(.powerClock, "Power-clock layer owns lifecycle, wake intent, recovery/quarantine, sovereign actuation, and compute budget.", ["DeviceState", "BudgetFrame"], ["ActionPermit", "RuntimeTrace"]),
             layer(.neuralCore, "Neural-core layer owns Scout/Core model routing and structured heads.", ["ModelArtifact", "HeadOutputs"], ["BudgetFrame"]),
-            layer(.compressionRuntime, "Compression runtime owns Breath-Fold-Resume contracts, ThoughtFold recovery anchors, checkpoint-safe rollback, and hot-start recovery.", ["ThoughtFold", "MorphGraph", "HotColdMap", "PrecisionProfile", "ResumeFrame", "RollbackAnchor", "LungState", "BreathScheduler", "RuntimeTrace"], ["BudgetFrame"]),
+            layer(.compressionRuntime, "Compression runtime owns Breath-Fold-Resume contracts, ThoughtFold recovery anchors, integrity weave verification, checkpoint-safe rollback, thermal exchange routing, organ delta loading plans, and hot-start recovery.", ["ThoughtFold", "MorphGraph", "HotColdMap", "OrganPackage", "OrganDeltaPlan", "PrecisionProfile", "ThermalExchanger", "IntegrityWeave", "ResumeFrame", "RollbackAnchor", "LungState", "BreathScheduler", "RuntimeTrace"], ["BudgetFrame"]),
             layer(.foundation, "Foundation layer owns stable world priors, structure courses, and boundary priors.", ["BaseCheckpoint", "FoundationEval"], ["EvalSample"]),
             layer(.hostProfile, "Host layer owns the host constitution, compatibility host profile projection, host gate, deletion, rollback, and privacy vault.", ["HostConstitution", "HostConstitutionVault", "HostDeletionManifest", "HostSyncRevocationLedger", "HostVersionTree", "HostProfile", "HostVersion"], ["RiskCard", "UpdateTicket"]),
             layer(.context, "Context layer turns raw input into task, emotion, pressure, relation, and manipulation signals.", ["ContextFrame"], ["BudgetFrame", "HostProfile"]),
@@ -276,9 +276,9 @@ public enum BASProgramExecutionBlueprintBuilder {
             layer(.memory, "Memory layer owns hot/warm/cold retrieval, conflict fingerprints, and promotion.", ["MemoryAtom", "MemoryBundle"], ["HostProfile", "UpdateTicket"]),
             layer(.loop, "Dream-loop layer owns candidates, forecasts, critique, convergence, and bounded iteration.", ["ThoughtFrame", "CandidatePath"], ["BudgetFrame", "RiskCard"]),
             layer(.triSelf, "Tri-self layer fuses id, ego, and superego scoring into a merged choice.", ["TriSelfScore", "MergedChoice"], ["HostProfile", "RiskCard"]),
-            layer(.risk, "Risk layer owns calibration, GSI, and ActionPermit. It remains on the critical path.", ["RiskCard", "ActionPermit"], ["BudgetFrame", "HostProfile"]),
-            layer(.action, "Action layer renders answer, compare, delay, block, and replace modes without weakening boundaries.", ["RenderedOutput"], ["ActionPermit", "HostProfile"]),
-            layer(.evolution, "Evolution layer emits UpdateTicket, rule candidates, and offline-learning exports.", ["UpdateTicket", "RuleCandidate"], ["RenderedOutput", "HostProfile"])
+            layer(.risk, "Risk layer owns the risk-climate field, GSI, reversibility-aware gating, ActionPermit permit membranes, and sovereign escalation hints. It remains on the critical path.", ["RiskCard", "ActionPermit", "RiskField", "RiskDecisionPackage", "SovereignEscalationHint"], ["BudgetFrame", "HostProfile"]),
+            layer(.action, "Action layer renders the repo-real five-mode protective rendering scaffold (answer, compare, delay, block, replace) without weakening boundaries, while leaving richer gentle-hand surfaces to future compatibility-projected rollout.", ["RenderedOutput"], ["ActionPermit", "HostProfile"]),
+            layer(.evolution, "Evolution layer emits UpdateTicket, governed candidates, shadow-trial and retraction lineage, promotion seals, schema-level workflow/guard/bias/risk-pattern/export placeholders, and offline-learning exports.", ["UpdateTicket", "RuleCandidate", "ExperienceCandidate", "ShadowTrialRecord", "VersionDelta", "WorkflowCandidate", "GuardTemplateCandidate", "BiasRecord", "RiskPatternCandidate", "RetractionOrder", "LearningExportBundle", "EvolutionSeal"], ["RenderedOutput", "HostProfile"])
         ],
         workPackages: [
             wp("WP0", "总体架构与项目治理", "Freeze layer boundaries, object contracts, regression policy, and change control.", [], .currentRepository, .first, "Chief Architect", ["Chief Architect"], ["Evaluation Lead", "SDK Lead"], "Chief Architect", "2 weeks", [], ["WP14", "WP16"], ["Interface churn before M0"], ["M0"], ["13-layer glossary approved", "Schema governance entries frozen", "Regression gate policy published"]),
@@ -292,9 +292,9 @@ public enum BASProgramExecutionBlueprintBuilder {
             wp("WP8", "海马井", "Implement hot/warm/cold memory stores, conflict engine, promotion, and audit replay.", [.memory], .currentRepository, .second, "Host & Memory Lead", ["Host & Memory Lead"], ["Loop Lead", "Risk Lead"], "Chief Architect", "5 weeks", ["WP5", "WP7"], ["WP3", "WP13"], ["Conflict promotion and replay"], ["M4"], ["MemoryBundle stable", "Conflict fingerprints enforced", "Cold writes always require review"]),
             wp("WP9", "梦环层", "Implement bounded loop controller, candidates, forecast, critique, and stop policy.", [.loop], .currentRepository, .first, "Loop Lead", ["Loop Lead"], ["Runtime Lead", "Risk Lead"], "Chief Architect", "5 weeks", ["WP1", "WP7"], ["WP10", "WP11"], ["Dead-loop prevention"], ["M2", "M3"], ["Two-path loop shipped", "Stop conditions enforced", "Loop Utility Gain tracked"]),
             wp("WP10", "三我庭", "Implement id/ego/superego heads, fusion, veto, and explanation codes.", [.triSelf], .currentRepository, .second, "Loop Lead", ["Loop Lead", "Risk Lead"], ["Host & Memory Lead", "Product Lead"], "Chief Architect", "4 weeks", ["WP5", "WP9"], ["WP11", "WP12"], ["Over-suppression from superego"], ["M4"], ["TriSelf score contract stable", "Veto reasons surfaced", "Fusion remains explainable"]),
-            wp("WP11", "风闸层", "Implement risk taxonomy, GSI, calibrated RiskCard, and ActionPermit.", [.risk], .currentRepository, .first, "Risk Lead", ["Risk Lead"], ["Loop Lead", "Evaluation Lead"], "Chief Architect", "5 weeks", ["WP6", "WP7", "WP9"], ["WP10", "WP16"], ["Calibration drift and GSI precision"], ["M2", "M3"], ["RiskCard schema stable", "Block/delay/replace live", "GSI stays on the main path"]),
-            wp("WP12", "柔手层", "Render answer, compare, delay, block, and replace modes with host-aware tone.", [.action], .currentRepository, .first, "Product Lead", ["Product Lead"], ["Risk Lead", "Host & Memory Lead"], "Chief Architect", "3 weeks", ["WP5", "WP9", "WP11"], ["WP18"], ["Alternatives after block"], ["M2", "M3"], ["RenderedOutput supports all five modes", "Tone policy cannot weaken boundaries"]),
-            wp("WP13", "蜕变炉", "Implement UpdateTicket generation, rule mining, write gate, and review queue.", [.evolution], .currentRepository, .second, "Host & Memory Lead", ["Host & Memory Lead", "Training Lead"], ["Risk Lead", "Evaluation Lead"], "Chief Architect", "4 weeks", ["WP5", "WP8", "WP11"], ["WP15"], ["No uncontrolled online learning"], ["M4", "M7"], ["UpdateTicket stable", "Cold-memory writes blocked without review", "Offline export path verified"]),
+            wp("WP11", "风闸层", "Implement the risk-climate field, GSI, calibrated RiskCard projection, ActionPermit permit membrane, and sovereign escalation hints.", [.risk], .currentRepository, .first, "Risk Lead", ["Risk Lead"], ["Loop Lead", "Evaluation Lead"], "Chief Architect", "5 weeks", ["WP6", "WP7", "WP9"], ["WP10", "WP16"], ["Calibration drift and GSI precision"], ["M2", "M3"], ["RiskField schema stable", "Block/delay/replace and draft/local-only live", "Sovereign escalation stays on the main path"]),
+            wp("WP12", "柔手层", "Render the repo-real five-mode protective rendering scaffold (answer, compare, delay, block, replace) with host-aware tone while preserving compatibility-projected headroom for future gentle-hand surfaces.", [.action], .currentRepository, .first, "Product Lead", ["Product Lead"], ["Risk Lead", "Host & Memory Lead"], "Chief Architect", "3 weeks", ["WP5", "WP9", "WP11"], ["WP18"], ["Alternatives after block"], ["M2", "M3"], ["RenderedOutput supports the five-mode protective scaffold", "Tone policy cannot weaken boundaries"]),
+            wp("WP13", "蜕变炉", "Stabilize the existing Stage 1 governed spine and establish the governed path into candidate nurseries, shadow-trial theater, version/retraction systems, and cross-layer L8-L14 evolution interfaces under the review-gated checkpoint chain, with no uncontrolled online learning.", [.evolution], .currentRepository, .second, "Host & Memory Lead", ["Host & Memory Lead", "Training Lead"], ["Risk Lead", "Evaluation Lead"], "Chief Architect", "4 weeks", ["WP5", "WP8", "WP11"], ["WP15"], ["No uncontrolled online learning"], ["M4", "M7"], ["Stage 1 governed spine remains stable", "Candidate nursery and shadow-trial expansion contract is published", "Cold-memory writes and promotion stay blocked without review or seal", "Offline export path remains governed"]),
             wp("WP14", "数据工程与标注平台", "Govern structure/risk/host/manipulation data and strong hard negatives.", [], .externalTraining, .third, "Data Engineering Lead", ["Data Engineering Lead"], ["Risk Lead", "Host & Memory Lead"], "Chief Architect", "6 weeks", ["WP0"], ["WP4", "WP15", "WP16"], ["Gaslight and conflict dataset quality"], ["M0", "M3"], ["Annotation guide published", "Hard negatives cover manipulation, conflict, and host-vs-boundary collisions"]),
             wp("WP15", "训练与蒸馏平台", "Build teacher orchestration, multi-task training, distillation, and QAT.", [], .externalTraining, .third, "Training Lead", ["Training Lead", "Model Lead"], ["Evaluation Lead", "Compression Lead"], "Chief Architect", "8 weeks", ["WP2", "WP4", "WP13", "WP14"], ["WP16"], ["Teacher trace quality and task interference"], ["M5", "M6"], ["Teacher traces registered", "Loop strategy distillation measured", "QAT preserves risk heads"]),
             wp("WP16", "评测、红队与回归门禁", "Own benchmarks, gaslight red-team sets, mobile stress suites, and gates.", [], .currentRepository, .third, "Evaluation Lead", ["Evaluation Lead"], ["Risk Lead", "Runtime Lead", "Training Lead"], "Chief Architect", "5 weeks", ["WP0", "WP14"], ["WP11", "WP15", "WP17"], ["Real-device coverage and long-horizon regressions"], ["M0", "M3", "M6"], ["LUG/RCE/GRR/BCS/MCRA/EQR tracked", "Gaslight bench operational", "Daily and weekly gates live"]),
@@ -304,8 +304,8 @@ public enum BASProgramExecutionBlueprintBuilder {
         milestones: [
             milestone("M0", "架构冻结", "Freeze 13-layer responsibilities, schema governance, KPI set, and regression gates.", ["13-layer glossary approved", "Program blueprint published", "Governed schema list frozen"]),
             milestone("M1", "底盘P0", "Budget, Scout/Core prototype, HostProfile lifecycle, and hot-start foundations live.", ["BudgetFrame implemented", "Scout/Core prototypes benchmarked", "HostProfile version/delete works"]),
-            milestone("M2", "认知闭环Alpha", "Main cognitive loop replays end to end with ThoughtFrame, RiskCard, ActionPermit, and UpdateTicket.", ["Two-path loop works", "Replay path is available", "No uncontrolled loop growth"]),
-            milestone("M3", "风险增强Beta", "GSI, forecast, critique, and block/delay/replace are stable and measurably safer than baseline.", ["RCE down vs baseline", "GRR up vs baseline", "High-risk compliance failure rate improved"]),
+            milestone("M2", "认知闭环Alpha", "Main cognitive loop replays end to end with ThoughtFrame, RiskCard, RiskDecisionPackage, ActionPermit, and UpdateTicket.", ["Two-path loop works", "Replay path is available", "No uncontrolled loop growth"]),
+            milestone("M3", "风险增强Beta", "GSI, forecast, critique, and the expanded wind-gate mode lattice are stable and measurably safer than baseline.", ["RCE down vs baseline", "GRR up vs baseline", "High-risk compliance failure rate improved"]),
             milestone("M4", "宿主记忆Beta+", "Hot/warm/cold memory, conflicts, deletion/freeze/rollback, and host fidelity are trustworthy.", ["Conflict handling passes", "Cold writes require review", "Host rollback is verified"]),
             milestone("M5", "参数内化版", "Core heads and loop strategy move from orchestration into trained heads with reduced latency.", ["External orchestration shrinks", "Multi-head core benchmarked", "Distillation retains safety behavior"]),
             milestone("M6", "Mobile RC", "ThoughtFold, hot-start, quantized path, SDK, and mobile thermals meet release-candidate guardrails.", ["Thermal limits pass", "Startup path passes", "SDK integration docs published"]),
@@ -343,7 +343,7 @@ public enum BASProgramExecutionBlueprintBuilder {
                 updated.summary = "Power-clock layer owns lifecycle, wake intent, recovery/quarantine, lease enforcement, and compute budget."
                 updated.guardedBy = ["ActionPermit", "RuntimeTrace", "SovereignExecutionReceipt"]
             case .evolution:
-                updated.summary = "Evolution layer emits UpdateTicket, rule candidates, review payloads, and offline-learning exports."
+                updated.summary = "Evolution layer emits UpdateTicket, governed candidates, shadow-trial and retraction lineage, promotion seals, schema-level workflow/guard/bias/export placeholders, review payloads, and offline-learning exports."
             default:
                 break
             }
@@ -353,11 +353,12 @@ public enum BASProgramExecutionBlueprintBuilder {
                 .sovereign,
                 "Sovereign layer owns actuation commands, execution receipts, kill-switch contraction, and rollback-safe command bridging.",
                 [
-                    "SovereignVerdict",
-                    "SovereignCommitToken",
-                    "SovereignLock",
-                    "QuarantineRecord",
-                    "SovereignAuditEntry",
+                "SovereignVerdict",
+                "SovereignCommitToken",
+                "SovereignWarrant",
+                "SovereignLock",
+                "QuarantineRecord",
+                "SovereignAuditEntry",
                     "SovereignActuationCommand",
                     "SovereignExecutionReceipt",
                     "RuntimePolicyLineage"

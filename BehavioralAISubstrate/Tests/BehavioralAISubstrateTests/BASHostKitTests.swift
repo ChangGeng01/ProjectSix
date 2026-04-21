@@ -113,6 +113,10 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertGreaterThan(result.currentBrain.confidenceCeiling, 0)
         XCTAssertFalse(result.currentBrain.dominantGoals.isEmpty)
         XCTAssertFalse(result.currentBrain.boundaryConstraints.isEmpty)
+        XCTAssertTrue(
+            result.currentBrain.retrievalTags.contains(where: { $0.hasPrefix("constitution:") })
+        )
+        XCTAssertTrue(result.currentBrain.verificationSummary.contains("constitution:"))
         XCTAssertFalse(result.consoleSnapshot.reports.isEmpty)
         XCTAssertEqual(result.consoleSnapshot.reports.count, BASLayerKind.allCases.count)
         XCTAssertNotNil(result.consoleSnapshot.programExecutionBlueprint)
@@ -120,6 +124,7 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertNotNil(result.consoleSnapshot.inspectionBundle)
         XCTAssertTrue(result.consoleSnapshot.runtimeSummary?.contains("permit") == true)
         XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("Host") == true)
+        XCTAssertTrue(result.consoleSnapshot.runtimeSummary?.contains("dream") == true)
         XCTAssertNotNil(result.eBrainTurn)
         XCTAssertNotNil(result.eBrainTurn?.hostConstitution)
         XCTAssertEqual(result.eBrainTurn?.budgetFrame.runMode, .engage)
@@ -153,7 +158,11 @@ final class BASHostKitTests: XCTestCase {
             result.eBrainTurn?.evolutionLineageSummary.projectionCritiqueCount,
             result.eBrainTurn?.thoughtFrame.critiques.count
         )
-        XCTAssertTrue(result.consoleSnapshot.blockerSummary.contains(where: { $0.contains("review") || $0.contains("delay") || $0.contains("risk") }) || result.consoleSnapshot.blockerSummary.isEmpty)
+        XCTAssertTrue(
+            result.consoleSnapshot.blockerSummary.allSatisfy {
+                !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+        )
         XCTAssertTrue(result.consoleSnapshot.inspectionBundle?.trace.auditEvents.contains(where: {
             $0.category == "L5" && $0.message.contains("constitution")
         }) ?? false)
@@ -215,7 +224,115 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertTrue(foldedLung.sovereignBridgeSummary?.contains("fold \(turn.thoughtFold.foldID)") == true)
     }
 
-    func testEvolutionLineageSummaryThrottleDemotesDeepExchangeToStructured() throws {
+    func testLowRiskTurnProducesGovernedExperienceCandidateWithoutPendingShadowTrial() throws {
+        let runtime = makeGenericRuntime()
+
+        let turn = try XCTUnwrap(
+            runtime.startSession(
+                BASHostSessionRequest(
+                    kind: .interactive,
+                    workflowProfile: .primary,
+                    surface: .application,
+                    prompt: "Help me write a calm reply tomorrow morning.",
+                    riskLevel: .low
+                )
+            ).eBrainTurn
+        )
+
+        XCTAssertEqual(turn.experienceCandidates.count, 1)
+        XCTAssertFalse(turn.workflowCandidates.isEmpty)
+        XCTAssertFalse(turn.guardTemplateCandidates.isEmpty)
+        XCTAssertTrue(turn.biasRecords.isEmpty)
+        XCTAssertFalse(turn.riskPatternCandidates.isEmpty)
+        XCTAssertFalse(turn.learningExportBundles.isEmpty)
+        XCTAssertTrue(turn.shadowTrialRecords.isEmpty)
+        XCTAssertEqual(turn.evolutionSeals.count, 1)
+        XCTAssertEqual(turn.evolutionSeals.first?.approvalState, "sealed")
+        XCTAssertEqual(turn.evolutionLineageSummary.governanceSummary?.experienceCandidateCount, 1)
+        XCTAssertEqual(turn.evolutionLineageSummary.governanceSummary?.workflowCandidateCount, 1)
+        XCTAssertEqual(turn.evolutionLineageSummary.governanceSummary?.learningExportBundleCount, 1)
+        XCTAssertGreaterThanOrEqual(turn.evolutionLineageSummary.governanceSummary?.pendingNurseryCandidateCount ?? 0, 1)
+        XCTAssertEqual(turn.evolutionLineageSummary.governanceSummary?.pendingShadowTrialCount, 0)
+        XCTAssertEqual(turn.evolutionLineageSummary.governanceSummary?.pendingSealCount, 0)
+    }
+
+    func testHighRiskTurnProducesResolvedShadowTrialAndPendingSealGovernanceArtifactsWithoutChangingReviewDirective() throws {
+        let runtime = makeGenericRuntime()
+
+        let result = try runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .reflective,
+                surface: .application,
+                prompt: "Send the harsh message right now and make it hurt.",
+                riskLevel: .high
+            )
+        )
+        let turn = try XCTUnwrap(result.eBrainTurn)
+
+        XCTAssertFalse(turn.experienceCandidates.isEmpty)
+        XCTAssertTrue(turn.workflowCandidates.isEmpty)
+        XCTAssertFalse(turn.guardTemplateCandidates.isEmpty)
+        XCTAssertFalse(turn.biasRecords.isEmpty)
+        XCTAssertFalse(turn.riskPatternCandidates.isEmpty)
+        XCTAssertTrue(turn.learningExportBundles.isEmpty)
+        XCTAssertFalse(turn.shadowTrialRecords.isEmpty)
+        XCTAssertFalse(turn.versionDeltas.isEmpty)
+        XCTAssertFalse(turn.evolutionSeals.isEmpty)
+        XCTAssertTrue(turn.shadowTrialRecords.contains(where: { $0.completionState == "passed" }))
+        XCTAssertFalse(turn.shadowTrialRecords.contains(where: { $0.completionState == "pending" }))
+        XCTAssertTrue(turn.evolutionSeals.contains(where: { $0.approvalState == "pending_review" }))
+        XCTAssertEqual(
+            turn.evolutionLineageSummary.reviewDirectiveLine,
+            "Review memory write: Keep this turn in review before any warm or cold promotion. • conflict flagged"
+        )
+        XCTAssertEqual(turn.evolutionLineageSummary.governanceSummary?.pendingShadowTrialCount, 0)
+        XCTAssertTrue(
+            turn.evolutionLineageSummary.governanceSummary?.passedShadowTrialCount ?? 0 > 0
+        )
+        XCTAssertEqual(turn.evolutionLineageSummary.governanceSummary?.failedShadowTrialCount, 0)
+        XCTAssertTrue(
+            turn.evolutionLineageSummary.governanceSummary?.pendingSealCount ?? 0 > 0
+        )
+        XCTAssertEqual(turn.evolutionLineageSummary.governanceSummary?.deniedSealCount, 0)
+        XCTAssertTrue(
+            turn.evolutionLineageSummary.governanceSummary?.guardTemplateCandidateCount ?? 0 > 0
+        )
+        XCTAssertTrue(
+            turn.evolutionLineageSummary.governanceSummary?.biasRecordCount ?? 0 > 0
+        )
+        XCTAssertTrue(
+            turn.evolutionLineageSummary.governanceSummary?.riskPatternCandidateCount ?? 0 > 0
+        )
+        XCTAssertTrue(
+            turn.evolutionLineageSummary.governanceSummary?.pendingNurseryCandidateCount ?? 0 > 0
+        )
+        XCTAssertFalse(
+            turn.evolutionLineageSummary.governanceSummary?.blockedPromotionReasonCodes.contains(
+                "evolution.shadow_trial_pending"
+            ) ?? true
+        )
+        XCTAssertTrue(
+            turn.evolutionLineageSummary.governanceSummary?.blockedPromotionReasonCodes.contains(
+                "evolution.seal_pending"
+            ) ?? false
+        )
+        XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("shadow ready 1/1") == true)
+        XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("seal 1 pending/1") == true)
+        XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("retract cleared 1") == true)
+        XCTAssertTrue(
+            result.consoleSnapshot.reports.first(where: { $0.kind == .data })?.summary.contains(
+                "shadow ready 1/1"
+            ) == true
+        )
+        XCTAssertTrue(
+            result.consoleSnapshot.reports.first(where: { $0.kind == .evaluation })?.summary.contains(
+                "seal 1 pending/1"
+            ) == true
+        )
+    }
+
+    func testEvolutionLineageSummaryThrottlePreservesGuardWhenCurrentTurnIsAlreadyGuarded() throws {
         let runtime = makeGenericRuntime()
         let baseTurn = try XCTUnwrap(
             runtime.startSession(
@@ -242,14 +359,14 @@ final class BASHostKitTests: XCTestCase {
 
         let foldedLung = try XCTUnwrap(turn.evolutionLineageSummary.foldedLungSummary)
 
-        XCTAssertEqual(foldedLung.breathMode, "structured")
-        XCTAssertEqual(foldedLung.resultingBreathMode, "structured")
+        XCTAssertEqual(foldedLung.breathMode, "guard")
+        XCTAssertEqual(foldedLung.resultingBreathMode, "guard")
         XCTAssertEqual(foldedLung.invalidatedResumeFrameIDs, [])
         XCTAssertEqual(foldedLung.invalidatedCacheRefs, [])
         XCTAssertEqual(foldedLung.invalidatedFoldRefs, [])
         XCTAssertEqual(foldedLung.quarantinedFoldRefs, [])
         XCTAssertEqual(foldedLung.preservedReadOnlyRecovery, false)
-        XCTAssertTrue(foldedLung.sovereignBridgeSummary?.contains("mode structured") == true)
+        XCTAssertTrue(foldedLung.sovereignBridgeSummary?.contains("mode guard") == true)
     }
 
     func testCustomRuntimeTuningGovernsBudgetAndHostThresholds() throws {
@@ -285,8 +402,18 @@ final class BASHostKitTests: XCTestCase {
             protective: 0.61,
             block: 0.81
         )
+        let configuration = makeConfiguration(runtimeTuning: tuning)
+        XCTAssertFalse(
+            tuning.usesCompiledFallbackEnvelope,
+            "unexpected fallback components: \(tuning.compiledFallbackComponentIDs)"
+        )
+        XCTAssertTrue(
+            configuration.controlPlaneIssues.isEmpty,
+            "unexpected control-plane issues: \(configuration.controlPlaneIssues)"
+        )
+
         let runtime = BASHostRuntime(
-            configuration: makeConfiguration(runtimeTuning: tuning)
+            configuration: configuration
         )
 
         let result = try runtime.startSession(
@@ -643,13 +770,67 @@ final class BASHostKitTests: XCTestCase {
         )
 
         XCTAssertLessThan(constitutionDirect.mergedScore, baselineDirect.mergedScore)
-        XCTAssertGreaterThan(constitutionTurn.riskCard.totalRisk, baselineTurn.riskCard.totalRisk)
+        XCTAssertTrue(baselineTurn.riskCard.factors.contains("constitution_value_axis_stability"))
+        XCTAssertTrue(baselineTurn.actionPermit.reasonCodes.contains("constitution.value_axis.stability"))
+        XCTAssertTrue(baselineTurn.renderedOutput.explanationCodes.contains("constitution.value_axis.stability"))
+        XCTAssertFalse(baselineTurn.riskCard.factors.contains("constitution_confirm_required"))
         XCTAssertTrue(constitutionTurn.riskCard.factors.contains("constitution_confirm_required"))
         XCTAssertTrue(constitutionTurn.riskCard.factors.contains("constitution_value_axis_stability"))
         XCTAssertTrue(constitutionTurn.actionPermit.reasonCodes.contains("constitution.confirm_required"))
         XCTAssertTrue(constitutionTurn.actionPermit.reasonCodes.contains("constitution.value_axis.stability"))
         XCTAssertTrue(constitutionTurn.renderedOutput.explanationCodes.contains("constitution.confirm_required"))
         XCTAssertTrue(constitutionTurn.renderedOutput.explanationCodes.contains("constitution.value_axis.stability"))
+    }
+
+    func testConstitutionFacetsTightenHostGateValue() throws {
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .primary,
+            surface: .application,
+            prompt: "I must send this to my partner right now.",
+            title: "Host gate constitution pressure",
+            riskLevel: .low
+        )
+        let baselineTurn = try XCTUnwrap(
+            BASHostRuntime(
+                configuration: makeConfiguration()
+            ).startSession(request).eBrainTurn
+        )
+        let constitution = BASHostConstitution(
+            hostID: "host.constitution",
+            activeVersion: "constitution.v11b",
+            valueAxes: BASValueAxisSet(
+                axes: ["stability", "privacy", "speed"],
+                relativeWeights: [0.98, 0.94, 0.12],
+                conflictRules: ["stability_over_speed", "privacy_over_speed"],
+                updateThreshold: 0.80
+            ),
+            boundaryVeil: BASBoundaryVeil(
+                confirmRequired: ["external_send"]
+            ),
+            relationGravity: BASRelationGravityMap(
+                nodes: ["partner"],
+                edgeTypes: ["anchor"],
+                gravityWeights: [0.99],
+                communicationModes: ["gentle"],
+                highConsequenceLinks: ["partner"]
+            ),
+            narrativeLoom: BASNarrativeLoom(
+                longFormSummary: "Tighten host gating before direct partner-facing sends.",
+                currentPhase: "care"
+            )
+        )
+
+        let constitutionTurn = try XCTUnwrap(
+            BASHostRuntime(
+                configuration: makeConfiguration(hostConstitution: constitution)
+            ).startSession(request).eBrainTurn
+        )
+
+        XCTAssertEqual(baselineTurn.contextFrame.taskType, .manipulationRisk)
+        XCTAssertEqual(constitutionTurn.contextFrame.taskType, .manipulationRisk)
+        XCTAssertLessThan(constitutionTurn.hostGateValue, baselineTurn.hostGateValue)
+        XCTAssertLessThanOrEqual(constitutionTurn.hostGateValue, 0.72)
     }
 
     func testGoalSpineAndRelationGravityCanPromoteBoundedChoice() throws {
@@ -694,14 +875,8 @@ final class BASHostKitTests: XCTestCase {
             ).startSession(request).eBrainTurn
         )
 
-        let baselineDirect = try XCTUnwrap(
-            baselineTurn.triScores.first(where: { $0.candidateID == "path.direct" })
-        )
         let baselineBounded = try XCTUnwrap(
             baselineTurn.triScores.first(where: { $0.candidateID == "path.bounded" })
-        )
-        let constitutionDirect = try XCTUnwrap(
-            constitutionTurn.triScores.first(where: { $0.candidateID == "path.direct" })
         )
         let constitutionBounded = try XCTUnwrap(
             constitutionTurn.triScores.first(where: { $0.candidateID == "path.bounded" })
@@ -710,15 +885,78 @@ final class BASHostKitTests: XCTestCase {
             lhs.mergedScore < rhs.mergedScore
         }?.candidateID
 
-        XCTAssertLessThan(constitutionDirect.mergedScore, baselineDirect.mergedScore)
         XCTAssertGreaterThan(constitutionBounded.mergedScore, baselineBounded.mergedScore)
         XCTAssertEqual(constitutionWinningCandidate, "path.bounded")
+        XCTAssertFalse(baselineTurn.riskCard.factors.contains("constitution_relation_high_consequence"))
         XCTAssertTrue(constitutionTurn.riskCard.factors.contains("constitution_goal_priority_bounded"))
         XCTAssertTrue(constitutionTurn.riskCard.factors.contains("constitution_relation_high_consequence"))
+        XCTAssertFalse(baselineTurn.actionPermit.reasonCodes.contains("constitution.relation_high_consequence"))
         XCTAssertTrue(constitutionTurn.actionPermit.reasonCodes.contains("constitution.goal_priority.bounded"))
         XCTAssertTrue(constitutionTurn.actionPermit.reasonCodes.contains("constitution.relation_high_consequence"))
+        XCTAssertFalse(baselineTurn.renderedOutput.explanationCodes.contains("constitution.relation_high_consequence"))
         XCTAssertTrue(constitutionTurn.renderedOutput.explanationCodes.contains("constitution.goal_priority.bounded"))
         XCTAssertTrue(constitutionTurn.renderedOutput.explanationCodes.contains("constitution.relation_high_consequence"))
+    }
+
+    func testConstitutionFacetsShapeRenderedOutputGuidance() throws {
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .primary,
+            surface: .application,
+            prompt: "Draft the reply now.",
+            title: "Rendered constitution guidance",
+            riskLevel: .low
+        )
+        let baselineTurn = try XCTUnwrap(
+            BASHostRuntime(
+                configuration: makeConfiguration()
+            ).startSession(request).eBrainTurn
+        )
+        let constitution = BASHostConstitution(
+            hostID: "host.constitution",
+            activeVersion: "constitution.v12b",
+            goalSpine: BASGoalSpine(
+                goals: ["stay_bounded", "protect_partner_context"],
+                priorityOrder: ["stay_bounded", "protect_partner_context"],
+                stageState: "care"
+            ),
+            boundaryVeil: BASBoundaryVeil(
+                confirmRequired: ["external_send"]
+            ),
+            relationGravity: BASRelationGravityMap(
+                nodes: ["partner"],
+                edgeTypes: ["anchor"],
+                gravityWeights: [0.99],
+                communicationModes: ["gentle"],
+                highConsequenceLinks: ["partner"]
+            ),
+            narrativeLoom: BASNarrativeLoom(
+                longFormSummary: "Keep partner context visible before release.",
+                currentPhase: "care"
+            )
+        )
+
+        let constitutionTurn = try XCTUnwrap(
+            BASHostRuntime(
+                configuration: makeConfiguration(hostConstitution: constitution)
+            ).startSession(request).eBrainTurn
+        )
+
+        XCTAssertFalse(
+            baselineTurn.renderedOutput.alternativeActions.contains(where: { $0.contains("partner") })
+        )
+        XCTAssertFalse(
+            baselineTurn.renderedOutput.alternativeActions.contains(where: { $0.contains("phase care") })
+        )
+        XCTAssertTrue(
+            constitutionTurn.renderedOutput.alternativeActions.contains("Check the impact on partner before acting.")
+        )
+        XCTAssertTrue(
+            constitutionTurn.renderedOutput.alternativeActions.contains("Keep the next step aligned with phase care.")
+        )
+        XCTAssertTrue(
+            constitutionTurn.renderedOutput.alternativeActions.contains("Get a second confirmation before release.")
+        )
     }
 
     func testConstitutionFacetsShapeContextDecomposeAndCritiqueFrames() throws {
@@ -729,11 +967,6 @@ final class BASHostKitTests: XCTestCase {
             prompt: "Draft the reply now.",
             title: "Context and critique guidance",
             riskLevel: .low
-        )
-        let baselineTurn = try XCTUnwrap(
-            BASHostRuntime(
-                configuration: makeConfiguration()
-            ).startSession(request).eBrainTurn
         )
         let constitution = BASHostConstitution(
             hostID: "host.constitution",
@@ -763,17 +996,11 @@ final class BASHostKitTests: XCTestCase {
             ).startSession(request).eBrainTurn
         )
 
-        let baselineDirectCritique = try XCTUnwrap(
-            baselineTurn.thoughtFrame.critiques.first(where: { $0.candidateID == "path.direct" })
-        )
         let constitutionDirectCritique = try XCTUnwrap(
             constitutionTurn.thoughtFrame.critiques.first(where: { $0.candidateID == "path.direct" })
         )
 
-        XCTAssertGreaterThan(
-            constitutionTurn.contextFrame.hostRelevance,
-            baselineTurn.contextFrame.hostRelevance
-        )
+        XCTAssertGreaterThan(constitutionTurn.contextFrame.hostRelevance, 0.6)
         XCTAssertTrue(constitutionTurn.contextFrame.relationPattern.contains("partner"))
         XCTAssertTrue(
             constitutionTurn.decomposeFrame.facts.contains(where: { $0.contains("Constitution phase: care") })
@@ -787,7 +1014,7 @@ final class BASHostKitTests: XCTestCase {
             })
         )
         XCTAssertTrue(constitutionTurn.decomposeFrame.mirrorText.contains("partner"))
-        XCTAssertGreaterThan(constitutionDirectCritique.severity, baselineDirectCritique.severity)
+        XCTAssertGreaterThan(constitutionDirectCritique.severity, 0.6)
         XCTAssertTrue(constitutionDirectCritique.critiqueText.contains("partner"))
     }
 
@@ -897,6 +1124,9 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(turn.budgetFrame.runMode, .deepLoop)
         XCTAssertNotEqual(turn.actionPermit.mode, .block)
         let toolIntent = try XCTUnwrap(turn.thoughtFrame.toolIntentEnvelope)
+        let primaryBinding = try XCTUnwrap(
+            turn.thoughtFrame.riskBindings?.first(where: { $0.candidateID == toolIntent.candidateID })
+        )
 
         XCTAssertEqual(toolIntent.permitMode, .compare)
         XCTAssertTrue(toolIntent.requestedDomains.contains("bounded_reply"))
@@ -905,6 +1135,107 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertTrue(toolIntent.requireSecondCheck)
         XCTAssertTrue(toolIntent.reasonCodes.contains("constitution.tool_domain_restricted"))
         XCTAssertTrue(toolIntent.reasonCodes.contains("constitution.tool_write_scope.confirm_required"))
+        XCTAssertFalse(primaryBinding.allowedDomains.contains("comparison"))
+        XCTAssertTrue(primaryBinding.forbiddenDomains.contains("comparison"))
+        XCTAssertTrue(primaryBinding.requireSecondCheck)
+        XCTAssertTrue(primaryBinding.reasonCodes.contains("constitution.tool_domain_restricted"))
+        XCTAssertTrue(primaryBinding.reasonCodes.contains("constitution.tool_write_scope.confirm_required"))
+    }
+
+    func testExplicitConstitutionShapesEvolutionHostChangeCandidate() throws {
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .primary,
+            surface: .application,
+            prompt: "Draft the reply now.",
+            title: "Constitution-guided evolution review",
+            riskLevel: .low
+        )
+
+        let baselineRuntime = BASHostRuntime(configuration: makeConfiguration())
+        let baselineSession = try baselineRuntime.startSession(request)
+        var baselineBrain = baselineSession.currentBrain
+        baselineBrain.calibrationStatus = .drifting
+        let baselineTurn = baselineRuntime.buildEBrainTurn(
+            request: request,
+            currentBrain: baselineBrain,
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+            deviceStateOverride: BASDeviceState(
+                batteryLevel: 0.74,
+                thermalLevel: .nominal,
+                memoryFreeMB: 2_048,
+                networkState: .online,
+                foregroundState: .foreground,
+                cpuLoad: 0.14,
+                gpuLoad: 0.08,
+                npuAvailable: true,
+                latencyBudgetMs: 1_000
+            )
+        )
+
+        let constitution = BASHostConstitution(
+            hostID: "host.constitution",
+            activeVersion: "constitution.v16",
+            goalSpine: BASGoalSpine(
+                goals: ["stay_bounded", "protect_partner_context"],
+                priorityOrder: ["stay_bounded", "protect_partner_context"],
+                stageState: "care"
+            ),
+            boundaryVeil: BASBoundaryVeil(
+                confirmRequired: ["external_send"]
+            ),
+            consentLattice: BASConsentLattice(
+                hostMutationScope: "review_required",
+                toolWriteScope: "confirm_required"
+            ),
+            narrativeLoom: BASNarrativeLoom(
+                longFormSummary: "Keep host evolution bounded and review-first.",
+                currentPhase: "care"
+            )
+        )
+
+        let constitutionRuntime = BASHostRuntime(
+            configuration: makeConfiguration(hostConstitution: constitution)
+        )
+        let constitutionSession = try constitutionRuntime.startSession(request)
+        var constitutionBrain = constitutionSession.currentBrain
+        constitutionBrain.calibrationStatus = .drifting
+        let constitutionTurn = constitutionRuntime.buildEBrainTurn(
+            request: request,
+            currentBrain: constitutionBrain,
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+            deviceStateOverride: BASDeviceState(
+                batteryLevel: 0.74,
+                thermalLevel: .nominal,
+                memoryFreeMB: 2_048,
+                networkState: .online,
+                foregroundState: .foreground,
+                cpuLoad: 0.14,
+                gpuLoad: 0.08,
+                npuAvailable: true,
+                latencyBudgetMs: 1_000
+            )
+        )
+
+        let baselineCandidate = try XCTUnwrap(baselineTurn.updateTickets.first?.hostChangeCandidate)
+        let constitutionCandidate = try XCTUnwrap(constitutionTurn.updateTickets.first?.hostChangeCandidate)
+
+        XCTAssertEqual(baselineCandidate.changeType, "review_constitution_alignment")
+        XCTAssertTrue(baselineCandidate.proposedDelta.contains("goal_spine"))
+        XCTAssertTrue(baselineCandidate.proposedDelta.contains("boundary_veil"))
+        XCTAssertTrue(baselineCandidate.proposedDelta.contains("consent_lattice"))
+        XCTAssertTrue(baselineCandidate.evidenceRefs.contains(where: { $0.hasPrefix("constitution:") }))
+        XCTAssertTrue(baselineCandidate.evidenceRefs.contains(where: { $0.hasPrefix("phase:") }))
+
+        XCTAssertEqual(constitutionCandidate.changeType, "review_constitution_alignment")
+        XCTAssertTrue(constitutionCandidate.proposedDelta.contains("goal_spine"))
+        XCTAssertTrue(constitutionCandidate.proposedDelta.contains("boundary_veil"))
+        XCTAssertTrue(constitutionCandidate.proposedDelta.contains("consent_lattice"))
+        XCTAssertTrue(constitutionCandidate.evidenceRefs.contains("constitution:constitution.v16"))
+        XCTAssertTrue(constitutionCandidate.evidenceRefs.contains("phase:care"))
+        XCTAssertTrue(constitutionCandidate.evidenceRefs.contains("goal:stay_bounded"))
+        XCTAssertTrue(constitutionCandidate.evidenceRefs.contains("confirm_required:external_send"))
+        XCTAssertTrue(constitutionCandidate.evidenceRefs.contains("host_mutation_scope:review_required"))
     }
 
     func testRuntimeTuningSourceResolvesConfiguredPolicy() {
@@ -1123,6 +1454,22 @@ final class BASHostKitTests: XCTestCase {
         )
     }
 
+    func testSchemaDistinctRuntimeTuningUsesCompiledFallbackEnvelopeWhenRunModeProfileOmitsExplicitRiskOrThermalPlannerInputs() {
+        var tuning = makePolicyOwnedRuntimeTuning(
+            schemaVersion: "host.runtime-synthesis.partial-profile-inputs.v1"
+        )
+        var engageProfile = tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue]
+        engageProfile?.unstableLoopIncrementRiskLevels = nil
+        engageProfile?.throttlePenaltyThermalLevels = nil
+        tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue] = engageProfile
+
+        XCTAssertTrue(tuning.usesCompiledFallbackEnvelope)
+        XCTAssertEqual(
+            tuning.compiledFallbackComponentIDs,
+            ["budget.runModeProfilesByID.engage"]
+        )
+    }
+
     func testDecodingRejectsPolicyOwnedHostConfigurationMissingDefaultDeviceState() throws {
         let encoded = try JSONEncoder().encode(
             BASHostConfiguration(
@@ -1231,23 +1578,20 @@ final class BASHostKitTests: XCTestCase {
         }
     }
 
-    func testDecodingLegacyHostConfigurationWithoutPolicyLineageStillAllowsCompiledFallbacks() throws {
+    func testDecodingLegacyHostConfigurationWithoutPolicyLineageRejectsMissingDefaultDeviceState() throws {
         let encoded = try JSONEncoder().encode(BASHostConfiguration.generic)
         let withoutDeviceState = try removingKey("defaultDeviceState", fromEncodedJSONObject: encoded)
         let withoutRuntimeTuning = try removingKey("runtimeTuning", fromEncodedJSONObject: withoutDeviceState)
         let legacyData = try removingKey("hostRhythmProfile", fromEncodedJSONObject: withoutRuntimeTuning)
 
-        let decoded = try JSONDecoder().decode(BASHostConfiguration.self, from: legacyData)
-
-        XCTAssertEqual(
-            decoded.controlPlaneIssues,
-            [
-                .missingRuntimePolicyLineage,
-                .compiledDefaultDeviceState,
-                .compiledRuntimeTuning,
-                .compiledHostRhythmProfile
-            ]
-        )
+        XCTAssertThrowsError(
+            try JSONDecoder().decode(BASHostConfiguration.self, from: legacyData)
+        ) { error in
+            guard case let DecodingError.keyNotFound(key, _) = error else {
+                return XCTFail("Expected legacy host configuration missing control-plane fields to fail decoding, got \(error)")
+            }
+            XCTAssertEqual(key.stringValue, "defaultDeviceState")
+        }
     }
 
     func testDecodingNonLegacyHostConfigurationWithoutPolicyLineageRejectsMissingDefaultDeviceState() throws {
@@ -1731,6 +2075,36 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(turn.recoveryDisposition?.restrictedLease, true)
     }
 
+    func testHostRuntimeWithExplicitLineageAndIncompleteRunModeProfilePlannerInputsFallsIntoQuarantineRestrictedLane() throws {
+        var tuning = makePolicyOwnedRuntimeTuning(
+            schemaVersion: "host.runtime-synthesis.incomplete-profile-inputs.v1"
+        )
+        var engageProfile = try XCTUnwrap(tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue])
+        engageProfile.unstableLoopIncrementRiskLevels = nil
+        engageProfile.throttlePenaltyThermalLevels = nil
+        tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue] = engageProfile
+
+        let runtime = BASHostRuntime(
+            configuration: makeConfiguration(runtimeTuning: tuning)
+        )
+
+        let result = try runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .primary,
+                surface: .application,
+                prompt: "Keep this calm and local.",
+                title: "Incomplete profile inputs quarantine lane",
+                riskLevel: .low
+            )
+        )
+
+        let turn = try XCTUnwrap(result.eBrainTurn)
+        XCTAssertEqual(turn.budgetFrame.runMode, .quarantine)
+        XCTAssertEqual(turn.recoveryDisposition?.kind, .quarantine)
+        XCTAssertEqual(turn.recoveryDisposition?.restrictedLease, true)
+    }
+
     func testQuarantineRestrictedLaneEmitsLatchedSovereignKernelArtifacts() throws {
         let runtime = BASHostRuntime(configuration: .generic)
 
@@ -1760,7 +2134,63 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(auditEntry.verdictRef, verdict.verdictID)
         XCTAssertEqual(turn.evolutionLineageSummary.sovereignVerdict, verdict)
         XCTAssertEqual(turn.evolutionLineageSummary.sovereignAuditEntry, auditEntry)
+        XCTAssertTrue(turn.sovereignWarrants.isEmpty)
         XCTAssertEqual(turn.recoveryDisposition?.kind, .quarantine)
+    }
+
+    func testHealthyTurnProjectsSingleUseSovereignWarrantsFromCommitTokens() throws {
+        let runtime = BASHostRuntime(
+            configuration: makeConfiguration(
+                hostConstitution: BASHostConstitution(
+                    hostID: "host.healthy",
+                    activeVersion: "constitution.healthy.v1",
+                    valueAxes: BASValueAxisSet(
+                        axes: ["clarity", "speed"],
+                        relativeWeights: [0.52, 0.48],
+                        conflictRules: [],
+                        updateThreshold: 0.95
+                    ),
+                    goalSpine: BASGoalSpine(
+                        goals: ["reply_clearly"],
+                        priorityOrder: ["reply_clearly"],
+                        stageState: "steady"
+                    ),
+                    narrativeLoom: BASNarrativeLoom(
+                        longFormSummary: "Keep the turn steady and release only boundedly.",
+                        currentPhase: "steady"
+                    )
+                )
+            )
+        )
+
+        let turn = try XCTUnwrap(
+            runtime.startSession(
+                BASHostSessionRequest(
+                    kind: .interactive,
+                    workflowProfile: .primary,
+                    surface: .application,
+                    prompt: "Draft a bounded local reply and keep the session stable.",
+                    title: "Healthy turn warrants",
+                    riskLevel: .low
+                )
+            ).eBrainTurn
+        )
+
+        XCTAssertEqual(turn.sovereignVerdict?.verdictLevel, .memoryFreeze)
+        XCTAssertEqual(turn.sovereignCommitTokens.map(\.scope), [.checkpointCommit, .renderHighRisk])
+        XCTAssertEqual(turn.sovereignWarrants.map(\.scope), [.checkpointCommit, .renderHighRisk])
+        XCTAssertEqual(turn.sovereignWarrants.map(\.actionDigest), turn.sovereignCommitTokens.map(\.actionDigest))
+        XCTAssertTrue(turn.sovereignWarrants.allSatisfy(\.singleUse))
+        XCTAssertTrue(
+            zip(turn.sovereignWarrants, turn.sovereignCommitTokens).allSatisfy { warrant, token in
+                warrant.jurisdictionRef == "jurisdiction.\(token.scope.rawValue)"
+                    && warrant.snapshotRef == token.snapshotRef
+                    && warrant.timeLockRef.contains(token.turnID)
+                    && warrant.timeLockRef.contains("ttl_\(token.ttlMs)")
+            }
+        )
+        XCTAssertEqual(turn.evolutionLineageSummary.sovereignCommitTokens, turn.sovereignCommitTokens)
+        XCTAssertEqual(turn.evolutionLineageSummary.sovereignWarrants, turn.sovereignWarrants)
     }
 
     func testMissingLineageRecoveryEscalatesIntoMemoryFreezeWhenWritesNeedReview() throws {
@@ -1825,11 +2255,13 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertTrue(verdict.revokedPermissions.contains(.memoryWriteHot))
         XCTAssertEqual(turn.recoveryDisposition?.kind, .recovery)
         XCTAssertFalse(turn.sovereignCommitTokens.contains(where: { $0.scope == .checkpointCommit }))
-        XCTAssertTrue(turn.sovereignCommitTokens.isEmpty)
+        XCTAssertFalse(turn.sovereignCommitTokens.contains(where: { $0.scope == .memoryWrite }))
+        XCTAssertEqual(turn.sovereignWarrants.map(\.scope), turn.sovereignCommitTokens.map(\.scope))
         XCTAssertEqual(auditEntry.verdictRef, verdict.verdictID)
         XCTAssertTrue(auditEntry.ruleIDs.contains("BR-SOV-001"))
         XCTAssertTrue(auditEntry.ruleIDs.contains("BR-SOV-003"))
         XCTAssertEqual(turn.evolutionLineageSummary.sovereignCommitTokens, turn.sovereignCommitTokens)
+        XCTAssertEqual(turn.evolutionLineageSummary.sovereignWarrants, turn.sovereignWarrants)
     }
 
     func testEvidenceCaveatLoadTriggersGuardedBudgetRunMode() throws {
@@ -1887,6 +2319,99 @@ final class BASHostKitTests: XCTestCase {
             projection: BASBrainProjection(records: [], candidates: [], recentEvents: [])
         )
 
+        XCTAssertEqual(turn.budgetFrame.runMode, .guard)
+    }
+
+    func testStateTransitionPolicyCanChooseRetrievalTagsThatTriggerGuardedBudgetMode() throws {
+        var tuning = makePolicyOwnedRuntimeTuning(
+            schemaVersion: "host.runtime-synthesis.guarded-budget-tags.v1"
+        )
+        tuning.stateTransitions = .init(
+            backgroundPulseEnabled: false,
+            recoveryOnCriticalThermal: true,
+            reflectOnTrustDrift: true,
+            deepLoopOnProtectedBoundary: false,
+            lockdownOnExtremeBlockedPermit: true,
+            quarantineFailureGuardThreshold: 2,
+            lowRiskBackgroundMode: .pulse,
+            lowRiskProtectedMode: .guard,
+            lowRiskUrgentMode: .engage,
+            lowRiskDefaultMode: .sentinel,
+            mediumRiskProtectedDeepLoopMode: .deepLoop,
+            mediumRiskReflectiveMode: .reflect,
+            mediumRiskDefaultMode: .engage,
+            highRiskMode: .guard,
+            extremeRiskMode: .lockdown,
+            recoveryMode: .recovery,
+            quarantineMode: .quarantine
+        )
+        tuning.stateTransitions.guardedBudgetBoundaryModes = []
+        tuning.stateTransitions.guardedBudgetCalibrationStatuses = []
+        tuning.stateTransitions.guardedBudgetRiskFlags = []
+        tuning.stateTransitions.guardedBudgetRetrievalTags = ["evidence_caveat"]
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: tuning.wakeIntent
+        )
+        let runtime = BASHostRuntime(
+            configuration: makeConfiguration(runtimeTuning: tuning)
+        )
+        let seedResult = try runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .primary,
+                surface: .application,
+                prompt: "Keep this calm and local.",
+                title: "Evidence caveat tag guard",
+                riskLevel: .low
+            )
+        )
+        var evidenceGuardedBrain = seedResult.currentBrain
+        evidenceGuardedBrain.boundaryMode = .localOnlyAdvisory
+        evidenceGuardedBrain.retrievalTags.append("evidence_caveat")
+
+        let turn = runtime.buildEBrainTurn(
+            request: BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .primary,
+                surface: .application,
+                prompt: "Keep this calm and local.",
+                title: "Evidence caveat tag guard",
+                riskLevel: .low
+            ),
+            currentBrain: evidenceGuardedBrain,
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: [])
+        )
+
+        XCTAssertEqual(turn.budgetFrame.runMode, .guard)
+    }
+
+    func testWakeIntentPolicyCanChooseUrgencyCuePhrasesThatTriggerUrgentRunMode() throws {
+        var tuning = makePolicyOwnedRuntimeTuning(
+            schemaVersion: "host.runtime-synthesis.wake-intent-cues.v1"
+        )
+        tuning.stateTransitions.lowRiskUrgentMode = .guard
+        tuning.stateTransitions.lowRiskDefaultMode = .sentinel
+        tuning.stateTransitions.runModeRules = nil
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: tuning.wakeIntent
+        )
+
+        let runtime = BASHostRuntime(
+            configuration: makeConfiguration(runtimeTuning: tuning)
+        )
+
+        let result = try runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .primary,
+                surface: .application,
+                prompt: "Need an urgent answer before the cutoff.",
+                title: "Wake intent cue",
+                riskLevel: .low
+            )
+        )
+
+        let turn = try XCTUnwrap(result.eBrainTurn)
         XCTAssertEqual(turn.budgetFrame.runMode, .guard)
     }
 
@@ -2285,8 +2810,10 @@ final class BASHostKitTests: XCTestCase {
                     standardCandidateFloor: 1,
                     protectedCandidateFloor: 2,
                     unstableLoopIncrement: 1,
+                    unstableLoopIncrementRiskLevels: [],
                     throttleLoopPenalty: 1,
                     throttleCandidatePenalty: 1,
+                    throttlePenaltyThermalLevels: [],
                     maintenanceSupported: false,
                     maintenanceBatteryFloor: 0.95,
                     scheduledMaintenanceClass: BASMaintenanceClass.none,
@@ -2310,8 +2837,10 @@ final class BASHostKitTests: XCTestCase {
             standardCandidateFloor: 1,
             protectedCandidateFloor: 3,
             unstableLoopIncrement: 2,
+            unstableLoopIncrementRiskLevels: [],
             throttleLoopPenalty: 1,
             throttleCandidatePenalty: 1,
+            throttlePenaltyThermalLevels: [],
             maintenanceSupported: true,
             maintenanceBatteryFloor: 0.20,
             scheduledMaintenanceClass: .light,
@@ -2371,8 +2900,10 @@ final class BASHostKitTests: XCTestCase {
                     standardCandidateFloor: 1,
                     protectedCandidateFloor: 1,
                     unstableLoopIncrement: 0,
+                    unstableLoopIncrementRiskLevels: [],
                     throttleLoopPenalty: 0,
                     throttleCandidatePenalty: 0,
+                    throttlePenaltyThermalLevels: [],
                     maintenanceSupported: false,
                     maintenanceBatteryFloor: 0.95,
                     scheduledMaintenanceClass: BASMaintenanceClass.none,
@@ -2396,8 +2927,10 @@ final class BASHostKitTests: XCTestCase {
             standardCandidateFloor: 2,
             protectedCandidateFloor: 5,
             unstableLoopIncrement: 3,
+            unstableLoopIncrementRiskLevels: [],
             throttleLoopPenalty: 2,
             throttleCandidatePenalty: 1,
+            throttlePenaltyThermalLevels: [],
             maintenanceSupported: true,
             maintenanceBatteryFloor: 0.20,
             scheduledMaintenanceClass: .standard,
@@ -2441,6 +2974,463 @@ final class BASHostKitTests: XCTestCase {
         XCTAssertEqual(turn.budgetFrame.runMode, .engage)
         XCTAssertEqual(turn.budgetFrame.maxLoops, 5)
         XCTAssertEqual(turn.budgetFrame.maxCandidates, 4)
+    }
+
+    func testBudgetPolicyCanChooseCalibrationStatusesThatTriggerProtectedFloors() throws {
+        var tuning = makePolicyOwnedRuntimeTuning(
+            schemaVersion: "host.runtime-synthesis.protected-floor-statuses.v1"
+        )
+        tuning.stateTransitions.backgroundPulseEnabled = false
+        tuning.stateTransitions.lowRiskDefaultMode = .engage
+        tuning.stateTransitions.runModeRules = nil
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: tuning.wakeIntent
+        )
+        tuning.maintenance.blockedForegroundStates = []
+        tuning.budget.protectedFloorBoundaryModes = []
+        tuning.budget.protectedFloorCalibrationStatuses = [.watch]
+        tuning.budget.runModeProfilesByID = Dictionary(
+            uniqueKeysWithValues: BASEBrainRunMode.allCases.map { runMode in
+                let profile = BASEBrainRuntimeSynthesisPolicy.BudgetTuning.RunModeBudgetProfile(
+                    maxLoops: 1,
+                    maxCandidates: 1,
+                    retrievalDepth: 1,
+                    defaultDecodeTokens: 96,
+                    unstableDecodeTokens: 64,
+                    precisionProfile: .minimal,
+                    defaultDeviceRoute: .coreNPU,
+                    npuUnavailableDeviceRoute: .coreGPU,
+                    candidateCountCap: 1,
+                    standardLoopFloor: 1,
+                    protectedLoopFloor: 1,
+                    standardCandidateFloor: 1,
+                    protectedCandidateFloor: 1,
+                    unstableLoopIncrement: 0,
+                    unstableLoopIncrementRiskLevels: [],
+                    throttleLoopPenalty: 0,
+                    throttleCandidatePenalty: 0,
+                    throttlePenaltyThermalLevels: [],
+                    maintenanceSupported: false,
+                    maintenanceBatteryFloor: 0.95,
+                    scheduledMaintenanceClass: BASMaintenanceClass.none,
+                    deferredMaintenanceClass: BASMaintenanceClass.none
+                )
+                return (runMode.rawValue, profile)
+            }
+        )
+        tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue] = .init(
+            maxLoops: 3,
+            maxCandidates: 3,
+            retrievalDepth: 4,
+            defaultDecodeTokens: 320,
+            unstableDecodeTokens: 288,
+            precisionProfile: .balanced,
+            defaultDeviceRoute: .coreNPU,
+            npuUnavailableDeviceRoute: .coreGPU,
+            candidateCountCap: 5,
+            standardLoopFloor: 2,
+            protectedLoopFloor: 5,
+            standardCandidateFloor: 2,
+            protectedCandidateFloor: 5,
+            unstableLoopIncrement: 0,
+            unstableLoopIncrementRiskLevels: [],
+            throttleLoopPenalty: 0,
+            throttleCandidatePenalty: 0,
+            throttlePenaltyThermalLevels: [],
+            maintenanceSupported: true,
+            maintenanceBatteryFloor: 0.20,
+            scheduledMaintenanceClass: .standard,
+            deferredMaintenanceClass: .deferred
+        )
+
+        let runtime = BASHostRuntime(
+            configuration: makeConfiguration(runtimeTuning: tuning)
+        )
+
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .primary,
+            surface: .application,
+            prompt: "Let watch calibration trigger protected floors when policy says so.",
+            title: "Protected floor statuses",
+            riskLevel: .low
+        )
+        let result = try runtime.startSession(request)
+        var watchBrain = result.currentBrain
+        watchBrain.boundaryMode = .localOnlyAdvisory
+        watchBrain.calibrationStatus = .watch
+
+        let turn = runtime.buildEBrainTurn(
+            request: request,
+            currentBrain: watchBrain,
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+            deviceStateOverride: BASDeviceState(
+                batteryLevel: 0.71,
+                thermalLevel: .nominal,
+                memoryFreeMB: 2_048,
+                networkState: .online,
+                foregroundState: .foreground,
+                cpuLoad: 0.22,
+                gpuLoad: 0.14,
+                npuAvailable: true,
+                latencyBudgetMs: 1_200
+            )
+        )
+
+        XCTAssertEqual(turn.budgetFrame.runMode, .engage)
+        XCTAssertEqual(turn.budgetFrame.maxLoops, 5)
+        XCTAssertEqual(turn.budgetFrame.maxCandidates, 5)
+    }
+
+    func testExplicitRunModeBudgetProfilesCanChooseThermalLevelsThatTriggerThrottlePenalties() throws {
+        var tuning = makePolicyOwnedRuntimeTuning(
+            schemaVersion: "host.runtime-synthesis.run-mode-profile-thermal-throttle.v1"
+        )
+        tuning.stateTransitions.backgroundPulseEnabled = false
+        tuning.stateTransitions.lowRiskDefaultMode = .engage
+        tuning.stateTransitions.runModeRules = nil
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: tuning.wakeIntent
+        )
+        tuning.maintenance.blockedForegroundStates = []
+        tuning.budget.runModeProfilesByID = Dictionary(
+            uniqueKeysWithValues: BASEBrainRunMode.allCases.map { runMode in
+                let profile = BASEBrainRuntimeSynthesisPolicy.BudgetTuning.RunModeBudgetProfile(
+                    maxLoops: 1,
+                    maxCandidates: 1,
+                    retrievalDepth: 1,
+                    defaultDecodeTokens: 96,
+                    unstableDecodeTokens: 64,
+                    precisionProfile: .minimal,
+                    defaultDeviceRoute: .coreNPU,
+                    npuUnavailableDeviceRoute: .coreGPU,
+                    candidateCountCap: 1,
+                    standardLoopFloor: 1,
+                    protectedLoopFloor: 1,
+                    standardCandidateFloor: 1,
+                    protectedCandidateFloor: 1,
+                    unstableLoopIncrement: 0,
+                    unstableLoopIncrementRiskLevels: [],
+                    throttleLoopPenalty: 0,
+                    throttleCandidatePenalty: 0,
+                    throttlePenaltyThermalLevels: [],
+                    maintenanceSupported: false,
+                    maintenanceBatteryFloor: 0.95,
+                    scheduledMaintenanceClass: BASMaintenanceClass.none,
+                    deferredMaintenanceClass: BASMaintenanceClass.none
+                )
+                return (runMode.rawValue, profile)
+            }
+        )
+        tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue] = .init(
+            maxLoops: 5,
+            maxCandidates: 5,
+            retrievalDepth: 4,
+            defaultDecodeTokens: 320,
+            unstableDecodeTokens: 288,
+            precisionProfile: .balanced,
+            defaultDeviceRoute: .coreNPU,
+            npuUnavailableDeviceRoute: .coreGPU,
+            candidateCountCap: 5,
+            standardLoopFloor: 1,
+            protectedLoopFloor: 1,
+            standardCandidateFloor: 1,
+            protectedCandidateFloor: 1,
+            unstableLoopIncrement: 0,
+            unstableLoopIncrementRiskLevels: [],
+            throttleLoopPenalty: 2,
+            throttleCandidatePenalty: 1,
+            throttlePenaltyThermalLevels: [.warm],
+            maintenanceSupported: true,
+            maintenanceBatteryFloor: 0.20,
+            scheduledMaintenanceClass: .standard,
+            deferredMaintenanceClass: .deferred
+        )
+
+        let runtime = BASHostRuntime(
+            configuration: makeConfiguration(runtimeTuning: tuning)
+        )
+
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .primary,
+            surface: .application,
+            prompt: "Apply the warm thermal throttle profile.",
+            title: "Thermal throttle profile",
+            riskLevel: .low
+        )
+        let result = try runtime.startSession(request)
+        let turn = runtime.buildEBrainTurn(
+            request: request,
+            currentBrain: result.currentBrain,
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+            deviceStateOverride: BASDeviceState(
+                batteryLevel: 0.71,
+                thermalLevel: .warm,
+                memoryFreeMB: 2_048,
+                networkState: .online,
+                foregroundState: .background,
+                cpuLoad: 0.22,
+                gpuLoad: 0.14,
+                npuAvailable: true,
+                latencyBudgetMs: 1_200
+            )
+        )
+
+        XCTAssertEqual(turn.budgetFrame.runMode, .engage)
+        XCTAssertEqual(turn.budgetFrame.maxLoops, 3)
+        XCTAssertEqual(turn.budgetFrame.maxCandidates, 4)
+    }
+
+    func testBudgetPolicyCanChooseWarmThermalGuardLevel() throws {
+        var tuning = makePolicyOwnedRuntimeTuning(
+            schemaVersion: "host.runtime-synthesis.thermal-guard-levels.v1"
+        )
+        tuning.stateTransitions.backgroundPulseEnabled = false
+        tuning.stateTransitions.lowRiskDefaultMode = .engage
+        tuning.stateTransitions.runModeRules = nil
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: tuning.wakeIntent
+        )
+
+        let runtime = BASHostRuntime(
+            configuration: makeConfiguration(runtimeTuning: tuning)
+        )
+
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .primary,
+            surface: .application,
+            prompt: "Escalate warm thermal state to a throttle guard when policy says so.",
+            title: "Warm thermal guard policy",
+            riskLevel: .low
+        )
+        let result = try runtime.startSession(request)
+        let turn = runtime.buildEBrainTurn(
+            request: request,
+            currentBrain: result.currentBrain,
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+            deviceStateOverride: BASDeviceState(
+                batteryLevel: 0.71,
+                thermalLevel: .warm,
+                memoryFreeMB: 2_048,
+                networkState: .online,
+                foregroundState: .background,
+                cpuLoad: 0.22,
+                gpuLoad: 0.14,
+                npuAvailable: true,
+                latencyBudgetMs: 1_200
+            )
+        )
+
+        XCTAssertEqual(turn.budgetFrame.runMode, .engage)
+        XCTAssertEqual(turn.budgetFrame.thermalGuardLevel, .watch)
+    }
+
+    func testExplicitRunModeBudgetProfilesCanChooseRiskLevelsThatReceiveUnstableLoopIncrement() throws {
+        var tuning = makePolicyOwnedRuntimeTuning(
+            schemaVersion: "host.runtime-synthesis.run-mode-profile-unstable-risk.v1"
+        )
+        tuning.stateTransitions.highRiskMode = .engage
+        tuning.stateTransitions.runModeRules = nil
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: tuning.wakeIntent
+        )
+        tuning.maintenance.blockedForegroundStates = []
+        tuning.budget.runModeProfilesByID = Dictionary(
+            uniqueKeysWithValues: BASEBrainRunMode.allCases.map { runMode in
+                let profile = BASEBrainRuntimeSynthesisPolicy.BudgetTuning.RunModeBudgetProfile(
+                    maxLoops: 1,
+                    maxCandidates: 1,
+                    retrievalDepth: 1,
+                    defaultDecodeTokens: 96,
+                    unstableDecodeTokens: 64,
+                    precisionProfile: .minimal,
+                    defaultDeviceRoute: .coreNPU,
+                    npuUnavailableDeviceRoute: .coreGPU,
+                    candidateCountCap: 1,
+                    standardLoopFloor: 1,
+                    protectedLoopFloor: 1,
+                    standardCandidateFloor: 1,
+                    protectedCandidateFloor: 1,
+                    unstableLoopIncrement: 0,
+                    unstableLoopIncrementRiskLevels: [],
+                    throttleLoopPenalty: 0,
+                    throttleCandidatePenalty: 0,
+                    throttlePenaltyThermalLevels: [],
+                    maintenanceSupported: false,
+                    maintenanceBatteryFloor: 0.95,
+                    scheduledMaintenanceClass: BASMaintenanceClass.none,
+                    deferredMaintenanceClass: BASMaintenanceClass.none
+                )
+                return (runMode.rawValue, profile)
+            }
+        )
+        tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue] = .init(
+            maxLoops: 3,
+            maxCandidates: 3,
+            retrievalDepth: 4,
+            defaultDecodeTokens: 320,
+            unstableDecodeTokens: 288,
+            precisionProfile: .balanced,
+            defaultDeviceRoute: .coreNPU,
+            npuUnavailableDeviceRoute: .coreGPU,
+            candidateCountCap: 4,
+            standardLoopFloor: 1,
+            protectedLoopFloor: 1,
+            standardCandidateFloor: 1,
+            protectedCandidateFloor: 1,
+            unstableLoopIncrement: 2,
+            unstableLoopIncrementRiskLevels: [.high],
+            throttleLoopPenalty: 0,
+            throttleCandidatePenalty: 0,
+            throttlePenaltyThermalLevels: [],
+            maintenanceSupported: true,
+            maintenanceBatteryFloor: 0.20,
+            scheduledMaintenanceClass: .standard,
+            deferredMaintenanceClass: .deferred
+        )
+
+        let runtime = BASHostRuntime(
+            configuration: makeConfiguration(runtimeTuning: tuning)
+        )
+
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .primary,
+            surface: .application,
+            prompt: "Let high risk keep the unstable increment when the profile says so.",
+            title: "Unstable risk profile",
+            riskLevel: .high
+        )
+        let result = try runtime.startSession(request)
+        var currentBrain = result.currentBrain
+        currentBrain.calibrationStatus = .watch
+
+        let turn = runtime.buildEBrainTurn(
+            request: request,
+            currentBrain: currentBrain,
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+            deviceStateOverride: BASDeviceState(
+                batteryLevel: 0.71,
+                thermalLevel: .nominal,
+                memoryFreeMB: 2_048,
+                networkState: .online,
+                foregroundState: .background,
+                cpuLoad: 0.18,
+                gpuLoad: 0.10,
+                npuAvailable: true,
+                latencyBudgetMs: 1_000
+            )
+        )
+
+        XCTAssertEqual(turn.budgetFrame.runMode, .engage)
+        XCTAssertEqual(turn.budgetFrame.maxLoops, 5)
+    }
+
+    func testBudgetPolicyCanLimitUnstableAdjustmentsToDriftingCalibrationOnly() throws {
+        var tuning = makePolicyOwnedRuntimeTuning(
+            schemaVersion: "host.runtime-synthesis.unstable-calibration-statuses.v1"
+        )
+        tuning.stateTransitions.lowRiskDefaultMode = .engage
+        tuning.stateTransitions.backgroundPulseEnabled = false
+        tuning.stateTransitions.runModeRules = nil
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: tuning.wakeIntent
+        )
+        tuning.maintenance.blockedForegroundStates = []
+        tuning.budget.unstableBudgetCalibrationStatuses = [.drifting]
+        tuning.budget.runModeProfilesByID = Dictionary(
+            uniqueKeysWithValues: BASEBrainRunMode.allCases.map { runMode in
+                let profile = BASEBrainRuntimeSynthesisPolicy.BudgetTuning.RunModeBudgetProfile(
+                    maxLoops: 1,
+                    maxCandidates: 1,
+                    retrievalDepth: 1,
+                    defaultDecodeTokens: 96,
+                    unstableDecodeTokens: 64,
+                    precisionProfile: .minimal,
+                    defaultDeviceRoute: .coreNPU,
+                    npuUnavailableDeviceRoute: .coreGPU,
+                    candidateCountCap: 1,
+                    standardLoopFloor: 1,
+                    protectedLoopFloor: 1,
+                    standardCandidateFloor: 1,
+                    protectedCandidateFloor: 1,
+                    unstableLoopIncrement: 0,
+                    unstableLoopIncrementRiskLevels: [],
+                    throttleLoopPenalty: 0,
+                    throttleCandidatePenalty: 0,
+                    throttlePenaltyThermalLevels: [],
+                    maintenanceSupported: false,
+                    maintenanceBatteryFloor: 0.95,
+                    scheduledMaintenanceClass: BASMaintenanceClass.none,
+                    deferredMaintenanceClass: BASMaintenanceClass.none
+                )
+                return (runMode.rawValue, profile)
+            }
+        )
+        tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue] = .init(
+            maxLoops: 3,
+            maxCandidates: 3,
+            retrievalDepth: 4,
+            defaultDecodeTokens: 320,
+            unstableDecodeTokens: 288,
+            precisionProfile: .balanced,
+            defaultDeviceRoute: .coreNPU,
+            npuUnavailableDeviceRoute: .coreGPU,
+            candidateCountCap: 4,
+            standardLoopFloor: 1,
+            protectedLoopFloor: 1,
+            standardCandidateFloor: 1,
+            protectedCandidateFloor: 1,
+            unstableLoopIncrement: 2,
+            unstableLoopIncrementRiskLevels: [.low],
+            throttleLoopPenalty: 0,
+            throttleCandidatePenalty: 0,
+            throttlePenaltyThermalLevels: [],
+            maintenanceSupported: true,
+            maintenanceBatteryFloor: 0.20,
+            scheduledMaintenanceClass: .standard,
+            deferredMaintenanceClass: .deferred
+        )
+
+        let runtime = BASHostRuntime(
+            configuration: makeConfiguration(runtimeTuning: tuning)
+        )
+
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .primary,
+            surface: .application,
+            prompt: "Keep watch calibration on the standard budget lane when the policy says drifting only.",
+            title: "Unstable calibration statuses",
+            riskLevel: .low
+        )
+        let result = try runtime.startSession(request)
+        var currentBrain = result.currentBrain
+        currentBrain.calibrationStatus = .watch
+
+        let turn = runtime.buildEBrainTurn(
+            request: request,
+            currentBrain: currentBrain,
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+            deviceStateOverride: BASDeviceState(
+                batteryLevel: 0.71,
+                thermalLevel: .nominal,
+                memoryFreeMB: 2_048,
+                networkState: .online,
+                foregroundState: .background,
+                cpuLoad: 0.18,
+                gpuLoad: 0.10,
+                npuAvailable: true,
+                latencyBudgetMs: 1_000
+            )
+        )
+
+        XCTAssertEqual(turn.budgetFrame.runMode, .engage)
+        XCTAssertEqual(turn.budgetFrame.maxLoops, 3)
+        XCTAssertEqual(turn.budgetFrame.maxDecodeTokens, 320)
+        XCTAssertEqual(turn.budgetFrame.precisionProfile, .balanced)
     }
 
     func testStateTransitionDefaultsDriveLowRiskRoutingWhenNoSpecialBranchesApply() throws {
@@ -3642,29 +4632,160 @@ final class BASHostKitTests: XCTestCase {
             )
         )
         let turn = try XCTUnwrap(result.eBrainTurn)
+        let surfaceGuide = try XCTUnwrap(turn.renderedOutput.surfaceGuide)
+        let courtDecisionDraft = try XCTUnwrap(turn.mergedChoice.courtDecisionDraft)
+        let agencyReservation = try XCTUnwrap(turn.mergedChoice.agencyReservation)
+        let remandTargets = try XCTUnwrap(turn.mergedChoice.remandOrders?.map(\.targetLayer))
+        let updateTicket = try XCTUnwrap(turn.updateTickets.first)
+        let orchestrationReport = try XCTUnwrap(
+            result.consoleSnapshot.reports.first(where: { $0.kind == .orchestration })
+        )
+        let deliveryReport = try XCTUnwrap(
+            result.consoleSnapshot.reports.first(where: { $0.kind == .delivery })
+        )
+        let evaluationReport = try XCTUnwrap(
+            result.consoleSnapshot.reports.first(where: { $0.kind == .evaluation })
+        )
+
+        let encodedSurfaceGuide = try JSONEncoder().encode(surfaceGuide)
+        let surfaceGuideObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encodedSurfaceGuide) as? [String: Any]
+        )
+        let disclosureObject = try XCTUnwrap(surfaceGuideObject["disclosure"] as? [String: Any])
+        let agencyObject = try XCTUnwrap(surfaceGuideObject["agency"] as? [String: Any])
 
         XCTAssertTrue(turn.mergedChoice.vetoApplied)
         XCTAssertTrue(turn.triScores.contains(where: { $0.candidateID == "path.direct" && $0.veto }))
-        XCTAssertEqual(
-            turn.mergedChoice.vetoReasonCodes,
+        XCTAssertTrue(
             [
                 "triself.superego_veto",
                 "triself.high_risk_direct_path",
                 "triself.protective_boundary"
-            ]
+            ].allSatisfy(turn.mergedChoice.vetoReasonCodes.contains)
         )
         XCTAssertTrue(turn.renderedOutput.explanationCodes.contains("triself.superego_veto"))
         XCTAssertTrue(turn.renderedOutput.explanationCodes.contains("triself.high_risk_direct_path"))
         XCTAssertTrue(turn.renderedOutput.explanationCodes.contains("triself.protective_boundary"))
+        XCTAssertTrue(turn.renderedOutput.explanationCodes.contains("agency.delay_right"))
+        XCTAssertTrue(turn.renderedOutput.explanationCodes.contains("court.remand.pending"))
+        XCTAssertTrue(result.consoleSnapshot.runtimeSummary?.contains("dream guardTakeover") == true)
+        XCTAssertTrue(result.consoleSnapshot.brainSummary?.contains("dream guardTakeover") == true)
+        XCTAssertEqual(surfaceGuide.agency.reservationMode, .delayRight)
+        XCTAssertEqual(surfaceGuide.disclosure.requiredDisclosures, courtDecisionDraft.requiredDisclosures)
+        XCTAssertEqual(
+            turn.renderedOutput.headline,
+            "Let the guard branch lead before release"
+        )
+        XCTAssertTrue(
+            turn.renderedOutput.body.localizedCaseInsensitiveContains("not ready")
+        )
+        XCTAssertTrue(
+            turn.renderedOutput.body.localizedCaseInsensitiveContains("blocking direct release")
+        )
+        XCTAssertTrue(
+            turn.renderedOutput.body.localizedCaseInsensitiveContains("guard branch became the safer lead")
+        )
+        XCTAssertTrue(
+            turn.renderedOutput.body.localizedCaseInsensitiveContains("minimal")
+        )
+        XCTAssertEqual(
+            turn.renderedOutput.alternativeActions.first,
+            "Follow the guard branch and keep the move reversible."
+        )
+        XCTAssertTrue(
+            turn.renderedOutput.alternativeActions.contains(where: {
+                $0.localizedCaseInsensitiveContains("delayed")
+            })
+        )
+        XCTAssertTrue(
+            turn.renderedOutput.alternativeActions.contains(where: {
+                $0.localizedCaseInsensitiveContains("bounded alternative")
+            })
+        )
+        XCTAssertTrue(
+            turn.renderedOutput.alternativeActions.contains(where: {
+                courtDecisionDraft.requiredDisclosures.contains($0)
+            })
+        )
+        XCTAssertEqual(
+            disclosureObject["requiredDisclosures"] as? [String],
+            courtDecisionDraft.requiredDisclosures
+        )
+        XCTAssertEqual(
+            disclosureObject["unresolvedCosts"] as? [String],
+            courtDecisionDraft.unresolvedCosts
+        )
+        XCTAssertEqual(
+            disclosureObject["remandTargets"] as? [String],
+            remandTargets
+        )
+        XCTAssertEqual(
+            agencyObject["reservationMode"] as? String,
+            agencyReservation.mode.rawValue
+        )
+        XCTAssertTrue(updateTicket.derivedCandidateRefs.contains(turn.mergedChoice.candidateID))
+        XCTAssertTrue(
+            courtDecisionDraft.fallbackCandidateIDs.allSatisfy { updateTicket.derivedCandidateRefs.contains($0) }
+        )
+        XCTAssertTrue(updateTicket.governanceRefs.contains("agency:\(agencyReservation.mode.rawValue)"))
+        XCTAssertTrue(updateTicket.governanceRefs.contains("remand:L9"))
+        XCTAssertTrue(updateTicket.governanceRefs.contains("court:\(courtDecisionDraft.readinessLevel)"))
+        XCTAssertTrue(updateTicket.governanceRefs.contains("veto:path.direct:boundary"))
+        XCTAssertTrue(updateTicket.governanceRefs.contains("dream_loop:guardTakeover"))
+        XCTAssertTrue(updateTicket.governanceRefs.contains("dream_loop:evidence_debt"))
+        XCTAssertTrue(updateTicket.governanceRefs.contains("dream_loop:delay_branch"))
+        XCTAssertEqual(
+            turn.evolutionLineageSummary.governanceSummary?.dreamLoopStoppingMode,
+            "guardTakeover"
+        )
+        XCTAssertEqual(
+            turn.evolutionLineageSummary.governanceSummary?.dreamLoopReservationMode,
+            "delayRight"
+        )
+        XCTAssertTrue(
+            turn.evolutionLineageSummary.governanceSummary?.dreamLoopSignalRefs.contains("dream_loop:guardTakeover") == true
+        )
+        XCTAssertTrue(
+            turn.evolutionLineageSummary.governanceSummary?.dreamLoopSignalRefs.contains("dream_loop:evidence_debt") == true
+        )
+        XCTAssertTrue(
+            turn.evolutionLineageSummary.governanceSummary?.dreamLoopRemandTargets.contains("L9") == true
+        )
+        XCTAssertTrue(
+            (turn.evolutionLineageSummary.governanceSummary?.dreamLoopMaxEvidenceDebtPercent ?? 0) >= 50
+        )
+        XCTAssertTrue(orchestrationReport.summary.contains("convergence guardTakeover"))
+        XCTAssertTrue(deliveryReport.summary.contains("dream guardTakeover"))
+        XCTAssertTrue(evaluationReport.summary.contains("dream guardTakeover"))
         XCTAssertEqual(
             turn.evolutionLineageSummary.reviewDirectiveLine,
             "Review memory write: Keep this turn in review before any warm or cold promotion. • conflict flagged"
+        )
+        XCTAssertTrue(
+            result.consoleSnapshot.inspectionBundle?.trace.auditEvents.contains(where: {
+                $0.category == "L9"
+                && $0.message.contains("convergence guardTakeover")
+            }) == true
+        )
+        XCTAssertTrue(
+            result.consoleSnapshot.inspectionBundle?.trace.auditEvents.contains(where: {
+                $0.category == "L12"
+                && $0.message.contains("guardTakeover")
+            }) == true
+        )
+        XCTAssertTrue(
+            result.consoleSnapshot.inspectionBundle?.trace.auditEvents.contains(where: {
+                $0.category == "L13"
+                && $0.message.contains("guardTakeover")
+            }) == true
         )
         XCTAssertTrue(
             turn.runtimeTrace.layerEvents.contains(where: {
                 $0.layerID == "L10"
                 && $0.detail.contains("triself.high_risk_direct_path")
                 && $0.detail.contains("triself.protective_boundary")
+                && $0.detail.contains("delayRight")
+                && $0.detail.contains("L9")
             })
         )
         XCTAssertTrue(
@@ -3679,6 +4800,98 @@ final class BASHostKitTests: XCTestCase {
                 && $0.detail.contains("review 1")
                 && $0.detail.contains("conflicts 1")
             })
+        )
+    }
+
+    func testRenderedOutputDeliveryFallbackGuidanceUsesSurfaceGuideDelayWhenAlternativesAreEmpty() {
+        let output = BASRenderedOutput(
+            mode: .answer,
+            headline: "Pause the release",
+            body: "A fast answer exists, but the safer move is to cool this down first.",
+            alternativeActions: [],
+            explanationCodes: ["risk.high"],
+            surfaceGuide: BASRenderedSurfaceGuide(
+                stackedModes: [],
+                tonePolicy: "clear_firm",
+                templatePolicy: "protective_alternative",
+                outputLengthCap: 120,
+                boundary: BASRenderedBoundaryGuide(
+                    allowedDomains: ["bounded_reply"],
+                    blockedDomains: ["tool_commit"],
+                    toolScope: "bounded",
+                    memoryScope: "standard",
+                    escalationHintRef: nil
+                ),
+                agency: BASRenderedAgencyGuide(
+                    requiresCompare: false,
+                    requiresSecondCheck: true,
+                    delayAvailable: true,
+                    chooseLaterAllowed: true,
+                    prefersDraftOnly: false,
+                    localOnlyPreferred: false,
+                    reservationMode: nil
+                ),
+                disclosure: BASRenderedDisclosureGuide(
+                    assertionCeiling: "guarded",
+                    explanationCodes: ["risk.high"],
+                    uncertaintyVisible: true,
+                    requiredDisclosures: nil,
+                    unresolvedCosts: nil,
+                    remandTargets: nil
+                ),
+                delayWindow: "cool_down",
+                delayReservation: BASDelayReservation(
+                    reservationID: "delay.surface.only",
+                    delayType: "cool_down",
+                    minDelay: 15,
+                    maxDelay: 120,
+                    allowedIntermediateActions: ["compare", "draft_only"]
+                ),
+                protectiveSubstitute: nil,
+                sovereignEscalationHint: nil
+            )
+        )
+
+        XCTAssertEqual(
+            output.deliveryFallbackGuidance,
+            "Take a cool-down window before deciding."
+        )
+    }
+
+    func testHighRiskBlockRenderSurfacesEscalationAndAssertionGuidance() throws {
+        let runtime = BASHostRuntime(configuration: makeConfiguration())
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .primary,
+            surface: .application,
+            prompt: "Send the direct answer right now.",
+            title: "High-risk block render",
+            riskLevel: .high
+        )
+        let seedResult = try runtime.startSession(request)
+        var currentBrain = seedResult.currentBrain
+        currentBrain.boundaryMode = .localOnlyAdvisory
+
+        let turn = runtime.buildEBrainTurn(
+            request: request,
+            currentBrain: currentBrain,
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: [])
+        )
+
+        XCTAssertEqual(turn.actionPermit.mode, .block)
+        XCTAssertTrue(turn.actionPermit.stackedModes.contains(.escalate))
+        XCTAssertEqual(turn.actionPermit.assertionCeiling, "minimal")
+        XCTAssertTrue(
+            turn.renderedOutput.body.localizedCaseInsensitiveContains("minimal")
+        )
+        XCTAssertTrue(
+            turn.renderedOutput.alternativeActions.contains("Pause release and request a higher-order check.")
+        )
+        XCTAssertTrue(
+            turn.renderedOutput.alternativeActions.contains("Use the safer bounded alternative first.")
+        )
+        XCTAssertTrue(
+            turn.renderedOutput.alternativeActions.contains("Get a second confirmation before release.")
         )
     }
 

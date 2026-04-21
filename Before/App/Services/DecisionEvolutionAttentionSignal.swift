@@ -19,6 +19,63 @@ enum DecisionEvolutionAttentionPresentationSupport {
     }
 }
 
+enum DecisionEvolutionHorizonTriggerReasonSupport {
+    private static let preferredPrefixes = [
+        "Evidence ",
+        "Temporal ",
+        "Persistence ",
+        "Horizon ",
+        "Capability "
+    ]
+
+    static func preferredLine(
+        from horizonDiagnosticsLines: [String]
+    ) -> String? {
+        for prefix in preferredPrefixes {
+            if let line = horizonDiagnosticsLines.first(where: { $0.hasPrefix(prefix) }) {
+                return line
+            }
+        }
+
+        return horizonDiagnosticsLines.first
+    }
+
+    static func enrichedAuditTriggerReason(
+        baseReason: String?,
+        horizonDiagnosticsLines: [String]
+    ) -> String? {
+        let trimmedBaseReason = trimmed(baseReason)
+        let preferredHorizonLine = preferredLine(
+            from: horizonDiagnosticsLines
+        ).flatMap(trimmed)
+
+        guard let preferredHorizonLine else {
+            return trimmedBaseReason
+        }
+
+        guard let trimmedBaseReason else {
+            return preferredHorizonLine
+        }
+
+        guard trimmedBaseReason != preferredHorizonLine,
+              !trimmedBaseReason.contains(preferredHorizonLine) else {
+            return trimmedBaseReason
+        }
+
+        return "\(trimmedBaseReason) • \(preferredHorizonLine)"
+    }
+
+    private static func trimmed(
+        _ text: String?
+    ) -> String? {
+        let trimmedText = text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let trimmedText, !trimmedText.isEmpty else {
+            return nil
+        }
+        return trimmedText
+    }
+}
+
 struct DecisionEvolutionAttentionPresentation: Equatable, Sendable {
     let severity: DecisionEvolutionAttentionSeverity
     let badgeValue: String?
@@ -55,13 +112,28 @@ struct DecisionEvolutionAttentionSignal: Equatable, Sendable {
     }
 
     func resolvedTriggerReason(
-        fallback: String?
+        fallback: String?,
+        controlEntryKind: DecisionEvolutionWidgetControlEntryKind? = nil,
+        horizonDiagnosticsLines: [String] = []
     ) -> String? {
         let trimmedDetail = detail?.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let trimmedDetail, !trimmedDetail.isEmpty {
-            return trimmedDetail
+        let trimmedFallback = fallback?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let baseReason: String? = if let trimmedDetail, !trimmedDetail.isEmpty {
+            trimmedDetail
+        } else if let trimmedFallback, !trimmedFallback.isEmpty {
+            trimmedFallback
+        } else {
+            String?.none
         }
-        return fallback
+
+        if controlEntryKind == .audit {
+            return DecisionEvolutionHorizonTriggerReasonSupport.enrichedAuditTriggerReason(
+                baseReason: baseReason,
+                horizonDiagnosticsLines: horizonDiagnosticsLines
+            )
+        }
+
+        return baseReason
     }
 
     static func build(

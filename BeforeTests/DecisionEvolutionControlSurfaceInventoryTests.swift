@@ -385,7 +385,43 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
                 thoughtFoldChecksum: "fold-checkpoint-detail",
                 updateTicketSummaries: ["ticket-checkpoint-detail"],
                 guardrailFindings: ["guardrail-checkpoint-detail"],
-                recommendedKillSwitches: ["kill-checkpoint-detail"]
+                recommendedKillSwitches: ["kill-checkpoint-detail"],
+                foldedLungSummary: BASEvolutionFoldedLungSummary(
+                    morphGraphID: "morph-checkpoint-detail",
+                    hotColdMapID: "hotcold-checkpoint-detail",
+                    precisionProfileID: "precision-checkpoint-detail",
+                    lungStateRef: "lung-checkpoint-detail",
+                    integrityWeaveID: "integrity-checkpoint-detail",
+                    breathMode: "guard",
+                    breathPhase: "exchange",
+                    thermalPressure: 63,
+                    cachePressure: 48,
+                    restoreReadinessPercent: 84,
+                    resumeID: "resume-checkpoint-detail",
+                    sourceFoldID: "fold-checkpoint-detail",
+                    resumeDepth: 1,
+                    fallbackMode: "rollbackAnchor",
+                    rollbackAnchorID: "rollback-checkpoint-detail",
+                    safeSnapshotRef: "snapshot-checkpoint-detail",
+                    foldRefs: ["fold-checkpoint-detail"],
+                    integrityHash: "abc123def456",
+                    morphActiveOrganIDs: ["riskSpine", "stubCore"],
+                    morphExecutionOrder: ["riskSpine", "stubCore"],
+                    morphDeviceRouteMap: ["riskSpine": "ane"],
+                    morphThermalProfile: ["guarded"],
+                    hotOrganIDs: ["stubCore"],
+                    warmOrganIDs: ["riskSpine"],
+                    coldOrganIDs: ["simuRing"],
+                    thermalExchangeMode: "predictive_guard",
+                    thermalPredictedBand: "warm",
+                    thermalCoolingActions: ["trim_batch"],
+                    integrityRequiredChecks: ["fold_checksum"],
+                    integrityCompletedChecks: ["fold_checksum"],
+                    integrityPurityState: "verified",
+                    integrityVerificationHash: "abc123def456",
+                    precisionDegradationOrder: ["fp16", "int8"],
+                    precisionGuardSafeFloorID: "int8"
+                )
             )),
             fallbackRiskLevel: "high",
             fallbackPermitMode: "delay"
@@ -412,6 +448,17 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
         #expect(presentation.ticketsLine == "Tickets: ticket-checkpoint-detail")
         #expect(presentation.auditLine == "Audit: guardrail-checkpoint-detail")
         #expect(presentation.killSwitchesLine == "Kill switches: kill-checkpoint-detail")
+        #expect(presentation.foldedLungTitle == "Folded lung")
+        #expect(
+            presentation.foldedLungLines
+                == [
+                    "L3 compression runtime • breath guard • phase exchange • anchor rollback-checkpoint-detail",
+                    "Breath guard • Phase exchange • Restore 84%",
+                    "Morph graph morph-checkpoint-detail • organs riskSpine, stubCore • route ane • thermal guarded",
+                    "Integrity weave verified • checks 1/1 • hash abc123def456",
+                    "Rollback anchor rollback-checkpoint-detail • snapshot snapshot-checkpoint-detail"
+                ]
+        )
         #expect(presentation.diffLine == "Diff: Queued for guarded review")
         #expect(presentation.diffBulletLines == ["• Queued for guarded review"])
         #expect(presentation.recordedLine.contains("Recorded "))
@@ -454,6 +501,8 @@ struct DecisionEvolutionControlSurfaceInventoryTests {
                 == DecisionEvolutionCheckpointDetailPresentationSupport.lineagePendingSummaryText
         )
         #expect(presentation.usesSecondarySummaryTone == true)
+        #expect(presentation.foldedLungTitle == nil)
+        #expect(presentation.foldedLungLines.isEmpty)
     }
 
     @Test

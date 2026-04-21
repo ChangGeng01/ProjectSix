@@ -892,7 +892,7 @@ enum BehavioralAISubstrateBridge {
         let checkpointLineage = resolvedTurn == nil
             ? export.selectedCheckpointLineage(matching: export.preferredCheckpointSelectionContext)
             : nil
-        let flightDeckCompilation = export.basFlightDeckCompilation
+        let flightDeckCompilation = synchronizedExport.basFlightDeckCompilation
         let runtimeContext = runtimeContext(from: export)
         let brainSnapshot = brainSnapshot(from: currentBrainState)
         let roleProfile = roleProfile(from: currentBrainState)
@@ -929,10 +929,13 @@ enum BehavioralAISubstrateBridge {
 
         if let resolvedTurn {
             var mergedSnapshot = BASEBrainConsoleSupport.mergedSnapshot(baseSnapshot, with: resolvedTurn)
-            if let pressureLine = synchronizedExport.effectiveEBrainFactsBundle?.pressureLine {
+            let runtimeAdditions =
+                synchronizedExport.effectiveEBrainFactsBundle?.consoleRuntimeSummaryAdditions
+                ?? DeveloperDecisionReplayEBrainSummary(turn: resolvedTurn).factsBundle().consoleRuntimeSummaryAdditions
+            if !runtimeAdditions.isEmpty {
                 mergedSnapshot.runtimeSummary = appendConsoleSummary(
                     base: mergedSnapshot.runtimeSummary,
-                    addition: pressureLine
+                    additions: runtimeAdditions
                 )
             }
             if !synchronizedExport.effectiveLayerStackLines.isEmpty {
@@ -1107,6 +1110,15 @@ enum BehavioralAISubstrateBridge {
         to approvalState: DecisionEvolutionApprovalState,
         in context: ModelContext
     ) -> DecisionEvolutionState? {
+        let gateVerdict = evolutionCheckpointApprovalGateVerdict(
+            checkpointID,
+            to: approvalState,
+            in: context
+        )
+        guard gateVerdict?.allowsPromotion != false else {
+            return nil
+        }
+
         let result: BASAppleEvolutionCheckpointWriteResult<DecisionEvolutionCheckpoint> =
             BASAppleEvolutionCheckpointWriter.setApprovalState(
                 approvalState,
@@ -1125,6 +1137,53 @@ enum BehavioralAISubstrateBridge {
         }
 
         return result.currentState
+    }
+
+    @MainActor
+    static func evolutionCheckpointApprovalBlockReason(
+        _ checkpointID: String,
+        to approvalState: DecisionEvolutionApprovalState,
+        in context: ModelContext
+    ) -> String? {
+        guard let verdict = evolutionCheckpointApprovalGateVerdict(
+            checkpointID,
+            to: approvalState,
+            in: context
+        ), !verdict.allowsPromotion else {
+            return nil
+        }
+
+        let labels = BASEvolutionPromotionGate.operatorFacingRequirementLabels(
+            for: verdict.reasonCodes
+        )
+        guard labels.isEmpty == false else {
+            return "Checkpoint \(checkpointID) could not be approved for automatic evolution."
+        }
+
+        let requirementSummary: String
+        if labels.count == 1 {
+            requirementSummary = labels[0]
+        } else if labels.count == 2 {
+            requirementSummary = "\(labels[0]) and \(labels[1])"
+        } else {
+            requirementSummary = labels.dropLast().joined(separator: ", ")
+                + ", and "
+                + (labels.last ?? "")
+        }
+
+        let baseReason = "Checkpoint \(checkpointID) is still waiting on \(requirementSummary)."
+        guard let checkpoint = fetchEvolutionCheckpoint(checkpointID, in: context) else {
+            return baseReason
+        }
+
+        let detailSentences = governanceApprovalDetailSentences(
+            for: checkpoint.lineageSummary?.governanceSummary
+        )
+        guard detailSentences.isEmpty == false else {
+            return baseReason
+        }
+
+        return ([baseReason] + detailSentences).joined(separator: " ")
     }
 
     @MainActor
@@ -1197,6 +1256,38 @@ enum BehavioralAISubstrateBridge {
         )
     }
 
+    private static func governanceApprovalDetailSentences(
+        for governanceSummary: BASEvolutionLineageSummary.GovernanceSummary?
+    ) -> [String] {
+        guard let governanceSummary else {
+            return []
+        }
+
+        return [
+            approvalDetailSentence(
+                prefix: "Version tree",
+                highlights: governanceSummary.versionDeltaHighlights
+            ),
+            approvalDetailSentence(
+                prefix: "Retraction",
+                highlights: governanceSummary.retractionOrderHighlights
+            )
+        ].compactMap { $0 }
+    }
+
+    private static func approvalDetailSentence(
+        prefix: String,
+        highlights: [String]
+    ) -> String? {
+        guard let detail = highlights.first?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !detail.isEmpty else {
+            return nil
+        }
+
+        return "\(prefix): \(detail)."
+    }
+
     static func entryIntentEnvelope(from envelope: DecisionIntentEnvelope) -> BASEntryIntentEnvelope {
         let kindID = BeforeProductCompatibility.substrateEntryIntentKindID(envelope.kind)
         return BASEntryIntentBridgeBuilder.envelope(
@@ -1250,7 +1341,7 @@ enum BehavioralAISubstrateBridge {
         selectBoxTab: () -> Void,
         performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
         performRestore: () -> Void,
-        performOpenEvolutionControl: () -> Void,
+        performOpenEvolutionControl: (DecisionIntentEnvelope) -> Void,
         refreshCurrentBrain: (BrainStateUpdateSource) -> Void
     ) {
         let handleDeferredEnvelope: (DecisionIntentEnvelope) -> Void = { envelope in
@@ -1297,7 +1388,7 @@ enum BehavioralAISubstrateBridge {
         selectBoxTab: () -> Void,
         performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
         performRestore: () -> Void,
-        performOpenEvolutionControl: () -> Void,
+        performOpenEvolutionControl: (DecisionIntentEnvelope) -> Void,
         refreshPredictedIntervention: () -> Void,
         syncWidgetSnapshot: () -> Void = {}
     ) {
@@ -1350,11 +1441,11 @@ enum BehavioralAISubstrateBridge {
         performRoutedInput: (DecisionIntentEnvelope, String) -> Void,
         performPredictiveIntervention: (BASApplePredictiveInterventionSuggestion?) -> Void,
         performRestore: () -> Void,
-        performOpenEvolutionControl: () -> Void,
+        performOpenEvolutionControl: (DecisionIntentEnvelope) -> Void,
         refreshCurrentBrain: (BrainStateUpdateSource) -> Void
     ) {
         if envelope.kind == .openEvolutionControl {
-            performOpenEvolutionControl()
+            performOpenEvolutionControl(envelope)
             refreshCurrentBrain(.watchHandoff)
             return
         }
@@ -2200,6 +2291,32 @@ enum BehavioralAISubstrateBridge {
     ) -> DecisionEvolutionCheckpoint? {
         ((try? context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())) ?? [])
             .first(where: { $0.id == checkpointID })
+    }
+
+    @MainActor
+    private static func evolutionCheckpointApprovalGateVerdict(
+        _ checkpointID: String,
+        to approvalState: DecisionEvolutionApprovalState,
+        in context: ModelContext
+    ) -> BASEvolutionPromotionGateVerdict? {
+        guard approvalState == .automatic,
+              let checkpoint = fetchEvolutionCheckpoint(checkpointID, in: context) else {
+            return nil
+        }
+
+        let checkpointSummary = BASEvolutionCheckpointSummary(
+            id: checkpoint.id,
+            previousCheckpointID: checkpoint.previousCheckpointID,
+            createdAt: checkpoint.createdAt,
+            diffSummary: checkpoint.diffSummary,
+            rollbackReady: checkpoint.rollbackReady,
+            approvalState: checkpoint.approvalState,
+            lineageSummary: checkpoint.lineageSummary
+        )
+        return BASEvolutionPromotionGate.evaluate(
+            checkpoint: checkpointSummary,
+            targetApprovalState: approvalState
+        )
     }
 
     private static func restoredEvolutionState(

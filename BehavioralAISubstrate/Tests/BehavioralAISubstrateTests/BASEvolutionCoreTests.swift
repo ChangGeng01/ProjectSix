@@ -25,7 +25,132 @@ final class BASEvolutionCoreTests: XCTestCase {
 
         XCTAssertEqual(summary.schemaVersion, BASEvolutionLineageSummary.currentSchemaVersion)
         XCTAssertEqual(summary.activeKillSwitches, [])
+        XCTAssertNil(summary.governanceSummary)
         XCTAssertEqual(summary.recommendedKillSwitches, ["disableHighRiskAutoAction"])
+    }
+
+    func testPromotionGateBlocksAutomaticApprovalWhenGovernancePrerequisitesRemainPending() {
+        let now = Date(timeIntervalSince1970: 1_715_000_100)
+        let governanceSummary = BASEvolutionLineageSummary.GovernanceSummary(
+            experienceCandidateCount: 2,
+            experienceCandidateTypeCounts: ["guard": 1, "host": 1],
+            shadowTrialCount: 1,
+            pendingShadowTrialCount: 1,
+            sealCount: 1,
+            pendingSealCount: 1,
+            versionDeltaCount: 1,
+            versionDeltaHighlights: ["rule rule.pending • rollback rollback.rule.pending"],
+            retractionOrderCount: 1,
+            retractionOrderHighlights: ["pending rule.pending • reason evolution.shadow_trial_pending"],
+            pendingRetractionCount: 1,
+            blockedPromotionReasonCodes: [
+                "evolution.shadow_trial_pending",
+                "evolution.retraction_pending",
+                "evolution.seal_pending"
+            ]
+        )
+        let checkpoint = BASEvolutionCheckpointStoredFields(
+            id: "checkpoint-governed",
+            createdAt: now,
+            fingerprint: "fp-governed",
+            previousCheckpointID: nil,
+            modeName: "mirror",
+            sourceID: "explicit_refresh",
+            identityRole: .pauseCompanion,
+            boundaryMode: .localOnlyProtective,
+            calibrationStatus: .stable,
+            diffSummary: ["Governed checkpoint"],
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            lineageSummary: BASEvolutionLineageSummary(
+                recordedAt: now,
+                sessionID: "session-governed",
+                taskType: "conflict",
+                riskLevel: "high",
+                permitMode: "delay",
+                hostGatePercent: 84,
+                thoughtFoldChecksum: "fold-governed",
+                updateTicketSummaries: ["Hold before promote"],
+                guardrailFindings: ["protective path"],
+                recommendedKillSwitches: ["requireReviewedWrites"],
+                governanceSummary: governanceSummary
+            )
+        )
+
+        let verdict = BASEvolutionPromotionGate.evaluate(
+            checkpoint: checkpoint,
+            targetApprovalState: .automatic
+        )
+
+        XCTAssertFalse(verdict.allowsPromotion)
+        XCTAssertEqual(verdict.reasonCodes, governanceSummary.blockedPromotionReasonCodes)
+        XCTAssertEqual(verdict.primaryReason, "evolution.shadow_trial_pending")
+    }
+
+    func testPromotionGateBlocksAutomaticApprovalWhenShadowTrialFailsAfterResolution() {
+        let now = Date(timeIntervalSince1970: 1_715_000_200)
+        let governanceSummary = BASEvolutionLineageSummary.GovernanceSummary(
+            experienceCandidateCount: 1,
+            experienceCandidateTypeCounts: ["guard": 1],
+            passedShadowTrialCount: 0,
+            failedShadowTrialCount: 1,
+            shadowTrialCount: 1,
+            pendingShadowTrialCount: 0,
+            sealCount: 1,
+            deniedSealCount: 1,
+            pendingSealCount: 0,
+            versionDeltaCount: 1,
+            versionDeltaHighlights: ["rule rule.failed • rollback rollback.rule.failed"],
+            retractionOrderCount: 1,
+            retractionOrderHighlights: ["cleared rule.failed • reason evolution.shadow_trial_failed"],
+            pendingRetractionCount: 0,
+            blockedPromotionReasonCodes: [
+                "evolution.shadow_trial_failed",
+                "evolution.seal_denied"
+            ]
+        )
+        let checkpoint = BASEvolutionCheckpointStoredFields(
+            id: "checkpoint-shadow-failed",
+            createdAt: now,
+            fingerprint: "fp-shadow-failed",
+            previousCheckpointID: nil,
+            modeName: "mirror",
+            sourceID: "explicit_refresh",
+            identityRole: .pauseCompanion,
+            boundaryMode: .localOnlyProtective,
+            calibrationStatus: .stable,
+            diffSummary: ["Shadow trial failed."],
+            approvalState: .reviewSuggested,
+            rollbackReady: true,
+            lineageSummary: BASEvolutionLineageSummary(
+                recordedAt: now,
+                sessionID: "session-shadow-failed",
+                taskType: "conflict",
+                riskLevel: "high",
+                permitMode: "delay",
+                hostGatePercent: 87,
+                thoughtFoldChecksum: "fold-shadow-failed",
+                updateTicketSummaries: ["Reject guarded escalation"],
+                guardrailFindings: ["guard path failed bounded trial"],
+                recommendedKillSwitches: ["requireReviewedWrites"],
+                governanceSummary: governanceSummary
+            )
+        )
+
+        let verdict = BASEvolutionPromotionGate.evaluate(
+            checkpoint: checkpoint,
+            targetApprovalState: .automatic
+        )
+
+        XCTAssertFalse(verdict.allowsPromotion)
+        XCTAssertEqual(verdict.reasonCodes, governanceSummary.blockedPromotionReasonCodes)
+        XCTAssertEqual(verdict.primaryReason, "evolution.shadow_trial_failed")
+        XCTAssertEqual(
+            BASEvolutionPromotionGate.operatorFacingRequirementLabels(
+                for: governanceSummary.blockedPromotionReasonCodes
+            ),
+            ["shadow trial failure", "evolution seal denial"]
+        )
     }
 
     func testCheckpointPlannerDeduplicatesEquivalentLatestState() {
@@ -173,6 +298,8 @@ final class BASEvolutionCoreTests: XCTestCase {
             thoughtFoldChecksum: "fold-fabric",
             updateTicketSummaries: ["Hold before promote"],
             reviewDirectiveLine: "Review host drift",
+            hostChangeCandidateIDs: ["candidate.host.drift"],
+            hostChangeTypes: ["goal_spine"],
             activeKillSwitches: ["force_guard_mode"],
             guardrailFindings: ["protective boundary held"],
             recommendedKillSwitches: ["disableHighRiskAutoAction"],
@@ -218,6 +345,8 @@ final class BASEvolutionCoreTests: XCTestCase {
                 precisionProfileID: "precision.guard",
                 lungStateRef: "lung.guard",
                 breathSchedulerID: "scheduler.guard",
+                thermalExchangeID: "thermal.guard",
+                integrityWeaveID: "integrity.guard",
                 breathMode: "guard",
                 breathPhase: "exchange",
                 thermalPressure: 77,
@@ -270,6 +399,23 @@ final class BASEvolutionCoreTests: XCTestCase {
                 schedulerAllowsMicroSleep: true,
                 schedulerResumeBudgetClass: "rollback_hot",
                 schedulerReasonCodes: ["risk_guard", "restore_ready"],
+                thermalExchangeMode: "protective_exchange",
+                thermalPredictedBand: "hot",
+                thermalCoolingActions: ["delay_cold_organs", "trim_noncritical_precision"],
+                thermalSuppressedOrganIDs: ["criticBlade", "simuRing"],
+                thermalReroutedOrganIDs: ["permitKnot"],
+                thermalRerouteTargets: ["permitKnot": "scoutCPU"],
+                thermalPrecisionDowngradeRecords: [
+                    .init(organID: "hostModulationMesh", tierID: "balanced")
+                ],
+                thermalExchangeReasonCodes: ["thermal.hot", "guard.watch"],
+                integrityRequiredChecks: ["fold_checksum", "risk_permit", "host_gate"],
+                integrityCompletedChecks: ["fold_checksum", "risk_permit"],
+                integrityFailedChecks: ["host_gate"],
+                integrityPurityState: "review_required",
+                integrityContaminationRefs: ["thermal.hot", "rollback.ready"],
+                integrityTrustedSnapshotRef: "snapshot.guard",
+                integrityVerificationHash: "integrity.guard.hash",
                 precisionOrganPrecisionRecords: [
                     .init(organID: "stubCore", tierID: "full"),
                     .init(organID: "riskSpine", tierID: "protected"),
@@ -278,6 +424,28 @@ final class BASEvolutionCoreTests: XCTestCase {
                 precisionLockedOrganIDs: ["riskSpine", "permitKnot", "stubCore"],
                 precisionDegradationOrder: ["full", "protected", "balanced", "minimal"],
                 precisionGuardSafeFloorID: "protected"
+            ),
+            governanceSummary: BASEvolutionLineageSummary.GovernanceSummary(
+                experienceCandidateCount: 1,
+                experienceCandidateTypeCounts: ["host_change": 1],
+                passedShadowTrialCount: 0,
+                failedShadowTrialCount: 0,
+                shadowTrialCount: 1,
+                pendingShadowTrialCount: 1,
+                sealCount: 1,
+                deniedSealCount: 0,
+                pendingSealCount: 0,
+                versionDeltaCount: 1,
+                versionDeltaHighlights: ["host host.v2 • rollback host.v1"],
+                retractionOrderCount: 1,
+                retractionOrderHighlights: ["pending host.v1 • reason tool.write"],
+                pendingRetractionCount: 1,
+                blockedPromotionReasonCodes: ["tool.write", "memory.write", "host.write"],
+                dreamLoopStoppingMode: "guardTakeover",
+                dreamLoopSignalRefs: ["dream_loop:guardTakeover", "dream_loop:evidence_debt"],
+                dreamLoopRemandTargets: ["L9", "L14"],
+                dreamLoopReservationMode: "delayRight",
+                dreamLoopMaxEvidenceDebtPercent: 78
             )
         )
 
@@ -299,6 +467,33 @@ final class BASEvolutionCoreTests: XCTestCase {
         XCTAssertEqual(decoded.projectionForecastCount, 2)
         XCTAssertEqual(decoded.projectionCritiqueCount, 1)
         XCTAssertEqual(decoded.degradedReasonCodes, ["thermal_guard"])
+        XCTAssertEqual(decoded.hostChangeCandidateIDs, ["candidate.host.drift"])
+        XCTAssertEqual(decoded.hostChangeTypes, ["goal_spine"])
+        XCTAssertEqual(decoded.governanceSummary?.experienceCandidateCount, 1)
+        XCTAssertEqual(decoded.governanceSummary?.experienceCandidateTypeCounts["host_change"], 1)
+        XCTAssertEqual(decoded.governanceSummary?.passedShadowTrialCount, 0)
+        XCTAssertEqual(decoded.governanceSummary?.failedShadowTrialCount, 0)
+        XCTAssertEqual(decoded.governanceSummary?.deniedSealCount, 0)
+        XCTAssertEqual(
+            decoded.governanceSummary?.versionDeltaHighlights,
+            ["host host.v2 • rollback host.v1"]
+        )
+        XCTAssertEqual(
+            decoded.governanceSummary?.retractionOrderHighlights,
+            ["pending host.v1 • reason tool.write"]
+        )
+        XCTAssertEqual(
+            decoded.governanceSummary?.blockedPromotionReasonCodes,
+            ["tool.write", "memory.write", "host.write"]
+        )
+        XCTAssertEqual(decoded.governanceSummary?.dreamLoopStoppingMode, "guardTakeover")
+        XCTAssertEqual(
+            decoded.governanceSummary?.dreamLoopSignalRefs,
+            ["dream_loop:guardTakeover", "dream_loop:evidence_debt"]
+        )
+        XCTAssertEqual(decoded.governanceSummary?.dreamLoopRemandTargets, ["L9", "L14"])
+        XCTAssertEqual(decoded.governanceSummary?.dreamLoopReservationMode, "delayRight")
+        XCTAssertEqual(decoded.governanceSummary?.dreamLoopMaxEvidenceDebtPercent, 78)
         XCTAssertEqual(decoded.contextSummary?.relationPattern, "self")
         XCTAssertEqual(decoded.contextSummary?.manipulationHintCount, 1)
         XCTAssertEqual(decoded.cognitionSummary?.factCount, 4)
@@ -314,6 +509,7 @@ final class BASEvolutionCoreTests: XCTestCase {
         XCTAssertEqual(decoded.foldedLungSummary?.hotColdMapID, "hotcold.guard")
         XCTAssertEqual(decoded.foldedLungSummary?.hotOrganIDs, ["stubCore", "riskSpine", "permitKnot"])
         XCTAssertEqual(decoded.foldedLungSummary?.hotColdPreloadPolicy, "guard_preload")
+        XCTAssertEqual(decoded.foldedLungSummary?.integrityWeaveID, "integrity.guard")
         XCTAssertEqual(decoded.foldedLungSummary?.breathSchedulerID, "scheduler.guard")
         XCTAssertEqual(decoded.foldedLungSummary?.schedulerCadenceTag, "guard_resume")
         XCTAssertEqual(decoded.foldedLungSummary?.schedulerCheckpointCadence, "anchor_each_turn")
@@ -323,6 +519,24 @@ final class BASEvolutionCoreTests: XCTestCase {
         XCTAssertEqual(decoded.foldedLungSummary?.schedulerAllowsMicroSleep, true)
         XCTAssertEqual(decoded.foldedLungSummary?.schedulerResumeBudgetClass, "rollback_hot")
         XCTAssertEqual(decoded.foldedLungSummary?.schedulerReasonCodes, ["risk_guard", "restore_ready"])
+        XCTAssertEqual(decoded.foldedLungSummary?.thermalExchangeID, "thermal.guard")
+        XCTAssertEqual(decoded.foldedLungSummary?.thermalExchangeMode, "protective_exchange")
+        XCTAssertEqual(decoded.foldedLungSummary?.thermalPredictedBand, "hot")
+        XCTAssertEqual(decoded.foldedLungSummary?.thermalCoolingActions, ["delay_cold_organs", "trim_noncritical_precision"])
+        XCTAssertEqual(decoded.foldedLungSummary?.thermalSuppressedOrganIDs, ["criticBlade", "simuRing"])
+        XCTAssertEqual(decoded.foldedLungSummary?.thermalRerouteTargets["permitKnot"], "scoutCPU")
+        XCTAssertEqual(
+            decoded.foldedLungSummary?.thermalPrecisionDowngradeRecords,
+            [BASEvolutionFoldedLungSummary.PrecisionRecord(organID: "hostModulationMesh", tierID: "balanced")]
+        )
+        XCTAssertEqual(decoded.foldedLungSummary?.thermalExchangeReasonCodes, ["thermal.hot", "guard.watch"])
+        XCTAssertEqual(decoded.foldedLungSummary?.integrityRequiredChecks, ["fold_checksum", "risk_permit", "host_gate"])
+        XCTAssertEqual(decoded.foldedLungSummary?.integrityCompletedChecks, ["fold_checksum", "risk_permit"])
+        XCTAssertEqual(decoded.foldedLungSummary?.integrityFailedChecks, ["host_gate"])
+        XCTAssertEqual(decoded.foldedLungSummary?.integrityPurityState, "review_required")
+        XCTAssertEqual(decoded.foldedLungSummary?.integrityContaminationRefs, ["thermal.hot", "rollback.ready"])
+        XCTAssertEqual(decoded.foldedLungSummary?.integrityTrustedSnapshotRef, "snapshot.guard")
+        XCTAssertEqual(decoded.foldedLungSummary?.integrityVerificationHash, "integrity.guard.hash")
         XCTAssertEqual(decoded.foldedLungSummary?.precisionGuardSafeFloorID, "protected")
     }
 }

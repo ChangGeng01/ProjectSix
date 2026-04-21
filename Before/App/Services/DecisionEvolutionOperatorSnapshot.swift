@@ -844,6 +844,19 @@ enum DecisionEvolutionOperatorSummaryPresentationSupport {
 struct DecisionEvolutionOperatorSummaryPresentation: Equatable, Sendable {
     let headline: String
     let primaryReason: String?
+    let sovereignPostureTitle: String?
+    let sovereignPostureLines: [String]
+    let horizonDiagnosticsTitle: String?
+    let horizonDiagnosticsLines: [String]
+    let foldedLungTitle: String?
+    let foldedLungLines: [String]
+    let furnaceContributionTitle: String?
+    let furnaceContributionLines: [String]
+    let furnaceChecklistTitle: String?
+    let furnaceChecklistLines: [String]
+    let furnaceNextStepTitle: String?
+    let furnaceNextStepDetail: String?
+    let furnaceWorkbenchPresentation: DecisionEvolutionFurnaceWorkbenchPresentation?
     let modeLine: String
     let countsLine: String
     let killSwitchesLine: String?
@@ -861,6 +874,8 @@ struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
     let activeCheckpointSource: DecisionEvolutionActiveCheckpointSource
     let reviewCheckpointID: String?
     let killSwitches: [String]
+    let summaryReasons: [String]
+    let furnaceWorkbenchPresentation: DecisionEvolutionFurnaceWorkbenchPresentation?
 
     var surfaceTitle: String {
         DecisionEvolutionOperatorSummaryPresentationSupport.surfaceTitle(
@@ -877,9 +892,53 @@ struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
     }
 
     var summaryPresentation: DecisionEvolutionOperatorSummaryPresentation {
-        DecisionEvolutionOperatorSummaryPresentation(
+        let sovereignPostureLines = DecisionEvolutionSovereignPosturePresentationSupport.lines(
+            from: summaryReasons
+        )
+        let horizonDiagnosticsLines = DecisionEvolutionHorizonDiagnosticsPresentationSupport.lines(
+            from: summaryReasons
+        )
+        let foldedLungLines = DecisionEvolutionFoldedLungPresentationSupport.lines(
+            from: summaryReasons
+        )
+        let furnaceContributionLines = DecisionEvolutionFurnaceContributionPresentationSupport.lines(
+            from: summaryReasons
+        )
+        let furnaceChecklistLines = DecisionEvolutionFurnaceChecklistPresentationSupport.lines(
+            from: summaryReasons
+        )
+        let furnaceNextStepDetail = DecisionEvolutionFurnaceNextStepPresentationSupport.detail(
+            from: furnaceChecklistLines
+        )
+
+        return DecisionEvolutionOperatorSummaryPresentation(
             headline: headline,
             primaryReason: primaryReason,
+            sovereignPostureTitle: sovereignPostureLines.isEmpty
+                ? nil
+                : DecisionEvolutionSovereignPosturePresentationSupport.title,
+            sovereignPostureLines: sovereignPostureLines,
+            horizonDiagnosticsTitle: horizonDiagnosticsLines.isEmpty
+                ? nil
+                : DecisionEvolutionHorizonDiagnosticsPresentationSupport.title,
+            horizonDiagnosticsLines: horizonDiagnosticsLines,
+            foldedLungTitle: foldedLungLines.isEmpty
+                ? nil
+                : DecisionEvolutionFoldedLungPresentationSupport.title,
+            foldedLungLines: foldedLungLines,
+            furnaceContributionTitle: furnaceContributionLines.isEmpty
+                ? nil
+                : DecisionEvolutionFurnaceContributionPresentationSupport.title,
+            furnaceContributionLines: furnaceContributionLines,
+            furnaceChecklistTitle: furnaceChecklistLines.isEmpty
+                ? nil
+                : DecisionEvolutionFurnaceChecklistPresentationSupport.title,
+            furnaceChecklistLines: furnaceChecklistLines,
+            furnaceNextStepTitle: furnaceNextStepDetail == nil
+                ? nil
+                : DecisionEvolutionFurnaceNextStepPresentationSupport.title,
+            furnaceNextStepDetail: furnaceNextStepDetail,
+            furnaceWorkbenchPresentation: furnaceWorkbenchPresentation,
             modeLine: DecisionEvolutionOperatorSummaryPresentationSupport.modeLine(
                 surfaceKind: surfaceKind,
                 interactionMode: interactionMode
@@ -917,19 +976,37 @@ struct DecisionEvolutionOperatorSnapshot: Equatable, Sendable {
     ) -> DecisionEvolutionOperatorSnapshot {
         let releaseSummary = workspace.releaseSummary
         let operatorGuidance = policy.operatorGuidance(contract: contract)
+        let furnaceWorkbenchPresentation = releaseSummary.flatMap { releaseSummary in
+            let furnaceChecklistLines = DecisionEvolutionFurnaceChecklistPresentationSupport.lines(
+                from: releaseSummary.reasons
+            )
+            let furnaceNextStepDetail = DecisionEvolutionFurnaceNextStepPresentationSupport.detail(
+                from: furnaceChecklistLines
+            )
+            return DecisionEvolutionFurnaceWorkbenchPresentationSupport.build(
+                detail: furnaceNextStepDetail,
+                controlSurface: workspace.controlSurface
+            )
+        }
 
         return DecisionEvolutionOperatorSnapshot(
             surfaceKind: surfaceKind,
             interactionMode: contract.interactionMode,
             releaseState: releaseSummary?.state,
             headline: releaseSummary?.headline ?? operatorGuidance.headline,
-            primaryReason: releaseSummary?.reasons.first ?? operatorGuidance.primaryReason,
+            primaryReason: releaseSummary.map {
+                DecisionEvolutionPrimaryReasonPresentationSupport.primaryReason(
+                    from: $0.reasons
+                )
+            } ?? operatorGuidance.primaryReason,
             pendingReviewCount: workspace.facts.pendingReviewCount,
             rollbackReadyCount: workspace.facts.rollbackReadyCount,
             activeCheckpointID: workspace.activePresentation?.checkpointID,
             activeCheckpointSource: workspace.controlSurface.activeCheckpointSource,
             reviewCheckpointID: workspace.reviewPresentation?.checkpointID,
-            killSwitches: workspace.facts.killSwitches
+            killSwitches: workspace.facts.killSwitches,
+            summaryReasons: releaseSummary?.reasons ?? [],
+            furnaceWorkbenchPresentation: furnaceWorkbenchPresentation
         )
     }
 }

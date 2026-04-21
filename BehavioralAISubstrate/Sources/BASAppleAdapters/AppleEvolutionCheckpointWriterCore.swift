@@ -346,6 +346,18 @@ public enum BASAppleEvolutionCheckpointWriter {
         refs.insert(lineageSummary.sessionID)
         refs.insert(lineageSummary.thoughtFoldChecksum)
         refs.formUnion(lineageSummary.updateTicketSummaries.filter { !$0.isEmpty })
+        if let governanceSummary = lineageSummary.governanceSummary {
+            if let dreamLoopStoppingMode = governanceSummary.dreamLoopStoppingMode,
+               dreamLoopStoppingMode.isEmpty == false {
+                refs.insert("dream_loop_stop:\(dreamLoopStoppingMode)")
+            }
+            if let dreamLoopReservationMode = governanceSummary.dreamLoopReservationMode,
+               dreamLoopReservationMode.isEmpty == false {
+                refs.insert("dream_loop_reservation:\(dreamLoopReservationMode)")
+            }
+            refs.formUnion(governanceSummary.dreamLoopSignalRefs.filter { !$0.isEmpty })
+            refs.formUnion(governanceSummary.dreamLoopRemandTargets.filter { !$0.isEmpty })
+        }
         if let foldedLungSummary = lineageSummary.foldedLungSummary {
             refs.formUnion(foldedLungReferences(for: foldedLungSummary))
         }
@@ -382,6 +394,22 @@ public enum BASAppleEvolutionCheckpointWriter {
            breathSchedulerID.isEmpty == false {
             refs.insert(breathSchedulerID)
         }
+        if let thermalExchangeID = foldedLungSummary.thermalExchangeID,
+           thermalExchangeID.isEmpty == false {
+            refs.insert(thermalExchangeID)
+        }
+        if let integrityWeaveID = foldedLungSummary.integrityWeaveID,
+           integrityWeaveID.isEmpty == false {
+            refs.insert(integrityWeaveID)
+        }
+        if let integrityTrustedSnapshotRef = foldedLungSummary.integrityTrustedSnapshotRef,
+           integrityTrustedSnapshotRef.isEmpty == false {
+            refs.insert(integrityTrustedSnapshotRef)
+        }
+        if let integrityVerificationHash = foldedLungSummary.integrityVerificationHash,
+           integrityVerificationHash.isEmpty == false {
+            refs.insert(integrityVerificationHash)
+        }
         if let hostVersionRef = foldedLungSummary.hostVersionRef,
            hostVersionRef.isEmpty == false {
             refs.insert(hostVersionRef)
@@ -390,12 +418,62 @@ public enum BASAppleEvolutionCheckpointWriter {
            cacheStateRef.isEmpty == false {
             refs.insert(cacheStateRef)
         }
+        refs.formUnion(dynamicFoldedLungReferences(for: foldedLungSummary))
         refs.formUnion(foldedLungSummary.foldRefs.filter { !$0.isEmpty })
         refs.formUnion(foldedLungSummary.invalidatedResumeFrameIDs.filter { !$0.isEmpty })
         refs.formUnion(foldedLungSummary.invalidatedCacheRefs.filter { !$0.isEmpty })
         refs.formUnion(foldedLungSummary.invalidatedFoldRefs.filter { !$0.isEmpty })
         refs.formUnion(foldedLungSummary.quarantinedFoldRefs.filter { !$0.isEmpty })
         return refs
+    }
+
+    private static func dynamicFoldedLungReferences(
+        for foldedLungSummary: BASEvolutionFoldedLungSummary
+    ) -> Set<String> {
+        guard let encodedSummary = try? JSONEncoder().encode(foldedLungSummary),
+              let payload = try? JSONSerialization.jsonObject(with: encodedSummary) as? [String: Any] else {
+            return []
+        }
+
+        var refs = Set<String>()
+        insertStringReference(named: "organDeltaPlanID", from: payload, into: &refs)
+        insertStringArrayReferences(named: "organDeltaActivatePackageIDs", from: payload, into: &refs)
+        insertStringArrayReferences(named: "organDeltaPreloadPackageIDs", from: payload, into: &refs)
+        insertStringArrayReferences(named: "organDeltaEvictPackageIDs", from: payload, into: &refs)
+        insertStringArrayReferences(named: "organDeltaRetainPackageIDs", from: payload, into: &refs)
+        insertStringArrayReferences(named: "organDeltaRollbackSafePackageIDs", from: payload, into: &refs)
+
+        if let packageRecords = payload["organPackageRecords"] as? [[String: Any]] {
+            for record in packageRecords {
+                if let packageID = record["packageID"] as? String,
+                   packageID.isEmpty == false {
+                    refs.insert(packageID)
+                }
+            }
+        }
+
+        return refs
+    }
+
+    private static func insertStringReference(
+        named key: String,
+        from payload: [String: Any],
+        into refs: inout Set<String>
+    ) {
+        if let value = payload[key] as? String,
+           value.isEmpty == false {
+            refs.insert(value)
+        }
+    }
+
+    private static func insertStringArrayReferences(
+        named key: String,
+        from payload: [String: Any],
+        into refs: inout Set<String>
+    ) {
+        if let values = payload[key] as? [String] {
+            refs.formUnion(values.filter { !$0.isEmpty })
+        }
     }
 
     private static func relinkedSnapshots(

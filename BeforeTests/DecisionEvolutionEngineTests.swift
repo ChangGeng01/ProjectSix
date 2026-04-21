@@ -287,6 +287,149 @@ final class DecisionEvolutionEngineTests: XCTestCase {
     }
 
     @MainActor
+    func testBridgeBlocksAutomaticApprovalWhenGovernanceGateRequiresTrialOrSeal() throws {
+        let container = try ModelContainer(
+            for: DecisionEvolutionCheckpoint.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_715_000_333)
+
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-governance-blocked",
+                createdAt: now,
+                fingerprint: "fingerprint-governance-blocked",
+                previousCheckpointID: nil,
+                mode: .mirror,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyProtective,
+                calibrationStatus: .stable,
+                diffSummary: ["Governed checkpoint waits for trial and seal."],
+                approvalState: .reviewSuggested,
+                rollbackReady: true,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: now,
+                    sessionID: "session-governance-blocked",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 88,
+                    thoughtFoldChecksum: "fold-governance-blocked",
+                    updateTicketSummaries: ["Guard the checkpoint before promote."],
+                    guardrailFindings: ["protective path"],
+                    recommendedKillSwitches: ["requireReviewedWrites"],
+                    governanceSummary: BASEvolutionLineageSummary.GovernanceSummary(
+                        experienceCandidateCount: 2,
+                        experienceCandidateTypeCounts: ["guard": 1, "rule": 1],
+                        shadowTrialCount: 1,
+                        pendingShadowTrialCount: 1,
+                        sealCount: 1,
+                        pendingSealCount: 1,
+                        versionDeltaCount: 1,
+                        retractionOrderCount: 1,
+                        pendingRetractionCount: 0,
+                        blockedPromotionReasonCodes: [
+                            "evolution.shadow_trial_pending",
+                            "evolution.seal_pending"
+                        ]
+                    )
+                )
+            )
+        )
+        try context.save()
+
+        let evolved = BehavioralAISubstrateBridge.setEvolutionCheckpointApproval(
+            "checkpoint-governance-blocked",
+            to: .automatic,
+            in: context
+        )
+
+        XCTAssertNil(evolved)
+        XCTAssertEqual(
+            BehavioralAISubstrateBridge.evolutionCheckpointApprovalBlockReason(
+                "checkpoint-governance-blocked",
+                to: .automatic,
+                in: context
+            ),
+            "Checkpoint checkpoint-governance-blocked is still waiting on shadow trial and evolution seal review."
+        )
+        let checkpoints = try context.fetch(FetchDescriptor<DecisionEvolutionCheckpoint>())
+        XCTAssertEqual(checkpoints.first?.approvalState, .reviewSuggested)
+    }
+
+    @MainActor
+    func testBridgeAppendsVersionAndRetractionDetailToGovernanceApprovalBlockReason() throws {
+        let container = try ModelContainer(
+            for: DecisionEvolutionCheckpoint.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = container.mainContext
+        let now = Date()
+
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-governance-detailed",
+                createdAt: now,
+                fingerprint: "fingerprint-governance-detailed",
+                previousCheckpointID: nil,
+                mode: .mirror,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyProtective,
+                calibrationStatus: .stable,
+                diffSummary: ["Governed checkpoint carries version and retraction detail."],
+                approvalState: .reviewSuggested,
+                rollbackReady: true,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: now,
+                    sessionID: "session-governance-detailed",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 92,
+                    thoughtFoldChecksum: "fold-governance-detailed",
+                    updateTicketSummaries: ["Guard the checkpoint before promote."],
+                    guardrailFindings: ["protective path"],
+                    recommendedKillSwitches: ["requireReviewedWrites"],
+                    governanceSummary: BASEvolutionLineageSummary.GovernanceSummary(
+                        experienceCandidateCount: 2,
+                        experienceCandidateTypeCounts: ["guard": 1, "rule": 1],
+                        shadowTrialCount: 1,
+                        pendingShadowTrialCount: 1,
+                        sealCount: 1,
+                        pendingSealCount: 1,
+                        versionDeltaCount: 1,
+                        versionDeltaHighlights: [
+                            "rule rule.ready • rollback rollback.rule.ready"
+                        ],
+                        retractionOrderCount: 1,
+                        retractionOrderHighlights: [
+                            "pending rule.pending • reason evolution.shadow_trial_pending"
+                        ],
+                        pendingRetractionCount: 1,
+                        blockedPromotionReasonCodes: [
+                            "evolution.shadow_trial_pending",
+                            "evolution.seal_pending"
+                        ]
+                    )
+                )
+            )
+        )
+        try context.save()
+
+        XCTAssertEqual(
+            BehavioralAISubstrateBridge.evolutionCheckpointApprovalBlockReason(
+                "checkpoint-governance-detailed",
+                to: .automatic,
+                in: context
+            ),
+            "Checkpoint checkpoint-governance-detailed is still waiting on shadow trial and evolution seal review. Version tree: rule rule.ready • rollback rollback.rule.ready. Retraction: pending rule.pending • reason evolution.shadow_trial_pending."
+        )
+    }
+
+    @MainActor
     func testBridgeCanRestoreCurrentBrainFromCheckpointSnapshot() throws {
         let container = try ModelContainer(
             for: DecisionEvolutionCheckpoint.self,
@@ -913,6 +1056,63 @@ final class DecisionEvolutionEngineTests: XCTestCase {
             "Session session-host-gate-parity • Host gate 37% • Fold fold-host-gate-parity"
         )
         XCTAssertEqual(controlSurface.activePresentation?.summaryText, "LOW → ANSWER")
+    }
+
+    @MainActor
+    func testBeforeAppModelControlSurfaceCarriesRecoveredWindGateMetadata() throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+
+        let container = try makeCheckpointApplyContainer()
+        let context = container.mainContext
+
+        context.insert(
+            DecisionEvolutionCheckpoint(
+                id: "checkpoint-control-surface-wind-gate",
+                createdAt: localDate(year: 2026, month: 4, day: 11, hour: 6, minute: 15),
+                fingerprint: "fingerprint-control-surface-wind-gate",
+                previousCheckpointID: nil,
+                mode: .quick,
+                source: .explicitRefresh,
+                identityRole: .pauseCompanion,
+                boundaryMode: .localOnlyAdvisory,
+                calibrationStatus: .stable,
+                diffSummary: ["Recovered wind gate should stay visible across control surface summaries."],
+                approvalState: .automatic,
+                rollbackReady: true,
+                brainStateSnapshot: nil,
+                lineageSummary: BASEvolutionLineageSummary(
+                    recordedAt: localDate(year: 2026, month: 4, day: 11, hour: 6, minute: 15),
+                    sessionID: "session-control-surface-wind-gate",
+                    taskType: "conflict",
+                    riskLevel: "high",
+                    permitMode: "delay",
+                    hostGatePercent: 76,
+                    thoughtFoldChecksum: "fold-control-surface-wind-gate",
+                    updateTicketSummaries: ["Keep the guarded checkpoint visible."],
+                    guardrailFindings: ["wind gate guardrail"],
+                    recommendedKillSwitches: ["external-tools"],
+                    assertionCeiling: "guarded",
+                    delayType: "cool_down",
+                    substituteType: "draft",
+                    sovereignHintLevel: "elevated"
+                )
+            )
+        )
+        try context.save()
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+        let controlSurface = app.makeEvolutionControlSurface()
+
+        XCTAssertEqual(controlSurface.activePresentation?.checkpointID, "checkpoint-control-surface-wind-gate")
+        XCTAssertEqual(controlSurface.activePresentation?.lineageHostGatePercent, 76)
+        XCTAssertEqual(
+            controlSurface.activePresentation?.metadataText,
+            "Session session-control-surface-wind-gate • Host gate 76% • Fold fold-control-surface-wind-gate • Wind gate primary delay • assert guarded • delay cool_down • substitute draft • sovereign elevated"
+        )
+        XCTAssertEqual(controlSurface.activePresentation?.summaryText, "HIGH → DELAY")
     }
 
     @MainActor
@@ -2868,6 +3068,47 @@ final class DecisionEvolutionEngineTests: XCTestCase {
     }
 
     @MainActor
+    func testBeforeAppModelHandleInitialAppearancePreservesAuditEntryContextFromWatchHandoff() throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+        DecisionIntentEnvelopeStore.clear()
+
+        let container = try makeCheckpointApplyContainer()
+        WatchHandoffCoordinator.enqueueOpenEvolutionControl(
+            headline: "Inspect the watch audit findings",
+            controlEntryKindID: DecisionEvolutionWidgetControlEntryKind.audit.rawValue
+        )
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+
+        app.handleInitialAppearance()
+
+        XCTAssertTrue(app.isEvolutionControlCenterPresented)
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.controlEntryKind,
+            .audit
+        )
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.title,
+            DecisionEvolutionWidgetControlEntryLexiconSupport.auditTitle
+        )
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.systemImage,
+            "exclamationmark.circle"
+        )
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.headline,
+            "Inspect the watch audit findings"
+        )
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.detail,
+            "A watch audit alert asked the iPhone brain to inspect evolution findings."
+        )
+    }
+
+    @MainActor
     func testBeforeAppModelSceneActivePresentsEvolutionControlCenterFromWidgetIntent() async throws {
         ActiveDecisionWorkspaceStore.clear()
         DecisionTaskGraphStore.clear()
@@ -2889,6 +3130,128 @@ final class DecisionEvolutionEngineTests: XCTestCase {
 
         XCTAssertTrue(app.isEvolutionControlCenterPresented)
         XCTAssertNil(DecisionIntentEnvelopeStore.consume())
+    }
+
+    @MainActor
+    func testBeforeAppModelSceneActivePreservesAuditEntryContextFromWidgetIntent() async throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+        DecisionIntentEnvelopeStore.clear()
+
+        let container = try makeCheckpointApplyContainer()
+        let intent = OpenEvolutionControlIntent(
+            entrySource: .homeWidgetMedium,
+            controlEntry: DecisionEvolutionWidgetControlEntryPresentation(
+                kindID: DecisionEvolutionWidgetControlEntryKind.audit.rawValue,
+                title: "Audit on iPhone",
+                systemImage: "exclamationmark.circle",
+                prompt: "Inspect the widget audit findings",
+                instruction: "Continue on iPhone to inspect audit findings before widening rollout.",
+                triggerReason: nil
+            )
+        )
+        _ = try await intent.perform()
+
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+
+        app.handleScenePhase(.active)
+
+        XCTAssertTrue(app.isEvolutionControlCenterPresented)
+        XCTAssertEqual(app.evolutionControlEntryContext?.controlEntryKind, .audit)
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.title,
+            DecisionEvolutionWidgetControlEntryLexiconSupport.auditTitle
+        )
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.systemImage,
+            "exclamationmark.circle"
+        )
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.headline,
+            "Inspect the widget audit findings"
+        )
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.detail,
+            "Inspect evolution audit findings from Medium Widget."
+        )
+    }
+
+    @MainActor
+    func testBeforeAppModelPresentEvolutionControlCenterForSurfacePreservesAuditEntryContextFromFlightDeck() throws {
+        ActiveDecisionWorkspaceStore.clear()
+        DecisionTaskGraphStore.clear()
+        PendingLaunchRequestStore.clear()
+        PendingReflectionStore.clear()
+        DecisionIntentEnvelopeStore.clear()
+
+        let container = try makeCheckpointApplyContainer()
+        let app = BeforeAppModel(modelContainer: container, startupNotice: nil)
+        let flightDeck = DecisionSystemFlightDeck(
+            generatedAt: Date(timeIntervalSince1970: 1_713_580_800),
+            overallScore: 82,
+            overallHealth: .watch,
+            layerReports: [],
+            sessionEngineSummary: nil,
+            localModelLibrarySummary: nil,
+            isPureLocalClosedLoop: true,
+            dominantBlockers: [],
+            eBrainSummary: nil,
+            releaseControlSummary: DecisionSystemReleaseControlSummary(
+                state: .watch,
+                headline: DecisionEvolutionReleasePathPresentationSupport.watchingAuditFindingsHeadline,
+                reasons: [
+                    "Factors: evidence_caveat_load",
+                    "Capability compatiblePreview",
+                    "Temporal volatile",
+                    "Evidence supported/ruleBound"
+                ],
+                activeKillSwitches: [],
+                recommendedKillSwitches: [],
+                killSwitches: [],
+                pendingReviewCount: 0,
+                rollbackReadyCount: 0,
+                canRestoreActiveCheckpoint: false,
+                canRollbackActiveCheckpoint: false,
+                activeCheckpointID: nil,
+                activeCheckpointSource: .none,
+                reviewCheckpointID: nil,
+                primaryBlocker: .auditFindings
+            ),
+            evolutionControlSurface: DecisionEvolutionControlSurface(
+                activeCheckpoint: nil,
+                reviewCheckpoint: nil,
+                pendingReviewQueue: [],
+                latestPersistedLineage: nil
+            ),
+            pendingReviewCheckpointCount: 0,
+            pendingReviewQueue: []
+        )
+
+        app.presentEvolutionControlCenter(
+            for: .home,
+            flightDeck: flightDeck
+        )
+
+        XCTAssertTrue(app.isEvolutionControlCenterPresented)
+        XCTAssertEqual(app.evolutionControlEntryContext?.controlEntryKind, .audit)
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.title,
+            DecisionEvolutionWidgetControlEntryLexiconSupport.auditTitle
+        )
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.systemImage,
+            "exclamationmark.circle"
+        )
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.headline,
+            DecisionEvolutionReleasePathPresentationSupport.watchingAuditFindingsHeadline
+        )
+        XCTAssertEqual(
+            app.evolutionControlEntryContext?.detail,
+            "Factors: evidence_caveat_load • Evidence supported/ruleBound"
+        )
     }
 
     private func makeCheckpointApplyContainer() throws -> ModelContainer {
@@ -2945,11 +3308,23 @@ final class DecisionEvolutionEngineTests: XCTestCase {
             }.count
         )
         let expectedControlEntryKind = surfaceState.policy.widgetControlEntryKind
+        let expectedTriggerReason = attentionSignal.resolvedTriggerReason(
+            fallback: surfaceState.operatorSnapshot.primaryReason,
+            controlEntryKind: expectedControlEntryKind,
+            horizonDiagnosticsLines: surfaceState
+                .operatorSnapshot
+                .summaryPresentation
+                .horizonDiagnosticsLines
+        )
+        let expectedPrimaryReason = expectedControlEntryKind == .audit
+            ? expectedTriggerReason
+            : surfaceState.operatorSnapshot.primaryReason
+        let expectedAttentionDetail = expectedControlEntryKind == .audit
+            ? expectedTriggerReason
+            : attentionSignal.detail
         let expectedControlEntry = surfaceState.policy.widgetControlEntryPresentation(
             prompt: attentionSignal.headline,
-            triggerReason: attentionSignal.resolvedTriggerReason(
-                fallback: surfaceState.operatorSnapshot.primaryReason
-            )
+            triggerReason: expectedTriggerReason
         )
         let expectedPrimaryActionKind: DecisionEvolutionWidgetPrimaryActionKind =
             expectedControlEntry == nil ? .quick : .evolutionControl
@@ -2958,6 +3333,7 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         XCTAssertEqual(evolution?.activeCheckpointSourceID, surfaceState.policy.input.activeCheckpointSource.rawValue, file: file, line: line)
         XCTAssertEqual(evolution?.controlEntryKindID, expectedControlEntryKind?.rawValue, file: file, line: line)
         XCTAssertEqual(evolution?.storedControlEntry, expectedControlEntry, file: file, line: line)
+        XCTAssertEqual(evolution?.primaryReason, expectedPrimaryReason, file: file, line: line)
         XCTAssertEqual(snapshot.primaryActionPresentation.kind, expectedPrimaryActionKind, file: file, line: line)
         XCTAssertEqual(evolution?.hasActiveCheckpoint, controlSurface.activePresentation != nil, file: file, line: line)
         XCTAssertEqual(evolution?.hasReviewCheckpoint, controlSurface.reviewPresentation != nil, file: file, line: line)
@@ -2968,7 +3344,7 @@ final class DecisionEvolutionEngineTests: XCTestCase {
         XCTAssertEqual(evolution?.attentionSeverityID, attentionSignal.severity.rawValue, file: file, line: line)
         XCTAssertEqual(evolution?.attentionBadgeValue, attentionSignal.badgeValue, file: file, line: line)
         XCTAssertEqual(evolution?.attentionHeadline, attentionSignal.headline, file: file, line: line)
-        XCTAssertEqual(evolution?.attentionDetail, attentionSignal.detail, file: file, line: line)
+        XCTAssertEqual(evolution?.attentionDetail, expectedAttentionDetail, file: file, line: line)
         XCTAssertEqual(
             evolution?.surfacePresentation.controlEntry?.title,
             expectedControlEntry?.title,

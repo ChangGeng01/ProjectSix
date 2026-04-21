@@ -216,7 +216,8 @@ final class DecisionSessionEngineReviewDigestBuilderTests: XCTestCase {
                 hostGatePercent: 58,
                 reviewDirectiveLine: "Review evidence caveat before promotion.",
                 riskFactorsLine: "Factors: evidence_caveat_load",
-                reasonCodesLine: "Reason codes: evidence.caveat"
+                reasonCodesLine: "Reason codes: evidence.caveat",
+                courtLine: "Court: agency delay right • remand L9"
             ),
             latestEventID: "evt-5",
             latestEventSeq: 5,
@@ -254,7 +255,7 @@ final class DecisionSessionEngineReviewDigestBuilderTests: XCTestCase {
         ])
         XCTAssertEqual(
             reviewLines.last?.detail,
-            "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+            "Factors: evidence_caveat_load • Reason codes: evidence.caveat • Court: agency delay right • remand L9"
         )
         XCTAssertEqual(reviewLines.last?.severity, .watch)
     }
@@ -276,7 +277,7 @@ final class DecisionSessionEngineReviewDigestBuilderTests: XCTestCase {
                 permitMode: "replace",
                 hostGatePercent: 63,
                 sovereignVerdictLine: "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
-                sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • lock session • quarantine session",
+                sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session",
                 sovereignAuditLine: "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
             ),
             latestEventID: "evt-8",
@@ -315,7 +316,7 @@ final class DecisionSessionEngineReviewDigestBuilderTests: XCTestCase {
         ])
         XCTAssertEqual(
             reviewLines[1].detail,
-            "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine • Sovereign authority • tokens memoryWrite • lock session • quarantine session • Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+            "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine • Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session • Sovereign audit • BR-SOV-004 • ref audit.session-l14"
         )
         XCTAssertEqual(reviewLines[1].severity, .watch)
     }

@@ -6,17 +6,27 @@ struct DecisionSessionEngineSessionDigestView: View {
     let checkpointBudgetLine: String?
     let checkpointDecisionLine: String?
     let checkpointTaskLine: String?
+    let checkpointWindGateLine: String?
+    let checkpointPresenceLine: String?
     let checkpointPressureLine: String?
     let checkpointRiskFactorsLine: String?
     let checkpointReasonCodesLine: String?
+    let checkpointCourtLine: String?
     let checkpointAuditLine: String?
     let checkpointSovereignVerdictLine: String?
     let checkpointSovereignAuthorityLine: String?
     let checkpointSovereignAuditLine: String?
     let checkpointKillSwitchesLine: String?
     let checkpointActionLine: String?
+    let checkpointMorphLine: String?
     let checkpointLungLine: String?
     let checkpointHotColdLine: String?
+    let checkpointPrecisionLine: String?
+    let checkpointOrganPackageLine: String?
+    let checkpointOrganDeltaLine: String?
+    let checkpointSchedulerLine: String?
+    let checkpointThermalExchangeLine: String?
+    let checkpointIntegrityWeaveLine: String?
     let checkpointResumeLine: String?
     let checkpointRollbackLine: String?
     let checkpointSovereignBridgeLine: String?
@@ -36,17 +46,27 @@ struct DecisionSessionEngineSessionDigestView: View {
         checkpointBudgetLine: String? = nil,
         checkpointDecisionLine: String? = nil,
         checkpointTaskLine: String? = nil,
+        checkpointWindGateLine: String? = nil,
+        checkpointPresenceLine: String? = nil,
         checkpointPressureLine: String? = nil,
         checkpointRiskFactorsLine: String? = nil,
         checkpointReasonCodesLine: String? = nil,
+        checkpointCourtLine: String? = nil,
         checkpointAuditLine: String? = nil,
         checkpointSovereignVerdictLine: String? = nil,
         checkpointSovereignAuthorityLine: String? = nil,
         checkpointSovereignAuditLine: String? = nil,
         checkpointKillSwitchesLine: String? = nil,
         checkpointActionLine: String? = nil,
+        checkpointMorphLine: String? = nil,
         checkpointLungLine: String? = nil,
         checkpointHotColdLine: String? = nil,
+        checkpointPrecisionLine: String? = nil,
+        checkpointOrganPackageLine: String? = nil,
+        checkpointOrganDeltaLine: String? = nil,
+        checkpointSchedulerLine: String? = nil,
+        checkpointThermalExchangeLine: String? = nil,
+        checkpointIntegrityWeaveLine: String? = nil,
         checkpointResumeLine: String? = nil,
         checkpointRollbackLine: String? = nil,
         checkpointSovereignBridgeLine: String? = nil,
@@ -65,17 +85,27 @@ struct DecisionSessionEngineSessionDigestView: View {
         self.checkpointBudgetLine = checkpointBudgetLine
         self.checkpointDecisionLine = checkpointDecisionLine
         self.checkpointTaskLine = checkpointTaskLine
+        self.checkpointWindGateLine = checkpointWindGateLine
+        self.checkpointPresenceLine = checkpointPresenceLine
         self.checkpointPressureLine = checkpointPressureLine
         self.checkpointRiskFactorsLine = checkpointRiskFactorsLine
         self.checkpointReasonCodesLine = checkpointReasonCodesLine
+        self.checkpointCourtLine = checkpointCourtLine
         self.checkpointAuditLine = checkpointAuditLine
         self.checkpointSovereignVerdictLine = checkpointSovereignVerdictLine
         self.checkpointSovereignAuthorityLine = checkpointSovereignAuthorityLine
         self.checkpointSovereignAuditLine = checkpointSovereignAuditLine
         self.checkpointKillSwitchesLine = checkpointKillSwitchesLine
         self.checkpointActionLine = checkpointActionLine
+        self.checkpointMorphLine = checkpointMorphLine
         self.checkpointLungLine = checkpointLungLine
         self.checkpointHotColdLine = checkpointHotColdLine
+        self.checkpointPrecisionLine = checkpointPrecisionLine
+        self.checkpointOrganPackageLine = checkpointOrganPackageLine
+        self.checkpointOrganDeltaLine = checkpointOrganDeltaLine
+        self.checkpointSchedulerLine = checkpointSchedulerLine
+        self.checkpointThermalExchangeLine = checkpointThermalExchangeLine
+        self.checkpointIntegrityWeaveLine = checkpointIntegrityWeaveLine
         self.checkpointResumeLine = checkpointResumeLine
         self.checkpointRollbackLine = checkpointRollbackLine
         self.checkpointSovereignBridgeLine = checkpointSovereignBridgeLine
@@ -121,6 +151,20 @@ struct DecisionSessionEngineSessionDigestView: View {
                     .lineLimit(2)
             }
 
+            if let checkpointWindGateLine {
+                Text(checkpointWindGateLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointPresenceLine {
+                Text(checkpointPresenceLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
             if let checkpointPressureLine {
                 Text(checkpointPressureLine)
                     .font(.caption2)
@@ -137,6 +181,13 @@ struct DecisionSessionEngineSessionDigestView: View {
 
             if let checkpointReasonCodesLine {
                 Text(checkpointReasonCodesLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointCourtLine {
+                Text(checkpointCourtLine)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -184,6 +235,13 @@ struct DecisionSessionEngineSessionDigestView: View {
                     .lineLimit(2)
             }
 
+            if let checkpointMorphLine {
+                Text(checkpointMorphLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
             if let checkpointLungLine {
                 Text(checkpointLungLine)
                     .font(.caption2)
@@ -193,6 +251,48 @@ struct DecisionSessionEngineSessionDigestView: View {
 
             if let checkpointHotColdLine {
                 Text(checkpointHotColdLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointPrecisionLine {
+                Text(checkpointPrecisionLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointOrganPackageLine {
+                Text(checkpointOrganPackageLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointOrganDeltaLine {
+                Text(checkpointOrganDeltaLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointSchedulerLine {
+                Text(checkpointSchedulerLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointThermalExchangeLine {
+                Text(checkpointThermalExchangeLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let checkpointIntegrityWeaveLine {
+                Text(checkpointIntegrityWeaveLine)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)

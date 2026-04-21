@@ -63,6 +63,11 @@ public enum BASEBrainSchemaGovernanceRegistry {
             tests: ["schema.sovereign_commit_token.current", "schema.sovereign_commit_token.backward"]
         ),
         entry(
+            "SovereignWarrant",
+            versionedType: BASSovereignWarrant.self,
+            tests: ["schema.sovereign_warrant.current", "schema.sovereign_warrant.backward"]
+        ),
+        entry(
             "SovereignLock",
             versionedType: BASSovereignLock.self,
             tests: ["schema.sovereign_lock.current", "schema.sovereign_lock.backward"]
@@ -198,6 +203,61 @@ public enum BASEBrainSchemaGovernanceRegistry {
             tests: ["schema.host_version.current", "schema.host_version.backward"]
         ),
         entry(
+            "TemporalMemoryField",
+            versionedType: BASTemporalMemoryField.self,
+            tests: ["schema.temporal_memory_field.current", "schema.temporal_memory_field.backward"]
+        ),
+        entry(
+            "TemporalMemoryRecord",
+            versionedType: BASTemporalMemoryRecord.self,
+            tests: ["schema.temporal_memory_record.current", "schema.temporal_memory_record.backward"]
+        ),
+        entry(
+            "MemoryTemperatureProfile",
+            versionedType: BASMemoryTemperatureProfile.self,
+            tests: ["schema.memory_temperature_profile.current", "schema.memory_temperature_profile.backward"]
+        ),
+        entry(
+            "MemoryProvenanceSeal",
+            versionedType: BASMemoryProvenanceSeal.self,
+            tests: ["schema.memory_provenance_seal.current", "schema.memory_provenance_seal.backward"]
+        ),
+        entry(
+            "MemoryEpisodeArc",
+            versionedType: BASMemoryEpisodeArc.self,
+            tests: ["schema.memory_episode_arc.current", "schema.memory_episode_arc.backward"]
+        ),
+        entry(
+            "MemoryConflictCluster",
+            versionedType: BASMemoryConflictCluster.self,
+            tests: ["schema.memory_conflict_cluster.current", "schema.memory_conflict_cluster.backward"]
+        ),
+        entry(
+            "MemoryContinuityAnchor",
+            versionedType: BASMemoryContinuityAnchor.self,
+            tests: ["schema.memory_continuity_anchor.current", "schema.memory_continuity_anchor.backward"]
+        ),
+        entry(
+            "MemoryReplayFrame",
+            versionedType: BASMemoryReplayFrame.self,
+            tests: ["schema.memory_replay_frame.current", "schema.memory_replay_frame.backward"]
+        ),
+        entry(
+            "MemoryQuarantineRecord",
+            versionedType: BASMemoryQuarantineRecord.self,
+            tests: ["schema.memory_quarantine_record.current", "schema.memory_quarantine_record.backward"]
+        ),
+        entry(
+            "MemorySanctumEntry",
+            versionedType: BASMemorySanctumEntry.self,
+            tests: ["schema.memory_sanctum_entry.current", "schema.memory_sanctum_entry.backward"]
+        ),
+        entry(
+            "MemoryForgetCascade",
+            versionedType: BASMemoryForgetCascade.self,
+            tests: ["schema.memory_forget_cascade.current", "schema.memory_forget_cascade.backward"]
+        ),
+        entry(
             "MemoryAtom",
             versionedType: BASMemoryAtom.self,
             tests: ["schema.memory.current", "schema.memory.backward"]
@@ -228,6 +288,31 @@ public enum BASEBrainSchemaGovernanceRegistry {
             tests: ["schema.critique_bundle.current", "schema.critique_bundle.backward"]
         ),
         entry(
+            "UncertaintyLedger",
+            versionedType: BASUncertaintyLedger.self,
+            tests: ["schema.uncertainty_ledger.current", "schema.uncertainty_ledger.backward"]
+        ),
+        entry(
+            "EvidenceDebt",
+            versionedType: BASEvidenceDebt.self,
+            tests: ["schema.evidence_debt.current", "schema.evidence_debt.backward"]
+        ),
+        entry(
+            "ConvergenceCertificate",
+            versionedType: BASConvergenceCertificate.self,
+            tests: ["schema.convergence_certificate.current", "schema.convergence_certificate.backward"]
+        ),
+        entry(
+            "LoopLeaseReceipt",
+            versionedType: BASLoopLeaseReceipt.self,
+            tests: ["schema.loop_lease_receipt.current", "schema.loop_lease_receipt.backward"]
+        ),
+        entry(
+            "SovereignBreakpointHint",
+            versionedType: BASSovereignBreakpointHint.self,
+            tests: ["schema.sovereign_breakpoint_hint.current", "schema.sovereign_breakpoint_hint.backward"]
+        ),
+        entry(
             "RiskPermitBinding",
             versionedType: BASRiskPermitBinding.self,
             tests: ["schema.risk_permit_binding.current", "schema.risk_permit_binding.backward"]
@@ -256,6 +341,16 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "PrecisionProfile",
             versionedType: BASPrecisionProfile.self,
             tests: ["schema.precision_profile.current", "schema.precision_profile.backward"]
+        ),
+        entry(
+            "ThermalExchanger",
+            versionedType: BASThermalExchangeFrame.self,
+            tests: ["schema.thermal_exchange.current", "schema.thermal_exchange.backward"]
+        ),
+        entry(
+            "IntegrityWeave",
+            versionedType: BASIntegrityWeaveFrame.self,
+            tests: ["schema.integrity_weave.current", "schema.integrity_weave.backward"]
         ),
         entry(
             "ResumeFrame",
@@ -391,6 +486,116 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "ActionPermit",
             versionedType: BASActionPermit.self,
             tests: ["schema.permit.current", "schema.permit.backward"]
+        ),
+        entry(
+            "RiskField",
+            versionedType: BASRiskField.self,
+            tests: ["schema.risk_field.current", "schema.risk_field.backward"]
+        ),
+        entry(
+            "HazardVector",
+            versionedType: BASHazardVector.self,
+            tests: ["schema.hazard_vector.current", "schema.hazard_vector.backward"]
+        ),
+        entry(
+            "HarmRadiusMap",
+            versionedType: BASHarmRadiusMap.self,
+            tests: ["schema.harm_radius_map.current", "schema.harm_radius_map.backward"]
+        ),
+        entry(
+            "ReversibilityProfile",
+            versionedType: BASReversibilityProfile.self,
+            tests: ["schema.reversibility_profile.current", "schema.reversibility_profile.backward"]
+        ),
+        entry(
+            "EvidenceSufficiency",
+            versionedType: BASEvidenceSufficiency.self,
+            tests: ["schema.evidence_sufficiency.current", "schema.evidence_sufficiency.backward"]
+        ),
+        entry(
+            "GSITrace",
+            versionedType: BASGSITrace.self,
+            tests: ["schema.gsi_trace.current", "schema.gsi_trace.backward"]
+        ),
+        entry(
+            "VulnerabilityCoupling",
+            versionedType: BASVulnerabilityCoupling.self,
+            tests: ["schema.vulnerability_coupling.current", "schema.vulnerability_coupling.backward"]
+        ),
+        entry(
+            "ActionModeDecision",
+            versionedType: BASActionModeDecision.self,
+            tests: ["schema.action_mode_decision.current", "schema.action_mode_decision.backward"]
+        ),
+        entry(
+            "DelayReservation",
+            versionedType: BASDelayReservation.self,
+            tests: ["schema.delay_reservation.current", "schema.delay_reservation.backward"]
+        ),
+        entry(
+            "ProtectiveSubstitute",
+            versionedType: BASProtectiveSubstitute.self,
+            tests: ["schema.protective_substitute.current", "schema.protective_substitute.backward"]
+        ),
+        entry(
+            "SovereignEscalationHint",
+            versionedType: BASSovereignEscalationHint.self,
+            tests: ["schema.sovereign_escalation_hint.current", "schema.sovereign_escalation_hint.backward"]
+        ),
+        entry(
+            "RiskDecisionPackage",
+            versionedType: BASRiskDecisionPackage.self,
+            tests: ["schema.risk_decision_package.current", "schema.risk_decision_package.backward"]
+        ),
+        entry(
+            "ExperienceCandidate",
+            versionedType: BASExperienceCandidate.self,
+            tests: ["schema.experience_candidate.current", "schema.experience_candidate.backward"]
+        ),
+        entry(
+            "ShadowTrialRecord",
+            versionedType: BASShadowTrialRecord.self,
+            tests: ["schema.shadow_trial_record.current", "schema.shadow_trial_record.backward"]
+        ),
+        entry(
+            "VersionDelta",
+            versionedType: BASVersionDelta.self,
+            tests: ["schema.version_delta.current", "schema.version_delta.backward"]
+        ),
+        entry(
+            "WorkflowCandidate",
+            versionedType: BASWorkflowCandidate.self,
+            tests: ["schema.workflow_candidate.current", "schema.workflow_candidate.backward"]
+        ),
+        entry(
+            "GuardTemplateCandidate",
+            versionedType: BASGuardTemplateCandidate.self,
+            tests: ["schema.guard_template_candidate.current", "schema.guard_template_candidate.backward"]
+        ),
+        entry(
+            "BiasRecord",
+            versionedType: BASBiasRecord.self,
+            tests: ["schema.bias_record.current", "schema.bias_record.backward"]
+        ),
+        entry(
+            "RiskPatternCandidate",
+            versionedType: BASRiskPatternCandidate.self,
+            tests: ["schema.risk_pattern_candidate.current", "schema.risk_pattern_candidate.backward"]
+        ),
+        entry(
+            "RetractionOrder",
+            versionedType: BASRetractionOrder.self,
+            tests: ["schema.retraction_order.current", "schema.retraction_order.backward"]
+        ),
+        entry(
+            "LearningExportBundle",
+            versionedType: BASLearningExportBundle.self,
+            tests: ["schema.learning_export_bundle.current", "schema.learning_export_bundle.backward"]
+        ),
+        entry(
+            "EvolutionSeal",
+            versionedType: BASEvolutionSeal.self,
+            tests: ["schema.evolution_seal.current", "schema.evolution_seal.backward"]
         ),
         entry(
             "UpdateTicket",

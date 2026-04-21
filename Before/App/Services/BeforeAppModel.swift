@@ -40,6 +40,50 @@ struct DecisionSessionEnginePendingImportDraft: Identifiable, Sendable {
     }
 }
 
+struct DecisionEvolutionControlEntryContext: Equatable, Sendable {
+    let entrySource: EntrySource
+    let controlEntryKindID: String?
+    let headline: String
+    let detail: String?
+
+    var controlEntryKind: DecisionEvolutionWidgetControlEntryKind? {
+        controlEntryKindID.flatMap(DecisionEvolutionWidgetControlEntryKind.init(rawValue:))
+    }
+
+    var title: String {
+        controlEntryKind.map(DecisionEvolutionWidgetControlEntryLexiconSupport.title(for:))
+            ?? DecisionEvolutionWidgetControlEntryLexiconSupport.openTitle
+    }
+
+    var systemImage: String {
+        controlEntryKind.map(DecisionEvolutionWidgetControlEntryLexiconSupport.systemImage(for:))
+            ?? "arrow.up.right.circle"
+    }
+
+    init(
+        entrySource: EntrySource,
+        controlEntryKindID: String?,
+        headline: String,
+        detail: String?
+    ) {
+        self.entrySource = entrySource
+        self.controlEntryKindID = controlEntryKindID
+        self.headline = headline
+        self.detail = detail
+    }
+
+    init?(envelope: DecisionIntentEnvelope) {
+        guard envelope.kind == .openEvolutionControl else { return nil }
+        let controlEntryKind = envelope.controlEntryKind
+        let fallbackHeadline = controlEntryKind.map(DecisionEvolutionWidgetControlEntryLexiconSupport.title(for:))
+            ?? DecisionEvolutionWidgetControlEntryLexiconSupport.openTitle
+        self.entrySource = envelope.entrySource
+        self.controlEntryKindID = controlEntryKind?.rawValue
+        self.headline = envelope.promptSeed ?? fallbackHeadline
+        self.detail = envelope.triggerReason
+    }
+}
+
 @MainActor
 final class BeforeAppModel: ObservableObject {
     private static var deferredSessionEngineTasks: [UUID: Task<Void, Never>] = [:]
@@ -61,6 +105,7 @@ final class BeforeAppModel: ObservableObject {
     @Published private(set) var evolutionControlMutationEpoch: Int = 0
     @Published private(set) var latestEvolutionMutationOutcome: DecisionEvolutionMutationOutcome?
     @Published private(set) var activeEvolutionKillSwitches: [BASKillSwitchID]
+    @Published private(set) var evolutionControlEntryContext: DecisionEvolutionControlEntryContext?
     @Published private(set) var gemmaLibraryMutationEpoch: Int = 0
     @Published private(set) var isDownloadingGemmaModel = false
     @Published private(set) var isDownloadingOpenModel = false
@@ -216,6 +261,7 @@ final class BeforeAppModel: ObservableObject {
         latestEvolutionMutationOutcome = nil
         pendingReflectionContext = nil
         shouldPromptReflectionAfterBackground = false
+        evolutionControlEntryContext = nil
     }
 
     func dismissStartupNotice() {
@@ -618,8 +664,10 @@ final class BeforeAppModel: ObservableObject {
                         interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
                     },
                     performRestore: { restoreActiveWorkspaceIfNeeded() },
-                    performOpenEvolutionControl: {
-                        presentEvolutionControlCenter()
+                    performOpenEvolutionControl: { envelope in
+                        presentEvolutionControlCenter(
+                            entryContext: DecisionEvolutionControlEntryContext(envelope: envelope)
+                        )
                     },
                     refreshCurrentBrain: { source in
                         refreshGlobalBrainState(source: source)
@@ -654,8 +702,10 @@ final class BeforeAppModel: ObservableObject {
                         interventionCandidate = suggestion.map(makeInterventionCandidate(from:))
                     },
                     performRestore: { restoreActiveWorkspaceIfNeeded() },
-                    performOpenEvolutionControl: {
-                        presentEvolutionControlCenter()
+                    performOpenEvolutionControl: { envelope in
+                        presentEvolutionControlCenter(
+                            entryContext: DecisionEvolutionControlEntryContext(envelope: envelope)
+                        )
                     },
                     refreshCurrentBrain: { source in
                         refreshGlobalBrainState(source: source)
@@ -1331,6 +1381,7 @@ final class BeforeAppModel: ObservableObject {
 
     @MainActor
     func approveEvolutionCheckpoint(checkpointID: String) {
+        let context = modelContainer.mainContext
         let updated = updateEvolutionCheckpoint {
             BehavioralAISubstrateBridge.setEvolutionCheckpointApproval(
                 checkpointID,
@@ -1339,10 +1390,16 @@ final class BeforeAppModel: ObservableObject {
             )
         }
         guard updated != nil else {
+            let blockReason = BehavioralAISubstrateBridge.evolutionCheckpointApprovalBlockReason(
+                checkpointID,
+                to: .automatic,
+                in: context
+            )
             publishEvolutionMutationOutcome(
                 kind: .approveCheckpoint,
                 title: "Approve checkpoint",
-                message: "Checkpoint \(checkpointID) could not be approved for automatic evolution.",
+                message: blockReason
+                    ?? "Checkpoint \(checkpointID) could not be approved for automatic evolution.",
                 isSuccess: false,
                 isDestructive: false,
                 checkpointIDs: [checkpointID]
@@ -1797,11 +1854,26 @@ final class BeforeAppModel: ObservableObject {
         let recommendedKillSwitchCount = workspaceFacts.recommendedKillSwitches.filter {
             !activeKillSwitchIDs.contains($0)
         }.count
+        let horizonDiagnosticsLines = evolutionSurfaceState
+            .operatorSnapshot
+            .summaryPresentation
+            .horizonDiagnosticsLines
+        let widgetTriggerReason = attentionSignal.resolvedTriggerReason(
+            fallback: evolutionSurfaceState.operatorSnapshot.primaryReason,
+            controlEntryKind: evolutionSurfaceState.policy.widgetControlEntryKind,
+            horizonDiagnosticsLines: horizonDiagnosticsLines
+        )
+        let widgetAttentionDetail =
+            evolutionSurfaceState.policy.widgetControlEntryKind == .audit
+            ? widgetTriggerReason
+            : attentionSignal.detail
+        let widgetPrimaryReason =
+            evolutionSurfaceState.policy.widgetControlEntryKind == .audit
+            ? widgetTriggerReason
+            : evolutionSurfaceState.operatorSnapshot.primaryReason
         let widgetControlEntry = evolutionSurfaceState.policy.widgetControlEntryPresentation(
             prompt: attentionSignal.headline,
-            triggerReason: attentionSignal.resolvedTriggerReason(
-                fallback: evolutionSurfaceState.operatorSnapshot.primaryReason
-            )
+            triggerReason: widgetTriggerReason
         )
         let snapshot = WidgetSnapshot(
             safeMessage: WidgetSafeCopy.message(
@@ -1816,11 +1888,11 @@ final class BeforeAppModel: ObservableObject {
                 controlEntryKindID: evolutionSurfaceState.policy.widgetControlEntryKind?.rawValue,
                 storedControlEntry: widgetControlEntry,
                 headline: evolutionSurfaceState.operatorSnapshot.headline,
-                primaryReason: evolutionSurfaceState.operatorSnapshot.primaryReason,
+                primaryReason: widgetPrimaryReason,
                 attentionSeverityID: attentionSignal.severity.rawValue,
                 attentionBadgeValue: attentionSignal.badgeValue,
                 attentionHeadline: attentionSignal.headline,
-                attentionDetail: attentionSignal.detail,
+                attentionDetail: widgetAttentionDetail,
                 hasActiveCheckpoint: controlSurface.activePresentation != nil,
                 hasReviewCheckpoint: controlSurface.reviewPresentation != nil,
                 pendingReviewCount: workspaceFacts.pendingReviewCount,
@@ -2000,12 +2072,93 @@ final class BeforeAppModel: ObservableObject {
         return inventory.buildControlSurface()
     }
 
-    func presentEvolutionControlCenter() {
+    @MainActor
+    func evolutionControlEntryContext(
+        for contract: DecisionEvolutionSurfaceContract,
+        flightDeck: DecisionSystemFlightDeck
+    ) -> DecisionEvolutionControlEntryContext? {
+        let surfaceState = makeEvolutionSurfaceState(
+            contract: contract,
+            flightDeck: flightDeck
+        )
+        let triggerReason = surfaceState.attentionSignal.resolvedTriggerReason(
+            fallback: surfaceState.operatorSnapshot.primaryReason,
+            controlEntryKind: surfaceState.policy.widgetControlEntryKind,
+            horizonDiagnosticsLines: surfaceState
+                .operatorSnapshot
+                .summaryPresentation
+                .horizonDiagnosticsLines
+        )
+        guard let controlEntry = surfaceState.policy.widgetControlEntryPresentation(
+            prompt: surfaceState.attentionSignal.headline,
+            triggerReason: triggerReason
+        ) else {
+            return nil
+        }
+
+        return DecisionEvolutionControlEntryContext(
+            entrySource: .app,
+            controlEntryKindID: controlEntry.kindID,
+            headline: controlEntry.prompt,
+            detail: controlEntry.triggerReason
+                ?? EntrySource.app.defaultEvolutionControlTriggerReason(
+                    for: surfaceState.policy.widgetControlEntryKind
+                )
+        )
+    }
+
+    @MainActor
+    func presentEvolutionControlCenter(
+        for contract: DecisionEvolutionSurfaceContract,
+        flightDeck: DecisionSystemFlightDeck
+    ) {
+        presentEvolutionControlCenter(
+            entryContext: evolutionControlEntryContext(
+                for: contract,
+                flightDeck: flightDeck
+            )
+        )
+    }
+
+    @MainActor
+    func presentEvolutionControlCenterForCurrentSurface() async {
+        guard let contract = currentEvolutionNavigationSurfaceContract else {
+            presentEvolutionControlCenter()
+            return
+        }
+
+        let flightDeck = await systemFlightDeck()
+        presentEvolutionControlCenter(
+            for: contract,
+            flightDeck: flightDeck
+        )
+    }
+
+    func presentEvolutionControlCenter(
+        entryContext: DecisionEvolutionControlEntryContext? = nil
+    ) {
+        evolutionControlEntryContext = entryContext
         isEvolutionControlCenterPresented = true
     }
 
     func dismissEvolutionControlCenter() {
+        evolutionControlEntryContext = nil
         isEvolutionControlCenterPresented = false
+    }
+
+    private var currentEvolutionNavigationSurfaceContract: DecisionEvolutionSurfaceContract? {
+        switch selectedTab {
+        case .home:
+            .home
+        case .history:
+            .history
+        case .portrait:
+            .portrait
+        case .settings:
+            .settings
+        case .box, .support:
+            nil
+        }
     }
 
     func presentSessionEngineControlCenter() {
@@ -2843,7 +2996,7 @@ final class BeforeAppModel: ObservableObject {
         clearActiveDecisionFlows()
         reflectionContext = nil
         letGoContext = nil
-        isEvolutionControlCenterPresented = false
+        dismissEvolutionControlCenter()
         pendingReflectionContext = nil
         shouldPromptReflectionAfterBackground = false
         persistPendingReflectionState()

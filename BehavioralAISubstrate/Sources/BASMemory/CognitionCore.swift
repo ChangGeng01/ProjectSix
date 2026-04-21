@@ -1011,6 +1011,18 @@ public enum BASDecisionBrainCompiler {
         merged.loadedPendingMemoryCount = max(seed.loadedPendingMemoryCount, computed.loadedPendingMemoryCount)
         merged.deferredCandidateCount = max(seed.deferredCandidateCount, computed.deferredCandidateCount)
         merged.admittedCandidateCount = max(seed.admittedCandidateCount, computed.admittedCandidateCount)
+        merged.externallyRefreshedCandidateCount = max(
+            seed.externallyRefreshedCandidateCount,
+            computed.externallyRefreshedCandidateCount
+        )
+        merged.quarantinedObservationCount = max(
+            seed.quarantinedObservationCount,
+            computed.quarantinedObservationCount
+        )
+        merged.evidenceCaveatedCandidateCount = max(
+            seed.evidenceCaveatedCandidateCount,
+            computed.evidenceCaveatedCandidateCount
+        )
         merged.screenedOutMemoryCount = max(seed.screenedOutMemoryCount, computed.screenedOutMemoryCount)
         merged.screenedOutPendingMemoryCount = max(seed.screenedOutPendingMemoryCount, computed.screenedOutPendingMemoryCount)
         merged.loadedReasonCounts = mergeReasonCounts(seed.loadedReasonCounts, computed.loadedReasonCounts)

@@ -473,7 +473,7 @@ enum DecisionIntelligenceCoordinator {
                 neuralState: neuralState,
                 brainState: brainState
             )
-        let allowsProtectivePath = eBrainTurn?.actionPermit.mode.isProtective == true
+        let allowsProtectivePath = eBrainTurn?.hasProtectiveSurfaceGuidance == true
         guard (preferences.onDeviceIntelligenceMode.isEnabled && quickStrategy.allowsModelInvocation)
                 || allowsProtectivePath else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineQuickResult(
@@ -525,7 +525,7 @@ enum DecisionIntelligenceCoordinator {
                 neuralState: neuralState,
                 brainState: brainState
             )
-        let allowsProtectivePath = eBrainTurn?.actionPermit.mode.isProtective == true
+        let allowsProtectivePath = eBrainTurn?.hasProtectiveSurfaceGuidance == true
         guard (preferences.onDeviceIntelligenceMode.isEnabled && balanceStrategy.allowsModelInvocation)
                 || allowsProtectivePath else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineBalanceResult(
@@ -577,7 +577,7 @@ enum DecisionIntelligenceCoordinator {
                 neuralState: neuralState,
                 brainState: brainState
             )
-        let allowsProtectivePath = eBrainTurn?.actionPermit.mode.isProtective == true
+        let allowsProtectivePath = eBrainTurn?.hasProtectiveSurfaceGuidance == true
         guard (preferences.onDeviceIntelligenceMode.isEnabled && mirrorStrategy.allowsModelInvocation)
                 || allowsProtectivePath else { return nil }
         return await DecisionIntelligenceProviderPipeline.refineMirrorResult(

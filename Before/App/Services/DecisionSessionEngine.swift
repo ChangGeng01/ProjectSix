@@ -183,8 +183,19 @@ struct DecisionSessionCheckpointEBrainAnchor: Codable, Equatable, Sendable {
     var permitMode: String?
     var hostGatePercent: Int?
     var reviewDirectiveLine: String?
+    var presenceLine: String?
     var riskFactorsLine: String?
     var reasonCodesLine: String?
+    var courtLine: String?
+    var versionTreeLine: String?
+    var retractionLine: String?
+    var stackedModes: [String]
+    var assertionCeiling: String?
+    var allowedDomains: [String]
+    var blockedDomains: [String]
+    var delayType: String?
+    var substituteType: String?
+    var sovereignHintLevel: String?
     var sovereignVerdictLine: String?
     var sovereignAuthorityLine: String?
     var sovereignAuditLine: String?
@@ -193,10 +204,52 @@ struct DecisionSessionCheckpointEBrainAnchor: Codable, Equatable, Sendable {
     var hotColdMap: BASHotColdMap?
     var precisionProfile: BASPrecisionProfile?
     var lungState: BASLungState?
+    var thermalExchange: BASThermalExchangeFrame?
     var breathScheduler: BASBreathSchedulerFrame?
+    var integrityWeave: BASIntegrityWeaveFrame?
+    var organPackages: [BASOrganPackage]
+    var organDeltaPlan: BASOrganDeltaPlan?
     var resumeFrame: BASResumeFrame?
     var rollbackAnchor: BASRollbackAnchor?
     var sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult?
+
+    private enum CodingKeys: String, CodingKey {
+        case sessionID
+        case thoughtFoldChecksum
+        case riskLevel
+        case permitMode
+        case hostGatePercent
+        case reviewDirectiveLine
+        case presenceLine
+        case riskFactorsLine
+        case reasonCodesLine
+        case courtLine
+        case versionTreeLine
+        case retractionLine
+        case stackedModes
+        case assertionCeiling
+        case allowedDomains
+        case blockedDomains
+        case delayType
+        case substituteType
+        case sovereignHintLevel
+        case sovereignVerdictLine
+        case sovereignAuthorityLine
+        case sovereignAuditLine
+        case executionCapability
+        case morphGraph
+        case hotColdMap
+        case precisionProfile
+        case lungState
+        case thermalExchange
+        case breathScheduler
+        case integrityWeave
+        case organPackages
+        case organDeltaPlan
+        case resumeFrame
+        case rollbackAnchor
+        case sovereignBridgeResult
+    }
 
     init(
         sessionID: String? = nil,
@@ -205,8 +258,19 @@ struct DecisionSessionCheckpointEBrainAnchor: Codable, Equatable, Sendable {
         permitMode: String? = nil,
         hostGatePercent: Int? = nil,
         reviewDirectiveLine: String? = nil,
+        presenceLine: String? = nil,
         riskFactorsLine: String? = nil,
         reasonCodesLine: String? = nil,
+        courtLine: String? = nil,
+        versionTreeLine: String? = nil,
+        retractionLine: String? = nil,
+        stackedModes: [String] = [],
+        assertionCeiling: String? = nil,
+        allowedDomains: [String] = [],
+        blockedDomains: [String] = [],
+        delayType: String? = nil,
+        substituteType: String? = nil,
+        sovereignHintLevel: String? = nil,
         sovereignVerdictLine: String? = nil,
         sovereignAuthorityLine: String? = nil,
         sovereignAuditLine: String? = nil,
@@ -215,7 +279,11 @@ struct DecisionSessionCheckpointEBrainAnchor: Codable, Equatable, Sendable {
         hotColdMap: BASHotColdMap? = nil,
         precisionProfile: BASPrecisionProfile? = nil,
         lungState: BASLungState? = nil,
+        thermalExchange: BASThermalExchangeFrame? = nil,
         breathScheduler: BASBreathSchedulerFrame? = nil,
+        integrityWeave: BASIntegrityWeaveFrame? = nil,
+        organPackages: [BASOrganPackage] = [],
+        organDeltaPlan: BASOrganDeltaPlan? = nil,
         resumeFrame: BASResumeFrame? = nil,
         rollbackAnchor: BASRollbackAnchor? = nil,
         sovereignBridgeResult: DecisionFoldedLungSovereignBridgeResult? = nil
@@ -226,8 +294,19 @@ struct DecisionSessionCheckpointEBrainAnchor: Codable, Equatable, Sendable {
         self.permitMode = permitMode?.evolutionTrimmedNonEmpty
         self.hostGatePercent = hostGatePercent
         self.reviewDirectiveLine = reviewDirectiveLine?.evolutionTrimmedNonEmpty
+        self.presenceLine = presenceLine?.evolutionTrimmedNonEmpty
         self.riskFactorsLine = riskFactorsLine?.evolutionTrimmedNonEmpty
         self.reasonCodesLine = reasonCodesLine?.evolutionTrimmedNonEmpty
+        self.courtLine = courtLine?.evolutionTrimmedNonEmpty
+        self.versionTreeLine = versionTreeLine?.evolutionTrimmedNonEmpty
+        self.retractionLine = retractionLine?.evolutionTrimmedNonEmpty
+        self.stackedModes = Self.orderedUniqueStrings(stackedModes)
+        self.assertionCeiling = assertionCeiling?.evolutionTrimmedNonEmpty
+        self.allowedDomains = Self.orderedUniqueStrings(allowedDomains)
+        self.blockedDomains = Self.orderedUniqueStrings(blockedDomains)
+        self.delayType = delayType?.evolutionTrimmedNonEmpty
+        self.substituteType = substituteType?.evolutionTrimmedNonEmpty
+        self.sovereignHintLevel = sovereignHintLevel?.evolutionTrimmedNonEmpty
         self.sovereignVerdictLine = sovereignVerdictLine?.evolutionTrimmedNonEmpty
         self.sovereignAuthorityLine = sovereignAuthorityLine?.evolutionTrimmedNonEmpty
         self.sovereignAuditLine = sovereignAuditLine?.evolutionTrimmedNonEmpty
@@ -236,10 +315,106 @@ struct DecisionSessionCheckpointEBrainAnchor: Codable, Equatable, Sendable {
         self.hotColdMap = hotColdMap
         self.precisionProfile = precisionProfile
         self.lungState = lungState
+        self.thermalExchange = thermalExchange
         self.breathScheduler = breathScheduler
+        self.integrityWeave = integrityWeave
+        self.organPackages = organPackages
+        self.organDeltaPlan = organDeltaPlan
         self.resumeFrame = resumeFrame
         self.rollbackAnchor = rollbackAnchor
         self.sovereignBridgeResult = sovereignBridgeResult
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            sessionID: try container.decodeIfPresent(String.self, forKey: .sessionID),
+            thoughtFoldChecksum: try container.decodeIfPresent(String.self, forKey: .thoughtFoldChecksum),
+            riskLevel: try container.decodeIfPresent(String.self, forKey: .riskLevel),
+            permitMode: try container.decodeIfPresent(String.self, forKey: .permitMode),
+            hostGatePercent: try container.decodeIfPresent(Int.self, forKey: .hostGatePercent),
+            reviewDirectiveLine: try container.decodeIfPresent(String.self, forKey: .reviewDirectiveLine),
+            presenceLine: try container.decodeIfPresent(String.self, forKey: .presenceLine),
+            riskFactorsLine: try container.decodeIfPresent(String.self, forKey: .riskFactorsLine),
+            reasonCodesLine: try container.decodeIfPresent(String.self, forKey: .reasonCodesLine),
+            courtLine: try container.decodeIfPresent(String.self, forKey: .courtLine),
+            versionTreeLine: try container.decodeIfPresent(String.self, forKey: .versionTreeLine),
+            retractionLine: try container.decodeIfPresent(String.self, forKey: .retractionLine),
+            stackedModes: try container.decodeIfPresent([String].self, forKey: .stackedModes) ?? [],
+            assertionCeiling: try container.decodeIfPresent(String.self, forKey: .assertionCeiling),
+            allowedDomains: try container.decodeIfPresent([String].self, forKey: .allowedDomains) ?? [],
+            blockedDomains: try container.decodeIfPresent([String].self, forKey: .blockedDomains) ?? [],
+            delayType: try container.decodeIfPresent(String.self, forKey: .delayType),
+            substituteType: try container.decodeIfPresent(String.self, forKey: .substituteType),
+            sovereignHintLevel: try container.decodeIfPresent(String.self, forKey: .sovereignHintLevel),
+            sovereignVerdictLine: try container.decodeIfPresent(String.self, forKey: .sovereignVerdictLine),
+            sovereignAuthorityLine: try container.decodeIfPresent(String.self, forKey: .sovereignAuthorityLine),
+            sovereignAuditLine: try container.decodeIfPresent(String.self, forKey: .sovereignAuditLine),
+            executionCapability: try container.decodeIfPresent(DecisionSessionCheckpointExecutionCapability.self, forKey: .executionCapability),
+            morphGraph: try container.decodeIfPresent(BASMorphGraph.self, forKey: .morphGraph),
+            hotColdMap: try container.decodeIfPresent(BASHotColdMap.self, forKey: .hotColdMap),
+            precisionProfile: try container.decodeIfPresent(BASPrecisionProfile.self, forKey: .precisionProfile),
+            lungState: try container.decodeIfPresent(BASLungState.self, forKey: .lungState),
+            thermalExchange: try container.decodeIfPresent(BASThermalExchangeFrame.self, forKey: .thermalExchange),
+            breathScheduler: try container.decodeIfPresent(BASBreathSchedulerFrame.self, forKey: .breathScheduler),
+            integrityWeave: try container.decodeIfPresent(BASIntegrityWeaveFrame.self, forKey: .integrityWeave),
+            organPackages: try container.decodeIfPresent([BASOrganPackage].self, forKey: .organPackages) ?? [],
+            organDeltaPlan: try container.decodeIfPresent(BASOrganDeltaPlan.self, forKey: .organDeltaPlan),
+            resumeFrame: try container.decodeIfPresent(BASResumeFrame.self, forKey: .resumeFrame),
+            rollbackAnchor: try container.decodeIfPresent(BASRollbackAnchor.self, forKey: .rollbackAnchor),
+            sovereignBridgeResult: try container.decodeIfPresent(DecisionFoldedLungSovereignBridgeResult.self, forKey: .sovereignBridgeResult)
+        )
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(sessionID, forKey: .sessionID)
+        try container.encodeIfPresent(thoughtFoldChecksum, forKey: .thoughtFoldChecksum)
+        try container.encodeIfPresent(riskLevel, forKey: .riskLevel)
+        try container.encodeIfPresent(permitMode, forKey: .permitMode)
+        try container.encodeIfPresent(hostGatePercent, forKey: .hostGatePercent)
+        try container.encodeIfPresent(reviewDirectiveLine, forKey: .reviewDirectiveLine)
+        try container.encodeIfPresent(presenceLine, forKey: .presenceLine)
+        try container.encodeIfPresent(riskFactorsLine, forKey: .riskFactorsLine)
+        try container.encodeIfPresent(reasonCodesLine, forKey: .reasonCodesLine)
+        try container.encodeIfPresent(courtLine, forKey: .courtLine)
+        try container.encodeIfPresent(versionTreeLine, forKey: .versionTreeLine)
+        try container.encodeIfPresent(retractionLine, forKey: .retractionLine)
+        try container.encode(stackedModes, forKey: .stackedModes)
+        try container.encodeIfPresent(assertionCeiling, forKey: .assertionCeiling)
+        try container.encode(allowedDomains, forKey: .allowedDomains)
+        try container.encode(blockedDomains, forKey: .blockedDomains)
+        try container.encodeIfPresent(delayType, forKey: .delayType)
+        try container.encodeIfPresent(substituteType, forKey: .substituteType)
+        try container.encodeIfPresent(sovereignHintLevel, forKey: .sovereignHintLevel)
+        try container.encodeIfPresent(sovereignVerdictLine, forKey: .sovereignVerdictLine)
+        try container.encodeIfPresent(sovereignAuthorityLine, forKey: .sovereignAuthorityLine)
+        try container.encodeIfPresent(sovereignAuditLine, forKey: .sovereignAuditLine)
+        try container.encodeIfPresent(executionCapability, forKey: .executionCapability)
+        try container.encodeIfPresent(morphGraph, forKey: .morphGraph)
+        try container.encodeIfPresent(hotColdMap, forKey: .hotColdMap)
+        try container.encodeIfPresent(precisionProfile, forKey: .precisionProfile)
+        try container.encodeIfPresent(lungState, forKey: .lungState)
+        try container.encodeIfPresent(thermalExchange, forKey: .thermalExchange)
+        try container.encodeIfPresent(breathScheduler, forKey: .breathScheduler)
+        try container.encodeIfPresent(integrityWeave, forKey: .integrityWeave)
+        try container.encode(organPackages, forKey: .organPackages)
+        try container.encodeIfPresent(organDeltaPlan, forKey: .organDeltaPlan)
+        try container.encodeIfPresent(resumeFrame, forKey: .resumeFrame)
+        try container.encodeIfPresent(rollbackAnchor, forKey: .rollbackAnchor)
+        try container.encodeIfPresent(sovereignBridgeResult, forKey: .sovereignBridgeResult)
+    }
+
+    private static func orderedUniqueStrings(_ values: [String]) -> [String] {
+        values.reduce(into: [String]()) { uniqueValues, value in
+            guard let trimmed = value.evolutionTrimmedNonEmpty else {
+                return
+            }
+            guard uniqueValues.contains(trimmed) == false else {
+                return
+            }
+            uniqueValues.append(trimmed)
+        }
     }
 }
 
@@ -416,6 +591,28 @@ extension DecisionSessionCheckpointEBrainAnchor {
         reviewDirectiveLine?.evolutionTrimmedNonEmpty
     }
 
+    var resolvedPresenceLine: String? {
+        presenceLine?.evolutionTrimmedNonEmpty
+    }
+
+    var windGateLine: String? {
+        guard let permitMode = permitMode?.evolutionTrimmedNonEmpty else {
+            return nil
+        }
+
+        return DecisionEvolutionNarrativeFormattingSupport.joined([
+            "L11 wind gate",
+            "primary \(permitMode)",
+            stackedModes.isEmpty ? nil : "stacked \(Array(stackedModes.prefix(3)).joined(separator: ", "))",
+            assertionCeiling?.evolutionTrimmedNonEmpty.map { "assert \($0)" },
+            allowedDomains.isEmpty ? nil : "allow \(Array(allowedDomains.prefix(3)).joined(separator: ", "))",
+            blockedDomains.isEmpty ? nil : "block \(Array(blockedDomains.prefix(3)).joined(separator: ", "))",
+            delayType?.evolutionTrimmedNonEmpty.map { "delay \($0)" },
+            substituteType?.evolutionTrimmedNonEmpty.map { "substitute \($0)" },
+            sovereignHintLevel?.evolutionTrimmedNonEmpty.map { "sovereign \($0)" }
+        ].compactMap { $0 }).nilIfEmpty
+    }
+
     var resolvedRiskFactorsLine: String? {
         riskFactorsLine?.evolutionTrimmedNonEmpty
     }
@@ -426,6 +623,10 @@ extension DecisionSessionCheckpointEBrainAnchor {
                 prefix: "Reason codes",
                 values: executionCapability?.reasonCodes ?? []
             )
+    }
+
+    var resolvedCourtLine: String? {
+        courtLine?.evolutionTrimmedNonEmpty
     }
 
     var lungLine: String? {
@@ -444,8 +645,24 @@ extension DecisionSessionCheckpointEBrainAnchor {
         foldedLungSnapshot?.precisionLine
     }
 
+    var organPackageLine: String? {
+        foldedLungSnapshot?.organPackageLine
+    }
+
+    var thermalExchangeLine: String? {
+        foldedLungSnapshot?.thermalExchangeLine
+    }
+
     var schedulerLine: String? {
         foldedLungSnapshot?.schedulerLine
+    }
+
+    var integrityWeaveLine: String? {
+        foldedLungSnapshot?.integrityWeaveLine
+    }
+
+    var organDeltaLine: String? {
+        foldedLungSnapshot?.organDeltaLine
     }
 
     var resumeLine: String? {
@@ -476,8 +693,19 @@ extension DecisionSessionCheckpointEBrainAnchor {
             permitMode: newer.permitMode ?? permitMode,
             hostGatePercent: newer.hostGatePercent ?? hostGatePercent,
             reviewDirectiveLine: newer.reviewDirectiveLine ?? reviewDirectiveLine,
+            presenceLine: newer.presenceLine ?? presenceLine,
             riskFactorsLine: newer.riskFactorsLine ?? riskFactorsLine,
             reasonCodesLine: newer.reasonCodesLine ?? reasonCodesLine,
+            courtLine: newer.courtLine ?? courtLine,
+            versionTreeLine: newer.versionTreeLine ?? versionTreeLine,
+            retractionLine: newer.retractionLine ?? retractionLine,
+            stackedModes: newer.stackedModes.isEmpty ? stackedModes : newer.stackedModes,
+            assertionCeiling: newer.assertionCeiling ?? assertionCeiling,
+            allowedDomains: newer.allowedDomains.isEmpty ? allowedDomains : newer.allowedDomains,
+            blockedDomains: newer.blockedDomains.isEmpty ? blockedDomains : newer.blockedDomains,
+            delayType: newer.delayType ?? delayType,
+            substituteType: newer.substituteType ?? substituteType,
+            sovereignHintLevel: newer.sovereignHintLevel ?? sovereignHintLevel,
             sovereignVerdictLine: newer.sovereignVerdictLine ?? sovereignVerdictLine,
             sovereignAuthorityLine: newer.sovereignAuthorityLine ?? sovereignAuthorityLine,
             sovereignAuditLine: newer.sovereignAuditLine ?? sovereignAuditLine,
@@ -486,7 +714,11 @@ extension DecisionSessionCheckpointEBrainAnchor {
             hotColdMap: newer.hotColdMap ?? hotColdMap,
             precisionProfile: newer.precisionProfile ?? precisionProfile,
             lungState: newer.lungState ?? lungState,
+            thermalExchange: newer.thermalExchange ?? thermalExchange,
             breathScheduler: newer.breathScheduler ?? breathScheduler,
+            integrityWeave: newer.integrityWeave ?? integrityWeave,
+            organPackages: newer.organPackages.isEmpty ? organPackages : newer.organPackages,
+            organDeltaPlan: newer.organDeltaPlan ?? organDeltaPlan,
             resumeFrame: newer.resumeFrame ?? resumeFrame,
             rollbackAnchor: newer.rollbackAnchor ?? rollbackAnchor,
             sovereignBridgeResult: newer.sovereignBridgeResult ?? sovereignBridgeResult
@@ -805,8 +1037,10 @@ struct DecisionSessionRuntimeInspectionSession: Equatable, Sendable, Identifiabl
             decisionLine: latestCheckpointDecisionLine,
             taskLine: latestCheckpointTaskLine,
             pressureLine: latestCheckpointPressureLine,
+            presenceLine: latestCheckpointEBrainAnchor?.resolvedPresenceLine,
             riskFactorsLine: latestCheckpointEBrainAnchor?.resolvedRiskFactorsLine,
             reasonCodesLine: latestCheckpointEBrainAnchor?.resolvedReasonCodesLine,
+            courtLine: latestCheckpointEBrainAnchor?.resolvedCourtLine,
             auditLine: latestCheckpointAuditLine,
             activeKillSwitchesLine: latestCheckpointActiveKillSwitchesLine,
             killSwitchesLine: latestCheckpointKillSwitchesLine,
@@ -841,8 +1075,10 @@ struct DecisionSessionCheckpointPresentationFacts: Equatable, Sendable {
     let decisionLine: String?
     let taskLine: String?
     let pressureLine: String?
+    let presenceLine: String?
     let riskFactorsLine: String?
     let reasonCodesLine: String?
+    let courtLine: String?
     let auditLine: String?
     let activeKillSwitchesLine: String?
     let killSwitchesLine: String?
@@ -857,12 +1093,32 @@ struct DecisionSessionCheckpointPresentationFacts: Equatable, Sendable {
         taskLine ?? anchor?.taskLine
     }
 
+    private var effectivePresenceLine: String? {
+        presenceLine ?? anchor?.resolvedPresenceLine
+    }
+
+    private var effectiveCourtLine: String? {
+        courtLine ?? anchor?.resolvedCourtLine
+    }
+
     var resolvedDecisionLine: String? {
         effectiveDecisionLine
     }
 
     var resolvedTaskLine: String? {
         effectiveTaskLine
+    }
+
+    var resolvedPresenceLine: String? {
+        effectivePresenceLine
+    }
+
+    var resolvedCourtLine: String? {
+        effectiveCourtLine
+    }
+
+    var windGateLine: String? {
+        anchor?.windGateLine
     }
 
     var runtimeLine: String? {
@@ -893,8 +1149,24 @@ struct DecisionSessionCheckpointPresentationFacts: Equatable, Sendable {
         anchor?.precisionLine
     }
 
+    var organPackageLine: String? {
+        anchor?.organPackageLine
+    }
+
+    var organDeltaLine: String? {
+        anchor?.organDeltaLine
+    }
+
+    var thermalExchangeLine: String? {
+        anchor?.thermalExchangeLine
+    }
+
     var schedulerLine: String? {
         anchor?.schedulerLine
+    }
+
+    var integrityWeaveLine: String? {
+        anchor?.integrityWeaveLine
     }
 
     var resumeLine: String? {
@@ -925,6 +1197,14 @@ struct DecisionSessionCheckpointPresentationFacts: Equatable, Sendable {
         anchor?.sovereignAuditLine
     }
 
+    var versionTreeLine: String? {
+        anchor?.versionTreeLine
+    }
+
+    var retractionLine: String? {
+        anchor?.retractionLine
+    }
+
     var digestLines: [String] {
         var lines: [String] = []
 
@@ -941,6 +1221,14 @@ struct DecisionSessionCheckpointPresentationFacts: Equatable, Sendable {
             lines.append(effectiveTaskLine)
         }
 
+        if let windGateLine {
+            lines.append(windGateLine)
+        }
+
+        if let effectivePresenceLine {
+            lines.append(effectivePresenceLine)
+        }
+
         if let pressureLine {
             lines.append(pressureLine)
         }
@@ -951,6 +1239,10 @@ struct DecisionSessionCheckpointPresentationFacts: Equatable, Sendable {
 
         if let reasonCodesLine {
             lines.append(reasonCodesLine)
+        }
+
+        if let effectiveCourtLine {
+            lines.append(effectiveCourtLine)
         }
 
         if let auditPressureLine {
@@ -969,6 +1261,14 @@ struct DecisionSessionCheckpointPresentationFacts: Equatable, Sendable {
             lines.append(sovereignAuditLine)
         }
 
+        if let versionTreeLine {
+            lines.append(versionTreeLine)
+        }
+
+        if let retractionLine {
+            lines.append(retractionLine)
+        }
+
         if let lungLine {
             lines.append(lungLine)
         }
@@ -985,8 +1285,24 @@ struct DecisionSessionCheckpointPresentationFacts: Equatable, Sendable {
             lines.append(precisionLine)
         }
 
+        if let organPackageLine {
+            lines.append(organPackageLine)
+        }
+
+        if let organDeltaLine {
+            lines.append(organDeltaLine)
+        }
+
         if let schedulerLine {
             lines.append(schedulerLine)
+        }
+
+        if let thermalExchangeLine {
+            lines.append(thermalExchangeLine)
+        }
+
+        if let integrityWeaveLine {
+            lines.append(integrityWeaveLine)
         }
 
         if let resumeLine {

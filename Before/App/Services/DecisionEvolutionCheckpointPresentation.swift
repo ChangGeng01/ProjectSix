@@ -62,12 +62,24 @@ enum DecisionEvolutionCheckpointRecoverySupport {
 enum DecisionEvolutionCheckpointDetailPresentationSupport {
     static let emptyLineageMessage = "No persisted checkpoint lineage is available yet."
     static let lineagePendingSummaryText = "Lineage pending • review details stay available, but recovered risk facts are not attached yet."
+    static let foldedLungTitle = DecisionEvolutionFoldedLungPresentationSupport.title
     static let ticketsPrefix = "Tickets"
     static let auditPrefix = "Audit"
     static let killSwitchesPrefix = "Kill switches"
     static let diffPrefix = "Diff"
     static let selectTitle = "Select"
     static let selectedTitle = "Selected"
+    private static let foldedLungPriorityPrefixes = [
+        "L3 compression runtime",
+        "Breath ",
+        "Morph graph",
+        "Integrity weave",
+        "Rollback anchor",
+        "Hot pack",
+        "Precision profile",
+        "Thermal exchanger",
+        "Resume frame"
+    ]
 
     static func rollbackStateTitle(rollbackReady: Bool) -> String {
         DecisionEvolutionCheckpointLexiconSupport.rollbackStateTitle(
@@ -155,6 +167,81 @@ enum DecisionEvolutionCheckpointDetailPresentationSupport {
 
     static func diffBulletLines(values: [String]) -> [String] {
         values.map { "\u{2022} \($0)" }
+    }
+
+    static func windGateMetadataLine(layerStackLines: [String]) -> String? {
+        guard let rawLine = layerStackLines.first(where: { $0.hasPrefix("L11 wind gate") })?
+            .evolutionTrimmedNonEmpty
+        else {
+            return nil
+        }
+
+        let components = rawLine.components(separatedBy: " • ")
+        guard components.count > 1 else {
+            return "Wind gate active"
+        }
+
+        let detail = components.dropFirst().joined(separator: " • ").evolutionTrimmedNonEmpty
+        return detail.map { "Wind gate \($0)" } ?? "Wind gate active"
+    }
+
+    static func combinedMetadataText(
+        base: String?,
+        windGateLine: String?
+    ) -> String? {
+        switch (base?.evolutionTrimmedNonEmpty, windGateLine?.evolutionTrimmedNonEmpty) {
+        case let (base?, windGateLine?):
+            return DecisionEvolutionNarrativeFormattingSupport.joined([base, windGateLine])
+        case let (base?, nil):
+            return base
+        case let (nil, windGateLine?):
+            return windGateLine
+        case (nil, nil):
+            return nil
+        }
+    }
+
+    static func foldedLungLines(
+        eBrain: DeveloperDecisionReplayEBrainSummary?
+    ) -> [String] {
+        guard let eBrain else {
+            return []
+        }
+
+        let allLines = DecisionEvolutionEBrainPresentationSupport.foldedLungLines(
+            layerStackLines: eBrain.layerStackLines,
+            lungLine: eBrain.lungLine,
+            morphLine: eBrain.morphLine,
+            hotColdLine: eBrain.hotColdLine,
+            precisionLine: eBrain.precisionLine,
+            organPackageLine: eBrain.organPackageLine,
+            organDeltaLine: eBrain.organDeltaLine,
+            schedulerLine: eBrain.schedulerLine,
+            thermalExchangeLine: eBrain.thermalExchangeLine,
+            integrityWeaveLine: eBrain.integrityWeaveLine,
+            resumeLine: eBrain.resumeLine,
+            rollbackLine: eBrain.rollbackLine
+        )
+
+        let prioritized = orderedUnique(
+            foldedLungPriorityPrefixes.compactMap { prefix in
+                allLines.first(where: { $0.hasPrefix(prefix) })
+            }
+        )
+        if prioritized.isEmpty == false {
+            return Array(prioritized.prefix(5))
+        }
+
+        return Array(allLines.prefix(3))
+    }
+
+    private static func orderedUnique(
+        _ values: [String]
+    ) -> [String] {
+        values.reduce(into: [String]()) { uniqueValues, value in
+            guard uniqueValues.contains(value) == false else { return }
+            uniqueValues.append(value)
+        }
     }
 }
 
@@ -249,6 +336,8 @@ struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendabl
     let summaryText: String
     let usesSecondarySummaryTone: Bool
     let metadataText: String?
+    let foldedLungTitle: String?
+    let foldedLungLines: [String]
     let updateTicketSummaries: [String]
     let auditFindings: [String]
     let killSwitches: [String]
@@ -331,6 +420,7 @@ struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendabl
         lineageRiskLevel != nil
             || lineagePermitMode != nil
             || metadataText != nil
+            || !foldedLungLines.isEmpty
             || !updateTicketSummaries.isEmpty
             || !auditFindings.isEmpty
             || !killSwitches.isEmpty
@@ -394,17 +484,31 @@ struct DecisionEvolutionCheckpointPresentation: Identifiable, Equatable, Sendabl
             usesSecondarySummaryTone = true
         }
 
+        let baseMetadataText: String?
         if let sessionID = snapshot.sessionID,
            let hostGatePercent = snapshot.hostGatePercent,
            let thoughtFoldChecksum = snapshot.thoughtFoldChecksum {
-            metadataText = DecisionEvolutionEBrainPresentationSupport.sessionHostFoldLine(
+            baseMetadataText = DecisionEvolutionEBrainPresentationSupport.sessionHostFoldLine(
                 sessionID: sessionID,
                 hostGatePercent: hostGatePercent,
                 foldChecksum: thoughtFoldChecksum
             )
         } else {
-            metadataText = nil
+            baseMetadataText = nil
         }
+
+        metadataText = DecisionEvolutionCheckpointDetailPresentationSupport.combinedMetadataText(
+            base: baseMetadataText,
+            windGateLine: DecisionEvolutionCheckpointDetailPresentationSupport.windGateMetadataLine(
+                layerStackLines: snapshot.eBrain?.layerStackLines ?? []
+            )
+        )
+        foldedLungLines = DecisionEvolutionCheckpointDetailPresentationSupport.foldedLungLines(
+            eBrain: snapshot.eBrain
+        )
+        foldedLungTitle = foldedLungLines.isEmpty
+            ? nil
+            : DecisionEvolutionCheckpointDetailPresentationSupport.foldedLungTitle
     }
 
     init(checkpoint: DecisionEvolutionCheckpoint) {

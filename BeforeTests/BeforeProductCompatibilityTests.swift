@@ -128,6 +128,15 @@ final class BeforeProductCompatibilityTests: XCTestCase {
         XCTAssertNotNil(policy["risk"])
         XCTAssertNotNil(budget["lowRiskPrecisionProfile"])
         XCTAssertNotNil(budget["engageRetrievalDepth"])
+        XCTAssertNotNil(budget["unstableLoopIncrementRiskLevels"])
+        XCTAssertNotNil(budget["throttlePenaltyThermalLevels"])
+        XCTAssertNotNil(budget["unstableBudgetCalibrationStatuses"])
+        XCTAssertNotNil(budget["nominalThermalGuardLevel"])
+        XCTAssertNotNil(budget["warmThermalGuardLevel"])
+        XCTAssertNotNil(budget["hotThermalGuardLevel"])
+        XCTAssertNotNil(budget["criticalThermalGuardLevel"])
+        XCTAssertNotNil(budget["protectedFloorBoundaryModes"])
+        XCTAssertNotNil(budget["protectedFloorCalibrationStatuses"])
         let runModeProfiles = try XCTUnwrap(budget["runModeProfilesByID"] as? [String: Any])
         XCTAssertEqual(runModeProfiles.keys.count, 10)
         let engageProfile = try XCTUnwrap(runModeProfiles["engage"] as? [String: Any])
@@ -144,8 +153,10 @@ final class BeforeProductCompatibilityTests: XCTestCase {
         XCTAssertNotNil(engageProfile["standardCandidateFloor"])
         XCTAssertNotNil(engageProfile["protectedCandidateFloor"])
         XCTAssertNotNil(engageProfile["unstableLoopIncrement"])
+        XCTAssertNotNil(engageProfile["unstableLoopIncrementRiskLevels"])
         XCTAssertNotNil(engageProfile["throttleLoopPenalty"])
         XCTAssertNotNil(engageProfile["throttleCandidatePenalty"])
+        XCTAssertNotNil(engageProfile["throttlePenaltyThermalLevels"])
         XCTAssertNotNil(engageProfile["maintenanceSupported"])
         XCTAssertNotNil(engageProfile["maintenanceBatteryFloor"])
         XCTAssertNotNil(engageProfile["scheduledMaintenanceClass"])
@@ -163,10 +174,18 @@ final class BeforeProductCompatibilityTests: XCTestCase {
         XCTAssertNotNil(lockdownProfile["npuUnavailableDeviceRoute"])
         XCTAssertNotNil(lockdownProfile["pureLocalPreferredDeviceRoute"])
         XCTAssertNotNil(lockdownProfile["maintenanceBatteryFloor"])
+        let wakeIntent = try XCTUnwrap(policy["wakeIntent"] as? [String: Any])
+        XCTAssertNotNil(wakeIntent["engageUrgencyIncrement"])
+        XCTAssertNotNil(wakeIntent["reflectCueIncrement"])
+        XCTAssertNotNil(wakeIntent["deepLoopCueIncrement"])
         let runModeRules = try XCTUnwrap(stateTransitions["runModeRules"] as? [[String: Any]])
         XCTAssertFalse(runModeRules.isEmpty)
         XCTAssertNotNil(stateTransitions["lowRiskDefaultMode"])
         XCTAssertNotNil(stateTransitions["criticalThermalMode"])
+        XCTAssertNotNil(stateTransitions["guardedBudgetBoundaryModes"])
+        XCTAssertNotNil(stateTransitions["guardedBudgetCalibrationStatuses"])
+        XCTAssertNotNil(stateTransitions["guardedBudgetRiskFlags"])
+        XCTAssertNotNil(stateTransitions["guardedBudgetRetrievalTags"])
         XCTAssertNotNil(maintenance["allowedThermalLevels"])
         XCTAssertNotNil(maintenance["blockedForegroundStates"])
         XCTAssertNotNil(maintenance["lightweightAllowedClass"])
@@ -207,7 +226,9 @@ final class BeforeProductCompatibilityTests: XCTestCase {
         let resolution = BeforeProductCompatibility.resolvedRuntimePolicy
         var configuration = BeforeProductCompatibility.hostConfiguration(for: resolution)
         var tuning = configuration.runtimeTuning
+        tuning.stateTransitions.backgroundPulseEnabled = false
         tuning.stateTransitions.lowRiskDefaultMode = .engage
+        tuning.stateTransitions.runModeRules = nil
         tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
             wakeIntent: tuning.wakeIntent
         )
@@ -288,6 +309,401 @@ final class BeforeProductCompatibilityTests: XCTestCase {
         let turn = try XCTUnwrap(result.eBrainTurn)
         XCTAssertFalse(turn.budgetFrame.maintenanceAllowed)
         XCTAssertEqual(turn.budgetFrame.maintenanceClass, .deferred)
+    }
+
+    func testRuntimePolicyBudgetThermalPenaltyLevelsDriveWarmTurnThrottle() throws {
+        let resolution = BeforeProductCompatibility.resolvedRuntimePolicy
+        var configuration = BeforeProductCompatibility.hostConfiguration(for: resolution)
+        var tuning = configuration.runtimeTuning
+        tuning.stateTransitions.backgroundPulseEnabled = false
+        tuning.stateTransitions.lowRiskDefaultMode = .engage
+        tuning.stateTransitions.runModeRules = nil
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: tuning.wakeIntent
+        )
+        var engageProfile = try XCTUnwrap(
+            tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue]
+        )
+        engageProfile.maxLoops = 5
+        engageProfile.maxCandidates = 5
+        engageProfile.candidateCountCap = 5
+        engageProfile.throttleLoopPenalty = 2
+        engageProfile.throttleCandidatePenalty = 1
+        engageProfile.throttlePenaltyThermalLevels = [.warm]
+        tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue] = engageProfile
+        configuration.runtimeTuning = tuning
+        configuration.defaultDeviceState = BASDeviceState(
+            batteryLevel: 0.71,
+            thermalLevel: .warm,
+            memoryFreeMB: 2_048,
+            networkState: .online,
+            foregroundState: .background,
+            cpuLoad: 0.22,
+            gpuLoad: 0.14,
+            npuAvailable: true,
+            latencyBudgetMs: 1_200
+        )
+
+        let runtime = BASHostRuntime(configuration: configuration)
+        let result = try runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .primary,
+                surface: .application,
+                prompt: "Throttle on warm thermal when the policy says so.",
+                title: "Warm throttle policy",
+                riskLevel: .low
+            )
+        )
+
+        let turn = try XCTUnwrap(result.eBrainTurn)
+        XCTAssertEqual(turn.budgetFrame.runMode, .engage)
+        XCTAssertEqual(turn.budgetFrame.maxLoops, 3)
+        XCTAssertEqual(turn.budgetFrame.maxCandidates, 4)
+    }
+
+    func testRuntimePolicyBundleWarmThermalGuardLevelDrivesHostRuntimeBehavior() throws {
+        let resolution = BeforeProductCompatibility.resolvedRuntimePolicy
+        var configuration = BeforeProductCompatibility.hostConfiguration(for: resolution)
+        configuration.defaultDeviceState = BASDeviceState(
+            batteryLevel: 0.71,
+            thermalLevel: .warm,
+            memoryFreeMB: 2_048,
+            networkState: .online,
+            foregroundState: .background,
+            cpuLoad: 0.22,
+            gpuLoad: 0.14,
+            npuAvailable: true,
+            latencyBudgetMs: 1_200
+        )
+
+        let runtime = BASHostRuntime(configuration: configuration)
+        let result = try runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .primary,
+                surface: .application,
+                prompt: "Respect the bundled warm thermal guard policy.",
+                title: "Bundled warm thermal guard policy",
+                riskLevel: .low
+            )
+        )
+
+        let turn = try XCTUnwrap(result.eBrainTurn)
+        XCTAssertEqual(turn.budgetFrame.runMode, .pulse)
+        XCTAssertEqual(turn.budgetFrame.thermalGuardLevel, .watch)
+    }
+
+    func testRuntimePolicyBudgetUnstableRiskLevelsDriveHighRiskLoopIncrement() throws {
+        let resolution = BeforeProductCompatibility.resolvedRuntimePolicy
+        var configuration = BeforeProductCompatibility.hostConfiguration(for: resolution)
+        var tuning = configuration.runtimeTuning
+        tuning.stateTransitions.highRiskMode = .engage
+        tuning.stateTransitions.runModeRules = nil
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: tuning.wakeIntent
+        )
+        tuning.budget.unstableBudgetCalibrationStatuses = [.watch, .drifting]
+        var engageProfile = try XCTUnwrap(
+            tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue]
+        )
+        engageProfile.maxLoops = 3
+        engageProfile.unstableLoopIncrement = 2
+        engageProfile.unstableLoopIncrementRiskLevels = [.high]
+        tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue] = engageProfile
+        configuration.runtimeTuning = tuning
+        configuration.defaultDeviceState = BASDeviceState(
+            batteryLevel: 0.71,
+            thermalLevel: .nominal,
+            memoryFreeMB: 2_048,
+            networkState: .online,
+            foregroundState: .background,
+            cpuLoad: 0.18,
+            gpuLoad: 0.10,
+            npuAvailable: true,
+            latencyBudgetMs: 1_000
+        )
+
+        let runtime = BASHostRuntime(configuration: configuration)
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .primary,
+            surface: .application,
+            prompt: "Keep the unstable increment for high risk when the policy says so.",
+            title: "Unstable risk policy",
+            riskLevel: .high
+        )
+        let result = try runtime.startSession(request)
+        var currentBrain = result.currentBrain
+        currentBrain.calibrationStatus = .watch
+
+        let turn = runtime.buildEBrainTurn(
+            request: request,
+            currentBrain: currentBrain,
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+            deviceStateOverride: configuration.defaultDeviceState
+        )
+
+        XCTAssertEqual(turn.budgetFrame.runMode, .engage)
+        XCTAssertEqual(turn.budgetFrame.maxLoops, 5)
+    }
+
+    func testRuntimePolicyBudgetCanLimitUnstableAdjustmentsToDriftingCalibrationOnly() throws {
+        let resolution = BeforeProductCompatibility.resolvedRuntimePolicy
+        var configuration = BeforeProductCompatibility.hostConfiguration(for: resolution)
+        var tuning = configuration.runtimeTuning
+        tuning.stateTransitions.lowRiskDefaultMode = .engage
+        tuning.stateTransitions.backgroundPulseEnabled = false
+        tuning.stateTransitions.runModeRules = nil
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: tuning.wakeIntent
+        )
+        let budget = tuning.budget
+        tuning.budget = BASEBrainRuntimeSynthesisPolicy.BudgetTuning(
+            standardDecodeTokens: budget.standardDecodeTokens,
+            unstableDecodeTokens: budget.unstableDecodeTokens,
+            guardedDecodeTokens: budget.guardedDecodeTokens,
+            maintenanceBatteryFloor: budget.maintenanceBatteryFloor,
+            lowRiskLoops: budget.lowRiskLoops,
+            mediumRiskLoops: budget.mediumRiskLoops,
+            highRiskLoops: budget.highRiskLoops,
+            extremeRiskLoops: budget.extremeRiskLoops,
+            lowRiskCandidates: budget.lowRiskCandidates,
+            mediumRiskCandidates: budget.mediumRiskCandidates,
+            highRiskCandidates: budget.highRiskCandidates,
+            extremeRiskCandidates: budget.extremeRiskCandidates,
+            lowRiskRetrievalDepth: budget.lowRiskRetrievalDepth,
+            mediumRiskRetrievalDepth: budget.mediumRiskRetrievalDepth,
+            guardedRetrievalDepth: budget.guardedRetrievalDepth,
+            standardLoopFloor: budget.standardLoopFloor,
+            protectedLoopFloor: budget.protectedLoopFloor,
+            standardCandidateFloor: budget.standardCandidateFloor,
+            protectedCandidateFloor: budget.protectedCandidateFloor,
+            maxCandidateCount: budget.maxCandidateCount,
+            unstableLoopIncrement: budget.unstableLoopIncrement,
+            unstableLoopIncrementRiskLevels: budget.unstableLoopIncrementRiskLevels,
+            unstableBudgetCalibrationStatuses: [.drifting],
+            throttleLoopPenalty: budget.throttleLoopPenalty,
+            throttleCandidatePenalty: budget.throttleCandidatePenalty,
+            throttlePenaltyThermalLevels: budget.throttlePenaltyThermalLevels,
+            defaultPrecisionProfile: budget.defaultPrecisionProfile,
+            unstablePrecisionProfile: budget.unstablePrecisionProfile,
+            guardedPrecisionProfile: budget.guardedPrecisionProfile,
+            lowRiskPrecisionProfile: budget.lowRiskPrecisionProfile,
+            mediumRiskPrecisionProfile: budget.mediumRiskPrecisionProfile,
+            highRiskPrecisionProfile: budget.highRiskPrecisionProfile,
+            extremeRiskPrecisionProfile: budget.extremeRiskPrecisionProfile,
+            pulseRetrievalDepth: budget.pulseRetrievalDepth,
+            sentinelRetrievalDepth: budget.sentinelRetrievalDepth,
+            engageRetrievalDepth: budget.engageRetrievalDepth,
+            reflectRetrievalDepth: budget.reflectRetrievalDepth,
+            deepLoopRetrievalDepth: budget.deepLoopRetrievalDepth,
+            guardRetrievalDepth: budget.guardRetrievalDepth,
+            recoveryRetrievalDepth: budget.recoveryRetrievalDepth,
+            quarantineRetrievalDepth: budget.quarantineRetrievalDepth,
+            lockdownRetrievalDepth: budget.lockdownRetrievalDepth,
+            dormantRetrievalDepth: budget.dormantRetrievalDepth,
+            runModeProfilesByID: budget.runModeProfilesByID
+        )
+        var engageProfile = try XCTUnwrap(
+            tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue]
+        )
+        engageProfile.maxLoops = 3
+        engageProfile.defaultDecodeTokens = 320
+        engageProfile.unstableDecodeTokens = 288
+        engageProfile.precisionProfile = .balanced
+        engageProfile.unstableLoopIncrement = 2
+        tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue] = engageProfile
+        configuration.runtimeTuning = tuning
+        configuration.defaultDeviceState = BASDeviceState(
+            batteryLevel: 0.71,
+            thermalLevel: .nominal,
+            memoryFreeMB: 2_048,
+            networkState: .online,
+            foregroundState: .background,
+            cpuLoad: 0.18,
+            gpuLoad: 0.10,
+            npuAvailable: true,
+            latencyBudgetMs: 1_000
+        )
+
+        let runtime = BASHostRuntime(configuration: configuration)
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .primary,
+            surface: .application,
+            prompt: "Keep watch calibration on the standard budget lane when drifting-only unstable policy is active.",
+            title: "Drifting-only unstable policy",
+            riskLevel: .low
+        )
+        let result = try runtime.startSession(request)
+        var currentBrain = result.currentBrain
+        currentBrain.calibrationStatus = .watch
+
+        let turn = runtime.buildEBrainTurn(
+            request: request,
+            currentBrain: currentBrain,
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+            deviceStateOverride: configuration.defaultDeviceState
+        )
+
+        XCTAssertEqual(turn.budgetFrame.runMode, .engage)
+        XCTAssertEqual(turn.budgetFrame.maxLoops, 3)
+        XCTAssertEqual(turn.budgetFrame.maxDecodeTokens, 320)
+        XCTAssertEqual(turn.budgetFrame.precisionProfile, .balanced)
+    }
+
+    func testRuntimePolicyBudgetCanChooseCalibrationStatusesThatTriggerProtectedFloors() throws {
+        let resolution = BeforeProductCompatibility.resolvedRuntimePolicy
+        var configuration = BeforeProductCompatibility.hostConfiguration(for: resolution)
+        var tuning = configuration.runtimeTuning
+        tuning.stateTransitions.lowRiskDefaultMode = .engage
+        tuning.stateTransitions.backgroundPulseEnabled = false
+        tuning.stateTransitions.runModeRules = nil
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: tuning.wakeIntent
+        )
+        tuning.budget.protectedFloorBoundaryModes = []
+        tuning.budget.protectedFloorCalibrationStatuses = [.watch]
+        var engageProfile = try XCTUnwrap(
+            tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue]
+        )
+        engageProfile.maxLoops = 3
+        engageProfile.maxCandidates = 3
+        engageProfile.candidateCountCap = 5
+        engageProfile.standardLoopFloor = 2
+        engageProfile.protectedLoopFloor = 5
+        engageProfile.standardCandidateFloor = 2
+        engageProfile.protectedCandidateFloor = 5
+        tuning.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue] = engageProfile
+        configuration.runtimeTuning = tuning
+        configuration.defaultDeviceState = BASDeviceState(
+            batteryLevel: 0.71,
+            thermalLevel: .nominal,
+            memoryFreeMB: 2_048,
+            networkState: .online,
+            foregroundState: .background,
+            cpuLoad: 0.18,
+            gpuLoad: 0.10,
+            npuAvailable: true,
+            latencyBudgetMs: 1_000
+        )
+
+        let runtime = BASHostRuntime(configuration: configuration)
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .primary,
+            surface: .application,
+            prompt: "Let watch calibration trigger protected floors when policy says so.",
+            title: "Protected floor statuses",
+            riskLevel: .low
+        )
+        let result = try runtime.startSession(request)
+        var currentBrain = result.currentBrain
+        currentBrain.boundaryMode = .localOnlyAdvisory
+        currentBrain.calibrationStatus = .watch
+
+        let turn = runtime.buildEBrainTurn(
+            request: request,
+            currentBrain: currentBrain,
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+            deviceStateOverride: configuration.defaultDeviceState
+        )
+
+        XCTAssertEqual(turn.budgetFrame.runMode, .engage)
+        XCTAssertEqual(turn.budgetFrame.maxLoops, 5)
+        XCTAssertEqual(turn.budgetFrame.maxCandidates, 5)
+    }
+
+    func testRuntimePolicyStateTransitionsCanChooseRetrievalTagsThatTriggerGuardedBudgetMode() throws {
+        let resolution = BeforeProductCompatibility.resolvedRuntimePolicy
+        var configuration = BeforeProductCompatibility.hostConfiguration(for: resolution)
+        var tuning = configuration.runtimeTuning
+        tuning.stateTransitions.backgroundPulseEnabled = false
+        tuning.stateTransitions.lowRiskProtectedMode = .guard
+        tuning.stateTransitions.lowRiskDefaultMode = .sentinel
+        tuning.stateTransitions.guardedBudgetBoundaryModes = []
+        tuning.stateTransitions.guardedBudgetCalibrationStatuses = []
+        tuning.stateTransitions.guardedBudgetRiskFlags = []
+        tuning.stateTransitions.guardedBudgetRetrievalTags = ["evidence_caveat"]
+        tuning.stateTransitions.runModeRules = nil
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: tuning.wakeIntent
+        )
+        configuration.runtimeTuning = tuning
+        configuration.defaultDeviceState = BASDeviceState(
+            batteryLevel: 0.71,
+            thermalLevel: .nominal,
+            memoryFreeMB: 2_048,
+            networkState: .online,
+            foregroundState: .background,
+            cpuLoad: 0.18,
+            gpuLoad: 0.10,
+            npuAvailable: true,
+            latencyBudgetMs: 1_000
+        )
+
+        let runtime = BASHostRuntime(configuration: configuration)
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: .primary,
+            surface: .application,
+            prompt: "Keep this calm and local.",
+            title: "Evidence caveat tag guard",
+            riskLevel: .low
+        )
+        let result = try runtime.startSession(request)
+        var currentBrain = result.currentBrain
+        currentBrain.boundaryMode = .localOnlyAdvisory
+        currentBrain.retrievalTags.append("evidence_caveat")
+
+        let turn = runtime.buildEBrainTurn(
+            request: request,
+            currentBrain: currentBrain,
+            projection: BASBrainProjection(records: [], candidates: [], recentEvents: []),
+            deviceStateOverride: configuration.defaultDeviceState
+        )
+
+        XCTAssertEqual(turn.budgetFrame.runMode, .guard)
+    }
+
+    func testRuntimePolicyWakeIntentCanChooseUrgencyCuePhrasesThatTriggerUrgentRunMode() throws {
+        let resolution = BeforeProductCompatibility.resolvedRuntimePolicy
+        var configuration = BeforeProductCompatibility.hostConfiguration(for: resolution)
+        var tuning = configuration.runtimeTuning
+        tuning.stateTransitions.lowRiskUrgentMode = .guard
+        tuning.stateTransitions.lowRiskDefaultMode = .sentinel
+        tuning.stateTransitions.runModeRules = nil
+        tuning.stateTransitions.runModeRules = tuning.stateTransitions.resolvedRunModeRules(
+            wakeIntent: tuning.wakeIntent
+        )
+        configuration.runtimeTuning = tuning
+        configuration.defaultDeviceState = BASDeviceState(
+            batteryLevel: 0.71,
+            thermalLevel: .nominal,
+            memoryFreeMB: 2_048,
+            networkState: .online,
+            foregroundState: .foreground,
+            cpuLoad: 0.18,
+            gpuLoad: 0.10,
+            npuAvailable: true,
+            latencyBudgetMs: 1_000
+        )
+
+        let runtime = BASHostRuntime(configuration: configuration)
+        let result = try runtime.startSession(
+            BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .primary,
+                surface: .application,
+                prompt: "Need an urgent answer before the cutoff.",
+                title: "Wake intent cue",
+                riskLevel: .low
+            )
+        )
+
+        let turn = try XCTUnwrap(result.eBrainTurn)
+        XCTAssertEqual(turn.budgetFrame.runMode, .guard)
     }
 
     func testBrainBootstrapRecoveryContractRoundTripsPolicySeverityAndAlertIDs() throws {
@@ -611,6 +1027,130 @@ final class BeforeProductCompatibilityTests: XCTestCase {
         )
 
         XCTAssertEqual(resolution.lineage.source, .fallbackFactory)
+        XCTAssertTrue(
+            resolution.issues.contains {
+                $0.kind == .runtimeBudgetProfilesRejected &&
+                $0.requestedIdentifier == "before.host.runtime-synthesis.v1"
+            }
+        )
+    }
+
+    func testRuntimePolicyResolutionRejectsBundleWhenRunModeBudgetProfilesMissExplicitRiskOrThermalPlannerInputs() throws {
+        let bundledData = try Data(contentsOf: runtimePolicyBundleURL())
+        var bundle = try JSONDecoder().decode(BeforeRuntimePolicyBundle.self, from: bundledData)
+        var policy = try XCTUnwrap(
+            bundle.runtimeTuningRegistry.policiesByID["before.host.runtime-synthesis.v1"]
+        )
+        var engageProfile = try XCTUnwrap(policy.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue])
+        engageProfile.unstableLoopIncrementRiskLevels = nil
+        engageProfile.throttlePenaltyThermalLevels = nil
+        policy.budget.runModeProfilesByID?[BASEBrainRunMode.engage.rawValue] = engageProfile
+        bundle.runtimeTuningRegistry.policiesByID["before.host.runtime-synthesis.v1"] = policy
+
+        let resolution = BeforeRuntimePolicyStore.resolve(
+            bundledData: try JSONEncoder().encode(bundle)
+        )
+
+        XCTAssertEqual(resolution.lineage.source, .fallbackFactory)
+        XCTAssertTrue(
+            resolution.issues.contains {
+                $0.kind == .runtimeBudgetProfilesRejected &&
+                $0.requestedIdentifier == "before.host.runtime-synthesis.v1"
+            }
+        )
+    }
+
+    func testRuntimePolicyResolutionRebuildsEmergencyFallbackBundleWhenFallbackFactoryIsInvalid() throws {
+        let bundledData = try Data(contentsOf: runtimePolicyBundleURL())
+        var rejectedBundle = try JSONDecoder().decode(BeforeRuntimePolicyBundle.self, from: bundledData)
+        var rejectedPolicy = try XCTUnwrap(
+            rejectedBundle.runtimeTuningRegistry.policiesByID["before.host.runtime-synthesis.v1"]
+        )
+        rejectedPolicy.budget.runModeProfilesByID = nil
+        rejectedBundle.runtimeTuningRegistry.policiesByID["before.host.runtime-synthesis.v1"] = rejectedPolicy
+
+        let resolution = BeforeRuntimePolicyStore.resolve(
+            bundledData: try JSONEncoder().encode(rejectedBundle),
+            fallbackBundleOverride: rejectedBundle
+        )
+
+        XCTAssertEqual(resolution.lineage.source, .fallbackFactory)
+        XCTAssertEqual(
+            resolution.lineage.runtimeTuningPolicyID,
+            BeforeRuntimePolicyFallbacks.runtimeTuningPolicyID
+        )
+        XCTAssertEqual(
+            resolution.runtimeTuningSource.resolvedPolicy.schemaVersion,
+            BeforeRuntimePolicyFallbacks.runtimeTuningPolicy.schemaVersion
+        )
+        XCTAssertEqual(
+            resolution.bundle.bundleVersion,
+            "\(BeforeRuntimePolicyFallbacks.bundle.bundleVersion).emergency"
+        )
+        XCTAssertTrue(
+            resolution.issues.contains {
+                $0.kind == .fallbackFactoryRejected &&
+                $0.fallbackIdentifier == BeforeRuntimePolicyFallbacks.runtimeTuningPolicyID
+            }
+        )
+    }
+
+    func testRuntimePolicyResolutionUsesDegradedEmergencyBundleInsteadOfCrashingWhenEmergencyValidationStillFindsIssues() throws {
+        let bundledData = try Data(contentsOf: runtimePolicyBundleURL())
+        var rejectedBundle = try JSONDecoder().decode(BeforeRuntimePolicyBundle.self, from: bundledData)
+        var rejectedPolicy = try XCTUnwrap(
+            rejectedBundle.runtimeTuningRegistry.policiesByID["before.host.runtime-synthesis.v1"]
+        )
+        rejectedPolicy.budget.runModeProfilesByID = nil
+        rejectedBundle.runtimeTuningRegistry.policiesByID["before.host.runtime-synthesis.v1"] = rejectedPolicy
+
+        var degradedEmergencyBundle = BeforeRuntimePolicyFallbacks.emergencyBundle()
+        var degradedEmergencyPolicy = try XCTUnwrap(
+            degradedEmergencyBundle.runtimeTuningRegistry.policiesByID["before.host.runtime-synthesis.v1"]
+        )
+        degradedEmergencyPolicy.stateTransitions.runModeRules = nil
+        degradedEmergencyBundle.runtimeTuningRegistry.policiesByID["before.host.runtime-synthesis.v1"] = degradedEmergencyPolicy
+
+        let resolution = BeforeRuntimePolicyStore.resolve(
+            bundledData: try JSONEncoder().encode(rejectedBundle),
+            fallbackBundleOverride: rejectedBundle,
+            emergencyBundleOverride: degradedEmergencyBundle
+        )
+
+        XCTAssertEqual(resolution.lineage.source, .fallbackFactory)
+        XCTAssertEqual(
+            resolution.bundle.bundleVersion,
+            "\(BeforeRuntimePolicyFallbacks.bundle.bundleVersion).emergency"
+        )
+        XCTAssertTrue(
+            resolution.issues.contains {
+                $0.kind == .fallbackFactoryRejected &&
+                $0.fallbackIdentifier == BeforeRuntimePolicyFallbacks.runtimeTuningPolicyID
+            }
+        )
+        XCTAssertTrue(
+            resolution.issues.contains {
+                $0.kind == .runtimeTransitionRulesRejected &&
+                $0.requestedIdentifier == "before.host.runtime-synthesis.v1"
+            }
+        )
+    }
+
+    func testRuntimePolicyResolutionDoesNotReportBundledDecodeFailureWhenBundleDecodedButValidationRejected() throws {
+        let bundledData = try Data(contentsOf: runtimePolicyBundleURL())
+        var rejectedBundle = try JSONDecoder().decode(BeforeRuntimePolicyBundle.self, from: bundledData)
+        var rejectedPolicy = try XCTUnwrap(
+            rejectedBundle.runtimeTuningRegistry.policiesByID["before.host.runtime-synthesis.v1"]
+        )
+        rejectedPolicy.budget.runModeProfilesByID = nil
+        rejectedBundle.runtimeTuningRegistry.policiesByID["before.host.runtime-synthesis.v1"] = rejectedPolicy
+
+        let resolution = BeforeRuntimePolicyStore.resolve(
+            bundledData: try JSONEncoder().encode(rejectedBundle)
+        )
+
+        XCTAssertEqual(resolution.lineage.source, .fallbackFactory)
+        XCTAssertFalse(resolution.issues.contains { $0.kind == .bundledDecodeFailed })
         XCTAssertTrue(
             resolution.issues.contains {
                 $0.kind == .runtimeBudgetProfilesRejected &&

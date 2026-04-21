@@ -53,18 +53,29 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
             latestCheckpointActiveKillSwitchesLine: "eBrain active kill switches: force_guard_mode",
             latestCheckpointKillSwitchesLine: "eBrain active kill switches: force_guard_mode • eBrain recommended kill switches: require_reviewed_writes",
             latestCheckpointActionLine: "action: restored active quick workspace state",
-            latestCheckpointEBrainAnchor: DecisionSessionCheckpointEBrainAnchor(
-                sessionID: session.id,
-                thoughtFoldChecksum: "fold1abc",
-                riskLevel: "guarded",
-                permitMode: "delay",
-                hostGatePercent: 40,
-                riskFactorsLine: "Factors: evidence_caveat_load",
-                reasonCodesLine: "Reason codes: evidence.caveat",
-                sovereignVerdictLine: "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine",
-                sovereignAuthorityLine: "Sovereign authority • tokens memoryWrite • lock session • quarantine session",
-                sovereignAuditLine: "Sovereign audit • BR-SOV-004 • ref audit.session-l14",
-            ),
+            latestCheckpointEBrainAnchor: {
+                var anchor = DecisionSessionCheckpointEBrainAnchor(
+                    sessionID: session.id,
+                    thoughtFoldChecksum: "fold1abc",
+                    riskLevel: "guarded",
+                    permitMode: "delay",
+                    hostGatePercent: 40
+                )
+                anchor.riskFactorsLine = "Factors: evidence_caveat_load"
+                anchor.reasonCodesLine = "Reason codes: evidence.caveat"
+                anchor.courtLine = "Court: agency delay right • remand L9"
+                anchor.stackedModes = ["draftOnly", "mirror"]
+                anchor.assertionCeiling = "guarded"
+                anchor.allowedDomains = ["draft.note", "text.delay"]
+                anchor.blockedDomains = ["tool.write", "memory.write", "host.write"]
+                anchor.delayType = "cool_down"
+                anchor.substituteType = "draft"
+                anchor.sovereignHintLevel = "elevated"
+                anchor.sovereignVerdictLine = "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine"
+                anchor.sovereignAuthorityLine = "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session"
+                anchor.sovereignAuditLine = "Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+                return anchor
+            }(),
             latestEventID: "evt_9",
             latestEventSeq: 9,
             latestEventType: .sessionError,
@@ -192,7 +203,7 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.sessions[0].healthSummary?.title, "Watchdog expired")
         XCTAssertTrue(snapshot.sessions[0].canRecover)
         XCTAssertTrue(snapshot.sessions[0].canCorrect)
-        XCTAssertEqual(snapshot.reviewItems.map(\.title), [
+        XCTAssertEqual(snapshot.reviewItems.map { $0.title }, [
             "Merge review queue",
             "Replay anchor ready",
             "Sovereign posture",
@@ -202,12 +213,15 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
         XCTAssertTrue(snapshot.reviewItems[1].detail.contains("Checkpoint ckpt_1"))
         XCTAssertEqual(
             snapshot.reviewItems[2].detail,
-            "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine • Sovereign authority • tokens memoryWrite • lock session • quarantine session • Sovereign audit • BR-SOV-004 • ref audit.session-l14"
+            "Sovereign verdict quarantine • latched • mode guard • reason runtime.quarantine • Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session • Sovereign audit • BR-SOV-004 • ref audit.session-l14"
         )
-        XCTAssertEqual(snapshot.reviewItems[2].severity, .watch)
+        XCTAssertEqual(
+            snapshot.reviewItems[2].severity,
+            DecisionSessionEngineHealthSeverity.watch
+        )
         XCTAssertEqual(
             snapshot.reviewItems[3].detail,
-            "Factors: evidence_caveat_load • Reason codes: evidence.caveat"
+            "Factors: evidence_caveat_load • Reason codes: evidence.caveat • Court: agency delay right • remand L9"
         )
         XCTAssertEqual(
             snapshot.sessions[0].checkpointBudgetLine,
@@ -223,6 +237,10 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
         )
         XCTAssertEqual(snapshot.sessions[0].checkpointTaskLine, "Review protective path: delay")
         XCTAssertEqual(
+            snapshot.sessions[0].checkpointWindGateLine,
+            "L11 wind gate • primary delay • stacked draftOnly, mirror • assert guarded • allow draft.note, text.delay • block tool.write, memory.write, host.write • delay cool_down • substitute draft • sovereign elevated"
+        )
+        XCTAssertEqual(
             snapshot.sessions[0].checkpointActionLine,
             "action: restored active quick workspace state"
         )
@@ -233,7 +251,7 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
         )
         XCTAssertEqual(
             snapshot.sessions[0].checkpointSovereignAuthorityLine,
-            "Sovereign authority • tokens memoryWrite • lock session • quarantine session"
+            "Sovereign authority • tokens memoryWrite • warrants memoryWrite • lock session • quarantine session"
         )
         XCTAssertEqual(
             snapshot.sessions[0].checkpointSovereignAuditLine,
@@ -245,15 +263,18 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
         )
         XCTAssertEqual(snapshot.sessions[0].checkpointRiskFactorsLine, "Factors: evidence_caveat_load")
         XCTAssertEqual(snapshot.sessions[0].checkpointReasonCodesLine, "Reason codes: evidence.caveat")
+        XCTAssertEqual(snapshot.sessions[0].checkpointCourtLine, "Court: agency delay right • remand L9")
         XCTAssertTrue(snapshot.sessions[0].branchLine.contains("Merge-ready 1"))
         XCTAssertEqual(
             snapshot.sessions[0].mergeReviewLine,
             "Merge review 1 active correction branch can append back onto head without rewriting history."
         )
-        let mergeReview = try XCTUnwrap(snapshot.selectedMergeReview)
+        let mergeReview: DecisionSessionEngineControlMergeReview = try XCTUnwrap(
+            snapshot.selectedMergeReview
+        )
         XCTAssertEqual(mergeReview.sourceBranchID, "branch_recovery")
         XCTAssertEqual(mergeReview.targetBranchID, "branch_main")
-        XCTAssertEqual(mergeReview.detailRows.map(\.label), [
+        XCTAssertEqual(mergeReview.detailRows.map { $0.label }, [
             "Source branch",
             "Target branch",
             "Source status",
@@ -298,7 +319,9 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.selectedRecoveryNotice, timeline.recoveryNotice)
         XCTAssertEqual(snapshot.selectedMergeNotice, timeline.mergeNotice)
         XCTAssertTrue(snapshot.timelineItems.contains(where: { $0.emphasizesRecovery }))
-        let recoveredEvent = try XCTUnwrap(snapshot.timelineItems.last)
+        let recoveredEvent: DecisionSessionEngineControlTimelinePresentation = try XCTUnwrap(
+            snapshot.timelineItems.last
+        )
         XCTAssertEqual(recoveredEvent.eventID, "evt_10")
         XCTAssertEqual(recoveredEvent.seqLine, "Event seq 10")
         XCTAssertFalse(recoveredEvent.canTargetCorrection)
@@ -356,7 +379,9 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
             selectedTimeline: timeline
         )
 
-        let targetableItem = try XCTUnwrap(snapshot.timelineItems.first)
+        let targetableItem: DecisionSessionEngineControlTimelinePresentation = try XCTUnwrap(
+            snapshot.timelineItems.first
+        )
         XCTAssertEqual(targetableItem.eventID, "evt_user")
         XCTAssertEqual(targetableItem.seqLine, "Event seq 3")
         XCTAssertTrue(targetableItem.canTargetCorrection)
@@ -394,7 +419,7 @@ final class DecisionSessionEngineControlSnapshotTests: XCTestCase {
             pendingImportPreview: pendingImport.presentation
         )
 
-        XCTAssertEqual(snapshot.reviewItems.map(\.title), ["Pending import draft"])
+        XCTAssertEqual(snapshot.reviewItems.map { $0.title }, ["Pending import draft"])
         XCTAssertTrue(snapshot.reviewItems[0].detail.contains("Bundle parser-session.json"))
         XCTAssertEqual(snapshot.pendingImportPreview?.bundleLine, "Bundle parser-session.json")
     }

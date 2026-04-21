@@ -566,7 +566,8 @@ enum DecisionSessionReviewPresentationSupport {
     ) -> DecisionSessionEngineReviewDigestLine? {
         guard let detail = horizonDiagnosticsDetail(
             riskFactorsLine: session.checkpointPresentationFacts.riskFactorsLine,
-            reasonCodesLine: session.checkpointPresentationFacts.reasonCodesLine
+            reasonCodesLine: session.checkpointPresentationFacts.reasonCodesLine,
+            courtLine: session.checkpointPresentationFacts.resolvedCourtLine
         ) else {
             return nil
         }
@@ -580,10 +581,11 @@ enum DecisionSessionReviewPresentationSupport {
 
     static func horizonDiagnosticsDetail(
         riskFactorsLine: String?,
-        reasonCodesLine: String?
+        reasonCodesLine: String?,
+        courtLine: String? = nil
     ) -> String? {
         let detail = DecisionEvolutionNarrativeFormattingSupport.joined(
-            [riskFactorsLine, reasonCodesLine].compactMap { $0 }
+            [riskFactorsLine, reasonCodesLine, courtLine].compactMap { $0 }
         )
         return detail.isEmpty ? nil : detail
     }
@@ -629,6 +631,7 @@ enum DecisionSessionReviewPresentationSupport {
         if let horizonSession = summary.recentSessions.first(where: {
             $0.checkpointPresentationFacts.riskFactorsLine != nil
                 || $0.checkpointPresentationFacts.reasonCodesLine != nil
+                || $0.checkpointPresentationFacts.resolvedCourtLine != nil
         }), let horizonLine = horizonDiagnosticsDigestLine(session: horizonSession) {
             items.append(horizonLine)
         }
@@ -1407,7 +1410,7 @@ enum DecisionSessionControlPresentationSupport {
             recoveryCount: inspection?.recoveryCount
         )
 
-        return DecisionSessionEngineControlSessionPresentation(
+        return DecisionSessionEngineControlSessionPresentation.make(
             sessionID: session.id,
             title: session.title,
             statusLine: inspection.map {
@@ -1424,17 +1427,27 @@ enum DecisionSessionControlPresentationSupport {
             checkpointBudgetLine: checkpointFacts?.runtimeLine,
             checkpointDecisionLine: checkpointFacts?.decisionLine,
             checkpointTaskLine: checkpointFacts?.taskLine,
+            checkpointWindGateLine: checkpointFacts?.windGateLine,
+            checkpointPresenceLine: checkpointFacts?.resolvedPresenceLine,
             checkpointPressureLine: checkpointFacts?.pressureLine,
             checkpointRiskFactorsLine: checkpointFacts?.riskFactorsLine,
             checkpointReasonCodesLine: checkpointFacts?.reasonCodesLine,
+            checkpointCourtLine: checkpointFacts?.resolvedCourtLine,
             checkpointAuditLine: checkpointFacts?.auditLine,
             checkpointSovereignVerdictLine: checkpointFacts?.sovereignVerdictLine,
             checkpointSovereignAuthorityLine: checkpointFacts?.sovereignAuthorityLine,
             checkpointSovereignAuditLine: checkpointFacts?.sovereignAuditLine,
             checkpointKillSwitchesLine: checkpointFacts?.killSwitchesLine,
             checkpointActionLine: checkpointFacts?.actionLine,
+            checkpointMorphLine: checkpointFacts?.morphLine,
             checkpointLungLine: checkpointFacts?.lungLine,
             checkpointHotColdLine: checkpointFacts?.hotColdLine,
+            checkpointPrecisionLine: checkpointFacts?.precisionLine,
+            checkpointOrganPackageLine: checkpointFacts?.organPackageLine,
+            checkpointOrganDeltaLine: checkpointFacts?.organDeltaLine,
+            checkpointSchedulerLine: checkpointFacts?.schedulerLine,
+            checkpointThermalExchangeLine: checkpointFacts?.thermalExchangeLine,
+            checkpointIntegrityWeaveLine: checkpointFacts?.integrityWeaveLine,
             checkpointResumeLine: checkpointFacts?.resumeLine,
             checkpointRollbackLine: checkpointFacts?.rollbackLine,
             checkpointSovereignBridgeLine: checkpointFacts?.sovereignBridgeLine,
@@ -1700,12 +1713,14 @@ struct DecisionSessionEngineHealthSummary: Equatable, Sendable {
         let horizonSession = summary.activeSession.flatMap { session in
             DecisionSessionReviewPresentationSupport.horizonDiagnosticsDetail(
                 riskFactorsLine: session.checkpointPresentationFacts.riskFactorsLine,
-                reasonCodesLine: session.checkpointPresentationFacts.reasonCodesLine
+                reasonCodesLine: session.checkpointPresentationFacts.reasonCodesLine,
+                courtLine: session.checkpointPresentationFacts.resolvedCourtLine
             ).map { (session, $0) }
         } ?? summary.recentSessions.lazy.compactMap { session in
             DecisionSessionReviewPresentationSupport.horizonDiagnosticsDetail(
                 riskFactorsLine: session.checkpointPresentationFacts.riskFactorsLine,
-                reasonCodesLine: session.checkpointPresentationFacts.reasonCodesLine
+                reasonCodesLine: session.checkpointPresentationFacts.reasonCodesLine,
+                courtLine: session.checkpointPresentationFacts.resolvedCourtLine
             ).map { (session, $0) }
         }.first
 
@@ -1783,7 +1798,8 @@ struct DecisionSessionEngineHealthSummary: Equatable, Sendable {
         if let inspection,
            let horizonDetail = DecisionSessionReviewPresentationSupport.horizonDiagnosticsDetail(
                 riskFactorsLine: inspection.checkpointPresentationFacts.riskFactorsLine,
-                reasonCodesLine: inspection.checkpointPresentationFacts.reasonCodesLine
+                reasonCodesLine: inspection.checkpointPresentationFacts.reasonCodesLine,
+                courtLine: inspection.checkpointPresentationFacts.resolvedCourtLine
            ) {
             return DecisionSessionEngineHealthSummary(
                 severity: .watch,
@@ -1847,9 +1863,12 @@ struct DecisionSessionEngineSessionPresentation: Identifiable, Equatable, Sendab
     let checkpointBudgetLine: String?
     let checkpointDecisionLine: String?
     let checkpointTaskLine: String?
+    let checkpointWindGateLine: String?
+    let checkpointPresenceLine: String?
     let checkpointPressureLine: String?
     let checkpointRiskFactorsLine: String?
     let checkpointReasonCodesLine: String?
+    let checkpointCourtLine: String?
     let checkpointAuditLine: String?
     let checkpointSovereignVerdictLine: String?
     let checkpointSovereignAuthorityLine: String?
@@ -1859,8 +1878,12 @@ struct DecisionSessionEngineSessionPresentation: Identifiable, Equatable, Sendab
     let morphLine: String?
     let hotColdLine: String?
     let precisionLine: String?
+    let organPackageLine: String?
     let lungLine: String?
+    let organDeltaLine: String?
     let schedulerLine: String?
+    let thermalExchangeLine: String?
+    let integrityWeaveLine: String?
     let resumeLine: String?
     let rollbackLine: String?
     let sovereignBridgeLine: String?
@@ -1885,9 +1908,12 @@ struct DecisionSessionEngineSessionPresentation: Identifiable, Equatable, Sendab
         checkpointBudgetLine: String?,
         checkpointDecisionLine: String?,
         checkpointTaskLine: String?,
+        checkpointWindGateLine: String? = nil,
+        checkpointPresenceLine: String? = nil,
         checkpointPressureLine: String?,
         checkpointRiskFactorsLine: String? = nil,
         checkpointReasonCodesLine: String? = nil,
+        checkpointCourtLine: String? = nil,
         checkpointAuditLine: String?,
         checkpointSovereignVerdictLine: String? = nil,
         checkpointSovereignAuthorityLine: String? = nil,
@@ -1897,8 +1923,12 @@ struct DecisionSessionEngineSessionPresentation: Identifiable, Equatable, Sendab
         morphLine: String? = nil,
         hotColdLine: String? = nil,
         precisionLine: String? = nil,
+        organPackageLine: String? = nil,
         lungLine: String? = nil,
+        organDeltaLine: String? = nil,
         schedulerLine: String? = nil,
+        thermalExchangeLine: String? = nil,
+        integrityWeaveLine: String? = nil,
         resumeLine: String? = nil,
         rollbackLine: String? = nil,
         sovereignBridgeLine: String? = nil,
@@ -1922,9 +1952,12 @@ struct DecisionSessionEngineSessionPresentation: Identifiable, Equatable, Sendab
         self.checkpointBudgetLine = checkpointBudgetLine
         self.checkpointDecisionLine = checkpointDecisionLine
         self.checkpointTaskLine = checkpointTaskLine
+        self.checkpointWindGateLine = checkpointWindGateLine
+        self.checkpointPresenceLine = checkpointPresenceLine
         self.checkpointPressureLine = checkpointPressureLine
         self.checkpointRiskFactorsLine = checkpointRiskFactorsLine
         self.checkpointReasonCodesLine = checkpointReasonCodesLine
+        self.checkpointCourtLine = checkpointCourtLine
         self.checkpointAuditLine = checkpointAuditLine
         self.checkpointSovereignVerdictLine = checkpointSovereignVerdictLine
         self.checkpointSovereignAuthorityLine = checkpointSovereignAuthorityLine
@@ -1934,8 +1967,12 @@ struct DecisionSessionEngineSessionPresentation: Identifiable, Equatable, Sendab
         self.morphLine = morphLine
         self.hotColdLine = hotColdLine
         self.precisionLine = precisionLine
+        self.organPackageLine = organPackageLine
         self.lungLine = lungLine
+        self.organDeltaLine = organDeltaLine
         self.schedulerLine = schedulerLine
+        self.thermalExchangeLine = thermalExchangeLine
+        self.integrityWeaveLine = integrityWeaveLine
         self.resumeLine = resumeLine
         self.rollbackLine = rollbackLine
         self.sovereignBridgeLine = sovereignBridgeLine
@@ -1964,19 +2001,27 @@ struct DecisionSessionEngineReplayRecoverySummary: Equatable, Sendable {
     let taskLine: String?
     let actionLine: String?
     let pressureLine: String?
+    let windGateLine: String?
     let riskFactorsLine: String?
     let reasonCodesLine: String?
+    let courtLine: String?
     let auditLine: String?
     let sovereignVerdictLine: String?
     let sovereignAuthorityLine: String?
     let sovereignAuditLine: String?
+    let versionTreeLine: String?
+    let retractionLine: String?
     let activeKillSwitchesLine: String?
     let killSwitchesLine: String?
     let morphLine: String?
     let hotColdLine: String?
     let precisionLine: String?
+    let organPackageLine: String?
     let lungLine: String?
+    let organDeltaLine: String?
     let schedulerLine: String?
+    let thermalExchangeLine: String?
+    let integrityWeaveLine: String?
     let resumeLine: String?
     let rollbackLine: String?
     let sovereignBridgeLine: String?
@@ -1992,19 +2037,27 @@ struct DecisionSessionEngineReplayRecoverySummary: Equatable, Sendable {
         taskLine: String?,
         actionLine: String?,
         pressureLine: String?,
+        windGateLine: String? = nil,
         riskFactorsLine: String? = nil,
         reasonCodesLine: String? = nil,
+        courtLine: String? = nil,
         auditLine: String?,
         sovereignVerdictLine: String? = nil,
         sovereignAuthorityLine: String? = nil,
         sovereignAuditLine: String? = nil,
+        versionTreeLine: String? = nil,
+        retractionLine: String? = nil,
         activeKillSwitchesLine: String?,
         killSwitchesLine: String?,
         morphLine: String? = nil,
         hotColdLine: String? = nil,
         precisionLine: String? = nil,
+        organPackageLine: String? = nil,
         lungLine: String? = nil,
+        organDeltaLine: String? = nil,
         schedulerLine: String? = nil,
+        thermalExchangeLine: String? = nil,
+        integrityWeaveLine: String? = nil,
         resumeLine: String? = nil,
         rollbackLine: String? = nil,
         sovereignBridgeLine: String? = nil,
@@ -2019,19 +2072,27 @@ struct DecisionSessionEngineReplayRecoverySummary: Equatable, Sendable {
         self.taskLine = taskLine
         self.actionLine = actionLine
         self.pressureLine = pressureLine
+        self.windGateLine = windGateLine
         self.riskFactorsLine = riskFactorsLine
         self.reasonCodesLine = reasonCodesLine
+        self.courtLine = courtLine
         self.auditLine = auditLine
         self.sovereignVerdictLine = sovereignVerdictLine
         self.sovereignAuthorityLine = sovereignAuthorityLine
         self.sovereignAuditLine = sovereignAuditLine
+        self.versionTreeLine = versionTreeLine
+        self.retractionLine = retractionLine
         self.activeKillSwitchesLine = activeKillSwitchesLine
         self.killSwitchesLine = killSwitchesLine
         self.morphLine = morphLine
         self.hotColdLine = hotColdLine
         self.precisionLine = precisionLine
+        self.organPackageLine = organPackageLine
         self.lungLine = lungLine
+        self.organDeltaLine = organDeltaLine
         self.schedulerLine = schedulerLine
+        self.thermalExchangeLine = thermalExchangeLine
+        self.integrityWeaveLine = integrityWeaveLine
         self.resumeLine = resumeLine
         self.rollbackLine = rollbackLine
         self.sovereignBridgeLine = sovereignBridgeLine
@@ -2055,14 +2116,17 @@ struct DecisionSessionEngineReplayRecoverySummary: Equatable, Sendable {
             DecisionEvolutionNarrativeFormattingSupport.joined(
                 [detailLine, killSwitchesLine].compactMap { $0 }
             ).nilIfEmpty,
+            windGateLine,
             DecisionEvolutionNarrativeFormattingSupport.joined(
-                [riskFactorsLine, reasonCodesLine].compactMap { $0 }
+                [riskFactorsLine, reasonCodesLine, courtLine].compactMap { $0 }
             ).nilIfEmpty,
             sovereignVerdictLine,
             sovereignAuthorityLine,
             sovereignAuditLine,
+            versionTreeLine,
+            retractionLine,
             DecisionEvolutionNarrativeFormattingSupport.joined(
-                [lungLine, morphLine, hotColdLine, precisionLine, schedulerLine, resumeLine, rollbackLine, sovereignBridgeLine].compactMap { $0 }
+                [lungLine, morphLine, hotColdLine, precisionLine, organPackageLine, organDeltaLine, schedulerLine, thermalExchangeLine, integrityWeaveLine, resumeLine, rollbackLine, sovereignBridgeLine].compactMap { $0 }
             ).nilIfEmpty
         ]
         .compactMap { $0?.nilIfEmpty }
@@ -2092,14 +2156,18 @@ extension DeveloperDecisionReplayEBrainSummary {
             taskLine: checkpointTaskLine,
             actionLine: nil,
             pressureLine: checkpointPressureLine,
+            windGateLine: checkpointWindGateLine,
             riskFactorsLine: riskFactorsLine,
             reasonCodesLine: reasonCodesLine,
+            courtLine: courtLine,
             auditLine: DecisionSessionReviewPresentationSupport.auditLine(
                 guardrailFindings: guardrailFindings
             ),
             sovereignVerdictLine: sovereignVerdictLine,
             sovereignAuthorityLine: sovereignAuthorityLine,
             sovereignAuditLine: sovereignAuditLine,
+            versionTreeLine: versionTreeLine,
+            retractionLine: retractionLine,
             activeKillSwitchesLine: DecisionEvolutionKillSwitchPresentationSupport.activeLine(
                 killSwitches: activeKillSwitches
             ),
@@ -2109,8 +2177,12 @@ extension DeveloperDecisionReplayEBrainSummary {
             morphLine: morphLine,
             hotColdLine: hotColdLine,
             precisionLine: precisionLine,
+            organPackageLine: organPackageLine,
             lungLine: lungLine,
+            organDeltaLine: organDeltaLine,
             schedulerLine: schedulerLine,
+            thermalExchangeLine: thermalExchangeLine,
+            integrityWeaveLine: integrityWeaveLine,
             resumeLine: resumeLine,
             rollbackLine: rollbackLine,
             sovereignBridgeLine: sovereignBridgeLine,
@@ -2152,19 +2224,27 @@ extension DecisionSessionRuntimeInspectionSession {
             taskLine: checkpointFacts.resolvedTaskLine,
             actionLine: checkpointFacts.actionLine,
             pressureLine: checkpointFacts.pressureLine,
+            windGateLine: checkpointFacts.windGateLine,
             riskFactorsLine: checkpointFacts.riskFactorsLine,
             reasonCodesLine: checkpointFacts.reasonCodesLine,
+            courtLine: checkpointFacts.resolvedCourtLine,
             auditLine: checkpointFacts.combinedAuditLine(addition: openStepAlertLine),
             sovereignVerdictLine: checkpointFacts.sovereignVerdictLine,
             sovereignAuthorityLine: checkpointFacts.sovereignAuthorityLine,
             sovereignAuditLine: checkpointFacts.sovereignAuditLine,
+            versionTreeLine: checkpointFacts.versionTreeLine,
+            retractionLine: checkpointFacts.retractionLine,
             activeKillSwitchesLine: checkpointFacts.activeKillSwitchesLine,
             killSwitchesLine: checkpointFacts.killSwitchesLine,
             morphLine: checkpointFacts.morphLine,
             hotColdLine: checkpointFacts.hotColdLine,
             precisionLine: checkpointFacts.precisionLine,
+            organPackageLine: checkpointFacts.organPackageLine,
             lungLine: checkpointFacts.lungLine,
+            organDeltaLine: checkpointFacts.organDeltaLine,
             schedulerLine: checkpointFacts.schedulerLine,
+            thermalExchangeLine: checkpointFacts.thermalExchangeLine,
+            integrityWeaveLine: checkpointFacts.integrityWeaveLine,
             resumeLine: checkpointFacts.resumeLine,
             rollbackLine: checkpointFacts.rollbackLine,
             sovereignBridgeLine: checkpointFacts.sovereignBridgeLine,
@@ -2280,9 +2360,12 @@ struct DecisionSessionEnginePresentation: Equatable, Sendable {
             checkpointBudgetLine: checkpointFacts.runtimeLine,
             checkpointDecisionLine: checkpointFacts.resolvedDecisionLine,
             checkpointTaskLine: checkpointFacts.resolvedTaskLine,
+            checkpointWindGateLine: checkpointFacts.windGateLine,
+            checkpointPresenceLine: checkpointFacts.resolvedPresenceLine,
             checkpointPressureLine: checkpointFacts.pressureLine,
             checkpointRiskFactorsLine: checkpointFacts.riskFactorsLine,
             checkpointReasonCodesLine: checkpointFacts.reasonCodesLine,
+            checkpointCourtLine: checkpointFacts.resolvedCourtLine,
             checkpointAuditLine: checkpointFacts.auditLine,
             checkpointSovereignVerdictLine: checkpointFacts.sovereignVerdictLine,
             checkpointSovereignAuthorityLine: checkpointFacts.sovereignAuthorityLine,
@@ -2292,7 +2375,12 @@ struct DecisionSessionEnginePresentation: Equatable, Sendable {
             morphLine: checkpointFacts.morphLine,
             hotColdLine: checkpointFacts.hotColdLine,
             precisionLine: checkpointFacts.precisionLine,
+            organPackageLine: checkpointFacts.organPackageLine,
             lungLine: checkpointFacts.lungLine,
+            organDeltaLine: checkpointFacts.organDeltaLine,
+            schedulerLine: checkpointFacts.schedulerLine,
+            thermalExchangeLine: checkpointFacts.thermalExchangeLine,
+            integrityWeaveLine: checkpointFacts.integrityWeaveLine,
             resumeLine: checkpointFacts.resumeLine,
             rollbackLine: checkpointFacts.rollbackLine,
             sovereignBridgeLine: checkpointFacts.sovereignBridgeLine,

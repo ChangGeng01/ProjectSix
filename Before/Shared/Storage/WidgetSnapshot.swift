@@ -175,11 +175,28 @@ enum DecisionEvolutionWidgetControlEntryLexiconSupport {
 }
 
 struct DecisionEvolutionWidgetControlEntryPresentation: Codable, Equatable, Sendable {
+    let kindID: String?
     let title: String
     let systemImage: String
     let prompt: String
     let instruction: String
     let triggerReason: String?
+
+    init(
+        kindID: String? = nil,
+        title: String,
+        systemImage: String,
+        prompt: String,
+        instruction: String,
+        triggerReason: String?
+    ) {
+        self.kindID = kindID
+        self.title = title
+        self.systemImage = systemImage
+        self.prompt = prompt
+        self.instruction = instruction
+        self.triggerReason = triggerReason
+    }
 }
 
 enum DecisionEvolutionWidgetPrimaryActionKind: Equatable, Sendable {
@@ -189,10 +206,27 @@ enum DecisionEvolutionWidgetPrimaryActionKind: Equatable, Sendable {
 
 struct DecisionEvolutionWidgetPrimaryActionPresentation: Equatable, Sendable {
     let kind: DecisionEvolutionWidgetPrimaryActionKind
+    let controlEntryKindID: String?
     let title: String
     let systemImage: String
     let prompt: String?
     let triggerReason: String?
+
+    init(
+        kind: DecisionEvolutionWidgetPrimaryActionKind,
+        controlEntryKindID: String? = nil,
+        title: String,
+        systemImage: String,
+        prompt: String?,
+        triggerReason: String?
+    ) {
+        self.kind = kind
+        self.controlEntryKindID = controlEntryKindID
+        self.title = title
+        self.systemImage = systemImage
+        self.prompt = prompt
+        self.triggerReason = triggerReason
+    }
 }
 
 struct DecisionEvolutionWidgetSurfacePresentation: Equatable, Sendable {
@@ -207,6 +241,7 @@ struct DecisionEvolutionWidgetSurfacePresentation: Equatable, Sendable {
 enum DecisionEvolutionWidgetPresentationSupport {
     static let defaultPrimaryAction = DecisionEvolutionWidgetPrimaryActionPresentation(
         kind: .quick,
+        controlEntryKindID: nil,
         title: "Open Before",
         systemImage: "pause.circle.fill",
         prompt: nil,
@@ -349,6 +384,7 @@ enum DecisionEvolutionWidgetPresentationSupport {
         triggerReason: String? = nil
     ) -> DecisionEvolutionWidgetControlEntryPresentation {
         DecisionEvolutionWidgetControlEntryPresentation(
+            kindID: kind.rawValue,
             title: controlEntryTitle(kind: kind),
             systemImage: controlEntrySystemImage(kind: kind),
             prompt: prompt,
@@ -585,6 +621,11 @@ struct WidgetEvolutionSnapshot: Codable, Equatable, Sendable {
         controlEntryTitle
     }
 
+    var resolvedControlEntryKind: DecisionEvolutionWidgetControlEntryKind? {
+        guard surfacesAttention else { return nil }
+        return controlEntryKind
+    }
+
     var controlEntryPresentation: DecisionEvolutionWidgetControlEntryPresentation? {
         if let storedControlEntry {
             return storedControlEntry
@@ -641,6 +682,7 @@ struct WidgetSnapshot: Codable, Sendable {
         if let controlEntry = evolution?.controlEntryPresentation {
             return DecisionEvolutionWidgetPrimaryActionPresentation(
                 kind: .evolutionControl,
+                controlEntryKindID: evolution?.resolvedControlEntryKind?.rawValue,
                 title: controlEntry.title,
                 systemImage: controlEntry.systemImage,
                 prompt: controlEntry.prompt,
@@ -735,6 +777,7 @@ enum WidgetSnapshotStore {
         guard let controlEntry else { return nil }
 
         return DecisionEvolutionWidgetControlEntryPresentation(
+            kindID: controlEntry.kindID,
             title: String(controlEntry.title.prefix(40)),
             systemImage: String(controlEntry.systemImage.prefix(60)),
             prompt: String(controlEntry.prompt.prefix(120)),

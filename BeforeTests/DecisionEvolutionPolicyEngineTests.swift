@@ -183,7 +183,7 @@ final class DecisionEvolutionPolicyEngineTests: XCTestCase {
         XCTAssertEqual(input.recommendedKillSwitches, ["external-tools"])
         XCTAssertFalse(input.canRestoreActiveCheckpoint)
         XCTAssertFalse(input.canRollbackActiveCheckpoint)
-        XCTAssertEqual(input.reviewAuditFindings, ["audit-review-workspace"])
+        XCTAssertEqual(input.reviewAuditFindings, [])
         XCTAssertEqual(input.queueAuditFindings, ["audit-review-workspace"])
         XCTAssertEqual(input.queueKillSwitches, ["queue-kill"])
     }
@@ -405,6 +405,7 @@ final class DecisionEvolutionPolicyEngineTests: XCTestCase {
                 triggerReason: "Factors: evidence_caveat_load"
             ),
             DecisionEvolutionWidgetControlEntryPresentation(
+                kindID: DecisionEvolutionWidgetControlEntryKind.audit.rawValue,
                 title: "Audit on iPhone",
                 systemImage: "exclamationmark.circle",
                 prompt: "Watching audit findings before wider rollout",

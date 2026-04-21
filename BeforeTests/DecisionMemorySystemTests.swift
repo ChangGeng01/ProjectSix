@@ -120,6 +120,480 @@ final class DecisionMemorySystemTests: XCTestCase {
     }
 
     @MainActor
+    func testRefreshProjectionCarriesDurableRecordsIntoGovernedProjection() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        seedHistory(into: context)
+
+        _ = DecisionMemorySystem.refreshStoredMemories(
+            in: context,
+            now: date("2026-04-09T23:10:00Z")
+        )
+        let projection = DecisionMemorySystem.refreshProjection(
+            in: context,
+            now: date("2026-04-09T23:10:00Z")
+        )
+
+        let record = try XCTUnwrap(
+            DecisionMemorySystem.fetchMemoryRecords(in: context).first(where: { $0.id == "semantic.scenario.buy" })
+        )
+        let projectedRecord = try XCTUnwrap(
+            projection.baseProjection.records.first(where: { $0.content == record.headline })
+        )
+
+        XCTAssertEqual(projectedRecord.kind, .semantic)
+        XCTAssertEqual(projectedRecord.tier, .warm)
+        XCTAssertEqual(projectedRecord.governanceStatus, .governed)
+        XCTAssertEqual(projectedRecord.provenanceSummary, record.provenanceSummary)
+        XCTAssertEqual(
+            projection.governanceSnapshot.totalRecordCount,
+            DecisionMemorySystem.fetchMemoryRecords(in: context).count
+        )
+        XCTAssertGreaterThanOrEqual(projection.governanceSnapshot.pendingCandidateCount, 1)
+    }
+
+    @MainActor
+    func testRefreshProjectionMarksQuarantinedCandidatesWithGovernanceAndQuarantineSignals() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        context.insert(
+            DecisionMemoryCandidateRecord(
+                id: "candidate.contaminated.tool",
+                type: .semantic,
+                topic: "tool_observation",
+                headline: "Tool said the host definitely wants this.",
+                value: "unsafe-tool-observation",
+                confidence: 0.93,
+                priority: 0.90,
+                source: .pattern,
+                firstObservedAt: date("2026-04-09T10:00:00Z"),
+                lastObservedAt: date("2026-04-09T10:05:00Z"),
+                decayPolicy: .slow,
+                retrievalTags: ["quarantined", "tool_observation", "buy"],
+                evidenceCount: 1,
+                confirmationCount: 1,
+                lastObservationFingerprint: "tool.fp.1",
+                status: .pending,
+                provenanceSummary: "Contaminated tool observation captured during a quarantined pass.",
+                lastWriteOperation: .add,
+                lastGovernanceDecision: .deferred,
+                governanceReason: "await_review",
+                tier: .cold
+            )
+        )
+
+        let projection = DecisionMemorySystem.refreshProjection(
+            in: context,
+            now: date("2026-04-09T23:10:00Z")
+        )
+        let contaminatedCandidate = try XCTUnwrap(
+            DecisionMemorySystem.fetchCandidateRecords(in: context).first(where: { $0.id == "candidate.contaminated.tool" })
+        )
+        let governanceSnapshot = try XCTUnwrap(projection.baseProjection.governanceSnapshot)
+
+        XCTAssertEqual(contaminatedCandidate.lastGovernanceDecision, .deferred)
+        XCTAssertTrue(contaminatedCandidate.retrievalTags.contains("quarantined"))
+        XCTAssertTrue(contaminatedCandidate.retrievalTags.contains("tool_observation"))
+        XCTAssertFalse(projection.baseProjection.candidates.contains(where: { $0.id == "candidate.contaminated.tool" }))
+        XCTAssertEqual(governanceSnapshot.screenedOutMemoryCount, 1)
+        XCTAssertEqual(governanceSnapshot.screenedOutPendingMemoryCount, 1)
+        XCTAssertEqual(governanceSnapshot.quarantinedObservationCount, 1)
+        XCTAssertEqual(projection.governanceSnapshot.quarantinedObservationCount, 1)
+    }
+
+    @MainActor
+    func testRefreshProjectionKeepsRepeatedTopicRecordAndCandidateVisibleInCurrentProjection() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        context.insert(
+            DecisionMemoryRecord(
+                id: "record.boundary.1",
+                type: .semantic,
+                topic: "boundary_topic",
+                headline: "Protect the boundary first.",
+                value: "protect_first",
+                confidence: 0.82,
+                priority: 0.74,
+                source: .history,
+                lastConfirmedAt: date("2026-04-09T09:00:00Z"),
+                decayPolicy: .slow,
+                retrievalTags: ["boundary", "repeat"],
+                evidenceCount: 3,
+                observationCount: 2,
+                provenanceSummary: "Confirmed from repeated quick-loop history.",
+                lifecycleState: .active,
+                tier: .warm
+            )
+        )
+        context.insert(
+            DecisionMemoryCandidateRecord(
+                id: "candidate.boundary.2",
+                type: .semantic,
+                topic: "boundary_topic",
+                headline: "Protect the boundary after a pause.",
+                value: "protect_after_pause",
+                confidence: 0.77,
+                priority: 0.73,
+                source: .reflection,
+                firstObservedAt: date("2026-04-09T10:00:00Z"),
+                lastObservedAt: date("2026-04-09T10:05:00Z"),
+                decayPolicy: .medium,
+                retrievalTags: ["boundary", "repeat"],
+                evidenceCount: 2,
+                confirmationCount: 2,
+                lastObservationFingerprint: "boundary.fp.2",
+                status: .pending,
+                provenanceSummary: "Reflected from repeated boundary rehearsal.",
+                lastWriteOperation: .add,
+                lastGovernanceDecision: .deferred,
+                governanceReason: "pending_review",
+                tier: .warm
+            )
+        )
+
+        let projection = DecisionMemorySystem.refreshProjection(
+            in: context,
+            now: date("2026-04-09T23:10:00Z")
+        )
+        let projectedRecord = try XCTUnwrap(
+            projection.baseProjection.records.first(where: { $0.content == "Protect the boundary first." })
+        )
+        let projectedCandidate = try XCTUnwrap(
+            projection.baseProjection.candidates.first(where: { $0.id == "candidate.boundary.2" })
+        )
+
+        XCTAssertEqual(projectedRecord.kind, .semantic)
+        XCTAssertEqual(projectedCandidate.headline, "Protect the boundary after a pause.")
+        XCTAssertEqual(projectedCandidate.source, .reflection)
+        XCTAssertEqual(projection.governanceSnapshot.totalRecordCount, 1)
+        XCTAssertEqual(projection.governanceSnapshot.totalCandidateCount, 1)
+        XCTAssertEqual(projection.governanceSnapshot.pendingCandidateCount, 1)
+        XCTAssertEqual(projection.governanceSnapshot.deferredCandidateCount, 1)
+    }
+
+    @MainActor
+    func testRefreshStoredMemoriesProjectsTemporalFieldAndSealMetadataIntoLegacyRecords() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let stableNow = date("2026-04-09T23:10:00Z")
+
+        seedHistory(into: context)
+
+        _ = DecisionMemorySystem.refreshStoredMemories(
+            in: context,
+            now: stableNow
+        )
+        let field = DecisionMemorySystem.temporalField(
+            in: context,
+            now: stableNow
+        )
+
+        let semanticRecord = try XCTUnwrap(
+            DecisionMemorySystem.fetchMemoryRecords(in: context).first(where: { $0.id == "semantic.scenario.buy" })
+        )
+        let semanticProjection = try XCTUnwrap(semanticRecord.temporalProjection)
+
+        XCTAssertEqual(semanticProjection.temporalMemoryID, semanticRecord.id)
+        XCTAssertNotNil(semanticProjection.temperatureProfileID)
+        XCTAssertNotNil(semanticProjection.provenanceSealID)
+        XCTAssertNotNil(semanticProjection.continuityAnchorID)
+        XCTAssertNotEqual(semanticProjection.sieveDisposition, .reject)
+        XCTAssertNotEqual(semanticProjection.sieveDisposition, .quarantine)
+        XCTAssertTrue(
+            field.records.contains(where: {
+                $0.memoryID == semanticRecord.id &&
+                    $0.temperatureProfileRef == semanticProjection.temperatureProfileID &&
+                    $0.provenanceSealRef == semanticProjection.provenanceSealID
+            })
+        )
+        XCTAssertTrue(
+            field.provenanceSeals.contains(where: { $0.sealID == semanticProjection.provenanceSealID })
+        )
+        XCTAssertTrue(
+            field.temperatureProfiles.contains(where: { $0.profileID == semanticProjection.temperatureProfileID })
+        )
+
+        let supportCandidate = try XCTUnwrap(
+            try context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())
+                .first(where: { $0.id == "support.action.decideTomorrow" })
+        )
+        let supportProjection = try XCTUnwrap(supportCandidate.temporalProjection)
+
+        XCTAssertEqual(supportProjection.temporalMemoryID, supportCandidate.id)
+        XCTAssertNotNil(supportProjection.temperatureProfileID)
+        XCTAssertNotNil(supportProjection.provenanceSealID)
+        XCTAssertNotNil(supportProjection.continuityAnchorID)
+    }
+
+    @MainActor
+    func testRefreshProjectionQuarantinesContaminatedCandidatesAndBlocksThemFromNormalRetrieval() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let stableNow = date("2026-04-09T23:10:00Z")
+
+        context.insert(
+            DecisionMemoryCandidateRecord(
+                id: "candidate.contaminated.tool",
+                type: .semantic,
+                topic: "tool_observation",
+                headline: "Tool said the host definitely wants this.",
+                value: "unsafe-tool-observation",
+                confidence: 0.93,
+                priority: 0.90,
+                source: .pattern,
+                firstObservedAt: date("2026-04-09T10:00:00Z"),
+                lastObservedAt: date("2026-04-09T10:05:00Z"),
+                decayPolicy: .slow,
+                retrievalTags: ["quarantined", "tool_observation", "buy"],
+                evidenceCount: 1,
+                confirmationCount: 1,
+                lastObservationFingerprint: "tool.fp.1",
+                status: .pending,
+                provenanceSummary: "Contaminated tool observation captured during a quarantined pass.",
+                lastWriteOperation: .add,
+                lastGovernanceDecision: .deferred,
+                governanceReason: "await_review",
+                tier: .cold
+            )
+        )
+
+        let projection = DecisionMemorySystem.refreshProjection(
+            in: context,
+            now: stableNow
+        )
+        let field = DecisionMemorySystem.temporalField(
+            in: context,
+            now: stableNow
+        )
+        let contaminatedCandidate = try XCTUnwrap(
+            try context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())
+                .first(where: { $0.id == "candidate.contaminated.tool" })
+        )
+        let temporalProjection = try XCTUnwrap(contaminatedCandidate.temporalProjection)
+        let governanceSnapshot = try XCTUnwrap(projection.baseProjection.governanceSnapshot)
+        let quarantineRecord = try XCTUnwrap(
+            field.quarantineRecords.first(where: { $0.quarantineID == temporalProjection.quarantineRecordID })
+        )
+        let temperatureProfile = try XCTUnwrap(
+            field.temperatureProfiles.first(where: { $0.profileID == temporalProjection.temperatureProfileID })
+        )
+
+        XCTAssertEqual(temporalProjection.sieveDisposition, .quarantine)
+        XCTAssertNotNil(temporalProjection.quarantineRecordID)
+        XCTAssertFalse(projection.baseProjection.candidates.contains(where: { $0.id == contaminatedCandidate.id }))
+        XCTAssertEqual(quarantineRecord.memoryRef, contaminatedCandidate.id)
+        XCTAssertEqual(temperatureProfile.currentBand, .quarantine)
+        XCTAssertTrue(temperatureProfile.accessRules.contains("blocked_from_normal_retrieval"))
+        XCTAssertEqual(governanceSnapshot.screenedOutMemoryCount, 1)
+        XCTAssertEqual(governanceSnapshot.screenedOutPendingMemoryCount, 1)
+        XCTAssertEqual(governanceSnapshot.quarantinedObservationCount, 1)
+    }
+
+    @MainActor
+    func testTemporalFieldBuildsEpisodeArcConflictClusterAndReplayFrameForRepeatedTopic() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let stableNow = date("2026-04-09T23:10:00Z")
+
+        context.insert(
+            DecisionMemoryRecord(
+                id: "record.boundary.seed",
+                type: .semantic,
+                topic: "boundary_topic",
+                headline: "Protect the boundary first.",
+                value: "protect_first",
+                confidence: 0.82,
+                priority: 0.74,
+                source: .history,
+                lastConfirmedAt: date("2026-04-09T09:00:00Z"),
+                decayPolicy: .slow,
+                retrievalTags: ["boundary", "repeat"],
+                evidenceCount: 3,
+                observationCount: 2,
+                provenanceSummary: "Confirmed from repeated quick-loop history.",
+                lifecycleState: .active,
+                tier: .warm
+            )
+        )
+        context.insert(
+            DecisionMemoryCandidateRecord(
+                id: "candidate.boundary.seed",
+                type: .semantic,
+                topic: "boundary_topic",
+                headline: "Protect the boundary after a pause.",
+                value: "protect_after_pause",
+                confidence: 0.77,
+                priority: 0.73,
+                source: .reflection,
+                firstObservedAt: date("2026-04-09T10:00:00Z"),
+                lastObservedAt: date("2026-04-09T10:05:00Z"),
+                decayPolicy: .medium,
+                retrievalTags: ["boundary", "repeat"],
+                evidenceCount: 2,
+                confirmationCount: 2,
+                lastObservationFingerprint: "boundary.fp.2",
+                status: .pending,
+                provenanceSummary: "Reflected from repeated boundary rehearsal.",
+                lastWriteOperation: .add,
+                lastGovernanceDecision: .deferred,
+                governanceReason: "pending_review",
+                tier: .warm
+            )
+        )
+        try context.save()
+
+        let field = DecisionMemorySystem.temporalField(
+            in: context,
+            now: stableNow
+        )
+        let result = DecisionMemorySystem.reconcileTemporalFieldStage(
+            in: context,
+            now: stableNow
+        )
+
+        let arc = try XCTUnwrap(
+            field.episodeArcs.first(where: { $0.arcID == "arc.boundary.topic" })
+        )
+        let conflictCluster = try XCTUnwrap(
+            field.conflictClusters.first(where: { $0.clusterID == "conflict.boundary.topic" })
+        )
+        let continuityAnchor = try XCTUnwrap(field.continuityAnchors.first)
+        let record = try XCTUnwrap(
+            DecisionMemorySystem.fetchMemoryRecords(in: context).first(where: { $0.id == "record.boundary.seed" })
+        )
+        let candidate = try XCTUnwrap(
+            try context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())
+                .first(where: { $0.id == "candidate.boundary.seed" })
+        )
+
+        XCTAssertEqual(Set(arc.linkedMemoryRefs), Set(["record.boundary.seed", "candidate.boundary.seed"]))
+        XCTAssertEqual(arc.currentState, "tracking")
+        XCTAssertEqual(arc.escalationPattern, "repeat-tracking")
+        XCTAssertEqual(Set(conflictCluster.memoryRefs), Set(["record.boundary.seed", "candidate.boundary.seed"]))
+        XCTAssertTrue(conflictCluster.unresolved)
+        XCTAssertTrue(continuityAnchor.activeArcRefs.contains(arc.arcID))
+        XCTAssertTrue(
+            field.replayFrames.contains(where: {
+                $0.replayScope == .arc &&
+                    Set($0.targetRefs) == Set(["record.boundary.seed", "candidate.boundary.seed"])
+            })
+        )
+        XCTAssertTrue(
+            field.replayFrames.contains(where: {
+                $0.replayScope == .conflict &&
+                    Set($0.targetRefs) == Set(["record.boundary.seed", "candidate.boundary.seed"])
+            })
+        )
+        XCTAssertEqual(record.temporalProjection?.episodeArcIDs, [arc.arcID])
+        XCTAssertEqual(record.temporalProjection?.conflictClusterIDs, [conflictCluster.clusterID])
+        XCTAssertEqual(candidate.temporalProjection?.episodeArcIDs, [arc.arcID])
+        XCTAssertEqual(candidate.temporalProjection?.conflictClusterIDs, [conflictCluster.clusterID])
+        XCTAssertEqual(result.field.episodeArcs.count, 1)
+        XCTAssertEqual(result.field.conflictClusters.count, 1)
+    }
+
+    @MainActor
+    func testTemporalFieldBuildsSanctumEntriesAndForgetCascadesForSensitiveAndRevokedMemories() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let stableNow = date("2026-04-09T23:10:00Z")
+
+        context.insert(
+            DecisionMemoryRecord(
+                id: "record.private.boundary",
+                type: .semantic,
+                topic: "private_boundary",
+                headline: "Keep this boundary private.",
+                value: "private_boundary",
+                confidence: 0.88,
+                priority: 0.72,
+                source: .history,
+                lastConfirmedAt: date("2026-04-09T08:00:00Z"),
+                decayPolicy: .slow,
+                retrievalTags: ["sealed", "sensitive", "private"],
+                evidenceCount: 3,
+                observationCount: 2,
+                provenanceSummary: "Sensitive host-only boundary confirmed from direct history.",
+                lifecycleState: .active,
+                tier: .warm
+            )
+        )
+        context.insert(
+            DecisionMemoryCandidateRecord(
+                id: "candidate.rollback.boundary",
+                type: .support,
+                topic: "private_boundary",
+                headline: "Withdraw the stale boundary draft.",
+                value: "withdraw_boundary_draft",
+                confidence: 0.67,
+                priority: 0.58,
+                source: .reflection,
+                firstObservedAt: date("2026-04-09T09:00:00Z"),
+                lastObservedAt: date("2026-04-09T09:05:00Z"),
+                decayPolicy: .medium,
+                retrievalTags: ["rollback", "deleted"],
+                evidenceCount: 1,
+                confirmationCount: 1,
+                lastObservationFingerprint: "rollback.fp.1",
+                status: .pending,
+                provenanceSummary: "Structured rollback request for a stale draft.",
+                lastWriteOperation: .delete,
+                lastGovernanceDecision: .deferred,
+                governanceReason: "withdraw_pending",
+                tier: .warm
+            )
+        )
+        try context.save()
+
+        let projection = DecisionMemorySystem.refreshProjection(
+            in: context,
+            now: stableNow
+        )
+        let field = DecisionMemorySystem.temporalField(
+            in: context,
+            now: stableNow
+        )
+
+        let sealedRecord = try XCTUnwrap(
+            DecisionMemorySystem.fetchMemoryRecords(in: context).first(where: { $0.id == "record.private.boundary" })
+        )
+        let sealedProjection = try XCTUnwrap(sealedRecord.temporalProjection)
+        let forgetCandidate = try XCTUnwrap(
+            try context.fetch(FetchDescriptor<DecisionMemoryCandidateRecord>())
+                .first(where: { $0.id == "candidate.rollback.boundary" })
+        )
+        let forgetProjection = try XCTUnwrap(forgetCandidate.temporalProjection)
+        let sealedProfile = try XCTUnwrap(
+            field.temperatureProfiles.first(where: { $0.profileID == sealedProjection.temperatureProfileID })
+        )
+        let sanctumEntry = try XCTUnwrap(
+            field.sanctumEntries.first(where: { $0.entryID == sealedProjection.sanctumEntryID })
+        )
+        let forgetCascade = try XCTUnwrap(
+            field.forgetCascades.first(where: { $0.cascadeID == forgetProjection.forgetCascadeIDs.first })
+        )
+
+        XCTAssertEqual(field.sanctumEntries.count, 1)
+        XCTAssertEqual(field.forgetCascades.count, 1)
+        XCTAssertEqual(sealedProfile.currentBand, .sealed)
+        XCTAssertEqual(sanctumEntry.memoryRef, sealedRecord.id)
+        XCTAssertNotNil(sealedProjection.sanctumEntryID)
+        XCTAssertFalse(
+            projection.baseProjection.records.contains(where: { $0.content == "Keep this boundary private." })
+        )
+
+        XCTAssertEqual(forgetCascade.rootTargets, [forgetCandidate.id])
+        XCTAssertEqual(forgetCascade.executionState, "delete_requested")
+        XCTAssertFalse(forgetProjection.forgetCascadeIDs.isEmpty)
+        XCTAssertTrue(
+            projection.baseProjection.candidates.contains(where: { $0.id == forgetCandidate.id })
+        )
+    }
+
+    @MainActor
     func testLoadBrainStateReconstructsProfileGoalsAndRelevantMemories() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -552,7 +1026,7 @@ final class DecisionMemorySystemTests: XCTestCase {
     }
 
     @MainActor
-    func testLoadBrainStateFallbackRecordsAuditableNoticeAndDegradedBias() {
+    func testLoadBrainStateFallbackRecordsAuditableNoticeAndDegradedBias() throws {
         enum SyntheticFailure: Error {
             case compilerRejected
         }
@@ -596,12 +1070,30 @@ final class DecisionMemorySystemTests: XCTestCase {
 
         XCTAssertTrue(brainState.sessionBiases.contains("brain-bootstrap-recovery"))
         XCTAssertTrue(brainState.sessionBiases.contains("brain-bootstrap-remediation-required"))
+        XCTAssertTrue(brainState.sessionBiases.contains("release-lane:recovery"))
+        XCTAssertTrue(brainState.sessionBiases.contains("lease:restricted"))
+        XCTAssertTrue(brainState.sessionBiases.contains("confirmation:operator_recovery_review"))
         XCTAssertTrue(brainState.retrievalTags.contains("recovery"))
         XCTAssertTrue(brainState.retrievalTags.contains("restricted"))
         XCTAssertTrue(brainState.retrievalTags.contains("restricted-lease"))
         XCTAssertTrue(brainState.retrievalTags.contains("tool-write-blocked"))
         XCTAssertTrue(brainState.retrievalTags.contains("memory-write-blocked"))
         XCTAssertTrue(brainState.retrievalTags.contains("deep-loop-blocked"))
+        XCTAssertTrue(
+            brainState.relevantMemories.contains(
+                BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.recoveryIssueSummary
+            )
+        )
+        XCTAssertTrue(
+            brainState.relevantMemories.contains(
+                BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.recoveryIssueRemediation
+            )
+        )
+        XCTAssertTrue(
+            brainState.relevantMemories.contains(
+                "Required confirmations: operator_recovery_review"
+            )
+        )
         XCTAssertEqual(brainState.boundaryPolicy.mode, .localOnlyProtective)
         XCTAssertEqual(
             brainState.boundaryPolicy.allowedActionClasses,
@@ -662,10 +1154,31 @@ final class DecisionMemorySystemTests: XCTestCase {
         XCTAssertEqual(brainState.memoryGovernance.deferredCandidateCount, 1)
         XCTAssertEqual(brainState.memoryGovernance.admittedCandidateCount, 1)
         XCTAssertEqual(brainState.evolutionState.pendingReviewCount, 2)
+        XCTAssertEqual(brainState.evolutionState.checkpointCount, 1)
+        XCTAssertFalse(brainState.evolutionState.rollbackReady)
         XCTAssertTrue(
             brainState.evolutionState.recentDiffSummary.contains(where: {
                 $0.localizedCaseInsensitiveContains("recovery")
             })
+        )
+        let recoveryCheckpoint = try XCTUnwrap(brainState.evolutionState.latestCheckpoint)
+        XCTAssertEqual(recoveryCheckpoint.approvalState, .reviewSuggested)
+        XCTAssertFalse(recoveryCheckpoint.rollbackReady)
+        XCTAssertTrue(
+            recoveryCheckpoint.diffSummary.contains(where: {
+                $0.localizedCaseInsensitiveContains("operator confirmations required")
+            })
+        )
+        let recoveryLineage = try XCTUnwrap(recoveryCheckpoint.lineageSummary)
+        XCTAssertEqual(recoveryLineage.runMode, .recovery)
+        XCTAssertEqual(recoveryLineage.taskType, "brain-bootstrap-fallback")
+        XCTAssertEqual(recoveryLineage.recoveryDisposition?.kind, .recovery)
+        XCTAssertEqual(recoveryLineage.recoveryDisposition?.restrictedLease, true)
+        XCTAssertEqual(recoveryLineage.recoveryDisposition?.toolWriteAllowed, false)
+        XCTAssertEqual(recoveryLineage.recoveryDisposition?.memoryWriteAllowed, false)
+        XCTAssertEqual(
+            recoveryLineage.recoveryDisposition?.summary,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.recoveryIssueSummary
         )
         XCTAssertNotNil(PersistenceIssueRecorder.latestNotice())
         XCTAssertTrue(
@@ -679,7 +1192,7 @@ final class DecisionMemorySystemTests: XCTestCase {
     }
 
     @MainActor
-    func testRepeatedBrainBootstrapFallbackEscalatesToQuarantineContract() {
+    func testRepeatedBrainBootstrapFallbackEscalatesToQuarantineContract() throws {
         enum SyntheticFailure: Error {
             case compilerRejected
         }
@@ -733,11 +1246,30 @@ final class DecisionMemorySystemTests: XCTestCase {
         )
 
         XCTAssertTrue(quarantinedBrainState.sessionBiases.contains("brain-bootstrap-quarantine"))
+        XCTAssertTrue(quarantinedBrainState.sessionBiases.contains("release-lane:quarantine"))
+        XCTAssertTrue(quarantinedBrainState.sessionBiases.contains("lease:restricted"))
+        XCTAssertTrue(quarantinedBrainState.sessionBiases.contains("operator-review-required"))
+        XCTAssertTrue(quarantinedBrainState.sessionBiases.contains("confirmation:operator_quarantine_release"))
         XCTAssertTrue(quarantinedBrainState.retrievalTags.contains("quarantine"))
         XCTAssertTrue(quarantinedBrainState.retrievalTags.contains("restricted-lease"))
         XCTAssertTrue(quarantinedBrainState.retrievalTags.contains("tool-write-blocked"))
         XCTAssertTrue(quarantinedBrainState.retrievalTags.contains("memory-write-blocked"))
         XCTAssertTrue(quarantinedBrainState.retrievalTags.contains("deep-loop-blocked"))
+        XCTAssertTrue(
+            quarantinedBrainState.relevantMemories.contains(
+                BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.quarantineIssueSummary
+            )
+        )
+        XCTAssertTrue(
+            quarantinedBrainState.relevantMemories.contains(
+                BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.quarantineIssueRemediation
+            )
+        )
+        XCTAssertTrue(
+            quarantinedBrainState.relevantMemories.contains(
+                "Required confirmations: operator_recovery_review, operator_quarantine_release"
+            )
+        )
         XCTAssertEqual(quarantinedBrainState.boundaryPolicy.mode, .localOnlyProtective)
         XCTAssertEqual(
             quarantinedBrainState.boundaryPolicy.allowedActionClasses,
@@ -795,6 +1327,22 @@ final class DecisionMemorySystemTests: XCTestCase {
         XCTAssertEqual(quarantinedBrainState.memoryGovernance.pendingCandidateCount, 3)
         XCTAssertEqual(quarantinedBrainState.memoryGovernance.deferredCandidateCount, 2)
         XCTAssertEqual(quarantinedBrainState.evolutionState.pendingReviewCount, 3)
+        XCTAssertEqual(quarantinedBrainState.evolutionState.checkpointCount, 1)
+        let quarantineCheckpoint = try XCTUnwrap(quarantinedBrainState.evolutionState.latestCheckpoint)
+        XCTAssertEqual(quarantineCheckpoint.approvalState, .reviewSuggested)
+        XCTAssertFalse(quarantineCheckpoint.rollbackReady)
+        let quarantineLineage = try XCTUnwrap(quarantineCheckpoint.lineageSummary)
+        XCTAssertEqual(quarantineLineage.runMode, .quarantine)
+        XCTAssertEqual(quarantineLineage.taskType, "brain-bootstrap-fallback")
+        XCTAssertEqual(quarantineLineage.recoveryDisposition?.kind, .quarantine)
+        XCTAssertEqual(quarantineLineage.recoveryDisposition?.restrictedLease, true)
+        XCTAssertEqual(quarantineLineage.recoveryDisposition?.toolWriteAllowed, false)
+        XCTAssertEqual(quarantineLineage.recoveryDisposition?.memoryWriteAllowed, false)
+        XCTAssertEqual(
+            quarantineLineage.recoveryDisposition?.summary,
+            BeforeProductCompatibility.currentBrainBootstrapRecoveryContract.quarantineIssueSummary
+        )
+        XCTAssertEqual(quarantineLineage.quarantineRecords.map(\.zone), [.session, .tool, .memory])
         XCTAssertEqual(PersistenceIssueRecorder.latestIssue()?.severity, .critical)
     }
 

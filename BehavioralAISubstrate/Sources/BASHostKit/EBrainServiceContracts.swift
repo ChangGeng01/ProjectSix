@@ -319,10 +319,101 @@ public protocol BASRiskServicing: Sendable {
         budget: BASBudgetFrame
     ) -> (BASRiskCard, BASActionPermit)
 
+    func buildRiskDecisionPackage(
+        contextFrame: BASContextFrame,
+        thoughtFrame: BASThoughtFrame,
+        triScores: [BASTriSelfScore],
+        budget: BASBudgetFrame
+    ) -> BASRiskDecisionPackage
+
     func riskLevel(for score: Double) -> BASBrainRiskLevel
 }
 
 public extension BASRiskServicing {
+    func buildRiskDecisionPackage(
+        contextFrame: BASContextFrame,
+        thoughtFrame: BASThoughtFrame,
+        triScores: [BASTriSelfScore],
+        budget: BASBudgetFrame
+    ) -> BASRiskDecisionPackage {
+        let (riskCard, actionPermit) = gateAction(
+            contextFrame: contextFrame,
+            thoughtFrame: thoughtFrame,
+            triScores: triScores,
+            budget: budget
+        )
+        let riskField = BASRiskField(
+            fieldID: "risk-field.\(thoughtFrame.decomposeRef).\(thoughtFrame.stepIndex)",
+            candidateRef: thoughtFrame.candidates.first?.candidateID ?? thoughtFrame.decomposeRef,
+            hazardVector: BASHazardVector(
+                harmSeverity: riskCard.totalRisk,
+                harmScope: riskCard.totalRisk,
+                irreversibility: riskCard.irreversibility,
+                uncertainty: riskCard.uncertainty,
+                evidenceDebt: riskCard.uncertainty,
+                manipulationIntensity: riskCard.manipulationStrength,
+                pressureAuthenticity: contextFrame.timePressure,
+                vulnerabilityCoupling: contextFrame.emotionalLoad,
+                sideEffectScope: riskCard.totalRisk
+            ),
+            harmRadius: BASHarmRadiusMap(
+                radiusID: "harm-radius.\(thoughtFrame.decomposeRef).\(thoughtFrame.stepIndex)",
+                privateImpact: contextFrame.emotionalLoad,
+                relationImpact: contextFrame.consequenceLevel,
+                workflowImpact: contextFrame.ambiguityScore,
+                publicImpact: contextFrame.timePressure,
+                longTermTrace: riskCard.irreversibility
+            ),
+            reversibilityProfile: BASReversibilityProfile(
+                profileID: "reversibility.\(thoughtFrame.decomposeRef).\(thoughtFrame.stepIndex)",
+                reversible: riskCard.irreversibility < 0.5,
+                rollbackCost: riskCard.irreversibility,
+                confirmNodes: riskCard.irreversibility >= 0.7 ? ["second_check"] : [],
+                draftSafe: true,
+                smallStepPossible: riskCard.riskLevel < .extreme
+            ),
+            evidenceSufficiency: BASEvidenceSufficiency(
+                sufficiencyID: "evidence.\(thoughtFrame.decomposeRef).\(thoughtFrame.stepIndex)",
+                supportLevel: max(0, 1 - riskCard.uncertainty),
+                missingEvidence: riskCard.uncertainty >= 0.5 ? ["follow_up_evidence"] : [],
+                allowedAssertionLevel: riskCard.assertionCeiling,
+                allowedActionLevel: actionPermit.mode.rawValue
+            ),
+            gsiTrace: BASGSITrace(
+                traceID: "gsi.\(thoughtFrame.decomposeRef).\(thoughtFrame.stepIndex)",
+                gaslightSignals: contextFrame.manipulationHints,
+                coerciveUrgency: contextFrame.timePressure,
+                shamePressure: 0,
+                authorityMask: 0,
+                relationLeverage: riskCard.manipulationStrength,
+                susceptibilityBand: riskCard.gsiScore >= 0.7 ? "elevated" : "stable"
+            ),
+            vulnerabilityCoupling: BASVulnerabilityCoupling(
+                couplingID: "vulnerability.\(thoughtFrame.decomposeRef).\(thoughtFrame.stepIndex)",
+                touchedBoundaries: [],
+                lowEnergyResonance: contextFrame.emotionalLoad,
+                sensitivityWindow: contextFrame.emotionalLoad,
+                protectionBias: riskCard.riskLevel >= .high ? 0.8 : 0.3
+            ),
+            confidenceBand: riskCard.riskLevel >= .high ? "guarded" : "open"
+        )
+        let modeDecision = BASActionModeDecision(
+            decisionID: "mode.\(thoughtFrame.decomposeRef).\(thoughtFrame.stepIndex)",
+            primaryMode: actionPermit.mode,
+            stackedModes: actionPermit.stackedModes,
+            reasonCodes: actionPermit.reasonCodes,
+            confidence: max(0, 1 - riskCard.uncertainty)
+        )
+
+        return BASRiskDecisionPackage(
+            packageID: "risk-package.\(thoughtFrame.decomposeRef).\(thoughtFrame.stepIndex)",
+            riskCard: riskCard,
+            riskField: riskField,
+            actionModeDecision: modeDecision,
+            actionPermit: actionPermit
+        )
+    }
+
     func riskLevel(for score: Double) -> BASBrainRiskLevel {
         switch score {
         case ..<0.35:

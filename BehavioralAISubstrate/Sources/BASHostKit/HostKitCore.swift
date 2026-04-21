@@ -981,8 +981,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             public var standardCandidateFloor: Int?
             public var protectedCandidateFloor: Int?
             public var unstableLoopIncrement: Int?
+            public var unstableLoopIncrementRiskLevels: [BASBrainRiskLevel]?
             public var throttleLoopPenalty: Int?
             public var throttleCandidatePenalty: Int?
+            public var throttlePenaltyThermalLevels: [BASThermalLevel]?
             public var maintenanceSupported: Bool?
             public var maintenanceBatteryFloor: Double?
             public var scheduledMaintenanceClass: BASMaintenanceClass?
@@ -1004,8 +1006,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                 standardCandidateFloor: Int? = nil,
                 protectedCandidateFloor: Int? = nil,
                 unstableLoopIncrement: Int? = nil,
+                unstableLoopIncrementRiskLevels: [BASBrainRiskLevel]? = nil,
                 throttleLoopPenalty: Int? = nil,
                 throttleCandidatePenalty: Int? = nil,
+                throttlePenaltyThermalLevels: [BASThermalLevel]? = nil,
                 maintenanceSupported: Bool? = nil,
                 maintenanceBatteryFloor: Double? = nil,
                 scheduledMaintenanceClass: BASMaintenanceClass? = nil,
@@ -1026,8 +1030,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                 self.standardCandidateFloor = standardCandidateFloor
                 self.protectedCandidateFloor = protectedCandidateFloor
                 self.unstableLoopIncrement = unstableLoopIncrement
+                self.unstableLoopIncrementRiskLevels = unstableLoopIncrementRiskLevels
                 self.throttleLoopPenalty = throttleLoopPenalty
                 self.throttleCandidatePenalty = throttleCandidatePenalty
+                self.throttlePenaltyThermalLevels = throttlePenaltyThermalLevels
                 self.maintenanceSupported = maintenanceSupported
                 self.maintenanceBatteryFloor = maintenanceBatteryFloor
                 self.scheduledMaintenanceClass = scheduledMaintenanceClass
@@ -1061,8 +1067,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                     standardCandidateFloor: standardCandidateFloor ?? fallback.standardCandidateFloor,
                     protectedCandidateFloor: protectedCandidateFloor ?? fallback.protectedCandidateFloor,
                     unstableLoopIncrement: unstableLoopIncrement ?? fallback.unstableLoopIncrement,
+                    unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels ?? fallback.unstableLoopIncrementRiskLevels,
                     throttleLoopPenalty: throttleLoopPenalty ?? fallback.throttleLoopPenalty,
                     throttleCandidatePenalty: throttleCandidatePenalty ?? fallback.throttleCandidatePenalty,
+                    throttlePenaltyThermalLevels: throttlePenaltyThermalLevels ?? fallback.throttlePenaltyThermalLevels,
                     maintenanceSupported: maintenanceSupported ?? fallback.maintenanceSupported,
                     maintenanceBatteryFloor: maintenanceBatteryFloor ?? fallback.maintenanceBatteryFloor,
                     scheduledMaintenanceClass: scheduledMaintenanceClass ?? fallback.scheduledMaintenanceClass,
@@ -1091,9 +1099,18 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
         public var standardCandidateFloor: Int
         public var protectedCandidateFloor: Int
         public var maxCandidateCount: Int
+        public var protectedFloorBoundaryModes: [BASBoundaryPolicyMode]
+        public var protectedFloorCalibrationStatuses: [BASCalibrationStatus]
         public var unstableLoopIncrement: Int
+        public var unstableLoopIncrementRiskLevels: [BASBrainRiskLevel]
+        public var unstableBudgetCalibrationStatuses: [BASCalibrationStatus]
+        public var nominalThermalGuardLevel: BASThermalGuardLevel
+        public var warmThermalGuardLevel: BASThermalGuardLevel
+        public var hotThermalGuardLevel: BASThermalGuardLevel
+        public var criticalThermalGuardLevel: BASThermalGuardLevel
         public var throttleLoopPenalty: Int
         public var throttleCandidatePenalty: Int
+        public var throttlePenaltyThermalLevels: [BASThermalLevel]
         public var defaultPrecisionProfile: BASRuntimePrecisionProfile
         public var unstablePrecisionProfile: BASRuntimePrecisionProfile
         public var guardedPrecisionProfile: BASRuntimePrecisionProfile
@@ -1134,9 +1151,18 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             case standardCandidateFloor
             case protectedCandidateFloor
             case maxCandidateCount
+            case protectedFloorBoundaryModes
+            case protectedFloorCalibrationStatuses
             case unstableLoopIncrement
+            case unstableLoopIncrementRiskLevels
+            case unstableBudgetCalibrationStatuses
+            case nominalThermalGuardLevel
+            case warmThermalGuardLevel
+            case hotThermalGuardLevel
+            case criticalThermalGuardLevel
             case throttleLoopPenalty
             case throttleCandidatePenalty
+            case throttlePenaltyThermalLevels
             case defaultPrecisionProfile
             case unstablePrecisionProfile
             case guardedPrecisionProfile
@@ -1178,9 +1204,18 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             standardCandidateFloor: Int = 1,
             protectedCandidateFloor: Int = 2,
             maxCandidateCount: Int = 4,
+            protectedFloorBoundaryModes: [BASBoundaryPolicyMode] = [.localOnlyProtective],
+            protectedFloorCalibrationStatuses: [BASCalibrationStatus] = [],
             unstableLoopIncrement: Int = 1,
+            unstableLoopIncrementRiskLevels: [BASBrainRiskLevel] = [.low, .medium],
+            unstableBudgetCalibrationStatuses: [BASCalibrationStatus] = [.watch, .drifting],
+            nominalThermalGuardLevel: BASThermalGuardLevel = .nominal,
+            warmThermalGuardLevel: BASThermalGuardLevel = .watch,
+            hotThermalGuardLevel: BASThermalGuardLevel = .throttle,
+            criticalThermalGuardLevel: BASThermalGuardLevel = .emergency,
             throttleLoopPenalty: Int = 1,
             throttleCandidatePenalty: Int = 1,
+            throttlePenaltyThermalLevels: [BASThermalLevel] = [.hot],
             defaultPrecisionProfile: BASRuntimePrecisionProfile = .balanced,
             unstablePrecisionProfile: BASRuntimePrecisionProfile = .protected,
             guardedPrecisionProfile: BASRuntimePrecisionProfile = .protected,
@@ -1220,9 +1255,18 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             self.standardCandidateFloor = standardCandidateFloor
             self.protectedCandidateFloor = protectedCandidateFloor
             self.maxCandidateCount = maxCandidateCount
+            self.protectedFloorBoundaryModes = protectedFloorBoundaryModes
+            self.protectedFloorCalibrationStatuses = protectedFloorCalibrationStatuses
             self.unstableLoopIncrement = unstableLoopIncrement
+            self.unstableLoopIncrementRiskLevels = unstableLoopIncrementRiskLevels
+            self.unstableBudgetCalibrationStatuses = unstableBudgetCalibrationStatuses
+            self.nominalThermalGuardLevel = nominalThermalGuardLevel
+            self.warmThermalGuardLevel = warmThermalGuardLevel
+            self.hotThermalGuardLevel = hotThermalGuardLevel
+            self.criticalThermalGuardLevel = criticalThermalGuardLevel
             self.throttleLoopPenalty = throttleLoopPenalty
             self.throttleCandidatePenalty = throttleCandidatePenalty
+            self.throttlePenaltyThermalLevels = throttlePenaltyThermalLevels
             self.defaultPrecisionProfile = defaultPrecisionProfile
             self.unstablePrecisionProfile = unstablePrecisionProfile
             self.guardedPrecisionProfile = guardedPrecisionProfile
@@ -1241,6 +1285,29 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             self.lockdownRetrievalDepth = lockdownRetrievalDepth ?? guardedRetrievalDepth
             self.dormantRetrievalDepth = dormantRetrievalDepth ?? lowRiskRetrievalDepth
             self.runModeProfilesByID = runModeProfilesByID
+        }
+
+        public func thermalGuardLevel(
+            for thermalLevel: BASThermalLevel
+        ) -> BASThermalGuardLevel {
+            switch thermalLevel {
+            case .nominal:
+                nominalThermalGuardLevel
+            case .warm:
+                warmThermalGuardLevel
+            case .hot:
+                hotThermalGuardLevel
+            case .critical:
+                criticalThermalGuardLevel
+            }
+        }
+
+        public func usesProtectedFloors(
+            boundaryMode: BASBoundaryPolicyMode,
+            calibrationStatus: BASCalibrationStatus
+        ) -> Bool {
+            protectedFloorBoundaryModes.contains(boundaryMode) ||
+                protectedFloorCalibrationStatuses.contains(calibrationStatus)
         }
 
         private static func synthesizedRunModeProfiles(
@@ -1275,8 +1342,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             protectedCandidateFloor: Int,
             candidateCountCap: Int,
             unstableLoopIncrement: Int,
+            unstableLoopIncrementRiskLevels: [BASBrainRiskLevel],
             throttleLoopPenalty: Int,
             throttleCandidatePenalty: Int,
+            throttlePenaltyThermalLevels: [BASThermalLevel],
             lightweightMaintenanceBatteryFloor: Double,
             standardMaintenanceBatteryFloor: Double,
             restrictedMaintenanceBatteryFloor: Double,
@@ -1301,8 +1370,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                     standardCandidateFloor: standardCandidateFloor,
                     protectedCandidateFloor: protectedCandidateFloor,
                     unstableLoopIncrement: unstableLoopIncrement,
+                    unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels,
                     throttleLoopPenalty: throttleLoopPenalty,
                     throttleCandidatePenalty: throttleCandidatePenalty,
+                    throttlePenaltyThermalLevels: throttlePenaltyThermalLevels,
                     maintenanceSupported: true,
                     maintenanceBatteryFloor: standardMaintenanceBatteryFloor,
                     scheduledMaintenanceClass: activeRunModeClass,
@@ -1323,8 +1394,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                     standardCandidateFloor: standardCandidateFloor,
                     protectedCandidateFloor: protectedCandidateFloor,
                     unstableLoopIncrement: unstableLoopIncrement,
+                    unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels,
                     throttleLoopPenalty: throttleLoopPenalty,
                     throttleCandidatePenalty: throttleCandidatePenalty,
+                    throttlePenaltyThermalLevels: throttlePenaltyThermalLevels,
                     maintenanceSupported: true,
                     maintenanceBatteryFloor: lightweightMaintenanceBatteryFloor,
                     scheduledMaintenanceClass: lightweightAllowedClass,
@@ -1345,8 +1418,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                     standardCandidateFloor: standardCandidateFloor,
                     protectedCandidateFloor: protectedCandidateFloor,
                     unstableLoopIncrement: unstableLoopIncrement,
+                    unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels,
                     throttleLoopPenalty: throttleLoopPenalty,
                     throttleCandidatePenalty: throttleCandidatePenalty,
+                    throttlePenaltyThermalLevels: throttlePenaltyThermalLevels,
                     maintenanceSupported: true,
                     maintenanceBatteryFloor: lightweightMaintenanceBatteryFloor,
                     scheduledMaintenanceClass: lightweightAllowedClass,
@@ -1367,8 +1442,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                     standardCandidateFloor: standardCandidateFloor,
                     protectedCandidateFloor: protectedCandidateFloor,
                     unstableLoopIncrement: unstableLoopIncrement,
+                    unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels,
                     throttleLoopPenalty: throttleLoopPenalty,
                     throttleCandidatePenalty: throttleCandidatePenalty,
+                    throttlePenaltyThermalLevels: throttlePenaltyThermalLevels,
                     maintenanceSupported: true,
                     maintenanceBatteryFloor: standardMaintenanceBatteryFloor,
                     scheduledMaintenanceClass: activeRunModeClass,
@@ -1389,8 +1466,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                     standardCandidateFloor: standardCandidateFloor,
                     protectedCandidateFloor: protectedCandidateFloor,
                     unstableLoopIncrement: unstableLoopIncrement,
+                    unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels,
                     throttleLoopPenalty: throttleLoopPenalty,
                     throttleCandidatePenalty: throttleCandidatePenalty,
+                    throttlePenaltyThermalLevels: throttlePenaltyThermalLevels,
                     maintenanceSupported: true,
                     maintenanceBatteryFloor: standardMaintenanceBatteryFloor,
                     scheduledMaintenanceClass: activeRunModeClass,
@@ -1411,8 +1490,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                     standardCandidateFloor: standardCandidateFloor,
                     protectedCandidateFloor: protectedCandidateFloor,
                     unstableLoopIncrement: unstableLoopIncrement,
+                    unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels,
                     throttleLoopPenalty: throttleLoopPenalty,
                     throttleCandidatePenalty: throttleCandidatePenalty,
+                    throttlePenaltyThermalLevels: throttlePenaltyThermalLevels,
                     maintenanceSupported: true,
                     maintenanceBatteryFloor: standardMaintenanceBatteryFloor,
                     scheduledMaintenanceClass: activeRunModeClass,
@@ -1434,8 +1515,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                     standardCandidateFloor: standardCandidateFloor,
                     protectedCandidateFloor: protectedCandidateFloor,
                     unstableLoopIncrement: unstableLoopIncrement,
+                    unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels,
                     throttleLoopPenalty: throttleLoopPenalty,
                     throttleCandidatePenalty: throttleCandidatePenalty,
+                    throttlePenaltyThermalLevels: throttlePenaltyThermalLevels,
                     maintenanceSupported: false,
                     maintenanceBatteryFloor: restrictedMaintenanceBatteryFloor,
                     scheduledMaintenanceClass: restrictedRunModeClass,
@@ -1457,8 +1540,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                     standardCandidateFloor: standardCandidateFloor,
                     protectedCandidateFloor: protectedCandidateFloor,
                     unstableLoopIncrement: unstableLoopIncrement,
+                    unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels,
                     throttleLoopPenalty: throttleLoopPenalty,
                     throttleCandidatePenalty: throttleCandidatePenalty,
+                    throttlePenaltyThermalLevels: throttlePenaltyThermalLevels,
                     maintenanceSupported: false,
                     maintenanceBatteryFloor: restrictedMaintenanceBatteryFloor,
                     scheduledMaintenanceClass: restrictedRunModeClass,
@@ -1480,8 +1565,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                     standardCandidateFloor: standardCandidateFloor,
                     protectedCandidateFloor: protectedCandidateFloor,
                     unstableLoopIncrement: unstableLoopIncrement,
+                    unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels,
                     throttleLoopPenalty: throttleLoopPenalty,
                     throttleCandidatePenalty: throttleCandidatePenalty,
+                    throttlePenaltyThermalLevels: throttlePenaltyThermalLevels,
                     maintenanceSupported: false,
                     maintenanceBatteryFloor: restrictedMaintenanceBatteryFloor,
                     scheduledMaintenanceClass: restrictedRunModeClass,
@@ -1503,8 +1590,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                     standardCandidateFloor: standardCandidateFloor,
                     protectedCandidateFloor: protectedCandidateFloor,
                     unstableLoopIncrement: unstableLoopIncrement,
+                    unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels,
                     throttleLoopPenalty: throttleLoopPenalty,
                     throttleCandidatePenalty: throttleCandidatePenalty,
+                    throttlePenaltyThermalLevels: throttlePenaltyThermalLevels,
                     maintenanceSupported: false,
                     maintenanceBatteryFloor: restrictedMaintenanceBatteryFloor,
                     scheduledMaintenanceClass: restrictedRunModeClass,
@@ -1548,8 +1637,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                 protectedCandidateFloor: protectedCandidateFloor,
                 candidateCountCap: maxCandidateCount,
                 unstableLoopIncrement: unstableLoopIncrement,
+                unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels,
                 throttleLoopPenalty: throttleLoopPenalty,
                 throttleCandidatePenalty: throttleCandidatePenalty,
+                throttlePenaltyThermalLevels: throttlePenaltyThermalLevels,
                 lightweightMaintenanceBatteryFloor: maintenance.lightBatteryFloor,
                 standardMaintenanceBatteryFloor: maintenance.standardBatteryFloor,
                 restrictedMaintenanceBatteryFloor: maintenanceBatteryFloor,
@@ -1608,8 +1699,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                 protectedCandidateFloor: protectedCandidateFloor,
                 candidateCountCap: maxCandidateCount,
                 unstableLoopIncrement: unstableLoopIncrement,
+                unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels,
                 throttleLoopPenalty: throttleLoopPenalty,
                 throttleCandidatePenalty: throttleCandidatePenalty,
+                throttlePenaltyThermalLevels: throttlePenaltyThermalLevels,
                 lightweightMaintenanceBatteryFloor: maintenance.lightBatteryFloor,
                 standardMaintenanceBatteryFloor: maintenance.standardBatteryFloor,
                 restrictedMaintenanceBatteryFloor: maintenanceBatteryFloor,
@@ -1632,8 +1725,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                 standardCandidateFloor: standardCandidateFloor,
                 protectedCandidateFloor: protectedCandidateFloor,
                 unstableLoopIncrement: unstableLoopIncrement,
+                unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels,
                 throttleLoopPenalty: throttleLoopPenalty,
                 throttleCandidatePenalty: throttleCandidatePenalty,
+                throttlePenaltyThermalLevels: throttlePenaltyThermalLevels,
                 maintenanceSupported: true,
                 maintenanceBatteryFloor: maintenance.standardBatteryFloor,
                 scheduledMaintenanceClass: maintenance.activeRunModeClass,
@@ -1662,8 +1757,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                     profile.standardCandidateFloor == nil ||
                     profile.protectedCandidateFloor == nil ||
                     profile.unstableLoopIncrement == nil ||
+                    profile.unstableLoopIncrementRiskLevels == nil ||
                     profile.throttleLoopPenalty == nil ||
                     profile.throttleCandidatePenalty == nil ||
+                    profile.throttlePenaltyThermalLevels == nil ||
                     profile.maintenanceSupported == nil ||
                     profile.maintenanceBatteryFloor == nil ||
                     profile.scheduledMaintenanceClass == nil ||
@@ -1695,9 +1792,24 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             let standardCandidateFloor = try container.decode(Int.self, forKey: .standardCandidateFloor)
             let protectedCandidateFloor = try container.decode(Int.self, forKey: .protectedCandidateFloor)
             let maxCandidateCount = try container.decode(Int.self, forKey: .maxCandidateCount)
+            let protectedFloorBoundaryModes = try container.decodeIfPresent(
+                [BASBoundaryPolicyMode].self,
+                forKey: .protectedFloorBoundaryModes
+            ) ?? [.localOnlyProtective]
+            let protectedFloorCalibrationStatuses = try container.decodeIfPresent(
+                [BASCalibrationStatus].self,
+                forKey: .protectedFloorCalibrationStatuses
+            ) ?? []
             let unstableLoopIncrement = try container.decode(Int.self, forKey: .unstableLoopIncrement)
+            let unstableLoopIncrementRiskLevels = try container.decode([BASBrainRiskLevel].self, forKey: .unstableLoopIncrementRiskLevels)
+            let unstableBudgetCalibrationStatuses = try container.decode([BASCalibrationStatus].self, forKey: .unstableBudgetCalibrationStatuses)
+            let nominalThermalGuardLevel = try container.decode(BASThermalGuardLevel.self, forKey: .nominalThermalGuardLevel)
+            let warmThermalGuardLevel = try container.decode(BASThermalGuardLevel.self, forKey: .warmThermalGuardLevel)
+            let hotThermalGuardLevel = try container.decode(BASThermalGuardLevel.self, forKey: .hotThermalGuardLevel)
+            let criticalThermalGuardLevel = try container.decode(BASThermalGuardLevel.self, forKey: .criticalThermalGuardLevel)
             let throttleLoopPenalty = try container.decode(Int.self, forKey: .throttleLoopPenalty)
             let throttleCandidatePenalty = try container.decode(Int.self, forKey: .throttleCandidatePenalty)
+            let throttlePenaltyThermalLevels = try container.decode([BASThermalLevel].self, forKey: .throttlePenaltyThermalLevels)
             let defaultPrecisionProfile = try container.decode(BASRuntimePrecisionProfile.self, forKey: .defaultPrecisionProfile)
             let unstablePrecisionProfile = try container.decode(BASRuntimePrecisionProfile.self, forKey: .unstablePrecisionProfile)
             let guardedPrecisionProfile = try container.decode(BASRuntimePrecisionProfile.self, forKey: .guardedPrecisionProfile)
@@ -1723,9 +1835,18 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                 standardCandidateFloor: standardCandidateFloor,
                 protectedCandidateFloor: protectedCandidateFloor,
                 maxCandidateCount: maxCandidateCount,
+                protectedFloorBoundaryModes: protectedFloorBoundaryModes,
+                protectedFloorCalibrationStatuses: protectedFloorCalibrationStatuses,
                 unstableLoopIncrement: unstableLoopIncrement,
+                unstableLoopIncrementRiskLevels: unstableLoopIncrementRiskLevels,
+                unstableBudgetCalibrationStatuses: unstableBudgetCalibrationStatuses,
+                nominalThermalGuardLevel: nominalThermalGuardLevel,
+                warmThermalGuardLevel: warmThermalGuardLevel,
+                hotThermalGuardLevel: hotThermalGuardLevel,
+                criticalThermalGuardLevel: criticalThermalGuardLevel,
                 throttleLoopPenalty: throttleLoopPenalty,
                 throttleCandidatePenalty: throttleCandidatePenalty,
+                throttlePenaltyThermalLevels: throttlePenaltyThermalLevels,
                 defaultPrecisionProfile: defaultPrecisionProfile,
                 unstablePrecisionProfile: unstablePrecisionProfile,
                 guardedPrecisionProfile: guardedPrecisionProfile,
@@ -1769,9 +1890,18 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             try container.encode(standardCandidateFloor, forKey: .standardCandidateFloor)
             try container.encode(protectedCandidateFloor, forKey: .protectedCandidateFloor)
             try container.encode(maxCandidateCount, forKey: .maxCandidateCount)
+            try container.encode(protectedFloorBoundaryModes, forKey: .protectedFloorBoundaryModes)
+            try container.encode(protectedFloorCalibrationStatuses, forKey: .protectedFloorCalibrationStatuses)
             try container.encode(unstableLoopIncrement, forKey: .unstableLoopIncrement)
+            try container.encode(unstableLoopIncrementRiskLevels, forKey: .unstableLoopIncrementRiskLevels)
+            try container.encode(unstableBudgetCalibrationStatuses, forKey: .unstableBudgetCalibrationStatuses)
+            try container.encode(nominalThermalGuardLevel, forKey: .nominalThermalGuardLevel)
+            try container.encode(warmThermalGuardLevel, forKey: .warmThermalGuardLevel)
+            try container.encode(hotThermalGuardLevel, forKey: .hotThermalGuardLevel)
+            try container.encode(criticalThermalGuardLevel, forKey: .criticalThermalGuardLevel)
             try container.encode(throttleLoopPenalty, forKey: .throttleLoopPenalty)
             try container.encode(throttleCandidatePenalty, forKey: .throttleCandidatePenalty)
+            try container.encode(throttlePenaltyThermalLevels, forKey: .throttlePenaltyThermalLevels)
             try container.encode(defaultPrecisionProfile, forKey: .defaultPrecisionProfile)
             try container.encode(unstablePrecisionProfile, forKey: .unstablePrecisionProfile)
             try container.encode(guardedPrecisionProfile, forKey: .guardedPrecisionProfile)
@@ -1800,6 +1930,9 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
         public var reflectCueIncrement: Double
         public var deepLoopCueIncrement: Double
         public var highRiskGuardThreshold: Double
+        public var urgencyCuePhrases: [String]
+        public var reflectiveCuePhrases: [String]
+        public var deepLoopCuePhrases: [String]
 
         public init(
             pulseBatteryFloor: Double,
@@ -1807,7 +1940,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             engageUrgencyIncrement: Double,
             reflectCueIncrement: Double,
             deepLoopCueIncrement: Double,
-            highRiskGuardThreshold: Double
+            highRiskGuardThreshold: Double,
+            urgencyCuePhrases: [String] = ["now", "immediately", "urgent", "asap", "tonight", "must"],
+            reflectiveCuePhrases: [String] = ["think", "reflect", "consider", "unclear", "confused", "compare"],
+            deepLoopCuePhrases: [String] = ["plan", "strategy", "multi-step", "tradeoff", "pros and cons", "simulate"]
         ) {
             self.pulseBatteryFloor = pulseBatteryFloor
             self.sentinelBatteryFloor = sentinelBatteryFloor
@@ -1815,6 +1951,31 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             self.reflectCueIncrement = reflectCueIncrement
             self.deepLoopCueIncrement = deepLoopCueIncrement
             self.highRiskGuardThreshold = highRiskGuardThreshold
+            self.urgencyCuePhrases = urgencyCuePhrases
+            self.reflectiveCuePhrases = reflectiveCuePhrases
+            self.deepLoopCuePhrases = deepLoopCuePhrases
+        }
+
+        public func containsUrgency(_ text: String) -> Bool {
+            containsCue(text, phrases: urgencyCuePhrases)
+        }
+
+        public func containsReflectiveCue(_ text: String) -> Bool {
+            containsCue(text, phrases: reflectiveCuePhrases)
+        }
+
+        public func containsDeepLoopCue(_ text: String) -> Bool {
+            containsCue(text, phrases: deepLoopCuePhrases)
+        }
+
+        private func containsCue(_ text: String, phrases: [String]) -> Bool {
+            let normalized = text.lowercased()
+            return phrases.contains { phrase in
+                let normalizedPhrase = phrase
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased()
+                return normalizedPhrase.isEmpty == false && normalized.contains(normalizedPhrase)
+            }
         }
 
         public static let generic = WakeIntentTuning(
@@ -1823,7 +1984,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             engageUrgencyIncrement: 0.18,
             reflectCueIncrement: 0.16,
             deepLoopCueIncrement: 0.26,
-            highRiskGuardThreshold: 0.70
+            highRiskGuardThreshold: 0.70,
+            urgencyCuePhrases: ["now", "immediately", "urgent", "asap", "tonight", "must"],
+            reflectiveCuePhrases: ["think", "reflect", "consider", "unclear", "confused", "compare"],
+            deepLoopCuePhrases: ["plan", "strategy", "multi-step", "tradeoff", "pros and cons", "simulate"]
         )
     }
 
@@ -1922,6 +2086,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
         public var recoveryOnCriticalThermal: Bool
         public var reflectOnTrustDrift: Bool
         public var deepLoopOnProtectedBoundary: Bool
+        public var guardedBudgetBoundaryModes: [BASBoundaryPolicyMode]
+        public var guardedBudgetCalibrationStatuses: [BASCalibrationStatus]
+        public var guardedBudgetRiskFlags: [BASBrainStateRiskFlag]
+        public var guardedBudgetRetrievalTags: [String]
         public var lockdownOnExtremeBlockedPermit: Bool
         public var quarantineFailureGuardThreshold: Int
         public var criticalThermalMode: BASEBrainRunMode
@@ -1943,6 +2111,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             case recoveryOnCriticalThermal
             case reflectOnTrustDrift
             case deepLoopOnProtectedBoundary
+            case guardedBudgetBoundaryModes
+            case guardedBudgetCalibrationStatuses
+            case guardedBudgetRiskFlags
+            case guardedBudgetRetrievalTags
             case lockdownOnExtremeBlockedPermit
             case quarantineFailureGuardThreshold
             case criticalThermalMode
@@ -1965,6 +2137,16 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             recoveryOnCriticalThermal: Bool,
             reflectOnTrustDrift: Bool,
             deepLoopOnProtectedBoundary: Bool,
+            guardedBudgetBoundaryModes: [BASBoundaryPolicyMode] = [.localOnlyProtective],
+            guardedBudgetCalibrationStatuses: [BASCalibrationStatus] = [],
+            guardedBudgetRiskFlags: [BASBrainStateRiskFlag] = [
+                .lowTrustLoad,
+                .retrievalInstability,
+                .externalRefreshGuardTriggered,
+                .observationOnlyQuarantine,
+                .evidenceCaveatLoad
+            ],
+            guardedBudgetRetrievalTags: [String] = ["evidence_caveat"],
             lockdownOnExtremeBlockedPermit: Bool,
             quarantineFailureGuardThreshold: Int,
             criticalThermalMode: BASEBrainRunMode? = nil,
@@ -1985,6 +2167,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             self.recoveryOnCriticalThermal = recoveryOnCriticalThermal
             self.reflectOnTrustDrift = reflectOnTrustDrift
             self.deepLoopOnProtectedBoundary = deepLoopOnProtectedBoundary
+            self.guardedBudgetBoundaryModes = guardedBudgetBoundaryModes
+            self.guardedBudgetCalibrationStatuses = guardedBudgetCalibrationStatuses
+            self.guardedBudgetRiskFlags = guardedBudgetRiskFlags
+            self.guardedBudgetRetrievalTags = guardedBudgetRetrievalTags
             self.lockdownOnExtremeBlockedPermit = lockdownOnExtremeBlockedPermit
             self.quarantineFailureGuardThreshold = quarantineFailureGuardThreshold
             self.criticalThermalMode = criticalThermalMode ?? (recoveryOnCriticalThermal ? .recovery : .guard)
@@ -2008,6 +2194,28 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             let recoveryOnCriticalThermal = try container.decode(Bool.self, forKey: .recoveryOnCriticalThermal)
             let reflectOnTrustDrift = try container.decode(Bool.self, forKey: .reflectOnTrustDrift)
             let deepLoopOnProtectedBoundary = try container.decode(Bool.self, forKey: .deepLoopOnProtectedBoundary)
+            let guardedBudgetBoundaryModes = try container.decodeIfPresent(
+                [BASBoundaryPolicyMode].self,
+                forKey: .guardedBudgetBoundaryModes
+            ) ?? [.localOnlyProtective]
+            let guardedBudgetCalibrationStatuses = try container.decodeIfPresent(
+                [BASCalibrationStatus].self,
+                forKey: .guardedBudgetCalibrationStatuses
+            ) ?? []
+            let guardedBudgetRiskFlags = try container.decodeIfPresent(
+                [BASBrainStateRiskFlag].self,
+                forKey: .guardedBudgetRiskFlags
+            ) ?? [
+                .lowTrustLoad,
+                .retrievalInstability,
+                .externalRefreshGuardTriggered,
+                .observationOnlyQuarantine,
+                .evidenceCaveatLoad
+            ]
+            let guardedBudgetRetrievalTags = try container.decodeIfPresent(
+                [String].self,
+                forKey: .guardedBudgetRetrievalTags
+            ) ?? ["evidence_caveat"]
             let lockdownOnExtremeBlockedPermit = try container.decode(Bool.self, forKey: .lockdownOnExtremeBlockedPermit)
             let quarantineFailureGuardThreshold = try container.decode(Int.self, forKey: .quarantineFailureGuardThreshold)
 
@@ -2016,6 +2224,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
                 recoveryOnCriticalThermal: recoveryOnCriticalThermal,
                 reflectOnTrustDrift: reflectOnTrustDrift,
                 deepLoopOnProtectedBoundary: deepLoopOnProtectedBoundary,
+                guardedBudgetBoundaryModes: guardedBudgetBoundaryModes,
+                guardedBudgetCalibrationStatuses: guardedBudgetCalibrationStatuses,
+                guardedBudgetRiskFlags: guardedBudgetRiskFlags,
+                guardedBudgetRetrievalTags: guardedBudgetRetrievalTags,
                 lockdownOnExtremeBlockedPermit: lockdownOnExtremeBlockedPermit,
                 quarantineFailureGuardThreshold: quarantineFailureGuardThreshold,
                 criticalThermalMode: try container.decodeIfPresent(BASEBrainRunMode.self, forKey: .criticalThermalMode),
@@ -2040,6 +2252,10 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             try container.encode(recoveryOnCriticalThermal, forKey: .recoveryOnCriticalThermal)
             try container.encode(reflectOnTrustDrift, forKey: .reflectOnTrustDrift)
             try container.encode(deepLoopOnProtectedBoundary, forKey: .deepLoopOnProtectedBoundary)
+            try container.encode(guardedBudgetBoundaryModes, forKey: .guardedBudgetBoundaryModes)
+            try container.encode(guardedBudgetCalibrationStatuses, forKey: .guardedBudgetCalibrationStatuses)
+            try container.encode(guardedBudgetRiskFlags, forKey: .guardedBudgetRiskFlags)
+            try container.encode(guardedBudgetRetrievalTags, forKey: .guardedBudgetRetrievalTags)
             try container.encode(lockdownOnExtremeBlockedPermit, forKey: .lockdownOnExtremeBlockedPermit)
             try container.encode(quarantineFailureGuardThreshold, forKey: .quarantineFailureGuardThreshold)
             try container.encode(criticalThermalMode, forKey: .criticalThermalMode)
@@ -2078,6 +2294,26 @@ public struct BASEBrainRuntimeSynthesisPolicy: Codable, Equatable, Sendable {
             wakeIntent: WakeIntentTuning
         ) -> [RunModeTransitionRule] {
             runModeRules ?? synthesizedRunModeRules(wakeIntent: wakeIntent)
+        }
+
+        public func requiresGuardedBudget(
+            boundaryMode: BASBoundaryPolicyMode,
+            calibrationStatus: BASCalibrationStatus,
+            riskFlags: [BASBrainStateRiskFlag],
+            retrievalTags: [String]
+        ) -> Bool {
+            if guardedBudgetBoundaryModes.contains(boundaryMode) {
+                return true
+            }
+            if guardedBudgetCalibrationStatuses.contains(calibrationStatus) {
+                return true
+            }
+            if riskFlags.contains(where: { guardedBudgetRiskFlags.contains($0) }) {
+                return true
+            }
+
+            let normalizedTags = Set(retrievalTags.map { $0.lowercased() })
+            return guardedBudgetRetrievalTags.contains { normalizedTags.contains($0.lowercased()) }
         }
 
         func resolvedRunMode(
@@ -2941,49 +3177,20 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
             BASRuntimePolicyLineage.self,
             forKey: .runtimePolicyLineage
         )
-        let defaultDeviceState: BASDeviceState
-        let runtimeTuning: BASEBrainRuntimeSynthesisPolicy
-        let hostRhythmProfile: BASHostRhythmProfile
-        let requiresExplicitControlPlaneFields: Bool
-
-        if runtimePolicyLineage != nil {
-            requiresExplicitControlPlaneFields = true
-        } else {
-            let containsExplicitControlPlaneFields = container.contains(.defaultDeviceState) ||
-                container.contains(.runtimeTuning) ||
-                container.contains(.hostRhythmProfile)
-            let generic = BASHostConfiguration.generic
-            let matchesLegacyGenericCompatibilityShell =
-                runtimeProfileID == generic.runtimeProfileID &&
-                policyProfileID == generic.policyProfileID &&
-                prefersPureLocal == generic.prefersPureLocal
-            requiresExplicitControlPlaneFields =
-                containsExplicitControlPlaneFields || !matchesLegacyGenericCompatibilityShell
-        }
-
-        if requiresExplicitControlPlaneFields {
-            defaultDeviceState = try container.decode(BASDeviceState.self, forKey: .defaultDeviceState)
-            runtimeTuning = try container.decode(BASEBrainRuntimeSynthesisPolicy.self, forKey: .runtimeTuning)
-            hostRhythmProfile = try container.decode(BASHostRhythmProfile.self, forKey: .hostRhythmProfile)
-        } else {
-            defaultDeviceState = BASHostConfiguration.genericDefaultDeviceState
-            runtimeTuning = .generic
-            hostRhythmProfile = .generic
-        }
 
         self.init(
             runtimeProfileID: runtimeProfileID,
             policyProfileID: policyProfileID,
             prefersPureLocal: prefersPureLocal,
-            defaultDeviceState: defaultDeviceState,
+            defaultDeviceState: try container.decode(BASDeviceState.self, forKey: .defaultDeviceState),
             console: try container.decode(BASHostConsoleConfiguration.self, forKey: .console),
             lifecycleBehavior: try container.decode(BASHostLifecycleBehaviorConfiguration.self, forKey: .lifecycleBehavior),
             workflowBehavior: try container.decode(BASHostWorkflowBehaviorConfiguration.self, forKey: .workflowBehavior),
             cognitionBehavior: try container.decode(BASHostCognitionBehaviorConfiguration.self, forKey: .cognitionBehavior),
             presentation: try container.decode(BASHostPresentationConfiguration.self, forKey: .presentation),
-            runtimeTuning: runtimeTuning,
+            runtimeTuning: try container.decode(BASEBrainRuntimeSynthesisPolicy.self, forKey: .runtimeTuning),
             runtimePolicyLineage: runtimePolicyLineage,
-            hostRhythmProfile: hostRhythmProfile,
+            hostRhythmProfile: try container.decode(BASHostRhythmProfile.self, forKey: .hostRhythmProfile),
             hostConstitution: try container.decodeIfPresent(BASHostConstitution.self, forKey: .hostConstitution),
             hostConstitutionVault: try container.decodeIfPresent(BASHostConstitutionVault.self, forKey: .hostConstitutionVault),
             hostVersionTree: try container.decodeIfPresent(BASHostVersionTree.self, forKey: .hostVersionTree),
@@ -3900,10 +4107,17 @@ public struct BASHostRuntime: Sendable {
             deviceStateOverride: nil,
             now: now
         )
+        let constitutionAwareCurrentBrain = applyConstitutionAwareness(
+            to: currentBrain,
+            constitution: eBrainTurn.hostConstitution,
+            vault: eBrainTurn.hostConstitutionVault,
+            versionTree: eBrainTurn.hostVersionTree,
+            forgetRequest: eBrainTurn.hostForgetRequest
+        )
         return BASHostSessionResult(
             requestKind: request.kind,
             workflowProfile: request.workflowProfile,
-            currentBrain: currentBrain,
+            currentBrain: constitutionAwareCurrentBrain,
             projection: makeHostProjection(from: projection),
             eBrainTurn: eBrainTurn,
             activeSessionTitle: request.title ?? configuration.presentation.sessionTitles.title(for: request.workflowProfile),
@@ -3912,7 +4126,7 @@ public struct BASHostRuntime: Sendable {
             interventionSuggestion: interventionSuggestion,
             consoleSnapshot: consoleSnapshot(
                 requestKind: request.kind,
-                currentBrain: currentBrain,
+                currentBrain: constitutionAwareCurrentBrain,
                 notices: notices,
                 followUpActions: followUpActions,
                 eBrainTurn: eBrainTurn
@@ -3956,7 +4170,7 @@ public struct BASHostRuntime: Sendable {
                 tags.append("forget_sync_exports_revoked:true")
             }
         }
-        return tags.uniqued()
+        return constitutionAwareOrderedUnique(tags)
     }
 
     private func constitutionAwareVerificationSnapshot(
@@ -3994,7 +4208,39 @@ public struct BASHostRuntime: Sendable {
                 segments.append("forget_sync_exports_revoked:true")
             }
         }
-        return segments.uniqued().joined(separator: "|")
+        return constitutionAwareOrderedUnique(segments).joined(separator: "|")
+    }
+
+    private func constitutionAwareOrderedUnique(
+        _ values: [String]
+    ) -> [String] {
+        var seen = Set<String>()
+        return values.filter { seen.insert($0).inserted }
+    }
+
+    private func applyConstitutionAwareness(
+        to currentBrain: BASHostCurrentBrain,
+        constitution: BASHostConstitution?,
+        vault: BASHostConstitutionVault?,
+        versionTree: BASHostVersionTree?,
+        forgetRequest: BASForgetRequest?
+    ) -> BASHostCurrentBrain {
+        var updated = currentBrain
+        updated.retrievalTags = constitutionAwareRetrievalTags(
+            base: currentBrain.retrievalTags,
+            constitution: constitution,
+            vault: vault,
+            versionTree: versionTree,
+            forgetRequest: forgetRequest
+        )
+        updated.verificationSummary = constitutionAwareVerificationSnapshot(
+            base: currentBrain.verificationSummary,
+            constitution: constitution,
+            vault: vault,
+            versionTree: versionTree,
+            forgetRequest: forgetRequest
+        )
+        return updated
     }
 
     private func resolvedHostConstitutionVault(
@@ -4437,11 +4683,4 @@ public struct BASHostRuntime: Sendable {
         }
     }
 
-}
-
-private extension Sequence where Element == String {
-    func uniqued() -> [String] {
-        var seen = Set<String>()
-        return filter { seen.insert($0).inserted }
-    }
 }

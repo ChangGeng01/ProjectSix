@@ -9,17 +9,27 @@ struct DecisionSessionEngineControlSessionPresentation: Identifiable, Equatable,
     let checkpointBudgetLine: String?
     let checkpointDecisionLine: String?
     let checkpointTaskLine: String?
+    let checkpointWindGateLine: String?
+    let checkpointPresenceLine: String?
     let checkpointPressureLine: String?
     let checkpointRiskFactorsLine: String?
     let checkpointReasonCodesLine: String?
+    let checkpointCourtLine: String?
     let checkpointAuditLine: String?
     let checkpointSovereignVerdictLine: String?
     let checkpointSovereignAuthorityLine: String?
     let checkpointSovereignAuditLine: String?
     let checkpointKillSwitchesLine: String?
     let checkpointActionLine: String?
+    let checkpointMorphLine: String?
     let checkpointLungLine: String?
     let checkpointHotColdLine: String?
+    let checkpointPrecisionLine: String?
+    let checkpointOrganPackageLine: String?
+    let checkpointOrganDeltaLine: String?
+    let checkpointSchedulerLine: String?
+    let checkpointThermalExchangeLine: String?
+    let checkpointIntegrityWeaveLine: String?
     let checkpointResumeLine: String?
     let checkpointRollbackLine: String?
     let checkpointSovereignBridgeLine: String?
@@ -38,6 +48,204 @@ struct DecisionSessionEngineControlSessionPresentation: Identifiable, Equatable,
     let canArchive: Bool
     let canCorrect: Bool
     let isSelected: Bool
+
+    init(
+        sessionID: String,
+        title: String,
+        statusLine: String,
+        healthSummary: DecisionSessionEngineHealthSummary?,
+        checkpointLine: String,
+        checkpointBudgetLine: String?,
+        checkpointDecisionLine: String?,
+        checkpointTaskLine: String?,
+        checkpointWindGateLine: String? = nil,
+        checkpointPresenceLine: String? = nil,
+        checkpointPressureLine: String?,
+        checkpointRiskFactorsLine: String?,
+        checkpointReasonCodesLine: String?,
+        checkpointCourtLine: String?,
+        checkpointAuditLine: String?,
+        checkpointSovereignVerdictLine: String?,
+        checkpointSovereignAuthorityLine: String?,
+        checkpointSovereignAuditLine: String?,
+        checkpointKillSwitchesLine: String?,
+        checkpointActionLine: String?,
+        checkpointMorphLine: String? = nil,
+        checkpointLungLine: String?,
+        checkpointHotColdLine: String?,
+        checkpointPrecisionLine: String? = nil,
+        checkpointOrganPackageLine: String? = nil,
+        checkpointOrganDeltaLine: String? = nil,
+        checkpointSchedulerLine: String? = nil,
+        checkpointThermalExchangeLine: String? = nil,
+        checkpointIntegrityWeaveLine: String? = nil,
+        checkpointResumeLine: String?,
+        checkpointRollbackLine: String?,
+        checkpointSovereignBridgeLine: String?,
+        checkpointSovereignBridgeDetailLines: [String],
+        branchLine: String,
+        recoveryLine: String,
+        mergeReviewLine: String?,
+        faultLine: String?,
+        stepFreshnessLine: String?,
+        stepAlertLine: String?,
+        detailLine: String,
+        updatedAt: Date,
+        canPause: Bool,
+        canResume: Bool,
+        canRecover: Bool,
+        canArchive: Bool,
+        canCorrect: Bool,
+        isSelected: Bool
+    ) {
+        self.sessionID = sessionID
+        self.title = title
+        self.statusLine = statusLine
+        self.healthSummary = healthSummary
+        self.checkpointLine = checkpointLine
+        self.checkpointBudgetLine = checkpointBudgetLine
+        self.checkpointDecisionLine = checkpointDecisionLine
+        self.checkpointTaskLine = checkpointTaskLine
+        self.checkpointWindGateLine = checkpointWindGateLine
+        self.checkpointPresenceLine = checkpointPresenceLine
+        self.checkpointPressureLine = checkpointPressureLine
+        self.checkpointRiskFactorsLine = checkpointRiskFactorsLine
+        self.checkpointReasonCodesLine = checkpointReasonCodesLine
+        self.checkpointCourtLine = checkpointCourtLine
+        self.checkpointAuditLine = checkpointAuditLine
+        self.checkpointSovereignVerdictLine = checkpointSovereignVerdictLine
+        self.checkpointSovereignAuthorityLine = checkpointSovereignAuthorityLine
+        self.checkpointSovereignAuditLine = checkpointSovereignAuditLine
+        self.checkpointKillSwitchesLine = checkpointKillSwitchesLine
+        self.checkpointActionLine = checkpointActionLine
+        self.checkpointMorphLine = checkpointMorphLine
+        self.checkpointLungLine = checkpointLungLine
+        self.checkpointHotColdLine = checkpointHotColdLine
+        self.checkpointPrecisionLine = checkpointPrecisionLine
+        self.checkpointOrganPackageLine = checkpointOrganPackageLine
+        self.checkpointOrganDeltaLine = checkpointOrganDeltaLine
+        self.checkpointSchedulerLine = checkpointSchedulerLine
+        self.checkpointThermalExchangeLine = checkpointThermalExchangeLine
+        self.checkpointIntegrityWeaveLine = checkpointIntegrityWeaveLine
+        self.checkpointResumeLine = checkpointResumeLine
+        self.checkpointRollbackLine = checkpointRollbackLine
+        self.checkpointSovereignBridgeLine = checkpointSovereignBridgeLine
+        self.checkpointSovereignBridgeDetailLines = checkpointSovereignBridgeDetailLines
+        self.branchLine = branchLine
+        self.recoveryLine = recoveryLine
+        self.mergeReviewLine = mergeReviewLine
+        self.faultLine = faultLine
+        self.stepFreshnessLine = stepFreshnessLine
+        self.stepAlertLine = stepAlertLine
+        self.detailLine = detailLine
+        self.updatedAt = updatedAt
+        self.canPause = canPause
+        self.canResume = canResume
+        self.canRecover = canRecover
+        self.canArchive = canArchive
+        self.canCorrect = canCorrect
+        self.isSelected = isSelected
+    }
+
+    static func make(
+        sessionID: String,
+        title: String,
+        statusLine: String,
+        healthSummary: DecisionSessionEngineHealthSummary?,
+        checkpointLine: String,
+        checkpointBudgetLine: String?,
+        checkpointDecisionLine: String?,
+        checkpointTaskLine: String?,
+        checkpointWindGateLine: String? = nil,
+        checkpointPresenceLine: String? = nil,
+        checkpointPressureLine: String?,
+        checkpointRiskFactorsLine: String?,
+        checkpointReasonCodesLine: String?,
+        checkpointCourtLine: String?,
+        checkpointAuditLine: String?,
+        checkpointSovereignVerdictLine: String?,
+        checkpointSovereignAuthorityLine: String?,
+        checkpointSovereignAuditLine: String?,
+        checkpointKillSwitchesLine: String?,
+        checkpointActionLine: String?,
+        checkpointMorphLine: String? = nil,
+        checkpointLungLine: String?,
+        checkpointHotColdLine: String?,
+        checkpointPrecisionLine: String? = nil,
+        checkpointOrganPackageLine: String? = nil,
+        checkpointOrganDeltaLine: String? = nil,
+        checkpointSchedulerLine: String? = nil,
+        checkpointThermalExchangeLine: String? = nil,
+        checkpointIntegrityWeaveLine: String? = nil,
+        checkpointResumeLine: String?,
+        checkpointRollbackLine: String?,
+        checkpointSovereignBridgeLine: String?,
+        checkpointSovereignBridgeDetailLines: [String],
+        branchLine: String,
+        recoveryLine: String,
+        mergeReviewLine: String?,
+        faultLine: String?,
+        stepFreshnessLine: String?,
+        stepAlertLine: String?,
+        detailLine: String,
+        updatedAt: Date,
+        canPause: Bool,
+        canResume: Bool,
+        canRecover: Bool,
+        canArchive: Bool,
+        canCorrect: Bool,
+        isSelected: Bool
+    ) -> DecisionSessionEngineControlSessionPresentation {
+        DecisionSessionEngineControlSessionPresentation(
+            sessionID: sessionID,
+            title: title,
+            statusLine: statusLine,
+            healthSummary: healthSummary,
+            checkpointLine: checkpointLine,
+            checkpointBudgetLine: checkpointBudgetLine,
+            checkpointDecisionLine: checkpointDecisionLine,
+            checkpointTaskLine: checkpointTaskLine,
+            checkpointWindGateLine: checkpointWindGateLine,
+            checkpointPresenceLine: checkpointPresenceLine,
+            checkpointPressureLine: checkpointPressureLine,
+            checkpointRiskFactorsLine: checkpointRiskFactorsLine,
+            checkpointReasonCodesLine: checkpointReasonCodesLine,
+            checkpointCourtLine: checkpointCourtLine,
+            checkpointAuditLine: checkpointAuditLine,
+            checkpointSovereignVerdictLine: checkpointSovereignVerdictLine,
+            checkpointSovereignAuthorityLine: checkpointSovereignAuthorityLine,
+            checkpointSovereignAuditLine: checkpointSovereignAuditLine,
+            checkpointKillSwitchesLine: checkpointKillSwitchesLine,
+            checkpointActionLine: checkpointActionLine,
+            checkpointMorphLine: checkpointMorphLine,
+            checkpointLungLine: checkpointLungLine,
+            checkpointHotColdLine: checkpointHotColdLine,
+            checkpointPrecisionLine: checkpointPrecisionLine,
+            checkpointOrganPackageLine: checkpointOrganPackageLine,
+            checkpointOrganDeltaLine: checkpointOrganDeltaLine,
+            checkpointSchedulerLine: checkpointSchedulerLine,
+            checkpointThermalExchangeLine: checkpointThermalExchangeLine,
+            checkpointIntegrityWeaveLine: checkpointIntegrityWeaveLine,
+            checkpointResumeLine: checkpointResumeLine,
+            checkpointRollbackLine: checkpointRollbackLine,
+            checkpointSovereignBridgeLine: checkpointSovereignBridgeLine,
+            checkpointSovereignBridgeDetailLines: checkpointSovereignBridgeDetailLines,
+            branchLine: branchLine,
+            recoveryLine: recoveryLine,
+            mergeReviewLine: mergeReviewLine,
+            faultLine: faultLine,
+            stepFreshnessLine: stepFreshnessLine,
+            stepAlertLine: stepAlertLine,
+            detailLine: detailLine,
+            updatedAt: updatedAt,
+            canPause: canPause,
+            canResume: canResume,
+            canRecover: canRecover,
+            canArchive: canArchive,
+            canCorrect: canCorrect,
+            isSelected: isSelected
+        )
+    }
 
     var id: String { sessionID }
 }

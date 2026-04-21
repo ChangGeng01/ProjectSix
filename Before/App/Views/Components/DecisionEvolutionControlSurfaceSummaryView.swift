@@ -85,6 +85,8 @@ struct DecisionEvolutionControlSurfaceSummaryView: View {
                 summaryText: presentation.summaryText,
                 summaryColor: presentation.usesSecondarySummaryTone ? .secondary : BeforeTheme.ember,
                 metadataText: presentation.metadataText,
+                foldedLungTitle: presentation.foldedLungTitle,
+                foldedLungLines: presentation.foldedLungLines,
                 ticketsLine: presentation.ticketsLine,
                 auditLine: presentation.auditLine,
                 killSwitchesLine: presentation.killSwitchesLine

@@ -198,6 +198,38 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
         XCTAssertEqual(next?.riskLevel, .medium)
     }
 
+    func testWidgetEvolutionControlIntentUsesAuditAwareFallbackReason() async throws {
+        let controlEntry = DecisionEvolutionWidgetControlEntryPresentation(
+            kindID: DecisionEvolutionWidgetControlEntryKind.audit.rawValue,
+            title: "Audit on iPhone",
+            systemImage: "exclamationmark.circle",
+            prompt: "Inspect the audit findings",
+            instruction: "Continue on iPhone to inspect audit findings before widening rollout.",
+            triggerReason: nil
+        )
+        let intent = OpenEvolutionControlIntent(
+            entrySource: .homeWidgetMedium,
+            controlEntry: controlEntry
+        )
+
+        _ = try await intent.perform()
+
+        let next = DecisionIntentEnvelopeStore.consume()
+
+        XCTAssertEqual(next?.kind, .openEvolutionControl)
+        XCTAssertEqual(next?.sourceSurface, .widget)
+        XCTAssertEqual(next?.entrySource, .homeWidgetMedium)
+        XCTAssertEqual(next?.promptSeed, "Inspect the audit findings")
+        XCTAssertEqual(
+            next?.controlEntryKindID,
+            DecisionEvolutionWidgetControlEntryKind.audit.rawValue
+        )
+        XCTAssertEqual(
+            next?.triggerReason,
+            "Inspect evolution audit findings from Medium Widget."
+        )
+    }
+
     func testWatchQuickCaptureUsesSharedFactoryAndPreservesScenarioAndRisk() {
         WatchHandoffCoordinator.enqueueQuickCapture(
             promptSeed: "Pause before replying",
@@ -323,6 +355,67 @@ final class DecisionIntentEnvelopeStoreTests: XCTestCase {
             EntrySource.watch.defaultEvolutionControlTriggerReason
         )
         XCTAssertEqual(next?.riskLevel, .medium)
+    }
+
+    func testWatchEvolutionControlHandoffUsesAuditAwareFallbackReason() {
+        let controlEntry = DecisionEvolutionWidgetControlEntryPresentation(
+            kindID: DecisionEvolutionWidgetControlEntryKind.audit.rawValue,
+            title: "Audit on iPhone",
+            systemImage: "exclamationmark.circle",
+            prompt: "Inspect the watch audit findings",
+            instruction: "Continue on iPhone to inspect audit findings before widening rollout.",
+            triggerReason: nil
+        )
+
+        WatchHandoffCoordinator.enqueueOpenEvolutionControl(controlEntry)
+
+        let next = DecisionIntentEnvelopeStore.consume()
+
+        XCTAssertEqual(next?.kind, .openEvolutionControl)
+        XCTAssertEqual(next?.sourceSurface, .watch)
+        XCTAssertEqual(next?.entrySource, .watch)
+        XCTAssertEqual(next?.promptSeed, "Inspect the watch audit findings")
+        XCTAssertEqual(
+            next?.controlEntryKindID,
+            DecisionEvolutionWidgetControlEntryKind.audit.rawValue
+        )
+        XCTAssertEqual(
+            next?.triggerReason,
+            "A watch audit alert asked the iPhone brain to inspect evolution findings."
+        )
+        XCTAssertEqual(next?.riskLevel, .medium)
+    }
+
+    func testLockScreenPrimaryActionIntentUsesAuditAwareFallbackReason() async throws {
+        let action = DecisionEvolutionWidgetPrimaryActionPresentation(
+            kind: .evolutionControl,
+            controlEntryKindID: DecisionEvolutionWidgetControlEntryKind.audit.rawValue,
+            title: "Audit on iPhone",
+            systemImage: "exclamationmark.circle",
+            prompt: "Inspect the accessory audit findings",
+            triggerReason: nil
+        )
+        let intent = OpenEvolutionControlIntent(
+            entrySource: .lockScreenWidget,
+            primaryAction: action
+        )
+
+        _ = try await intent.perform()
+
+        let next = DecisionIntentEnvelopeStore.consume()
+
+        XCTAssertEqual(next?.kind, .openEvolutionControl)
+        XCTAssertEqual(next?.sourceSurface, .widget)
+        XCTAssertEqual(next?.entrySource, .lockScreenWidget)
+        XCTAssertEqual(next?.promptSeed, "Inspect the accessory audit findings")
+        XCTAssertEqual(
+            next?.controlEntryKindID,
+            DecisionEvolutionWidgetControlEntryKind.audit.rawValue
+        )
+        XCTAssertEqual(
+            next?.triggerReason,
+            "Inspect evolution audit findings from Lock Screen Widget."
+        )
     }
 
     func testEnqueueKeepsNewestFiveEnvelopesWhenQueueOverflows() {
@@ -457,6 +550,7 @@ private extension DecisionIntentEnvelope {
             promptSeed: promptSeed,
             riskLevel: riskLevel,
             triggerReason: triggerReason,
+            controlEntryKindID: controlEntryKindID,
             requestedAt: requestedAt,
             expiresAt: expiresAt
         )

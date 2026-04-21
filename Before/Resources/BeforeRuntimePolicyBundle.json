@@ -84,9 +84,28 @@
           "standardCandidateFloor": 1,
           "protectedCandidateFloor": 2,
           "maxCandidateCount": 4,
+          "protectedFloorBoundaryModes": [
+            "local_only_protective"
+          ],
+          "protectedFloorCalibrationStatuses": [],
           "unstableLoopIncrement": 1,
+          "unstableLoopIncrementRiskLevels": [
+            "low",
+            "medium"
+          ],
+          "unstableBudgetCalibrationStatuses": [
+            "watch",
+            "drifting"
+          ],
+          "nominalThermalGuardLevel": "nominal",
+          "warmThermalGuardLevel": "watch",
+          "hotThermalGuardLevel": "throttle",
+          "criticalThermalGuardLevel": "emergency",
           "throttleLoopPenalty": 1,
           "throttleCandidatePenalty": 1,
+          "throttlePenaltyThermalLevels": [
+            "hot"
+          ],
           "defaultPrecisionProfile": "balanced",
           "unstablePrecisionProfile": "protected",
           "guardedPrecisionProfile": "protected",
@@ -114,6 +133,13 @@
               "standardCandidateFloor": 1,
               "protectedCandidateFloor": 2,
               "unstableLoopIncrement": 1,
+              "unstableLoopIncrementRiskLevels": [
+                "low",
+                "medium"
+              ],
+              "throttlePenaltyThermalLevels": [
+                "hot"
+              ],
               "throttleLoopPenalty": 1,
               "throttleCandidatePenalty": 1
             },
@@ -136,6 +162,13 @@
               "standardCandidateFloor": 1,
               "protectedCandidateFloor": 2,
               "unstableLoopIncrement": 1,
+              "unstableLoopIncrementRiskLevels": [
+                "low",
+                "medium"
+              ],
+              "throttlePenaltyThermalLevels": [
+                "hot"
+              ],
               "throttleLoopPenalty": 1,
               "throttleCandidatePenalty": 1
             },
@@ -158,6 +191,13 @@
               "standardCandidateFloor": 1,
               "protectedCandidateFloor": 2,
               "unstableLoopIncrement": 1,
+              "unstableLoopIncrementRiskLevels": [
+                "low",
+                "medium"
+              ],
+              "throttlePenaltyThermalLevels": [
+                "hot"
+              ],
               "throttleLoopPenalty": 1,
               "throttleCandidatePenalty": 1
             },
@@ -180,6 +220,13 @@
               "standardCandidateFloor": 1,
               "protectedCandidateFloor": 2,
               "unstableLoopIncrement": 1,
+              "unstableLoopIncrementRiskLevels": [
+                "low",
+                "medium"
+              ],
+              "throttlePenaltyThermalLevels": [
+                "hot"
+              ],
               "throttleLoopPenalty": 1,
               "throttleCandidatePenalty": 1
             },
@@ -202,6 +249,13 @@
               "standardCandidateFloor": 1,
               "protectedCandidateFloor": 2,
               "unstableLoopIncrement": 1,
+              "unstableLoopIncrementRiskLevels": [
+                "low",
+                "medium"
+              ],
+              "throttlePenaltyThermalLevels": [
+                "hot"
+              ],
               "throttleLoopPenalty": 1,
               "throttleCandidatePenalty": 1
             },
@@ -224,6 +278,13 @@
               "standardCandidateFloor": 1,
               "protectedCandidateFloor": 2,
               "unstableLoopIncrement": 1,
+              "unstableLoopIncrementRiskLevels": [
+                "low",
+                "medium"
+              ],
+              "throttlePenaltyThermalLevels": [
+                "hot"
+              ],
               "throttleLoopPenalty": 1,
               "throttleCandidatePenalty": 1
             },
@@ -247,6 +308,13 @@
               "standardCandidateFloor": 1,
               "protectedCandidateFloor": 2,
               "unstableLoopIncrement": 1,
+              "unstableLoopIncrementRiskLevels": [
+                "low",
+                "medium"
+              ],
+              "throttlePenaltyThermalLevels": [
+                "hot"
+              ],
               "throttleLoopPenalty": 1,
               "throttleCandidatePenalty": 1
             },
@@ -270,6 +338,13 @@
               "standardCandidateFloor": 1,
               "protectedCandidateFloor": 2,
               "unstableLoopIncrement": 1,
+              "unstableLoopIncrementRiskLevels": [
+                "low",
+                "medium"
+              ],
+              "throttlePenaltyThermalLevels": [
+                "hot"
+              ],
               "throttleLoopPenalty": 1,
               "throttleCandidatePenalty": 1
             },
@@ -293,6 +368,13 @@
               "standardCandidateFloor": 1,
               "protectedCandidateFloor": 2,
               "unstableLoopIncrement": 1,
+              "unstableLoopIncrementRiskLevels": [
+                "low",
+                "medium"
+              ],
+              "throttlePenaltyThermalLevels": [
+                "hot"
+              ],
               "throttleLoopPenalty": 1,
               "throttleCandidatePenalty": 1
             },
@@ -316,6 +398,13 @@
               "standardCandidateFloor": 1,
               "protectedCandidateFloor": 2,
               "unstableLoopIncrement": 1,
+              "unstableLoopIncrementRiskLevels": [
+                "low",
+                "medium"
+              ],
+              "throttlePenaltyThermalLevels": [
+                "hot"
+              ],
               "throttleLoopPenalty": 1,
               "throttleCandidatePenalty": 1
             }
@@ -337,13 +426,51 @@
           "engageUrgencyIncrement": 0.18,
           "reflectCueIncrement": 0.16,
           "deepLoopCueIncrement": 0.26,
-          "highRiskGuardThreshold": 0.68
+          "highRiskGuardThreshold": 0.68,
+          "urgencyCuePhrases": [
+            "now",
+            "immediately",
+            "urgent",
+            "asap",
+            "tonight",
+            "must"
+          ],
+          "reflectiveCuePhrases": [
+            "think",
+            "reflect",
+            "consider",
+            "unclear",
+            "confused",
+            "compare"
+          ],
+          "deepLoopCuePhrases": [
+            "plan",
+            "strategy",
+            "multi-step",
+            "tradeoff",
+            "pros and cons",
+            "simulate"
+          ]
         },
         "stateTransitions": {
           "backgroundPulseEnabled": true,
           "recoveryOnCriticalThermal": true,
           "reflectOnTrustDrift": true,
           "deepLoopOnProtectedBoundary": true,
+          "guardedBudgetBoundaryModes": [
+            "local_only_protective"
+          ],
+          "guardedBudgetCalibrationStatuses": [],
+          "guardedBudgetRiskFlags": [
+            "low_trust_load",
+            "retrieval_instability",
+            "external_refresh_guard_triggered",
+            "observation_only_quarantine",
+            "evidence_caveat_load"
+          ],
+          "guardedBudgetRetrievalTags": [
+            "evidence_caveat"
+          ],
           "lockdownOnExtremeBlockedPermit": true,
           "quarantineFailureGuardThreshold": 3,
           "criticalThermalMode": "recovery",

@@ -182,6 +182,32 @@ final class PendingLaunchRequestStoreTests: XCTestCase {
         )
     }
 
+    func testEnqueueEvolutionControlEnvelopePreservesAuditControlEntryKindAcrossSharedProtectedQueue() {
+        PendingLaunchRequestStore.clear()
+
+        let envelope = DecisionIntentEnvelope.openEvolutionControl(
+            entrySource: .homeWidgetMedium,
+            promptSeed: "Inspect the audit findings",
+            controlEntryKindID: DecisionEvolutionWidgetControlEntryKind.audit.rawValue,
+            requestedAt: Date()
+        )
+
+        PendingLaunchRequestStore.enqueue(envelope)
+
+        let restored = PendingLaunchRequestStore.consumeEnvelope()
+
+        XCTAssertEqual(restored?.kind, .openEvolutionControl)
+        XCTAssertEqual(restored?.entrySource, .homeWidgetMedium)
+        XCTAssertEqual(
+            restored?.controlEntryKindID,
+            DecisionEvolutionWidgetControlEntryKind.audit.rawValue
+        )
+        XCTAssertEqual(
+            restored?.triggerReason,
+            "Inspect evolution audit findings from Medium Widget."
+        )
+    }
+
     func testExpiredProtectedPayloadIsPurgedWhenQueueIsLoaded() {
         PendingLaunchRequestStore.clear()
 

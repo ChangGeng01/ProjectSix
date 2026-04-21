@@ -6,6 +6,39 @@ import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
 
+public extension BASRenderedOutput {
+    var deliveryFallbackGuidance: String? {
+        if let action = alternativeActions.first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+            return action
+        }
+        if let substitute = surfaceGuide?.protectiveSubstitute?.description,
+           !substitute.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return substitute
+        }
+        if let delayType = surfaceGuide?.delayReservation?.delayType ?? surfaceGuide?.delayWindow {
+            return deliveryFallbackDelayGuidance(for: delayType)
+        }
+        if surfaceGuide?.agency.localOnlyPreferred == true {
+            return "Keep the next step local and reversible."
+        }
+        if surfaceGuide?.agency.prefersDraftOnly == true {
+            return "Keep the move in draft until the boundary is re-checked."
+        }
+        return nil
+    }
+
+    private func deliveryFallbackDelayGuidance(for delayType: String) -> String {
+        switch delayType {
+        case "cool_down":
+            return "Take a cool-down window before deciding."
+        case "evidence_wait":
+            return "Wait for one more piece of evidence before deciding."
+        default:
+            return "Wait before taking the next step."
+        }
+    }
+}
+
 public enum BASEBrainConsoleSupport {
     public static func inspectionBundle(
         for turn: BASEBrainTurnResult,
@@ -48,11 +81,14 @@ public enum BASEBrainConsoleSupport {
             "Run \(turn.budgetFrame.runMode.rawValue)",
             "route \(turn.budgetFrame.deviceRoute.rawValue)",
             "permit \(turn.actionPermit.mode.rawValue)",
+            dreamLoopRuntimeSummary(for: turn),
             "loops \(turn.runtimeTrace.loopCount)",
             "fold \(turn.thoughtFold.checksum.prefix(8))",
             "audit \(turn.runtimeTrace.guardrailFindings.count)",
             "power \(Int((turn.runtimeTrace.powerEstimate * 100).rounded()))%"
-        ].joined(separator: " • ")
+        ]
+        .compactMap { $0 }
+        .joined(separator: " • ")
 
         guard let fallback, !fallback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return eBrainSummary
@@ -89,7 +125,8 @@ public enum BASEBrainConsoleSupport {
             },
             turn.hostForgetRequest.map {
                 "forget \($0.requestID) • verified \($0.verified)"
-            }
+            },
+            evolutionGovernanceSummary(for: turn)
         ]
         .compactMap { $0 }
         .joined(separator: " • ")
@@ -100,6 +137,7 @@ public enum BASEBrainConsoleSupport {
             "version \(turn.hostContext.activeVersion)",
             constitutionSummary,
             governanceSummary,
+            dreamLoopBrainSummary(for: turn),
             goalSummary,
             mirrorSummary
         ]
@@ -149,7 +187,8 @@ public enum BASEBrainConsoleSupport {
                 },
                 turn.hostForgetRequest.map {
                     "forget \($0.requestID) • verified \($0.verified)"
-                }
+                },
+                evolutionGovernanceSummary(for: turn)
             ]
             .compactMap { $0 }
             .joined(separator: " • ")
@@ -168,7 +207,16 @@ public enum BASEBrainConsoleSupport {
             merged.score = adjustedScore(base: report.score, fallback: blockers.isEmpty ? 0.94 : 0.50)
         case .orchestration:
             let blockers = orchestrationBlockers(for: turn)
-            merged.summary = "L9 loop \(turn.runtimeTrace.loopCount) • candidates \(turn.thoughtFrame.candidates.count) • stop \((turn.thoughtFrame.stopReason ?? .candidateStable).rawValue)"
+            merged.summary = [
+                "L9 loop \(turn.runtimeTrace.loopCount)",
+                "candidates \(turn.thoughtFrame.candidates.count)",
+                "stop \((turn.thoughtFrame.stopReason ?? .candidateStable).rawValue)",
+                turn.thoughtFrame.convergenceCertificate.map { "convergence \($0.stoppingMode.rawValue)" },
+                turn.thoughtFrame.candidateFrontier.map { "frontier \($0.frontierWidth)" },
+                maxEvidenceDebtSummary(for: turn)
+            ]
+            .compactMap { $0 }
+            .joined(separator: " • ")
             merged.blockers = blockers
             merged.score = adjustedScore(base: report.score, fallback: blockers.isEmpty ? 0.91 : 0.60)
         case .observability:
@@ -186,12 +234,30 @@ public enum BASEBrainConsoleSupport {
             merged.score = adjustedScore(base: report.score, fallback: 0.92)
         case .evaluation:
             let reviewCount = turn.updateTickets.filter(\.requiresReview).count
-            merged.summary = "L13 tickets \(turn.updateTickets.count) • review \(reviewCount) • schema guard \(turn.updateTickets.first?.schemaVersion ?? BASUpdateTicket.currentSchemaVersion)"
+            let governanceSummary = evolutionGovernanceSummary(for: turn)
+            merged.summary = [
+                "L13 tickets \(turn.updateTickets.count)",
+                "review \(reviewCount)",
+                dreamLoopEvaluationSummary(for: turn),
+                governanceSummary,
+                "schema guard \(turn.updateTickets.first?.schemaVersion ?? BASUpdateTicket.currentSchemaVersion)"
+            ]
+            .compactMap { $0 }
+            .joined(separator: " • ")
             merged.blockers = turn.updateTickets.contains(where: \.conflictFlag) ? ["Update tickets contain unresolved conflicts."] : []
             merged.score = adjustedScore(base: report.score, fallback: merged.blockers.isEmpty ? 0.89 : 0.62)
         case .delivery:
-            merged.summary = "L12 \(turn.renderedOutput.mode.rawValue) output • alternatives \(turn.renderedOutput.alternativeActions.count) • codes \(turn.renderedOutput.explanationCodes.count)"
-            merged.blockers = turn.actionPermit.mode == .block && turn.renderedOutput.alternativeActions.isEmpty
+            let surfaceDetails = deliverySurfaceDetails(for: turn.renderedOutput)
+            merged.summary = [
+                "L12 \(turn.renderedOutput.mode.rawValue) output",
+                "alternatives \(turn.renderedOutput.alternativeActions.count)",
+                "codes \(turn.renderedOutput.explanationCodes.count)",
+                dreamLoopDeliverySummary(for: turn),
+                surfaceDetails.isEmpty ? nil : surfaceDetails
+            ]
+            .compactMap { $0 }
+            .joined(separator: " • ")
+            merged.blockers = turn.actionPermit.mode == .block && turn.renderedOutput.deliveryFallbackGuidance == nil
                 ? ["Blocked outputs should offer a safer alternative path."]
                 : []
             merged.score = adjustedScore(base: report.score, fallback: merged.blockers.isEmpty ? 0.90 : 0.66)
@@ -199,6 +265,106 @@ public enum BASEBrainConsoleSupport {
 
         merged.health = BASLayerReport.health(forScore: merged.score, blockers: merged.blockers)
         return merged
+    }
+
+    private static func evolutionGovernanceSummary(
+        for turn: BASEBrainTurnResult
+    ) -> String? {
+        let shadowTrialCount = turn.shadowTrialRecords.count
+        let passedShadowTrialCount = turn.shadowTrialRecords.filter(\.isPassed).count
+        let failedShadowTrialCount = turn.shadowTrialRecords.filter(\.isFailed).count
+        let pendingShadowTrialCount = turn.shadowTrialRecords.filter(\.isPending).count
+        let sealCount = turn.evolutionSeals.count
+        let deniedSealCount = turn.evolutionSeals.filter(\.isDenied).count
+        let pendingSealCount = turn.evolutionSeals.filter(\.isPending).count
+        let pendingRetractionCount = turn.retractionOrders.filter {
+            $0.executionState != "completed" && $0.executionState != "cleared"
+        }.count
+
+        var details: [String] = []
+        if !turn.experienceCandidates.isEmpty {
+            details.append("candidates \(turn.experienceCandidates.count)")
+        }
+        if let shadowSummary = shadowTrialSummary(
+            shadowTrialCount: shadowTrialCount,
+            passedShadowTrialCount: passedShadowTrialCount,
+            failedShadowTrialCount: failedShadowTrialCount,
+            pendingShadowTrialCount: pendingShadowTrialCount
+        ) {
+            details.append(shadowSummary)
+        }
+        if let sealSummary = sealSummary(
+            sealCount: sealCount,
+            deniedSealCount: deniedSealCount,
+            pendingSealCount: pendingSealCount
+        ) {
+            details.append(sealSummary)
+        }
+        if !turn.versionDeltas.isEmpty {
+            details.append("version \(turn.versionDeltas.count)")
+        }
+        if !turn.retractionOrders.isEmpty {
+            details.append(
+                pendingRetractionCount > 0
+                    ? "retract \(pendingRetractionCount) pending/\(turn.retractionOrders.count)"
+                    : "retract cleared \(turn.retractionOrders.count)"
+            )
+        }
+        if !turn.workflowCandidates.isEmpty
+            || !turn.guardTemplateCandidates.isEmpty
+            || !turn.biasRecords.isEmpty
+            || !turn.riskPatternCandidates.isEmpty
+            || !turn.learningExportBundles.isEmpty {
+            details.append("workflow \(turn.workflowCandidates.count)")
+            details.append("guard \(turn.guardTemplateCandidates.count)")
+            details.append("bias \(turn.biasRecords.count)")
+            details.append("risk \(turn.riskPatternCandidates.count)")
+            details.append("export \(turn.learningExportBundles.count)")
+        }
+        if let governanceSummary = turn.evolutionLineageSummary.governanceSummary,
+           !governanceSummary.blockedPromotionReasonCodes.isEmpty {
+            details.append("gate hold")
+        }
+
+        return details.isEmpty ? nil : details.joined(separator: " • ")
+    }
+
+    private static func shadowTrialSummary(
+        shadowTrialCount: Int,
+        passedShadowTrialCount: Int,
+        failedShadowTrialCount: Int,
+        pendingShadowTrialCount: Int
+    ) -> String? {
+        guard shadowTrialCount > 0 else {
+            return nil
+        }
+        if failedShadowTrialCount > 0 {
+            return "shadow failed \(failedShadowTrialCount)/\(shadowTrialCount)"
+        }
+        if pendingShadowTrialCount > 0 {
+            return "shadow \(pendingShadowTrialCount) pending/\(shadowTrialCount)"
+        }
+        if passedShadowTrialCount > 0 {
+            return "shadow ready \(passedShadowTrialCount)/\(shadowTrialCount)"
+        }
+        return "shadow cleared \(shadowTrialCount)"
+    }
+
+    private static func sealSummary(
+        sealCount: Int,
+        deniedSealCount: Int,
+        pendingSealCount: Int
+    ) -> String? {
+        guard sealCount > 0 else {
+            return nil
+        }
+        if deniedSealCount > 0 {
+            return "seal denied \(deniedSealCount)/\(sealCount)"
+        }
+        if pendingSealCount > 0 {
+            return "seal \(pendingSealCount) pending/\(sealCount)"
+        }
+        return "seal ready \(sealCount)"
     }
 
     private static func executionTrace(
@@ -218,16 +384,125 @@ public enum BASEBrainConsoleSupport {
                 generationMs: turn.runtimeTrace.latencyBreakdownMs["loop", default: 0] + turn.runtimeTrace.latencyBreakdownMs["action", default: 0],
                 toolMs: turn.runtimeTrace.latencyBreakdownMs["evolution", default: 0]
             ),
-            auditEvents: turn.runtimeTrace.layerEvents.prefix(10).map { event in
+            auditEvents: turn.runtimeTrace.layerEvents.prefix(13).map { event in
                 BASAuditEvent(
                     category: event.layerID,
                     message: "\(event.event): \(event.detail)"
                 )
             },
-            outputSummary: [turn.renderedOutput.headline, turn.renderedOutput.body]
+            outputSummary: [turn.renderedOutput.headline, turn.renderedOutput.body, turn.renderedOutput.deliveryFallbackGuidance]
+                .compactMap { $0 }
                 .filter { !$0.isEmpty }
                 .joined(separator: " • ")
         )
+    }
+
+    private static func deliverySurfaceDetails(
+        for output: BASRenderedOutput
+    ) -> String {
+        guard let guide = output.surfaceGuide else {
+            return ""
+        }
+
+        var details: [String] = []
+
+        if guide.stackedModes.isEmpty == false {
+            details.append("stacked \(guide.stackedModes.map(\.rawValue).joined(separator: ","))")
+        }
+        if guide.agency.requiresSecondCheck {
+            details.append("second_check")
+        }
+        if let reservationMode = guide.agency.reservationMode {
+            details.append("agency \(reservationMode.rawValue)")
+        }
+        if let delayType = guide.delayReservation?.delayType ?? guide.delayWindow {
+            details.append("delay \(delayType)")
+        }
+        if let remandTargets = guide.disclosure.remandTargets,
+           !remandTargets.isEmpty {
+            details.append("remand \(remandTargets.joined(separator: ","))")
+        }
+        if let requiredDisclosures = guide.disclosure.requiredDisclosures,
+           !requiredDisclosures.isEmpty {
+            details.append("disclosures \(requiredDisclosures.count)")
+        }
+        if let substituteType = guide.protectiveSubstitute?.substituteType {
+            details.append("substitute \(substituteType)")
+        }
+        if let urgency = guide.sovereignEscalationHint?.urgency {
+            details.append("sovereign \(urgency)")
+        }
+
+        return details.joined(separator: " • ")
+    }
+
+    private static func dreamLoopRuntimeSummary(
+        for turn: BASEBrainTurnResult
+    ) -> String? {
+        if let stoppingMode = turn.thoughtFrame.convergenceCertificate?.stoppingMode.rawValue {
+            return "dream \(stoppingMode)"
+        }
+        if let stopReason = turn.thoughtFrame.stopReason?.rawValue {
+            return "dream \(stopReason)"
+        }
+        return nil
+    }
+
+    private static func dreamLoopBrainSummary(
+        for turn: BASEBrainTurnResult
+    ) -> String? {
+        let stoppingMode = turn.thoughtFrame.convergenceCertificate?.stoppingMode.rawValue
+        let frontierWidth = turn.thoughtFrame.candidateFrontier?.frontierWidth
+        let weakPredictionCount = turn.thoughtFrame.uncertaintyLedger?.weakPredictions.count ?? 0
+        let breakpointCount = turn.thoughtFrame.sovereignBreakpointHints?.count ?? 0
+
+        var details: [String] = []
+        if let stoppingMode {
+            details.append("dream \(stoppingMode)")
+        }
+        if let frontierWidth {
+            details.append("frontier \(frontierWidth)")
+        }
+        if weakPredictionCount > 0 {
+            details.append("weak \(weakPredictionCount)")
+        }
+        if breakpointCount > 0 {
+            details.append("break \(breakpointCount)")
+        }
+
+        return details.isEmpty ? nil : details.joined(separator: " • ")
+    }
+
+    private static func maxEvidenceDebtSummary(
+        for turn: BASEBrainTurnResult
+    ) -> String? {
+        guard let maxDebt = turn.thoughtFrame.evidenceDebts?.map(\.debtWeight).max() else {
+            return nil
+        }
+        return "debt \(Int((maxDebt * 100).rounded()))%"
+    }
+
+    private static func dreamLoopEvaluationSummary(
+        for turn: BASEBrainTurnResult
+    ) -> String? {
+        let dreamLoopSignals = turn.updateTickets
+            .flatMap(\.governanceRefs)
+            .filter { $0.hasPrefix("dream_loop:") }
+            .map { $0.replacingOccurrences(of: "dream_loop:", with: "") }
+            .basOrderedUniqueStrings()
+        guard dreamLoopSignals.isEmpty == false else {
+            return turn.thoughtFrame.convergenceCertificate.map { "dream \($0.stoppingMode.rawValue)" }
+        }
+        return "dream \(Array(dreamLoopSignals.prefix(3)).joined(separator: ","))"
+    }
+
+    private static func dreamLoopDeliverySummary(
+        for turn: BASEBrainTurnResult
+    ) -> String? {
+        guard let stoppingMode = turn.thoughtFrame.convergenceCertificate?.stoppingMode.rawValue else {
+            return nil
+        }
+        return "dream \(stoppingMode)"
     }
 
     private static func currentBrainState(
@@ -292,7 +567,7 @@ public enum BASEBrainConsoleSupport {
             }
         }
         let verificationSnapshot = verificationSnapshotParts
-            .uniqued()
+            .basOrderedUniqueStrings()
             .joined(separator: "|")
 
         return BASCurrentBrainState(
@@ -302,7 +577,7 @@ public enum BASEBrainConsoleSupport {
             reactionWeights: reactionWeights(for: turn.hostContext.tonePreference),
             activeTemplateIDs: [],
             recentFailurePatternIDs: [],
-            retrievalTags: (turn.memoryBundle.retrievalTags + constitutionRetrievalTags + governanceRetrievalTags).uniqued(),
+            retrievalTags: (turn.memoryBundle.retrievalTags + constitutionRetrievalTags + governanceRetrievalTags).basOrderedUniqueStrings(),
             verificationSnapshot: verificationSnapshot
         )
     }
@@ -340,7 +615,7 @@ public enum BASEBrainConsoleSupport {
         let reason: String
 
         switch turn.actionPermit.mode {
-        case .answer, .compare, .replace, .block:
+        case .answer, .mirror, .compare, .draftOnly, .localOnly, .replace, .block, .escalate:
             decision = .allow
             reason = "Protective output released via \(turn.actionPermit.mode.rawValue)."
         case .delay:
@@ -364,7 +639,7 @@ public enum BASEBrainConsoleSupport {
         reportBlockers: [String],
         inspection: BASInspectionBundle
     ) -> [String] {
-        Array((existing + reportBlockers + inspection.blockerSummary).uniqued().prefix(8))
+        Array((existing + reportBlockers + inspection.blockerSummary).basOrderedUniqueStrings().prefix(8))
     }
 
     private static func runtimeBlockers(for turn: BASEBrainTurnResult) -> [String] {
@@ -489,8 +764,8 @@ private extension String {
     }
 }
 
-private extension Sequence where Element == String {
-    func uniqued() -> [String] {
+extension Sequence where Element == String {
+    func basOrderedUniqueStrings() -> [String] {
         var seen = Set<String>()
         return filter { seen.insert($0).inserted }
     }

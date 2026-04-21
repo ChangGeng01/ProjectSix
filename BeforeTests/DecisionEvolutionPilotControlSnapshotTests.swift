@@ -345,6 +345,314 @@ struct DecisionEvolutionPilotControlSnapshotTests {
         }
 
         #expect(snapshot.recommendedKillSwitches == ["external-tools"])
+        #expect(snapshot.foldedLungTitle == nil)
+        #expect(snapshot.foldedLungLines.isEmpty)
+    }
+
+    @Test
+    func pilotSnapshotSurfacesFoldedLungLinesFromReleaseReasons() {
+        let snapshot = DecisionEvolutionPilotControlSnapshot.build(
+            controlSurface: makeControlSurface(
+                active: makeCheckpoint(
+                    checkpointID: "active-folded-lung",
+                    createdAt: Date(timeIntervalSince1970: 10),
+                    approvalState: .automatic,
+                    hasLineage: true
+                )
+            ),
+            releaseSummary: makeReleaseSummary(
+                headline: "Folded lung should remain visible in pilot controls.",
+                reasons: [
+                    "L3 compression runtime • resumed checkpoint lineage",
+                    "Breath guard/exchange • thermal 0.42 • restore ready",
+                    "Morph graph guard.runtime • organs riskPermit,stubCore",
+                    "Hot pack hot stubCore,riskPermit • warm sentinel • cold projectionRing",
+                    "Precision profile riskPermit fp16 • stubCore fp16",
+                    "Thermal exchanger predictive_guard • reroute stubCore->ane",
+                    "Integrity weave verified guard.fold"
+                ],
+                pendingReviewCount: 0,
+                canRestoreActiveCheckpoint: true,
+                activeCheckpointID: "active-folded-lung",
+                activeCheckpointSource: .pinnedHint
+            ),
+            surfaceContract: .controlCenter,
+            navigationOptions: DecisionEvolutionSurfaceContract.controlCenter.navigationSurfaceOptions()
+        )
+
+        #expect(snapshot.foldedLungTitle == "Folded lung")
+        #expect(
+            snapshot.foldedLungLines
+                == [
+                    "L3 compression runtime • resumed checkpoint lineage",
+                    "Breath guard/exchange • thermal 0.42 • restore ready",
+                    "Morph graph guard.runtime • organs riskPermit,stubCore",
+                    "Hot pack hot stubCore,riskPermit • warm sentinel • cold projectionRing",
+                    "Precision profile riskPermit fp16 • stubCore fp16",
+                    "Thermal exchanger predictive_guard • reroute stubCore->ane",
+                    "Integrity weave verified guard.fold"
+                ]
+        )
+    }
+
+    @Test
+    func pilotSnapshotOmitsFoldedLungLinesWithoutReleaseSummary() {
+        let snapshot = DecisionEvolutionPilotControlSnapshot.build(
+            controlSurface: makeControlSurface(
+                active: makeCheckpoint(
+                    checkpointID: "active-no-folded-lung",
+                    createdAt: Date(timeIntervalSince1970: 10),
+                    approvalState: .automatic,
+                    hasLineage: true
+                )
+            ),
+            releaseSummary: nil,
+            surfaceContract: .controlCenter,
+            navigationOptions: DecisionEvolutionSurfaceContract.controlCenter.navigationSurfaceOptions()
+        )
+
+        #expect(snapshot.foldedLungTitle == nil)
+        #expect(snapshot.foldedLungLines.isEmpty)
+    }
+
+    @Test
+    func localMutationSurfaceBuildsFurnaceWorkbenchGuidanceForQuickActions() throws {
+        let snapshot = DecisionEvolutionPilotControlSnapshot.build(
+            controlSurface: makeControlSurface(
+                active: makeCheckpoint(
+                    checkpointID: "active-furnace-quick",
+                    createdAt: Date(timeIntervalSince1970: 10),
+                    approvalState: .automatic,
+                    hasLineage: true
+                )
+            ),
+            releaseSummary: makeReleaseSummary(
+                headline: "Furnace quick actions should hold the next step.",
+                reasons: [
+                    "L13 governance • candidates 1 • shadow 1 pending/1 • seal 1 ready/1 • version 0 • retract 0 ready/0 • gate hold"
+                ],
+                pendingReviewCount: 0,
+                canRestoreActiveCheckpoint: true,
+                activeCheckpointID: "active-furnace-quick",
+                activeCheckpointSource: .pinnedHint
+            ),
+            surfaceContract: .controlCenter,
+            navigationOptions: DecisionEvolutionSurfaceContract.controlCenter.navigationSurfaceOptions()
+        )
+
+        #expect(snapshot.furnaceWorkbenchSectionTitle == "Furnace workbench")
+        let guidance = try #require(snapshot.furnaceWorkbenchGuidance)
+        #expect(guidance.title == "Quick actions are holding the next furnace review step")
+        #expect(guidance.detail == "Review the pending shadow trial before promotion or approval.")
+        #expect(guidance.runNowActionTitle == DecisionEvolutionPilotControlPresentationSupport.restoreActiveTitle)
+        #expect(guidance.runNowIntent?.kind == .restoreActiveCheckpoint)
+        #expect(guidance.actionTitle == "Inspect quick actions")
+        #expect(guidance.focusTarget == .quickActions)
+    }
+
+    @Test
+    func localMutationSurfaceBuildsFurnaceWorkbenchGuidanceForQueueLineage() throws {
+        let snapshot = DecisionEvolutionPilotControlSnapshot.build(
+            controlSurface: makeControlSurface(
+                active: makeCheckpoint(
+                    checkpointID: "active-furnace-lineage",
+                    createdAt: Date(timeIntervalSince1970: 10),
+                    approvalState: .automatic,
+                    hasLineage: true
+                ),
+                pendingReview: [
+                    makeCheckpoint(
+                        checkpointID: "review-furnace-lineage",
+                        createdAt: Date(timeIntervalSince1970: 20),
+                        approvalState: .reviewSuggested,
+                        hasLineage: true
+                    )
+                ]
+            ),
+            releaseSummary: makeReleaseSummary(
+                headline: "Furnace lineage cleanup should hold the next step.",
+                reasons: [
+                    "L13 retraction • pending rule.pending • reason evolution.shadow_trial_pending"
+                ],
+                pendingReviewCount: 1,
+                canRestoreActiveCheckpoint: true,
+                activeCheckpointID: "active-furnace-lineage",
+                activeCheckpointSource: .pinnedHint,
+                reviewCheckpointID: "review-furnace-lineage"
+            ),
+            surfaceContract: .controlCenter,
+            navigationOptions: DecisionEvolutionSurfaceContract.controlCenter.navigationSurfaceOptions()
+        )
+
+        #expect(snapshot.furnaceWorkbenchSectionTitle == "Furnace workbench")
+        let guidance = try #require(snapshot.furnaceWorkbenchGuidance)
+        #expect(guidance.title == "Queue lineage is holding the next furnace review step")
+        #expect(guidance.detail == "Clear the pending retraction order before wider rollout.")
+        #expect(guidance.runNowActionTitle == DecisionEvolutionPilotControlPresentationSupport.clearQueueLineageTitle)
+        #expect(guidance.runNowIntent?.kind == .clearPendingReviewLineage)
+        #expect(guidance.actionTitle == "Inspect queue lineage")
+        #expect(guidance.focusTarget == .queueLineage)
+    }
+
+    @Test
+    func localMutationSurfaceBuildsReadyFurnaceWorkbenchAvailabilityForQuickActions() throws {
+        let snapshot = DecisionEvolutionPilotControlSnapshot.build(
+            controlSurface: makeControlSurface(
+                active: makeCheckpoint(
+                    checkpointID: "active-furnace-ready",
+                    createdAt: Date(timeIntervalSince1970: 10),
+                    approvalState: .automatic,
+                    hasLineage: true
+                ),
+                pendingReview: [
+                    makeCheckpoint(
+                        checkpointID: "review-furnace-ready",
+                        createdAt: Date(timeIntervalSince1970: 20),
+                        approvalState: .reviewSuggested,
+                        hasLineage: true
+                    )
+                ],
+                restorableCheckpointIDs: ["active-furnace-ready-prior"]
+            ),
+            releaseSummary: makeReleaseSummary(
+                headline: "Furnace quick actions should show what can run now.",
+                reasons: [
+                    "L13 governance • candidates 1 • shadow 1 pending/1 • seal 0 ready/0 • version 0 • retract 0 ready/0 • gate hold"
+                ],
+                pendingReviewCount: 1,
+                canRestoreActiveCheckpoint: true,
+                canRollbackActiveCheckpoint: true,
+                activeCheckpointID: "active-furnace-ready",
+                activeCheckpointSource: .pinnedHint,
+                reviewCheckpointID: "review-furnace-ready"
+            ),
+            surfaceContract: .controlCenter,
+            navigationOptions: DecisionEvolutionSurfaceContract.controlCenter.navigationSurfaceOptions()
+        )
+
+        let guidance = try #require(snapshot.furnaceWorkbenchGuidance)
+        #expect(guidance.focusTarget == .quickActions)
+        #expect(guidance.runNowActionTitle == DecisionEvolutionPilotControlPresentationSupport.approveQueueTitle)
+        #expect(guidance.runNowIntent?.kind == .approvePendingCheckpoints)
+        #expect(guidance.availabilityTitle == "Ready now")
+        #expect(
+            guidance.availabilityLines
+                == [
+                    "Restore active path is available.",
+                    "Rollback active path is available.",
+                    "Approve review queue is available."
+                ]
+        )
+    }
+
+    @Test
+    func localMutationSurfaceBuildsMixedFurnaceWorkbenchAvailabilityForQuickActions() throws {
+        let snapshot = DecisionEvolutionPilotControlSnapshot.build(
+            controlSurface: makeControlSurface(
+                active: makeCheckpoint(
+                    checkpointID: "active-furnace-mixed",
+                    createdAt: Date(timeIntervalSince1970: 10),
+                    approvalState: .automatic,
+                    hasLineage: true
+                )
+            ),
+            releaseSummary: makeReleaseSummary(
+                headline: "Furnace quick actions should explain mixed readiness.",
+                reasons: [
+                    "L13 governance • candidates 1 • shadow 1 pending/1 • seal 0 ready/0 • version 0 • retract 0 ready/0 • gate hold"
+                ],
+                pendingReviewCount: 0,
+                canRestoreActiveCheckpoint: true,
+                canRollbackActiveCheckpoint: false,
+                activeCheckpointID: "active-furnace-mixed",
+                activeCheckpointSource: .pinnedHint
+            ),
+            surfaceContract: .controlCenter,
+            navigationOptions: DecisionEvolutionSurfaceContract.controlCenter.navigationSurfaceOptions()
+        )
+
+        let guidance = try #require(snapshot.furnaceWorkbenchGuidance)
+        #expect(guidance.focusTarget == .quickActions)
+        #expect(guidance.runNowActionTitle == DecisionEvolutionPilotControlPresentationSupport.restoreActiveTitle)
+        #expect(guidance.runNowIntent?.kind == .restoreActiveCheckpoint)
+        #expect(guidance.availabilityTitle == "Ready now")
+        #expect(
+            guidance.availabilityLines
+                == [
+                    "Restore active path is available.",
+                    "Rollback active path is waiting for a restorable previous checkpoint.",
+                    "Approve review queue is waiting for pending review checkpoints."
+                ]
+        )
+    }
+
+    @Test
+    func localMutationSurfaceBuildsBlockedFurnaceWorkbenchAvailabilityForQuickActions() throws {
+        let snapshot = DecisionEvolutionPilotControlSnapshot.build(
+            controlSurface: makeControlSurface(),
+            releaseSummary: makeReleaseSummary(
+                headline: "Furnace quick actions are fully blocked.",
+                reasons: [
+                    "L13 governance • candidates 1 • shadow 1 pending/1 • seal 0 ready/0 • version 0 • retract 0 ready/0 • gate hold"
+                ],
+                pendingReviewCount: 0,
+                canRestoreActiveCheckpoint: false
+            ),
+            surfaceContract: .controlCenter,
+            navigationOptions: DecisionEvolutionSurfaceContract.controlCenter.navigationSurfaceOptions()
+        )
+
+        let guidance = try #require(snapshot.furnaceWorkbenchGuidance)
+        #expect(guidance.focusTarget == .quickActions)
+        #expect(guidance.runNowActionTitle == nil)
+        #expect(guidance.runNowIntent == nil)
+        #expect(guidance.availabilityTitle == "Blocked")
+        #expect(
+            guidance.availabilityLines
+                == [
+                    "Restore active path is waiting for an active checkpoint.",
+                    "Rollback active path is waiting for an active checkpoint.",
+                    "Approve review queue is waiting for pending review checkpoints."
+                ]
+        )
+    }
+
+    @Test
+    func localMutationSurfaceBuildsBlockedFurnaceWorkbenchAvailabilityForQueueLineage() throws {
+        let snapshot = DecisionEvolutionPilotControlSnapshot.build(
+            controlSurface: makeControlSurface(
+                active: makeCheckpoint(
+                    checkpointID: "active-furnace-lineage-blocked",
+                    createdAt: Date(timeIntervalSince1970: 10),
+                    approvalState: .automatic,
+                    hasLineage: true
+                )
+            ),
+            releaseSummary: makeReleaseSummary(
+                headline: "Furnace lineage cleanup is blocked.",
+                reasons: [
+                    "L13 retraction • pending rule.pending • reason evolution.shadow_trial_pending"
+                ],
+                pendingReviewCount: 0,
+                canRestoreActiveCheckpoint: true,
+                activeCheckpointID: "active-furnace-lineage-blocked",
+                activeCheckpointSource: .pinnedHint
+            ),
+            surfaceContract: .controlCenter,
+            navigationOptions: DecisionEvolutionSurfaceContract.controlCenter.navigationSurfaceOptions()
+        )
+
+        let guidance = try #require(snapshot.furnaceWorkbenchGuidance)
+        #expect(guidance.focusTarget == .queueLineage)
+        #expect(guidance.runNowActionTitle == nil)
+        #expect(guidance.runNowIntent == nil)
+        #expect(guidance.availabilityTitle == "Blocked")
+        #expect(
+            guidance.availabilityLines
+                == [
+                    "Clear queue lineage is waiting for lineage-backed review checkpoints."
+                ]
+        )
     }
 
     @Test

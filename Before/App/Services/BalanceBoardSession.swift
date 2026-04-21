@@ -81,7 +81,7 @@ final class BalanceBoardSession: ObservableObject, Identifiable {
         )
 
         let base = DecisionIntelligenceCoordinator.balanceResult(for: input, preferences: preferences)
-        let shouldProtectBeforePublishing = eBrainTurn?.actionPermit.mode.isProtective == true
+        let shouldProtectBeforePublishing = eBrainTurn?.hasProtectiveSurfaceGuidance == true
         let shouldRefine = preferences.onDeviceIntelligenceMode.isEnabled || shouldProtectBeforePublishing
         guard shouldRefine else {
             result = base

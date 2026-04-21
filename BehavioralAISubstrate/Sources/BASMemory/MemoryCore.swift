@@ -938,7 +938,7 @@ public enum BASEvolutionApprovalState: String, CaseIterable, Codable, Sendable {
 }
 
 public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.3.0"
+    public static let currentSchemaVersion = "1.6.0"
 
     public struct PrecisionRecord: Codable, Equatable, Sendable {
         public let organID: String
@@ -953,12 +953,43 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
         }
     }
 
+    public struct OrganPackageRecord: Codable, Equatable, Sendable {
+        public let packageID: String
+        public let organID: String
+        public let sizeMB: Int
+        public let precisionOptionIDs: [String]
+        public let loadTimeMs: Int
+        public let thermalCost: Int
+        public let sovereignClass: String
+
+        public init(
+            packageID: String,
+            organID: String,
+            sizeMB: Int,
+            precisionOptionIDs: [String] = [],
+            loadTimeMs: Int,
+            thermalCost: Int,
+            sovereignClass: String
+        ) {
+            self.packageID = packageID.trimmingCharacters(in: .whitespacesAndNewlines)
+            self.organID = organID.trimmingCharacters(in: .whitespacesAndNewlines)
+            self.sizeMB = max(0, sizeMB)
+            self.precisionOptionIDs = precisionOptionIDs
+            self.loadTimeMs = max(0, loadTimeMs)
+            self.thermalCost = max(0, thermalCost)
+            self.sovereignClass = sovereignClass.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
     public let schemaVersion: String
     public let morphGraphID: String?
     public let hotColdMapID: String?
     public let precisionProfileID: String?
     public let lungStateRef: String?
     public let breathSchedulerID: String?
+    public let thermalExchangeID: String?
+    public let integrityWeaveID: String?
+    public let organDeltaPlanID: String?
     public let breathMode: String
     public let breathPhase: String
     public let thermalPressure: Int
@@ -993,6 +1024,15 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
     public let hotOrganIDs: [String]
     public let warmOrganIDs: [String]
     public let coldOrganIDs: [String]
+    public let organPackageRecords: [OrganPackageRecord]
+    public let organDeltaMode: String?
+    public let organDeltaActivatePackageIDs: [String]
+    public let organDeltaPreloadPackageIDs: [String]
+    public let organDeltaEvictPackageIDs: [String]
+    public let organDeltaRetainPackageIDs: [String]
+    public let organDeltaRollbackSafePackageIDs: [String]
+    public let organDeltaTriggeredActuationKinds: [String]
+    public let organDeltaReasonCodes: [String]
     public let hotColdPreloadPolicy: String?
     public let hotColdEvictionPolicy: String?
     public let schedulerCadenceTag: String?
@@ -1003,6 +1043,21 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
     public let schedulerAllowsMicroSleep: Bool?
     public let schedulerResumeBudgetClass: String?
     public let schedulerReasonCodes: [String]
+    public let thermalExchangeMode: String?
+    public let thermalPredictedBand: String?
+    public let thermalCoolingActions: [String]
+    public let thermalSuppressedOrganIDs: [String]
+    public let thermalReroutedOrganIDs: [String]
+    public let thermalRerouteTargets: [String: String]
+    public let thermalPrecisionDowngradeRecords: [PrecisionRecord]
+    public let thermalExchangeReasonCodes: [String]
+    public let integrityRequiredChecks: [String]
+    public let integrityCompletedChecks: [String]
+    public let integrityFailedChecks: [String]
+    public let integrityPurityState: String?
+    public let integrityContaminationRefs: [String]
+    public let integrityTrustedSnapshotRef: String?
+    public let integrityVerificationHash: String?
     public let precisionOrganPrecisionRecords: [PrecisionRecord]
     public let precisionLockedOrganIDs: [String]
     public let precisionDegradationOrder: [String]
@@ -1015,6 +1070,9 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
         precisionProfileID: String? = nil,
         lungStateRef: String? = nil,
         breathSchedulerID: String? = nil,
+        thermalExchangeID: String? = nil,
+        integrityWeaveID: String? = nil,
+        organDeltaPlanID: String? = nil,
         breathMode: String,
         breathPhase: String,
         thermalPressure: Int,
@@ -1049,6 +1107,15 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
         hotOrganIDs: [String] = [],
         warmOrganIDs: [String] = [],
         coldOrganIDs: [String] = [],
+        organPackageRecords: [OrganPackageRecord] = [],
+        organDeltaMode: String? = nil,
+        organDeltaActivatePackageIDs: [String] = [],
+        organDeltaPreloadPackageIDs: [String] = [],
+        organDeltaEvictPackageIDs: [String] = [],
+        organDeltaRetainPackageIDs: [String] = [],
+        organDeltaRollbackSafePackageIDs: [String] = [],
+        organDeltaTriggeredActuationKinds: [String] = [],
+        organDeltaReasonCodes: [String] = [],
         hotColdPreloadPolicy: String? = nil,
         hotColdEvictionPolicy: String? = nil,
         schedulerCadenceTag: String? = nil,
@@ -1059,6 +1126,21 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
         schedulerAllowsMicroSleep: Bool? = nil,
         schedulerResumeBudgetClass: String? = nil,
         schedulerReasonCodes: [String] = [],
+        thermalExchangeMode: String? = nil,
+        thermalPredictedBand: String? = nil,
+        thermalCoolingActions: [String] = [],
+        thermalSuppressedOrganIDs: [String] = [],
+        thermalReroutedOrganIDs: [String] = [],
+        thermalRerouteTargets: [String: String] = [:],
+        thermalPrecisionDowngradeRecords: [PrecisionRecord] = [],
+        thermalExchangeReasonCodes: [String] = [],
+        integrityRequiredChecks: [String] = [],
+        integrityCompletedChecks: [String] = [],
+        integrityFailedChecks: [String] = [],
+        integrityPurityState: String? = nil,
+        integrityContaminationRefs: [String] = [],
+        integrityTrustedSnapshotRef: String? = nil,
+        integrityVerificationHash: String? = nil,
         precisionOrganPrecisionRecords: [PrecisionRecord] = [],
         precisionLockedOrganIDs: [String] = [],
         precisionDegradationOrder: [String] = [],
@@ -1070,6 +1152,9 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
         self.precisionProfileID = precisionProfileID?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.lungStateRef = lungStateRef?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.breathSchedulerID = breathSchedulerID?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.thermalExchangeID = thermalExchangeID?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.integrityWeaveID = integrityWeaveID?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.organDeltaPlanID = organDeltaPlanID?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.breathMode = breathMode
         self.breathPhase = breathPhase
         self.thermalPressure = min(max(thermalPressure, 0), 100)
@@ -1104,6 +1189,15 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
         self.hotOrganIDs = hotOrganIDs
         self.warmOrganIDs = warmOrganIDs
         self.coldOrganIDs = coldOrganIDs
+        self.organPackageRecords = organPackageRecords
+        self.organDeltaMode = organDeltaMode?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.organDeltaActivatePackageIDs = organDeltaActivatePackageIDs
+        self.organDeltaPreloadPackageIDs = organDeltaPreloadPackageIDs
+        self.organDeltaEvictPackageIDs = organDeltaEvictPackageIDs
+        self.organDeltaRetainPackageIDs = organDeltaRetainPackageIDs
+        self.organDeltaRollbackSafePackageIDs = organDeltaRollbackSafePackageIDs
+        self.organDeltaTriggeredActuationKinds = organDeltaTriggeredActuationKinds
+        self.organDeltaReasonCodes = organDeltaReasonCodes
         self.hotColdPreloadPolicy = hotColdPreloadPolicy?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.hotColdEvictionPolicy = hotColdEvictionPolicy?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.schedulerCadenceTag = schedulerCadenceTag?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1114,6 +1208,26 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
         self.schedulerAllowsMicroSleep = schedulerAllowsMicroSleep
         self.schedulerResumeBudgetClass = schedulerResumeBudgetClass?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.schedulerReasonCodes = schedulerReasonCodes
+        self.thermalExchangeMode = thermalExchangeMode?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.thermalPredictedBand = thermalPredictedBand?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.thermalCoolingActions = thermalCoolingActions
+        self.thermalSuppressedOrganIDs = thermalSuppressedOrganIDs
+        self.thermalReroutedOrganIDs = thermalReroutedOrganIDs
+        self.thermalRerouteTargets = thermalRerouteTargets.reduce(into: [:]) { result, entry in
+            let key = entry.key.trimmingCharacters(in: .whitespacesAndNewlines)
+            let value = entry.value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard key.isEmpty == false, value.isEmpty == false else { return }
+            result[key] = value
+        }
+        self.thermalPrecisionDowngradeRecords = thermalPrecisionDowngradeRecords
+        self.thermalExchangeReasonCodes = thermalExchangeReasonCodes
+        self.integrityRequiredChecks = integrityRequiredChecks
+        self.integrityCompletedChecks = integrityCompletedChecks
+        self.integrityFailedChecks = integrityFailedChecks
+        self.integrityPurityState = integrityPurityState?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.integrityContaminationRefs = integrityContaminationRefs
+        self.integrityTrustedSnapshotRef = integrityTrustedSnapshotRef?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.integrityVerificationHash = integrityVerificationHash?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.precisionOrganPrecisionRecords = precisionOrganPrecisionRecords
         self.precisionLockedOrganIDs = precisionLockedOrganIDs
         self.precisionDegradationOrder = precisionDegradationOrder
@@ -1127,6 +1241,9 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
         case precisionProfileID
         case lungStateRef
         case breathSchedulerID
+        case thermalExchangeID
+        case integrityWeaveID
+        case organDeltaPlanID
         case breathMode
         case breathPhase
         case thermalPressure
@@ -1161,6 +1278,15 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
         case hotOrganIDs
         case warmOrganIDs
         case coldOrganIDs
+        case organPackageRecords
+        case organDeltaMode
+        case organDeltaActivatePackageIDs
+        case organDeltaPreloadPackageIDs
+        case organDeltaEvictPackageIDs
+        case organDeltaRetainPackageIDs
+        case organDeltaRollbackSafePackageIDs
+        case organDeltaTriggeredActuationKinds
+        case organDeltaReasonCodes
         case hotColdPreloadPolicy
         case hotColdEvictionPolicy
         case schedulerCadenceTag
@@ -1171,6 +1297,21 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
         case schedulerAllowsMicroSleep
         case schedulerResumeBudgetClass
         case schedulerReasonCodes
+        case thermalExchangeMode
+        case thermalPredictedBand
+        case thermalCoolingActions
+        case thermalSuppressedOrganIDs
+        case thermalReroutedOrganIDs
+        case thermalRerouteTargets
+        case thermalPrecisionDowngradeRecords
+        case thermalExchangeReasonCodes
+        case integrityRequiredChecks
+        case integrityCompletedChecks
+        case integrityFailedChecks
+        case integrityPurityState
+        case integrityContaminationRefs
+        case integrityTrustedSnapshotRef
+        case integrityVerificationHash
         case precisionOrganPrecisionRecords
         case precisionLockedOrganIDs
         case precisionDegradationOrder
@@ -1179,79 +1320,217 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        schemaVersion = try container.decodeIfPresent(String.self, forKey: .schemaVersion)
+        let schemaVersion = try container.decodeIfPresent(String.self, forKey: .schemaVersion)
             ?? BASEvolutionFoldedLungSummary.currentSchemaVersion
-        morphGraphID = try container.decodeIfPresent(String.self, forKey: .morphGraphID)
-        hotColdMapID = try container.decodeIfPresent(String.self, forKey: .hotColdMapID)
-        precisionProfileID = try container.decodeIfPresent(String.self, forKey: .precisionProfileID)
-        lungStateRef = try container.decodeIfPresent(String.self, forKey: .lungStateRef)
-        breathSchedulerID = try container.decodeIfPresent(String.self, forKey: .breathSchedulerID)
-        breathMode = try container.decode(String.self, forKey: .breathMode)
-        breathPhase = try container.decode(String.self, forKey: .breathPhase)
-        thermalPressure = min(max(try container.decode(Int.self, forKey: .thermalPressure), 0), 100)
-        cachePressure = min(max(try container.decode(Int.self, forKey: .cachePressure), 0), 100)
-        restoreReadinessPercent = min(max(try container.decode(Int.self, forKey: .restoreReadinessPercent), 0), 100)
-        resumeID = try container.decode(String.self, forKey: .resumeID)
-        sourceFoldID = try container.decode(String.self, forKey: .sourceFoldID)
-        resumeDepth = max(0, try container.decode(Int.self, forKey: .resumeDepth))
-        requiredOrganIDs = try container.decodeIfPresent([String].self, forKey: .requiredOrganIDs) ?? []
-        consistencyChecks = try container.decodeIfPresent([String].self, forKey: .consistencyChecks) ?? []
-        fallbackMode = try container.decode(String.self, forKey: .fallbackMode)
-        rollbackAnchorID = try container.decode(String.self, forKey: .rollbackAnchorID)
-        safeSnapshotRef = try container.decode(String.self, forKey: .safeSnapshotRef)
-        foldRefs = try container.decodeIfPresent([String].self, forKey: .foldRefs) ?? []
-        hostVersionRef = try container.decodeIfPresent(String.self, forKey: .hostVersionRef)
-        cacheStateRef = try container.decodeIfPresent(String.self, forKey: .cacheStateRef)
-        integrityHash = try container.decode(String.self, forKey: .integrityHash)
-        sovereignActuationKinds = try container.decodeIfPresent(
+        let morphGraphID = try container.decodeIfPresent(String.self, forKey: .morphGraphID)
+        let hotColdMapID = try container.decodeIfPresent(String.self, forKey: .hotColdMapID)
+        let precisionProfileID = try container.decodeIfPresent(String.self, forKey: .precisionProfileID)
+        let lungStateRef = try container.decodeIfPresent(String.self, forKey: .lungStateRef)
+        let breathSchedulerID = try container.decodeIfPresent(String.self, forKey: .breathSchedulerID)
+        let thermalExchangeID = try container.decodeIfPresent(String.self, forKey: .thermalExchangeID)
+        let integrityWeaveID = try container.decodeIfPresent(String.self, forKey: .integrityWeaveID)
+        let organDeltaPlanID = try container.decodeIfPresent(String.self, forKey: .organDeltaPlanID)
+        let breathMode = try container.decode(String.self, forKey: .breathMode)
+        let breathPhase = try container.decode(String.self, forKey: .breathPhase)
+        let thermalPressure = min(max(try container.decode(Int.self, forKey: .thermalPressure), 0), 100)
+        let cachePressure = min(max(try container.decode(Int.self, forKey: .cachePressure), 0), 100)
+        let restoreReadinessPercent = min(max(try container.decode(Int.self, forKey: .restoreReadinessPercent), 0), 100)
+        let resumeID = try container.decode(String.self, forKey: .resumeID)
+        let sourceFoldID = try container.decode(String.self, forKey: .sourceFoldID)
+        let resumeDepth = max(0, try container.decode(Int.self, forKey: .resumeDepth))
+        let requiredOrganIDs = try container.decodeIfPresent([String].self, forKey: .requiredOrganIDs) ?? []
+        let consistencyChecks = try container.decodeIfPresent([String].self, forKey: .consistencyChecks) ?? []
+        let fallbackMode = try container.decode(String.self, forKey: .fallbackMode)
+        let rollbackAnchorID = try container.decode(String.self, forKey: .rollbackAnchorID)
+        let safeSnapshotRef = try container.decode(String.self, forKey: .safeSnapshotRef)
+        let foldRefs = try container.decodeIfPresent([String].self, forKey: .foldRefs) ?? []
+        let hostVersionRef = try container.decodeIfPresent(String.self, forKey: .hostVersionRef)
+        let cacheStateRef = try container.decodeIfPresent(String.self, forKey: .cacheStateRef)
+        let integrityHash = try container.decode(String.self, forKey: .integrityHash)
+        let sovereignActuationKinds = try container.decodeIfPresent(
             [BASSovereignActuationKind].self,
             forKey: .sovereignActuationKinds
         ) ?? []
-        invalidatedResumeFrameIDs = try container.decodeIfPresent(
+        let invalidatedResumeFrameIDs = try container.decodeIfPresent(
             [String].self,
             forKey: .invalidatedResumeFrameIDs
         ) ?? []
-        invalidatedCacheRefs = try container.decodeIfPresent(
+        let invalidatedCacheRefs = try container.decodeIfPresent(
             [String].self,
             forKey: .invalidatedCacheRefs
         ) ?? []
-        invalidatedFoldRefs = try container.decodeIfPresent(
+        let invalidatedFoldRefs = try container.decodeIfPresent(
             [String].self,
             forKey: .invalidatedFoldRefs
         ) ?? []
-        quarantinedFoldRefs = try container.decodeIfPresent(
+        let quarantinedFoldRefs = try container.decodeIfPresent(
             [String].self,
             forKey: .quarantinedFoldRefs
         ) ?? []
-        resultingBreathMode = try container.decodeIfPresent(String.self, forKey: .resultingBreathMode)
-        preservedReadOnlyRecovery = try container.decodeIfPresent(Bool.self, forKey: .preservedReadOnlyRecovery)
-        sovereignBridgeSummary = try container.decodeIfPresent(String.self, forKey: .sovereignBridgeSummary)
-        morphActiveOrganIDs = try container.decodeIfPresent([String].self, forKey: .morphActiveOrganIDs) ?? []
-        morphExecutionOrder = try container.decodeIfPresent([String].self, forKey: .morphExecutionOrder) ?? []
-        morphPrecisionRecords = try container.decodeIfPresent([PrecisionRecord].self, forKey: .morphPrecisionRecords) ?? []
-        morphDeviceRouteMap = try container.decodeIfPresent([String: String].self, forKey: .morphDeviceRouteMap) ?? [:]
-        morphThermalProfile = try container.decodeIfPresent([String].self, forKey: .morphThermalProfile) ?? []
-        morphSovereignConstraints = try container.decodeIfPresent([String].self, forKey: .morphSovereignConstraints) ?? []
-        hotOrganIDs = try container.decodeIfPresent([String].self, forKey: .hotOrganIDs) ?? []
-        warmOrganIDs = try container.decodeIfPresent([String].self, forKey: .warmOrganIDs) ?? []
-        coldOrganIDs = try container.decodeIfPresent([String].self, forKey: .coldOrganIDs) ?? []
-        hotColdPreloadPolicy = try container.decodeIfPresent(String.self, forKey: .hotColdPreloadPolicy)
-        hotColdEvictionPolicy = try container.decodeIfPresent(String.self, forKey: .hotColdEvictionPolicy)
-        schedulerCadenceTag = try container.decodeIfPresent(String.self, forKey: .schedulerCadenceTag)
-        schedulerCheckpointCadence = try container.decodeIfPresent(String.self, forKey: .schedulerCheckpointCadence)
-        schedulerMicroSleepWindowMs = try container.decodeIfPresent(Int.self, forKey: .schedulerMicroSleepWindowMs).map { max(0, $0) }
-        schedulerBackgroundMaintenanceWindowMs = try container.decodeIfPresent(Int.self, forKey: .schedulerBackgroundMaintenanceWindowMs).map { max(0, $0) }
-        schedulerAllowsBackgroundMaintenance = try container.decodeIfPresent(Bool.self, forKey: .schedulerAllowsBackgroundMaintenance)
-        schedulerAllowsMicroSleep = try container.decodeIfPresent(Bool.self, forKey: .schedulerAllowsMicroSleep)
-        schedulerResumeBudgetClass = try container.decodeIfPresent(String.self, forKey: .schedulerResumeBudgetClass)
-        schedulerReasonCodes = try container.decodeIfPresent([String].self, forKey: .schedulerReasonCodes) ?? []
-        precisionOrganPrecisionRecords = try container.decodeIfPresent(
+        let resultingBreathMode = try container.decodeIfPresent(String.self, forKey: .resultingBreathMode)
+        let preservedReadOnlyRecovery = try container.decodeIfPresent(Bool.self, forKey: .preservedReadOnlyRecovery)
+        let sovereignBridgeSummary = try container.decodeIfPresent(String.self, forKey: .sovereignBridgeSummary)
+        let morphActiveOrganIDs = try container.decodeIfPresent([String].self, forKey: .morphActiveOrganIDs) ?? []
+        let morphExecutionOrder = try container.decodeIfPresent([String].self, forKey: .morphExecutionOrder) ?? []
+        let morphPrecisionRecords = try container.decodeIfPresent([PrecisionRecord].self, forKey: .morphPrecisionRecords) ?? []
+        let morphDeviceRouteMap = try container.decodeIfPresent([String: String].self, forKey: .morphDeviceRouteMap) ?? [:]
+        let morphThermalProfile = try container.decodeIfPresent([String].self, forKey: .morphThermalProfile) ?? []
+        let morphSovereignConstraints = try container.decodeIfPresent([String].self, forKey: .morphSovereignConstraints) ?? []
+        let hotOrganIDs = try container.decodeIfPresent([String].self, forKey: .hotOrganIDs) ?? []
+        let warmOrganIDs = try container.decodeIfPresent([String].self, forKey: .warmOrganIDs) ?? []
+        let coldOrganIDs = try container.decodeIfPresent([String].self, forKey: .coldOrganIDs) ?? []
+        let organPackageRecords = try container.decodeIfPresent(
+            [OrganPackageRecord].self,
+            forKey: .organPackageRecords
+        ) ?? []
+        let organDeltaMode = try container.decodeIfPresent(String.self, forKey: .organDeltaMode)
+        let organDeltaActivatePackageIDs = try container.decodeIfPresent(
+            [String].self,
+            forKey: .organDeltaActivatePackageIDs
+        ) ?? []
+        let organDeltaPreloadPackageIDs = try container.decodeIfPresent(
+            [String].self,
+            forKey: .organDeltaPreloadPackageIDs
+        ) ?? []
+        let organDeltaEvictPackageIDs = try container.decodeIfPresent(
+            [String].self,
+            forKey: .organDeltaEvictPackageIDs
+        ) ?? []
+        let organDeltaRetainPackageIDs = try container.decodeIfPresent(
+            [String].self,
+            forKey: .organDeltaRetainPackageIDs
+        ) ?? []
+        let organDeltaRollbackSafePackageIDs = try container.decodeIfPresent(
+            [String].self,
+            forKey: .organDeltaRollbackSafePackageIDs
+        ) ?? []
+        let organDeltaTriggeredActuationKinds = try container.decodeIfPresent(
+            [String].self,
+            forKey: .organDeltaTriggeredActuationKinds
+        ) ?? []
+        let organDeltaReasonCodes = try container.decodeIfPresent(
+            [String].self,
+            forKey: .organDeltaReasonCodes
+        ) ?? []
+        let hotColdPreloadPolicy = try container.decodeIfPresent(String.self, forKey: .hotColdPreloadPolicy)
+        let hotColdEvictionPolicy = try container.decodeIfPresent(String.self, forKey: .hotColdEvictionPolicy)
+        let schedulerCadenceTag = try container.decodeIfPresent(String.self, forKey: .schedulerCadenceTag)
+        let schedulerCheckpointCadence = try container.decodeIfPresent(String.self, forKey: .schedulerCheckpointCadence)
+        let schedulerMicroSleepWindowMs = try container.decodeIfPresent(Int.self, forKey: .schedulerMicroSleepWindowMs).map { max(0, $0) }
+        let schedulerBackgroundMaintenanceWindowMs = try container.decodeIfPresent(Int.self, forKey: .schedulerBackgroundMaintenanceWindowMs).map { max(0, $0) }
+        let schedulerAllowsBackgroundMaintenance = try container.decodeIfPresent(Bool.self, forKey: .schedulerAllowsBackgroundMaintenance)
+        let schedulerAllowsMicroSleep = try container.decodeIfPresent(Bool.self, forKey: .schedulerAllowsMicroSleep)
+        let schedulerResumeBudgetClass = try container.decodeIfPresent(String.self, forKey: .schedulerResumeBudgetClass)
+        let schedulerReasonCodes = try container.decodeIfPresent([String].self, forKey: .schedulerReasonCodes) ?? []
+        let thermalExchangeMode = try container.decodeIfPresent(String.self, forKey: .thermalExchangeMode)
+        let thermalPredictedBand = try container.decodeIfPresent(String.self, forKey: .thermalPredictedBand)
+        let thermalCoolingActions = try container.decodeIfPresent([String].self, forKey: .thermalCoolingActions) ?? []
+        let thermalSuppressedOrganIDs = try container.decodeIfPresent([String].self, forKey: .thermalSuppressedOrganIDs) ?? []
+        let thermalReroutedOrganIDs = try container.decodeIfPresent([String].self, forKey: .thermalReroutedOrganIDs) ?? []
+        let thermalRerouteTargets = try container.decodeIfPresent([String: String].self, forKey: .thermalRerouteTargets) ?? [:]
+        let thermalPrecisionDowngradeRecords = try container.decodeIfPresent(
+            [PrecisionRecord].self,
+            forKey: .thermalPrecisionDowngradeRecords
+        ) ?? []
+        let thermalExchangeReasonCodes = try container.decodeIfPresent([String].self, forKey: .thermalExchangeReasonCodes) ?? []
+        let integrityRequiredChecks = try container.decodeIfPresent([String].self, forKey: .integrityRequiredChecks) ?? []
+        let integrityCompletedChecks = try container.decodeIfPresent([String].self, forKey: .integrityCompletedChecks) ?? []
+        let integrityFailedChecks = try container.decodeIfPresent([String].self, forKey: .integrityFailedChecks) ?? []
+        let integrityPurityState = try container.decodeIfPresent(String.self, forKey: .integrityPurityState)
+        let integrityContaminationRefs = try container.decodeIfPresent([String].self, forKey: .integrityContaminationRefs) ?? []
+        let integrityTrustedSnapshotRef = try container.decodeIfPresent(String.self, forKey: .integrityTrustedSnapshotRef)
+        let integrityVerificationHash = try container.decodeIfPresent(String.self, forKey: .integrityVerificationHash)
+        let precisionOrganPrecisionRecords = try container.decodeIfPresent(
             [PrecisionRecord].self,
             forKey: .precisionOrganPrecisionRecords
         ) ?? []
-        precisionLockedOrganIDs = try container.decodeIfPresent([String].self, forKey: .precisionLockedOrganIDs) ?? []
-        precisionDegradationOrder = try container.decodeIfPresent([String].self, forKey: .precisionDegradationOrder) ?? []
-        precisionGuardSafeFloorID = try container.decodeIfPresent(String.self, forKey: .precisionGuardSafeFloorID)
+        let precisionLockedOrganIDs = try container.decodeIfPresent([String].self, forKey: .precisionLockedOrganIDs) ?? []
+        let precisionDegradationOrder = try container.decodeIfPresent([String].self, forKey: .precisionDegradationOrder) ?? []
+        let precisionGuardSafeFloorID = try container.decodeIfPresent(String.self, forKey: .precisionGuardSafeFloorID)
+
+        self.init(
+            schemaVersion: schemaVersion,
+            morphGraphID: morphGraphID,
+            hotColdMapID: hotColdMapID,
+            precisionProfileID: precisionProfileID,
+            lungStateRef: lungStateRef,
+            breathSchedulerID: breathSchedulerID,
+            thermalExchangeID: thermalExchangeID,
+            integrityWeaveID: integrityWeaveID,
+            organDeltaPlanID: organDeltaPlanID,
+            breathMode: breathMode,
+            breathPhase: breathPhase,
+            thermalPressure: thermalPressure,
+            cachePressure: cachePressure,
+            restoreReadinessPercent: restoreReadinessPercent,
+            resumeID: resumeID,
+            sourceFoldID: sourceFoldID,
+            resumeDepth: resumeDepth,
+            requiredOrganIDs: requiredOrganIDs,
+            consistencyChecks: consistencyChecks,
+            fallbackMode: fallbackMode,
+            rollbackAnchorID: rollbackAnchorID,
+            safeSnapshotRef: safeSnapshotRef,
+            foldRefs: foldRefs,
+            hostVersionRef: hostVersionRef,
+            cacheStateRef: cacheStateRef,
+            integrityHash: integrityHash,
+            sovereignActuationKinds: sovereignActuationKinds,
+            invalidatedResumeFrameIDs: invalidatedResumeFrameIDs,
+            invalidatedCacheRefs: invalidatedCacheRefs,
+            invalidatedFoldRefs: invalidatedFoldRefs,
+            quarantinedFoldRefs: quarantinedFoldRefs,
+            resultingBreathMode: resultingBreathMode,
+            preservedReadOnlyRecovery: preservedReadOnlyRecovery,
+            sovereignBridgeSummary: sovereignBridgeSummary,
+            morphActiveOrganIDs: morphActiveOrganIDs,
+            morphExecutionOrder: morphExecutionOrder,
+            morphPrecisionRecords: morphPrecisionRecords,
+            morphDeviceRouteMap: morphDeviceRouteMap,
+            morphThermalProfile: morphThermalProfile,
+            morphSovereignConstraints: morphSovereignConstraints,
+            hotOrganIDs: hotOrganIDs,
+            warmOrganIDs: warmOrganIDs,
+            coldOrganIDs: coldOrganIDs,
+            organPackageRecords: organPackageRecords,
+            organDeltaMode: organDeltaMode,
+            organDeltaActivatePackageIDs: organDeltaActivatePackageIDs,
+            organDeltaPreloadPackageIDs: organDeltaPreloadPackageIDs,
+            organDeltaEvictPackageIDs: organDeltaEvictPackageIDs,
+            organDeltaRetainPackageIDs: organDeltaRetainPackageIDs,
+            organDeltaRollbackSafePackageIDs: organDeltaRollbackSafePackageIDs,
+            organDeltaTriggeredActuationKinds: organDeltaTriggeredActuationKinds,
+            organDeltaReasonCodes: organDeltaReasonCodes,
+            hotColdPreloadPolicy: hotColdPreloadPolicy,
+            hotColdEvictionPolicy: hotColdEvictionPolicy,
+            schedulerCadenceTag: schedulerCadenceTag,
+            schedulerCheckpointCadence: schedulerCheckpointCadence,
+            schedulerMicroSleepWindowMs: schedulerMicroSleepWindowMs,
+            schedulerBackgroundMaintenanceWindowMs: schedulerBackgroundMaintenanceWindowMs,
+            schedulerAllowsBackgroundMaintenance: schedulerAllowsBackgroundMaintenance,
+            schedulerAllowsMicroSleep: schedulerAllowsMicroSleep,
+            schedulerResumeBudgetClass: schedulerResumeBudgetClass,
+            schedulerReasonCodes: schedulerReasonCodes,
+            thermalExchangeMode: thermalExchangeMode,
+            thermalPredictedBand: thermalPredictedBand,
+            thermalCoolingActions: thermalCoolingActions,
+            thermalSuppressedOrganIDs: thermalSuppressedOrganIDs,
+            thermalReroutedOrganIDs: thermalReroutedOrganIDs,
+            thermalRerouteTargets: thermalRerouteTargets,
+            thermalPrecisionDowngradeRecords: thermalPrecisionDowngradeRecords,
+            thermalExchangeReasonCodes: thermalExchangeReasonCodes,
+            integrityRequiredChecks: integrityRequiredChecks,
+            integrityCompletedChecks: integrityCompletedChecks,
+            integrityFailedChecks: integrityFailedChecks,
+            integrityPurityState: integrityPurityState,
+            integrityContaminationRefs: integrityContaminationRefs,
+            integrityTrustedSnapshotRef: integrityTrustedSnapshotRef,
+            integrityVerificationHash: integrityVerificationHash,
+            precisionOrganPrecisionRecords: precisionOrganPrecisionRecords,
+            precisionLockedOrganIDs: precisionLockedOrganIDs,
+            precisionDegradationOrder: precisionDegradationOrder,
+            precisionGuardSafeFloorID: precisionGuardSafeFloorID
+        )
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -1262,6 +1541,9 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
         try container.encodeIfPresent(precisionProfileID, forKey: .precisionProfileID)
         try container.encodeIfPresent(lungStateRef, forKey: .lungStateRef)
         try container.encodeIfPresent(breathSchedulerID, forKey: .breathSchedulerID)
+        try container.encodeIfPresent(thermalExchangeID, forKey: .thermalExchangeID)
+        try container.encodeIfPresent(integrityWeaveID, forKey: .integrityWeaveID)
+        try container.encodeIfPresent(organDeltaPlanID, forKey: .organDeltaPlanID)
         try container.encode(breathMode, forKey: .breathMode)
         try container.encode(breathPhase, forKey: .breathPhase)
         try container.encode(thermalPressure, forKey: .thermalPressure)
@@ -1296,6 +1578,15 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
         try container.encode(hotOrganIDs, forKey: .hotOrganIDs)
         try container.encode(warmOrganIDs, forKey: .warmOrganIDs)
         try container.encode(coldOrganIDs, forKey: .coldOrganIDs)
+        try container.encode(organPackageRecords, forKey: .organPackageRecords)
+        try container.encodeIfPresent(organDeltaMode, forKey: .organDeltaMode)
+        try container.encode(organDeltaActivatePackageIDs, forKey: .organDeltaActivatePackageIDs)
+        try container.encode(organDeltaPreloadPackageIDs, forKey: .organDeltaPreloadPackageIDs)
+        try container.encode(organDeltaEvictPackageIDs, forKey: .organDeltaEvictPackageIDs)
+        try container.encode(organDeltaRetainPackageIDs, forKey: .organDeltaRetainPackageIDs)
+        try container.encode(organDeltaRollbackSafePackageIDs, forKey: .organDeltaRollbackSafePackageIDs)
+        try container.encode(organDeltaTriggeredActuationKinds, forKey: .organDeltaTriggeredActuationKinds)
+        try container.encode(organDeltaReasonCodes, forKey: .organDeltaReasonCodes)
         try container.encodeIfPresent(hotColdPreloadPolicy, forKey: .hotColdPreloadPolicy)
         try container.encodeIfPresent(hotColdEvictionPolicy, forKey: .hotColdEvictionPolicy)
         try container.encodeIfPresent(schedulerCadenceTag, forKey: .schedulerCadenceTag)
@@ -1306,6 +1597,21 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
         try container.encodeIfPresent(schedulerAllowsMicroSleep, forKey: .schedulerAllowsMicroSleep)
         try container.encodeIfPresent(schedulerResumeBudgetClass, forKey: .schedulerResumeBudgetClass)
         try container.encode(schedulerReasonCodes, forKey: .schedulerReasonCodes)
+        try container.encodeIfPresent(thermalExchangeMode, forKey: .thermalExchangeMode)
+        try container.encodeIfPresent(thermalPredictedBand, forKey: .thermalPredictedBand)
+        try container.encode(thermalCoolingActions, forKey: .thermalCoolingActions)
+        try container.encode(thermalSuppressedOrganIDs, forKey: .thermalSuppressedOrganIDs)
+        try container.encode(thermalReroutedOrganIDs, forKey: .thermalReroutedOrganIDs)
+        try container.encode(thermalRerouteTargets, forKey: .thermalRerouteTargets)
+        try container.encode(thermalPrecisionDowngradeRecords, forKey: .thermalPrecisionDowngradeRecords)
+        try container.encode(thermalExchangeReasonCodes, forKey: .thermalExchangeReasonCodes)
+        try container.encode(integrityRequiredChecks, forKey: .integrityRequiredChecks)
+        try container.encode(integrityCompletedChecks, forKey: .integrityCompletedChecks)
+        try container.encode(integrityFailedChecks, forKey: .integrityFailedChecks)
+        try container.encodeIfPresent(integrityPurityState, forKey: .integrityPurityState)
+        try container.encode(integrityContaminationRefs, forKey: .integrityContaminationRefs)
+        try container.encodeIfPresent(integrityTrustedSnapshotRef, forKey: .integrityTrustedSnapshotRef)
+        try container.encodeIfPresent(integrityVerificationHash, forKey: .integrityVerificationHash)
         try container.encode(precisionOrganPrecisionRecords, forKey: .precisionOrganPrecisionRecords)
         try container.encode(precisionLockedOrganIDs, forKey: .precisionLockedOrganIDs)
         try container.encode(precisionDegradationOrder, forKey: .precisionDegradationOrder)
@@ -1314,7 +1620,7 @@ public struct BASEvolutionFoldedLungSummary: Codable, Equatable, Sendable, BASSc
 }
 
 public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.10.0"
+    public static let currentSchemaVersion = "1.14.0"
 
     public struct ContextSummary: Codable, Equatable, Sendable {
         public let emotionalLoadPercent: Int
@@ -1323,6 +1629,14 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
         public let ambiguityPercent: Int
         public let consequencePercent: Int
         public let manipulationHintCount: Int
+        public let sceneType: String?
+        public let roleRelationClass: String?
+        public let powerDirection: String?
+        public let powerStrengthPercent: Int?
+        public let urgencyPercent: Int?
+        public let routeMode: String?
+        public let guardRequired: Bool?
+        public let continuityArc: String?
 
         public init(
             emotionalLoadPercent: Int,
@@ -1330,7 +1644,15 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
             relationPattern: String,
             ambiguityPercent: Int,
             consequencePercent: Int,
-            manipulationHintCount: Int
+            manipulationHintCount: Int,
+            sceneType: String? = nil,
+            roleRelationClass: String? = nil,
+            powerDirection: String? = nil,
+            powerStrengthPercent: Int? = nil,
+            urgencyPercent: Int? = nil,
+            routeMode: String? = nil,
+            guardRequired: Bool? = nil,
+            continuityArc: String? = nil
         ) {
             self.emotionalLoadPercent = emotionalLoadPercent
             self.timePressurePercent = timePressurePercent
@@ -1338,14 +1660,28 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
             self.ambiguityPercent = ambiguityPercent
             self.consequencePercent = consequencePercent
             self.manipulationHintCount = manipulationHintCount
+            self.sceneType = sceneType
+            self.roleRelationClass = roleRelationClass
+            self.powerDirection = powerDirection
+            self.powerStrengthPercent = powerStrengthPercent
+            self.urgencyPercent = urgencyPercent
+            self.routeMode = routeMode
+            self.guardRequired = guardRequired
+            self.continuityArc = continuityArc
         }
     }
 
     public struct CognitionSummary: Codable, Equatable, Sendable {
         public let factCount: Int
         public let goalCount: Int
+        public let claimCount: Int?
         public let unknownCount: Int
         public let contradictionCount: Int
+        public let pressureSummary: String?
+        public let manipulationSummary: String?
+        public let boundarySummary: String?
+        public let mirrorModeID: String?
+        public let routeHint: String?
         public let memoryAtomCount: Int
         public let candidateCount: Int
         public let forecastCount: Int
@@ -1355,8 +1691,14 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
         public init(
             factCount: Int,
             goalCount: Int,
+            claimCount: Int? = nil,
             unknownCount: Int,
             contradictionCount: Int,
+            pressureSummary: String? = nil,
+            manipulationSummary: String? = nil,
+            boundarySummary: String? = nil,
+            mirrorModeID: String? = nil,
+            routeHint: String? = nil,
             memoryAtomCount: Int,
             candidateCount: Int,
             forecastCount: Int,
@@ -1365,8 +1707,14 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
         ) {
             self.factCount = factCount
             self.goalCount = goalCount
+            self.claimCount = claimCount
             self.unknownCount = unknownCount
             self.contradictionCount = contradictionCount
+            self.pressureSummary = pressureSummary
+            self.manipulationSummary = manipulationSummary
+            self.boundarySummary = boundarySummary
+            self.mirrorModeID = mirrorModeID
+            self.routeHint = routeHint
             self.memoryAtomCount = memoryAtomCount
             self.candidateCount = candidateCount
             self.forecastCount = forecastCount
@@ -1397,6 +1745,182 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
         }
     }
 
+    public struct GovernanceSummary: Codable, Equatable, Sendable {
+        public let experienceCandidateCount: Int
+        public let experienceCandidateTypeCounts: [String: Int]
+        public let workflowCandidateCount: Int
+        public let guardTemplateCandidateCount: Int
+        public let biasRecordCount: Int
+        public let riskPatternCandidateCount: Int
+        public let learningExportBundleCount: Int
+        public let pendingNurseryCandidateCount: Int
+        public let passedShadowTrialCount: Int
+        public let failedShadowTrialCount: Int
+        public let shadowTrialCount: Int
+        public let pendingShadowTrialCount: Int
+        public let sealCount: Int
+        public let deniedSealCount: Int
+        public let pendingSealCount: Int
+        public let versionDeltaCount: Int
+        public let versionDeltaHighlights: [String]
+        public let retractionOrderCount: Int
+        public let retractionOrderHighlights: [String]
+        public let pendingRetractionCount: Int
+        public let blockedPromotionReasonCodes: [String]
+        public let dreamLoopStoppingMode: String?
+        public let dreamLoopSignalRefs: [String]
+        public let dreamLoopRemandTargets: [String]
+        public let dreamLoopReservationMode: String?
+        public let dreamLoopMaxEvidenceDebtPercent: Int?
+
+        public init(
+            experienceCandidateCount: Int,
+            experienceCandidateTypeCounts: [String: Int] = [:],
+            workflowCandidateCount: Int = 0,
+            guardTemplateCandidateCount: Int = 0,
+            biasRecordCount: Int = 0,
+            riskPatternCandidateCount: Int = 0,
+            learningExportBundleCount: Int = 0,
+            pendingNurseryCandidateCount: Int = 0,
+            passedShadowTrialCount: Int = 0,
+            failedShadowTrialCount: Int = 0,
+            shadowTrialCount: Int,
+            pendingShadowTrialCount: Int,
+            sealCount: Int,
+            deniedSealCount: Int = 0,
+            pendingSealCount: Int,
+            versionDeltaCount: Int,
+            versionDeltaHighlights: [String] = [],
+            retractionOrderCount: Int,
+            retractionOrderHighlights: [String] = [],
+            pendingRetractionCount: Int,
+            blockedPromotionReasonCodes: [String] = [],
+            dreamLoopStoppingMode: String? = nil,
+            dreamLoopSignalRefs: [String] = [],
+            dreamLoopRemandTargets: [String] = [],
+            dreamLoopReservationMode: String? = nil,
+            dreamLoopMaxEvidenceDebtPercent: Int? = nil
+        ) {
+            self.experienceCandidateCount = max(0, experienceCandidateCount)
+            self.experienceCandidateTypeCounts = experienceCandidateTypeCounts
+            self.workflowCandidateCount = max(0, workflowCandidateCount)
+            self.guardTemplateCandidateCount = max(0, guardTemplateCandidateCount)
+            self.biasRecordCount = max(0, biasRecordCount)
+            self.riskPatternCandidateCount = max(0, riskPatternCandidateCount)
+            self.learningExportBundleCount = max(0, learningExportBundleCount)
+            self.pendingNurseryCandidateCount = max(0, pendingNurseryCandidateCount)
+            self.passedShadowTrialCount = max(0, passedShadowTrialCount)
+            self.failedShadowTrialCount = max(0, failedShadowTrialCount)
+            self.shadowTrialCount = max(0, shadowTrialCount)
+            self.pendingShadowTrialCount = max(0, pendingShadowTrialCount)
+            self.sealCount = max(0, sealCount)
+            self.deniedSealCount = max(0, deniedSealCount)
+            self.pendingSealCount = max(0, pendingSealCount)
+            self.versionDeltaCount = max(0, versionDeltaCount)
+            self.versionDeltaHighlights = versionDeltaHighlights
+            self.retractionOrderCount = max(0, retractionOrderCount)
+            self.retractionOrderHighlights = retractionOrderHighlights
+            self.pendingRetractionCount = max(0, pendingRetractionCount)
+            self.blockedPromotionReasonCodes = blockedPromotionReasonCodes
+            self.dreamLoopStoppingMode = dreamLoopStoppingMode?.trimmingCharacters(in: .whitespacesAndNewlines)
+            self.dreamLoopSignalRefs = dreamLoopSignalRefs
+            self.dreamLoopRemandTargets = dreamLoopRemandTargets
+            self.dreamLoopReservationMode = dreamLoopReservationMode?.trimmingCharacters(in: .whitespacesAndNewlines)
+            self.dreamLoopMaxEvidenceDebtPercent = dreamLoopMaxEvidenceDebtPercent.map { max(0, min(100, $0)) }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case experienceCandidateCount
+            case experienceCandidateTypeCounts
+            case workflowCandidateCount
+            case guardTemplateCandidateCount
+            case biasRecordCount
+            case riskPatternCandidateCount
+            case learningExportBundleCount
+            case pendingNurseryCandidateCount
+            case passedShadowTrialCount
+            case failedShadowTrialCount
+            case shadowTrialCount
+            case pendingShadowTrialCount
+            case sealCount
+            case deniedSealCount
+            case pendingSealCount
+            case versionDeltaCount
+            case versionDeltaHighlights
+            case retractionOrderCount
+            case retractionOrderHighlights
+            case pendingRetractionCount
+            case blockedPromotionReasonCodes
+            case dreamLoopStoppingMode
+            case dreamLoopSignalRefs
+            case dreamLoopRemandTargets
+            case dreamLoopReservationMode
+            case dreamLoopMaxEvidenceDebtPercent
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.init(
+                experienceCandidateCount: try container.decodeIfPresent(Int.self, forKey: .experienceCandidateCount) ?? 0,
+                experienceCandidateTypeCounts: try container.decodeIfPresent([String: Int].self, forKey: .experienceCandidateTypeCounts) ?? [:],
+                workflowCandidateCount: try container.decodeIfPresent(Int.self, forKey: .workflowCandidateCount) ?? 0,
+                guardTemplateCandidateCount: try container.decodeIfPresent(Int.self, forKey: .guardTemplateCandidateCount) ?? 0,
+                biasRecordCount: try container.decodeIfPresent(Int.self, forKey: .biasRecordCount) ?? 0,
+                riskPatternCandidateCount: try container.decodeIfPresent(Int.self, forKey: .riskPatternCandidateCount) ?? 0,
+                learningExportBundleCount: try container.decodeIfPresent(Int.self, forKey: .learningExportBundleCount) ?? 0,
+                pendingNurseryCandidateCount: try container.decodeIfPresent(Int.self, forKey: .pendingNurseryCandidateCount) ?? 0,
+                passedShadowTrialCount: try container.decodeIfPresent(Int.self, forKey: .passedShadowTrialCount) ?? 0,
+                failedShadowTrialCount: try container.decodeIfPresent(Int.self, forKey: .failedShadowTrialCount) ?? 0,
+                shadowTrialCount: try container.decodeIfPresent(Int.self, forKey: .shadowTrialCount) ?? 0,
+                pendingShadowTrialCount: try container.decodeIfPresent(Int.self, forKey: .pendingShadowTrialCount) ?? 0,
+                sealCount: try container.decodeIfPresent(Int.self, forKey: .sealCount) ?? 0,
+                deniedSealCount: try container.decodeIfPresent(Int.self, forKey: .deniedSealCount) ?? 0,
+                pendingSealCount: try container.decodeIfPresent(Int.self, forKey: .pendingSealCount) ?? 0,
+                versionDeltaCount: try container.decodeIfPresent(Int.self, forKey: .versionDeltaCount) ?? 0,
+                versionDeltaHighlights: try container.decodeIfPresent([String].self, forKey: .versionDeltaHighlights) ?? [],
+                retractionOrderCount: try container.decodeIfPresent(Int.self, forKey: .retractionOrderCount) ?? 0,
+                retractionOrderHighlights: try container.decodeIfPresent([String].self, forKey: .retractionOrderHighlights) ?? [],
+                pendingRetractionCount: try container.decodeIfPresent(Int.self, forKey: .pendingRetractionCount) ?? 0,
+                blockedPromotionReasonCodes: try container.decodeIfPresent([String].self, forKey: .blockedPromotionReasonCodes) ?? [],
+                dreamLoopStoppingMode: try container.decodeIfPresent(String.self, forKey: .dreamLoopStoppingMode),
+                dreamLoopSignalRefs: try container.decodeIfPresent([String].self, forKey: .dreamLoopSignalRefs) ?? [],
+                dreamLoopRemandTargets: try container.decodeIfPresent([String].self, forKey: .dreamLoopRemandTargets) ?? [],
+                dreamLoopReservationMode: try container.decodeIfPresent(String.self, forKey: .dreamLoopReservationMode),
+                dreamLoopMaxEvidenceDebtPercent: try container.decodeIfPresent(Int.self, forKey: .dreamLoopMaxEvidenceDebtPercent)
+            )
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(experienceCandidateCount, forKey: .experienceCandidateCount)
+            try container.encode(experienceCandidateTypeCounts, forKey: .experienceCandidateTypeCounts)
+            try container.encode(workflowCandidateCount, forKey: .workflowCandidateCount)
+            try container.encode(guardTemplateCandidateCount, forKey: .guardTemplateCandidateCount)
+            try container.encode(biasRecordCount, forKey: .biasRecordCount)
+            try container.encode(riskPatternCandidateCount, forKey: .riskPatternCandidateCount)
+            try container.encode(learningExportBundleCount, forKey: .learningExportBundleCount)
+            try container.encode(pendingNurseryCandidateCount, forKey: .pendingNurseryCandidateCount)
+            try container.encode(passedShadowTrialCount, forKey: .passedShadowTrialCount)
+            try container.encode(failedShadowTrialCount, forKey: .failedShadowTrialCount)
+            try container.encode(shadowTrialCount, forKey: .shadowTrialCount)
+            try container.encode(pendingShadowTrialCount, forKey: .pendingShadowTrialCount)
+            try container.encode(sealCount, forKey: .sealCount)
+            try container.encode(deniedSealCount, forKey: .deniedSealCount)
+            try container.encode(pendingSealCount, forKey: .pendingSealCount)
+            try container.encode(versionDeltaCount, forKey: .versionDeltaCount)
+            try container.encode(versionDeltaHighlights, forKey: .versionDeltaHighlights)
+            try container.encode(retractionOrderCount, forKey: .retractionOrderCount)
+            try container.encode(retractionOrderHighlights, forKey: .retractionOrderHighlights)
+            try container.encode(pendingRetractionCount, forKey: .pendingRetractionCount)
+            try container.encode(blockedPromotionReasonCodes, forKey: .blockedPromotionReasonCodes)
+            try container.encodeIfPresent(dreamLoopStoppingMode, forKey: .dreamLoopStoppingMode)
+            try container.encode(dreamLoopSignalRefs, forKey: .dreamLoopSignalRefs)
+            try container.encode(dreamLoopRemandTargets, forKey: .dreamLoopRemandTargets)
+            try container.encodeIfPresent(dreamLoopReservationMode, forKey: .dreamLoopReservationMode)
+            try container.encodeIfPresent(dreamLoopMaxEvidenceDebtPercent, forKey: .dreamLoopMaxEvidenceDebtPercent)
+        }
+    }
+
     public let schemaVersion: String
     public let recordedAt: Date
     public let sessionID: String
@@ -1413,12 +1937,20 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
     public let activeKillSwitches: [String]
     public let guardrailFindings: [String]
     public let recommendedKillSwitches: [String]
+    public let stackedModes: [String]
+    public let assertionCeiling: String?
+    public let allowedDomains: [String]
+    public let blockedDomains: [String]
+    public let delayType: String?
+    public let substituteType: String?
+    public let sovereignHintLevel: String?
     public let wakeIntent: BASWakeIntent?
     public let vitalState: BASVitalState?
     public let runLease: BASRunLease?
     public let emergencyBrake: BASEmergencyBrake?
     public let sovereignVerdict: BASSovereignVerdict?
     public let sovereignCommitTokens: [BASSovereignCommitToken]
+    public let sovereignWarrants: [BASSovereignWarrant]
     public let sovereignLock: BASSovereignLock?
     public let quarantineRecords: [BASQuarantineRecord]
     public let sovereignAuditEntry: BASSovereignAuditEntry?
@@ -1440,6 +1972,7 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
     public let cognitionSummary: CognitionSummary?
     public let adjudicationSummary: AdjudicationSummary?
     public let foldedLungSummary: BASEvolutionFoldedLungSummary?
+    public let governanceSummary: GovernanceSummary?
 
     public init(
         schemaVersion: String = BASEvolutionLineageSummary.currentSchemaVersion,
@@ -1458,12 +1991,20 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
         activeKillSwitches: [String] = [],
         guardrailFindings: [String],
         recommendedKillSwitches: [String],
+        stackedModes: [String] = [],
+        assertionCeiling: String? = nil,
+        allowedDomains: [String] = [],
+        blockedDomains: [String] = [],
+        delayType: String? = nil,
+        substituteType: String? = nil,
+        sovereignHintLevel: String? = nil,
         wakeIntent: BASWakeIntent? = nil,
         vitalState: BASVitalState? = nil,
         runLease: BASRunLease? = nil,
         emergencyBrake: BASEmergencyBrake? = nil,
         sovereignVerdict: BASSovereignVerdict? = nil,
         sovereignCommitTokens: [BASSovereignCommitToken] = [],
+        sovereignWarrants: [BASSovereignWarrant] = [],
         sovereignLock: BASSovereignLock? = nil,
         quarantineRecords: [BASQuarantineRecord] = [],
         sovereignAuditEntry: BASSovereignAuditEntry? = nil,
@@ -1484,7 +2025,8 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
         contextSummary: ContextSummary? = nil,
         cognitionSummary: CognitionSummary? = nil,
         adjudicationSummary: AdjudicationSummary? = nil,
-        foldedLungSummary: BASEvolutionFoldedLungSummary? = nil
+        foldedLungSummary: BASEvolutionFoldedLungSummary? = nil,
+        governanceSummary: GovernanceSummary? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.recordedAt = recordedAt
@@ -1502,12 +2044,20 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
         self.activeKillSwitches = activeKillSwitches
         self.guardrailFindings = guardrailFindings
         self.recommendedKillSwitches = recommendedKillSwitches
+        self.stackedModes = stackedModes
+        self.assertionCeiling = assertionCeiling
+        self.allowedDomains = allowedDomains
+        self.blockedDomains = blockedDomains
+        self.delayType = delayType
+        self.substituteType = substituteType
+        self.sovereignHintLevel = sovereignHintLevel
         self.wakeIntent = wakeIntent
         self.vitalState = vitalState
         self.runLease = runLease
         self.emergencyBrake = emergencyBrake
         self.sovereignVerdict = sovereignVerdict
         self.sovereignCommitTokens = sovereignCommitTokens
+        self.sovereignWarrants = sovereignWarrants
         self.sovereignLock = sovereignLock
         self.quarantineRecords = quarantineRecords
         self.sovereignAuditEntry = sovereignAuditEntry
@@ -1529,6 +2079,7 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
         self.cognitionSummary = cognitionSummary
         self.adjudicationSummary = adjudicationSummary
         self.foldedLungSummary = foldedLungSummary
+        self.governanceSummary = governanceSummary
     }
 
     public init(
@@ -1583,12 +2134,20 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
         case activeKillSwitches
         case guardrailFindings
         case recommendedKillSwitches
+        case stackedModes
+        case assertionCeiling
+        case allowedDomains
+        case blockedDomains
+        case delayType
+        case substituteType
+        case sovereignHintLevel
         case wakeIntent
         case vitalState
         case runLease
         case emergencyBrake
         case sovereignVerdict
         case sovereignCommitTokens
+        case sovereignWarrants
         case sovereignLock
         case quarantineRecords
         case sovereignAuditEntry
@@ -1610,6 +2169,7 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
         case cognitionSummary
         case adjudicationSummary
         case foldedLungSummary
+        case governanceSummary
     }
 
     public init(from decoder: Decoder) throws {
@@ -1631,6 +2191,13 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
         activeKillSwitches = try container.decodeIfPresent([String].self, forKey: .activeKillSwitches) ?? []
         guardrailFindings = try container.decode([String].self, forKey: .guardrailFindings)
         recommendedKillSwitches = try container.decode([String].self, forKey: .recommendedKillSwitches)
+        stackedModes = try container.decodeIfPresent([String].self, forKey: .stackedModes) ?? []
+        assertionCeiling = try container.decodeIfPresent(String.self, forKey: .assertionCeiling)
+        allowedDomains = try container.decodeIfPresent([String].self, forKey: .allowedDomains) ?? []
+        blockedDomains = try container.decodeIfPresent([String].self, forKey: .blockedDomains) ?? []
+        delayType = try container.decodeIfPresent(String.self, forKey: .delayType)
+        substituteType = try container.decodeIfPresent(String.self, forKey: .substituteType)
+        sovereignHintLevel = try container.decodeIfPresent(String.self, forKey: .sovereignHintLevel)
         wakeIntent = try container.decodeIfPresent(BASWakeIntent.self, forKey: .wakeIntent)
         vitalState = try container.decodeIfPresent(BASVitalState.self, forKey: .vitalState)
         runLease = try container.decodeIfPresent(BASRunLease.self, forKey: .runLease)
@@ -1639,6 +2206,10 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
         sovereignCommitTokens = try container.decodeIfPresent(
             [BASSovereignCommitToken].self,
             forKey: .sovereignCommitTokens
+        ) ?? []
+        sovereignWarrants = try container.decodeIfPresent(
+            [BASSovereignWarrant].self,
+            forKey: .sovereignWarrants
         ) ?? []
         sovereignLock = try container.decodeIfPresent(BASSovereignLock.self, forKey: .sovereignLock)
         quarantineRecords = try container.decodeIfPresent(
@@ -1676,6 +2247,10 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
             BASEvolutionFoldedLungSummary.self,
             forKey: .foldedLungSummary
         )
+        governanceSummary = try container.decodeIfPresent(
+            GovernanceSummary.self,
+            forKey: .governanceSummary
+        )
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -1696,12 +2271,20 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
         try container.encode(activeKillSwitches, forKey: .activeKillSwitches)
         try container.encode(guardrailFindings, forKey: .guardrailFindings)
         try container.encode(recommendedKillSwitches, forKey: .recommendedKillSwitches)
+        try container.encode(stackedModes, forKey: .stackedModes)
+        try container.encodeIfPresent(assertionCeiling, forKey: .assertionCeiling)
+        try container.encode(allowedDomains, forKey: .allowedDomains)
+        try container.encode(blockedDomains, forKey: .blockedDomains)
+        try container.encodeIfPresent(delayType, forKey: .delayType)
+        try container.encodeIfPresent(substituteType, forKey: .substituteType)
+        try container.encodeIfPresent(sovereignHintLevel, forKey: .sovereignHintLevel)
         try container.encodeIfPresent(wakeIntent, forKey: .wakeIntent)
         try container.encodeIfPresent(vitalState, forKey: .vitalState)
         try container.encodeIfPresent(runLease, forKey: .runLease)
         try container.encodeIfPresent(emergencyBrake, forKey: .emergencyBrake)
         try container.encodeIfPresent(sovereignVerdict, forKey: .sovereignVerdict)
         try container.encode(sovereignCommitTokens, forKey: .sovereignCommitTokens)
+        try container.encode(sovereignWarrants, forKey: .sovereignWarrants)
         try container.encodeIfPresent(sovereignLock, forKey: .sovereignLock)
         try container.encode(quarantineRecords, forKey: .quarantineRecords)
         try container.encodeIfPresent(sovereignAuditEntry, forKey: .sovereignAuditEntry)
@@ -1723,6 +2306,7 @@ public struct BASEvolutionLineageSummary: Codable, Equatable, Sendable, BASSchem
         try container.encodeIfPresent(cognitionSummary, forKey: .cognitionSummary)
         try container.encodeIfPresent(adjudicationSummary, forKey: .adjudicationSummary)
         try container.encodeIfPresent(foldedLungSummary, forKey: .foldedLungSummary)
+        try container.encodeIfPresent(governanceSummary, forKey: .governanceSummary)
     }
 }
 
