@@ -210,7 +210,7 @@
 
 ---
 
-## 四 · 附 — M20–M34 观测原语波次（additive overlay，2026-04-22）
+## 四 · 附 — M20–M37 观测原语波次（additive overlay，2026-04-22）
 
 > 这一附段**不改**上面任何一行兑现度分数。它记录的是在 M1–M12 完全体骨架已绿的前提下，M20 起**叠加**在 L4 / L6 / L7 / L8 / L9 / L10 / L11 / L12 / L13 之上的"观测原语 + 跨层 reconcile scaffold"工作。兑现度栏目里任何"L14 reconciler 将来把每层观测拉到同一张桌上"的承诺，今天已经由这批代码兑现。
 
@@ -231,12 +231,14 @@
 | M33 | M30/M31/M32 audit-trail 对齐 (docs) | `docs/EBRAIN_13L_COMPLETION_MATRIX.md` · `docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md` | — |
 | M34 | Codable dedup + turn/session invariant 深度审修 | `BASRuntimeCore/BASObservationReconciliationCore.swift` · `BASWorldPrior/BASWorldPriorObservation.swift` | 7 新 XCTest |
 | M35 | M34 audit-trail 闭环 + 本附段 (docs) | `docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md` · `docs/QINAO_HONESTY_BOARD.md` | — |
+| M36 | 9 份 per-layer roadmap 加 overlay 附段 | `docs/EBRAIN_L2/L3/L6/L7/L8/L9/L10/L12/L13_*_ROADMAP.md` | — |
+| M37 | L8 tier reconciler coverage 投影（8→9 层） | `BASMemory/BASMemoryTieringObservationCoverage.swift` · `BASRuntimeCore/BASObservationReconciliationCore.swift`（doc 更新） | 4 新 XCTest |
 
-**波次总体性质**：全部 additive — `BASRuntimeCore` 仍是 leaf 模块（`BASObservationReconciliationCore.swift` 不 import 任何观测生产者），`BASSovereign` 的 microkernel 隔离保持；每个原语都是值类型 + `Sendable` + `Codable`，带独立 budget 表与 ring-actor ledger；invariant（dedup-on-layer，turn/session 同桌）在所有构造路径（init / `appending(_:)` / `init(from:)`）上都被枚举测试钉住。
+**波次总体性质**：全部 additive — `BASRuntimeCore` 仍是 leaf 模块（`BASObservationReconciliationCore.swift` 不 import 任何观测生产者），`BASSovereign` 的 microkernel 隔离保持；每个原语都是值类型 + `Sendable` + `Codable`，带独立 budget 表与 ring-actor ledger；invariant（dedup-on-layer，turn/session 同桌）在所有构造路径（init / `appending(_:)` / `init(from:)`）上都被枚举测试钉住。L8（M37）是这批里唯一的"无 bundle"投影：`BASMemoryTieringReconciliationOutcome.coverageSummary(turnID:sessionID:)` 把 governance sweep 的结果绑到调用方指定的 turn/session，和另外 8 层共用同一张 `BASObservationReconciliationReport`。
 
-**累计覆盖**：14 层认知架构中 8 层（L4/L6/L7/L9/L10/L11/L12/L13）已有 `*ObservationBundle → BASObservationCoverageSummary` 投影，加上 L8 独立的 tier-transition reconciler。剩余 6 层（L1/L2/L3/L5/L8/L14）中 L8 已有 M21 reconciler 等价面，其他 5 层留到下一波。
+**累计覆盖**：14 层认知架构中 **9 层**（L4/L6/L7/**L8**/L9/L10/L11/L12/L13）已有 `→ BASObservationCoverageSummary` 投影；L8 通过 M21 reconciler + M37 `coverageSummary(turnID:sessionID:)` 正式进入同一张桌。剩余 5 层（L1/L2/L3/L5/L14）留到下一波。
 
-**回归基线**：BAS 620 XCTest + 417 swift-testing + Qinao 162 XCTest = **1199 + 1 OS-gated skip 全绿**。
+**回归基线**：BAS 624 XCTest + 417 swift-testing + Qinao 162 XCTest = **1203 + 1 OS-gated skip 全绿**。
 
 ---
 

@@ -233,6 +233,119 @@ final class BASObservationCoverageProjectionTests: XCTestCase {
         XCTAssertTrue(s.hasCoreSignalCoverage)
     }
 
+    // MARK: - L8 hippocampal well (M37)
+
+    private func tieringProfile(
+        id: String,
+        tier: BASMemoryTier,
+        recency: Double = 0.5,
+        frequency: Double = 0.5,
+        sensitivity: Double = 0.0,
+        staleness: Double = 0.0
+    ) -> BASMemoryTieringProfile {
+        BASMemoryTieringProfile(
+            atomID: id,
+            currentTier: tier,
+            recencyScore: recency,
+            accessFrequency: frequency,
+            sensitivityDrift: sensitivity,
+            worldContextStaleness: staleness,
+            observedAt: t0)
+    }
+
+    private func makeTieringReconciler(
+        at timestamp: TimeInterval = 1_000
+    ) -> (BASMemoryTieringReconciler, BASMemoryTierTransitionLog) {
+        let log = BASMemoryTierTransitionLog(capacity: 64)
+        let reconciler = BASMemoryTieringReconciler(
+            log: log,
+            clock: { Date(timeIntervalSince1970: timestamp) })
+        return (reconciler, log)
+    }
+
+    func testTieringProjectionMapsAtomIDsAndBudget() async {
+        let (reconciler, _) = makeTieringReconciler()
+        let outcome = await reconciler.reconcile(profiles: [
+            // hold (warm, neutral bands)
+            tieringProfile(id: "atom-a", tier: .warm),
+            // promote (cold → warm, heat 0.445)
+            tieringProfile(
+                id: "atom-b", tier: .cold,
+                recency: 0.8, frequency: 0.3),
+            // evictSuggest (cold, zero recency/frequency)
+            tieringProfile(
+                id: "atom-c", tier: .cold,
+                recency: 0.0, frequency: 0.0),
+            // duplicate atom-a, should collapse in distinctCount
+            tieringProfile(id: "atom-a", tier: .warm)
+        ])
+        let s = outcome.coverageSummary(
+            turnID: "t-l8", sessionID: "s-l8")
+
+        XCTAssertEqual(s.layer, .hippocampalWell)
+        XCTAssertEqual(s.turnID, "t-l8")
+        XCTAssertEqual(s.sessionID, "s-l8")
+        XCTAssertEqual(s.totalObservations, 4)
+        XCTAssertEqual(s.distinctSubjectCount, 3)
+        XCTAssertTrue(s.hasCoreSignalCoverage)
+
+        // Two holds (0.02 each), one promote (0.08), one evict
+        // suggest (0.10) — 0.22 total, clamped stays the same.
+        XCTAssertEqual(
+            s.budgetTotalCost,
+            0.02 + 0.08 + 0.10 + 0.02,
+            accuracy: 1e-9)
+    }
+
+    func testTieringProjectionEmptySweepReportsNoCoreCoverage() async {
+        let (reconciler, _) = makeTieringReconciler()
+        let outcome = await reconciler.reconcile(profiles: [])
+        let s = outcome.coverageSummary(
+            turnID: "t-l8-empty", sessionID: "s-l8")
+        XCTAssertEqual(s.layer, .hippocampalWell)
+        XCTAssertEqual(s.totalObservations, 0)
+        XCTAssertEqual(s.distinctSubjectCount, 0)
+        XCTAssertFalse(
+            s.hasCoreSignalCoverage,
+            "an empty sweep is silent — no audit signal")
+        XCTAssertEqual(s.budgetTotalCost, 0.0, accuracy: 1e-12)
+    }
+
+    func testTieringProjectionBudgetClampsAtOne() async {
+        // Fire enough high-cost decisions that the raw sum would
+        // overflow the [0, 1] budget window. The projection clamps.
+        // Quarantine is the heaviest branch at 0.15 per decision;
+        // 10 quarantines = 1.5 raw, must clamp to 1.0.
+        let sensitive = (0..<10).map {
+            tieringProfile(
+                id: "sens-\($0)", tier: .warm,
+                sensitivity: 0.9)
+        }
+        let (reconciler, _) = makeTieringReconciler()
+        let outcome = await reconciler.reconcile(
+            profiles: sensitive)
+        let s = outcome.coverageSummary(
+            turnID: "t-l8-clamp", sessionID: "s-l8")
+        XCTAssertEqual(s.budgetTotalCost, 1.0, accuracy: 1e-12)
+        XCTAssertEqual(s.distinctSubjectCount, 10)
+        XCTAssertEqual(s.totalObservations, 10)
+    }
+
+    func testTieringProjectionFeedsCrossLayerReportAsNinthLayer() async {
+        let (reconciler, _) = makeTieringReconciler()
+        let outcome = await reconciler.reconcile(profiles: [
+            tieringProfile(id: "atom-x", tier: .warm)
+        ])
+        let summary = outcome.coverageSummary(
+            turnID: "t", sessionID: "s")
+        let report = BASObservationReconciliationReport(
+            turnID: "t", sessionID: "s",
+            summaries: [summary])
+        XCTAssertEqual(report.coveredLayers, [.hippocampalWell])
+        XCTAssertTrue(
+            report.isFullyObserved(expected: [.hippocampalWell]))
+    }
+
     // MARK: - Cross-layer reconciliation
 
     func testEightLayerReconciliationAssemblesFullReport() {
