@@ -1,5 +1,23 @@
 # BehavioralAISubstrate Changelog
 
+## 2026-04-22
+
+- **M9 — turn-audit parity contract**: The sovereign audit now carries a `parity` field (`match / coordinatorStricter / coordinatorLaxer / engineOnly`) so callers can tell whether the independent engine agreed, was stricter, or disagreed with the coordinator. Parity semantics are unit-tested end-to-end so subsequent milestones can key fail-closed logic off a typed field instead of free-form comparisons.
+
+- **M10 — snapshot ark central registry + integrity check**: `BASSovereignSnapshotManager` becomes the single resolver for `safeSnapshotRef / foldRefs / hostVersionRef / integrityHash`; `BASSovereignHostVersionTree` exposes forward/backward/diff navigation; recovery paths verify the integrity hash on load and refuse resume on mismatch. Snapshot continuity proofs are no longer floating strings.
+
+- **M11 — L5 host constitution pipeline + projection parity**: `BASHostCandidatePipeline` threads submit → preview → approve → reject → rollback through the coordinator; every mutation round-trips through the compatibility projection and a parity test proves the legacy host profile view is bit-equal with the typed host-version tree.
+
+- **M12 — neural organ adapter + Apple Foundation Models**: `BASOrganAdapter` protocol plus a default provider that calls the on-device `FoundationModels` framework (iOS 18+). Scout/Core separation is expressed as distinct sampling profiles on the same adapter; local-MLX and other back-ends slot in without touching the substrate.
+
+- **M13 — L11 risk consumes L4 WorldPrior**: `QinaoWorldPriorEndpoint` folds the matched template's `irreversibleHarmScore` into `signals.irreversibility` (max), forces `.replace` on unacknowledged informed-consent templates, forces `.delay` on low-evidence irreversible templates, and returns `RiskError.unknownWorldTemplate` for taxonomy misses. Ten new tests cover every branch.
+
+- **M14 — offline distillation triple gate**: `QinaoLearningExportBundle` exposes `scrubbed + privacySafe + sovereignSafe` — all three must be green before an export leaves the device. Host-private host-constitution fields, L8 memory sensitivity tiers, and the audit ledger's clearance are each independent gates; any missing one refuses the export with a typed `QinaoLearningExportError`. 14 new tests.
+
+- **M15 — `sendSession` main-path turn audit**: Every turn — not just side-effect execution — now flows through an independent sovereign audit. Pre-flight refuses a halted session (`TurnError.sessionAlreadyHalted`); parity `.coordinatorLaxer` halts with reason `audit-parity:coordinator-laxer` then throws `TurnError.auditParityFailure`; severity `.rollback` / `.deadStop` halt with reason `audit-severity:<level>` and return `sessionHalted: true`; `.quarantine` flows through so the host decides. Five new tests.
+
+- **M16 — Apple BGTaskScheduler bridge**: `QinaoBGMaintenanceBridge` realises `BASBreathScheduler.PlatformBridge` against `BGTaskScheduler.shared` on iOS 13+ / tvOS 13+ / visionOS 1+ / Mac Catalyst 13.1+; macOS and watchOS get a no-op fallback so the scheduler still tracks the breath. The substrate stays a leaf module (no `BackgroundTasks` import). Eight new tests exercise the identifier protocol + end-to-end round-trip against the real scheduler actor.
+
 ## 2026-04-14
 
 - Pulled the remaining evolution `targets / recommended / selection-summary` sentence builders onto the shared narrative formatter: [`DecisionEvolutionSurfaceContract.swift`](/Users/changgeng/Project/Project06/Project06/Before/App/Services/DecisionEvolutionSurfaceContract.swift) now routes kill-switch `Recommended:` lines plus batch-selection `summary / targets` lines through `DecisionEvolutionNarrativeFormattingSupport`, [`DecisionEvolutionMutationIntent.swift`](/Users/changgeng/Project/Project06/Project06/Before/App/Services/DecisionEvolutionMutationIntent.swift) now routes preview-impact and outcome `Targets:` lines through the same labeled-line helper, and [`DecisionEvolutionSurfaceContractTests.swift`](/Users/changgeng/Project/Project06/Project06/BeforeTests/DecisionEvolutionSurfaceContractTests.swift), [`DecisionEvolutionBatchMutationSelectionTests.swift`](/Users/changgeng/Project/Project06/Project06/BeforeTests/DecisionEvolutionBatchMutationSelectionTests.swift), and [`DecisionEvolutionMutationIntentTests.swift`](/Users/changgeng/Project/Project06/Project06/BeforeTests/DecisionEvolutionMutationIntentTests.swift) now lock those shared formatter contracts directly.

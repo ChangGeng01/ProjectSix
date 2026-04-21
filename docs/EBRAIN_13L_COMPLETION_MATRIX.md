@@ -19,6 +19,37 @@
 - `脚手架`：接口、schema、蓝图已定，但核心能力仍待实装
 - `外部工程`：主要依赖训练、课程或独立产线，不在当前仓库内完成
 
+## M1-M16 里程碑账本（2026-04-22 口径）
+
+这张表记录 `QinaoRuntimeSDK` 自 2026-04 月起建成的 16 个里程碑；每一行都指向真实代码 + 真实测试。本账本与下面的 `L1-L13` 定性矩阵并行：前者用百分比刻画 `Qinao SDK 对外承诺的兑现率`，后者用 `已落地 / Alpha / 脚手架 / 外部工程` 记录底层仓库的工程状态。
+
+| 里程碑 | 范围 | 完成度 | 主要文件 | 覆盖测试 |
+| --- | --- | --- | --- | --- |
+| M1-M2 | L14 主权核 9 模块 + ledger / token / verdict 三件套 | 100% | `BASSovereign/*` | `BASSovereignTests` |
+| M3-M4 | Qinao 7 模块外壳 + 三签门 | 100% | `QinaoRuntimeSDK/Sources/Qinao*` | `QinaoRuntimeGateTests` |
+| M5-M6 | 五整体性质 end-to-end demo | 100% | `PropertyDemos/*.swift` | `WakeAndSleepDemo / WorldAndHostDemo / ThinkNotSpinDemo / ProtectNotTakeOverDemo / GrowNotWildlyDemo` |
+| M7 | 双审计：coordinator 与独立 engine 并签 | 100% | `BASSovereignTurnVerifier` + `QinaoSovereignControlPlane.auditTurn` | `QinaoSovereignTests` |
+| M8 | 神经器官 → loop 接线 | 100% | `BASOrganLoopBridge` | `BASOrchestrationTests` |
+| M9 | 审计 parity 语义 (match/stricter/laxer/engineOnly) | 100% | `BASSovereignTurnVerifier` | `BASSovereignTurnVerifierTests` |
+| M10 | 快照方舟中央注册表 + integrity 校验 + 版本树导航 | 90% | `BASSovereignSnapshotManager / BASSovereignHostVersionTree` | `BASSovereignSnapshotTests` |
+| M11 | L5 候选流水线 + projection parity | 95% | `BASHostCandidatePipeline` | `HostConstitutionTests` |
+| M12 | 神经器官 adapter + Apple Foundation Models provider | 85% | `BASOrganAdapter` + `BASAppleFoundationModelsAdapter` | `BASOrganTests` |
+| M13 | L11 风闸吃 L4 WorldPrior | 85% | `QinaoWorldPriorEndpoint / BASWorldPriorEndpointAdapter / QinaoRiskGate.requestActionPermit(worldContext:)` | `QinaoRiskWorldPriorTests` |
+| M14 | 离线蒸馏 triple-gate (scrubbed / privacySafe / sovereignSafe) | 100% | `QinaoLearningExportBundle` | `QinaoLearningExportTests` |
+| M15 | `sendSession` 主路径 turn audit（pre-halt 拒绝 / parity 失守 fail-closed / severity 自动 halt） | 100% | `QinaoRuntime.sendSession / QinaoSovereignControlPlane.markSessionHalted` | `QinaoRuntimeSessionTests` |
+| M16 | Apple BGTaskScheduler PlatformBridge | 100% | `QinaoBGMaintenanceBridge` | `QinaoBGMaintenanceBridgeTests` |
+
+### 关键层完成度映射（SDK 视角，2026-04-22）
+
+| 层 | 之前（plan §0.1 体检） | 现在（M1-M16 之后） | 依据 |
+| --- | --- | --- | --- |
+| L1 Lease & Life | 60% | **85%** | M16 BGTaskScheduler 真实接入；M8 loop 呼吸调度 |
+| L4 World Prior | 5% | **70%** | M13 L11 吃 causal template + 证据/同意逻辑 |
+| L5 Host Constitution | 80% | **95%** | M11 候选流水线 + projection parity |
+| L11 Risk Climate | 60% | **85%** | M13 world-prior fold + four-stage evaluator |
+| L13 Evolution Furnace | 40% | **70%** | M14 triple-gate 离线导出 |
+| L14 Sovereign Microkernel | 10% | **90%** | M1-M2 九模块 + M7/M9 双审计 + M15 主路径 turn audit |
+
 ## L1-L13
 
 | 层 | 名称 | 当前状态 | 当前仓库已落地 | 仍缺的关键口 |

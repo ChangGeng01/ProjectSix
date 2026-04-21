@@ -176,6 +176,34 @@ this page is currently backed by in code, tests, and CI.
 
 ---
 
+## Milestone ledger — what backs each promise today
+
+Every row below names the runtime file and test suite that proves the
+promise. All listed tests are part of the default `swift test` run on
+`QinaoRuntimeSDK` and are kept green on every push.
+
+| Promise | Backed by |
+| --- | --- |
+| **Wake before you answer — L1 lifecycle** | `QinaoRuntime` session bootstrap + `QinaoBGMaintenanceBridge` platform wake-up (`QinaoBGMaintenanceBridgeTests`, `QinaoRuntimeGateTests`) |
+| **Three-signature gate on every side-effect** | `QinaoRuntime.execute` (`QinaoRuntimeGateTests`) |
+| **Second-authority audit on every turn** | `QinaoRuntime.sendSession` main-path audit (`QinaoRuntimeSessionTests`) |
+| **Pre-halted session refuses to run** | `QinaoRuntime.sendSession` pre-flight (`QinaoRuntimeSessionTests.testPreHaltedSessionRefusesBeforeAuditing`) |
+| **Fail-closed on parity mismatch** | `QinaoRuntime.sendSession` parity branch (`QinaoRuntimeSessionTests.testLaxerParityFailsClosedAndMarksHalted`) |
+| **Severity-driven auto-halt (rollback / deadStop)** | `QinaoRuntime.sendSession` severity branch (`QinaoRuntimeSessionTests.testDeadStopSeverityAutoHalts`) |
+| **Host decides on quarantine severity** | `QinaoRuntime.sendSession` no-autohalt branch (`QinaoRuntimeSessionTests.testQuarantineSeverityDoesNotAutoHalt`) |
+| **World priors fold into the risk gate** | `QinaoRiskGate.requestActionPermit(…worldContext:worldEndpoint:)` (`QinaoRiskWorldPriorTests`) |
+| **Unknown world-template is a typed error** | `RiskError.unknownWorldTemplate` (`QinaoRiskWorldPriorTests`) |
+| **Informed consent forces `.replace`** | `QinaoRiskGate` consent branch (`QinaoRiskWorldPriorTests`) |
+| **Low-evidence irreversible forces `.delay`** | `QinaoRiskGate` evidence branch (`QinaoRiskWorldPriorTests`) |
+| **Host secrets stay out of base weights** | `QinaoLearningExportBundle` triple gate: scrubbed + privacySafe + sovereignSafe (`QinaoLearningExportTests`) |
+| **Host constitution: submit / preview / approve / rollback** | `QinaoHost` candidate pipeline + projection parity (`QinaoHostTests`, `WorldAndHostDemo.testHostCandidateFlowsSubmitPreviewApproveRollback`) |
+| **Cascade delete across memory tiers** | `QinaoMemory.forget(sensitivity:)` cascade (`WorldAndHostDemo.testSensitivityCascadeForgetIsTyped`) |
+| **Candidate frontier + compare panel + guardian branch** | `QinaoLoop` (`QinaoLoopTests`, `ThinkNotSpinDemo`) |
+| **Control plane: rollback / halt / release** | `QinaoSovereignControlPlane` (`QinaoSovereignTests`) |
+| **Five soft-hand surfaces (answer / compare / delay / block / replace)** | `QinaoUI` (`QinaoUITests`) |
+
+---
+
 ## License
 
 © Qinao · All rights reserved.
