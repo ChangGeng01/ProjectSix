@@ -1106,7 +1106,7 @@ public extension BASHostConstitutionVault {
     }
 }
 
-private func basOrderedUnique(_ values: [String]) -> [String] {
+internal func basOrderedUnique(_ values: [String]) -> [String] {
     var seen = Set<String>()
     var ordered: [String] = []
     for value in values where !value.isEmpty && seen.insert(value).inserted {

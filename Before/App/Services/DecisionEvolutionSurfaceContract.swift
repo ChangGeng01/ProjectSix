@@ -80,7 +80,6 @@ enum DecisionEvolutionNarrativeFormattingSupport {
     ) -> String? {
         prefixedLine(
             prefix: prefix,
-            separatorAfterPrefix: separator,
             values: sovereignAuthorityValues(
                 tokenScopes: tokenScopes,
                 warrantScopes: warrantScopes,
@@ -89,7 +88,8 @@ enum DecisionEvolutionNarrativeFormattingSupport {
                 warrantWitnessCount: warrantWitnessCount,
                 lockScopeID: lockScopeID,
                 quarantineZoneIDs: quarantineZoneIDs
-            )
+            ),
+            separatorAfterPrefix: separator
         )
     }
 

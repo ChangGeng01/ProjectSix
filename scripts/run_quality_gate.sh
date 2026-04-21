@@ -11,7 +11,7 @@ IOS_DERIVED_DATA="$DERIVED_DATA_ROOT/ios"
 UI_DERIVED_DATA="$DERIVED_DATA_ROOT/ui"
 
 typeset -i score=0
-typeset -i total=21
+typeset -i total=24
 
 rm -rf "$DERIVED_DATA_ROOT"
 
@@ -234,6 +234,15 @@ run_step "Launch, notification, reminder, and action tests" \
     -only-testing:BeforeTests/TomorrowBoxDelayTests \
     -only-testing:BeforeTests/SupportRequestFactoryTests \
     -only-testing:BeforeTests/SupportRequestKindTests
+
+run_step "Qinao SDK import boundary check" \
+  "$ROOT/scripts/check_qinao_import_boundaries.sh"
+
+run_step "Qinao SDK sovereign redaction check" \
+  "$ROOT/scripts/check_sovereign_redaction.sh"
+
+run_step "Qinao SDK full test suite" \
+  swift test --package-path "$ROOT/QinaoRuntimeSDK"
 
 run_step "Clean worktree after gate" \
   git -C "$ROOT" diff --quiet --exit-code
