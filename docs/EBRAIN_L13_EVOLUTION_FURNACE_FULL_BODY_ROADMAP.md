@@ -271,3 +271,15 @@ full-body 对象族先并行存在，再逐步替换旧主链的部分消费面�
 3. full-body `L13` 的到达路径必须经过候选苗圃、试演剧场、版本树、回收熔炉与跨层织网
 
 因此，`L13` 的 repo-real 演进不是一次性跳到完全体，而是沿着这五个阶段，把治理脊柱逐步长成完整身体。
+
+---
+
+## 附 — M20–M34 观测原语波次 overlay（2026-04-22）
+
+> 本附段不修改上面任何一句 roadmap 叙事，只补记"在本路线图定型之后" L13 相关波次已兑现的部分。
+
+- **M11 · shadow-trial coordinator 可运行**：`BASShadowTrialCoordinator` actor（`BASMemory/ShadowTrialCoordinator.swift`）把 L13 从"schema-only"升到可运行：submit（开启 pending trial）→ observe（累积 observedEffects、pending→observing）→ reportFailCondition（累积 failConditions）→ finalize(.passed/.failed/.blocked)（派生 `BASEvolutionSeal`，failed/blocked 附带 `BASRetractionOrder` 级联）每一步都追一条 ledger entry；`BASShadowTrialLedger` 协议抽 seam；`BASOrchestration/ShadowTrialLedgerBridge.swift` 把真 `BASSovereignAuditLedger` 接入——shadow-trial 链与 sovereign verdict 链是**同一条 hash chain**。16/16 测试绿；`promotionVerdict(for:)` 与 `BASEvolutionPromotionGate.blockedReasonCodes(for:)` 共用 5 档 reason 码。
+- **M28 · shadow-trial observation primitives**：`BASMemory/BASShadowTrialObservation.swift` 落地 `BASShadowTrialSignalKind`（`ticketIssued / trialRun / parityVerified / regressionDetected / promotionVote / quarantineVote` 六档）+ `BASShadowTrialObservationBundle`（`observations(forTicket:)` / first-seen `ticketIDs` / `hasCoreSignalCoverage` = ticketIssued + trialRun + (parityVerified OR regressionDetected) / `netPromotionScore(forTicket:)` = promote − quarantine / `regressionDetected(forTicket:)`）+ `BASShadowTrialObservationBudget`（`trialRun` 最贵 0.40，sandboxed 语料跑最烧）+ ring-actor ledger。19 新 XCTest。
+- **M14 · 离线蒸馏三闸**：`QinaoLearningExportBundle` exposes `scrubbed + privacySafe + sovereignSafe` — 三闸全绿 export 才出端。14/14 测试绿。
+- **M32 · 跨层投影**：`BASShadowTrialObservationBundle.coverageSummary`（`distinctSubjectCount` = `ticketIDs.count`），进入端到端 8 层 reconciliation。
+- 剩余缺口：workflow/guard/bias runtime 化 / Version Arboretum 可视化 / 自动晋升编排（未来里程碑）。

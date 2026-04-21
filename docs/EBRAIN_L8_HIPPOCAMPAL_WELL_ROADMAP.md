@@ -361,3 +361,14 @@
 最后才逐步进入 runtime 主链。
 
 这样做的意义不是保守，而是为了让 `L8` 的升级既能长出真正的 `Temporal Memory Field`，又不会打断当前仓库已经建立起来的 `MemoryAtom / MemoryBundle / HorizonPersistencePolicy / GovernanceCore / DecisionMemoryRecord` 现实保护面。
+
+---
+
+## 附 — M20–M34 观测原语波次 overlay（2026-04-22）
+
+> 本附段不修改上面任何一句 roadmap 叙事，只补记"在本路线图定型之后" L8 相关波次已兑现的部分。
+
+- **M20 · tiering primitives**：`BASMemory/BASMemoryTieringProfile.swift` 捕获四信号热度画像（recency / access frequency / sensitivity drift / world-context staleness）；`BASMemoryTemperaturePolicy.recommendTransition(_:)` 纯 `Sendable` 函数返回 `BASMemoryTierTransition`（`hold / promote / demote / quarantineSuggest / evictSuggest`）+ typed reasons；敏感度升级短路污染、两者短路 tier ladder；冷 + 中污染 suggest evict。`BASMemoryTierTransitionLog` 256-entry ring actor。18 新 XCTest。
+- **M21 · tier reconciler**：`BASMemoryTierTransitionReconciler` 走 `BASMemoryTieringProfile` 批并发 `recommendTransition(_:)`，emits `BASMemoryTierReconciliationReport`。纯 observational pass（不写 MemoryCore），让 L14 audit 层以后可以对比"reconciler 观测 vs 真实晋升路径"。16 新 XCTest。
+- **M7.4 · QinaoMemory façade**：`admit(_:)` 走 `BASMemoryGovernance.shouldAdmit` confidence floor gate；`recall(scope:sensitivity:tiers:)` 走 `BASMemoryTierFilter.filter` 规范排序；`recallFrontstage()` 丢 cold；`forget(id:/scope:/sensitivity:)` + `forgetAll()` 级联删除。11/11 测试绿。
+- 剩余缺口：完整温度生态 runtime / forget cascade 非 Qinao 触发路径 / sanctum reveal matrix（未来里程碑）。

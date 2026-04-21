@@ -418,3 +418,13 @@
 - 哪些案子今天不该判
 
 这就是 `L10` 从“打分器”长成“法庭”的路线。
+
+---
+
+## 附 — M20–M34 观测原语波次 overlay（2026-04-22）
+
+> 本附段不修改上面任何一句 roadmap 叙事，只补记"在本路线图定型之后" L10 相关波次已兑现的部分。
+
+- **M25 · tribunal observation primitives**：`BASOrchestration/BASTribunalObservation.swift` 落地三角色 `BASTribunalVoice`（`baseSelf 质我 / ruleSelf 律我 / aspireSelf 向我`）+ `BASTribunalDisposition`（`affirm / oppose / abstain`）+ `BASTribunalSignalKind`（`vote / objection / concession / convergence / dissent` 五档，convergence/dissent 是整庭事件，`voice` 可空、`disposition` 只在 vote 里有）+ `BASTribunalObservationBundle`（`observations(by:)` / `observations(onSubject:)` / `allVoicesSpoke` quorum check / `vote(by:on:)` 最新投票 / `voicesAgree(on:)` 三我一致 / `hasCoreSignalCoverage` = 三声都说话 + ≥1 条 convergence/dissent）+ `BASTribunalObservationBudget`（`objection` 最贵 0.25）+ ring-actor ledger。18 新 XCTest。
+- **M32 · 跨层投影**：`BASTribunalObservationBundle.coverageSummary`（`distinctSubjectCount` = `subjectIDs.count`；`hasCoreSignalCoverage` 映射自 `allVoicesSpoke`——三庭投票齐全 = 庭健康），进入端到端 8 层 reconciliation。
+- 剩余缺口：真正多头打分器 / 牺牲-悔意-主体性三对象 / veto explain 引擎（未来里程碑）。

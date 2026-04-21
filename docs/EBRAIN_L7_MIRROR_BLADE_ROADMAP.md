@@ -353,3 +353,13 @@
 最后才让刃与镜进入 runtime 主链。
 
 这样做的意义不是保守，而是为了让 `L7` 的升级既能长出真正的 `Cognitive Dissection Field`，又不会打断当前仓库已经建立起来的 `BASDecomposeFrame / BASMirrorDraft / schema governance / replay / checkpoint` 现实支架——也不会让镜刃层在还没学会“先清醒”之前，就抢先去“更聪明”。
+
+---
+
+## 附 — M20–M34 观测原语波次 overlay（2026-04-22）
+
+> 本附段不修改上面任何一句 roadmap 叙事，只补记"在本路线图定型之后" L7 相关波次已兑现的部分。
+
+- **M23 · mirror-blade decomposition observation primitives**：`BASOrchestration/BASDecompositionObservation.swift` 落地 `BASDecompositionSignalKind`（`factShard / unknown / contradiction / pressure / manipulation / mirrorDraft` 六档）+ `BASDecompositionObservationBundle`（`observations(of:)` / `mirrorDrafts` / `pressureLoad` / `hasCoreSignalCoverage` = factShard + contradiction + mirrorDraft — 证刃切得干净且镜子照了）+ `BASDecompositionObservationBudget`（`mirrorDraft` 最贵 0.35）+ ring-actor `BASDecompositionObservationLedger`。16 新 XCTest。
+- **M32 · 跨层投影**：`BASDecompositionObservationBundle.coverageSummary` 投影到中立 `BASObservationCoverageSummary`（`distinctSubjectCount` = 距离 kinds 数），已进入端到端 8 层 reconciliation。
+- 剩余缺口：真实解构引擎 / 矛盾检测器 / per-turn `DecomposeFrame` runtime（未来里程碑）。

@@ -331,3 +331,13 @@
 最后才逐步进入 runtime 主链。
 
 这样做的意义不是保守，而是为了让 `L6` 的升级既能长出真正的 `Presence Situation Field`，又不会打断当前仓库已经建立起来的 `BASContextFrame / analyzeContext / turn-entry hook / host relevance` 现实观测面。
+
+---
+
+## 附 — M20–M34 观测原语波次 overlay（2026-04-22）
+
+> 本附段不修改上面任何一句 roadmap 叙事，只补记"在本路线图定型之后" L6 相关波次已兑现的部分。
+
+- **M22 · presence-eye observation primitives**：`BASOrchestration/BASPresenceObservation.swift` 落地 `BASPresenceSignalKind`（`gaze / attentionShift / saliencePeak / salienceFade / contextTag / dwell` 六档）+ `BASPresenceObservation` + `BASPresenceObservationBundle`（`observations(of:)` / first-seen `contextTags` / `peakSalience` / `hasCoreSignalCoverage` = gaze + saliencePeak）+ `BASPresenceObservationBudget`（`saliencePeak` 最贵 0.20）+ ring-actor `BASPresenceObservationLedger`。16 新 XCTest。
+- **M32 · 跨层投影**：`BASPresenceObservationBundle.coverageSummary` 投影到中立 `BASObservationCoverageSummary`（`distinctSubjectCount` = 距离 channels 数，`hasCoreSignalCoverage` 映射自 `hasCoreChannelCoverage`），已进入 `BASObservationReconciliationReport` 端到端 8 层 reconciliation。
+- 剩余缺口：真实情境识别器 / 多语种反话模型 / 主链真实 `ContextFrame` runtime（未来里程碑）。

@@ -348,3 +348,13 @@ M10 已经把 `RollbackAnchor.safeSnapshotRef / integrityHash` 钉到中央登�
 最后才进冷热分包与 KV/state restore 工业实现。
 
 这样做的意义不是保守，而是为了让 `L3` 的升级既能长出真正的 `Folded Lung`，又不会打断当前仓库已经建立起来的 `ThoughtFold / checkpoint lineage / DecisionSessionEngine v1 / sovereignBridgeResult / snapshot ark` 现实保护面。
+
+---
+
+## 附 — M20–M34 观测原语波次 overlay（2026-04-22）
+
+> 本附段不修改上面任何一句 roadmap 叙事，只补记"在本路线图定型之后" L3 相关波次已兑现的部分。
+
+- **M10 · Snapshot Ark 完整落地**：`BASSovereignSnapshotManager` 中央注册表 + SHA-256 引用绑定 + `verifyRestore` integrity 校验；`BASSovereignHostVersionTree` append-only DAG + ancestors/descendants/lineage LCA + markBad/markGood + latestKnownGoodAncestor；`BASSovereignCleanRebootCoordinator` 翻译 `.rollback`/`.deadStop` verdict → RebootPlan（7 action）+ anchor binding + audit 落盘 + payload 校验。18/18 测试绿。这一步把 roadmap 里"snapshot ark 现实保护面"从口头升级为"可运行 + 可审计"。
+- **M20 · M21**：L8 `BASMemoryTieringProfile` + `BASMemoryTemperaturePolicy.recommendTransition(_:)` + `BASMemoryTierTransitionReconciler`（纯 Sendable pass，不写 MemoryCore）+ `BASMemoryTierTransitionLog` 256-entry ring actor。34 新 XCTest。为 L3 的 "工业冷热分包" 提前铺了温度语法的锚点。
+- 剩余主干：`OrganPackage / OrganDeltaPlan` 真实热装载 + KV/state restore 工业实现（未来里程碑）。

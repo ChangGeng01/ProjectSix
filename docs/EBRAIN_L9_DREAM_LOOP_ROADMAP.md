@@ -505,3 +505,15 @@
 再压成一条白皮书级路线定义：
 
 它的目标不是让系统“想更久”，而是让系统在主链可承受的租约内，形成更稳的候选结构、更诚实的不确定记录、更可靠的守护路径，以及在主权命令到来时真正会缩环、会断支、会停的思维器官。
+
+---
+
+## 附 — M20–M34 观测原语波次 overlay（2026-04-22）
+
+> 本附段不修改上面任何一句 roadmap 叙事，只补记"在本路线图定型之后" L9 相关波次已兑现的部分。
+
+- **M24 · candidate observation primitives**：`BASOrchestration/BASCandidateObservation.swift` 落地 `BASCandidateSignalKind`（`candidate / dominanceSignal / reversibilitySignal / guardianBranch / diversitySignal / delayRecommendation` 六档）+ `BASCandidateObservationBundle`（`observations(forCandidate:)` / first-seen `candidateIDs` / `hasCoreSignalCoverage` = candidate + reversibilitySignal + guardianBranch — 证明缩环、守护枝都触发过）+ `BASCandidateObservationBudget`（`guardianBranch` 最贵 0.30，反候选合成）+ ring-actor `BASCandidateObservationLedger`。17 新 XCTest。
+- **M7.5 · QinaoLoop façade**：`candidateFrontier(sessionID:topK:)` 用定型公式 `0.40·B − 0.30·C − 0.30·critiqueStrength + 0.15·R + 0.15·Conf` 排序、ID 字典序 tie-break；`comparePanel(sessionID:)` 按 frontier 顺序输出稳定 pros/cons/risks；`guardianBranch(sessionID:)` 在 critiqueStrength ≥ 0.7 时触发。
+- **M10 · Organ 驱动**：`QinaoLoop.generateCandidates(sessionID:seeds:)` 让一个活的 organ 按 seed 驱动后端 + 结果按同一公式排序；intake 三档校验在任何 endpoint 调用之前 fail-fast。
+- **M32 · 跨层投影**：`BASCandidateObservationBundle.coverageSummary`（`distinctSubjectCount` = `candidateIDs.count`）进入 reconciliation。
+- 剩余缺口：真实多候选生成器 / 完整反事实分岔引擎 / 主权断点直接进入梦环（未来里程碑）。

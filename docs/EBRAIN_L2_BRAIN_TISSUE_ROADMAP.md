@@ -344,3 +344,13 @@
 真实 NPU / 算子级工作留在 ML infra 仓。
 
 这样做的意义不是保守，而是为了让 `L2` 的升级既能长出真正的 `Neural Organ Fabric` 的 Swift 一面，又不会让本仓库越界承担它在 `dazzling-weaving-plum §9.6` 里被明确划走的 ANE / 算子 / 训练 / 量化工作——那些工作本就不是 Swift-only repo 能吃下的部分，硬塞进来只会让 `L1 灯芯` 的预算模型、`L11 风闸` 的权限边界与 `L14 玄戒` 的主权裁决一起失真。
+
+---
+
+## 附 — M20–M34 观测原语波次 overlay（2026-04-22）
+
+> 本附段不修改上面任何一句 roadmap 叙事，只补记"在本路线图定型之后" L2 相关波次已兑现的部分，供读者在 `EBRAIN_13L_COMPLETION_MATRIX.md` 与本文之间对齐。
+
+- **M5 · M12**：`BASOrganAdapter` protocol（`BASOrgan` leaf library）+ `BASOrganDeterministicAdapter`（SHA-256 digest 确定性 provider）+ `BASOrganRegistry`（on-device 优先 + remote fallback）+ `AppleFoundationOrganAdapter`（`BASAppleAdapters`，iOS 26 / macOS 26 / visionOS 26 `@available` + `#if canImport(FoundationModels)` 守护）。Scout/Core 通过 `sampling profile` 分化，27/27 测试绿（含 1 条 OS-gated skip）。
+- **M10**：`QinaoLoop.generateCandidates(sessionID:seeds:)` 让一个活的 organ（Deterministic / Apple / 未来 MLX）按 seed 驱动后端 + body 落为 actionSummary + providerID/traceID 真实溯源；registry bridging 保持"BAS 类型不进公开符号图"。
+- 剩余 15%：真机 macOS 26 验证 + MLX fallback provider 扩展位。

@@ -402,3 +402,14 @@
 
 `BASRenderedOutput` 在当前与接下来一个阶段里，都是 compatibility projection；  
 它不应被继续误写成未来无限扩张的终局主对象。
+
+---
+
+## 附 — M20–M34 观测原语波次 overlay（2026-04-22）
+
+> 本附段不修改上面任何一句 roadmap 叙事，只补记"在本路线图定型之后" L12 相关波次已兑现的部分。
+
+- **M27 · soft-hand observation primitives**：`BASOrchestration/BASSoftHandObservation.swift` 落地 `BASSoftHandMode`（`compare / draft / delay / boundary / silentStub` — 五种保护表面）+ `BASSoftHandSignalKind`（`suggestion / selection / render / deferral / downgrade / escalation` 六档）+ `BASSoftHandObservationBundle`（`observations(forMode:)` / `observations(forSubject:)` / first-seen `subjectIDs` / `selectedMode`（最新选择）/ `renderedAsSelected`（证明手真的渲了所选模式）/ `hasCoreSignalCoverage` = selection + render）+ `BASSoftHandObservationBudget`（`escalation` 最贵 0.25）+ ring-actor ledger。19 新 XCTest。
+- **M7.8 · QinaoUI 五模式表面整段落地**：`QinaoComparePanel / QinaoDraftShell / QinaoDelayPacket / QinaoBoundaryScript / QinaoSilentStub` — 双层 ViewModel + SwiftUI view；16/16 绿；SilentStub 刻意 0 内部词汇。
+- **M32 · 跨层投影**：`BASSoftHandObservationBundle.coverageSummary`（`distinctSubjectCount` = `subjectIDs.count`），进入端到端 8 层 reconciliation。
+- 剩余缺口：真实 surface matrix 底座 / draft/local/stub 表面治理 runtime / 可执行替代生成器（未来里程碑）。
