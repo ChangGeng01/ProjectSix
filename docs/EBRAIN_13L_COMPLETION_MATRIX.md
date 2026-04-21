@@ -39,18 +39,35 @@
 | M15 | `sendSession` 主路径 turn audit（pre-halt 拒绝 / parity 失守 fail-closed / severity 自动 halt） | 100% | `QinaoRuntime.sendSession / QinaoSovereignControlPlane.markSessionHalted` | `QinaoRuntimeSessionTests` |
 | M16 | Apple BGTaskScheduler PlatformBridge | 100% | `QinaoBGMaintenanceBridge` | `QinaoBGMaintenanceBridgeTests` |
 | M20 | L8 温度档案 + 四带政策 + 审计日志（additive，不动 `MemoryCore` 主链） | 100% | `BASMemoryTieringProfile` | `BASMemoryTieringProfileTests` |
+| M21 | L8 reconciler + reordering strategies + outcome counters（observational plan，不 mutate `MemoryCore`） | 100% | `BASMemoryTieringReconciler` | `BASMemoryTieringReconcilerTests` |
+| M22 | L6 临在眼 per-channel observation primitives（additive，不动 `BASContextFrame` 主链） | 100% | `BASPresenceObservation` | `BASPresenceObservationTests` |
+| M23 | L7 镜刃 per-signal decomposition observation primitives（additive，不动 `BASDecomposeFrame` 主链） | 100% | `BASDecompositionObservation` | `BASDecompositionObservationTests` |
+| M24 | L9 梦环 per-candidate observation primitives（additive，不动 `BASCandidateFrontier` 主链） | 100% | `BASCandidateObservation` | `BASCandidateObservationTests` |
+| M25 | L10 三我庭 per-voice tribunal observation primitives（additive，附带 allVoicesSpoke 法定人数 + voicesAgree 收敛） | 100% | `BASTribunalObservation` | `BASTribunalObservationTests` |
+| M26 | L11 风闸 per-dimension risk observation primitives（additive，不动 `BASActionPermit / BASRiskVector`） | 100% | `BASRiskObservation` | `BASRiskObservationTests` |
+| M27 | L12 柔手 per-mode soft-hand observation primitives（additive，附带 selectedMode + renderedAsSelected 健康检查） | 100% | `BASSoftHandObservation` | `BASSoftHandObservationTests` |
+| M28 | L13 per-ticket shadow-trial observation primitives（additive，附带 netPromotionScore + regressionDetected 启发式） | 100% | `BASShadowTrialObservation` | `BASShadowTrialObservationTests` |
 
-### 关键层完成度映射（SDK 视角，2026-04-22）
+### 关键层完成度映射（SDK 视角，2026-04-22 acceleration wave 后）
 
-| 层 | 之前（plan §0.1 体检） | 现在（M1-M16 + M20 之后） | 依据 |
+| 层 | 之前（plan §0.1 体检） | 现在（M1-M16 + M20-M28 之后） | 依据 |
 | --- | --- | --- | --- |
 | L1 Lease & Life | 60% | **85%** | M16 BGTaskScheduler 真实接入；M8 loop 呼吸调度 |
 | L4 World Prior | 5% | **70%** | M13 L11 吃 causal template + 证据/同意逻辑 |
 | L5 Host Constitution | 80% | **95%** | M11 候选流水线 + projection parity |
-| L8 Hippocampal Well | 45% | **55%** | M20 `BASMemoryTieringProfile` 四带政策 + quarantine/evict 分流 + append-only transition log（reconciliation 主链尚未接线） |
-| L11 Risk Climate | 60% | **85%** | M13 world-prior fold + four-stage evaluator |
-| L13 Evolution Furnace | 40% | **70%** | M14 triple-gate 离线导出 |
+| L6 Presence Eye | 50% | **60%** | M22 per-channel observation primitives + budget + ledger；ContextFrame 主链尚未接线 |
+| L7 Mirror Blade | 50% | **60%** | M23 per-signal decomposition primitives + budget + ledger；DecomposeFrame 主链尚未接线 |
+| L8 Hippocampal Well | 45% | **65%** | M20 四带政策 + M21 reconciler + 审计日志（reconciliation → mutation writer 尚未接线） |
+| L9 Dream Loop | 55% | **62%** | M24 per-candidate observation primitives + 预算；frontier 主链尚未接线 |
+| L10 Tri-Self Tribunal | 30% | **45%** | M25 per-voice tribunal primitives + 法定人数 + 收敛启发式；真正多头打分仍缺 |
+| L11 Risk Climate | 60% | **87%** | M13 world-prior fold + M26 per-dimension risk primitives + 三支柱 coverage |
+| L12 Gentle Hand | 50% | **58%** | M27 per-mode soft-hand primitives + renderedAsSelected 健康检查；五模式 surface matrix 仍缺 |
+| L13 Evolution Furnace | 40% | **73%** | M14 triple-gate 离线导出 + M28 per-ticket shadow-trial primitives |
 | L14 Sovereign Microkernel | 10% | **90%** | M1-M2 九模块 + M7/M9 双审计 + M15 主路径 turn audit |
+
+### M20-M28 共享语义
+
+M20-M28 的 9 个里程碑共享同一套 additive-only 观察原语形态：每一层都落下 `Signal kind enum + Observation value + Bundle (per-kind/per-subject filter + core coverage check) + Budget table + append-only Ledger actor`。这让 `L14` 将来在接一套统一 reconciler（"观察 ledger vs 最终 frame/permit/decision"）时，只需要一套形状，不需要七套。每一条都不 mutate 既有主链对象，所以它们随时可以被独立接入或回滚。
 
 ## L1-L13
 
