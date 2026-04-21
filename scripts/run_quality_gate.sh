@@ -11,7 +11,7 @@ IOS_DERIVED_DATA="$DERIVED_DATA_ROOT/ios"
 UI_DERIVED_DATA="$DERIVED_DATA_ROOT/ui"
 
 typeset -i score=0
-typeset -i total=24
+typeset -i total=25
 
 rm -rf "$DERIVED_DATA_ROOT"
 
@@ -234,6 +234,9 @@ run_step "Launch, notification, reminder, and action tests" \
     -only-testing:BeforeTests/TomorrowBoxDelayTests \
     -only-testing:BeforeTests/SupportRequestFactoryTests \
     -only-testing:BeforeTests/SupportRequestKindTests
+
+run_step "BehavioralAISubstrate SPM test suite" \
+  swift test --package-path "$ROOT/BehavioralAISubstrate"
 
 run_step "Qinao SDK import boundary check" \
   "$ROOT/scripts/check_qinao_import_boundaries.sh"
