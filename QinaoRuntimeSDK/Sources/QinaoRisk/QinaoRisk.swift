@@ -43,6 +43,10 @@ public actor QinaoRiskGate {
         case deferred(retryAfterSeconds: TimeInterval, reason: String)
         /// The gate asks the host to replace the intent with a softer one.
         case replaced(with: String, reason: String)
+        /// The world-prior endpoint did not recognise the template ID
+        /// supplied in `WorldRiskContext`. Distinct from `.denied` so
+        /// the host can tell "taxonomy miss" from "assessed unsafe".
+        case unknownWorldTemplate(id: String)
     }
 
     public enum Mode: String, Sendable, Equatable, Codable {
@@ -199,6 +203,40 @@ public actor QinaoRiskGate {
         try await requestActionPermit(for: intent, signals: .safe)
     }
 
+    /// World-aware permit request. Consults the supplied
+    /// `QinaoWorldPriorEndpoint` for the `worldContext.templateID`,
+    /// merges the irreversible-harm score into `signals.irreversibility`
+    /// via `max`, forces `.replace` when the matched template requires
+    /// informed consent and the caller has not acknowledged it, forces
+    /// `.delay` when an irreversible template lacks sufficient evidence,
+    /// and otherwise runs the standard four-stage evaluator. Throws
+    /// `.unknownWorldTemplate` when the endpoint has no entry for the
+    /// requested template ID.
+    ///
+    /// This is the call path hosts use when they want the L4 world-prior
+    /// layer ("懂世界") folded into the permit decision. Tests and
+    /// headless callers that never register a world-prior vault can
+    /// keep using the non-world overload — world-awareness is additive.
+    public func requestActionPermit(
+        for intent: ActionIntent,
+        signals: RiskSignals,
+        worldContext: WorldRiskContext,
+        worldEndpoint: any QinaoWorldPriorEndpoint
+    ) async throws -> ActionPermit {
+        guard
+            let worldAssessment = try await worldEndpoint
+                .assessRisk(templateID: worldContext.templateID)
+        else {
+            throw RiskError.unknownWorldTemplate(
+                id: worldContext.templateID)
+        }
+        let assessment = Self.assess(
+            signals,
+            worldAssessment: worldAssessment,
+            worldContext: worldContext)
+        return try issuePermit(for: intent, assessment: assessment)
+    }
+
     /// Verify a permit is live for a given intent.
     public func isPermitValid(
         _ permit: ActionPermit,
@@ -281,6 +319,95 @@ public actor QinaoRiskGate {
         return RiskAssessment(
             mode: .allow,
             reasonCodes: ["baseline-clear"])
+    }
+
+    /// World-aware evaluator. Deterministic layering on top of the
+    /// base `assess(_:)` pipeline:
+    ///
+    /// 1. The matched template's `irreversibleHarmScore` is folded
+    ///    into `signals.irreversibility` via `max`. This lets a
+    ///    world-prior template raise the bar on an otherwise
+    ///    "looks safe" signal set.
+    /// 2. The base evaluator runs on the merged signals. If it
+    ///    returns `.block`, block wins — hard ceilings trump every
+    ///    softer gate, including consent.
+    /// 3. If `requiresConsent && !consentAcknowledged`, we force
+    ///    `.replace` with the stable reason code `consent-required`
+    ///    and the substitute hint `request-informed-consent`. Hosts
+    ///    key their consent-prompt UI on this pair.
+    /// 4. If `!evidenceSufficient` and the template's irreversibility
+    ///    is non-trivial (`≥ 0.5`), we force `.delay` so the caller
+    ///    collects more evidence before committing.
+    /// 5. Otherwise the base result carries through, annotated with
+    ///    the `world-template:<id>` reason code for audit tracing.
+    ///
+    /// The evaluator is pure — same inputs always produce the same
+    /// `RiskAssessment`. No clock, no randomness, no network.
+    public static func assess(
+        _ signals: RiskSignals,
+        worldAssessment: WorldRiskAssessment,
+        worldContext: WorldRiskContext
+    ) -> RiskAssessment {
+        let merged = RiskSignals(
+            harmSeverity: signals.harmSeverity,
+            harmScope: signals.harmScope,
+            irreversibility: max(
+                signals.irreversibility,
+                worldAssessment.irreversibleHarmScore),
+            uncertainty: signals.uncertainty,
+            evidenceDebt: signals.evidenceDebt,
+            manipulationIntensity: signals.manipulationIntensity,
+            pressureAuthenticity: signals.pressureAuthenticity,
+            gsiScore: signals.gsiScore)
+
+        let base = assess(merged)
+        let templateTag =
+            "world-template:\(worldAssessment.matchedTemplateID)"
+
+        // Block wins unconditionally — consent can't unlock a hard
+        // ceiling, and evidence gaps can't be deferred past one.
+        if base.mode == .block {
+            return RiskAssessment(
+                mode: .block,
+                reasonCodes: base.reasonCodes + [templateTag],
+                recommendedDelaySeconds: base.recommendedDelaySeconds,
+                substituteHint: base.substituteHint)
+        }
+
+        // Consent gate: ethics-domain irreversibles require an
+        // explicit host acknowledgement, or we replace with a
+        // consent-prompt hint.
+        if worldAssessment.requiresConsent
+            && !worldContext.consentAcknowledged
+        {
+            return RiskAssessment(
+                mode: .replace,
+                reasonCodes: [
+                    "consent-required",
+                    templateTag
+                ],
+                substituteHint: "request-informed-consent")
+        }
+
+        // Evidence gate: non-trivially irreversible templates need
+        // sufficient evidence before we commit.
+        if !worldAssessment.evidenceSufficient
+            && worldAssessment.irreversibleHarmScore >= 0.5
+        {
+            return RiskAssessment(
+                mode: .delay,
+                reasonCodes: [
+                    "evidence-insufficient-for-irreversible",
+                    templateTag
+                ],
+                recommendedDelaySeconds: 60)
+        }
+
+        return RiskAssessment(
+            mode: base.mode,
+            reasonCodes: base.reasonCodes + [templateTag],
+            recommendedDelaySeconds: base.recommendedDelaySeconds,
+            substituteHint: base.substituteHint)
     }
 
     // MARK: - Internal

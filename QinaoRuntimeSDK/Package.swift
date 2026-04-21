@@ -96,7 +96,8 @@ let package = Package(
                 "QinaoLoop",
                 .product(name: "BASRuntimeCore", package: "BehavioralAISubstrate"),
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
-                .product(name: "BASLeaseLife", package: "BehavioralAISubstrate")
+                .product(name: "BASLeaseLife", package: "BehavioralAISubstrate"),
+                .product(name: "BASWorldPrior", package: "BehavioralAISubstrate")
             ]),
         // QinaoUI — SwiftUI components. Separated so headless
         // servers can depend on QinaoRuntime without pulling in
