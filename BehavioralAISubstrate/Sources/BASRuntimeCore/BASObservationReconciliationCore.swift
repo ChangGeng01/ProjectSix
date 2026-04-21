@@ -36,27 +36,26 @@ import Foundation
 /// The raw values are stable strings so that reports serialize
 /// deterministically across builds.
 ///
-/// Projection status (M41 wave): 13 of 14 layers carry a
-/// `*ObservationBundle` (or equivalent) →
-/// `BASObservationCoverageSummary` projection — L1 (leaseLife, via
+/// Projection status (M42 wave — **full 14-of-14 coverage closed**):
+/// every cognitive layer carries a `*ObservationBundle` (or
+/// equivalent) → `BASObservationCoverageSummary` projection:
+/// L1 (leaseLife, via
 /// `BASLeaseLifeCoordinator.TurnRecorded.coverageSummary(turnID:
 /// sessionID:)`), L2 (neuralOrgan, via
 /// `BASOrganRegistry.coverageSummary(turnID:sessionID:emittedAt:)`),
-/// L4 (worldPrior), L5 (hostConstitution, via
-/// `BASHostCandidatePipeline.coverageSummary(turnID:sessionID:
+/// L3 (thoughtFold, via `BASThoughtFold.coverageSummary(turnID:
+/// sessionID:emittedAt:)`), L4 (worldPrior), L5 (hostConstitution,
+/// via `BASHostCandidatePipeline.coverageSummary(turnID:sessionID:
 /// emittedAt:)`), L6 (presenceEye), L7 (mirrorBlade),
 /// L8 (hippocampalWell, via
 /// `BASMemoryTieringReconciliationOutcome.coverageSummary(turnID:
 /// sessionID:)`), L9 (dreamLoop), L10 (triSelfTribunal),
 /// L11 (riskClimate), L12 (gentleHand), L13 (evolutionFurnace),
 /// L14 (sovereign, via `BASSovereignAuditLedger.coverageSummary(
-/// turnID:sessionID:emittedAt:)`). The remaining one —
-/// L3 — does not yet emit observation primitives in this
-/// shape; the reconciler treats a silent layer as either "not
-/// expected" or "expected but silent" based on the caller's
-/// `expected` list. The enum is complete up front so downstream
-/// observation primitives can extend coverage without a breaking
-/// change.
+/// turnID:sessionID:emittedAt:)`). An L14 reconciler can now
+/// reason over the full cognition stack in one report — no layer
+/// remains structurally silent. The enum remains open for future
+/// additions without a breaking change.
 public enum BASCognitiveLayer: String, Sendable, Codable, CaseIterable {
     /// L1 — Lease & Life kernel.
     case leaseLife = "L1"
