@@ -38,14 +38,16 @@
 | M14 | 离线蒸馏 triple-gate (scrubbed / privacySafe / sovereignSafe) | 100% | `QinaoLearningExportBundle` | `QinaoLearningExportTests` |
 | M15 | `sendSession` 主路径 turn audit（pre-halt 拒绝 / parity 失守 fail-closed / severity 自动 halt） | 100% | `QinaoRuntime.sendSession / QinaoSovereignControlPlane.markSessionHalted` | `QinaoRuntimeSessionTests` |
 | M16 | Apple BGTaskScheduler PlatformBridge | 100% | `QinaoBGMaintenanceBridge` | `QinaoBGMaintenanceBridgeTests` |
+| M20 | L8 温度档案 + 四带政策 + 审计日志（additive，不动 `MemoryCore` 主链） | 100% | `BASMemoryTieringProfile` | `BASMemoryTieringProfileTests` |
 
 ### 关键层完成度映射（SDK 视角，2026-04-22）
 
-| 层 | 之前（plan §0.1 体检） | 现在（M1-M16 之后） | 依据 |
+| 层 | 之前（plan §0.1 体检） | 现在（M1-M16 + M20 之后） | 依据 |
 | --- | --- | --- | --- |
 | L1 Lease & Life | 60% | **85%** | M16 BGTaskScheduler 真实接入；M8 loop 呼吸调度 |
 | L4 World Prior | 5% | **70%** | M13 L11 吃 causal template + 证据/同意逻辑 |
 | L5 Host Constitution | 80% | **95%** | M11 候选流水线 + projection parity |
+| L8 Hippocampal Well | 45% | **55%** | M20 `BASMemoryTieringProfile` 四带政策 + quarantine/evict 分流 + append-only transition log（reconciliation 主链尚未接线） |
 | L11 Risk Climate | 60% | **85%** | M13 world-prior fold + four-stage evaluator |
 | L13 Evolution Furnace | 40% | **70%** | M14 triple-gate 离线导出 |
 | L14 Sovereign Microkernel | 10% | **90%** | M1-M2 九模块 + M7/M9 双审计 + M15 主路径 turn audit |
