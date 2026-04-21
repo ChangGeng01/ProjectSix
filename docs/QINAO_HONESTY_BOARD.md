@@ -210,6 +210,36 @@
 
 ---
 
+## 四 · 附 — M20–M34 观测原语波次（additive overlay，2026-04-22）
+
+> 这一附段**不改**上面任何一行兑现度分数。它记录的是在 M1–M12 完全体骨架已绿的前提下，M20 起**叠加**在 L4 / L6 / L7 / L8 / L9 / L10 / L11 / L12 / L13 之上的"观测原语 + 跨层 reconcile scaffold"工作。兑现度栏目里任何"L14 reconciler 将来把每层观测拉到同一张桌上"的承诺，今天已经由这批代码兑现。
+
+| Mx | 交付 | 代码 | 测试 |
+|---|---|---|---|
+| M20–M21 | L8 热温冷分层 primitives + 过渡 reconciler | `BASMemory/BASMemoryTieringProfile.swift` + `BASMemoryTemperaturePolicy.swift` + `BASMemoryTierTransitionReconciler` | 34 新 XCTest |
+| M22 | L6 presence-eye 六档信号 + budget + ring-ledger | `BASOrchestration/BASPresenceObservation.swift` | 16 新 XCTest |
+| M23 | L7 mirror-blade 六档分解信号 | `BASOrchestration/BASDecompositionObservation.swift` | 16 新 XCTest |
+| M24 | L9 dream-loop 候选信号 | `BASOrchestration/BASCandidateObservation.swift` | 17 新 XCTest |
+| M25 | L10 tri-self 三我庭 vote/objection/convergence | `BASOrchestration/BASTribunalObservation.swift` | 18 新 XCTest |
+| M26 | L11 风险六档信号 | `BASPolicy/BASRiskObservation.swift` | 19 新 XCTest |
+| M27 | L12 柔手五模式 × 六档信号 | `BASOrchestration/BASSoftHandObservation.swift` | 19 新 XCTest |
+| M28 | L13 影子试演六档信号 | `BASMemory/BASShadowTrialObservation.swift` | 19 新 XCTest |
+| M29 | M20–M28 audit-trail 对齐 (docs) | `docs/EBRAIN_13L_COMPLETION_MATRIX.md` | — |
+| M30 | L4 世界先验六档信号 + evidence-level 透传 | `BASWorldPrior/BASWorldPriorObservation.swift` | 24 新 XCTest |
+| M31 | 跨层中立 coverage summary + report scaffold | `BASRuntimeCore/BASObservationReconciliationCore.swift` | 17 新 XCTest |
+| M32 | 8 个 bundle → coverage summary 边缘投影 | `BASWorldPrior/BASWorldPriorObservationCoverage.swift` · `BASPolicy/BASRiskObservationCoverage.swift` · `BASMemory/BASShadowTrialObservationCoverage.swift` · `BASOrchestration/BASObservationCoverageProjections.swift` | 9 新 XCTest（含端到端 8 层 reconciliation） |
+| M33 | M30/M31/M32 audit-trail 对齐 (docs) | `docs/EBRAIN_13L_COMPLETION_MATRIX.md` · `docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md` | — |
+| M34 | Codable dedup + turn/session invariant 深度审修 | `BASRuntimeCore/BASObservationReconciliationCore.swift` · `BASWorldPrior/BASWorldPriorObservation.swift` | 7 新 XCTest |
+| M35 | M34 audit-trail 闭环 + 本附段 (docs) | `docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md` · `docs/QINAO_HONESTY_BOARD.md` | — |
+
+**波次总体性质**：全部 additive — `BASRuntimeCore` 仍是 leaf 模块（`BASObservationReconciliationCore.swift` 不 import 任何观测生产者），`BASSovereign` 的 microkernel 隔离保持；每个原语都是值类型 + `Sendable` + `Codable`，带独立 budget 表与 ring-actor ledger；invariant（dedup-on-layer，turn/session 同桌）在所有构造路径（init / `appending(_:)` / `init(from:)`）上都被枚举测试钉住。
+
+**累计覆盖**：14 层认知架构中 8 层（L4/L6/L7/L9/L10/L11/L12/L13）已有 `*ObservationBundle → BASObservationCoverageSummary` 投影，加上 L8 独立的 tier-transition reconciler。剩余 6 层（L1/L2/L3/L5/L8/L14）中 L8 已有 M21 reconciler 等价面，其他 5 层留到下一波。
+
+**回归基线**：BAS 620 XCTest + 417 swift-testing + Qinao 162 XCTest = **1199 + 1 OS-gated skip 全绿**。
+
+---
+
 ## 五、更新规则
 
 1. 每完成一个子模块（AuditLedger / TokenAuthority / VerdictEngine / ...）更新对应行的兑现度
