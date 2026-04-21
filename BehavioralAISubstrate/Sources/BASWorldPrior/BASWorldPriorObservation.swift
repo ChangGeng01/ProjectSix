@@ -190,6 +190,18 @@ public struct BASWorldPriorObservationBundle:
     /// (b) either a counterfactual seed or a boundary bedrock
     /// consultation. Without that minimum pair, no world-prior
     /// reasoning actually fired this turn.
+    ///
+    /// The `||` between counterfactual and bedrock is intentional
+    /// and asymmetric to other layers' `&&` style. Rationale:
+    ///   - A match with a counterfactual seed is enough — the
+    ///     reasoner explored at least one branch against the prior.
+    ///   - A match with a bedrock consultation is also enough — a
+    ///     boundary axiom was actively considered (and, implicitly,
+    ///     not overridden).
+    ///   - Requiring both would force every matched template to
+    ///     both branch-synthesize *and* touch bedrock, which is
+    ///     wasteful and does not match the spec's "fire one of the
+    ///     two reasoning pathways" contract for L4.
     public var hasCoreSignalCoverage: Bool {
         let covered = Set(observations.map { $0.kind })
         guard covered.contains(.templateMatched)

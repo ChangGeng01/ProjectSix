@@ -35,6 +35,18 @@ import Foundation
 ///
 /// The raw values are stable strings so that reports serialize
 /// deterministically across builds.
+///
+/// Projection status (M32 wave): 8 of 14 layers carry a
+/// `*ObservationBundle` → `BASObservationCoverageSummary`
+/// projection — L4 (worldPrior), L6 (presenceEye), L7 (mirrorBlade),
+/// L9 (dreamLoop), L10 (triSelfTribunal), L11 (riskClimate),
+/// L12 (gentleHand), L13 (evolutionFurnace). The remaining six —
+/// L1, L2, L3, L5, L8, L14 — do not yet emit observation primitives
+/// in this shape; the reconciler treats a silent layer as either
+/// "not expected" or "expected but silent" based on the caller's
+/// `expected` list. The enum is complete up front so downstream
+/// observation primitives can extend coverage without a breaking
+/// change.
 public enum BASCognitiveLayer: String, Sendable, Codable, CaseIterable {
     /// L1 — Lease & Life kernel.
     case leaseLife = "L1"
@@ -120,6 +132,15 @@ public struct BASObservationCoverageSummary:
 /// duplicate arrival (same layer, new summary) replaces the older
 /// reading rather than silently accumulating. Order of insertion
 /// is preserved for deterministic iteration.
+///
+/// Invariants enforced on every construction path (init, appending,
+/// decode):
+///   - at most one summary per `BASCognitiveLayer`, last-write-wins
+///     with first-seen order preserved
+///   - every retained summary's `turnID` / `sessionID` matches the
+///     report's `turnID` / `sessionID`; mismatched summaries are
+///     silently dropped (defensive — a value type should never
+///     carry a broken invariant forward)
 public struct BASObservationReconciliationReport:
     Sendable, Equatable, Codable
 {
@@ -134,27 +155,74 @@ public struct BASObservationReconciliationReport:
     ) {
         self.turnID = turnID
         self.sessionID = sessionID
-        // Deduplicate on layer (last write wins) while preserving
-        // first-seen order. This mirrors the ticketIDs /
-        // subjectIDs / templateIDs ordering semantics used by every
-        // observation bundle.
+        self.summaries = Self.dedupedAndFiltered(
+            summaries,
+            turnID: turnID,
+            sessionID: sessionID)
+    }
+
+    /// Custom `Decodable` conformance that re-runs the
+    /// dedup + turn/session filter post-decode, closing the invariant
+    /// hole where a crafted JSON payload carrying duplicate layers or
+    /// cross-turn summaries would otherwise bypass the designated
+    /// init.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(
+            keyedBy: CodingKeys.self)
+        let turnID = try container.decode(
+            String.self, forKey: .turnID)
+        let sessionID = try container.decode(
+            String.self, forKey: .sessionID)
+        let raw = try container.decode(
+            [BASObservationCoverageSummary].self,
+            forKey: .summaries)
+        self.turnID = turnID
+        self.sessionID = sessionID
+        self.summaries = Self.dedupedAndFiltered(
+            raw,
+            turnID: turnID,
+            sessionID: sessionID)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case turnID
+        case sessionID
+        case summaries
+    }
+
+    /// Normalize a raw summaries array into the invariant-respecting
+    /// form: drop anything whose `turnID` / `sessionID` disagree with
+    /// the enclosing report, then deduplicate on layer with
+    /// last-write-wins and first-seen order preserved.
+    private static func dedupedAndFiltered(
+        _ summaries: [BASObservationCoverageSummary],
+        turnID: String,
+        sessionID: String
+    ) -> [BASObservationCoverageSummary] {
         var keptOrder: [BASCognitiveLayer] = []
         var latest: [BASCognitiveLayer: BASObservationCoverageSummary] = [:]
-        for s in summaries {
+        for s in summaries
+        where s.turnID == turnID && s.sessionID == sessionID {
             if latest[s.layer] == nil {
                 keptOrder.append(s.layer)
             }
             latest[s.layer] = s
         }
-        self.summaries = keptOrder.compactMap { latest[$0] }
+        return keptOrder.compactMap { latest[$0] }
     }
 
     /// Return a new report with `summary` appended. If the layer
     /// already has a summary it is replaced in place; first-seen
-    /// order is preserved (immutable update).
+    /// order is preserved (immutable update). If the summary's
+    /// `turnID` / `sessionID` do not match the report's, the call is
+    /// a no-op — a coverage summary can never cross turn/session
+    /// boundaries in a single report.
     public func appending(
         _ summary: BASObservationCoverageSummary
     ) -> BASObservationReconciliationReport {
+        guard summary.turnID == turnID,
+              summary.sessionID == sessionID
+        else { return self }
         var next = summaries
         if let idx = next.firstIndex(where: { $0.layer == summary.layer }) {
             next[idx] = summary
