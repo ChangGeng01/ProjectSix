@@ -120,7 +120,16 @@ let package = Package(
                 .product(name: "BASRuntimeCore", package: "BehavioralAISubstrate"),
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
                 .product(name: "BASLeaseLife", package: "BehavioralAISubstrate"),
-                .product(name: "BASWorldPrior", package: "BehavioralAISubstrate")
+                .product(name: "BASWorldPrior", package: "BehavioralAISubstrate"),
+                // M80 — cross-chain ledger bridge: QinaoRuntime is the
+                // only layer that may import BASMemory (for the
+                // `BASShadowTrialLedger` protocol seam), BASSovereign
+                // (for the append-only chain), and BASOrchestration
+                // (for the `BASSovereignAuditLedger: BASShadowTrialLedger`
+                // conformance extension) in the same module.
+                .product(name: "BASMemory", package: "BehavioralAISubstrate"),
+                .product(name: "BASSovereign", package: "BehavioralAISubstrate"),
+                .product(name: "BASOrchestration", package: "BehavioralAISubstrate")
             ]),
         // QinaoUI — SwiftUI components. Separated so headless
         // servers can depend on QinaoRuntime without pulling in

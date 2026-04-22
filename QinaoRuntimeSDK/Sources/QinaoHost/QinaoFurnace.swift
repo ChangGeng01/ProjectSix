@@ -369,6 +369,48 @@ public actor QinaoFurnace {
             nextRetractionID: nextRetractionID)
     }
 
+    /// M80 — cross-chain init. The coordinator writes to
+    /// `coordinatorLedger` (typically a dual-writer that forks into
+    /// both `primaryLedger` AND a host-external append-only chain the
+    /// sovereign control plane owns), while `primaryLedger` remains
+    /// the read-side for `replay(candidateID:)` / `allTrialEvents()`.
+    ///
+    /// Fail-closed discipline is the coordinator's responsibility:
+    /// any throw from `coordinatorLedger.appendShadowTrialEvent(_:)`
+    /// prevents the in-memory coordinator state from being committed.
+    /// Callers building a cross-chain writer are expected to write to
+    /// the external side first, then the primary — so a sovereign
+    /// rejection never leaves a dangling entry in the primary that
+    /// `replay` would mistake for a committed transition.
+    ///
+    /// `package`-visible: the only supported factory for a joined
+    /// furnace is `QinaoRuntime.makeFurnace(joinedTo:)`, which lives
+    /// in the composition layer and owns the two ledger references.
+    /// Hosts that do not need the cross-chain continue to use the
+    /// two public inits above and see no behaviour change.
+    package init(
+        primaryLedger: BASInMemoryShadowTrialLedger,
+        coordinatorLedger: any BASShadowTrialLedger,
+        clock: @escaping @Sendable () -> Date = { Date() },
+        nextAuditID: @escaping @Sendable () -> String
+            = { "audit-" + UUID().uuidString },
+        nextTrialID: @escaping @Sendable () -> String
+            = { "trial-" + UUID().uuidString },
+        nextSealID: @escaping @Sendable () -> String
+            = { "seal-" + UUID().uuidString },
+        nextRetractionID: @escaping @Sendable () -> String
+            = { "retract-" + UUID().uuidString }
+    ) {
+        self.ledger = primaryLedger
+        self.coordinator = BASShadowTrialCoordinator(
+            ledger: coordinatorLedger,
+            clock: clock,
+            nextAuditID: nextAuditID,
+            nextTrialID: nextTrialID,
+            nextSealID: nextSealID,
+            nextRetractionID: nextRetractionID)
+    }
+
     // MARK: - Primary transitions
 
     /// Admit a candidate and open a pending trial. Delegates to the

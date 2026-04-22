@@ -542,6 +542,29 @@ public actor QinaoSovereignControlPlane {
         return (plane, handle)
     }
 
+    // MARK: - Cross-chain ledger escape hatch (M80)
+
+    /// Hand the sovereign append-only chain to the composition layer
+    /// so `QinaoFurnace`'s L13 shadow-trial events can be forked onto
+    /// it alongside the furnace's in-memory read-side ledger.
+    ///
+    /// Strictly `package`-visible: the consumer is
+    /// `QinaoRuntime.makeFurnace(joinedTo:)`, which owns the
+    /// dual-writer and the furnace it feeds. No Qinao public API
+    /// surfaces this type — the `package` visibility keeps the
+    /// symbol out of the redaction scanner's public-surface walk
+    /// (see `scripts/check_sovereign_redaction.sh`).
+    ///
+    /// The returned value is the SAME instance the control plane
+    /// uses for its own verdict / warrant / coverage entries, so
+    /// shadow-trial events and sovereign verdicts share one hash
+    /// chain. Integrity verification on the joined chain proves
+    /// evolution-side events could not have been tampered with
+    /// without invalidating every subsequent sovereign verdict.
+    package func sharedAppendOnlyChain() -> BASSovereignAuditLedger {
+        auditLedger
+    }
+
     // MARK: - Rollback
 
     public func bindSnapshotAnchor(
