@@ -51,22 +51,26 @@
 | M31 | Cross-layer 观察协调支架（`BASCognitiveLayer` + `BASObservationCoverageSummary` + `BASObservationReconciliationReport`）— pure 在 `BASRuntimeCore`，零上游耦合 | 100% | `BASObservationReconciliationCore` | `BASObservationReconciliationTests` |
 | M32 | 8 层 bundle → coverage summary 边缘投影（L4/L6/L7/L9/L10/L11/L12/L13）；tribunal `allVoicesSpoke` 映射为 core coverage；end-to-end 8 层协调报告测试 | 100% | `BAS*ObservationCoverage.swift`, `BASObservationCoverageProjections.swift` | `BASObservationCoverageProjectionTests` |
 
-### 关键层完成度映射（SDK 视角，2026-04-22 acceleration wave 后）
+### 关键层完成度映射（SDK 视角，2026-04-22 post-M47 读数）
 
-| 层 | 之前（plan §0.1 体检） | 现在（M1-M16 + M20-M32 之后） | 依据 |
+本表是当前 repo 真实兑现率的一次横切读数，覆盖 14 层全部（含 `L2 / L3` — 这两层不属于 M32 的 8 层 bundle 投影，此前在本矩阵里没有独立行，本次补齐）。
+
+| 层 | 之前（plan §0.1 体检） | 现在（M1-M47 之后，2026-04-22） | 依据 |
 | --- | --- | --- | --- |
-| L1 Lease & Life | 60% | **85%** | M16 BGTaskScheduler 真实接入；M8 loop 呼吸调度 |
+| L1 Lease & Life | 60% | **85%** | M16 BGTaskScheduler 真实接入；M8 loop 呼吸调度；M39 lease-life coverage 投影（10→11 层） |
+| L2 Neural Organ | 40% | **40%** | M12 `BASOrganAdapter` + `BASAppleFoundationModelsAdapter` 默认 provider（Scout/Core 以采样参数/提示词区分）；M41 per-signal neural-organ registry coverage 投影（12→13 层）。剩余 60% = 真实双模型 + 量化 + ANE 算子层 + 图编译器，属 plan §9.6 显式承认的 Swift-only 天花板，非纪律缺口 |
+| L3 Thought-fold | 40% | **72%** | `ThoughtFold / checkpoint lineage / 热启动 / Session Engine v1` 已进主产品 turn；`L3 v2` 呼吸状态机 + 主权桥 + `BASOrganPackage / BASOrganDeltaPlan / BASThermalExchangeFrame / BASBreathSchedulerFrame / BASLungState / BASRollbackAnchor / BASResumeFrame` 最小骨架；M42 L3 thought-fold coverage 投影（13→14 层，闭环） |
 | L4 World Prior | 5% | **75%** | M13 L11 吃 causal template + 证据/同意逻辑；M30 per-template world-prior primitives + evidence-level 传播 + priorContradiction 启发式 |
-| L5 Host Constitution | 80% | **95%** | M11 候选流水线 + projection parity |
+| L5 Host Constitution | 80% | **95%** | M11 候选流水线 + projection parity；M40 host-candidate pipeline coverage 投影（11→12 层） |
 | L6 Presence Eye | 50% | **60%** | M22 per-channel observation primitives + budget + ledger；ContextFrame 主链尚未接线 |
 | L7 Mirror Blade | 50% | **60%** | M23 per-signal decomposition primitives + budget + ledger；DecomposeFrame 主链尚未接线 |
-| L8 Hippocampal Well | 45% | **65%** | M20 四带政策 + M21 reconciler + 审计日志（reconciliation → mutation writer 尚未接线） |
+| L8 Hippocampal Well | 45% | **65%** | M20 四带政策 + M21 reconciler + 审计日志；M37 tier reconciler coverage 投影（8→9 层）（reconciliation → mutation writer 尚未接线） |
 | L9 Dream Loop | 55% | **62%** | M24 per-candidate observation primitives + 预算；frontier 主链尚未接线 |
 | L10 Tri-Self Tribunal | 30% | **45%** | M25 per-voice tribunal primitives + 法定人数 + 收敛启发式；真正多头打分仍缺 |
 | L11 Risk Climate | 60% | **87%** | M13 world-prior fold + M26 per-dimension risk primitives + 三支柱 coverage |
 | L12 Gentle Hand | 50% | **58%** | M27 per-mode soft-hand primitives + renderedAsSelected 健康检查；五模式 surface matrix 仍缺 |
 | L13 Evolution Furnace | 40% | **73%** | M14 triple-gate 离线导出 + M28 per-ticket shadow-trial primitives |
-| L14 Sovereign Microkernel | 10% | **92%** | M1-M2 九模块 + M7/M9 双审计 + M15 主路径 turn audit；M31 cross-layer 协调支架 + M32 8 层投影提供"一次读完所有层观察"形状 |
+| L14 Sovereign Microkernel | 10% | **92%** | M1-M2 九模块 + M7/M9 双审计 + M15 主路径 turn audit；M31 cross-layer 协调支架 + M32 8 层投影 + M37–M42 六层增量投影（闭环至 14-of-14）；M38 sovereign audit-ledger 自投影；M43 端到端组合证明；M44 verdict engine（第一读者）；M45 verdict engine 上热路径（load-bearing）；M47 跨会话隔离压力测试 |
 
 ### M20-M32 共享语义
 

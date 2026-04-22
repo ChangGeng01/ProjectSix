@@ -258,6 +258,36 @@
 
 ---
 
+## 四-A · 14 层全景快照（post-M47，2026-04-22）
+
+这一段和 [EBRAIN_13L_COMPLETION_MATRIX.md §关键层完成度映射](../docs/EBRAIN_13L_COMPLETION_MATRIX.md) 的表**同源**，是一次完整的 14 层兑现率横切读数。引用本表时必须连"依据"列一起引用 —— 单独的百分比没有意义。
+
+| 层 | 名称 | 兑现率 | 主要依据 |
+| --- | --- | --- | --- |
+| L1 | Lease & Life Kernel | **85%** | M16 BGTaskScheduler + M39 lease-life coverage 投影；剩余 = 真机 thermal twin + 异构路由 + 长会话热稳 |
+| L2 | Neural Organ Runtime | **40%** | M12 `BASOrganAdapter` + Apple FoundationModels provider + M41 neural-organ registry coverage；**Swift-only 天花板** — 剩余 60% = ANE 算子层 + 图编译器 + 真双模型量化 runtime，plan §9.6 明确为外部 ML 基础设施而非本 repo 纪律缺口 |
+| L3 | Thought-fold / 折叠肺 | **72%** | `ThoughtFold / checkpoint lineage / 热启动` + Session Engine v1（append-only event log + branch/merge/abandon + watchdog + recovery + import/export）进主产品；`L3 v2` 呼吸状态机 + 主权桥 + organ package/delta 骨架；M42 thought-fold coverage 投影（14-of-14 闭环） |
+| L4 | World Prior Vault | **75%** | `BASWorldPrior` 全库 + 20 因果模板 × 8 桥 × 5 轴 + CounterfactualSeeder + BoundaryBedrock + M13 L11 吃 worldPrior + M30 world-prior primitives + evidence-level 传播 + priorContradiction |
+| L5 | Host Constitution Vault | **95%** | 12 域 typed vault + VersionTree + ForgetRequest + M11 候选流水线 + projection parity + M40 host-candidate coverage 投影；剩余 = 跨设备一致撤回 + 并行宪法层 |
+| L6 | Presence Eye / 临场眼 | **60%** | M22 per-channel observation primitives + budget + ledger + M32 L6 coverage 投影；ContextFrame 主链尚未接线 |
+| L7 | Mirror Blade / 镜刃 | **60%** | M23 per-signal decomposition primitives + budget + ledger + M32 L7 coverage 投影；DecomposeFrame 主链尚未接线 |
+| L8 | Hippocampal Well / 海马井 | **65%** | M20 四带政策 + M21 reconciler + 审计日志 + Temporal Memory Field Stage 1（provenance seal / episode arc / conflict cluster / replay frame / quarantine / sanctum / forget skeleton）+ M37 tier coverage 投影；reconciliation → mutation writer 尚未接线 |
+| L9 | Dream Loop / 梦环 | **62%** | M24 per-candidate observation primitives + 预算 + M32 L9 coverage 投影；frontier 主链尚未接线 |
+| L10 | Tri-Self Tribunal / 三我庭 | **45%** | M25 per-voice tribunal primitives + 法定人数 + 收敛启发式 + M32 L10 coverage 投影；真正多头打分 / veto explain / 训练体系仍缺 |
+| L11 | Risk Climate / 风闸 | **87%** | M13 world-prior fold + M26 per-dimension risk primitives + 三支柱 coverage + M32 L11 coverage 投影；剩余 = 专项 GSI 模型 + 操控/煤气灯校准 + 风险校准曲线 bench |
+| L12 | Gentle Hand / 柔手 | **58%** | M27 per-mode soft-hand primitives + renderedAsSelected 健康检查 + M32 L12 coverage 投影；五模式 surface matrix + agency/disclosure/delay/substitute 结构 + 强边界脚本仍缺 |
+| L13 | Evolution Furnace / 蜕变炉 | **73%** | M14 triple-gate 离线导出（scrubbed/privacySafe/sovereignSafe）+ M28 per-ticket shadow-trial primitives + M32 L13 coverage 投影 + Stage 1 governance spine；workflow/guard/bias/export/risk-pattern 的 runtime 行为化仍在外部工程 |
+| L14 | Sovereign Microkernel | **92%** | M1-M2 九模块（IntegritySentinel / PrivilegeArbiter / ContaminationGuard / SnapshotManager / VerdictEngine / TokenAuthority / AuditLedger / SovereignLockManager / StubRenderer）+ M7/M9 双审计 + M15 主路径 turn audit + M31 cross-layer 协调支架 + M37–M42 六层增量投影（闭环至 14-of-14）+ M38 自投影 + M43 组合证明 + M44 verdict engine + M45 load-bearing 热路径 + M47 跨会话隔离压力证据 |
+
+**读表纪律**：
+
+- 百分比是**兑现率**（公开承诺被代码+测试兑现的比例），不是"功能完成度"；同一功能若未被测试钉住即使代码存在也不计。
+- `L2 = 40%` 是 plan §9.6 的**设计天花板**（Swift-only 边界），不是"未完成"—— 继续推 L2 需要离开本 repo 引入 ANE/算子/蒸馏 ML 产线。向外介绍时必须说这是天花板、不是漏洞。
+- `L5 / L11 / L14` 在 85–95% 区间，是最可对外宣称兑现的三条；`L2 / L10 / L12` 在 40–58% 区间，是最应保持谦逊措辞的三条。
+- 以 "5 整体性质" 与 "3 不变量" 对外讲话时，这张表是每一条承诺的**下游来源**—— 不得独立声明比本表高的数字。
+
+---
+
 ## 五、更新规则
 
 1. 每完成一个子模块（AuditLedger / TokenAuthority / VerdictEngine / ...）更新对应行的兑现度
