@@ -210,7 +210,7 @@
 
 ---
 
-## 四 · 附 — M20–M43 观测原语波次（additive overlay，2026-04-22）
+## 四 · 附 — M20–M44 观测原语波次（additive overlay，2026-04-22）
 
 > 这一附段**不改**上面任何一行兑现度分数。它记录的是在 M1–M12 完全体骨架已绿的前提下，M20 起**叠加**在 L4 / L6 / L7 / L8 / L9 / L10 / L11 / L12 / L13 之上的"观测原语 + 跨层 reconcile scaffold"工作。兑现度栏目里任何"L14 reconciler 将来把每层观测拉到同一张桌上"的承诺，今天已经由这批代码兑现。
 
@@ -239,12 +239,13 @@
 | M41 | L2 neural-organ registry coverage 投影（12→13 层） | `BASOrgan/BASOrganRegistryObservationCoverage.swift` · `BASRuntimeCore/BASObservationReconciliationCore.swift`（doc 更新） | 15 新 XCTest |
 | M42 | **L3 thought-fold coverage 投影（13→14 层，闭环）** | `BASOrchestration/BASThoughtFoldObservationCoverage.swift` · `BASRuntimeCore/BASObservationReconciliationCore.swift`（doc 更新） | 17 新 XCTest |
 | M43 | **14 层端到端 reconciliation 集成测试（组合证明）** | `BehavioralAISubstrateTests/BASFourteenLayerReconciliationTests.swift` | 5 新 XCTest |
+| M44 | **跨层 reconciliation verdict engine（第一读者）** | `BASRuntimeCore/BASObservationReconciliationVerdictEngine.swift` | 15 新 XCTest |
 
 **波次总体性质**：全部 additive — `BASRuntimeCore` 仍是 leaf 模块（`BASObservationReconciliationCore.swift` 不 import 任何观测生产者），`BASSovereign` 的 microkernel 隔离保持（M38 coverage 文件只依赖 `BASRuntimeCore`），`BASMemory` leaf 纪律保持（M40 coverage 只依赖 `BASRuntimeCore`），`BASLeaseLife`（M39）/`BASOrgan`（M41）/`BASOrchestration`（M42）leaf 纪律同样保持（三者 coverage 文件只依赖 `BASRuntimeCore`）；每个原语都是值类型 + `Sendable` + `Codable`，带独立 budget 表与 ring-actor ledger；invariant（dedup-on-layer，turn/session 同桌）在所有构造路径（init / `appending(_:)` / `init(from:)`）上都被枚举测试钉住。L8（M37）/L14（M38）/L1（M39）/L5（M40）/L2（M41）/L3（M42）是这批里的"无 bundle / 无内生 turn-key"投影：把 governance sweep 结果 / 审计链快照 / 每轮 lease-life 记录 / 宿主宪法版本前沿 / 神经器官登记簿 / 一次 cognition-fold 绑到调用方指定的 turn/session，和另外 8 层共用同一张 `BASObservationReconciliationReport`。M39 的 `hasCoreSignalCoverage` 语义特别 — `.emergency` guard level 是"L1 spoke but did not sustain core function"的可审计信号。M40 要求 `activeVersion` 非空；M41 要求 registry 同时覆盖 `.scout` AND `.core`；M42 要求 fold 三件结构锚点齐全（`!checksum.isEmpty && !restorePointer.isEmpty && degradedReasonCodes.isEmpty`），任一缺失都是 L3 结构不完整的可审计信号。M42 同时用 "optional refs 不算 L3 subject" 的边界规则避免与其他层的 subject namespace 双重计数。
 
-**累计覆盖**：14 层认知架构中 **14 层全部**（**L1/L2/L3/L4/L5/L6/L7/L8/L9/L10/L11/L12/L13/L14**）已有 `→ BASObservationCoverageSummary` 投影 — **14-of-14 全覆盖闭环**。一个 L14 reconciler 现在可以在一张 `BASObservationReconciliationReport` 里同时看到整个认知栈每一层，没有任何层是结构性静默的。M43 在 per-layer 投影之上再加一层**组合证明**：一个端到端集成测试用每层真实 primitive 构造 14 份 coverage summary，合并到同一张 report 里，断言 `coveredLayers.count == 14`、`Set(coveredLayers) == Set(BASCognitiveLayer.allCases)`、`isFullyObserved(expected: .allCases)` 为真 —— "14-of-14" 现在既是 per-layer claim 又是 composable claim。
+**累计覆盖**：14 层认知架构中 **14 层全部**（**L1/L2/L3/L4/L5/L6/L7/L8/L9/L10/L11/L12/L13/L14**）已有 `→ BASObservationCoverageSummary` 投影 — **14-of-14 全覆盖闭环**。一个 L14 reconciler 现在可以在一张 `BASObservationReconciliationReport` 里同时看到整个认知栈每一层，没有任何层是结构性静默的。M43 在 per-layer 投影之上再加一层**组合证明**：一个端到端集成测试用每层真实 primitive 构造 14 份 coverage summary，合并到同一张 report 里，断言 `coveredLayers.count == 14`、`Set(coveredLayers) == Set(BASCognitiveLayer.allCases)`、`isFullyObserved(expected: .allCases)` 为真 —— "14-of-14" 现在既是 per-layer claim 又是 composable claim。M44 再往上一层，把 report 从"可读取"推进到"可**裁决**"：一个纯 value-type verdict engine（`BASObservationReconciliationVerdictEngine.evaluate(...)` → `BASObservationReconciliationVerdict` with `clean < advisory < halt` severity + deterministic-order findings）是 14-of-14 substrate 的**第一读者**。budget overspend = halt；missing layer / missing core coverage = advisory；每条 finding 都 1:1 对应 report 上可指出的条件，裁决逻辑无 I/O、无 actor hop、无状态 — 两次相同输入总产出相等 verdict，可写入 sovereign 审计链。
 
-**回归基线**：BAS 692 XCTest + 417 swift-testing + Qinao 162 XCTest = **1271 + 1 OS-gated skip 全绿**。
+**回归基线**：BAS 707 XCTest + 417 swift-testing + Qinao 162 XCTest = **1286 + 1 OS-gated skip 全绿**。
 
 ---
 
