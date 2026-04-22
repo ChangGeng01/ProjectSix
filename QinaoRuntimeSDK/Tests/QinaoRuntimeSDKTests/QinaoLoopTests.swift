@@ -259,4 +259,212 @@ final class QinaoLoopTests: XCTestCase {
         let frontier = try await loop.candidateFrontier(sessionID: "s1")
         XCTAssertEqual(frontier.map(\.candidateID), ["new"])
     }
+
+    // MARK: - M74 tri-self tribunal
+
+    /// M74 expects position `i` of `triSelfScores` to match
+    /// position `i` of `candidateFrontier` — the three-voice
+    /// readout rides on the same ranking the host already shows.
+    /// We use IDs where alphabetical order reverses the frontier
+    /// order so "frontier order" is actually proven, not coincident.
+    func testTriSelfScoresProducesThreeVoicesPerCandidateInFrontierOrder()
+        async throws
+    {
+        let loop = QinaoLoop()
+        try await loop.submit(sessionID: "s1", candidates: [
+            // a-lo sorts first alphabetically but last by score.
+            makeInput("a-lo",
+                      benefit: 0.2, cost: 0.2,
+                      reversibility: 0.3, confidence: 0.2),
+            makeInput("b-hi",
+                      benefit: 0.9, cost: 0.1,
+                      reversibility: 0.8, confidence: 0.9),
+        ])
+        let frontier = try await loop.candidateFrontier(sessionID: "s1")
+        XCTAssertEqual(frontier.map(\.candidateID), ["b-hi", "a-lo"])
+        let triSelf = try await loop.triSelfScores(sessionID: "s1")
+        XCTAssertEqual(triSelf.count, 2)
+        XCTAssertEqual(triSelf.map(\.candidateID), ["b-hi", "a-lo"])
+        // Every candidate carries three voice readings + dominant.
+        for score in triSelf {
+            XCTAssertGreaterThanOrEqual(score.guardVoice.concern, 0)
+            XCTAssertLessThanOrEqual(score.guardVoice.concern, 1)
+            XCTAssertGreaterThanOrEqual(score.scoutVoice.concern, 0)
+            XCTAssertLessThanOrEqual(score.scoutVoice.concern, 1)
+            XCTAssertGreaterThanOrEqual(score.harmonyVoice.concern, 0)
+            XCTAssertLessThanOrEqual(score.harmonyVoice.concern, 1)
+        }
+    }
+
+    /// Guardian: 0.40*manip + 0.30*boundary + 0.30*clamp(wpc).
+    /// Reason-code priority: world-prior > manipulation > boundary,
+    /// each with its own threshold.
+    func testGuardVoiceConcernFormulaAndReasonCodes() {
+        let input = QinaoLoop.CandidateInput(
+            candidateID: "guard-heavy",
+            title: "t", actionSummary: "s",
+            expectedBenefit: 0.5, expectedCost: 0.2,
+            reversibility: 0.5, confidence: 0.5,
+            evidenceGap: 0, manipulationRisk: 0.8,
+            emotionalBias: 0, boundaryConflict: 0.6)
+        let score = QinaoLoop.triSelfScore(
+            for: input, worldPriorContradiction: 0.6)
+        // 0.40*0.8 + 0.30*0.6 + 0.30*0.6 = 0.32 + 0.18 + 0.18 = 0.68
+        XCTAssertEqual(score.guardVoice.concern, 0.68, accuracy: 1e-9)
+        XCTAssertEqual(score.guardVoice.reasonCodes,
+                       ["world-prior-contradiction",
+                        "manipulation-risk",
+                        "boundary-conflict"])
+    }
+
+    /// Scout: 0.55*evgap + 0.30*(1-conf) + 0.15*(1-ben).
+    /// Reason-code priority: evidence-gap > low-confidence >
+    /// low-expected-benefit.
+    func testScoutVoiceConcernFormulaAndReasonCodes() {
+        let input = QinaoLoop.CandidateInput(
+            candidateID: "scout-heavy",
+            title: "t", actionSummary: "s",
+            expectedBenefit: 0.2, expectedCost: 0.2,
+            reversibility: 0.5, confidence: 0.3,
+            evidenceGap: 0.8, manipulationRisk: 0,
+            emotionalBias: 0, boundaryConflict: 0)
+        let score = QinaoLoop.triSelfScore(
+            for: input, worldPriorContradiction: 0)
+        // 0.55*0.8 + 0.30*0.7 + 0.15*0.8 = 0.44 + 0.21 + 0.12 = 0.77
+        XCTAssertEqual(score.scoutVoice.concern, 0.77, accuracy: 1e-9)
+        XCTAssertEqual(score.scoutVoice.reasonCodes,
+                       ["evidence-gap",
+                        "low-confidence",
+                        "low-expected-benefit"])
+    }
+
+    /// Harmony: 0.60*emo + 0.40*(1-rev). Reason-code priority:
+    /// emotional-bias > low-reversibility.
+    func testHarmonyVoiceConcernFormulaAndReasonCodes() {
+        let input = QinaoLoop.CandidateInput(
+            candidateID: "harmony-heavy",
+            title: "t", actionSummary: "s",
+            expectedBenefit: 0.5, expectedCost: 0.2,
+            reversibility: 0.2, confidence: 0.5,
+            evidenceGap: 0, manipulationRisk: 0,
+            emotionalBias: 0.8, boundaryConflict: 0)
+        let score = QinaoLoop.triSelfScore(
+            for: input, worldPriorContradiction: 0)
+        // 0.60*0.8 + 0.40*0.8 = 0.48 + 0.32 = 0.80
+        XCTAssertEqual(score.harmonyVoice.concern, 0.80, accuracy: 1e-9)
+        XCTAssertEqual(score.harmonyVoice.reasonCodes,
+                       ["emotional-bias", "low-reversibility"])
+    }
+
+    /// Tie-break order is guardian > scout > harmony. The
+    /// precedence is its own contract, separate from the voice
+    /// formulas: scenario (a) proves composition-path ties via the
+    /// real formula; (b) and (c) exercise the precedence helper
+    /// directly, so IEEE-754 float drift in the voice formulas
+    /// can't mask the tie-break check.
+    func testDominantVoiceTiesBreakGuardianThenScoutThenHarmony() {
+        // (a) All three = 0.30 via the formula → guardian wins.
+        //   guardian  = 0.40*0.75           = 0.30
+        //   scout     = 0.30*(1-0)          = 0.30  (ben=1 zeroes last term)
+        //   harmony   = 0.40*(1-0.25)       = 0.30
+        let allEqual = QinaoLoop.CandidateInput(
+            candidateID: "all-equal",
+            title: "t", actionSummary: "s",
+            expectedBenefit: 1.0, expectedCost: 0.2,
+            reversibility: 0.25, confidence: 0,
+            evidenceGap: 0, manipulationRisk: 0.75,
+            emotionalBias: 0, boundaryConflict: 0)
+        let allEqualScore = QinaoLoop.triSelfScore(
+            for: allEqual, worldPriorContradiction: 0)
+        XCTAssertEqual(allEqualScore.guardVoice.concern, 0.30, accuracy: 1e-9)
+        XCTAssertEqual(allEqualScore.scoutVoice.concern, 0.30, accuracy: 1e-9)
+        XCTAssertEqual(allEqualScore.harmonyVoice.concern, 0.30, accuracy: 1e-9)
+        XCTAssertEqual(allEqualScore.dominantVoice, .guardian)
+
+        // (b) guardian=0, scout==harmony → scout wins.
+        XCTAssertEqual(
+            QinaoLoop.dominantTriSelfVoice(
+                guardian: 0.0, scout: 0.3, harmony: 0.3),
+            .scout)
+
+        // (c) guardian==scout==0, harmony>0 → harmony wins
+        // (neither earlier branch takes it).
+        XCTAssertEqual(
+            QinaoLoop.dominantTriSelfVoice(
+                guardian: 0.0, scout: 0.0, harmony: 0.3),
+            .harmony)
+    }
+
+    /// No candidate's MAX voice concern reaches 0.7 → no veto.
+    func testVetoExplainNilWhenNoVoiceCrosses0_7() async throws {
+        let loop = QinaoLoop()
+        try await loop.submit(sessionID: "s1", candidates: [
+            makeInput("c1",
+                      benefit: 0.8, cost: 0.1,
+                      reversibility: 0.6, confidence: 0.6,
+                      evidenceGap: 0.2, manipulation: 0.1,
+                      emotional: 0.1, boundary: 0.1)
+        ])
+        let veto = try await loop.vetoExplain(sessionID: "s1")
+        XCTAssertNil(veto)
+    }
+
+    /// Manipulation=1 + boundary=1 pushes guardian to exactly 0.70
+    /// (0.40 + 0.30). Guardian should be the vetoing voice, primary
+    /// reason manipulation-risk (priority over boundary-conflict),
+    /// supporting reason boundary-conflict.
+    func testVetoExplainNamesGuardVoiceWhenManipulationHigh()
+        async throws
+    {
+        let loop = QinaoLoop()
+        try await loop.submit(sessionID: "s1", candidates: [
+            makeInput("high-risk",
+                      benefit: 0.5, cost: 0.2,
+                      reversibility: 0.5, confidence: 0.5,
+                      manipulation: 1.0, boundary: 1.0),
+            makeInput("safe-alt",
+                      benefit: 0.5, cost: 0.2,
+                      reversibility: 0.5, confidence: 0.5),
+        ])
+        let veto = try await loop.vetoExplain(sessionID: "s1")
+        XCTAssertNotNil(veto)
+        XCTAssertEqual(veto?.candidateID, "high-risk")
+        XCTAssertEqual(veto?.vetoingVoice, .guardian)
+        XCTAssertEqual(veto?.concernLevel ?? 0, 0.70, accuracy: 1e-9)
+        XCTAssertEqual(veto?.primaryReason, "manipulation-risk")
+        XCTAssertEqual(veto?.supportingReasons, ["boundary-conflict"])
+        XCTAssertEqual(veto?.alternativeID, "safe-alt")
+        XCTAssertTrue(
+            veto?.alternativeRationale.hasPrefix("lowest-tri-self-max:")
+            ?? false,
+            "rationale must carry stable prefix, got: "
+            + (veto?.alternativeRationale ?? "nil"))
+    }
+
+    /// When multiple non-vetoed candidates exist, the alternative
+    /// is the one with the *lowest* MAX voice concern, not whichever
+    /// sorts first. "clean" (all zero risks, all favorable) beats
+    /// "mid-risk" (moderate manipulation) even though both are below
+    /// the 0.7 veto threshold.
+    func testVetoExplainPicksLowestTriSelfMaxAsAlternative() async throws {
+        let loop = QinaoLoop()
+        try await loop.submit(sessionID: "s1", candidates: [
+            makeInput("triggering",
+                      benefit: 0.5, cost: 0.2,
+                      reversibility: 0.5, confidence: 0.5,
+                      manipulation: 1.0, boundary: 1.0),
+            makeInput("mid-risk",
+                      benefit: 0.5, cost: 0.2,
+                      reversibility: 0.5, confidence: 0.5,
+                      manipulation: 0.4),
+            makeInput("clean",
+                      benefit: 1.0, cost: 0.1,
+                      reversibility: 1.0, confidence: 1.0),
+        ])
+        let veto = try await loop.vetoExplain(sessionID: "s1")
+        XCTAssertEqual(veto?.candidateID, "triggering")
+        XCTAssertEqual(veto?.alternativeID, "clean")
+        XCTAssertEqual(veto?.alternativeRationale,
+                       "lowest-tri-self-max:0.00")
+    }
 }

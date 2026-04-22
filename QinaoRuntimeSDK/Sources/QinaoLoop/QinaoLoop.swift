@@ -568,6 +568,124 @@ public actor QinaoLoop {
                 worldPriorContradiction: contradiction))
     }
 
+    // MARK: - M74 tri-self readouts
+
+    /// Per-candidate three-voice reading. Guardian / scout /
+    /// harmony each carry their own concern score and reason
+    /// codes; `dominantVoice` names whichever concern is largest
+    /// (ties: guardian > scout > harmony). Returned in the same
+    /// ordering `candidateFrontier` uses — frontier score desc,
+    /// ID asc on ties — so position `i` in `triSelfScores` lines
+    /// up with position `i` in `candidateFrontier`.
+    ///
+    /// Throws `.sessionUnknown` / `.noCandidatesYet` on the same
+    /// conditions as `candidateFrontier`.
+    public func triSelfScores(
+        sessionID: String
+    ) throws -> [TriSelfScore] {
+        guard let state = sessions[sessionID] else {
+            throw LoopError.sessionUnknown(id: sessionID)
+        }
+        guard !state.inputs.isEmpty else {
+            throw LoopError.noCandidatesYet
+        }
+        let frontier = try candidateFrontier(
+            sessionID: sessionID, topK: Int.max)
+        return frontier.compactMap { draft -> TriSelfScore? in
+            guard let input = state.inputs[draft.candidateID] else {
+                return nil
+            }
+            let contradiction =
+                state.contradictions[draft.candidateID] ?? 0
+            return Self.triSelfScore(
+                for: input,
+                worldPriorContradiction: contradiction)
+        }
+    }
+
+    /// Enriched guardian branch. When any candidate has a voice
+    /// concern ≥ 0.7, `vetoExplain` returns a `VetoExplain` that
+    /// names:
+    ///
+    /// - the vetoed candidate (highest MAX-voice-concern; ties
+    ///   break on ID asc)
+    /// - which voice cast the veto (that candidate's dominant)
+    /// - that voice's concern level on the candidate
+    /// - that voice's primary reason code + remaining supporting
+    ///   codes, in voice-internal priority order
+    /// - the alternative (lowest MAX-voice-concern; ties: higher
+    ///   reversibility, then ID asc)
+    /// - a stable `"lowest-tri-self-max:0.NN"` rationale string
+    ///
+    /// Returns `nil` when no candidate has any voice at or above
+    /// the 0.7 threshold — same trigger condition as
+    /// `guardianBranch`, but with voice-level attribution.
+    ///
+    /// Throws `.sessionUnknown` / `.noCandidatesYet` on the same
+    /// conditions as `candidateFrontier`.
+    public func vetoExplain(
+        sessionID: String
+    ) throws -> VetoExplain? {
+        let scores = try triSelfScores(sessionID: sessionID)
+        guard let state = sessions[sessionID] else {
+            throw LoopError.sessionUnknown(id: sessionID)
+        }
+        // Find the worst candidate: highest MAX-voice-concern that
+        // crosses 0.7. Ties break on candidateID ASC so "lowest
+        // ID wins tie" is deterministic across hosts.
+        let triggered = scores.compactMap {
+            score -> (score: TriSelfScore, max: Double)? in
+            let m = Self.maxTriSelfConcern(score)
+            return m >= 0.7 ? (score, m) : nil
+        }
+        let worstTuple = triggered.max { a, b in
+            if a.max != b.max { return a.max < b.max }
+            // Reverse compare so the *smaller* ID wins on a tie.
+            return a.score.candidateID > b.score.candidateID
+        }
+        guard let worst = worstTuple else {
+            return nil
+        }
+        // Alternative = lowest MAX-voice-concern among the rest.
+        // Ties: higher reversibility wins, then ID ASC.
+        let alternatives = scores.filter {
+            $0.candidateID != worst.score.candidateID
+        }
+        let chosen = alternatives.min { a, b in
+            let aMax = Self.maxTriSelfConcern(a)
+            let bMax = Self.maxTriSelfConcern(b)
+            if aMax != bMax { return aMax < bMax }
+            let aRev = state.inputs[a.candidateID]?
+                .reversibility ?? 0
+            let bRev = state.inputs[b.candidateID]?
+                .reversibility ?? 0
+            if aRev != bRev { return aRev > bRev }
+            return a.candidateID < b.candidateID
+        }
+        let altID = chosen?.candidateID
+            ?? "no-alternative-available"
+        let altRationale: String
+        if let c = chosen {
+            altRationale = Self.alternativeRationale(
+                forMaxConcern: Self.maxTriSelfConcern(c))
+        } else {
+            altRationale = "no-alternative-available"
+        }
+        let vetoingVoice = worst.score.dominantVoice
+        let voiceReading = Self.voiceReading(
+            vetoingVoice, on: worst.score)
+        let primary = voiceReading.reasonCodes.first ?? "unknown"
+        let supporting = Array(voiceReading.reasonCodes.dropFirst())
+        return VetoExplain(
+            candidateID: worst.score.candidateID,
+            vetoingVoice: vetoingVoice,
+            concernLevel: worst.max,
+            primaryReason: primary,
+            supportingReasons: supporting,
+            alternativeID: altID,
+            alternativeRationale: altRationale)
+    }
+
     // MARK: - Pure helpers
 
     /// Composite critique strength from the four L10 tribunal
