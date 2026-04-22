@@ -2025,6 +2025,22 @@ public struct BASEBrainRuntimeCoordinator {
             thoughtFrame.critiques = projectedCritiques
         }
 
+        // M59 — L4 world-prior main-chain wiring. Derive the
+        // per-candidate / per-signal world-prior bundle at the seam
+        // where `materializeThoughtArtifacts` has populated
+        // counterfactualBundles / critiqueBundles / uncertaintyLedger
+        // and `publicProjection` has merged candidate/forecast/critique
+        // lists — before tri-self tribunal runs so L10 can see L4
+        // signals on the same turn. Reuses M53's derived (sessionID,
+        // turnID) so L4 / L6 / L7 / L10 / L11 / L12 / L13 bundles on
+        // this turn share strictly equal coordinates — the L14 audit
+        // surface joins them by that key.
+        thoughtFrame = thoughtFrame
+            .withDerivedWorldPriorObservationBundle(
+                turnID: derivedTurnID,
+                sessionID: derivedSessionID,
+                emittedAt: request.recordedAt)
+
         var (triScores, mergedChoice) = triSelfService.mergeChoice(
             thoughtFrame: thoughtFrame,
             hostContext: hostContext

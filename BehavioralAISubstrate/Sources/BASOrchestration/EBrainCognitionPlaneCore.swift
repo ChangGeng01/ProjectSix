@@ -3,6 +3,7 @@ import BASMemory
 import BASObservability
 import BASPolicy
 import BASRuntimeCore
+import BASWorldPrior
 
 public enum BASContextTaskType: String, Codable, CaseIterable, Sendable {
     case chat
@@ -2609,7 +2610,7 @@ public enum BASThoughtStopReason: String, Codable, CaseIterable, Sendable {
 }
 
 public struct BASThoughtFrame: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.8.0"
+    public static let currentSchemaVersion = "1.9.0"
 
     public var schemaVersion: String
     public var stepIndex: Int
@@ -2693,6 +2694,25 @@ public struct BASThoughtFrame: BASSchemaVersioned {
     /// list on the same turn.
     public var updateTicketObservationBundle:
         BASUpdateTicketObservationBundle?
+    /// M59 — L4 world-prior per-candidate / per-signal observation
+    /// bundle derived from this frame's `candidates`,
+    /// `counterfactualBundles`, `critiqueBundles`, and
+    /// `uncertaintyLedger`. Six kinds (templateMatched,
+    /// counterfactualSeeded, domainBridgeCrossed,
+    /// boundaryBedrockConsulted, evidenceRevised, priorContradiction)
+    /// emit only when their structural precondition holds — a
+    /// candidate without a counterfactual bundle yields only one
+    /// templateMatched; a counterfactual crossing two domains yields
+    /// counterfactualSeeded plus domainBridgeCrossed; a critique with
+    /// both high boundaryConflict AND high critiqueStrength yields
+    /// priorContradiction on top of boundaryBedrockConsulted. A turn
+    /// with zero candidates yields a bundle with zero observations —
+    /// the legitimate "no-L4-turn" signal. Load-bearing consumers
+    /// (M32 L4 coverage projection, L14 audit surface) read this
+    /// field directly; coherent-by-construction with the populated
+    /// thought frame on the same turn.
+    public var worldPriorObservationBundle:
+        BASWorldPriorObservationBundle?
 
     public init(
         schemaVersion: String = BASThoughtFrame.currentSchemaVersion,
@@ -2732,7 +2752,9 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         softHandObservationBundle:
             BASSoftHandObservationBundle? = nil,
         updateTicketObservationBundle:
-            BASUpdateTicketObservationBundle? = nil
+            BASUpdateTicketObservationBundle? = nil,
+        worldPriorObservationBundle:
+            BASWorldPriorObservationBundle? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.stepIndex = stepIndex
@@ -2769,6 +2791,8 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         self.softHandObservationBundle = softHandObservationBundle
         self.updateTicketObservationBundle =
             updateTicketObservationBundle
+        self.worldPriorObservationBundle =
+            worldPriorObservationBundle
     }
 }
 
@@ -2906,6 +2930,40 @@ extension BASThoughtFrame {
         copy.updateTicketObservationBundle =
             BASUpdateTicketObservationBundle.derive(
                 fromUpdateTickets: updateTickets,
+                turnID: turnID,
+                sessionID: sessionID,
+                emittedAt: emittedAt)
+        return copy
+    }
+
+    /// M59 — Return a copy of this frame with a freshly derived
+    /// `worldPriorObservationBundle` attached. Pure function: no I/O,
+    /// no actor hop, deterministic for the same (frame, turnID,
+    /// sessionID, emittedAt) tuple.
+    ///
+    /// The coordinator calls this at the seam where
+    /// `materializeThoughtArtifacts` has filled in counterfactual
+    /// bundles / critique bundles / uncertainty ledger — after
+    /// `publicProjection` merges and before the tri-self tribunal
+    /// reads the frame — so the bundle flows into the same turn-audit
+    /// record that the L14 surface later signs, and downstream layers
+    /// (L10 tribunal, L11 risk climate, L12 soft hand, L13 evolution)
+    /// can reconcile their own per-candidate signals against the
+    /// L4 reasoning that fired on the same candidate.
+    ///
+    /// Existing frames with a non-nil bundle are overwritten — the
+    /// intent of this method is "re-derive from current signals", not
+    /// "merge". Callers that want to preserve an upstream bundle
+    /// should skip this helper and set the field directly.
+    public func withDerivedWorldPriorObservationBundle(
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> BASThoughtFrame {
+        var copy = self
+        copy.worldPriorObservationBundle =
+            BASWorldPriorObservationBundle.derive(
+                fromThoughtFrame: self,
                 turnID: turnID,
                 sessionID: sessionID,
                 emittedAt: emittedAt)
