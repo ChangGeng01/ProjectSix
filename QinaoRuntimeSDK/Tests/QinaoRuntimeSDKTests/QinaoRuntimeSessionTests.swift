@@ -69,6 +69,7 @@ final class QinaoRuntimeSessionTests: XCTestCase {
             coordinator: coordinator,
             tokenAuthority: tokenAuthority,
             turnVerifier: verifier,
+            auditLedger: ledger,
             warrantTTLSeconds: 10,
             now: now)
         let risk = QinaoRiskGate(permitTTLSeconds: 10, now: now)

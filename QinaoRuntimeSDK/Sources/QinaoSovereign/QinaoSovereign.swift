@@ -220,6 +220,85 @@ public actor QinaoSovereignControlPlane {
         public var isAcceptable: Bool { parity != .coordinatorLaxer }
     }
 
+    // MARK: - M45 Coverage verdict (cross-layer structural read)
+
+    /// Severity assigned to a cross-layer coverage verdict. Mirrors
+    /// the substrate's reconciliation severity ladder 1:1 but keeps
+    /// the `BAS*` type names off the public surface.
+    ///
+    /// Semantics:
+    ///   - `.clean` — every expected layer reported with core coverage
+    ///     and total wake budget stayed at or below the ceiling.
+    ///   - `.advisory` — some expected layer was silent or produced
+    ///     insufficient structural signal. Non-fatal; the session may
+    ///     continue with the finding recorded.
+    ///   - `.halt` — total per-turn budget exceeded the ceiling. The
+    ///     runtime treats this as fail-closed.
+    public enum CoverageSeverity:
+        String, Sendable, Equatable, Codable, Comparable, CaseIterable
+    {
+        case clean
+        case advisory
+        case halt
+
+        public static func < (
+            lhs: CoverageSeverity, rhs: CoverageSeverity
+        ) -> Bool {
+            let order: [CoverageSeverity] = [.clean, .advisory, .halt]
+            guard
+                let l = order.firstIndex(of: lhs),
+                let r = order.firstIndex(of: rhs)
+            else { return false }
+            return l < r
+        }
+    }
+
+    /// Structured finding produced by the substrate's reconciliation
+    /// engine while reading the per-turn coverage report. Each case
+    /// corresponds 1:1 with a substrate finding; layer identifiers are
+    /// carried as raw strings (`"L1"`..`"L14"`) so hosts do not import
+    /// the substrate's layer enum.
+    public enum CoverageFinding: Sendable, Equatable, Codable {
+        /// An expected layer produced no summary this turn.
+        case missingLayer(layerID: String)
+        /// A reporting layer produced a summary but its core-signal
+        /// coverage flag was false.
+        case layerMissingCoreCoverage(layerID: String)
+        /// Total clamped per-turn budget exceeded the ceiling.
+        case budgetOverspend(observed: Double, ceiling: Double)
+    }
+
+    /// Host-facing coverage verdict for one turn. Carries the severity
+    /// and the structured findings in the deterministic order the
+    /// engine emits them (budget first, then missing layers in
+    /// expected order, then no-core in first-seen order).
+    public struct CoverageReading: Sendable, Equatable, Codable {
+        public let sessionID: String
+        public let turnID: String
+        public let severity: CoverageSeverity
+        public let findings: [CoverageFinding]
+        public let emittedAt: Date
+
+        public init(
+            sessionID: String,
+            turnID: String,
+            severity: CoverageSeverity,
+            findings: [CoverageFinding],
+            emittedAt: Date
+        ) {
+            self.sessionID = sessionID
+            self.turnID = turnID
+            self.severity = severity
+            self.findings = findings
+            self.emittedAt = emittedAt
+        }
+
+        /// `true` iff the severity is `.clean` or `.advisory`. The
+        /// runtime treats `.halt` as a hard reason to stop the
+        /// session.
+        public var isAcceptable: Bool { severity != .halt }
+    }
+
     /// Qinao-local mirror of the substrate's brain-state enum. Names
     /// match 1:1; the indirection is what keeps the substrate type
     /// name out of the Qinao public surface.
@@ -352,6 +431,11 @@ public actor QinaoSovereignControlPlane {
     private let coordinator: BASSovereignCleanRebootCoordinator
     private let tokenAuthority: BASSovereignTokenAuthority
     private let turnVerifier: BASSovereignTurnVerifier
+    /// The shared audit ledger. Held directly (not just indirectly via
+    /// the coordinator/engine) so M45 coverage verdicts can be
+    /// recorded and queried without reaching back through intermediate
+    /// components.
+    private let auditLedger: BASSovereignAuditLedger
     private let warrantTTL: TimeInterval
     private let now: @Sendable () -> Date
     private var haltedSessions: Set<String> = []
@@ -374,12 +458,14 @@ public actor QinaoSovereignControlPlane {
         coordinator: BASSovereignCleanRebootCoordinator,
         tokenAuthority: BASSovereignTokenAuthority,
         turnVerifier: BASSovereignTurnVerifier,
+        auditLedger: BASSovereignAuditLedger,
         warrantTTLSeconds: TimeInterval = 30,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.coordinator = coordinator
         self.tokenAuthority = tokenAuthority
         self.turnVerifier = turnVerifier
+        self.auditLedger = auditLedger
         self.warrantTTL = warrantTTLSeconds
         self.now = now
     }
@@ -447,6 +533,7 @@ public actor QinaoSovereignControlPlane {
             coordinator: coordinator,
             tokenAuthority: tokenAuthority,
             turnVerifier: verifier,
+            auditLedger: ledger,
             warrantTTLSeconds: configuration.warrantTTLSeconds,
             now: configuration.now)
         let handle = SubstrateHandle(
@@ -740,6 +827,118 @@ public actor QinaoSovereignControlPlane {
         return try await auditTurn(
             observations: bas,
             coordinatorSeverity: coordinatorSeverity)
+    }
+
+    // MARK: - M45 coverage-verdict recording
+
+    /// Record a cross-layer coverage verdict for one turn.
+    ///
+    /// Projects the substrate's audit ledger into an L14 coverage
+    /// summary, assembles a single-layer reconciliation report, and
+    /// runs it through the pure reconciliation verdict engine (M44).
+    /// The resulting verdict is stored in the shared audit ledger
+    /// (via the M45 parallel coverage-verdict slot) and returned to
+    /// the caller in host-facing shape.
+    ///
+    /// Today only L14 produces hot-path data on every turn — hosts do
+    /// not yet stream per-turn observation bundles for L1..L13 into
+    /// the ledger. The default `expectedLayerIDs == ["L14"]` reflects
+    /// that reality; call sites that wire additional layers pass a
+    /// broader expectation set and any silent layer becomes a
+    /// `.missingLayer` finding in the returned verdict.
+    ///
+    /// - Parameters:
+    ///   - sessionID: session the coverage belongs to
+    ///   - turnID: turn the coverage belongs to
+    ///   - budgetCeiling: maximum allowed total clamped budget for
+    ///     the turn. Strict `>` comparison — at-ceiling is clean.
+    ///     Clamped to `[0, 1]` before use.
+    ///   - expectedLayerIDs: layer raw IDs (`"L1"`..`"L14"`) that
+    ///     should have reported. Defaults to `["L14"]`.
+    ///
+    /// - Returns: `CoverageReading` the runtime can act on. `.halt`
+    ///   severity is a hard signal to stop the session; `.advisory`
+    ///   is recorded but does not force a halt.
+    @discardableResult
+    public func recordTurnCoverage(
+        sessionID: String,
+        turnID: String,
+        budgetCeiling: Double = 1.0,
+        expectedLayerIDs: [String] = [
+            BASCognitiveLayer.sovereign.rawValue
+        ]
+    ) async -> CoverageReading {
+        let emittedAt = now()
+        let l14Summary = await auditLedger.coverageSummary(
+            turnID: turnID,
+            sessionID: sessionID,
+            emittedAt: emittedAt)
+        let report = BASObservationReconciliationReport(
+            turnID: turnID,
+            sessionID: sessionID,
+            summaries: [l14Summary])
+        let expected = expectedLayerIDs.compactMap {
+            BASCognitiveLayer(rawValue: $0)
+        }
+        let basVerdict =
+            BASObservationReconciliationVerdictEngine.evaluate(
+                report: report,
+                expectedLayers: expected,
+                budgetCeiling: budgetCeiling,
+                emittedAt: emittedAt)
+        await auditLedger.recordCoverageVerdict(basVerdict)
+        return Self.toCoverageReading(basVerdict)
+    }
+
+    /// Read back a coverage reading previously recorded via
+    /// `recordTurnCoverage`. Returns `nil` when no reading has been
+    /// recorded for the given `(session, turn)` pair.
+    public func coverageReading(
+        sessionID: String,
+        turnID: String
+    ) async -> CoverageReading? {
+        guard
+            let basVerdict = await auditLedger.coverageVerdict(
+                forSession: sessionID, turn: turnID)
+        else { return nil }
+        return Self.toCoverageReading(basVerdict)
+    }
+
+    // MARK: - Coverage-reading translators
+
+    private static func toCoverageReading(
+        _ v: BASObservationReconciliationVerdict
+    ) -> CoverageReading {
+        CoverageReading(
+            sessionID: v.sessionID,
+            turnID: v.turnID,
+            severity: toCoverageSeverity(v.severity),
+            findings: v.findings.map(toCoverageFinding),
+            emittedAt: v.emittedAt)
+    }
+
+    private static func toCoverageSeverity(
+        _ s: BASObservationReconciliationSeverity
+    ) -> CoverageSeverity {
+        switch s {
+        case .clean: return .clean
+        case .advisory: return .advisory
+        case .halt: return .halt
+        }
+    }
+
+    private static func toCoverageFinding(
+        _ f: BASObservationReconciliationFinding
+    ) -> CoverageFinding {
+        switch f {
+        case .missingLayer(let layer):
+            return .missingLayer(layerID: layer.rawValue)
+        case .layerMissingCoreCoverage(let layer):
+            return .layerMissingCoreCoverage(layerID: layer.rawValue)
+        case .budgetOverspend(let observed, let ceiling):
+            return .budgetOverspend(
+                observed: observed, ceiling: ceiling)
+        }
     }
 
     // MARK: - Qinao ↔ BAS enum mirror translators

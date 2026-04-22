@@ -181,19 +181,28 @@ public actor QinaoRuntime {
     // MARK: - Turn-level audit
 
     /// The outcome of a turn audit. Hosts that call `sendSession`
-    /// after every turn receive an `AuditReport`; if `sessionHalted`
-    /// is `true` the runtime has already engaged the halt and the
-    /// host must stop accepting new turns on this session until an
-    /// explicit `sovereign.releaseHaltedSession(...)` call.
+    /// after every turn receive an `AuditReport` plus a structural
+    /// `CoverageReading` (M45) derived from the substrate's
+    /// observation-report substrate; if `sessionHalted` is `true` the
+    /// runtime has already engaged the halt and the host must stop
+    /// accepting new turns on this session until an explicit
+    /// `sovereign.releaseHaltedSession(...)` call.
     public struct TurnOutcome: Sendable, Equatable {
         public let audit: QinaoSovereignControlPlane.AuditReport
+        /// Cross-layer coverage verdict for the turn (M45). Answers
+        /// "did every expected layer report healthily" and "did the
+        /// total wake-budget stay under the ceiling" for this turn.
+        /// `.halt` severity triggers a fail-closed session halt.
+        public let coverage: QinaoSovereignControlPlane.CoverageReading
         public let sessionHalted: Bool
 
         public init(
             audit: QinaoSovereignControlPlane.AuditReport,
+            coverage: QinaoSovereignControlPlane.CoverageReading,
             sessionHalted: Bool
         ) {
             self.audit = audit
+            self.coverage = coverage
             self.sessionHalted = sessionHalted
         }
     }
@@ -211,6 +220,14 @@ public actor QinaoRuntime {
             sessionID: String,
             severity: QinaoSovereignControlPlane.AuditSeverity,
             auditRef: String)
+        /// The M45 cross-layer coverage verdict returned `.halt`
+        /// severity — typically because total clamped per-turn budget
+        /// exceeded the ceiling. Fail-closed: the session is halted
+        /// before the caller sees the turn result.
+        case coverageHalt(
+            sessionID: String,
+            turnID: String,
+            findings: [QinaoSovereignControlPlane.CoverageFinding])
     }
 
     /// Main-path turn entry. Runs the completed turn's observations
@@ -242,7 +259,9 @@ public actor QinaoRuntime {
     /// on the outcome".
     public func sendSession(
         _ observations: QinaoSovereignControlPlane.TurnObservations,
-        coordinatorSeverity: QinaoSovereignControlPlane.AuditSeverity?
+        coordinatorSeverity: QinaoSovereignControlPlane.AuditSeverity?,
+        coverageBudgetCeiling: Double = 1.0,
+        expectedCoverageLayerIDs: [String] = ["L14"]
     ) async throws -> TurnOutcome {
         // Pre-flight: refuse if the session was already halted.
         if await sovereign.isSessionHalted(observations.sessionID) {
@@ -253,6 +272,18 @@ public actor QinaoRuntime {
         let report = try await sovereign.auditTurn(
             observations: observations,
             coordinatorSeverity: coordinatorSeverity)
+
+        // M45 — the cross-layer coverage verdict MUST be computed every
+        // turn, even on parity/severity halt paths, so the ledger's
+        // per-turn coverage row is present and governance tooling can
+        // diff "what the coordinator said" against "what the structural
+        // coverage read said" after-the-fact. Compute it before any
+        // throw so it also lands in the halt branches below.
+        let coverage = await sovereign.recordTurnCoverage(
+            sessionID: observations.sessionID,
+            turnID: observations.turnID,
+            budgetCeiling: coverageBudgetCeiling,
+            expectedLayerIDs: expectedCoverageLayerIDs)
 
         // Fail-closed: the coordinator was laxer than the independent
         // engine — the coordinator allowed something the engine would
@@ -268,6 +299,21 @@ public actor QinaoRuntime {
                 auditRef: report.auditRef)
         }
 
+        // M45 coverage-severity halt: the cross-layer coverage read
+        // returned `.halt` (typically a wake-budget overspend). This
+        // is a structural ceiling the coordinator does not see; the
+        // runtime halts the session and throws so the caller cannot
+        // advance past a budget breach.
+        if coverage.severity == .halt {
+            await sovereign.markSessionHalted(
+                sessionID: observations.sessionID,
+                reason: "coverage-halt")
+            throw TurnError.coverageHalt(
+                sessionID: observations.sessionID,
+                turnID: observations.turnID,
+                findings: coverage.findings)
+        }
+
         // Severity-driven halt path: the audit itself asked for a
         // hard stop (rollback / deadStop). Halt the session and
         // return the report so the caller can act on it (rollback
@@ -279,9 +325,15 @@ public actor QinaoRuntime {
             await sovereign.markSessionHalted(
                 sessionID: observations.sessionID,
                 reason: "audit-severity:\(report.severity.rawValue)")
-            return TurnOutcome(audit: report, sessionHalted: true)
+            return TurnOutcome(
+                audit: report,
+                coverage: coverage,
+                sessionHalted: true)
         }
 
-        return TurnOutcome(audit: report, sessionHalted: false)
+        return TurnOutcome(
+            audit: report,
+            coverage: coverage,
+            sessionHalted: false)
     }
 }

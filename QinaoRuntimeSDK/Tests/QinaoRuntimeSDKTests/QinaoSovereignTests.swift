@@ -58,6 +58,7 @@ final class QinaoSovereignTests: XCTestCase {
             coordinator: coordinator,
             tokenAuthority: tokenAuthority,
             turnVerifier: verifier,
+            auditLedger: ledger,
             warrantTTLSeconds: warrantTTL,
             now: now)
         return Fixture(

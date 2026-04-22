@@ -84,6 +84,7 @@ enum PropertyDemoFixture {
             coordinator: coordinator,
             tokenAuthority: tokenAuthority,
             turnVerifier: verifier,
+            auditLedger: ledger,
             warrantTTLSeconds: 30,
             now: now)
 

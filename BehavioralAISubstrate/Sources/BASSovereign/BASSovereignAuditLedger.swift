@@ -91,6 +91,17 @@ public actor BASSovereignAuditLedger {
     /// Index for O(1) `query(byAuditRef:)`. Kept in sync with `entries`.
     private var auditRefIndex: [String: Int] = [:]
 
+    /// Parallel storage for M44 cross-layer coverage verdicts
+    /// (`BASObservationReconciliationVerdict`). These are structured reads
+    /// of per-turn observation reports, **not** sovereign verdicts — they
+    /// are kept alongside the hash-chained entries (rather than mixed in)
+    /// so coverage audits can be queried without inflating the chain with
+    /// non-sovereign material, and so M44 verdicts do not need to carry
+    /// the full BR-012 signing machinery. Last-write-wins per
+    /// `(sessionID, turnID)` so a single turn cannot accumulate multiple
+    /// coverage readings.
+    private var coverageVerdicts: [BASObservationReconciliationVerdict] = []
+
     public init(
         signingSecret: SymmetricKey,
         signingNamespace: String = BASSovereignTrustConstants.signingNamespace
@@ -212,6 +223,65 @@ public actor BASSovereignAuditLedger {
     /// callers cannot mutate the ledger through it.
     public func snapshot() -> [AppendedEntry] {
         entries
+    }
+
+    // MARK: - Coverage-verdict storage (M45)
+    //
+    // The M44 verdict engine produces `BASObservationReconciliationVerdict`
+    // values from `BASObservationReconciliationReport`s. These represent a
+    // cross-layer structural read ("did every expected layer report with
+    // core coverage; did total wake-budget stay under the ceiling") and
+    // sit one level above the hash-chained sovereign verdicts this ledger
+    // was built for. Storing them in a parallel array keeps both concerns
+    // observable from the same ledger instance without conflating them.
+
+    /// Record a coverage verdict for a turn. If a verdict already exists
+    /// for the same `(sessionID, turnID)` it is replaced in place with the
+    /// incoming value (last-write-wins). Ordering of first-seen `(session,
+    /// turn)` keys is preserved so callers can iterate deterministically.
+    public func recordCoverageVerdict(
+        _ verdict: BASObservationReconciliationVerdict
+    ) {
+        if let idx = coverageVerdicts.firstIndex(where: {
+            $0.sessionID == verdict.sessionID
+                && $0.turnID == verdict.turnID
+        }) {
+            coverageVerdicts[idx] = verdict
+        } else {
+            coverageVerdicts.append(verdict)
+        }
+    }
+
+    /// Look up the coverage verdict for a specific turn, or `nil` if no
+    /// verdict has been recorded for that `(session, turn)` pair.
+    public func coverageVerdict(
+        forSession sessionID: String,
+        turn turnID: String
+    ) -> BASObservationReconciliationVerdict? {
+        coverageVerdicts.first {
+            $0.sessionID == sessionID && $0.turnID == turnID
+        }
+    }
+
+    /// Every coverage verdict recorded for a session, in first-seen turn
+    /// order. Used by governance tooling to reconstruct the per-turn
+    /// coverage timeline.
+    public func coverageVerdicts(
+        forSession sessionID: String
+    ) -> [BASObservationReconciliationVerdict] {
+        coverageVerdicts.filter { $0.sessionID == sessionID }
+    }
+
+    /// Total number of coverage verdicts across every session.
+    public func coverageVerdictCount() -> Int {
+        coverageVerdicts.count
+    }
+
+    /// Full value-copy export of coverage verdicts for replay/governance.
+    public func coverageVerdictSnapshot()
+        -> [BASObservationReconciliationVerdict]
+    {
+        coverageVerdicts
     }
 
     // MARK: - Canonical bytes / crypto primitives
