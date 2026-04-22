@@ -315,4 +315,135 @@ final class QinaoLifecycleTests: XCTestCase {
         let lungB = await lifecycle.lungActor()
         XCTAssertTrue(lungA === lungB)
     }
+
+    // MARK: - M69 applyLiveThermalGuardLevel(to:)
+
+    private func plannedBudget(
+        thermalGuardLevel: BASThermalGuardLevel = .nominal,
+        maintenanceClass: BASMaintenanceClass = .light
+    ) -> BASBudgetFrame {
+        BASBudgetFrame(
+            runMode: .engage,
+            maxLoops: 3,
+            maxCandidates: 5,
+            maxDecodeTokens: 128,
+            retrievalDepth: 4,
+            precisionProfile: .balanced,
+            deviceRoute: .scoutCPU,
+            thermalGuardLevel: thermalGuardLevel,
+            maintenanceAllowed: true,
+            leaseID: "lease-m69",
+            leaseExpiresAt: Date(timeIntervalSince1970: 1_700_000_500),
+            maintenanceClass: maintenanceClass,
+            wakeIntentID: "wake-m69",
+            allowedHeads: ["scout.default", "core.default"],
+            policyBundleVersion: "policy-v1.3",
+            policyDecisionIDs: ["p-1", "p-2"])
+    }
+
+    func testApplyLiveThermalRoutesCriticalIntoEmergency() async {
+        let thermal = ThermalSource()
+        let submitter = Submitter()
+        let canceller = Canceller()
+        thermal.set(.critical)
+        let lifecycle = makeLifecycle(
+            thermal: thermal,
+            submitter: submitter,
+            canceller: canceller)
+
+        let planned = plannedBudget(thermalGuardLevel: .nominal)
+        let routed = await lifecycle.applyLiveThermalGuardLevel(
+            to: planned)
+
+        // Thermal twin under `.critical` → guardLevel `.emergency`.
+        XCTAssertEqual(routed.thermalGuardLevel, .emergency)
+        // Every other field byte-stable: JSON encoding over an
+        // identity override (planned already has .nominal) would not
+        // be equal here, but we can at least spot-check the 16 other
+        // fields explicitly.
+        XCTAssertEqual(routed.schemaVersion, planned.schemaVersion)
+        XCTAssertEqual(routed.runMode, planned.runMode)
+        XCTAssertEqual(routed.maxLoops, planned.maxLoops)
+        XCTAssertEqual(routed.maxCandidates, planned.maxCandidates)
+        XCTAssertEqual(routed.maxDecodeTokens, planned.maxDecodeTokens)
+        XCTAssertEqual(routed.retrievalDepth, planned.retrievalDepth)
+        XCTAssertEqual(routed.precisionProfile,
+                       planned.precisionProfile)
+        XCTAssertEqual(routed.deviceRoute, planned.deviceRoute)
+        XCTAssertEqual(routed.maintenanceAllowed,
+                       planned.maintenanceAllowed)
+        XCTAssertEqual(routed.leaseID, planned.leaseID)
+        XCTAssertEqual(routed.leaseExpiresAt, planned.leaseExpiresAt)
+        XCTAssertEqual(routed.maintenanceClass,
+                       planned.maintenanceClass)
+        XCTAssertEqual(routed.wakeIntentID, planned.wakeIntentID)
+        XCTAssertEqual(routed.allowedHeads, planned.allowedHeads)
+        XCTAssertEqual(routed.policyBundleVersion,
+                       planned.policyBundleVersion)
+        XCTAssertEqual(routed.policyDecisionIDs,
+                       planned.policyDecisionIDs)
+    }
+
+    func testApplyLiveThermalForcesSampleWhenCold() async {
+        // No prior `recordTurn` / `resample` — the lifecycle has
+        // never observed a turn. The routing must still read live.
+        let thermal = ThermalSource()
+        let submitter = Submitter()
+        let canceller = Canceller()
+        thermal.set(.serious)
+        let lifecycle = makeLifecycle(
+            thermal: thermal,
+            submitter: submitter,
+            canceller: canceller)
+
+        let planned = plannedBudget(thermalGuardLevel: .nominal)
+        let routed = await lifecycle.applyLiveThermalGuardLevel(
+            to: planned)
+
+        // `.serious` → thermal level `.hot` → guard `.throttle`
+        // at zero pressure.
+        XCTAssertEqual(routed.thermalGuardLevel, .throttle)
+    }
+
+    func testApplyLiveThermalLeavesNominalWhenDeviceIsNominal() async {
+        let thermal = ThermalSource()
+        let submitter = Submitter()
+        let canceller = Canceller()
+        thermal.set(.nominal)
+        let lifecycle = makeLifecycle(
+            thermal: thermal,
+            submitter: submitter,
+            canceller: canceller)
+
+        // Warm the cache with an explicit resample so we cover the
+        // `currentReading() → cached` branch, not the cold fallback.
+        _ = await lifecycle.resample()
+
+        let planned = plannedBudget(thermalGuardLevel: .throttle)
+        let routed = await lifecycle.applyLiveThermalGuardLevel(
+            to: planned)
+
+        // Live reading wins over the caller's planned value.
+        XCTAssertEqual(routed.thermalGuardLevel, .nominal,
+            "live reading must override the planned value")
+    }
+
+    func testApplyLiveThermalDoesNotMutateSource() async {
+        let thermal = ThermalSource()
+        let submitter = Submitter()
+        let canceller = Canceller()
+        thermal.set(.critical)
+        let lifecycle = makeLifecycle(
+            thermal: thermal,
+            submitter: submitter,
+            canceller: canceller)
+
+        let planned = plannedBudget(thermalGuardLevel: .nominal)
+        _ = await lifecycle.applyLiveThermalGuardLevel(to: planned)
+
+        // Source budget is a value type — the derived routed copy
+        // must not retroactively change the caller's frame.
+        XCTAssertEqual(planned.thermalGuardLevel, .nominal,
+            "applyLiveThermal* must not mutate the source frame")
+    }
 }

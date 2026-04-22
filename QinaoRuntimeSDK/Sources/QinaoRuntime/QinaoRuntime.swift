@@ -93,6 +93,20 @@ public actor QinaoRuntime {
     public let risk: QinaoRiskGate
     public let sovereign: QinaoSovereignControlPlane
     public let loop: QinaoLoop
+    /// Optional L1 lease & life lifecycle (M66). When present, the
+    /// runtime can thread the live thermal reading into per-turn
+    /// `BASBudgetFrame` via `prepareBudgetForTurn(_:)` (M69) and
+    /// record end-of-turn telemetry through `recordTurnOnLifecycle`.
+    /// Hosts that construct the runtime without a lifecycle retain
+    /// the pre-M69 behavior byte-for-byte (every lifecycle-aware
+    /// method becomes a no-op or identity transform).
+    ///
+    /// Marked `nonisolated` because `QinaoLifecycle` is a `Sendable`
+    /// actor reference and the field itself is an immutable `let`;
+    /// exposing it synchronously lets hosts reach into the
+    /// lifecycle's actor surface (e.g. `thermalActor()`, `bridge`)
+    /// without a two-step actor hop.
+    public nonisolated let lifecycle: QinaoLifecycle?
 
     private let toolExecutor: ToolExecutor
     private let now: @Sendable () -> Date
@@ -104,13 +118,15 @@ public actor QinaoRuntime {
         sovereign: QinaoSovereignControlPlane,
         loop: QinaoLoop,
         toolExecutor: @escaping ToolExecutor,
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date = { Date() },
+        lifecycle: QinaoLifecycle? = nil
     ) {
         self.host = host
         self.memory = memory
         self.risk = risk
         self.sovereign = sovereign
         self.loop = loop
+        self.lifecycle = lifecycle
         self.toolExecutor = toolExecutor
         self.now = now
     }
@@ -335,5 +351,73 @@ public actor QinaoRuntime {
             audit: report,
             coverage: coverage,
             sessionHalted: false)
+    }
+
+    // MARK: - M69 lifecycle-aware budget routing
+
+    /// Route the live thermal guard level from the runtime's attached
+    /// `QinaoLifecycle` into a planned per-turn `BASBudgetFrame`.
+    ///
+    /// This is the M69 seam that closes invariant #1's last inch —
+    /// "先醒再答" stops being caller-invented and becomes main-chain
+    /// wired. A host's turn loop becomes:
+    ///
+    ///     let planned = BASBudgetFrame(...)                 // plan
+    ///     let routed  = await runtime.prepareBudgetForTurn(  // wake
+    ///         planned)
+    ///     // ... run the turn under `routed` ...
+    ///     await runtime.recordTurnOnLifecycle(                // decay
+    ///         runMode: .engage, durationSeconds: elapsed)
+    ///
+    /// When the runtime was constructed without a `QinaoLifecycle`
+    /// (pre-M69 call sites), this method returns `planned` unchanged
+    /// — byte-for-byte — so existing hosts see no behavioral change
+    /// until they explicitly wire a lifecycle in.
+    ///
+    /// When a lifecycle is attached, the method delegates to
+    /// `QinaoLifecycle.applyLiveThermalGuardLevel(to:)`, which uses
+    /// the twin's cached reading when warm and force-samples when
+    /// cold — so the returned frame always carries a live reading
+    /// rather than a stale default.
+    ///
+    /// - Parameter planned: The budget frame the host planned for
+    ///   the upcoming turn.
+    /// - Returns: `planned` unchanged when no lifecycle is attached;
+    ///   otherwise `planned` with `thermalGuardLevel` replaced by
+    ///   the lifecycle's live value and every other field preserved.
+    public func prepareBudgetForTurn(
+        _ planned: BASBudgetFrame
+    ) async -> BASBudgetFrame {
+        guard let lifecycle = lifecycle else { return planned }
+        return await lifecycle.applyLiveThermalGuardLevel(to: planned)
+    }
+
+    /// End-of-turn lifecycle telemetry. Forwards to the attached
+    /// `QinaoLifecycle.recordTurn(runMode:durationSeconds:)` so the
+    /// lung state accumulator advances, the thermal twin re-samples,
+    /// and the breath scheduler reconciles against the resulting
+    /// guard level. When no lifecycle is attached, does nothing.
+    ///
+    /// Returns the structured lifecycle outcome (lung snapshot,
+    /// thermal reading, cancelled breaths) when a lifecycle is
+    /// present; `nil` otherwise. Hosts that want to correlate the
+    /// runtime audit with the lifecycle telemetry can pair this with
+    /// `sendSession(...)`.
+    ///
+    /// - Parameters:
+    ///   - runMode: The run mode the turn used. Passed to
+    ///     `BASLungStateAccumulator` via the Qinao-native
+    ///     `QinaoRunMode` mirror.
+    ///   - durationSeconds: How long the turn actually took. Drives
+    ///     pressure accumulation.
+    @discardableResult
+    public func recordTurnOnLifecycle(
+        runMode: QinaoRunMode,
+        durationSeconds: Double
+    ) async -> BASLeaseLifeCoordinator.TurnRecorded? {
+        guard let lifecycle = lifecycle else { return nil }
+        return await lifecycle.recordTurn(
+            runMode: runMode,
+            durationSeconds: durationSeconds)
     }
 }

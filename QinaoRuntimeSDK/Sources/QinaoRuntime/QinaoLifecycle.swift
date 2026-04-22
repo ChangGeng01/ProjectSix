@@ -306,6 +306,43 @@ public actor QinaoLifecycle {
         await currentReading().guardLevel
     }
 
+    // MARK: - Budget-frame routing (M69)
+
+    /// Stamp the lifecycle's live thermal guard level onto a planned
+    /// `BASBudgetFrame` and return the routed copy.
+    ///
+    /// This is the M69 seam that closes the main-chain wiring from
+    /// lifecycle → per-turn budget. Before M69, hosts had to spell
+    /// out the two-step "read the twin, then call
+    /// `withLiveThermalGuardLevel`" dance themselves; with M69 the
+    /// one-liner becomes:
+    ///
+    ///     let routed = await lifecycle
+    ///         .applyLiveThermalGuardLevel(to: plannedBudget)
+    ///
+    /// Mirror of `BASBudgetFrame.withLiveThermalGuardLevel(from:)`
+    /// (M67), but keyed on `QinaoLifecycle` instead of
+    /// `BASLeaseLifeCoordinator` so hosts never have to touch the
+    /// substrate-private coordinator. Internally uses
+    /// `currentReading()` — warm-cache-preferred, force-sample when
+    /// the lifecycle has not yet observed a turn.
+    ///
+    /// Pure value-transform semantics: every other field of the
+    /// frame — schema version, run mode, caps, precision profile,
+    /// device route, lease metadata, maintenance class, allowed
+    /// heads, policy identifiers — is preserved byte-for-byte.
+    ///
+    /// - Parameter planned: The budget frame the caller has already
+    ///   built for the upcoming turn.
+    /// - Returns: A new frame identical to `planned` except that its
+    ///   `thermalGuardLevel` is the lifecycle's live value.
+    public func applyLiveThermalGuardLevel(
+        to planned: BASBudgetFrame
+    ) async -> BASBudgetFrame {
+        let reading = await currentReading()
+        return planned.withLiveThermalGuardLevel(reading.guardLevel)
+    }
+
     // MARK: - Breath scheduling (forwarding)
 
     /// Schedule a maintenance breath. Routes through the thermal-
