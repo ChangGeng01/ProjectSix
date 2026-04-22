@@ -739,11 +739,11 @@ final class BASUpdateTicketObservationDerivationTests: XCTestCase {
     func testThoughtFrameSchemaVersionAtOrAboveOneEightZero() {
         // Sanity floor: M58 established 1.8.0 as the L13-bundle
         // floor; M59 moved it to 1.9.0; M60 moved it to 1.10.0;
-        // M61 moved it to 1.11.0; M62 moved it to 1.12.0.
-        // Downstream legacy decoders expect the field to exist at
-        // or above this floor.
+        // M61 moved it to 1.11.0; M62 moved it to 1.12.0;
+        // M63 moved it to 1.13.0. Downstream legacy decoders expect
+        // the field to exist at or above this floor.
         XCTAssertEqual(
-            BASThoughtFrame.currentSchemaVersion, "1.12.0")
+            BASThoughtFrame.currentSchemaVersion, "1.13.0")
     }
 
     // MARK: - Path 15: bundle helpers

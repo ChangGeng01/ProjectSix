@@ -2610,7 +2610,7 @@ public enum BASThoughtStopReason: String, Codable, CaseIterable, Sendable {
 }
 
 public struct BASThoughtFrame: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.12.0"
+    public static let currentSchemaVersion = "1.13.0"
 
     public var schemaVersion: String
     public var stepIndex: Int
@@ -2757,6 +2757,24 @@ public struct BASThoughtFrame: BASSchemaVersioned {
     /// construction with the fold on the same turn.
     public var thoughtFoldObservationBundle:
         BASThoughtFoldObservationBundle?
+    /// M63 — L8 海马层 per-turn hippocampal memory observation
+    /// bundle derived from the turn's `BASMemoryBundle` (the
+    /// working-memory window retrieved + normalized at the start of
+    /// the turn). Up to eight kinds emit in a fixed order —
+    /// bundleRetrieved always fires (baseline); per-atom signals
+    /// (atomAdmitted / atomCandidate / atomFrozen / atomRetired)
+    /// classify each atom in `bundle.atoms` by promotion state and
+    /// frozen flag; conflictFlagged iterates top-level
+    /// `conflictRefs`; quarantineRecorded iterates
+    /// `temporalField.quarantineRecords`; forgetCascadeBound
+    /// iterates `temporalField.forgetCascades`. Shape classification
+    /// is turn-level (forgetting / quarantined / conflicted / empty /
+    /// quiet). Load-bearing consumers (future L8 coverage refinements,
+    /// L14 audit surface) read this field directly;
+    /// coherent-by-construction with the memory bundle on the same
+    /// turn.
+    public var hippocampalMemoryObservationBundle:
+        BASHippocampalMemoryObservationBundle?
 
     public init(
         schemaVersion: String = BASThoughtFrame.currentSchemaVersion,
@@ -2804,7 +2822,9 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         hostConstitutionObservationBundle:
             BASHostConstitutionObservationBundle? = nil,
         thoughtFoldObservationBundle:
-            BASThoughtFoldObservationBundle? = nil
+            BASThoughtFoldObservationBundle? = nil,
+        hippocampalMemoryObservationBundle:
+            BASHippocampalMemoryObservationBundle? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.stepIndex = stepIndex
@@ -2849,6 +2869,8 @@ public struct BASThoughtFrame: BASSchemaVersioned {
             hostConstitutionObservationBundle
         self.thoughtFoldObservationBundle =
             thoughtFoldObservationBundle
+        self.hippocampalMemoryObservationBundle =
+            hippocampalMemoryObservationBundle
     }
 }
 
@@ -3142,6 +3164,44 @@ extension BASThoughtFrame {
         copy.thoughtFoldObservationBundle =
             BASThoughtFoldObservationBundle.derive(
                 fromThoughtFold: fold,
+                turnID: turnID,
+                sessionID: sessionID,
+                emittedAt: emittedAt)
+        return copy
+    }
+
+    /// M63 — Return a copy of this frame with a freshly derived
+    /// `hippocampalMemoryObservationBundle` attached. Pure function:
+    /// no I/O, no actor hop, deterministic for the same (memoryBundle,
+    /// turnID, sessionID, emittedAt) tuple.
+    ///
+    /// The coordinator calls this at the seam where the memory
+    /// bundle has been retrieved and normalized — after
+    /// `memoryService.retrieve` + `normalizeMemoryBundle` — so the
+    /// bundle flows into the same turn-audit record that the L14
+    /// surface later signs.
+    ///
+    /// Unlike the tribunal / risk / soft-hand / world-prior / lease
+    /// / host-constitution / thought-fold derivations, this one takes
+    /// the memory bundle as an explicit argument because the thought
+    /// frame itself does not carry the memory bundle — the bundle is
+    /// a sibling value on the turn result that the coordinator
+    /// normalizes from the same inputs.
+    ///
+    /// Existing frames with a non-nil bundle are overwritten — the
+    /// intent of this method is "re-derive from current signals",
+    /// not "merge". Callers that want to preserve an upstream bundle
+    /// should skip this helper and set the field directly.
+    public func withDerivedHippocampalMemoryObservationBundle(
+        memoryBundle: BASMemoryBundle?,
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> BASThoughtFrame {
+        var copy = self
+        copy.hippocampalMemoryObservationBundle =
+            BASHippocampalMemoryObservationBundle.derive(
+                fromMemoryBundle: memoryBundle,
                 turnID: turnID,
                 sessionID: sessionID,
                 emittedAt: emittedAt)

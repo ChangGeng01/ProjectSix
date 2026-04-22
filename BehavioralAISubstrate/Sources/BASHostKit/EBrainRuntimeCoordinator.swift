@@ -2314,6 +2314,25 @@ public struct BASEBrainRuntimeCoordinator {
                 sessionID: derivedSessionID,
                 emittedAt: request.recordedAt)
 
+        // M63 — L8 海马层 main-chain wiring. Derive the per-turn
+        // hippocampal memory observation bundle from the normalized
+        // `memoryBundle` (single source of truth for retrieved atoms
+        // + top-level conflict refs + temporal field subsurfaces
+        // like quarantine records and forget cascades). Reuses M53's
+        // derived (sessionID, turnID) so the L8 bundle joins the
+        // L1 / L3 / L4 / L5 / L6 / L7 / L10 / L11 / L12 / L13
+        // bundles under the same coordinates — the L14 audit
+        // surface reconciles them by that key. Placed right after
+        // the M62 L3 seam and before `buildRuntimeTrace` so the
+        // updated frame propagates into the trace and then onto the
+        // sovereign verdict on the same turn.
+        thoughtFrame = thoughtFrame
+            .withDerivedHippocampalMemoryObservationBundle(
+                memoryBundle: memoryBundle,
+                turnID: derivedTurnID,
+                sessionID: derivedSessionID,
+                emittedAt: request.recordedAt)
+
         let runtimeTrace = buildRuntimeTrace(
             request: request,
             budgetFrame: routedBudget,
