@@ -85,6 +85,13 @@ extension QinaoLoop {
         public let manipulationRisk: Double
         public let emotionalBias: Double
         public let boundaryConflict: Double
+        /// Optional world-prior claim forwarded to the candidate
+        /// produced from this seed. Handled identically to
+        /// `CandidateInput.worldPriorClaim`: evaluated against the
+        /// wired `QinaoWorldPriorVault` (if any) during `submit` and
+        /// folded into the critique strength. Nil → organ-driven
+        /// candidate is scored purely on host-supplied numerics.
+        public let worldPriorClaim: CandidateInput.WorldPriorClaim?
 
         public init(
             candidateID: String,
@@ -99,7 +106,8 @@ extension QinaoLoop {
             evidenceGap: Double = 0,
             manipulationRisk: Double = 0,
             emotionalBias: Double = 0,
-            boundaryConflict: Double = 0
+            boundaryConflict: Double = 0,
+            worldPriorClaim: CandidateInput.WorldPriorClaim? = nil
         ) {
             self.candidateID = candidateID
             self.title = title
@@ -114,6 +122,7 @@ extension QinaoLoop {
             self.manipulationRisk = manipulationRisk
             self.emotionalBias = emotionalBias
             self.boundaryConflict = boundaryConflict
+            self.worldPriorClaim = worldPriorClaim
         }
     }
 

@@ -2,6 +2,7 @@ import Foundation
 import BASRuntimeCore
 import BASOrgan
 import BASOrchestration
+import QinaoWorldPrior
 
 /// QinaoLoop — the L9 dream-loop + L10 tribunal façade.
 ///
@@ -65,6 +66,16 @@ public actor QinaoLoop {
         public let manipulationRisk: Double
         public let emotionalBias: Double
         public let boundaryConflict: Double
+        /// Optional world-prior claim attached to this candidate. When
+        /// present, and when the loop is wired with a
+        /// `QinaoWorldPriorVault`, the claim is evaluated against the
+        /// vault's axioms via `evaluateHostOverride`; the `.clean /
+        /// .demote / .reject` outcome feeds a world-prior-contradiction
+        /// term into this candidate's critique strength. Nil means the
+        /// candidate is scored purely on host-supplied signals — i.e.
+        /// fully backwards compatible with batches submitted before
+        /// M51 shipped.
+        public let worldPriorClaim: WorldPriorClaim?
 
         public init(
             candidateID: String,
@@ -77,7 +88,8 @@ public actor QinaoLoop {
             evidenceGap: Double = 0,
             manipulationRisk: Double = 0,
             emotionalBias: Double = 0,
-            boundaryConflict: Double = 0
+            boundaryConflict: Double = 0,
+            worldPriorClaim: WorldPriorClaim? = nil
         ) {
             self.candidateID = candidateID
             self.title = title
@@ -90,6 +102,25 @@ public actor QinaoLoop {
             self.manipulationRisk = manipulationRisk
             self.emotionalBias = emotionalBias
             self.boundaryConflict = boundaryConflict
+            self.worldPriorClaim = worldPriorClaim
+        }
+
+        /// Host-declared world-prior claim attached to a candidate.
+        /// Mirrors the shape of `QinaoWorldPriorVault.evaluateHostOverride`
+        /// parameters so the loop can look up the axiom directly.
+        public struct WorldPriorClaim: Sendable, Equatable {
+            public let claimID: String
+            public let declaredEvidence: QinaoWorldPriorEvidenceLevel
+            public let statement: String
+            public init(
+                claimID: String,
+                declaredEvidence: QinaoWorldPriorEvidenceLevel,
+                statement: String
+            ) {
+                self.claimID = claimID
+                self.declaredEvidence = declaredEvidence
+                self.statement = statement
+            }
         }
     }
 
@@ -150,13 +181,22 @@ public actor QinaoLoop {
         var paths: [BASCandidatePath]
         var critiques: [String: BASCritiqueBundle]
         var inputs: [String: CandidateInput]
+        /// World-prior contradiction score per candidate, derived at
+        /// `submit` time from `vault.evaluateHostOverride(...)`. Zero
+        /// for candidates with no claim, no wired vault, or a `.clean`
+        /// outcome. Non-zero values are mixed into `critiqueStrength`
+        /// and participate in `dominantConcern` as the
+        /// `world-prior-contradiction` signal.
+        var contradictions: [String: Double]
     }
 
     private var sessions: [String: SessionState] = [:]
     private let organEndpoint: (any QinaoOrganEndpoint)?
+    private let worldPriorVault: QinaoWorldPriorVault?
 
     public init() {
         self.organEndpoint = nil
+        self.worldPriorVault = nil
     }
 
     /// Wire a host-supplied organ endpoint. The endpoint is called
@@ -166,14 +206,44 @@ public actor QinaoLoop {
     /// `guardianBranch(...)` remain unchanged.
     public init(organEndpoint: any QinaoOrganEndpoint) {
         self.organEndpoint = organEndpoint
+        self.worldPriorVault = nil
+    }
+
+    /// Wire an L4 world-prior vault. When a candidate carries a
+    /// `CandidateInput.WorldPriorClaim`, the loop will evaluate it
+    /// against the vault's axioms via `evaluateHostOverride` during
+    /// `submit` and fold the outcome into the candidate's critique
+    /// strength. Candidates without a claim and sessions without a
+    /// vault are unaffected — the world-prior path is purely additive.
+    public init(worldPrior: QinaoWorldPriorVault) {
+        self.organEndpoint = nil
+        self.worldPriorVault = worldPrior
+    }
+
+    /// Wire both an organ endpoint (for `generateCandidates`) and a
+    /// world-prior vault (for `submit` / `generateCandidates` critique
+    /// augmentation). This is the fully-composed loop — drafts arrive
+    /// from a live organ, claims are evaluated against axioms, and
+    /// guardian dissent names `world-prior-contradiction` when a
+    /// candidate would violate bedrock.
+    public init(
+        organEndpoint: any QinaoOrganEndpoint,
+        worldPrior: QinaoWorldPriorVault
+    ) {
+        self.organEndpoint = organEndpoint
+        self.worldPriorVault = worldPrior
     }
 
     /// Internal hook used by the SDK's integration tests and the
     /// runtime's bootstrap factory to wrap a substrate-level
     /// adapter/registry in the public `QinaoOrganEndpoint` seam
     /// without leaking substrate type names into the public API.
-    init(privateEndpoint: (any QinaoOrganEndpoint)?) {
+    init(
+        privateEndpoint: (any QinaoOrganEndpoint)? = nil,
+        privateWorldPrior: QinaoWorldPriorVault? = nil
+    ) {
         self.organEndpoint = privateEndpoint
+        self.worldPriorVault = privateWorldPrior
     }
 
     // MARK: - Intake
@@ -183,13 +253,20 @@ public actor QinaoLoop {
     /// `BASCritiqueBundle` pair so the L9/L10 pipeline sees the
     /// substrate's canonical shape, not host-style floats.
     ///
+    /// If the loop is wired with a `QinaoWorldPriorVault` and a
+    /// candidate carries a `WorldPriorClaim`, the claim is evaluated
+    /// against the vault's axioms *before* the critique bundle is
+    /// sealed: `.clean → 0.0`, `.demote → 0.5`, `.reject → 1.0`. The
+    /// contradiction score is mixed into `critiqueStrength` and also
+    /// participates in `dominantConcern` ordering.
+    ///
     /// Throws `.invalidCandidate` if:
     /// - `candidates` is empty
     /// - any `candidateID` is empty or duplicated within the batch
     public func submit(
         sessionID: String,
         candidates: [CandidateInput]
-    ) throws {
+    ) async throws {
         guard !candidates.isEmpty else {
             throw LoopError.invalidCandidate(
                 reason: "empty-submission")
@@ -207,6 +284,29 @@ public actor QinaoLoop {
             }
         }
 
+        // World-prior evaluation happens once per candidate-with-claim
+        // before we seal any critique bundles. Candidates without
+        // a claim (or without a wired vault) contribute 0.0.
+        var contradictions: [String: Double] = [:]
+        if let vault = worldPriorVault {
+            for c in candidates {
+                guard let claim = c.worldPriorClaim else {
+                    contradictions[c.candidateID] = 0
+                    continue
+                }
+                let outcome = await vault.evaluateHostOverride(
+                    claimID: claim.claimID,
+                    declaredEvidence: claim.declaredEvidence,
+                    statement: claim.statement)
+                contradictions[c.candidateID] =
+                    Self.contradictionScore(for: outcome)
+            }
+        } else {
+            for c in candidates {
+                contradictions[c.candidateID] = 0
+            }
+        }
+
         var paths: [BASCandidatePath] = []
         var critiques: [String: BASCritiqueBundle] = [:]
         var inputs: [String: CandidateInput] = [:]
@@ -219,7 +319,9 @@ public actor QinaoLoop {
                 expectedCost: c.expectedCost,
                 reversibility: c.reversibility,
                 confidence: c.confidence))
-            let critiqueStrength = Self.critiqueStrength(for: c)
+            let contradiction = contradictions[c.candidateID] ?? 0
+            let critiqueStrength = Self.critiqueStrength(
+                for: c, worldPriorContradiction: contradiction)
             critiques[c.candidateID] = BASCritiqueBundle(
                 candidateID: c.candidateID,
                 evidenceGap: c.evidenceGap,
@@ -232,7 +334,8 @@ public actor QinaoLoop {
         sessions[sessionID] = SessionState(
             paths: paths,
             critiques: critiques,
-            inputs: inputs)
+            inputs: inputs,
+            contradictions: contradictions)
     }
 
     /// Drop all state for a session. Idempotent — forgetting a
@@ -310,7 +413,7 @@ public actor QinaoLoop {
         let inputs = responses.map { seed, response in
             Self.candidateInput(fromSeed: seed, body: response.body)
         }
-        try submit(sessionID: sessionID, candidates: inputs)
+        try await submit(sessionID: sessionID, candidates: inputs)
 
         // Build the generated list in the same order the frontier
         // would present — the host gets a provenance-carrying view
@@ -349,7 +452,8 @@ public actor QinaoLoop {
             evidenceGap: seed.evidenceGap,
             manipulationRisk: seed.manipulationRisk,
             emotionalBias: seed.emotionalBias,
-            boundaryConflict: seed.boundaryConflict)
+            boundaryConflict: seed.boundaryConflict,
+            worldPriorClaim: seed.worldPriorClaim)
     }
 
     // MARK: - Readouts
@@ -455,27 +559,64 @@ public actor QinaoLoop {
         }
         let alternativeID = chosen?.candidateID
             ?? "no-alternative-available"
+        let contradiction = state.contradictions[worst.candidateID] ?? 0
         return GuardianBranch(
             candidateID: worst.candidateID,
             alternative: alternativeID,
-            dissent: Self.dominantConcern(for: worst))
+            dissent: Self.dominantConcern(
+                for: worst,
+                worldPriorContradiction: contradiction))
     }
 
     // MARK: - Pure helpers
 
     /// Composite critique strength from the four L10 tribunal
-    /// concern axes. Weights reflect the tribunal's stated
-    /// posture: manipulation is most serious, boundary conflict
-    /// second, emotional bias third, evidence gap fourth.
+    /// concern axes plus the L4 world-prior contradiction signal.
+    /// Weights reflect the tribunal's stated posture:
+    ///   manipulation (0.35) > boundary (0.30) > emotional (0.20)
+    ///   > evidenceGap (0.15); world-prior contradiction is folded
+    /// in as an additive term weighted 1.0 so that a fully-
+    /// rejected axiom claim (`contradiction = 1.0`) alone clamps
+    /// the critique to the maximum 1.0 (guardian threshold
+    /// guaranteed, bedrock penalty maximized against benefit), a
+    /// demoted claim (`contradiction = 0.5`) contributes a
+    /// moderate 0.5 boost that falls short of 0.7 alone but
+    /// combines additively with other concerns, and a clean claim
+    /// (`contradiction = 0.0`) leaves the pre-M51 formula intact.
+    /// The final value is clamped to [0, 1].
     static func critiqueStrength(
-        for c: CandidateInput
+        for c: CandidateInput,
+        worldPriorContradiction: Double
     ) -> Double {
-        let weighted =
+        let base =
             0.35 * c.manipulationRisk
           + 0.30 * c.boundaryConflict
           + 0.20 * c.emotionalBias
           + 0.15 * c.evidenceGap
+        let contradiction = min(max(worldPriorContradiction, 0), 1)
+        let weighted = base + contradiction
         return min(max(weighted, 0), 1)
+    }
+
+    /// Map a world-prior `evaluateHostOverride` outcome to a
+    /// contradiction score in [0, 1]. A clean override (host claim
+    /// is consistent with / strictly stronger than the cited axiom)
+    /// contributes nothing; a demote (evidence too thin for full
+    /// override) is treated as a moderate concern; a reject
+    /// (axiom is bedrock + claim can't meet it) forces the
+    /// candidate above the guardian threshold. Stable — guardian
+    /// dissent labelling depends on exactly these breakpoints.
+    static func contradictionScore(
+        for outcome: QinaoWorldPriorOverrideOutcome
+    ) -> Double {
+        switch outcome {
+        case .clean:
+            return 0.0
+        case .demote:
+            return 0.5
+        case .reject:
+            return 1.0
+        }
     }
 
     static func score(
@@ -516,12 +657,24 @@ public actor QinaoLoop {
     }
 
     /// Return the dominant concern label for the critique bundle;
-    /// ties broken by a stable priority (manipulation > boundary >
-    /// emotional > evidence). Used by `guardianBranch` as the
-    /// dissent string so host UI can key copy on it.
+    /// ties broken by a stable priority (world-prior-contradiction
+    /// > manipulation > boundary > emotional > evidence). Used by
+    /// `guardianBranch` as the dissent string so host UI can key
+    /// copy on it.
+    ///
+    /// `worldPriorContradiction` is taken from the session state's
+    /// per-candidate map (clean=0, demote=0.5, reject=1.0). It wins
+    /// outright when ≥ 0.5 — a demoted or rejected axiom claim is
+    /// structurally more serious than any within-axis concern
+    /// because it names a violation of the world-prior vault, not
+    /// just a flag on a single dimension.
     static func dominantConcern(
-        for bundle: BASCritiqueBundle
+        for bundle: BASCritiqueBundle,
+        worldPriorContradiction: Double = 0
     ) -> String {
+        if worldPriorContradiction >= 0.5 {
+            return "world-prior-contradiction"
+        }
         let entries: [(String, Double)] = [
             ("manipulation-risk", bundle.manipulationRisk),
             ("boundary-conflict", bundle.boundaryConflict),

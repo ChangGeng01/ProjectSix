@@ -76,9 +76,18 @@ let package = Package(
                 .product(name: "BASSovereign", package: "BehavioralAISubstrate")
             ]),
         // QinaoLoop — L9 dream loop + L10 tribunal façade.
+        // Optionally folds L4 world priors (`QinaoWorldPrior`) into
+        // candidate critique: a host-declared claim attached to a
+        // candidate is evaluated against the vault's axioms via
+        // `evaluateHostOverride`, and the `.clean / .demote / .reject`
+        // outcome feeds a world-prior-contradiction term into the
+        // critique strength. This closes the L4↔L9 loop cited on the
+        // honesty board's "会想不自转" row without changing the
+        // existing host-supplied scoring path (claims are opt-in).
         .target(
             name: "QinaoLoop",
             dependencies: [
+                "QinaoWorldPrior",
                 .product(name: "BASRuntimeCore", package: "BehavioralAISubstrate"),
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
                 .product(name: "BASOrchestration", package: "BehavioralAISubstrate")
