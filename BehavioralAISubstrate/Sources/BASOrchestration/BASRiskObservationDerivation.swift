@@ -101,6 +101,20 @@ extension BASRiskObservationBundle {
     ///     fires with a valid candidateRef / packageID).
     ///   - budget cost via `BASRiskObservationBudget.totalCost`
     ///     clamps to [0, 1] even at high signal emission.
+    ///
+    /// Duplicate-intentID contract: `derive` iterates bindings in
+    /// source order and emits observations per-binding. If two
+    /// bindings share the same `candidateID`, both emit their full
+    /// signal streams (observations are duplicated per intent) —
+    /// this is the primitive's "one observation per reading" design,
+    /// not a bug. The M32 coverage projection dedupes at the
+    /// subject level via `Set(observations.map(\.intentID))` so
+    /// `distinctSubjectCount` still reflects distinct candidates;
+    /// budget cost reflects total emission without dedup. Upstream,
+    /// `BASNeuralMaterializationCompiler.materializeRiskBindings`
+    /// produces one-binding-per-candidate, so duplicates should not
+    /// arise in the main-chain flow — but the derivation itself
+    /// does not enforce this.
     public static func derive(
         from thoughtFrame: BASThoughtFrame,
         turnID: String,
@@ -415,6 +429,16 @@ extension BASRiskObservationBundle {
 // own understanding of "the gate tightened" versus "the gate
 // loosened" when computing the shift direction for a
 // `.gatePressure` observation.
+//
+// MAINTAIN WITH `BASActionPermitMode` ENUM (defined in BASPolicy at
+// `EBrainRiskPlaneCore.swift`). Swift's exhaustive-switch will
+// force a compile error if a new case is added without updating
+// this table — that is the desired outcome. The rank is a
+// *semantic* openness ladder, not the enum's source order, so a
+// new case must be placed at the correct ordinal position, not
+// merely appended. Tests in `BASRiskObservationDerivationTests`
+// §2.b pin the full 9-mode matrix for direction computation;
+// run those after any edit.
 
 private extension BASActionPermitMode {
     var rank: Int {

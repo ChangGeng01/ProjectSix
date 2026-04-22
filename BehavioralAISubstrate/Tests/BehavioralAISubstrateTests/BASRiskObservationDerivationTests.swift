@@ -727,4 +727,217 @@ final class BASRiskObservationDerivationTests: XCTestCase {
         XCTAssertNil(decoded.riskObservationBundle)
         XCTAssertEqual(decoded.schemaVersion, "1.5.0")
     }
+
+    // MARK: - 9. Hardening (post-M56 deep-review remediation)
+
+    /// §9.a — pin the private rank extension over all 9
+    /// `BASActionPermitMode` cases. The rank is a semantic
+    /// openness ladder (answer=0 → escalate=8), not the enum's
+    /// source order; any silent reshuffle would flip direction
+    /// labels unnoticed. This test walks a 9×9 matrix minus the
+    /// diagonal (i≠j) and pins tighten/loosen for every shift.
+    func testGatePressureDirectionMatrixAcrossAllNineModes() {
+        let ladder: [BASActionPermitMode] = [
+            .answer, .mirror, .compare, .draftOnly,
+            .localOnly, .delay, .replace, .block, .escalate
+        ]
+        for (i, recommended) in ladder.enumerated() {
+            for (j, permit) in ladder.enumerated() {
+                guard i != j else { continue }
+                let f = frame(riskBindings: [
+                    binding(
+                        candidateID: "cand-\(i)-\(j)",
+                        recommendedMode: recommended,
+                        permitMode: permit)
+                ])
+                let bundle = BASRiskObservationBundle.derive(
+                    from: f,
+                    turnID: "t",
+                    sessionID: "s",
+                    emittedAt: fixedDate)
+                let pressure = bundle
+                    .observations(of: .gatePressure)
+                XCTAssertEqual(
+                    pressure.count, 1,
+                    "pair (i=\(i) rec=\(recommended), "
+                        + "j=\(j) permit=\(permit)) must emit"
+                        + " exactly one gatePressure observation")
+                // j > i → permit is more closed than recommended
+                //        → gate tightened
+                // j < i → permit is more open than recommended
+                //        → gate loosened
+                let expected = j > i
+                    ? "direction:tighten"
+                    : "direction:loosen"
+                XCTAssertTrue(
+                    pressure.first?.content.contains(expected)
+                        ?? false,
+                    "pair (i=\(i) rec=\(recommended), "
+                        + "j=\(j) permit=\(permit)) expected "
+                        + "\(expected)")
+            }
+        }
+    }
+
+    /// §9.b — `oneMinus` boundary. With `uncertainty == 1.0`,
+    /// confidence on all three core signals must be exactly 0 —
+    /// pins the `oneMinus` clamp that sits under `derive`.
+    func testUncertaintyAtOneYieldsZeroConfidence() throws {
+        let f = frame(riskBindings: [
+            binding(uncertainty: 1.0)
+        ])
+        let bundle = BASRiskObservationBundle.derive(
+            from: f,
+            turnID: "t",
+            sessionID: "s",
+            emittedAt: fixedDate)
+
+        let hazard = try XCTUnwrap(
+            bundle.observations(of: .hazardReading).first)
+        let irr = try XCTUnwrap(
+            bundle.observations(of: .irreversibilityReading).first)
+        let hp = try XCTUnwrap(
+            bundle.observations(of: .harmPotentialReading).first)
+        XCTAssertEqual(hazard.confidence, 0, accuracy: 1e-9)
+        XCTAssertEqual(irr.confidence, 0, accuracy: 1e-9)
+        XCTAssertEqual(hp.confidence, 0, accuracy: 1e-9)
+    }
+
+    /// §9.c — `clamp01` endpoints on `irreversibility`. `0.0`
+    /// and `1.0` must pass through verbatim; no clip-inversion
+    /// regression allowed on either endpoint.
+    func testIrreversibilityEndpointsPassThroughClamp() throws {
+        let zeroBundle = BASRiskObservationBundle.derive(
+            from: frame(
+                riskBindings: [binding(irreversibility: 0.0)]),
+            turnID: "t",
+            sessionID: "s",
+            emittedAt: fixedDate)
+        let zero = try XCTUnwrap(zeroBundle
+            .observations(of: .irreversibilityReading).first)
+        XCTAssertEqual(zero.salience, 0.0, accuracy: 1e-9)
+
+        let oneBundle = BASRiskObservationBundle.derive(
+            from: frame(
+                riskBindings: [binding(irreversibility: 1.0)]),
+            turnID: "t",
+            sessionID: "s",
+            emittedAt: fixedDate)
+        let one = try XCTUnwrap(oneBundle
+            .observations(of: .irreversibilityReading).first)
+        XCTAssertEqual(one.salience, 1.0, accuracy: 1e-9)
+    }
+
+    /// §9.d — distinct turn/session coordinates must propagate
+    /// independently. This end-to-end pins the "M56 shares
+    /// (sessionID, turnID) with L6 / L7 / L10 / L11 bundles"
+    /// invariant at the derivation level: the bundle's keys
+    /// must exactly equal what the caller passes, never
+    /// cross-wired.
+    func testDeriveHonorsDistinctTurnAndSessionCoordinates() {
+        let matrix: [(turn: String, session: String)] = [
+            ("t-1", "s-A"),
+            ("t-1", "s-B"),
+            ("t-2", "s-A"),
+            ("t-2", "s-B")
+        ]
+        let f = frame(riskBindings: [binding()])
+        for cell in matrix {
+            let bundle = BASRiskObservationBundle.derive(
+                from: f,
+                turnID: cell.turn,
+                sessionID: cell.session,
+                emittedAt: fixedDate)
+            XCTAssertEqual(
+                bundle.turnID, cell.turn,
+                "turnID must equal the caller's value, verbatim")
+            XCTAssertEqual(
+                bundle.sessionID, cell.session,
+                "sessionID must equal the caller's value, "
+                    + "verbatim")
+        }
+    }
+
+    /// §9.e — dense Codable round-trip exercises all 6 signal
+    /// kinds simultaneously and asserts byte-equal observation
+    /// set (not just count). Rules out silent CodingKey regression
+    /// on any one signal kind.
+    func testDenseBundleCodableRoundTripPreservesAllSixKinds()
+        throws
+    {
+        let f = frame(
+            riskBindings: [
+                binding(
+                    candidateID: "dense",
+                    uncertainty: 0.8,
+                    manipulationStrength: 0.5,
+                    recommendedMode: .answer,
+                    permitMode: .delay)
+            ],
+            riskDecisionPackage: package(longTermTrace: 0.7))
+        let enriched = f.withDerivedRiskObservationBundle(
+            turnID: "dense-t",
+            sessionID: "dense-s",
+            emittedAt: fixedDate)
+
+        // Pre-condition: the dense frame must emit all 6 kinds.
+        let observed = enriched.riskObservationBundle?.observations
+            ?? []
+        let kinds = Set(observed.map(\.kind))
+        XCTAssertEqual(kinds.count, 6)
+        XCTAssertTrue(kinds.contains(.hazardReading))
+        XCTAssertTrue(kinds.contains(.irreversibilityReading))
+        XCTAssertTrue(kinds.contains(.harmPotentialReading))
+        XCTAssertTrue(kinds.contains(.consequenceHorizonReading))
+        XCTAssertTrue(kinds.contains(.noveltyReading))
+        XCTAssertTrue(kinds.contains(.gatePressure))
+
+        let data = try JSONEncoder().encode(enriched)
+        let decoded = try JSONDecoder().decode(
+            BASThoughtFrame.self, from: data)
+
+        // Byte-equality: the decoded bundle must equal the
+        // original bundle, not merely share an observation count.
+        XCTAssertEqual(
+            decoded.riskObservationBundle,
+            enriched.riskObservationBundle)
+    }
+
+    /// §9.f — duplicate intentID pinning. Documents the
+    /// derivation's "one observation per reading, per binding"
+    /// contract: two bindings sharing a `candidateID` produce
+    /// duplicate core observations (raw count inflates), but the
+    /// M32 coverage projection dedupes subjects via Set so
+    /// `distinctSubjectCount` still reflects distinct candidates.
+    /// This is intentional — upstream
+    /// `BASNeuralMaterializationCompiler.materializeRiskBindings`
+    /// is expected to produce one-binding-per-candidate, but the
+    /// derivation itself does not enforce it.
+    func testDuplicateIntentIDEmitsPerBindingButCoverageDedups() {
+        let f = frame(riskBindings: [
+            binding(candidateID: "dup"),
+            binding(candidateID: "dup")
+        ])
+        let bundle = BASRiskObservationBundle.derive(
+            from: f,
+            turnID: "t",
+            sessionID: "s",
+            emittedAt: fixedDate)
+
+        // 2 bindings × 3 core signals = 6 observations.
+        XCTAssertEqual(
+            bundle.observations(of: .hazardReading).count, 2)
+        XCTAssertEqual(
+            bundle.observations(of: .irreversibilityReading).count,
+            2)
+        XCTAssertEqual(
+            bundle.observations(of: .harmPotentialReading).count,
+            2)
+
+        // But distinct subjects = 1 (Set dedup in intentIDs).
+        XCTAssertEqual(bundle.intentIDs.count, 1)
+        XCTAssertEqual(bundle.intentIDs, ["dup"])
+        XCTAssertEqual(
+            bundle.coverageSummary.distinctSubjectCount, 1)
+    }
 }
