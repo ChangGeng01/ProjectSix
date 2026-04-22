@@ -83,15 +83,21 @@ public actor QinaoMemory {
     // MARK: - State
 
     private var store: [UUID: BASGovernedMemory] = [:]
+    private var cascadeReceipts: [QinaoForgetCascadeReceipt] = []
     private let minimumConfidence: Double
     private let now: @Sendable () -> Date
+    private let cascadeIDFactory: @Sendable () -> String
 
     public init(
         minimumConfidence: Double = 0.6,
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date = { Date() },
+        cascadeIDFactory: @escaping @Sendable () -> String = {
+            UUID().uuidString
+        }
     ) {
         self.minimumConfidence = minimumConfidence
         self.now = now
+        self.cascadeIDFactory = cascadeIDFactory
     }
 
     // MARK: - Admit
@@ -163,30 +169,72 @@ public actor QinaoMemory {
 
     // MARK: - Forget (cascade across all tiers)
 
-    /// Delete one memory by ID across every tier. Throws
+    /// Delete one memory by ID across every tier.  Throws
     /// `.notFound` if nothing under that ID was admitted.
+    ///
+    /// Every call produces exactly one `QinaoForgetCascadeReceipt`
+    /// recording the cascade outcome; the receipt is appended to
+    /// `cascadeLedger()` and is the host's proof-of-delete.
     @discardableResult
     public func forget(id: UUID) throws -> BASGovernedMemory {
         guard let removed = store.removeValue(forKey: id) else {
+            // Even a "not found" cascade produces a receipt — the
+            // paper trail for a refused delete is as important as the
+            // paper trail for a successful one.
+            recordReceipt(
+                .init(
+                    cascadeID: cascadeIDFactory(),
+                    rootTargets: [id.uuidString],
+                    trigger: .singleID,
+                    removedMemoryIDs: [],
+                    cacheRefsInvalidated: [],
+                    executedAt: now(),
+                    executionState: .empty,
+                    summary: "forget(id:) — no match"))
             throw MemoryError.notFound(id: id)
         }
+        recordReceipt(
+            .init(
+                cascadeID: cascadeIDFactory(),
+                rootTargets: [id.uuidString],
+                trigger: .singleID,
+                removedMemoryIDs: [removed.id],
+                cacheRefsInvalidated: Self.defaultCacheRefs,
+                executedAt: now(),
+                executionState: .completed,
+                summary: "forget(id:) — 1 row removed"))
         return removed
     }
 
-    /// Cascade delete every memory under a scope. Returns the
+    /// Cascade delete every memory under a scope.  Returns the
     /// removed memories in their pre-delete form so the caller can
     /// audit or show a receipt.
+    ///
+    /// Produces exactly one cascade receipt regardless of match count.
     @discardableResult
     public func forget(
         scope: BASMemoryScope
     ) -> [BASGovernedMemory] {
         let matches = store.values.filter { $0.scope == scope }
         for m in matches { store.removeValue(forKey: m.id) }
+        let removedIDs = matches.map(\.id).sorted { $0.uuidString < $1.uuidString }
+        recordReceipt(
+            .init(
+                cascadeID: cascadeIDFactory(),
+                rootTargets: [scope.rawValue],
+                trigger: .scope,
+                removedMemoryIDs: removedIDs,
+                cacheRefsInvalidated: removedIDs.isEmpty ? [] : Self.defaultCacheRefs,
+                executedAt: now(),
+                executionState: removedIDs.isEmpty ? .empty : .completed,
+                summary: "forget(scope: .\(scope.rawValue)) — \(removedIDs.count) rows removed"))
         return Array(matches)
     }
 
     /// Cascade delete every memory at a given sensitivity level.
     /// Use this when a user says "forget anything sensitive".
+    ///
+    /// Produces exactly one cascade receipt regardless of match count.
     @discardableResult
     public func forget(
         sensitivity: BASMemorySensitivity
@@ -195,20 +243,77 @@ public actor QinaoMemory {
             $0.sensitivity == sensitivity
         }
         for m in matches { store.removeValue(forKey: m.id) }
+        let removedIDs = matches.map(\.id).sorted { $0.uuidString < $1.uuidString }
+        recordReceipt(
+            .init(
+                cascadeID: cascadeIDFactory(),
+                rootTargets: [sensitivity.rawValue],
+                trigger: .sensitivity,
+                removedMemoryIDs: removedIDs,
+                cacheRefsInvalidated: removedIDs.isEmpty ? [] : Self.defaultCacheRefs,
+                executedAt: now(),
+                executionState: removedIDs.isEmpty ? .empty : .completed,
+                summary: "forget(sensitivity: .\(sensitivity.rawValue)) — \(removedIDs.count) rows removed"))
         return Array(matches)
     }
 
     /// Wipe everything. Returns how many memories were removed.
+    ///
+    /// Produces exactly one cascade receipt carrying every removed ID
+    /// for downstream audit reconciliation.
     @discardableResult
     public func forgetAll() -> Int {
-        let count = store.count
+        let removed = Array(store.values)
+        let count = removed.count
         store.removeAll()
+        let removedIDs = removed.map(\.id).sorted { $0.uuidString < $1.uuidString }
+        recordReceipt(
+            .init(
+                cascadeID: cascadeIDFactory(),
+                rootTargets: [],
+                trigger: .all,
+                removedMemoryIDs: removedIDs,
+                cacheRefsInvalidated: removedIDs.isEmpty ? [] : Self.defaultCacheRefs,
+                executedAt: now(),
+                executionState: removedIDs.isEmpty ? .empty : .completed,
+                summary: "forgetAll — \(count) rows removed"))
         return count
     }
 
     // MARK: - Introspection
 
     public func count() -> Int { store.count }
+
+    /// Append-only cascade ledger.  Returns every receipt produced
+    /// by this actor in execution order (oldest first).  The host
+    /// uses this to prove-and-display every delete that ran.
+    public func cascadeLedger() -> [QinaoForgetCascadeReceipt] {
+        cascadeReceipts
+    }
+
+    /// Return the most recent N receipts, newest last.  Convenience
+    /// for hosts that only need the tail of the ledger (e.g. for a
+    /// "recent deletes" surface).
+    public func recentCascadeReceipts(limit: Int) -> [QinaoForgetCascadeReceipt] {
+        guard limit > 0 else { return [] }
+        return Array(cascadeReceipts.suffix(limit))
+    }
+
+    // MARK: - Private helpers
+
+    /// The frontstage recall + warm/cold projection share the same
+    /// cache key surface in the current implementation, so every
+    /// successful cascade invalidates this single ref.  Future
+    /// milestones can extend the ref set per projection layer.
+    private static let defaultCacheRefs: [String] = [
+        "qinao.memory.recall-frontstage",
+        "qinao.memory.recall-scoped",
+        "qinao.memory.recall-sensitivity"
+    ]
+
+    private func recordReceipt(_ receipt: QinaoForgetCascadeReceipt) {
+        cascadeReceipts.append(receipt)
+    }
 }
 
 private extension BASMemoryTier {
