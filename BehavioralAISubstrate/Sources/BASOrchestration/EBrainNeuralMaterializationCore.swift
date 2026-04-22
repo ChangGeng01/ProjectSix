@@ -10,6 +10,22 @@ public struct BASNeuralThoughtMaterialization: Equatable, Sendable {
     public var convergenceCertificate: BASConvergenceCertificate?
     public var loopLeaseReceipt: BASLoopLeaseReceipt?
     public var sovereignBreakpointHints: [BASSovereignBreakpointHint]?
+    /// M52 — L9 dream-loop per-candidate observation bundle. Emitted
+    /// as a first-class output of `materializeThoughtArtifacts`, derived
+    /// deterministically from the same `BASThoughtFrame` inputs that
+    /// drive the frontier. The bundle mirrors the frontier's decisions
+    /// (one `.candidate` + optional `.dominanceSignal` per candidate;
+    /// `.reversibilitySignal` for reversible paths; `.guardianBranch`
+    /// for guard paths; `.delayRecommendation` for delayed paths; a
+    /// single aggregate `.diversitySignal`), so the M24 primitives
+    /// stop being a test-only sidecar and start being load-bearing
+    /// observations that the M32 coverage projection and the L14
+    /// audit surface can rely on per turn.
+    ///
+    /// Nil iff `candidateFrontier` is also nil (no candidates →
+    /// no observations to emit); this keeps the pair coherent
+    /// by construction.
+    public var candidateObservationBundle: BASCandidateObservationBundle?
 
     public init(
         candidateFrontier: BASCandidateFrontier? = nil,
@@ -19,7 +35,8 @@ public struct BASNeuralThoughtMaterialization: Equatable, Sendable {
         evidenceDebts: [BASEvidenceDebt]? = nil,
         convergenceCertificate: BASConvergenceCertificate? = nil,
         loopLeaseReceipt: BASLoopLeaseReceipt? = nil,
-        sovereignBreakpointHints: [BASSovereignBreakpointHint]? = nil
+        sovereignBreakpointHints: [BASSovereignBreakpointHint]? = nil,
+        candidateObservationBundle: BASCandidateObservationBundle? = nil
     ) {
         self.candidateFrontier = candidateFrontier
         self.counterfactualBundles = counterfactualBundles
@@ -29,6 +46,7 @@ public struct BASNeuralThoughtMaterialization: Equatable, Sendable {
         self.convergenceCertificate = convergenceCertificate
         self.loopLeaseReceipt = loopLeaseReceipt
         self.sovereignBreakpointHints = sovereignBreakpointHints
+        self.candidateObservationBundle = candidateObservationBundle
     }
 }
 
@@ -70,6 +88,10 @@ public enum BASNeuralMaterializationCompiler {
             from: thoughtFrame,
             critiqueBundles: critiqueBundles
         )
+        let candidateObservationBundle = buildCandidateObservationBundle(
+            from: thoughtFrame,
+            frontier: candidateFrontier
+        )
 
         return BASNeuralThoughtMaterialization(
             candidateFrontier: candidateFrontier,
@@ -87,7 +109,8 @@ public enum BASNeuralMaterializationCompiler {
                 frontier: candidateFrontier,
                 counterfactualBundles: counterfactualBundles
             ),
-            sovereignBreakpointHints: sovereignBreakpointHints
+            sovereignBreakpointHints: sovereignBreakpointHints,
+            candidateObservationBundle: candidateObservationBundle
         )
     }
 
@@ -295,6 +318,160 @@ public enum BASNeuralMaterializationCompiler {
             diversityScore: Self.frontierDiversityScore(in: thoughtFrame.candidates),
             delayedPaths: delayedPaths
         )
+    }
+
+    /// M52 — derive an L9 per-candidate observation bundle from the
+    /// same `BASThoughtFrame` data that drives the frontier. This
+    /// closes the L4↔L9 adjacent gap for L9 itself: M24 primitives
+    /// stop being a test-only sidecar and start being a real output
+    /// of the main chain, so the M32 coverage projection and the L14
+    /// audit surface get a bundle per turn without any additional
+    /// wiring from the coordinator.
+    ///
+    /// The bundle mirrors the frontier's decisions (it is derived
+    /// from the same inputs; they are coherent by construction):
+    ///   - `.candidate` for every candidate (carries the raw draft
+    ///     signal; salience = dominance score, confidence = candidate
+    ///     confidence)
+    ///   - `.dominanceSignal` for every candidate (position-ordered
+    ///     salience so the dominance ordering is directly recoverable
+    ///     from the observations)
+    ///   - `.reversibilitySignal` for every reversible path
+    ///   - `.guardianBranch` for every guard path
+    ///   - `.delayRecommendation` for every delayed path
+    ///   - one aggregate `.diversitySignal` keyed by the first
+    ///     candidate (diversity is a frontier-level property, not a
+    ///     per-candidate property; we surface it once so the
+    ///     observation grammar keeps one record per signal kind the
+    ///     frontier actually used)
+    ///
+    /// Returns nil iff the frontier is also nil (no candidates → no
+    /// observations); this keeps the (`candidateFrontier`,
+    /// `candidateObservationBundle`) pair coherent.
+    public static func buildCandidateObservationBundle(
+        from thoughtFrame: BASThoughtFrame,
+        frontier: BASCandidateFrontier?
+    ) -> BASCandidateObservationBundle? {
+        guard
+            let frontier,
+            thoughtFrame.candidates.isEmpty == false
+        else {
+            return nil
+        }
+
+        let turnID = "l9.turn.step-\(thoughtFrame.stepIndex)"
+        let sessionID = thoughtFrame.decomposeRef
+        let emittedAt = Date()
+
+        let candidateByID = Dictionary(
+            uniqueKeysWithValues:
+                thoughtFrame.candidates.map { ($0.candidateID, $0) })
+        let dominanceOrder = frontier.dominanceOrder
+        let dominanceRank = Dictionary(
+            uniqueKeysWithValues:
+                dominanceOrder.enumerated()
+                .map { ($0.element, $0.offset) })
+        let reversibleSet = Set(frontier.reversiblePaths)
+        let guardSet = Set(frontier.guardPaths)
+        let delayedSet = Set(frontier.delayedPaths)
+        let orderCount = max(1, dominanceOrder.count)
+
+        var observations: [BASCandidateObservation] = []
+
+        for candidate in thoughtFrame.candidates {
+            let score = candidateDominanceScore(candidate)
+            let normalizedScore = min(max(score, 0), 1)
+            observations.append(
+                BASCandidateObservation(
+                    kind: .candidate,
+                    candidateID: candidate.candidateID,
+                    salience: normalizedScore,
+                    confidence: candidate.confidence,
+                    content: candidate.actionSummary,
+                    observedAt: emittedAt))
+
+            if let rank = dominanceRank[candidate.candidateID] {
+                let positionSalience =
+                    Double(orderCount - rank) / Double(orderCount)
+                observations.append(
+                    BASCandidateObservation(
+                        kind: .dominanceSignal,
+                        candidateID: candidate.candidateID,
+                        salience: positionSalience,
+                        confidence: normalizedScore,
+                        content:
+                            "dominance-rank:\(rank + 1)/\(orderCount)",
+                        observedAt: emittedAt))
+            }
+
+            if reversibleSet.contains(candidate.candidateID) {
+                observations.append(
+                    BASCandidateObservation(
+                        kind: .reversibilitySignal,
+                        candidateID: candidate.candidateID,
+                        salience: candidate.reversibility,
+                        confidence: candidate.confidence,
+                        content:
+                            "reversibility:\(candidate.reversibility)",
+                        observedAt: emittedAt))
+            }
+
+            if guardSet.contains(candidate.candidateID) {
+                // Guard paths include reversibility-only entries *and*
+                // lexicon matches; salience picks whichever is more
+                // informative so the observation isn't falsely weak.
+                let guardSalience = max(candidate.reversibility, 0.7)
+                observations.append(
+                    BASCandidateObservation(
+                        kind: .guardianBranch,
+                        candidateID: candidate.candidateID,
+                        salience: guardSalience,
+                        confidence: candidate.confidence,
+                        content:
+                            "guard-path:\(candidate.candidateID)",
+                        observedAt: emittedAt))
+            }
+
+            if delayedSet.contains(candidate.candidateID) {
+                observations.append(
+                    BASCandidateObservation(
+                        kind: .delayRecommendation,
+                        candidateID: candidate.candidateID,
+                        salience: 1.0 - candidate.confidence,
+                        confidence: candidate.confidence,
+                        content:
+                            "delayed-path:\(candidate.candidateID)",
+                        observedAt: emittedAt))
+            }
+        }
+
+        // One aggregate diversity observation. We key it to the first
+        // dominance-ordered candidate if present (the frontier's
+        // "bearer" of the ranking), otherwise to the first candidate
+        // as a fallback — either way the observation carries the
+        // global diversity score at bundle level.
+        let diversityBearer =
+            dominanceOrder.first
+            ?? thoughtFrame.candidates.first?.candidateID
+        if let diversityBearer,
+           let bearerCandidate = candidateByID[diversityBearer] {
+            observations.append(
+                BASCandidateObservation(
+                    kind: .diversitySignal,
+                    candidateID: diversityBearer,
+                    salience: frontier.diversityScore,
+                    confidence: bearerCandidate.confidence,
+                    content:
+                        "frontier-diversity:"
+                        + "\(frontier.diversityScore)",
+                    observedAt: emittedAt))
+        }
+
+        return BASCandidateObservationBundle(
+            turnID: turnID,
+            sessionID: sessionID,
+            observations: observations,
+            emittedAt: emittedAt)
     }
 
     public static func buildCounterfactualBundles(
