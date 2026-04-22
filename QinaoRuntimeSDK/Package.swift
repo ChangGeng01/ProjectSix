@@ -116,6 +116,7 @@ let package = Package(
                 "QinaoRisk",
                 "QinaoSovereign",
                 "QinaoLoop",
+                "QinaoWorldPrior",
                 .product(name: "BASRuntimeCore", package: "BehavioralAISubstrate"),
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
                 .product(name: "BASLeaseLife", package: "BehavioralAISubstrate"),

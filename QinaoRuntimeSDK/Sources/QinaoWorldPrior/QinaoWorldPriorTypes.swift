@@ -296,3 +296,75 @@ public enum QinaoWorldPriorOverrideOutcome: Equatable, Sendable {
         effective: QinaoWorldPriorEvidenceLevel)
     case reject(axiom: QinaoWorldPriorAxiom)
 }
+
+/// Qinao-native mirror of `BASWorldPriorRiskAssessment`.
+///
+/// The vault derives this from a matched causal template via the
+/// canonical L4 score: `reversibility × effectKind × domain-weight`,
+/// clamped to `[0.0, 1.0]`. The assessment is the shared contract by
+/// which L4 world knowledge reaches upstream consumers (L11 risk
+/// gate, L14 verdict engine, L9 dream loop) without any of them
+/// having to re-derive "what does reversibility mean for money vs.
+/// ethics vs. body". Two of its fields (`requiresConsent`,
+/// `evidenceSufficient`) are load-bearing:
+///
+/// - `requiresConsent == true` iff the matched template is in the
+///   `ethics` domain AND its `reversibility == .irreversible` — this
+///   is the L4 invariant that makes "no irreversible harm without
+///   informed consent" enforceable at the gate without re-encoding
+///   the ethics rules at each call-site.
+/// - `evidenceSufficient == false` iff the matched template is
+///   irreversible but its evidence level is weaker than
+///   `.wellSupported` — the gate / verdict engine reads this to
+///   escalate the decision floor.
+///
+/// This type exists so a host can observe L4's risk view of a
+/// template without importing `BASWorldPrior` or `QinaoRisk`. The
+/// same 4 out of 7 fields (`irreversibleHarmScore`, `requiresConsent`,
+/// `evidenceSufficient`, `matchedTemplateID`) are what the existing
+/// `QinaoRiskGate.WorldRiskAssessment` surface exposes to the L11
+/// gate — the runtime's internal bridge translates between the two
+/// so that one `QinaoWorldPriorVault` instance can feed both the L9
+/// loop (via `QinaoLoop(worldPrior:)`) and the L11 risk surface
+/// (via an endpoint built from the vault).
+public struct QinaoWorldPriorRiskAssessment:
+    Hashable, Codable, Sendable {
+    /// Template that matched the proposed intent.
+    public let matchedTemplateID: String
+    /// Domain of the matched template.
+    public let domain: QinaoWorldPriorDomain
+    /// Reversibility category copied from the template.
+    public let reversibility: QinaoWorldPriorCausalTemplate.Reversibility
+    /// Evidence level copied from the template.
+    public let evidenceLevel: QinaoWorldPriorEvidenceLevel
+    /// Whether the matched template requires informed consent from
+    /// another party (ethics-domain irreversible templates).
+    public let requiresConsent: Bool
+    /// Normalized `[0.0, 1.0]` score feeding upstream risk signals.
+    /// Clamped at construction; any value outside the unit interval
+    /// collapses to the nearest bound.
+    public let irreversibleHarmScore: Double
+    /// Whether the template's evidence level is strong enough to
+    /// support an irreversible operation without additional
+    /// corroboration.
+    public let evidenceSufficient: Bool
+
+    public init(
+        matchedTemplateID: String,
+        domain: QinaoWorldPriorDomain,
+        reversibility: QinaoWorldPriorCausalTemplate.Reversibility,
+        evidenceLevel: QinaoWorldPriorEvidenceLevel,
+        requiresConsent: Bool,
+        irreversibleHarmScore: Double,
+        evidenceSufficient: Bool
+    ) {
+        self.matchedTemplateID = matchedTemplateID
+        self.domain = domain
+        self.reversibility = reversibility
+        self.evidenceLevel = evidenceLevel
+        self.requiresConsent = requiresConsent
+        self.irreversibleHarmScore =
+            max(0.0, min(1.0, irreversibleHarmScore))
+        self.evidenceSufficient = evidenceSufficient
+    }
+}

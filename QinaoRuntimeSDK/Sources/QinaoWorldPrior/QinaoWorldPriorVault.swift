@@ -295,6 +295,34 @@ public actor QinaoWorldPriorVault {
         return QinaoWorldPriorProjection.fromBAS(basOutcome)
     }
 
+    // MARK: - Risk assessment (L4 → L11/L14 shared contract)
+
+    /// Produce a structured world-prior risk assessment for the given
+    /// template ID. Returns `nil` if the template is unknown.
+    ///
+    /// This is the method that lets one `QinaoWorldPriorVault`
+    /// instance serve both the L9 loop (which reads `axioms` +
+    /// `evaluateHostOverride` off the same vault) and the L11 risk
+    /// gate (which needs `irreversibleHarmScore` / `requiresConsent`
+    /// / `evidenceSufficient` to populate `SoftSignals` and the
+    /// verdict-engine floor). Before M79 the gate could only reach
+    /// the substrate vault via an internal adapter, so hosts had to
+    /// either accept a hidden second vault or lose access to the
+    /// Qinao-public vault's grow-path API.
+    ///
+    /// Score derivation is identical to the substrate's
+    /// `BASWorldPriorVault.assessRisk(templateID:)` — see that
+    /// method's doc-comment for the weight tables. The projection
+    /// here is a pure field-by-field mirror translated through
+    /// `QinaoWorldPriorProjection`.
+    public func assessRisk(
+        templateID: String
+    ) async -> QinaoWorldPriorRiskAssessment? {
+        guard let bas = await vault.assessRisk(templateID: templateID)
+        else { return nil }
+        return QinaoWorldPriorProjection.fromBAS(bas)
+    }
+
     // MARK: - Diagnostics
 
     public func templateCount() async -> Int {
@@ -633,5 +661,26 @@ enum QinaoWorldPriorProjection {
         case .reject(let axiom):
             return .reject(axiom: fromBAS(axiom))
         }
+    }
+
+    // MARK: - Risk assessment
+
+    /// Project a substrate `BASWorldPriorRiskAssessment` to the
+    /// Qinao-owned mirror. All seven fields round-trip losslessly:
+    /// numeric `irreversibleHarmScore` is re-clamped by the Qinao
+    /// initializer (safe no-op when the substrate already clamped),
+    /// and the enum fields walk the pure case-by-case translations
+    /// above.
+    static func fromBAS(
+        _ assessment: BASWorldPriorRiskAssessment
+    ) -> QinaoWorldPriorRiskAssessment {
+        QinaoWorldPriorRiskAssessment(
+            matchedTemplateID: assessment.matchedTemplateID,
+            domain: fromBAS(assessment.domain),
+            reversibility: fromBAS(assessment.reversibility),
+            evidenceLevel: fromBAS(assessment.evidenceLevel),
+            requiresConsent: assessment.requiresConsent,
+            irreversibleHarmScore: assessment.irreversibleHarmScore,
+            evidenceSufficient: assessment.evidenceSufficient)
     }
 }
