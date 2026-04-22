@@ -2610,7 +2610,7 @@ public enum BASThoughtStopReason: String, Codable, CaseIterable, Sendable {
 }
 
 public struct BASThoughtFrame: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.9.0"
+    public static let currentSchemaVersion = "1.10.0"
 
     public var schemaVersion: String
     public var stepIndex: Int
@@ -2713,6 +2713,22 @@ public struct BASThoughtFrame: BASSchemaVersioned {
     /// thought frame on the same turn.
     public var worldPriorObservationBundle:
         BASWorldPriorObservationBundle?
+    /// M60 — L1 灯芯层 per-turn kernel observation bundle derived from
+    /// the turn's finalized `BASBudgetFrame` (the routed budget, post
+    /// `powerClockService.planBudget` + `normalizeBudget` + device
+    /// routing + maintenance scheduling). Up to six kinds
+    /// (leaseGranted, runModeDetermined, thermalReadingObserved,
+    /// guardLevelEscalated, maintenanceClassified, deviceRouteSelected)
+    /// emit in a fixed order — four are unconditional, two gate on
+    /// structural precondition (guard level above nominal / a
+    /// non-none maintenance class with maintenance allowed). Shape
+    /// classification is turn-level (lockdown / dormant / emergency /
+    /// throttled / maintenance / nominal). Load-bearing consumers
+    /// (future L1 coverage refinements, L14 audit surface) read this
+    /// field directly; coherent-by-construction with the routed budget
+    /// on the same turn.
+    public var leaseLifeObservationBundle:
+        BASLeaseLifeObservationBundle?
 
     public init(
         schemaVersion: String = BASThoughtFrame.currentSchemaVersion,
@@ -2754,7 +2770,9 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         updateTicketObservationBundle:
             BASUpdateTicketObservationBundle? = nil,
         worldPriorObservationBundle:
-            BASWorldPriorObservationBundle? = nil
+            BASWorldPriorObservationBundle? = nil,
+        leaseLifeObservationBundle:
+            BASLeaseLifeObservationBundle? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.stepIndex = stepIndex
@@ -2793,6 +2811,8 @@ public struct BASThoughtFrame: BASSchemaVersioned {
             updateTicketObservationBundle
         self.worldPriorObservationBundle =
             worldPriorObservationBundle
+        self.leaseLifeObservationBundle =
+            leaseLifeObservationBundle
     }
 }
 
@@ -2964,6 +2984,47 @@ extension BASThoughtFrame {
         copy.worldPriorObservationBundle =
             BASWorldPriorObservationBundle.derive(
                 fromThoughtFrame: self,
+                turnID: turnID,
+                sessionID: sessionID,
+                emittedAt: emittedAt)
+        return copy
+    }
+
+    /// M60 — Return a copy of this frame with a freshly derived
+    /// `leaseLifeObservationBundle` attached. Pure function: no I/O,
+    /// no actor hop, deterministic for the same (budgetFrame, turnID,
+    /// sessionID, emittedAt) tuple.
+    ///
+    /// The coordinator calls this at the seam where the routed
+    /// `BASBudgetFrame` has been finalized (post
+    /// `powerClockService.planBudget` + `normalizeBudget` + device
+    /// routing + maintenance scheduling) — right after the M53 derived
+    /// sessionID / turnID is available, so the bundle shares
+    /// coordinates with the L4..L13 bundles on the same turn. This
+    /// keeps L1 observations coherent-by-construction with the L14
+    /// audit record.
+    ///
+    /// Unlike the tribunal / risk / soft-hand / world-prior
+    /// derivations, this one takes the budget frame as an explicit
+    /// argument because the thought frame itself does not carry L1
+    /// kernel state — the budget is the single source of truth for
+    /// run mode / guard level / maintenance / device route on this
+    /// turn.
+    ///
+    /// Existing frames with a non-nil bundle are overwritten — the
+    /// intent of this method is "re-derive from current signals", not
+    /// "merge". Callers that want to preserve an upstream bundle
+    /// should skip this helper and set the field directly.
+    public func withDerivedLeaseLifeObservationBundle(
+        budgetFrame: BASBudgetFrame,
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> BASThoughtFrame {
+        var copy = self
+        copy.leaseLifeObservationBundle =
+            BASLeaseLifeObservationBundle.derive(
+                fromBudgetFrame: budgetFrame,
                 turnID: turnID,
                 sessionID: sessionID,
                 emittedAt: emittedAt)

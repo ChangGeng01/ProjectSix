@@ -730,16 +730,19 @@ final class BASUpdateTicketObservationDerivationTests: XCTestCase {
     //
     // M58 bumped the frame from 1.7.0 → 1.8.0 for the L13 bundle.
     // M59 subsequently bumped it to 1.9.0 for the L4 world-prior
-    // bundle (additive — the L13 field is unchanged). The test
-    // asserts the current version so any future additive bundle
-    // field prompts an explicit bump review.
+    // bundle (additive — the L13 field is unchanged). M60 moved
+    // it to 1.10.0 for the L1 lease-life bundle (still additive —
+    // the L13 field is unchanged). The test asserts the current
+    // version so any future additive bundle field prompts an
+    // explicit bump review.
 
     func testThoughtFrameSchemaVersionAtOrAboveOneEightZero() {
         // Sanity floor: M58 established 1.8.0 as the L13-bundle
-        // floor; M59 moved it to 1.9.0. Downstream legacy decoders
-        // expect the field to exist at or above this floor.
+        // floor; M59 moved it to 1.9.0; M60 moved it to 1.10.0.
+        // Downstream legacy decoders expect the field to exist at
+        // or above this floor.
         XCTAssertEqual(
-            BASThoughtFrame.currentSchemaVersion, "1.9.0")
+            BASThoughtFrame.currentSchemaVersion, "1.10.0")
     }
 
     // MARK: - Path 15: bundle helpers

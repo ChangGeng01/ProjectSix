@@ -2241,6 +2241,26 @@ public struct BASEBrainRuntimeCoordinator {
                 turnID: derivedTurnID,
                 sessionID: derivedSessionID,
                 emittedAt: request.recordedAt)
+
+        // M60 — L1 灯芯层 main-chain wiring. Derive the per-turn
+        // kernel observation bundle from `routedBudget` (the single
+        // source of truth for run mode / thermal guard / maintenance
+        // / device route). Reuses M53's derived (sessionID, turnID)
+        // so the L1 bundle joins the L4 / L6 / L7 / L10 / L11 / L12
+        // / L13 bundles under the same coordinates — the L14 audit
+        // surface reconciles them by that key. Placed here (after
+        // the evolution ticket observation so the frame's other
+        // fields are all sealed) and BEFORE buildThoughtFold /
+        // buildRuntimeTrace, so the bundle propagates into the fold
+        // + trace and then onto the sovereign verdict on the same
+        // turn.
+        thoughtFrame = thoughtFrame
+            .withDerivedLeaseLifeObservationBundle(
+                budgetFrame: routedBudget,
+                turnID: derivedTurnID,
+                sessionID: derivedSessionID,
+                emittedAt: request.recordedAt)
+
         let auditFindings = budgetFindings + memoryFindings + loopFindings + riskFindings + evolutionFindings
         let killSwitches = recommendedKillSwitches(for: auditFindings)
         let thoughtFold = buildThoughtFold(
