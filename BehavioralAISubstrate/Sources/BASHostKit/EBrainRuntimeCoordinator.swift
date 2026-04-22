@@ -2053,6 +2053,21 @@ public struct BASEBrainRuntimeCoordinator {
             thoughtFrame.courtDecisionDraft = mergedChoice.courtDecisionDraft
         }
 
+        // M55 — L10 tri-self tribunal main-chain wiring. Derive the
+        // per-voice tribunal bundle at the seam where the tribunal
+        // has settled — after `triSelfService.mergeChoice` (and any
+        // reconciliation rerun) has filled in triScores / vetoMarks
+        // / tradeoffLedgers / remandOrders / courtDecisionDraft —
+        // reusing the same sessionID / turnID that the M53 L6 bundle,
+        // M54 L7 bundle, and `buildRuntimeTrace` downstream use. This
+        // keeps L10 observations coherent-by-construction with the
+        // L14 audit record and with L6 / L7 / L9 on the same turn.
+        thoughtFrame = thoughtFrame
+            .withDerivedTribunalObservationBundle(
+                turnID: derivedTurnID,
+                sessionID: derivedSessionID,
+                emittedAt: request.recordedAt)
+
         let riskService = self.riskService
         let rawRiskDecisionPackage = riskService.buildRiskDecisionPackage(
             contextFrame: contextFrame,

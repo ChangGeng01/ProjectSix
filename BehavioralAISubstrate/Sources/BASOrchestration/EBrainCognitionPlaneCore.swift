@@ -2608,7 +2608,7 @@ public enum BASThoughtStopReason: String, Codable, CaseIterable, Sendable {
 }
 
 public struct BASThoughtFrame: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.4.0"
+    public static let currentSchemaVersion = "1.5.0"
 
     public var schemaVersion: String
     public var stepIndex: Int
@@ -2640,6 +2640,16 @@ public struct BASThoughtFrame: BASSchemaVersioned {
     public var neuralLeaseReceipt: BASNeuralLeaseReceipt?
     public var stabilityScore: Double
     public var stopReason: BASThoughtStopReason?
+    /// M55 — L10 tri-self tribunal per-voice observation bundle
+    /// derived from this frame's triScores / vetoMarks / remandOrders
+    /// / courtDecisionDraft. `nil` when the frame was constructed by a
+    /// caller that predates M55 (legacy path) or when an explicit
+    /// `derive(...)` call was skipped. Load-bearing consumers (M32 L10
+    /// coverage projection, L14 audit surface) read this field
+    /// directly; coherent-by-construction with the rest of the frame
+    /// when populated.
+    public var tribunalObservationBundle:
+        BASTribunalObservationBundle?
 
     public init(
         schemaVersion: String = BASThoughtFrame.currentSchemaVersion,
@@ -2671,7 +2681,9 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         toolIntentEnvelope: BASToolIntentEnvelope? = nil,
         neuralLeaseReceipt: BASNeuralLeaseReceipt? = nil,
         stabilityScore: Double = 0,
-        stopReason: BASThoughtStopReason? = nil
+        stopReason: BASThoughtStopReason? = nil,
+        tribunalObservationBundle:
+            BASTribunalObservationBundle? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.stepIndex = stepIndex
@@ -2703,6 +2715,40 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         self.neuralLeaseReceipt = neuralLeaseReceipt
         self.stabilityScore = min(max(stabilityScore, 0), 1)
         self.stopReason = stopReason
+        self.tribunalObservationBundle = tribunalObservationBundle
+    }
+}
+
+extension BASThoughtFrame {
+    /// M55 — Return a copy of this frame with a freshly derived
+    /// `tribunalObservationBundle` attached. Pure function: no I/O, no
+    /// actor hop, deterministic for the same (frame, turnID,
+    /// sessionID, emittedAt) tuple.
+    ///
+    /// The coordinator calls this at the seam where the tribunal has
+    /// settled — after `triSelfService.mergeChoice` (and any
+    /// reconciliation rerun) has filled in triScores / vetoMarks /
+    /// tradeoffLedgers / remandOrders / courtDecisionDraft — so the
+    /// bundle flows into the same turn-audit record that the L14
+    /// surface later signs.
+    ///
+    /// Existing frames with a non-nil bundle are overwritten — the
+    /// intent of this method is "re-derive from current signals", not
+    /// "merge". Callers that want to preserve an upstream bundle
+    /// should skip this helper and set the field directly.
+    public func withDerivedTribunalObservationBundle(
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> BASThoughtFrame {
+        var copy = self
+        copy.tribunalObservationBundle =
+            BASTribunalObservationBundle.derive(
+                from: self,
+                turnID: turnID,
+                sessionID: sessionID,
+                emittedAt: emittedAt)
+        return copy
     }
 }
 

@@ -298,3 +298,262 @@ public actor BASTribunalObservationLedger {
 
     public func clear() { buffer.removeAll() }
 }
+
+// MARK: - M55 main-chain derivation from a completed BASThoughtFrame
+
+extension BASTribunalObservationBundle {
+    /// M55 — Derive an L10 observation bundle from a completed
+    /// `BASThoughtFrame`. The derivation is deterministic: for the
+    /// same input frame + turn/session + emittedAt it produces the
+    /// same bundle byte-for-byte. No I/O, no actor hop.
+    ///
+    /// Signal mapping (each signal kind is emitted iff the frame
+    /// carries structural evidence for it):
+    ///   - `.vote`         emitted 3× per `BASTriSelfScore`, one per
+    ///                     voice. Voice → score mapping:
+    ///                     baseSelf (质我) ← idScore (raw / honest),
+    ///                     ruleSelf (律我) ← superegoScore (principled),
+    ///                     aspireSelf (向我) ← egoScore (integrating /
+    ///                     growth). Disposition: `.affirm` if
+    ///                     score ≥ 0.6, `.oppose` if score ≤ 0.3,
+    ///                     else `.abstain`. salience = score.
+    ///                     confidence = mergedScore (how unified the
+    ///                     tribunal feels about this candidate).
+    ///                     subjectID = candidateID.
+    ///   - `.objection`    emitted per `BASVetoMark`. Voice is mapped
+    ///                     from vetoType: boundary / hostConstitution /
+    ///                     sovereignPrecondition → ruleSelf (legal /
+    ///                     principled veto), dignity → baseSelf (raw
+    ///                     dignity concern), irreversibility /
+    ///                     calibration → aspireSelf (long-horizon
+    ///                     growth concern). salience = 1.0 if veto is
+    ///                     non-compensable, 0.7 if compensable.
+    ///                     confidence = 1.0 (the frame committed to
+    ///                     this veto). subjectID = candidateID.
+    ///   - `.dissent`      emitted per `BASRemandOrder`. Voice = nil
+    ///                     (remand is a tribunal-level signal that
+    ///                     the subject cannot advance without more
+    ///                     work). salience = 0.8 (remand is a strong
+    ///                     signal but not terminal). confidence = 1.0.
+    ///                     subjectID = targetLayer.
+    ///   - `.convergence`  emitted iff `courtDecisionDraft != nil`
+    ///                     AND `voicesAgree(on: preferredCandidateID)`
+    ///                     AND `vetoMarks.isEmpty`. Voice = nil
+    ///                     (convergence is a tribunal-level signal).
+    ///                     salience = 1.0 (decision is made).
+    ///                     confidence = 1.0 when no vetos. subjectID =
+    ///                     preferredCandidateID.
+    ///
+    /// Invariants:
+    ///   - a completely empty `BASThoughtFrame` (no triScores, no
+    ///     vetos, no remands, no decision draft) produces a bundle
+    ///     with zero observations.
+    ///   - `allVoicesSpoke` iff the frame carried ≥1 triScore (every
+    ///     triScore emits one vote per voice, so any non-empty
+    ///     triScores array yields all three voices voting).
+    ///   - `hasCoreSignalCoverage` (L10 coverage projection) maps to
+    ///     `allVoicesSpoke` — so a non-empty triScores array suffices
+    ///     for L10 to register as "covered this turn".
+    ///   - budget cost via `BASTribunalObservationBudget.totalCost`
+    ///     clamps to [0, 1] even at high signal emission.
+    public static func derive(
+        from thoughtFrame: BASThoughtFrame,
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> BASTribunalObservationBundle {
+        var observations: [BASTribunalObservation] = []
+
+        // .vote — 3× per triScore, one per voice
+        for score in thoughtFrame.triScores {
+            observations.append(contentsOf:
+                voteObservations(for: score, at: emittedAt))
+        }
+
+        // .objection — per vetoMark
+        for mark in thoughtFrame.vetoMarks ?? [] {
+            observations.append(objectionObservation(
+                for: mark, at: emittedAt))
+        }
+
+        // .dissent — per remandOrder
+        for order in thoughtFrame.remandOrders ?? [] {
+            observations.append(dissentObservation(
+                for: order, at: emittedAt))
+        }
+
+        // .convergence — iff decision draft + voices agree + no vetos
+        if let convergence = convergenceObservation(
+            from: thoughtFrame, at: emittedAt) {
+            observations.append(convergence)
+        }
+
+        return BASTribunalObservationBundle(
+            turnID: turnID,
+            sessionID: sessionID,
+            observations: observations,
+            emittedAt: emittedAt
+        )
+    }
+
+    private static func voteObservations(
+        for score: BASTriSelfScore,
+        at emittedAt: Date
+    ) -> [BASTribunalObservation] {
+        let merged = clamp01(score.mergedScore)
+        let idObs = voteObservation(
+            voice: .baseSelf,
+            rawScore: score.idScore,
+            mergedScore: merged,
+            candidateID: score.candidateID,
+            veto: score.veto,
+            at: emittedAt)
+        let superegoObs = voteObservation(
+            voice: .ruleSelf,
+            rawScore: score.superegoScore,
+            mergedScore: merged,
+            candidateID: score.candidateID,
+            veto: score.veto,
+            at: emittedAt)
+        let egoObs = voteObservation(
+            voice: .aspireSelf,
+            rawScore: score.egoScore,
+            mergedScore: merged,
+            candidateID: score.candidateID,
+            veto: score.veto,
+            at: emittedAt)
+        return [idObs, superegoObs, egoObs]
+    }
+
+    private static func voteObservation(
+        voice: BASTribunalVoice,
+        rawScore: Double,
+        mergedScore: Double,
+        candidateID: String,
+        veto: Bool,
+        at emittedAt: Date
+    ) -> BASTribunalObservation {
+        let clamped = clamp01(rawScore)
+        let disposition: BASTribunalDisposition
+        if clamped >= 0.6 {
+            disposition = .affirm
+        } else if clamped <= 0.3 {
+            disposition = .oppose
+        } else {
+            disposition = .abstain
+        }
+        let content = "score:\(formatDouble(clamped))"
+            + "|merged:\(formatDouble(mergedScore))"
+            + "|veto:\(veto)"
+        return BASTribunalObservation(
+            kind: .vote,
+            voice: voice,
+            disposition: disposition,
+            subjectID: candidateID,
+            salience: clamped,
+            confidence: mergedScore,
+            content: content,
+            observedAt: emittedAt
+        )
+    }
+
+    private static func objectionObservation(
+        for mark: BASVetoMark,
+        at emittedAt: Date
+    ) -> BASTribunalObservation {
+        let voice = voiceForVetoType(mark.vetoType)
+        let salience = mark.compensable ? 0.7 : 1.0
+        let content = "vetoType:\(mark.vetoType.rawValue)"
+            + "|reasons:\(mark.reasonCodes.count)"
+            + "|compensable:\(mark.compensable)"
+        return BASTribunalObservation(
+            kind: .objection,
+            voice: voice,
+            disposition: nil,
+            subjectID: mark.candidateID,
+            salience: salience,
+            confidence: 1.0,
+            content: content,
+            observedAt: emittedAt
+        )
+    }
+
+    private static func dissentObservation(
+        for order: BASRemandOrder,
+        at emittedAt: Date
+    ) -> BASTribunalObservation {
+        let content = "work:\(order.requiredWork.count)"
+            + "|reasons:\(order.reasonCodes.count)"
+        return BASTribunalObservation(
+            kind: .dissent,
+            voice: nil,
+            disposition: nil,
+            subjectID: order.targetLayer,
+            salience: 0.8,
+            confidence: 1.0,
+            content: content,
+            observedAt: emittedAt
+        )
+    }
+
+    private static func convergenceObservation(
+        from thoughtFrame: BASThoughtFrame,
+        at emittedAt: Date
+    ) -> BASTribunalObservation? {
+        guard let draft = thoughtFrame.courtDecisionDraft else {
+            return nil
+        }
+        let hasVetos = (thoughtFrame.vetoMarks ?? []).isEmpty == false
+        guard hasVetos == false else { return nil }
+        // Build an ephemeral bundle from only votes to ask
+        // voicesAgree — keeps the logic in one place.
+        let voteOnly = thoughtFrame.triScores.flatMap { score in
+            voteObservations(for: score, at: emittedAt)
+        }
+        let ephemeral = BASTribunalObservationBundle(
+            turnID: "",
+            sessionID: "",
+            observations: voteOnly,
+            emittedAt: emittedAt
+        )
+        guard ephemeral.voicesAgree(on: draft.preferredCandidateID)
+        else { return nil }
+        let content = "readiness:\(draft.readinessLevel)"
+            + "|fallbacks:\(draft.fallbackCandidateIDs.count)"
+            + "|disclosures:\(draft.requiredDisclosures.count)"
+        return BASTribunalObservation(
+            kind: .convergence,
+            voice: nil,
+            disposition: nil,
+            subjectID: draft.preferredCandidateID,
+            salience: 1.0,
+            confidence: 1.0,
+            content: content,
+            observedAt: emittedAt
+        )
+    }
+
+    private static func voiceForVetoType(
+        _ vetoType: BASCourtVetoType
+    ) -> BASTribunalVoice {
+        switch vetoType {
+        case .boundary,
+             .hostConstitution,
+             .sovereignPrecondition:
+            return .ruleSelf
+        case .dignity:
+            return .baseSelf
+        case .irreversibility,
+             .calibration:
+            return .aspireSelf
+        }
+    }
+
+    private static func clamp01(_ value: Double) -> Double {
+        min(1, max(0, value))
+    }
+
+    private static func formatDouble(_ value: Double) -> String {
+        String(format: "%.2f", value)
+    }
+}
