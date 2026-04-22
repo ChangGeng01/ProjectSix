@@ -2608,7 +2608,7 @@ public enum BASThoughtStopReason: String, Codable, CaseIterable, Sendable {
 }
 
 public struct BASThoughtFrame: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.5.0"
+    public static let currentSchemaVersion = "1.6.0"
 
     public var schemaVersion: String
     public var stepIndex: Int
@@ -2650,6 +2650,18 @@ public struct BASThoughtFrame: BASSchemaVersioned {
     /// when populated.
     public var tribunalObservationBundle:
         BASTribunalObservationBundle?
+    /// M56 — L11 risk climate per-candidate / per-package observation
+    /// bundle derived from this frame's `riskBindings` (preferred, one
+    /// binding per candidate) or `riskDecisionPackage` (fallback when
+    /// no bindings materialized). Six-kind signal surface (hazard,
+    /// irreversibility, harmPotential always emitted; consequence
+    /// horizon / novelty / gate pressure gated by package presence,
+    /// uncertainty, and manipulation/mode-shift respectively).
+    /// Load-bearing consumers (M32 L11 coverage projection, L14 audit
+    /// surface) read this field directly; coherent-by-construction
+    /// with `riskBindings` / `riskDecisionPackage` when populated.
+    public var riskObservationBundle:
+        BASRiskObservationBundle?
 
     public init(
         schemaVersion: String = BASThoughtFrame.currentSchemaVersion,
@@ -2683,7 +2695,9 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         stabilityScore: Double = 0,
         stopReason: BASThoughtStopReason? = nil,
         tribunalObservationBundle:
-            BASTribunalObservationBundle? = nil
+            BASTribunalObservationBundle? = nil,
+        riskObservationBundle:
+            BASRiskObservationBundle? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.stepIndex = stepIndex
@@ -2716,6 +2730,7 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         self.stabilityScore = min(max(stabilityScore, 0), 1)
         self.stopReason = stopReason
         self.tribunalObservationBundle = tribunalObservationBundle
+        self.riskObservationBundle = riskObservationBundle
     }
 }
 
@@ -2744,6 +2759,37 @@ extension BASThoughtFrame {
         var copy = self
         copy.tribunalObservationBundle =
             BASTribunalObservationBundle.derive(
+                from: self,
+                turnID: turnID,
+                sessionID: sessionID,
+                emittedAt: emittedAt)
+        return copy
+    }
+
+    /// M56 — Return a copy of this frame with a freshly derived
+    /// `riskObservationBundle` attached. Pure function: no I/O, no
+    /// actor hop, deterministic for the same (frame, turnID,
+    /// sessionID, emittedAt) tuple.
+    ///
+    /// The coordinator calls this at the seam where the L11 risk
+    /// climate has settled — after `riskService.buildRiskDecisionPackage`
+    /// plus `normalizeRiskDecision` / `materializeRiskBindings` have
+    /// populated `riskBindings` / `riskDecisionPackage` — so the bundle
+    /// flows into the same turn-audit record that the L14 surface
+    /// later signs.
+    ///
+    /// Existing frames with a non-nil bundle are overwritten — the
+    /// intent of this method is "re-derive from current signals", not
+    /// "merge". Callers that want to preserve an upstream bundle
+    /// should skip this helper and set the field directly.
+    public func withDerivedRiskObservationBundle(
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> BASThoughtFrame {
+        var copy = self
+        copy.riskObservationBundle =
+            BASRiskObservationBundle.derive(
                 from: self,
                 turnID: turnID,
                 sessionID: sessionID,

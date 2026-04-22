@@ -2122,6 +2122,16 @@ public struct BASEBrainRuntimeCoordinator {
         thoughtFrame.riskCard = boundRiskCard
         thoughtFrame.actionPermit = boundActionPermit
         thoughtFrame.riskDecisionPackage = normalizedRiskDecisionPackage
+        // M56 — L11 risk climate now surfaces per-dimension
+        // observations on the main-chain thought frame. Reuses M53's
+        // derived (sessionID, turnID) so L6 / L7 / L10 / L11 bundles
+        // on this turn share strictly equal coordinates — the L14
+        // audit surface joins them by that key.
+        thoughtFrame = thoughtFrame
+            .withDerivedRiskObservationBundle(
+                turnID: derivedTurnID,
+                sessionID: derivedSessionID,
+                emittedAt: request.recordedAt)
 
         let hostGateValue = hostProfileService.applyHostGate(
             profile: hostContext,
