@@ -211,15 +211,38 @@ public actor QinaoRuntime {
         /// `.halt` severity triggers a fail-closed session halt.
         public let coverage: QinaoSovereignControlPlane.CoverageReading
         public let sessionHalted: Bool
+        /// M70 — the lifecycle-routed `BASBudgetFrame` that this turn
+        /// actually ran under. `nil` when the caller did not pass a
+        /// `plannedBudget` into `sendSession`, or when the runtime
+        /// has no attached `QinaoLifecycle` (backwards-compat path).
+        /// When non-`nil`, the `thermalGuardLevel` field reflects the
+        /// live reading taken from the lifecycle's thermal twin at
+        /// the moment `sendSession` ran — all 16 other fields are
+        /// preserved byte-for-byte from the caller's `plannedBudget`.
+        public let routedBudget: BASBudgetFrame?
+        /// M70 — the lifecycle turn record produced after a healthy
+        /// turn. `nil` when the caller did not pass a
+        /// `turnDurationSeconds`, when the runtime has no attached
+        /// `QinaoLifecycle`, or when the turn hit any halt branch
+        /// (parity failure / coverage halt / severity rollback /
+        /// severity deadStop) — halted turns deliberately do not
+        /// advance the lung accumulator or resample the thermal
+        /// twin, because a halted turn is a failed outcome and must
+        /// not distort the lifecycle's continuous state.
+        public let turnRecorded: BASLeaseLifeCoordinator.TurnRecorded?
 
         public init(
             audit: QinaoSovereignControlPlane.AuditReport,
             coverage: QinaoSovereignControlPlane.CoverageReading,
-            sessionHalted: Bool
+            sessionHalted: Bool,
+            routedBudget: BASBudgetFrame? = nil,
+            turnRecorded: BASLeaseLifeCoordinator.TurnRecorded? = nil
         ) {
             self.audit = audit
             self.coverage = coverage
             self.sessionHalted = sessionHalted
+            self.routedBudget = routedBudget
+            self.turnRecorded = turnRecorded
         }
     }
 
@@ -277,12 +300,31 @@ public actor QinaoRuntime {
         _ observations: QinaoSovereignControlPlane.TurnObservations,
         coordinatorSeverity: QinaoSovereignControlPlane.AuditSeverity?,
         coverageBudgetCeiling: Double = 1.0,
-        expectedCoverageLayerIDs: [String] = ["L14"]
+        expectedCoverageLayerIDs: [String] = ["L14"],
+        plannedBudget: BASBudgetFrame? = nil,
+        turnDurationSeconds: Double? = nil
     ) async throws -> TurnOutcome {
         // Pre-flight: refuse if the session was already halted.
         if await sovereign.isSessionHalted(observations.sessionID) {
             throw TurnError.sessionAlreadyHalted(
                 id: observations.sessionID)
+        }
+
+        // M70 — route the planned budget through the lifecycle's live
+        // thermal reading BEFORE audit, so the budget used for this
+        // turn reflects the actual device state rather than the
+        // caller's plan. `prepareBudgetForTurn` is identity when no
+        // lifecycle is attached, so callers that do not pass a
+        // `plannedBudget` or that built the runtime without a
+        // lifecycle see pre-M70 behavior byte-for-byte. When a
+        // `plannedBudget` IS passed, the routed copy lands in
+        // `TurnOutcome.routedBudget` for the caller to use in the
+        // next turn's planner or for audit diffs.
+        let routedBudget: BASBudgetFrame?
+        if let planned = plannedBudget {
+            routedBudget = await prepareBudgetForTurn(planned)
+        } else {
+            routedBudget = nil
         }
 
         let report = try await sovereign.auditTurn(
@@ -305,6 +347,13 @@ public actor QinaoRuntime {
         // engine — the coordinator allowed something the engine would
         // have blocked. Halt the session before returning so the
         // caller cannot accidentally continue the conversation.
+        //
+        // M70: do NOT record the turn on the lifecycle — a halted
+        // turn is a failed outcome and must not advance the lung
+        // accumulator or resample the thermal twin. The caller sees
+        // `throw`, not a `TurnOutcome`, so there is no place to
+        // report `turnRecorded` anyway; the explicit contract is
+        // "halt paths leave lifecycle state untouched".
         if !report.isAcceptable {
             await sovereign.markSessionHalted(
                 sessionID: observations.sessionID,
@@ -319,7 +368,8 @@ public actor QinaoRuntime {
         // returned `.halt` (typically a wake-budget overspend). This
         // is a structural ceiling the coordinator does not see; the
         // runtime halts the session and throws so the caller cannot
-        // advance past a budget breach.
+        // advance past a budget breach. M70: same no-record contract
+        // as the parity halt above.
         if coverage.severity == .halt {
             await sovereign.markSessionHalted(
                 sessionID: observations.sessionID,
@@ -334,6 +384,12 @@ public actor QinaoRuntime {
         // hard stop (rollback / deadStop). Halt the session and
         // return the report so the caller can act on it (rollback
         // prompt UI, human-intervention banner, etc.).
+        //
+        // M70: halt returns a `TurnOutcome` rather than throwing, so
+        // we DO have a place to surface `routedBudget` (the caller
+        // still wants to see what budget the turn ran under, even if
+        // the turn is being halted). But `turnRecorded` stays `nil`
+        // — a halted turn must not distort lifecycle state.
         let autoHaltSeverities: Set<
             QinaoSovereignControlPlane.AuditSeverity
         > = [.rollback, .deadStop]
@@ -344,13 +400,37 @@ public actor QinaoRuntime {
             return TurnOutcome(
                 audit: report,
                 coverage: coverage,
-                sessionHalted: true)
+                sessionHalted: true,
+                routedBudget: routedBudget,
+                turnRecorded: nil)
+        }
+
+        // M70 — healthy turn path: record the turn on the lifecycle
+        // so the lung accumulator and thermal twin advance. This
+        // only fires when (a) the caller passed a `plannedBudget`
+        // (so we know the run mode), (b) the caller passed a
+        // `turnDurationSeconds`, and (c) a lifecycle is attached.
+        // Any of those being absent leaves `turnRecorded` `nil` and
+        // the lifecycle state unchanged — identical to pre-M70
+        // behavior.
+        let turnRecorded: BASLeaseLifeCoordinator.TurnRecorded?
+        if
+            let planned = plannedBudget,
+            let duration = turnDurationSeconds
+        {
+            turnRecorded = await recordTurnOnLifecycle(
+                runMode: QinaoRunMode(bridging: planned.runMode),
+                durationSeconds: duration)
+        } else {
+            turnRecorded = nil
         }
 
         return TurnOutcome(
             audit: report,
             coverage: coverage,
-            sessionHalted: false)
+            sessionHalted: false,
+            routedBudget: routedBudget,
+            turnRecorded: turnRecorded)
     }
 
     // MARK: - M69 lifecycle-aware budget routing
