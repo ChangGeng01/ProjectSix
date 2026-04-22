@@ -2211,6 +2211,20 @@ public struct BASEBrainRuntimeCoordinator {
             updateTickets: normalizedTickets
         )
         let updateTickets = evolutionGovernance.updateTickets
+        // M58 — L13 evolution surface now emits per-ticket update
+        // observations on the main-chain thought frame. Reuses M53's
+        // derived (sessionID, turnID) so L6 / L7 / L10 / L11 / L12 /
+        // L13 bundles on this turn share strictly equal coordinates —
+        // the L14 audit surface joins them by that key. Must run AFTER
+        // the governed ticket list is sealed and BEFORE buildThoughtFold
+        // / buildRuntimeTrace read the frame, so the bundle propagates
+        // into the fold + trace and then onto the sovereign verdict.
+        thoughtFrame = thoughtFrame
+            .withDerivedUpdateTicketObservationBundle(
+                updateTickets: updateTickets,
+                turnID: derivedTurnID,
+                sessionID: derivedSessionID,
+                emittedAt: request.recordedAt)
         let auditFindings = budgetFindings + memoryFindings + loopFindings + riskFindings + evolutionFindings
         let killSwitches = recommendedKillSwitches(for: auditFindings)
         let thoughtFold = buildThoughtFold(

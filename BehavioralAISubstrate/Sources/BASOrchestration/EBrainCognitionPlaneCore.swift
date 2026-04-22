@@ -1,5 +1,6 @@
 import Foundation
 import BASMemory
+import BASObservability
 import BASPolicy
 import BASRuntimeCore
 
@@ -2608,7 +2609,7 @@ public enum BASThoughtStopReason: String, Codable, CaseIterable, Sendable {
 }
 
 public struct BASThoughtFrame: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.7.0"
+    public static let currentSchemaVersion = "1.8.0"
 
     public var schemaVersion: String
     public var stepIndex: Int
@@ -2676,6 +2677,22 @@ public struct BASThoughtFrame: BASSchemaVersioned {
     /// rendered output on the same turn.
     public var softHandObservationBundle:
         BASSoftHandObservationBundle?
+    /// M58 — L13 evolution per-ticket update observation bundle
+    /// derived from the turn's finalized `[BASUpdateTicket]` list
+    /// (the governed tickets, post `buildEvolutionGovernanceArtifacts`).
+    /// Six kinds (submission, hostChangeProposed, memoryWriteProposed,
+    /// ruleCandidateProposed, conflictDetected, reviewRequired) emit
+    /// only when their structural precondition holds — a ticket with
+    /// only a memory-write suggestion yields one submission and one
+    /// memoryWriteProposed; a conflicted host-change ticket that
+    /// requires review yields four signals. A turn with zero tickets
+    /// yields a bundle with zero observations — the legitimate
+    /// "no-evolution turn" signal. Load-bearing consumers (M32 L13
+    /// coverage projection, L14 audit surface) read this field
+    /// directly; coherent-by-construction with the governed ticket
+    /// list on the same turn.
+    public var updateTicketObservationBundle:
+        BASUpdateTicketObservationBundle?
 
     public init(
         schemaVersion: String = BASThoughtFrame.currentSchemaVersion,
@@ -2713,7 +2730,9 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         riskObservationBundle:
             BASRiskObservationBundle? = nil,
         softHandObservationBundle:
-            BASSoftHandObservationBundle? = nil
+            BASSoftHandObservationBundle? = nil,
+        updateTicketObservationBundle:
+            BASUpdateTicketObservationBundle? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.stepIndex = stepIndex
@@ -2748,6 +2767,8 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         self.tribunalObservationBundle = tribunalObservationBundle
         self.riskObservationBundle = riskObservationBundle
         self.softHandObservationBundle = softHandObservationBundle
+        self.updateTicketObservationBundle =
+            updateTicketObservationBundle
     }
 }
 
@@ -2846,6 +2867,45 @@ extension BASThoughtFrame {
             BASSoftHandObservationBundle.derive(
                 from: self,
                 renderedOutput: renderedOutput,
+                turnID: turnID,
+                sessionID: sessionID,
+                emittedAt: emittedAt)
+        return copy
+    }
+
+    /// M58 — Return a copy of this frame with a freshly derived
+    /// `updateTicketObservationBundle` attached. Pure function: no I/O,
+    /// no actor hop, deterministic for the same (tickets, turnID,
+    /// sessionID, emittedAt) tuple.
+    ///
+    /// The coordinator calls this at the seam where the L13 evolution
+    /// service has finalized its ticket list — after
+    /// `evolutionService.buildTickets` + `normalizeUpdateTickets` +
+    /// `buildEvolutionGovernanceArtifacts` have settled the governed
+    /// ticket list — so the bundle flows into the same turn-audit
+    /// record that the L14 surface later signs.
+    ///
+    /// Unlike the tribunal / risk / soft-hand derivations, this one
+    /// takes the finalized ticket list as an explicit argument because
+    /// the tickets live outside the thought frame (on
+    /// `evolutionGovernance.updateTickets`). Tickets are the only
+    /// source of submission / mutation-proposal / conflict / review
+    /// evidence; the frame provides only the turn coordinates.
+    ///
+    /// Existing frames with a non-nil bundle are overwritten — the
+    /// intent of this method is "re-derive from current signals", not
+    /// "merge". Callers that want to preserve an upstream bundle
+    /// should skip this helper and set the field directly.
+    public func withDerivedUpdateTicketObservationBundle(
+        updateTickets: [BASUpdateTicket],
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> BASThoughtFrame {
+        var copy = self
+        copy.updateTicketObservationBundle =
+            BASUpdateTicketObservationBundle.derive(
+                fromUpdateTickets: updateTickets,
                 turnID: turnID,
                 sessionID: sessionID,
                 emittedAt: emittedAt)

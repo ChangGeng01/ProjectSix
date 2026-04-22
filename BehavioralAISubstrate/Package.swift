@@ -49,8 +49,14 @@ let package = Package(
         // fake for tests. Platform providers (Apple FoundationModels,
         // MLX, remote LLMs) live in adapter layers.
         .target(name: "BASOrgan", dependencies: ["BASRuntimeCore"]),
-        .target(name: "BASOrchestration", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASWorldPrior", "BASLeaseLife", "BASOrgan"]),
         .target(name: "BASObservability", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy"]),
+        // BASOrchestration depends on BASObservability because M58
+        // `BASUpdateTicketObservationDerivation` needs to read
+        // `BASUpdateTicket` (defined in BASObservability) to produce a
+        // per-ticket observation bundle on the main-chain thought frame.
+        // Safe topology: BASObservability does not import BASOrchestration,
+        // so no cycle.
+        .target(name: "BASOrchestration", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASWorldPrior", "BASLeaseLife", "BASOrgan", "BASObservability"]),
         .target(
             name: "BASEvaluation",
             dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASObservability"]
