@@ -437,6 +437,124 @@ public actor QinaoLoop {
         }
     }
 
+    /// M77 — Budget-aware generation overload.
+    ///
+    /// Same pipeline as `generateCandidates(sessionID:seeds:)` with
+    /// one addition: for each seed the loop computes a
+    /// `QinaoOrganRoutingDecision` from the routed `BASBudgetFrame`
+    /// (typically supplied by `QinaoRuntime.prepareBudgetForTurn`)
+    /// and hands it to the endpoint.
+    ///
+    /// Dispatch rules:
+    ///
+    /// - Endpoint conforms to `QinaoBudgetAwareOrganEndpoint` →
+    ///   calls `produceBody(prompt:context:sessionID:decision:)` so
+    ///   temperature / token budget / determinism all flow through
+    ///   to the adapter.
+    /// - Endpoint is plain `QinaoOrganEndpoint` → falls back to
+    ///   `produceBody(prompt:context:role:sessionID:)` but still
+    ///   uses `decision.role` (which may have been downgraded from
+    ///   core to scout under thermal emergency), so thermal
+    ///   protection still works even against legacy endpoints that
+    ///   can't honor temperature/tokens.
+    ///
+    /// `decisions` returned on the generated-candidate order mirror
+    /// the frontier-sorted return value so hosts can correlate
+    /// each draft with its routing decision. (Note: the decision
+    /// array is *not* currently exposed; this is an internal
+    /// contract reserved for a future audit surface. The exported
+    /// return value keeps the same `[GeneratedCandidate]` shape as
+    /// the non-routed overload.)
+    ///
+    /// Pass `routedBudget: nil` to skip routing entirely — the
+    /// decision function returns `budget-absent` defaults and the
+    /// loop behaves identically to the non-routed overload. Passing
+    /// `nil` is preferable to just calling the non-routed overload
+    /// when a host wants to exercise the routing path with defaults
+    /// (useful in tests).
+    public func generateCandidates(
+        sessionID: String,
+        seeds: [CandidateSeed],
+        routedBudget: BASBudgetFrame?,
+        routingPolicy: QinaoOrganRoutingPolicy = .default
+    ) async throws -> [GeneratedCandidate] {
+        guard let endpoint = organEndpoint else {
+            throw LoopError.organUnavailable(
+                reason: "no-endpoint-configured")
+        }
+        guard !seeds.isEmpty else {
+            throw LoopError.invalidCandidate(
+                reason: "empty-submission")
+        }
+        var seenIDs = Set<String>()
+        for seed in seeds {
+            let trimmed = seed.candidateID
+                .trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else {
+                throw LoopError.invalidCandidate(
+                    reason: "empty-candidate-id")
+            }
+            guard seenIDs.insert(trimmed).inserted else {
+                throw LoopError.invalidCandidate(
+                    reason: "duplicate-candidate-id:\(trimmed)")
+            }
+        }
+
+        // Per-seed decision + dispatch. The order of decisions
+        // mirrors seed order so the frontier-join below can zip them
+        // back with the response tuple.
+        let budgetAwareEndpoint = endpoint as? QinaoBudgetAwareOrganEndpoint
+        var responses: [(CandidateSeed, OrganResponse)] = []
+        responses.reserveCapacity(seeds.count)
+        for seed in seeds {
+            let decision = QinaoOrganRouting.decide(
+                budget: routedBudget,
+                seedRole: seed.role,
+                policy: routingPolicy)
+            let response: OrganResponse
+            if let aware = budgetAwareEndpoint {
+                response = try await aware.produceBody(
+                    prompt: seed.prompt,
+                    context: seed.context,
+                    sessionID: sessionID,
+                    decision: decision)
+            } else {
+                // Legacy endpoint — forward the routed role only so
+                // thermal downgrades still hit the endpoint even if
+                // it can't honor temperature/tokens.
+                response = try await endpoint.produceBody(
+                    prompt: seed.prompt,
+                    context: seed.context,
+                    role: decision.role,
+                    sessionID: sessionID)
+            }
+            responses.append((seed, response))
+        }
+
+        let inputs = responses.map { seed, response in
+            Self.candidateInput(fromSeed: seed, body: response.body)
+        }
+        try await submit(sessionID: sessionID, candidates: inputs)
+
+        let frontier = try candidateFrontier(
+            sessionID: sessionID, topK: Int.max)
+        var responseByID: [String: OrganResponse] = [:]
+        for (seed, response) in responses {
+            responseByID[seed.candidateID] = response
+        }
+        return frontier.compactMap { draft in
+            guard let response = responseByID[draft.candidateID]
+            else { return nil }
+            return GeneratedCandidate(
+                candidateID: draft.candidateID,
+                body: draft.body,
+                providerID: response.providerID,
+                traceID: response.traceID,
+                score: draft.score,
+                reversibility: draft.reversibility)
+        }
+    }
+
     static func candidateInput(
         fromSeed seed: CandidateSeed,
         body: String
