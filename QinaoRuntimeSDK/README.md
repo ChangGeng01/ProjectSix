@@ -77,32 +77,33 @@ demo for each lives under
 
 ---
 
-## Seven public modules
+## Eight public modules
 
 ```
-          QinaoRuntime
-                │
-      ┌─────────┼──────────┬──────────┐
-      ▼         ▼          ▼          ▼
-   QinaoHost QinaoMemory QinaoLoop  QinaoRisk
-      │         │          │          │
-      └────┬────┴──────────┴──────────┘
-           ▼
-      QinaoSovereign
-           │
-           ▼
-        QinaoUI
+               QinaoRuntime
+                    │
+      ┌──────┬──────┼──────┬───────┬──────────────┐
+      ▼      ▼      ▼      ▼       ▼              ▼
+   QinaoHost QinaoMemory QinaoLoop QinaoRisk QinaoWorldPrior
+      │      │      │      │       │              │
+      └──────┴──────┴──────┴───────┴──────────────┘
+                         ▼
+                    QinaoSovereign
+                         │
+                         ▼
+                      QinaoUI
 ```
 
-| Module           | Role                                                         |
-| ---------------- | ------------------------------------------------------------ |
-| `QinaoRuntime`   | Session lifecycle, three-signature gate, tool execution.     |
-| `QinaoHost`      | Host constitution: submit / preview / approve / reject / rollback / freeze / thaw. |
-| `QinaoMemory`    | Session memory: admit / recall / forget across hot·warm·cold tiers. |
-| `QinaoLoop`      | Candidate frontier, compare panel, guardian branch.          |
-| `QinaoRisk`      | Risk signals → four-way assessment with stable reason codes. |
-| `QinaoSovereign` | Control plane: rollback plan, warrant issuance, session halt. |
-| `QinaoUI`        | Five soft-hand SwiftUI surfaces (compare panel · draft shell · delay packet · boundary script · silent stub). |
+| Module             | Role                                                         |
+| ------------------ | ------------------------------------------------------------ |
+| `QinaoRuntime`     | Session lifecycle, three-signature gate, tool execution.     |
+| `QinaoHost`        | Host constitution: submit / preview / approve / reject / rollback / freeze / thaw. |
+| `QinaoMemory`      | Session memory: admit / recall / forget across hot·warm·cold tiers. |
+| `QinaoLoop`        | Candidate frontier, compare panel, guardian branch.          |
+| `QinaoRisk`        | Risk signals → four-way assessment with stable reason codes. |
+| `QinaoWorldPrior`  | Horizons, axioms, causal templates, domain bridges, counterfactual branches, and boundary-bedrock override evaluation. |
+| `QinaoSovereign`   | Control plane: rollback plan, warrant issuance, session halt. |
+| `QinaoUI`          | Five soft-hand SwiftUI surfaces (compare panel · draft shell · delay packet · boundary script · silent stub). |
 
 Every public type in every module is `Sendable`. Every public error is
 typed and carries stable reason codes. Nothing in a module's public
@@ -200,6 +201,9 @@ promise. All listed tests are part of the default `swift test` run on
 | **Unknown world-template is a typed error** | `RiskError.unknownWorldTemplate` (`QinaoRiskWorldPriorTests`) |
 | **Informed consent forces `.replace`** | `QinaoRiskGate` consent branch (`QinaoRiskWorldPriorTests`) |
 | **Low-evidence irreversible forces `.delay`** | `QinaoRiskGate` evidence branch (`QinaoRiskWorldPriorTests`) |
+| **World priors queryable as a public façade** | `QinaoWorldPriorVault` actor (8 domains · 20 causal templates · 8 domain bridges · 5 axioms · counterfactual seeder ≥ 3 branches) with Qinao-native mirror types only (`QinaoWorldPriorTests`) |
+| **Host override of a world axiom is clean / demote / reject** | `QinaoWorldPriorVault.evaluateHostOverride(claimID:declaredEvidence:statement:)` bedrock semantics (`QinaoWorldPriorTests.testAxiomaticClaimOutranksWellSupportedOverride` · `testEqualEvidenceOverrideDemotesToPlausible` · `testByteIdenticalStatementOverrideIsClean`) |
+| **Grow path is reference-integrity checked** | `QinaoWorldPriorVault.registerTemplate` / `registerBridge` — duplicate IDs, unknown template refs in bridge pairings, and axiom collisions surface as typed `VaultError` (`QinaoWorldPriorTests.testDuplicateTemplateIDThrowsTypedError` · `testBridgeReferencingUnknownTemplateFailsRefIntegrity`) |
 | **Host secrets stay out of base weights** | `QinaoLearningExportBundle` triple gate: scrubbed + privacySafe + sovereignSafe (`QinaoLearningExportTests`) |
 | **Host constitution: submit / preview / approve / rollback** | `QinaoHost` candidate pipeline + projection parity (`QinaoHostTests`, `WorldAndHostDemo.testHostCandidateFlowsSubmitPreviewApproveRollback`) |
 | **Cascade delete across memory tiers** | `QinaoMemory.forget(sensitivity:)` cascade (`WorldAndHostDemo.testSensitivityCascadeForgetIsTyped`) |

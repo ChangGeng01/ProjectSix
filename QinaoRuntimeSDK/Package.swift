@@ -31,6 +31,7 @@ let package = Package(
         .library(name: "QinaoLoop", targets: ["QinaoLoop"]),
         .library(name: "QinaoRisk", targets: ["QinaoRisk"]),
         .library(name: "QinaoSovereign", targets: ["QinaoSovereign"]),
+        .library(name: "QinaoWorldPrior", targets: ["QinaoWorldPrior"]),
         .library(name: "QinaoUI", targets: ["QinaoUI"])
     ],
     dependencies: [
@@ -82,6 +83,18 @@ let package = Package(
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
                 .product(name: "BASOrchestration", package: "BehavioralAISubstrate")
             ]),
+        // QinaoWorldPrior — L4 world-prior vault façade. Public
+        // surface: horizons, axioms, causal templates, cross-domain
+        // bridges, counterfactual branches, boundary-bedrock
+        // override guard. Internal `BASWorldPrior*` symbols never
+        // leak through a public API; all types are Qinao-owned
+        // mirrors translated in `QinaoWorldPriorProjection`.
+        .target(
+            name: "QinaoWorldPrior",
+            dependencies: [
+                .product(name: "BASRuntimeCore", package: "BehavioralAISubstrate"),
+                .product(name: "BASWorldPrior", package: "BehavioralAISubstrate")
+            ]),
         // QinaoRuntime — composes Host + Risk + Sovereign into
         // a session-level three-signature gate. Depends on the
         // other Qinao modules (not on BAS directly, except for
@@ -114,6 +127,7 @@ let package = Package(
                 "QinaoLoop",
                 "QinaoRisk",
                 "QinaoSovereign",
+                "QinaoWorldPrior",
                 "QinaoUI",
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate")
             ])

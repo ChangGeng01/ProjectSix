@@ -50,6 +50,7 @@
 | M30 | L4 per-template world-prior observation primitives（additive，附带 evidence-level 传播 + priorContradiction 启发式） | 100% | `BASWorldPriorObservation` | `BASWorldPriorObservationTests` |
 | M31 | Cross-layer 观察协调支架（`BASCognitiveLayer` + `BASObservationCoverageSummary` + `BASObservationReconciliationReport`）— pure 在 `BASRuntimeCore`，零上游耦合 | 100% | `BASObservationReconciliationCore` | `BASObservationReconciliationTests` |
 | M32 | 8 层 bundle → coverage summary 边缘投影（L4/L6/L7/L9/L10/L11/L12/L13）；tribunal `allVoicesSpoke` 映射为 core coverage；end-to-end 8 层协调报告测试 | 100% | `BAS*ObservationCoverage.swift`, `BASObservationCoverageProjections.swift` | `BASObservationCoverageProjectionTests` |
+| M50 | L4 World Prior 公开 façade — 第 8 个 Qinao library；`QinaoWorldPriorVault` actor + 9 Qinao-native mirror 类型（EvidenceLevel Comparable / Domain / Axiom / CausalTemplate + 3 nested enum / DomainBridge + TemplatePair / Horizon / PerturbKind / CounterfactualBranch / OverrideOutcome）+ 9 档 typed `VaultError`；`import QinaoWorldPrior` 可直接查 horizons/templates/axioms/bridges/counterfactualBranches + evaluateHostOverride（clean/demote/reject BoundaryBedrock）+ grow-path registerHorizon/Template/Bridge 引用完整性守卫；`BASWorldPrior*` 符号不出现在公开符号图（redaction 扫 8 Qinao 模块 0 违规） | 100% | `QinaoRuntimeSDK/Sources/QinaoWorldPrior/*` | `QinaoWorldPriorTests` |
 
 ### 关键层完成度映射（SDK 视角，2026-04-22 post-M47 读数）
 
@@ -62,7 +63,7 @@
 | L1 Lease & Life | 60% | **85%** | M16 BGTaskScheduler 真实接入；M8 loop 呼吸调度；M39 lease-life coverage 投影（10→11 层） |
 | L2 Neural Organ | 40% | **40%** | M12 `BASOrganAdapter` + `BASAppleFoundationModelsAdapter` 默认 provider（Scout/Core 以采样参数/提示词区分）；M41 per-signal neural-organ registry coverage 投影（12→13 层）。剩余 60% = 真实双模型 + 量化 + ANE 算子层 + 图编译器，属 plan §9.6 显式承认的 Swift-only 天花板，非纪律缺口 |
 | L3 Thought-fold | 40% | **72%** | `ThoughtFold / checkpoint lineage / 热启动 / Session Engine v1` 已进主产品 turn；`L3 v2` 呼吸状态机 + 主权桥 + `BASOrganPackage / BASOrganDeltaPlan / BASThermalExchangeFrame / BASBreathSchedulerFrame / BASLungState / BASRollbackAnchor / BASResumeFrame` 最小骨架；M42 L3 thought-fold coverage 投影（13→14 层，闭环） |
-| L4 World Prior | 5% | **75%** | M13 L11 吃 causal template + 证据/同意逻辑；M30 per-template world-prior primitives + evidence-level 传播 + priorContradiction 启发式 |
+| L4 World Prior | 5% | **82%** | M13 L11 吃 causal template + 证据/同意逻辑；M30 per-template world-prior primitives + evidence-level 传播 + priorContradiction 启发式；**M50 `QinaoWorldPrior` 公开 façade**（第 8 个 Qinao library · `QinaoWorldPriorVault` actor + 9 mirror 类型 + 9 档 typed `VaultError` + 19/19 XCTest 绿 · `BASWorldPrior*` 符号不出现在公开符号图 · redaction 扫 8 模块 0 违规） |
 | L5 Host Constitution | 80% | **95%** | M11 候选流水线 + projection parity；M40 host-candidate pipeline coverage 投影（11→12 层） |
 | L6 Presence Eye | 50% | **60%** | M22 per-channel observation primitives + budget + ledger；ContextFrame 主链尚未接线 |
 | L7 Mirror Blade | 50% | **60%** | M23 per-signal decomposition primitives + budget + ledger；DecomposeFrame 主链尚未接线 |
