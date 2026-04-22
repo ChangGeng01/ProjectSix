@@ -2608,7 +2608,7 @@ public enum BASThoughtStopReason: String, Codable, CaseIterable, Sendable {
 }
 
 public struct BASThoughtFrame: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.6.0"
+    public static let currentSchemaVersion = "1.7.0"
 
     public var schemaVersion: String
     public var stepIndex: Int
@@ -2662,6 +2662,20 @@ public struct BASThoughtFrame: BASSchemaVersioned {
     /// with `riskBindings` / `riskDecisionPackage` when populated.
     public var riskObservationBundle:
         BASRiskObservationBundle?
+    /// M57 — L12 gentle-hand per-subject render observation bundle
+    /// derived from this frame's `riskBindings` (preferred, one binding
+    /// per candidate) or `riskDecisionPackage` (fallback) combined with
+    /// the final `BASRenderedOutput` the action service produced. Six
+    /// kinds (suggestion, selection, render, deferral, downgrade,
+    /// escalation) emit only when their structural precondition holds
+    /// — an empty-body render yields no `render` kind, a permit mode
+    /// equal to its recommendation yields no direction kind, a sovereign
+    /// hint yields an unconditional `escalation`. Load-bearing consumers
+    /// (M32 L12 coverage projection, L14 audit surface) read this field
+    /// directly; coherent-by-construction with `riskBindings` and the
+    /// rendered output on the same turn.
+    public var softHandObservationBundle:
+        BASSoftHandObservationBundle?
 
     public init(
         schemaVersion: String = BASThoughtFrame.currentSchemaVersion,
@@ -2697,7 +2711,9 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         tribunalObservationBundle:
             BASTribunalObservationBundle? = nil,
         riskObservationBundle:
-            BASRiskObservationBundle? = nil
+            BASRiskObservationBundle? = nil,
+        softHandObservationBundle:
+            BASSoftHandObservationBundle? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.stepIndex = stepIndex
@@ -2731,6 +2747,7 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         self.stopReason = stopReason
         self.tribunalObservationBundle = tribunalObservationBundle
         self.riskObservationBundle = riskObservationBundle
+        self.softHandObservationBundle = softHandObservationBundle
     }
 }
 
@@ -2791,6 +2808,44 @@ extension BASThoughtFrame {
         copy.riskObservationBundle =
             BASRiskObservationBundle.derive(
                 from: self,
+                turnID: turnID,
+                sessionID: sessionID,
+                emittedAt: emittedAt)
+        return copy
+    }
+
+    /// M57 — Return a copy of this frame with a freshly derived
+    /// `softHandObservationBundle` attached. Pure function: no I/O, no
+    /// actor hop, deterministic for the same (frame, renderedOutput,
+    /// turnID, sessionID, emittedAt) tuple.
+    ///
+    /// The coordinator calls this at the seam where the L12 gentle
+    /// hand has finished rendering — after `actionService.render` +
+    /// `projectedRenderedOutput` produce the final `BASRenderedOutput`
+    /// — so the bundle flows into the same turn-audit record that the
+    /// L14 surface later signs.
+    ///
+    /// Unlike the tribunal / risk derivations, this one takes the
+    /// rendered output as an explicit argument because the render is
+    /// the primary source of `selection` / `render` / `deferral`
+    /// evidence; the thought frame alone (with its `riskBindings` /
+    /// `riskDecisionPackage`) carries the suggestion side.
+    ///
+    /// Existing frames with a non-nil bundle are overwritten — the
+    /// intent of this method is "re-derive from current signals", not
+    /// "merge". Callers that want to preserve an upstream bundle
+    /// should skip this helper and set the field directly.
+    public func withDerivedSoftHandObservationBundle(
+        renderedOutput: BASRenderedOutput,
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> BASThoughtFrame {
+        var copy = self
+        copy.softHandObservationBundle =
+            BASSoftHandObservationBundle.derive(
+                from: self,
+                renderedOutput: renderedOutput,
                 turnID: turnID,
                 sessionID: sessionID,
                 emittedAt: emittedAt)

@@ -2178,6 +2178,19 @@ public struct BASEBrainRuntimeCoordinator {
             actionPermit: boundActionPermit,
             riskDecisionPackage: normalizedRiskDecisionPackage
         )
+        // M57 — L12 gentle hand now surfaces per-subject render
+        // observations on the main-chain thought frame. Reuses M53's
+        // derived (sessionID, turnID) so L6 / L7 / L10 / L11 / L12
+        // bundles on this turn share strictly equal coordinates — the
+        // L14 audit surface joins them by that key. Must run AFTER
+        // renderedOutput is sealed and BEFORE evolutionService sees
+        // the frame, so UpdateTicket derivation can read the bundle.
+        thoughtFrame = thoughtFrame
+            .withDerivedSoftHandObservationBundle(
+                renderedOutput: renderedOutput,
+                turnID: derivedTurnID,
+                sessionID: derivedSessionID,
+                emittedAt: request.recordedAt)
         let rawTickets = evolutionService.buildTickets(
             thoughtFrame: thoughtFrame,
             output: renderedOutput,
