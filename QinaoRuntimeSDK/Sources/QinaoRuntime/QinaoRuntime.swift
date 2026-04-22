@@ -500,4 +500,103 @@ public actor QinaoRuntime {
             runMode: runMode,
             durationSeconds: durationSeconds)
     }
+
+    // MARK: - M78 routed candidate generation (lifecycle + M77 routing + loop)
+
+    /// Result of driving per-turn organ routing through the full
+    /// runtime stack. Pairs generated candidates with the per-seed
+    /// routing decisions that produced them, so hosts can audit
+    /// "which seed was routed to which (role, temperature,
+    /// maxOutputTokens, deterministic) and under what reason codes"
+    /// in lockstep with the candidates themselves.
+    ///
+    /// `routedBudget` is the live-thermal copy of the caller's
+    /// `plannedBudget` (after `prepareBudgetForTurn(_:)`). When the
+    /// caller passes a `nil` `plannedBudget` or the runtime has no
+    /// `lifecycle` attached, `routedBudget` is `nil` and routing
+    /// falls back to policy defaults — i.e., the pre-M77 `.scout` /
+    /// `.core` sampling behavior with reason code `"budget-absent"`.
+    ///
+    /// The arrays are parallel by index: `decisions[i]` is the
+    /// decision the router produced for `seeds[i]`. The loop applies
+    /// the same pure `QinaoOrganRouting.decide(...)` internally, so
+    /// the audit decisions returned here agree byte-for-byte with
+    /// the decisions the loop fed to the endpoint.
+    public struct RoutedGenerationResult: Sendable, Equatable {
+        public let candidates: [QinaoLoop.GeneratedCandidate]
+        public let decisions: [QinaoLoop.QinaoOrganRoutingDecision]
+        public let routedBudget: BASBudgetFrame?
+
+        public init(
+            candidates: [QinaoLoop.GeneratedCandidate],
+            decisions: [QinaoLoop.QinaoOrganRoutingDecision],
+            routedBudget: BASBudgetFrame?
+        ) {
+            self.candidates = candidates
+            self.decisions = decisions
+            self.routedBudget = routedBudget
+        }
+    }
+
+    /// Single entry point that folds the three M70/M77 seams
+    /// together at the QinaoRuntime boundary:
+    ///
+    /// 1. route `plannedBudget` through the attached lifecycle so the
+    ///    live thermal guard level lands in `routedBudget`
+    ///    (`prepareBudgetForTurn` identity when no lifecycle is
+    ///    attached — pre-M70 byte-equivalent);
+    /// 2. compute per-seed `QinaoOrganRoutingDecision` via the pure
+    ///    `QinaoOrganRouting.decide(...)` pipeline so the caller can
+    ///    audit which routing reason codes applied to each seed;
+    /// 3. drive `QinaoLoop.generateCandidates(..., routedBudget:,
+    ///    routingPolicy:)` so the endpoint (if it conforms to
+    ///    `QinaoBudgetAwareOrganEndpoint`) builds per-turn presets
+    ///    with (temperature, maxOutputTokens, deterministic)
+    ///    reflecting the routed budget — and legacy endpoints still
+    ///    get the thermally-downgraded role via the loop's legacy
+    ///    fallback.
+    ///
+    /// The decisions returned here are recomputed locally from the
+    /// same `routedBudget` + `routingPolicy` the loop used, so the
+    /// audit trail is independently verifiable rather than echoed
+    /// back from the loop's internal state. When the loop rejects
+    /// (e.g., empty seeds, empty sessionID, endpoint throws), this
+    /// method throws the same typed error — the decisions array is
+    /// discarded and no `RoutedGenerationResult` is returned.
+    ///
+    /// Callers that want *just* routing decisions without driving
+    /// generation can call `QinaoLoop.QinaoOrganRouting.decide(...)`
+    /// directly; callers that want *just* generation without the
+    /// audit record can call `loop.generateCandidates(...,
+    /// routedBudget:)` directly. This method is the convenience for
+    /// the common case "route + generate + keep the audit trail
+    /// together".
+    public func generateCandidatesForTurn(
+        sessionID: String,
+        seeds: [QinaoLoop.CandidateSeed],
+        plannedBudget: BASBudgetFrame? = nil,
+        routingPolicy: QinaoLoop.QinaoOrganRoutingPolicy = .default
+    ) async throws -> RoutedGenerationResult {
+        let routedBudget: BASBudgetFrame?
+        if let planned = plannedBudget {
+            routedBudget = await prepareBudgetForTurn(planned)
+        } else {
+            routedBudget = nil
+        }
+        let decisions = seeds.map { seed in
+            QinaoLoop.QinaoOrganRouting.decide(
+                budget: routedBudget,
+                seedRole: seed.role,
+                policy: routingPolicy)
+        }
+        let candidates = try await loop.generateCandidates(
+            sessionID: sessionID,
+            seeds: seeds,
+            routedBudget: routedBudget,
+            routingPolicy: routingPolicy)
+        return RoutedGenerationResult(
+            candidates: candidates,
+            decisions: decisions,
+            routedBudget: routedBudget)
+    }
 }
