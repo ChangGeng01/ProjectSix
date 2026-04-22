@@ -2333,6 +2333,26 @@ public struct BASEBrainRuntimeCoordinator {
                 sessionID: derivedSessionID,
                 emittedAt: request.recordedAt)
 
+        // M64 — L2 神经器官层 main-chain wiring. Derive the per-turn
+        // neural-organ-registry observation bundle from the
+        // coordinator's finalized `thoughtFrame.organMap` (post
+        // early seal + `applySovereignNeuralContract` — the single
+        // source of truth for morph / active organs / precision
+        // tiers / routing policy / sovereign constraints / head
+        // guarantees on this turn). Reuses M53's derived
+        // (sessionID, turnID) so the L2 bundle joins the L1 / L3 /
+        // L4 / L5 / L6 / L7 / L8 / L10 / L11 / L12 / L13 bundles
+        // under the same coordinates — the L14 audit surface
+        // reconciles them by that key. Placed right after the M63
+        // L8 seam and before `buildRuntimeTrace` so the updated
+        // frame propagates into the trace and then onto the
+        // sovereign verdict on the same turn.
+        thoughtFrame = thoughtFrame
+            .withDerivedNeuralOrganObservationBundle(
+                turnID: derivedTurnID,
+                sessionID: derivedSessionID,
+                emittedAt: request.recordedAt)
+
         let runtimeTrace = buildRuntimeTrace(
             request: request,
             budgetFrame: routedBudget,

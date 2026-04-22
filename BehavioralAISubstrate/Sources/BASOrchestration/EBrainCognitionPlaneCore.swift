@@ -2610,7 +2610,7 @@ public enum BASThoughtStopReason: String, Codable, CaseIterable, Sendable {
 }
 
 public struct BASThoughtFrame: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.13.0"
+    public static let currentSchemaVersion = "1.14.0"
 
     public var schemaVersion: String
     public var stepIndex: Int
@@ -2775,6 +2775,23 @@ public struct BASThoughtFrame: BASSchemaVersioned {
     /// turn.
     public var hippocampalMemoryObservationBundle:
         BASHippocampalMemoryObservationBundle?
+    /// M64 — L2 神经器官层 per-turn neural-organ-registry
+    /// observation bundle derived from the turn's finalized
+    /// `BASNeuralOrganMap` (post `applySovereignNeuralContract`).
+    /// Up to six kinds emit in a fixed order — organMapSealed
+    /// always fires (baseline anchor); organActive iterates
+    /// `activeOrgans`; precisionSet iterates `precisionMap`;
+    /// routingPolicyApplied always fires when the map is sealed;
+    /// sovereignConstraintActive iterates `sovereignConstraints`
+    /// (empty / whitespace entries skipped); headGuaranteeActive
+    /// iterates `headGuarantees` (empty / whitespace entries
+    /// skipped). Shape classification is turn-level (quarantined /
+    /// rebuilding / stubOnly / guarded / quiet / absent).
+    /// Load-bearing consumers (future L2 coverage refinements, L14
+    /// audit surface) read this field directly; coherent-by-
+    /// construction with the organ map on the same turn.
+    public var neuralOrganObservationBundle:
+        BASNeuralOrganObservationBundle?
 
     public init(
         schemaVersion: String = BASThoughtFrame.currentSchemaVersion,
@@ -2824,7 +2841,9 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         thoughtFoldObservationBundle:
             BASThoughtFoldObservationBundle? = nil,
         hippocampalMemoryObservationBundle:
-            BASHippocampalMemoryObservationBundle? = nil
+            BASHippocampalMemoryObservationBundle? = nil,
+        neuralOrganObservationBundle:
+            BASNeuralOrganObservationBundle? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.stepIndex = stepIndex
@@ -2871,6 +2890,8 @@ public struct BASThoughtFrame: BASSchemaVersioned {
             thoughtFoldObservationBundle
         self.hippocampalMemoryObservationBundle =
             hippocampalMemoryObservationBundle
+        self.neuralOrganObservationBundle =
+            neuralOrganObservationBundle
     }
 }
 
@@ -3202,6 +3223,43 @@ extension BASThoughtFrame {
         copy.hippocampalMemoryObservationBundle =
             BASHippocampalMemoryObservationBundle.derive(
                 fromMemoryBundle: memoryBundle,
+                turnID: turnID,
+                sessionID: sessionID,
+                emittedAt: emittedAt)
+        return copy
+    }
+
+    /// M64 — Return a copy of this frame with a freshly derived
+    /// `neuralOrganObservationBundle` attached. Pure function: no
+    /// I/O, no actor hop, deterministic for the same (map, turnID,
+    /// sessionID, emittedAt) tuple.
+    ///
+    /// The coordinator calls this at the seam where the neural
+    /// organ map has been finalized — after the early seal on
+    /// `thoughtFrame.organMap` and any sovereign neural contract
+    /// mutation (`applySovereignNeuralContract`) — so the bundle
+    /// flows into the same turn-audit record that the L14 surface
+    /// later signs.
+    ///
+    /// Unlike the tribunal / risk / soft-hand / world-prior
+    /// derivations, this one reads `self.organMap` directly because
+    /// the thought frame carries the L2 state as a top-level field.
+    /// A `nil` map produces an empty observation bundle — the
+    /// legitimate "no-neural-plane-this-turn" signal.
+    ///
+    /// Existing frames with a non-nil bundle are overwritten — the
+    /// intent of this method is "re-derive from current signals",
+    /// not "merge". Callers that want to preserve an upstream bundle
+    /// should skip this helper and set the field directly.
+    public func withDerivedNeuralOrganObservationBundle(
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> BASThoughtFrame {
+        var copy = self
+        copy.neuralOrganObservationBundle =
+            BASNeuralOrganObservationBundle.derive(
+                fromOrganMap: self.organMap,
                 turnID: turnID,
                 sessionID: sessionID,
                 emittedAt: emittedAt)
