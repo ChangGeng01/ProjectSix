@@ -191,6 +191,11 @@ promise. All listed tests are part of the default `swift test` run on
 | **Fail-closed on parity mismatch** | `QinaoRuntime.sendSession` parity branch (`QinaoRuntimeSessionTests.testLaxerParityFailsClosedAndMarksHalted`) |
 | **Severity-driven auto-halt (rollback / deadStop)** | `QinaoRuntime.sendSession` severity branch (`QinaoRuntimeSessionTests.testDeadStopSeverityAutoHalts`) |
 | **Host decides on quarantine severity** | `QinaoRuntime.sendSession` no-autohalt branch (`QinaoRuntimeSessionTests.testQuarantineSeverityDoesNotAutoHalt`) |
+| **Coverage reading on every turn** | `QinaoRuntime.sendSession` records a structured `CoverageReading` before any halt branch; queryable via `sovereign.coverageReading(sessionID:turnID:)` (`QinaoRuntimeCoverageTests.testCleanTurnRecordsCoverageAndIsQueryable`) |
+| **Budget-ceiling breach halts fail-closed** | `TurnError.coverageHalt` + `reason = "coverage-halt"` when clamped per-turn cost exceeds ceiling (`QinaoRuntimeCoverageTests.testLowBudgetCeilingTripsCoverageHalt`) |
+| **Halt path preserves coverage audit row** | Coverage computed before parity / severity branches so the ledger retains a reading on fail-closed exits (`QinaoRuntimeCoverageTests.testDeadStopHaltPathStillCarriesCoverage`) |
+| **Expected-layer expansion is auditable** | Caller-specified `expectedCoverageLayerIDs` surfaces silent layers as `.missingLayer` findings (`QinaoRuntimeCoverageTests.testAdditionalExpectedLayersProduceMissingFindings`) |
+| **Cross-session isolation** | Coverage / halt / audit state is keyed per `(sessionID, turnID)` and does not leak across sessions (`QinaoRuntimeCrossSessionTests`) |
 | **World priors fold into the risk gate** | `QinaoRiskGate.requestActionPermit(…worldContext:worldEndpoint:)` (`QinaoRiskWorldPriorTests`) |
 | **Unknown world-template is a typed error** | `RiskError.unknownWorldTemplate` (`QinaoRiskWorldPriorTests`) |
 | **Informed consent forces `.replace`** | `QinaoRiskGate` consent branch (`QinaoRiskWorldPriorTests`) |
