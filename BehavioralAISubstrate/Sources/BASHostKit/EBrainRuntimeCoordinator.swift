@@ -2295,6 +2295,25 @@ public struct BASEBrainRuntimeCoordinator {
             riskCard: boundRiskCard,
             hostGateValue: hostGateValue
         )
+
+        // M62 — L3 思纹层 main-chain wiring. Derive the per-turn
+        // fold observation bundle from the freshly built
+        // `thoughtFold` (single source of truth for foldID +
+        // checksum + ark refs + organ packages + degradation
+        // reasons). Reuses M53's derived (sessionID, turnID) so the
+        // L3 bundle joins the L1 / L4 / L5 / L6 / L7 / L10 / L11 /
+        // L12 / L13 bundles under the same coordinates — the L14
+        // audit surface reconciles them by that key. Placed between
+        // `buildThoughtFold` and `buildRuntimeTrace` so the updated
+        // frame propagates into the trace and then onto the
+        // sovereign verdict on the same turn.
+        thoughtFrame = thoughtFrame
+            .withDerivedThoughtFoldObservationBundle(
+                fold: thoughtFold,
+                turnID: derivedTurnID,
+                sessionID: derivedSessionID,
+                emittedAt: request.recordedAt)
+
         let runtimeTrace = buildRuntimeTrace(
             request: request,
             budgetFrame: routedBudget,

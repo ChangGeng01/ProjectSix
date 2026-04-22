@@ -2610,7 +2610,7 @@ public enum BASThoughtStopReason: String, Codable, CaseIterable, Sendable {
 }
 
 public struct BASThoughtFrame: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.11.0"
+    public static let currentSchemaVersion = "1.12.0"
 
     public var schemaVersion: String
     public var stepIndex: Int
@@ -2744,6 +2744,19 @@ public struct BASThoughtFrame: BASSchemaVersioned {
     /// with the L5 vault state on the same turn.
     public var hostConstitutionObservationBundle:
         BASHostConstitutionObservationBundle?
+    /// M62 — L3 思纹层 per-turn thought-fold observation bundle
+    /// derived from the turn's `BASThoughtFold`. Up to seven kinds
+    /// emit in a fixed order — foldSealed always fires (baseline
+    /// anchor); snapshotAnchored / rollbackAnchored / resumeAnchored
+    /// / integrityBound gate on non-empty ref fields; organPackageBound
+    /// iterates `organPackageRefs`; degradationFlagged iterates
+    /// `degradedReasonCodes`. Shape classification is turn-level
+    /// (degraded / orphan / integrityBound / snapshotted / quiet).
+    /// Load-bearing consumers (future L3 coverage refinements, L14
+    /// audit surface) read this field directly; coherent-by-
+    /// construction with the fold on the same turn.
+    public var thoughtFoldObservationBundle:
+        BASThoughtFoldObservationBundle?
 
     public init(
         schemaVersion: String = BASThoughtFrame.currentSchemaVersion,
@@ -2789,7 +2802,9 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         leaseLifeObservationBundle:
             BASLeaseLifeObservationBundle? = nil,
         hostConstitutionObservationBundle:
-            BASHostConstitutionObservationBundle? = nil
+            BASHostConstitutionObservationBundle? = nil,
+        thoughtFoldObservationBundle:
+            BASThoughtFoldObservationBundle? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.stepIndex = stepIndex
@@ -2832,6 +2847,8 @@ public struct BASThoughtFrame: BASSchemaVersioned {
             leaseLifeObservationBundle
         self.hostConstitutionObservationBundle =
             hostConstitutionObservationBundle
+        self.thoughtFoldObservationBundle =
+            thoughtFoldObservationBundle
     }
 }
 
@@ -3088,6 +3105,43 @@ extension BASThoughtFrame {
                 fromHostConstitution: constitution,
                 versionTree: versionTree,
                 forgetRequest: forgetRequest,
+                turnID: turnID,
+                sessionID: sessionID,
+                emittedAt: emittedAt)
+        return copy
+    }
+
+    /// M62 — Return a copy of this frame with a freshly derived
+    /// `thoughtFoldObservationBundle` attached. Pure function: no
+    /// I/O, no actor hop, deterministic for the same (fold, turnID,
+    /// sessionID, emittedAt) tuple.
+    ///
+    /// The coordinator calls this at the seam where the thought
+    /// fold has been built — after `buildThoughtFold` has produced
+    /// the canonical compaction + checksum + ark refs — so the
+    /// bundle flows into the same turn-audit record that the L14
+    /// surface later signs.
+    ///
+    /// Unlike the tribunal / risk / soft-hand / world-prior / lease
+    /// / host-constitution derivations, this one takes the fold as
+    /// an explicit argument because the thought frame itself does
+    /// not carry the fold — the fold is a sibling value on the turn
+    /// result that the coordinator constructs from the same inputs.
+    ///
+    /// Existing frames with a non-nil bundle are overwritten — the
+    /// intent of this method is "re-derive from current signals",
+    /// not "merge". Callers that want to preserve an upstream bundle
+    /// should skip this helper and set the field directly.
+    public func withDerivedThoughtFoldObservationBundle(
+        fold: BASThoughtFold,
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> BASThoughtFrame {
+        var copy = self
+        copy.thoughtFoldObservationBundle =
+            BASThoughtFoldObservationBundle.derive(
+                fromThoughtFold: fold,
                 turnID: turnID,
                 sessionID: sessionID,
                 emittedAt: emittedAt)
