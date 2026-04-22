@@ -263,3 +263,185 @@ public actor BASDecompositionObservationLedger {
 
     public func clear() { buffer.removeAll() }
 }
+
+// MARK: - M54 main-chain derivation from a completed BASDecomposeFrame
+
+extension BASDecompositionObservationBundle {
+    /// M54 — Derive an L7 observation bundle from a completed
+    /// `BASDecomposeFrame`. The derivation is deterministic: for the
+    /// same input frame + turn/session + emittedAt it produces the
+    /// same bundle byte-for-byte. No I/O, no actor hop.
+    ///
+    /// Signal mapping (each signal kind is emitted iff the frame
+    /// carries structural evidence for it):
+    ///   - `.factShard`     emitted iff `factShards` non-empty.
+    ///                      salience = `min(1, count * 0.15)` — signal
+    ///                      grows with shard count, saturates at ~7.
+    ///                      confidence = mean of `certainty` across
+    ///                      shards (reflects how confident the frame
+    ///                      is in the facts it gathered).
+    ///   - `.unknown`       emitted iff `unknownRecords` non-empty.
+    ///                      salience = `min(1, count * 0.25)`.
+    ///                      confidence = fraction of unknowns with
+    ///                      `blocking == true` (blocking unknowns
+    ///                      matter structurally; if none blocks, the
+    ///                      pipeline is less sure these gaps matter).
+    ///   - `.contradiction` emitted iff `contradictionRecords`
+    ///                      non-empty. salience = max `severity`.
+    ///                      confidence = fraction with
+    ///                      `unresolved == true` (resolved
+    ///                      contradictions carry less signal weight
+    ///                      for this turn).
+    ///   - `.pressure`      emitted iff `pressureVectors` non-empty.
+    ///                      salience = max `strength`.
+    ///                      confidence = mean `authenticity`
+    ///                      (manufactured pressure should be lower
+    ///                      confidence than authentic pressure).
+    ///   - `.manipulation`  emitted iff `manipulationPatterns`
+    ///                      non-empty. salience = max pattern
+    ///                      `confidence` (confidence in the
+    ///                      manipulation pattern IS the primary
+    ///                      signal strength).
+    ///                      confidence = `min(1, count * 0.33)`
+    ///                      (more patterns converging = more
+    ///                      confidence the frame saw something).
+    ///   - `.mirrorDraft`   emitted iff `mirrorDraft != nil` AND draft
+    ///                      has non-empty `summary` or `toneGuard`.
+    ///                      salience = mode-dependent (silent 0.3,
+    ///                      soft 0.6, hard 0.8) — hard mirror carries
+    ///                      more observation weight.
+    ///                      confidence = `0.8` if calibrationPoints
+    ///                      non-empty else `0.5`.
+    ///
+    /// Invariants:
+    ///   - a completely empty `BASDecomposeFrame` (no facts, no
+    ///     unknowns, no contradictions, no pressure, no manipulation,
+    ///     no mirror draft) produces a bundle with zero observations.
+    ///   - `hasCoreSignalCoverage` (factShard + contradiction +
+    ///     mirrorDraft) iff the frame carried evidence for all three.
+    ///   - budget cost via `BASDecompositionObservationBudget.totalCost`
+    ///     clamps to [0, 1] even at max 6-kind emission (the raw sum
+    ///     is 1.35; the clamp prevents runaway).
+    public static func derive(
+        from decomposeFrame: BASDecomposeFrame,
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> BASDecompositionObservationBundle {
+        var observations: [BASDecompositionObservation] = []
+
+        // .factShard — iff fact shards present
+        if decomposeFrame.factShards.isEmpty == false {
+            let shards = decomposeFrame.factShards
+            let salience = min(1.0, Double(shards.count) * 0.15)
+            let meanCertainty = shards.reduce(0.0) {
+                $0 + $1.certainty
+            } / Double(shards.count)
+            observations.append(BASDecompositionObservation(
+                kind: .factShard,
+                salience: salience,
+                confidence: meanCertainty,
+                content: "shards:\(shards.count)",
+                observedAt: emittedAt
+            ))
+        }
+
+        // .unknown — iff unknown records present
+        if decomposeFrame.unknownRecords.isEmpty == false {
+            let records = decomposeFrame.unknownRecords
+            let salience = min(1.0, Double(records.count) * 0.25)
+            let blockingCount = records.filter { $0.blocking }.count
+            let confidence =
+                Double(blockingCount) / Double(records.count)
+            observations.append(BASDecompositionObservation(
+                kind: .unknown,
+                salience: salience,
+                confidence: confidence,
+                content: "records:\(records.count)"
+                    + "|blocking:\(blockingCount)",
+                observedAt: emittedAt
+            ))
+        }
+
+        // .contradiction — iff contradiction records present
+        if decomposeFrame.contradictionRecords.isEmpty == false {
+            let records = decomposeFrame.contradictionRecords
+            let maxSeverity =
+                records.map { $0.severity }.max() ?? 0
+            let unresolvedCount = records.filter { $0.unresolved }.count
+            let confidence =
+                Double(unresolvedCount) / Double(records.count)
+            observations.append(BASDecompositionObservation(
+                kind: .contradiction,
+                salience: maxSeverity,
+                confidence: confidence,
+                content: "records:\(records.count)"
+                    + "|unresolved:\(unresolvedCount)",
+                observedAt: emittedAt
+            ))
+        }
+
+        // .pressure — iff pressure vectors present
+        if decomposeFrame.pressureVectors.isEmpty == false {
+            let vectors = decomposeFrame.pressureVectors
+            let maxStrength =
+                vectors.map { $0.strength }.max() ?? 0
+            let meanAuthenticity = vectors.reduce(0.0) {
+                $0 + $1.authenticity
+            } / Double(vectors.count)
+            observations.append(BASDecompositionObservation(
+                kind: .pressure,
+                salience: maxStrength,
+                confidence: meanAuthenticity,
+                content: "vectors:\(vectors.count)",
+                observedAt: emittedAt
+            ))
+        }
+
+        // .manipulation — iff manipulation patterns present
+        if decomposeFrame.manipulationPatterns.isEmpty == false {
+            let patterns = decomposeFrame.manipulationPatterns
+            let maxConfidence =
+                patterns.map { $0.confidence }.max() ?? 0
+            let bundleConfidence =
+                min(1.0, Double(patterns.count) * 0.33)
+            observations.append(BASDecompositionObservation(
+                kind: .manipulation,
+                salience: maxConfidence,
+                confidence: bundleConfidence,
+                content: "patterns:\(patterns.count)",
+                observedAt: emittedAt
+            ))
+        }
+
+        // .mirrorDraft — iff draft present with non-empty text
+        if let draft = decomposeFrame.mirrorDraft,
+           draft.summary.isEmpty == false
+            || draft.toneGuard.isEmpty == false {
+            let salience: Double
+            switch draft.mode {
+            case .silent: salience = 0.3
+            case .soft:   salience = 0.6
+            case .hard:   salience = 0.8
+            }
+            let confidence =
+                draft.calibrationPoints.isEmpty ? 0.5 : 0.8
+            observations.append(BASDecompositionObservation(
+                kind: .mirrorDraft,
+                salience: salience,
+                confidence: confidence,
+                content: "mode:\(draft.mode.rawValue)"
+                    + "|calibrations:"
+                    + "\(draft.calibrationPoints.count)",
+                observedAt: emittedAt
+            ))
+        }
+
+        return BASDecompositionObservationBundle(
+            turnID: turnID,
+            sessionID: sessionID,
+            observations: observations,
+            emittedAt: emittedAt
+        )
+    }
+}

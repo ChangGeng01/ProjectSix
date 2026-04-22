@@ -802,7 +802,7 @@ public struct BASCanonicalCognitiveFrame: Codable, Equatable, Sendable {
 }
 
 public struct BASDecomposeFrame: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.1.0"
+    public static let currentSchemaVersion = "1.2.0"
 
     public var schemaVersion: String
     public var facts: [String]
@@ -823,6 +823,15 @@ public struct BASDecomposeFrame: BASSchemaVersioned {
     public var boundaryTouches: [BASBoundaryTouch]
     public var mirrorDraft: BASMirrorDraft?
     public var canonicalFrame: BASCanonicalCognitiveFrame?
+    /// M54 — L7 mirror-blade per-signal observation bundle derived
+    /// from this frame's records. `nil` when the frame was constructed
+    /// by a caller that predates M54 (legacy path) or when an explicit
+    /// `derive(...)` call was skipped. Load-bearing consumers (M32 L7
+    /// coverage projection, L14 audit surface) read this field
+    /// directly; coherent-by-construction with the rest of the frame
+    /// when populated.
+    public var decompositionObservationBundle:
+        BASDecompositionObservationBundle?
 
     public init(
         schemaVersion: String = BASDecomposeFrame.currentSchemaVersion,
@@ -843,7 +852,9 @@ public struct BASDecomposeFrame: BASSchemaVersioned {
         manipulationPatterns: [BASManipulationPattern]? = nil,
         boundaryTouches: [BASBoundaryTouch]? = nil,
         mirrorDraft: BASMirrorDraft? = nil,
-        canonicalFrame: BASCanonicalCognitiveFrame? = nil
+        canonicalFrame: BASCanonicalCognitiveFrame? = nil,
+        decompositionObservationBundle:
+            BASDecompositionObservationBundle? = nil
     ) {
         let resolvedFacts = facts.isEmpty ? (factShards?.map(\.text) ?? []) : facts
         let resolvedGoals = goals.isEmpty ? BASDecomposeFrame.flattenedGoals(from: goalSpineLocal) : goals
@@ -886,6 +897,7 @@ public struct BASDecomposeFrame: BASSchemaVersioned {
             manipulationSignals: resolvedManipulation,
             boundaryTouches: self.boundaryTouches
         )
+        self.decompositionObservationBundle = decompositionObservationBundle
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -908,6 +920,7 @@ public struct BASDecomposeFrame: BASSchemaVersioned {
         case boundaryTouches
         case mirrorDraft
         case canonicalFrame
+        case decompositionObservationBundle
     }
 
     public init(from decoder: Decoder) throws {
@@ -932,7 +945,10 @@ public struct BASDecomposeFrame: BASSchemaVersioned {
             manipulationPatterns: try container.decodeIfPresent([BASManipulationPattern].self, forKey: .manipulationPatterns),
             boundaryTouches: try container.decodeIfPresent([BASBoundaryTouch].self, forKey: .boundaryTouches),
             mirrorDraft: try container.decodeIfPresent(BASMirrorDraft.self, forKey: .mirrorDraft),
-            canonicalFrame: try container.decodeIfPresent(BASCanonicalCognitiveFrame.self, forKey: .canonicalFrame)
+            canonicalFrame: try container.decodeIfPresent(BASCanonicalCognitiveFrame.self, forKey: .canonicalFrame),
+            decompositionObservationBundle: try container.decodeIfPresent(
+                BASDecompositionObservationBundle.self,
+                forKey: .decompositionObservationBundle)
         )
     }
 
@@ -1191,6 +1207,38 @@ public struct BASDecomposeFrame: BASSchemaVersioned {
     ) -> [String] {
         var seen = Set<String>()
         return values.filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+}
+
+extension BASDecomposeFrame {
+    /// M54 — Return a copy of this frame with a freshly derived
+    /// `decompositionObservationBundle` attached. Pure function: no
+    /// I/O, no actor hop, deterministic for the same (frame, turnID,
+    /// sessionID, emittedAt) tuple.
+    ///
+    /// The coordinator calls this at the seam where both turn and
+    /// session identity are known — after `decomposeService.decompose`
+    /// + `mirror` + `checkContradiction` have filled in mirror text
+    /// and contradictions — so the bundle flows into the same
+    /// turn-audit record that the L14 surface later signs.
+    ///
+    /// Existing frames with a non-nil bundle are overwritten — the
+    /// intent of this method is "re-derive from current signals", not
+    /// "merge". Callers that want to preserve an upstream bundle
+    /// should skip this helper and set the field directly.
+    public func withDerivedDecompositionObservationBundle(
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> BASDecomposeFrame {
+        var copy = self
+        copy.decompositionObservationBundle =
+            BASDecompositionObservationBundle.derive(
+                from: self,
+                turnID: turnID,
+                sessionID: sessionID,
+                emittedAt: emittedAt)
+        return copy
     }
 }
 

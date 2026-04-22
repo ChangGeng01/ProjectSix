@@ -1919,6 +1919,19 @@ public struct BASEBrainRuntimeCoordinator {
             )
         }
 
+        // M54 — L7 mirror-blade main-chain wiring. Derive the
+        // per-signal decomposition bundle at the seam where
+        // `decomposeFrame` has been fully populated (facts / mirror
+        // text / contradictions), reusing the same sessionID / turnID
+        // that the M53 L6 bundle and `buildRuntimeTrace` downstream
+        // use. This keeps L7 observations coherent-by-construction
+        // with the L14 audit record and with L6 on the same turn.
+        decomposeFrame = decomposeFrame
+            .withDerivedDecompositionObservationBundle(
+                turnID: derivedTurnID,
+                sessionID: derivedSessionID,
+                emittedAt: request.recordedAt)
+
         let rawMemoryBundle = memoryService.retrieve(
             decomposeFrame: decomposeFrame,
             hostContext: hostContext,
