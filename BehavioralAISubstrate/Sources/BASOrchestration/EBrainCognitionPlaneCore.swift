@@ -2610,7 +2610,7 @@ public enum BASThoughtStopReason: String, Codable, CaseIterable, Sendable {
 }
 
 public struct BASThoughtFrame: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.10.0"
+    public static let currentSchemaVersion = "1.11.0"
 
     public var schemaVersion: String
     public var stepIndex: Int
@@ -2729,6 +2729,21 @@ public struct BASThoughtFrame: BASSchemaVersioned {
     /// on the same turn.
     public var leaseLifeObservationBundle:
         BASLeaseLifeObservationBundle?
+    /// M61 — L5 宿纹层 per-turn host-constitution governance
+    /// observation bundle derived from the turn's active
+    /// `BASHostConstitution`, `BASHostVersionTree`, and optional
+    /// `BASForgetRequest`. Up to six kinds emit in a fixed order —
+    /// anchorActive XOR constitutionUnbootstrapped (exactly one of
+    /// the two always present), followed by versionCommitted /
+    /// candidatePending / versionFrozen iterations over the version
+    /// tree, and a single forgetInFlight when a delete cascade is
+    /// active. Shape classification is turn-level (unbootstrapped /
+    /// forgetting / frozen / governing / quiet). Load-bearing
+    /// consumers (M40 L5 coverage projection parity, L14 audit
+    /// surface) read this field directly; coherent-by-construction
+    /// with the L5 vault state on the same turn.
+    public var hostConstitutionObservationBundle:
+        BASHostConstitutionObservationBundle?
 
     public init(
         schemaVersion: String = BASThoughtFrame.currentSchemaVersion,
@@ -2772,7 +2787,9 @@ public struct BASThoughtFrame: BASSchemaVersioned {
         worldPriorObservationBundle:
             BASWorldPriorObservationBundle? = nil,
         leaseLifeObservationBundle:
-            BASLeaseLifeObservationBundle? = nil
+            BASLeaseLifeObservationBundle? = nil,
+        hostConstitutionObservationBundle:
+            BASHostConstitutionObservationBundle? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.stepIndex = stepIndex
@@ -2813,6 +2830,8 @@ public struct BASThoughtFrame: BASSchemaVersioned {
             worldPriorObservationBundle
         self.leaseLifeObservationBundle =
             leaseLifeObservationBundle
+        self.hostConstitutionObservationBundle =
+            hostConstitutionObservationBundle
     }
 }
 
@@ -3025,6 +3044,50 @@ extension BASThoughtFrame {
         copy.leaseLifeObservationBundle =
             BASLeaseLifeObservationBundle.derive(
                 fromBudgetFrame: budgetFrame,
+                turnID: turnID,
+                sessionID: sessionID,
+                emittedAt: emittedAt)
+        return copy
+    }
+
+    /// M61 — Return a copy of this frame with a freshly derived
+    /// `hostConstitutionObservationBundle` attached. Pure function:
+    /// no I/O, no actor hop, deterministic for the same
+    /// (constitution, versionTree, forgetRequest, turnID, sessionID,
+    /// emittedAt) tuple.
+    ///
+    /// The coordinator calls this at the seam where the L5 vault
+    /// state for the turn is frozen — the coordinator already carries
+    /// `hostConstitution` / `hostVersionTree` / `hostForgetRequest`
+    /// as static reference fields, and M61 surfaces them as typed
+    /// per-subject evidence into the same turn-audit record the L14
+    /// surface later signs.
+    ///
+    /// Unlike the tribunal / risk / soft-hand / world-prior
+    /// derivations, this one takes the vault triple as explicit
+    /// arguments because the thought frame itself does not carry L5
+    /// governance state — the coordinator's three fields are the
+    /// single source of truth for active version / committed tree /
+    /// frozen IDs / pending candidates / forget request on this turn.
+    ///
+    /// Existing frames with a non-nil bundle are overwritten — the
+    /// intent of this method is "re-derive from current signals", not
+    /// "merge". Callers that want to preserve an upstream bundle
+    /// should skip this helper and set the field directly.
+    public func withDerivedHostConstitutionObservationBundle(
+        constitution: BASHostConstitution?,
+        versionTree: BASHostVersionTree?,
+        forgetRequest: BASForgetRequest?,
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> BASThoughtFrame {
+        var copy = self
+        copy.hostConstitutionObservationBundle =
+            BASHostConstitutionObservationBundle.derive(
+                fromHostConstitution: constitution,
+                versionTree: versionTree,
+                forgetRequest: forgetRequest,
                 turnID: turnID,
                 sessionID: sessionID,
                 emittedAt: emittedAt)

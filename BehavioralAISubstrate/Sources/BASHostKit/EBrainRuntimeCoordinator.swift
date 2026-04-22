@@ -2261,6 +2261,25 @@ public struct BASEBrainRuntimeCoordinator {
                 sessionID: derivedSessionID,
                 emittedAt: request.recordedAt)
 
+        // M61 — L5 宿纹层 main-chain wiring. Derive the per-turn
+        // host-constitution governance observation bundle from the
+        // coordinator's `hostConstitution` / `hostVersionTree` /
+        // `hostForgetRequest` fields (the single source of truth for
+        // active version / committed tree / frozen IDs / pending
+        // candidates / forget request on this turn). Reuses M53's
+        // derived (sessionID, turnID) so the L5 bundle joins the L1 /
+        // L4 / L6 / L7 / L10 / L11 / L12 / L13 bundles under the same
+        // coordinates. Placed after the M60 L1 seam so every other
+        // main-chain bundle on the frame is sealed before L5 emits.
+        thoughtFrame = thoughtFrame
+            .withDerivedHostConstitutionObservationBundle(
+                constitution: hostConstitution,
+                versionTree: hostVersionTree,
+                forgetRequest: hostForgetRequest,
+                turnID: derivedTurnID,
+                sessionID: derivedSessionID,
+                emittedAt: request.recordedAt)
+
         let auditFindings = budgetFindings + memoryFindings + loopFindings + riskFindings + evolutionFindings
         let killSwitches = recommendedKillSwitches(for: auditFindings)
         let thoughtFold = buildThoughtFold(
