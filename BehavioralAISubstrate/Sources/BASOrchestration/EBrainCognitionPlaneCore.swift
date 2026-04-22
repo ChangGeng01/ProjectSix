@@ -302,7 +302,7 @@ public struct BASContextRouteHint: BASSchemaVersioned {
 }
 
 public struct BASContextFrame: BASSchemaVersioned {
-    public static let currentSchemaVersion = "1.1.0"
+    public static let currentSchemaVersion = "1.2.0"
 
     public var schemaVersion: String
     public var utterance: String
@@ -325,6 +325,14 @@ public struct BASContextFrame: BASSchemaVersioned {
     public var continuityAnchor: BASContinuityAnchor?
     public var routeHint: BASContextRouteHint?
     public var confidenceBand: Double?
+    /// M53 — L6 presence-eye per-channel observation bundle derived
+    /// from this frame's signals. `nil` when the frame was
+    /// constructed by a caller that predates M53 (legacy path) or
+    /// when an explicit `derive(...)` call was skipped. Load-bearing
+    /// consumers (M32 L6 coverage projection, L14 audit surface)
+    /// read this field directly; coherent-by-construction with the
+    /// rest of the frame when populated.
+    public var presenceObservationBundle: BASPresenceObservationBundle?
 
     public init(
         schemaVersion: String = BASContextFrame.currentSchemaVersion,
@@ -347,7 +355,8 @@ public struct BASContextFrame: BASSchemaVersioned {
         hostResonance: BASHostResonance? = nil,
         continuityAnchor: BASContinuityAnchor? = nil,
         routeHint: BASContextRouteHint? = nil,
-        confidenceBand: Double? = nil
+        confidenceBand: Double? = nil,
+        presenceObservationBundle: BASPresenceObservationBundle? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.utterance = utterance
@@ -370,6 +379,7 @@ public struct BASContextFrame: BASSchemaVersioned {
         self.continuityAnchor = continuityAnchor
         self.routeHint = routeHint
         self.confidenceBand = confidenceBand.map { min(max($0, 0), 1) }
+        self.presenceObservationBundle = presenceObservationBundle
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -394,6 +404,7 @@ public struct BASContextFrame: BASSchemaVersioned {
         case continuityAnchor
         case routeHint
         case confidenceBand
+        case presenceObservationBundle
     }
 
     public init(from decoder: Decoder) throws {
@@ -425,6 +436,40 @@ public struct BASContextFrame: BASSchemaVersioned {
         self.confidenceBand = try container.decodeIfPresent(Double.self, forKey: .confidenceBand).map {
             min(max($0, 0), 1)
         }
+        self.presenceObservationBundle = try container.decodeIfPresent(
+            BASPresenceObservationBundle.self,
+            forKey: .presenceObservationBundle)
+    }
+}
+
+extension BASContextFrame {
+    /// M53 — Return a copy of this frame with a freshly derived
+    /// `presenceObservationBundle` attached. Pure function: no I/O,
+    /// no actor hop, deterministic for the same (frame, turnID,
+    /// sessionID, emittedAt) tuple.
+    ///
+    /// The coordinator calls this at the seam where both turn and
+    /// session identity are known (`EBrainRuntimeCoordinator` after
+    /// `contextService.analyzeContext(...)` returns) so the bundle
+    /// can flow into the same turn-audit record that the L14 surface
+    /// later signs.
+    ///
+    /// Existing frames with a non-nil bundle are overwritten — the
+    /// intent of this method is "re-derive from current signals",
+    /// not "merge". Callers that want to preserve an upstream bundle
+    /// should skip this helper and set the field directly.
+    public func withDerivedPresenceObservationBundle(
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> BASContextFrame {
+        var copy = self
+        copy.presenceObservationBundle = BASPresenceObservationBundle.derive(
+            from: self,
+            turnID: turnID,
+            sessionID: sessionID,
+            emittedAt: emittedAt)
+        return copy
     }
 }
 

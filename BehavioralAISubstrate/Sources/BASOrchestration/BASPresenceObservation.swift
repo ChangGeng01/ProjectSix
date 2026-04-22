@@ -221,3 +221,129 @@ public actor BASPresenceObservationLedger {
 
     public func clear() { buffer.removeAll() }
 }
+
+// MARK: - M53 main-chain derivation from a completed BASContextFrame
+
+extension BASPresenceObservationBundle {
+    /// M53 — Derive an L6 observation bundle from a completed
+    /// `BASContextFrame`. The derivation is deterministic: for the
+    /// same input frame + turn/session + emittedAt it produces the
+    /// same bundle byte-for-byte. No I/O, no actor hop.
+    ///
+    /// Channel mapping:
+    ///   - `.task`         always emitted; salience fixed at 0.8
+    ///                     (task is the anchor channel),
+    ///                     confidence = `1 - ambiguityScore`.
+    ///   - `.risk`         always emitted; salience =
+    ///                     `consequenceLevel`, confidence = 1.0 when
+    ///                     a `consequenceHorizon` is resolved else
+    ///                     0.5.
+    ///   - `.manipulation` emitted iff a `manipulationTrace` is
+    ///                     attached OR `manipulationHints` non-empty.
+    ///                     With a trace: salience = intensity
+    ///                     (= shamePressure * 0.5 + timeCoercion *
+    ///                     0.5), confidence = trace.confidence.
+    ///                     Hints-only path: salience = `min(1, count
+    ///                     * 0.2)`, confidence = 0.5.
+    ///   - `.environment`  always emitted; salience 0.3 (peripheral),
+    ///                     confidence 0.7; content echoes the scene
+    ///                     enum raw value.
+    ///   - `.bodyRhythm`   emitted iff `max(emotionalLoad,
+    ///                     timePressure) > 0.3`. Salience = that max;
+    ///                     confidence 0.6.
+    ///
+    /// Invariants:
+    ///   - `.task` and `.risk` and `.environment` are always present,
+    ///     so a "clean" bundle has `hasCoreChannelCoverage` iff
+    ///     manipulation is present.
+    ///   - budget cost via `BASPresenceObservationBudget.totalCost`
+    ///     clamps to [0, 1] even at max 5-channel emission.
+    public static func derive(
+        from contextFrame: BASContextFrame,
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> BASPresenceObservationBundle {
+        var observations: [BASPresenceObservation] = []
+
+        // .task — always emitted
+        observations.append(BASPresenceObservation(
+            channel: .task,
+            salience: 0.8,
+            confidence: 1 - contextFrame.ambiguityScore,
+            content: "task:\(contextFrame.taskType.rawValue)"
+                + "|scene:\(contextFrame.sceneType.rawValue)",
+            observedAt: emittedAt
+        ))
+
+        // .risk — always emitted
+        observations.append(BASPresenceObservation(
+            channel: .risk,
+            salience: contextFrame.consequenceLevel,
+            confidence: contextFrame.consequenceHorizon == nil
+                ? 0.5
+                : 1.0,
+            content: "consequence:\(contextFrame.consequenceLevel)",
+            observedAt: emittedAt
+        ))
+
+        // .manipulation — emitted iff signals present
+        if let trace = contextFrame.manipulationTrace {
+            let intensity =
+                trace.shamePressure * 0.5
+                + trace.timeCoercion * 0.5
+            observations.append(BASPresenceObservation(
+                channel: .manipulation,
+                salience: intensity,
+                confidence: trace.confidence,
+                content: "trace"
+                    + "|gaslight:\(trace.gaslightPrecursor)"
+                    + "|authority:\(trace.authorityMask)",
+                observedAt: emittedAt
+            ))
+        } else if !contextFrame.manipulationHints.isEmpty {
+            let s = min(
+                1.0,
+                Double(contextFrame.manipulationHints.count) * 0.2)
+            observations.append(BASPresenceObservation(
+                channel: .manipulation,
+                salience: s,
+                confidence: 0.5,
+                content: "hints:"
+                    + "\(contextFrame.manipulationHints.count)",
+                observedAt: emittedAt
+            ))
+        }
+
+        // .environment — always emitted (peripheral anchor)
+        observations.append(BASPresenceObservation(
+            channel: .environment,
+            salience: 0.3,
+            confidence: 0.7,
+            content: "scene:\(contextFrame.sceneType.rawValue)",
+            observedAt: emittedAt
+        ))
+
+        // .bodyRhythm — emitted iff elevated pressure
+        let bodySalience = max(
+            contextFrame.emotionalLoad,
+            contextFrame.timePressure)
+        if bodySalience > 0.3 {
+            observations.append(BASPresenceObservation(
+                channel: .bodyRhythm,
+                salience: bodySalience,
+                confidence: 0.6,
+                content: "emo:\(contextFrame.emotionalLoad)"
+                    + "|time:\(contextFrame.timePressure)",
+                observedAt: emittedAt
+            ))
+        }
+
+        return BASPresenceObservationBundle(
+            turnID: turnID,
+            sessionID: sessionID,
+            observations: observations,
+            emittedAt: emittedAt
+        )
+    }
+}

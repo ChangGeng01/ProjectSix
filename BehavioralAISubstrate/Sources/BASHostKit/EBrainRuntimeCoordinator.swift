@@ -1879,11 +1879,30 @@ public struct BASEBrainRuntimeCoordinator {
             contextFrame: nil,
             riskCard: nil
         )
-        let contextFrame = contextService.analyzeContext(
+        let rawContextFrame = contextService.analyzeContext(
             userInput: request.userInput,
             hostContext: hostContext,
             budget: routedBudget
         )
+
+        // M53 — L6 presence-eye main-chain wiring. Derive the
+        // per-channel observation bundle at the same seam where the
+        // coordinator obtains the context frame, using the same
+        // `sessionID` / `turnID` formula that `buildRuntimeTrace`
+        // emits downstream. This keeps L6 observations
+        // coherent-by-construction with the L14 audit record.
+        let derivedSessionID = [
+            request.hostID,
+            rawContextFrame.taskType.rawValue,
+            routedBudget.runMode.rawValue
+        ].joined(separator: "|")
+        let derivedTurnID =
+            "\(derivedSessionID)#\(request.recordedAt.timeIntervalSinceReferenceDate)"
+        let contextFrame = rawContextFrame
+            .withDerivedPresenceObservationBundle(
+                turnID: derivedTurnID,
+                sessionID: derivedSessionID,
+                emittedAt: request.recordedAt)
 
         var decomposeFrame = decomposeService.decompose(
             contextFrame: contextFrame,
