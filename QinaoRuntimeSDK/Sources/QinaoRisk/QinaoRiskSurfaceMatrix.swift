@@ -373,3 +373,276 @@ public extension QinaoRiskGate {
             consentPromptKey: consentPromptKey)
     }
 }
+
+// MARK: - M85: counterfactual-aware surface enrichment
+
+public extension QinaoRiskGate {
+
+    /// M85 — Qinao-local mirror of L9's
+    /// `QinaoLoop.DreamCycleOutcome.CandidateCounterfactualView`.
+    ///
+    /// The risk gate uses this to decide whether the surface matrix
+    /// should be upgraded by L9 dream-cycle evidence. It is
+    /// deliberately a **value copy** of the loop's view type rather
+    /// than a direct re-export: the risk module does not import the
+    /// loop module, so hosts that ran
+    /// `QinaoLoop.refineAgainstCounterfactuals(...)` first copy the
+    /// four numeric fields into this struct before calling the
+    /// enriched surface-matrix overload. That pattern keeps the
+    /// Qinao module graph a DAG (Risk is leaf; Loop depends on
+    /// nothing below Risk; composition belongs in QinaoRuntime).
+    ///
+    /// All inputs are clamped at init: `aggregatedContradiction` to
+    /// [0, 1]; each branch count to ≥0. This prevents a sloppy
+    /// caller from poisoning the `dominantSignal` / threshold
+    /// derivations.
+    struct CounterfactualEvidence: Sendable, Equatable, Codable {
+        public let aggregatedContradiction: Double
+        public let branchesExposedInsufficient: Int
+        public let branchesEqualEvidence: Int
+        public let branchesRobustlySurvived: Int
+
+        public init(
+            aggregatedContradiction: Double,
+            branchesExposedInsufficient: Int,
+            branchesEqualEvidence: Int,
+            branchesRobustlySurvived: Int
+        ) {
+            self.aggregatedContradiction =
+                min(max(aggregatedContradiction, 0), 1)
+            self.branchesExposedInsufficient =
+                max(0, branchesExposedInsufficient)
+            self.branchesEqualEvidence =
+                max(0, branchesEqualEvidence)
+            self.branchesRobustlySurvived =
+                max(0, branchesRobustlySurvived)
+        }
+
+        /// Total branches the refinement pass examined. Equal to
+        /// the sum of the three tally fields (invariant pinned by
+        /// M84's `QinaoLoopDreamCycleTests`).
+        public var branchesExamined: Int {
+            branchesExposedInsufficient
+              + branchesEqualEvidence
+              + branchesRobustlySurvived
+        }
+
+        /// Stable dominant-signal label host copy libraries can key
+        /// on. Five cases:
+        /// - `"no-branches"` — the refinement ran but produced 0
+        ///   branches (the vault had no perturbations to project).
+        /// - `"exposed-insufficient-dominant"` — exposed strictly
+        ///   exceeds BOTH equal and survived; the candidate's claim
+        ///   fails in most perturbed worlds.
+        /// - `"equal-evidence-dominant"` — equal strictly exceeds
+        ///   BOTH exposed and survived; the claim barely survives
+        ///   most perturbed worlds.
+        /// - `"robust-survival-dominant"` — survived strictly
+        ///   exceeds BOTH exposed and equal; the claim is robust.
+        /// - `"balanced"` — no single category dominates (e.g. 1/1/1
+        ///   or 2/2/2); evidence is split.
+        public var dominantSignal: String {
+            let e = branchesExposedInsufficient
+            let q = branchesEqualEvidence
+            let s = branchesRobustlySurvived
+            if e + q + s == 0 { return "no-branches" }
+            if e > q && e > s { return "exposed-insufficient-dominant" }
+            if q > e && q > s { return "equal-evidence-dominant" }
+            if s > e && s > q { return "robust-survival-dominant" }
+            return "balanced"
+        }
+
+        /// True when aggregated contradiction has crossed the same
+        /// 0.7 threshold L9's `guardianBranch` uses. This is the
+        /// trigger for upgrading the surface matrix: if the
+        /// dream-cycle evidence alone would have tripped L9's
+        /// guardian, L12 柔手 should disclose the world-prior
+        /// concern explicitly rather than render a bare draft.
+        public var crossesGuardianThreshold: Bool {
+            aggregatedContradiction >= 0.7
+        }
+    }
+
+    /// M85 — surface action enriched with dream-cycle evidence.
+    ///
+    /// `base` is the `SurfaceAction` the matrix would have produced
+    /// from the risk assessment alone; `evidence` is the
+    /// counterfactual summary the caller supplied; `upgraded` is
+    /// true when the evidence caused the surface to be rewritten
+    /// (see `surfaceAction(for:counterfactualEvidence:...)` for
+    /// the upgrade rules).
+    ///
+    /// Hosts that log a surface event should log both the original
+    /// `assessment.mode` AND this value's `upgraded` bit so the
+    /// audit trail records whether the UI seen by the user came
+    /// from the risk gate's own verdict or from a dream-cycle
+    /// upgrade path.
+    struct EnrichedSurfaceAction: Sendable, Equatable, Codable {
+        public let base: SurfaceAction
+        public let evidence: CounterfactualEvidence
+        public let upgraded: Bool
+
+        public init(
+            base: SurfaceAction,
+            evidence: CounterfactualEvidence,
+            upgraded: Bool
+        ) {
+            self.base = base
+            self.evidence = evidence
+            self.upgraded = upgraded
+        }
+    }
+}
+
+// MARK: - M85: Pure enriched projection
+
+extension QinaoRiskGate {
+
+    /// M85 — project an assessment onto the surface matrix, then
+    /// optionally upgrade the surface using counterfactual evidence
+    /// from a dream-cycle refinement pass.
+    ///
+    /// ## Upgrade rules (stable — pinned by tests)
+    ///
+    /// The upgrade fires when BOTH conditions hold:
+    /// - `counterfactualEvidence.crossesGuardianThreshold` is true
+    ///   (aggregated contradiction ≥ 0.7), AND
+    /// - the base surface is either `.draftShell` (from an `.allow`
+    ///   assessment) or `.comparePanel` (from a non-consent
+    ///   `.replace` assessment). Blocks, delays, and consent-gated
+    ///   replacements already produce stringent surfaces; upgrading
+    ///   them would duplicate signals.
+    ///
+    /// When the upgrade fires the base action is rewritten:
+    /// - `surface` → `.boundaryScript`
+    /// - `agency`  → `.userAffirm`
+    /// - `disclosure` → `.explicit`
+    /// - `substitute` → `.requestConsent(promptKey:
+    ///   "dream-cycle-counterfactual-concern")` (stable key the
+    ///   host's copy library maps to language explaining that the
+    ///   world-prior counterfactual check raised a concern)
+    /// - `reasonCodes` gets `"world-prior-contradiction-counterfactual"`
+    ///   appended (if not already present); existing reason codes
+    ///   are preserved so the audit trail still names the underlying
+    ///   risk assessment's concerns.
+    ///
+    /// When the upgrade does not fire, `upgraded == false` and the
+    /// base action is returned verbatim. The evidence is always
+    /// attached so hosts that want to expose counterfactual readings
+    /// alongside a non-upgraded surface can do so (e.g. show a
+    /// "robust survival" badge on a draft shell).
+    ///
+    /// Non-upgrade assessments where the evidence is still surfaced:
+    /// - `.block` — silentStub / refuse stays as-is; evidence
+    ///   attached for audit.
+    /// - `.delay` — delayPacket / deferToLater stays as-is.
+    /// - `.replace` with `"consent-required"` — boundaryScript /
+    ///   requestConsent stays as-is (already explicit).
+    public static func surfaceAction(
+        for assessment: RiskAssessment,
+        counterfactualEvidence: CounterfactualEvidence,
+        auditReference: String? = nil,
+        candidateIDs: [String] = [],
+        consentPromptKey: String = "default-consent-prompt"
+    ) -> EnrichedSurfaceAction {
+        let base = surfaceAction(
+            for: assessment,
+            auditReference: auditReference,
+            candidateIDs: candidateIDs,
+            consentPromptKey: consentPromptKey)
+
+        let isUpgradeable =
+            base.surface == .draftShell
+            || base.surface == .comparePanel
+        let shouldUpgrade =
+            counterfactualEvidence.crossesGuardianThreshold
+            && isUpgradeable
+
+        guard shouldUpgrade else {
+            return EnrichedSurfaceAction(
+                base: base,
+                evidence: counterfactualEvidence,
+                upgraded: false)
+        }
+
+        var reasons = base.reasonCodes
+        let mark = "world-prior-contradiction-counterfactual"
+        if !reasons.contains(mark) {
+            reasons.append(mark)
+        }
+        let upgraded = SurfaceAction(
+            surface: .boundaryScript,
+            agency: .userAffirm,
+            disclosure: .explicit,
+            substitute: .requestConsent(
+                promptKey: "dream-cycle-counterfactual-concern"),
+            reasonCodes: reasons,
+            auditReference: base.auditReference)
+        return EnrichedSurfaceAction(
+            base: upgraded,
+            evidence: counterfactualEvidence,
+            upgraded: true)
+    }
+}
+
+// MARK: - M85: Actor convenience (enriched)
+
+public extension QinaoRiskGate {
+
+    /// Run the pure evaluator on `signals`, project onto the surface
+    /// matrix, and fold in counterfactual evidence from a prior
+    /// dream-cycle refinement pass. See
+    /// `surfaceAction(for:counterfactualEvidence:...)` for the
+    /// upgrade rules.
+    ///
+    /// Does **not** issue a permit (same contract as the pre-M85
+    /// `requestSurfaceAction(...)` — the permit path lives on
+    /// `requestActionPermit(for:signals:)`).
+    func requestSurfaceAction(
+        for signals: RiskSignals,
+        counterfactualEvidence: CounterfactualEvidence,
+        auditReference: String? = nil,
+        candidateIDs: [String] = [],
+        consentPromptKey: String = "default-consent-prompt"
+    ) -> EnrichedSurfaceAction {
+        let assessment = Self.assess(signals)
+        return Self.surfaceAction(
+            for: assessment,
+            counterfactualEvidence: counterfactualEvidence,
+            auditReference: auditReference,
+            candidateIDs: candidateIDs,
+            consentPromptKey: consentPromptKey)
+    }
+
+    /// World-aware variant that additionally folds in counterfactual
+    /// evidence. Throws `.unknownWorldTemplate` when the vault
+    /// doesn't recognise `worldContext.templateID`, matching the
+    /// permit-path semantics.
+    func requestSurfaceAction(
+        for signals: RiskSignals,
+        worldContext: WorldRiskContext,
+        worldEndpoint: any QinaoWorldPriorEndpoint,
+        counterfactualEvidence: CounterfactualEvidence,
+        auditReference: String? = nil,
+        candidateIDs: [String] = [],
+        consentPromptKey: String = "default-consent-prompt"
+    ) async throws -> EnrichedSurfaceAction {
+        guard
+            let worldAssessment = try await worldEndpoint
+                .assessRisk(templateID: worldContext.templateID)
+        else {
+            throw RiskError.unknownWorldTemplate(
+                id: worldContext.templateID)
+        }
+        let assessment = Self.assess(
+            signals,
+            worldAssessment: worldAssessment,
+            worldContext: worldContext)
+        return Self.surfaceAction(
+            for: assessment,
+            counterfactualEvidence: counterfactualEvidence,
+            auditReference: auditReference,
+            candidateIDs: candidateIDs,
+            consentPromptKey: consentPromptKey)
+    }
+}
