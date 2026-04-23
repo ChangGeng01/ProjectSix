@@ -205,7 +205,17 @@ enum DecisionIntelligenceProviderPipeline {
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> QuickCheckResult? {
         let adjustedStrategy = strategy?.clamped(using: eBrainTurn)
-        if testingStubProfile == nil,
+        // Protective overlay must run whenever the stub provider
+        // will NOT actually take over the refine result. The stub
+        // is injected only when `testingStubProfile != nil AND
+        // preference != .template` (see
+        // `BehavioralAISubstrateBridge.swift:753-754`). So we
+        // apply the overlay when EITHER no stub profile is set
+        // (production path) OR the preference is `.template` —
+        // in the latter case the stub wouldn't fire even with a
+        // profile, and without the overlay we'd return nil on
+        // protective turns.
+        if (testingStubProfile == nil || preference == .template),
            let eBrainTurn,
            shouldUseProtectiveOverlay(for: eBrainTurn) {
             return protectiveQuickResult(base: base, turn: eBrainTurn)
@@ -372,7 +382,17 @@ enum DecisionIntelligenceProviderPipeline {
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> BalanceBoardResult? {
         let adjustedStrategy = strategy?.clamped(using: eBrainTurn)
-        if testingStubProfile == nil,
+        // Protective overlay must run whenever the stub provider
+        // will NOT actually take over the refine result. The stub
+        // is injected only when `testingStubProfile != nil AND
+        // preference != .template` (see
+        // `BehavioralAISubstrateBridge.swift:753-754`). So we
+        // apply the overlay when EITHER no stub profile is set
+        // (production path) OR the preference is `.template` —
+        // in the latter case the stub wouldn't fire even with a
+        // profile, and without the overlay we'd return nil on
+        // protective turns.
+        if (testingStubProfile == nil || preference == .template),
            let eBrainTurn,
            shouldUseProtectiveOverlay(for: eBrainTurn) {
             return protectiveBalanceResult(base: base, turn: eBrainTurn)
@@ -539,7 +559,17 @@ enum DecisionIntelligenceProviderPipeline {
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> MirrorResult? {
         let adjustedStrategy = strategy?.clamped(using: eBrainTurn)
-        if testingStubProfile == nil,
+        // Protective overlay must run whenever the stub provider
+        // will NOT actually take over the refine result. The stub
+        // is injected only when `testingStubProfile != nil AND
+        // preference != .template` (see
+        // `BehavioralAISubstrateBridge.swift:753-754`). So we
+        // apply the overlay when EITHER no stub profile is set
+        // (production path) OR the preference is `.template` —
+        // in the latter case the stub wouldn't fire even with a
+        // profile, and without the overlay we'd return nil on
+        // protective turns.
+        if (testingStubProfile == nil || preference == .template),
            let eBrainTurn,
            shouldUseProtectiveOverlay(for: eBrainTurn) {
             return protectiveMirrorResult(base: base, turn: eBrainTurn)
