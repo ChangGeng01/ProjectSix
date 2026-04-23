@@ -129,7 +129,15 @@ let package = Package(
                 // conformance extension) in the same module.
                 .product(name: "BASMemory", package: "BehavioralAISubstrate"),
                 .product(name: "BASSovereign", package: "BehavioralAISubstrate"),
-                .product(name: "BASOrchestration", package: "BehavioralAISubstrate")
+                .product(name: "BASOrchestration", package: "BehavioralAISubstrate"),
+                // M82 — main-trunk turn-artifacts projection: the
+                // composition layer is the only place that may carry
+                // the substrate's turn-result type across the seam
+                // between BAS and Qinao. The bridge helper that
+                // consumes that type is `package`-scoped so the
+                // forbidden redaction token never reaches a public
+                // Qinao symbol.
+                .product(name: "BASHostKit", package: "BehavioralAISubstrate")
             ]),
         // QinaoUI — SwiftUI components. Separated so headless
         // servers can depend on QinaoRuntime without pulling in
