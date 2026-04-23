@@ -426,6 +426,150 @@ public actor QinaoSovereignControlPlane {
         }
     }
 
+    // MARK: - Public value types · M83 audit-trail rotation + LINEAGE_CUT
+
+    /// Why a trail segment was closed. Mirrors the substrate's
+    /// rotation-reason ladder 1:1 but keeps the internal type name
+    /// off the public surface.
+    public enum TrailRotationReason: String, Sendable, Equatable, Codable,
+        CaseIterable
+    {
+        /// Routine size/time rotation; no semantic meaning beyond
+        /// hygiene.
+        case scheduledRotation
+        /// A session ended; the segment was closed so audit queries
+        /// stop cleanly at the final turn.
+        case sessionClosure
+        /// A LINEAGE_CUT marker was just written; the segment closes
+        /// so the cut is bounded by a stable anchor.
+        case lineageCut
+        /// Integrity was re-baselined (e.g. key rotation).
+        case integrityRebaseline
+        /// Explicit operator request (e.g. archive cutoff).
+        case explicitOperator
+    }
+
+    /// Public descriptor of one closed (or currently-open) audit-
+    /// trail segment. A segment is one contiguous hash-chained run;
+    /// rotation produces a sequence of these. A host never needs to
+    /// know what is inside a segment — the descriptor is enough for
+    /// replay, archival, and "has the trail advanced since last
+    /// time" checks.
+    public struct TrailSegment: Sendable, Equatable, Codable {
+        public let segmentID: String
+        /// 0 for the genesis segment, incrementing by one per
+        /// rotation within the session.
+        public let segmentIndex: Int
+        public let sessionID: String
+        /// Opaque anchor — the tail hash of the preceding segment,
+        /// or the literal `"GENESIS"` sentinel for segment 0. Hosts
+        /// compare anchors for equality; they don't interpret them.
+        public let startAnchor: String
+        /// Opaque tail hash of this segment, or `nil` while the
+        /// segment is still open.
+        public let tailHash: String?
+        public let entryCount: Int
+        public let openedAt: Date
+        public let closedAt: Date?
+        public let closedBy: TrailRotationReason?
+        /// Rotation that closed this segment, if any. Hosts use this
+        /// to correlate a closed segment with their own rotation log.
+        public let closingRotationID: String?
+
+        public init(
+            segmentID: String,
+            segmentIndex: Int,
+            sessionID: String,
+            startAnchor: String,
+            tailHash: String? = nil,
+            entryCount: Int = 0,
+            openedAt: Date,
+            closedAt: Date? = nil,
+            closedBy: TrailRotationReason? = nil,
+            closingRotationID: String? = nil
+        ) {
+            self.segmentID = segmentID
+            self.segmentIndex = segmentIndex
+            self.sessionID = sessionID
+            self.startAnchor = startAnchor
+            self.tailHash = tailHash
+            self.entryCount = entryCount
+            self.openedAt = openedAt
+            self.closedAt = closedAt
+            self.closedBy = closedBy
+            self.closingRotationID = closingRotationID
+        }
+
+        /// `true` iff the segment has a tailHash, i.e. has been closed
+        /// by a rotation.
+        public var isClosed: Bool { tailHash != nil }
+    }
+
+    /// How deep a LINEAGE_CUT cascades through audit references.
+    /// Mirrors the substrate depth enum one-to-one; the public name
+    /// intentionally omits any substrate-module vocabulary.
+    public enum LineageCutDepth: Sendable, Equatable, Codable {
+        /// Only the root audit ref. No cascade.
+        case root
+        /// Root plus up to `hops` levels of downstream citations
+        /// (entries that named the root or a prior cut-set member
+        /// in their reference fields). `hops < 0` is clamped to 0.
+        case bounded(hops: Int)
+        /// Cascade until fixpoint — no downstream citation edge
+        /// crosses out of the cut set.
+        case entireLineage
+    }
+
+    /// Outcome of a sovereign-approved lineage cut. Carries the
+    /// cascade's affected / protected audit refs plus the segment
+    /// bookkeeping the cut triggered. Downstream consumers (host
+    /// forget queues, version arboretum prune workers) consume this
+    /// to drive their own removal workflows.
+    public struct LineageCutOutcome: Sendable, Equatable, Codable {
+        public let cutID: String
+        public let sessionID: String
+        /// Audit refs the cascade concluded were downstream of the
+        /// root and should be cut. In deterministic cascade order.
+        public let affectedAuditRefs: [String]
+        /// Audit refs the cascade reached but preserved because their
+        /// rule set intersected the request's protected-rules set.
+        /// The cascade stops at these — anything further downstream
+        /// through a protected node is preserved alongside it.
+        public let protectedAuditRefs: [String]
+        /// The audit ref of the cut-marker entry itself. The marker
+        /// is hash-chained into the trail; a host that restores from
+        /// a snapshot can look this ref up to reconstruct the cut's
+        /// full payload.
+        public let markerAuditRef: String
+        /// Segment that the cut closed. Its tail is the marker's
+        /// self-hash; its `closedBy == .lineageCut`.
+        public let closedSegment: TrailSegment
+        /// Rotation ID the cut generated internally. Hosts correlate
+        /// this with their own rotation log.
+        public let rotationID: String
+        public let completedAt: Date
+
+        public init(
+            cutID: String,
+            sessionID: String,
+            affectedAuditRefs: [String],
+            protectedAuditRefs: [String],
+            markerAuditRef: String,
+            closedSegment: TrailSegment,
+            rotationID: String,
+            completedAt: Date
+        ) {
+            self.cutID = cutID
+            self.sessionID = sessionID
+            self.affectedAuditRefs = affectedAuditRefs
+            self.protectedAuditRefs = protectedAuditRefs
+            self.markerAuditRef = markerAuditRef
+            self.closedSegment = closedSegment
+            self.rotationID = rotationID
+            self.completedAt = completedAt
+        }
+    }
+
     // MARK: - Internals (never re-exported)
 
     private let coordinator: BASSovereignCleanRebootCoordinator
@@ -693,6 +837,190 @@ public actor QinaoSovereignControlPlane {
     /// a reason.
     public func haltReason(sessionID: String) -> String? {
         haltReasons[sessionID]
+    }
+
+    // MARK: - M83 · Audit-trail rotation + LINEAGE_CUT
+
+    /// Errors surfaced by rotation and lineage-cut operations.
+    public enum TrailError: Error, Equatable, Sendable {
+        /// Rotation was requested for a session that has no open
+        /// segment — either the session has never appended or the
+        /// last segment was just closed without an intervening append.
+        case noOpenSegment(sessionID: String)
+        /// LINEAGE_CUT referenced a root audit ref that doesn't exist
+        /// in the trail.
+        case lineageRootNotFound(auditRef: String)
+        /// The cut's `cutID` / `sessionID` / `rootAuditRef` was empty.
+        case invalidRequest(String)
+        /// The session is halted; trail operations are refused while
+        /// halted to prevent a compromised session from trimming its
+        /// own lineage.
+        case sessionHalted(sessionID: String)
+    }
+
+    /// Rotate the audit trail for a session. Closes the currently-
+    /// open segment (stamping its tail hash) so subsequent appends
+    /// start a fresh successor anchored to that tail. Returns the
+    /// closed segment.
+    ///
+    /// Rotation is safe for BR-012: no hash-chain content is
+    /// modified, only segment-boundary bookkeeping is added. A
+    /// rotated trail still verifies end-to-end with the same
+    /// SHA-256 discipline as a flat one.
+    ///
+    /// A halted session refuses rotation — halted sessions are not
+    /// allowed to decide their own rotation cadence. Clear the halt
+    /// (e.g. via `requestRollback` / explicit operator action)
+    /// before attempting rotation on a halted session.
+    @discardableResult
+    public func rotateAuditTrail(
+        sessionID: String,
+        reason: TrailRotationReason = .scheduledRotation,
+        rotationID: String? = nil
+    ) async throws -> TrailSegment {
+        if haltedSessions.contains(sessionID) {
+            throw TrailError.sessionHalted(sessionID: sessionID)
+        }
+        let plan = BASSovereignLedgerRotationPlan(
+            rotationID: rotationID
+                ?? "rot-\(UUID().uuidString)",
+            sessionID: sessionID,
+            beforeTurnID: nil,
+            reason: Self.toBASRotationReason(reason),
+            requestedAt: now())
+        do {
+            let closed = try await auditLedger.rotate(plan: plan)
+            return Self.externalize(closed)
+        } catch BASSovereignAuditLedger.LedgerError.noOpenSegment(
+            let session)
+        {
+            throw TrailError.noOpenSegment(sessionID: session)
+        }
+    }
+
+    /// Apply a sovereign-approved LINEAGE_CUT. Cascades downstream
+    /// from `rootAuditRef` up to the requested depth, skipping any
+    /// entry whose rule set intersects `protectedRuleIDs` (and
+    /// halting the cascade at those entries — their own downstream
+    /// is preserved alongside them).
+    ///
+    /// The cut writes a hash-chained marker entry into the trail and
+    /// immediately rotates the segment so the marker becomes the
+    /// closing tail. Downstream consumers (host forget queues,
+    /// version arboretum prune workers, evolution furnace bias
+    /// cleaners) read `affectedAuditRefs` from the returned outcome
+    /// to drive their own removal state machines.
+    ///
+    /// BR-012 compliance: LINEAGE_CUT does NOT delete any audit
+    /// entry. The `affectedAuditRefs` remain queryable in the trail;
+    /// the cut merely records the sovereign intent to propagate
+    /// removal to *downstream consumers*, not to the trail itself.
+    @discardableResult
+    public func cutLineage(
+        cutID: String,
+        sessionID: String,
+        rootAuditRef: String,
+        depth: LineageCutDepth = .entireLineage,
+        reason: String,
+        protectedRuleIDs: Set<String> = []
+    ) async throws -> LineageCutOutcome {
+        if haltedSessions.contains(sessionID) {
+            throw TrailError.sessionHalted(sessionID: sessionID)
+        }
+        guard !cutID.isEmpty else {
+            throw TrailError.invalidRequest("cutID must be non-empty")
+        }
+        guard !sessionID.isEmpty else {
+            throw TrailError.invalidRequest("sessionID must be non-empty")
+        }
+        guard !rootAuditRef.isEmpty else {
+            throw TrailError.invalidRequest(
+                "rootAuditRef must be non-empty")
+        }
+        let request = BASSovereignLineageCutRequest(
+            cutID: cutID,
+            sessionID: sessionID,
+            rootAuditID: rootAuditRef,
+            depth: Self.toBASDepth(depth),
+            reason: reason,
+            protectedRuleIDs: protectedRuleIDs,
+            requestedAt: now())
+        do {
+            let outcome = try await auditLedger.lineageCut(
+                request: request)
+            // After lineage-cut, the closed segment is available via
+            // `segments(forSession:)` — find the one stamped with
+            // our rotationID.
+            let segs = await auditLedger.segments(
+                forSession: sessionID)
+            let closed = segs.first {
+                $0.closingRotationID == outcome.rotation.rotationID
+            }
+            guard let closed else {
+                // Can't happen: lineageCut always rotates. Defensive.
+                throw TrailError.invalidRequest(
+                    "lineageCut produced no closing segment")
+            }
+            return LineageCutOutcome(
+                cutID: outcome.cutID,
+                sessionID: outcome.sessionID,
+                affectedAuditRefs: outcome.affectedAuditIDs,
+                protectedAuditRefs: outcome.protectedAuditIDs,
+                markerAuditRef: outcome.markerAuditID,
+                closedSegment: Self.externalize(closed),
+                rotationID: outcome.rotation.rotationID,
+                completedAt: outcome.completedAt)
+        } catch BASSovereignAuditLedger.LedgerError
+            .lineageRootNotFound(let id)
+        {
+            throw TrailError.lineageRootNotFound(auditRef: id)
+        } catch BASSovereignAuditLedger.LedgerError.invalidEntry(let msg) {
+            throw TrailError.invalidRequest(msg)
+        }
+    }
+
+    /// Read back the currently-open trail segment for a session, or
+    /// `nil` when no segment is open (no appends since the last
+    /// rotation or the session is fresh).
+    public func currentAuditSegment(
+        sessionID: String
+    ) async -> TrailSegment? {
+        await auditLedger.currentSegment(forSession: sessionID)
+            .map(Self.externalize)
+    }
+
+    /// Every trail segment (closed + open) for a session, in
+    /// creation order.
+    public func auditSegments(
+        sessionID: String
+    ) async -> [TrailSegment] {
+        await auditLedger.segments(forSession: sessionID)
+            .map(Self.externalize)
+    }
+
+    /// Look up a previously-applied cut by its marker audit ref.
+    /// Returns `nil` if no cut with that marker has been recorded.
+    public func lineageCutOutcome(
+        markerAuditRef: String
+    ) async -> LineageCutOutcome? {
+        guard let bas = await auditLedger.lineageCutOutcome(
+            markerAuditID: markerAuditRef)
+        else { return nil }
+        let segs = await auditLedger.segments(
+            forSession: bas.sessionID)
+        let closed = segs.first {
+            $0.closingRotationID == bas.rotation.rotationID
+        }
+        guard let closed else { return nil }
+        return LineageCutOutcome(
+            cutID: bas.cutID,
+            sessionID: bas.sessionID,
+            affectedAuditRefs: bas.affectedAuditIDs,
+            protectedAuditRefs: bas.protectedAuditIDs,
+            markerAuditRef: bas.markerAuditID,
+            closedSegment: Self.externalize(closed),
+            rotationID: bas.rotation.rotationID,
+            completedAt: bas.completedAt)
     }
 
     // MARK: - Warrant issuance
@@ -1053,5 +1381,57 @@ public actor QinaoSovereignControlPlane {
         case .coordinatorLaxer: return .coordinatorLaxer
         case .engineOnly: return .engineOnly
         }
+    }
+
+    // MARK: - M83 · mirror translators
+
+    private static func toBASRotationReason(
+        _ reason: TrailRotationReason
+    ) -> BASSovereignLedgerRotationReason {
+        switch reason {
+        case .scheduledRotation: return .scheduledRotation
+        case .sessionClosure: return .sessionClosure
+        case .lineageCut: return .lineageCut
+        case .integrityRebaseline: return .integrityRebaseline
+        case .explicitOperator: return .explicitOperator
+        }
+    }
+
+    private static func toTrailRotationReason(
+        _ reason: BASSovereignLedgerRotationReason
+    ) -> TrailRotationReason {
+        switch reason {
+        case .scheduledRotation: return .scheduledRotation
+        case .sessionClosure: return .sessionClosure
+        case .lineageCut: return .lineageCut
+        case .integrityRebaseline: return .integrityRebaseline
+        case .explicitOperator: return .explicitOperator
+        }
+    }
+
+    private static func toBASDepth(
+        _ depth: LineageCutDepth
+    ) -> BASSovereignLineageCutDepth {
+        switch depth {
+        case .root: return .root
+        case .bounded(let hops): return .bounded(hops: hops)
+        case .entireLineage: return .entireLineage
+        }
+    }
+
+    private static func externalize(
+        _ segment: BASSovereignLedgerSegment
+    ) -> TrailSegment {
+        TrailSegment(
+            segmentID: segment.segmentID,
+            segmentIndex: segment.segmentIndex,
+            sessionID: segment.sessionID,
+            startAnchor: segment.startAnchor,
+            tailHash: segment.tailHash,
+            entryCount: segment.entryCount,
+            openedAt: segment.openedAt,
+            closedAt: segment.closedAt,
+            closedBy: segment.closedBy.map(toTrailRotationReason),
+            closingRotationID: segment.closingRotationID)
     }
 }

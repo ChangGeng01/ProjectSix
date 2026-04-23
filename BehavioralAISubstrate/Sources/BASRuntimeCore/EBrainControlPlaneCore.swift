@@ -914,6 +914,234 @@ public struct BASSovereignAuditEntry: BASSchemaVersioned {
     }
 }
 
+// MARK: - M83 · Audit ledger rotation + LINEAGE_CUT
+//
+// Long-running sessions accumulate thousands of hash-chained audit
+// entries. BR-012 forbids tampering with the chain (any delete is a
+// red line), but a chain that grows unbounded cannot be snapshotted,
+// queried, or safely archived. Rotation solves that without breaking
+// integrity: a segment is closed (its tail hash becomes the genesis
+// anchor of the next segment) and the chain as a whole remains
+// continuously verifiable — a rotated ledger proves every entry's
+// integrity by walking segment → segment → segment with the same
+// SHA-256 re-anchor discipline the in-segment chain uses.
+//
+// LINEAGE_CUT is the sovereign-approved way to propagate a removal
+// request downstream through the rest of the second brain (L8 forget
+// cascade, L13 version arboretum prune) WITHOUT deleting the audit
+// trail itself. The cut is recorded as a first-class audit entry —
+// itself hash-chained — whose `signalRefs` enumerate the affected
+// audit IDs. Subsequent rotation wraps the cut marker into the closed
+// segment; consumers that restore from a snapshot replay the cut
+// marker to drive their own pruning.
+
+/// Reason a ledger segment was closed.
+public enum BASSovereignLedgerRotationReason: String, Codable, CaseIterable,
+    Sendable
+{
+    /// Routine size/time rotation; no semantic meaning beyond hygiene.
+    case scheduledRotation
+    /// A session ended; its segment is closed so audit queries stop
+    /// at the final turn.
+    case sessionClosure
+    /// A LINEAGE_CUT marker was just appended; the segment is closed
+    /// so the cut is bounded by a stable anchor.
+    case lineageCut
+    /// Integrity was re-baselined (e.g. after a key-rotation or a
+    /// governance-approved repair); the outgoing segment is closed
+    /// with its current tail, the new one opens under a new anchor.
+    case integrityRebaseline
+    /// Explicit operator request (e.g. archive cutoff).
+    case explicitOperator
+}
+
+/// Plan describing an audit-ledger rotation. The plan is itself
+/// appended to the *outgoing* segment as a final audit entry before
+/// the cutover, so the rotation event is hash-chained into the record
+/// it closes.
+public struct BASSovereignLedgerRotationPlan: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var rotationID: String
+    public var sessionID: String
+    /// Optional turn cutoff. When set, rotation waits until the last
+    /// entry for this `(sessionID, turnID)` has been appended before
+    /// closing the segment. When `nil`, rotation happens against the
+    /// current tail.
+    public var beforeTurnID: String?
+    public var reason: BASSovereignLedgerRotationReason
+    public var requestedAt: Date
+
+    public init(
+        schemaVersion: String =
+            BASSovereignLedgerRotationPlan.currentSchemaVersion,
+        rotationID: String,
+        sessionID: String,
+        beforeTurnID: String? = nil,
+        reason: BASSovereignLedgerRotationReason,
+        requestedAt: Date
+    ) {
+        self.schemaVersion = schemaVersion
+        self.rotationID = rotationID
+        self.sessionID = sessionID
+        self.beforeTurnID = beforeTurnID
+        self.reason = reason
+        self.requestedAt = requestedAt
+    }
+}
+
+/// Descriptor of a closed (or currently-open) ledger segment. One
+/// segment is one contiguous hash-chained run; rotation produces a
+/// sequence of these.
+public struct BASSovereignLedgerSegment: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var segmentID: String
+    /// 0 for the genesis segment, incrementing by one per rotation.
+    public var segmentIndex: Int
+    public var sessionID: String
+    /// SHA-256 of the prior segment's tail, or the literal `"GENESIS"`
+    /// sentinel for segment 0.
+    public var startAnchor: String
+    /// SHA-256 of this segment's final entry, or `nil` while the
+    /// segment is still open.
+    public var tailHash: String?
+    public var entryCount: Int
+    public var openedAt: Date
+    public var closedAt: Date?
+    public var closedBy: BASSovereignLedgerRotationReason?
+    /// Rotation plan that closed this segment (if any).
+    public var closingRotationID: String?
+
+    public init(
+        schemaVersion: String =
+            BASSovereignLedgerSegment.currentSchemaVersion,
+        segmentID: String,
+        segmentIndex: Int,
+        sessionID: String,
+        startAnchor: String,
+        tailHash: String? = nil,
+        entryCount: Int = 0,
+        openedAt: Date,
+        closedAt: Date? = nil,
+        closedBy: BASSovereignLedgerRotationReason? = nil,
+        closingRotationID: String? = nil
+    ) {
+        self.schemaVersion = schemaVersion
+        self.segmentID = segmentID
+        self.segmentIndex = segmentIndex
+        self.sessionID = sessionID
+        self.startAnchor = startAnchor
+        self.tailHash = tailHash
+        self.entryCount = entryCount
+        self.openedAt = openedAt
+        self.closedAt = closedAt
+        self.closedBy = closedBy
+        self.closingRotationID = closingRotationID
+    }
+}
+
+/// How deep a LINEAGE_CUT cascades through audit references.
+public enum BASSovereignLineageCutDepth: Codable, Equatable, Sendable {
+    /// Only the root audit ID. No descendants.
+    case root
+    /// Root + up to `hops` levels of direct reference descendants
+    /// (another entry's `verdictRef` / `signalRefs` / `actionRefs` /
+    /// `snapshotRef` names an audit ID already in the cut set).
+    case bounded(hops: Int)
+    /// Cascade until fixpoint — no reference edge crosses out of the
+    /// cut set.
+    case entireLineage
+}
+
+/// Sovereign request to cut a lineage of audit entries.
+public struct BASSovereignLineageCutRequest: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var cutID: String
+    public var sessionID: String
+    /// The audit ID the cut cascades from.
+    public var rootAuditID: String
+    public var depth: BASSovereignLineageCutDepth
+    public var reason: String
+    /// Rules that cannot be cut from history. If a candidate's
+    /// `ruleIDs` intersect this set the entry is preserved (moved to
+    /// `protectedAuditIDs` in the outcome) and its sub-edges are NOT
+    /// followed. This is the sovereign-protected bail-out — certain
+    /// events (deadStop, rollback, release of sovereign locks) cannot
+    /// be expunged from the trail regardless of downstream intent.
+    public var protectedRuleIDs: Set<String>
+    public var requestedAt: Date
+
+    public init(
+        schemaVersion: String =
+            BASSovereignLineageCutRequest.currentSchemaVersion,
+        cutID: String,
+        sessionID: String,
+        rootAuditID: String,
+        depth: BASSovereignLineageCutDepth,
+        reason: String,
+        protectedRuleIDs: Set<String> = [],
+        requestedAt: Date
+    ) {
+        self.schemaVersion = schemaVersion
+        self.cutID = cutID
+        self.sessionID = sessionID
+        self.rootAuditID = rootAuditID
+        self.depth = depth
+        self.reason = reason
+        self.protectedRuleIDs = protectedRuleIDs
+        self.requestedAt = requestedAt
+    }
+}
+
+/// Outcome of applying a LINEAGE_CUT request. Always accompanied by a
+/// rotation — the cut itself becomes the closing entry of the
+/// outgoing segment.
+public struct BASSovereignLineageCutOutcome: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var cutID: String
+    public var sessionID: String
+    /// Audit IDs that were cut. In first-seen order under the cascade
+    /// traversal so replay is deterministic.
+    public var affectedAuditIDs: [String]
+    /// Audit IDs that the cascade reached but that were preserved
+    /// because their rule set intersected `protectedRuleIDs`.
+    public var protectedAuditIDs: [String]
+    /// Rotation that bounded the cut into a closed segment.
+    public var rotation: BASSovereignLedgerRotationPlan
+    /// The audit ref of the cut marker entry itself. Consumers that
+    /// restore from a snapshot query this to find the cut payload.
+    public var markerAuditID: String
+    public var completedAt: Date
+
+    public init(
+        schemaVersion: String =
+            BASSovereignLineageCutOutcome.currentSchemaVersion,
+        cutID: String,
+        sessionID: String,
+        affectedAuditIDs: [String],
+        protectedAuditIDs: [String],
+        rotation: BASSovereignLedgerRotationPlan,
+        markerAuditID: String,
+        completedAt: Date
+    ) {
+        self.schemaVersion = schemaVersion
+        self.cutID = cutID
+        self.sessionID = sessionID
+        self.affectedAuditIDs = affectedAuditIDs
+        self.protectedAuditIDs = protectedAuditIDs
+        self.rotation = rotation
+        self.markerAuditID = markerAuditID
+        self.completedAt = completedAt
+    }
+}
+
 public struct BASHostRhythmProfile: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.0.0"
 
