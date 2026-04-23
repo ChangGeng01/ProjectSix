@@ -1,8 +1,7 @@
 import XCTest
 import SwiftData
-import BASAppleAdapters
-import BASMemory
-import BASRuntimeCore
+import BASHostKit
+// M86 — BASAppleAdapters, BASMemory, BASRuntimeCore are @_exported from BASHostKit.
 @testable import Before
 
 final class DecisionMemorySystemTests: XCTestCase {

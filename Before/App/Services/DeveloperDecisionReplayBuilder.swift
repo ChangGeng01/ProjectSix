@@ -1,6 +1,7 @@
 import Foundation
 import BASHostKit
-import BASMemory
+// M86 — BASMemory is @_exported from BASHostKit; direct import removed
+// per check_sdk_import_boundaries.sh (FORBIDDEN_REGEX).
 
 enum DeveloperDecisionReplayRecord: Identifiable {
     case quick(CheckEvent)

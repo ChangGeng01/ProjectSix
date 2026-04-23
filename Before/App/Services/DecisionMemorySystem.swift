@@ -2,8 +2,9 @@ import CryptoKit
 import Foundation
 import SwiftData
 import BASHostKit
-import BASMemory
-import BASRuntimeCore
+// M86 — BASMemory and BASRuntimeCore are @_exported from BASHostKit;
+// direct imports removed per check_sdk_import_boundaries.sh
+// (FORBIDDEN_REGEX).
 
 enum DecisionMemorySystem {
     static let projectionRefreshLimits = BeforeProductCompatibility.projectionRefreshLimits

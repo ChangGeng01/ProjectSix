@@ -1,6 +1,6 @@
 import XCTest
 import BASHostKit
-import BASOrchestration
+// M86 — BASOrchestration is @_exported from BASHostKit.
 @testable import Before
 
 final class DecisionFoldedLungTests: XCTestCase {

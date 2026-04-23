@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 import Testing
 import BASHostKit
-import BASMemory
+// M86 — BASMemory is @_exported from BASHostKit.
 @testable import Before
 
 @MainActor

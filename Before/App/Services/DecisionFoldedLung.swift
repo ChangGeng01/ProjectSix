@@ -1,6 +1,7 @@
 import Foundation
 import BASHostKit
-import BASOrchestration
+// M86 — BASOrchestration is @_exported from BASHostKit; direct import
+// removed per check_sdk_import_boundaries.sh (FORBIDDEN_REGEX).
 
 private func decisionOrderedUniqueLines(_ values: [String]) -> [String] {
     values.reduce(into: [String]()) { uniqueValues, value in

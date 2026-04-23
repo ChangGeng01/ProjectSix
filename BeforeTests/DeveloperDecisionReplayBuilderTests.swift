@@ -1,8 +1,6 @@
 import XCTest
 import BASHostKit
-import BASMemory
-import BASOrchestration
-import BASPolicy
+// M86 — BASMemory, BASOrchestration, BASPolicy are @_exported from BASHostKit.
 @testable import Before
 
 final class DeveloperDecisionReplayBuilderTests: XCTestCase {
