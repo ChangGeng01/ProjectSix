@@ -47,6 +47,16 @@ public actor QinaoLoop {
         /// `provider-unavailable:<detail>`, `pressure-refusal:<detail>`,
         /// `no-adapter-for-role:<role>`, `unknown-provider:<id>`).
         case organUnavailable(reason: String)
+        /// M84 — the dream-cycle refinement path cannot run. Reason
+        /// codes are stable:
+        /// - `"no-world-prior-vault"`: the loop was initialised
+        ///   without a `QinaoWorldPriorVault`; there is nothing to
+        ///   refine against.
+        /// - `"unknown-template:<id>"`: the vault has no record of
+        ///   the requested template ID.
+        /// - `"vault-error:<description>"`: any other substrate-side
+        ///   seeder failure (should never fire on supported paths).
+        case worldPriorUnavailable(reason: String)
     }
 
     // MARK: - Public input / output types
@@ -157,6 +167,87 @@ public actor QinaoLoop {
             self.pros = pros
             self.cons = cons
             self.risks = risks
+        }
+    }
+
+    /// M84 — summary of a dream-cycle refinement pass.
+    ///
+    /// `refineAgainstCounterfactuals(sessionID:templateID:description:)`
+    /// projects each candidate-with-claim across the vault's
+    /// counterfactual branches for one template, aggregates the
+    /// branch-by-branch evidence comparisons into a single refined
+    /// contradiction score per candidate, and folds the refined
+    /// scores back into the session's critique state so downstream
+    /// `candidateFrontier` / `guardianBranch` / `triSelfScores` /
+    /// `vetoExplain` queries see the dream-cycle-informed view.
+    ///
+    /// `perCandidate` is ordered by `candidateID` ascending for
+    /// deterministic output across repeated calls; candidates that
+    /// carry no `WorldPriorClaim` are skipped entirely (they are
+    /// neither refined nor returned).
+    public struct DreamCycleOutcome: Sendable, Equatable, Codable {
+        public let sessionID: String
+        public let templateID: String
+        public let branchesExamined: Int
+        public let perCandidate: [CandidateCounterfactualView]
+
+        /// Per-candidate record of how one refinement pass shifted
+        /// the contradiction score. `branchesExposedInsufficient +
+        /// branchesEqualEvidence + branchesRobustlySurvived ==
+        /// branchesExamined` is an invariant the unit tests pin.
+        public struct CandidateCounterfactualView:
+            Sendable, Equatable, Codable {
+            public let candidateID: String
+            /// Contradiction score stamped at `submit` time (M51);
+            /// preserved as a lower bound — this method never
+            /// lowers a candidate's contradiction.
+            public let baseContradiction: Double
+            /// `max(baseContradiction, branchAggregate)` where
+            /// `branchAggregate =
+            ///  (exposedInsufficient * 1.0 + equalEvidence * 0.5)
+            ///   / max(1, branchesExamined)`.
+            public let aggregatedContradiction: Double
+            /// Branches whose residual evidence rung is STRONGER
+            /// than the claim's declared evidence — the claim fails
+            /// even in the perturbed world, so the counterfactual
+            /// exposes insufficiency.
+            public let branchesExposedInsufficient: Int
+            /// Branches whose residual evidence matches the claim's
+            /// declared evidence — the claim barely survives.
+            public let branchesEqualEvidence: Int
+            /// Branches whose residual evidence is WEAKER than the
+            /// claim — the claim survives these perturbed worlds
+            /// with margin.
+            public let branchesRobustlySurvived: Int
+
+            public init(
+                candidateID: String,
+                baseContradiction: Double,
+                aggregatedContradiction: Double,
+                branchesExposedInsufficient: Int,
+                branchesEqualEvidence: Int,
+                branchesRobustlySurvived: Int
+            ) {
+                self.candidateID = candidateID
+                self.baseContradiction = baseContradiction
+                self.aggregatedContradiction = aggregatedContradiction
+                self.branchesExposedInsufficient =
+                    branchesExposedInsufficient
+                self.branchesEqualEvidence = branchesEqualEvidence
+                self.branchesRobustlySurvived = branchesRobustlySurvived
+            }
+        }
+
+        public init(
+            sessionID: String,
+            templateID: String,
+            branchesExamined: Int,
+            perCandidate: [CandidateCounterfactualView]
+        ) {
+            self.sessionID = sessionID
+            self.templateID = templateID
+            self.branchesExamined = branchesExamined
+            self.perCandidate = perCandidate
         }
     }
 
@@ -342,6 +433,194 @@ public actor QinaoLoop {
     /// session that was never submitted is a no-op.
     public func clear(sessionID: String) {
         sessions.removeValue(forKey: sessionID)
+    }
+
+    // MARK: - Dream-cycle refinement (M84)
+
+    /// M84 — refine session candidates against counterfactual
+    /// branches of one world-prior template.
+    ///
+    /// Closes the "L9 dream-cycle ↔ L4 world-prior deep integration"
+    /// gap that the honesty board tracks under "懂世界也懂宿主": M51
+    /// already evaluates a candidate's `WorldPriorClaim` at `submit`
+    /// time via `vault.evaluateHostOverride(...)`, but that single
+    /// call only checks the claim against bedrock axioms — a purely
+    /// static snapshot of the world. This method asks the same vault
+    /// for the counterfactual branches of one chosen template (drop
+    /// precondition, introduce blocker, cross-domain bridge) and
+    /// projects each session candidate-with-claim across those
+    /// perturbed worlds, producing a richer "does the claim still
+    /// stand in these alternative worlds?" signal.
+    ///
+    /// ## Aggregation formula
+    ///
+    /// For each candidate-with-claim:
+    /// ```
+    /// let exposed = branches.filter {
+    ///     $0.branchEvidence.rank > claim.declaredEvidence.rank
+    /// }.count
+    /// let equal   = branches.filter {
+    ///     $0.branchEvidence.rank == claim.declaredEvidence.rank
+    /// }.count
+    /// let survived = branches.count - exposed - equal
+    /// let branchAggregate =
+    ///     (Double(exposed) * 1.0 + Double(equal) * 0.5)
+    ///   / Double(max(1, branches.count))
+    /// let aggregated = max(baseContradiction, branchAggregate)
+    /// ```
+    /// The `max(baseContradiction, ...)` rule guarantees the
+    /// refinement NEVER lowers a candidate's contradiction — a
+    /// demote-at-submit (0.5) survives even if every branch reports
+    /// robust survival.
+    ///
+    /// ## Side effects
+    ///
+    /// - The session's `contradictions[candidateID]` is updated to
+    ///   the aggregated value.
+    /// - The session's `critiques[candidateID].critiqueStrength` is
+    ///   recomputed with the aggregated contradiction so downstream
+    ///   `candidateFrontier` / `guardianBranch` / `triSelfScores` /
+    ///   `vetoExplain` queries reflect the dream-cycle view.
+    /// - Candidates **without** a `WorldPriorClaim` are skipped —
+    ///   they are neither refined nor included in the returned
+    ///   `perCandidate`. Candidates without a claim keep their
+    ///   base contradiction of 0.
+    ///
+    /// ## Determinism
+    ///
+    /// `perCandidate` is sorted by `candidateID` ascending so
+    /// repeated invocations on the same session + template return
+    /// the same ordering. The vault's counterfactual seeder is
+    /// itself deterministic for a fixed template ID, so calling
+    /// this method twice in a row is idempotent.
+    ///
+    /// ## Errors
+    ///
+    /// - `.sessionUnknown(id:)` if `sessionID` has no submitted
+    ///   candidates.
+    /// - `.worldPriorUnavailable(reason: "no-world-prior-vault")`
+    ///   if the loop was initialised without a vault.
+    /// - `.worldPriorUnavailable(reason: "unknown-template:<id>")`
+    ///   if the vault has no record of `templateID`.
+    /// - `.worldPriorUnavailable(reason: "vault-error:<msg>")` for
+    ///   any other seeder failure.
+    public func refineAgainstCounterfactuals(
+        sessionID: String,
+        templateID: String,
+        description: String = ""
+    ) async throws -> DreamCycleOutcome {
+        // PRE-AWAIT phase: validate inputs cheaply without holding
+        // a copy of session state. Taking a snapshot before the
+        // await would be unsafe — actor methods are reentrant at
+        // `await` points, so `clear(sessionID:)` or a fresh
+        // `submit(...)` can run between our snapshot and our
+        // write-back, causing us to resurrect cleared sessions or
+        // overwrite someone else's submission. We only read the
+        // session here to decide whether to short-circuit on
+        // unknown-session; we do NOT keep the value.
+        guard sessions[sessionID] != nil else {
+            throw LoopError.sessionUnknown(id: sessionID)
+        }
+        guard let vault = worldPriorVault else {
+            throw LoopError.worldPriorUnavailable(
+                reason: "no-world-prior-vault")
+        }
+
+        // AWAIT phase: fetch counterfactual branches. The actor
+        // may reenter here and service other calls on `self`.
+        let branches: [QinaoWorldPriorCounterfactualBranch]
+        do {
+            branches = try await vault.counterfactualBranches(
+                for: templateID,
+                description: description)
+        } catch QinaoWorldPriorVault.VaultError
+            .unknownTemplate(let id) {
+            throw LoopError.worldPriorUnavailable(
+                reason: "unknown-template:\(id)")
+        } catch {
+            throw LoopError.worldPriorUnavailable(
+                reason: "vault-error:\(error)")
+        }
+
+        // POST-AWAIT phase: re-read the session state AS IT IS NOW.
+        // If another task cleared the session during our await, we
+        // must throw rather than resurrect it. If another task
+        // submitted a fresh batch, we refine the NEW batch (the
+        // branches themselves are a function of templateID only,
+        // so they apply equally to whatever candidates are on the
+        // session now). This read-modify-write block contains no
+        // further `await`, so within it the actor guarantees no
+        // further interleaving.
+        guard var state = sessions[sessionID] else {
+            throw LoopError.sessionUnknown(id: sessionID)
+        }
+
+        // Iterate in candidateID-ASC order so perCandidate ordering
+        // is stable across repeated invocations.
+        let candidateIDs = state.inputs.keys.sorted()
+        var views:
+            [DreamCycleOutcome.CandidateCounterfactualView] = []
+        for cid in candidateIDs {
+            guard let input = state.inputs[cid],
+                  let claim = input.worldPriorClaim else { continue }
+
+            var exposed = 0
+            var equal = 0
+            var survived = 0
+            for branch in branches {
+                let branchRank = branch.branchEvidence.rank
+                let claimRank = claim.declaredEvidence.rank
+                if branchRank > claimRank {
+                    exposed += 1
+                } else if branchRank == claimRank {
+                    equal += 1
+                } else {
+                    survived += 1
+                }
+            }
+            let branchAggregate: Double
+            if branches.isEmpty {
+                branchAggregate = 0
+            } else {
+                branchAggregate =
+                    (Double(exposed) * 1.0 + Double(equal) * 0.5)
+                  / Double(branches.count)
+            }
+            let base = state.contradictions[cid] ?? 0
+            let aggregated = max(base, branchAggregate)
+            state.contradictions[cid] = aggregated
+
+            // Rebuild the critique bundle with the refined
+            // contradiction so downstream queries see the
+            // dream-cycle view.
+            if let bundle = state.critiques[cid] {
+                let newStrength = Self.critiqueStrength(
+                    for: input,
+                    worldPriorContradiction: aggregated)
+                state.critiques[cid] = BASCritiqueBundle(
+                    candidateID: bundle.candidateID,
+                    evidenceGap: bundle.evidenceGap,
+                    manipulationRisk: bundle.manipulationRisk,
+                    emotionalBias: bundle.emotionalBias,
+                    boundaryConflict: bundle.boundaryConflict,
+                    critiqueStrength: newStrength)
+            }
+
+            views.append(.init(
+                candidateID: cid,
+                baseContradiction: base,
+                aggregatedContradiction: aggregated,
+                branchesExposedInsufficient: exposed,
+                branchesEqualEvidence: equal,
+                branchesRobustlySurvived: survived))
+        }
+        sessions[sessionID] = state
+
+        return DreamCycleOutcome(
+            sessionID: sessionID,
+            templateID: templateID,
+            branchesExamined: branches.count,
+            perCandidate: views)
     }
 
     // MARK: - Organ-driven generation
