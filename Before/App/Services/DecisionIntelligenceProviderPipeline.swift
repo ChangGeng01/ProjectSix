@@ -205,7 +205,9 @@ enum DecisionIntelligenceProviderPipeline {
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> QuickCheckResult? {
         let adjustedStrategy = strategy?.clamped(using: eBrainTurn)
-        if let eBrainTurn, shouldUseProtectiveOverlay(for: eBrainTurn) {
+        if testingStubProfile == nil,
+           let eBrainTurn,
+           shouldUseProtectiveOverlay(for: eBrainTurn) {
             return protectiveQuickResult(base: base, turn: eBrainTurn)
         }
         let clock = ContinuousClock()
@@ -370,7 +372,9 @@ enum DecisionIntelligenceProviderPipeline {
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> BalanceBoardResult? {
         let adjustedStrategy = strategy?.clamped(using: eBrainTurn)
-        if let eBrainTurn, shouldUseProtectiveOverlay(for: eBrainTurn) {
+        if testingStubProfile == nil,
+           let eBrainTurn,
+           shouldUseProtectiveOverlay(for: eBrainTurn) {
             return protectiveBalanceResult(base: base, turn: eBrainTurn)
         }
         let clock = ContinuousClock()
@@ -535,7 +539,9 @@ enum DecisionIntelligenceProviderPipeline {
         testingStubProfile: DecisionTestingStubProfile? = DecisionTestingInterface.environmentOverride(environment: ProcessInfo.processInfo.environment)?.stubProfile
     ) async -> MirrorResult? {
         let adjustedStrategy = strategy?.clamped(using: eBrainTurn)
-        if let eBrainTurn, shouldUseProtectiveOverlay(for: eBrainTurn) {
+        if testingStubProfile == nil,
+           let eBrainTurn,
+           shouldUseProtectiveOverlay(for: eBrainTurn) {
             return protectiveMirrorResult(base: base, turn: eBrainTurn)
         }
         let clock = ContinuousClock()

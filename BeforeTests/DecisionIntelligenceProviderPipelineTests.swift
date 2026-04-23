@@ -1150,6 +1150,120 @@ final class DecisionIntelligenceProviderPipelineTests: XCTestCase {
         XCTAssertEqual(refined?.nextAction, "Keep the move in draft until the boundary is re-checked.")
     }
 
+    @MainActor
+    func testTestingStubBypassesProtectiveOverlayInQuickRefinement() async {
+        let base = QuickCheckResult(
+            currentPerspective: "Base current.",
+            afterPerspective: "Base after.",
+            verdict: .pause,
+            primaryAction: .wait90s,
+            secondaryActions: [.decideTomorrow]
+        )
+        let input = QuickCheckInput(
+            scenario: .buy,
+            motivation: .reward,
+            expectedOutcome: .temporaryRelief,
+            controlLevel: .maybe,
+            note: "Today was rough."
+        )
+        let turn = protectiveTurn(
+            mode: .block,
+            headline: "Hold the boundary",
+            body: "Pause and protect the boundary first.",
+            alternativeActions: ["Leave the stimulus", "Decide tomorrow"]
+        )
+        XCTAssertTrue(turn.hasProtectiveSurfaceGuidance)
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineQuickResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNotEqual(refined?.currentPerspective, turn.renderedOutput.headline)
+        XCTAssertNotEqual(refined?.afterPerspective, turn.renderedOutput.body)
+        XCTAssertTrue(refined?.currentPerspective.contains("Stub current:") == true)
+        XCTAssertTrue(refined?.afterPerspective.contains("Stub after:") == true)
+    }
+
+    @MainActor
+    func testTestingStubBypassesProtectiveOverlayInBalanceRefinement() async {
+        let base = BalanceBoardResult(
+            headline: "Base headline",
+            summary: "Base summary",
+            focusTitle: "Base focus",
+            focusDescription: "Base description",
+            nextAction: "Base next action"
+        )
+        let input = BalanceBoardInput(
+            prompt: "Should I take this side project?",
+            desire: "Momentum",
+            concern: "Burn out",
+            constraint: "My week is already full.",
+            longTerm: "I want steadier energy next month."
+        )
+        let turn = protectiveTurn(
+            mode: .block,
+            headline: "Hold the boundary",
+            body: "Pause and protect the boundary first.",
+            alternativeActions: ["Leave the stimulus", "Decide tomorrow"]
+        )
+        XCTAssertTrue(turn.hasProtectiveSurfaceGuidance)
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineBalanceResult(
+            base: base,
+            input: input,
+            brainState: permissiveBrainState(mode: .balance),
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNotEqual(refined?.headline, turn.renderedOutput.headline)
+        XCTAssertEqual(refined?.headline, "Stub balance board")
+    }
+
+    @MainActor
+    func testTestingStubBypassesProtectiveOverlayInMirrorRefinement() async {
+        let base = MirrorResult(
+            headline: "Base headline",
+            coreTension: "Base tension",
+            nextActionTitle: "Base next action title",
+            nextAction: "Base next action"
+        )
+        let input = MirrorInput(
+            prompt: "Should I stay in this relationship?",
+            emotion: "I feel tired and sad.",
+            relationship: "We keep repeating the same argument.",
+            reality: "We live far apart and avoid hard conversations.",
+            longTerm: "I want steadier relationships.",
+            selfLens: "I feel pulled between hope and exhaustion."
+        )
+        let turn = protectiveTurn(
+            mode: .replace,
+            headline: "Take the safer step",
+            body: "Use the safer path instead of forcing the current one.",
+            alternativeActions: ["Use the safer step", "Continue mindfully"]
+        )
+        XCTAssertTrue(turn.hasProtectiveSurfaceGuidance)
+
+        let refined = await DecisionIntelligenceProviderPipeline.refineMirrorResult(
+            base: base,
+            input: input,
+            eBrainTurn: turn,
+            preference: .gemmaE4B,
+            allowFallbacks: true,
+            testingStubProfile: .smoke
+        )
+
+        XCTAssertNotEqual(refined?.headline, turn.renderedOutput.headline)
+        XCTAssertTrue(refined?.headline.contains("Stub mirror") == true)
+    }
+
     func testTurnProtectiveSurfaceModeFallsBackToRenderedDelayWhenPermitModeIsAnswer() {
         var turn = protectiveTurn(
             mode: .answer,

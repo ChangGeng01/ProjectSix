@@ -143,17 +143,35 @@ final class AIFlowUITests: XCTestCase {
         element.typeText(text)
     }
 
-    private func waitForLabel(containing text: String, on element: XCUIElement) {
-        let predicate = NSPredicate(format: "label CONTAINS %@", text)
-        expectation(for: predicate, evaluatedWith: element)
-        waitForExpectations(timeout: timeout)
+    private func waitForLabel(
+        containing text: String,
+        on element: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        waitForLabel(containingAny: [text], on: element, file: file, line: line)
     }
 
-    private func waitForLabel(containingAny texts: [String], on element: XCUIElement) {
-        let predicates = texts.map { NSPredicate(format: "label CONTAINS %@", $0) }
-        let predicate = NSCompoundPredicate(orPredicateWithSubpredicates: predicates)
-        expectation(for: predicate, evaluatedWith: element)
-        waitForExpectations(timeout: timeout)
+    private func waitForLabel(
+        containingAny texts: [String],
+        on element: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        var lastLabel = element.label
+        while Date() < deadline {
+            lastLabel = element.label
+            if texts.contains(where: { lastLabel.contains($0) }) {
+                return
+            }
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        XCTFail(
+            "Expected label on '\(element.identifier)' to contain one of \(texts); actual label was: '\(lastLabel)'",
+            file: file,
+            line: line
+        )
     }
 
     private func reveal(
