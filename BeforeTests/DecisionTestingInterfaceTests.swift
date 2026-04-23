@@ -2604,7 +2604,7 @@ struct DecisionTestingInterfaceTests {
         #expect(presentation.displayPermitMode == "delay")
         #expect(presentation.hasLineage == true)
         #expect(presentation.summaryText == "HIGH → DELAY")
-        #expect(presentation.metadataText == "Session before.quick.presentation-lineage • Host gate 82% • Fold fold-lineage")
+        #expect(presentation.metadataText == "Session before.quick.presentation-lineage • Host gate 82% • Fold fold-lineage • Dream loop reserve delay right • remand L9")
         #expect(presentation.courtSummaryLine == "Court: agency delay right • remand L9")
         #expect(queueItem.hasLineage == true)
         #expect(queueItem.primarySummary == presentation.primarySummary)
