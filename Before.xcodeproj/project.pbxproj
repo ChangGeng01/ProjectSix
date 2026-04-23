@@ -379,7 +379,6 @@
 		C68A6B36A45AE8D6D6249813 /* CheckAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1CF4BDBA8776C1E59C9B45 /* CheckAction.swift */; };
 		C93BF6D21211DB50838BCF9C /* DecisionSessionEngineReviewPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5315DFFA3689959E339FE26 /* DecisionSessionEngineReviewPresentationTests.swift */; };
 		CAB11927D050A066FC23293E /* BeforeRuntimePolicyBundle.json in Resources */ = {isa = PBXBuildFile; fileRef = BA8A84A3E67E31E271C77F6F /* BeforeRuntimePolicyBundle.json */; };
-		CAB11927D050A066FC232940 /* BeforeRuntimePolicyBundle.json in Resources */ = {isa = PBXBuildFile; fileRef = BA8A84A3E67E31E271C77F6F /* BeforeRuntimePolicyBundle.json */; };
 		CAB963F6268D231C97294E4E /* DecisionIntelligenceProviderRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D481442A499D260E04A5D3AD /* DecisionIntelligenceProviderRegistryTests.swift */; };
 		CC15D4EE356A7EB095BD13DE /* BalanceBoardEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5476CF22FF1B67A4F1E4502 /* BalanceBoardEngineTests.swift */; };
 		CC5EF4FD96DC5D33D7F92A37 /* DecisionContinuationActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5658063272F3B6A6B04B0EFE /* DecisionContinuationActions.swift */; };
@@ -1574,7 +1573,6 @@
 			buildPhases = (
 				AD0EEA89577A17A4821D0A6C /* Sources */,
 				487DCD755E33B040857BC285 /* Frameworks */,
-				E93B58130832A94EF191BAF5 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -1765,14 +1763,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				62BC59F28EFB73407F848C35 /* Assets.xcassets in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		E93B58130832A94EF191BAF5 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				CAB11927D050A066FC232940 /* BeforeRuntimePolicyBundle.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
