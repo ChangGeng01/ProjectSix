@@ -600,6 +600,32 @@ public actor QinaoSovereignControlPlane {
         [(sessionID: String, turnID: String,
           frame: BASRenderFrame)] = []
 
+    /// M132 — global FIFO capacity for `renderFrameEntries[]`.
+    ///
+    /// Unlike the BAS ledger's `observationBundles[]` + `coverage
+    /// Verdicts[]` + `sovereignFrames[]` (all three are the chain's
+    /// off-chain mirror and share the chain's audit-lifetime
+    /// retention), the Qinao-side `renderFrameEntries[]` is a
+    /// convenience surface for host UI mounting — it doesn't need
+    /// to carry the full session history forever. A long-running
+    /// chat session (hundreds of turns over hours) would otherwise
+    /// accrete an unbounded array in memory; M132 caps it at a
+    /// configurable ceiling with first-in-first-out eviction so
+    /// the newest turns (the ones the UI actually wants to render)
+    /// always win.
+    ///
+    /// Default = 4096 entries. Callers that expect longer sessions
+    /// or multi-session servers can bump via the bootstrap init;
+    /// callers that want deterministic unit-test behavior can cap
+    /// at a small integer (the M132 test suite uses 8).
+    ///
+    /// LWW-on-(sessionID, turnID) still applies: re-emitting the
+    /// same turn replaces in place without incrementing size.
+    /// Only NEW (sessionID, turnID) tuples that would push the
+    /// array past the cap trigger eviction of the oldest entry.
+    public static let defaultRenderFrameCapacity: Int = 4096
+    private let renderFrameCapacity: Int
+
     /// Cache of planID → internal plan, so `verifyRestore` can hand
     /// the coordinator the exact plan it emitted (the plan's
     /// initializer is substrate-internal by design).
@@ -619,7 +645,10 @@ public actor QinaoSovereignControlPlane {
         turnVerifier: BASSovereignTurnVerifier,
         auditLedger: BASSovereignAuditLedger,
         warrantTTLSeconds: TimeInterval = 30,
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date = { Date() },
+        renderFrameCapacity: Int =
+            QinaoSovereignControlPlane
+                .defaultRenderFrameCapacity
     ) {
         self.coordinator = coordinator
         self.tokenAuthority = tokenAuthority
@@ -627,6 +656,12 @@ public actor QinaoSovereignControlPlane {
         self.auditLedger = auditLedger
         self.warrantTTL = warrantTTLSeconds
         self.now = now
+        // M132 — clamp to at least 1; a zero or negative cap
+        // would make the storage write-only (every record
+        // followed by immediate eviction) which is never what
+        // hosts want.
+        self.renderFrameCapacity =
+            Swift.max(1, renderFrameCapacity)
     }
 
     // MARK: - Public bootstrap
@@ -1389,6 +1424,12 @@ public actor QinaoSovereignControlPlane {
     /// `turnID` are explicit because the L12 schema doesn't
     /// embed them in the frame itself. If an entry exists for
     /// the same `(sessionID, turnID)`, replaces in place.
+    ///
+    /// M132 — honors `renderFrameCapacity`. When a NEW (sessionID,
+    /// turnID) tuple would push the array past the cap, the
+    /// oldest entry (index 0) is evicted FIFO-style so the cap
+    /// holds. LWW on existing keys does not trigger eviction
+    /// because the size is unchanged.
     public func recordRenderFrame(
         _ frame: BASRenderFrame,
         sessionID: String,
@@ -1397,16 +1438,23 @@ public actor QinaoSovereignControlPlane {
         if let idx = renderFrameEntries.firstIndex(where: {
             $0.sessionID == sessionID && $0.turnID == turnID
         }) {
+            // LWW — replace in place, no size change, no eviction.
             renderFrameEntries[idx] = (
                 sessionID: sessionID,
                 turnID: turnID,
                 frame: frame)
-        } else {
-            renderFrameEntries.append((
-                sessionID: sessionID,
-                turnID: turnID,
-                frame: frame))
+            return
         }
+        // New key — check cap BEFORE append. If at capacity,
+        // evict the oldest entry first so the count stays ≤ cap
+        // after the append.
+        if renderFrameEntries.count >= renderFrameCapacity {
+            renderFrameEntries.removeFirst()
+        }
+        renderFrameEntries.append((
+            sessionID: sessionID,
+            turnID: turnID,
+            frame: frame))
     }
 
     /// M127 — look up a per-turn render frame, or `nil`.
