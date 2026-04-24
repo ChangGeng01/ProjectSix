@@ -503,6 +503,54 @@ public actor QinaoRuntime {
             expectedLayerIDs: finalExpectedLayerIDs,
             additionalSummaries: finalAdditionalSummaries)
 
+        // M123 骨架 — sovereign-frame aggregator.
+        //
+        // The L14 whitepaper §5.1 `BASSovereignFrame` is the 17-field
+        // aggregator that binds one turn's sovereign surface. M119
+        // shipped the struct; M123 actually builds one per turn and
+        // streams it into the ledger's parallel `sovereignFrames[]`
+        // storage alongside the observation bundle (M90/M122).
+        //
+        // Fields we can populate deterministically from sendSession
+        // state:
+        //   * frameID / sessionID / turnID — identity
+        //   * deviceStateRef   — the routed budget's leaseID when
+        //                        lifecycle+budget present (live
+        //                        thermal reading has already landed
+        //                        in the routedBudget).
+        //   * hostVersionRef   — the L5 constitution's activeVersion
+        //                        (already fetched for L5 auto-stream;
+        //                        reuse to avoid a second actor hop).
+        //   * continuityRef    — observations.snapshotRef; this is
+        //                        the only snapshot anchor the caller
+        //                        carries for the turn.
+        //   * thoughtFoldRef   — the L3 fold's foldID (matches the
+        //                        deterministic "fold.<sess>.<turn>"
+        //                        we built above).
+        //   * policyHash       — observations.policyHash verbatim.
+        // Fields left `nil` today (call-site-invented:
+        // riskCardRef / actionPermitRef / pending* digests /
+        // jurisdictionRef / timeLockRef / contaminationRefs) will be
+        // populated in future milestones as they surface in the
+        // TurnObservations shape or via dedicated bridge types. `nil`
+        // preserves the whitepaper's optional-semantics for those
+        // refs (they are only expected when an actual artifact was
+        // bound for the turn).
+        let sovereignFrame = BASSovereignFrame(
+            frameID: "frame."
+                + observations.sessionID
+                + "." + observations.turnID,
+            sessionID: observations.sessionID,
+            turnID: observations.turnID,
+            deviceStateRef: routedBudget?.leaseID,
+            hostVersionRef: l5Constitution.activeVersion.isEmpty
+                ? nil : l5Constitution.activeVersion,
+            continuityRef: observations.snapshotRef.isEmpty
+                ? nil : observations.snapshotRef,
+            thoughtFoldRef: l3Fold.foldID,
+            policyHash: observations.policyHash)
+        await sovereign.recordSovereignFrame(sovereignFrame)
+
         // Fail-closed: the coordinator was laxer than the independent
         // engine — the coordinator allowed something the engine would
         // have blocked. Halt the session before returning so the

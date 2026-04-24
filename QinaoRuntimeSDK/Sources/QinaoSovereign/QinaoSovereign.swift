@@ -1295,6 +1295,69 @@ public actor QinaoSovereignControlPlane {
             forSession: sessionID, turn: turnID)
     }
 
+    // MARK: - M123 · Sovereign frame streaming (骨架)
+    //
+    // `BASSovereignFrame` (L14 §5.1) is the per-turn aggregator
+    // that binds one turn's full sovereign surface — session/turn
+    // IDs, device/host/continuity/fold/risk/permit refs, pending
+    // action digests, jurisdiction + time-lock refs, contamination
+    // refs, policy hash. M123 gives the control plane a way to
+    // stream one frame per turn into the ledger's parallel
+    // `sovereignFrames[]` storage (added alongside M90's observation
+    // bundle storage).
+    //
+    // The frame itself does NOT participate in the hash chain — the
+    // chain is authoritative via `entries[]` (M11/M9 auditTurn) — but
+    // the parallel index lets replay tools walk one (sess, turn) key
+    // and reach three residues simultaneously:
+    //
+    //    chain entry          — signed + hash-chained sovereign seal
+    //    observation bundle   — L1/L3/L5/L14 per-layer coverage
+    //    sovereign frame      — aggregator refs back to the artifacts
+    //
+    // Together those three residues are the M123 "骨架" (skeleton)
+    // the L1/L3/L5 blood (M121/M122) flows through: every healthy
+    // turn the ledger holds a coherent three-surface imprint of the
+    // turn, not just the chain entry.
+
+    /// M123 — record a per-turn `BASSovereignFrame` into the ledger's
+    /// parallel sovereign-frame storage. Last-write-wins on
+    /// `(sessionID, turnID)`; first-seen order preserved. Call this
+    /// after `recordTurnCoverage(...)` so the ledger gets the
+    /// coverage bundle AND the aggregator in the same turn.
+    public func recordSovereignFrame(
+        _ frame: BASSovereignFrame
+    ) async {
+        await auditLedger.recordSovereignFrame(frame)
+    }
+
+    /// M123 — look up the per-turn sovereign frame recorded via
+    /// `recordSovereignFrame(...)`. Returns `nil` if no frame was
+    /// recorded for that turn.
+    public func sovereignFrame(
+        sessionID: String,
+        turnID: String
+    ) async -> BASSovereignFrame? {
+        await auditLedger.sovereignFrame(
+            forSession: sessionID, turn: turnID)
+    }
+
+    /// M123 — every per-turn sovereign frame recorded for a
+    /// session, in first-seen turn order.
+    public func sovereignFrames(
+        forSession sessionID: String
+    ) async -> [BASSovereignFrame] {
+        await auditLedger.sovereignFrames(
+            forSession: sessionID)
+    }
+
+    /// M123 — total number of sovereign frames across every
+    /// session. Used by tests to pin last-write-wins semantics
+    /// (re-emit must not accrete).
+    public func sovereignFrameCount() async -> Int {
+        await auditLedger.sovereignFrameCount()
+    }
+
     /// M103 — append a `permit:issued` audit entry for a permit the
     /// risk gate just issued. This is the sovereign-side half of
     /// the M99 `QinaoRiskGate.PermitEventRecorder` pipeline: M99

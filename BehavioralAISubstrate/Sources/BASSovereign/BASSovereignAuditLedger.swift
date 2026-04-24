@@ -147,6 +147,30 @@ public actor BASSovereignAuditLedger {
     private var observationBundles:
         [BASObservationReconciliationReport] = []
 
+    /// M123 — per-turn sovereign-frame aggregator.
+    ///
+    /// `BASSovereignFrame` is the L14 whitepaper §5.1 aggregator —
+    /// the one struct that binds a single turn's sovereign surface
+    /// together (session/turn IDs, device/host/continuity/fold/risk/
+    /// permit refs, pending-action digests, jurisdiction + time-lock
+    /// refs, contamination refs, policy hash).
+    ///
+    /// Pre-M123 the struct was shipped (M119) but had zero consumers
+    /// on the hot path. M123 exposes a parallel storage + record
+    /// method on the ledger so QinaoRuntime.sendSession can stream
+    /// one frame per turn alongside the L1+L3+L5+L14 observation
+    /// bundle already streamed via `observationBundles[]` (M122).
+    /// Together the two parallel storages give the sovereign audit
+    /// surface a complete per-turn residue: the coverage SUMMARIES
+    /// (observationBundles) plus the aggregator REFS pointing at
+    /// the artifacts that produced them (sovereignFrames).
+    ///
+    /// Same "off-chain" discipline as `observationBundles` — frames
+    /// do NOT participate in the hash chain. Hash-chaining belongs
+    /// to `entries[]`; the parallel storages are additive per-turn
+    /// indexes a future replay path can walk alongside the chain.
+    private var sovereignFrames: [BASSovereignFrame] = []
+
     /// M91 — optional cross-process storage. Defaults to
     /// `BASSovereignLedgerNullStorage` (in-memory-only, pre-M91
     /// behaviour byte-for-byte). When a `BASSovereignLedgerSQLiteStorage`
@@ -840,6 +864,63 @@ public actor BASSovereignAuditLedger {
         -> [BASObservationReconciliationReport]
     {
         observationBundles
+    }
+
+    // MARK: - M123 · Sovereign frame parallel storage
+    //
+    // The L14 whitepaper §5.1 aggregator binds one turn's sovereign
+    // surface (device/host/continuity/fold/risk/permit refs + policy
+    // hash + contamination refs). Parallel storage, same off-chain
+    // discipline as observationBundles[] — last-write-wins on
+    // (sessionID, turnID), first-seen insertion order preserved.
+
+    /// Record a per-turn `BASSovereignFrame`. If a frame already
+    /// exists for the same `(sessionID, turnID)` the new frame
+    /// replaces it in place — a coordinator that re-emits mid-turn
+    /// (e.g. after a late risk card landed) overwrites cleanly with
+    /// the latest aggregator. First-seen order is preserved.
+    public func recordSovereignFrame(
+        _ frame: BASSovereignFrame
+    ) {
+        if let idx = sovereignFrames.firstIndex(where: {
+            $0.sessionID == frame.sessionID
+                && $0.turnID == frame.turnID
+        }) {
+            sovereignFrames[idx] = frame
+        } else {
+            sovereignFrames.append(frame)
+        }
+    }
+
+    /// Look up the per-turn sovereign frame for a specific
+    /// `(sessionID, turnID)` pair, or `nil` if no frame was recorded
+    /// for that turn.
+    public func sovereignFrame(
+        forSession sessionID: String,
+        turn turnID: String
+    ) -> BASSovereignFrame? {
+        sovereignFrames.first {
+            $0.sessionID == sessionID && $0.turnID == turnID
+        }
+    }
+
+    /// Every per-turn sovereign frame recorded for a session, in
+    /// first-seen turn order.
+    public func sovereignFrames(
+        forSession sessionID: String
+    ) -> [BASSovereignFrame] {
+        sovereignFrames.filter { $0.sessionID == sessionID }
+    }
+
+    /// Total number of sovereign frames across every session.
+    public func sovereignFrameCount() -> Int {
+        sovereignFrames.count
+    }
+
+    /// Full value-copy export of sovereign frames for replay /
+    /// governance. Parallel to `observationBundleSnapshot()`.
+    public func sovereignFrameSnapshot() -> [BASSovereignFrame] {
+        sovereignFrames
     }
 
     // MARK: - M83 · Rotation
