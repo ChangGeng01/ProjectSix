@@ -125,6 +125,15 @@ public actor BASSovereignTokenAuthority {
     private let signingKey: Curve25519.Signing.PrivateKey
     private let now: @Sendable () -> Date
 
+    /// M93c — optional revocation broadcaster. When non-nil every
+    /// `revoke(...)` / `revokeAllTokens(forSession:)` /
+    /// `revokeWarrant(...)` call publishes a
+    /// `BASSovereignRevocationEvent` to every subscriber. Nil
+    /// preserves pre-M93 behaviour byte-for-byte so existing call
+    /// sites are unaffected.
+    private let revocationBroadcaster:
+        BASSovereignRevocationBroadcaster?
+
     /// `tokenID` → record.
     private var mintedTokens: [String: MintedTokenRecord] = [:]
     /// `warrantID` → record.
@@ -134,10 +143,12 @@ public actor BASSovereignTokenAuthority {
 
     public init(
         signingKey: Curve25519.Signing.PrivateKey = Curve25519.Signing.PrivateKey(),
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date = { Date() },
+        revocationBroadcaster: BASSovereignRevocationBroadcaster? = nil
     ) {
         self.signingKey = signingKey
         self.now = now
+        self.revocationBroadcaster = revocationBroadcaster
     }
 
     /// Public key exported so verifiers in other processes (tests,
@@ -268,7 +279,11 @@ public actor BASSovereignTokenAuthority {
 
     /// Revoke every un-redeemed token for a session. Called when L14
     /// escalates to `ROLLBACK` or `DEAD_STOP` per §8.2 and §10.3.
-    public func revokeAllTokens(forSession sessionID: String) {
+    ///
+    /// M93c — when a `revocationBroadcaster` is wired, publishes one
+    /// `BASSovereignRevocationEvent` per newly-revoked token with
+    /// `reasonCode: "session-revoked-all"`.
+    public func revokeAllTokens(forSession sessionID: String) async {
         // We don't store sessionID in the record (it's in the token
         // itself, which lives outside the actor). A real implementation
         // persists session refs; for v1 we provide the hook as a
@@ -277,16 +292,43 @@ public actor BASSovereignTokenAuthority {
         // Callers that track which tokens belong to which session can
         // instead call `revoke(tokenID:)` for precision.
         _ = sessionID
+        var revokedIDs: [String] = []
         for (id, var record) in mintedTokens where !record.redeemed {
             record.redeemed = true
             mintedTokens[id] = record
+            revokedIDs.append(id)
+        }
+        if let broadcaster = revocationBroadcaster {
+            for id in revokedIDs {
+                await broadcaster.publish(
+                    BASSovereignRevocationEvent(
+                        kind: .commitToken,
+                        subjectID: id,
+                        reasonCode: "session-revoked-all",
+                        publishedAt: now()))
+            }
         }
     }
 
-    public func revoke(tokenID: String) {
-        if var record = mintedTokens[tokenID] {
-            record.redeemed = true
-            mintedTokens[tokenID] = record
+    /// Revoke a single token by ID.
+    ///
+    /// M93c — when a `revocationBroadcaster` is wired AND the token
+    /// was previously un-revoked, publishes one
+    /// `BASSovereignRevocationEvent` with `reasonCode: "host-requested"`.
+    /// Revoking an already-revoked token is a no-op that does NOT
+    /// re-broadcast (idempotent).
+    public func revoke(tokenID: String) async {
+        guard var record = mintedTokens[tokenID] else { return }
+        let wasRevoked = record.redeemed
+        record.redeemed = true
+        mintedTokens[tokenID] = record
+        if !wasRevoked, let broadcaster = revocationBroadcaster {
+            await broadcaster.publish(
+                BASSovereignRevocationEvent(
+                    kind: .commitToken,
+                    subjectID: tokenID,
+                    reasonCode: "host-requested",
+                    publishedAt: now()))
         }
     }
 
