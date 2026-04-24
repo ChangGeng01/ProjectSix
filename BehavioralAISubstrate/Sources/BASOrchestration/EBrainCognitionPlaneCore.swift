@@ -1859,6 +1859,289 @@ public struct BASCortexPacket: BASSchemaVersioned {
         consistencyChecksum: "")
 }
 
+// MARK: - M114 L9 whitepaper §5 parity
+
+/// L9 dream-loop stop reason. Matches whitepaper §5.1
+/// `ThoughtLoopState.stop_reason` vocabulary.
+public enum BASThoughtLoopStopReason:
+    String, Codable, Sendable, Equatable, Hashable, CaseIterable
+{
+    case converged
+    case leaseEnd
+    case sovereignCut
+    case guardTakeover
+    case pending
+}
+
+/// L9 candidate path status. Matches whitepaper §5.2
+/// `CandidatePath.status` vocabulary.
+public enum BASCandidatePathStatus:
+    String, Codable, Sendable, Equatable, Hashable, CaseIterable
+{
+    case active
+    case dominated
+    /// L12 soft-hand guard branch. Swift keyword-escaped.
+    case `guard`
+    case delayed
+    case cut
+}
+
+/// L9 sovereign-break suggested action. Matches whitepaper §5.12
+/// `SovereignBreakpointHint.suggested_action` vocabulary.
+public enum BASSovereignBreakSuggestedAction:
+    String, Codable, Sendable, Equatable, Hashable, CaseIterable
+{
+    case shrink
+    case cut
+    case freeze
+    case stop
+}
+
+/// L9 whitepaper §5.1 `ThoughtLoopState` — the aggregator state
+/// of one dream-loop turn. Binds the canonical frame + memory
+/// bundle + active frontier refs + counterfactual / projection /
+/// adversarial lists + uncertainty / evidence-debt / convergence
+/// / lease refs + sovereign breakpoints + stop reason.
+public struct BASThoughtLoopState: BASSchemaVersioned,
+    Equatable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var loopID: String
+    public var canonicalFrameRef: String?
+    public var memoryBundleRef: String?
+    public var activeFrontierRef: String?
+    public var counterfactualRefs: [String]
+    public var projectionRefs: [String]
+    public var adversarialRefs: [String]
+    public var uncertaintyRef: String?
+    public var evidenceDebtRef: String?
+    public var convergenceRef: String?
+    public var leaseRef: String?
+    public var sovereignBreakRefs: [String]
+    public var stopReason: BASThoughtLoopStopReason
+
+    public init(
+        schemaVersion: String
+            = BASThoughtLoopState.currentSchemaVersion,
+        loopID: String,
+        canonicalFrameRef: String? = nil,
+        memoryBundleRef: String? = nil,
+        activeFrontierRef: String? = nil,
+        counterfactualRefs: [String] = [],
+        projectionRefs: [String] = [],
+        adversarialRefs: [String] = [],
+        uncertaintyRef: String? = nil,
+        evidenceDebtRef: String? = nil,
+        convergenceRef: String? = nil,
+        leaseRef: String? = nil,
+        sovereignBreakRefs: [String] = [],
+        stopReason: BASThoughtLoopStopReason = .pending
+    ) {
+        self.schemaVersion = schemaVersion
+        self.loopID = loopID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.canonicalFrameRef = canonicalFrameRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.memoryBundleRef = memoryBundleRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.activeFrontierRef = activeFrontierRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.counterfactualRefs = counterfactualRefs
+        self.projectionRefs = projectionRefs
+        self.adversarialRefs = adversarialRefs
+        self.uncertaintyRef = uncertaintyRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.evidenceDebtRef = evidenceDebtRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.convergenceRef = convergenceRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.leaseRef = leaseRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.sovereignBreakRefs = sovereignBreakRefs
+        self.stopReason = stopReason
+    }
+}
+
+/// L9 whitepaper §5.4 `CounterfactualBranch` — one branch emitted
+/// by the counterfactual manifold that perturbs one condition from
+/// a parent candidate and projects the shift.
+public struct BASCounterfactualBranch: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var branchID: String
+    public var alteredCondition: String
+    public var parentCandidateRef: String
+    public var projectedShift: String
+    public var uncertainty: Double
+    public var dependencyRefs: [String]
+
+    public init(
+        schemaVersion: String
+            = BASCounterfactualBranch.currentSchemaVersion,
+        branchID: String,
+        alteredCondition: String,
+        parentCandidateRef: String,
+        projectedShift: String = "",
+        uncertainty: Double = 0,
+        dependencyRefs: [String] = []
+    ) {
+        self.schemaVersion = schemaVersion
+        self.branchID = branchID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.alteredCondition = alteredCondition
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.parentCandidateRef = parentCandidateRef
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.projectedShift = projectedShift
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.uncertainty = min(1, max(0, uncertainty))
+        self.dependencyRefs = dependencyRefs
+    }
+}
+
+/// L9 whitepaper §5.5 `OutcomeProjection` — per-candidate future
+/// projection covering short/mid/worst-case + reversibility loss
+/// + affected domains + confidence band.
+public struct BASOutcomeProjection: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var projectionID: String
+    public var candidateRef: String
+    public var shortTerm: String
+    public var midTerm: String
+    public var worstCase: String
+    /// [0, 1] how much reversibility is lost by following this
+    /// candidate (higher = harder to undo).
+    public var reversibilityLoss: Double
+    public var affectedDomains: [String]
+    /// [0, 1] confidence in the projection.
+    public var confidenceBand: Double
+
+    public init(
+        schemaVersion: String
+            = BASOutcomeProjection.currentSchemaVersion,
+        projectionID: String,
+        candidateRef: String,
+        shortTerm: String = "",
+        midTerm: String = "",
+        worstCase: String = "",
+        reversibilityLoss: Double = 0,
+        affectedDomains: [String] = [],
+        confidenceBand: Double = 0
+    ) {
+        self.schemaVersion = schemaVersion
+        self.projectionID = projectionID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.candidateRef = candidateRef
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.shortTerm = shortTerm
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.midTerm = midTerm
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.worstCase = worstCase
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.reversibilityLoss = min(1, max(0, reversibilityLoss))
+        self.affectedDomains = affectedDomains
+        self.confidenceBand = min(1, max(0, confidenceBand))
+    }
+}
+
+/// L9 whitepaper §5.6 `AdversarialBrief` — a red-team brief against
+/// one candidate, scoring evidence gap / emotional bias /
+/// manipulation risk / boundary conflict / host misalignment /
+/// overall severity.
+public struct BASAdversarialBrief: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var briefID: String
+    public var candidateRef: String
+    /// [0, 1] evidence gap severity.
+    public var evidenceGap: Double
+    /// [0, 1] emotional bias severity.
+    public var emotionalBias: Double
+    /// [0, 1] manipulation risk severity.
+    public var manipulationRisk: Double
+    /// [0, 1] boundary conflict severity.
+    public var boundaryConflict: Double
+    /// [0, 1] host misalignment severity.
+    public var hostMisalignment: Double
+    /// [0, 1] aggregate severity the adversarial court assigns.
+    public var severity: Double
+
+    public init(
+        schemaVersion: String
+            = BASAdversarialBrief.currentSchemaVersion,
+        briefID: String,
+        candidateRef: String,
+        evidenceGap: Double = 0,
+        emotionalBias: Double = 0,
+        manipulationRisk: Double = 0,
+        boundaryConflict: Double = 0,
+        hostMisalignment: Double = 0,
+        severity: Double = 0
+    ) {
+        self.schemaVersion = schemaVersion
+        self.briefID = briefID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.candidateRef = candidateRef
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.evidenceGap = min(1, max(0, evidenceGap))
+        self.emotionalBias = min(1, max(0, emotionalBias))
+        self.manipulationRisk = min(1, max(0, manipulationRisk))
+        self.boundaryConflict = min(1, max(0, boundaryConflict))
+        self.hostMisalignment = min(1, max(0, hostMisalignment))
+        self.severity = min(1, max(0, severity))
+    }
+}
+
+/// L9 whitepaper §5.7 `HostAlignmentMap` — per-candidate analysis
+/// of which host goals it aligns with / which values it violates
+/// / which relations it impacts / overall long-term alignment.
+public struct BASHostAlignmentMap: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var candidateRef: String
+    public var alignedGoals: [String]
+    public var violatedValues: [String]
+    public var relationImpactRefs: [String]
+    /// [0, 1] long-term alignment with host constitution. Higher
+    /// = more aligned.
+    public var longTermAlignmentScore: Double
+
+    public init(
+        schemaVersion: String
+            = BASHostAlignmentMap.currentSchemaVersion,
+        candidateRef: String,
+        alignedGoals: [String] = [],
+        violatedValues: [String] = [],
+        relationImpactRefs: [String] = [],
+        longTermAlignmentScore: Double = 0
+    ) {
+        self.schemaVersion = schemaVersion
+        self.candidateRef = candidateRef
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.alignedGoals = alignedGoals
+        self.violatedValues = violatedValues
+        self.relationImpactRefs = relationImpactRefs
+        self.longTermAlignmentScore = min(
+            1, max(0, longTermAlignmentScore))
+    }
+}
+
 public struct BASCandidateFrontier: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.1.0"
 

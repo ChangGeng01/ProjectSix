@@ -30,7 +30,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 140)  // +M113 PromotionPetition
+        #expect(governedObjects.count == 145)  // +M114 5 L9 types
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
@@ -193,6 +193,11 @@ struct BASEBrainSchemaGovernanceRegistryTests {
                 BASCognitiveDissectionFrame.currentSchemaVersion,  // M112
             "MemoryPromotionPetition":
                 BASMemoryPromotionPetition.currentSchemaVersion,  // M113
+            "ThoughtLoopState": BASThoughtLoopState.currentSchemaVersion,  // M114
+            "CounterfactualBranch": BASCounterfactualBranch.currentSchemaVersion,  // M114
+            "OutcomeProjection": BASOutcomeProjection.currentSchemaVersion,  // M114
+            "AdversarialBrief": BASAdversarialBrief.currentSchemaVersion,  // M114
+            "HostAlignmentMap": BASHostAlignmentMap.currentSchemaVersion,  // M114
             "SovereignActuationCommand": BASSovereignActuationCommand.currentSchemaVersion,
             "SovereignExecutionReceipt": BASSovereignExecutionReceipt.currentSchemaVersion,
             "SovereignVerdict": BASSovereignVerdict.currentSchemaVersion,

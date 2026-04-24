@@ -352,6 +352,32 @@ public enum BASEBrainSchemaGovernanceRegistry {
             versionedType: BASMemoryPromotionPetition.self,
             tests: ["schema.memory_promotion_petition.current", "schema.memory_promotion_petition.backward"]
         ),
+        // M114 — L9 Dream Loop whitepaper §5 object family.
+        entry(
+            "ThoughtLoopState",
+            versionedType: BASThoughtLoopState.self,
+            tests: ["schema.thought_loop_state.current", "schema.thought_loop_state.backward"]
+        ),
+        entry(
+            "CounterfactualBranch",
+            versionedType: BASCounterfactualBranch.self,
+            tests: ["schema.counterfactual_branch.current", "schema.counterfactual_branch.backward"]
+        ),
+        entry(
+            "OutcomeProjection",
+            versionedType: BASOutcomeProjection.self,
+            tests: ["schema.outcome_projection.current", "schema.outcome_projection.backward"]
+        ),
+        entry(
+            "AdversarialBrief",
+            versionedType: BASAdversarialBrief.self,
+            tests: ["schema.adversarial_brief.current", "schema.adversarial_brief.backward"]
+        ),
+        entry(
+            "HostAlignmentMap",
+            versionedType: BASHostAlignmentMap.self,
+            tests: ["schema.host_alignment_map.current", "schema.host_alignment_map.backward"]
+        ),
         entry(
             "CandidateFrontier",
             versionedType: BASCandidateFrontier.self,

@@ -118,6 +118,12 @@ struct BASEBrainProgramBlueprintTests {
             "UnknownSet",
             "CognitiveDissectionFrame",
             "MemoryPromotionPetition",  // M113 L8 §5
+            // M114 L9 §5 dream-loop object family:
+            "ThoughtLoopState",
+            "CounterfactualBranch",
+            "OutcomeProjection",
+            "AdversarialBrief",
+            "HostAlignmentMap",
             "SovereignActuationCommand",
             "SovereignExecutionReceipt",
             "SovereignVerdict",
