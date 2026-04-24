@@ -253,11 +253,13 @@ public actor QinaoRuntime {
         /// no explicit bridge type is needed; QinaoUI stays a
         /// dependency-free leaf module.
         ///
-        /// `nil` only when a future non-standard code path bypasses
-        /// the healthy-path derivation — the main `sendSession`
-        /// contract is "every returned TurnOutcome has a
-        /// surfaceDecision". Tests pin this contract.
-        public let surfaceDecision: BASSurfaceDecision?
+        /// M145 — field is now non-optional. Every return path in
+        /// `sendSession` populates it deterministically. Host-
+        /// authored fixtures that construct `TurnOutcome` directly
+        /// must supply a value. The init no longer carries a nil
+        /// default for this field. Pre-M145 call sites that passed
+        /// `surfaceDecision: nil` must migrate to a real value.
+        public let surfaceDecision: BASSurfaceDecision
 
         /// M128 — the per-turn residue attached directly to the
         /// outcome. Pre-M128 a host wanting the observation bundle
@@ -288,7 +290,7 @@ public actor QinaoRuntime {
             sessionHalted: Bool,
             routedBudget: BASBudgetFrame? = nil,
             turnRecorded: BASLeaseLifeCoordinator.TurnRecorded? = nil,
-            surfaceDecision: BASSurfaceDecision? = nil,
+            surfaceDecision: BASSurfaceDecision,
             residue: QinaoSovereignControlPlane.TurnResidue? = nil
         ) {
             self.audit = audit

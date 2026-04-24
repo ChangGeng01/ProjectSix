@@ -177,7 +177,13 @@ final class QinaoRuntimeOutcomeResidueTests: XCTestCase {
     func testDirectConstructOutcomeAllowsNilResidue() {
         // Host-authored TurnOutcome (e.g. in test fixtures) should
         // still compile with nil residue — the init default gives
-        // backward-compat to pre-M128 host code.
+        // backward-compat to pre-M128 host code. M145 note:
+        // surfaceDecision is now non-optional; direct construction
+        // MUST supply a value but residue is still optional.
+        let decision = QinaoRuntime.deriveSurfaceDecision(
+            auditSeverity: .pass,
+            coverageSeverity: .clean,
+            auditRef: "audit.direct")
         let outcome = QinaoRuntime.TurnOutcome(
             audit: QinaoSovereignControlPlane.AuditReport(
                 sessionID: "sess.direct",
@@ -193,9 +199,13 @@ final class QinaoRuntimeOutcomeResidueTests: XCTestCase {
                 severity: .clean,
                 findings: [],
                 emittedAt: Date()),
-            sessionHalted: false)
+            sessionHalted: false,
+            surfaceDecision: decision)
         XCTAssertNil(
             outcome.residue,
             "direct-constructed outcome with no residue: nil")
+        XCTAssertEqual(
+            outcome.surfaceDecision.surface, .draftShell,
+            "M145: non-optional surfaceDecision directly readable")
     }
 }
