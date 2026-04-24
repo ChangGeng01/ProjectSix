@@ -256,13 +256,37 @@ public actor QinaoRuntime {
         /// surfaceDecision". Tests pin this contract.
         public let surfaceDecision: BASSurfaceDecision?
 
+        /// M128 — the per-turn residue attached directly to the
+        /// outcome. Pre-M128 a host wanting the observation bundle
+        /// / sovereign frame / render frame had to make three
+        /// separate `sovereign.turnResidue(...)` round-trips after
+        /// `sendSession` returned. M128 eliminates that API overlap:
+        /// the outcome carries the residue already, taken at the
+        /// same moment the other fields were sealed so it is
+        /// guaranteed consistent with `audit` + `coverage`.
+        ///
+        /// Optional because:
+        ///   * `TurnOutcome` is public and used by host-written
+        ///     test fixtures that build one by hand (nil there is
+        ///     fine — the old query API still works)
+        ///   * we preserve the init default for backward-compat;
+        ///     every `sendSession` return path in this file
+        ///     populates it, which tests pin.
+        ///
+        /// When non-nil, `residue.verify()` can be called against
+        /// `sovereign.verifyTurnResidue(_:)` to run the M124
+        /// cross-surface integrity checks without a second fetch.
+        public let residue:
+            QinaoSovereignControlPlane.TurnResidue?
+
         public init(
             audit: QinaoSovereignControlPlane.AuditReport,
             coverage: QinaoSovereignControlPlane.CoverageReading,
             sessionHalted: Bool,
             routedBudget: BASBudgetFrame? = nil,
             turnRecorded: BASLeaseLifeCoordinator.TurnRecorded? = nil,
-            surfaceDecision: BASSurfaceDecision? = nil
+            surfaceDecision: BASSurfaceDecision? = nil,
+            residue: QinaoSovereignControlPlane.TurnResidue? = nil
         ) {
             self.audit = audit
             self.coverage = coverage
@@ -270,6 +294,7 @@ public actor QinaoRuntime {
             self.routedBudget = routedBudget
             self.turnRecorded = turnRecorded
             self.surfaceDecision = surfaceDecision
+            self.residue = residue
         }
     }
 
@@ -726,6 +751,9 @@ public actor QinaoRuntime {
             await sovereign.markSessionHalted(
                 sessionID: observations.sessionID,
                 reason: "audit-severity:\(report.severity.rawValue)")
+            let residue = await sovereign.turnResidue(
+                sessionID: observations.sessionID,
+                turnID: observations.turnID)
             return TurnOutcome(
                 audit: report,
                 coverage: coverage,
@@ -737,7 +765,8 @@ public actor QinaoRuntime {
                     coverageSeverity: coverage.severity,
                     auditRef: report.auditRef,
                     routedBudget: routedBudget,
-                    retryPolicy: surfaceRetryPolicy))
+                    retryPolicy: surfaceRetryPolicy),
+                residue: residue)
         }
 
         // M70 — healthy turn path: record the turn on the lifecycle
@@ -760,6 +789,9 @@ public actor QinaoRuntime {
             turnRecorded = nil
         }
 
+        let residue = await sovereign.turnResidue(
+            sessionID: observations.sessionID,
+            turnID: observations.turnID)
         return TurnOutcome(
             audit: report,
             coverage: coverage,
@@ -771,7 +803,8 @@ public actor QinaoRuntime {
                 coverageSeverity: coverage.severity,
                 auditRef: report.auditRef,
                 routedBudget: routedBudget,
-                retryPolicy: surfaceRetryPolicy))
+                retryPolicy: surfaceRetryPolicy),
+            residue: residue)
     }
 
     // MARK: - M125 · L12 surface-decision derivation (皮肤)
