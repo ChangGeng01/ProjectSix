@@ -117,6 +117,7 @@ struct BASEBrainProgramBlueprintTests {
             "AffectLayer",
             "UnknownSet",
             "CognitiveDissectionFrame",
+            "MemoryPromotionPetition",  // M113 L8 §5
             "SovereignActuationCommand",
             "SovereignExecutionReceipt",
             "SovereignVerdict",

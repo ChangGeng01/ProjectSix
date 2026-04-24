@@ -346,6 +346,12 @@ public enum BASEBrainSchemaGovernanceRegistry {
             versionedType: BASCognitiveDissectionFrame.self,
             tests: ["schema.cognitive_dissection_frame.current", "schema.cognitive_dissection_frame.backward"]
         ),
+        // M113 — L8 Hippocampal Well whitepaper §5 promotion petition.
+        entry(
+            "MemoryPromotionPetition",
+            versionedType: BASMemoryPromotionPetition.self,
+            tests: ["schema.memory_promotion_petition.current", "schema.memory_promotion_petition.backward"]
+        ),
         entry(
             "CandidateFrontier",
             versionedType: BASCandidateFrontier.self,

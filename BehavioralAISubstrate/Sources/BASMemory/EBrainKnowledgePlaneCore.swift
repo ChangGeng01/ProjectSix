@@ -707,6 +707,83 @@ public struct BASMemorySanctumEntry: BASSchemaVersioned {
     }
 }
 
+// MARK: - M113 L8 whitepaper §5 PromotionPetition
+//
+// `BASMemoryTemperatureBand` already exists at line ~260 with the
+// same 5 cases (hot / warm / cold / sealed / quarantine) matching
+// whitepaper §4.2 exactly. Re-use that enum; define only what's
+// new below.
+
+/// Approval state for a promotion petition. Stable raw values for
+/// cross-layer consumers (L14 audit / L5 host-candidate pipeline).
+public enum BASMemoryPromotionApprovalState:
+    String, Codable, Sendable, Equatable, Hashable, CaseIterable
+{
+    /// Not yet evaluated.
+    case pending
+    /// Under active evaluation (cooldown / review).
+    case reviewing
+    /// Approved — the memory will be moved to `toBand`.
+    case approved
+    /// Rejected — the memory stays in `fromBand`.
+    case rejected
+    /// Deferred to a future turn (e.g. more evidence needed).
+    case deferred
+}
+
+/// L8 whitepaper §5 `PromotionPetition` — a pending request to
+/// move one memory atom from one temperature band to another
+/// (e.g. warm → hot after repeated host-relevant activation, or
+/// cold → sealed after a sanctum request). Carries the evidence
+/// + scoring + approval state the L8 promotion-lift uses to
+/// decide. Distinct from `BASHostCandidatePipeline` (L5 host
+/// mutation candidate) — this is L8-internal memory-band
+/// migration.
+public struct BASMemoryPromotionPetition: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var petitionID: String
+    public var targetMemoryRef: String
+    public var fromBand: BASMemoryTemperatureBand
+    public var toBand: BASMemoryTemperatureBand
+    public var evidenceRefs: [String]
+    /// [0, 1] how many times this memory has been re-accessed
+    /// during a relevance window. Higher = stronger case for
+    /// promotion.
+    public var repetitionScore: Double
+    /// [0, 1] how relevant this memory is to the host's active
+    /// goals / relationships. Higher = stronger case for
+    /// promotion.
+    public var hostRelevance: Double
+    public var approvalState: BASMemoryPromotionApprovalState
+
+    public init(
+        schemaVersion: String
+            = BASMemoryPromotionPetition.currentSchemaVersion,
+        petitionID: String,
+        targetMemoryRef: String,
+        fromBand: BASMemoryTemperatureBand,
+        toBand: BASMemoryTemperatureBand,
+        evidenceRefs: [String] = [],
+        repetitionScore: Double = 0,
+        hostRelevance: Double = 0,
+        approvalState: BASMemoryPromotionApprovalState = .pending
+    ) {
+        self.schemaVersion = schemaVersion
+        self.petitionID = petitionID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.targetMemoryRef = targetMemoryRef
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.fromBand = fromBand
+        self.toBand = toBand
+        self.evidenceRefs = evidenceRefs
+        self.repetitionScore = min(1, max(0, repetitionScore))
+        self.hostRelevance = min(1, max(0, hostRelevance))
+        self.approvalState = approvalState
+    }
+}
+
 public struct BASMemoryForgetCascade: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.0.0"
 
