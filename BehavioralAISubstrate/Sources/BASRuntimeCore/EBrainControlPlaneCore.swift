@@ -18,6 +18,24 @@ public enum BASNetworkState: String, Codable, CaseIterable, Sendable {
     case online
 }
 
+/// M106 — L1 whitepaper §6 `DeviceState.charging_state` coverage.
+/// Stable raw values cross-layer consumers can key on.
+public enum BASChargingState: String, Codable, CaseIterable, Sendable {
+    /// Device reported no charging info (not available on this
+    /// platform, or the battery subsystem has not sampled yet).
+    case unknown
+    /// Battery is discharging — no external power.
+    case unplugged
+    /// Charging via AC / MagSafe / proprietary-fast adapter.
+    case chargingAC
+    /// Charging via USB host (typically slower).
+    case chargingUSB
+    /// Charging via wireless pad.
+    case chargingWireless
+    /// Battery is at 100% and still connected to power.
+    case full
+}
+
 public enum BASForegroundState: String, Codable, CaseIterable, Sendable {
     case foreground
     case background
@@ -1190,6 +1208,16 @@ public struct BASDeviceState: BASSchemaVersioned {
     public var gpuLoad: Double
     public var npuAvailable: Bool
     public var latencyBudgetMs: Int
+    /// M106 — L1 whitepaper §6 `DeviceState.charging_state`
+    /// coverage. Defaults to `.unknown` so pre-M106 fixtures
+    /// round-trip byte-for-byte.
+    public var chargingState: BASChargingState
+    /// M106 — L1 whitepaper §6 `DeviceState.os_pressure` coverage.
+    /// Normalized [0, 1] aggregate of OS-reported pressure signals
+    /// (memory + CPU + disk) separate from `thermalLevel` which
+    /// covers the thermal axis alone. Defaults to `0` for clean
+    /// devices.
+    public var osPressure: Double
 
     public init(
         schemaVersion: String = BASDeviceState.currentSchemaVersion,
@@ -1201,7 +1229,9 @@ public struct BASDeviceState: BASSchemaVersioned {
         cpuLoad: Double,
         gpuLoad: Double,
         npuAvailable: Bool,
-        latencyBudgetMs: Int
+        latencyBudgetMs: Int,
+        chargingState: BASChargingState = .unknown,
+        osPressure: Double = 0
     ) {
         self.schemaVersion = schemaVersion
         self.batteryLevel = batteryLevel
@@ -1213,7 +1243,65 @@ public struct BASDeviceState: BASSchemaVersioned {
         self.gpuLoad = gpuLoad
         self.npuAvailable = npuAvailable
         self.latencyBudgetMs = latencyBudgetMs
+        self.chargingState = chargingState
+        self.osPressure = min(1, max(0, osPressure))
     }
+}
+
+/// M106 — L1 whitepaper §6 `PowerLedger` schema. Pre-M106 the
+/// struct was listed in the whitepaper as one of the six §6 key
+/// objects but had no corresponding Swift type. This closes the
+/// final §6 gap (5/6 → 6/6 coverage).
+///
+/// Field semantics mirror the whitepaper:
+/// - `turnEnergyCost`: normalized [0, 1] — how much of the turn's
+///   energy budget this turn consumed.
+/// - `sessionEnergyCost`: cumulative energy cost for the current
+///   session. Unbounded above — long sessions legitimately sum
+///   well past 1.0.
+/// - `foregroundCost`: normalized [0, 1] — fraction of energy
+///   cost attributed to foreground work.
+/// - `maintenanceCost`: normalized [0, 1] — fraction of energy
+///   cost attributed to background maintenance windows (M4
+///   breath scheduler output).
+/// - `guardReserve`: normalized [0, 1] — energy headroom the L1
+///   guard must preserve for emergency-brake execution. Gate
+///   consumers refuse turns that would drop this below a floor.
+public struct BASPowerLedger: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var turnEnergyCost: Double
+    public var sessionEnergyCost: Double
+    public var foregroundCost: Double
+    public var maintenanceCost: Double
+    public var guardReserve: Double
+
+    public init(
+        schemaVersion: String = BASPowerLedger.currentSchemaVersion,
+        turnEnergyCost: Double,
+        sessionEnergyCost: Double,
+        foregroundCost: Double,
+        maintenanceCost: Double,
+        guardReserve: Double
+    ) {
+        self.schemaVersion = schemaVersion
+        self.turnEnergyCost = min(1, max(0, turnEnergyCost))
+        self.sessionEnergyCost = max(0, sessionEnergyCost)
+        self.foregroundCost = min(1, max(0, foregroundCost))
+        self.maintenanceCost = min(1, max(0, maintenanceCost))
+        self.guardReserve = min(1, max(0, guardReserve))
+    }
+
+    /// A zero-cost ledger — the baseline state before any turn
+    /// has executed on a session. Useful as a default / fallback
+    /// when the runtime has not yet begun accounting.
+    public static let zero = BASPowerLedger(
+        turnEnergyCost: 0,
+        sessionEnergyCost: 0,
+        foregroundCost: 0,
+        maintenanceCost: 0,
+        guardReserve: 1.0)
 }
 
 public extension BASDeviceState {

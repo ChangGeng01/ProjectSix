@@ -101,6 +101,7 @@ struct BASEBrainProgramBlueprintTests {
             "VitalState",
             "RunLease",
             "EmergencyBrake",
+            "PowerLedger",  // M106 L1 §6 key-object closure
             "SovereignActuationCommand",
             "SovereignExecutionReceipt",
             "SovereignVerdict",

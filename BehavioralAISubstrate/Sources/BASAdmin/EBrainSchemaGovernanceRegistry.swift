@@ -38,6 +38,11 @@ public enum BASEBrainSchemaGovernanceRegistry {
             tests: ["schema.emergency_brake.current", "schema.emergency_brake.backward"]
         ),
         entry(
+            "PowerLedger",
+            versionedType: BASPowerLedger.self,
+            tests: ["schema.power_ledger.current", "schema.power_ledger.backward"]
+        ),
+        entry(
             "SovereignActuationCommand",
             versionedType: BASSovereignActuationCommand.self,
             tests: ["schema.sovereign_command.current", "schema.sovereign_command.backward"]
