@@ -817,6 +817,34 @@ public actor QinaoRuntime {
         // preserves the whitepaper's optional-semantics for those
         // refs (they are only expected when an actual artifact was
         // bound for the turn).
+        // M144 — synthetic refs for risk card + action permit +
+        // agency reservation when the caller-supplied thoughtFrame
+        // carries them. Neither `BASRiskCard`, `BASActionPermit`,
+        // nor `BASAgencyReservation` carries a natural stable ID
+        // in its schema, so we synthesize deterministic refs of
+        // the form `"<prefix>.<sessionID>.<turnID>"` — same
+        // discipline as the M123 frame ID and M127 render ID.
+        // Callers who want their own IDs can layer on top via
+        // future milestones that thread explicit IDs through.
+        let riskCardRef: String? =
+            thoughtFrame?.riskCard.map { _ in
+                "risk-card."
+                + observations.sessionID
+                + "." + observations.turnID
+            }
+        let actionPermitRef: String? =
+            thoughtFrame?.actionPermit.map { _ in
+                "permit."
+                + observations.sessionID
+                + "." + observations.turnID
+            }
+        let agencyReservationRef: String? =
+            thoughtFrame?.agencyReservation.map { _ in
+                "agency-reservation."
+                + observations.sessionID
+                + "." + observations.turnID
+            }
+
         let sovereignFrame = BASSovereignFrame(
             frameID: "frame."
                 + observations.sessionID
@@ -829,6 +857,8 @@ public actor QinaoRuntime {
             continuityRef: observations.snapshotRef.isEmpty
                 ? nil : observations.snapshotRef,
             thoughtFoldRef: l3Fold.foldID,
+            riskCardRef: riskCardRef,
+            actionPermitRef: actionPermitRef,
             policyHash: observations.policyHash)
         await sovereign.recordSovereignFrame(sovereignFrame)
 
@@ -882,15 +912,20 @@ public actor QinaoRuntime {
             routedBudget: routedBudget,
             retryPolicy: surfaceRetryPolicy)
 
+        // M144 — wire render frame's actionPermitRef +
+        // agencyReservationRef from the same synthetic refs we
+        // used for the sovereign frame. Render frame now picks up
+        // the L12 surface's upstream bindings: risk → permit →
+        // agency reservation → surface decision. 4 of its 12
+        // optional refs are populated deterministically when the
+        // thoughtFrame carries the source data.
         let renderFrame = BASRenderFrame(
             frameID: "render."
                 + observations.sessionID
                 + "." + observations.turnID,
             mergedChoiceRef: l3Fold.foldID,
-            actionPermitRef: nil,
-            // → future M127+n: wire to M103 permit audit entry ID.
-            agencyReservationRef: nil,
-            // → future: wire to L11 agency reservation stream.
+            actionPermitRef: actionPermitRef,
+            agencyReservationRef: agencyReservationRef,
             hostStyleRef: l5Constitution.activeVersion.isEmpty
                 ? nil : l5Constitution.activeVersion,
             situationRef: nil,
