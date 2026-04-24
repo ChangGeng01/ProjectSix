@@ -1358,6 +1358,197 @@ public actor QinaoSovereignControlPlane {
         await auditLedger.sovereignFrameCount()
     }
 
+    // MARK: - M124 · Turn residue + cross-surface integrity (筋脉)
+    //
+    // M121 landed blood flow (L1), M122 extended it to L3+L5, M123
+    // landed the sovereign-frame skeleton. M124 lands the tendons:
+    // a single value type that bundles the three parallel surfaces
+    // (coverage verdict + observation bundle + sovereign frame)
+    // for one (sessionID, turnID), plus a verification method that
+    // checks cross-reference integrity.
+    //
+    // What M124 verifies (no exception, no halt — diagnostic only;
+    // callers decide the policy response):
+    //   * Every residue component present (or documented missing)
+    //   * Frame's `frameID` follows the M123 convention
+    //     "frame.<sessionID>.<turnID>"
+    //   * Frame's `thoughtFoldRef` follows the M122 convention
+    //     "fold.<sessionID>.<turnID>"
+    //   * Observation bundle carries the always-present L14 summary
+    //   * Bundle and frame agree on sessionID + turnID
+    //
+    // What M124 does NOT verify (out of scope for this pass):
+    //   * Cryptographic hash-chain integrity of `entries[]` — the
+    //     ledger itself exposes `verifyChainIntegrity()` for that
+    //     (M81/M87); M124 stays at the per-turn residue surface.
+    //   * Signature verification of chain entries — same reason.
+    //   * That `continuityRef` resolves to a registered snapshot
+    //     in the SnapshotManager — future M124+n once snapshot
+    //     registration becomes a first-class action on sendSession.
+
+    /// M124 — The three-residue imprint for one (sessionID, turnID):
+    /// coverage reading, observation bundle, sovereign frame. Every
+    /// component is optional because production ledgers can have
+    /// partial turns (halt paths, pre-halted sessions, etc.).
+    public struct TurnResidue: Sendable, Equatable {
+        public let sessionID: String
+        public let turnID: String
+        public let coverageReading: CoverageReading?
+        public let observationBundle:
+            BASObservationReconciliationReport?
+        public let sovereignFrame: BASSovereignFrame?
+
+        public init(
+            sessionID: String,
+            turnID: String,
+            coverageReading: CoverageReading?,
+            observationBundle:
+                BASObservationReconciliationReport?,
+            sovereignFrame: BASSovereignFrame?
+        ) {
+            self.sessionID = sessionID
+            self.turnID = turnID
+            self.coverageReading = coverageReading
+            self.observationBundle = observationBundle
+            self.sovereignFrame = sovereignFrame
+        }
+
+        /// `true` when all three residue components are present.
+        /// Partial residues (coverage without bundle, bundle without
+        /// frame) occur on halt paths or pre-halted sessions.
+        public var isComplete: Bool {
+            coverageReading != nil
+                && observationBundle != nil
+                && sovereignFrame != nil
+        }
+    }
+
+    /// M124 — Structured diagnostic for a TurnResidue integrity check.
+    /// Empty findings ⇒ the three surfaces are mutually coherent.
+    public struct TurnResidueVerification:
+        Sendable, Equatable
+    {
+        public let findings: [Finding]
+
+        public init(findings: [Finding]) {
+            self.findings = findings
+        }
+
+        public var isValid: Bool { findings.isEmpty }
+
+        public enum Finding: Sendable, Equatable {
+            case missingCoverage
+            case missingObservationBundle
+            case missingSovereignFrame
+            /// Bundle and frame disagree on sessionID.
+            case sessionIDMismatch(bundle: String, frame: String)
+            /// Bundle and frame disagree on turnID.
+            case turnIDMismatch(bundle: String, frame: String)
+            /// Frame's `frameID` does not follow
+            /// "frame.<sessionID>.<turnID>".
+            case frameIDConventionMismatch(
+                expected: String, got: String)
+            /// Frame's `thoughtFoldRef` does not follow
+            /// "fold.<sessionID>.<turnID>".
+            case thoughtFoldRefConventionMismatch(
+                expected: String, got: String)
+            /// Observation bundle is missing the always-present
+            /// L14 (sovereign) summary.
+            case missingL14InBundle
+        }
+    }
+
+    /// M124 — Fetch the three-residue imprint for one (sessionID,
+    /// turnID). All three parallel-storage reads happen inside the
+    /// same actor hop so the values represent a coherent snapshot
+    /// of the ledger at one moment.
+    public func turnResidue(
+        sessionID: String,
+        turnID: String
+    ) async -> TurnResidue {
+        let cov = await coverageReading(
+            sessionID: sessionID, turnID: turnID)
+        let bundle = await auditLedger.observationBundle(
+            forSession: sessionID, turn: turnID)
+        let frame = await auditLedger.sovereignFrame(
+            forSession: sessionID, turn: turnID)
+        return TurnResidue(
+            sessionID: sessionID,
+            turnID: turnID,
+            coverageReading: cov,
+            observationBundle: bundle,
+            sovereignFrame: frame)
+    }
+
+    /// M124 — Verify cross-surface integrity of a turn residue.
+    /// Pure function (no I/O, no actor hop) — callers pass a value
+    /// previously fetched via `turnResidue(sessionID:turnID:)`.
+    public nonisolated func verifyTurnResidue(
+        _ residue: TurnResidue
+    ) -> TurnResidueVerification {
+        var findings:
+            [TurnResidueVerification.Finding] = []
+
+        if residue.coverageReading == nil {
+            findings.append(.missingCoverage)
+        }
+        if residue.observationBundle == nil {
+            findings.append(.missingObservationBundle)
+        }
+        if residue.sovereignFrame == nil {
+            findings.append(.missingSovereignFrame)
+        }
+
+        if let bundle = residue.observationBundle {
+            let hasL14 = bundle.summaries.contains {
+                $0.layer == .sovereign
+            }
+            if !hasL14 {
+                findings.append(.missingL14InBundle)
+            }
+        }
+
+        if let bundle = residue.observationBundle,
+           let frame = residue.sovereignFrame
+        {
+            if bundle.sessionID != frame.sessionID {
+                findings.append(.sessionIDMismatch(
+                    bundle: bundle.sessionID,
+                    frame: frame.sessionID))
+            }
+            if bundle.turnID != frame.turnID {
+                findings.append(.turnIDMismatch(
+                    bundle: bundle.turnID,
+                    frame: frame.turnID))
+            }
+        }
+
+        if let frame = residue.sovereignFrame {
+            let expectedFrameID =
+                "frame." + frame.sessionID
+                + "." + frame.turnID
+            if frame.frameID != expectedFrameID {
+                findings.append(
+                    .frameIDConventionMismatch(
+                        expected: expectedFrameID,
+                        got: frame.frameID))
+            }
+            let expectedFoldRef =
+                "fold." + frame.sessionID
+                + "." + frame.turnID
+            if let ref = frame.thoughtFoldRef,
+               ref != expectedFoldRef
+            {
+                findings.append(
+                    .thoughtFoldRefConventionMismatch(
+                        expected: expectedFoldRef,
+                        got: ref))
+            }
+        }
+
+        return TurnResidueVerification(findings: findings)
+    }
+
     /// M103 — append a `permit:issued` audit entry for a permit the
     /// risk gate just issued. This is the sovereign-side half of
     /// the M99 `QinaoRiskGate.PermitEventRecorder` pipeline: M99
