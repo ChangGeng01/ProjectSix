@@ -1431,6 +1431,85 @@ public struct BASNeuralOrganMap: BASSchemaVersioned {
     }
 }
 
+/// M107 — L2 whitepaper §7 `CortexPacket` coverage.
+///
+/// The cortex packet is the Core Cortex organ's **per-turn compact
+/// output frame**: a bundle of semantic + structural + modulation
+/// + risk + seed + checksum fields that downstream organs (Simu
+/// Ring / Critic Blade / Risk Spine / Permit Knot) consume to
+/// produce candidate frontiers, counterfactuals, and critiques.
+///
+/// Pre-M107 the `BASNeuralOrgan.coreCortex` case existed in the
+/// organ enum but the packet shape itself was whitepaper-only.
+/// M107 lands the Swift struct so substrate + Qinao layers can
+/// build, serialize, and audit cortex packets end-to-end.
+///
+/// Field semantics (from whitepaper §7):
+/// - `semanticFrame`: compact string summary of the primary
+///   semantic claim the cortex produced for this turn.
+/// - `structureSlots`: slot-map of structural roles (subject /
+///   verb / object / time / place / reason / …); keys are
+///   slot names, values are filled content. Kept as
+///   `[String: String]` so the slot vocabulary can evolve without
+///   a schema bump.
+/// - `hostModSummary`: compact summary of how the Host Modulation
+///   Mesh shaped this packet (boundary / style / consent
+///   adjustments applied upstream).
+/// - `riskSummary`: compact summary from the Risk Spine of what
+///   risk vectors this packet triggers.
+/// - `candidateSeed`: minimal seed string downstream candidate
+///   generation uses to produce candidates (title + prompt
+///   fragment).
+/// - `consistencyChecksum`: digest the Consistency Lattice uses
+///   to verify internal coherence across organs. Caller
+///   computes; runtime verifies.
+public struct BASCortexPacket: BASSchemaVersioned {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var semanticFrame: String
+    public var structureSlots: [String: String]
+    public var hostModSummary: String
+    public var riskSummary: String
+    public var candidateSeed: String
+    public var consistencyChecksum: String
+
+    public init(
+        schemaVersion: String = BASCortexPacket.currentSchemaVersion,
+        semanticFrame: String,
+        structureSlots: [String: String] = [:],
+        hostModSummary: String,
+        riskSummary: String,
+        candidateSeed: String,
+        consistencyChecksum: String
+    ) {
+        self.schemaVersion = schemaVersion
+        self.semanticFrame = semanticFrame
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.structureSlots = structureSlots
+        self.hostModSummary = hostModSummary
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.riskSummary = riskSummary
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.candidateSeed = candidateSeed
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.consistencyChecksum = consistencyChecksum
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// An empty-valued packet — useful as a fallback when the
+    /// cortex organ degrades and emits only a stub. Downstream
+    /// organs that see an empty semanticFrame can trace this
+    /// back to the cortex degradation branch.
+    public static let empty = BASCortexPacket(
+        semanticFrame: "",
+        structureSlots: [:],
+        hostModSummary: "",
+        riskSummary: "",
+        candidateSeed: "",
+        consistencyChecksum: "")
+}
+
 public struct BASCandidateFrontier: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.1.0"
 

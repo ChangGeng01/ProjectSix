@@ -278,6 +278,11 @@ public enum BASEBrainSchemaGovernanceRegistry {
             tests: ["schema.neural_organ_map.current", "schema.neural_organ_map.backward"]
         ),
         entry(
+            "CortexPacket",
+            versionedType: BASCortexPacket.self,
+            tests: ["schema.cortex_packet.current", "schema.cortex_packet.backward"]
+        ),
+        entry(
             "CandidateFrontier",
             versionedType: BASCandidateFrontier.self,
             tests: ["schema.candidate_frontier.current", "schema.candidate_frontier.backward"]

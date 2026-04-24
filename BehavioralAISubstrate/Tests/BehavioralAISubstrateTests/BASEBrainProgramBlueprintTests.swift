@@ -102,6 +102,7 @@ struct BASEBrainProgramBlueprintTests {
             "RunLease",
             "EmergencyBrake",
             "PowerLedger",  // M106 L1 §6 key-object closure
+            "CortexPacket",  // M107 L2 §7 key-object closure
             "SovereignActuationCommand",
             "SovereignExecutionReceipt",
             "SovereignVerdict",

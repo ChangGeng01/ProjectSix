@@ -29,7 +29,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 126)  // M106 +PowerLedger
+        #expect(governedObjects.count == 127)  // M106 +PowerLedger, M107 +CortexPacket
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
@@ -176,6 +176,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "RunLease": BASRunLease.currentSchemaVersion,
             "EmergencyBrake": BASEmergencyBrake.currentSchemaVersion,
             "PowerLedger": BASPowerLedger.currentSchemaVersion,  // M106
+            "CortexPacket": BASCortexPacket.currentSchemaVersion,  // M107
             "SovereignActuationCommand": BASSovereignActuationCommand.currentSchemaVersion,
             "SovereignExecutionReceipt": BASSovereignExecutionReceipt.currentSchemaVersion,
             "SovereignVerdict": BASSovereignVerdict.currentSchemaVersion,
