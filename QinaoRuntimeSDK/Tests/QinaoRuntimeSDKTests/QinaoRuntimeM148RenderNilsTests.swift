@@ -27,71 +27,8 @@ import BASOrchestration
 ///   6. All sources present → all 4 populated
 final class QinaoRuntimeM148RenderNilsTests: XCTestCase {
 
-    struct Fixture: Sendable {
-        let runtime: QinaoRuntime
-        let sovereign: QinaoSovereignControlPlane
-    }
+    // M155 — migrated to shared QinaoTestFixture.
 
-    private func makeRuntime(
-        now: @escaping @Sendable () -> Date = { Date() }
-    ) async -> Fixture {
-        actor ToolRecorder {
-            func record(name: String, payload: Data) -> Data {
-                Data()
-            }
-        }
-        let recorder = ToolRecorder()
-        let snapshotManager = BASSovereignSnapshotManager(now: now)
-        let versionTree = BASSovereignHostVersionTree(now: now)
-        let ledger = BASSovereignAuditLedger(
-            signingSecret: SymmetricKey(size: .bits256))
-        let coordinator = BASSovereignCleanRebootCoordinator(
-            snapshotManager: snapshotManager,
-            versionTree: versionTree,
-            ledger: ledger,
-            now: now)
-        let tokenAuthority = BASSovereignTokenAuthority(now: now)
-        let engine = BASSovereignVerdictEngine(
-            ledger: ledger, now: now)
-        let verifier = BASSovereignTurnVerifier(engine: engine)
-        let sovereign = QinaoSovereignControlPlane(
-            coordinator: coordinator,
-            tokenAuthority: tokenAuthority,
-            turnVerifier: verifier,
-            auditLedger: ledger,
-            warrantTTLSeconds: 10,
-            now: now)
-        let risk = QinaoRiskGate(permitTTLSeconds: 10, now: now)
-        let constitution = BASHostConstitution(
-            hostID: "host.m148",
-            activeVersion: "host.v1")
-        let tree = BASHostVersionTree(
-            activeVersionID: "host.v1",
-            versions: [
-                BASHostVersion(
-                    versionID: "host.v1",
-                    createdAt: now(),
-                    changedFields: [],
-                    reason: "seed",
-                    approvedByPolicy: true)
-            ])
-        let pipeline = BASHostCandidatePipeline(
-            constitution: constitution,
-            versionTree: tree,
-            clock: now)
-        let host = QinaoHost(pipeline: pipeline)
-        let memory = QinaoMemory()
-        let loop = QinaoLoop()
-
-        let executor: QinaoRuntime.ToolExecutor = { name, payload in
-            await recorder.record(name: name, payload: payload)
-        }
-        let runtime = QinaoRuntime(
-            host: host, memory: memory, risk: risk,
-            sovereign: sovereign, loop: loop,
-            toolExecutor: executor, now: now, lifecycle: nil)
-        return Fixture(runtime: runtime, sovereign: sovereign)
-    }
 
     private func obs(
         turnID: String = "turn.1"
@@ -104,7 +41,7 @@ final class QinaoRuntimeM148RenderNilsTests: XCTestCase {
     }
 
     func testNoSourceParamsLeavesAllFourNil() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m148")
         let o = obs(turnID: "turn.none")
         _ = try await fx.runtime.sendSession(
             o, coordinatorSeverity: .pass)
@@ -117,7 +54,7 @@ final class QinaoRuntimeM148RenderNilsTests: XCTestCase {
     }
 
     func testDecomposeFramePopulatesSituation() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m148")
         let o = obs(turnID: "turn.situ")
         _ = try await fx.runtime.sendSession(
             o,
@@ -133,7 +70,7 @@ final class QinaoRuntimeM148RenderNilsTests: XCTestCase {
 
     func testDecomposeFrameWithMirrorPopulatesMirrorRef()
         async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m148")
         let o = obs(turnID: "turn.mir")
         let draft = BASMirrorDraft(
             draftID: "draft.x",
@@ -154,7 +91,7 @@ final class QinaoRuntimeM148RenderNilsTests: XCTestCase {
     }
 
     func testRenderedOutputPopulatesToneRef() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m148")
         let o = obs(turnID: "turn.tone")
         _ = try await fx.runtime.sendSession(
             o,
@@ -174,7 +111,7 @@ final class QinaoRuntimeM148RenderNilsTests: XCTestCase {
     }
 
     func testForceCurveRefJointGate() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m148")
         // renderedOutput WITHOUT risk card → no forceCurveRef
         let o1 = obs(turnID: "turn.no-risk")
         _ = try await fx.runtime.sendSession(
@@ -220,7 +157,7 @@ final class QinaoRuntimeM148RenderNilsTests: XCTestCase {
     }
 
     func testAllFourWithFullSources() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m148")
         let o = obs(turnID: "turn.all")
         let draft = BASMirrorDraft(
             draftID: "d.x",

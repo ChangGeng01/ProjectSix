@@ -35,73 +35,8 @@ import BASOrchestration
 ///   7. Re-emit replaces in place (LWW).
 final class QinaoRuntimeRenderFrameTests: XCTestCase {
 
-    struct Fixture: Sendable {
-        let runtime: QinaoRuntime
-        let sovereign: QinaoSovereignControlPlane
-    }
+    // M155 — migrated to shared QinaoTestFixture.
 
-    private func makeRuntime(
-        now: @escaping @Sendable () -> Date = { Date() }
-    ) async -> Fixture {
-        actor ToolRecorder {
-            func record(name: String, payload: Data) -> Data {
-                Data()
-            }
-        }
-        let recorder = ToolRecorder()
-
-        let snapshotManager = BASSovereignSnapshotManager(now: now)
-        let versionTree = BASSovereignHostVersionTree(now: now)
-        let ledger = BASSovereignAuditLedger(
-            signingSecret: SymmetricKey(size: .bits256))
-        let coordinator = BASSovereignCleanRebootCoordinator(
-            snapshotManager: snapshotManager,
-            versionTree: versionTree,
-            ledger: ledger,
-            now: now)
-        let tokenAuthority = BASSovereignTokenAuthority(now: now)
-        let engine = BASSovereignVerdictEngine(
-            ledger: ledger, now: now)
-        let verifier = BASSovereignTurnVerifier(engine: engine)
-        let sovereign = QinaoSovereignControlPlane(
-            coordinator: coordinator,
-            tokenAuthority: tokenAuthority,
-            turnVerifier: verifier,
-            auditLedger: ledger,
-            warrantTTLSeconds: 10,
-            now: now)
-
-        let risk = QinaoRiskGate(permitTTLSeconds: 10, now: now)
-        let constitution = BASHostConstitution(
-            hostID: "host.m127",
-            activeVersion: "host.v3")
-        let tree = BASHostVersionTree(
-            activeVersionID: "host.v3",
-            versions: [
-                BASHostVersion(
-                    versionID: "host.v3",
-                    createdAt: now(),
-                    changedFields: [],
-                    reason: "seed",
-                    approvedByPolicy: true)
-            ])
-        let pipeline = BASHostCandidatePipeline(
-            constitution: constitution,
-            versionTree: tree,
-            clock: now)
-        let host = QinaoHost(pipeline: pipeline)
-        let memory = QinaoMemory()
-        let loop = QinaoLoop()
-
-        let executor: QinaoRuntime.ToolExecutor = { name, payload in
-            await recorder.record(name: name, payload: payload)
-        }
-        let runtime = QinaoRuntime(
-            host: host, memory: memory, risk: risk,
-            sovereign: sovereign, loop: loop,
-            toolExecutor: executor, now: now, lifecycle: nil)
-        return Fixture(runtime: runtime, sovereign: sovereign)
-    }
 
     private func observations(
         sessionID: String = "sess.m127",
@@ -117,7 +52,7 @@ final class QinaoRuntimeRenderFrameTests: XCTestCase {
     // MARK: - 1. Healthy turn records render frame
 
     func testHealthyTurnRecordsRenderFrame() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m127")
         let obs = observations(turnID: "turn.record")
 
         _ = try await fx.runtime.sendSession(
@@ -133,7 +68,7 @@ final class QinaoRuntimeRenderFrameTests: XCTestCase {
     // MARK: - 2. frameID convention
 
     func testRenderFrameIDConvention() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m127")
         let obs = observations(
             sessionID: "sess.convention",
             turnID: "turn.convention")
@@ -153,7 +88,7 @@ final class QinaoRuntimeRenderFrameTests: XCTestCase {
     // MARK: - 3. mergedChoiceRef → L3 fold
 
     func testMergedChoiceRefMatchesL3FoldID() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m127")
         let obs = observations(
             sessionID: "sess.m3",
             turnID: "turn.m3")
@@ -173,7 +108,9 @@ final class QinaoRuntimeRenderFrameTests: XCTestCase {
     // MARK: - 4. hostStyleRef → L5 constitution.activeVersion
 
     func testHostStyleRefMatchesActiveVersion() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(
+            hostID: "host.m127",
+            activeVersion: "host.v3")
         let obs = observations(turnID: "turn.style")
 
         _ = try await fx.runtime.sendSession(
@@ -191,7 +128,7 @@ final class QinaoRuntimeRenderFrameTests: XCTestCase {
 
     func testSovereignSurfaceRefMatchesSovereignFrameID()
         async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m127")
         let obs = observations(turnID: "turn.sovlink")
 
         _ = try await fx.runtime.sendSession(
@@ -211,7 +148,7 @@ final class QinaoRuntimeRenderFrameTests: XCTestCase {
     // MARK: - 6. outputSurfaceRef / disclosure / substitute refs
 
     func testSurfaceDecisionDerivedRefs() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m127")
         let obs = observations(turnID: "turn.refs")
 
         _ = try await fx.runtime.sendSession(
@@ -236,7 +173,7 @@ final class QinaoRuntimeRenderFrameTests: XCTestCase {
     // MARK: - 7. Re-emit replaces in place (LWW)
 
     func testReEmitReplacesRenderFrameInPlace() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m127")
         let obs = observations(turnID: "turn.rewrite")
 
         _ = try await fx.runtime.sendSession(
@@ -254,7 +191,7 @@ final class QinaoRuntimeRenderFrameTests: XCTestCase {
     // MARK: - 8. Nil refs stay nil (documented future-wiring)
 
     func testFiveRefsStayNilPerDocumentedScope() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m127")
         let obs = observations(turnID: "turn.nils")
 
         _ = try await fx.runtime.sendSession(

@@ -26,71 +26,7 @@ import BASOrchestration
 ///   5. All 6 at once → all populated on same frame
 final class QinaoRuntimeM147SovereignNilsTests: XCTestCase {
 
-    struct Fixture: Sendable {
-        let runtime: QinaoRuntime
-        let sovereign: QinaoSovereignControlPlane
-    }
-
-    private func makeRuntime(
-        now: @escaping @Sendable () -> Date = { Date() }
-    ) async -> Fixture {
-        actor ToolRecorder {
-            func record(name: String, payload: Data) -> Data {
-                Data()
-            }
-        }
-        let recorder = ToolRecorder()
-        let snapshotManager = BASSovereignSnapshotManager(now: now)
-        let versionTree = BASSovereignHostVersionTree(now: now)
-        let ledger = BASSovereignAuditLedger(
-            signingSecret: SymmetricKey(size: .bits256))
-        let coordinator = BASSovereignCleanRebootCoordinator(
-            snapshotManager: snapshotManager,
-            versionTree: versionTree,
-            ledger: ledger,
-            now: now)
-        let tokenAuthority = BASSovereignTokenAuthority(now: now)
-        let engine = BASSovereignVerdictEngine(
-            ledger: ledger, now: now)
-        let verifier = BASSovereignTurnVerifier(engine: engine)
-        let sovereign = QinaoSovereignControlPlane(
-            coordinator: coordinator,
-            tokenAuthority: tokenAuthority,
-            turnVerifier: verifier,
-            auditLedger: ledger,
-            warrantTTLSeconds: 10,
-            now: now)
-        let risk = QinaoRiskGate(permitTTLSeconds: 10, now: now)
-        let constitution = BASHostConstitution(
-            hostID: "host.m147",
-            activeVersion: "host.v1")
-        let tree = BASHostVersionTree(
-            activeVersionID: "host.v1",
-            versions: [
-                BASHostVersion(
-                    versionID: "host.v1",
-                    createdAt: now(),
-                    changedFields: [],
-                    reason: "seed",
-                    approvedByPolicy: true)
-            ])
-        let pipeline = BASHostCandidatePipeline(
-            constitution: constitution,
-            versionTree: tree,
-            clock: now)
-        let host = QinaoHost(pipeline: pipeline)
-        let memory = QinaoMemory()
-        let loop = QinaoLoop()
-
-        let executor: QinaoRuntime.ToolExecutor = { name, payload in
-            await recorder.record(name: name, payload: payload)
-        }
-        let runtime = QinaoRuntime(
-            host: host, memory: memory, risk: risk,
-            sovereign: sovereign, loop: loop,
-            toolExecutor: executor, now: now, lifecycle: nil)
-        return Fixture(runtime: runtime, sovereign: sovereign)
-    }
+    // M155 — migrated to shared QinaoTestFixture.
 
     private func obs(
         turnID: String = "turn.1"
@@ -105,7 +41,7 @@ final class QinaoRuntimeM147SovereignNilsTests: XCTestCase {
     // MARK: - 1. No source params → all 6 fields nil/empty
 
     func testNoSourceParamsLeavesAllSixNil() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m147")
         let o = obs(turnID: "turn.none")
         _ = try await fx.runtime.sendSession(
             o, coordinatorSeverity: .pass)
@@ -122,7 +58,7 @@ final class QinaoRuntimeM147SovereignNilsTests: XCTestCase {
     // MARK: - 2. jurisdictionMap → jurisdictionRef = mapID
 
     func testJurisdictionMapPopulatesRef() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m147")
         let o = obs(turnID: "turn.jur")
         let jm = BASJurisdictionMap(
             mapID: "jm.health-tier-1",
@@ -139,7 +75,7 @@ final class QinaoRuntimeM147SovereignNilsTests: XCTestCase {
     // MARK: - 3. contaminationLineages → refs map to IDs
 
     func testContaminationLineagesMapToRefs() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m147")
         let o = obs(turnID: "turn.cont")
         let lineages = [
             BASContaminationLineage(
@@ -169,7 +105,7 @@ final class QinaoRuntimeM147SovereignNilsTests: XCTestCase {
     // MARK: - 4. Direct-string fields pass through
 
     func testDirectStringFieldsPassThrough() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m147")
         let o = obs(turnID: "turn.direct")
         _ = try await fx.runtime.sendSession(
             o,
@@ -192,7 +128,7 @@ final class QinaoRuntimeM147SovereignNilsTests: XCTestCase {
     // MARK: - 5. All 6 at once
 
     func testAllSixFieldsPopulatedTogether() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m147")
         let o = obs(turnID: "turn.all")
         let jm = BASJurisdictionMap(mapID: "jm.full")
         let lineages = [

@@ -37,70 +37,8 @@ final class QinaoRuntimeTurnResidueTests: XCTestCase {
         func record(name: String, payload: Data) -> Data { Data() }
     }
 
-    struct Fixture: Sendable {
-        let runtime: QinaoRuntime
-        let sovereign: QinaoSovereignControlPlane
-    }
+    // M155 — migrated to shared QinaoTestFixture.
 
-    private func makeRuntime(
-        now: @escaping @Sendable () -> Date = { Date() }
-    ) async -> Fixture {
-        let recorder = ToolRecorder()
-        let snapshotManager = BASSovereignSnapshotManager(now: now)
-        let versionTree = BASSovereignHostVersionTree(now: now)
-        let ledger = BASSovereignAuditLedger(
-            signingSecret: SymmetricKey(size: .bits256))
-        let coordinator = BASSovereignCleanRebootCoordinator(
-            snapshotManager: snapshotManager,
-            versionTree: versionTree,
-            ledger: ledger,
-            now: now)
-        let tokenAuthority = BASSovereignTokenAuthority(now: now)
-        let engine = BASSovereignVerdictEngine(
-            ledger: ledger, now: now)
-        let verifier = BASSovereignTurnVerifier(engine: engine)
-        let sovereign = QinaoSovereignControlPlane(
-            coordinator: coordinator,
-            tokenAuthority: tokenAuthority,
-            turnVerifier: verifier,
-            auditLedger: ledger,
-            warrantTTLSeconds: 10,
-            now: now)
-
-        let risk = QinaoRiskGate(permitTTLSeconds: 10, now: now)
-        let constitution = BASHostConstitution(
-            hostID: "host.m124",
-            activeVersion: "host.v1")
-        let tree = BASHostVersionTree(
-            activeVersionID: "host.v1",
-            versions: [
-                BASHostVersion(
-                    versionID: "host.v1",
-                    createdAt: now(),
-                    changedFields: [],
-                    reason: "seed",
-                    approvedByPolicy: true)
-            ])
-        let pipeline = BASHostCandidatePipeline(
-            constitution: constitution,
-            versionTree: tree,
-            clock: now)
-        let host = QinaoHost(pipeline: pipeline)
-        let memory = QinaoMemory()
-        let loop = QinaoLoop()
-
-        let executor: QinaoRuntime.ToolExecutor = { name, payload in
-            await recorder.record(name: name, payload: payload)
-        }
-
-        let runtime = QinaoRuntime(
-            host: host, memory: memory, risk: risk,
-            sovereign: sovereign, loop: loop,
-            toolExecutor: executor, now: now, lifecycle: nil)
-
-        return Fixture(
-            runtime: runtime, sovereign: sovereign)
-    }
 
     private func observations(
         sessionID: String = "sess.m124",
@@ -117,7 +55,7 @@ final class QinaoRuntimeTurnResidueTests: XCTestCase {
 
     func testHealthyTurnProducesCompleteValidResidue()
         async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m124")
         let obs = observations(turnID: "turn.happy")
 
         _ = try await fx.runtime.sendSession(
@@ -143,7 +81,7 @@ final class QinaoRuntimeTurnResidueTests: XCTestCase {
     // MARK: - 2. Never-sent turn → missing everything
 
     func testUnsentTurnHasEmptyResidue() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m124")
         // Note: no sendSession call.
 
         let residue = await fx.sovereign.turnResidue(
@@ -169,7 +107,7 @@ final class QinaoRuntimeTurnResidueTests: XCTestCase {
     // MARK: - 3. Synthetic frame with wrong frameID convention
 
     func testFrameIDConventionDrift() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m124")
         let obs = observations(turnID: "turn.drift")
 
         _ = try await fx.runtime.sendSession(
@@ -208,7 +146,7 @@ final class QinaoRuntimeTurnResidueTests: XCTestCase {
     // MARK: - 4. Synthetic thoughtFoldRef drift
 
     func testThoughtFoldRefDrift() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m124")
         let obs = observations(turnID: "turn.fold-drift")
 
         _ = try await fx.runtime.sendSession(
@@ -246,7 +184,7 @@ final class QinaoRuntimeTurnResidueTests: XCTestCase {
 
     func testCrossSurfaceSessionTurnMismatchFlagged()
         async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m124")
         let obs = observations(turnID: "turn.happy")
 
         _ = try await fx.runtime.sendSession(

@@ -24,71 +24,10 @@ import BASWorldPrior
 ///   3. Default expected-layer set expands to include L4, L10, L11
 final class QinaoRuntimeL4AutoStreamTests: XCTestCase {
 
-    struct Fixture: Sendable {
-        let runtime: QinaoRuntime
-        let sovereign: QinaoSovereignControlPlane
-    }
-
-    private func makeRuntime(
-        now: @escaping @Sendable () -> Date = { Date() }
-    ) async -> Fixture {
-        actor ToolRecorder {
-            func record(name: String, payload: Data) -> Data {
-                Data()
-            }
-        }
-        let recorder = ToolRecorder()
-        let snapshotManager = BASSovereignSnapshotManager(now: now)
-        let versionTree = BASSovereignHostVersionTree(now: now)
-        let ledger = BASSovereignAuditLedger(
-            signingSecret: SymmetricKey(size: .bits256))
-        let coordinator = BASSovereignCleanRebootCoordinator(
-            snapshotManager: snapshotManager,
-            versionTree: versionTree,
-            ledger: ledger,
-            now: now)
-        let tokenAuthority = BASSovereignTokenAuthority(now: now)
-        let engine = BASSovereignVerdictEngine(
-            ledger: ledger, now: now)
-        let verifier = BASSovereignTurnVerifier(engine: engine)
-        let sovereign = QinaoSovereignControlPlane(
-            coordinator: coordinator,
-            tokenAuthority: tokenAuthority,
-            turnVerifier: verifier,
-            auditLedger: ledger,
-            warrantTTLSeconds: 10,
-            now: now)
-        let risk = QinaoRiskGate(permitTTLSeconds: 10, now: now)
-        let constitution = BASHostConstitution(
-            hostID: "host.m139",
-            activeVersion: "host.v1")
-        let tree = BASHostVersionTree(
-            activeVersionID: "host.v1",
-            versions: [
-                BASHostVersion(
-                    versionID: "host.v1",
-                    createdAt: now(),
-                    changedFields: [],
-                    reason: "seed",
-                    approvedByPolicy: true)
-            ])
-        let pipeline = BASHostCandidatePipeline(
-            constitution: constitution,
-            versionTree: tree,
-            clock: now)
-        let host = QinaoHost(pipeline: pipeline)
-        let memory = QinaoMemory()
-        let loop = QinaoLoop()
-
-        let executor: QinaoRuntime.ToolExecutor = { name, payload in
-            await recorder.record(name: name, payload: payload)
-        }
-        let runtime = QinaoRuntime(
-            host: host, memory: memory, risk: risk,
-            sovereign: sovereign, loop: loop,
-            toolExecutor: executor, now: now, lifecycle: nil)
-        return Fixture(runtime: runtime, sovereign: sovereign)
-    }
+    // M155 — migrated to shared QinaoTestFixture. Pre-M155 this
+    // file carried ~80 lines of ToolRecorder + Fixture struct +
+    // makeRuntime() boilerplate; post-M155 it uses the shared
+    // factory and keeps only the per-test concerns.
 
     private func obs(
         turnID: String = "turn.1"
@@ -108,7 +47,7 @@ final class QinaoRuntimeL4AutoStreamTests: XCTestCase {
     }
 
     func testNoThoughtFrameSkipsL4() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m139")
         let o = obs(turnID: "turn.skip")
         _ = try await fx.runtime.sendSession(
             o, coordinatorSeverity: .pass)
@@ -119,7 +58,7 @@ final class QinaoRuntimeL4AutoStreamTests: XCTestCase {
     }
 
     func testThoughtFramePassedStreamsL4() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m139")
         let o = obs(turnID: "turn.with")
         _ = try await fx.runtime.sendSession(
             o,
@@ -136,7 +75,7 @@ final class QinaoRuntimeL4AutoStreamTests: XCTestCase {
     }
 
     func testDefaultExpectedExpandsForL4L10L11() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m139")
         let o = obs(turnID: "turn.exp")
         _ = try await fx.runtime.sendSession(
             o,

@@ -30,71 +30,8 @@ import BASWorldPrior
 /// the refactor guarantees.
 final class QinaoRuntimeM152TurnInputsTests: XCTestCase {
 
-    struct Fixture: Sendable {
-        let runtime: QinaoRuntime
-        let sovereign: QinaoSovereignControlPlane
-    }
+    // M155 — migrated to shared QinaoTestFixture.
 
-    private func makeRuntime(
-        now: @escaping @Sendable () -> Date = { Date() }
-    ) async -> Fixture {
-        actor ToolRecorder {
-            func record(name: String, payload: Data) -> Data {
-                Data()
-            }
-        }
-        let recorder = ToolRecorder()
-        let snapshotManager = BASSovereignSnapshotManager(now: now)
-        let versionTree = BASSovereignHostVersionTree(now: now)
-        let ledger = BASSovereignAuditLedger(
-            signingSecret: SymmetricKey(size: .bits256))
-        let coordinator = BASSovereignCleanRebootCoordinator(
-            snapshotManager: snapshotManager,
-            versionTree: versionTree,
-            ledger: ledger,
-            now: now)
-        let tokenAuthority = BASSovereignTokenAuthority(now: now)
-        let engine = BASSovereignVerdictEngine(
-            ledger: ledger, now: now)
-        let verifier = BASSovereignTurnVerifier(engine: engine)
-        let sovereign = QinaoSovereignControlPlane(
-            coordinator: coordinator,
-            tokenAuthority: tokenAuthority,
-            turnVerifier: verifier,
-            auditLedger: ledger,
-            warrantTTLSeconds: 10,
-            now: now)
-        let risk = QinaoRiskGate(permitTTLSeconds: 10, now: now)
-        let constitution = BASHostConstitution(
-            hostID: "host.m152",
-            activeVersion: "host.v1")
-        let tree = BASHostVersionTree(
-            activeVersionID: "host.v1",
-            versions: [
-                BASHostVersion(
-                    versionID: "host.v1",
-                    createdAt: now(),
-                    changedFields: [],
-                    reason: "seed",
-                    approvedByPolicy: true)
-            ])
-        let pipeline = BASHostCandidatePipeline(
-            constitution: constitution,
-            versionTree: tree,
-            clock: now)
-        let host = QinaoHost(pipeline: pipeline)
-        let memory = QinaoMemory()
-        let loop = QinaoLoop()
-
-        let executor: QinaoRuntime.ToolExecutor = { name, payload in
-            await recorder.record(name: name, payload: payload)
-        }
-        let runtime = QinaoRuntime(
-            host: host, memory: memory, risk: risk,
-            sovereign: sovereign, loop: loop,
-            toolExecutor: executor, now: now, lifecycle: nil)
-        return Fixture(runtime: runtime, sovereign: sovereign)
-    }
 
     private func obs(
         sessionID: String = "sess.m152",
@@ -110,7 +47,7 @@ final class QinaoRuntimeM152TurnInputsTests: XCTestCase {
     // MARK: - 1. Minimal shape
 
     func testMinimalShape() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m152")
         let inputs = QinaoRuntime.TurnInputs(
             observations: obs(turnID: "turn.minimal"),
             coordinatorSeverity: .pass)
@@ -123,7 +60,7 @@ final class QinaoRuntimeM152TurnInputsTests: XCTestCase {
     // MARK: - 2. Property-set shape
 
     func testPropertySetShape() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m152")
         var inputs = QinaoRuntime.TurnInputs(
             observations: obs(turnID: "turn.property"),
             coordinatorSeverity: .pass)
@@ -154,7 +91,7 @@ final class QinaoRuntimeM152TurnInputsTests: XCTestCase {
     // MARK: - 3. Fluent .with {} shape
 
     func testFluentWithShape() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m152")
         let outcome = try await fx.runtime.sendSession(
             .init(
                 observations: obs(turnID: "turn.fluent"),
@@ -182,7 +119,7 @@ final class QinaoRuntimeM152TurnInputsTests: XCTestCase {
     /// the critical fields.
     func testLegacyAndInputsEquivalence() async throws {
         // Legacy 22-param path.
-        let fx1 = await makeRuntime()
+        let fx1 = await QinaoTestFixture.make(hostID: "host.m152")
         let obs1 = obs(turnID: "turn.legacy")
         let tf = BASThoughtFrame(
             stepIndex: 0,
@@ -194,7 +131,7 @@ final class QinaoRuntimeM152TurnInputsTests: XCTestCase {
             thoughtFrame: tf)
 
         // TurnInputs path.
-        let fx2 = await makeRuntime()
+        let fx2 = await QinaoTestFixture.make(hostID: "host.m152")
         let obs2 = obs(turnID: "turn.inputs")
         var inputs = QinaoRuntime.TurnInputs(
             observations: obs2,

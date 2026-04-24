@@ -32,76 +32,8 @@ import BASOrchestration
 ///      chain-integrity finding (cross-surface findings match).
 final class QinaoRuntimeStrongVerifyTests: XCTestCase {
 
-    struct Fixture: Sendable {
-        let runtime: QinaoRuntime
-        let sovereign: QinaoSovereignControlPlane
-        let ledger: BASSovereignAuditLedger
-    }
+    // M155 — migrated to shared QinaoTestFixture.
 
-    private func makeRuntime(
-        now: @escaping @Sendable () -> Date = { Date() }
-    ) async -> Fixture {
-        actor ToolRecorder {
-            func record(name: String, payload: Data) -> Data {
-                Data()
-            }
-        }
-        let recorder = ToolRecorder()
-
-        let snapshotManager = BASSovereignSnapshotManager(now: now)
-        let versionTree = BASSovereignHostVersionTree(now: now)
-        let ledger = BASSovereignAuditLedger(
-            signingSecret: SymmetricKey(size: .bits256))
-        let coordinator = BASSovereignCleanRebootCoordinator(
-            snapshotManager: snapshotManager,
-            versionTree: versionTree,
-            ledger: ledger,
-            now: now)
-        let tokenAuthority = BASSovereignTokenAuthority(now: now)
-        let engine = BASSovereignVerdictEngine(
-            ledger: ledger, now: now)
-        let verifier = BASSovereignTurnVerifier(engine: engine)
-        let sovereign = QinaoSovereignControlPlane(
-            coordinator: coordinator,
-            tokenAuthority: tokenAuthority,
-            turnVerifier: verifier,
-            auditLedger: ledger,
-            warrantTTLSeconds: 10,
-            now: now)
-        let risk = QinaoRiskGate(permitTTLSeconds: 10, now: now)
-        let constitution = BASHostConstitution(
-            hostID: "host.m129",
-            activeVersion: "host.v1")
-        let tree = BASHostVersionTree(
-            activeVersionID: "host.v1",
-            versions: [
-                BASHostVersion(
-                    versionID: "host.v1",
-                    createdAt: now(),
-                    changedFields: [],
-                    reason: "seed",
-                    approvedByPolicy: true)
-            ])
-        let pipeline = BASHostCandidatePipeline(
-            constitution: constitution,
-            versionTree: tree,
-            clock: now)
-        let host = QinaoHost(pipeline: pipeline)
-        let memory = QinaoMemory()
-        let loop = QinaoLoop()
-
-        let executor: QinaoRuntime.ToolExecutor = { name, payload in
-            await recorder.record(name: name, payload: payload)
-        }
-        let runtime = QinaoRuntime(
-            host: host, memory: memory, risk: risk,
-            sovereign: sovereign, loop: loop,
-            toolExecutor: executor, now: now, lifecycle: nil)
-        return Fixture(
-            runtime: runtime,
-            sovereign: sovereign,
-            ledger: ledger)
-    }
 
     private func observations(
         sessionID: String = "sess.m129",
@@ -117,7 +49,7 @@ final class QinaoRuntimeStrongVerifyTests: XCTestCase {
     // MARK: - 1. Healthy turn + healthy ledger → strong verify valid
 
     func testStrongVerifyOnHealthyTurnIsValid() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m129")
         let obs = observations(turnID: "turn.strong-happy")
 
         let outcome = try await fx.runtime.sendSession(
@@ -142,7 +74,7 @@ final class QinaoRuntimeStrongVerifyTests: XCTestCase {
     // MARK: - 2. Strong verify matches pure verify on clean ledger
 
     func testStrongAndPureAgreeOnHealthyLedger() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m129")
         let obs = observations(turnID: "turn.agree")
 
         let outcome = try await fx.runtime.sendSession(
@@ -162,7 +94,7 @@ final class QinaoRuntimeStrongVerifyTests: XCTestCase {
 
     func testStrongVerifyOnDriftWithCleanLedgerOnlyCrossSurface()
         async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.m129")
         let obs = observations(turnID: "turn.drift")
 
         _ = try await fx.runtime.sendSession(

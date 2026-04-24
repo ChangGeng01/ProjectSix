@@ -43,74 +43,8 @@ final class QinaoRuntimeSessionTests: XCTestCase {
         }
     }
 
-    struct Fixture: Sendable {
-        let runtime: QinaoRuntime
-        let sovereign: QinaoSovereignControlPlane
-    }
+    // M155 — migrated to shared QinaoTestFixture.
 
-    private func makeRuntime(
-        now: @escaping @Sendable () -> Date = { Date() }
-    ) async -> Fixture {
-        let recorder = ToolRecorder()
-        let snapshotManager = BASSovereignSnapshotManager(now: now)
-        let versionTree = BASSovereignHostVersionTree(now: now)
-        let ledger = BASSovereignAuditLedger(
-            signingSecret: SymmetricKey(size: .bits256))
-        let coordinator = BASSovereignCleanRebootCoordinator(
-            snapshotManager: snapshotManager,
-            versionTree: versionTree,
-            ledger: ledger,
-            now: now)
-        let tokenAuthority = BASSovereignTokenAuthority(now: now)
-        let engine = BASSovereignVerdictEngine(ledger: ledger, now: now)
-        let verifier = BASSovereignTurnVerifier(engine: engine)
-
-        let sovereign = QinaoSovereignControlPlane(
-            coordinator: coordinator,
-            tokenAuthority: tokenAuthority,
-            turnVerifier: verifier,
-            auditLedger: ledger,
-            warrantTTLSeconds: 10,
-            now: now)
-        let risk = QinaoRiskGate(permitTTLSeconds: 10, now: now)
-
-        let constitution = BASHostConstitution(
-            hostID: "host",
-            activeVersion: "host.v1")
-        let tree = BASHostVersionTree(
-            activeVersionID: "host.v1",
-            versions: [
-                BASHostVersion(
-                    versionID: "host.v1",
-                    createdAt: now(),
-                    changedFields: [],
-                    reason: "seed",
-                    approvedByPolicy: true)
-            ])
-        let pipeline = BASHostCandidatePipeline(
-            constitution: constitution,
-            versionTree: tree,
-            clock: now)
-        let host = QinaoHost(pipeline: pipeline)
-
-        let memory = QinaoMemory()
-        let loop = QinaoLoop()
-
-        let executor: QinaoRuntime.ToolExecutor = { name, payload in
-            await recorder.record(name: name, payload: payload)
-        }
-
-        let runtime = QinaoRuntime(
-            host: host,
-            memory: memory,
-            risk: risk,
-            sovereign: sovereign,
-            loop: loop,
-            toolExecutor: executor,
-            now: now)
-
-        return Fixture(runtime: runtime, sovereign: sovereign)
-    }
 
     private func observations(
         sessionID: String = "sess.audit",
@@ -132,7 +66,7 @@ final class QinaoRuntimeSessionTests: XCTestCase {
     // MARK: - Clean turn
 
     func testCleanTurnPassesWithoutHalting() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.test")
         let obs = observations()
 
         let outcome = try await fx.runtime.sendSession(
@@ -148,7 +82,7 @@ final class QinaoRuntimeSessionTests: XCTestCase {
     // MARK: - Laxer-parity fail-closed
 
     func testLaxerParityFailsClosedAndMarksHalted() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.test")
         // runtimeUnstableInHighRisk → engine must emit ≥ .shadowLock.
         // Coordinator reported `.pass` → laxer.
         let obs = observations { o in
@@ -184,7 +118,7 @@ final class QinaoRuntimeSessionTests: XCTestCase {
     // MARK: - Pre-halted refusal
 
     func testPreHaltedSessionRefusesBeforeAuditing() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.test")
         let sessionID = "sess.already.halted"
         await fx.sovereign.markSessionHalted(
             sessionID: sessionID,
@@ -205,7 +139,7 @@ final class QinaoRuntimeSessionTests: XCTestCase {
     // MARK: - Severity-driven auto-halt
 
     func testDeadStopSeverityAutoHalts() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.test")
         // unauthorizedSelfMutation → BR-007 → minLevel .deadStop.
         // coordinatorSeverity = nil → engineOnly parity (acceptable),
         // so the laxer-parity branch never fires and we land squarely
@@ -233,7 +167,7 @@ final class QinaoRuntimeSessionTests: XCTestCase {
     }
 
     func testQuarantineSeverityDoesNotAutoHalt() async throws {
-        let fx = await makeRuntime()
+        let fx = await QinaoTestFixture.make(hostID: "host.test")
         // hostRemovalBypassed → BR-005 → minLevel .quarantine.
         // Quarantine is NOT in the auto-halt set — the host decides.
         // coordinatorSeverity = .quarantine → match parity → clean

@@ -56,112 +56,8 @@ final class QinaoRuntimeSovereignFrameTests: XCTestCase {
         func record(_ identifier: String) {}
     }
 
-    struct Fixture: Sendable {
-        let runtime: QinaoRuntime
-        let sovereign: QinaoSovereignControlPlane
-        let plannedBudget: BASBudgetFrame
-    }
+    // M155 — migrated to shared QinaoTestFixture.
 
-    private func makeRuntime(
-        withLifecycle: Bool,
-        now: @escaping @Sendable () -> Date = { Date() }
-    ) async -> Fixture {
-        let recorder = ToolRecorder()
-        let snapshotManager = BASSovereignSnapshotManager(now: now)
-        let versionTree = BASSovereignHostVersionTree(now: now)
-        let ledger = BASSovereignAuditLedger(
-            signingSecret: SymmetricKey(size: .bits256))
-        let coordinator = BASSovereignCleanRebootCoordinator(
-            snapshotManager: snapshotManager,
-            versionTree: versionTree,
-            ledger: ledger,
-            now: now)
-        let tokenAuthority = BASSovereignTokenAuthority(now: now)
-        let engine = BASSovereignVerdictEngine(
-            ledger: ledger, now: now)
-        let verifier = BASSovereignTurnVerifier(engine: engine)
-        let sovereign = QinaoSovereignControlPlane(
-            coordinator: coordinator,
-            tokenAuthority: tokenAuthority,
-            turnVerifier: verifier,
-            auditLedger: ledger,
-            warrantTTLSeconds: 10,
-            now: now)
-
-        let risk = QinaoRiskGate(permitTTLSeconds: 10, now: now)
-        let constitution = BASHostConstitution(
-            hostID: "host.m123",
-            activeVersion: "host.v1")
-        let tree = BASHostVersionTree(
-            activeVersionID: "host.v1",
-            versions: [
-                BASHostVersion(
-                    versionID: "host.v1",
-                    createdAt: now(),
-                    changedFields: [],
-                    reason: "seed",
-                    approvedByPolicy: true)
-            ])
-        let pipeline = BASHostCandidatePipeline(
-            constitution: constitution,
-            versionTree: tree,
-            clock: now)
-        let host = QinaoHost(pipeline: pipeline)
-        let memory = QinaoMemory()
-        let loop = QinaoLoop()
-
-        let executor: QinaoRuntime.ToolExecutor = { name, payload in
-            await recorder.record(name: name, payload: payload)
-        }
-
-        let lifecycle: QinaoLifecycle?
-        if withLifecycle {
-            let thermal = ThermalSource()
-            let submitter = NoopSubmitter()
-            let canceller = NoopCanceller()
-            lifecycle = QinaoLifecycle.makeForTesting(
-                taskIdentifierPrefix: "m123.breath",
-                timeConstantSeconds: 180,
-                thermalReader: { thermal.get() },
-                submitter: { id, date in
-                    await submitter.record(
-                        identifier: id, date: date)
-                },
-                canceller: { id in await canceller.record(id) },
-                clock: { Date(timeIntervalSince1970: 1_700_000_000) })
-        } else {
-            lifecycle = nil
-        }
-
-        let runtime = QinaoRuntime(
-            host: host, memory: memory, risk: risk,
-            sovereign: sovereign, loop: loop,
-            toolExecutor: executor, now: now,
-            lifecycle: lifecycle)
-
-        let plannedBudget = BASBudgetFrame(
-            runMode: .engage,
-            maxLoops: 3,
-            maxCandidates: 3,
-            maxDecodeTokens: 512,
-            retrievalDepth: 3,
-            precisionProfile: .protected,
-            deviceRoute: .hybridLocal,
-            thermalGuardLevel: .nominal,
-            maintenanceAllowed: false,
-            leaseID: "lease.m123",
-            leaseExpiresAt: now().addingTimeInterval(60),
-            maintenanceClass: .light,
-            wakeIntentID: "wake.m123",
-            allowedHeads: ["answer"],
-            policyBundleVersion: "pb.v1",
-            policyDecisionIDs: [])
-
-        return Fixture(
-            runtime: runtime,
-            sovereign: sovereign,
-            plannedBudget: plannedBudget)
-    }
 
     private func observations(
         sessionID: String = "sess.m123",
@@ -179,7 +75,7 @@ final class QinaoRuntimeSovereignFrameTests: XCTestCase {
     // MARK: - 1. Every healthy sendSession records a frame
 
     func testHealthyTurnRecordsSovereignFrame() async throws {
-        let fx = await makeRuntime(withLifecycle: false)
+        let fx = await QinaoTestFixture.make(hostID: "host.m123", withLifecycle: false)
         let obs = observations(turnID: "turn.record")
 
         _ = try await fx.runtime.sendSession(
@@ -195,7 +91,7 @@ final class QinaoRuntimeSovereignFrameTests: XCTestCase {
     // MARK: - 2. frameID deterministic per (session, turn)
 
     func testFrameIDIsDeterministicPerSessionTurn() async throws {
-        let fx = await makeRuntime(withLifecycle: false)
+        let fx = await QinaoTestFixture.make(hostID: "host.m123", withLifecycle: false)
         let obs = observations(
             sessionID: "sess.det",
             turnID: "turn.det")
@@ -216,7 +112,7 @@ final class QinaoRuntimeSovereignFrameTests: XCTestCase {
     //         thoughtFoldRef)
 
     func testFrameCarriesTurnObservationsVerbatim() async throws {
-        let fx = await makeRuntime(withLifecycle: false)
+        let fx = await QinaoTestFixture.make(hostID: "host.m123", withLifecycle: false)
         let obs = observations(
             sessionID: "sess.verbatim",
             turnID: "turn.verbatim",
@@ -246,7 +142,7 @@ final class QinaoRuntimeSovereignFrameTests: XCTestCase {
     // MARK: - 4. Re-emit replaces in place (LWW)
 
     func testReEmitReplacesFrameInPlace() async throws {
-        let fx = await makeRuntime(withLifecycle: false)
+        let fx = await QinaoTestFixture.make(hostID: "host.m123", withLifecycle: false)
         let obs = observations(turnID: "turn.rewrite")
 
         _ = try await fx.runtime.sendSession(
@@ -270,12 +166,29 @@ final class QinaoRuntimeSovereignFrameTests: XCTestCase {
     func testDeviceStateRefReflectsLifecycleAndBudget() async throws {
         // With lifecycle + plannedBudget → deviceStateRef =
         // routed budget's leaseID.
-        let fx1 = await makeRuntime(withLifecycle: true)
+        let fx1 = await QinaoTestFixture.make(hostID: "host.m123", withLifecycle: true)
         let obs1 = observations(turnID: "turn.with")
+        let plannedBudget = BASBudgetFrame(
+            runMode: .engage,
+            maxLoops: 3,
+            maxCandidates: 3,
+            maxDecodeTokens: 512,
+            retrievalDepth: 3,
+            precisionProfile: .protected,
+            deviceRoute: .hybridLocal,
+            thermalGuardLevel: .nominal,
+            maintenanceAllowed: false,
+            leaseID: "lease.m123",
+            leaseExpiresAt: Date().addingTimeInterval(60),
+            maintenanceClass: .light,
+            wakeIntentID: "wake.m123",
+            allowedHeads: ["answer"],
+            policyBundleVersion: "pb.v1",
+            policyDecisionIDs: [])
         _ = try await fx1.runtime.sendSession(
             obs1,
             coordinatorSeverity: .pass,
-            plannedBudget: fx1.plannedBudget)
+            plannedBudget: plannedBudget)
         let frame1 = await fx1.sovereign.sovereignFrame(
             sessionID: obs1.sessionID, turnID: obs1.turnID)
         XCTAssertEqual(
@@ -283,7 +196,7 @@ final class QinaoRuntimeSovereignFrameTests: XCTestCase {
             "deviceStateRef = routed budget leaseID when present")
 
         // Without lifecycle → routedBudget is nil → deviceStateRef nil.
-        let fx2 = await makeRuntime(withLifecycle: false)
+        let fx2 = await QinaoTestFixture.make(hostID: "host.m123", withLifecycle: false)
         let obs2 = observations(turnID: "turn.without")
         _ = try await fx2.runtime.sendSession(
             obs2, coordinatorSeverity: .pass)
