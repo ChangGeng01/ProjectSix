@@ -4048,6 +4048,34 @@ public struct BASThoughtFold: BASSchemaVersioned {
     }
 }
 
+// MARK: - M108 L3 whitepaper parity alias
+//
+// L3 whitepaper §6 ThoughtFold spec names the "host modulation
+// summary" field `host_mod_summary`; the substrate implementation
+// uses `hostEffectSummary` — semantically identical but a literal
+// whitepaper-↔-code audit would flag it as a naming drift.
+// `hostModSummary` is a zero-cost computed-property alias
+// forwarding to `hostEffectSummary`; both names round-trip to the
+// same storage so existing Codable payloads and 20+ production
+// call sites stay byte-for-byte identical.
+//
+// Same approach as `.empty` baselines (M106 / M107): expose the
+// whitepaper-literal name through a read-only computed surface
+// without touching stored state. When a future schema bump (v1.8.0)
+// is warranted, the stored property can be renamed and this alias
+// retained as a deprecated-on-read helper.
+extension BASThoughtFold {
+    /// L3 whitepaper §6 `host_mod_summary` literal alias. Returns
+    /// the same value as `hostEffectSummary`; they are the same
+    /// semantic field under two naming conventions (internal
+    /// "effect" vs whitepaper "mod"). Writable for symmetry — the
+    /// setter forwards to the canonical stored property.
+    public var hostModSummary: String {
+        get { hostEffectSummary }
+        set { hostEffectSummary = newValue }
+    }
+}
+
 public struct BASRenderedBoundaryGuide: Codable, Equatable, Sendable {
     public var allowedDomains: [String]
     public var blockedDomains: [String]
