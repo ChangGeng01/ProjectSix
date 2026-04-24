@@ -244,6 +244,9 @@ run_step "Qinao SDK import boundary check" \
 run_step "Qinao SDK sovereign redaction check" \
   "$ROOT/scripts/check_sovereign_redaction.sh"
 
+run_step "Sovereign auditTurn choke-point lint" \
+  "$ROOT/scripts/check_sovereign_choke_point.sh"
+
 run_step "Qinao SDK full test suite" \
   swift test --package-path "$ROOT/QinaoRuntimeSDK"
 
