@@ -265,4 +265,67 @@ final class BASL1L2L5CoverageProjectionTests: XCTestCase {
             [.leaseLife, .neuralOrgan, .hostConstitution])
         XCTAssertEqual(report.summaries.count, 3)
     }
+
+    // MARK: - L8 HippocampalWell (M98)
+
+    private func hippocampalObs(
+        kind: BASHippocampalMemorySignalKind,
+        subject: String
+    ) -> BASHippocampalMemoryObservation {
+        BASHippocampalMemoryObservation(
+            kind: kind,
+            shape: .quiet,
+            subjectID: subject,
+            salience: 0.5,
+            confidence: 0.5,
+            content: "x",
+            observedAt: t0)
+    }
+
+    func testHippocampalProjectionCarriesLayerAndFields() {
+        let bundle = BASHippocampalMemoryObservationBundle(
+            turnID: "t.l8",
+            sessionID: "s.l8",
+            observations: [
+                hippocampalObs(kind: .bundleRetrieved,
+                    subject: "host.v1"),
+                hippocampalObs(kind: .atomAdmitted,
+                    subject: "memory.alpha"),
+                hippocampalObs(kind: .atomCandidate,
+                    subject: "memory.beta"),
+            ],
+            emittedAt: t0)
+        let s = bundle.coverageSummary
+        XCTAssertEqual(s.layer, .hippocampalWell)
+        XCTAssertEqual(s.turnID, "t.l8")
+        XCTAssertEqual(s.sessionID, "s.l8")
+        XCTAssertEqual(s.totalObservations, 3)
+        XCTAssertEqual(
+            s.distinctSubjectCount, 3,
+            "3 distinct L8 subject IDs")
+        XCTAssertTrue(
+            s.hasCoreSignalCoverage,
+            "bundleRetrieved ⇒ hasBundleRetrieval predicate fires")
+        XCTAssertEqual(
+            s.budgetTotalCost,
+            BASHippocampalMemorySignalBudget.totalCost(
+                for: bundle),
+            accuracy: 1e-9,
+            "byte-equal budget delegation")
+    }
+
+    func testHippocampalProjectionNoRetrievalIsNotCore() {
+        let bundle = BASHippocampalMemoryObservationBundle(
+            turnID: "t.l8.no-retrieval",
+            sessionID: "s.l8",
+            observations: [
+                hippocampalObs(kind: .atomAdmitted,
+                    subject: "memory.a"),
+            ],
+            emittedAt: t0)
+        let s = bundle.coverageSummary
+        XCTAssertFalse(
+            s.hasCoreSignalCoverage,
+            "atom admitted without bundleRetrieved ⇒ not core")
+    }
 }

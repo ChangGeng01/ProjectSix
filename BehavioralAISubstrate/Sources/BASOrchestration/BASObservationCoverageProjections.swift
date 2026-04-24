@@ -196,3 +196,36 @@ extension BASHostConstitutionObservationBundle {
             emittedAt: emittedAt)
     }
 }
+
+// MARK: - L8 hippocampal well (M98)
+//
+// Completes the 14-layer coverage projection matrix. L8 is the
+// hippocampal memory layer — retrieval events + pinning events +
+// forgetting events per turn. `hasCoreSignalCoverage` surfaces the
+// `hasBundleRetrieval` predicate (L8 is "healthy" when at least
+// one retrieval was observed in the turn). Closes the remaining
+// cognitive-layer gap identified in the M97 post-mortem; every
+// per-turn observation bundle type that exists as a substrate
+// first-class type now has a matching `coverageSummary` edge that
+// hosts can stream through QinaoRuntime.sendSession's
+// `additionalCoverageSummaries:` parameter (M95).
+
+extension BASHippocampalMemoryObservationBundle {
+    /// Neutral coverage summary for L8. `distinctSubjectCount`
+    /// maps to the distinct memory subjects touched this turn
+    /// (retrieval refs / pin refs / forget refs). `hasCoreSignalCoverage`
+    /// surfaces the existing `hasBundleRetrieval` predicate — L8 is
+    /// "healthy" when at least one retrieval event was observed.
+    public var coverageSummary: BASObservationCoverageSummary {
+        BASObservationCoverageSummary(
+            layer: .hippocampalWell,
+            turnID: turnID,
+            sessionID: sessionID,
+            totalObservations: observations.count,
+            distinctSubjectCount: subjectIDs.count,
+            hasCoreSignalCoverage: hasCoreSignalCoverage,
+            budgetTotalCost:
+                BASHippocampalMemorySignalBudget.totalCost(for: self),
+            emittedAt: emittedAt)
+    }
+}
