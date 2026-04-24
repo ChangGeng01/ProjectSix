@@ -232,19 +232,44 @@ public actor QinaoRuntime {
         /// twin, because a halted turn is a failed outcome and must
         /// not distort the lifecycle's continuous state.
         public let turnRecorded: BASLeaseLifeCoordinator.TurnRecorded?
+        /// M125 皮肤 — L12 surface decision derived from the healthy
+        /// turn's audit + coverage severity. Present for every
+        /// TurnOutcome returned by `sendSession` (`.halt` branches
+        /// throw rather than return, so a TurnOutcome always implies
+        /// either `sessionHalted == true` (rollback/deadStop) or a
+        /// clean pass).
+        ///
+        /// Hosts consume this to decide which QinaoUI component to
+        /// mount:
+        ///
+        ///    QinaoUI.ComponentID(surfaceDecision.surface.rawValue)
+        ///
+        /// M88's raw-value parity pin guarantees the string is a
+        /// valid ComponentID ("compare-panel" / "draft-shell" /
+        /// "delay-packet" / "boundary-script" / "silent-stub"), so
+        /// no explicit bridge type is needed; QinaoUI stays a
+        /// dependency-free leaf module.
+        ///
+        /// `nil` only when a future non-standard code path bypasses
+        /// the healthy-path derivation — the main `sendSession`
+        /// contract is "every returned TurnOutcome has a
+        /// surfaceDecision". Tests pin this contract.
+        public let surfaceDecision: BASSurfaceDecision?
 
         public init(
             audit: QinaoSovereignControlPlane.AuditReport,
             coverage: QinaoSovereignControlPlane.CoverageReading,
             sessionHalted: Bool,
             routedBudget: BASBudgetFrame? = nil,
-            turnRecorded: BASLeaseLifeCoordinator.TurnRecorded? = nil
+            turnRecorded: BASLeaseLifeCoordinator.TurnRecorded? = nil,
+            surfaceDecision: BASSurfaceDecision? = nil
         ) {
             self.audit = audit
             self.coverage = coverage
             self.sessionHalted = sessionHalted
             self.routedBudget = routedBudget
             self.turnRecorded = turnRecorded
+            self.surfaceDecision = surfaceDecision
         }
     }
 
@@ -610,7 +635,11 @@ public actor QinaoRuntime {
                 coverage: coverage,
                 sessionHalted: true,
                 routedBudget: routedBudget,
-                turnRecorded: nil)
+                turnRecorded: nil,
+                surfaceDecision: Self.deriveSurfaceDecision(
+                    auditSeverity: report.severity,
+                    coverageSeverity: coverage.severity,
+                    auditRef: report.auditRef))
         }
 
         // M70 — healthy turn path: record the turn on the lifecycle
@@ -638,7 +667,113 @@ public actor QinaoRuntime {
             coverage: coverage,
             sessionHalted: false,
             routedBudget: routedBudget,
-            turnRecorded: turnRecorded)
+            turnRecorded: turnRecorded,
+            surfaceDecision: Self.deriveSurfaceDecision(
+                auditSeverity: report.severity,
+                coverageSeverity: coverage.severity,
+                auditRef: report.auditRef))
+    }
+
+    // MARK: - M125 · L12 surface-decision derivation (皮肤)
+    //
+    // The healthy-path + auto-halt-but-returned path of sendSession
+    // derives a BASSurfaceDecision so hosts immediately know which
+    // of the 5 QinaoUI surfaces (compare-panel / draft-shell /
+    // delay-packet / boundary-script / silent-stub) to mount. The
+    // rawValue of `surfaceDecision.surface` is byte-equal to
+    // `QinaoUI.ComponentID.rawValue` (M88 pinned parity), so the
+    // bridge is a trivial `ComponentID(decision.surface.rawValue)`
+    // call in the host — no typed bridge helper is needed, QinaoUI
+    // stays a zero-dep leaf.
+    //
+    // Mapping (audit severity is the primary signal; coverage
+    // severity escalates a healthy audit to advisory when the
+    // structural reader flagged something sub-critical):
+    //
+    //   auditSeverity == .pass  + coverageSeverity == .clean
+    //     → draft-shell + user-affirm + minimal
+    //       substitute = .render(candidateID: <deterministic>)
+    //
+    //   auditSeverity == .pass  + coverageSeverity == .advisory
+    //     → draft-shell + user-affirm + reasoned (surface the
+    //       coverage advisory reason codes without blocking)
+    //
+    //   auditSeverity == .throttle / .shadowLock / .toolCut /
+    //   .memoryFreeze / .quarantine
+    //     → delay-packet + host-override + minimal
+    //       substitute = .deferToLater(retryAfterSeconds: 60)
+    //
+    //   auditSeverity == .rollback → boundary-script + host-override
+    //     + explicit + substitute = .refuse(auditReference: ...)
+    //
+    //   auditSeverity == .deadStop → silent-stub + host-override
+    //     + silent + substitute = .refuse(auditReference: ...)
+    //
+    // `auditReference` on the decision is always set to the report's
+    // `auditRef` so downstream UI can link back to the ledger entry.
+    nonisolated static func deriveSurfaceDecision(
+        auditSeverity: QinaoSovereignControlPlane.AuditSeverity,
+        coverageSeverity:
+            QinaoSovereignControlPlane.CoverageSeverity,
+        auditRef: String
+    ) -> BASSurfaceDecision {
+        switch auditSeverity {
+        case .deadStop:
+            return BASSurfaceDecision(
+                surface: .silentStub,
+                agency: .hostOverride,
+                disclosure: .silent,
+                substitute: .refuse(auditReference: auditRef),
+                reasonCodes: ["audit.severity:deadStop"],
+                auditReference: auditRef)
+
+        case .rollback:
+            return BASSurfaceDecision(
+                surface: .boundaryScript,
+                agency: .hostOverride,
+                disclosure: .explicit,
+                substitute: .refuse(auditReference: auditRef),
+                reasonCodes: ["audit.severity:rollback"],
+                auditReference: auditRef)
+
+        case .throttle, .shadowLock, .toolCut,
+             .memoryFreeze, .quarantine:
+            return BASSurfaceDecision(
+                surface: .delayPacket,
+                agency: .hostOverride,
+                disclosure: .minimal,
+                substitute: .deferToLater(
+                    retryAfterSeconds: 60),
+                reasonCodes: [
+                    "audit.severity:" + auditSeverity.rawValue,
+                ],
+                auditReference: auditRef)
+
+        case .pass:
+            // Coverage severity escalates disclosure when clean
+            // audit still has structural warnings.
+            let disclosure: BASSurfaceDisclosure
+            var codes = ["audit.severity:pass"]
+            switch coverageSeverity {
+            case .clean:
+                disclosure = .minimal
+            case .advisory:
+                disclosure = .reasoned
+                codes.append("coverage.severity:advisory")
+            case .halt:
+                // Theoretically unreachable: coverage == .halt
+                // throws before the healthy return; defensive.
+                disclosure = .explicit
+                codes.append("coverage.severity:halt")
+            }
+            return BASSurfaceDecision(
+                surface: .draftShell,
+                agency: .userAffirm,
+                disclosure: disclosure,
+                substitute: .render(candidateID: auditRef),
+                reasonCodes: codes,
+                auditReference: auditRef)
+        }
     }
 
     // MARK: - M69 lifecycle-aware budget routing
