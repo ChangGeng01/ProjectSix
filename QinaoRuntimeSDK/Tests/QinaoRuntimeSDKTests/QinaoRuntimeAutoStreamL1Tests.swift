@@ -12,30 +12,35 @@ import BASOrchestration
 @testable import QinaoSovereign
 @testable import QinaoLoop
 
-/// M121 — end-to-end test: when QinaoRuntime.sendSession is called
-/// with a lifecycle + plannedBudget, the L1 observation bundle is
-/// auto-derived and streamed into the L14 audit ledger's
-/// observationBundle storage.
+/// M121 + M122 — end-to-end test: `QinaoRuntime.sendSession`
+/// auto-streams the L1 / L3 / L5 observation bundles into the L14
+/// audit ledger's `observationBundle` storage every turn.
 ///
-/// This is the first production path that consumes:
+/// M121 landed the L1 pipe (lease-life). M122 extended the same
+/// choke-point to L3 (thought-fold) and L5 (host-constitution),
+/// which fire unconditionally on every healthy turn. The L1
+/// branch still gates on `lifecycle + routedBudget`.
+///
+/// Production paths consumed:
 /// - M66 QinaoLifecycle
 /// - M60 BASLeaseLifeObservationBundle.derive
+/// - M61 BASHostConstitutionObservationBundle.derive  (M122)
+/// - M62 BASThoughtFoldObservationBundle.derive       (M122)
 /// - M95 sendSession additionalCoverageSummaries hook
-/// - M97 L1 coverageSummary projection
+/// - M97 L1/L2/L5 coverageSummary projections
 /// - M104 prepareBudgetForTurn routed-budget pipeline
-///
-/// All 5 pieces now flow together: lifecycle → live thermal →
-/// routed budget → derive L1 bundle → stream to ledger →
-/// queryable via observationBundle(sessionID:turnID:).
 ///
 /// Pins:
 /// 1. With lifecycle + plannedBudget: ledger observationBundle
-///    is non-nil AND contains L1 summary
-/// 2. Without lifecycle: pre-M121 behavior (no L1 auto-stream)
-/// 3. Without plannedBudget: pre-M121 behavior
+///    is non-nil AND contains L14 + L1 + L3 + L5 summaries in
+///    deterministic order.
+/// 2. Without lifecycle: L1 is absent but L14+L3+L5 still stream
+///    (M122 — pre-M121's "no bundle at all" no longer holds).
+/// 3. Without plannedBudget: same as (2) — only L1 depends on the
+///    routed budget.
 /// 4. Caller-supplied additionalCoverageSummaries are preserved
-///    alongside the auto-injected L1 (append, not replace)
-/// 5. Custom expectedCoverageLayerIDs not modified by auto-inject
+///    alongside the auto-injected L1+L3+L5 (append, not replace).
+/// 5. Custom expectedCoverageLayerIDs not modified by auto-inject.
 final class QinaoRuntimeAutoStreamL1Tests: XCTestCase {
 
     // MARK: - Fixtures
@@ -195,7 +200,7 @@ final class QinaoRuntimeAutoStreamL1Tests: XCTestCase {
             policyHash: "policy.m121")
     }
 
-    // MARK: - 1. With lifecycle + planned budget → L1 auto-streams
+    // MARK: - 1. With lifecycle + planned budget → L1+L3+L5 auto-streams
 
     func testLifecycleAndPlannedBudgetAutoStreamsL1Bundle()
         async throws {
@@ -214,19 +219,19 @@ final class QinaoRuntimeAutoStreamL1Tests: XCTestCase {
             bundle,
             "observation bundle must be recorded when lifecycle " +
                 "+ plannedBudget both present")
-        // Should have L14 + auto-injected L1 = 2 summaries.
+        // M122 — L14 always first; then caller additions (none here);
+        // then auto-inject in L1 → L3 → L5 order.
         XCTAssertEqual(
-            bundle?.summaries.count, 2,
-            "L14 + auto-injected L1")
+            bundle?.summaries.count, 4,
+            "L14 + L1 + L3 + L5")
+        let layers = bundle?.summaries.map(\.layer) ?? []
         XCTAssertEqual(
-            bundle?.summaries.first?.layer, .sovereign,
-            "L14 always first")
-        XCTAssertEqual(
-            bundle?.summaries.last?.layer, .leaseLife,
-            "L1 auto-injected after L14")
+            layers,
+            [.sovereign, .leaseLife, .thoughtFold, .hostConstitution],
+            "M122 auto-inject order: L14, L1, L3, L5")
     }
 
-    // MARK: - 2. No lifecycle → no L1 auto-stream
+    // MARK: - 2. No lifecycle → L1 absent but L3+L5 still fire
 
     func testNoLifecycleDoesNotAutoStreamL1() async throws {
         let fx = await makeRuntime(withLifecycle: false)
@@ -239,12 +244,23 @@ final class QinaoRuntimeAutoStreamL1Tests: XCTestCase {
 
         let bundle = await fx.sovereign.observationBundle(
             sessionID: obs.sessionID, turnID: obs.turnID)
-        XCTAssertNil(
+        // M122 — bundle is now always recorded because L3/L5
+        // auto-inject on every turn. L1 stays off because
+        // lifecycle is nil.
+        XCTAssertNotNil(
             bundle,
-            "no lifecycle → no auto-stream (pre-M121 behaviour)")
+            "M122: L3+L5 stream regardless of lifecycle")
+        let layers = bundle?.summaries.map(\.layer) ?? []
+        XCTAssertEqual(
+            layers,
+            [.sovereign, .thoughtFold, .hostConstitution],
+            "no L1 without lifecycle; L3+L5 still present")
+        XCTAssertFalse(
+            layers.contains(.leaseLife),
+            "L1 must be absent without lifecycle")
     }
 
-    // MARK: - 3. No plannedBudget → no L1 auto-stream
+    // MARK: - 3. No plannedBudget → L1 absent but L3+L5 still fire
 
     func testNoPlannedBudgetDoesNotAutoStreamL1() async throws {
         let fx = await makeRuntime(withLifecycle: true)
@@ -256,25 +272,39 @@ final class QinaoRuntimeAutoStreamL1Tests: XCTestCase {
 
         let bundle = await fx.sovereign.observationBundle(
             sessionID: obs.sessionID, turnID: obs.turnID)
-        XCTAssertNil(
+        XCTAssertNotNil(
             bundle,
-            "no plannedBudget → no routed budget → no L1 derive")
+            "M122: L3+L5 stream regardless of plannedBudget")
+        let layers = bundle?.summaries.map(\.layer) ?? []
+        XCTAssertEqual(
+            layers,
+            [.sovereign, .thoughtFold, .hostConstitution],
+            "no L1 without routed budget; L3+L5 still present")
+        XCTAssertFalse(
+            layers.contains(.leaseLife),
+            "L1 must be absent without routed budget")
     }
 
-    // MARK: - 4. Caller-supplied extras coexist with auto-injected L1
+    // MARK: - 4. Caller-supplied extras coexist; report dedups
+    //         on layer (last-write-wins, first-seen order).
 
     func testCallerSuppliedExtrasCoexistWithAutoL1()
         async throws {
         let fx = await makeRuntime(withLifecycle: true)
         let obs = observations(turnID: "turn.mixed")
 
-        // Caller passes an L3 summary themselves; the runtime
-        // should append L1 on top without replacing the L3.
-        let l3Summary = BASObservationCoverageSummary(
+        // Caller passes an L3 summary themselves. The runtime
+        // appends its auto-injected L1+L3+L5. `BASObservation
+        // ReconciliationReport`'s init deduplicates by layer —
+        // last-write-wins, first-seen position preserved — so the
+        // final bundle carries exactly one L3 summary (value = auto
+        // L3), and the caller's L3 *position* comes first among the
+        // non-L14 layers.
+        let callerL3 = BASObservationCoverageSummary(
             layer: .thoughtFold,
             turnID: obs.turnID,
             sessionID: obs.sessionID,
-            totalObservations: 1,
+            totalObservations: 99,       // distinctive marker
             distinctSubjectCount: 1,
             hasCoreSignalCoverage: true,
             budgetTotalCost: 0.1,
@@ -284,19 +314,31 @@ final class QinaoRuntimeAutoStreamL1Tests: XCTestCase {
             obs,
             coordinatorSeverity: .pass,
             plannedBudget: fx.plannedBudget,
-            additionalCoverageSummaries: [l3Summary])
+            additionalCoverageSummaries: [callerL3])
 
         let bundle = await fx.sovereign.observationBundle(
             sessionID: obs.sessionID, turnID: obs.turnID)
         XCTAssertNotNil(bundle)
+        // L14 + L3 (caller position, auto value) + L1 + L5 = 4
         XCTAssertEqual(
-            bundle?.summaries.count, 3,
-            "L14 + caller L3 + auto-injected L1 = 3 summaries")
+            bundle?.summaries.count, 4,
+            "dedup by layer: caller L3 + auto L3 collapse to one")
         let layers = bundle?.summaries.map(\.layer) ?? []
         XCTAssertEqual(
             layers,
-            [.sovereign, .thoughtFold, .leaseLife],
-            "L14 first, caller-supplied middle, auto-L1 last")
+            [
+                .sovereign,         // L14 always first
+                .thoughtFold,       // L3 (first-seen via caller)
+                .leaseLife,         // L1 (auto)
+                .hostConstitution,  // L5 (auto)
+            ],
+            "order = first-seen; dedup last-write-wins")
+        // Pin last-write-wins: the caller's 99-totalObservations
+        // marker must have been overwritten by the auto L3.
+        let l3 = bundle?.summaries.first { $0.layer == .thoughtFold }
+        XCTAssertNotEqual(
+            l3?.totalObservations, 99,
+            "auto L3 must have overwritten caller L3 (LWW)")
     }
 
     // MARK: - 5. Custom expectedLayerIDs preserved

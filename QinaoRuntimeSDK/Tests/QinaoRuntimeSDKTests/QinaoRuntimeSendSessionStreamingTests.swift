@@ -19,27 +19,39 @@ import BASSovereign
 /// already built the streaming machinery on the sovereign side, but
 /// no caller in the main trunk ever used it.
 ///
-/// M95 adds one optional parameter to `sendSession`:
+/// M95 added one optional parameter to `sendSession`:
 ///
 ///     additionalCoverageSummaries: [BASObservationCoverageSummary]?
 ///         = nil
 ///
-/// Nil (default) preserves the pre-M95 path byte-for-byte: zero
-/// streamed bundles. Non-nil (even empty) triggers the streaming
+/// Nil (default) *used to* preserve the pre-M95 path byte-for-byte:
+/// zero streamed bundles. Non-nil (even empty) triggered the streaming
 /// branch — the per-turn observation bundle lands in the ledger's
 /// parallel storage alongside the always-present L14 summary.
 ///
-/// Covered contracts:
+/// ## M122 update
 ///
-/// 1. **Backward compat** — default nil leaves `observationBundle`
-///    lookup returning `nil` for the turn; pre-M95 byte-for-byte.
+/// M121 wired L1 (lease-life) auto-stream on `sendSession` when the
+/// caller attaches a `QinaoLifecycle` + `plannedBudget`. M122 extended
+/// the same choke-point to L3 (thought-fold) and L5 (host-
+/// constitution), which auto-inject on *every* healthy turn — no
+/// gating. Consequence: the "default nil produces an empty bundle"
+/// pin no longer holds — the bundle always carries at least L14 + L3
+/// + L5, plus L1 when a lifecycle is attached.
+///
+/// Covered contracts (post-M122):
+///
+/// 1. **Default path auto-streams L3+L5** — default nil still fires
+///    the streaming branch because L3+L5 are auto-injected. (Formerly
+///    pinned "no bundle", now pins "L14 + L3 + L5".)
 /// 2. **Streaming path** — non-nil forwards and the bundle
 ///    round-trips via `observationBundle(sessionID:turnID:)`.
-/// 3. **Empty-array path** — `[]` still triggers streaming (nil vs
-///    non-nil is the signal, not count).
+/// 3. **Empty-array path** — `[]` still triggers streaming; post-M122
+///    the bundle carries L14 + auto L3 + auto L5 (= 3 summaries).
 /// 4. **Halt path with streaming** — a coverage-halt throw still
 ///    streams the bundle (recordTurnCoverage runs before the halt
-///    branch fires).
+///    branch fires). Post-M122 the halt bundle includes L14 + caller
+///    extras + auto L3 + auto L5.
 /// 5. **Pre-halted session** — nothing streams because the pre-flight
 ///    gate refuses the turn before recordTurnCoverage runs.
 final class QinaoRuntimeSendSessionStreamingTests: XCTestCase {
@@ -151,11 +163,13 @@ final class QinaoRuntimeSendSessionStreamingTests: XCTestCase {
             emittedAt: Date(timeIntervalSince1970: 1_700_000_000))
     }
 
-    // MARK: - 1. Default nil preserves pre-M95 behavior
+    // MARK: - 1. Default nil still auto-streams L3 + L5 (M122)
 
-    /// Without `additionalCoverageSummaries:`, the ledger's
-    /// observation-bundle storage stays empty for the turn —
-    /// pre-M95 contract preserved byte-for-byte.
+    /// Post-M122 contract: default nil still fires the streaming
+    /// branch because L3 (thought-fold) + L5 (host-constitution)
+    /// auto-inject on every healthy turn regardless of the caller
+    /// passing `additionalCoverageSummaries:`. This supersedes the
+    /// pre-M95 pin of "default → empty bundle".
     func testDefaultNilDoesNotStreamObservationBundle() async throws {
         let fx = await makeRuntime()
         let obs = observations()
@@ -165,9 +179,13 @@ final class QinaoRuntimeSendSessionStreamingTests: XCTestCase {
 
         let bundle = await fx.sovereign.observationBundle(
             sessionID: obs.sessionID, turnID: obs.turnID)
-        XCTAssertNil(
+        XCTAssertNotNil(
             bundle,
-            "pre-M95 default path must leave observationBundle empty")
+            "M122: L3+L5 auto-inject fires every turn")
+        XCTAssertEqual(
+            bundle?.summaries.map(\.layer),
+            [.sovereign, .thoughtFold, .hostConstitution],
+            "L14 + auto L3 + auto L5 (no L1 — no lifecycle here)")
     }
 
     // MARK: - 2. Non-nil triggers streaming; bundle round-trips
@@ -217,9 +235,9 @@ final class QinaoRuntimeSendSessionStreamingTests: XCTestCase {
 
     // MARK: - 3. Empty array still triggers streaming
 
-    /// Passing `[]` (non-nil but empty) still fires the streaming
-    /// branch — nil vs non-nil is the trigger, not count. The bundle
-    /// carries exactly the L14 summary.
+    /// Passing `[]` (non-nil but empty) fires the streaming branch.
+    /// Post-M122 the bundle is L14 + auto L3 + auto L5 = 3 summaries
+    /// (L1 stays absent without a lifecycle).
     func testEmptyArrayTriggersStreamingWithOnlyL14() async throws {
         let fx = await makeRuntime()
         let obs = observations(
@@ -234,10 +252,11 @@ final class QinaoRuntimeSendSessionStreamingTests: XCTestCase {
             sessionID: obs.sessionID, turnID: obs.turnID)
         XCTAssertNotNil(bundle,
             "non-nil empty array still triggers streaming")
-        XCTAssertEqual(bundle?.summaries.count, 1,
-            "only L14 in the bundle when extras is empty")
+        XCTAssertEqual(bundle?.summaries.count, 3,
+            "L14 + auto L3 + auto L5 = 3")
         XCTAssertEqual(
-            bundle?.summaries.first?.layer, .sovereign)
+            bundle?.summaries.map(\.layer),
+            [.sovereign, .thoughtFold, .hostConstitution])
     }
 
     // MARK: - 4. Coverage-halt still streams the bundle
@@ -272,9 +291,13 @@ final class QinaoRuntimeSendSessionStreamingTests: XCTestCase {
             sessionID: obs.sessionID, turnID: obs.turnID)
         XCTAssertNotNil(bundle,
             "halt branch must still have streamed the bundle")
+        // Post-M122: halt branch still carries caller extras AND
+        // the auto-injected L3 + L5. Order = L14, caller extras
+        // (first-seen positions), auto L3 (dedup with caller L3 if
+        // any — none here), auto L5.
         XCTAssertEqual(
             bundle?.summaries.map(\.layer),
-            [.sovereign, .leaseLife])
+            [.sovereign, .leaseLife, .thoughtFold, .hostConstitution])
     }
 
     // MARK: - 5. Pre-halted session streams nothing

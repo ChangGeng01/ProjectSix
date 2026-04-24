@@ -52,6 +52,41 @@ public actor QinaoHost {
             trustedDeviceIDs: trustedDeviceIDs)
     }
 
+    // MARK: - M122 L5 governance surface (hot-path accessors)
+    //
+    // These pass-throughs expose the raw `BASHostConstitution` and
+    // `BASHostVersionTree` the pipeline carries — not the domain-
+    // projected vault. `QinaoRuntime.sendSession` uses them as the
+    // ingredients for `BASHostConstitutionObservationBundle.derive(...)`
+    // so the L5 governance observation lands in the audit ledger
+    // alongside L1 (M121) and L14 (M9) every turn.
+    //
+    // The methods are deliberately thin — no staging, no approval
+    // lifecycle — so their presence on the public surface doesn't
+    // let callers circumvent `submit / preview / approve / reject`.
+    // They read the already-committed state.
+
+    /// M122 — The active `BASHostConstitution` currently committed
+    /// in the pipeline. Non-nil once the pipeline has been
+    /// initialised with a seed constitution (which every production
+    /// call site does in `init`). Hosts that wire a pipeline without
+    /// a seed would receive a degenerate value — but since the
+    /// pipeline's own initialiser requires a non-optional seed, this
+    /// accessor is always valid on any runtime built through the
+    /// public surface.
+    public func currentConstitution() async -> BASHostConstitution {
+        await pipeline.currentConstitution()
+    }
+
+    /// M122 — The current `BASHostVersionTree` backing the
+    /// pipeline's version pointer. Includes committed versions,
+    /// pending candidate IDs, and frozen-version set — everything
+    /// the L5 governance derivation in
+    /// `BASHostConstitutionObservationBundle.derive(...)` needs.
+    public func currentVersionTree() async -> BASHostVersionTree {
+        await pipeline.currentVersionTree()
+    }
+
     /// Stage a new host change candidate for preview.
     @discardableResult
     public func submit(

@@ -2,6 +2,8 @@ import Foundation
 import BASRuntimeCore
 import BASOrgan
 import BASLeaseLife
+import BASOrchestration
+import BASMemory
 import QinaoHost
 import QinaoMemory
 import QinaoRisk
@@ -370,9 +372,60 @@ public actor QinaoRuntime {
         // ["L14", "L1"] so the coverage verdict expects (and
         // validates) L1's presence. Callers that pass a custom
         // expectedLayerIDs are trusted and not modified.
+        // M122 血液流动 — L1 / L3 / L5 auto-stream discipline
+        //
+        // M121 wired L1 (lease-life) on the condition that both
+        // lifecycle and plannedBudget are present. M122 extends the
+        // same choke-point to L3 (thought-fold) and L5 (host-
+        // constitution) so every healthy turn leaves an L1+L3+L5+L14
+        // residue in the ledger rather than a lone L14 stub.
+        //
+        //   L1 (lease-life)        — needs lifecycle + routedBudget
+        //                            (M121, unchanged).
+        //   L3 (thought-fold)      — derived from a minimum-viable
+        //                            `BASThoughtFold` built out of
+        //                            the TurnObservations (sessionID/
+        //                            turnID/snapshotRef/policyHash);
+        //                            always fires when the caller
+        //                            has a sessionID + turnID, which
+        //                            is every healthy call site.
+        //   L5 (host-constitution) — derived from the pipeline's
+        //                            committed constitution + version
+        //                            tree via QinaoHost pass-throughs;
+        //                            always fires on turns where a
+        //                            host is attached (every call
+        //                            site today).
+        //
+        // The expected-layer-ID set is expanded in lockstep with the
+        // injected layers, but only when the caller left the default
+        // ["L14"] — custom expectation sets are treated as an explicit
+        // statement of what the caller wants validated and the auto-
+        // inject never rewrites them.
+        //
+        // Rationale for the minimum-viable fold:
+        //   * `foldID`           — deterministic per (session, turn)
+        //                           so the ledger row is stable.
+        //   * `restorePointer`   — the observations' snapshotRef;
+        //                           an L3 observation always points
+        //                           back at the same snapshot the L14
+        //                           audit row references.
+        //   * `checksum`         — policyHash; any policy drift is
+        //                           visible as a fold-checksum drift.
+        //   * `snapshotRef`      — same — produces a
+        //                           `.snapshotAnchored` signal whenever
+        //                           the turn has a non-empty
+        //                           snapshotRef (the production path).
+        // Every other field is left defaulted, so this stays a thin
+        // but real blood vessel; the fully-typed fold produced by the
+        // coordinator (`BASThoughtFoldAssembly`) remains the main
+        // path for richer derivations when a host wires it into the
+        // additionalCoverageSummaries parameter explicitly.
         var finalAdditionalSummaries =
             additionalCoverageSummaries
         var finalExpectedLayerIDs = expectedCoverageLayerIDs
+        var autoInjectedLayerCodes: [String] = []
+
+        // L1 auto-stream (M121 — unchanged).
         if let lifecycle = lifecycle,
            let routed = routedBudget {
             let l1Bundle = lifecycle
@@ -384,12 +437,63 @@ public actor QinaoRuntime {
             var combined = finalAdditionalSummaries ?? []
             combined.append(l1Bundle.coverageSummary)
             finalAdditionalSummaries = combined
-            // Expand expectation set to include L1 when caller
-            // left the default ["L14"]; custom sets stay
-            // untouched.
-            if expectedCoverageLayerIDs == ["L14"] {
-                finalExpectedLayerIDs = ["L14", "L1"]
-            }
+            autoInjectedLayerCodes.append("L1")
+        }
+
+        // M122 — L3 auto-stream. A minimum-viable BASThoughtFold is
+        // built from the TurnObservations; see rationale above.
+        // Unlike L1/L5 (bundle-level projections), L3's coverage
+        // summary hangs off `BASThoughtFold` itself because the fold
+        // is the compact-slot/signature/ref-weighted artifact the
+        // coverage budget references. We invoke the fold-level
+        // projection directly so the summary is byte-stable under a
+        // deterministic (fold, turnID, sessionID, emittedAt) tuple.
+        let l3Fold = BASThoughtFold(
+            foldID: "fold."
+                + observations.sessionID
+                + "." + observations.turnID,
+            hostEffectSummary: "",
+            restorePointer: observations.snapshotRef,
+            checksum: observations.policyHash,
+            snapshotRef: observations.snapshotRef)
+        do {
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l3Fold.coverageSummary(
+                turnID: observations.turnID,
+                sessionID: observations.sessionID,
+                emittedAt: now()))
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L3")
+        }
+
+        // M122 — L5 auto-stream. Pulls the committed constitution +
+        // version tree off QinaoHost's pipeline. Forget requests are
+        // not surfaced through the pipeline, so we pass nil; a future
+        // milestone can route the in-flight forget request through
+        // here once QinaoHost exposes it.
+        let l5Constitution = await host.currentConstitution()
+        let l5VersionTree = await host.currentVersionTree()
+        let l5Bundle = BASHostConstitutionObservationBundle.derive(
+            fromHostConstitution: l5Constitution,
+            versionTree: l5VersionTree,
+            forgetRequest: nil,
+            turnID: observations.turnID,
+            sessionID: observations.sessionID,
+            emittedAt: now())
+        do {
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l5Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L5")
+        }
+
+        // Expand the expectation set only when the caller accepted
+        // the default ["L14"]; a custom expectation is treated as an
+        // explicit statement and left alone.
+        if expectedCoverageLayerIDs == ["L14"]
+           && !autoInjectedLayerCodes.isEmpty {
+            finalExpectedLayerIDs =
+                ["L14"] + autoInjectedLayerCodes
         }
 
         let coverage = await sovereign.recordTurnCoverage(
