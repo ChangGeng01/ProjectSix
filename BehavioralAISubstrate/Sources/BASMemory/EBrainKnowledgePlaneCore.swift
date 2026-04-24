@@ -113,6 +113,20 @@ public struct BASHostVersion: BASSchemaVersioned {
     public var reason: String
     public var rollbackRef: String?
     public var approvedByPolicy: Bool
+    /// M110 — L5 whitepaper §6 `BASHostVersionTree.parentVersionID`
+    /// coverage. Links this version to its immediate ancestor in
+    /// the host-version tree (nil for the root version). Optional
+    /// so pre-M110 fixtures decode without change (auto-synth
+    /// Codable uses decodeIfPresent for `String?`).
+    public var parentVersionID: String?
+    /// M110 — L5 whitepaper §6 `BASHostVersionTree.signature`
+    /// coverage. Cryptographic signature over (versionID +
+    /// parentVersionID + changedFields + reason + createdAt) that
+    /// a sovereign-layer verifier can cross-check before allowing
+    /// restore. Optional so pre-M110 fixtures decode unchanged;
+    /// production flows will fill this from the same Ed25519
+    /// key-pair as the audit ledger (M87).
+    public var signature: String?
 
     public init(
         schemaVersion: String = BASHostVersion.currentSchemaVersion,
@@ -121,7 +135,9 @@ public struct BASHostVersion: BASSchemaVersioned {
         changedFields: [String],
         reason: String,
         rollbackRef: String? = nil,
-        approvedByPolicy: Bool
+        approvedByPolicy: Bool,
+        parentVersionID: String? = nil,
+        signature: String? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.versionID = versionID
@@ -130,6 +146,10 @@ public struct BASHostVersion: BASSchemaVersioned {
         self.reason = reason
         self.rollbackRef = rollbackRef
         self.approvedByPolicy = approvedByPolicy
+        self.parentVersionID = parentVersionID?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.signature = signature?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

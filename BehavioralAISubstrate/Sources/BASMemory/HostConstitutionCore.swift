@@ -353,6 +353,22 @@ public struct BASHostConstitution: BASSchemaVersioned {
     }
 }
 
+// MARK: - M110 L5 whitepaper parity alias
+
+/// L5 whitepaper §6 `BASHostConstitution.activeVersionID` literal
+/// alias. Returns the same storage as `activeVersion`; the
+/// substrate's canonical name is `activeVersion` but the L5
+/// whitepaper uses `activeVersionID`. This zero-cost computed
+/// forwards both read + write so whitepaper-literal audits pass
+/// without touching 30+ existing call sites. Mirrors the M108
+/// `BASThoughtFold.hostModSummary` alias pattern.
+extension BASHostConstitution {
+    public var activeVersionID: String {
+        get { activeVersion }
+        set { activeVersion = newValue }
+    }
+}
+
 public struct BASHostChangeCandidate: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.1.0"
 
