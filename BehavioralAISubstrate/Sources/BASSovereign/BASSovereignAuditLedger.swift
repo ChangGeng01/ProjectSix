@@ -81,11 +81,42 @@ public actor BASSovereignAuditLedger {
 
     private static let genesisHash = "GENESIS"
 
-    /// Shared secret used to sign canonical entry bytes. In a real
-    /// deployment this is rotated by the `TokenAuthority`'s keyring; v1
-    /// keeps it as a constructor-injected value so tests can deterministically
-    /// mint chains.
-    private let signingSecret: SymmetricKey
+    /// M87 — internal signing mode.
+    ///
+    /// Before M87 the ledger hard-coded HMAC-SHA256 with a
+    /// `SymmetricKey`. M87 adds Ed25519 as a first-class alternative
+    /// for production cross-verifier integrity. See
+    /// `BASSovereignEd25519Signing.swift` for why asymmetric signing
+    /// matters here. The enum keeps both paths addressable from the
+    /// same ledger instance so callers (tests, existing call sites
+    /// using `withSeed(_:)`, new prod call sites using
+    /// `init(ed25519KeyPair:)`) share one public surface.
+    private enum SigningMode: Sendable {
+        case hmac(SymmetricKey)
+        case ed25519(BASSovereignEd25519KeyPair)
+    }
+
+    /// Active signing mode. Selected at construction and immutable
+    /// for the ledger's lifetime — switching mode mid-chain would
+    /// break `verifyChainIntegrity()` because the prior signatures
+    /// were computed with a different scheme.
+    private let signingMode: SigningMode
+
+    /// Convenience accessor for the Ed25519 public key when the
+    /// ledger is in `.ed25519` mode; nil in `.hmac` mode. Cross-
+    /// process verifiers that already hold the ledger instance can
+    /// use this to pre-populate their verifier, though the
+    /// **intended production pattern** is: provisioner generates the
+    /// key pair once, stores the private half in a keychain, stores
+    /// the public half in a well-known manifest, and hands the
+    /// public half to every verifier at boot. The ledger's own copy
+    /// here is a convenience for in-process paths.
+    public var ed25519PublicKey: Curve25519.Signing.PublicKey? {
+        switch signingMode {
+        case .hmac: return nil
+        case .ed25519(let pair): return pair.publicKey
+        }
+    }
 
     /// Namespace tag ("which keyring version am I signing under").
     /// Included in canonical bytes so a reader with a different namespace
@@ -139,24 +170,69 @@ public actor BASSovereignAuditLedger {
     /// parsing signalRefs blobs.
     private var cutOutcomes: [String: BASSovereignLineageCutOutcome] = [:]
 
+    /// HMAC-SHA256 constructor — the pre-M87 production path.
+    ///
+    /// Still supported (and still the default for in-process ledgers
+    /// that don't need cross-verifier integrity), but for new
+    /// production deployments prefer `init(ed25519KeyPair:
+    /// signingNamespace:)` so verifiers can re-check entries without
+    /// holding the signing secret. See `BASSovereignEd25519Signing.swift`
+    /// for the full rationale.
     public init(
         signingSecret: SymmetricKey,
         signingNamespace: String = BASSovereignTrustConstants.signingNamespace
     ) {
-        self.signingSecret = signingSecret
+        self.signingMode = .hmac(signingSecret)
         self.signingNamespace = signingNamespace
     }
 
-    /// Convenience factory that derives a deterministic secret from a
-    /// string seed. Useful for tests and for bootstrap when a secure
-    /// keyring is not yet available. **Not appropriate for production**
-    /// unless the seed is itself high-entropy and stored in the keychain.
+    /// M87 — Ed25519 constructor for production cross-verifier
+    /// integrity.
+    ///
+    /// A ledger built with this init produces entries whose
+    /// signatures can be checked by any verifier holding only the
+    /// matching public key (see `BASSovereignAuditLedger.verify(
+    /// _:publicKey:signingNamespace:)`). The private key stays in
+    /// the ledger — no verifier needs to see it. This is the
+    /// production-grade signing path.
+    public init(
+        ed25519KeyPair: BASSovereignEd25519KeyPair,
+        signingNamespace: String = BASSovereignTrustConstants.signingNamespace
+    ) {
+        self.signingMode = .ed25519(ed25519KeyPair)
+        self.signingNamespace = signingNamespace
+    }
+
+    /// Convenience factory that derives a deterministic HMAC secret
+    /// from a string seed. Useful for tests and for bootstrap when
+    /// a secure keyring is not yet available. **Not appropriate for
+    /// production** unless the seed is itself high-entropy and
+    /// stored in the keychain. For production prefer the Ed25519
+    /// path — see `withEd25519Seed(_:)` for a deterministic test
+    /// fixture in that mode or call
+    /// `init(ed25519KeyPair: BASSovereignEd25519KeyPair.generate())`
+    /// for a fresh production key.
     public static func withSeed(
         _ seed: String,
         namespace: String = BASSovereignTrustConstants.signingNamespace
     ) -> BASSovereignAuditLedger {
         let secret = SymmetricKey(data: SHA256.hash(data: Data(seed.utf8)))
         return BASSovereignAuditLedger(signingSecret: secret, signingNamespace: namespace)
+    }
+
+    /// M87 — convenience factory that derives a deterministic
+    /// Ed25519 key pair from a string seed (via
+    /// `BASSovereignEd25519KeyPair.fromSeed(_:)`). Test-only — same
+    /// warning as `withSeed(_:)`: low-entropy seeds are attackable.
+    /// For production use `generate()` + keychain storage.
+    public static func withEd25519Seed(
+        _ seed: String,
+        namespace: String = BASSovereignTrustConstants.signingNamespace
+    ) throws -> BASSovereignAuditLedger {
+        let pair = try BASSovereignEd25519KeyPair.fromSeed(seed)
+        return BASSovereignAuditLedger(
+            ed25519KeyPair: pair,
+            signingNamespace: namespace)
     }
 
     // MARK: - Append
@@ -184,17 +260,37 @@ public actor BASSovereignAuditLedger {
 
         let priorHash = entries.last?.selfHash ?? Self.genesisHash
         let canonical = canonicalBytes(for: draft, priorHash: priorHash)
-        let computedSignature = sign(canonical)
 
-        // Verify or install the signature. If the caller provided one we
-        // require it to match what we would have computed; otherwise we
-        // install ours. Either way the stored entry ends up with a valid
-        // signature bound to the chain position.
+        // M87 — sign/verify dispatch on mode. HMAC is deterministic
+        // so byte-equality works for caller-supplied signatures.
+        // Ed25519 is non-deterministic in CryptoKit (fault-attack
+        // entropy), so caller-supplied signatures must be verified
+        // cryptographically with the public key, NOT by recomputing
+        // a fresh signature and comparing bytes (which would
+        // spuriously reject every valid caller-supplied signature
+        // under Ed25519).
         var sealed = draft
         if sealed.signature.isEmpty {
-            sealed.signature = computedSignature
-        } else if sealed.signature != computedSignature {
-            throw LedgerError.signatureMismatch(auditID: sealed.auditID)
+            sealed.signature = sign(canonical)
+        } else {
+            switch signingMode {
+            case .hmac:
+                let computedSignature = sign(canonical)
+                guard sealed.signature == computedSignature else {
+                    throw LedgerError.signatureMismatch(auditID: sealed.auditID)
+                }
+            case .ed25519(let keyPair):
+                guard let sigData = Data(
+                    base64Encoded: sealed.signature)
+                else {
+                    throw LedgerError.signatureMismatch(auditID: sealed.auditID)
+                }
+                guard keyPair.publicKey.isValidSignature(
+                    sigData, for: canonical)
+                else {
+                    throw LedgerError.signatureMismatch(auditID: sealed.auditID)
+                }
+            }
         }
 
         let selfHash = hash(canonical)
@@ -252,9 +348,32 @@ public actor BASSovereignAuditLedger {
                 throw LedgerError.chainIntegrityBroken(lastVerifiedAuditID: lastClean)
             }
             let canonical = canonicalBytes(for: appended.entry, priorHash: appended.priorHash)
-            let expectedSignature = sign(canonical)
-            guard appended.entry.signature == expectedSignature else {
-                throw LedgerError.chainIntegrityBroken(lastVerifiedAuditID: lastClean)
+            // M87 — signature verification must dispatch on signing
+            // mode. HMAC is deterministic (recompute-and-compare
+            // works); Ed25519 is NOT deterministic in CryptoKit
+            // (Apple adds fault-attack entropy to the nonce on top
+            // of RFC 8032's baseline), so each re-sign of the same
+            // message yields a DIFFERENT signature. For Ed25519 we
+            // therefore verify with `publicKey.isValidSignature(_:
+            // for:)` against the stored signature, which is the
+            // canonical verification primitive for the scheme.
+            switch signingMode {
+            case .hmac:
+                let expectedSignature = sign(canonical)
+                guard appended.entry.signature == expectedSignature else {
+                    throw LedgerError.chainIntegrityBroken(lastVerifiedAuditID: lastClean)
+                }
+            case .ed25519(let keyPair):
+                guard let sigData = Data(
+                    base64Encoded: appended.entry.signature)
+                else {
+                    throw LedgerError.chainIntegrityBroken(lastVerifiedAuditID: lastClean)
+                }
+                guard keyPair.publicKey.isValidSignature(
+                    sigData, for: canonical)
+                else {
+                    throw LedgerError.chainIntegrityBroken(lastVerifiedAuditID: lastClean)
+                }
             }
             let expectedSelfHash = hash(canonical)
             guard appended.selfHash == expectedSelfHash else {
@@ -514,27 +633,36 @@ public actor BASSovereignAuditLedger {
         for entry: BASSovereignAuditEntry,
         priorHash: String
     ) -> Data {
-        let fields: [String] = [
-            entry.schemaVersion,
-            entry.auditID,
-            entry.sessionID,
-            entry.turnID,
-            entry.verdictRef,
-            entry.ruleIDs.joined(separator: ","),
-            entry.signalRefs.joined(separator: ","),
-            entry.actionRefs.joined(separator: ","),
-            entry.snapshotRef,
-            entry.actor.rawValue,
-            String(Int(entry.appendedAt.timeIntervalSince1970 * 1000)),
-            priorHash,
-            signingNamespace
-        ]
-        return Data(fields.joined(separator: "|").utf8)
+        // M87 — delegate to the package-level shared helper so the
+        // static `verify(_:publicKey:signingNamespace:)` path and the
+        // instance `sign(_:)` path share exactly one byte-layout
+        // definition. A desync between the two was the #1 risk of
+        // adding a static verifier; routing both sites through
+        // `basSovereignAuditCanonicalBytes` closes that risk.
+        basSovereignAuditCanonicalBytes(
+            for: entry,
+            priorHash: priorHash,
+            signingNamespace: signingNamespace)
     }
 
     private func sign(_ data: Data) -> String {
-        let mac = HMAC<SHA256>.authenticationCode(for: data, using: signingSecret)
-        return Data(mac).base64EncodedString()
+        // M87 — dispatch on the active signing mode. Ed25519 is
+        // deterministic (RFC 8032: the nonce is derived from the
+        // message + private key, not random), so recompute-and-
+        // compare in `verifyChainIntegrity()` stays byte-exact. HMAC
+        // path is the pre-M87 behaviour retained for backward compat.
+        switch signingMode {
+        case .hmac(let key):
+            let mac = HMAC<SHA256>.authenticationCode(for: data, using: key)
+            return Data(mac).base64EncodedString()
+        case .ed25519(let keyPair):
+            // `signature(for:)` is non-throwing on
+            // `Curve25519.Signing.PrivateKey`; returns the raw
+            // 64-byte signature which we base64 to share the same
+            // storage shape as HMAC.
+            let sig = (try? keyPair.privateKey.signature(for: data)) ?? Data()
+            return sig.base64EncodedString()
+        }
     }
 
     private func hash(_ data: Data) -> String {
