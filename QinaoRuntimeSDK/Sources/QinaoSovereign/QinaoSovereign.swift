@@ -1295,6 +1295,59 @@ public actor QinaoSovereignControlPlane {
             forSession: sessionID, turn: turnID)
     }
 
+    /// M103 — append a `permit:issued` audit entry for a permit the
+    /// risk gate just issued. This is the sovereign-side half of
+    /// the M99 `QinaoRiskGate.PermitEventRecorder` pipeline: M99
+    /// lets the gate invoke a caller-provided closure on every
+    /// successful permit issue; M103 provides the concrete
+    /// closure-body that writes the entry into the L14 audit chain.
+    ///
+    /// The entry is signed and hash-chained with the rest of the
+    /// ledger, so any post-facto audit can cryptographically
+    /// prove that every live permit has a matching audit record.
+    /// Fail-closed semantics: if the append throws (signature
+    /// failure, invalid entry), the error propagates — the M99
+    /// recorder re-raises out of `requestActionPermit`, and the
+    /// caller never receives the permit. This is the "append 失败
+    /// 立刻 halt" contract the plan §T8 calls for.
+    ///
+    /// Input is plain primitive types — no `QinaoRisk.ActionPermit`
+    /// type leaks across the module boundary. The composition
+    /// layer (`QinaoRuntime.makePermitEventRecorder`) does the
+    /// permit → primitive projection at the bridge site.
+    ///
+    /// - Parameters:
+    ///   - permitID: the permit's stable ID.
+    ///   - sessionID: the session the permit was issued against.
+    ///   - digest: the action-intent digest the permit is bound to.
+    ///   - reasonCodes: the reason codes the risk assessment
+    ///     carried.
+    ///   - issuedAt: the permit's issuedAt timestamp.
+    public func recordPermitIssued(
+        permitID: String,
+        sessionID: String,
+        digest: String,
+        reasonCodes: [String],
+        issuedAt: Date
+    ) async throws {
+        // The ledger requires non-empty sessionID + verdictRef.
+        // Build them deterministically from the permit identity.
+        let verdictRef = "permit:issued:\(permitID)"
+        let draft = BASSovereignAuditEntry(
+            auditID: verdictRef,
+            sessionID: sessionID,
+            turnID: "permit-issuance",
+            verdictRef: verdictRef,
+            ruleIDs: ["permit:issued"],
+            signalRefs: reasonCodes,
+            actionRefs: [digest],
+            snapshotRef: "permit-event",
+            actor: .system,
+            signature: "",  // ledger will sign internally
+            appendedAt: issuedAt)
+        _ = try await auditLedger.append(draft)
+    }
+
     /// Read back a coverage reading previously recorded via
     /// `recordTurnCoverage`. Returns `nil` when no reading has been
     /// recorded for the given `(session, turn)` pair.
