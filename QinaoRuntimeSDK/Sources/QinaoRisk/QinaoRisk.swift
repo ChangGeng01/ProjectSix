@@ -170,14 +170,43 @@ public actor QinaoRiskGate {
     private let permitTTL: TimeInterval
     private let defaultDelaySeconds: TimeInterval
     private let now: @Sendable () -> Date
+    private let permitEventRecorder: PermitEventRecorder?
+
+    /// M99 — callback fired AFTER a permit is successfully issued
+    /// but BEFORE it is returned to the caller. Designed to let the
+    /// L14 audit ledger record a `permit:issued` event so every
+    /// permit that reaches the caller has a durable audit trail.
+    ///
+    /// Fail-closed semantics: if the recorder throws, the permit
+    /// is NOT returned to the caller. The error propagates out of
+    /// `requestActionPermit`. This prevents a permit from escaping
+    /// into the wild without its audit entry landing — the very
+    /// failure mode T8 in the l2-silly-piglet plan calls out
+    /// ("ledger append failure must halt").
+    ///
+    /// Optional: tests and legacy call sites default to `nil`, which
+    /// preserves pre-M99 behavior byte-for-byte — permits issue
+    /// exactly as before with no recorder call.
+    ///
+    /// The closure is isolated to the Qinao composition layer
+    /// (QinaoRuntime) for reasons of architectural hygiene — keeping
+    /// `QinaoRisk` free of a direct `BASSovereign` import maintains
+    /// the four-layer nesting model. The composition layer holds
+    /// the actual `BASSovereignAuditLedger` reference and adapts it
+    /// into this closure shape.
+    public typealias PermitEventRecorder = @Sendable (
+        ActionPermit
+    ) async throws -> Void
 
     public init(
         permitTTLSeconds: TimeInterval = 30,
         defaultDelaySeconds: TimeInterval = 60,
+        permitEventRecorder: PermitEventRecorder? = nil,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.permitTTL = permitTTLSeconds
         self.defaultDelaySeconds = defaultDelaySeconds
+        self.permitEventRecorder = permitEventRecorder
         self.now = now
     }
 
@@ -191,7 +220,8 @@ public actor QinaoRiskGate {
         signals: RiskSignals
     ) async throws -> ActionPermit {
         let assessment = Self.assess(signals)
-        return try issuePermit(for: intent, assessment: assessment)
+        return try await issuePermit(
+            for: intent, assessment: assessment)
     }
 
     /// Zero-signal overload — defaults to `RiskSignals.safe`
@@ -234,7 +264,8 @@ public actor QinaoRiskGate {
             signals,
             worldAssessment: worldAssessment,
             worldContext: worldContext)
-        return try issuePermit(for: intent, assessment: assessment)
+        return try await issuePermit(
+            for: intent, assessment: assessment)
     }
 
     /// Verify a permit is live for a given intent.
@@ -415,11 +446,11 @@ public actor QinaoRiskGate {
     private func issuePermit(
         for intent: ActionIntent,
         assessment: RiskAssessment
-    ) throws -> ActionPermit {
+    ) async throws -> ActionPermit {
         switch assessment.mode {
         case .allow:
             let issuedAt = now()
-            return ActionPermit(
+            let permit = ActionPermit(
                 permitID: "permit-\(UUID().uuidString)",
                 digest: intent.digest,
                 sessionID: intent.sessionID,
@@ -427,6 +458,15 @@ public actor QinaoRiskGate {
                 reasonCodes: assessment.reasonCodes,
                 issuedAt: issuedAt,
                 expiresAt: issuedAt.addingTimeInterval(permitTTL))
+            // M99 — fail-closed audit recording. If a recorder is
+            // wired, it MUST succeed before the permit reaches the
+            // caller. Any recorder error propagates out so the
+            // caller never receives a permit whose audit entry
+            // failed to land.
+            if let recorder = permitEventRecorder {
+                try await recorder(permit)
+            }
+            return permit
         case .block:
             throw RiskError.denied(
                 reason: assessment.reasonCodes.joined(separator: ","))
