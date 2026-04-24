@@ -357,7 +357,8 @@ public actor QinaoRuntime {
         turnDurationSeconds: Double? = nil,
         additionalCoverageSummaries: [BASObservationCoverageSummary]?
             = nil,
-        surfaceRetryPolicy: SurfaceRetryPolicy = .default
+        surfaceRetryPolicy: SurfaceRetryPolicy = .default,
+        contextFrame: BASContextFrame? = nil
     ) async throws -> TurnOutcome {
         // Pre-flight: refuse if the session was already halted.
         if await sovereign.isSessionHalted(observations.sessionID) {
@@ -536,6 +537,31 @@ public actor QinaoRuntime {
             combined.append(l5Bundle.coverageSummary)
             finalAdditionalSummaries = combined
             autoInjectedLayerCodes.append("L5")
+        }
+
+        // M134 — L6 presenceEye auto-stream. Unlike L3/L5 (which
+        // can be derived from always-present state: observations
+        // for L3, host pipeline for L5), L6 requires a real
+        // `BASContextFrame` carrying the turn's utterance + scene
+        // + emotional weather + urgency truth + manipulation
+        // trace. Fabricating one with neutral zeros would emit
+        // meaningless observations that pollute the ledger, so
+        // L6 streams ONLY when the caller passes a contextFrame
+        // — this is the same "opt-in via lifecycle/budget" pattern
+        // M121 established for L1. Callers that want L6 in the
+        // ledger pass their real frame; callers that don't see
+        // backward-compat identity behavior (no L6 bundle, no
+        // ["L6"] expansion).
+        if let ctxFrame = contextFrame {
+            let l6Bundle = BASPresenceObservationBundle.derive(
+                from: ctxFrame,
+                turnID: observations.turnID,
+                sessionID: observations.sessionID,
+                emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l6Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L6")
         }
 
         // Expand the expectation set only when the caller accepted
