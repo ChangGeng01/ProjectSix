@@ -1812,6 +1812,26 @@ public actor QinaoSovereignControlPlane {
         /// and a new segment opens anchored to the last clean
         /// entry.
         case rotateSegmentOnBreak(reason: String)
+        /// M143 — 4th whitepaper L14 §5 action: halt + produce
+        /// a `RollbackPlan` for each affected session via the
+        /// existing `requestRollback(sessionID:fromVersionID:)`
+        /// path. The plans are not AUTO-COMMITTED — that would
+        /// violate invariant #3 — but they're cached in the
+        /// coordinator's plan cache and their IDs are surfaced
+        /// in the outcome's `rollbackPlanIDs[]`, so the host can
+        /// inspect / approve / execute them.
+        ///
+        /// `hostVersionID` is the "from" version applied to every
+        /// affected session (typical case: all sessions live in
+        /// the same host version). Per-session versions require
+        /// the caller to run the policy N times with different
+        /// single-session affected lists.
+        ///
+        /// `reason` is recorded in each session's halt reason with
+        /// the prefix `"chain-break-rollback:"`.
+        case rollbackToLastClean(
+            reason: String,
+            hostVersionID: String)
     }
 
     /// M133 — structured outcome of `autoHealChainIntegrity(...)`.
@@ -1823,32 +1843,36 @@ public actor QinaoSovereignControlPlane {
     {
         /// `true` when the chain was intact at heal-time (no
         /// break). A healthy chain means no recovery action was
-        /// taken; `haltedSessionIDs` and `rotatedSegmentIDs` are
-        /// both empty in this case.
+        /// taken; `haltedSessionIDs` / `rotatedSegmentIDs` /
+        /// `rollbackPlanIDs` are all empty in this case.
         public let wasHealthy: Bool
         /// Short action tag — one of `"noop"` (healthy) /
         /// `"halt"` / `"quarantine"` / `"rotate"` /
-        /// `"unknown-error"`. Stable raw strings so tests and
-        /// audit replay can dispatch on them.
+        /// `"rollback"` / `"unknown-error"`. Stable raw strings
+        /// so tests and audit replay can dispatch on them.
         public let action: String
         /// From the ledger's integrity check: audit ID of the
         /// last clean entry before the break. `nil` when the
         /// chain is healthy OR when the break is at genesis.
         public let lastVerifiedAuditID: String?
         /// Sessions the recovery marked as halted. For `.haltOnly`
-        /// and `.quarantineAffectedSessions(_:)` this equals
-        /// the input `affectedSessionIDs`; for
-        /// `.rotateSegmentOnBreak(_:)` same, but the
-        /// rotation step is in addition.
+        /// / `.quarantineAffectedSessions(_)` this equals the
+        /// input `affectedSessionIDs`; other policies halt AND
+        /// take a follow-up action.
         public let haltedSessionIDs: [String]
         /// Segment IDs that were successfully closed by the
         /// rotation path. Empty for `.haltOnly` /
-        /// `.quarantineAffectedSessions(_:)` (they don't rotate).
-        /// For `.rotateSegmentOnBreak(_:)`: one segment ID per
-        /// session that had an open segment at heal-time (others
-        /// are silently skipped — a session with nothing to
-        /// rotate has nothing to close).
+        /// `.quarantineAffectedSessions(_)` (they don't rotate);
+        /// non-empty only on `.rotateSegmentOnBreak(_)`.
         public let rotatedSegmentIDs: [String]
+        /// M143 — rollback plan IDs produced for each affected
+        /// session under the `.rollbackToLastClean(_:_)` policy.
+        /// Non-empty only when the policy is
+        /// `.rollbackToLastClean(...)`. Each plan ID can be fed
+        /// to `coordinator.executeReboot(planID:)` by a host that
+        /// wants to actually apply the rollback; the recovery
+        /// path itself does NOT commit.
+        public let rollbackPlanIDs: [String]
         public let emittedAt: Date
 
         public init(
@@ -1857,6 +1881,7 @@ public actor QinaoSovereignControlPlane {
             lastVerifiedAuditID: String?,
             haltedSessionIDs: [String],
             rotatedSegmentIDs: [String],
+            rollbackPlanIDs: [String] = [],
             emittedAt: Date
         ) {
             self.wasHealthy = wasHealthy
@@ -1864,6 +1889,7 @@ public actor QinaoSovereignControlPlane {
             self.lastVerifiedAuditID = lastVerifiedAuditID
             self.haltedSessionIDs = haltedSessionIDs
             self.rotatedSegmentIDs = rotatedSegmentIDs
+            self.rollbackPlanIDs = rollbackPlanIDs
             self.emittedAt = emittedAt
         }
     }
@@ -1927,23 +1953,33 @@ public actor QinaoSovereignControlPlane {
     ) async -> ChainBreakRecoveryOutcome {
         var halted: [String] = []
         var rotated: [String] = []
+        var rollbackPlans: [String] = []
         let action: String
         let reason: String
         let shouldRotate: Bool
+        let rollbackVersionID: String?
 
         switch policy {
         case .haltOnly:
             action = "halt"
             reason = "chain-break:halt"
             shouldRotate = false
+            rollbackVersionID = nil
         case .quarantineAffectedSessions(let r):
             action = "quarantine"
             reason = "chain-break-quarantine:" + r
             shouldRotate = false
+            rollbackVersionID = nil
         case .rotateSegmentOnBreak(let r):
             action = "rotate"
             reason = "chain-break-rotate:" + r
             shouldRotate = true
+            rollbackVersionID = nil
+        case .rollbackToLastClean(let r, let hostVersionID):
+            action = "rollback"
+            reason = "chain-break-rollback:" + r
+            shouldRotate = false
+            rollbackVersionID = hostVersionID
         }
 
         for sid in affectedSessionIDs {
@@ -1972,6 +2008,24 @@ public actor QinaoSovereignControlPlane {
                     // silently skip them. Halt still applies.
                 }
             }
+            if let versionID = rollbackVersionID {
+                // M143 — best-effort rollback plan production.
+                // The plan is cached in the coordinator's
+                // planCache; host must explicitly approve +
+                // execute. Coordinator may throw if the host
+                // version has no snapshot anchor / no known-good
+                // ancestor / is unknown — skip those sessions.
+                do {
+                    let plan = try await requestRollback(
+                        sessionID: sid,
+                        fromVersionID: versionID)
+                    rollbackPlans.append(plan.planID)
+                } catch {
+                    // Best effort. Skipped sessions are still
+                    // halted; host can retry after resolving
+                    // version state.
+                }
+            }
         }
 
         return ChainBreakRecoveryOutcome(
@@ -1980,6 +2034,7 @@ public actor QinaoSovereignControlPlane {
             lastVerifiedAuditID: lastVerifiedAuditID,
             haltedSessionIDs: halted,
             rotatedSegmentIDs: rotated,
+            rollbackPlanIDs: rollbackPlans,
             emittedAt: now())
     }
 
